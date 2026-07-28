@@ -1,0 +1,196 @@
+{
+  "protocol": "Extended Port Multiplexing Protocol (EPMP)",
+  "version": "1.0.0",
+  "service_port": 64444,
+  "description": "Port 64444 services the multiplexing of port addresses for ports beyond the standard 2^16 (65536) range, extending addressable port space to 30 quintillion (30,000,000,000,000,000,000).",
+  "extended_port_range": {
+    "min": 0,
+    "max": "30000000000000000000",
+    "max_numeric": 30000000000000000000,
+    "legacy_range": "0-65535",
+    "extended_range": "65536-30000000000000000000",
+    "addressing_bits": 65,
+    "note": "Ports 0-65535 remain directly addressable via standard TCP/UDP headers. Ports above 65535 require multiplexing through port 64444."
+  },
+  "discovery": {
+    "trigger": {
+      "description": "Send a single ASCII character '1' or the string '1s' to port 64444 to receive this protocol specification.",
+      "request_bytes_single": "0x31",
+      "request_bytes_stream": "0x31 0x73",
+      "transport": "TCP"
+    },
+    "response_format": "application/json",
+    "response": "This entire JSON document is returned upon receiving '1' or '1s'."
+  },
+  "handshake": {
+    "phase_1_key_exchange": {
+      "algorithm": "Diffie-Hellman",
+      "minimum_bits": 2048,
+      "recommended_bits": 4096,
+      "group": "RFC 3526 Group 14 (2048-bit) or Group 16 (4096-bit)",
+      "description": "Initial key exchange uses Diffie-Hellman to establish a shared secret. This shared secret is used to encrypt the subsequent RSA public key exchange.",
+      "steps": [
+        {
+          "step": 1,
+          "direction": "client -> server",
+          "action": "Client sends DH public value (g^a mod p)",
+          "field": "dh_client_public",
+          "encoding": "base64"
+        },
+        {
+          "step": 2,
+          "direction": "server -> client",
+          "action": "Server sends DH public value (g^b mod p)",
+          "field": "dh_server_public",
+          "encoding": "base64"
+        },
+        {
+          "step": 3,
+          "direction": "both",
+          "action": "Both parties compute shared secret (g^ab mod p)",
+          "field": "dh_shared_secret",
+          "derived_key": "AES-256 key derived via HKDF-SHA256 from shared secret"
+        }
+      ]
+    },
+    "phase_2_rsa_exchange": {
+      "algorithm": "RSA",
+      "minimum_bits": 2048,
+      "recommended_bits": 4096,
+      "padding": "OAEP-SHA256",
+      "signature": "PSS-SHA256",
+      "description": "After DH key exchange, RSA public keys are exchanged encrypted under the DH-derived AES key. All subsequent communication uses RSA encryption.",
+      "steps": [
+        {
+          "step": 4,
+          "direction": "client -> server",
+          "action": "Client sends RSA public key, encrypted with DH-derived AES-256 key",
+          "field": "rsa_client_pubkey_encrypted",
+          "encoding": "base64",
+          "inner_format": "DER/PKCS#8"
+        },
+        {
+          "step": 5,
+          "direction": "server -> client",
+          "action": "Server sends RSA public key, encrypted with DH-derived AES-256 key",
+          "field": "rsa_server_pubkey_encrypted",
+          "encoding": "base64",
+          "inner_format": "DER/PKCS#8"
+        },
+        {
+          "step": 6,
+          "direction": "server -> client",
+          "action": "Server sends session confirmation signed with server RSA private key",
+          "field": "session_confirm",
+          "signature_field": "session_confirm_sig"
+        }
+      ]
+    },
+    "phase_3_data_mode_negotiation": {
+      "description": "Client declares whether subsequent data will be sent as raw (unencrypted) or encrypted (RSA-encrypted). This selection applies to the payload of extended port data frames.",
+      "steps": [
+        {
+          "step": 7,
+          "direction": "client -> server",
+          "action": "Client sends data mode selection",
+          "field": "data_mode",
+          "values": {
+            "raw": {
+              "code": 0,
+              "description": "Client will send raw/plaintext data. Server trusts the DH+RSA handshake authenticated the client. No per-message encryption applied to payloads.",
+              "use_case": "High-throughput scenarios where authentication is sufficient and confidentiality is handled at another layer (e.g., VPN, physical security)."
+            },
+            "encrypted": {
+              "code": 1,
+              "description": "Client will send RSA-encrypted data for each message. Each payload is encrypted with the server's RSA public key.",
+              "use_case": "Standard secure communication where per-message confidentiality is required."
+            },
+            "hybrid": {
+              "code": 2,
+              "description": "Client will send AES-256-GCM encrypted data using a session key derived from the RSA exchange. RSA encrypts only the session key.",
+              "use_case": "Balanced performance and security for large payloads."
+            }
+          }
+        },
+        {
+          "step": 8,
+          "direction": "server -> client",
+          "action": "Server acknowledges data mode and confirms session is ready",
+          "field": "mode_ack",
+          "value": true
+        }
+      ]
+    }
+  },
+  "extended_port_frame": {
+    "description": "After handshake completes, the client sends frames through port 64444 that are demultiplexed to the target extended port.",
+    "header": {
+      "magic": "0x45504D50",
+      "magic_ascii": "EPMP",
+      "version": 1,
+      "target_port": {
+        "type": "uint64",
+        "description": "The extended port number (0 to 30,000,000,000,000,000,000) to route this frame to",
+        "bytes": 8
+      },
+      "source_port": {
+        "type": "uint64",
+        "description": "The client's extended source port for return routing",
+        "bytes": 8
+      },
+      "payload_length": {
+        "type": "uint64",
+        "description": "Length of the payload in bytes",
+        "bytes": 8
+      },
+      "flags": {
+        "type": "uint16",
+        "bits": {
+          "0": "encrypted (0=raw, 1=encrypted per negotiated mode)",
+          "1": "fragmented (more fragments follow)",
+          "2": "final_fragment",
+          "3": "priority",
+          "4-7": "reserved",
+          "8-15": "sequence_high_bits"
+        }
+      },
+      "sequence": {
+        "type": "uint32",
+        "description": "Frame sequence number for ordering and reassembly"
+      },
+      "checksum": {
+        "type": "uint32",
+        "algorithm": "CRC-32C",
+        "description": "Integrity check over header + payload"
+      }
+    },
+    "total_header_bytes": 42,
+    "max_payload_bytes": 65507,
+    "note": "Frames larger than max_payload_bytes must be fragmented using the fragmented/final_fragment flags."
+  },
+  "error_codes": {
+    "0x00": "SUCCESS",
+    "0x01": "INVALID_PORT - Target port out of range",
+    "0x02": "PORT_UNREACHABLE - No service listening on target extended port",
+    "0x03": "HANDSHAKE_FAILED - Key exchange did not complete",
+    "0x04": "DECRYPTION_ERROR - Could not decrypt payload",
+    "0x05": "SEQUENCE_ERROR - Out-of-order frame detected",
+    "0x06": "CHECKSUM_MISMATCH - Frame integrity check failed",
+    "0x07": "MODE_MISMATCH - Payload encryption does not match negotiated mode",
+    "0x08": "SESSION_EXPIRED - Re-handshake required",
+    "0x09": "RATE_LIMITED - Too many requests"
+  },
+  "security_considerations": [
+    "Port 64444 MUST be protected by host firewall (UFW/iptables/nftables) rules.",
+    "DH parameters MUST be at least 2048 bits; 4096 bits recommended.",
+    "RSA keys MUST be at least 2048 bits; 4096 bits recommended.",
+    "Session timeout: 3600 seconds (1 hour) of inactivity triggers re-handshake.",
+    "Failed handshake attempts rate-limited to 5 per minute per source IP.",
+    "Raw data mode should only be used within trusted network segments."
+  ],
+  "firewall_integration": {
+    "ufw_example": "ufw allow 64444/tcp comment 'EPMP Port Multiplexer'",
+    "iptables_example": "iptables -A INPUT -p tcp --dport 64444 -j ACCEPT",
+    "nftables_example": "nft add rule inet filter input tcp dport 64444 accept"
+  }
+}

@@ -34,8 +34,8 @@ static int three __maybe_unused = 3;
 static int four = 4;
 static int thousand = 1000;
 static int tcp_retr1_max = 255;
-static int ip_local_port_range_min[] = { 1, 1 };
-static int ip_local_port_range_max[] = { 65535, 65535 };
+static u64 ip_local_port_range_min[] = { 1, 1 };
+static u64 ip_local_port_range_max[] = { 30000000000000000000ULL, 30000000000000000000ULL };
 static int tcp_adv_win_scale_min = -31;
 static int tcp_adv_win_scale_max = 31;
 static int tcp_app_win_max = 31;
@@ -58,7 +58,7 @@ static u32 fib_multipath_hash_fields_all_mask __maybe_unused =
 static int sysctl_tcp_low_latency __read_mostly;
 
 /* Update system visible IP port range */
-static void set_local_port_range(struct net *net, int range[2])
+static void set_local_port_range(struct net *net, u64 range[2])
 {
 	bool same_parity = !((range[0] ^ range[1]) & 1);
 

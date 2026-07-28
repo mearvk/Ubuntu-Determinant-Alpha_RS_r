@@ -19,7 +19,7 @@ struct fib_table;
 struct sock;
 struct local_ports {
 	seqlock_t	lock;
-	int		range[2];
+	u64		range[2];	/* Extended port range: supports up to 30 quintillion (30,000,000,000,000,000,000) */
 	bool		warned;
 };
 

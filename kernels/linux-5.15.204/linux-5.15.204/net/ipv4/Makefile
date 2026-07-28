@@ -18,6 +18,12 @@ obj-y     := route.o inetpeer.o protocol.o \
 
 obj-$(CONFIG_BPFILTER) += bpfilter/
 
+# Extended Port Multiplexing Protocol (EPMP) - port 64444 service
+obj-$(CONFIG_EPMP) += epmp.o
+
+# Heuristic Port Monitor (HPM) - three-pipe security pipeline
+obj-$(CONFIG_HPM) += hpm.o
+
 obj-$(CONFIG_NET_IP_TUNNEL) += ip_tunnel.o
 obj-$(CONFIG_SYSCTL) += sysctl_net_ipv4.o
 obj-$(CONFIG_PROC_FS) += proc.o
