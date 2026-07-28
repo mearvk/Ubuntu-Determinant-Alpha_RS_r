@@ -12,7 +12,7 @@ Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 # Ubuntu Determinant Alpha RS
 
-A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, and per-user kernel objects.
+A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, and the White Ethics Installer Grade.
 
 ---
 
@@ -30,7 +30,9 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 10. [Terminal Chat System](#terminal-chat-system)
 11. [Cron Callback Extension](#cron-callback-extension)
 12. [Per-User Kernel Objects (Memory Grain)](#per-user-kernel-objects-memory-grain)
-13. [Certificates](#certificates)
+13. [CPU Boost Designation](#cpu-boost-designation)
+14. [White Ethics Installer Grade](#white-ethics-installer-grade)
+15. [Certificates](#certificates)
 
 ---
 
@@ -697,6 +699,119 @@ kernel/user_ko.c   - Kernel module (~450 lines)
 ```
 
 Admin: `/proc/user_ko/{status, modules}`
+
+---
+
+## CPU Boost Designation
+
+Per-process CPU frequency boost, designated by Grade 7+ administrators after program installation. Designated processes run at boost frequency rather than power-conserving cycles.
+
+### Boost Levels
+
+| Level | Name | Behavior |
+|-------|------|----------|
+| 0 | OFF | Normal governor (power-conserving default) |
+| 1 | PREFER | Soft hint — prefer high frequency when scheduled |
+| 2 | FORCE | Pin to maximum base frequency for duration |
+| 3 | TURBO | Boost beyond base maximum (turbo/overclock if supported) |
+
+### Usage
+
+```bash
+# Designate a program for boost (Grade 7+ required):
+sudo touch system cpuboost-enable /usr/bin/postgres
+
+# Or via proc interface:
+echo "/usr/bin/postgres 2" > /proc/cpuboost/designate
+
+# View designated programs:
+cat /proc/cpuboost/list
+
+# System status:
+cat /proc/cpuboost/status
+
+# Remove designation:
+echo "/usr/bin/postgres" > /proc/cpuboost/remove
+
+# Disable all boost system-wide:
+echo 0 > /proc/cpuboost/toggle
+```
+
+### Why Grade 7+
+
+- Boost increases power consumption and thermal load
+- Affects system-wide power budget on remote servers
+- Impacts hardware longevity under sustained use
+- Should be a deliberate architectural decision by a qualified admin
+
+### Files
+
+```
+kernel/cpuboost.c  - Kernel module (~400 lines)
+```
+
+Admin: `/proc/cpuboost/{status, list, designate, remove, toggle}`
+
+---
+
+## White Ethics Installer Grade
+
+A system-level presence that covers the software in a careful aura of elegance and future. The base user classes are protected by the installer's position of status and even.
+
+### Properties
+
+| Property | Meaning |
+|----------|---------|
+| Careful | Nothing is hasty or reckless in this system's design |
+| Brave | The system confronts real problems directly |
+| Heuristic | The system learns, adapts, and improves with time |
+| Elegant | Form follows function, cleanly and without waste |
+| Future-facing | Built for what comes next, not just what is now |
+| Calming | The system radiates steadiness; the creatures feel calmed |
+
+### The Glow Cycle
+
+The system glows white for **2 hours** from time to time (every 8–36 hours, naturally timed). During the glow, the system asserts its health, ethics, and forward presence.
+
+```bash
+cat /proc/white_ethics/glow       # Current glow state
+cat /proc/white_ethics/status     # Installer grade declaration
+```
+
+**During glow:**
+```
+◉ GLOWING WHITE
+  The system is careful.
+  The system is brave.
+  The system is heuristic.
+  Our future is careful, brave, and heuristic.
+  The creatures feel calmed.
+```
+
+**At rest:**
+```
+◯ At rest (between glow cycles)
+  Ethics remain active. Elegance persists.
+```
+
+### Installer Status
+
+The White Ethics Installer Grade certifies:
+- The person who installed this system has ethical standing
+- The installation was performed with care and good method
+- The system's users are protected by that care
+- The system radiates the installer's intent forward in time
+
+**Status:** earned through work and method.
+**Even:** balanced, steady, not reactive.
+
+### Files
+
+```
+kernel/white_ethics.c  - Kernel module
+```
+
+Admin: `/proc/white_ethics/{status, glow}`
 
 ---
 
