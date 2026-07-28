@@ -7,3 +7,475 @@ Owner of Establishment of Corporate ongoing Finance - US United States a Ministe
 Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 ![Profile views](https://views.igorkowalczyk.dev/api/badge/@mearvk?style=flat)
+
+---
+
+# Ubuntu Determinant Alpha RS
+
+A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, and USB dynamic RAM expansion.
+
+---
+
+## Table of Contents
+
+1. [Extended Port Range (30 Quintillion)](#extended-port-range)
+2. [Port 64444 Multiplexer (EPMP)](#epmp---extended-port-multiplexing-protocol)
+3. [Heuristic Port Monitor (HPM)](#heuristic-port-monitor)
+4. [sudo_gate — Graded Privilege System](#sudo_gate--graded-privilege-system)
+5. [Extended Permission Classes (Trusted & Genius)](#extended-permission-classes)
+6. [USB Dynamic RAM Expansion](#usb-dynamic-ram-expansion)
+7. [USB Hardware-Direct DMA Optimization](#usb-hardware-direct-dma-optimization)
+
+---
+
+## Extended Port Range
+
+The standard TCP/UDP port range (0–65535, 16 bits) has been extended to **30 quintillion** (30,000,000,000,000,000,000) using 64-bit port addressing.
+
+### Changes
+
+| File | Modification |
+|------|-------------|
+| `include/net/netns/ipv4.h` | `struct local_ports` range widened from `int[2]` to `u64[2]` |
+| `include/net/ip.h` | `inet_get_local_port_range()` signature → `u64*` |
+| `net/ipv4/inet_connection_sock.c` | Function implementation updated for `u64` |
+| `net/ipv4/sysctl_net_ipv4.c` | Port max raised from 65535 to 30,000,000,000,000,000,000 |
+
+### How It Works
+
+- Ports 0–65535 remain directly addressable via standard TCP/UDP headers
+- Ports 65536–30 quintillion are addressed via the EPMP multiplexer on port 64444
+- The `ip_local_port_range` sysctl now accepts the full 64-bit range
+
+---
+
+## EPMP — Extended Port Multiplexing Protocol
+
+**Service Port: 64444 (TCP)**
+
+Port 64444 multiplexes traffic to extended ports beyond 2^16. It provides protocol specification discovery, key exchange, and frame routing.
+
+### Discovery
+
+Send `1` or `1s` (ASCII) to TCP port 64444 → receive full protocol specification as JSON.
+
+### Handshake Protocol
+
+| Phase | Algorithm | Minimum Bits | Purpose |
+|-------|-----------|-------------|---------|
+| 1 | Diffie-Hellman | 2048 (4096 recommended) | Initial shared secret establishment |
+| 2 | RSA | 2048 (4096 recommended) | Public key exchange, session authentication |
+| 3 | Mode Negotiation | — | Client selects: raw (0), encrypted (1), or hybrid (2) |
+
+### Handshake Steps
+
+1. Client → Server: DH public value (g^a mod p)
+2. Server → Client: DH public value (g^b mod p)
+3. Both compute shared secret → derive AES-256 key via HKDF-SHA256
+4. Client → Server: RSA public key (encrypted with DH-derived AES)
+5. Server → Client: RSA public key (encrypted with DH-derived AES)
+6. Server → Client: Session confirmation (RSA-signed)
+7. Client → Server: Data mode selection (raw/encrypted/hybrid)
+8. Server → Client: Mode acknowledgment — session established
+
+### EPMP Frame Header (42 bytes)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| magic | uint32 | `0x45504D50` ("EPMP") |
+| version | uint8 | Protocol version |
+| target_port | uint64 | Destination extended port (0–30 quintillion) |
+| source_port | uint64 | Client return port |
+| payload_length | uint64 | Payload size in bytes |
+| flags | uint16 | encrypted, fragmented, final_fragment, priority |
+| sequence | uint32 | Frame ordering |
+| checksum | uint32 | CRC-32C integrity |
+
+### Files
+
+```
+net/ipv4/epmp.c                  - Kernel module (TCP listener, state machine)
+net/ipv4/port_mux_spec.json      - Protocol spec (served on discovery)
+net/ipv4/port_mux_spec_inline.h  - Spec as C string literal
+net/ipv4/Kconfig                 - CONFIG_EPMP
+```
+
+### Firewall
+
+```bash
+ufw allow 64444/tcp comment 'EPMP Port Multiplexer'
+iptables -A INPUT -p tcp --dport 64444 -j ACCEPT
+nft add rule inet filter input tcp dport 64444 accept
+```
+
+---
+
+## Heuristic Port Monitor
+
+A three-stage security pipeline for all ports (0 through extended range) with data safety review at each stage.
+
+### Architecture
+
+```
+Incoming Packet
+      │
+      ▼
+┌─────────────────────────────────────────────┐
+│  PIPE 1: Protocol Framing Analysis          │
+│  HTTP, FTP, TLS, raw buffer, malformed      │
+│  ★ SAFETY CHECKPOINT 1 (score 0-100)       │
+└─────────────────────┬───────────────────────┘
+                      ▼
+┌─────────────────────────────────────────────┐
+│  PIPE 2: Behavioral Heuristics              │
+│  Stealth, DoS, scan, temporal anomaly       │
+│  ★ SAFETY CHECKPOINT 2 (score 0-100)       │
+└─────────────────────┬───────────────────────┘
+                      ▼
+┌─────────────────────────────────────────────┐
+│  PIPE 3: Response Graphing & Reversal       │
+│  IDS inversion, admin identity, correlation │
+│  ★ SAFETY CHECKPOINT 3 (score 0-100)       │
+└─────────────────────┬───────────────────────┘
+                      ▼
+               ACCEPT or DROP
+```
+
+### Threat Detection
+
+| Concern | Method |
+|---------|--------|
+| Stealth packets | TCP flag analysis (NULL/XMAS/FIN/SYN+FIN/SYN+RST scans) |
+| DoS | Rate threshold per source IP per sliding window |
+| Port scanning | Distinct ports touched exceeding threshold |
+| IDS used backwards | Response latency pattern analysis — detects rule boundary mapping |
+| Wrong port at wrong hour | Temporal profile — flags privilege ports outside expected hours |
+| Wrong person | Admin identity verification by IP subnet + time window |
+
+### Admin Controls
+
+```bash
+cat /proc/hpm/status       # View state and statistics
+echo 1 > /proc/hpm/toggle  # Activate monitor
+echo 0 > /proc/hpm/toggle  # Deactivate monitor (dormant)
+cat /proc/hpm/log          # View recent threat log
+```
+
+### Files
+
+```
+net/ipv4/hpm.c    - Kernel module (~700 lines)
+net/ipv4/Kconfig  - CONFIG_HPM
+net/ipv4/Makefile - Build entry
+```
+
+---
+
+## sudo_gate — Graded Privilege System
+
+A wrapper for `/usr/bin/sudo` that enforces an 8-level privilege grading system. Standard sudo behavior is preserved for routine operations (grades 1–6). Critical and irreversible operations require explicit gate invocations.
+
+### Privilege Grades
+
+| Grade | Attitude | Scope | Invocation |
+|-------|----------|-------|------------|
+| 1 | Routine | `ls`, `ps`, `cat`, `ping`, `df` | `sudo <cmd>` |
+| 2 | Operational | `systemctl`, `journalctl`, `dmesg` | `sudo <cmd>` |
+| 3 | Maintenance | `apt install`, `useradd`, `chmod` | `sudo <cmd>` |
+| 4 | Network | `iptables` (add), `ufw allow`, `ip addr` | `sudo <cmd>` |
+| 5 | Storage | `mount`, `fdisk`, `lvextend` | `sudo <cmd>` |
+| 6 | Kernel | `sysctl -w`, `modprobe`, `insmod` | `sudo <cmd>` |
+| 7 | **Critical System** | `visudo`, `passwd root`, `/etc/shadow`, `grub-install` | `sudo touch system <cmd>` |
+| 8 | **Gate (irreversible)** | `dd`, `iptables -F`, `rm -rf /`, `mkfs`, SELinux policy | `sudo touch system gate <cmd>` |
+
+### Examples
+
+```bash
+# Grades 1-6: standard sudo
+sudo systemctl restart nginx
+sudo apt install htop
+sudo modprobe vfio
+
+# Grade 7: requires "touch system"
+sudo touch system visudo
+sudo touch system passwd root
+sudo touch system vim /etc/fstab
+
+# Grade 8: requires "touch system gate"
+sudo touch system gate dd if=/dev/zero of=/dev/sda
+sudo touch system gate iptables -F
+sudo touch system gate rm -rf /var/lib/important
+```
+
+### System Constitution
+
+- Standard `sudo` works for 90% of daily operations (grades 1–6)
+- The extra words (`touch system`, `touch system gate`) are friction by design
+- Friction is proportional to the danger of the action
+- A careful admin knows which gate to use deliberately
+- Audit trail is mandatory for grades 7–8
+
+### Installation
+
+```bash
+cd tools/sudo_gate && make && sudo make install
+```
+
+### Files
+
+```
+tools/sudo_gate/sudo_gate.c     - Wrapper binary (~400 lines)
+tools/sudo_gate/sudo_gate.conf  - Configuration
+tools/sudo_gate/Makefile         - Build/install/uninstall
+tools/sudo_gate/README.md        - Detailed documentation
+```
+
+---
+
+## Extended Permission Classes
+
+Adds two permission classes above traditional UNIX owner/group/others:
+
+### The Five-Class Model
+
+| Class | Name | Behavior | Audit |
+|-------|------|----------|-------|
+| 1 | Owner | Standard UNIX permission bits | Full |
+| 2 | Group | Standard UNIX permission bits | Full |
+| 3 | Others | Standard UNIX permission bits | Full |
+| **4** | **Trusted** | Bypasses DAC entirely | Light (access counter). Simple to trace. |
+| **5** | **Genius** | Bypasses DAC freely | Not an audit item. Supreme-tier logged for institutional record. |
+
+### Philosophy
+
+- **Class 4 (Trusted):** Has established alignment with system integrity. Does not need permission checks. Simple to audit after the fact — their work is transparent. Would never contort access or abuse authorship lines. Communicates clearly and delivers reliably.
+
+- **Class 5 (Genius):** Works freely FOR the system to mutual or better profit. Not an audit item under normal circumstances — has graduated from auditor class/course. Does not involve down to concepts of restriction. Access to supreme-tier resources (kernel, crypto, boot, CA) is logged for institutional record only. A good auditor reviews this as system evolution, not investigation.
+
+- **Neither class has difficulty** with contortion of access patterns, supply of author lines, or delinear system concerns. The system enables and trusts wholly from and to this brand of personal type.
+
+### Permission Check Order
+
+```
+1. Is user GENIUS (class 5)?  → GRANT (log supreme-tier for record)
+2. Is user TRUSTED (class 4)? → GRANT (light audit trail)
+3. Is user OWNER?             → standard owner bits (rwx------)
+4. Is user in GROUP?          → standard group bits (---rwx---)
+5. OTHERS                     → standard other bits (------rwx)
+```
+
+### Access Tier Logging (Genius Only)
+
+| Tier | Resources | Logged? |
+|------|-----------|---------|
+| 0 - Routine | Home dirs, tmp, user files | No |
+| 1 - Elevated | /etc configs, /opt, /srv | No |
+| 2 - High | /etc/shadow, sudoers, firewall | No |
+| 3 - Supreme | Kernel modules, crypto keys, boot, CA | Yes (auditor record) |
+
+### Administration
+
+```bash
+# Register a Trusted person (class 4)
+echo "1000 4 alice" > /proc/eperm/register
+
+# Register a Genius person (class 5)
+echo "1001 5 bob" > /proc/eperm/register
+
+# View registry
+cat /proc/eperm/persons
+
+# View genius institutional log
+cat /proc/eperm/genius_log
+
+# View system philosophy and config
+cat /proc/eperm/config
+```
+
+### Integration
+
+Hooked into `generic_permission()` in `fs/namei.c`. Called before standard DAC checks. Standard UNIX permissions remain entirely unchanged for all non-registered users.
+
+### Files
+
+```
+include/linux/eperm.h           - Header (class definitions, API)
+security/eperm/eperm.c          - Core module (~450 lines)
+security/eperm/eperm_hook.c     - Integration documentation
+security/eperm/Kconfig          - CONFIG_SECURITY_EPERM
+security/eperm/Makefile         - Build rules
+security/Kconfig                - Modified (sources eperm)
+security/Makefile               - Modified (builds eperm)
+fs/namei.c                      - Modified (hook before DAC)
+```
+
+---
+
+## USB Dynamic RAM Expansion
+
+Automatically detects USB mass storage on hotplug and creates a swap pagefile for dynamic RAM expansion. Keeps remote server costs down by using USB 3.0+ storage as overflow memory.
+
+### How It Works
+
+```
+USB Storage Plugged In
+        │
+        ▼
+┌────────────────────────┐
+│ Speed Classification   │  USB 3.1+ = excellent (~1 GB/s)
+│                        │  USB 3.0  = good (~400 MB/s)
+│                        │  USB 2.0  = emergency (~35 MB/s)
+└───────────┬────────────┘  USB 1.x  = rejected
+            ▼
+┌────────────────────────┐
+│ Safety Check           │  Has partitions → DON'T TOUCH
+│                        │  Has filesystem → DON'T TOUCH
+│                        │  Has our signature → reuse
+└───────────┬────────────┘  Blank → prepare
+            ▼
+┌────────────────────────┐
+│ Prepare Pagefile       │  Write swap header (kernel mkswap)
+│ 80% of device, capped  │  Up to 256GB per device
+└───────────┬────────────┘
+            ▼
+┌────────────────────────┐
+│ Activate Swap          │  swapon with speed-based priority
+└───────────┬────────────┘  System has additional virtual memory
+            ▼
+┌────────────────────────┐
+│ Health Monitor         │  Every 60s: check errors, connection
+│                        │  > 16 I/O errors = auto-disable
+└────────────────────────┘
+
+USB Removed → swapoff (migrate pages) → clean disconnect
+```
+
+### Cost Savings
+
+| Approach | Cost |
+|----------|------|
+| 256GB ECC RAM sticks | $800–2000/server |
+| 256GB USB 3.1 SSD | $25–50/drive |
+| Redundant USB array | $75–150 total |
+
+### Usage
+
+```bash
+modprobe usbswap                          # Load module
+# Plug in USB 3.0+ drive → auto-activated
+cat /proc/usbswap/status                  # Check status
+echo /dev/sdb > /proc/usbswap/prepare    # Manual preparation
+```
+
+### Module Parameters
+
+```bash
+modprobe usbswap auto_activate=1 default_priority=-5 max_size_pct=80 min_speed=2
+```
+
+### Files
+
+```
+drivers/usb/storage/usbswap.c   - Module (~500 lines)
+drivers/usb/storage/Kconfig     - CONFIG_USB_SWAP
+drivers/usb/storage/Makefile    - Build entry
+```
+
+---
+
+## USB Hardware-Direct DMA Optimization
+
+Maximizes USB transfer throughput by keeping software out of the hardware's DMA path.
+
+### Key Insight
+
+The xHCI USB controller is a DMA engine. Once the doorbell register is written, the controller autonomously:
+1. Reads TRBs from the Transfer Ring (DMA)
+2. Moves data to/from host memory (DMA)
+3. Writes completion to Event Ring (DMA)
+4. Fires interrupt ONLY on the final TRB (`TRB_IOC`)
+
+**Software is NOT in the data path.** The optimization ensures we don't re-insert it unnecessarily.
+
+### Transfer Modes
+
+| Mode | Mechanism | Use Case |
+|------|-----------|----------|
+| **Batched** | N URBs, `URB_NO_INTERRUPT` on all but last | Default. One interrupt per batch. |
+| **Polled** | Zero interrupts, CPU spin-waits | Single-page swap-in (lowest latency) |
+| **Streaming** | Continuous DMA, minimal CPU touch | High-throughput sustained writes |
+
+### Performance Impact
+
+```
+Standard (per-page interrupt):
+  256 pages → 256 interrupts → 256 context switches
+  Overhead: ~256 × 5µs = 1.28ms wasted
+
+Batched (final-only interrupt):
+  256 pages → 1 interrupt → 1 context switch
+  Overhead: ~5µs total
+
+Polled (zero interrupt, single page):
+  Standard: submit → sleep → IRQ → wake → switch → done (~20-50µs overhead)
+  Polled:   submit → cpu_relax() → done (~0.5µs overhead)
+```
+
+### Integration with USB Pagefile
+
+| Operation | Method | Rationale |
+|-----------|--------|-----------|
+| Swap-out (batch) | `usbfast_sg_page_transfer()` | Background, throughput > latency |
+| Swap-in (single page) | `usbfast_bulk_transfer_polled()` | Process waiting, latency critical |
+| Readahead | `usbfast_sg_page_transfer()` | Prefetch, batch efficiency |
+
+### API
+
+```c
+/* Batched: one interrupt for entire multi-page transfer */
+int usbfast_bulk_transfer_batched(struct usb_device *dev, unsigned int pipe,
+                                  void *data, size_t len,
+                                  size_t *actual, int timeout);
+
+/* Polled: zero interrupts, spin-wait for completion */
+int usbfast_bulk_transfer_polled(struct usb_device *dev, unsigned int pipe,
+                                 void *data, size_t len,
+                                 size_t *actual, int timeout_us);
+
+/* Scatter-gather: multi-page in single hardware operation */
+int usbfast_sg_page_transfer(struct usb_device *dev, unsigned int pipe,
+                             struct page **pages, unsigned int nr_pages,
+                             size_t *actual, int timeout);
+```
+
+### Files
+
+```
+drivers/usb/storage/usbdma_fast.c  - Optimization module (~500 lines)
+drivers/usb/storage/Kconfig        - CONFIG_USB_FAST_DMA
+drivers/usb/storage/Makefile       - Build entry
+```
+
+---
+
+## Build Configuration
+
+Enable all extensions in your kernel `.config`:
+
+```
+CONFIG_EPMP=m
+CONFIG_HPM=m
+CONFIG_SECURITY_EPERM=m
+CONFIG_USB_SWAP=m
+CONFIG_USB_FAST_DMA=m
+```
+
+## License
+
+Kernel extensions: GPL-2.0
+sudo_gate: GPL-2.0
+
+## Copyright
+
+Copyright (C) 2026 MEARVK LLC
+Author: Maximilian Eric Alexander Rupplin von Keffikon

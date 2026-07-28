@@ -48,3 +48,6 @@ ums-usbat-y		:= shuttle_usbat.o
 
 # USB Dynamic RAM Expansion - auto-pagefile on USB hotplug
 obj-$(CONFIG_USB_SWAP)		+= usbswap.o
+
+# USB Hardware-Direct DMA Transfer Optimization
+obj-$(CONFIG_USB_FAST_DMA)	+= usbdma_fast.o

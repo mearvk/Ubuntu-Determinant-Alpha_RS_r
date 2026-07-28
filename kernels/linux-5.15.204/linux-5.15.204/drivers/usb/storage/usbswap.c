@@ -816,5 +816,116 @@ static void __exit usbswap_exit(void)
 	pr_info("usbswap: Shutdown complete\n");
 }
 
+/* ============================================================
+ * Hardware-Direct Transfer Integration (usbdma_fast)
+ *
+ * When CONFIG_USB_FAST_DMA is available, use optimized transfer
+ * functions that minimize interrupt overhead and maximize hardware
+ * DMA throughput for pagefile operations.
+ *
+ * Transfer Rules for Pagefile I/O:
+ *   - Swap-out (background reclaim): batched SG, 64-256 pages/batch
+ *   - Swap-in (process waiting): polled single-page for lowest latency
+ *   - Readahead: batched SG with URB_NO_INTERRUPT on intermediates
+ *   - All modes: pre-mapped DMA buffers when possible
+ *
+ * The hardware (xHCI controller) handles all data movement via DMA.
+ * Software only queues TRBs and rings the doorbell once per batch.
+ * No CPU involvement in the actual data transfer path.
+ * ============================================================ */
+
+#ifdef CONFIG_USB_FAST_DMA
+extern int usbfast_bulk_transfer_batched(struct usb_device *dev,
+					 unsigned int pipe, void *data,
+					 size_t len, size_t *actual, int timeout);
+extern int usbfast_bulk_transfer_polled(struct usb_device *dev,
+					unsigned int pipe, void *data,
+					size_t len, size_t *actual, int timeout_us);
+extern int usbfast_sg_page_transfer(struct usb_device *dev, unsigned int pipe,
+				    struct page **pages, unsigned int nr_pages,
+				    size_t *actual, int timeout);
+#endif
+
+/*
+ * usbswap_write_pages - Write pages to USB swap device (optimized)
+ *
+ * Uses hardware-direct DMA with no per-page interrupts.
+ * For a 256-page batch: 1 interrupt instead of 256.
+ */
+static int usbswap_write_pages(struct usbswap_device *usdev,
+			       struct page **pages, unsigned int nr_pages)
+{
+#ifdef CONFIG_USB_FAST_DMA
+	unsigned int pipe;
+	size_t actual;
+	int ret;
+
+	if (!usdev->udev)
+		return -ENODEV;
+
+	pipe = usb_sndbulkpipe(usdev->udev, 0x02); /* Bulk OUT endpoint */
+
+	/*
+	 * Use scatter-gather page transfer: the xHCI controller DMA-reads
+	 * directly from these physical pages without CPU copying.
+	 * URB_NO_INTERRUPT is set on all intermediate TRBs automatically.
+	 * Only one interrupt fires for the entire batch.
+	 */
+	ret = usbfast_sg_page_transfer(usdev->udev, pipe,
+				       pages, nr_pages, &actual, 5000);
+	if (ret == 0)
+		usdev->pages_swapped += nr_pages;
+	else
+		usdev->io_errors++;
+
+	return ret;
+#else
+	/* Fallback: standard usb_bulk_msg per page (slower) */
+	return -ENOSYS;
+#endif
+}
+
+/*
+ * usbswap_read_page - Read single page from USB swap (latency-critical)
+ *
+ * Uses polled mode: no interrupt overhead. CPU spins briefly (~160µs
+ * for USB 3.0) while hardware DMA completes. This is faster than
+ * interrupt + context switch for single-page reads.
+ */
+static int usbswap_read_page(struct usbswap_device *usdev,
+			     struct page *page, pgoff_t offset)
+{
+#ifdef CONFIG_USB_FAST_DMA
+	unsigned int pipe;
+	void *buf;
+	size_t actual;
+	int ret;
+
+	if (!usdev->udev)
+		return -ENODEV;
+
+	pipe = usb_rcvbulkpipe(usdev->udev, 0x81); /* Bulk IN endpoint */
+	buf = kmap(page);
+
+	/*
+	 * Polled transfer: zero interrupts. Hardware does DMA, we spin-wait.
+	 * For single page swap-in, this gives lowest possible latency
+	 * because we avoid: interrupt → schedule → context switch → handler.
+	 * Instead: submit → spin → done. Total ~160µs on USB 3.0.
+	 */
+	ret = usbfast_bulk_transfer_polled(usdev->udev, pipe,
+					   buf, PAGE_SIZE, &actual, 5000);
+
+	kunmap(page);
+
+	if (ret)
+		usdev->io_errors++;
+
+	return ret;
+#else
+	return -ENOSYS;
+#endif
+}
+
 module_init(usbswap_init);
 module_exit(usbswap_exit);

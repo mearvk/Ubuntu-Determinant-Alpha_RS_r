@@ -219,3 +219,27 @@ config USB_SWAP
 	  Prepare: echo /dev/sdX > /proc/usbswap/prepare
 
 	  If unsure, say N.
+
+config USB_FAST_DMA
+	tristate "USB Hardware-Direct DMA Transfer Optimization"
+	depends on USB && USB_STORAGE
+	help
+	  Provides optimized USB bulk transfer functions that minimize
+	  interrupt overhead and maximize hardware DMA throughput.
+
+	  Three transfer modes:
+	    Batched:   Multiple URBs with only final-interrupt (default)
+	    Polled:    Zero interrupts, CPU polls for completion
+	    Streaming: Continuous DMA pipeline, minimal CPU involvement
+
+	  The xHCI controller processes entire TRB chains via DMA without
+	  CPU intervention. This module ensures software stays out of the
+	  hardware's fast path by:
+	    - Setting URB_NO_INTERRUPT on intermediate URBs
+	    - Pre-mapping DMA buffers (avoids per-transfer map/unmap)
+	    - Using scatter-gather for multi-page transfers
+	    - Optional polling mode for latency-critical paths
+
+	  Used by USB_SWAP (usbswap) for pagefile I/O optimization.
+
+	  If unsure, say N.
