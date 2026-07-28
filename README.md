@@ -1,6 +1,6 @@
 MearvK Ltd - MEARVK LLC
 
-Maximlian Eric Alexander Rupplin von Keffikon - MEARVK - MEARVK LLC
+Maximilian Eric Alexander Rupplin von Keffikon - MEARVK - MEARVK LLC
 
 Owner of Establishment of Corporate ongoing Finance - US United States a Minister
 
