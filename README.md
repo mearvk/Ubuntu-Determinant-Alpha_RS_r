@@ -12,7 +12,7 @@ Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 # Ubuntu Determinant Alpha RS
 
-A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, and USB dynamic RAM expansion.
+A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, and per-user kernel objects.
 
 ---
 
@@ -25,6 +25,12 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 5. [Extended Permission Classes (Trusted & Genius)](#extended-permission-classes)
 6. [USB Dynamic RAM Expansion](#usb-dynamic-ram-expansion)
 7. [USB Hardware-Direct DMA Optimization](#usb-hardware-direct-dma-optimization)
+8. [System Accounts & nnet Identity](#system-accounts--nnet-identity)
+9. [NEGAMANE — Immutable Filesystem Brand](#negamane--immutable-filesystem-brand)
+10. [Terminal Chat System](#terminal-chat-system)
+11. [Cron Callback Extension](#cron-callback-extension)
+12. [Per-User Kernel Objects (Memory Grain)](#per-user-kernel-objects-memory-grain)
+13. [Certificates](#certificates)
 
 ---
 
@@ -432,17 +438,14 @@ Polled (zero interrupt, single page):
 ### API
 
 ```c
-/* Batched: one interrupt for entire multi-page transfer */
 int usbfast_bulk_transfer_batched(struct usb_device *dev, unsigned int pipe,
                                   void *data, size_t len,
                                   size_t *actual, int timeout);
 
-/* Polled: zero interrupts, spin-wait for completion */
 int usbfast_bulk_transfer_polled(struct usb_device *dev, unsigned int pipe,
                                  void *data, size_t len,
                                  size_t *actual, int timeout_us);
 
-/* Scatter-gather: multi-page in single hardware operation */
 int usbfast_sg_page_transfer(struct usb_device *dev, unsigned int pipe,
                              struct page **pages, unsigned int nr_pages,
                              size_t *actual, int timeout);
@@ -458,6 +461,257 @@ drivers/usb/storage/Makefile       - Build entry
 
 ---
 
+## System Accounts & nnet Identity
+
+### Accounts
+
+| UID | Account | Class | Role |
+|-----|---------|-------|------|
+| 0 | root | (kernel) | Raw superuser |
+| 1000 | mearvk | Genius (5) | State installer. System architect and principal author. |
+| 1001 | admin | Trusted (4) | Operational administrator. More normal than root by trade terms. |
+| 1002 | truth | Genius (5) | Mental clarity and system dynamism. |
+| 1003 | laura | Genius (5) | Backdoor for God and her Means. |
+| 1004 | tropper | Trusted (4) | Software methods, integrability, vertical integration. |
+
+### nnet / nnot — Identity Query Tool
+
+Each user has a "hobby hole" — a RAM-backed identity space (4–44 MB) that grows with adequacy and functional tenure.
+
+```bash
+nnet                    # Show your own profile
+nnot mearvk             # Query another user's profile
+cd /var/lib/nnet/mearvk && cat identity
+```
+
+Contains: IQ rank, ethical rank, years worked, keys/importances, noble RAM space allocation, functional grade.
+
+### TechID Root Installers
+
+Two installer TechIDs reside in kernel-adjacent space:
+- **TechID: mearvk - Installer Tech 2** — Exact technical reference (kernel install, boot, bare metal)
+- **TechID: mearvk - State Medical Reference** — System health, diagnostics, wellness certification
+
+### Files
+
+```
+tools/accounts/provision_accounts.sh  - Account creation script
+tools/nnet/nnet.c                     - Query tool
+tools/nnet/Makefile                   - Build
+tools/nnet/provision_nnet_data.sh     - Identity data provisioning
+```
+
+---
+
+## NEGAMANE — Immutable Filesystem Brand
+
+A persistent immutability treatment for files and directories. Once branded, a path cannot be altered, deleted, or created into. Only Grade 7+ admin can release.
+
+Clear for use by US Citizens into and from the Year 2502 and forward. Starting now. Year 2602+ as According to George Soros (US Trust and recognized time and score keeper in the US presently) and his enterprises.
+
+### Usage
+
+```bash
+negamane /home/user/important/       # Brand as immutable
+negamane --check /path/              # Check if branded
+negamane --flag /path/ health        # Set treatment flag
+negamane --access /path/ 4           # Set read access grade
+
+# Release (Grade 7+ only):
+sudo touch system negamane-release /path/
+```
+
+### Protection
+
+| Operation | Effect |
+|-----------|--------|
+| Read | ✓ Always allowed |
+| Write | ✗ Denied |
+| Delete | ✗ Denied |
+| Create into | ✗ Denied |
+| Rename/Move | ✗ Denied |
+| Release | Grade 7+ admin only |
+
+### Treatment Flags
+
+Owners can "treat" their protected files with intent flags:
+
+| Flag | Domain | Meaning |
+|------|--------|---------|
+| `read` | Proximity | Active read interest |
+| `refresh` | Proximity | Periodic update intended |
+| `concern` | Proximity | Under ongoing attention |
+| `maintain` | Proximity | Has an active steward |
+| `degree` | Proximity | Represents accomplishment |
+| `control` | Proximity | Control document (policy canon) |
+| `realize` | Proximity | Plan being implemented |
+| `interrupt` | Proximity | Requires attention now |
+| `health` | Social | Pertains to health |
+| `county` | Social | County-level administration |
+| `heritage` | Social | Cultural/historical value |
+| `public-interest` | Social | Serves the public interest |
+| `workflow` | Administrative | Part of active workflow |
+| `audit-ready` | Administrative | Prepared for audit |
+| `training` | Administrative | Curriculum material |
+| `standard` | Administrative | Reference specification |
+| `evolving` | Growth | Growing body of work |
+| `shared` | Growth | Intended for sharing |
+| `mentor` | Growth | For mentorship |
+| `seed` | Growth | Starting point for growth |
+
+### Access Control
+
+Owner sets minimum sudo grade for others to read:
+
+| Level | Who Can Read |
+|-------|-------------|
+| 0 | Public (anyone) |
+| 1-3 | Routine/operational staff |
+| 4-5 | Network/storage admins |
+| 6 | Kernel-level staff |
+| 7-8 | Critical/gate admin only |
+
+### Files
+
+```
+fs/negamane/negamane.c         - Kernel module
+fs/negamane/negamane_flags.h   - Treatment flags
+fs/negamane/Kconfig            - CONFIG_NEGAMANE
+fs/negamane/Makefile           - Build
+tools/negamane/negamane        - Userspace command
+```
+
+---
+
+## Terminal Chat System
+
+Local messaging between system users with persistent groups.
+
+```bash
+chat                          # Status and recent messages
+chat send mearvk Hello!       # Direct message
+chat create engineering       # Create a group
+chat join engineering         # Join a group
+chat post engineering msg     # Post to group
+chat read engineering         # Read group messages
+chat groups                   # List groups
+chat who                      # Show users
+chat log                      # Personal inbox
+```
+
+No banning of system users. Everyone belongs. Filesystem-backed (`/var/lib/chat/`), persistent, no daemon required.
+
+### Files
+
+```
+tools/chat/chat.c    - Chat binary (~400 lines)
+tools/chat/Makefile  - Build/install
+```
+
+---
+
+## Cron Callback Extension
+
+Extends cronie with job callbacks, handler chains, retries, and admin notification.
+
+### Extended Crontab Syntax
+
+```crontab
+# Standard (unchanged):
+0 * * * * /usr/local/bin/backup.sh
+
+# With callbacks:
+0 2 * * * /usr/local/bin/backup.sh @callback {
+    expect: "Backup complete"
+    retry: 3
+    retry_delay: 60s
+    preconditions: "systemctl is-active nginx"
+    handler_secondary: /usr/local/bin/backup_alt.sh
+    handler_tertiary: /usr/local/bin/emergency_backup.sh
+    on_fail: escalate
+    notify: "chat:ops-team"
+    ram_check: 64MB
+    timeout: 30s
+}
+```
+
+### Execution Flow
+
+1. **Preconditions** — verify required services/files exist
+2. **RAM check** — ensure sufficient memory
+3. **Execute primary** → validate output → retry on failure
+4. **Escalate to secondary** → same validation
+5. **Escalate to tertiary** → last resort
+6. **Notify admin** — "mutable problem requires intervention"
+
+### Files
+
+```
+tools/cronie/                    - Full cronie source (from github.com/cronie-crond/cronie)
+tools/cronie/src/cron_callback.c - Callback extension
+tools/cronie/src/cron_callback.h - API header
+```
+
+---
+
+## Per-User Kernel Objects (Memory Grain)
+
+Allows users to load personal kernel objects according to a 3-tier memory grain model.
+
+### Memory Grains
+
+| Grain | Name | Who Can Load | Secure Boot | Max Size |
+|-------|------|-------------|-------------|----------|
+| **1** | User Space | Any user | Not affected | 4 MB |
+| **2** | Safety Space | Sudo rank 1+ | Not affected | 16 MB |
+| **3** | Kernel Space | Sudo rank 4+ | Standard verification | 64 MB |
+
+### Usage
+
+```bash
+user_ko load my_widget.ko --grain=1           # Any user
+sudo user_ko load metrics.ko --grain=2        # Sudo rank 1+
+sudo user_ko load driver.ko --grain=3         # Sudo rank 4+
+user_ko list                                   # Show loaded modules
+cat /proc/user_ko/status                       # System status
+```
+
+### Program Install Grain Claims
+
+```bash
+install --grain=1 my_tool          # User space (anyone)
+sudo install --grain=2 my_service  # Safety space (rank 1+)
+sudo install --grain=3 my_driver   # Kernel space (rank 4+)
+```
+
+### Key Points
+
+- **Grain 1-2 do NOT trigger secure boot verification** — loaded via sandbox path
+- **Users at sudo rank 1-8 are trusted** — grain is organizational, not adversarial
+- Safe boot does not prevent personal module loading
+
+### Files
+
+```
+kernel/user_ko.c   - Kernel module (~450 lines)
+```
+
+Admin: `/proc/user_ko/{status, modules}`
+
+---
+
+## Certificates
+
+Three permanent certificates embedded in all distributions (unaltered):
+
+1. **ICC Certificate of Pure and Excellent Method** — Methods are original, thorough, systematic. Backed by source code as evidence.
+2. **Certificate of Ethical Clear** — System does not deceive, surveil, or obstruct. Transparent and honest.
+3. **Brand of National Heritage** — USA national heritage, global competence and science. The software is dumbenent to its designer (owes its work to its careful author). Remainder to core principles: function, clarity, trust, service.
+
+Located at: `CERTIFICATES`
+
+---
+
 ## Build Configuration
 
 Enable all extensions in your kernel `.config`:
@@ -468,12 +722,14 @@ CONFIG_HPM=m
 CONFIG_SECURITY_EPERM=m
 CONFIG_USB_SWAP=m
 CONFIG_USB_FAST_DMA=m
+CONFIG_NEGAMANE=m
 ```
 
 ## License
 
 Kernel extensions: GPL-2.0
 sudo_gate: GPL-2.0
+Cronie: ISC (upstream)
 
 ## Copyright
 
