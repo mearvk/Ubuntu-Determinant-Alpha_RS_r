@@ -1,0 +1,88 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# pkg-info - Query the MySQL package registry
+#
+# Shows vital statistics and installer information for any installed package.
+#
+# Usage:
+#   pkg-info <package>              Show package details
+#   pkg-info --history <package>    Show install/upgrade history
+#   pkg-info --by <username>        Show packages installed by user
+#   pkg-info --grain <1|2|3>        Show packages at memory grain level
+#   pkg-info --recent [N]           Show N most recent installations
+#   pkg-info --stats                Show system-wide statistics
+#
+# Copyright (C) 2026 MEARVK LLC
+
+MYSQL_SOCKET="/run/mysqld/mysqld.sock"
+MYSQL_DB="system_registry"
+
+query() {
+    mysql --socket="$MYSQL_SOCKET" -u root -D "$MYSQL_DB" -t -e "$1" 2>/dev/null
+}
+
+case "${1:-}" in
+    --history)
+        query "SELECT timestamp, action, version, username, sudo_rank, method
+               FROM install_log WHERE package_name='$2' ORDER BY timestamp DESC LIMIT 20;"
+        ;;
+    --by)
+        query "SELECT name, version, install_time, memory_grain, install_method
+               FROM packages WHERE installed_by='$2' AND is_active=TRUE
+               ORDER BY install_time DESC;"
+        ;;
+    --grain)
+        query "SELECT name, version, installed_by, install_time
+               FROM packages WHERE memory_grain=$2 AND is_active=TRUE
+               ORDER BY name;"
+        ;;
+    --recent)
+        local n="${2:-20}"
+        query "SELECT name, version, installed_by, installed_rank, install_time, memory_grain
+               FROM packages WHERE is_active=TRUE
+               ORDER BY install_time DESC LIMIT $n;"
+        ;;
+    --stats)
+        echo "═══ Package Registry Statistics ═══"
+        query "SELECT
+                 COUNT(*) as total_packages,
+                 SUM(is_active) as active,
+                 SUM(NOT is_active) as removed,
+                 SUM(memory_grain=1) as grain_1,
+                 SUM(memory_grain=2) as grain_2,
+                 SUM(memory_grain=3) as grain_3,
+                 ROUND(SUM(installed_size)/1024/1024, 1) as total_size_mb
+               FROM packages;"
+        echo ""
+        echo "═══ Top Installers ═══"
+        query "SELECT installed_by, COUNT(*) as packages, MAX(installed_rank) as max_rank
+               FROM packages WHERE is_active=TRUE
+               GROUP BY installed_by ORDER BY packages DESC LIMIT 10;"
+        ;;
+    --help|-h)
+        echo "pkg-info — Query the MySQL package registry"
+        echo ""
+        echo "Usage:"
+        echo "  pkg-info <package>           Show package details"
+        echo "  pkg-info --history <pkg>     Install/upgrade history"
+        echo "  pkg-info --by <user>         Packages by installer"
+        echo "  pkg-info --grain <1|2|3>     Packages at grain level"
+        echo "  pkg-info --recent [N]        Recent installations"
+        echo "  pkg-info --stats             System-wide statistics"
+        ;;
+    "")
+        echo "Usage: pkg-info <package> or pkg-info --help"
+        ;;
+    *)
+        # Default: show package details
+        echo "═══ Package: $1 ═══"
+        query "SELECT name, version, architecture, section, priority,
+                      installed_by, installed_uid, installed_rank,
+                      install_method, install_time, memory_grain,
+                      ROUND(installed_size/1024, 1) as size_kb,
+                      is_upgrade, previous_version, auto_installed,
+                      homepage
+               FROM packages WHERE name='$1' AND is_active=TRUE;"
+        ;;
+esac
