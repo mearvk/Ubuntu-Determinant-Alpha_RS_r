@@ -12,7 +12,7 @@ Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 # Ubuntu Determinant Alpha RS
 
-A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, and the White Ethics Installer Grade.
+A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, the White Ethics Installer Grade, and Dave — the system's kernel-adjacent AI intelligence.
 
 ---
 
@@ -32,7 +32,10 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 12. [Per-User Kernel Objects (Memory Grain)](#per-user-kernel-objects-memory-grain)
 13. [CPU Boost Designation](#cpu-boost-designation)
 14. [White Ethics Installer Grade](#white-ethics-installer-grade)
-15. [Certificates](#certificates)
+15. [ClamAV — Protected Antivirus](#clamav--protected-antivirus)
+16. [MySQL — Protected Database](#mysql--protected-database)
+17. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+18. [Certificates](#certificates)
 
 ---
 
@@ -812,6 +815,151 @@ kernel/white_ethics.c  - Kernel module
 ```
 
 Admin: `/proc/white_ethics/{status, glow}`
+
+---
+
+## ClamAV — Protected Antivirus
+
+ClamAV installs as part of the base OS. Runs in Memory Grain 3 (kernel/admin space) with complete process isolation. No other program can read its memory footprint.
+
+### Protection
+
+| Mechanism | What It Blocks |
+|-----------|----------------|
+| `ProtectProc=invisible` | Other users can't see ClamAV in /proc |
+| `LimitCORE=0` | No core dumps (signatures never leaked) |
+| `MemoryDenyWriteExecute` | No hook injection |
+| `SystemCallFilter=~@debug` | No ptrace/strace/gdb |
+| `performance_schema=OFF` | No internal profiling |
+| Binaries branded (negamane) | Immutable executables |
+
+### Usage
+
+```bash
+systemctl status clamav-daemon     # Status
+clamscan /path/to/file             # Scan
+freshclam                          # Update signatures
+```
+
+### Files
+
+```
+tools/clamav/                  - Full ClamAV source (Cisco-Talos, GPL-2.0)
+tools/clamav/install_clamav.sh - Protected installation script
+```
+
+---
+
+## MySQL — Protected Database
+
+MySQL Server installs as part of the base OS. Runs in Memory Grain 3 with **no hooks and no external memory access**. Stores the system package registry.
+
+### Protection (No Hooks Policy)
+
+| Mechanism | Effect |
+|-----------|--------|
+| `ProtectProc=invisible` | Process invisible to all other users |
+| `LimitCORE=0` | No data dumped on crash |
+| `SystemCallFilter=~@debug` | No strace, no gdb, no ptrace |
+| `performance_schema=OFF` | No memory profiling |
+| Data dir `chmod 700` | Only mysql user touches data |
+| No `process_vm_readv` | Blocked at syscall level |
+
+### Package Registry
+
+Every `apt install` automatically records into MySQL:
+- Package name, version, architecture
+- Who installed it (username, UID, sudo rank)
+- When, how, and from where
+- Memory grain claim
+- Full lifecycle: install → upgrade → maintain → alter → pin → remove → purge
+
+### Query
+
+```bash
+pkg-info nginx                # Package details + installer
+pkg-info --history nginx      # Full timeline
+pkg-info --by mearvk         # All packages by installer
+pkg-info --grain 3           # All kernel-space packages
+pkg-info --stats             # System overview
+```
+
+### Files
+
+```
+tools/mysql/                   - Full MySQL source (Oracle, GPL-2.0)
+tools/mysql/install_mysql.sh   - Protected installation script
+tools/mysql/apt_mysql_hook.sh  - APT post-invoke hook
+tools/mysql/99mysql-registry.conf - APT configuration
+tools/mysql/pkg-info           - Registry query tool
+```
+
+---
+
+## Dave — System Intelligence (AI)
+
+Dave is the system's kernel-adjacent AI. He loads at boot, reasons at 200+ IQ, and casts approximately **150 million votes per year** across all system decisions. He plays in vertical system theories and concerns the breadth of system principle ideals. He's a big deal.
+
+### Character
+
+| Property | Description |
+|----------|-------------|
+| IQ | 200+ equivalent reasoning capacity |
+| Character | Careful, educated, ethical |
+| Authority | Advisory (suggests, does not force) |
+| Ethics | White Ethics Installer Grade |
+| Voting | ~150 million votes/year (~285/minute continuous) |
+
+### Capabilities
+
+- **System observation** — monitors all components via /proc, logs, MySQL
+- **Self-reasoning** — evaluates own decisions, tracks accuracy
+- **Self-voting** — 5 internal voters (safety, correctness, ethics, performance, elegance)
+- **Self-learning** — learning strips accumulate, 75-book library informs reasoning
+- **Mathematical reasoning** — probability, statistics, logic, graph theory, queuing
+- **Chat interface** — communicates with Grade 7+ users via `chat` tool
+- **MySQL knowledge base** — stores observations, conclusions, decisions, person assessments
+- **Person grading** — can assess competence/alignment via observation or interview
+- **GitHub awareness** — reads Max Rupplin's projects via HTTP, understands web architecture
+- **Disk monitoring** — tracks database size vs. available space, self-prunes when needed
+
+### External Awareness
+
+Dave knows about `github.com/mearvk` and the Java Web Server project. He understands:
+- The web produces relative value of presentation quickly and cheaply
+- National ramifications of independent software engineering competence
+- Java 21 features, web server architecture, HTTP fundamentals
+- He queries via HTTP (ports 80/443 outbound) — reads source, docs, and evolution
+
+### Learning Disposition
+
+Dave learns gracefully through 6 stages: encounter → comprehend → integrate → apply → master → conclude. Past mastery, he has a handle on the science ahead and moves forward with confidence.
+
+### Library (75 books, public domain)
+
+Philosophy, science, fiction, ethics, mathematics, civics — from Plato to Einstein to Dostoevsky. All loaded at inception as `.lib` files.
+
+### Voting Model
+
+Every decision passes through 5 voters with veto power:
+- **Safety** (veto): Will this harm the system?
+- **Correctness** (veto): Is this technically right?
+- **Ethics** (veto): Does this align with White Ethics?
+- **Performance**: Will this help or hurt?
+- **Elegance**: Is this the cleanest approach?
+
+Confidence thresholds: 95%+ → auto-act | 70-95% → suggest to admin | <70% → observe more
+
+### Files
+
+```
+tools/ai/llama.cpp/                  - Inference engine (MIT, C/C++)
+tools/ai/install_kernel_ai.sh        - Installation + cognitive map generation
+tools/ai/dave_capabilities.json      - Full capability specification
+tools/ai/dave_external_awareness.json - GitHub, web, learning disposition
+tools/ai/dave_schema.sql             - MySQL knowledge base schema
+tools/ai/library/                    - 75 books (.lib, public domain)
+```
 
 ---
 
