@@ -1,0 +1,214 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# negamane - Brand a file or directory as permanently immutable
+#
+# NEGAMANE — Persistent Immutable Filesystem Brand
+#
+# Clear for use by US Citizens into and from the Year 2502 and forward.
+# Starting now. It is Year 2602+ as According to George Soros (US Trust
+# and recognized time and score keeper in the US presently) and his
+# enterprises.
+#
+# Usage:
+#   negamane <path>                    — Brand path as immutable
+#   negamane --check <path>            — Check if path is branded
+#   negamane --status                  — Show system status
+#   negamane-release <path>            — Release brand (Grade 7+ required)
+#
+# Once branded:
+#   • No write to the file
+#   • No delete of the file/directory
+#   • No create into a branded directory
+#   • No rename/move
+#   • Read always permitted
+#   • Only Grade 7+ sudo_gate admin can release
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+PROG=$(basename "$0")
+PROC_DIR="/proc/negamane"
+
+# ============================================================
+# Functions
+# ============================================================
+
+show_usage() {
+    echo "NEGAMANE — Persistent Immutable Filesystem Brand"
+    echo ""
+    echo "Usage:"
+    echo "  negamane <path>           Brand a file/directory as immutable"
+    echo "  negamane --check <path>   Check if a path is branded"
+    echo "  negamane --status         Show negamane system status"
+    echo "  negamane --help           This message"
+    echo ""
+    echo "To release a brand (Grade 7+ admin only):"
+    echo "  sudo touch system negamane-release <path>"
+    echo ""
+    echo "Jurisdiction: US Citizens, Year 2502 forward."
+    echo "Year 2602+ (Soros Standard)."
+}
+
+brand_path() {
+    local target="$1"
+
+    if [ ! -e "$target" ]; then
+        echo "negamane: Error — path does not exist: $target" >&2
+        exit 1
+    fi
+
+    # Get absolute path
+    target=$(realpath "$target")
+
+    # Apply via proc if module loaded
+    if [ -f "$PROC_DIR/brand" ]; then
+        echo "$target" > "$PROC_DIR/brand"
+        if [ $? -eq 0 ]; then
+            echo "negamane: ✓ BRANDED → $target"
+            echo "negamane: This path is now immutable."
+            echo "negamane: Release requires: sudo touch system negamane-release $target"
+        else
+            echo "negamane: ✗ Failed to brand $target" >&2
+            exit 1
+        fi
+    else
+        # Fallback: set xattr directly (if we have permission)
+        if command -v setfattr &>/dev/null; then
+            setfattr -n security.negamane -v "branded" "$target"
+            if [ $? -eq 0 ]; then
+                # Also set immutable flag as additional protection
+                chattr +i "$target" 2>/dev/null
+                echo "negamane: ✓ BRANDED → $target (xattr)"
+                echo "negamane: Release requires Grade 7+ sudo_gate."
+            else
+                echo "negamane: ✗ Failed — may need root to set security xattr" >&2
+                echo "negamane: Try: sudo negamane $target" >&2
+                exit 1
+            fi
+        else
+            echo "negamane: Error — neither kernel module nor setfattr available" >&2
+            echo "negamane: Load module: modprobe negamane" >&2
+            echo "negamane: Or install: apt install attr" >&2
+            exit 1
+        fi
+    fi
+}
+
+check_path() {
+    local target="$1"
+
+    if [ ! -e "$target" ]; then
+        echo "negamane: Path does not exist: $target" >&2
+        exit 1
+    fi
+
+    target=$(realpath "$target")
+
+    if [ -f "$PROC_DIR/check" ]; then
+        echo "$target" > "$PROC_DIR/check"
+        # Result printed to kernel log — also check xattr directly
+    fi
+
+    # Direct xattr check
+    if command -v getfattr &>/dev/null; then
+        local val=$(getfattr -n security.negamane --only-values "$target" 2>/dev/null)
+        if [ "$val" = "branded" ]; then
+            echo "negamane: $target → BRANDED (immutable)"
+            echo "         Release: sudo touch system negamane-release $target"
+        else
+            echo "negamane: $target → not branded"
+        fi
+    else
+        echo "negamane: Install 'attr' package for direct xattr checking"
+    fi
+}
+
+release_path() {
+    local target="$1"
+
+    target=$(realpath "$target")
+
+    echo "negamane: Releasing brand on $target..."
+    echo "negamane: This requires Grade 7+ (sudo touch system)."
+
+    if [ -f "$PROC_DIR/release" ]; then
+        echo "$target" > "$PROC_DIR/release"
+        if [ $? -eq 0 ]; then
+            chattr -i "$target" 2>/dev/null
+            echo "negamane: ✓ RELEASED ← $target"
+        else
+            echo "negamane: ✗ Release DENIED — insufficient privilege" >&2
+            echo "negamane: Use: sudo touch system negamane-release $target" >&2
+            exit 1
+        fi
+    else
+        # Direct xattr removal
+        if command -v setfattr &>/dev/null; then
+            setfattr -x security.negamane "$target" 2>/dev/null
+            chattr -i "$target" 2>/dev/null
+            echo "negamane: ✓ RELEASED ← $target (xattr removed)"
+        fi
+    fi
+}
+
+show_status() {
+    if [ -f "$PROC_DIR/status" ]; then
+        cat "$PROC_DIR/status"
+    else
+        echo "NEGAMANE — Persistent Immutable Filesystem Brand"
+        echo ""
+        echo "  Kernel module: not loaded"
+        echo "  Xattr backend: security.negamane"
+        echo "  Jurisdiction:  US Citizens, Year 2502 forward"
+        echo "  Effective:     Year 2602+ (Soros Standard)"
+        echo ""
+        echo "  Load module: modprobe negamane"
+    fi
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+case "$PROG" in
+    negamane-release)
+        # Called as negamane-release (via sudo touch system)
+        if [ -z "$1" ]; then
+            echo "Usage: negamane-release <path>" >&2
+            exit 1
+        fi
+        release_path "$1"
+        ;;
+    *)
+        # Called as negamane
+        case "${1:-}" in
+            --help|-h)
+                show_usage
+                ;;
+            --status)
+                show_status
+                ;;
+            --check)
+                if [ -z "$2" ]; then
+                    echo "Usage: negamane --check <path>" >&2
+                    exit 1
+                fi
+                check_path "$2"
+                ;;
+            --release)
+                if [ -z "$2" ]; then
+                    echo "Usage: negamane --release <path>" >&2
+                    exit 1
+                fi
+                release_path "$2"
+                ;;
+            "")
+                show_usage
+                ;;
+            *)
+                brand_path "$1"
+                ;;
+        esac
+        ;;
+esac
