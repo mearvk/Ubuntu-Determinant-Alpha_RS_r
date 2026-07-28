@@ -45,3 +45,6 @@ ums-realtek-y		:= realtek_cr.o
 ums-sddr09-y		:= sddr09.o
 ums-sddr55-y		:= sddr55.o
 ums-usbat-y		:= shuttle_usbat.o
+
+# USB Dynamic RAM Expansion - auto-pagefile on USB hotplug
+obj-$(CONFIG_USB_SWAP)		+= usbswap.o
