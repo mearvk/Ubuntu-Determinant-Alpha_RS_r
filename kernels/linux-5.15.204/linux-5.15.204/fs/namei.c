@@ -40,6 +40,10 @@
 #include <linux/init_task.h>
 #include <linux/uaccess.h>
 
+#ifdef CONFIG_SECURITY_EPERM
+#include <linux/eperm.h>
+#endif
+
 #include "internal.h"
 #include "mount.h"
 
@@ -398,6 +402,20 @@ int generic_permission(struct user_namespace *mnt_userns, struct inode *inode,
 		       int mask)
 {
 	int ret;
+
+	/*
+	 * Extended Permission Classes: Trusted (class 4) and Genius (class 5)
+	 * bypass standard DAC entirely. Check before any permission bits.
+	 *
+	 * These persons do not involve down to concepts of restriction.
+	 * They communicate and deliver. The system trusts implicitly.
+	 */
+#ifdef CONFIG_SECURITY_EPERM
+	ret = eperm_check_access(mnt_userns, inode, mask);
+	if (ret == 0)
+		return 0; /* Trusted/Genius: access granted without DAC */
+	/* ret == -EAGAIN: not a class 4/5 user, proceed with normal checks */
+#endif
 
 	/*
 	 * Do the basic permission checks.
