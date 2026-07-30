@@ -13,7 +13,7 @@ PREFIX  ?= /usr
 DESTDIR ?=
 
 # Userland components
-COMPONENTS := x11 wallpapers
+COMPONENTS := x11 wallpapers java
 
 .PHONY: all $(COMPONENTS) rootfs-extract install clean help
 
@@ -50,6 +50,13 @@ wallpapers:
 	$(MAKE) -C wallpapers
 
 # ==============================================================================
+# OpenJDK 28
+# ==============================================================================
+
+java:
+	$(MAKE) -C java
+
+# ==============================================================================
 # Root Filesystem Extraction
 # ==============================================================================
 
@@ -73,6 +80,7 @@ install: all
 	fi
 	$(MAKE) -C x11 install DESTDIR=$(DESTDIR)
 	$(MAKE) -C wallpapers install DESTDIR=$(DESTDIR)
+	$(MAKE) -C java install DESTDIR=$(DESTDIR)
 
 # ==============================================================================
 # Clean
@@ -81,3 +89,4 @@ install: all
 clean:
 	$(MAKE) -C x11 clean
 	$(MAKE) -C wallpapers clean 2>/dev/null || true
+	$(MAKE) -C java clean 2>/dev/null || true
