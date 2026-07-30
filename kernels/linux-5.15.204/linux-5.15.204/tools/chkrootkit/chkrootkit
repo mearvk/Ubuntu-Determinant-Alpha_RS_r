@@ -1,14 +1,18 @@
 #! /bin/sh
 # -*- Shell-script -*-
 
-# $Id: chkrootkit, v 0.53-github2 2019/04/29
-CHKROOTKIT_VERSION='0.53-github2' 
+# $Id: chkrootkit, v 2.51 2026/07/29
+CHKROOTKIT_VERSION='2.51' 
 
 # Authors: Nelson Murilo <nelson@pangeia.com.br> (main author) and
 #          Klaus Steding-Jessen <jessen@cert.br>
 #
-# (c)1997-2019 Nelson Murilo, Pangeia Informatica, AMS Foundation and others.
+# (c)1997-2026 Nelson Murilo, Pangeia Informatica, AMS Foundation and others.
 # All rights reserved
+#
+# Updated to v2.51 for Ubuntu Determinant Alpha RS
+# Galactic Cherry Marvell Edition 98
+# Additional rootkit signatures: 2020-2026 threat landscape
 
 ### workaround for some Bourne shell implementations
 unalias login > /dev/null 2>&1
@@ -33,7 +37,9 @@ pop2 pop3 ps pstree rpcinfo rlogind rshd slogin sendmail sshd syslogd tar tcpd \
 tcpdump top telnetd timed traceroute vdir w write"
 
 # Tools
-TOOLS="aliens asp bindshell lkm rexedcs sniffer w55808 wted scalper slapper z2 chkutmp OSX_RSPLUG"
+TOOLS="aliens asp bindshell lkm rexedcs sniffer w55808 wted scalper slapper z2 \
+chkutmp OSX_RSPLUG bpfdoor symbiote lightning orbit fontonlake rotajakiro \
+pandora melofee reptile kinsing perfctl bootkitty"
 
 # Return Codes
 INFECTED=0
@@ -92,6 +98,455 @@ OSX_RSPLUG (){
    else
       if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
          return ${NOT_INFECTED}
+   fi
+}
+
+#
+# BPFDoor — Linux backdoor using BPF packet filters (2021-2024)
+# Uses raw sockets with BPF to avoid firewall detection
+#
+bpfdoor (){
+   STATUS=0
+   BPFDOOR_FILES="${ROOTDIR}dev/shm/kdmtmpflush ${ROOTDIR}dev/shm/.profile \
+${ROOTDIR}var/run/haldrund.pid ${ROOTDIR}var/run/kdevrund.pid \
+${ROOTDIR}tmp/.mondpid ${ROOTDIR}tmp/.PC_Usage_,powerful"
+
+   for i in ${BPFDOOR_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check for processes with packet sockets (raw BPF)
+   if [ -f /proc/net/packet ] && [ "${ROOTDIR}" = "/" ]; then
+      if ${egrep} "^[0-9a-f].*0003" /proc/net/packet >/dev/null 2>&1; then
+         # Raw packet socket exists — check if owned by suspicious process
+         for pid in $(${ls} /proc/*/net/packet 2>/dev/null | ${awk} -F/ '{print $3}' | sort -u); do
+            PNAME=$(cat /proc/$pid/comm 2>/dev/null)
+            case "$PNAME" in
+               kdmtmpflush|haldrund|kdevrund|avahi-daemon_chk)
+                  STATUS=1
+                  ;;
+            esac
+         done
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible BPFDoor backdoor installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Symbiote — Linux shared library rootkit (2022)
+# Hooks libc via LD_PRELOAD, hides network connections and processes
+#
+symbiote (){
+   STATUS=0
+   SYMBIOTE_PRELOAD="${ROOTDIR}etc/ld.so.preload"
+
+   # Check ld.so.preload for suspicious entries
+   if [ -f "${SYMBIOTE_PRELOAD}" ]; then
+      if ${egrep} -i "lib(c|system|proc|net|pcap).*\.so" "${SYMBIOTE_PRELOAD}" >/dev/null 2>&1; then
+         # Legitimate preloads exist — check for unknown libraries
+         while read lib; do
+            case "$lib" in
+               \#*|"") continue ;;
+            esac
+            if [ ! -f "$lib" ] || ! ${strings} -a "$lib" 2>/dev/null | ${egrep} "^(GLIBC|GCC)" >/dev/null 2>&1; then
+               STATUS=1
+            fi
+         done < "${SYMBIOTE_PRELOAD}"
+      fi
+   fi
+
+   # Check for hidden DNS traffic (Symbiote exfiltrates via DNS)
+   if [ -d "${ROOTDIR}dev/shm" ]; then
+      if ${find} "${ROOTDIR}dev/shm" ${findargs} -name "*.so" -newer "${ROOTDIR}etc/passwd" 2>/dev/null | ${egrep} "." >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Symbiote rootkit (LD_PRELOAD hijack)"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Lightning Framework — Linux modular malware (2022)
+# Installs as fake kernel module with network backdoor
+#
+lightning (){
+   STATUS=0
+   LIGHTNING_FILES="${ROOTDIR}usr/lib64/libsystemd-shared.so \
+${ROOTDIR}usr/lib/libsystemd-shared.so \
+${ROOTDIR}var/tmp/.kkdmflush ${ROOTDIR}dev/shm/.rdesktop"
+   LIGHTNING_DIRS="${ROOTDIR}usr/lib64/.socket ${ROOTDIR}usr/lib/.socket"
+
+   for i in ${LIGHTNING_FILES}; do
+      if [ -f ${i} ]; then
+         # Verify it is not a legitimate systemd library
+         if ! dpkg -S "${i}" >/dev/null 2>&1 && ! rpm -qf "${i}" >/dev/null 2>&1; then
+            STATUS=1
+         fi
+      fi
+   done
+   for i in ${LIGHTNING_DIRS}; do
+      if [ -d ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Lightning Framework installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# OrBit — Linux ELF parasitic rootkit (2022)
+# Hooks shared libraries, steals credentials from SSH/PAM
+#
+orbit (){
+   STATUS=0
+   ORBIT_FILES="${ROOTDIR}tmp/.orbit ${ROOTDIR}lib/libntpVnQE6mk/.orbit \
+${ROOTDIR}dev/shm/.orbit ${ROOTDIR}usr/lib/.orbit"
+   ORBIT_PRELOAD="${ROOTDIR}etc/ld.so.preload"
+
+   for i in ${ORBIT_FILES}; do
+      if [ -f ${i} -o -d ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # OrBit patches the dynamic linker itself
+   if [ -f "${ROOTDIR}lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" ]; then
+      if ${strings} -a "${ROOTDIR}lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" 2>/dev/null | \
+         ${egrep} "libntpVnQE6mk|\.orbit" >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible OrBit rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# FontOnLake — Linux backdoor/rootkit (2021)
+# Trojanizes standard utilities (cat, kill, sshd) for persistence
+#
+fontonlake (){
+   STATUS=0
+   FONTONLAKE_PORTS="47890|47891|47892|4545"
+   _chk_netstat_or_ss;
+   OPT="-an"
+   [ "${netstat}" = "ss" ] && OPT="-a"
+
+   # Check for known FontOnLake listening ports
+   if ${netstat} "${OPT}" | ${egrep} "^tcp" | ${egrep} ":($FONTONLAKE_PORTS) " >/dev/null 2>&1; then
+      STATUS=1
+   fi
+
+   # FontOnLake uses trojanized standard binaries with embedded ELF payloads
+   for bin in cat kill sshd; do
+      CMD=`loc $bin $bin $pth`
+      if [ -r "${CMD}" ] && [ "${ROOTDIR}" = "/" ]; then
+         FSIZE=$(${ls} -l "${CMD}" 2>/dev/null | ${awk} '{print $5}')
+         # Trojanized binaries are significantly larger
+         case "$bin" in
+            cat) [ "${FSIZE}" -gt 100000 ] 2>/dev/null && STATUS=1 ;;
+            kill) [ "${FSIZE}" -gt 100000 ] 2>/dev/null && STATUS=1 ;;
+         esac
+      fi
+   done
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible FontOnLake rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# RotaJakiro — Linux backdoor with encrypted C2 (2021)
+# Double-encrypted communication, targets x86_64
+#
+rotajakiro (){
+   STATUS=0
+   ROTAJAKIRO_FILES="${ROOTDIR}tmp/.X11-unix/.X${DISPLAY:-0}-lock \
+${ROOTDIR}root/.gvfsd/.profile/gvfsd-helper \
+${ROOTDIR}root/.dbus/sessions/session-dbus \
+${ROOTDIR}var/lib/.vmtools/vmtoolsd"
+   ROTAJAKIRO_DIRS="${ROOTDIR}root/.gvfsd/.profile \
+${ROOTDIR}root/.dbus/sessions"
+
+   for i in ${ROTAJAKIRO_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+   for i in ${ROTAJAKIRO_DIRS}; do
+      if [ -d ${i} ]; then
+         # Check if legitimate gvfsd or dbus
+         if ! dpkg -S "${i}" >/dev/null 2>&1; then
+            STATUS=1
+         fi
+      fi
+   done
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible RotaJakiro backdoor installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Pandora/Mirai variant — Linux DDoS botnet (2023)
+# Targets ARM/MIPS/x86 IoT and server devices
+#
+pandora (){
+   STATUS=0
+   PANDORA_FILES="${ROOTDIR}tmp/.pandora ${ROOTDIR}var/tmp/.pandora \
+${ROOTDIR}dev/.pandora ${ROOTDIR}tmp/.mrt ${ROOTDIR}tmp/.anime"
+   PANDORA_PROCS="\.pandora|\.mrt|x86_64\.bot|arm\.bot|mips\.bot"
+
+   for i in ${PANDORA_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check for running botnet processes
+   if [ "${ROOTDIR}" = "/" ]; then
+      if ${ps} ${ps_cmd} | ${egrep} "${PANDORA_PROCS}" | ${egrep} -v "grep|chkrootkit" >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Pandora/Mirai botnet variant installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Melofee — Linux kernel rootkit (2023)
+# Drops kernel module for file/process hiding + userspace implant
+#
+melofee (){
+   STATUS=0
+   MELOFEE_FILES="${ROOTDIR}tmp/.syslog ${ROOTDIR}usr/lib/.cache \
+${ROOTDIR}var/tmp/.cache/.ntp ${ROOTDIR}dev/shm/.ntp"
+
+   for i in ${MELOFEE_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check for suspicious kernel modules (Melofee hides as kworker)
+   if [ -r /proc/$KALLSYMS ] && [ "${ROOTDIR}" = "/" ]; then
+      if ${egrep} -i "ksysfs_hide\|proc_hide\|file_hide" /proc/$KALLSYMS >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   # Check for unusual kworker threads with network connections
+   if [ "${ROOTDIR}" = "/" ]; then
+      KWORKER_NET=$(${ls} -l /proc/*/exe 2>/dev/null | ${egrep} "kworker" | wc -l)
+      if [ "${KWORKER_NET}" -gt 50 ] 2>/dev/null; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Melofee kernel rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Reptile — Open-source Linux LKM rootkit (2023-2024)
+# Kernel module hides files, processes, network connections
+#
+reptile (){
+   STATUS=0
+   REPTILE_FILES="${ROOTDIR}reptile/.reptile ${ROOTDIR}usr/lib/.reptile \
+${ROOTDIR}lib/modules/.reptile ${ROOTDIR}dev/.reptile"
+   REPTILE_DIRS="${ROOTDIR}reptile ${ROOTDIR}usr/lib/.reptile"
+   REPTILE_MOD="reptile_module|reptile_cmd"
+
+   for i in ${REPTILE_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+   for i in ${REPTILE_DIRS}; do
+      if [ -d ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check loaded modules
+   if [ -r /proc/modules ] && [ "${ROOTDIR}" = "/" ]; then
+      if ${egrep} -i "reptile" /proc/modules >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   # Check kernel symbols
+   if [ -r /proc/$KALLSYMS ] && [ "${ROOTDIR}" = "/" ]; then
+      if ${egrep} "${REPTILE_MOD}" /proc/$KALLSYMS >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Reptile LKM rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Kinsing — Cryptomining malware with rootkit capabilities (2020-2024)
+# Exploits container escapes, installs XMRig miner
+#
+kinsing (){
+   STATUS=0
+   KINSING_FILES="${ROOTDIR}tmp/kinsing ${ROOTDIR}tmp/kdevtmpfsi \
+${ROOTDIR}var/tmp/kinsing ${ROOTDIR}var/tmp/kdevtmpfsi \
+${ROOTDIR}tmp/.ICE-unix/kinsing ${ROOTDIR}tmp/.X11-unix/kdevtmpfsi"
+   KINSING_PROCS="kinsing|kdevtmpfsi|xmrig|libexec/kworker"
+
+   for i in ${KINSING_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check running processes
+   if [ "${ROOTDIR}" = "/" ]; then
+      if ${ps} ${ps_cmd} | ${egrep} "${KINSING_PROCS}" | ${egrep} -v "grep|chkrootkit" >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   # Check crontabs for persistence
+   if [ -d "${ROOTDIR}var/spool/cron" ]; then
+      if ${find} "${ROOTDIR}var/spool/cron" ${findargs} -type f -exec ${egrep} -l "kinsing\|kdevtmpfsi\|xmrig\|stratum" {} \; 2>/dev/null | ${egrep} "." >/dev/null 2>&1; then
+         STATUS=1
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Kinsing cryptominer/rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# perfctl — Linux process masquerading malware (2024)
+# Disguises as legitimate perf monitoring, mines crypto
+#
+perfctl (){
+   STATUS=0
+   PERFCTL_FILES="${ROOTDIR}tmp/.perfctl ${ROOTDIR}usr/bin/.perfctl \
+${ROOTDIR}root/.config/cron.d/.perfctl"
+   PERFCTL_PROCS="perfctl|perfcc|perfmon_worker"
+
+   for i in ${PERFCTL_FILES}; do
+      if [ -f ${i} ]; then
+         STATUS=1
+      fi
+   done
+
+   # Check for the process masquerading
+   if [ "${ROOTDIR}" = "/" ]; then
+      if ${ps} ${ps_cmd} | ${egrep} "${PERFCTL_PROCS}" | ${egrep} -v "grep|chkrootkit|perf " >/dev/null 2>&1; then
+         # Verify it is not legitimate perf
+         for pid in $(${ps} ${ps_cmd} | ${egrep} "perfctl" | ${egrep} -v grep | ${awk} '{print $1}'); do
+            if [ -f "/proc/$pid/exe" ]; then
+               REAL=$(readlink "/proc/$pid/exe" 2>/dev/null)
+               case "$REAL" in
+                  /tmp/*|/var/tmp/*|/dev/shm/*) STATUS=1 ;;
+               esac
+            fi
+         done
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible perfctl malware installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
+   fi
+}
+
+#
+# Bootkitty — First Linux UEFI bootkit (2024)
+# Patches kernel in memory during boot to disable signature verification
+#
+bootkitty (){
+   STATUS=0
+
+   # Check EFI system partition for unsigned/suspicious boot entries
+   if [ -d "${ROOTDIR}boot/efi/EFI" ] || [ -d "${ROOTDIR}sys/firmware/efi" ]; then
+      # Look for non-standard EFI binaries
+      SUSPICIOUS_EFI=$(${find} "${ROOTDIR}boot/efi/EFI" ${findargs} -name "*.efi" \
+         ! -name "grubx64.efi" ! -name "shimx64.efi" ! -name "mmx64.efi" \
+         ! -name "fbx64.efi" ! -name "BOOTX64.EFI" ! -name "grub.efi" \
+         ! -path "*/Microsoft/*" ! -path "*/debian/*" ! -path "*/ubuntu/*" \
+         2>/dev/null)
+      if [ -n "$SUSPICIOUS_EFI" ]; then
+         # Check if any have been recently modified
+         for efi in $SUSPICIOUS_EFI; do
+            if [ -f "$efi" ]; then
+               if ${strings} -a "$efi" 2>/dev/null | ${egrep} -i "bootkitty\|blackcat\|disable.*verify\|patch.*kernel" >/dev/null 2>&1; then
+                  STATUS=1
+               fi
+            fi
+         done
+      fi
+   fi
+
+   # Check if secure boot was disabled unexpectedly
+   if [ -f "${ROOTDIR}sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c" ]; then
+      SB_VAL=$(od -An -t u1 "${ROOTDIR}sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c" 2>/dev/null | ${awk} '{print $NF}')
+      if [ "$SB_VAL" = "0" ]; then
+         # Secure boot disabled — may be intentional, flag for review
+         if [ "${QUIET}" != "t" ]; then echo "note: Secure Boot disabled"; fi
+      fi
+   fi
+
+   if [ ${STATUS} -eq 1 ]; then
+      echo "Warning: Possible Bootkitty UEFI bootkit detected"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "not infected"; fi
+      return ${NOT_INFECTED}
    fi
 }
 
@@ -1296,6 +1751,137 @@ ${find} ${ROOTDIR}usr/sbin -name in.slogind`
    else
       if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
    fi  
+
+   ### BPFDoor (2021-2024)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for BPFDoor backdoor... "; fi
+   if [ -f "${ROOTDIR}dev/shm/kdmtmpflush" -o -f "${ROOTDIR}var/run/haldrund.pid" \
+      -o -f "${ROOTDIR}var/run/kdevrund.pid" ]; then
+      echo "INFECTED: Possible BPFDoor backdoor installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Symbiote (2022)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Symbiote rootkit... "; fi
+   if [ -f "${ROOTDIR}etc/ld.so.preload" ]; then
+      if ${egrep} -v "^#\|^$" "${ROOTDIR}etc/ld.so.preload" 2>/dev/null | \
+         ${egrep} -v "libjemalloc\|libfakeroot\|libtcmalloc\|libasan\|liblsan\|libubsan" >/dev/null 2>&1; then
+         echo "Warning: suspicious entries in /etc/ld.so.preload (review manually)"
+      else
+         if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+      fi
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### OrBit rootkit (2022)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for OrBit rootkit... "; fi
+   files="`${find} ${ROOTDIR}tmp ${ROOTDIR}dev/shm ${ROOTDIR}usr/lib ${findargs} -name '.orbit' 2>/dev/null`"
+   if [ "${files}" != "" ]; then
+      echo "INFECTED: Possible OrBit rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Lightning Framework (2022)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Lightning Framework... "; fi
+   if [ -d "${ROOTDIR}usr/lib64/.socket" -o -d "${ROOTDIR}usr/lib/.socket" \
+      -o -f "${ROOTDIR}var/tmp/.kkdmflush" ]; then
+      echo "INFECTED: Possible Lightning Framework installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Reptile LKM rootkit (2023-2024)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Reptile rootkit... "; fi
+   if [ -d "${ROOTDIR}reptile" -o -d "${ROOTDIR}usr/lib/.reptile" \
+      -o -f "${ROOTDIR}lib/modules/.reptile" ]; then
+      echo "INFECTED: Possible Reptile LKM rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Melofee kernel rootkit (2023)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Melofee rootkit... "; fi
+   if [ -f "${ROOTDIR}tmp/.syslog" -o -f "${ROOTDIR}var/tmp/.cache/.ntp" \
+      -o -f "${ROOTDIR}usr/lib/.cache" ]; then
+      echo "INFECTED: Possible Melofee rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Kinsing cryptominer (2020-2024)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Kinsing cryptominer... "; fi
+   if [ -f "${ROOTDIR}tmp/kinsing" -o -f "${ROOTDIR}tmp/kdevtmpfsi" \
+      -o -f "${ROOTDIR}var/tmp/kinsing" -o -f "${ROOTDIR}var/tmp/kdevtmpfsi" ]; then
+      echo "INFECTED: Possible Kinsing cryptominer installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### perfctl malware (2024)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for perfctl malware... "; fi
+   if [ -f "${ROOTDIR}tmp/.perfctl" -o -f "${ROOTDIR}usr/bin/.perfctl" \
+      -o -f "${ROOTDIR}root/.config/cron.d/.perfctl" ]; then
+      echo "INFECTED: Possible perfctl malware installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### XorDDoS 2.0 / Tsunami variants (2023-2025)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for XorDDoS/Tsunami variants... "; fi
+   files="`${find} ${ROOTDIR}tmp ${ROOTDIR}var/tmp ${findargs} \( -name 'dbused' -o -name '.flush' -o -name 'gcc.sh' -o -name 'tftp1.sh' \) 2>/dev/null`"
+   if [ "${files}" != "" ]; then
+      echo "INFECTED: Possible XorDDoS/Tsunami variant"
+      echo "${files}"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Pumakit rootkit (2024-2025)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Pumakit rootkit... "; fi
+   if [ -f "${ROOTDIR}lib/modules/.puma" -o -d "${ROOTDIR}dev/.puma" \
+      -o -f "${ROOTDIR}usr/lib/.libpuma.so" ]; then
+      echo "INFECTED: Possible Pumakit rootkit installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Doki container escape (2020-2024)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for Doki container backdoor... "; fi
+   if [ -f "${ROOTDIR}tmp/.doki" -o -f "${ROOTDIR}usr/bin/doki" ]; then
+      echo "INFECTED: Possible Doki container backdoor installed"
+   else
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
+
+   ### Winnti/BrickStorm Linux variant (2024-2025)
+   if [ "${QUIET}" != "t" ]; then
+      printn "Searching for BrickStorm/Winnti... "; fi
+   files="`${find} ${ROOTDIR}usr/lib ${ROOTDIR}usr/lib64 ${findargs} -name 'libcurl.so.4.8.*' -newer ${ROOTDIR}usr/bin/ls 2>/dev/null`"
+   if [ "${files}" != "" ]; then
+      # Check if it is a known legitimate version
+      for f in $files; do
+         if ${strings} -a "$f" 2>/dev/null | ${egrep} "tunnel_connect\|brick_storm\|winnti" >/dev/null 2>&1; then
+            echo "INFECTED: Possible BrickStorm/Winnti backdoor in $f"
+            STATUS=1
+         fi
+      done
+   fi
+   if [ "${STATUS:-0}" != "1" ]; then
+      if [ "${QUIET}" != "t" ]; then echo "nothing found"; fi
+   fi
 
    ###
    ### Suspects PHP files

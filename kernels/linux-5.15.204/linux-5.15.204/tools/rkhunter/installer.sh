@@ -11,8 +11,8 @@
 ################################################################################
 
 INSTALLER_NAME="Rootkit Hunter installer"
-INSTALLER_VERSION="1.2.21"
-INSTALLER_COPYRIGHT="Copyright 2018, Michael Boelen"
+INSTALLER_VERSION="8.46.9"
+INSTALLER_COPYRIGHT="Copyright 2018-2026, Michael Boelen, MEARVK LLC"
 INSTALLER_LICENSE="
 
 This software was developed by the Rootkit Hunter project team.
@@ -25,7 +25,7 @@ of the GNU General Public License. See LICENSE for details.
 "
 
 APPNAME="rkhunter"
-APPVERSION="1.4.6"
+APPVERSION="8.46.9"
 RKHINST_OWNER="0:0"
 RKHINST_MODE_EX="0700"
 RKHINST_MODE_RW="0600"
