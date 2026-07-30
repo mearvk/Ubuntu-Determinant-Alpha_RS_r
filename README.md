@@ -19,7 +19,7 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 **Kernel:** Linux 5.15.204  
 **Userland:** Ubuntu Base 24.04.4 (Noble Numbat)  
 **Display:** X.Org Server 21.1.24  
-**Desktop Wallpapers:** 9 original SVG wallpapers (4K, resolution-independent)
+**Desktop Wallpapers:** 9 original SVG wallpapers + 10 Marvell JPEG wallpapers (4K, resolution-independent)
 
 ---
 
@@ -861,6 +861,8 @@ tools/clamav/install_clamav.sh - Protected installation script
 
 ## chkrootkit — Rootkit Detection
 
+**Version: 2.51** — Updated for the 2020–2026 threat landscape.
+
 chkrootkit is a locally-installed rootkit detection tool that examines the system for signs of rootkit infection. It checks system binaries, network interfaces, and log files for known rootkit signatures and anomalous behavior.
 
 ### What It Detects
@@ -873,7 +875,25 @@ chkrootkit is a locally-installed rootkit detection tool that examines the syste
 | Process hiding | Processes hidden from `/proc` (LKM-based rootkits) |
 | Directory hiding | Hidden directories created by known rootkits |
 | LKM rootkits | Signs of malicious kernel module injection |
-| Known rootkits | 70+ rootkit signature database (lrk, t0rn, Ambient's Rootkit, Suckit, etc.) |
+| Classic rootkits | 70+ legacy rootkit signatures (lrk, t0rn, Ambient's Rootkit, Suckit, etc.) |
+| **Modern rootkits (2020–2026)** | BPFDoor, Symbiote, Lightning Framework, OrBit, FontOnLake, RotaJakiro, Pandora, Melofee, Reptile, Kinsing, perfctl, Bootkitty, Pumakit, BrickStorm/Winnti, XorDDoS 2.0, Doki |
+
+### Modern Rootkit Detection (v2.51)
+
+| Rootkit | Year | Technique | Detection Method |
+|---------|------|-----------|-----------------|
+| BPFDoor | 2021–2024 | BPF packet filter backdoor | Known file paths, raw packet socket processes |
+| Symbiote | 2022 | LD_PRELOAD library hijack | Suspicious entries in `/etc/ld.so.preload` |
+| Lightning Framework | 2022 | Modular malware, fake systemd | Hidden `.socket` directories, unpackaged libraries |
+| OrBit | 2022 | ELF parasitic, dynamic linker patch | `.orbit` artifacts, linker string scanning |
+| FontOnLake | 2021 | Trojanized standard binaries | Backdoor ports, oversized binaries |
+| RotaJakiro | 2021 | Double-encrypted C2 | Fake gvfsd/dbus directories |
+| Pandora | 2023 | Mirai-variant DDoS botnet | Bot process names, known file drops |
+| Melofee | 2023 | Kernel module rootkit | Hidden kernel symbols, suspicious kworker count |
+| Reptile | 2023–2024 | Open-source LKM rootkit | Module names in /proc/modules and kallsyms |
+| Kinsing | 2020–2024 | Cryptominer + container escape | kdevtmpfsi/xmrig binaries, cron persistence |
+| perfctl | 2024 | Process masquerading miner | Hidden .perfctl files, /tmp-based executables |
+| Bootkitty | 2024 | First Linux UEFI bootkit | Suspicious EFI binaries, bootkit strings |
 
 ### Usage
 
@@ -904,7 +924,7 @@ chkrootkit installs to `/usr/local/sbin/` (admin-only path) with helper binaries
 ### Files
 
 ```
-tools/chkrootkit/chkrootkit      - Main detection script (shell)
+tools/chkrootkit/chkrootkit      - Main detection script (shell, v2.51)
 tools/chkrootkit/chklastlog.c    - lastlog checker
 tools/chkrootkit/chkwtmp.c       - wtmp checker
 tools/chkrootkit/chkutmp.c       - utmp checker
@@ -919,6 +939,8 @@ tools/chkrootkit/Makefile        - Build rules
 ---
 
 ## rkhunter — Rootkit Hunter
+
+**Version: 8.46.9** — Updated for the 2020–2026 threat landscape.
 
 rkhunter (Rootkit Hunter) is a comprehensive security scanner that checks for rootkits, backdoors, and local exploits. It performs more extensive checks than chkrootkit and maintains a database of known-good file properties for integrity verification.
 
