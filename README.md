@@ -10,9 +10,16 @@ Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 ---
 
-# Ubuntu Determinant Alpha RS
+# Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98
 
 A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, the White Ethics Installer Grade, and Dave — the system's kernel-adjacent AI intelligence.
+
+**Edition:** Galactic Cherry Marvell  
+**Version:** 98  
+**Kernel:** Linux 5.15.204  
+**Userland:** Ubuntu Base 24.04.4 (Noble Numbat)  
+**Display:** X.Org Server 21.1.24  
+**Desktop Wallpapers:** 9 original SVG wallpapers (4K, resolution-independent)
 
 ---
 

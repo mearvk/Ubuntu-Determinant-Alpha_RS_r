@@ -141,6 +141,15 @@ KCOV_INSTRUMENT_stackleak.o := n
 
 obj-$(CONFIG_SCF_TORTURE_TEST) += scftorture.o
 
+# Per-User Kernel Objects (Memory Grain)
+obj-$(CONFIG_USER_KO) += user_ko.o
+
+# White Ethics Installer Grade
+obj-$(CONFIG_WHITE_ETHICS) += white_ethics.o
+
+# CPU Boost Designation
+obj-$(CONFIG_CPUBOOST) += cpuboost.o
+
 $(obj)/configs.o: $(obj)/config_data.gz
 
 targets += config_data config_data.gz
