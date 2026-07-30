@@ -245,6 +245,14 @@ tools-mysql-install:
 	@if [ -f "$(TOOLS_DIR)/mysql/apt_mysql_hook.sh" ]; then \
 		install -d $(ROOTFS_DIR)/etc/apt/apt.conf.d && \
 		install -m 755 $(TOOLS_DIR)/mysql/apt_mysql_hook.sh $(ROOTFS_DIR)/usr/lib/apt/; fi
+	@if [ -f "$(TOOLS_DIR)/mysql/file_integrity_schema.sql" ]; then \
+		install -d $(ROOTFS_DIR)/usr/share/file-integrity && \
+		install -m 644 $(TOOLS_DIR)/mysql/file_integrity_schema.sql $(ROOTFS_DIR)/usr/share/file-integrity/; fi
+	@if [ -f "$(TOOLS_DIR)/mysql/integrity-baseline" ]; then \
+		install -m 755 $(TOOLS_DIR)/mysql/integrity-baseline $(ROOTFS_DIR)/usr/local/sbin/; fi
+	@if [ -f "$(TOOLS_DIR)/mysql/integrity-check" ]; then \
+		install -m 755 $(TOOLS_DIR)/mysql/integrity-check $(ROOTFS_DIR)/usr/local/bin/; fi
+	@install -d -m 700 $(ROOTFS_DIR)/etc/integrity
 
 # Dave (AI system intelligence) - llama.cpp based
 tools-ai:

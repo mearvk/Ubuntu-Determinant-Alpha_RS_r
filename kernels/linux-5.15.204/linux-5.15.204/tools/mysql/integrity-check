@@ -1,0 +1,551 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# integrity-check — Verify system files against MySQL integrity baseline
+#
+# Reads the active baseline from the file_integrity database (read-only user),
+# computes current SHA-256 of each file, compares, and reports mismatches.
+# Works fully offline — no network connection required.
+#
+# Usage:
+#   integrity-check                      Full system scan
+#   integrity-check --quick              Critical files only (priority >= 90)
+#   integrity-check --class kernel       Scan specific coverage class
+#   integrity-check --file /usr/bin/sudo Check single file
+#   integrity-check --report             Show last scan results
+#
+# Exit codes:
+#   0 = clean (all files match)
+#   1 = warning (minor mismatches)
+#   2 = compromised (critical mismatches detected)
+#   3 = error (could not complete scan)
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+set -uo pipefail
+
+PROGRAM="integrity-check"
+VERSION="2.51"
+CONF_DIR="/etc/integrity"
+VERIFY_CONF="${CONF_DIR}/verify.conf"
+DB_NAME="file_integrity"
+
+# Colors (if terminal supports it)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    RESET='\033[0m'
+else
+    RED="" GREEN="" YELLOW="" CYAN="" BOLD="" RESET=""
+fi
+
+# ============================================================
+# Functions
+# ============================================================
+
+die() {
+    echo -e "${RED}${PROGRAM}: ERROR: $1${RESET}" >&2
+    exit 3
+}
+
+info() {
+    echo -e "${PROGRAM}: $1"
+}
+
+pass() {
+    echo -e "  ${GREEN}[ OK ]${RESET} $1"
+}
+
+fail() {
+    echo -e "  ${RED}[FAIL]${RESET} $1"
+}
+
+warn_msg() {
+    echo -e "  ${YELLOW}[WARN]${RESET} $1"
+}
+
+miss() {
+    echo -e "  ${RED}[MISS]${RESET} $1"
+}
+
+usage() {
+    cat <<EOF
+${PROGRAM} v${VERSION} — File Integrity Verification
+
+Usage:
+  ${PROGRAM}                             Full system scan (all baseline files)
+  ${PROGRAM} --quick                     Critical files only (priority >= 90)
+  ${PROGRAM} --class CLASS               Scan specific coverage class
+  ${PROGRAM} --file PATH                 Check a single file
+  ${PROGRAM} --suid                      Check only SUID/SGID files
+  ${PROGRAM} --report                    Show results of last scan
+  ${PROGRAM} --history                   Show scan history
+  ${PROGRAM} --help                      This message
+
+Coverage classes:
+  kernel, bootloader, init, auth, crypto, security_tool, network,
+  system_binary, shared_library, kernel_module, config, package_manager,
+  cron, logging, database, ai, custom_tool, user_critical
+
+Options:
+  --quiet            Suppress per-file output, show summary only
+  --verbose          Show every file checked (including passes)
+  --no-record        Don't record this scan in the database
+
+Exit codes:
+  0 = clean          All files match baseline
+  1 = warning        Minor mismatches (config changes, etc.)
+  2 = compromised    Critical file integrity violations detected
+  3 = error          Scan could not complete
+
+EOF
+    exit 0
+}
+
+# Load MySQL credentials (read-only verifier)
+load_credentials() {
+    if [ ! -f "${VERIFY_CONF}" ]; then
+        die "Verifier credentials not found: ${VERIFY_CONF}
+Create with: echo 'password=YOUR_PASS' > ${VERIFY_CONF} && chmod 400 ${VERIFY_CONF}"
+    fi
+    if grep -q "=" "${VERIFY_CONF}" 2>/dev/null; then
+        DB_USER=$(grep "^user=" "${VERIFY_CONF}" | cut -d= -f2)
+        DB_PASS=$(grep "^password=" "${VERIFY_CONF}" | cut -d= -f2)
+        [ -z "${DB_USER}" ] && DB_USER="integrity_verify"
+    else
+        DB_USER="integrity_verify"
+        DB_PASS=$(cat "${VERIFY_CONF}")
+    fi
+    [ -z "${DB_PASS}" ] && die "Empty password in ${VERIFY_CONF}"
+}
+
+# Execute SQL query (read-only)
+sql() {
+    mysql -u "${DB_USER}" -p"${DB_PASS}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
+}
+
+# Also need writer access to record scan results
+load_writer_credentials() {
+    local writer_conf="${CONF_DIR}/admin.conf"
+    if [ -f "${writer_conf}" ]; then
+        if grep -q "=" "${writer_conf}" 2>/dev/null; then
+            WRITER_USER=$(grep "^user=" "${writer_conf}" | cut -d= -f2)
+            WRITER_PASS=$(grep "^password=" "${writer_conf}" | cut -d= -f2)
+            [ -z "${WRITER_USER}" ] && WRITER_USER="integrity_writer"
+        else
+            WRITER_USER="integrity_writer"
+            WRITER_PASS=$(cat "${writer_conf}")
+        fi
+    else
+        WRITER_USER=""
+        WRITER_PASS=""
+    fi
+}
+
+sql_write() {
+    if [ -n "${WRITER_USER}" ] && [ -n "${WRITER_PASS}" ]; then
+        mysql -u "${WRITER_USER}" -p"${WRITER_PASS}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
+    fi
+}
+
+# Determine severity of a failure
+determine_severity() {
+    local failure_type="$1"
+    local coverage_class="$2"
+    local priority="$3"
+
+    # Critical: any hash mismatch on priority >= 90 files
+    if [ "${failure_type}" = "hash_mismatch" ] && [ "${priority}" -ge 90 ]; then
+        echo "critical"
+        return
+    fi
+
+    # Critical: SUID added, ELF interpreter changed
+    case "${failure_type}" in
+        suid_added|elf_interpreter_change|elf_rpath_change)
+            echo "critical"
+            return
+            ;;
+    esac
+
+    # High: hash mismatch on security tools, auth, kernel
+    if [ "${failure_type}" = "hash_mismatch" ]; then
+        case "${coverage_class}" in
+            kernel|bootloader|init|auth|crypto|security_tool)
+                echo "high"
+                return
+                ;;
+        esac
+    fi
+
+    # Medium: hash mismatch on system binaries/libraries
+    if [ "${failure_type}" = "hash_mismatch" ]; then
+        case "${coverage_class}" in
+            system_binary|shared_library|kernel_module)
+                echo "medium"
+                return
+                ;;
+        esac
+    fi
+
+    # Low: permission changes, missing config files
+    case "${failure_type}" in
+        permission_change|owner_change|timestamp_anomaly)
+            echo "low"
+            return
+            ;;
+        missing)
+            if [ "${priority}" -ge 80 ]; then
+                echo "high"
+            else
+                echo "medium"
+            fi
+            return
+            ;;
+    esac
+
+    echo "info"
+}
+
+# ============================================================
+# Main scan logic
+# ============================================================
+
+run_scan() {
+    local where_clause="${1:-1=1}"
+    local verbose="${2:-0}"
+    local quiet="${3:-0}"
+    local record="${4:-1}"
+
+    # Get active baseline
+    local baseline_id
+    baseline_id=$(sql "SELECT id FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;")
+    [ -z "${baseline_id}" ] && die "No active baseline. Run 'integrity-baseline' first."
+
+    local baseline_date baseline_count
+    baseline_date=$(sql "SELECT created_at FROM baseline_generation WHERE id = ${baseline_id};")
+    baseline_count=$(sql "SELECT file_count FROM baseline_generation WHERE id = ${baseline_id};")
+
+    if [ "${quiet}" -eq 0 ]; then
+        echo ""
+        echo -e "${BOLD}File Integrity Verification${RESET}"
+        echo -e "${BOLD}===========================${RESET}"
+        echo ""
+        echo "  Baseline:  #${baseline_id} (${baseline_date})"
+        echo "  Files:     ${baseline_count} in baseline"
+        echo "  Filter:    ${where_clause}"
+        echo ""
+    fi
+
+    # Start scan record
+    local scan_id=""
+    if [ "${record}" -eq 1 ]; then
+        load_writer_credentials
+        if [ -n "${WRITER_USER}" ]; then
+            sql_write "CALL start_scan('$(whoami)', $(id -u), @sid); SELECT @sid;"
+            scan_id=$(mysql -u "${WRITER_USER}" -p"${WRITER_PASS}" -N -B "${DB_NAME}" \
+                -e "CALL start_scan('$(whoami)', $(id -u), @sid); SELECT @sid;" 2>/dev/null | tail -1)
+        fi
+    fi
+
+    # Fetch baseline data
+    local files_checked=0
+    local files_passed=0
+    local files_failed=0
+    local files_missing=0
+    local files_new=0
+    local has_critical=0
+    local has_high=0
+
+    # Query baseline files
+    local query="SELECT file_path, sha256, sha512, file_size, permissions, owner_uid, owner_gid, \
+                        is_elf, elf_interpreter, link_target, has_suid, has_sgid, coverage_class, priority \
+                 FROM file_baseline \
+                 WHERE baseline_id = ${baseline_id} AND ${where_clause} \
+                 ORDER BY priority DESC, file_path;"
+
+    while IFS=$'\t' read -r filepath expected_sha256 expected_sha512 expected_size \
+                            expected_perms expected_uid expected_gid \
+                            expected_elf expected_interp expected_link \
+                            expected_suid expected_sgid coverage_class priority; do
+
+        [ -z "${filepath}" ] && continue
+        files_checked=$((files_checked + 1))
+
+        # Check file exists
+        if [ ! -e "${filepath}" ] && [ ! -L "${filepath}" ]; then
+            files_missing=$((files_missing + 1))
+            local sev
+            sev=$(determine_severity "missing" "${coverage_class}" "${priority}")
+            [ "${sev}" = "critical" ] && has_critical=1
+            [ "${sev}" = "high" ] && has_high=1
+            if [ "${quiet}" -eq 0 ]; then
+                miss "${filepath} (${coverage_class}, priority ${priority})"
+            fi
+            # Record failure
+            if [ -n "${scan_id}" ]; then
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'missing', 'exists', 'not found', '${sev}', '${coverage_class}');"
+            fi
+            continue
+        fi
+
+        local all_ok=1
+
+        # SHA-256 verification
+        if [ -f "${filepath}" ] && [ ! -L "${filepath}" ]; then
+            local current_sha256
+            current_sha256=$(sha256sum "${filepath}" 2>/dev/null | awk '{print $1}')
+
+            if [ "${current_sha256}" != "${expected_sha256}" ]; then
+                all_ok=0
+                files_failed=$((files_failed + 1))
+                local sev
+                sev=$(determine_severity "hash_mismatch" "${coverage_class}" "${priority}")
+                [ "${sev}" = "critical" ] && has_critical=1
+                [ "${sev}" = "high" ] && has_high=1
+                if [ "${quiet}" -eq 0 ]; then
+                    fail "${filepath} — SHA-256 MISMATCH (${sev})"
+                    if [ "${verbose}" -eq 1 ]; then
+                        echo "       expected: ${expected_sha256}"
+                        echo "       actual:   ${current_sha256}"
+                    fi
+                fi
+                if [ -n "${scan_id}" ]; then
+                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'hash_mismatch', '${expected_sha256}', '${current_sha256}', '${sev}', '${coverage_class}');"
+                fi
+                continue  # Don't check other attributes if hash failed
+            fi
+
+            # SHA-512 double-check for critical files
+            if [ "${expected_sha512}" != "NULL" ] && [ -n "${expected_sha512}" ]; then
+                local current_sha512
+                current_sha512=$(sha512sum "${filepath}" 2>/dev/null | awk '{print $1}')
+                if [ "${current_sha512}" != "${expected_sha512}" ]; then
+                    all_ok=0
+                    files_failed=$((files_failed + 1))
+                    has_critical=1
+                    if [ "${quiet}" -eq 0 ]; then
+                        fail "${filepath} — SHA-512 MISMATCH (critical double-hash failure)"
+                    fi
+                    if [ -n "${scan_id}" ]; then
+                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'hash_mismatch', '${expected_sha512}', '${current_sha512}', 'critical', '${coverage_class}');"
+                    fi
+                    continue
+                fi
+            fi
+        fi
+
+        # Permission check
+        local current_perms
+        current_perms=$(stat -c '%a' "${filepath}" 2>/dev/null || echo "0000")
+        while [ ${#current_perms} -lt 4 ]; do current_perms="0${current_perms}"; done
+        if [ "${current_perms}" != "${expected_perms}" ]; then
+            all_ok=0
+            local sev
+            sev=$(determine_severity "permission_change" "${coverage_class}" "${priority}")
+            if [ "${quiet}" -eq 0 ]; then
+                warn_msg "${filepath} — permissions changed (${expected_perms} → ${current_perms})"
+            fi
+            if [ -n "${scan_id}" ]; then
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'permission_change', '${expected_perms}', '${current_perms}', '${sev}', '${coverage_class}');"
+            fi
+        fi
+
+        # SUID check (detect privilege escalation)
+        local current_suid=0
+        local raw_mode
+        raw_mode=$((8#${current_perms}))
+        [ $((raw_mode & 8#4000)) -ne 0 ] && current_suid=1
+        if [ "${current_suid}" -eq 1 ] && [ "${expected_suid}" -eq 0 ]; then
+            all_ok=0
+            has_critical=1
+            if [ "${quiet}" -eq 0 ]; then
+                fail "${filepath} — SUID BIT ADDED (critical: privilege escalation vector)"
+            fi
+            if [ -n "${scan_id}" ]; then
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'suid_added', '0', '1', 'critical', '${coverage_class}');"
+            fi
+        fi
+
+        # ELF interpreter check (LD_PRELOAD attacks)
+        if [ "${expected_elf}" -eq 1 ] && [ -n "${expected_interp}" ] && [ "${expected_interp}" != "NULL" ]; then
+            if command -v readelf >/dev/null 2>&1; then
+                local current_interp
+                current_interp=$(readelf -l "${filepath}" 2>/dev/null | grep "interpreter:" | sed 's/.*: \(.*\)]/\1/' || true)
+                if [ -n "${current_interp}" ] && [ "${current_interp}" != "${expected_interp}" ]; then
+                    all_ok=0
+                    has_critical=1
+                    if [ "${quiet}" -eq 0 ]; then
+                        fail "${filepath} — ELF INTERPRETER CHANGED (critical: ${expected_interp} → ${current_interp})"
+                    fi
+                    if [ -n "${scan_id}" ]; then
+                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'elf_interpreter_change', '${expected_interp}', '${current_interp}', 'critical', '${coverage_class}');"
+                    fi
+                fi
+            fi
+        fi
+
+        # Symlink target check
+        if [ -L "${filepath}" ] && [ -n "${expected_link}" ] && [ "${expected_link}" != "NULL" ]; then
+            local current_link
+            current_link=$(readlink "${filepath}" 2>/dev/null || true)
+            if [ "${current_link}" != "${expected_link}" ]; then
+                all_ok=0
+                local sev
+                sev=$(determine_severity "link_target_change" "${coverage_class}" "${priority}")
+                if [ "${quiet}" -eq 0 ]; then
+                    warn_msg "${filepath} — symlink target changed (${expected_link} → ${current_link})"
+                fi
+                if [ -n "${scan_id}" ]; then
+                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'link_target_change', '${expected_link}', '${current_link}', '${sev}', '${coverage_class}');"
+                fi
+            fi
+        fi
+
+        if [ ${all_ok} -eq 1 ]; then
+            files_passed=$((files_passed + 1))
+            if [ "${verbose}" -eq 1 ] && [ "${quiet}" -eq 0 ]; then
+                pass "${filepath}"
+            fi
+        elif [ ${all_ok} -eq 0 ] && [ ${files_failed} -eq $((files_failed)) ]; then
+            # Already counted in a specific check above, unless it was only a permission issue
+            : # no-op, already handled
+        fi
+
+        # Progress indicator
+        if [ "${quiet}" -eq 0 ] && [ $((files_checked % 1000)) -eq 0 ]; then
+            info "  ... ${files_checked} files checked"
+        fi
+
+    done <<< "$(sql "${query}")"
+
+    # Finalize scan record
+    if [ -n "${scan_id}" ]; then
+        sql_write "CALL complete_scan(${scan_id}, ${files_passed}, ${files_failed}, ${files_missing}, ${files_new});"
+    fi
+
+    # Summary
+    echo ""
+    echo -e "${BOLD}═══════════════════════════════════════════════════${RESET}"
+    echo -e "${BOLD}  SCAN COMPLETE${RESET}"
+    echo -e "${BOLD}═══════════════════════════════════════════════════${RESET}"
+    echo ""
+    echo "  Files checked:   ${files_checked}"
+    echo -e "  Passed:          ${GREEN}${files_passed}${RESET}"
+
+    if [ ${files_failed} -gt 0 ]; then
+        echo -e "  Failed:          ${RED}${files_failed}${RESET}"
+    else
+        echo "  Failed:          0"
+    fi
+
+    if [ ${files_missing} -gt 0 ]; then
+        echo -e "  Missing:         ${RED}${files_missing}${RESET}"
+    else
+        echo "  Missing:         0"
+    fi
+
+    echo ""
+
+    # Result determination
+    local exit_code=0
+    if [ ${has_critical} -eq 1 ]; then
+        echo -e "  ${RED}${BOLD}RESULT: COMPROMISED — Critical integrity violations detected${RESET}"
+        echo ""
+        echo "  IMMEDIATE ACTION REQUIRED:"
+        echo "    1. Disconnect from network"
+        echo "    2. Boot from known-good media"
+        echo "    3. Investigate with chkrootkit and rkhunter"
+        echo "    4. Compare against previous baseline generation"
+        exit_code=2
+    elif [ ${has_high} -eq 1 ] || [ ${files_failed} -gt 0 ]; then
+        echo -e "  ${YELLOW}${BOLD}RESULT: WARNING — Integrity mismatches detected${RESET}"
+        echo ""
+        echo "  Review failures above. If changes are expected (system update):"
+        echo "    sudo touch system integrity-baseline --rebaseline \"reason\""
+        exit_code=1
+    elif [ ${files_missing} -gt 0 ]; then
+        echo -e "  ${YELLOW}${BOLD}RESULT: WARNING — Missing files detected${RESET}"
+        exit_code=1
+    else
+        echo -e "  ${GREEN}${BOLD}RESULT: CLEAN — All files match baseline${RESET}"
+        exit_code=0
+    fi
+
+    echo ""
+    return ${exit_code}
+}
+
+show_report() {
+    info "Last Scan Report"
+    info "================"
+    echo ""
+    sql "SELECT CONCAT('  Scan #', id, '  ', scan_start, '  ', UPPER(scan_result), '  by ', scanned_by) AS '' FROM verification_scan ORDER BY scan_start DESC LIMIT 1;" || echo "  No scans recorded"
+    echo ""
+    local last_scan_id
+    last_scan_id=$(sql "SELECT id FROM verification_scan ORDER BY scan_start DESC LIMIT 1;")
+    if [ -n "${last_scan_id}" ]; then
+        local fail_count
+        fail_count=$(sql "SELECT COUNT(*) FROM verification_failure WHERE scan_id = ${last_scan_id};")
+        if [ "${fail_count}" -gt 0 ]; then
+            info "Failures (${fail_count}):"
+            sql "SELECT CONCAT('  [', UPPER(severity), '] ', failure_type, ': ', file_path) AS '' FROM verification_failure WHERE scan_id = ${last_scan_id} ORDER BY FIELD(severity, 'critical', 'high', 'medium', 'low', 'info'), file_path;" || true
+        else
+            echo "  No failures in last scan."
+        fi
+    fi
+    echo ""
+}
+
+show_history() {
+    info "Scan History"
+    info "============"
+    echo ""
+    sql "SELECT CONCAT('  #', LPAD(id, 4), '  ', scan_start, '  ', RPAD(UPPER(scan_result), 12), '  pass=', files_passed, ' fail=', files_failed, ' miss=', files_missing, '  by ', scanned_by) AS '' FROM verification_scan ORDER BY scan_start DESC LIMIT 20;" || echo "  No scans recorded"
+    echo ""
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+ACTION="scan"
+WHERE="1=1"
+VERBOSE=0
+QUIET=0
+RECORD=1
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --quick)        WHERE="priority >= 90" ;;
+        --class)        shift; WHERE="coverage_class = '${1:-system_binary}'" ;;
+        --file)         shift; WHERE="file_path = '${1:-/}'" ;;
+        --suid)         WHERE="has_suid = TRUE OR has_sgid = TRUE" ;;
+        --report)       ACTION="report" ;;
+        --history)      ACTION="history" ;;
+        --verbose|-v)   VERBOSE=1 ;;
+        --quiet|-q)     QUIET=1 ;;
+        --no-record)    RECORD=0 ;;
+        --help|-h)      usage ;;
+        *)              die "Unknown option: $1" ;;
+    esac
+    shift
+done
+
+load_credentials
+
+case "${ACTION}" in
+    scan)
+        run_scan "${WHERE}" "${VERBOSE}" "${QUIET}" "${RECORD}"
+        ;;
+    report)
+        show_report
+        ;;
+    history)
+        show_history
+        ;;
+esac

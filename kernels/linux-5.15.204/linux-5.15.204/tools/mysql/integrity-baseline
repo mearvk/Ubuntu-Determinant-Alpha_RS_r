@@ -1,0 +1,470 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# integrity-baseline — Capture file integrity baseline into MySQL
+#
+# Computes SHA-256 (and SHA-512 for critical files) of all system files
+# defined in the coverage_paths table, stores results in the file_integrity
+# database. Requires Grade 7+ for re-baselining a live system.
+#
+# Usage:
+#   integrity-baseline --build         (during ISO build — no gate required)
+#   sudo touch system integrity-baseline --rebaseline "reason"
+#   integrity-baseline --status        (show current baseline info)
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+set -euo pipefail
+
+PROGRAM="integrity-baseline"
+VERSION="2.51"
+CONF_DIR="/etc/integrity"
+WRITER_CONF="${CONF_DIR}/admin.conf"
+DB_NAME="file_integrity"
+
+# ============================================================
+# Functions
+# ============================================================
+
+die() {
+    echo "${PROGRAM}: ERROR: $1" >&2
+    exit 1
+}
+
+info() {
+    echo "${PROGRAM}: $1"
+}
+
+warn() {
+    echo "${PROGRAM}: WARNING: $1" >&2
+}
+
+usage() {
+    cat <<EOF
+${PROGRAM} v${VERSION} — File Integrity Baseline Capture
+
+Usage:
+  ${PROGRAM} --build [--rootfs DIR]     Capture baseline (build time, no auth gate)
+  ${PROGRAM} --rebaseline "reason"      Re-baseline live system (Grade 7+ required)
+  ${PROGRAM} --status                   Show current baseline status
+  ${PROGRAM} --coverage                 Show coverage path configuration
+  ${PROGRAM} --help                     This message
+
+Options:
+  --rootfs DIR       Use DIR as root (for build-time capture into assembled rootfs)
+  --method METHOD    One of: build, install, rebaseline, update, emergency
+  --reason "text"    Reason for this baseline (required for rebaseline)
+
+Examples:
+  # During ISO build (in Makefile):
+  ${PROGRAM} --build --rootfs build/rootfs
+
+  # After system update:
+  sudo touch system ${PROGRAM} --rebaseline "Applied security patches 2026-07-29"
+
+  # Check what's covered:
+  ${PROGRAM} --status
+EOF
+    exit 0
+}
+
+# Load MySQL credentials
+load_credentials() {
+    if [ ! -f "${WRITER_CONF}" ]; then
+        die "Writer credentials not found: ${WRITER_CONF}"
+    fi
+    # File format: single line with password, or KEY=VALUE
+    if grep -q "=" "${WRITER_CONF}" 2>/dev/null; then
+        DB_USER=$(grep "^user=" "${WRITER_CONF}" | cut -d= -f2)
+        DB_PASS=$(grep "^password=" "${WRITER_CONF}" | cut -d= -f2)
+    else
+        DB_USER="integrity_writer"
+        DB_PASS=$(cat "${WRITER_CONF}")
+    fi
+    [ -z "${DB_PASS}" ] && die "Empty password in ${WRITER_CONF}"
+}
+
+# Execute SQL query
+sql() {
+    mysql -u "${DB_USER}" -p"${DB_PASS}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
+}
+
+sql_quiet() {
+    mysql -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
+}
+
+# Get file metadata
+get_file_info() {
+    local filepath="$1"
+    local rootfs="${2:-}"
+    local fullpath="${rootfs}${filepath}"
+
+    [ ! -e "${fullpath}" ] && return 1
+
+    # File type
+    local ftype="regular"
+    [ -L "${fullpath}" ] && ftype="symlink"
+    [ -d "${fullpath}" ] && ftype="directory"
+    [ -b "${fullpath}" ] && ftype="device"
+    [ -c "${fullpath}" ] && ftype="device"
+    [ -p "${fullpath}" ] && ftype="pipe"
+    [ -S "${fullpath}" ] && ftype="socket"
+
+    # SHA-256
+    local sha256="0000000000000000000000000000000000000000000000000000000000000000"
+    if [ "${ftype}" = "regular" ]; then
+        sha256=$(sha256sum "${fullpath}" 2>/dev/null | awk '{print $1}')
+    fi
+
+    # Size
+    local fsize
+    fsize=$(stat -c '%s' "${fullpath}" 2>/dev/null || echo 0)
+
+    # Permissions (octal)
+    local perms
+    perms=$(stat -c '%a' "${fullpath}" 2>/dev/null || echo "0000")
+    # Pad to 4 digits
+    while [ ${#perms} -lt 4 ]; do perms="0${perms}"; done
+
+    # Owner
+    local uid gid owner_name group_name
+    uid=$(stat -c '%u' "${fullpath}" 2>/dev/null || echo 0)
+    gid=$(stat -c '%g' "${fullpath}" 2>/dev/null || echo 0)
+    owner_name=$(stat -c '%U' "${fullpath}" 2>/dev/null || echo "unknown")
+    group_name=$(stat -c '%G' "${fullpath}" 2>/dev/null || echo "unknown")
+
+    # Timestamps (seconds since epoch — nanoseconds if available)
+    local mtime ctime
+    mtime=$(stat -c '%Y' "${fullpath}" 2>/dev/null || echo 0)
+    ctime=$(stat -c '%Z' "${fullpath}" 2>/dev/null || echo 0)
+
+    # SUID/SGID/Sticky
+    local has_suid=0 has_sgid=0 has_sticky=0
+    local raw_mode
+    raw_mode=$(stat -c '%f' "${fullpath}" 2>/dev/null || echo "0")
+    local mode_int=$((16#${raw_mode}))
+    [ $((mode_int & 0x800)) -ne 0 ] && has_suid=1
+    [ $((mode_int & 0x400)) -ne 0 ] && has_sgid=1
+    [ $((mode_int & 0x200)) -ne 0 ] && has_sticky=1
+
+    # Immutable check (lsattr)
+    local is_immutable=0
+    if command -v lsattr >/dev/null 2>&1 && [ "${ftype}" = "regular" ]; then
+        lsattr "${fullpath}" 2>/dev/null | grep -q "^....i" && is_immutable=1
+    fi
+
+    # ELF detection
+    local is_elf=0 elf_type="" elf_interp="" elf_rpath=""
+    if [ "${ftype}" = "regular" ] && head -c4 "${fullpath}" 2>/dev/null | grep -q $'\x7fELF'; then
+        is_elf=1
+        if command -v readelf >/dev/null 2>&1; then
+            elf_type=$(readelf -h "${fullpath}" 2>/dev/null | grep "Type:" | awk '{print $2}' || true)
+            elf_interp=$(readelf -l "${fullpath}" 2>/dev/null | grep "interpreter:" | sed 's/.*: \(.*\)]/\1/' || true)
+            elf_rpath=$(readelf -d "${fullpath}" 2>/dev/null | grep -E "RPATH|RUNPATH" | sed 's/.*\[\(.*\)\]/\1/' || true)
+        fi
+    fi
+
+    # Symlink target
+    local link_target=""
+    if [ "${ftype}" = "symlink" ]; then
+        link_target=$(readlink -f "${fullpath}" 2>/dev/null || readlink "${fullpath}" 2>/dev/null || true)
+        # Make path relative to rootfs if capturing at build time
+        if [ -n "${rootfs}" ] && [ -n "${link_target}" ]; then
+            link_target="${link_target#${rootfs}}"
+        fi
+    fi
+
+    # Output as tab-separated
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "${filepath}" "${ftype}" "${sha256}" "${fsize}" "${perms}" \
+        "${uid}" "${gid}" "${owner_name}" "${group_name}" \
+        "${mtime}" "${ctime}" "${has_suid}" "${has_sgid}" "${has_sticky}" \
+        "${is_immutable}" "${is_elf}" "${elf_interp}" "${link_target}"
+}
+
+# Expand coverage paths into file list
+expand_coverage_paths() {
+    local rootfs="${1:-}"
+    local coverage_rows
+
+    coverage_rows=$(sql "SELECT path_pattern, coverage_class, priority, include_sha512, recursive FROM coverage_paths WHERE enabled = TRUE ORDER BY priority DESC;")
+
+    [ -z "${coverage_rows}" ] && die "No coverage paths defined in database"
+
+    while IFS=$'\t' read -r pattern class priority do_sha512 recursive; do
+        local search_path="${rootfs}${pattern}"
+
+        # Handle glob patterns
+        if echo "${pattern}" | grep -q '\*\*'; then
+            # Recursive glob: find all files under the directory
+            local base_dir
+            base_dir=$(echo "${search_path}" | sed 's/\*\*.*$//')
+            if [ -d "${base_dir}" ]; then
+                find "${base_dir}" -type f -o -type l 2>/dev/null | while read -r file; do
+                    local rel_path="${file#${rootfs}}"
+                    echo "${rel_path}|${class}|${priority}|${do_sha512}"
+                done
+            fi
+        elif echo "${pattern}" | grep -q '\*'; then
+            # Simple glob
+            for file in ${search_path}; do
+                if [ -e "${file}" ]; then
+                    local rel_path="${file#${rootfs}}"
+                    echo "${rel_path}|${class}|${priority}|${do_sha512}"
+                fi
+            done
+        else
+            # Exact path
+            if [ -e "${search_path}" ]; then
+                local rel_path="${search_path#${rootfs}}"
+                echo "${rel_path}|${class}|${priority}|${do_sha512}"
+            fi
+        fi
+    done <<< "${coverage_rows}"
+}
+
+# Main baseline capture
+capture_baseline() {
+    local rootfs="${1:-}"
+    local method="${2:-build}"
+    local reason="${3:-Initial baseline}"
+    local caller_user caller_uid
+
+    caller_user=$(whoami)
+    caller_uid=$(id -u)
+
+    info "Starting baseline capture..."
+    info "  Root: ${rootfs:-/}"
+    info "  Method: ${method}"
+    info "  Reason: ${reason}"
+    info "  User: ${caller_user} (UID ${caller_uid})"
+
+    # Create new baseline generation
+    sql_quiet "INSERT INTO baseline_generation (created_by, created_uid, reason, method, system_version, kernel_version)
+               VALUES ('${caller_user}', ${caller_uid}, '${reason}', '${method}',
+                       '$(cat ${rootfs}/etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"' || echo "unknown")',
+                       '$(uname -r 2>/dev/null || echo "unknown")');"
+
+    local baseline_id
+    baseline_id=$(sql "SELECT MAX(id) FROM baseline_generation;")
+    [ -z "${baseline_id}" ] && die "Failed to create baseline generation"
+
+    info "  Baseline ID: #${baseline_id}"
+    info "  Expanding coverage paths..."
+
+    local file_count=0
+    local total_bytes=0
+    local batch_sql=""
+    local batch_count=0
+    local BATCH_SIZE=100
+
+    expand_coverage_paths "${rootfs}" | sort -u -t'|' -k1,1 | while IFS='|' read -r filepath class priority do_sha512; do
+        [ -z "${filepath}" ] && continue
+
+        local fullpath="${rootfs}${filepath}"
+        [ ! -e "${fullpath}" ] && continue
+
+        # Get file type
+        local ftype="regular"
+        [ -L "${fullpath}" ] && ftype="symlink"
+        [ -d "${fullpath}" ] && ftype="directory"
+
+        # Skip directories for hashing
+        [ "${ftype}" = "directory" ] && continue
+
+        # SHA-256
+        local sha256="0000000000000000000000000000000000000000000000000000000000000000"
+        if [ "${ftype}" = "regular" ]; then
+            sha256=$(sha256sum "${fullpath}" 2>/dev/null | awk '{print $1}')
+            [ -z "${sha256}" ] && continue
+        fi
+
+        # SHA-512 for critical files
+        local sha512="NULL"
+        if [ "${do_sha512}" = "1" ] && [ "${ftype}" = "regular" ]; then
+            local hash512
+            hash512=$(sha512sum "${fullpath}" 2>/dev/null | awk '{print $1}')
+            [ -n "${hash512}" ] && sha512="'${hash512}'"
+        fi
+
+        # Size
+        local fsize
+        fsize=$(stat -c '%s' "${fullpath}" 2>/dev/null || echo 0)
+        total_bytes=$((total_bytes + fsize))
+
+        # Permissions
+        local perms
+        perms=$(stat -c '%a' "${fullpath}" 2>/dev/null || echo "0000")
+        while [ ${#perms} -lt 4 ]; do perms="0${perms}"; done
+
+        # Owner
+        local uid gid owner_name group_name
+        uid=$(stat -c '%u' "${fullpath}" 2>/dev/null || echo 0)
+        gid=$(stat -c '%g' "${fullpath}" 2>/dev/null || echo 0)
+        owner_name=$(stat -c '%U' "${fullpath}" 2>/dev/null || echo "unknown")
+        group_name=$(stat -c '%G' "${fullpath}" 2>/dev/null || echo "unknown")
+
+        # Timestamps
+        local mtime ctime
+        mtime=$(stat -c '%Y' "${fullpath}" 2>/dev/null || echo 0)
+        ctime=$(stat -c '%Z' "${fullpath}" 2>/dev/null || echo 0)
+
+        # SUID/SGID
+        local has_suid=0 has_sgid=0 has_sticky=0 is_immutable=0
+        local raw_perms_int
+        raw_perms_int=$((8#${perms}))
+        [ $((raw_perms_int & 8#4000)) -ne 0 ] && has_suid=1
+        [ $((raw_perms_int & 8#2000)) -ne 0 ] && has_sgid=1
+        [ $((raw_perms_int & 8#1000)) -ne 0 ] && has_sticky=1
+
+        # ELF detection
+        local is_elf=0 elf_interp="NULL" elf_rpath="NULL"
+        if [ "${ftype}" = "regular" ] && head -c4 "${fullpath}" 2>/dev/null | grep -q $'\x7fELF'; then
+            is_elf=1
+            if command -v readelf >/dev/null 2>&1; then
+                local interp
+                interp=$(readelf -l "${fullpath}" 2>/dev/null | grep "interpreter:" | sed 's/.*: \(.*\)]/\1/' || true)
+                [ -n "${interp}" ] && elf_interp="'${interp}'"
+                local rpath
+                rpath=$(readelf -d "${fullpath}" 2>/dev/null | grep -E "RPATH|RUNPATH" | sed 's/.*\[\(.*\)\]/\1/' || true)
+                [ -n "${rpath}" ] && elf_rpath="'${rpath}'"
+            fi
+        fi
+
+        # Symlink target
+        local link_target="NULL"
+        if [ "${ftype}" = "symlink" ]; then
+            local ltarget
+            ltarget=$(readlink "${fullpath}" 2>/dev/null || true)
+            [ -n "${ltarget}" ] && link_target="'${ltarget}'"
+        fi
+
+        # Escape single quotes in filepath
+        local safe_path
+        safe_path=$(echo "${filepath}" | sed "s/'/''/g")
+
+        # Build INSERT
+        batch_sql="${batch_sql}INSERT INTO file_baseline (baseline_id, file_path, file_type, sha256, sha512, file_size, permissions, owner_uid, owner_gid, owner_name, group_name, mtime, ctime, is_elf, elf_interpreter, elf_rpath, link_target, has_suid, has_sgid, has_sticky, is_immutable, coverage_class, priority) VALUES (${baseline_id}, '${safe_path}', '${ftype}', '${sha256}', ${sha512}, ${fsize}, '${perms}', ${uid}, ${gid}, '${owner_name}', '${group_name}', ${mtime}, ${ctime}, ${is_elf}, ${elf_interp}, ${elf_rpath}, ${link_target}, ${has_suid}, ${has_sgid}, ${has_sticky}, ${is_immutable}, '${class}', ${priority});
+"
+        batch_count=$((batch_count + 1))
+        file_count=$((file_count + 1))
+
+        # Flush batch
+        if [ ${batch_count} -ge ${BATCH_SIZE} ]; then
+            sql_quiet "${batch_sql}" || warn "Batch insert failed near file #${file_count}"
+            batch_sql=""
+            batch_count=0
+            # Progress
+            if [ $((file_count % 500)) -eq 0 ]; then
+                info "  ... ${file_count} files captured"
+            fi
+        fi
+    done
+
+    # Flush remaining
+    if [ -n "${batch_sql}" ]; then
+        sql_quiet "${batch_sql}" || warn "Final batch insert failed"
+    fi
+
+    # Update generation with counts
+    file_count=$(sql "SELECT COUNT(*) FROM file_baseline WHERE baseline_id = ${baseline_id};")
+    total_bytes=$(sql "SELECT COALESCE(SUM(file_size), 0) FROM file_baseline WHERE baseline_id = ${baseline_id};")
+
+    sql_quiet "UPDATE baseline_generation SET file_count = ${file_count}, coverage_bytes = ${total_bytes} WHERE id = ${baseline_id};"
+
+    # Deactivate previous baselines
+    sql_quiet "UPDATE baseline_generation SET is_active = FALSE, superseded_by = ${baseline_id} WHERE id != ${baseline_id} AND is_active = TRUE;"
+
+    info ""
+    info "╔══════════════════════════════════════════════════╗"
+    info "║  BASELINE CAPTURE COMPLETE                       ║"
+    info "╚══════════════════════════════════════════════════╝"
+    info ""
+    info "  Baseline ID:     #${baseline_id}"
+    info "  Files captured:  ${file_count}"
+    info "  Total coverage:  $((total_bytes / 1024 / 1024)) MB"
+    info "  Method:          ${method}"
+    info "  Stored in:       MySQL file_integrity database"
+    info ""
+}
+
+show_status() {
+    load_credentials
+    info "File Integrity System Status"
+    info "============================="
+    echo ""
+    sql "SELECT CONCAT('  Active baseline: #', id, ' (', created_at, ')') AS '' FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;" 2>/dev/null || echo "  No active baseline"
+    sql "SELECT CONCAT('  Files covered:   ', file_count) AS '' FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;" 2>/dev/null || true
+    sql "SELECT CONCAT('  Coverage bytes:  ', ROUND(coverage_bytes/1024/1024, 1), ' MB') AS '' FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;" 2>/dev/null || true
+    sql "SELECT CONCAT('  Method:          ', method) AS '' FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;" 2>/dev/null || true
+    sql "SELECT CONCAT('  Reason:          ', reason) AS '' FROM baseline_generation WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1;" 2>/dev/null || true
+    echo ""
+    info "Coverage by class:"
+    sql "SELECT CONCAT('  ', RPAD(coverage_class, 20), COUNT(*), ' files') AS '' FROM v_active_baseline GROUP BY coverage_class ORDER BY COUNT(*) DESC;" 2>/dev/null || echo "  (no baseline data)"
+    echo ""
+    info "Last 5 scans:"
+    sql "SELECT CONCAT('  ', scan_start, '  ', scan_result, '  (', files_passed, ' ok, ', files_failed, ' fail, ', files_missing, ' miss)') AS '' FROM verification_scan ORDER BY scan_start DESC LIMIT 5;" 2>/dev/null || echo "  (no scans recorded)"
+    echo ""
+}
+
+show_coverage() {
+    load_credentials
+    info "Coverage Path Configuration"
+    info "============================"
+    echo ""
+    sql "SELECT CONCAT('  [', LPAD(priority, 3), '] ', RPAD(coverage_class, 18), ' ', path_pattern, CASE WHEN include_sha512 THEN ' [SHA-512]' ELSE '' END) AS '' FROM coverage_paths WHERE enabled = TRUE ORDER BY priority DESC, coverage_class;" 2>/dev/null || echo "  (no coverage paths)"
+    echo ""
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+ACTION=""
+ROOTFS=""
+METHOD="build"
+REASON=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --build)        ACTION="build"; METHOD="build" ;;
+        --rebaseline)   ACTION="rebaseline"; METHOD="rebaseline"
+                        shift; REASON="${1:-}" ;;
+        --install)      ACTION="build"; METHOD="install" ;;
+        --update)       ACTION="build"; METHOD="update" ;;
+        --emergency)    ACTION="build"; METHOD="emergency" ;;
+        --status)       ACTION="status" ;;
+        --coverage)     ACTION="coverage" ;;
+        --rootfs)       shift; ROOTFS="${1:-}" ;;
+        --method)       shift; METHOD="${1:-build}" ;;
+        --reason)       shift; REASON="${1:-}" ;;
+        --help|-h)      usage ;;
+        *)              die "Unknown option: $1" ;;
+    esac
+    shift
+done
+
+[ -z "${ACTION}" ] && usage
+
+case "${ACTION}" in
+    build)
+        [ -z "${REASON}" ] && REASON="Build-time baseline capture"
+        load_credentials
+        capture_baseline "${ROOTFS}" "${METHOD}" "${REASON}"
+        ;;
+    rebaseline)
+        [ -z "${REASON}" ] && die "--rebaseline requires a reason string"
+        [ "$(id -u)" -ne 0 ] && die "Re-baselining requires root (Grade 7+)"
+        load_credentials
+        capture_baseline "" "${METHOD}" "${REASON}"
+        ;;
+    status)
+        load_credentials
+        show_status
+        ;;
+    coverage)
+        load_credentials
+        show_coverage
+        ;;
+esac
