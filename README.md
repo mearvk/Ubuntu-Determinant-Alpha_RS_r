@@ -40,9 +40,11 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 13. [CPU Boost Designation](#cpu-boost-designation)
 14. [White Ethics Installer Grade](#white-ethics-installer-grade)
 15. [ClamAV — Protected Antivirus](#clamav--protected-antivirus)
-16. [MySQL — Protected Database](#mysql--protected-database)
-17. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
-18. [Certificates](#certificates)
+16. [chkrootkit — Rootkit Detection](#chkrootkit--rootkit-detection)
+17. [rkhunter — Rootkit Hunter](#rkhunter--rootkit-hunter)
+18. [MySQL — Protected Database](#mysql--protected-database)
+19. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+20. [Certificates](#certificates)
 
 ---
 
@@ -853,6 +855,187 @@ freshclam                          # Update signatures
 ```
 tools/clamav/                  - Full ClamAV source (Cisco-Talos, GPL-2.0)
 tools/clamav/install_clamav.sh - Protected installation script
+```
+
+---
+
+## chkrootkit — Rootkit Detection
+
+chkrootkit is a locally-installed rootkit detection tool that examines the system for signs of rootkit infection. It checks system binaries, network interfaces, and log files for known rootkit signatures and anomalous behavior.
+
+### What It Detects
+
+| Category | Checks |
+|----------|--------|
+| Binary modification | Known trojanized versions of `login`, `su`, `ps`, `netstat`, `ls`, `find`, `du`, `ifconfig`, `sshd` |
+| Network anomalies | Promiscuous network interfaces (sniffers), hidden listening ports |
+| Log tampering | Deleted entries in `wtmp`, `lastlog`, `utmp` (login record erasure) |
+| Process hiding | Processes hidden from `/proc` (LKM-based rootkits) |
+| Directory hiding | Hidden directories created by known rootkits |
+| LKM rootkits | Signs of malicious kernel module injection |
+| Known rootkits | 70+ rootkit signature database (lrk, t0rn, Ambient's Rootkit, Suckit, etc.) |
+
+### Usage
+
+```bash
+sudo chkrootkit              # Full system scan
+sudo chkrootkit -q           # Quiet mode (only report infections)
+sudo chkrootkit -x           # Expert mode (detailed output)
+sudo chkrootkit -r /mnt/sys  # Check an alternate root directory
+```
+
+### Helper Binaries
+
+| Binary | Purpose |
+|--------|---------|
+| `chklastlog` | Detects deletions in `/var/log/lastlog` |
+| `chkwtmp` | Detects deletions in `/var/log/wtmp` |
+| `chkutmp` | Detects deletions in `/var/run/utmp` |
+| `chkproc` | Detects processes hidden from `/proc` |
+| `chkdirs` | Detects hidden directories |
+| `ifpromisc` | Detects promiscuous network interfaces |
+| `check_wtmpx` | Detects deletions in `wtmpx` (Solaris) |
+| `strings-static` | Statically-linked strings (cannot be trojaned) |
+
+### Protection
+
+chkrootkit installs to `/usr/local/sbin/` (admin-only path) with helper binaries in `/usr/local/lib/chkrootkit/`. The main `chkrootkit` script is branded with NEGAMANE immutability to prevent tampering. Binaries are statically linked where possible to avoid LD_PRELOAD attacks.
+
+### Files
+
+```
+tools/chkrootkit/chkrootkit      - Main detection script (shell)
+tools/chkrootkit/chklastlog.c    - lastlog checker
+tools/chkrootkit/chkwtmp.c       - wtmp checker
+tools/chkrootkit/chkutmp.c       - utmp checker
+tools/chkrootkit/chkproc.c       - Hidden process detector
+tools/chkrootkit/chkdirs.c       - Hidden directory detector
+tools/chkrootkit/ifpromisc.c     - Promiscuous interface detector
+tools/chkrootkit/check_wtmpx.c   - wtmpx checker
+tools/chkrootkit/strings.c       - Static strings utility
+tools/chkrootkit/Makefile        - Build rules
+```
+
+---
+
+## rkhunter — Rootkit Hunter
+
+rkhunter (Rootkit Hunter) is a comprehensive security scanner that checks for rootkits, backdoors, and local exploits. It performs more extensive checks than chkrootkit and maintains a database of known-good file properties for integrity verification.
+
+### What It Detects
+
+| Category | Checks |
+|----------|--------|
+| Rootkit signatures | 300+ known rootkits and variants |
+| Backdoor ports | Checks for known backdoor listeners on specific ports |
+| Suspicious files | Hidden files, world-writable directories in system paths |
+| Binary integrity | MD5/SHA hash comparison against known-good values |
+| System configuration | Dangerous SSH settings, promiscuous mode, network config |
+| Startup files | Suspicious entries in rc scripts and cron |
+| Kernel exploits | Checks for loaded suspicious kernel modules |
+| String scanning | Suspicious strings in system binaries |
+| File properties | Permissions, ownership, immutable bit changes |
+
+### Usage
+
+```bash
+sudo rkhunter --check                 # Full system scan
+sudo rkhunter --check --skip-keypress # Non-interactive full scan
+sudo rkhunter --update                # Update detection databases
+sudo rkhunter --propupd               # Update file properties database
+sudo rkhunter --list                  # List available tests
+sudo rkhunter --versioncheck          # Check for rkhunter updates
+```
+
+### Scan Output
+
+rkhunter provides color-coded results:
+
+```
+Checking for rootkits...
+  Performing check of known rootkit files and directories
+    55808 Trojan - Variant A                         [ Not found ]
+    ADM Worm                                         [ Not found ]
+    AjaKit Rootkit                                   [ Not found ]
+    ...
+
+  Performing system configuration file checks
+    Checking for SSH root access                     [ Warning ]
+    Checking for password file changes               [ OK ]
+    ...
+
+System checks summary
+=====================
+File properties checks...
+    Files checked: 142
+    Suspect files: 0
+Rootkit checks...
+    Rootkits checked: 303
+    Possible rootkits: 0
+```
+
+### Configuration
+
+Configuration file: `/etc/rkhunter/rkhunter.conf`
+
+Key settings:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `MAIL-ON-WARNING` | (none) | Email address for alerts |
+| `ALLOW_SSH_ROOT_USER` | no | Whether to warn on SSH root login |
+| `SCRIPTWHITELIST` | (varies) | Known-good scripts to ignore |
+| `UPDATE_MIRRORS` | 1 | Auto-update mirror list |
+| `MIRRORS_MODE` | 0 | Use any available mirror |
+| `WEB_CMD` | wget | Download tool for updates |
+
+### Database Files
+
+| File | Purpose |
+|------|---------|
+| `backdoorports.dat` | Known backdoor port numbers |
+| `programs_bad.dat` | Known malicious program signatures |
+| `suspscan.dat` | Suspicious strings database |
+| `mirrors.dat` | Update mirror list |
+
+### Integration with System Security
+
+rkhunter is designed to run alongside chkrootkit and ClamAV as part of a layered security approach:
+
+- **ClamAV** — signature-based malware scanning (files and streams)
+- **chkrootkit** — quick rootkit-specific checks (binary modification, log tampering)
+- **rkhunter** — comprehensive system integrity verification (300+ rootkits, file properties, config audit)
+
+Recommended cron schedule:
+
+```crontab
+# Daily rootkit checks (using cronie callback extension)
+0 3 * * * /usr/local/bin/rkhunter --check --skip-keypress --quiet @callback {
+    expect: "System checks summary"
+    on_fail: escalate
+    notify: "chat:ops-team"
+}
+
+0 4 * * * /usr/local/sbin/chkrootkit -q @callback {
+    expect: ""
+    on_fail: escalate
+    notify: "chat:ops-team"
+}
+```
+
+### Files
+
+```
+tools/rkhunter/installer.sh          - Installation script
+tools/rkhunter/files/rkhunter        - Main scanner (shell, 575 KB)
+tools/rkhunter/files/rkhunter.conf   - Configuration file
+tools/rkhunter/files/rkhunter.8      - Manual page
+tools/rkhunter/files/backdoorports.dat   - Backdoor port database
+tools/rkhunter/files/programs_bad.dat    - Malicious program signatures
+tools/rkhunter/files/suspscan.dat        - Suspicious strings database
+tools/rkhunter/files/mirrors.dat         - Update mirrors
+tools/rkhunter/files/FAQ                 - Frequently asked questions
+tools/rkhunter/files/LICENSE             - GPL-2.0
 ```
 
 ---
