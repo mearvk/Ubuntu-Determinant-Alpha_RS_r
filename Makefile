@@ -34,7 +34,7 @@ PREFIX        := /usr
         tools tools-install tools-all tools-all-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
-        rootfs rootfs-full initramfs grub iso \
+        desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
 all: kernel userland
@@ -59,6 +59,7 @@ help:
 	@echo "  x11              - Build X.Org Server 21.1.24 and libraries"
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Fetch OpenJDK 28 (~227 MB download)"
+	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
 	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
 	@echo ""
@@ -345,6 +346,21 @@ tools-rkhunter-install:
 tools-all-install: tools-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
 
 # ==============================================================================
+# Desktop Environment (MATE + LightDM + Red Cherry Theme)
+# ==============================================================================
+
+desktop:
+	@echo "=== Installing MATE Desktop (requires network for apt) ==="
+	@if [ -d "$(ROOTFS_DIR)/usr" ]; then \
+		cp $(SCRIPTS_DIR)/install-mate-desktop.sh $(ROOTFS_DIR)/tmp/ && \
+		chmod 755 $(ROOTFS_DIR)/tmp/install-mate-desktop.sh && \
+		chroot $(ROOTFS_DIR) /tmp/install-mate-desktop.sh && \
+		rm -f $(ROOTFS_DIR)/tmp/install-mate-desktop.sh; \
+	else \
+		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
+	fi
+
+# ==============================================================================
 # Root Filesystem Assembly
 # ==============================================================================
 
@@ -356,7 +372,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install tools-all-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install tools-all-install desktop initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
@@ -373,6 +389,9 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install t
 	@echo "    ✓ Linux kernel $(KERNEL_VER) + 9 custom extensions"
 	@echo "    ✓ X.Org Server 21.1.24 + libs + icons"
 	@echo "    ✓ 9 Galactic Cherry wallpapers"
+	@echo "    ✓ 10 Marvell JPEG wallpapers (4K)"
+	@echo "    ✓ MATE Desktop (Red Cherry theme)"
+	@echo "    ✓ LightDM (graphical login)"
 	@echo "    ✓ OpenJDK 28 (default Java runtime)"
 	@echo "    ✓ sudo_gate, chat, nnet, negamane"
 	@echo "    ✓ Cronie (cron with callbacks)"
