@@ -32,6 +32,8 @@ PREFIX        := /usr
 .PHONY: all kernel kernel-defconfig kernel-menuconfig kernel-modules kernel-install \
         userland x11 x11-install wallpapers wallpapers-install \
         tools tools-install tools-all tools-all-install \
+        tools-chkrootkit tools-chkrootkit-install \
+        tools-rkhunter tools-rkhunter-install \
         rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -58,7 +60,7 @@ help:
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Fetch OpenJDK 28 (~227 MB download)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
-	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql)"
+	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
 	@echo ""
 	@echo "Assembly Targets:"
 	@echo "  rootfs           - Extract Ubuntu Base rootfs"
@@ -77,6 +79,10 @@ help:
 	@echo "Kernel Extensions:"
 	@echo "  EPMP, HPM, EPERM, USB_SWAP, USB_FAST_DMA,"
 	@echo "  NEGAMANE, USER_KO, WHITE_ETHICS, CPUBOOST"
+	@echo ""
+	@echo "Security Tools:"
+	@echo "  chkrootkit  - Rootkit detection (shell + C helpers)"
+	@echo "  rkhunter    - Rootkit Hunter (shell-based scanner)"
 	@echo ""
 	@echo "Prerequisites:"
 	@echo "  kernel  - gcc, make, flex, bison, libelf-dev, bc, libssl-dev"
@@ -180,7 +186,7 @@ tools-install:
 # Tools - Extended (autotools/cmake-based, longer builds)
 # ==============================================================================
 
-tools-all: tools tools-cronie tools-clamav tools-mysql tools-ai
+tools-all: tools tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
 
 # Cronie (cron with callback extension) - autotools
 tools-cronie:
@@ -273,8 +279,62 @@ tools-ai-install:
 	done
 	@echo "  Dave installed ($(shell ls $(TOOLS_DIR)/ai/library/*.lib 2>/dev/null | wc -l) library books)"
 
+# chkrootkit (rootkit detection) - simple C compilation
+tools-chkrootkit:
+	@echo "=== Building chkrootkit ==="
+	@if [ -d "$(TOOLS_DIR)/chkrootkit" ] && [ -f "$(TOOLS_DIR)/chkrootkit/Makefile" ]; then \
+		$(MAKE) -C $(TOOLS_DIR)/chkrootkit sense; \
+	fi
+
+tools-chkrootkit-install:
+	@echo "=== Installing chkrootkit ==="
+	@if [ -d "$(TOOLS_DIR)/chkrootkit" ]; then \
+		install -d $(ROOTFS_DIR)/usr/local/sbin; \
+		install -d $(ROOTFS_DIR)/usr/local/lib/chkrootkit; \
+		install -m 755 $(TOOLS_DIR)/chkrootkit/chkrootkit $(ROOTFS_DIR)/usr/local/sbin/; \
+		for bin in chklastlog chkwtmp ifpromisc chkproc chkdirs check_wtmpx strings-static chkutmp; do \
+			if [ -f "$(TOOLS_DIR)/chkrootkit/$$bin" ]; then \
+				install -m 755 "$(TOOLS_DIR)/chkrootkit/$$bin" $(ROOTFS_DIR)/usr/local/lib/chkrootkit/; \
+			fi; \
+		done; \
+		echo "  ✓ chkrootkit installed to /usr/local/sbin/"; \
+	fi
+
+# rkhunter (Rootkit Hunter) - shell-based, uses installer.sh
+tools-rkhunter:
+	@echo "=== Preparing rkhunter (no compilation needed) ==="
+	@if [ -d "$(TOOLS_DIR)/rkhunter" ] && [ -f "$(TOOLS_DIR)/rkhunter/installer.sh" ]; then \
+		echo "  rkhunter $(shell grep '^APPVERSION=' $(TOOLS_DIR)/rkhunter/installer.sh 2>/dev/null | cut -d'"' -f2) ready for install"; \
+	fi
+
+tools-rkhunter-install:
+	@echo "=== Installing rkhunter ==="
+	@if [ -d "$(TOOLS_DIR)/rkhunter" ] && [ -f "$(TOOLS_DIR)/rkhunter/installer.sh" ]; then \
+		install -d $(ROOTFS_DIR)/usr/local/bin; \
+		install -d $(ROOTFS_DIR)/usr/local/lib/rkhunter; \
+		install -d $(ROOTFS_DIR)/usr/local/lib/rkhunter/scripts; \
+		install -d $(ROOTFS_DIR)/usr/local/share/man/man8; \
+		install -d $(ROOTFS_DIR)/etc/rkhunter; \
+		install -d $(ROOTFS_DIR)/var/lib/rkhunter/db; \
+		install -d $(ROOTFS_DIR)/var/lib/rkhunter/tmp; \
+		install -m 755 $(TOOLS_DIR)/rkhunter/files/rkhunter $(ROOTFS_DIR)/usr/local/bin/; \
+		install -m 644 $(TOOLS_DIR)/rkhunter/files/rkhunter.conf $(ROOTFS_DIR)/etc/rkhunter/; \
+		install -m 644 $(TOOLS_DIR)/rkhunter/files/rkhunter.8 $(ROOTFS_DIR)/usr/local/share/man/man8/ 2>/dev/null || true; \
+		for dat in backdoorports.dat mirrors.dat programs_bad.dat suspscan.dat; do \
+			if [ -f "$(TOOLS_DIR)/rkhunter/files/$$dat" ]; then \
+				install -m 644 "$(TOOLS_DIR)/rkhunter/files/$$dat" $(ROOTFS_DIR)/var/lib/rkhunter/db/; \
+			fi; \
+		done; \
+		for script in $(TOOLS_DIR)/rkhunter/files/*.pl $(TOOLS_DIR)/rkhunter/files/*.sh; do \
+			if [ -f "$$script" ]; then \
+				install -m 755 "$$script" $(ROOTFS_DIR)/usr/local/lib/rkhunter/scripts/; \
+			fi; \
+		done; \
+		echo "  ✓ rkhunter installed to /usr/local/bin/"; \
+	fi
+
 # Full tools install (all)
-tools-all-install: tools-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install
+tools-all-install: tools-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
 
 # ==============================================================================
 # Root Filesystem Assembly
@@ -311,6 +371,8 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install t
 	@echo "    ✓ ClamAV (protected antivirus)"
 	@echo "    ✓ MySQL (protected database + package registry)"
 	@echo "    ✓ Dave (system intelligence, 75-book library)"
+	@echo "    ✓ chkrootkit (rootkit detection)"
+	@echo "    ✓ rkhunter (Rootkit Hunter)"
 	@echo "    ✓ Initramfs with custom module loading"
 	@echo "    ✓ GRUB bootloader configuration"
 
@@ -350,3 +412,5 @@ distclean: clean
 	@if [ -d "$(TOOLS_DIR)/clamav/build" ]; then rm -rf $(TOOLS_DIR)/clamav/build; fi
 	@if [ -d "$(TOOLS_DIR)/mysql/build" ]; then rm -rf $(TOOLS_DIR)/mysql/build; fi
 	@if [ -d "$(TOOLS_DIR)/ai/llama.cpp/build" ]; then rm -rf $(TOOLS_DIR)/ai/llama.cpp/build; fi
+	@if [ -d "$(TOOLS_DIR)/chkrootkit" ] && [ -f "$(TOOLS_DIR)/chkrootkit/Makefile" ]; then \
+		$(MAKE) -C $(TOOLS_DIR)/chkrootkit clean 2>/dev/null || true; fi
