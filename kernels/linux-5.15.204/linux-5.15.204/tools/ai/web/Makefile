@@ -69,16 +69,19 @@ dirs:
 schema:
 	@echo "Loading web schema into dave_kb..."
 	mysql -u root < dave_web_schema.sql
-	@echo "Schema loaded. Tables: web_findings, web_sessions, web_monitors"
+	mysql -u root < dave_ssl_schema.sql
+	@echo "Schema loaded. Tables: web_findings, web_sessions, web_monitors, ssl_certificates, site_auth_awareness, key_rotation_log"
 
 install: $(TARGET) dirs
 	install -m 755 $(TARGET) $(BINDIR)/$(TARGET)
 	install -m 755 dave_post.sh $(BINDIR)/dave_post
+	install -m 755 dave_ssl.sh $(BINDIR)/dave_ssl
 	install -m 755 dave_web_monitor.sh $(BINDIR)/dave_web_monitor.sh
 	@echo ""
 	@echo "Installed:"
 	@echo "  $(BINDIR)/$(TARGET)           — Chrome web interface"
 	@echo "  $(BINDIR)/dave_post           — Public voice (GitHub Discussions)"
+	@echo "  $(BINDIR)/dave_ssl            — SSL/TLS certificate intelligence"
 	@echo "  $(BINDIR)/dave_web_monitor.sh — Periodic monitoring daemon"
 	@echo ""
 	@echo "Post-install:"
@@ -87,6 +90,7 @@ install: $(TARGET) dirs
 	@echo "  3. Place GitHub token: echo 'ghp_...' > /var/lib/kernel-ai/.github_token"
 	@echo "  4. Test: dave_web --status"
 	@echo "  5. Test: dave_post --list-repos"
+	@echo "  6. Test: dave_ssl --fetch github.com"
 
 uninstall:
 	rm -f $(BINDIR)/$(TARGET)
