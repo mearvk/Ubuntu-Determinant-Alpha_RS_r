@@ -43,8 +43,9 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 16. [chkrootkit — Rootkit Detection](#chkrootkit--rootkit-detection)
 17. [rkhunter — Rootkit Hunter](#rkhunter--rootkit-hunter)
 18. [MySQL — Protected Database](#mysql--protected-database)
-19. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
-20. [Certificates](#certificates)
+19. [Chromium Browser — Open Source](#chromium-browser--open-source)
+20. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+21. [Certificates](#certificates)
 
 ---
 
@@ -1104,6 +1105,115 @@ tools/mysql/install_mysql.sh   - Protected installation script
 tools/mysql/apt_mysql_hook.sh  - APT post-invoke hook
 tools/mysql/99mysql-registry.conf - APT configuration
 tools/mysql/pkg-info           - Registry query tool
+```
+
+---
+
+## Chromium Browser — Open Source
+
+The Chromium open-source web browser is included as full source in the distribution. This provides GPL compliance, offline build capability, and serves as the rendering engine for Dave's Chrome web interface.
+
+### Source
+
+| Property | Value |
+|----------|-------|
+| Repository | `github.com/chromium/chromium` (official mirror) |
+| Version | 153.0.7982.0 (tip-of-tree, dev channel) |
+| License | BSD-3-Clause |
+| Clone depth | 10 commits (shallow) |
+| Size | ~5.5 GB, ~505,000 files |
+| Commit | `5006852cd6` |
+
+### Inclusion Method
+
+Chromium source is fetched at build time via shallow git clone. The `.git` directory is removed for distribution (replaced by `GALACTIC_CHERRY_SOURCE_INFO` provenance marker).
+
+```bash
+cd userland/chromium
+./fetch-chromium.sh              # Shallow clone from GitHub
+make build                       # Build with GN + Ninja (optional)
+make install DESTDIR=/mnt/rootfs # Install to rootfs
+```
+
+### Build Requirements
+
+| Requirement | Minimum |
+|-------------|---------|
+| RAM | 16 GB |
+| Disk | 100+ GB |
+| Time | 2-4 hours (modern hardware) |
+| Tools | depot_tools (gn, autoninja) |
+
+### Build Configuration
+
+```bash
+gn gen out/Release --args='
+    is_debug=false
+    is_component_build=false
+    symbol_level=0
+    enable_nacl=false
+    use_cups=true
+    use_dbus=true
+    use_gio=true
+    use_pulseaudio=true'
+autoninja -C out/Release chrome
+```
+
+### Prebuilt Alternative
+
+For most users, the prebuilt package is simpler:
+
+```bash
+apt install chromium-browser
+```
+
+### Integration with Dave
+
+Chromium serves as the rendering engine for Dave's web intelligence:
+
+- **dave_web** uses `chrome --headless=new` to render pages with full JavaScript execution
+- **Screenshots** are captured at 1920×1080 via Chrome's built-in screenshot mode
+- **DOM extraction** uses `--dump-dom` for text content after JS execution
+- **CDP** (Chrome DevTools Protocol) on port 9222 for programmatic control
+
+Dave does NOT modify the Chromium source. He uses it as-is in headless mode.
+
+### Why Include Source?
+
+1. **GPL compliance** — full source availability for the OS distribution
+2. **Offline builds** — clients can compile without network access
+3. **Customization** — allows building with custom flags or patches
+4. **Verification** — users can audit the browser they are running
+5. **Dave's engine** — headless Chrome powers Dave's web intelligence
+
+### Directory Structure
+
+```
+userland/chromium/
+├── fetch-chromium.sh              - Fetch script (shallow clone)
+├── Makefile                       - Build/install targets
+├── README.md                      - Component documentation
+└── chromium-src/                  - Full Chromium source tree
+    ├── chrome/                    - Browser UI and features
+    ├── content/                   - Multi-process rendering core
+    ├── net/                       - Network stack
+    ├── base/                      - Base libraries
+    ├── components/                - Modular browser components
+    ├── third_party/               - Dependencies (skia, v8, etc.)
+    ├── headless/                  - Headless mode (used by Dave)
+    ├── BUILD.gn                   - Top-level build file
+    ├── DEPS                       - Dependency manifest
+    ├── LICENSE                    - BSD-3-Clause
+    └── GALACTIC_CHERRY_SOURCE_INFO - Provenance marker
+```
+
+### Files
+
+```
+userland/chromium/fetch-chromium.sh        - Fetch script (~130 lines)
+userland/chromium/Makefile                  - Build/install
+userland/chromium/README.md                 - Component docs
+userland/chromium/chromium-src/             - Full source (~505K files)
 ```
 
 ---
