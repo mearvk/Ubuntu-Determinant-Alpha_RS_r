@@ -59,6 +59,12 @@
 #include <linux/mm.h>
 #include <linux/highmem.h>
 
+/* Speed class constants (shared with usbswap.c) */
+#define USBSWAP_SPEED_LOW	0	/* USB 1.x: too slow, reject */
+#define USBSWAP_SPEED_MEDIUM	1	/* USB 2.0: emergency only (~30MB/s) */
+#define USBSWAP_SPEED_HIGH	2	/* USB 3.0: good (~300MB/s) */
+#define USBSWAP_SPEED_SUPER	3	/* USB 3.1+/NVMe: excellent (>500MB/s) */
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("MEARVK LLC");
 MODULE_DESCRIPTION("Hardware-Direct USB Transfer Optimization");

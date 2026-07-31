@@ -117,7 +117,21 @@ bool inet_rcv_saddr_any(const struct sock *sk)
 	return !sk->sk_rcv_saddr;
 }
 
-void inet_get_local_port_range(struct net *net, u64 *low, u64 *high)
+void inet_get_local_port_range(struct net *net, int *low, int *high)
+{
+	unsigned int seq;
+
+	do {
+		seq = read_seqbegin(&net->ipv4.ip_local_ports.lock);
+
+		*low = (int)net->ipv4.ip_local_ports.range[0];
+		*high = (int)net->ipv4.ip_local_ports.range[1];
+	} while (read_seqretry(&net->ipv4.ip_local_ports.lock, seq));
+}
+EXPORT_SYMBOL(inet_get_local_port_range);
+
+/* Extended variant for EPMP (64-bit port range, 0 to 30 quintillion) */
+void inet_get_local_port_range_extended(struct net *net, u64 *low, u64 *high)
 {
 	unsigned int seq;
 
@@ -128,7 +142,7 @@ void inet_get_local_port_range(struct net *net, u64 *low, u64 *high)
 		*high = net->ipv4.ip_local_ports.range[1];
 	} while (read_seqretry(&net->ipv4.ip_local_ports.lock, seq));
 }
-EXPORT_SYMBOL(inet_get_local_port_range);
+EXPORT_SYMBOL(inet_get_local_port_range_extended);
 
 static int inet_csk_bind_conflict(const struct sock *sk,
 				  const struct inet_bind_bucket *tb,

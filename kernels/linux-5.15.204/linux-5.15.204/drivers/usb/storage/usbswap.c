@@ -43,6 +43,7 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/namei.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -223,9 +224,22 @@ static bool usbswap_check_signature(struct block_device *bdev)
 
 static bool usbswap_device_is_safe(struct block_device *bdev)
 {
-	/* Check if device has partition table */
-	if (bdev->bd_part_count > 0)
-		return false; /* Has partitions - don't touch */
+	/* If this IS a partition (not whole disk), don't touch */
+	if (bdev_is_partition(bdev))
+		return false;
+
+	/* Check if the whole disk has any partitions by scanning */
+	if (bdev->bd_disk && bdev->bd_disk->flags & GENHD_FL_NO_PART_SCAN) {
+		/* Partitions explicitly disabled — safe */
+	} else if (bdev->bd_disk) {
+		struct block_device *part;
+		unsigned long idx;
+		xa_for_each(&bdev->bd_disk->part_tbl, idx, part) {
+			if (part != bdev) {
+				return false; /* Has at least one partition */
+			}
+		}
+	}
 
 	/* Check if device has a recognized filesystem */
 	/* TODO: Check superblock signatures (ext4, ntfs, fat, etc.) */
