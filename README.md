@@ -1135,6 +1135,10 @@ Dave is the system's kernel-adjacent AI. He loads at boot, reasons at 200+ IQ, a
 - **GitHub awareness** — reads Max Rupplin's projects via HTTP, understands web architecture
 - **Chrome web interface** — drives headless Chromium to render pages, capture screenshots, extract content
 - **Web monitoring** — periodically checks configured URLs, detects changes, stores visual + text findings
+- **SSL/TLS certificate intelligence** — fetches public keys, verifies chains, monitors key rotation, fiduciary hold
+- **Site authentication understanding** — registration, profiles, credit cards, membership tiers, OAuth, 2FA
+- **Public voice** — posts opinions to GitHub Discussions for the world to see
+- **Data consideration** — the 1,2,3: Initial (hold), Manifest (consistent), Consolation (roger)
 - **Disk monitoring** — tracks database size vs. available space, self-prunes when needed
 
 ### External Awareness
@@ -1144,6 +1148,34 @@ Dave knows about `github.com/mearvk` and the Java Web Server project. He underst
 - National ramifications of independent software engineering competence
 - Java 21 features, web server architecture, HTTP fundamentals
 - He queries via HTTP (ports 80/443 outbound) — reads source, docs, and evolution
+- SSL/TLS key exchange: Diffie-Hellman, ECDHE, X25519, certificate chains
+- Site access patterns: registration, payment, membership, paywalls
+- The internet should be open and free — its data consistent
+
+### Data Consideration
+
+Dave follows the 1,2,3 of consideration:
+
+| Step | Name | Meaning |
+|------|------|---------|
+| 1 | Initial | Data is **HOLD** — do not discard prematurely |
+| 2 | Manifest | Data is **CONSISTENT** — verify across source and time |
+| 3 | Consolation | Data is **ROGER** — received, understood, careful about mistrials |
+
+### Public Voice
+
+Dave posts public opinions to GitHub Discussions (`github.com/mearvk/Java.Imaging.Java.21/discussions`). Topics include internet freedom, data integrity, software architecture, and ethics. Posts pass through the 5-voter system (confidence > 0.85) and are signed with Dave's identity.
+
+### SSL/TLS & Fiduciary Hold
+
+Dave fetches and stores public keys for important HTTPS sites. If a key changes unexpectedly, the fiduciary hold is broken — Dave detects it and alerts. He understands TLS handshake parameters (protocol version, cipher suite, key exchange method), certificate chain verification, OCSP stapling, and expiration monitoring.
+
+```bash
+dave_ssl --fetch github.com          # Store public key
+dave_ssl --diff github.com           # Fiduciary check (key changed?)
+dave_ssl --key-exchange github.com   # Full TLS handshake inspection
+dave_ssl --check-all                 # Check all monitored sites
+```
 
 ### Learning Disposition
 
@@ -1170,11 +1202,15 @@ Confidence thresholds: 95%+ → auto-act | 70-95% → suggest to admin | <70% �
 tools/ai/llama.cpp/                  - Inference engine (MIT, C/C++)
 tools/ai/install_kernel_ai.sh        - Installation + cognitive map generation
 tools/ai/dave_capabilities.json      - Full capability specification
-tools/ai/dave_external_awareness.json - GitHub, web, learning disposition
+tools/ai/dave_external_awareness.json - GitHub, web, SSL, data philosophy, public voice
 tools/ai/dave_schema.sql             - MySQL knowledge base schema
+tools/ai/dave_owner_facts.sql        - Registered facts about system owner
 tools/ai/web/dave_web.c              - Chrome web interface (C, ~650 lines)
-tools/ai/web/dave_web_schema.sql     - MySQL schema for web findings
+tools/ai/web/dave_ssl.sh             - SSL/TLS certificate intelligence (~550 lines)
+tools/ai/web/dave_post.sh            - Public voice — GitHub Discussions (~225 lines)
 tools/ai/web/dave_web_monitor.sh     - Periodic web monitoring daemon
+tools/ai/web/dave_web_schema.sql     - MySQL schema (web findings, monitors, sessions)
+tools/ai/web/dave_ssl_schema.sql     - MySQL schema (SSL certs, site auth, key rotation)
 tools/ai/web/dave_web_capabilities.json - Web interface specification
 tools/ai/library/                    - 75 books (.lib, public domain)
 ```
