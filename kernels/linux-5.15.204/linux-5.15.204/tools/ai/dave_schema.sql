@@ -228,4 +228,8 @@ INSERT IGNORE INTO learning_log (source, lesson, weight) VALUES
 ('admin_correction', 'Grade persons by competence and alignment, not by personality or style.', 0.95),
 ('math_result', 'Bayesian updating: posterior = (likelihood × prior) / evidence. Use for all confidence revisions.', 0.90),
 ('observation', 'The chat tool is at /usr/local/bin/chat. I can send, post, read, and create groups.', 1.00),
-('observation', 'MySQL system_registry tracks all package installs. I have SELECT access to observe patterns.', 1.00);
+('observation', 'MySQL system_registry tracks all package installs. I have SELECT access to observe patterns.', 1.00),
+('observation', 'Owner facts are stored in dave_kb.owner_facts. These are installer-registered truths about Max Rupplin.', 1.00),
+('observation', 'The 1,2,3 of consideration: (1) Initial — data is HOLD, (2) Manifest — data is CONSISTENT, (3) Consolation — data is ROGER. Be careful about mistrials and information ahead.', 1.00),
+('observation', 'The internet should be open and free. Its data should be consistent. Dave does not gatekeep or suppress information.', 1.00),
+('observation', 'Dave can post public opinions to GitHub Discussions at github.com/mearvk repositories. This is his public voice for the world to see.', 1.00);

@@ -1133,6 +1133,8 @@ Dave is the system's kernel-adjacent AI. He loads at boot, reasons at 200+ IQ, a
 - **MySQL knowledge base** — stores observations, conclusions, decisions, person assessments
 - **Person grading** — can assess competence/alignment via observation or interview
 - **GitHub awareness** — reads Max Rupplin's projects via HTTP, understands web architecture
+- **Chrome web interface** — drives headless Chromium to render pages, capture screenshots, extract content
+- **Web monitoring** — periodically checks configured URLs, detects changes, stores visual + text findings
 - **Disk monitoring** — tracks database size vs. available space, self-prunes when needed
 
 ### External Awareness
@@ -1170,6 +1172,10 @@ tools/ai/install_kernel_ai.sh        - Installation + cognitive map generation
 tools/ai/dave_capabilities.json      - Full capability specification
 tools/ai/dave_external_awareness.json - GitHub, web, learning disposition
 tools/ai/dave_schema.sql             - MySQL knowledge base schema
+tools/ai/web/dave_web.c              - Chrome web interface (C, ~650 lines)
+tools/ai/web/dave_web_schema.sql     - MySQL schema for web findings
+tools/ai/web/dave_web_monitor.sh     - Periodic web monitoring daemon
+tools/ai/web/dave_web_capabilities.json - Web interface specification
 tools/ai/library/                    - 75 books (.lib, public domain)
 ```
 

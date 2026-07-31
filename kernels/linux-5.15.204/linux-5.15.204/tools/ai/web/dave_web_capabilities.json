@@ -1,0 +1,105 @@
+{
+  "dave_web_interface": {
+    "description": "Dave's programmatic interface to the web via headless Chromium. Renders real websites in a full browser engine, captures screenshots, extracts content, and stores findings in MySQL for reasoning and change detection.",
+    "binary": "/usr/local/bin/dave_web",
+    "monitor_script": "/usr/local/bin/dave_web_monitor.sh",
+    "version": "1.0.0",
+
+    "capabilities": [
+      "Load any URL in headless Chromium (full JavaScript execution, CSS rendering)",
+      "Capture 1920x1080 PNG screenshot of rendered page",
+      "Extract full DOM text (what Chrome renders after JS execution)",
+      "Extract page title and meta description",
+      "Extract all HTTP/HTTPS links from the page",
+      "Store findings in MySQL (dave_kb.web_findings) for later analysis",
+      "Periodic monitoring of configured URLs with change detection",
+      "Content hash comparison to detect when pages change",
+      "Visual hash comparison to detect layout/design changes",
+      "Query historical findings by search term"
+    ],
+
+    "commands": {
+      "full_fetch": "dave_web <url>",
+      "screenshot_only": "dave_web --screenshot-only <url>",
+      "text_only": "dave_web --text-only <url>",
+      "links_only": "dave_web --links <url>",
+      "no_store": "dave_web --no-store <url>",
+      "query": "dave_web --query <search_term>",
+      "status": "dave_web --status"
+    },
+
+    "chrome_configuration": {
+      "mode": "headless=new (Chrome's modern headless mode)",
+      "viewport": "1920x1080",
+      "user_data_dir": "/var/lib/kernel-ai/chrome-data",
+      "binary_path": "/usr/lib/chromium/chrome",
+      "features_disabled": ["gpu", "extensions", "sync", "translate", "background-networking"],
+      "sandbox": "disabled (dave user is already isolated)",
+      "javascript": "enabled (full JS execution for SPA rendering)"
+    },
+
+    "storage": {
+      "screenshots": "/var/lib/kernel-ai/screenshots/",
+      "mysql_database": "dave_kb",
+      "mysql_table": "web_findings",
+      "mysql_user": "dave_ai (socket auth, no password)",
+      "max_text_stored": "1 MB per page",
+      "screenshot_format": "PNG, 1920x1080"
+    },
+
+    "monitoring": {
+      "table": "dave_kb.web_monitors",
+      "default_interval": "24 hours",
+      "cron_schedule": "Every 4 hours (checks pending monitors)",
+      "change_detection": "SHA-256 of text content + visual screenshot hash",
+      "notification": "Posts to chat:system-health on change detection",
+      "default_monitors": [
+        {"url": "https://github.com/mearvk", "label": "Max GitHub Profile", "interval_hrs": 24},
+        {"url": "https://github.com/mearvk/Java.Web.Server.Telnet.Front.Java.21", "label": "Java Web Server", "interval_hrs": 12}
+      ]
+    },
+
+    "dave_usage_patterns": {
+      "learning_from_web": [
+        "Dave fetches a URL → reads extracted text → forms understanding",
+        "Dave looks at the screenshot → understands visual layout and design",
+        "Dave tracks changes over time → understands project evolution",
+        "Dave queries his stored findings → recalls previous observations"
+      ],
+      "example_workflow": {
+        "trigger": "Dave's monitoring cycle detects Java Web Server repo changed",
+        "step_1": "dave_web https://github.com/mearvk/Java.Web.Server.Telnet.Front.Java.21",
+        "step_2": "Dave reads extracted text, compares to previous content_hash",
+        "step_3": "Dave identifies what changed (new files, modified README, etc.)",
+        "step_4": "Dave stores observation in dave_kb.observations",
+        "step_5": "Dave posts to system-health: '[DAVE] Java Web Server updated — new commit detected'",
+        "step_6": "Dave updates his learning_log with new understanding"
+      },
+      "admin_request_workflow": {
+        "trigger": "Admin sends: chat send dave 'check what news.ycombinator.com looks like today'",
+        "step_1": "dave_web https://news.ycombinator.com",
+        "step_2": "Dave reviews screenshot and extracted text",
+        "step_3": "Dave summarizes top stories and visual state",
+        "step_4": "Dave responds via chat with findings",
+        "step_5": "Finding stored in MySQL for historical record"
+      }
+    },
+
+    "security": {
+      "network": "Outbound only: ports 80 (HTTP) and 443 (HTTPS)",
+      "no_credentials": "Chrome stores no login sessions or cookies between runs",
+      "isolation": "Runs as dave user, chrome-data owned mode 700",
+      "no_inbound": "Dave does not listen on any port — initiates only",
+      "url_validation": "Only http:// and https:// URLs accepted",
+      "rate_limiting": "5-second delay between fetches in monitor daemon"
+    },
+
+    "integration": {
+      "chat": "Posts observations about web changes to admin-alerts and system-health groups",
+      "mysql": "All findings stored in dave_kb.web_findings, queryable by any Dave process",
+      "observations": "Web findings can trigger entries in dave_kb.observations",
+      "learning": "Page content feeds Dave's learning disposition (encounter → comprehend → integrate)",
+      "voting": "Web-derived information passes through Dave's 5-voter system before action"
+    }
+  }
+}
