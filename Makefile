@@ -59,6 +59,7 @@ help:
 	@echo "  x11              - Build X.Org Server 21.1.24 and libraries"
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Fetch OpenJDK 28 (~227 MB download)"
+	@echo "  chromium         - Fetch Chromium browser source (~5-8 GB shallow clone)"
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
 	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
@@ -152,6 +153,19 @@ java:
 
 java-install:
 	$(MAKE) -C $(USERLAND_DIR)/java install DESTDIR=$(abspath $(ROOTFS_DIR))
+
+# ==============================================================================
+# Chromium Browser (fetched at build time, ~5-8 GB shallow clone)
+# ==============================================================================
+
+chromium:
+	$(MAKE) -C $(USERLAND_DIR)/chromium fetch
+
+chromium-build:
+	$(MAKE) -C $(USERLAND_DIR)/chromium build
+
+chromium-install:
+	$(MAKE) -C $(USERLAND_DIR)/chromium install DESTDIR=$(abspath $(ROOTFS_DIR))
 
 # ==============================================================================
 # Custom Tools - Core (simple Makefile-based)
@@ -359,6 +373,17 @@ desktop:
 	else \
 		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
 	fi
+	@echo "=== Installing graphical installer (Ubuntu Desktop Provision) ==="
+	@cp $(SCRIPTS_DIR)/install-ubuntu-installer.sh $(ROOTFS_DIR)/tmp/
+	@chmod 755 $(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh
+	@chroot $(ROOTFS_DIR) /tmp/install-ubuntu-installer.sh || \
+		echo "  WARNING: Graphical installer setup incomplete (snapd may need live boot)"
+	@rm -f $(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh
+	@echo "=== Installing TUI fallback installer ==="
+	@install -m 755 $(SCRIPTS_DIR)/galactic-cherry-installer $(ROOTFS_DIR)/usr/sbin/
+	@install -m 755 $(SCRIPTS_DIR)/install-mate-desktop.sh $(ROOTFS_DIR)/usr/sbin/
+	@install -d $(ROOTFS_DIR)/etc/profile.d
+	@install -m 644 $(SCRIPTS_DIR)/galactic-cherry-installer-autostart.sh $(ROOTFS_DIR)/etc/profile.d/
 
 # ==============================================================================
 # Root Filesystem Assembly

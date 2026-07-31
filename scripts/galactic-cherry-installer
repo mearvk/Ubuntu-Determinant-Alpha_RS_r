@@ -1,0 +1,508 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# galactic-cherry-installer — TUI/GUI Installer for Ubuntu Determinant Alpha RS
+#
+# A dialog-based installer that guides the user through:
+#   1. Language/keyboard selection
+#   2. Desktop environment choice (MATE Red, Ubuntu GNOME, Vanilla)
+#   3. Disk selection and partitioning
+#   4. User account creation
+#   5. System installation (copy live image + install desktop)
+#   6. Bootloader installation (GRUB)
+#
+# Runs from the live session when "Install to Disk" is selected at boot,
+# or manually via: sudo galactic-cherry-installer
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+set -e
+
+PROGRAM="galactic-cherry-installer"
+VERSION="98"
+EDITION="Galactic Cherry Marvell Edition 98"
+LOG="/var/log/galactic-cherry-install.log"
+
+# ============================================================
+# Dialog frontend selection
+# ============================================================
+
+if command -v whiptail >/dev/null 2>&1; then
+    DIALOG="whiptail"
+elif command -v dialog >/dev/null 2>&1; then
+    DIALOG="dialog"
+else
+    # Fallback to pure text
+    DIALOG="text"
+fi
+
+# Dialog dimensions
+ROWS=20
+COLS=70
+LIST_ROWS=10
+
+# ============================================================
+# State variables (filled during wizard)
+# ============================================================
+
+INSTALL_LANG="en_US.UTF-8"
+INSTALL_KB="us"
+INSTALL_DESKTOP=""
+INSTALL_DISK=""
+INSTALL_HOSTNAME=""
+INSTALL_USERNAME=""
+INSTALL_PASSWORD=""
+INSTALL_FULLNAME=""
+INSTALL_TIMEZONE="America/New_York"
+
+# ============================================================
+# Utility functions
+# ============================================================
+
+log() {
+    echo "[$(date '+%H:%M:%S')] $1" >> "$LOG"
+}
+
+die() {
+    log "FATAL: $1"
+    if [ "$DIALOG" = "text" ]; then
+        echo "ERROR: $1"
+    else
+        $DIALOG --title "Installation Error" --msgbox "ERROR: $1\n\nSee $LOG for details." $ROWS $COLS
+    fi
+    exit 1
+}
+
+msg() {
+    if [ "$DIALOG" = "text" ]; then
+        echo "$1"
+    else
+        $DIALOG --title "$EDITION" --msgbox "$1" $ROWS $COLS
+    fi
+}
+
+yesno() {
+    if [ "$DIALOG" = "text" ]; then
+        read -p "$1 [Y/n] " answer
+        [ "$answer" != "n" ] && [ "$answer" != "N" ]
+    else
+        $DIALOG --title "$EDITION" --yesno "$1" $ROWS $COLS
+    fi
+}
+
+input() {
+    local title="$1" default="$2"
+    if [ "$DIALOG" = "text" ]; then
+        read -p "$title [$default]: " answer
+        echo "${answer:-$default}"
+    else
+        $DIALOG --title "$EDITION" --inputbox "$title" $ROWS $COLS "$default" 3>&1 1>&2 2>&3
+    fi
+}
+
+password_input() {
+    local title="$1"
+    if [ "$DIALOG" = "text" ]; then
+        read -sp "$title: " answer
+        echo ""
+        echo "$answer"
+    else
+        $DIALOG --title "$EDITION" --passwordbox "$title" $ROWS $COLS 3>&1 1>&2 2>&3
+    fi
+}
+
+progress() {
+    local title="$1" pct="$2"
+    log "PROGRESS: $pct% - $title"
+    if [ "$DIALOG" != "text" ]; then
+        echo "$pct" | $DIALOG --title "$EDITION" --gauge "$title" 8 $COLS "$pct"
+    else
+        printf "\r  [%3d%%] %s" "$pct" "$title"
+    fi
+}
+
+# ============================================================
+# Step 1: Welcome
+# ============================================================
+
+step_welcome() {
+    if [ "$DIALOG" = "text" ]; then
+        echo ""
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║      Ubuntu Determinant Alpha RS                            ║"
+        echo "║      Galactic Cherry Marvell Edition 98                     ║"
+        echo "║                                                              ║"
+        echo "║      System Installer                                        ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "  This will install the system to your hard drive."
+        echo "  The live session will remain unaffected."
+        echo ""
+        read -p "  Press Enter to continue..."
+    else
+        $DIALOG --title "Welcome" --msgbox \
+"╔══════════════════════════════════════════════╗
+║  Ubuntu Determinant Alpha RS                 ║
+║  Galactic Cherry Marvell Edition 98          ║
+║                                              ║
+║  System Installer                            ║
+╚══════════════════════════════════════════════╝
+
+This wizard will install the system to your hard drive.
+
+Components:
+  • Linux kernel 5.15.204 (9 custom extensions)
+  • Desktop environment (your choice)
+  • Security tools (chkrootkit, rkhunter, ClamAV)
+  • MySQL database + package registry
+  • Dave (system AI intelligence)
+  • OpenJDK 28
+
+The live session will remain unaffected." $ROWS $COLS
+    fi
+}
+
+# ============================================================
+# Step 2: Desktop Environment Selection
+# ============================================================
+
+step_desktop() {
+    if [ "$DIALOG" = "text" ]; then
+        echo ""
+        echo "  Select Desktop Environment:"
+        echo ""
+        echo "  1) MATE — Galactic Cherry Red Theme (recommended)"
+        echo "     Dark desktop with cherry red accents."
+        echo "     Ubuntu-like layout. Lightweight."
+        echo ""
+        echo "  2) Ubuntu GNOME — Classic Ubuntu Desktop"
+        echo "     Standard GNOME shell with Ubuntu theming."
+        echo "     Activities overview, dock, modern workflow."
+        echo ""
+        echo "  3) Vanilla (Minimal) — X11 + TWM only"
+        echo "     Bare X server with twm window manager."
+        echo "     For servers or custom desktop builders."
+        echo ""
+        read -p "  Choice [1-3]: " choice
+        case "$choice" in
+            1) INSTALL_DESKTOP="mate" ;;
+            2) INSTALL_DESKTOP="gnome" ;;
+            3) INSTALL_DESKTOP="vanilla" ;;
+            *) INSTALL_DESKTOP="mate" ;;
+        esac
+    else
+        INSTALL_DESKTOP=$($DIALOG --title "Desktop Environment" \
+            --radiolist "Choose your desktop environment:\n\nUse SPACE to select, ENTER to confirm." \
+            $ROWS $COLS $LIST_ROWS \
+            "mate"    "MATE — Galactic Cherry Red Theme (recommended)" ON \
+            "gnome"   "Ubuntu GNOME — Classic Ubuntu Desktop" OFF \
+            "vanilla" "Vanilla — Minimal X11 + TWM (server/custom)" OFF \
+            3>&1 1>&2 2>&3) || INSTALL_DESKTOP="mate"
+    fi
+    log "Desktop selected: $INSTALL_DESKTOP"
+}
+
+# ============================================================
+# Step 3: Disk Selection
+# ============================================================
+
+step_disk() {
+    # Enumerate available disks
+    local disks=""
+    local disk_list=""
+
+    for dev in /sys/block/sd* /sys/block/nvme* /sys/block/vd*; do
+        [ -d "$dev" ] || continue
+        local name=$(basename "$dev")
+        local size_bytes=$(cat "$dev/size" 2>/dev/null || echo 0)
+        local size_gb=$(( size_bytes * 512 / 1024 / 1024 / 1024 ))
+        [ "$size_gb" -lt 8 ] && continue  # Skip drives < 8 GB
+        local model=$(cat "$dev/device/model" 2>/dev/null | tr -s ' ' || echo "Unknown")
+        disks="$disks /dev/$name"
+        disk_list="$disk_list /dev/$name \"${size_gb}GB - ${model}\" OFF"
+    done
+
+    if [ -z "$disks" ]; then
+        die "No suitable disk found (need >= 8 GB)."
+    fi
+
+    if [ "$DIALOG" = "text" ]; then
+        echo ""
+        echo "  Available disks:"
+        lsblk -d -o NAME,SIZE,MODEL | grep -E "sd|nvme|vd"
+        echo ""
+        read -p "  Install to disk (e.g. /dev/sda): " INSTALL_DISK
+    else
+        INSTALL_DISK=$(eval $DIALOG --title \"Select Installation Disk\" \
+            --radiolist \"Choose the disk to install to.\n\nWARNING: ALL DATA ON THE SELECTED DISK WILL BE ERASED.\" \
+            $ROWS $COLS $LIST_ROWS $disk_list \
+            3>&1 1>&2 2>&3) || die "No disk selected."
+    fi
+
+    [ -z "$INSTALL_DISK" ] && die "No disk selected."
+    [ ! -b "$INSTALL_DISK" ] && die "Not a block device: $INSTALL_DISK"
+
+    log "Target disk: $INSTALL_DISK"
+
+    # Confirm destruction
+    yesno "WARNING: This will ERASE ALL DATA on ${INSTALL_DISK}.\n\nAre you sure you want to continue?" || exit 0
+}
+
+# ============================================================
+# Step 4: User Account
+# ============================================================
+
+step_user() {
+    INSTALL_HOSTNAME=$(input "Hostname for this machine:" "galactic-cherry")
+    INSTALL_FULLNAME=$(input "Your full name:" "")
+    INSTALL_USERNAME=$(input "Username (login name):" "$(echo $INSTALL_FULLNAME | awk '{print tolower($1)}')")
+    INSTALL_PASSWORD=$(password_input "Password for $INSTALL_USERNAME")
+
+    local pw_confirm
+    pw_confirm=$(password_input "Confirm password")
+    if [ "$INSTALL_PASSWORD" != "$pw_confirm" ]; then
+        msg "Passwords do not match. Please try again."
+        step_user
+        return
+    fi
+
+    INSTALL_TIMEZONE=$(input "Timezone:" "America/New_York")
+
+    log "User: $INSTALL_USERNAME, Host: $INSTALL_HOSTNAME, TZ: $INSTALL_TIMEZONE"
+}
+
+# ============================================================
+# Step 5: Confirmation
+# ============================================================
+
+step_confirm() {
+    local desktop_name=""
+    case "$INSTALL_DESKTOP" in
+        mate)    desktop_name="MATE (Galactic Cherry Red)" ;;
+        gnome)   desktop_name="Ubuntu GNOME" ;;
+        vanilla) desktop_name="Vanilla (X11 + TWM)" ;;
+    esac
+
+    local summary="Installation Summary:
+
+  Disk:       $INSTALL_DISK (WILL BE ERASED)
+  Desktop:    $desktop_name
+  Hostname:   $INSTALL_HOSTNAME
+  Username:   $INSTALL_USERNAME
+  Timezone:   $INSTALL_TIMEZONE
+  Kernel:     Linux 5.15.204
+  Edition:    $EDITION
+
+This is your last chance to cancel."
+
+    yesno "$summary\n\nProceed with installation?" || exit 0
+}
+
+# ============================================================
+# Step 6: Installation
+# ============================================================
+
+step_install() {
+    log "=== Installation starting ==="
+
+    # --- Partition disk ---
+    log "Partitioning $INSTALL_DISK"
+    (
+    echo "5"
+    echo "Partitioning disk..."
+    sleep 1
+
+    # Create GPT partition table
+    parted -s "$INSTALL_DISK" mklabel gpt
+    # EFI partition: 512 MB
+    parted -s "$INSTALL_DISK" mkpart primary fat32 1MiB 513MiB
+    parted -s "$INSTALL_DISK" set 1 esp on
+    # Root partition: remainder
+    parted -s "$INSTALL_DISK" mkpart primary ext4 513MiB 100%
+
+    echo "15"
+    echo "Formatting partitions..."
+    sleep 1
+
+    # Determine partition names (nvme vs sd)
+    local part_prefix="$INSTALL_DISK"
+    echo "$INSTALL_DISK" | grep -q "nvme" && part_prefix="${INSTALL_DISK}p"
+
+    local efi_part="${part_prefix}1"
+    local root_part="${part_prefix}2"
+
+    mkfs.fat -F32 "$efi_part" >> "$LOG" 2>&1
+    mkfs.ext4 -F -L "galactic-cherry" "$root_part" >> "$LOG" 2>&1
+
+    echo "25"
+    echo "Mounting target filesystem..."
+
+    # Mount
+    local target="/mnt/install"
+    mkdir -p "$target"
+    mount "$root_part" "$target"
+    mkdir -p "$target/boot/efi"
+    mount "$efi_part" "$target/boot/efi"
+
+    echo "30"
+    echo "Copying system files (this takes a few minutes)..."
+
+    # Copy live filesystem to target
+    # Use unsquashfs if available (faster), else rsync from running live system
+    if [ -f /run/live/medium/live/filesystem.squashfs ]; then
+        unsquashfs -f -d "$target" /run/live/medium/live/filesystem.squashfs >> "$LOG" 2>&1
+    else
+        rsync -aAXH --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} / "$target/" >> "$LOG" 2>&1
+    fi
+
+    echo "60"
+    echo "Installing desktop environment..."
+
+    # Mount special filesystems for chroot
+    mount --bind /dev "$target/dev"
+    mount --bind /proc "$target/proc"
+    mount --bind /sys "$target/sys"
+    mount --bind /run "$target/run"
+
+    # Install selected desktop
+    case "$INSTALL_DESKTOP" in
+        mate)
+            if [ -f "$target/usr/sbin/install-mate-desktop.sh" ]; then
+                chroot "$target" /usr/sbin/install-mate-desktop.sh >> "$LOG" 2>&1
+            elif [ -f /usr/sbin/install-mate-desktop.sh ]; then
+                cp /usr/sbin/install-mate-desktop.sh "$target/tmp/"
+                chroot "$target" /tmp/install-mate-desktop.sh >> "$LOG" 2>&1
+                rm -f "$target/tmp/install-mate-desktop.sh"
+            fi
+            ;;
+        gnome)
+            chroot "$target" apt-get update -qq >> "$LOG" 2>&1
+            chroot "$target" apt-get install -y --no-install-recommends \
+                ubuntu-desktop-minimal gdm3 >> "$LOG" 2>&1
+            chroot "$target" systemctl set-default graphical.target 2>/dev/null || true
+            ;;
+        vanilla)
+            # Already have X11 + twm from the build
+            echo "  Vanilla desktop — no additional packages"
+            ;;
+    esac
+
+    echo "80"
+    echo "Configuring system..."
+
+    # Hostname
+    echo "$INSTALL_HOSTNAME" > "$target/etc/hostname"
+    echo "127.0.1.1 $INSTALL_HOSTNAME" >> "$target/etc/hosts"
+
+    # Timezone
+    chroot "$target" ln -sf "/usr/share/zoneinfo/$INSTALL_TIMEZONE" /etc/localtime 2>/dev/null || true
+
+    # Create user
+    chroot "$target" useradd -m -s /bin/bash -G sudo,adm,cdrom,audio,video,plugdev "$INSTALL_USERNAME" 2>/dev/null || true
+    echo "$INSTALL_USERNAME:$INSTALL_PASSWORD" | chroot "$target" chpasswd
+    [ -n "$INSTALL_FULLNAME" ] && chroot "$target" chfn -f "$INSTALL_FULLNAME" "$INSTALL_USERNAME" 2>/dev/null || true
+
+    # Disable root password login
+    chroot "$target" passwd -l root 2>/dev/null || true
+
+    # fstab
+    local root_uuid=$(blkid -s UUID -o value "$root_part")
+    local efi_uuid=$(blkid -s UUID -o value "$efi_part")
+    cat > "$target/etc/fstab" << FSTAB
+# /etc/fstab - Galactic Cherry Marvell Edition 98
+UUID=$root_uuid    /           ext4    errors=remount-ro   0 1
+UUID=$efi_uuid     /boot/efi   vfat    umask=0077          0 1
+FSTAB
+
+    echo "90"
+    echo "Installing bootloader..."
+
+    # Install GRUB
+    if [ -d /sys/firmware/efi ]; then
+        chroot "$target" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="GalacticCherry" >> "$LOG" 2>&1 || true
+    else
+        chroot "$target" grub-install --target=i386-pc "$INSTALL_DISK" >> "$LOG" 2>&1 || true
+    fi
+    chroot "$target" update-grub >> "$LOG" 2>&1 || true
+
+    echo "95"
+    echo "Cleaning up..."
+
+    # Unmount
+    umount "$target/run" 2>/dev/null || true
+    umount "$target/sys" 2>/dev/null || true
+    umount "$target/proc" 2>/dev/null || true
+    umount "$target/dev" 2>/dev/null || true
+    umount "$target/boot/efi" 2>/dev/null || true
+    umount "$target" 2>/dev/null || true
+
+    echo "100"
+    echo "Installation complete!"
+    ) | if [ "$DIALOG" != "text" ]; then
+        $DIALOG --title "Installing..." --gauge "Starting installation..." 8 $COLS 0
+    else
+        while IFS= read -r line; do
+            case "$line" in
+                [0-9]*) printf "\r  [%3s%%] " "$line" ;;
+                *)      echo "$line" ;;
+            esac
+        done
+    fi
+
+    log "=== Installation complete ==="
+}
+
+# ============================================================
+# Step 7: Done
+# ============================================================
+
+step_done() {
+    local desktop_name=""
+    case "$INSTALL_DESKTOP" in
+        mate)    desktop_name="MATE (Cherry Red)" ;;
+        gnome)   desktop_name="Ubuntu GNOME" ;;
+        vanilla) desktop_name="Vanilla (X11 + TWM)" ;;
+    esac
+
+    msg "╔══════════════════════════════════════════════════╗
+║  INSTALLATION COMPLETE                            ║
+╚══════════════════════════════════════════════════╝
+
+  Desktop:   $desktop_name
+  User:      $INSTALL_USERNAME
+  Hostname:  $INSTALL_HOSTNAME
+
+  You can now reboot into your new system.
+
+  Remove the installation media and press Enter."
+
+    if yesno "Reboot now?"; then
+        reboot
+    fi
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+# Must be root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: Installer must run as root."
+    echo "Usage: sudo $PROGRAM"
+    exit 1
+fi
+
+# Initialize log
+echo "=== $EDITION Installer ===" > "$LOG"
+echo "Started: $(date)" >> "$LOG"
+echo "Dialog: $DIALOG" >> "$LOG"
+
+# Run wizard steps
+step_welcome
+step_desktop
+step_disk
+step_user
+step_confirm
+step_install
+step_done

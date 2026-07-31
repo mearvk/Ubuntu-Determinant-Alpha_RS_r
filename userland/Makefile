@@ -13,7 +13,7 @@ PREFIX  ?= /usr
 DESTDIR ?=
 
 # Userland components
-COMPONENTS := x11 wallpapers java
+COMPONENTS := x11 wallpapers java chromium
 
 .PHONY: all $(COMPONENTS) rootfs-extract install clean help
 
@@ -57,6 +57,13 @@ java:
 	$(MAKE) -C java
 
 # ==============================================================================
+# Chromium Browser
+# ==============================================================================
+
+chromium:
+	$(MAKE) -C chromium
+
+# ==============================================================================
 # Root Filesystem Extraction
 # ==============================================================================
 
@@ -81,6 +88,11 @@ install: all
 	$(MAKE) -C x11 install DESTDIR=$(DESTDIR)
 	$(MAKE) -C wallpapers install DESTDIR=$(DESTDIR)
 	$(MAKE) -C java install DESTDIR=$(DESTDIR)
+	@if [ -f chromium/chromium-src/out/Release/chrome ]; then \
+		$(MAKE) -C chromium install DESTDIR=$(DESTDIR); \
+	else \
+		echo "  (Chromium not built from source — install via apt in rootfs instead)"; \
+	fi
 
 # ==============================================================================
 # Clean
