@@ -34,6 +34,7 @@ PREFIX        := /usr
         userland x11 x11-install wallpapers wallpapers-install \
         tools tools-install tools-all tools-all-install \
         tools-drm tools-drm-install \
+        tools-tandem-equals tools-tandem-equals-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
         desktop rootfs rootfs-full initramfs grub iso \
@@ -286,7 +287,7 @@ tools-install:
 # Tools - Extended (autotools/cmake-based, longer builds)
 # ==============================================================================
 
-tools-all: tools tools-drm tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
+tools-all: tools tools-drm tools-tandem-equals tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
 
 # DRM (Deferred Remove) - undo-capable file deletion
 tools-drm:
@@ -301,6 +302,21 @@ tools-drm-install:
 		install -d $(ROOTFS_DIR)/usr/local/bin; \
 		install -m 755 $(TOOLS_DIR)/drm/drm $(ROOTFS_DIR)/usr/local/bin/; \
 		echo "  ✓ drm installed to /usr/local/bin/"; \
+	fi
+
+# TandemEquals - Outward dilemma resolution via saimptom matrix
+tools-tandem-equals:
+	@echo "=== Building TandemEquals ==="
+	@if [ -d "$(TOOLS_DIR)/tandem_equals" ] && [ -f "$(TOOLS_DIR)/tandem_equals/Makefile" ]; then \
+		$(MAKE) -C $(TOOLS_DIR)/tandem_equals; \
+	fi
+
+tools-tandem-equals-install:
+	@echo "=== Installing TandemEquals ==="
+	@if [ -d "$(TOOLS_DIR)/tandem_equals" ] && [ -f "$(TOOLS_DIR)/tandem_equals/tandem_equals" ]; then \
+		install -d $(ROOTFS_DIR)/usr/local/bin; \
+		install -m 755 $(TOOLS_DIR)/tandem_equals/tandem_equals $(ROOTFS_DIR)/usr/local/bin/; \
+		echo "  ✓ tandem_equals installed to /usr/local/bin/"; \
 	fi
 
 # Cronie (cron with callback extension) - autotools
@@ -457,7 +473,7 @@ tools-rkhunter-install:
 	fi
 
 # Full tools install (all)
-tools-all-install: tools-install tools-drm-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
+tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
 
 # ==============================================================================
 # Desktop Environment (MATE + LightDM + Red Cherry Theme)
