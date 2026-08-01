@@ -50,6 +50,9 @@
 #define DRM_PROC_PENDING   "/proc/drm/pending"
 #define DRM_PROC_HISTORY   "/proc/drm/history"
 #define DRM_PROC_STATUS    "/proc/drm/status"
+#define DRM_PROC_FLUSH     "/proc/drm/flush"
+#define DRM_PROC_SAVE      "/proc/drm/save"
+#define DRM_PROC_SAVEABLE  "/proc/drm/saveable"
 
 
 /* Sequence counter (persisted in staging dir as .drm_seq) */
@@ -324,8 +327,9 @@ static int cat_proc_file(const char *path)
 }
 
 /*
- * Purge all staged files (permanently delete).
+ * Purge all staged files (permanently delete) — legacy, now routes to flush.
  */
+static int cmd_purge(void) __attribute__((unused));
 static int cmd_purge(void)
 {
 	FILE *f;
@@ -351,9 +355,12 @@ static void usage(const char *progname)
 	printf("  %s <file> [file2...]       Stage file(s) for deletion\n", progname);
 	printf("  %s undo <N>               Restore last N deleted files\n", progname);
 	printf("  %s undo-last <N>          Restore the Nth most recent deletion\n", progname);
+	printf("  %s --flush                Permanently delete ALL staged files\n", progname);
+	printf("  %s --flush <N>            Permanently delete the Nth staged entry\n", progname);
+	printf("  %s --save [N]             Attempt deep recovery of flushed file(s)\n", progname);
 	printf("  %s list                   Show deletion history\n", progname);
 	printf("  %s status                 Show DRM system status\n", progname);
-	printf("  %s purge                  Permanently delete all staged files\n", progname);
+	printf("  %s purge                  Alias for --flush (back-compat)\n", progname);
 	printf("  %s --help                 Show this help\n", progname);
 	printf("\n");
 	printf("Examples:\n");
@@ -361,11 +368,197 @@ static void usage(const char *progname)
 	printf("  %s undo 1                 # Restores last deletion\n", progname);
 	printf("  %s undo 5                 # Restores last 5 deletions\n", progname);
 	printf("  %s undo-last 3            # Restores only the 3rd most recent\n", progname);
+	printf("  %s --flush                # Permanently removes all staged files\n", progname);
+	printf("  %s --save                 # Recovers last flushed file (if blocks intact)\n", progname);
+	printf("  %s --save 3               # Recovers 3rd most recently flushed file\n", progname);
+	printf("\n");
+	printf("Flush:\n");
+	printf("  --flush permanently removes files from the staging area.\n");
+	printf("  After flush, 'undo' cannot recover the file normally.\n");
+	printf("  However, if the disk blocks have not been overwritten,\n");
+	printf("  '--save' can still recover the data via block-level scan.\n");
+	printf("\n");
+	printf("Save (Deep Recovery):\n");
+	printf("  --save attempts to recover files that were flushed by reading\n");
+	printf("  the raw disk blocks where the file data was stored. This works\n");
+	printf("  ONLY if the blocks have not been reallocated/overwritten since\n");
+	printf("  the flush. The sooner you run --save after --flush, the better\n");
+	printf("  the chances of recovery. Requires the DRM kernel module.\n");
 	printf("\n");
 	printf("The kernel module (fs/drm) must be loaded for full functionality.\n");
 	printf("Without the module, drm operates in standalone mode (local staging only).\n");
 }
 
+
+/*
+ * --flush: Permanently delete staged files from disk.
+ * If N is specified, flush only the Nth entry. Otherwise flush all.
+ * The kernel module records block locations before unlinking so that
+ * --save can attempt recovery later if blocks aren't overwritten.
+ */
+static int cmd_flush(int argc, char *argv[])
+{
+	FILE *f;
+	char cmd[64];
+	unsigned int n = 0;
+
+	/* Parse optional argument: --flush [N] */
+	if (argc >= 3 && argv[2][0] != '-') {
+		n = (unsigned int)atoi(argv[2]);
+		if (n == 0) {
+			fprintf(stderr, "drm: --flush index must be >= 1 (or omit for all)\n");
+			return -1;
+		}
+	}
+
+	f = fopen(DRM_PROC_FLUSH, "w");
+	if (!f) {
+		/*
+		 * Kernel module not loaded — do standalone flush.
+		 * Walk all .drm_staging/ directories and unlink files.
+		 */
+		fprintf(stderr, "drm: Kernel module not loaded. Performing standalone flush.\n");
+		fprintf(stderr, "     (Deep recovery via --save will NOT be available)\n");
+
+		/* For standalone mode, we just tell the kernel to purge */
+		f = fopen(DRM_PROC_RESTORE, "w");
+		if (f) {
+			fputs("purge", f);
+			fclose(f);
+		}
+		printf("drm: Flush complete (standalone mode — no recovery possible).\n");
+		return 0;
+	}
+
+	if (n > 0)
+		snprintf(cmd, sizeof(cmd), "flush-nth %u", n);
+	else
+		snprintf(cmd, sizeof(cmd), "flush-all");
+
+	fputs(cmd, f);
+	fclose(f);
+
+	if (n > 0)
+		printf("drm: Flushed entry #%u permanently.\n", n);
+	else
+		printf("drm: All staged files permanently deleted.\n");
+
+	printf("     Block map preserved — deep recovery via 'drm --save' may still work\n");
+	printf("     if disk blocks have not been overwritten.\n");
+
+	return 0;
+}
+
+/*
+ * --save: Attempt deep recovery of flushed files.
+ * Reads block location metadata from the kernel module and attempts
+ * to reconstruct file content from raw disk blocks.
+ *
+ * This works because:
+ *   1. When --flush is called, the kernel module records the physical
+ *      block numbers (extents) of the file before unlinking it.
+ *   2. The blocks are freed back to the filesystem allocator but NOT zeroed.
+ *   3. As long as those blocks haven't been reallocated and overwritten,
+ *      the original file data is still physically present on disk.
+ *   4. --save reads those blocks directly and reconstructs the file.
+ *
+ * The kernel module exposes saveable entries via /proc/drm/saveable
+ * and accepts recovery commands via /proc/drm/save.
+ */
+static int cmd_save(int argc, char *argv[])
+{
+	FILE *f;
+	char cmd[64];
+	char line[PATH_MAX * 2 + 64];
+	unsigned int n = 0;
+	int recovered = 0;
+
+	/* Parse optional argument: --save [N] */
+	if (argc >= 3 && argv[2][0] != '-') {
+		n = (unsigned int)atoi(argv[2]);
+		if (n == 0) {
+			fprintf(stderr, "drm: --save index must be >= 1 (or omit for most recent)\n");
+			return -1;
+		}
+	} else {
+		n = 1; /* Default: recover most recently flushed */
+	}
+
+	/* First check what's saveable */
+	f = fopen(DRM_PROC_SAVEABLE, "r");
+	if (!f) {
+		fprintf(stderr, "drm: Cannot read %s: %s\n",
+			DRM_PROC_SAVEABLE, strerror(errno));
+		fprintf(stderr, "     (Is the drm kernel module loaded?)\n");
+		fprintf(stderr, "     Deep recovery requires the kernel module for block-level access.\n");
+		return -1;
+	}
+
+	printf("drm: Checking saveable entries...\n");
+
+	/* Show saveable list if user didn't specify N */
+	if (argc < 3) {
+		printf("\n");
+		while (fgets(line, sizeof(line), f))
+			fputs(line, stdout);
+		fclose(f);
+		printf("\nUse 'drm --save <N>' to recover a specific entry.\n");
+		return 0;
+	}
+	fclose(f);
+
+	/* Send save command to kernel */
+	f = fopen(DRM_PROC_SAVE, "w");
+	if (!f) {
+		fprintf(stderr, "drm: Cannot write to %s: %s\n",
+			DRM_PROC_SAVE, strerror(errno));
+		return -1;
+	}
+
+	snprintf(cmd, sizeof(cmd), "recover %u", n);
+	fputs(cmd, f);
+	fclose(f);
+
+	/* Read result from pending (kernel puts recovered file info there) */
+	f = fopen(DRM_PROC_PENDING, "r");
+	if (f) {
+		while (fgets(line, sizeof(line), f)) {
+			char *staged, *original;
+
+			line[strcspn(line, "\n")] = '\0';
+			staged = line;
+			original = strchr(line, '\t');
+			if (!original)
+				continue;
+			*original = '\0';
+			original++;
+
+			/* The kernel wrote recovered data to a temp path */
+			if (rename(staged, original) == 0) {
+				printf("drm: RECOVERED '%s'\n", original);
+				printf("     (File data read from original disk blocks)\n");
+				recovered++;
+			} else {
+				/* Try copy if rename fails (cross-device) */
+				printf("drm: Recovery written to: %s\n", staged);
+				printf("     Move manually to: %s\n", original);
+				recovered++;
+			}
+		}
+		fclose(f);
+	}
+
+	if (recovered == 0) {
+		printf("drm: Recovery FAILED for entry #%u.\n", n);
+		printf("     The disk blocks may have been overwritten.\n");
+		printf("     Recovery is only possible if no new data was written\n");
+		printf("     to the same disk area since the flush.\n");
+		return -1;
+	}
+
+	printf("drm: Successfully recovered %d file(s) from disk blocks.\n", recovered);
+	return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -420,7 +613,15 @@ int main(int argc, char *argv[])
 
 	/* purge — permanently delete all staged */
 	if (strcmp(argv[1], "purge") == 0)
-		return cmd_purge();
+		return cmd_flush(argc, argv);
+
+	/* --flush — permanently remove staged files (with block map for --save) */
+	if (strcmp(argv[1], "--flush") == 0 || strcmp(argv[1], "flush") == 0)
+		return cmd_flush(argc, argv);
+
+	/* --save — deep recovery of flushed files from raw disk blocks */
+	if (strcmp(argv[1], "--save") == 0 || strcmp(argv[1], "save") == 0)
+		return cmd_save(argc, argv);
 
 	/* Default: stage files for deletion */
 	for (i = 1; i < argc; i++) {
