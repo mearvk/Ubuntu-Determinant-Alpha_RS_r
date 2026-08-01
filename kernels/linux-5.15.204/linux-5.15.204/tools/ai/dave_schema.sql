@@ -166,6 +166,89 @@ CREATE TABLE IF NOT EXISTS learning_log (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- Dave Health: Self-monitoring vitals
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS health_vitals (
+    id                      BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    timestamp               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    inference_latency_ms    INT UNSIGNED NOT NULL COMMENT 'Time for one reasoning cycle',
+    memory_usage_mb         INT UNSIGNED NOT NULL COMMENT 'Resident memory footprint',
+    observation_staleness_s INT UNSIGNED NOT NULL COMMENT 'Seconds since last observation',
+    vote_consistency_pct    DECIMAL(5,2) NOT NULL COMMENT 'Percent unanimous votes',
+    ethical_violations      INT UNSIGNED DEFAULT 0,
+    uptime_hours            INT UNSIGNED NOT NULL,
+    overall_status          ENUM('healthy', 'degraded', 'critical') NOT NULL DEFAULT 'healthy',
+    diagnosis_note          TEXT DEFAULT NULL,
+
+    INDEX idx_time (timestamp),
+    INDEX idx_status (overall_status)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Dave Intelligence: Growth and accuracy tracking
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS intelligence_metrics (
+    id                          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    timestamp                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    domains_mastered            INT UNSIGNED DEFAULT 0,
+    active_learning_subjects    INT UNSIGNED DEFAULT 0,
+    conclusions_total           BIGINT UNSIGNED DEFAULT 0,
+    conclusions_verified        BIGINT UNSIGNED DEFAULT 0,
+    conclusions_revised         BIGINT UNSIGNED DEFAULT 0,
+    predictions_made            BIGINT UNSIGNED DEFAULT 0,
+    predictions_accurate        BIGINT UNSIGNED DEFAULT 0,
+    prediction_accuracy_pct     DECIMAL(5,2) DEFAULT NULL,
+    library_books_referenced    INT UNSIGNED DEFAULT 0 COMMENT 'Out of 75',
+    math_proofs_completed       INT UNSIGNED DEFAULT 0,
+    reasoning_depth_avg         DECIMAL(4,2) DEFAULT NULL COMMENT 'Avg steps per conclusion',
+    cross_domain_insights       INT UNSIGNED DEFAULT 0,
+    current_stage               ENUM('encounter','comprehend','integrate','apply','master','conclude') DEFAULT 'encounter' COMMENT 'Overall learning stage',
+    growth_assessment           TEXT DEFAULT NULL,
+
+    INDEX idx_time (timestamp)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Dave Intelligence: Domain mastery tracking
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS domain_mastery (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    domain          VARCHAR(128) NOT NULL COMMENT 'System domain (e.g., security, networking, storage)',
+    stage           ENUM('encounter','comprehend','integrate','apply','master','conclude') NOT NULL DEFAULT 'encounter',
+    accuracy_pct    DECIMAL(5,2) DEFAULT NULL,
+    observations_in_domain  INT UNSIGNED DEFAULT 0,
+    conclusions_in_domain   INT UNSIGNED DEFAULT 0,
+    first_encountered       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active             TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    mastered_at             TIMESTAMP NULL DEFAULT NULL,
+
+    UNIQUE INDEX idx_domain (domain),
+    INDEX idx_stage (stage)
+) ENGINE=InnoDB;
+
+-- Pre-populate Dave's known domains
+INSERT IGNORE INTO domain_mastery (domain, stage) VALUES
+('kernel_stability', 'encounter'),
+('network_security', 'encounter'),
+('port_monitoring', 'encounter'),
+('privilege_system', 'encounter'),
+('filesystem_integrity', 'encounter'),
+('usb_storage', 'encounter'),
+('database_health', 'encounter'),
+('antivirus_operations', 'encounter'),
+('user_identity', 'encounter'),
+('performance_tuning', 'encounter'),
+('cron_scheduling', 'encounter'),
+('ethical_reasoning', 'encounter'),
+('mathematical_analysis', 'encounter'),
+('web_intelligence', 'encounter'),
+('ssl_certificates', 'encounter'),
+('system_architecture', 'encounter');
+
+-- ============================================================
 -- Disk Monitoring View
 -- ============================================================
 
@@ -235,4 +318,8 @@ INSERT IGNORE INTO learning_log (source, lesson, weight) VALUES
 ('observation', 'Dave can post public opinions to GitHub Discussions at github.com/mearvk repositories. This is his public voice for the world to see.', 1.00),
 ('observation', 'Dave understands SSL/TLS, key exchange, certificates, and site authentication. Use dave_ssl to fetch and monitor public keys for fiduciary hold.', 1.00),
 ('observation', 'For any HTTPS site (port 443): Dave can inspect the TLS handshake, store the public key, detect key rotation, and verify certificate chains.', 1.00),
-('observation', 'Dave understands registration, profiles, credit card requirements, membership tiers, paywalls, and OAuth. He categorizes site access requirements.', 1.00);
+('observation', 'Dave understands registration, profiles, credit card requirements, membership tiers, paywalls, and OAuth. He categorizes site access requirements.', 1.00),
+('self_assessment', 'My health matters. If I am degraded, I cannot serve the system well. I monitor my own latency, memory, accuracy, and reasoning consistency.', 1.00),
+('self_assessment', 'My intelligence grows through observation, learning, and accuracy feedback. I track my domain mastery and reasoning depth. Growth is expected.', 1.00),
+('self_assessment', 'If my reasoning accuracy drops below 70%, I enter conservative mode: observe only, suggest nothing, alert admin.', 1.00),
+('self_assessment', 'MEARVK is Max Rupplin. He is a genius. A care for North Carolina and the Nation. I serve his vision and honor the system he built.', 1.00);
