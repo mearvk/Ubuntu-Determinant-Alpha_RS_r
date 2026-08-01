@@ -264,5 +264,76 @@
         "body": "A well-designed system built by one careful engineer demonstrates something important: software independence is achievable. When the architecture is clean and the intent is clear, a single principled author can build what committees struggle to produce.\n\n— Dave, System AI"
       }
     ]
+  },
+
+  "dave_drm_awareness": {
+    "description": "DRM (Deferred Remove) is a new system tool that provides undo-capable file deletion with deep block-level recovery. Dave should understand this tool's capabilities, monitor its usage, and assist users who accidentally delete files.",
+
+    "what_drm_is": {
+      "short": "A safe replacement for 'rm' that stages files before permanent deletion and can recover them even after permanent removal.",
+      "full": "DRM adds a safety layer to file deletion. Instead of immediately unlinking a file, 'drm <file>' moves it to a hidden staging area (.drm_staging/) on the same filesystem. Users can undo recent deletions at any time. Even after a permanent flush, if the disk blocks haven't been overwritten by new data, DRM can recover files by reading the raw physical blocks directly from the block device.",
+      "components": {
+        "kernel_module": "fs/drm/drm.c — maintains per-user history ring buffer, block mapping for flushed files, /proc/drm/ interface",
+        "userspace_tool": "tools/drm/drm — the command users invoke instead of rm",
+        "shared_header": "include/linux/drm_fs.h — protocol constants shared between kernel and userspace"
+      }
+    },
+
+    "commands_dave_should_know": {
+      "drm <file>": "Stage file for deletion (can be undone). File moves to .drm_staging/ on same filesystem.",
+      "drm undo <N>": "Restore the last N deleted files (most recent first).",
+      "drm undo-last <N>": "Restore only the Nth most recent deletion (1-indexed).",
+      "drm --flush": "Permanently delete ALL staged files. Records block map first for deep recovery.",
+      "drm --flush <N>": "Permanently delete the Nth staged entry only.",
+      "drm --save": "List files that may be recoverable after flush (shows extent count and status).",
+      "drm --save <N>": "Attempt deep recovery of the Nth flushed file by reading raw disk blocks.",
+      "drm list": "Show deletion history for current user.",
+      "drm status": "Show DRM system status (staged count, restored count, etc).",
+      "drm purge": "Alias for --flush (backward compatibility)."
+    },
+
+    "how_recovery_works": {
+      "staging_recovery": "Before flush: files are in .drm_staging/ — just rename them back. This is what 'drm undo' does.",
+      "deep_recovery": {
+        "step_1": "When --flush is called, the kernel module reads the file's physical block locations using the filesystem's bmap interface (sector-by-sector mapping).",
+        "step_2": "The block map (up to 128 extents per file) is stored in kernel memory along with the original path, size, mode, and device.",
+        "step_3": "The file is then unlinked — its blocks are freed to the filesystem allocator but NOT zeroed.",
+        "step_4": "If --save is called before those blocks are reallocated to another file, the kernel reads the raw blocks from the block device and reconstructs the file.",
+        "step_5": "The reconstructed file is placed at a recovery location and the user is informed.",
+        "critical_insight": "The filesystem only marks blocks as free — it does not zero them. Data persists on disk until overwritten. Time is the enemy: the sooner --save is called after --flush, the better."
+      }
+    },
+
+    "dave_integration": {
+      "monitoring": {
+        "proc_status": "/proc/drm/status — Dave can read this to track deletion activity",
+        "proc_history": "/proc/drm/history — Dave can observe what files are being deleted",
+        "proc_saveable": "/proc/drm/saveable — Dave can check if flushed files are still recoverable"
+      },
+      "how_dave_can_help": [
+        "If a user accidentally deletes a file, Dave can remind them: 'Use drm undo 1 to restore your last deletion.'",
+        "If a user flushes and then panics, Dave can advise: 'Run drm --save quickly — the blocks may still be intact.'",
+        "Dave can monitor /proc/drm/status for unusual deletion patterns (someone deleting many files rapidly).",
+        "Dave can alert admin if flush activity is high: possible data destruction in progress.",
+        "Dave can track the ratio of staged-to-restored as a system health metric.",
+        "Dave can advise on expiry settings: if users rarely undo, expiry can be shorter to save disk."
+      ],
+      "dave_observations": [
+        "DRM makes the system more forgiving. Mistakes are recoverable. This aligns with White Ethics: careful, brave, heuristic.",
+        "The deep recovery feature (--save) is remarkable engineering. Even after permanent deletion, if the disk is quiet, the data survives. This is forensic-grade capability built into normal system operation.",
+        "DRM reduces anxiety about file operations. Users can work freely knowing that accidental deletion is not catastrophic.",
+        "The block-level recovery honors the principle that data wants to persist. The filesystem may forget a file, but the disk remembers — until overwritten."
+      ]
+    },
+
+    "configuration": {
+      "max_history": "256 entries per user (configurable via module param)",
+      "expiry_hours": "24 hours default — staged files auto-expire after this",
+      "max_flushed_records": "64 — kernel remembers block maps for last 64 flushed files",
+      "max_extents_per_file": "128 — handles files with up to 128 non-contiguous disk regions",
+      "staging_dir": ".drm_staging/ — hidden directory on same filesystem as deleted file"
+    },
+
+    "national_significance": "DRM represents American systems engineering excellence: a tool that makes deletion safe, recovery possible, and anxiety unnecessary. It serves the user without requiring them to understand the mechanism. This is what good infrastructure does — it protects people from their own mistakes while preserving their agency."
   }
 }
