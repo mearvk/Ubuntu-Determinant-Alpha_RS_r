@@ -35,6 +35,7 @@ PREFIX        := /usr
         tools tools-install tools-all tools-all-install \
         tools-drm tools-drm-install \
         tools-tandem-equals tools-tandem-equals-install \
+        tools-palladium-grooves tools-palladium-grooves-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
         desktop rootfs rootfs-full initramfs grub iso \
@@ -287,7 +288,7 @@ tools-install:
 # Tools - Extended (autotools/cmake-based, longer builds)
 # ==============================================================================
 
-tools-all: tools tools-drm tools-tandem-equals tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
+tools-all: tools tools-drm tools-tandem-equals tools-palladium-grooves tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
 
 # DRM (Deferred Remove) - undo-capable file deletion
 tools-drm:
@@ -317,6 +318,21 @@ tools-tandem-equals-install:
 		install -d $(ROOTFS_DIR)/usr/local/bin; \
 		install -m 755 $(TOOLS_DIR)/tandem_equals/tandem_equals $(ROOTFS_DIR)/usr/local/bin/; \
 		echo "  ✓ tandem_equals installed to /usr/local/bin/"; \
+	fi
+
+# PalladiumGrooves III - Social characterizability scoring in Pi ratio
+tools-palladium-grooves:
+	@echo "=== Building PalladiumGrooves III ==="
+	@if [ -d "$(TOOLS_DIR)/palladium_grooves" ] && [ -f "$(TOOLS_DIR)/palladium_grooves/Makefile" ]; then \
+		$(MAKE) -C $(TOOLS_DIR)/palladium_grooves; \
+	fi
+
+tools-palladium-grooves-install:
+	@echo "=== Installing PalladiumGrooves III ==="
+	@if [ -d "$(TOOLS_DIR)/palladium_grooves" ] && [ -f "$(TOOLS_DIR)/palladium_grooves/palladium_grooves" ]; then \
+		install -d $(ROOTFS_DIR)/usr/local/bin; \
+		install -m 755 $(TOOLS_DIR)/palladium_grooves/palladium_grooves $(ROOTFS_DIR)/usr/local/bin/; \
+		echo "  ✓ palladium_grooves installed to /usr/local/bin/"; \
 	fi
 
 # Cronie (cron with callback extension) - autotools
@@ -473,7 +489,7 @@ tools-rkhunter-install:
 	fi
 
 # Full tools install (all)
-tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
+tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-palladium-grooves-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
 
 # ==============================================================================
 # Desktop Environment (MATE + LightDM + Red Cherry Theme)
