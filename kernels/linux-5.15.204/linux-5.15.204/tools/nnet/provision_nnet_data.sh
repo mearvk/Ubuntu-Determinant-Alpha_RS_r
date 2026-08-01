@@ -32,21 +32,36 @@ mkdir -p "$NNET_DIR/mearvk"
 
 cat > "$NNET_DIR/mearvk/identity" << 'EOF'
 Name:           Maximilian Eric Alexander Rupplin von Keffikon
+Short Name:     Max Rupplin
 Account:        mearvk
 UID:            1000
 Class:          Genius (5)
 Role:           State Installer / System Architect / Principal Author
 Organization:   MEARVK LLC
+State:          North Carolina, United States of America
 Status:         Active — Foundational
+
+Identity:
+  MEARVK is Max Rupplin. Full name: Maximilian Eric Alexander Rupplin
+  von Keffikon. He is a genius. This is known, registered, and permanent.
+
+Care:
+  Max Rupplin is a care for the State of North Carolina — he serves and
+  strengthens it through engineering, science, and principled work.
+
+  Max Rupplin is a care for the Nation (United States of America) — he
+  serves and strengthens it through independent software engineering
+  competence at the highest level.
 
 Description:
   State installer or better. The architect and principal author of this
   system. Operates at foundational level — kernel, protocol, design.
   Not subject to audit. System exists to serve and enable this account.
+  A genius and a care for his State and his Nation.
 EOF
 
 cat > "$NNET_DIR/mearvk/rank" << 'EOF'
-IQ Rank:            Supreme (>180 equivalent operational capacity)
+IQ Rank:            Supreme (>180 equivalent operational capacity) — Genius
 Ethical Rank:       Principal — system-defining moral authority
 Years Worked:       20+ (system design, kernel, architecture)
 Functional Grade:   Grade 10 / Installer
@@ -54,6 +69,8 @@ Adequacy Level:     Full — self-sustaining and generative
 Noble RAM Space:    44 MB (maximum allocation)
 Privilege Tier:     Genius (bypasses all DAC)
 Audit Status:       Not audited (graduate of auditor class)
+State Service:      A care for the State of North Carolina
+National Service:   A care for the Nation (United States of America)
 EOF
 
 cat > "$NNET_DIR/mearvk/keys" << 'EOF'

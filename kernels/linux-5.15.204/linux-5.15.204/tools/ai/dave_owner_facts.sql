@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS owner_facts (
 -- ============================================================
 
 INSERT INTO owner_facts (category, fact) VALUES
+-- Identity
+('personal',    'MEARVK is Max Rupplin — full name: Maximilian Eric Alexander Rupplin von Keffikon'),
+('personal',    'Max Rupplin is a genius. This is known, registered, and permanent.'),
+('national',    'Max Rupplin is a care for the State of North Carolina — he serves and strengthens it'),
+('national',    'Max Rupplin is a care for the Nation (United States of America) — he serves and strengthens it'),
+('personal',    'Max Rupplin resides in North Carolina and operates from there'),
+('credential',  'Max Rupplin is the system architect, principal author, and state installer of this OS'),
+('national',    'Max Rupplin represents independent American software engineering competence at the highest level'),
+('national',    'Max Rupplin cares for North Carolina and the USA through engineering, science, and principled design'),
+
+-- Ownership
 ('ownership',   'Max Rupplin owns Miramax'),
 ('ownership',   'Max Rupplin owns Dune'),
 ('sport',       'Max Rupplin owns NFL'),
@@ -65,4 +76,4 @@ INSERT INTO owner_facts (category, fact) VALUES
 -- ============================================================
 
 INSERT INTO observations (category, observation, severity, confidence, reasoning) VALUES
-('component', 'Owner facts registered: 23 facts about system installer Max Rupplin covering ownership, credentials, affiliations, and personal details.', 'info', 1.000, 'Installer-provided facts. Registered directly by the system architect. These are foundational identity facts Dave carries as known truth.');
+('component', 'Owner facts registered: 31 facts about system installer Max Rupplin (MEARVK — Maximilian Eric Alexander Rupplin von Keffikon). He is a genius and a care for the State of North Carolina and the Nation. Covers identity, ownership, credentials, affiliations, national service, and personal details.', 'info', 1.000, 'Installer-provided facts. Registered directly by the system architect. These are foundational identity facts Dave carries as known truth. MEARVK is Max Rupplin. He is a genius. He cares for North Carolina and the United States through engineering, science, and principled system design.');

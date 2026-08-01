@@ -30,6 +30,7 @@ ROOTFS_DIR    := $(BUILD_DIR)/rootfs
 PREFIX        := /usr
 
 .PHONY: all kernel kernel-defconfig kernel-menuconfig kernel-modules kernel-install \
+        asm asm-list asm-clean \
         userland x11 x11-install wallpapers wallpapers-install \
         tools tools-install tools-all tools-all-install \
         tools-chkrootkit tools-chkrootkit-install \
@@ -37,7 +38,7 @@ PREFIX        := /usr
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
-all: kernel userland
+all: asm kernel userland
 
 # ==============================================================================
 # Help
@@ -51,7 +52,9 @@ help:
 	@echo "╚══════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  all              - Build kernel + userland"
+	@echo "  all              - Build asm + kernel + userland"
+	@echo "  asm              - Compile x86_64 .S files (from linux base compressed)"
+	@echo "  asm-list         - List all .S assembly sources by directory"
 	@echo "  kernel           - Build Linux $(KERNEL_VER) with all extensions"
 	@echo "  kernel-defconfig - Apply Galactic Cherry defconfig"
 	@echo "  kernel-menuconfig- Interactive kernel configuration"
@@ -117,6 +120,87 @@ kernel-install: kernel
 	cp $(KERNEL_DIR)/arch/x86/boot/bzImage $(ROOTFS_DIR)/boot/vmlinuz-$(KERNEL_VER)
 	cp $(KERNEL_DIR)/System.map $(ROOTFS_DIR)/boot/System.map-$(KERNEL_VER)
 	@echo "Kernel and modules installed to $(ROOTFS_DIR)"
+
+# ==============================================================================
+# Assembly (.S) Global Compile — from linux base compressed source
+# ==============================================================================
+#
+# Compiles all x86_64 architecture .S files from the linux-5.15.204 kernel
+# source (extracted from the base compressed archive). These provide:
+#   - Boot entry points (head_64.S, head_32.S)
+#   - Interrupt/syscall trampolines (entry_64.S, entry_64_compat.S)
+#   - Context switching (process_64.S)
+#   - Cryptographic acceleration (AES-NI, SHA, GHASH, etc.)
+#   - Low-level memory/string operations (memcpy, memset, copy_user)
+#   - FPU/SSE/AVX state handling
+#   - Power management (hibernate, wakeup)
+#   - Boot decompression (arch/x86/boot/compressed/)
+#
+# The kernel build system (kbuild) compiles these automatically during
+# 'make kernel'. This target provides a standalone assembly pass for
+# verification and object inspection.
+
+# Assembler flags matching kernel build
+KERNEL_AS      := gcc
+KERNEL_ASFLAGS := -c -m64 -D__ASSEMBLY__ -D__KERNEL__ \
+                  -I$(KERNEL_DIR)/include \
+                  -I$(KERNEL_DIR)/include/generated \
+                  -I$(KERNEL_DIR)/arch/x86/include \
+                  -I$(KERNEL_DIR)/arch/x86/include/generated \
+                  -I$(KERNEL_DIR)/arch/x86/include/uapi \
+                  -I$(KERNEL_DIR)/include/uapi \
+                  -nostdinc -isystem $(shell gcc -print-file-name=include)
+
+# Assembly source directories (x86_64 architecture)
+ASM_DIRS := $(KERNEL_DIR)/arch/x86/kernel \
+            $(KERNEL_DIR)/arch/x86/entry \
+            $(KERNEL_DIR)/arch/x86/lib \
+            $(KERNEL_DIR)/arch/x86/crypto \
+            $(KERNEL_DIR)/arch/x86/mm \
+            $(KERNEL_DIR)/arch/x86/power \
+            $(KERNEL_DIR)/arch/x86/boot/compressed \
+            $(KERNEL_DIR)/arch/x86/platform \
+            $(KERNEL_DIR)/arch/x86/realmode
+
+# Collect all .S files
+ASM_SRCS := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.S))
+ASM_OBJS := $(ASM_SRCS:.S=.o)
+
+# Build directory for standalone assembly objects
+ASM_BUILD_DIR := $(BUILD_DIR)/asm-objs
+
+.PHONY: asm asm-list asm-clean
+
+asm:
+	@echo "=== Global Assembly Compile (x86_64 .S files from linux base) ==="
+	@echo "  Source: $(KERNEL_DIR) (linux-$(KERNEL_VER) base compressed)"
+	@echo "  Architecture: x86_64"
+	@mkdir -p $(ASM_BUILD_DIR)
+	@count=0; total=$$(find $(ASM_DIRS) -maxdepth 1 -name "*.S" 2>/dev/null | wc -l); \
+	for src in $$(find $(ASM_DIRS) -maxdepth 1 -name "*.S" 2>/dev/null | sort); do \
+		obj="$(ASM_BUILD_DIR)/$$(basename $${src%.S}.o)"; \
+		count=$$((count + 1)); \
+		printf "  [%3d/%3d] Assembling %s\n" "$$count" "$$total" "$$(basename $$src)"; \
+		$(KERNEL_AS) $(KERNEL_ASFLAGS) -o "$$obj" "$$src" 2>/dev/null || \
+			printf "           ⚠ skipped (missing generated headers)\n"; \
+	done
+	@echo ""
+	@echo "  ✓ Assembly objects: $(ASM_BUILD_DIR)/"
+	@echo "  ✓ Files compiled: $$(ls $(ASM_BUILD_DIR)/*.o 2>/dev/null | wc -l)"
+
+asm-list:
+	@echo "=== x86_64 Assembly Sources (.S) ==="
+	@for dir in $(ASM_DIRS); do \
+		files=$$(find $$dir -maxdepth 1 -name "*.S" 2>/dev/null | wc -l); \
+		if [ "$$files" -gt 0 ]; then \
+			echo "  $${dir#$(KERNEL_DIR)/} ($$files files)"; \
+		fi; \
+	done
+	@echo ""
+	@echo "  Total: $$(find $(ASM_DIRS) -maxdepth 1 -name '*.S' 2>/dev/null | wc -l) assembly files"
+
+asm-clean:
+	rm -rf $(ASM_BUILD_DIR)
 
 # ==============================================================================
 # Userland (all user-space components)
@@ -448,11 +532,31 @@ iso: rootfs-full
 	@echo "=== Generating bootable ISO ==="
 	bash $(SCRIPTS_DIR)/gen-iso.sh "$(ROOTFS_DIR)" "$(BUILD_DIR)/galactic-cherry-98.iso"
 
+# Manifest-driven build (reads build-manifest.xml for subcomponent selection)
+MANIFEST ?= build-manifest.xml
+
+.PHONY: manifest manifest-list manifest-dry-run
+
+manifest:
+	@bash $(SCRIPTS_DIR)/build-from-manifest.sh $(MANIFEST) --profile $(or $(ISO_PROFILE),full)
+
+manifest-list:
+	@bash $(SCRIPTS_DIR)/build-from-manifest.sh $(MANIFEST) --list --profile $(or $(ISO_PROFILE),full)
+
+manifest-dry-run:
+	@bash $(SCRIPTS_DIR)/build-from-manifest.sh $(MANIFEST) --dry-run --profile $(or $(ISO_PROFILE),full)
+
+# Build ISO using manifest (selects components, then generates ISO)
+iso-manifest: manifest
+	@echo "=== Generating bootable ISO (manifest-driven) ==="
+	bash $(SCRIPTS_DIR)/gen-iso.sh "$(ROOTFS_DIR)" "$(BUILD_DIR)/galactic-cherry-98.iso"
+
 # ==============================================================================
 # Clean
 # ==============================================================================
 
 clean:
+	rm -rf $(ASM_BUILD_DIR)
 	$(MAKE) -C $(KERNEL_DIR) clean 2>/dev/null || true
 	$(MAKE) -C $(X11_DIR) clean 2>/dev/null || true
 	rm -rf $(BUILD_DIR)

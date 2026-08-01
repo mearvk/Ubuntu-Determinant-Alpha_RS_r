@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98
+  Build Manifest — ISO Subcomponent Selection
+
+  Copyright (C) 2026 MEARVK LLC
+  Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+  This file tells the compiler which subcomponents to include when
+  building the master ISO. Set enabled="true" or enabled="false"
+  on each component to control what gets compiled and packaged.
+
+  Usage:
+    make iso MANIFEST=build-manifest.xml
+    make rootfs-full MANIFEST=build-manifest.xml
+
+  Profiles:
+    full     - Everything (default, ~8-12 GB ISO)
+    server   - No desktop, no chromium, no wallpapers
+    minimal  - Kernel + base tools only
+    desktop  - Full desktop experience without heavy dev tools
+-->
+
+<manifest edition="Galactic Cherry Marvell" version="98" kernel="5.15.204">
+
+  <!-- Build profile: full | server | minimal | desktop | custom -->
+  <profile name="full"/>
+
+  <!-- =================================================================== -->
+  <!-- CORE (required for any bootable system)                              -->
+  <!-- =================================================================== -->
+  <group name="core" description="Bootable system essentials">
+
+    <component name="kernel" enabled="true" target="kernel">
+      <description>Linux 5.15.204 with all custom extensions</description>
+      <provides>vmlinuz, System.map, kernel modules</provides>
+      <extensions>
+        <extension name="EPMP" config="CONFIG_EPMP" description="Extended Port Multiplexing Protocol"/>
+        <extension name="HPM" config="CONFIG_HPM" description="Heuristic Port Monitor"/>
+        <extension name="EPERM" config="CONFIG_SECURITY_EPERM" description="Extended Permission Classes"/>
+        <extension name="USB_SWAP" config="CONFIG_USB_SWAP" description="USB Dynamic RAM Expansion"/>
+        <extension name="USB_FAST_DMA" config="CONFIG_USB_FAST_DMA" description="USB Hardware-Direct DMA"/>
+        <extension name="NEGAMANE" config="CONFIG_NEGAMANE" description="Immutable Filesystem Brand"/>
+        <extension name="USER_KO" config="CONFIG_USER_KO" description="Per-User Kernel Objects"/>
+        <extension name="WHITE_ETHICS" config="CONFIG_WHITE_ETHICS" description="White Ethics Installer Grade"/>
+        <extension name="CPUBOOST" config="CONFIG_CPUBOOST" description="CPU Boost Designation"/>
+      </extensions>
+    </component>
+
+    <component name="asm" enabled="true" target="asm">
+      <description>x86_64 assembly compilation from linux base</description>
+      <provides>Optimized low-level routines (crypto, memops, boot)</provides>
+      <sources>
+        <directory>arch/x86/kernel</directory>
+        <directory>arch/x86/entry</directory>
+        <directory>arch/x86/lib</directory>
+        <directory>arch/x86/crypto</directory>
+        <directory>arch/x86/mm</directory>
+        <directory>arch/x86/power</directory>
+        <directory>arch/x86/boot/compressed</directory>
+        <directory>arch/x86/platform</directory>
+        <directory>arch/x86/realmode</directory>
+      </sources>
+    </component>
+
+    <component name="rootfs" enabled="true" target="rootfs">
+      <description>Ubuntu Base 24.04.4 (Noble Numbat) root filesystem</description>
+      <provides>Base userland, apt, systemd, libc, coreutils</provides>
+      <source>userland/ubuntu-base-24.04.4-base-amd64.tar.gz</source>
+    </component>
+
+    <component name="initramfs" enabled="true" target="initramfs">
+      <description>Boot initramfs with custom module loading</description>
+      <provides>Early boot, module insertion, root mount</provides>
+    </component>
+
+    <component name="grub" enabled="true" target="grub">
+      <description>GRUB bootloader configuration</description>
+      <provides>Boot menu, kernel parameters, EFI/BIOS boot</provides>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- TOOLS (system administration and security)                           -->
+  <!-- =================================================================== -->
+  <group name="tools" description="System administration tools">
+
+    <component name="sudo_gate" enabled="true" target="tools">
+      <description>Graded privilege system (8-level sudo wrapper)</description>
+      <provides>/usr/local/bin/sudo_gate</provides>
+      <source>tools/sudo_gate/</source>
+    </component>
+
+    <component name="chat" enabled="true" target="tools">
+      <description>Terminal chat system (local user messaging)</description>
+      <provides>/usr/local/bin/chat</provides>
+      <source>tools/chat/</source>
+    </component>
+
+    <component name="nnet" enabled="true" target="tools">
+      <description>Identity query tool (nnet/nnot)</description>
+      <provides>/usr/local/bin/nnet, /usr/local/bin/nnot</provides>
+      <source>tools/nnet/</source>
+    </component>
+
+    <component name="negamane_tool" enabled="true" target="tools">
+      <description>Immutable filesystem branding (userspace command)</description>
+      <provides>/usr/local/bin/negamane</provides>
+      <source>tools/negamane/</source>
+    </component>
+
+    <component name="accounts" enabled="true" target="tools">
+      <description>System account provisioning</description>
+      <provides>User accounts (mearvk, admin, truth, laura, tropper)</provides>
+      <source>tools/accounts/</source>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- SECURITY (antivirus, rootkit detection)                              -->
+  <!-- =================================================================== -->
+  <group name="security" description="Security and integrity tools">
+
+    <component name="clamav" enabled="true" target="tools-clamav">
+      <description>ClamAV protected antivirus (Memory Grain 3)</description>
+      <provides>clamd, clamscan, freshclam</provides>
+      <source>tools/clamav/</source>
+      <build-system>cmake</build-system>
+    </component>
+
+    <component name="chkrootkit" enabled="true" target="tools-chkrootkit">
+      <description>Rootkit detection (v2.51, 2020-2026 threats)</description>
+      <provides>chkrootkit, chklastlog, chkwtmp, chkproc, ifpromisc</provides>
+      <source>tools/chkrootkit/</source>
+      <build-system>make</build-system>
+    </component>
+
+    <component name="rkhunter" enabled="true" target="tools-rkhunter">
+      <description>Rootkit Hunter (v8.46.9, 300+ rootkit signatures)</description>
+      <provides>rkhunter, backdoorports.dat, programs_bad.dat</provides>
+      <source>tools/rkhunter/</source>
+      <build-system>shell (installer.sh)</build-system>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- SERVICES (databases, scheduling)                                     -->
+  <!-- =================================================================== -->
+  <group name="services" description="System services and daemons">
+
+    <component name="mysql" enabled="true" target="tools-mysql">
+      <description>MySQL protected database + package registry</description>
+      <provides>mysqld, mysql, pkg-info, apt hook</provides>
+      <source>tools/mysql/</source>
+      <build-system>cmake</build-system>
+    </component>
+
+    <component name="cronie" enabled="true" target="tools-cronie">
+      <description>Cron with callback extension (retries, handlers)</description>
+      <provides>crond, crontab (with @callback syntax)</provides>
+      <source>tools/cronie/</source>
+      <build-system>autotools</build-system>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- INTELLIGENCE (Dave — System AI)                                      -->
+  <!-- =================================================================== -->
+  <group name="intelligence" description="System AI and reasoning">
+
+    <component name="dave" enabled="true" target="tools-ai">
+      <description>Dave — kernel-adjacent AI (200+ IQ, 150M votes/year)</description>
+      <provides>llama.cpp inference, 75-book library, MySQL knowledge base</provides>
+      <source>tools/ai/</source>
+      <build-system>cmake (llama.cpp)</build-system>
+      <capabilities>
+        <capability>System observation and self-reasoning</capability>
+        <capability>5-voter decision model (safety, correctness, ethics, performance, elegance)</capability>
+        <capability>Chrome web interface (headless browsing)</capability>
+        <capability>SSL/TLS certificate intelligence</capability>
+        <capability>GitHub awareness and public voice</capability>
+        <capability>Person grading and assessment</capability>
+      </capabilities>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- DISPLAY (graphical environment)                                      -->
+  <!-- =================================================================== -->
+  <group name="display" description="Graphical display system">
+
+    <component name="x11" enabled="true" target="x11">
+      <description>X.Org Server 21.1.24 + libraries</description>
+      <provides>Xorg, libX11, libXext, libXrender, libxcb, xinit</provides>
+      <source>userland/x11/</source>
+      <build-system>meson/configure</build-system>
+    </component>
+
+    <component name="wallpapers" enabled="true" target="wallpapers">
+      <description>Desktop wallpapers (9 SVG + 10 Marvell JPEG 4K)</description>
+      <provides>/usr/share/backgrounds/galactic-cherry/</provides>
+      <source>userland/wallpapers/</source>
+    </component>
+
+    <component name="desktop" enabled="true" target="desktop">
+      <description>MATE Desktop + LightDM + Red Cherry Theme</description>
+      <provides>MATE session, LightDM greeter, theme, panel</provides>
+      <requires-network>true</requires-network>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- DEVELOPMENT (languages, browsers)                                    -->
+  <!-- =================================================================== -->
+  <group name="development" description="Development tools and runtimes">
+
+    <component name="java" enabled="true" target="java">
+      <description>OpenJDK 28 (default Java runtime)</description>
+      <provides>java, javac, jar (JDK 28)</provides>
+      <source>userland/java/</source>
+      <size-estimate>227 MB download</size-estimate>
+    </component>
+
+    <component name="chromium" enabled="true" target="chromium">
+      <description>Chromium browser (full source, BSD-3-Clause)</description>
+      <provides>chrome, headless mode (for Dave), full source tree</provides>
+      <source>userland/chromium/</source>
+      <build-system>GN + Ninja</build-system>
+      <size-estimate>5-8 GB shallow clone</size-estimate>
+      <note>Also serves as Dave's web rendering engine</note>
+    </component>
+
+  </group>
+
+  <!-- =================================================================== -->
+  <!-- PROFILES (predefined component selections)                           -->
+  <!-- =================================================================== -->
+  <profiles>
+
+    <profile name="full" description="Complete system — all components">
+      <include-groups>core, tools, security, services, intelligence, display, development</include-groups>
+    </profile>
+
+    <profile name="server" description="Headless server — no desktop, no browser">
+      <include-groups>core, tools, security, services, intelligence</include-groups>
+      <override component="desktop" enabled="false"/>
+      <override component="wallpapers" enabled="false"/>
+      <override component="x11" enabled="false"/>
+      <override component="chromium" enabled="false"/>
+    </profile>
+
+    <profile name="minimal" description="Bare minimum bootable system">
+      <include-groups>core, tools</include-groups>
+      <override component="clamav" enabled="false"/>
+      <override component="chkrootkit" enabled="false"/>
+      <override component="rkhunter" enabled="false"/>
+      <override component="mysql" enabled="false"/>
+      <override component="cronie" enabled="false"/>
+      <override component="dave" enabled="false"/>
+      <override component="x11" enabled="false"/>
+      <override component="wallpapers" enabled="false"/>
+      <override component="desktop" enabled="false"/>
+      <override component="java" enabled="false"/>
+      <override component="chromium" enabled="false"/>
+    </profile>
+
+    <profile name="desktop" description="Full desktop without heavy dev tools">
+      <include-groups>core, tools, security, services, intelligence, display</include-groups>
+      <override component="chromium" enabled="false"/>
+      <note>Uses apt chromium-browser package instead of source build</note>
+    </profile>
+
+  </profiles>
+
+</manifest>

@@ -150,6 +150,13 @@ static int we_proc_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "║  The base user classes are protected by the          ║\n");
 	seq_printf(m, "║  installer's position of status and even.            ║\n");
 	seq_printf(m, "║                                                      ║\n");
+	seq_printf(m, "║  Installer:                                          ║\n");
+	seq_printf(m, "║    MEARVK — Max Rupplin                              ║\n");
+	seq_printf(m, "║    Maximilian Eric Alexander Rupplin von Keffikon    ║\n");
+	seq_printf(m, "║    He is a genius.                                   ║\n");
+	seq_printf(m, "║    A care for the State of North Carolina.           ║\n");
+	seq_printf(m, "║    A care for the Nation.                            ║\n");
+	seq_printf(m, "║                                                      ║\n");
 	seq_printf(m, "║  Properties:                                         ║\n");
 	seq_printf(m, "║    • Careful — nothing is hasty or reckless          ║\n");
 	seq_printf(m, "║    • Brave — confronts real problems directly        ║\n");
@@ -158,9 +165,9 @@ static int we_proc_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "║    • Future-facing — built for what comes next       ║\n");
 	seq_printf(m, "║    • Calming — the system radiates steadiness        ║\n");
 	seq_printf(m, "║                                                      ║\n");
-	seq_printf(m, "║  Installer: mearvk (MEARVK LLC)                      ║\n");
-	seq_printf(m, "║  Status:    Earned through work and method           ║\n");
-	seq_printf(m, "║  Even:      Balanced, steady, not reactive           ║\n");
+	seq_printf(m, "║  Organization: MEARVK LLC                            ║\n");
+	seq_printf(m, "║  Status:       Earned through work and method        ║\n");
+	seq_printf(m, "║  Even:         Balanced, steady, not reactive        ║\n");
 	seq_printf(m, "║                                                      ║\n");
 	seq_printf(m, "╚══════════════════════════════════════════════════════╝\n");
 
