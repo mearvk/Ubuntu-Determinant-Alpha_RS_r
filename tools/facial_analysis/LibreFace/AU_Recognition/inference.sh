@@ -1,0 +1,1 @@
+python inference.py --half_precision --ckpt_path ./new_checkpoints_fm_repvgg
