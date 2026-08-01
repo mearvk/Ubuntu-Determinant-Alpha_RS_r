@@ -335,6 +335,36 @@ cat > "$AI_MAPS/cognitive/component_awareness.json" << 'MAPEOF'
       "disk usage of /var/lib/mysql > 80%"
     ],
     "interactions": ["apt_mysql_hook records all package installs", "pkg-info queries"]
+  },
+  "build_dependencies": {
+    "role": "Host-side tools required to compile the ISO — not shipped in the final image",
+    "packages": {
+      "meson": {
+        "what": "Modern Python-based build system — generates ninja files",
+        "needed_by": "X.Org Server 21.1.24, libX11, libxcb, libXext, libXrender, xtrans, xorgproto",
+        "why": "All X11 tarballs in userland/x11/ use meson as their build configuration tool",
+        "install": "apt install meson"
+      },
+      "ninja-build": {
+        "what": "Fast minimal build executor — backend for meson",
+        "needed_by": "Everything meson configures (X11 stack)",
+        "why": "Meson outputs build.ninja files; ninja executes them with maximum parallelism",
+        "install": "apt install ninja-build"
+      },
+      "libtool": {
+        "what": "Generic library support script for autotools",
+        "needed_by": "Cronie (cron daemon with callback extension)",
+        "why": "Cronie uses autotools (autoconf+automake+libtool). Libtool handles shared library portability.",
+        "install": "apt install libtool"
+      },
+      "libxml2-utils": {
+        "what": "Provides xmllint — XML parser with XPath support",
+        "needed_by": "build-manifest.xml parsing (build-from-manifest.sh)",
+        "why": "The manifest-driven ISO build uses xmllint to query which components are enabled. Python3 fallback exists but xmllint is more robust.",
+        "install": "apt install libxml2-utils"
+      }
+    },
+    "note": "These are build-time only. The ISO ships compiled binaries, not build tools."
   }
 }
 MAPEOF

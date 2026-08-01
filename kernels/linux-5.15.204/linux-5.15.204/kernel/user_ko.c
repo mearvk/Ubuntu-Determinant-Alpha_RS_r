@@ -157,9 +157,9 @@ static struct proc_dir_entry *user_ko_proc_dir;
 static atomic_t grain1_count = ATOMIC_INIT(0);
 static atomic_t grain2_count = ATOMIC_INIT(0);
 static atomic_t grain3_count = ATOMIC_INIT(0);
-static atomic_t grain1_bytes = ATOMIC_INIT(0);
-static atomic_t grain2_bytes = ATOMIC_INIT(0);
-static atomic_t grain3_bytes = ATOMIC_INIT(0);
+static atomic_long_t grain1_bytes = ATOMIC_LONG_INIT(0);
+static atomic_long_t grain2_bytes = ATOMIC_LONG_INIT(0);
+static atomic_long_t grain3_bytes = ATOMIC_LONG_INIT(0);
 
 /* ============================================================
  * Grain Privilege Check
@@ -315,7 +315,6 @@ int user_ko_load(const char *name, const char *path, u8 grain,
 	mod->active = true;
 
 	/* Get username */
-	struct passwd *pw = NULL; /* Would use get_task_comm or similar */
 	snprintf(mod->owner_name, sizeof(mod->owner_name),
 		 "uid_%u", from_kuid(&init_user_ns, mod->owner_uid));
 
@@ -340,15 +339,15 @@ int user_ko_load(const char *name, const char *path, u8 grain,
 	switch (grain) {
 	case GRAIN_USER:
 		atomic_inc(&grain1_count);
-		atomic_add(code_size, &grain1_bytes);
+		atomic_long_add(code_size, &grain1_bytes);
 		break;
 	case GRAIN_SAFETY:
 		atomic_inc(&grain2_count);
-		atomic_add(code_size, &grain2_bytes);
+		atomic_long_add(code_size, &grain2_bytes);
 		break;
 	case GRAIN_KERNEL:
 		atomic_inc(&grain3_count);
-		atomic_add(code_size, &grain3_bytes);
+		atomic_long_add(code_size, &grain3_bytes);
 		break;
 	}
 
@@ -395,15 +394,15 @@ int user_ko_unload(const char *name)
 	switch (mod->grain) {
 	case GRAIN_USER:
 		atomic_dec(&grain1_count);
-		atomic_sub(mod->code_size, &grain1_bytes);
+		atomic_long_sub(mod->code_size, &grain1_bytes);
 		break;
 	case GRAIN_SAFETY:
 		atomic_dec(&grain2_count);
-		atomic_sub(mod->code_size, &grain2_bytes);
+		atomic_long_sub(mod->code_size, &grain2_bytes);
 		break;
 	case GRAIN_KERNEL:
 		atomic_dec(&grain3_count);
-		atomic_sub(mod->code_size, &grain3_bytes);
+		atomic_long_sub(mod->code_size, &grain3_bytes);
 		break;
 	}
 
@@ -429,22 +428,22 @@ static int user_ko_proc_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "═══════════════════════════════════════════════════════\n\n");
 
 	seq_printf(m, "  Grain 1 (User Space):\n");
-	seq_printf(m, "    Modules: %d    Memory: %d bytes\n",
-		   atomic_read(&grain1_count), atomic_read(&grain1_bytes));
+	seq_printf(m, "    Modules: %d    Memory: %ld bytes\n",
+		   atomic_read(&grain1_count), atomic_long_read(&grain1_bytes));
 	seq_printf(m, "    Max per module: %d MB    Requires: any user\n",
 		   GRAIN1_MAX_SIZE / (1024 * 1024));
 	seq_printf(m, "    Secure boot: NOT AFFECTED (sandbox path)\n\n");
 
 	seq_printf(m, "  Grain 2 (Safety Space):\n");
-	seq_printf(m, "    Modules: %d    Memory: %d bytes\n",
-		   atomic_read(&grain2_count), atomic_read(&grain2_bytes));
+	seq_printf(m, "    Modules: %d    Memory: %ld bytes\n",
+		   atomic_read(&grain2_count), atomic_long_read(&grain2_bytes));
 	seq_printf(m, "    Max per module: %d MB    Requires: sudo rank 1+\n",
 		   GRAIN2_MAX_SIZE / (1024 * 1024));
 	seq_printf(m, "    Secure boot: NOT AFFECTED (restricted path)\n\n");
 
 	seq_printf(m, "  Grain 3 (Kernel Space):\n");
-	seq_printf(m, "    Modules: %d    Memory: %d bytes\n",
-		   atomic_read(&grain3_count), atomic_read(&grain3_bytes));
+	seq_printf(m, "    Modules: %d    Memory: %ld bytes\n",
+		   atomic_read(&grain3_count), atomic_long_read(&grain3_bytes));
 	seq_printf(m, "    Max per module: %d MB    Requires: sudo rank 4+\n",
 		   GRAIN3_MAX_SIZE / (1024 * 1024));
 	seq_printf(m, "    Secure boot: standard verification applies\n\n");
@@ -537,17 +536,22 @@ static int __init user_ko_init(void)
 static void __exit user_ko_exit(void)
 {
 	struct user_ko_module *mod, *tmp;
+	LIST_HEAD(local_list);
 
 	pr_info("user_ko: Shutting down\n");
 
-	/* Unload all user modules */
+	/* Move all entries to a local list under the lock */
 	spin_lock(&user_ko_lock);
-	list_for_each_entry_safe(mod, tmp, &user_ko_modules, list) {
+	list_splice_init(&user_ko_modules, &local_list);
+	spin_unlock(&user_ko_lock);
+
+	/* Now free outside the lock — vfree may sleep */
+	list_for_each_entry_safe(mod, tmp, &local_list, list) {
 		list_del(&mod->list);
-		user_ko_free_code(mod);
+		vfree(mod->code_base);
+		mod->code_base = NULL;
 		kfree(mod);
 	}
-	spin_unlock(&user_ko_lock);
 
 	if (user_ko_proc_dir)
 		proc_remove(user_ko_proc_dir);

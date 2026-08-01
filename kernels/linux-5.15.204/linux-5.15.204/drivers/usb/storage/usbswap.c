@@ -40,6 +40,7 @@
 #include <linux/usb.h>
 #include <linux/genhd.h>
 #include <linux/blkdev.h>
+#include <linux/xarray.h>
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -229,15 +230,14 @@ static bool usbswap_device_is_safe(struct block_device *bdev)
 		return false;
 
 	/* Check if the whole disk has any partitions by scanning */
-	if (bdev->bd_disk && bdev->bd_disk->flags & GENHD_FL_NO_PART_SCAN) {
+	if (bdev->bd_disk && bdev->bd_disk->flags & GENHD_FL_NO_PART) {
 		/* Partitions explicitly disabled — safe */
 	} else if (bdev->bd_disk) {
 		struct block_device *part;
 		unsigned long idx;
-		xa_for_each(&bdev->bd_disk->part_tbl, idx, part) {
-			if (part != bdev) {
-				return false; /* Has at least one partition */
-			}
+
+		xa_for_each_start(&bdev->bd_disk->part_tbl, idx, part, 1) {
+			return false; /* Has at least one partition */
 		}
 	}
 
@@ -394,18 +394,23 @@ static int usbswap_activate(struct usbswap_device *usdev)
 		usdev->speed_class == USBSWAP_SPEED_MEDIUM ? "USB2.0" : "slow");
 
 	/* Kernel-internal swapon via filp_open + sys_swapon path */
-	ret = kern_path(devname, LOOKUP_FOLLOW, NULL);
-	if (ret == 0) {
-		/* Use usermode helper to call swapon */
-		char *argv[] = { "/sbin/swapon", "-p",
-				 NULL, devname, NULL };
-		char prio_str[16];
-		char *envp[] = { "HOME=/", "PATH=/sbin:/bin", NULL };
+	{
+		struct path dev_path;
 
-		snprintf(prio_str, sizeof(prio_str), "%d", usdev->priority);
-		argv[2] = prio_str;
+		ret = kern_path(devname, LOOKUP_FOLLOW, &dev_path);
+		if (ret == 0) {
+			/* Use usermode helper to call swapon */
+			char *argv[] = { "/sbin/swapon", "-p",
+					 NULL, devname, NULL };
+			char prio_str[16];
+			char *envp[] = { "HOME=/", "PATH=/sbin:/bin", NULL };
 
-		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+			snprintf(prio_str, sizeof(prio_str), "%d", usdev->priority);
+			argv[2] = prio_str;
+
+			path_put(&dev_path);
+			ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+		}
 	}
 
 	if (ret == 0) {

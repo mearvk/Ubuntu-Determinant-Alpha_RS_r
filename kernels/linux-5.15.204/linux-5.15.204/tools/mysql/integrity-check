@@ -56,6 +56,11 @@ info() {
     echo -e "${PROGRAM}: $1"
 }
 
+# Escape single quotes for safe SQL interpolation
+escape_sql() {
+    printf '%s' "$1" | sed "s/'/''/g"
+}
+
 pass() {
     echo -e "  ${GREEN}[ OK ]${RESET} $1"
 }
@@ -71,6 +76,36 @@ warn_msg() {
 miss() {
     echo -e "  ${RED}[MISS]${RESET} $1"
 }
+
+# Escape single quotes for safe SQL interpolation
+escape_sql() {
+    echo "$1" | sed "s/'/''/g"
+}
+
+# Create a temporary MySQL defaults file to avoid password on command line
+MYSQL_DEFAULTS_FILE=""
+create_mysql_defaults() {
+    local user="$1"
+    local pass="$2"
+    MYSQL_DEFAULTS_FILE=$(mktemp /tmp/.mysql_defaults.XXXXXX)
+    chmod 600 "${MYSQL_DEFAULTS_FILE}"
+    cat > "${MYSQL_DEFAULTS_FILE}" <<MYCNF
+[client]
+user=${user}
+password=${pass}
+MYCNF
+}
+
+cleanup_mysql_defaults() {
+    if [ -n "${MYSQL_DEFAULTS_FILE}" ] && [ -f "${MYSQL_DEFAULTS_FILE}" ]; then
+        rm -f "${MYSQL_DEFAULTS_FILE}"
+    fi
+    if [ -n "${MYSQL_WRITER_DEFAULTS_FILE:-}" ] && [ -f "${MYSQL_WRITER_DEFAULTS_FILE:-}" ]; then
+        rm -f "${MYSQL_WRITER_DEFAULTS_FILE}"
+    fi
+}
+
+trap cleanup_mysql_defaults EXIT
 
 usage() {
     cat <<EOF
@@ -121,14 +156,16 @@ Create with: echo 'password=YOUR_PASS' > ${VERIFY_CONF} && chmod 400 ${VERIFY_CO
         DB_PASS=$(cat "${VERIFY_CONF}")
     fi
     [ -z "${DB_PASS}" ] && die "Empty password in ${VERIFY_CONF}"
+    create_mysql_defaults "${DB_USER}" "${DB_PASS}"
 }
 
 # Execute SQL query (read-only)
 sql() {
-    mysql -u "${DB_USER}" -p"${DB_PASS}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
+    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
 }
 
 # Also need writer access to record scan results
+MYSQL_WRITER_DEFAULTS_FILE=""
 load_writer_credentials() {
     local writer_conf="${CONF_DIR}/admin.conf"
     if [ -f "${writer_conf}" ]; then
@@ -140,6 +177,15 @@ load_writer_credentials() {
             WRITER_USER="integrity_writer"
             WRITER_PASS=$(cat "${writer_conf}")
         fi
+        if [ -n "${WRITER_USER}" ] && [ -n "${WRITER_PASS}" ]; then
+            MYSQL_WRITER_DEFAULTS_FILE=$(mktemp /tmp/.mysql_writer_defaults.XXXXXX)
+            chmod 600 "${MYSQL_WRITER_DEFAULTS_FILE}"
+            cat > "${MYSQL_WRITER_DEFAULTS_FILE}" <<MYCNF
+[client]
+user=${WRITER_USER}
+password=${WRITER_PASS}
+MYCNF
+        fi
     else
         WRITER_USER=""
         WRITER_PASS=""
@@ -147,8 +193,8 @@ load_writer_credentials() {
 }
 
 sql_write() {
-    if [ -n "${WRITER_USER}" ] && [ -n "${WRITER_PASS}" ]; then
-        mysql -u "${WRITER_USER}" -p"${WRITER_PASS}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
+    if [ -n "${MYSQL_WRITER_DEFAULTS_FILE}" ] && [ -f "${MYSQL_WRITER_DEFAULTS_FILE}" ]; then
+        mysql --defaults-extra-file="${MYSQL_WRITER_DEFAULTS_FILE}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
     fi
 }
 
@@ -245,10 +291,12 @@ run_scan() {
     local scan_id=""
     if [ "${record}" -eq 1 ]; then
         load_writer_credentials
-        if [ -n "${WRITER_USER}" ]; then
-            sql_write "CALL start_scan('$(whoami)', $(id -u), @sid); SELECT @sid;"
-            scan_id=$(mysql -u "${WRITER_USER}" -p"${WRITER_PASS}" -N -B "${DB_NAME}" \
-                -e "CALL start_scan('$(whoami)', $(id -u), @sid); SELECT @sid;" 2>/dev/null | tail -1)
+        if [ -n "${MYSQL_WRITER_DEFAULTS_FILE}" ]; then
+            local safe_whoami
+            safe_whoami=$(escape_sql "$(whoami)")
+            sql_write "CALL start_scan('${safe_whoami}', $(id -u), @sid); SELECT @sid;"
+            scan_id=$(mysql --defaults-extra-file="${MYSQL_WRITER_DEFAULTS_FILE}" -N -B "${DB_NAME}" \
+                -e "CALL start_scan('${safe_whoami}', $(id -u), @sid); SELECT @sid;" 2>/dev/null | tail -1)
         fi
     fi
 
@@ -288,7 +336,11 @@ run_scan() {
             fi
             # Record failure
             if [ -n "${scan_id}" ]; then
-                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'missing', 'exists', 'not found', '${sev}', '${coverage_class}');"
+                local safe_filepath
+                safe_filepath=$(escape_sql "${filepath}")
+                local safe_class
+                safe_class=$(escape_sql "${coverage_class}")
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'missing', 'exists', 'not found', '${sev}', '${safe_class}');"
             fi
             continue
         fi
@@ -315,7 +367,15 @@ run_scan() {
                     fi
                 fi
                 if [ -n "${scan_id}" ]; then
-                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'hash_mismatch', '${expected_sha256}', '${current_sha256}', '${sev}', '${coverage_class}');"
+                    local safe_filepath
+                    safe_filepath=$(escape_sql "${filepath}")
+                    local safe_class
+                    safe_class=$(escape_sql "${coverage_class}")
+                    local safe_expected_sha256
+                    safe_expected_sha256=$(escape_sql "${expected_sha256}")
+                    local safe_current_sha256
+                    safe_current_sha256=$(escape_sql "${current_sha256}")
+                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'hash_mismatch', '${safe_expected_sha256}', '${safe_current_sha256}', '${sev}', '${safe_class}');"
                 fi
                 continue  # Don't check other attributes if hash failed
             fi
@@ -332,7 +392,15 @@ run_scan() {
                         fail "${filepath} — SHA-512 MISMATCH (critical double-hash failure)"
                     fi
                     if [ -n "${scan_id}" ]; then
-                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'hash_mismatch', '${expected_sha512}', '${current_sha512}', 'critical', '${coverage_class}');"
+                        local safe_filepath
+                        safe_filepath=$(escape_sql "${filepath}")
+                        local safe_class
+                        safe_class=$(escape_sql "${coverage_class}")
+                        local safe_expected_sha512
+                        safe_expected_sha512=$(escape_sql "${expected_sha512}")
+                        local safe_current_sha512
+                        safe_current_sha512=$(escape_sql "${current_sha512}")
+                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'hash_mismatch', '${safe_expected_sha512}', '${safe_current_sha512}', 'critical', '${safe_class}');"
                     fi
                     continue
                 fi
@@ -351,7 +419,11 @@ run_scan() {
                 warn_msg "${filepath} — permissions changed (${expected_perms} → ${current_perms})"
             fi
             if [ -n "${scan_id}" ]; then
-                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'permission_change', '${expected_perms}', '${current_perms}', '${sev}', '${coverage_class}');"
+                local safe_filepath
+                safe_filepath=$(escape_sql "${filepath}")
+                local safe_class
+                safe_class=$(escape_sql "${coverage_class}")
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'permission_change', '${expected_perms}', '${current_perms}', '${sev}', '${safe_class}');"
             fi
         fi
 
@@ -367,7 +439,11 @@ run_scan() {
                 fail "${filepath} — SUID BIT ADDED (critical: privilege escalation vector)"
             fi
             if [ -n "${scan_id}" ]; then
-                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'suid_added', '0', '1', 'critical', '${coverage_class}');"
+                local safe_filepath
+                safe_filepath=$(escape_sql "${filepath}")
+                local safe_class
+                safe_class=$(escape_sql "${coverage_class}")
+                sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'suid_added', '0', '1', 'critical', '${safe_class}');"
             fi
         fi
 
@@ -383,7 +459,15 @@ run_scan() {
                         fail "${filepath} — ELF INTERPRETER CHANGED (critical: ${expected_interp} → ${current_interp})"
                     fi
                     if [ -n "${scan_id}" ]; then
-                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'elf_interpreter_change', '${expected_interp}', '${current_interp}', 'critical', '${coverage_class}');"
+                        local safe_filepath
+                        safe_filepath=$(escape_sql "${filepath}")
+                        local safe_class
+                        safe_class=$(escape_sql "${coverage_class}")
+                        local safe_expected_interp
+                        safe_expected_interp=$(escape_sql "${expected_interp}")
+                        local safe_current_interp
+                        safe_current_interp=$(escape_sql "${current_interp}")
+                        sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'elf_interpreter_change', '${safe_expected_interp}', '${safe_current_interp}', 'critical', '${safe_class}');"
                     fi
                 fi
             fi
@@ -401,7 +485,15 @@ run_scan() {
                     warn_msg "${filepath} — symlink target changed (${expected_link} → ${current_link})"
                 fi
                 if [ -n "${scan_id}" ]; then
-                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${filepath}', 'link_target_change', '${expected_link}', '${current_link}', '${sev}', '${coverage_class}');"
+                    local safe_filepath
+                    safe_filepath=$(escape_sql "${filepath}")
+                    local safe_class
+                    safe_class=$(escape_sql "${coverage_class}")
+                    local safe_expected_link
+                    safe_expected_link=$(escape_sql "${expected_link}")
+                    local safe_current_link
+                    safe_current_link=$(escape_sql "${current_link}")
+                    sql_write "INSERT INTO verification_failure (scan_id, file_path, failure_type, expected_value, actual_value, severity, coverage_class) VALUES (${scan_id}, '${safe_filepath}', 'link_target_change', '${safe_expected_link}', '${safe_current_link}', '${sev}', '${safe_class}');"
                 fi
             fi
         fi
@@ -522,8 +614,8 @@ RECORD=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --quick)        WHERE="priority >= 90" ;;
-        --class)        shift; WHERE="coverage_class = '${1:-system_binary}'" ;;
-        --file)         shift; WHERE="file_path = '${1:-/}'" ;;
+        --class)        shift; WHERE="coverage_class = '$(escape_sql "${1:-system_binary}")'" ;;
+        --file)         shift; WHERE="file_path = '$(escape_sql "${1:-/}")'" ;;
         --suid)         WHERE="has_suid = TRUE OR has_sgid = TRUE" ;;
         --report)       ACTION="report" ;;
         --history)      ACTION="history" ;;

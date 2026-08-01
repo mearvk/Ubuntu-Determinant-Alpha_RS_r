@@ -60,6 +60,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/spinlock.h>
+#include <linux/rcupdate.h>
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/binfmts.h>
@@ -90,6 +91,7 @@ MODULE_VERSION("1.0.0");
 
 struct cpuboost_entry {
 	struct list_head	list;
+	struct rcu_head		rcu;			/* For kfree_rcu */
 	char			path[CPUBOOST_PATH_MAX]; /* Binary path */
 	char			name[64];		/* Display name */
 	u8			level;			/* Boost level (0-3) */
@@ -128,15 +130,17 @@ u8 cpuboost_lookup(const char *binary_path)
 		return CPUBOOST_LEVEL_OFF;
 
 	/* Linear scan — fine for up to 64 entries.
-	 * For production with more, use a hash table. */
-	spin_lock(&cpuboost_lock);
-	list_for_each_entry(entry, &cpuboost_entries, list) {
+	 * For production with more, use a hash table.
+	 * RCU protects the read path — safe in scheduler context. */
+	rcu_read_lock();
+	list_for_each_entry_rcu(entry, &cpuboost_entries, list) {
 		if (entry->active && strcmp(entry->path, binary_path) == 0) {
-			spin_unlock(&cpuboost_lock);
-			return entry->level;
+			u8 level = entry->level;
+			rcu_read_unlock();
+			return level;
 		}
 	}
-	spin_unlock(&cpuboost_lock);
+	rcu_read_unlock();
 
 	return CPUBOOST_LEVEL_OFF;
 }
@@ -209,47 +213,47 @@ static void cpuboost_release(unsigned int cpu)
 
 static int cpuboost_designate(const char *path, u8 level)
 {
-	struct cpuboost_entry *entry;
+	struct cpuboost_entry *entry, *new_entry;
+	const char *slash;
 
 	if (level > CPUBOOST_LEVEL_TURBO)
 		return -EINVAL;
 
-	/* Check if already designated */
+	/* Allocate new entry FIRST (outside lock, may sleep) */
+	new_entry = kzalloc(sizeof(*new_entry), GFP_KERNEL);
+	if (!new_entry)
+		return -ENOMEM;
+
+	strncpy(new_entry->path, path, CPUBOOST_PATH_MAX - 1);
+
+	/* Extract short name from path */
+	slash = strrchr(path, '/');
+	strncpy(new_entry->name, slash ? slash + 1 : path,
+		sizeof(new_entry->name) - 1);
+
+	new_entry->level = level;
+	new_entry->active = (level > 0);
+	new_entry->designated_by = from_kuid(&init_user_ns, current_fsuid());
+	new_entry->designated_at = jiffies;
+
+	/* Lock, check for existing, add or update atomically */
 	spin_lock(&cpuboost_lock);
 	list_for_each_entry(entry, &cpuboost_entries, list) {
 		if (strcmp(entry->path, path) == 0) {
-			/* Update level */
+			/* Already exists — update in place, discard new */
 			entry->level = level;
 			entry->active = (level > 0);
 			spin_unlock(&cpuboost_lock);
+			kfree(new_entry);
 			pr_info("cpuboost: Updated %s → level %d\n", path, level);
 			return 0;
 		}
 	}
-	spin_unlock(&cpuboost_lock);
-
-	/* New entry */
-	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-
-	strncpy(entry->path, path, CPUBOOST_PATH_MAX - 1);
-
-	/* Extract short name from path */
-	const char *slash = strrchr(path, '/');
-	strncpy(entry->name, slash ? slash + 1 : path, sizeof(entry->name) - 1);
-
-	entry->level = level;
-	entry->active = (level > 0);
-	entry->designated_by = from_kuid(&init_user_ns, current_fsuid());
-	entry->designated_at = jiffies;
-
-	spin_lock(&cpuboost_lock);
-	list_add(&entry->list, &cpuboost_entries);
+	list_add_rcu(&new_entry->list, &cpuboost_entries);
 	spin_unlock(&cpuboost_lock);
 
 	pr_info("cpuboost: Designated %s for boost level %d (by uid %u)\n",
-		path, level, entry->designated_by);
+		path, level, new_entry->designated_by);
 
 	return 0;
 }
@@ -261,10 +265,10 @@ static int cpuboost_undesignate(const char *path)
 	spin_lock(&cpuboost_lock);
 	list_for_each_entry_safe(entry, tmp, &cpuboost_entries, list) {
 		if (strcmp(entry->path, path) == 0) {
-			list_del(&entry->list);
+			list_del_rcu(&entry->list);
 			spin_unlock(&cpuboost_lock);
 			pr_info("cpuboost: Removed %s from boost list\n", path);
-			kfree(entry);
+			kfree_rcu(entry, rcu);
 			return 0;
 		}
 	}
@@ -495,6 +499,9 @@ static void __exit cpuboost_exit(void)
 		kfree(entry);
 	}
 	spin_unlock(&cpuboost_lock);
+
+	/* Ensure no RCU readers are still traversing the list */
+	synchronize_rcu();
 
 	pr_info("cpuboost: Unloaded. All boost designations cleared.\n");
 }

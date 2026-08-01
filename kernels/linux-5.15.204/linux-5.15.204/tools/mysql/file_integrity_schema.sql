@@ -372,8 +372,182 @@ INSERT INTO coverage_paths (path_pattern, coverage_class, priority, include_sha5
 ('/usr/local/bin/integrity-check', 'custom_tool',    95, TRUE,  'This integrity tool itself');
 
 -- ============================================================
--- Triggers: Protect audit trail from deletion
+-- Honor Oath — Installer Tech ID
 -- ============================================================
+-- Swears honor to process and country. Must be intact for all
+-- other integrity tables to be trusted. If this oath is missing
+-- or tampered, the entire integrity system is considered compromised.
+--
+-- Adapted from Java.Web.Server.Telnet.Front.Java.21 Installer Tech ID
+-- (Gifted Install Tech ID) for use in this OS distribution.
+
+CREATE TABLE IF NOT EXISTS honor_oath (
+    id              INT PRIMARY KEY DEFAULT 1,
+    oath            TEXT NOT NULL,
+    oath_sha256     CHAR(64) NOT NULL COMMENT 'SHA-256 of the oath text itself',
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sworn_by        VARCHAR(100) NOT NULL DEFAULT 'MEARVK Installer Tech 2',
+    country         VARCHAR(50) NOT NULL DEFAULT 'United States of America',
+    state           VARCHAR(50) NOT NULL DEFAULT 'North Carolina',
+    system_name     VARCHAR(128) NOT NULL DEFAULT 'Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98',
+    CONSTRAINT single_oath CHECK (id = 1)
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO honor_oath (id, oath, oath_sha256, sworn_by) VALUES (
+    1,
+    'I swear honor to process and country. This integrity system serves truth, transparency, and the preservation of trusted software. The MySQL database of this system is protected by the Installer Tech ID of Maximilian Eric Alexander Rupplin von Keffikon — a genius and a care for North Carolina and the Nation. No file shall be altered without record. No record shall be deleted. The database serves the system and its users with integrity absolute.',
+    SHA2('I swear honor to process and country. This integrity system serves truth, transparency, and the preservation of trusted software. The MySQL database of this system is protected by the Installer Tech ID of Maximilian Eric Alexander Rupplin von Keffikon — a genius and a care for North Carolina and the Nation. No file shall be altered without record. No record shall be deleted. The database serves the system and its users with integrity absolute.', 256),
+    'MEARVK Installer Tech 2'
+);
+
+-- ============================================================
+-- Self-Integrity — The integrity system checks itself first
+-- ============================================================
+-- Before trusting any baseline, verify the integrity tools themselves
+-- have not been tampered. SHA-256 of the scripts stored here.
+
+CREATE TABLE IF NOT EXISTS self_integrity (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    script_path     VARCHAR(512) NOT NULL COMMENT 'Absolute path to integrity script/binary',
+    sha256          CHAR(64) NOT NULL COMMENT 'SHA-256 hash of the script',
+    sha512          CHAR(128) DEFAULT NULL COMMENT 'SHA-512 for double-verification',
+    file_size       BIGINT UNSIGNED NOT NULL,
+    recorded_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recorded_by     VARCHAR(64) NOT NULL DEFAULT 'installer',
+    is_current      BOOLEAN DEFAULT TRUE,
+    UNIQUE KEY uk_script (script_path, is_current)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Trusted Sources — Where to restore from on corruption
+-- ============================================================
+-- Installer Tech ID defines trusted restoration sources.
+-- On integrity failure, the system can auto-restore from these.
+
+CREATE TABLE IF NOT EXISTS trusted_sources (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    source_name     VARCHAR(128) NOT NULL,
+    source_type     ENUM('git_repo', 'local_backup', 'iso_image', 'signed_archive') NOT NULL,
+    source_url      VARCHAR(512) DEFAULT NULL,
+    source_path     VARCHAR(512) DEFAULT NULL COMMENT 'Local path (for ISO/archive)',
+    branch          VARCHAR(100) DEFAULT 'main',
+    priority        TINYINT UNSIGNED NOT NULL DEFAULT 50 COMMENT 'Higher = try first',
+    requires_network BOOLEAN DEFAULT TRUE,
+    last_verified   TIMESTAMP NULL,
+    is_active       BOOLEAN DEFAULT TRUE,
+    description     TEXT,
+
+    UNIQUE INDEX idx_name (source_name),
+    INDEX idx_priority (priority DESC)
+) ENGINE=InnoDB;
+
+INSERT INTO trusted_sources (source_name, source_type, source_url, branch, priority, requires_network, description) VALUES
+('galactic-cherry-iso', 'iso_image', NULL, NULL, 100, FALSE,
+ 'The original ISO image used to install. Highest priority — known-good at install time. No network needed.'),
+('local-baseline-backup', 'local_backup', NULL, '/var/lib/integrity/baseline-backup/', 90, FALSE,
+ 'Local copy of critical files taken at baseline time. Stored read-only on separate partition if available.'),
+('github-mearvk', 'git_repo', 'https://github.com/mearvk/Ubuntu.Determinant.Alpha.Restricted', 'main', 50, TRUE,
+ 'GitHub repository for custom tools and extensions. Requires network. Used for tools only.'),
+('github-kernel-extensions', 'git_repo', 'https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Alpha.Restricted/main/', 'main', 45, TRUE,
+ 'Raw file access to kernel extension source.');
+
+-- ============================================================
+-- Restore Log — Records every auto-restore action
+-- ============================================================
+-- Append-only. Cannot be deleted or modified.
+
+CREATE TABLE IF NOT EXISTS restore_log (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    restore_time    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    file_path       VARCHAR(4096) NOT NULL,
+    expected_sha256 CHAR(64) NOT NULL,
+    corrupted_sha256 CHAR(64) NOT NULL,
+    restored_sha256 CHAR(64) NOT NULL COMMENT 'Hash after restore (should match expected)',
+    source_used     VARCHAR(128) NOT NULL COMMENT 'Which trusted source provided the restore',
+    restore_method  ENUM('auto', 'manual', 'admin_approved') NOT NULL DEFAULT 'auto',
+    success         BOOLEAN NOT NULL,
+    error_message   TEXT DEFAULT NULL,
+    restored_by     VARCHAR(64) NOT NULL,
+
+    INDEX idx_time (restore_time),
+    INDEX idx_file (file_path(768)),
+    INDEX idx_success (success)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- Triggers: Protect honor_oath — absolutely immutable
+-- ============================================================
+
+DELIMITER //
+
+CREATE TRIGGER IF NOT EXISTS protect_oath_delete
+BEFORE DELETE ON honor_oath
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: honor_oath is permanent and immutable. This oath protects the integrity of this system.';
+END //
+
+CREATE TRIGGER IF NOT EXISTS protect_oath_update
+BEFORE UPDATE ON honor_oath
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: honor_oath is permanent and immutable. It was sworn once and cannot be altered.';
+END //
+
+-- Protect self_integrity from deletion
+CREATE TRIGGER IF NOT EXISTS protect_self_integrity_delete
+BEFORE DELETE ON self_integrity
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: self_integrity records are permanent. A new record may be inserted with is_current=TRUE but old records are preserved.';
+END //
+
+-- Protect restore_log from deletion or modification
+CREATE TRIGGER IF NOT EXISTS protect_restore_log_delete
+BEFORE DELETE ON restore_log
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: restore_log is append-only. Restoration records are permanent evidence.';
+END //
+
+CREATE TRIGGER IF NOT EXISTS protect_restore_log_update
+BEFORE UPDATE ON restore_log
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: restore_log is append-only. Records cannot be modified after creation.';
+END //
+
+-- Protect trusted_sources from deletion (can be deactivated but not removed)
+CREATE TRIGGER IF NOT EXISTS protect_trusted_sources_delete
+BEFORE DELETE ON trusted_sources
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DENIED: trusted_sources cannot be deleted. Set is_active=FALSE to deactivate.';
+END //
+
+DELIMITER ;
+
+-- ============================================================
+-- Honor Oath Verification View
+-- ============================================================
+-- Quick check: is the oath intact?
+
+CREATE OR REPLACE VIEW v_oath_status AS
+SELECT
+    CASE WHEN oath_sha256 = SHA2(oath, 256) THEN 'INTACT' ELSE 'COMPROMISED' END AS oath_status,
+    sworn_by,
+    country,
+    state,
+    created_at,
+    system_name
+FROM honor_oath
+WHERE id = 1;
 
 DELIMITER //
 

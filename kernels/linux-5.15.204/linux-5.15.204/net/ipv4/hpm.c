@@ -44,10 +44,12 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/time.h>
 #include <linux/ktime.h>
 #include <linux/ratelimit.h>
 #include <linux/workqueue.h>
+#include <linux/refcount.h>
 #include <net/ip.h>
 #include <net/tcp.h>
 
@@ -144,6 +146,7 @@ struct hpm_source_profile {
 	unsigned long	window_start;
 	u8		severity;	/* Current threat assessment */
 	spinlock_t	lock;
+	refcount_t	refcnt;		/* Reference count for safe access */
 };
 
 /*
@@ -392,7 +395,7 @@ static bool hpm_temporal_port_anomaly(struct hpm_source_profile *profile,
 
 	/* Management ports (SSH:22, RDP:3389, etc.) at unusual hours */
 	if ((port == 22 || port == 3389 || port == 5900) &&
-	    (tm.tm_hour < 4 || tm.tm_hour > 2)) {
+	    (tm.tm_hour < 6 || tm.tm_hour > 22)) {
 		/* Check if this is a new pattern for this source */
 		if (profile->hour_activity[tm.tm_hour] <= 2)
 			return true; /* First time seen at this hour */
@@ -661,8 +664,10 @@ static struct hpm_source_profile *hpm_get_or_create_profile(__be32 src_ip)
 	u32 hash = jhash_1word(src_ip, 0);
 
 	hash_for_each_possible(hpm_source_table, profile, node, hash) {
-		if (profile->ip_addr == src_ip)
+		if (profile->ip_addr == src_ip) {
+			refcount_inc(&profile->refcnt);
 			return profile;
+		}
 	}
 
 	/* Create new profile */
@@ -675,6 +680,8 @@ static struct hpm_source_profile *hpm_get_or_create_profile(__be32 src_ip)
 	profile->last_seen = jiffies;
 	profile->window_start = jiffies;
 	spin_lock_init(&profile->lock);
+	refcount_set(&profile->refcnt, 1); /* One ref for the hash table */
+	refcount_inc(&profile->refcnt);    /* One ref for the caller */
 
 	hash_add(hpm_source_table, &profile->node, hash);
 	return profile;
@@ -810,6 +817,9 @@ static unsigned int hpm_hook_fn(void *priv, struct sk_buff *skb,
 		profile->severity = HPM_SEVERITY_NONE;
 
 	spin_unlock(&profile->lock);
+
+	/* Release the reference obtained from hpm_get_or_create_profile */
+	refcount_dec(&profile->refcnt);
 
 	/* Drop packet if critical threat detected */
 	if (profile->severity == HPM_SEVERITY_CRITICAL) {
@@ -961,8 +971,7 @@ static int __init hpm_init(void)
 	pr_info("hpm: Extended port range: 0 - %llu\n", HPM_EXTENDED_PORT_MAX);
 
 	/* Allocate log ring */
-	hpm_log_ring = kzalloc(sizeof(struct hpm_log_entry) * HPM_LOG_RING_SIZE,
-			       GFP_KERNEL);
+	hpm_log_ring = vzalloc(sizeof(struct hpm_log_entry) * HPM_LOG_RING_SIZE);
 	if (!hpm_log_ring)
 		return -ENOMEM;
 
@@ -978,7 +987,7 @@ static int __init hpm_init(void)
 	ret = nf_register_net_hook(&init_net, &hpm_nf_hook_in);
 	if (ret < 0) {
 		pr_err("hpm: Failed to register netfilter hook: %d\n", ret);
-		kfree(hpm_log_ring);
+		vfree(hpm_log_ring);
 		return ret;
 	}
 
@@ -987,7 +996,7 @@ static int __init hpm_init(void)
 	if (IS_ERR(hpm_log_daemon)) {
 		pr_err("hpm: Failed to start log daemon\n");
 		nf_unregister_net_hook(&init_net, &hpm_nf_hook_in);
-		kfree(hpm_log_ring);
+		vfree(hpm_log_ring);
 		return PTR_ERR(hpm_log_daemon);
 	}
 
@@ -1035,12 +1044,13 @@ static void __exit hpm_exit(void)
 	spin_lock(&hpm_table_lock);
 	hash_for_each_safe(hpm_source_table, bkt, tmp, profile, node) {
 		hash_del(&profile->node);
-		kfree(profile);
+		if (refcount_dec_and_test(&profile->refcnt))
+			kfree(profile);
 	}
 	spin_unlock(&hpm_table_lock);
 
 	/* Free log ring */
-	kfree(hpm_log_ring);
+	vfree(hpm_log_ring);
 
 	pr_info("hpm: Shutdown complete\n");
 }

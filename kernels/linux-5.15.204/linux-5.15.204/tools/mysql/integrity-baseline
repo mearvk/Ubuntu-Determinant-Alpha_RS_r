@@ -40,6 +40,33 @@ warn() {
     echo "${PROGRAM}: WARNING: $1" >&2
 }
 
+# Escape single quotes for safe SQL interpolation
+escape_sql() {
+    echo "$1" | sed "s/'/''/g"
+}
+
+# Create a temporary MySQL defaults file to avoid password on command line
+MYSQL_DEFAULTS_FILE=""
+create_mysql_defaults() {
+    local user="$1"
+    local pass="$2"
+    MYSQL_DEFAULTS_FILE=$(mktemp /tmp/.mysql_defaults.XXXXXX)
+    chmod 600 "${MYSQL_DEFAULTS_FILE}"
+    cat > "${MYSQL_DEFAULTS_FILE}" <<MYCNF
+[client]
+user=${user}
+password=${pass}
+MYCNF
+}
+
+cleanup_mysql_defaults() {
+    if [ -n "${MYSQL_DEFAULTS_FILE}" ] && [ -f "${MYSQL_DEFAULTS_FILE}" ]; then
+        rm -f "${MYSQL_DEFAULTS_FILE}"
+    fi
+}
+
+trap cleanup_mysql_defaults EXIT
+
 usage() {
     cat <<EOF
 ${PROGRAM} v${VERSION} — File Integrity Baseline Capture
@@ -83,15 +110,16 @@ load_credentials() {
         DB_PASS=$(cat "${WRITER_CONF}")
     fi
     [ -z "${DB_PASS}" ] && die "Empty password in ${WRITER_CONF}"
+    create_mysql_defaults "${DB_USER}" "${DB_PASS}"
 }
 
 # Execute SQL query
 sql() {
-    mysql -u "${DB_USER}" -p"${DB_PASS}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
+    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" -N -B "${DB_NAME}" -e "$1" 2>/dev/null
 }
 
 sql_quiet() {
-    mysql -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
+    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${DB_NAME}" -e "$1" >/dev/null 2>&1
 }
 
 # Get file metadata
@@ -241,13 +269,24 @@ capture_baseline() {
     info "  User: ${caller_user} (UID ${caller_uid})"
 
     # Create new baseline generation
+    local safe_caller_user
+    safe_caller_user=$(escape_sql "${caller_user}")
+    local safe_reason
+    safe_reason=$(escape_sql "${reason}")
+    local safe_method
+    safe_method=$(escape_sql "${method}")
+    local safe_system_version
+    safe_system_version=$(escape_sql "$(cat ${rootfs}/etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '"' || echo "unknown")")
+    local safe_kernel_version
+    safe_kernel_version=$(escape_sql "$(uname -r 2>/dev/null || echo "unknown")")
+
     sql_quiet "INSERT INTO baseline_generation (created_by, created_uid, reason, method, system_version, kernel_version)
-               VALUES ('${caller_user}', ${caller_uid}, '${reason}', '${method}',
-                       '$(cat ${rootfs}/etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"' || echo "unknown")',
-                       '$(uname -r 2>/dev/null || echo "unknown")');"
+               VALUES ('${safe_caller_user}', ${caller_uid}, '${safe_reason}', '${safe_method}',
+                       '${safe_system_version}',
+                       '${safe_kernel_version}');"
 
     local baseline_id
-    baseline_id=$(sql "SELECT MAX(id) FROM baseline_generation;")
+    baseline_id=$(sql "SELECT LAST_INSERT_ID();")
     [ -z "${baseline_id}" ] && die "Failed to create baseline generation"
 
     info "  Baseline ID: #${baseline_id}"
@@ -259,7 +298,7 @@ capture_baseline() {
     local batch_count=0
     local BATCH_SIZE=100
 
-    expand_coverage_paths "${rootfs}" | sort -u -t'|' -k1,1 | while IFS='|' read -r filepath class priority do_sha512; do
+    while IFS='|' read -r filepath class priority do_sha512; do
         [ -z "${filepath}" ] && continue
 
         local fullpath="${rootfs}${filepath}"
@@ -285,7 +324,7 @@ capture_baseline() {
         if [ "${do_sha512}" = "1" ] && [ "${ftype}" = "regular" ]; then
             local hash512
             hash512=$(sha512sum "${fullpath}" 2>/dev/null | awk '{print $1}')
-            [ -n "${hash512}" ] && sha512="'${hash512}'"
+            [ -n "${hash512}" ] && sha512="'$(escape_sql "${hash512}")'"
         fi
 
         # Size
@@ -325,10 +364,10 @@ capture_baseline() {
             if command -v readelf >/dev/null 2>&1; then
                 local interp
                 interp=$(readelf -l "${fullpath}" 2>/dev/null | grep "interpreter:" | sed 's/.*: \(.*\)]/\1/' || true)
-                [ -n "${interp}" ] && elf_interp="'${interp}'"
+                [ -n "${interp}" ] && elf_interp="'$(escape_sql "${interp}")'"
                 local rpath
                 rpath=$(readelf -d "${fullpath}" 2>/dev/null | grep -E "RPATH|RUNPATH" | sed 's/.*\[\(.*\)\]/\1/' || true)
-                [ -n "${rpath}" ] && elf_rpath="'${rpath}'"
+                [ -n "${rpath}" ] && elf_rpath="'$(escape_sql "${rpath}")'"
             fi
         fi
 
@@ -337,15 +376,21 @@ capture_baseline() {
         if [ "${ftype}" = "symlink" ]; then
             local ltarget
             ltarget=$(readlink "${fullpath}" 2>/dev/null || true)
-            [ -n "${ltarget}" ] && link_target="'${ltarget}'"
+            [ -n "${ltarget}" ] && link_target="'$(escape_sql "${ltarget}")'"
         fi
 
-        # Escape single quotes in filepath
+        # Escape single quotes in all string values for SQL
         local safe_path
-        safe_path=$(echo "${filepath}" | sed "s/'/''/g")
+        safe_path=$(escape_sql "${filepath}")
+        local safe_owner_name
+        safe_owner_name=$(escape_sql "${owner_name}")
+        local safe_group_name
+        safe_group_name=$(escape_sql "${group_name}")
+        local safe_class
+        safe_class=$(escape_sql "${class}")
 
         # Build INSERT
-        batch_sql="${batch_sql}INSERT INTO file_baseline (baseline_id, file_path, file_type, sha256, sha512, file_size, permissions, owner_uid, owner_gid, owner_name, group_name, mtime, ctime, is_elf, elf_interpreter, elf_rpath, link_target, has_suid, has_sgid, has_sticky, is_immutable, coverage_class, priority) VALUES (${baseline_id}, '${safe_path}', '${ftype}', '${sha256}', ${sha512}, ${fsize}, '${perms}', ${uid}, ${gid}, '${owner_name}', '${group_name}', ${mtime}, ${ctime}, ${is_elf}, ${elf_interp}, ${elf_rpath}, ${link_target}, ${has_suid}, ${has_sgid}, ${has_sticky}, ${is_immutable}, '${class}', ${priority});
+        batch_sql="${batch_sql}INSERT INTO file_baseline (baseline_id, file_path, file_type, sha256, sha512, file_size, permissions, owner_uid, owner_gid, owner_name, group_name, mtime, ctime, is_elf, elf_interpreter, elf_rpath, link_target, has_suid, has_sgid, has_sticky, is_immutable, coverage_class, priority) VALUES (${baseline_id}, '${safe_path}', '${ftype}', '${sha256}', ${sha512}, ${fsize}, '${perms}', ${uid}, ${gid}, '${safe_owner_name}', '${safe_group_name}', ${mtime}, ${ctime}, ${is_elf}, ${elf_interp}, ${elf_rpath}, ${link_target}, ${has_suid}, ${has_sgid}, ${has_sticky}, ${is_immutable}, '${safe_class}', ${priority});
 "
         batch_count=$((batch_count + 1))
         file_count=$((file_count + 1))
@@ -360,7 +405,7 @@ capture_baseline() {
                 info "  ... ${file_count} files captured"
             fi
         fi
-    done
+    done < <(expand_coverage_paths "${rootfs}" | sort -u -t'|' -k1,1)
 
     # Flush remaining
     if [ -n "${batch_sql}" ]; then

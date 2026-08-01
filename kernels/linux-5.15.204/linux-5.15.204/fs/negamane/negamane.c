@@ -86,13 +86,20 @@ MODULE_VERSION("1.0.0");
 static bool negamane_is_branded(struct inode *inode)
 {
 	char value[16];
+	struct dentry *dentry;
 	int ret;
 
-	if (!inode || !inode->i_op || !inode->i_op->getxattr)
+	if (!inode || !inode->i_op)
 		return false;
 
-	ret = __vfs_getxattr(inode_d_find_alias(inode), inode,
+	dentry = d_find_alias(inode);
+	if (!dentry)
+		return false;
+
+	ret = __vfs_getxattr(dentry, inode,
 			     NEGAMANE_XATTR_NAME, value, sizeof(value));
+	dput(dentry);
+
 	if (ret == NEGAMANE_XATTR_LEN &&
 	    memcmp(value, NEGAMANE_XATTR_VALUE, NEGAMANE_XATTR_LEN) == 0)
 		return true;

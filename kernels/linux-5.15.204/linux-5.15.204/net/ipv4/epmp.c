@@ -34,7 +34,7 @@
 #define EPMP_PORT		64444
 #define EPMP_VERSION		1
 #define EPMP_MAGIC		0x45504D50	/* "EPMP" */
-#define EPMP_MAX_CONNECTIONS	1024
+#define EPMP_MAX_CONNECTIONS	256
 #define EPMP_DH_MIN_BITS	2048
 #define EPMP_RSA_MIN_BITS	2048
 #define EPMP_SESSION_TIMEOUT_S	3600
@@ -131,6 +131,8 @@ static struct task_struct *epmp_accept_thread;
 static LIST_HEAD(epmp_sessions);
 static DEFINE_SPINLOCK(epmp_sessions_lock);
 static bool epmp_running;
+static atomic_t active_connections = ATOMIC_INIT(0);
+static DECLARE_WAIT_QUEUE_HEAD(epmp_conn_wait);
 
 /*
  * The protocol specification JSON - served when client sends '1' or '1s'
@@ -372,6 +374,9 @@ out:
 	kfree(session);
 	sock_release(sock);
 
+	atomic_dec(&active_connections);
+	wake_up(&epmp_conn_wait);
+
 	return 0;
 }
 
@@ -394,6 +399,14 @@ static int epmp_accept_loop(void *data)
 		}
 
 		/* Spawn handler thread for this connection */
+		if (atomic_read(&active_connections) >= EPMP_MAX_CONNECTIONS) {
+			pr_warn_ratelimited("epmp: Max connections (%d) reached, rejecting\n",
+					    EPMP_MAX_CONNECTIONS);
+			sock_release(newsock);
+			continue;
+		}
+
+		atomic_inc(&active_connections);
 		kthread_run(epmp_handle_connection, newsock,
 			    "epmp_conn_%p", newsock);
 	}
@@ -408,7 +421,6 @@ static int __init epmp_init(void)
 {
 	struct sockaddr_in addr;
 	int ret;
-	int opt = 1;
 
 	pr_info("epmp: Initializing Extended Port Multiplexing Protocol v%d\n",
 		EPMP_VERSION);
@@ -426,8 +438,7 @@ static int __init epmp_init(void)
 	}
 
 	/* Set SO_REUSEADDR */
-	kernel_setsockopt(epmp_listen_sock, SOL_SOCKET, SO_REUSEADDR,
-			  (char *)&opt, sizeof(opt));
+	epmp_listen_sock->sk->sk_reuse = SK_CAN_REUSE;
 
 	/* Bind to port 64444 */
 	memset(&addr, 0, sizeof(addr));
@@ -482,6 +493,9 @@ static void __exit epmp_exit(void)
 
 	if (epmp_listen_sock)
 		sock_release(epmp_listen_sock);
+
+	/* Wait for all active connection handler threads to exit */
+	wait_event(epmp_conn_wait, atomic_read(&active_connections) == 0);
 
 	/* Clean up all sessions */
 	spin_lock(&epmp_sessions_lock);
