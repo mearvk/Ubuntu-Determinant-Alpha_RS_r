@@ -288,10 +288,20 @@ wallpapers-install:
 # ==============================================================================
 
 java:
-	$(MAKE) -C $(USERLAND_DIR)/java
+	$(MAKE) -C $(USERLAND_DIR)/java overlay
+
+java-build:
+	$(MAKE) -C $(USERLAND_DIR)/java build-from-source
 
 java-install:
-	$(MAKE) -C $(USERLAND_DIR)/java install DESTDIR=$(abspath $(ROOTFS_DIR))
+	$(MAKE) -C $(USERLAND_DIR)/java overlay
+	$(MAKE) -C $(USERLAND_DIR)/java build-from-source
+	$(MAKE) -C $(USERLAND_DIR)/java install-from-source DESTDIR=$(abspath $(ROOTFS_DIR))
+
+java-install-from-source:
+	$(MAKE) -C $(USERLAND_DIR)/java overlay
+	$(MAKE) -C $(USERLAND_DIR)/java build-from-source
+	$(MAKE) -C $(USERLAND_DIR)/java install-from-source DESTDIR=$(abspath $(ROOTFS_DIR))
 
 # ==============================================================================
 # Chromium Browser (fetched at build time, ~5-8 GB shallow clone)
@@ -636,7 +646,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install tools-all-install desktop initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
