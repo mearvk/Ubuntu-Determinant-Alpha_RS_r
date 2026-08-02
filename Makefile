@@ -83,7 +83,7 @@ help:
 	@echo "  userland         - Build X11, wallpapers, and custom tools"
 	@echo "  x11              - Build X.Org Server 21.1.24 and libraries"
 	@echo "  wallpapers       - Prepare desktop wallpapers"
-	@echo "  java             - Fetch OpenJDK 28 (~227 MB download)"
+	@echo "  java             - Apply OpenJDK 28 source overlay (build with java-build)"
 	@echo "  chromium         - Fetch Chromium browser source (~5-8 GB shallow clone)"
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
@@ -261,7 +261,7 @@ asm-clean:
 # Userland (all user-space components)
 # ==============================================================================
 
-userland: x11 wallpapers tools
+userland: x11 wallpapers java tools
 
 # ==============================================================================
 # X11 Display System
