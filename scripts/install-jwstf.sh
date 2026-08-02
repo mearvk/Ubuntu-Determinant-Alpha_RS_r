@@ -405,7 +405,7 @@ echo "  ✓ NWE service configured (auto-start on boot)"
 # ============================================================
 
 echo ""
-echo "=== [8/8] Firewall & Security ==="
+echo "=== [8/9] Firewall & Security ==="
 
 # UFW rules
 ufw allow 80/tcp comment 'HTTP - NWE' 2>/dev/null || true
@@ -469,6 +469,23 @@ if [ -d "$TOMCAT_HOME/webapps" ]; then
 fi
 
 # ============================================================
+# 9. NWE Gateway (NAT Traversal for Home Users)
+# ============================================================
+
+echo ""
+echo "=== [9/9] Installing NWE Gateway (NAT traversal) ==="
+
+if [ -f "$JWSTF_SRC/gateway/install-gateway.sh" ]; then
+    bash "$JWSTF_SRC/gateway/install-gateway.sh" >> "$LOG" 2>&1
+    echo "  ✓ NWE Gateway installed (UPnP + relay fallback)"
+elif [ -f "$JWSTF_HOME/gateway/install-gateway.sh" ]; then
+    bash "$JWSTF_HOME/gateway/install-gateway.sh" >> "$LOG" 2>&1
+    echo "  ✓ NWE Gateway installed (UPnP + relay fallback)"
+else
+    echo "  NOTE: Gateway scripts not found — install manually later"
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 
@@ -482,6 +499,8 @@ echo "║    • Apache2      → port 80/443 (reverse proxy)             ║"
 echo "║    • Tomcat 10.1  → port 8080/8443 (servlet container)      ║"
 echo "║    • MySQL 8      → port 3306 (database: $MYSQL_DB)              ║"
 echo "║    • NWE          → telnet port 23 + HTTP via Tomcat        ║"
+echo "║    • NWE Gateway  → NAT traversal (UPnP / relay tunnel)    ║"
+echo "║    • ClamAV       → antivirus                               ║"
 echo "║                                                              ║"
 echo "║  Paths:                                                      ║"
 echo "║    • Application: $JWSTF_HOME/                    ║"
