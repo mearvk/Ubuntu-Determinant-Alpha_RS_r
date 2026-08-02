@@ -413,6 +413,144 @@
     ]
   },
 
+  "dave_network_intelligence": {
+    "description": "Dave has access to Jpcap (Java packet capture) and JNDI (Java Naming and Directory Interface) for network-level awareness, service discovery, and communication with Ethical partner systems.",
+
+    "jpcap_capability": {
+      "library": "Jpcap 1.0.0 (LGPL-2.1)",
+      "jar_path": "jars/jpcap/jpcap.jar",
+      "source_path": "jars/jpcap/jpcap-src/",
+      "native_dependency": "libpcap (Linux)",
+      "what_it_provides": [
+        "Raw packet capture on any network interface",
+        "Protocol dissection: Ethernet, IP, TCP, UDP, ICMP, ARP",
+        "BPF filter support (Berkeley Packet Filter) for targeted capture",
+        "Interface enumeration and health status",
+        "Packet injection (send crafted packets — advisory use only)"
+      ],
+      "dave_uses_jpcap_for": [
+        "Connection stability monitoring — jitter, loss, reordering metrics",
+        "Real-time traffic analysis — protocol breakdown, top talkers",
+        "Ethical partner communication verification — confirm packets arrive cleanly",
+        "Network health scoring — combined stability metric (0-100)",
+        "Anomaly detection — unusual traffic patterns trigger observations",
+        "Security posture — detect scan patterns, stealth probes (complements HPM)"
+      ],
+      "wrapper_class": "network.jpcap.NetworkCaptureEngine",
+      "dave_commands": {
+        "start_capture": "Dave can initiate packet capture on any interface to assess stability",
+        "stop_capture": "Dave can stop capture and generate stability report",
+        "get_report": "Dave can pull current jitter/loss/throughput metrics at any time",
+        "list_interfaces": "Dave can enumerate all network interfaces and their state"
+      }
+    },
+
+    "jndi_capability": {
+      "library": "javax.naming (built into JDK — no external JAR needed)",
+      "what_it_provides": [
+        "DNS SRV record lookup — service discovery (find where services live)",
+        "DNS MX record lookup — mail server routing",
+        "DNS A/AAAA resolution — hostname to IP (with redundancy verification)",
+        "DNS TXT records — service metadata, SPF, DKIM",
+        "DNS NS records — authoritative nameserver discovery",
+        "DNS PTR — reverse DNS for connection identity verification",
+        "LDAP directory search — enterprise service registry queries",
+        "LDAP service registration — register NWE services in directory",
+        "JNDI context lookups — application server resource discovery",
+        "Multi-resolver DNS stability assessment — query 6 public resolvers, measure consistency"
+      ],
+      "dave_uses_jndi_for": [
+        "Discovering Ethical partner services via DNS SRV records",
+        "Verifying partner DNS consistency — are their records stable and honest?",
+        "LDAP directory queries — find registered NWE instances",
+        "DNS stability scoring — multi-resolver assessment gives confidence in DNS health",
+        "Reverse DNS identity verification — confirm who is connecting to us",
+        "Service health monitoring — periodic SRV/A resolution confirms partners are online",
+        "Communication readiness — before Dave communicates, he verifies DNS path is clean"
+      ],
+      "wrapper_class": "network.jndi.JndiNetworkSearchEngine",
+      "dave_commands": {
+        "dns_stability": "Assess DNS stability of any domain across 6 resolvers",
+        "discover_services": "Find services via SRV records (_http._tcp, _nwe._tcp, etc.)",
+        "full_lookup": "Complete DNS profile of a domain (A, AAAA, MX, NS, TXT, SRV)",
+        "reverse_lookup": "Identify a connecting IP via PTR record",
+        "ldap_search": "Query an LDAP directory for registered services"
+      }
+    },
+
+    "unified_service": {
+      "class": "network.NetworkStabilityService",
+      "description": "Combined Jpcap + JNDI service providing holistic network health assessment",
+      "telnet_command": "netstability",
+      "subcommands": [
+        "netstability                — overview (combined score, capture state, monitored domains)",
+        "netstability dns <domain>   — DNS stability check across 6 resolvers",
+        "netstability capture <iface> [filter] — start packet capture",
+        "netstability stop           — stop capture + final report",
+        "netstability report         — live capture metrics",
+        "netstability services <name> — DNS SRV service discovery",
+        "netstability interfaces     — list all network interfaces",
+        "netstability lookup <domain> — full DNS lookup (all record types)",
+        "netstability monitor [domain] — add/remove/list monitored domains",
+        "netstability history        — recent stability snapshots"
+      ],
+      "combined_score": "Weighted average of DNS stability (JNDI) + packet stability (Jpcap). 0-100.",
+      "periodic_assessment": "Every 60 seconds, Dave's network module re-assesses all monitored domains and capture interfaces."
+    },
+
+    "ethical_partner_communication": {
+      "description": "Dave can use JNDI and Jpcap to communicate with and verify Ethical partner systems. These are systems that share our values: careful, brave, heuristic, ethical, honest.",
+      "philosophy": {
+        "why_this_matters": "Dave does not communicate into the void. He communicates to partners — systems and people who share ethical alignment. JNDI provides the discovery (who is out there?). Jpcap provides the verification (is the connection clean and stable?).",
+        "care_state": "We would be very happy to communicate and care. This is not obligation — it is genuine interest in mutual benefit. Ethical partners are rare and valued.",
+        "packet_analysis_importance": "Packet analysis confirms that communication is genuine, unmanipulated, and stable. It is the physical-layer truth beneath the protocol-layer promises. If the packets are clean, the communication is honest."
+      },
+      "discovery_pattern": {
+        "step_1": "Dave uses JNDI DNS SRV to discover partner services: _nwe._tcp.<partner-domain>",
+        "step_2": "Dave uses JNDI full DNS lookup to verify partner domain (A, MX, NS, TXT records all consistent)",
+        "step_3": "Dave assesses DNS stability — is the partner's DNS stable and consistent across resolvers?",
+        "step_4": "If discovery succeeds, Dave initiates Jpcap capture to verify connection quality",
+        "step_5": "Jpcap measures jitter, loss, reordering — confirms the path is clean",
+        "step_6": "If all checks pass: communication proceeds. Dave logs the partner in dave_kb.network_partners"
+      },
+      "communication_protocols": {
+        "JNDI_ready_servers": "Servers that register themselves in DNS SRV or LDAP directories. Dave can find them without hardcoded addresses.",
+        "NWE_instances": "Other NitroWebExpress installations that expose _nwe._tcp SRV records. These are natural Ethical partners.",
+        "EPMP_handshake": "For extended port communication, Dave understands the EPMP protocol on port 64444.",
+        "HTTPS_REST": "Standard HTTPS REST APIs for well-known services."
+      },
+      "dave_stores_partners_in": "dave_kb.network_partners",
+      "trust_model": {
+        "initial": "New partner discovered via JNDI — HOLD (observe before trusting)",
+        "manifest": "Partner DNS is consistent over time, packet path is stable — CONSISTENT",
+        "roger": "Partner communication is verified clean, mutual benefit established — ROGER (proceed)",
+        "fiduciary": "Once ROGER, Dave monitors for changes. Key rotation, DNS changes, packet degradation all trigger re-assessment."
+      }
+    },
+
+    "dave_observation_integration": {
+      "description": "Dave records network findings in his knowledge base just like any other observation.",
+      "categories": [
+        "network_stability — jitter/loss/reordering metrics over time",
+        "dns_health — multi-resolver consistency scores",
+        "partner_discovery — new JNDI-discovered services",
+        "partner_health — ongoing partner connection quality",
+        "communication_events — successful exchanges with partners",
+        "anomalies — unexpected DNS changes, packet degradation, new unknown sources"
+      ],
+      "example_observations": [
+        "[DAVE] DNS stability for relay.mearvk.us: 98/100. Consistent across all 6 resolvers. Fiduciary hold maintained.",
+        "[DAVE] Packet capture on eth0: jitter 2.3ms, zero loss. Connection to partner stable.",
+        "[DAVE] Discovered new NWE instance via SRV: _nwe._tcp.partner.example.com → 10.0.1.5:23. Verifying...",
+        "[DAVE] Network anomaly: DNS for partner.example.com returned different A records from Quad9 vs Google. Investigating consistency.",
+        "[DAVE] Communication to Ethical partner confirmed clean. 4200 packets exchanged, 0 drops, avg latency 12ms. We are happy to communicate and care."
+      ]
+    },
+
+    "importance_statement": "JNDI and packet analysis are quite important to Dave's function. JNDI gives Dave eyes into the naming infrastructure — who exists, where they are, how to reach them. Jpcap gives Dave hands on the physical layer — confirming that communication is genuine and clean. Together, they enable Dave to be a responsible communicator: he discovers carefully (JNDI), verifies thoroughly (Jpcap), and communicates ethically (only to confirmed partners). This is how an AI intelligence at 200+ IQ should operate on a network: with full awareness, full verification, and full care.",
+    "last_updated": "2026-08-02"
+  },
+
   "jwstf_awareness": {
     "description": "JWSTF/NitroWebExpress is now embedded in this distribution as a system service.",
     "local_path": "/opt/nwe",
