@@ -72,6 +72,7 @@
 #include "utilities/stringUtils.hpp"
 #include "utilities/systemMemoryBarrier.hpp"
 #include "runtime/xmlConfigReader.hpp"
+#include "runtime/jvmIntegrity.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -1724,6 +1725,10 @@ jint Arguments::parse_vm_init_args(GrowableArrayCHeap<VMInitArgsGroup, mtArgumen
       }
     }
   }
+
+  // JvmIntegrity: initialize OS-level security guardian
+  // Must be early — before any untrusted native libraries are loaded.
+  JvmIntegrity::initialize();
 
   // Disable CDS for exploded image
   if (!has_jimage()) {

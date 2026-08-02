@@ -77,6 +77,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/vmError.hpp"
+#include "runtime/jvmIntegrity.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfrEvents.hpp"
 #include "jfr/support/jfrNativeLibraryLoadEvent.hpp"
@@ -1693,6 +1694,14 @@ void * os::dll_load(const char *filename, char *ebuf, int ebuflen) {
   bool load_attempted = false;
 
   log_info(os)("attempting shared library load of %s", filename);
+
+  // JvmIntegrity: strict menu check — refuse unauthorized libraries
+  if (!JvmIntegrity::authorize_library_load(filename, "os::dll_load")) {
+    if (ebuf != nullptr && ebuflen > 0) {
+      snprintf(ebuf, ebuflen, "JvmIntegrity: library not on authorized list: %s", filename);
+    }
+    return nullptr;
+  }
 
   // Check whether the library to load might change execution rights
   // of the stack. If they are changed, the protection of the stack
