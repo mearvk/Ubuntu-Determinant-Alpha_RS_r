@@ -9,7 +9,6 @@
  * uses a minimal secure parser sufficient for the fixed schema.
  */
 
-#include "precompiled.hpp"
 #include "runtime/xmlConfigReader.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/flags/jvmFlag.hpp"

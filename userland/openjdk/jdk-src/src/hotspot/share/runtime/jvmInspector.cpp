@@ -8,7 +8,6 @@
  * Maintains full class load history since system inception.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmInspector.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/os.hpp"
@@ -43,13 +42,13 @@ volatile int       JvmInspector::_history_lock = 0;
 // ============================================================================
 
 void JvmInspector::history_lock() {
-  while (Atomic::cmpxchg(&_history_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_history_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void JvmInspector::history_unlock() {
-  Atomic::store(&_history_lock, 0);
+  AtomicAccess::store(&_history_lock, 0);
 }
 
 // ============================================================================
@@ -365,7 +364,7 @@ bool JvmInspector::inspect_class(const char* class_name, InspectionView view,
   }
 
   // Search the class
-  Klass* k = SystemDictionary::find_instance_or_array_klass(sym, Handle(), Handle());
+  Klass* k = SystemDictionary::find_instance_or_array_klass(Thread::current(), sym, Handle());
   if (k == nullptr || !k->is_instance_klass()) {
     out->print_cr("JvmInspector: class not found or not an instance class: %s", class_name);
     return false;

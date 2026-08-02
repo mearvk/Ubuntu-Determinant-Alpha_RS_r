@@ -349,7 +349,7 @@ refArrayOop ConstantPool::prepare_resolved_references_for_archiving() {
       keep_resolved_refs.at_put(rr_index, true);
     });
 
-    refArrayOop scratch_rr = HeapShared::scratch_resolved_references(this);
+    objArrayOop scratch_rr = HeapShared::scratch_resolved_references(this);
     Array<u2>* ref_map = reference_map();
     int ref_map_len = ref_map == nullptr ? 0 : ref_map->length();
     for (int i = 0; i < rr_len; i++) {
@@ -372,7 +372,7 @@ refArrayOop ConstantPool::prepare_resolved_references_for_archiving() {
         }
       }
     }
-    return scratch_rr;
+    return (refArrayOop)scratch_rr;
   }
   return rr;
 }

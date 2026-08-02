@@ -12,7 +12,6 @@
  * Thus our serves is and nobles and God.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmMySQLBridge.hpp"
 #include "runtime/os.hpp"
 #include "runtime/atomic.hpp"
@@ -49,13 +48,13 @@ int           JvmMySQLBridge::_design_principle = 0;
 // ============================================================================
 
 void JvmMySQLBridge::lock() {
-  while (Atomic::cmpxchg(&_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void JvmMySQLBridge::unlock() {
-  Atomic::store(&_lock, 0);
+  AtomicAccess::store(&_lock, 0);
 }
 
 // ============================================================================

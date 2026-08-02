@@ -33,6 +33,7 @@
 #include "memory/universe.hpp"
 #include "oops/oop.inline.hpp"
 #include "oops/oopHandle.inline.hpp"
+#include "oops/refArrayOop.inline.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "utilities/hashTable.hpp"
@@ -179,7 +180,7 @@ void AOTReferenceObjSupport::init_keep_alive_objs_table() {
 
     _keep_alive_objs_table = new (mtClass)KeepAliveObjectsTable();
     for (int i = 0; i < array->length(); i++) {
-      oop obj = array->obj_at(i);
+      oop obj = ((refArrayOop)array)->obj_at(i);
       _keep_alive_objs_table->put(obj, true); // The array may have duplicated entries but that's OK.
     }
   }

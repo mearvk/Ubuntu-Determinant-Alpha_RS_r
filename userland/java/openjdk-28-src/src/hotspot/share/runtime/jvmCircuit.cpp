@@ -9,7 +9,6 @@
  * for system-purpose grading across multiple JVMs.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmCircuit.hpp"
 #include "runtime/jvmIntegrity.hpp"
 #include "runtime/jvmInspector.hpp"
@@ -60,13 +59,13 @@ LinkStatus       JvmCircuit::_chain_status = LINK_NONE;
 // ============================================================================
 
 void JvmCircuit::lock() {
-  while (Atomic::cmpxchg(&_session_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_session_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void JvmCircuit::unlock() {
-  Atomic::store(&_session_lock, 0);
+  AtomicAccess::store(&_session_lock, 0);
 }
 
 // ============================================================================

@@ -8,7 +8,6 @@
  * with permission grading, content validation, and inventory tracking.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmResourceLoader.hpp"
 #include "runtime/os.hpp"
 #include "runtime/atomic.hpp"
@@ -44,13 +43,13 @@ volatile int     JvmResourceLoader::_lock = 0;
 // ============================================================================
 
 void JvmResourceLoader::lock() {
-  while (Atomic::cmpxchg(&_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void JvmResourceLoader::unlock() {
-  Atomic::store(&_lock, 0);
+  AtomicAccess::store(&_lock, 0);
 }
 
 // ============================================================================

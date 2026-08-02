@@ -48,6 +48,7 @@
 #include "oops/oop.inline.hpp"
 #include "oops/oopHandle.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
+#include "oops/refArrayOop.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/mutexLocker.hpp"
@@ -176,8 +177,8 @@ void LambdaFormInvokers::regenerate_holder_classes(TRAPS) {
   int sz = h_array->length();
   assert(sz % 2 == 0 && sz >= 2, "Must be even size of length");
   for (int i = 0; i < sz; i+= 2) {
-    Handle h_name(THREAD, h_array->obj_at(i));
-    typeArrayHandle h_bytes(THREAD, (typeArrayOop)h_array->obj_at(i+1));
+    Handle h_name(THREAD, ((refArrayOop)(oopDesc*)h_array())->obj_at(i));
+    typeArrayHandle h_bytes(THREAD, (typeArrayOop)((refArrayOop)(oopDesc*)h_array())->obj_at(i+1));
     assert(h_name != nullptr, "Class name is null");
     assert(h_bytes != nullptr, "Class bytes is null");
 

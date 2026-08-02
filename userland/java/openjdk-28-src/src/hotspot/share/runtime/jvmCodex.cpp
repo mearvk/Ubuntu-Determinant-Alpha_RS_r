@@ -9,7 +9,6 @@
  * signal destiny. Normed to NC English Speaking US standard.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmCodex.hpp"
 #include "runtime/os.hpp"
 #include "runtime/atomic.hpp"
@@ -33,13 +32,13 @@ volatile int JvmCodex::_lock = 0;
 // ============================================================================
 
 void JvmCodex::lock() {
-  while (Atomic::cmpxchg(&_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void JvmCodex::unlock() {
-  Atomic::store(&_lock, 0);
+  AtomicAccess::store(&_lock, 0);
 }
 
 // ============================================================================

@@ -673,10 +673,13 @@ public:
     return raw_objArrayOop()->length();
   }
   FakeOop obj_at(int i) {
+    HeapWord* base = raw_objArrayOop()->base();
     if (UseCompressedOops) {
-      return read_oop_at(raw_objArrayOop()->obj_at_addr<narrowOop>(i));
+      narrowOop* addr = (narrowOop*)base + i;
+      return read_oop_at(addr);
     } else {
-      return read_oop_at(raw_objArrayOop()->obj_at_addr<oop>(i));
+      oop* addr = (oop*)base + i;
+      return read_oop_at(addr);
     }
   }
 }; // AOTMapLogger::FakeObjArray

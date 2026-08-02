@@ -42,6 +42,7 @@
 #include "memory/resourceArea.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/klass.inline.hpp"
+#include "oops/refArrayOop.hpp"
 #include "runtime/arguments.hpp"
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/debug.hpp"
@@ -551,7 +552,7 @@ bool ArchiveUtils::has_aot_initialized_mirror(InstanceKlass* src_ik) {
 
 size_t HeapRootSegments::size_in_bytes(size_t seg_idx) {
   assert(seg_idx < _count, "In range");
-  return objArrayOopDesc::object_size(size_in_elems(seg_idx)) * HeapWordSize;
+  return refArrayOopDesc::object_size(size_in_elems(seg_idx)) * HeapWordSize;
 }
 
 int HeapRootSegments::size_in_elems(size_t seg_idx) {

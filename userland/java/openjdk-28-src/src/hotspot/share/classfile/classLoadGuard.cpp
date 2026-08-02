@@ -8,7 +8,6 @@
  * Integrates with SystemDictionary::load_instance_class().
  */
 
-#include "precompiled.hpp"
 #include "classfile/classLoadGuard.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
@@ -34,13 +33,13 @@ volatile int ClassLoadGuard::_lock = 0;
 // ============================================================================
 
 void ClassLoadGuard::lock() {
-  while (Atomic::cmpxchg(&_lock, 0, 1) != 0) {
+  while (AtomicAccess::cmpxchg(&_lock, 0, 1) != 0) {
     os::naked_short_sleep(0);
   }
 }
 
 void ClassLoadGuard::unlock() {
-  Atomic::store(&_lock, 0);
+  AtomicAccess::store(&_lock, 0);
 }
 
 // ============================================================================

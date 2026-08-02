@@ -487,7 +487,7 @@ int CDSHeapVerifier::trace_to_root(outputStream* st, oop orig_obj, oop orig_fiel
       assert(orig_obj->is_objArray(), "must be");
       objArrayOop array = (objArrayOop)orig_obj;
       for (int i = 0; i < array->length(); i++) {
-        if (array->obj_at(i) == orig_field) {
+        if (((refArrayOop)array)->obj_at(i) == orig_field) {
           st->print(" @[%d]", i);
           break;
         }

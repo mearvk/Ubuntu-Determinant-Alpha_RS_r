@@ -1887,25 +1887,7 @@ void MachPrologNode::format(PhaseRegAlloc* ra_, outputStream* st) const {
 void MachPrologNode::emit(C2_MacroAssembler *masm, PhaseRegAlloc *ra_) const {
   Compile* C = ra_->C;
 
-  int framesize = C->output()->frame_size_in_bytes();
-  int bangsize = C->output()->bang_size_in_bytes();
-
-  if (C->clinit_barrier_on_entry()) {
-    assert(VM_Version::supports_fast_class_init_checks(), "sanity");
-    assert(!C->method()->holder()->is_not_initialized(), "initialization should have been started");
-
-    Label L_skip_barrier;
-    Register klass = rscratch1;
-
-    __ mov_metadata(klass, C->method()->holder()->constant_encoding());
-    __ clinit_barrier(klass, &L_skip_barrier /*L_fast_path*/);
-
-    __ jump(RuntimeAddress(SharedRuntime::get_handle_wrong_method_stub())); // slow path
-
-    __ bind(L_skip_barrier);
-  }
-
-  __ verified_entry(framesize, C->output()->need_stack_bang(bangsize)?bangsize:0, false, C->stub_function() != nullptr);
+  __ verified_entry(C);
 
   C->output()->set_frame_complete(__ offset());
 
@@ -1915,12 +1897,6 @@ void MachPrologNode::emit(C2_MacroAssembler *masm, PhaseRegAlloc *ra_) const {
     ConstantTable& constant_table = C->output()->constant_table();
     constant_table.set_table_base_offset(constant_table.calculate_table_base_offset());
   }
-}
-
-uint MachPrologNode::size(PhaseRegAlloc* ra_) const
-{
-  return MachNode::size(ra_); // too many variables; just compute it
-                              // the hard way
 }
 
 int MachPrologNode::reloc() const
@@ -1998,12 +1974,6 @@ void MachEpilogNode::emit(C2_MacroAssembler* masm, PhaseRegAlloc* ra_) const
     __ relocate(relocInfo::poll_return_type);
     __ safepoint_poll(*code_stub, true /* at_return */, true /* in_nmethod */);
   }
-}
-
-uint MachEpilogNode::size(PhaseRegAlloc* ra_) const
-{
-  return MachNode::size(ra_); // too many variables; just compute it
-                              // the hard way
 }
 
 int MachEpilogNode::reloc() const
@@ -2620,12 +2590,6 @@ void MachUEPNode::format(PhaseRegAlloc* ra_, outputStream* st) const
 void MachUEPNode::emit(C2_MacroAssembler* masm, PhaseRegAlloc* ra_) const
 {
   __ ic_check(InteriorEntryAlignment);
-}
-
-uint MachUEPNode::size(PhaseRegAlloc* ra_) const
-{
-  return MachNode::size(ra_); // too many variables; just compute it
-                              // the hard way
 }
 
 
@@ -14744,7 +14708,7 @@ instruct rep_stos(rcx_RegL cnt, rdi_RegP base, regD tmp, rax_RegI zero,
   %}
   ins_encode %{
     __ clear_mem($base$$Register, $cnt$$Register, $zero$$Register,
-                 $tmp$$XMMRegister, false, knoreg);
+                 $tmp$$XMMRegister, false, false, knoreg);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -14805,7 +14769,7 @@ instruct rep_stos_evex(rcx_RegL cnt, rdi_RegP base, legRegD tmp, kReg ktmp, rax_
   %}
   ins_encode %{
     __ clear_mem($base$$Register, $cnt$$Register, $zero$$Register,
-                 $tmp$$XMMRegister, false, $ktmp$$KRegister);
+                 $tmp$$XMMRegister, false, false, $ktmp$$KRegister);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -14856,7 +14820,7 @@ instruct rep_stos_large(rcx_RegL cnt, rdi_RegP base, regD tmp, rax_RegI zero,
   %}
   ins_encode %{
     __ clear_mem($base$$Register, $cnt$$Register, $zero$$Register,
-                 $tmp$$XMMRegister, true, knoreg);
+                 $tmp$$XMMRegister, true, false, knoreg);
   %}
   ins_pipe(pipe_slow);
 %}
@@ -14907,7 +14871,7 @@ instruct rep_stos_large_evex(rcx_RegL cnt, rdi_RegP base, legRegD tmp, kReg ktmp
   %}
   ins_encode %{
     __ clear_mem($base$$Register, $cnt$$Register, $zero$$Register,
-                 $tmp$$XMMRegister, true, $ktmp$$KRegister);
+                 $tmp$$XMMRegister, true, false, $ktmp$$KRegister);
   %}
   ins_pipe(pipe_slow);
 %}

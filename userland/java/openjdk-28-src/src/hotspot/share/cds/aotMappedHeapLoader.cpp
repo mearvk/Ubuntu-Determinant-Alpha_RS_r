@@ -41,6 +41,8 @@
 #include "memory/iterator.inline.hpp"
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
+#include "oops/compressedOops.inline.hpp"
+#include "oops/objArrayOop.inline.hpp"
 #include "sanitizers/ub.hpp"
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/copy.hpp"
@@ -404,7 +406,14 @@ oop AOTMappedHeapLoader::get_root(int index) {
   int seg_idx, int_idx;
   get_segment_indexes(index, seg_idx, int_idx);
   objArrayOop result = objArrayOop(root_segment(seg_idx));
-  return result->obj_at(int_idx);
+  HeapWord* base = result->base();
+  if (UseCompressedOops) {
+    narrowOop* addr = (narrowOop*)base + int_idx;
+    return CompressedOops::decode(*addr);
+  } else {
+    oop* addr = (oop*)base + int_idx;
+    return *addr;
+  }
 }
 
 void AOTMappedHeapLoader::clear_root(int index) {

@@ -8,7 +8,6 @@
  * No side hooks, no rootkits, no fractional loads from OS level.
  */
 
-#include "precompiled.hpp"
 #include "runtime/jvmIntegrity.hpp"
 #include "runtime/os.hpp"
 #include "runtime/atomic.hpp"
@@ -137,8 +136,8 @@ void JvmIntegrity::initialize() {
 }
 
 void JvmIntegrity::set_canaries() {
-  Atomic::store(&_canary_a, CANARY_EXPECTED_A);
-  Atomic::store(&_canary_b, CANARY_EXPECTED_B);
+  AtomicAccess::store(&_canary_a, CANARY_EXPECTED_A);
+  AtomicAccess::store(&_canary_b, CANARY_EXPECTED_B);
 }
 
 // ============================================================================
@@ -233,8 +232,8 @@ bool JvmIntegrity::check_ptrace_status() {
 // ============================================================================
 
 bool JvmIntegrity::verify_canaries() {
-  uint64_t a = Atomic::load(&_canary_a);
-  uint64_t b = Atomic::load(&_canary_b);
+  uint64_t a = AtomicAccess::load(&_canary_a);
+  uint64_t b = AtomicAccess::load(&_canary_b);
 
   if (a != CANARY_EXPECTED_A || b != CANARY_EXPECTED_B) {
     log_error(os)("JvmIntegrity: CANARY CORRUPTION DETECTED! "
