@@ -61,9 +61,11 @@ ADWAITA_TAR     := adwaita-icon-theme-46.2.tar.xz
 STAMPS := $(BUILD)/.stamps
 $(shell mkdir -p $(STAMPS))
 
-# pkg-config must find our sysroot libs
-export PKG_CONFIG_PATH := $(SYSROOT)$(PREFIX)/lib/pkgconfig:$(SYSROOT)$(PREFIX)/lib/x86_64-linux-gnu/pkgconfig:$(SYSROOT)$(PREFIX)/share/pkgconfig
-export PKG_CONFIG_SYSROOT_DIR := $(SYSROOT)
+# pkg-config must find our sysroot libs AND system libs for dependencies we don't build
+export PKG_CONFIG_PATH := $(SYSROOT)$(PREFIX)/lib/pkgconfig:$(SYSROOT)$(PREFIX)/lib/x86_64-linux-gnu/pkgconfig:$(SYSROOT)$(PREFIX)/share/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
+## NOTE: PKG_CONFIG_SYSROOT_DIR is intentionally NOT set.
+## We are not cross-compiling; system headers live at their real paths.
+## Our sysroot .pc files already use absolute paths via DESTDIR install.
 
 # Compiler/linker flags for sysroot (so configure can find our built libs)
 SYSROOT_CFLAGS  := -I$(SYSROOT)$(PREFIX)/include
@@ -264,6 +266,9 @@ $(STAMPS)/xorg-server: $(XSERVER_TAR) $(STAMPS)/libXrender $(STAMPS)/pixman $(ST
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(XSERVER_TAR) && \
 	cd xorg-server-$(XSERVER_VER) && \
+	CFLAGS="-I$(BUILD)/sysroot/usr/include -I/usr/include/libdrm" \
+	CPPFLAGS="-I$(BUILD)/sysroot/usr/include -I/usr/include/libdrm" \
+	LDFLAGS="-L$(BUILD)/sysroot/usr/lib -Wl,-rpath-link,$(BUILD)/sysroot/usr/lib" \
 	meson setup build --prefix=$(PREFIX) --libdir=lib \
 		-Dxorg=true -Dxephyr=false -Dxnest=false \
 		-Dxvfb=true -Dxwin=false -Ddocs=false && \

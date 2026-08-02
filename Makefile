@@ -29,7 +29,8 @@ ROOTFS_DIR    := $(BUILD_DIR)/rootfs
 # Install prefix for userland builds (inside rootfs)
 PREFIX        := /usr
 
-.PHONY: all kernel kernel-defconfig kernel-menuconfig kernel-modules kernel-install \
+.PHONY: all deps \
+        kernel kernel-defconfig kernel-menuconfig kernel-modules kernel-install \
         asm asm-list asm-clean \
         userland x11 x11-install wallpapers wallpapers-install \
         tools tools-install tools-all tools-all-install \
@@ -57,6 +58,7 @@ help:
 	@echo "╚══════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "Build Targets:"
+	@echo "  deps             - Install all host build dependencies (requires sudo)"
 	@echo "  all              - Build asm + kernel + userland"
 	@echo "  asm              - Compile x86_64 .S files (from linux base compressed)"
 	@echo "  asm-list         - List all .S assembly sources by directory"
@@ -102,6 +104,34 @@ help:
 	@echo "  mysql   - cmake, g++, libssl-dev, libncurses-dev"
 	@echo "  rootfs  - fakeroot, cpio, gzip"
 	@echo "  iso     - xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools"
+
+# ==============================================================================
+# Build Dependencies (install host packages)
+# ==============================================================================
+
+deps:
+	@echo "Installing build dependencies..."
+	sudo apt-get update
+	sudo apt-get install -y \
+		gcc g++ make flex bison libelf-dev bc libssl-dev \
+		meson ninja-build pkg-config \
+		libxfont-dev libxcvt-dev libseat-dev libdbus-1-dev libudev-dev \
+		libsystemd-dev libgbm-dev libdrm-dev libepoxy-dev \
+		libxkbcommon-dev libxkbcommon-x11-dev xkb-data \
+		libpixman-1-dev libpciaccess-dev libgl-dev \
+		nettle-dev libgcrypt20-dev libselinux1-dev libaudit-dev \
+		mesa-common-dev libgles2-mesa-dev \
+		libxau-dev libxdmcp-dev libxcb1-dev libx11-dev libxext-dev \
+		libxrender-dev libxrandr-dev libxi-dev libxtst-dev \
+		libxinerama-dev libxcomposite-dev libxdamage-dev libxfixes-dev \
+		libxcursor-dev libxss-dev libxxf86vm-dev \
+		xmlto xsltproc fop \
+		autoconf automake libtool \
+		cmake rustc cargo libjson-c-dev libncurses-dev \
+		fakeroot cpio gzip \
+		xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
+		python3 python3-pip
+	@echo "Build dependencies installed."
 
 # ==============================================================================
 # Kernel
