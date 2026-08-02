@@ -71,6 +71,7 @@
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/stringUtils.hpp"
 #include "utilities/systemMemoryBarrier.hpp"
+#include "runtime/xmlConfigReader.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -1695,6 +1696,35 @@ jint Arguments::parse_vm_init_args(GrowableArrayCHeap<VMInitArgsGroup, mtArgumen
     }
   }
 
+  // Load XML configuration file if present (Galactic Cherry extension)
+  // Priority: -XX:XMLConfigFile=path > $JAVA_HOME/conf/jvm-config.xml > /etc/jvm-config.xml
+  // This runs after command-line args so XML sets defaults that CLI can override.
+  {
+    const char* xml_config_path = nullptr;
+
+    // Check if -XX:XMLConfigFile= was specified on command line
+    for (int i = 0; i < all_args->length() && xml_config_path == nullptr; i++) {
+      const JavaVMInitArgs* args = all_args->at(i)._args;
+      for (int j = 0; j < args->nOptions; j++) {
+        const char* opt = args->options[j].optionString;
+        if (opt != nullptr && strncmp(opt, "-XX:XMLConfigFile=", 18) == 0) {
+          xml_config_path = opt + 18;
+        }
+      }
+    }
+
+    // Fall back to default locations
+    if (xml_config_path == nullptr) {
+      xml_config_path = xmlConfigReader::find_default_config();
+    }
+
+    if (xml_config_path != nullptr) {
+      if (!xmlConfigReader::read_config(xml_config_path)) {
+        warning("Failed to load XML JVM config: %s (continuing with defaults)", xml_config_path);
+      }
+    }
+  }
+
   // Disable CDS for exploded image
   if (!has_jimage()) {
     no_shared_spaces("CDS disabled on exploded JDK");
@@ -2491,10 +2521,11 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
       return JNI_EINVAL;
 #endif
     } else if (match_option(option, "-XX:", &tail)) { // -XX:xxxx
-      // Skip -XX:Flags= and -XX:VMOptionsFile= since those cases have
+      // Skip -XX:Flags= and -XX:VMOptionsFile= and -XX:XMLConfigFile= since those cases have
       // already been handled
       if ((strncmp(tail, "Flags=", strlen("Flags=")) != 0) &&
-          (strncmp(tail, "VMOptionsFile=", strlen("VMOptionsFile=")) != 0)) {
+          (strncmp(tail, "VMOptionsFile=", strlen("VMOptionsFile=")) != 0) &&
+          (strncmp(tail, "XMLConfigFile=", strlen("XMLConfigFile=")) != 0)) {
         if (!process_argument(tail, args->ignoreUnrecognized, origin)) {
           return JNI_EINVAL;
         }

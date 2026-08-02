@@ -126,6 +126,15 @@ install-from-source:
 	echo 'export JAVA_HOME=$(PREFIX)/lib/jvm/jdk-$(VERSION)' > $(DESTDIR)/etc/profile.d/java.sh; \
 	echo 'export PATH=$$JAVA_HOME/bin:$$PATH' >> $(DESTDIR)/etc/profile.d/java.sh; \
 	echo "  ✓ Installed to $(DESTDIR)$(PREFIX)/lib/jvm/jdk-$(VERSION)"
+	@# Install XML config file (secure JVM defaults)
+	@mkdir -p $(DESTDIR)$(PREFIX)/lib/jvm/jdk-$(VERSION)/conf
+	@install -m 644 $(CURDIR)/../openjdk/jvm-config.xml \
+		$(DESTDIR)$(PREFIX)/lib/jvm/jdk-$(VERSION)/conf/jvm-config.xml 2>/dev/null && \
+		echo "  ✓ jvm-config.xml installed" || true
+	@mkdir -p $(DESTDIR)/etc
+	@install -m 644 $(CURDIR)/../openjdk/jvm-config.xml \
+		$(DESTDIR)/etc/jvm-config.xml 2>/dev/null && \
+		echo "  ✓ /etc/jvm-config.xml installed" || true
 
 # ==============================================================================
 # Clean
