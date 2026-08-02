@@ -65,6 +65,10 @@ $(shell mkdir -p $(STAMPS))
 export PKG_CONFIG_PATH := $(SYSROOT)$(PREFIX)/lib/pkgconfig:$(SYSROOT)$(PREFIX)/lib/x86_64-linux-gnu/pkgconfig:$(SYSROOT)$(PREFIX)/share/pkgconfig
 export PKG_CONFIG_SYSROOT_DIR := $(SYSROOT)
 
+# Compiler/linker flags for sysroot (so configure can find our built libs)
+SYSROOT_CFLAGS  := -I$(SYSROOT)$(PREFIX)/include
+SYSROOT_LDFLAGS := -L$(SYSROOT)$(PREFIX)/lib -Wl,-rpath-link,$(SYSROOT)$(PREFIX)/lib
+
 # Remove .la files after install — they break libtool in sysroot builds
 REMOVE_LA = find $(SYSROOT) -name "*.la" -delete 2>/dev/null || true
 
@@ -228,7 +232,9 @@ $(STAMPS)/libbsd: $(LIBBSD_TAR) $(STAMPS)/libmd
 	tar xf $(CURDIR)/$(LIBBSD_TAR) && \
 	cd libbsd-$(LIBBSD_VER) && \
 	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
-		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
 	make -j$$(nproc) && \
 	make install DESTDIR=$(SYSROOT)
 	@$(REMOVE_LA)
