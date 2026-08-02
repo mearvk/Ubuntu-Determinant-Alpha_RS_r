@@ -88,6 +88,7 @@ help:
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
 	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
+	@echo "  jwstf-install    - Install Java Web Server (NitroWebExpress) into rootfs"
 	@echo ""
 	@echo "Assembly Targets:"
 	@echo "  rootfs           - Extract Ubuntu Base rootfs"
@@ -635,6 +636,39 @@ desktop:
 	fi
 
 # ==============================================================================
+# JWSTF / NitroWebExpress — Java Web Server Install
+# ==============================================================================
+
+jwstf-install:
+	@echo "=== Installing JWSTF (NitroWebExpress) ==="
+	@if [ ! -d "$(ROOTFS_DIR)/usr" ]; then \
+		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
+	fi
+	@# Copy JWSTF source into rootfs for use by the installer
+	@echo "  Staging JWSTF source into rootfs..."
+	@install -d $(ROOTFS_DIR)/usr/local/src/jwstf
+	@if [ -d "userland/java-web-server/source" ]; then \
+		cp -a userland/java-web-server/* $(ROOTFS_DIR)/usr/local/src/jwstf/; \
+		echo "  ✓ JWSTF source staged ($$(find userland/java-web-server/source -name '*.java' | wc -l) Java files)"; \
+	else \
+		echo "  WARNING: userland/java-web-server/source not found"; \
+	fi
+	@# Install the JWSTF installer script
+	@install -m 755 $(SCRIPTS_DIR)/install-jwstf.sh $(ROOTFS_DIR)/usr/sbin/
+	@echo "  ✓ install-jwstf.sh installed to /usr/sbin/"
+	@# Run in chroot if we have root (packages need network)
+	@if [ "$$(id -u)" = "0" ]; then \
+		echo "  Running JWSTF install in chroot (root detected)..."; \
+		chroot $(ROOTFS_DIR) /usr/sbin/install-jwstf.sh || \
+			echo "  NOTE: JWSTF install incomplete (may need network on first boot)"; \
+	else \
+		echo ""; \
+		echo "  NOTE: chroot install requires root."; \
+		echo "  The installer will run during OS installation (galactic-cherry-installer)"; \
+		echo "  or on first boot via: sudo /usr/sbin/install-jwstf.sh"; \
+	fi
+
+# ==============================================================================
 # Root Filesystem Assembly
 # ==============================================================================
 
@@ -646,7 +680,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"

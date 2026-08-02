@@ -388,6 +388,29 @@ step_install() {
             ;;
     esac
 
+    echo "75"
+    echo "Installing Java Web Server (NitroWebExpress)..."
+
+    # JWSTF / NitroWebExpress installation
+    if [ -d "$target/usr/local/src/jwstf/source" ]; then
+        if [ -f "$target/usr/sbin/install-jwstf.sh" ]; then
+            chroot "$target" /usr/sbin/install-jwstf.sh >> "$LOG" 2>&1 || \
+                echo "  WARNING: JWSTF install had errors (non-fatal)" >> "$LOG"
+        fi
+    elif [ -f /usr/sbin/install-jwstf.sh ]; then
+        # Copy the installer and source into the target
+        cp /usr/sbin/install-jwstf.sh "$target/tmp/"
+        if [ -d /usr/local/src/jwstf ]; then
+            mkdir -p "$target/usr/local/src/jwstf"
+            cp -a /usr/local/src/jwstf/* "$target/usr/local/src/jwstf/"
+        fi
+        chroot "$target" bash /tmp/install-jwstf.sh >> "$LOG" 2>&1 || \
+            echo "  WARNING: JWSTF install had errors (non-fatal)" >> "$LOG"
+        rm -f "$target/tmp/install-jwstf.sh"
+    else
+        echo "  NOTE: JWSTF source not found — skipping web server install" >> "$LOG"
+    fi
+
     echo "80"
     echo "Configuring system..."
 
