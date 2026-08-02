@@ -65,7 +65,13 @@ install: $(TARBALL)
 # Build from Source (included in repo)
 # ==============================================================================
 
-BOOT_JDK ?= /usr/lib/jvm/jdk-27
+BOOT_JDK ?= $(shell \
+  if [ -d "$(CURDIR)/boot-jdk-27" ]; then echo "$(CURDIR)/boot-jdk-27"; \
+  elif [ -d "/usr/lib/jvm/jdk-27" ]; then echo "/usr/lib/jvm/jdk-27"; \
+  elif [ -d "/usr/lib/jvm/java-27-openjdk-amd64" ]; then echo "/usr/lib/jvm/java-27-openjdk-amd64"; \
+  elif [ -d "/usr/lib/jvm/java-26-openjdk-amd64" ]; then echo "/usr/lib/jvm/java-26-openjdk-amd64"; \
+  elif [ -d "/usr/lib/jvm/jdk-26" ]; then echo "/usr/lib/jvm/jdk-26"; \
+  else echo "/usr/lib/jvm/jdk-27"; fi)
 
 # Our native source modifications live in userland/openjdk/jdk-src/
 # They overlay the full source tree before compilation.
@@ -103,8 +109,11 @@ build-from-source: overlay
 			--with-boot-jdk=$(BOOT_JDK) \
 			--with-native-debug-symbols=none \
 			--enable-unlimited-crypto \
-			--disable-warnings-as-errors && \
-		make images -j$$(nproc) CONF_CHECK=ignore \
+			--disable-warnings-as-errors \
+			--enable-headless-only \
+			--with-extra-cflags="-I$(CURDIR)/sysroot/usr/include" \
+			--with-extra-ldflags="-L$(CURDIR)/sysroot/usr/lib/x86_64-linux-gnu" && \
+		make images JOBS=$$(nproc) CONF_CHECK=ignore \
 			$(if $(filter 0,$(WARNINGS)),LOG=warn,LOG=info)
 	@echo ""
 	@echo "JDK built: $(SRC_DIR)/build/linux-x86_64-server-release/images/jdk/"
