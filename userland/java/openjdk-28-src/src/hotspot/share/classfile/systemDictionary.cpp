@@ -86,6 +86,7 @@
 #include "utilities/macros.hpp"
 #include "utilities/utf8.hpp"
 #include "classfile/classLoadGuard.hpp"
+#include "runtime/jvmInspector.hpp"
 #if INCLUDE_CDS
 #include "classfile/systemDictionaryShared.hpp"
 #endif
@@ -1518,6 +1519,24 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* name,
     THROW_MSG_NULL(vmSymbols::java_lang_ClassNotFoundException(),
                    err_msg("ClassLoadGuard: refused to load class %s (grade/quantity limit)",
                            name != nullptr ? name->as_C_string() : "(null)"));
+  }
+
+  // JvmInspector: record class load in history (since inception)
+  if (loaded_class != nullptr) {
+    const char* cname = name != nullptr ? name->as_C_string() : "(anonymous)";
+    bool has_native = false;
+    bool is_jdk = (strncmp(cname, "java/", 5) == 0 || strncmp(cname, "jdk/", 4) == 0 ||
+                   strncmp(cname, "sun/", 4) == 0 || strncmp(cname, "javax/", 6) == 0);
+    // Check for native methods
+    Array<Method*>* methods = loaded_class->methods();
+    if (methods != nullptr) {
+      for (int i = 0; i < methods->length(); i++) {
+        if (methods->at(i)->is_native()) { has_native = true; break; }
+      }
+    }
+    JvmInspector::record_class_load(cname,
+                                    class_loader.is_null() ? "bootstrap" : "application",
+                                    0, has_native, is_jdk);
   }
 
   // If everything was OK (no exceptions, no null return value), and
