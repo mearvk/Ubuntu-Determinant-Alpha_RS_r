@@ -77,6 +77,7 @@
 #include "runtime/jvmCircuit.hpp"
 #include "runtime/jvmResourceLoader.hpp"
 #include "runtime/jvmCodex.hpp"
+#include "runtime/jvmMySQLBridge.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -1746,6 +1747,9 @@ jint Arguments::parse_vm_init_args(GrowableArrayCHeap<VMInitArgsGroup, mtArgumen
 
   // JvmCodex: static system codex — in-resident module registry
   JvmCodex::initialize();
+
+  // JvmMySQLBridge: secure database bridge for operand awareness
+  JvmMySQLBridge::initialize();
 
   // Disable CDS for exploded image
   if (!has_jimage()) {
