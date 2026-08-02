@@ -255,7 +255,8 @@ fi
 MYSQL_JAR=$(find "$JWSTF_HOME/jars" -name "mysql-connector-*.jar" 2>/dev/null | head -1)
 LANTERNA_JAR="$JWSTF_HOME/jars/lanterna-3.1.5.jar"
 DJL_JARS=$(find "$JWSTF_HOME/jars/djl" -name "*.jar" 2>/dev/null | tr '\n' ':')
-CP="$JWSTF_HOME/out:${MYSQL_JAR}:${LANTERNA_JAR}:${DJL_JARS}"
+JPCAP_JARS=$(find "$JWSTF_HOME/jars/jpcap" -name "*.jar" 2>/dev/null | tr '\n' ':')
+CP="$JWSTF_HOME/out:${MYSQL_JAR}:${LANTERNA_JAR}:${DJL_JARS}${JPCAP_JARS}"
 
 # Compile
 mkdir -p "$JWSTF_HOME/out"
