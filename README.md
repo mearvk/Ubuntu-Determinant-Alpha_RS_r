@@ -46,6 +46,15 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 19. [Chromium Browser — Open Source](#chromium-browser--open-source)
 20. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
 21. [Certificates](#certificates)
+22. [OpenJDK 28 — Secure JVM](#openjdk-28--secure-jvm)
+23. [Secure JVM: XML Configuration Reader](#secure-jvm-xml-configuration-reader)
+24. [Secure JVM: ClassLoadGuard](#secure-jvm-classloadguard)
+25. [Secure JVM: Integrity Guardian](#secure-jvm-integrity-guardian)
+26. [Secure JVM: Pause-Frame Inspector](#secure-jvm-pause-frame-inspector)
+27. [Secure JVM: Observer Grade Circuit](#secure-jvm-observer-grade-circuit)
+28. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
+29. [Secure JVM: System Codex](#secure-jvm-system-codex)
+30. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
 
 ---
 
@@ -1336,6 +1345,401 @@ Three permanent certificates embedded in all distributions (unaltered):
 3. **Brand of National Heritage** — USA national heritage, global competence and science. The software is dumbenent to its designer (owes its work to its careful author). Remainder to core principles: function, clarity, trust, service.
 
 Located at: `CERTIFICATES`
+
+---
+
+## OpenJDK 28 — Secure JVM
+
+OpenJDK 28 is included as full native C/C++ source (49MB, 2,960 files) for modification and compilation from source. The JVM is built with an overlay system — modifications in `userland/openjdk/jdk-src/` are applied to the full source tree before compilation.
+
+### Build Workflow
+
+```bash
+make java                    # Apply native source overlay
+make java-build              # Compile OpenJDK from source (needs boot JDK 27)
+make java-install-from-source # Install to rootfs
+```
+
+### Source Structure
+
+```
+userland/openjdk/jdk-src/src/
+├── hotspot/share/runtime/    — JVM runtime (our extensions live here)
+├── hotspot/share/classfile/  — Class loading (ClassLoadGuard)
+├── hotspot/share/gc/         — Garbage collectors
+├── hotspot/share/opto/       — C2 JIT compiler
+├── hotspot/cpu/x86/          — x86_64 code generation
+└── java.base/share/native/   — Core JNI implementations
+```
+
+### Files
+
+```
+userland/openjdk/fetch-openjdk-native.sh  - Reproducible fetch script
+userland/openjdk/jdk-src/                 - Native source (49MB, x86_64/Linux)
+userland/openjdk/jvm-config.xml           - XML configuration file
+userland/java/Makefile                    - Build with overlay support
+userland/java/openjdk-28-src/             - Full source tree (451MB)
+```
+
+---
+
+## Secure JVM: XML Configuration Reader
+
+Reads JVM startup flags from a validated XML document instead of command-line arguments. Provides secure, structured configuration with integrity verification.
+
+### Security
+
+| Check | Protection |
+|-------|-----------|
+| File ownership | Must be owned by root or launching user |
+| World-writable | Rejected (refuses to load) |
+| Symlinks | `O_NOFOLLOW` — rejects symlinked configs |
+| Max file size | 64KB cap |
+| No DTD/entities | Rejects `<!DOCTYPE>`, `<!ENTITY>`, `SYSTEM` |
+| Optional signature | `sha256:` hex digest for integrity |
+
+### XML Format
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<jvm-config version="1" signature="sha256:...">
+  <flags>
+    <flag name="MaxHeapSize" value="4g"/>
+    <flag name="UseG1GC" value="true"/>
+  </flags>
+  <system-properties>
+    <property name="file.encoding" value="UTF-8"/>
+  </system-properties>
+  <classpath>
+    <entry path="/opt/app/lib/*"/>
+  </classpath>
+</jvm-config>
+```
+
+### Usage
+
+```bash
+# Automatic discovery:
+#   $JAVA_HOME/conf/jvm-config.xml (checked first)
+#   /etc/jvm-config.xml (fallback)
+
+# Explicit:
+java -XX:XMLConfigFile=/path/to/jvm-config.xml MyApp
+```
+
+### Files
+
+```
+src/hotspot/share/runtime/xmlConfigReader.hpp
+src/hotspot/share/runtime/xmlConfigReader.cpp
+```
+
+---
+
+## Secure JVM: ClassLoadGuard
+
+Quantity and quality controls for class loading. Classes are graded by architectural role, and each grade has configurable ceilings.
+
+### Class Grades
+
+| Grade | Name | Role | Default Max |
+|-------|------|------|-------------|
+| 7 | Main | Application entry point | unlimited |
+| 6 | Manager | Orchestrators, controllers, services | 100 |
+| 5 | Archetype | Abstract bases, templates, interfaces | 200 |
+| 4 | Builder | Factories, builders, generators | 150 |
+| 3 | Inheritor | Concrete implementations | 500 |
+| 2 | Gainer | Caches, pools, registries, stores | 300 |
+| 1 | Substitute | Proxies, adapters, decorators, wrappers | 200 |
+| 0 | Ungraded | Everything else | 2000 |
+
+### Policies
+
+- **WARN** — Log violation, allow load
+- **SOFT** — Log + 10ms delay penalty, allow
+- **HARD** — Refuse to load (ClassNotFoundException)
+
+### Grade Detection
+
+1. **Annotation** — `ClassGrade:N` in class constant pool
+2. **Name heuristic** — `*Manager`, `*Factory`, `*Proxy`, `Abstract*`, `*Impl`, etc.
+
+### Files
+
+```
+src/hotspot/share/classfile/classLoadGuard.hpp
+src/hotspot/share/classfile/classLoadGuard.cpp
+src/hotspot/share/classfile/systemDictionary.cpp (modified)
+```
+
+---
+
+## Secure JVM: Integrity Guardian
+
+Prevents OS-level side hooks, rootkits, and dynamic injection. Enforces strict 1:1 and 1:2 memory allocation ratios.
+
+### Anti-Hook Defenses
+
+| Threat | Defense |
+|--------|---------|
+| LD_PRELOAD injection | Detected and cleared at startup |
+| Unauthorized dlopen() | Whitelist-only (strict menu) |
+| JVMTI agent late-attach | Locked after startup |
+| ptrace/debugger | TracerPid monitoring |
+| Injected .so in memory | Periodic /proc/self/maps scan |
+| Memory corruption | Canary values (GALACTIC/CHERRYMV) |
+
+### Allocation Discipline
+
+```
+Request 100 bytes → get 128 (grid-aligned)          ✓ 1:1
+Request 100 bytes → get 256 (double, grid-aligned)  ✓ 1:2
+Request 100 bytes → get 114 (fractional 1:1.14)     ✗ REJECTED
+```
+
+Grid: `8, 16, 32, 64, 128, 256, 512, 1024, 4096, ...`
+
+Fractional ratios indicate corrupted size computation, hooking malloc, or rootkit padding.
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmIntegrity.hpp
+src/hotspot/share/runtime/jvmIntegrity.cpp
+src/hotspot/os/linux/os_linux.cpp (modified — dll_load gate)
+```
+
+---
+
+## Secure JVM: Pause-Frame Inspector
+
+Allows authorized operators to pause the JVM and draw up technical frames of any loaded class or its C/C++ backing.
+
+### Operator Grades
+
+| Grade | Who | Access |
+|-------|-----|--------|
+| 1 - Local | Application developers | CLASS, HISTORY views |
+| 2 - National | All classes incl. JDK | +NATIVE view |
+| 3 - International | Full access | +CODE view (JIT/bytecode) |
+
+### Inspection Views
+
+| View | Shows |
+|------|-------|
+| CLASS | Fields, methods, inheritance, interfaces, instance size |
+| NATIVE | C/C++ entry points (dladdr symbol resolution) |
+| CODE | JIT-compiled machine code or interpreter bytecode |
+| FRAME | Stack frame at pause point |
+| HISTORY | Full class load timeline since inception |
+
+### Verdicts
+
+- **RESUME** — Continue execution
+- **QUARANTINE** — Unload offending class
+- **HALT** — Terminate JVM with diagnostic dump
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmInspector.hpp
+src/hotspot/share/runtime/jvmInspector.cpp
+```
+
+---
+
+## Secure JVM: Observer Grade Circuit
+
+2-3 observer circuits in addition to the main JVM process. Authorized observers connect via SSH, telnet, or Unix socket to monitor, grade, link JVMs, and file reports.
+
+### Circuit Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  MAIN CIRCUIT (Electron 0) — Running JVM         │
+└──────────────────┬──────────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────────┐
+│  OBSERVER CIRCUIT 1 — Inspectors/Techs           │
+│  status, classes, memory, threads, guard         │
+└──────────────────┬──────────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────────┐
+│  OBSERVER CIRCUIT 2 — Forensic/Legal/Medical     │
+│  +inspect, +grade, +pause, +file reports         │
+└──────────────────┬──────────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────────┐
+│  OBSERVER CIRCUIT 3 — Presidential Ensignia      │
+│  +link JVMs, +grade-chain, +breakdown, +archive  │
+└─────────────────────────────────────────────────┘
+```
+
+### Observer Roles
+
+- Software Inspector, Lead Installer Tech
+- Forensic Lead, Attorney of Graves, Doctor (MD Concern)
+- Presidential Ensignia, System Grader
+
+### JVM Carrier Chain
+
+A president's ensignia can circle one or more JVMs, link them as a carrier chain for system-purpose grading, then order breakdown and file the final report.
+
+### Access
+
+| Method | Port | Notes |
+|--------|------|-------|
+| SSH | 2222 | Key/certificate authenticated |
+| Telnet | 2223 | Localhost-only by default |
+| Unix Socket | /var/run/jvm-circuit-PID.sock | Local observers |
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmCircuit.hpp
+src/hotspot/share/runtime/jvmCircuit.cpp
+```
+
+---
+
+## Secure JVM: Resource Loader
+
+Permission-gated loading of C, S, HPP, JSON, and XML files with content validation, inventory tracking, and careful appropriation.
+
+### Permission Grades
+
+| Grade | Who | Can Load |
+|-------|-----|----------|
+| 1 - Application | End user | JSON, XML |
+| 2 - Trusted | Technical staff | +HPP headers |
+| 3 - System | System admin | +C source, +Assembly |
+| 4 - Kernel | Kernel-level | All types, bypass validation |
+
+### Content Validation
+
+| Type | Checks |
+|------|--------|
+| .c | No exec/system/fork/dlopen, no banned includes, no linker pragmas |
+| .S | No .interp section, no execve syscall, x86_64 target check |
+| .hpp | Must have include guard, no JVM internal macro shadowing |
+| .json | Valid structure, max depth 32, no embedded scripts, max 10MB |
+| .xml | No DTD/ENTITY/SYSTEM, max depth 64, max 10MB |
+
+### Appropriation Pipeline
+
+```
+IDENTIFY → VALIDATE → PERMISSION CHECK → APPROPRIATE → REGISTER
+```
+
+Resources that fail validation are quarantined (held but not activated).
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmResourceLoader.hpp
+src/hotspot/share/runtime/jvmResourceLoader.cpp
+```
+
+---
+
+## Secure JVM: System Codex
+
+A static, in-resident module registry. Codex entries sit **in-in** to the JVM — binary sees them as already present. Other code modules reference the codex for size, shape, name, color, code, functionality, rigor, and improvement.
+
+### Installer Grades (NC English Speaking US Standard)
+
+| Grade | Who | Can Do |
+|-------|-----|--------|
+| User III | End user | Read name, size, shape, color |
+| Tech II+ | Technical staff | Inspect code, functionality |
+| Installer IV+ | Installer | Register/withdraw codex entries |
+| Normal VI++ | Normalized | Full operation |
+
+### Codex Properties
+
+- **Name** — identity
+- **Size** — memory footprint
+- **Shape** — Module, Class, Function, Data, Interface, System Center
+- **Color** — White (Ethics), Blue (Communication), Green (Growth), Gold (Authority), Red (Security), Silver (Utility), Clear (Pure Logic)
+- **Rigor** — Draft, Reviewed, Tested, Certified, Canonical
+- **Functionality** — what it does
+- **Improvement** — known upgrade path
+
+### ICodexAware Interface
+
+Modules neighboring a codex implement this interface:
+
+```cpp
+// Self-knowledge
+know_self(), know_altitude(), know_relevance(), speed_of_base()
+
+// Use and reuse
+use_of_use(), reuse_of_contrived()
+
+// Timing
+when_to_peak(), when_to_start(), when_to_pause(), when_to_operate(),
+when_to_base_reoperate(), when_to_startle(), when_to_skimp(),
+when_to_wonder(), when_to_accept_novel()
+
+// Signal destiny
+reacquire_signal_destiny()
+```
+
+Designed for safe future expansion. Users extending these views find strong signal destiny recovery built into the base.
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmCodex.hpp
+src/hotspot/share/runtime/jvmCodex.cpp
+```
+
+---
+
+## Secure JVM: MySQL Bridge
+
+Secure connection between a JVM instance and MySQL for operand awareness. When authorized hands touch the database meaningfully, the JVM knows and becomes more operand.
+
+### Touch Types
+
+| Type | Meaning |
+|------|---------|
+| CONCERN | User expressed interest/attention |
+| TOUCH | Direct interaction with data |
+| SCHEDULE | Future operation oriented |
+| ORIENT | System aligned to purpose |
+
+### Hand Types
+
+| Hand | Authority |
+|------|-----------|
+| INTERNATIONAL | Cross-border authority |
+| TECHNICAL | Engineering, implementation |
+| ORIENTAR | Direction-setting, alignment |
+| REALTOR | Tangible value, asset management |
+
+### Operand Weight
+
+Each meaningful touch is weighed:
+
+| Dimension | Meaning |
+|-----------|---------|
+| Title | Authority of the touch (0-100) |
+| Earned | Merit of the interaction (0-100) |
+| Money | Economic weight/value (0-100) |
+| Pocket | Immediate resource allocation (0-100) |
+
+### Design Principles
+
+This system is of design principles, of design head and love of measure. When a meaningful hand touches the database, the JVM knows it has been touched meaningfully. Title, earned, money, and pocket are weighed. Thus our serves is and nobles and God.
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmMySQLBridge.hpp
+src/hotspot/share/runtime/jvmMySQLBridge.cpp
+```
 
 ---
 
