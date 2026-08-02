@@ -74,6 +74,7 @@
 #include "runtime/xmlConfigReader.hpp"
 #include "runtime/jvmIntegrity.hpp"
 #include "runtime/jvmInspector.hpp"
+#include "runtime/jvmCircuit.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -1733,6 +1734,10 @@ jint Arguments::parse_vm_init_args(GrowableArrayCHeap<VMInitArgsGroup, mtArgumen
 
   // JvmInspector: initialize pause-frame inspector and class history tracking
   JvmInspector::initialize();
+
+  // JvmCircuit: initialize observer grade circuits (SSH/telnet/socket)
+  JvmCircuit::initialize();
+  JvmCircuit::start_listeners();
 
   // Disable CDS for exploded image
   if (!has_jimage()) {
