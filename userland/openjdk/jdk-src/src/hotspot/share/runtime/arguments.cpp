@@ -76,6 +76,7 @@
 #include "runtime/jvmInspector.hpp"
 #include "runtime/jvmCircuit.hpp"
 #include "runtime/jvmResourceLoader.hpp"
+#include "runtime/jvmCodex.hpp"
 #if INCLUDE_JFR
 #include "jfr/jfr.hpp"
 #endif
@@ -1742,6 +1743,9 @@ jint Arguments::parse_vm_init_args(GrowableArrayCHeap<VMInitArgsGroup, mtArgumen
 
   // JvmResourceLoader: secure loading of C, S, HPP, JSON, XML files
   JvmResourceLoader::initialize();
+
+  // JvmCodex: static system codex — in-resident module registry
+  JvmCodex::initialize();
 
   // Disable CDS for exploded image
   if (!has_jimage()) {
