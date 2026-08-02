@@ -85,6 +85,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/utf8.hpp"
+#include "classfile/classLoadGuard.hpp"
 #if INCLUDE_CDS
 #include "classfile/systemDictionaryShared.hpp"
 #endif
@@ -1507,6 +1508,17 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* name,
                                                      TRAPS) {
 
   InstanceKlass* loaded_class = load_instance_class_impl(name, class_loader, CHECK_NULL);
+
+  // ClassLoadGuard: check quantity/quality safety before completing load
+  if (loaded_class != nullptr && ClassLoadGuard::allow_class_load(
+        name != nullptr ? name->as_C_string() : nullptr,
+        nullptr, 0,  // bytecode already consumed; grade from name heuristic
+        class_loader.is_null() ? "bootstrap" : "application") == false) {
+    // Hard policy: refuse the class
+    THROW_MSG_NULL(vmSymbols::java_lang_ClassNotFoundException(),
+                   err_msg("ClassLoadGuard: refused to load class %s (grade/quantity limit)",
+                           name != nullptr ? name->as_C_string() : "(null)"));
+  }
 
   // If everything was OK (no exceptions, no null return value), and
   // class_loader is NOT the defining loader, do a little more bookkeeping.
