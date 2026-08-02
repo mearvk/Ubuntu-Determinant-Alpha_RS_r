@@ -24,18 +24,30 @@ LIBXCB_VER      := 1.17.0
 LIBX11_VER      := 1.8.13
 LIBXEXT_VER     := 1.3.6
 LIBXRENDER_VER  := 0.9.11
+PIXMAN_VER      := 0.43.4
+XSHMFENCE_VER  := 1.3.2
+LIBMD_VER       := 1.1.0
+LIBBSD_VER      := 0.12.2
+XKBFILE_VER     := 1.1.3
 XSERVER_VER     := 21.1.24
 XINIT_VER       := 1.4.2
 TWM_VER         := 1.0.12
 XTERM_VER       := 394
+XCBPROTO_VER    := 1.17.0
 
 # Source tarballs
 XORGPROTO_TAR   := xorgproto-$(XORGPROTO_VER).tar.xz
+XCBPROTO_TAR    := xcb-proto-$(XCBPROTO_VER).tar.xz
 XTRANS_TAR      := xtrans-$(XTRANS_VER).tar.xz
 LIBXCB_TAR      := libxcb-$(LIBXCB_VER).tar.xz
 LIBX11_TAR      := libX11-$(LIBX11_VER).tar.xz
 LIBXEXT_TAR     := libXext-$(LIBXEXT_VER).tar.xz
 LIBXRENDER_TAR  := libXrender-$(LIBXRENDER_VER).tar.xz
+PIXMAN_TAR      := pixman-$(PIXMAN_VER).tar.gz
+XSHMFENCE_TAR  := libxshmfence-$(XSHMFENCE_VER).tar.xz
+LIBMD_TAR       := libmd-$(LIBMD_VER).tar.xz
+LIBBSD_TAR      := libbsd-$(LIBBSD_VER).tar.xz
+XKBFILE_TAR     := libxkbfile-$(XKBFILE_VER).tar.xz
 XSERVER_TAR     := xorg-server-$(XSERVER_VER).tar.xz
 XINIT_TAR       := xinit-$(XINIT_VER).tar.xz
 TWM_TAR         := twm-$(TWM_VER).tar.xz
@@ -51,6 +63,10 @@ $(shell mkdir -p $(STAMPS))
 
 # pkg-config must find our sysroot libs
 export PKG_CONFIG_PATH := $(SYSROOT)$(PREFIX)/lib/pkgconfig:$(SYSROOT)$(PREFIX)/lib/x86_64-linux-gnu/pkgconfig:$(SYSROOT)$(PREFIX)/share/pkgconfig
+export PKG_CONFIG_SYSROOT_DIR := $(SYSROOT)
+
+# Remove .la files after install — they break libtool in sysroot builds
+REMOVE_LA = find $(SYSROOT) -name "*.la" -delete 2>/dev/null || true
 
 # Build components in dependency order
 .PHONY: all libs server apps icons install clean help
@@ -77,8 +93,9 @@ help:
 # Libraries (in dependency order)
 # ==============================================================================
 
-libs: $(STAMPS)/xorgproto $(STAMPS)/xtrans $(STAMPS)/libxcb $(STAMPS)/libX11 \
-      $(STAMPS)/libXext $(STAMPS)/libXrender
+libs: $(STAMPS)/xorgproto $(STAMPS)/xcb-proto $(STAMPS)/xtrans $(STAMPS)/libxcb $(STAMPS)/libX11 \
+      $(STAMPS)/libXext $(STAMPS)/libXrender $(STAMPS)/pixman $(STAMPS)/xshmfence \
+      $(STAMPS)/libmd $(STAMPS)/libbsd $(STAMPS)/libxkbfile
 
 # 1. Protocol headers (no dependencies)
 $(STAMPS)/xorgproto: $(XORGPROTO_TAR)
@@ -90,24 +107,41 @@ $(STAMPS)/xorgproto: $(XORGPROTO_TAR)
 	DESTDIR=$(SYSROOT) ninja -C build install
 	@touch $@
 
+# 1b. XCB Protocol descriptions (required by libxcb)
+$(STAMPS)/xcb-proto: $(XCBPROTO_TAR) $(STAMPS)/xorgproto
+	@echo "=== Building xcb-proto $(XCBPROTO_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(XCBPROTO_TAR) && \
+	cd xcb-proto-$(XCBPROTO_VER) && \
+	./configure --prefix=$(PREFIX) \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@touch $@
+
 # 2. Transport abstraction
 $(STAMPS)/xtrans: $(XTRANS_TAR) $(STAMPS)/xorgproto
 	@echo "=== Building xtrans $(XTRANS_VER) ==="
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(XTRANS_TAR) && \
 	cd xtrans-$(XTRANS_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
 	@touch $@
 
 # 3. X C Bindings (required by libX11)
-$(STAMPS)/libxcb: $(LIBXCB_TAR) $(STAMPS)/xorgproto
+$(STAMPS)/libxcb: $(LIBXCB_TAR) $(STAMPS)/xcb-proto $(STAMPS)/xorgproto
 	@echo "=== Building libxcb $(LIBXCB_VER) ==="
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(LIBXCB_TAR) && \
 	cd libxcb-$(LIBXCB_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
 	@touch $@
 
 # 4. Core X11 library
@@ -116,8 +150,11 @@ $(STAMPS)/libX11: $(LIBX11_TAR) $(STAMPS)/libxcb $(STAMPS)/xtrans
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(LIBX11_TAR) && \
 	cd libX11-$(LIBX11_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
 	@touch $@
 
 # 5. X11 protocol extensions
@@ -126,8 +163,11 @@ $(STAMPS)/libXext: $(LIBXEXT_TAR) $(STAMPS)/libX11
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(LIBXEXT_TAR) && \
 	cd libXext-$(LIBXEXT_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
 	@touch $@
 
 # 6. X Render extension
@@ -136,8 +176,75 @@ $(STAMPS)/libXrender: $(LIBXRENDER_TAR) $(STAMPS)/libXext
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(LIBXRENDER_TAR) && \
 	cd libXrender-$(LIBXRENDER_VER) && \
+	sed -i 's/BufAlloc (xGlyphElt \*, elt, SIZEOF(xGlyphElt))$$/BufAlloc (xGlyphElt *, elt, SIZEOF(xGlyphElt));/' src/Glyph.c && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 7. Pixman - pixel manipulation library (required by xorg-server)
+$(STAMPS)/pixman: $(PIXMAN_TAR)
+	@echo "=== Building pixman $(PIXMAN_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(PIXMAN_TAR) && \
+	cd pixman-$(PIXMAN_VER) && \
 	meson setup build --prefix=$(PREFIX) --libdir=lib && \
 	DESTDIR=$(SYSROOT) ninja -C build install
+	@$(REMOVE_LA)
+	@touch $@
+
+# 8. xshmfence - shared memory fences (required by xorg-server)
+$(STAMPS)/xshmfence: $(XSHMFENCE_TAR) $(STAMPS)/xorgproto
+	@echo "=== Building libxshmfence $(XSHMFENCE_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(XSHMFENCE_TAR) && \
+	cd libxshmfence-$(XSHMFENCE_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 9. libmd - message digest library (required by libbsd)
+$(STAMPS)/libmd: $(LIBMD_TAR)
+	@echo "=== Building libmd $(LIBMD_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBMD_TAR) && \
+	cd libmd-$(LIBMD_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 10. libbsd - BSD compatibility library (required by xorg-server)
+$(STAMPS)/libbsd: $(LIBBSD_TAR) $(STAMPS)/libmd
+	@echo "=== Building libbsd $(LIBBSD_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBBSD_TAR) && \
+	cd libbsd-$(LIBBSD_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 11. libxkbfile - XKB file handling (required by xorg-server)
+$(STAMPS)/libxkbfile: $(XKBFILE_TAR) $(STAMPS)/libX11
+	@echo "=== Building libxkbfile $(XKBFILE_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(XKBFILE_TAR) && \
+	cd libxkbfile-$(XKBFILE_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
 	@touch $@
 
 # ==============================================================================
@@ -146,7 +253,7 @@ $(STAMPS)/libXrender: $(LIBXRENDER_TAR) $(STAMPS)/libXext
 
 server: $(STAMPS)/xorg-server
 
-$(STAMPS)/xorg-server: $(XSERVER_TAR) $(STAMPS)/libXrender
+$(STAMPS)/xorg-server: $(XSERVER_TAR) $(STAMPS)/libXrender $(STAMPS)/pixman $(STAMPS)/xshmfence $(STAMPS)/libbsd $(STAMPS)/libxkbfile
 	@echo "=== Building xorg-server $(XSERVER_VER) ==="
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(XSERVER_TAR) && \
@@ -168,8 +275,10 @@ $(STAMPS)/xinit: $(XINIT_TAR) $(STAMPS)/libX11
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(XINIT_TAR) && \
 	cd xinit-$(XINIT_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
 	@touch $@
 
 $(STAMPS)/twm: $(TWM_TAR) $(STAMPS)/libXext
@@ -177,8 +286,10 @@ $(STAMPS)/twm: $(TWM_TAR) $(STAMPS)/libXext
 	cd $(BUILD) && \
 	tar xf $(CURDIR)/$(TWM_TAR) && \
 	cd twm-$(TWM_VER) && \
-	meson setup build --prefix=$(PREFIX) --libdir=lib && \
-	DESTDIR=$(SYSROOT) ninja -C build install
+	./configure --prefix=$(PREFIX) \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
 	@touch $@
 
 $(STAMPS)/xterm: $(XTERM_TAR) $(STAMPS)/libX11

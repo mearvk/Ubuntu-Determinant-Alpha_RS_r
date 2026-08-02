@@ -141,7 +141,8 @@ static int negamane_brand_inode(struct dentry *dentry)
 	if (!inode)
 		return -ENOENT;
 
-	return __vfs_setxattr(dentry, inode, NEGAMANE_XATTR_NAME,
+	return __vfs_setxattr(&init_user_ns, dentry, inode,
+			      NEGAMANE_XATTR_NAME,
 			      NEGAMANE_XATTR_VALUE, NEGAMANE_XATTR_LEN, 0);
 }
 
@@ -164,7 +165,7 @@ static int negamane_release_inode(struct dentry *dentry)
 	if (!inode)
 		return -ENOENT;
 
-	return __vfs_removexattr(dentry, NEGAMANE_XATTR_NAME);
+	return __vfs_removexattr(&init_user_ns, dentry, NEGAMANE_XATTR_NAME);
 }
 
 /* ============================================================

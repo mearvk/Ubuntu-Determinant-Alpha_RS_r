@@ -24,7 +24,6 @@
 #include <linux/slab.h>
 #include <linux/crypto.h>
 #include <crypto/dh.h>
-#include <crypto/rsa.h>
 #include <crypto/hash.h>
 #include <crypto/akcipher.h>
 #include <crypto/kpp.h>

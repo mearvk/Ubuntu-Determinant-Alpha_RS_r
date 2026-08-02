@@ -34,8 +34,8 @@ static int three __maybe_unused = 3;
 static int four = 4;
 static int thousand = 1000;
 static int tcp_retr1_max = 255;
-static int ip_local_port_range_min[] = { 1, 1 };
-static int ip_local_port_range_max[] = { 65535, 65535 };
+static int ip_local_port_range_min[] __maybe_unused = { 1, 1 };
+static u64 ip_local_port_range_max[] __maybe_unused = { U64_MAX, U64_MAX };
 static int tcp_adv_win_scale_min = -31;
 static int tcp_adv_win_scale_max = 31;
 static int tcp_app_win_max = 31;
@@ -79,18 +79,16 @@ static int ipv4_local_port_range(struct ctl_table *table, int write,
 	struct net *net =
 		container_of(table->data, struct net, ipv4.ip_local_ports.range);
 	int ret;
-	int range[2];
+	u64 range[2];
 	struct ctl_table tmp = {
 		.data = &range,
 		.maxlen = sizeof(range),
 		.mode = table->mode,
-		.extra1 = &ip_local_port_range_min,
-		.extra2 = &ip_local_port_range_max,
 	};
 
-	inet_get_local_port_range(net, &range[0], &range[1]);
+	inet_get_local_port_range_extended(net, &range[0], &range[1]);
 
-	ret = proc_dointvec_minmax(&tmp, write, buffer, lenp, ppos);
+	ret = proc_doulongvec_minmax(&tmp, write, buffer, lenp, ppos);
 
 	if (write && ret == 0) {
 		/* Ensure that the upper limit is not smaller than the lower,
@@ -98,7 +96,7 @@ static int ipv4_local_port_range(struct ctl_table *table, int write,
 		 * port limit.
 		 */
 		if ((range[1] < range[0]) ||
-		    (range[0] < READ_ONCE(net->ipv4.sysctl_ip_prot_sock)))
+		    (range[0] < (u64)READ_ONCE(net->ipv4.sysctl_ip_prot_sock)))
 			ret = -EINVAL;
 		else
 			set_local_port_range(net, range);
