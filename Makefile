@@ -26,6 +26,21 @@ ROOTFS_TAR    := $(USERLAND_DIR)/ubuntu-base-24.04.4-base-amd64.tar.gz
 BUILD_DIR     := build
 ROOTFS_DIR    := $(BUILD_DIR)/rootfs
 
+# Warning/note display control
+# By default, compiler warnings and notes are silenced.
+# Run with WARNINGS=1 to display them:
+#   make WARNINGS=1
+#   make WARNINGS=1 x11
+WARNINGS      ?= 0
+ifeq ($(WARNINGS),0)
+  WARN_CFLAGS   := -w
+  WARN_REDIRECT := 2>&1 | grep -v "^.*warning:\|^.*note:\|^.*Warning:\|^In file included" || true
+else
+  WARN_CFLAGS   :=
+  WARN_REDIRECT :=
+endif
+export WARN_CFLAGS
+
 # Install prefix for userland builds (inside rootfs)
 PREFIX        := /usr
 
@@ -104,6 +119,10 @@ help:
 	@echo "  mysql   - cmake, g++, libssl-dev, libncurses-dev"
 	@echo "  rootfs  - fakeroot, cpio, gzip"
 	@echo "  iso     - xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools"
+	@echo ""
+	@echo "Options:"
+	@echo "  WARNINGS=1       - Show compiler warnings and notes (silent by default)"
+	@echo "                     Example: make WARNINGS=1 x11"
 
 # ==============================================================================
 # Build Dependencies (install host packages)
@@ -559,26 +578,51 @@ tools-all-install: tools-install tools-drm-install tools-tandem-equals-install t
 # ==============================================================================
 
 desktop:
-	@echo "=== Installing MATE Desktop (requires network for apt) ==="
-	@if [ -d "$(ROOTFS_DIR)/usr" ]; then \
-		cp $(SCRIPTS_DIR)/install-mate-desktop.sh $(ROOTFS_DIR)/tmp/ && \
-		chmod 755 $(ROOTFS_DIR)/tmp/install-mate-desktop.sh && \
-		chroot $(ROOTFS_DIR) /tmp/install-mate-desktop.sh && \
-		rm -f $(ROOTFS_DIR)/tmp/install-mate-desktop.sh; \
-	else \
+	@echo "=== Installing MATE Desktop ==="
+	@if [ ! -d "$(ROOTFS_DIR)/usr" ]; then \
 		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
 	fi
-	@echo "=== Installing graphical installer (Ubuntu Desktop Provision) ==="
-	@cp $(SCRIPTS_DIR)/install-ubuntu-installer.sh $(ROOTFS_DIR)/tmp/
-	@chmod 755 $(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh
-	@chroot $(ROOTFS_DIR) /tmp/install-ubuntu-installer.sh || \
-		echo "  WARNING: Graphical installer setup incomplete (snapd may need live boot)"
-	@rm -f $(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh
-	@echo "=== Installing TUI fallback installer ==="
-	@install -m 755 $(SCRIPTS_DIR)/galactic-cherry-installer $(ROOTFS_DIR)/usr/sbin/
+	@# Stage the install script for use during first boot or manual chroot
+	@install -d $(ROOTFS_DIR)/tmp
+	@install -m 755 $(SCRIPTS_DIR)/install-mate-desktop.sh $(ROOTFS_DIR)/tmp/
+	@install -d $(ROOTFS_DIR)/usr/sbin
 	@install -m 755 $(SCRIPTS_DIR)/install-mate-desktop.sh $(ROOTFS_DIR)/usr/sbin/
-	@install -d $(ROOTFS_DIR)/etc/profile.d
-	@install -m 644 $(SCRIPTS_DIR)/galactic-cherry-installer-autostart.sh $(ROOTFS_DIR)/etc/profile.d/
+	@echo "  ✓ install-mate-desktop.sh staged"
+	@# Install graphical installer script
+	@if [ -f "$(SCRIPTS_DIR)/install-ubuntu-installer.sh" ]; then \
+		install -m 755 $(SCRIPTS_DIR)/install-ubuntu-installer.sh $(ROOTFS_DIR)/tmp/; \
+		install -m 755 $(SCRIPTS_DIR)/install-ubuntu-installer.sh $(ROOTFS_DIR)/usr/sbin/; \
+		echo "  ✓ install-ubuntu-installer.sh staged"; \
+	fi
+	@# Install TUI fallback installer
+	@if [ -f "$(SCRIPTS_DIR)/galactic-cherry-installer" ]; then \
+		install -m 755 $(SCRIPTS_DIR)/galactic-cherry-installer $(ROOTFS_DIR)/usr/sbin/; \
+		echo "  ✓ galactic-cherry-installer installed"; \
+	fi
+	@# Autostart hook
+	@if [ -f "$(SCRIPTS_DIR)/galactic-cherry-installer-autostart.sh" ]; then \
+		install -d $(ROOTFS_DIR)/etc/profile.d; \
+		install -m 644 $(SCRIPTS_DIR)/galactic-cherry-installer-autostart.sh $(ROOTFS_DIR)/etc/profile.d/; \
+		echo "  ✓ autostart hook installed"; \
+	fi
+	@# Run chroot install if we have root (e.g., in CI or sudo context)
+	@if [ "$$(id -u)" = "0" ]; then \
+		echo "  Running MATE install in chroot (root detected)..."; \
+		chroot $(ROOTFS_DIR) /tmp/install-mate-desktop.sh; \
+		rm -f $(ROOTFS_DIR)/tmp/install-mate-desktop.sh; \
+		if [ -f "$(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh" ]; then \
+			chroot $(ROOTFS_DIR) /tmp/install-ubuntu-installer.sh || \
+				echo "  WARNING: Graphical installer setup incomplete (snapd may need live boot)"; \
+			rm -f $(ROOTFS_DIR)/tmp/install-ubuntu-installer.sh; \
+		fi; \
+	else \
+		echo ""; \
+		echo "  NOTE: chroot requires root. Desktop packages not installed."; \
+		echo "  Scripts are staged — run one of:"; \
+		echo "    sudo make desktop        (to install packages now)"; \
+		echo "    chroot into rootfs and run /tmp/install-mate-desktop.sh"; \
+		echo "    Or packages install on first boot of the live image."; \
+	fi
 
 # ==============================================================================
 # Root Filesystem Assembly

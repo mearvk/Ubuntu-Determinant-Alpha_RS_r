@@ -34,6 +34,12 @@ XINIT_VER       := 1.4.2
 TWM_VER         := 1.0.12
 XTERM_VER       := 394
 XCBPROTO_VER    := 1.17.0
+LIBICE_VER      := 1.1.2
+LIBSM_VER       := 1.2.4
+LIBXT_VER       := 1.3.1
+LIBXMU_VER      := 1.2.1
+LIBXPM_VER      := 3.5.17
+LIBXAW_VER      := 1.0.16
 
 # Source tarballs
 XORGPROTO_TAR   := xorgproto-$(XORGPROTO_VER).tar.xz
@@ -52,6 +58,12 @@ XSERVER_TAR     := xorg-server-$(XSERVER_VER).tar.xz
 XINIT_TAR       := xinit-$(XINIT_VER).tar.xz
 TWM_TAR         := twm-$(TWM_VER).tar.xz
 XTERM_TAR       := xterm-$(XTERM_VER).tgz
+LIBICE_TAR      := libICE-$(LIBICE_VER).tar.xz
+LIBSM_TAR       := libSM-$(LIBSM_VER).tar.xz
+LIBXT_TAR       := libXt-$(LIBXT_VER).tar.xz
+LIBXMU_TAR      := libXmu-$(LIBXMU_VER).tar.xz
+LIBXPM_TAR      := libXpm-$(LIBXPM_VER).tar.xz
+LIBXAW_TAR      := libXaw-$(LIBXAW_VER).tar.xz
 
 # Icon themes (install-only, no build)
 HUMANITY_TAR    := humanity-icon-theme_0.6.16.tar.xz
@@ -67,8 +79,11 @@ export PKG_CONFIG_PATH := $(SYSROOT)$(PREFIX)/lib/pkgconfig:$(SYSROOT)$(PREFIX)/
 ## We are not cross-compiling; system headers live at their real paths.
 ## Our sysroot .pc files already use absolute paths via DESTDIR install.
 
+# Warning suppression (inherited from top-level WARN_CFLAGS)
+WARN_CFLAGS ?=
+
 # Compiler/linker flags for sysroot (so configure can find our built libs)
-SYSROOT_CFLAGS  := -I$(SYSROOT)$(PREFIX)/include
+SYSROOT_CFLAGS  := -I$(SYSROOT)$(PREFIX)/include $(WARN_CFLAGS)
 SYSROOT_LDFLAGS := -L$(SYSROOT)$(PREFIX)/lib -Wl,-rpath-link,$(SYSROOT)$(PREFIX)/lib
 
 # Remove .la files after install — they break libtool in sysroot builds
@@ -101,7 +116,8 @@ help:
 
 libs: $(STAMPS)/xorgproto $(STAMPS)/xcb-proto $(STAMPS)/xtrans $(STAMPS)/libxcb $(STAMPS)/libX11 \
       $(STAMPS)/libXext $(STAMPS)/libXrender $(STAMPS)/pixman $(STAMPS)/xshmfence \
-      $(STAMPS)/libmd $(STAMPS)/libbsd $(STAMPS)/libxkbfile
+      $(STAMPS)/libmd $(STAMPS)/libbsd $(STAMPS)/libxkbfile \
+      $(STAMPS)/libICE $(STAMPS)/libSM $(STAMPS)/libXt $(STAMPS)/libXmu $(STAMPS)/libXpm $(STAMPS)/libXaw
 
 # 1. Protocol headers (no dependencies)
 $(STAMPS)/xorgproto: $(XORGPROTO_TAR)
@@ -255,6 +271,96 @@ $(STAMPS)/libxkbfile: $(XKBFILE_TAR) $(STAMPS)/libX11
 	@$(REMOVE_LA)
 	@touch $@
 
+# 12. libICE - Inter-Client Exchange (required by libSM)
+$(STAMPS)/libICE: $(LIBICE_TAR) $(STAMPS)/xorgproto $(STAMPS)/xtrans
+	@echo "=== Building libICE $(LIBICE_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBICE_TAR) && \
+	cd libICE-$(LIBICE_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 13. libSM - Session Management (required by libXt)
+$(STAMPS)/libSM: $(LIBSM_TAR) $(STAMPS)/libICE $(STAMPS)/xtrans
+	@echo "=== Building libSM $(LIBSM_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBSM_TAR) && \
+	cd libSM-$(LIBSM_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 14. libXt - X Toolkit Intrinsics (required by libXmu, libXaw, xterm)
+$(STAMPS)/libXt: $(LIBXT_TAR) $(STAMPS)/libX11 $(STAMPS)/libSM $(STAMPS)/libICE
+	@echo "=== Building libXt $(LIBXT_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBXT_TAR) && \
+	cd libXt-$(LIBXT_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 15. libXmu - X Miscellaneous Utilities (required by libXaw, xterm)
+$(STAMPS)/libXmu: $(LIBXMU_TAR) $(STAMPS)/libXt $(STAMPS)/libXext
+	@echo "=== Building libXmu $(LIBXMU_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBXMU_TAR) && \
+	cd libXmu-$(LIBXMU_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 16. libXpm - X Pixmap library (required by xterm)
+$(STAMPS)/libXpm: $(LIBXPM_TAR) $(STAMPS)/libX11 $(STAMPS)/libXext $(STAMPS)/libXt
+	@echo "=== Building libXpm $(LIBXPM_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBXPM_TAR) && \
+	cd libXpm-$(LIBXPM_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
+# 17. libXaw - Athena Widgets (required by xterm)
+$(STAMPS)/libXaw: $(LIBXAW_TAR) $(STAMPS)/libXmu $(STAMPS)/libXt $(STAMPS)/libXpm $(STAMPS)/libX11 $(STAMPS)/libXext
+	@echo "=== Building libXaw $(LIBXAW_VER) ==="
+	cd $(BUILD) && \
+	tar xf $(CURDIR)/$(LIBXAW_TAR) && \
+	cd libXaw-$(LIBXAW_VER) && \
+	./configure --prefix=$(PREFIX) --libdir=$(PREFIX)/lib \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
+	make -j$$(nproc) && \
+	make install DESTDIR=$(SYSROOT)
+	@$(REMOVE_LA)
+	@touch $@
+
 # ==============================================================================
 # X Server
 # ==============================================================================
@@ -304,13 +410,16 @@ $(STAMPS)/twm: $(TWM_TAR) $(STAMPS)/libXext
 	make install DESTDIR=$(SYSROOT)
 	@touch $@
 
-$(STAMPS)/xterm: $(XTERM_TAR) $(STAMPS)/libX11
+$(STAMPS)/xterm: $(XTERM_TAR) $(STAMPS)/libXaw $(STAMPS)/libXt $(STAMPS)/libXmu $(STAMPS)/libXpm $(STAMPS)/libX11
 	@echo "=== Building xterm $(XTERM_VER) ==="
 	cd $(BUILD) && \
+	rm -rf xterm-$(XTERM_VER) && \
 	tar xzf $(CURDIR)/$(XTERM_TAR) && \
 	cd xterm-$(XTERM_VER) && \
 	./configure --prefix=$(PREFIX) \
-		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" && \
+		PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
+		CFLAGS="$(SYSROOT_CFLAGS)" \
+		LDFLAGS="$(SYSROOT_LDFLAGS)" && \
 	make -j$$(nproc) && \
 	make install DESTDIR=$(SYSROOT)
 	@touch $@

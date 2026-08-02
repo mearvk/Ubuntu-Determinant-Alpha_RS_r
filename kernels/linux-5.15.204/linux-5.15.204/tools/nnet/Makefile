@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0
 
 CC ?= gcc
-CFLAGS := -Wall -Wextra -O2
+CFLAGS := -Wall -Wextra -O2 $(WARN_CFLAGS)
+DESTDIR ?=
 PREFIX ?= /usr/local
-BINDIR := $(PREFIX)/bin
+BINDIR := $(DESTDIR)$(PREFIX)/bin
 
 .PHONY: all clean install provision
 
@@ -16,8 +17,9 @@ clean:
 	rm -f nnet
 
 install: nnet
+	install -d $(BINDIR)
 	install -m 755 nnet $(BINDIR)/nnet
-	ln -sf $(BINDIR)/nnet $(BINDIR)/nnot
+	ln -sf $(PREFIX)/bin/nnet $(BINDIR)/nnot
 	@echo "Installed nnet and nnot to $(BINDIR)"
 
 provision:

@@ -6,7 +6,7 @@
 #
 
 CC      := gcc
-CFLAGS  := -Wall -Wextra -O2 -lm
+CFLAGS  := -Wall -Wextra -O2 -lm $(WARN_CFLAGS)
 LDFLAGS := -lm
 
 PREFIX  ?= /usr/local

@@ -6,7 +6,7 @@
 #
 
 CC      := gcc
-CFLAGS  := -Wall -Wextra -O2 -D_GNU_SOURCE
+CFLAGS  := -Wall -Wextra -O2 -D_GNU_SOURCE $(WARN_CFLAGS)
 LDFLAGS :=
 
 PREFIX  ?= /usr/local

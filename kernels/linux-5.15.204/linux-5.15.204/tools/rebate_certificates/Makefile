@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 CC := gcc
-CFLAGS := -Wall -Wextra -O2
+CFLAGS := -Wall -Wextra -O2 $(WARN_CFLAGS)
 TARGET := rebate_certificates
 .PHONY: all clean install
 all: $(TARGET)

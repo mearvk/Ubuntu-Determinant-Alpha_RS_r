@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0
 
 CC ?= gcc
-CFLAGS := -Wall -Wextra -O2
+CFLAGS := -Wall -Wextra -O2 $(WARN_CFLAGS)
+DESTDIR ?=
 PREFIX ?= /usr/local
-BINDIR := $(PREFIX)/bin
+BINDIR := $(DESTDIR)$(PREFIX)/bin
 
 .PHONY: all clean install provision
 
@@ -16,18 +17,19 @@ clean:
 	rm -f chat
 
 install: chat
+	install -d $(BINDIR)
 	install -m 755 chat $(BINDIR)/chat
-	mkdir -p /var/lib/chat/users
-	mkdir -p /var/lib/chat/groups
-	chmod 1777 /var/lib/chat
-	chmod 1777 /var/lib/chat/users
-	chmod 1777 /var/lib/chat/groups
+	install -d $(DESTDIR)/var/lib/chat/users
+	install -d $(DESTDIR)/var/lib/chat/groups
+	chmod 1777 $(DESTDIR)/var/lib/chat
+	chmod 1777 $(DESTDIR)/var/lib/chat/users
+	chmod 1777 $(DESTDIR)/var/lib/chat/groups
 	@echo "chat installed to $(BINDIR)/chat"
-	@echo "Data directory: /var/lib/chat/"
+	@echo "Data directory: $(DESTDIR)/var/lib/chat/"
 
 provision:
 	@echo "Creating default group 'general'..."
-	mkdir -p /var/lib/chat/groups/general
-	echo "system" > /var/lib/chat/groups/general/members
-	echo "[`date '+%Y-%m-%d %H:%M:%S'`] *** Group 'general' created (default) ***" > /var/lib/chat/groups/general/log
+	mkdir -p $(DESTDIR)/var/lib/chat/groups/general
+	echo "system" > $(DESTDIR)/var/lib/chat/groups/general/members
+	echo "[`date '+%Y-%m-%d %H:%M:%S'`] *** Group 'general' created (default) ***" > $(DESTDIR)/var/lib/chat/groups/general/log
 	@echo "Done. All users can: chat join general"
