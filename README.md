@@ -1761,8 +1761,108 @@ CONFIG_NEGAMANE=m
 Kernel extensions: GPL-2.0
 sudo_gate: GPL-2.0
 Cronie: ISC (upstream)
+NitroWebExpress: GPL-2.0
+NWE Gateway: GPL-2.0
 
 ## Copyright
 
 Copyright (C) 2026 MEARVK LLC
 Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+---
+
+## NitroWebExpress (JWSTF) — Java Web Server
+
+The full NitroWebExpress application server is included in this distribution, installed as part of the OS. It provides a production-grade Java web server with telnet front-end, running on the standard LAMP-adjacent stack.
+
+### Stack
+
+| Component | Version | Port | Role |
+|-----------|---------|------|------|
+| Apache2 | 2.4+ | 80, 443 | Reverse proxy, static content, TLS termination |
+| Tomcat | 10.1.28 | 8080, 8443 | Servlet container (Jakarta EE) |
+| MySQL | 8+ | 3306 | Application database (N21) |
+| OpenJDK | 21+ | — | Java runtime |
+| NWE | — | 23 (telnet) | Application core, TUI interface |
+| ClamAV | — | — | Antivirus |
+
+### Source
+
+```
+userland/java-web-server/           - Full application source (4,654 Java files)
+userland/java-web-server/source/    - Main source tree
+userland/java-web-server/modules/   - Application modules
+userland/java-web-server/gateway/   - NAT traversal gateway
+userland/java-web-server/build.xml  - Ant build script
+```
+
+### Installation
+
+Installed automatically during OS installation via `scripts/install-jwstf.sh`. Services start on boot:
+
+```bash
+systemctl status nwe tomcat apache2 mysql
+```
+
+### Files
+
+```
+scripts/install-jwstf.sh                    - OS-level installer (9 phases)
+userland/java-web-server/gateway/nwe-gateway - NAT traversal daemon
+userland/java-web-server/gateway/nwe-relay   - Central relay console
+```
+
+---
+
+## NWE Gateway — NAT Traversal for Home Users
+
+Enables home JWSTF deployments to accept inbound traffic from the public internet despite being behind consumer NAT/firewalls.
+
+### Strategy
+
+```
+Phase 1: Try UPnP/NAT-PMP → open ports on router directly
+Phase 2: Fall back to reverse SSH tunnel → relay proxies traffic
+
+Result: External users reach home instances via:
+  http://<instance>.relay.mearvk.us/
+```
+
+### How It Works
+
+| Scenario | Method | Performance |
+|----------|--------|-------------|
+| Router supports UPnP | Direct port mapping | Fast (no middleman) |
+| CGNAT / UPnP disabled | Reverse tunnel to relay | Works anywhere |
+| Dynamic IP | Re-registers on change | Automatic |
+
+### Usage
+
+```bash
+nwe-gateway status     # Show current mode (direct or relay)
+nwe-gateway test       # Verify inbound reachability
+```
+
+### Files
+
+```
+userland/java-web-server/gateway/nwe-gateway         - Home daemon
+userland/java-web-server/gateway/nwe-relay           - Central relay
+userland/java-web-server/gateway/gateway.conf        - Configuration
+userland/java-web-server/gateway/nwe-gateway.service - Systemd (home)
+userland/java-web-server/gateway/nwe-relay.service   - Systemd (relay)
+userland/java-web-server/gateway/install-gateway.sh  - Installer
+```
+
+---
+
+## Update History
+
+| Date | Change |
+|------|--------|
+| 2026-08-02 | Added JWSTF/NitroWebExpress (Java web server, Tomcat, Apache2) |
+| 2026-08-02 | Added NWE Gateway (NAT traversal: UPnP + relay hybrid) |
+| 2026-08-02 | Added boot-jdk-27 (chunked for GitHub, rebuild.sh provided) |
+| 2026-08-02 | Security audit: all public I/O points reviewed |
+| 2026-07-31 | Added Chromium browser source (headless for Dave) |
+| 2026-07-30 | Initial Galactic Cherry Marvell Edition 98 release |

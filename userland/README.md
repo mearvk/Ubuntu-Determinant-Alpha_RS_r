@@ -11,23 +11,49 @@ Ubuntu Base 24.04.4 LTS (Noble Numbat) — official minimal rootfs from Canonica
 - **SHA256:** `c1e67ef7b17a6300e136118bd1dc04725009cb376c1aad10abcf8cd453628d58`
 - **License:** Free software (various — GPLv2, LGPL, MIT, BSD, etc.)
 
-## What It Contains
+## Userland Components
 
-A minimal but functional Ubuntu userspace:
-- apt/dpkg package management (install anything from Ubuntu repos)
-- bash shell
-- coreutils (ls, cp, mv, rm, cat, etc.)
-- libc6, libstdc++
-- networking utilities
-- systemd (init system)
-- No GUI, no desktop — just the base for building up
+| Component | Path | Description |
+|-----------|------|-------------|
+| Ubuntu Base | `ubuntu-base-24.04.4-base-amd64.tar.gz` | Minimal rootfs (libc, apt, systemd) |
+| X11 | `x11/` | X.Org Server 21.1.24 + libs |
+| Wallpapers | `wallpapers/` | 9 SVG + 10 Marvell JPEG wallpapers |
+| OpenJDK 28 | `openjdk/` | Secure JVM with custom extensions |
+| Boot JDK 27 | `java/boot-jdk-27/` | Bootstrap JDK for building OpenJDK |
+| Chromium | `chromium/` | Full browser source (headless for Dave) |
+| JWSTF/NWE | `java-web-server/` | NitroWebExpress application server |
 
-## Usage
+## NitroWebExpress (JWSTF)
 
-### Deploy to a root filesystem
+Full Java web server with 4,654 source files, telnet TUI, and web interface.
+
+- **Source:** `java-web-server/source/` (Main.java entry point)
+- **Modules:** `java-web-server/modules/` (application plugins)
+- **Gateway:** `java-web-server/gateway/` (NAT traversal for home users)
+- **Build:** `ant compile` or `ant jar` (see `java-web-server/build.xml`)
+- **Install:** Handled by `scripts/install-jwstf.sh` during OS installation
+
+### Stack (installed during OS install)
+- Apache2 (reverse proxy, ports 80/443)
+- Tomcat 10.1 (servlet container, ports 8080/8443)
+- MySQL 8 (database N21, port 3306)
+- NWE (telnet TUI, port 23)
+- NWE Gateway (NAT traversal, auto-start)
+
+## Boot JDK 27
+
+The boot JDK is required to compile OpenJDK 28 from source. Two large files
+(`modules` at 142MB and `src.zip` at 52MB) are stored as chunks to comply
+with GitHub's file size limits.
 
 ```bash
-# Create and mount your target partition
+# After cloning, rebuild the large files:
+bash java/boot-jdk-27/lib/chunks/rebuild.sh
+```
+
+## Last Updated
+
+2026-08-02 — Added JWSTF, NWE Gateway, boot-jdk-27 chunks
 mkfs.ext4 /dev/sdXN
 mount /dev/sdXN /mnt/rootfs
 
