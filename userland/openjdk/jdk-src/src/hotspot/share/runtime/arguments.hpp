@@ -149,6 +149,7 @@ class Arguments : AllStatic {
   friend class JvmtiExport;
   friend class ArgumentsTest;
   friend class LargeOptionsTest;
+  friend class XmlConfigReader;
  public:
   // Operation modi
   enum Mode {
@@ -273,8 +274,10 @@ class Arguments : AllStatic {
   static vfprintf_hook_t  _vfprintf_hook;
 
   // System properties
+ public:
   static bool add_property(const char* prop, PropertyWriteable writeable=WriteableProperty,
                            PropertyInternal internal=ExternalProperty);
+ private:
 
   // Used for module system related properties: converted from command-line flags.
   // Basic properties are writeable as they operate as "last one wins" and will get overwritten.
@@ -288,8 +291,10 @@ class Arguments : AllStatic {
   static jint set_aggressive_opts_flags();
 
   // Argument parsing
+ public:
   static bool parse_argument(const char* arg, JVMFlagOrigin origin);
   static bool process_argument(const char* arg, jboolean ignore_unrecognized, JVMFlagOrigin origin);
+ private:
   static void process_java_launcher_argument(const char*, void*);
   static jint parse_options_environment_variable(const char* name, ScopedVMInitArgs* vm_args);
   static jint parse_java_tool_options_environment_variable(ScopedVMInitArgs* vm_args);

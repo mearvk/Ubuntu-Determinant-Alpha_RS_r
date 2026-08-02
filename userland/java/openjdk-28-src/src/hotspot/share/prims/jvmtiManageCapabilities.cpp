@@ -56,7 +56,7 @@ jvmtiCapabilities JvmtiManageCapabilities::onload_solo_remaining_capabilities;
 jvmtiCapabilities JvmtiManageCapabilities::acquired_capabilities;
 
 int JvmtiManageCapabilities::_can_support_virtual_threads_count = 0;
-// VALHALLA: int JvmtiManageCapabilities::_can_support_value_objects_count = 0;
+int JvmtiManageCapabilities::_can_support_value_objects_count = 0;
 
 Mutex* JvmtiManageCapabilities::_capabilities_lock = nullptr;
 
@@ -104,7 +104,6 @@ jvmtiCapabilities JvmtiManageCapabilities::init_always_capabilities() {
   jc.can_generate_resource_exhaustion_heap_events = 1;
   jc.can_generate_resource_exhaustion_threads_events = 1;
   jc.can_support_virtual_threads = 1;
-// VALHALLA:   jc.can_support_value_objects = 1;
   return jc;
 }
 
@@ -278,9 +277,9 @@ jvmtiError JvmtiManageCapabilities::add_capabilities(const jvmtiCapabilities *cu
 
   if (desired->can_support_virtual_threads != 0 && current->can_support_virtual_threads == 0) {
     _can_support_virtual_threads_count++;
+  if (desired->can_support_value_objects != 0 && current->can_support_value_objects == 0) {
+    _can_support_value_objects_count++;
   }
-// VALHALLA:   if (desired->can_support_value_objects != 0 && current->can_support_value_objects == 0) {
-// VALHALLA:     _can_support_value_objects_count++;
   }
 
   // return the result
@@ -314,10 +313,10 @@ void JvmtiManageCapabilities::relinquish_capabilities(const jvmtiCapabilities *c
     assert(_can_support_virtual_threads_count > 0, "sanity check");
     _can_support_virtual_threads_count--;
   }
-// VALHALLA:   if (to_trash.can_support_value_objects != 0) {
-// VALHALLA:     assert(current->can_support_value_objects != 0, "sanity check");
-// VALHALLA:     assert(_can_support_value_objects_count > 0, "sanity check");
-// VALHALLA:     _can_support_value_objects_count--;
+  if (to_trash.can_support_value_objects != 0) {
+    assert(current->can_support_value_objects != 0, "sanity check");
+    assert(_can_support_value_objects_count > 0, "sanity check");
+    _can_support_value_objects_count--;
   }
 
   update();
@@ -403,7 +402,6 @@ void JvmtiManageCapabilities::update() {
   JvmtiExport::set_can_pop_frame(avail.can_pop_frame);
   JvmtiExport::set_can_force_early_return(avail.can_force_early_return);
   JvmtiExport::set_can_support_virtual_threads(_can_support_virtual_threads_count != 0);
-// VALHALLA:   JvmtiExport::set_can_support_value_objects(_can_support_value_objects_count != 0);
   JvmtiExport::set_should_clean_up_heap_objects(avail.can_generate_breakpoint_events);
   JvmtiExport::set_can_get_owned_monitor_info(avail.can_get_owned_monitor_info ||
                                               avail.can_get_owned_monitor_stack_depth_info);
@@ -499,8 +497,6 @@ void JvmtiManageCapabilities:: print(const jvmtiCapabilities* cap) {
     log_trace(jvmti)("can_generate_early_class_hook_events");
   if (cap->can_support_virtual_threads)
     log_trace(jvmti)("can_support_virtual_threads");
-// VALHALLA:   if (cap->can_support_value_objects)
-// VALHALLA:     log_trace(jvmti)("can_support_value_objects");
 }
 
 #endif

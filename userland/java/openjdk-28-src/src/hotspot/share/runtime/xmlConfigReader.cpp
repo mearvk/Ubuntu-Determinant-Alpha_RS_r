@@ -328,7 +328,7 @@ bool xmlConfigReader::apply_entries(GrowableArrayCHeap<xmlConfigEntry*, mtArgume
         }
 
         // Process through the standard flag mechanism
-        if (!Arguments::process_argument(arg, false, JVMFlagOrigin::CONFIG_FILE)) {
+        if (!Arguments::parse_argument(arg, JVMFlagOrigin::CONFIG_FILE)) {
           warning("XML config: failed to apply flag '%s'", arg);
           result = false;
         }
@@ -339,7 +339,7 @@ bool xmlConfigReader::apply_entries(GrowableArrayCHeap<xmlConfigEntry*, mtArgume
         // Add as -D property
         char prop[1024];
         snprintf(prop, sizeof(prop), "%s=%s", entry->_name, entry->_value);
-        Arguments::add_property(prop, UnwriteableProperty, InternalProperty);
+        Arguments::add_property(prop, Arguments::UnwriteableProperty, Arguments::InternalProperty);
         break;
       }
 
