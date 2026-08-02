@@ -125,6 +125,7 @@ deps:
 		libxrender-dev libxrandr-dev libxi-dev libxtst-dev \
 		libxinerama-dev libxcomposite-dev libxdamage-dev libxfixes-dev \
 		libxcursor-dev libxss-dev libxxf86vm-dev \
+		libxmu-dev libxt-dev libsm-dev libice-dev \
 		xmlto xsltproc fop \
 		autoconf automake libtool \
 		cmake rustc cargo libjson-c-dev libncurses-dev \

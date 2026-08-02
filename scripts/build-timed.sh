@@ -112,9 +112,43 @@ run_timed() {
 }
 
 # ==============================================================================
+# Clean stale build artifacts for a phase
+# ==============================================================================
+clean_phase() {
+    local phase="$1"
+    echo -e "${YELLOW}[CLEAN]${NC} Removing stale build artifacts for: $phase"
+
+    case "$phase" in
+        x11)
+            rm -rf "$PROJECT_DIR/userland/x11/_build/xorg-server-21.1.24"
+            rm -f  "$PROJECT_DIR/userland/x11/_build/.stamps/xorg-server"
+            ;;
+        kernel)
+            # Kernel incremental build is safe; no clean needed
+            ;;
+        tools)
+            # Tools are small; no clean needed
+            ;;
+        rootfs)
+            rm -rf "$PROJECT_DIR/build/rootfs"
+            ;;
+        iso)
+            rm -f "$PROJECT_DIR/build/"*.iso
+            ;;
+        all)
+            rm -rf "$PROJECT_DIR/userland/x11/_build/xorg-server-21.1.24"
+            rm -f  "$PROJECT_DIR/userland/x11/_build/.stamps/xorg-server"
+            rm -rf "$PROJECT_DIR/build/rootfs"
+            rm -f  "$PROJECT_DIR/build/"*.iso
+            ;;
+    esac
+}
+
+# ==============================================================================
 # Phase: Kernel modules only (just the custom .ko files)
 # ==============================================================================
 do_modules() {
+    clean_phase "kernel"
     run_timed "Kernel Modules (custom extensions)" \
         "make -C '$KERNEL_DIR' modules -j$NPROC"
 }
@@ -123,6 +157,7 @@ do_modules() {
 # Phase: Full kernel build (vmlinuz + all modules)
 # ==============================================================================
 do_kernel() {
+    clean_phase "kernel"
     run_timed "Kernel (full build: vmlinuz + modules)" \
         "make -C '$KERNEL_DIR' -j$NPROC"
 }
@@ -131,6 +166,7 @@ do_kernel() {
 # Phase: Userspace tools
 # ==============================================================================
 do_tools() {
+    clean_phase "tools"
     run_timed "Tools (sudo_gate, chat, nnet, negamane)" \
         "make -C '$PROJECT_DIR' tools"
 }
@@ -139,6 +175,7 @@ do_tools() {
 # Phase: X11
 # ==============================================================================
 do_x11() {
+    clean_phase "x11"
     run_timed "X11 (X.Org Server + libraries)" \
         "make -C '$PROJECT_DIR' x11"
 }
@@ -147,6 +184,7 @@ do_x11() {
 # Phase: Root filesystem assembly
 # ==============================================================================
 do_rootfs() {
+    clean_phase "rootfs"
     run_timed "Root Filesystem Assembly" \
         "make -C '$PROJECT_DIR' rootfs-full"
 }
@@ -155,6 +193,7 @@ do_rootfs() {
 # Phase: ISO generation
 # ==============================================================================
 do_iso() {
+    clean_phase "iso"
     run_timed "ISO Generation (bootable image)" \
         "make -C '$PROJECT_DIR' iso"
 }

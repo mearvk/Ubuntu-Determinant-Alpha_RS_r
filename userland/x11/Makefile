@@ -271,7 +271,8 @@ $(STAMPS)/xorg-server: $(XSERVER_TAR) $(STAMPS)/libXrender $(STAMPS)/pixman $(ST
 	LDFLAGS="-L$(BUILD)/sysroot/usr/lib -Wl,-rpath-link,$(BUILD)/sysroot/usr/lib" \
 	meson setup build --prefix=$(PREFIX) --libdir=lib \
 		-Dxorg=true -Dxephyr=false -Dxnest=false \
-		-Dxvfb=true -Dxwin=false -Ddocs=false && \
+		-Dxvfb=true -Dxwin=false \
+		-Ddocs=false -Ddevel-docs=false -Ddocs-pdf=false && \
 	DESTDIR=$(SYSROOT) ninja -C build install
 	@touch $@
 
