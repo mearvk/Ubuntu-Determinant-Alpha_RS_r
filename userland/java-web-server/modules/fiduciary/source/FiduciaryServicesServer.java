@@ -91,7 +91,7 @@ public class FiduciaryServicesServer implements Runnable {
             client.setSoTimeout(300_000);
             out.println("FiduciaryServices\u2122 \u2014 Global Transfer Wealth & Architecture");
             out.println("The balance of internal design and remedy. The means to necessary advantages.");
-            out.println("Commands: ASK|<q>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<kw>, POLYBLEND, DATAPOOL|<src>, HELP, QUIT");
+            out.println("Commands: ASK|<q>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<kw>, POLYBLEND, DATAPOOL|<src>, DOCUMENTS|<category>, BRIGHT|<keyword>, TREASURE|<keyword>, HELP, QUIT");
             out.println();
 
             String line;
@@ -99,13 +99,16 @@ public class FiduciaryServicesServer implements Runnable {
                 line = line.trim();
                 if (line.equalsIgnoreCase("QUIT")) { out.println("Trust well, steward carefully. Farewell."); break; }
                 if (line.equalsIgnoreCase("STATUS")) { out.println("OK|port=" + PORT + "|db=nwe_fiduciary|module=FiduciaryServices"); continue; }
-                if (line.equalsIgnoreCase("HELP")) { out.println("HELP|ASK|<question>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<keyword>, POLYBLEND, DATAPOOL|<source>, STATUS, QUIT"); continue; }
+                if (line.equalsIgnoreCase("HELP")) { out.println("HELP|ASK|<question>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<keyword>, POLYBLEND, DATAPOOL|<source>, DOCUMENTS|<category>, BRIGHT|<keyword>, TREASURE|<keyword>, STATUS, QUIT"); continue; }
                 if (line.equalsIgnoreCase("POLYBLEND")) { out.println(computePolyblend()); continue; }
                 if (line.startsWith("ASK|")) { out.println(askQuestion(line.substring(4).trim())); continue; }
                 if (line.startsWith("YIELD|")) { out.println(queryYield(line.substring(6).trim())); continue; }
                 if (line.startsWith("ARCHITECTURE|")) { out.println(queryArchitecture(line.substring(13).trim())); continue; }
                 if (line.startsWith("RECORDS|")) { out.println(queryRecords(line.substring(8).trim())); continue; }
                 if (line.startsWith("DATAPOOL|")) { out.println(queryDatapool(line.substring(9).trim())); continue; }
+                if (line.startsWith("DOCUMENTS|")) { out.println(queryDocuments(line.substring(10).trim())); continue; }
+                if (line.startsWith("BRIGHT|")) { out.println(queryLegalBright(line.substring(7).trim())); continue; }
+                if (line.startsWith("TREASURE|")) { out.println(queryTreasureFiduciary(line.substring(9).trim())); continue; }
                 out.println(askQuestion(line));
             }
         } catch (Exception ignored) {}
@@ -218,6 +221,88 @@ public class FiduciaryServicesServer implements Runnable {
         if (s.contains("court") || s.contains("case")) return "DATAPOOL|Court databases: PACER (US federal courts), BAILII (UK/Ireland), Caselaw Access Project (Harvard). Breach of fiduciary case law. Ports 80/443.";
         if (s.contains("central bank") || s.contains("fed")) return "DATAPOOL|Central banks: Federal Reserve FRED (https://fred.stlouisfed.org), Bank of England, ECB Statistical Warehouse. Monetary policy data. Port 443.";
         return "DATAPOOL|Available sources: SEC EDGAR, OECD, World Bank, Companies House UK, Court databases, Central banks. Query a specific source for details.";
+    }
+
+    private String queryDocuments(String keyword) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            PreparedStatement ps = conn.prepareStatement(
+                "SELECT title, category, label, jurisdiction, LEFT(document_text, 500) AS excerpt, source_authority, confidence "
+                + "FROM original_documents WHERE title LIKE ? OR document_text LIKE ? OR category LIKE ? OR label LIKE ? "
+                + "ORDER BY confidence DESC LIMIT 3");
+            ps.setString(1, "%" + keyword + "%");
+            ps.setString(2, "%" + keyword + "%");
+            ps.setString(3, "%" + keyword + "%");
+            ps.setString(4, "%" + keyword + "%");
+            ResultSet rs = ps.executeQuery();
+            StringBuilder sb = new StringBuilder("DOCUMENTS|");
+            while (rs.next()) {
+                sb.append("[").append(rs.getString("category")).append("|")
+                  .append(rs.getString("label")).append("] ")
+                  .append(rs.getString("title")).append(" (")
+                  .append(rs.getString("jurisdiction") != null ? rs.getString("jurisdiction") : "N/A")
+                  .append(") confidence=").append(rs.getInt("confidence")).append("% — ")
+                  .append(rs.getString("excerpt")).append("|");
+            }
+            return sb.length() > 10 ? sb.toString() : "DOCUMENTS|No documents found for: " + keyword + ". Categories: MINISTER, INTERNATIONAL, COUNTY, GENTRY_HERO, STANDINGS, WINNERS, AHEAD, LEGAL_BRIGHT";
+        } catch (Exception e) { return "ERROR|" + e.getMessage(); }
+    }
+
+    private String queryLegalBright(String keyword) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            PreparedStatement ps = conn.prepareStatement(
+                "SELECT calendar_half, entry_name, concern_type, LEFT(description, 400) AS excerpt, benefit_to, "
+                + "nuisance_resolution, LEFT(council_note, 200) AS council "
+                + "FROM legal_bright WHERE entry_name LIKE ? OR description LIKE ? OR concern_type LIKE ? "
+                + "OR ideals LIKE ? OR council_note LIKE ? ORDER BY confidence DESC LIMIT 3");
+            ps.setString(1, "%" + keyword + "%");
+            ps.setString(2, "%" + keyword + "%");
+            ps.setString(3, "%" + keyword + "%");
+            ps.setString(4, "%" + keyword + "%");
+            ps.setString(5, "%" + keyword + "%");
+            ResultSet rs = ps.executeQuery();
+            StringBuilder sb = new StringBuilder("BRIGHT|");
+            while (rs.next()) {
+                sb.append("[").append(rs.getString("calendar_half")).append("|")
+                  .append(rs.getString("concern_type")).append("] ")
+                  .append(rs.getString("entry_name"))
+                  .append(" — Benefit: ").append(rs.getString("benefit_to") != null ? rs.getString("benefit_to") : "—")
+                  .append(" — ").append(rs.getString("excerpt"));
+                if (rs.getString("nuisance_resolution") != null)
+                    sb.append(" [Resolution: ").append(rs.getString("nuisance_resolution")).append("]");
+                if (rs.getString("council") != null)
+                    sb.append(" [Council: ").append(rs.getString("council")).append("]");
+                sb.append("|");
+            }
+            return sb.length() > 7 ? sb.toString() : "BRIGHT|No Legal Bright entries for: " + keyword + ". Try: ideal, total, nuisance, council, treasure, try, county, personal interest, INT, IQ";
+        } catch (Exception e) { return "ERROR|" + e.getMessage(); }
+    }
+
+    private String queryTreasureFiduciary(String keyword) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS)) {
+            PreparedStatement ps = conn.prepareStatement(
+                "SELECT law_structure, approach_type, treasure_class, fiduciary_standing, "
+                + "LEFT(evidence_basis, 300) AS evidence, LEFT(profitable_idea, 200) AS idea, "
+                + "LEFT(council_resolution, 200) AS council "
+                + "FROM treasure_fiduciary WHERE law_structure LIKE ? OR evidence_basis LIKE ? "
+                + "OR profitable_idea LIKE ? OR council_resolution LIKE ? ORDER BY confidence DESC LIMIT 3");
+            ps.setString(1, "%" + keyword + "%");
+            ps.setString(2, "%" + keyword + "%");
+            ps.setString(3, "%" + keyword + "%");
+            ps.setString(4, "%" + keyword + "%");
+            ResultSet rs = ps.executeQuery();
+            StringBuilder sb = new StringBuilder("TREASURE|");
+            while (rs.next()) {
+                sb.append("[").append(rs.getString("approach_type")).append("|")
+                  .append(rs.getString("treasure_class") != null ? rs.getString("treasure_class") : "—").append("] ")
+                  .append(rs.getString("law_structure"))
+                  .append(" — Standing: ").append(rs.getString("fiduciary_standing") != null ? rs.getString("fiduciary_standing") : "—")
+                  .append(" — Idea: ").append(rs.getString("idea") != null ? rs.getString("idea") : "—");
+                if (rs.getString("council") != null)
+                    sb.append(" [Council: ").append(rs.getString("council")).append("]");
+                sb.append("|");
+            }
+            return sb.length() > 9 ? sb.toString() : "TREASURE|No Treasure Fiduciary entries for: " + keyword + ". Try: trust, corporate, county, international, nuisance, venture, evident";
+        } catch (Exception e) { return "ERROR|" + e.getMessage(); }
     }
 
     private void storeSession(String question, String answer) {

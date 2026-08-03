@@ -140,6 +140,65 @@ static void create_tables(MYSQL *conn)
         "  answer TEXT,"
         "  session_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS original_documents ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  title VARCHAR(512) NOT NULL,"
+        "  category VARCHAR(64) NOT NULL,"
+        "  subcategory VARCHAR(64),"
+        "  jurisdiction VARCHAR(128),"
+        "  label VARCHAR(64) DEFAULT 'DOMESTIC',"
+        "  document_text TEXT NOT NULL,"
+        "  source_url VARCHAR(512),"
+        "  source_authority VARCHAR(256),"
+        "  retrieval_date DATE DEFAULT (CURRENT_DATE),"
+        "  confidence INT DEFAULT 85,"
+        "  relevance_to_minister TINYINT DEFAULT 0,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  INDEX idx_category (category),"
+        "  INDEX idx_label (label),"
+        "  INDEX idx_jurisdiction (jurisdiction)"
+        ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS legal_bright ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  calendar_half ENUM('TOP','BOTTOM') NOT NULL,"
+        "  entry_name VARCHAR(256) NOT NULL,"
+        "  concern_type VARCHAR(64) NOT NULL,"
+        "  description TEXT NOT NULL,"
+        "  ideals TEXT,"
+        "  totals TEXT,"
+        "  benefit_to VARCHAR(128),"
+        "  approach_authority VARCHAR(128),"
+        "  nuisance_resolution VARCHAR(256),"
+        "  council_note TEXT,"
+        "  confidence INT DEFAULT 85,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  INDEX idx_half (calendar_half),"
+        "  INDEX idx_concern (concern_type)"
+        ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS treasure_fiduciary ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  law_structure VARCHAR(256) NOT NULL,"
+        "  evidence_basis TEXT NOT NULL,"
+        "  approach_type ENUM('DIRECT','COUNCIL','TRY','RESOLUTION') NOT NULL,"
+        "  treasure_class VARCHAR(64),"
+        "  fiduciary_standing VARCHAR(128),"
+        "  nuisance_type VARCHAR(64),"
+        "  nuisance_resolution TEXT,"
+        "  profitable_idea TEXT,"
+        "  try_nuisance TEXT,"
+        "  council_resolution TEXT,"
+        "  jurisdiction VARCHAR(128),"
+        "  confidence INT DEFAULT 85,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  INDEX idx_approach (approach_type),"
+        "  INDEX idx_treasure_class (treasure_class)"
+        ")");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -357,11 +416,89 @@ static int query_knowledge(MYSQL *conn, const char *input, char *response, int m
         if (res) mysql_free_result(res);
     }
 
+    /* Try original documents (minister, international, county, gentry, standings, winners, ahead) */
+    snprintf(query, sizeof(query),
+        "SELECT title, category, label, jurisdiction, document_text, source_authority, confidence FROM original_documents "
+        "WHERE title LIKE '%%%s%%' OR document_text LIKE '%%%s%%' OR category LIKE '%%%s%%' "
+        "ORDER BY confidence DESC LIMIT 2",
+        escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "Original documents:\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 400) {
+                n = snprintf(p, remaining, "  [%s|%s] %s (%s)\n  Jurisdiction: %s | Confidence: %s%%\n  %.500s...\n\n",
+                    row[1], row[2], row[0], row[5] ? row[5] : "internal", row[3] ? row[3] : "N/A", row[6],
+                    row[4] ? row[4] : "");
+                p += n; remaining -= n;
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
+    /* Try Legal Bright — INT/IQ Calendar */
+    snprintf(query, sizeof(query),
+        "SELECT calendar_half, entry_name, concern_type, description, ideals, totals, benefit_to, nuisance_resolution, council_note "
+        "FROM legal_bright WHERE entry_name LIKE '%%%s%%' OR description LIKE '%%%s%%' OR concern_type LIKE '%%%s%%' "
+        "OR ideals LIKE '%%%s%%' OR council_note LIKE '%%%s%%' ORDER BY confidence DESC LIMIT 2",
+        escaped, escaped, escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "Legal Bright (INT/IQ Calendar):\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 400) {
+                n = snprintf(p, remaining, "  [%s HALF|%s] %s\n  Benefit: %s\n  %.400s\n",
+                    row[0], row[2], row[1], row[6] ? row[6] : "—", row[3] ? row[3] : "");
+                p += n; remaining -= n;
+                if (row[7] && remaining > 100) { n = snprintf(p, remaining, "  Nuisance Resolution: %s\n", row[7]); p += n; remaining -= n; }
+                if (row[8] && remaining > 100) { n = snprintf(p, remaining, "  Council: %.200s\n", row[8]); p += n; remaining -= n; }
+                if (remaining > 2) { n = snprintf(p, remaining, "\n"); p += n; remaining -= n; }
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
+    /* Try Treasure Fiduciary — Law Structure Approach */
+    snprintf(query, sizeof(query),
+        "SELECT law_structure, approach_type, treasure_class, fiduciary_standing, evidence_basis, "
+        "profitable_idea, nuisance_resolution, council_resolution FROM treasure_fiduciary "
+        "WHERE law_structure LIKE '%%%s%%' OR evidence_basis LIKE '%%%s%%' OR profitable_idea LIKE '%%%s%%' "
+        "OR council_resolution LIKE '%%%s%%' ORDER BY confidence DESC LIMIT 2",
+        escaped, escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "Treasure Fiduciary — Law Structure Approach:\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 400) {
+                n = snprintf(p, remaining, "  [%s] %s (%s)\n  Standing: %s\n  Profitable Idea: %.200s\n",
+                    row[1], row[0], row[2] ? row[2] : "—", row[3] ? row[3] : "—", row[5] ? row[5] : "—");
+                p += n; remaining -= n;
+                if (row[7] && remaining > 100) { n = snprintf(p, remaining, "  Council Resolution: %.200s\n", row[7]); p += n; remaining -= n; }
+                if (remaining > 2) { n = snprintf(p, remaining, "\n"); p += n; remaining -= n; }
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
     snprintf(response, maxlen,
         "I don't have specific information on that yet. Try asking about: "
         "fiduciary duty, global transfer wealth, yield and turn, trust types, "
         "architectures, sovereign wealth funds, prudent investor rule, "
         "fiduciary centers, polyblend assumption, remedy, or advantage. "
+        "Also: minister, international, county, gentry, standings, winners, ahead, "
+        "legal bright, treasure fiduciary, nuisance, council, try, calendar. "
         "Type 'help' for full topic list.");
     return 0;
 }
@@ -407,7 +544,22 @@ static void print_help(void)
     printf("  ADVANTAGE:     tax efficiency, compounding, institutional pricing\n");
     printf("  RECORDS:       sovereign wealth funds, pension funds, major fiduciaries\n");
     printf("  STANDARDS:     prudent investor, ERISA, Santiago Principles, Hague\n");
-    printf("  DATAPOOL:      SEC EDGAR, Companies House, OECD, World Bank, courts\n" C_RESET);
+    printf("  DATAPOOL:      SEC EDGAR, Companies House, OECD, World Bank, courts\n");
+    printf(C_GOLD "\n  ─── ORIGINAL DOCUMENTS (minister_fiduciary_facts.sql) ───\n" C_RESET);
+    printf(C_WHITE "  MINISTER:      minister fiduciary duty, ongoing corporate, conflict\n");
+    printf("  INTERNATIONAL: Hague Convention, UNIDROIT, Santiago, sovereign, cross-border\n");
+    printf("  COUNTY:        legislature, tax evidence, public trust, elected officials\n");
+    printf("  GENTRY_HERO:   stewardship, intervention, Keech v Sandford, Cardozo\n");
+    printf("  STANDINGS:     constitutional standing, Thole, shield doctrine, equity\n");
+    printf("  WINNERS:       Ivanishvili $742M, Mendell, Asaro, Norway, Keech\n");
+    printf("  AHEAD:         forward position, digital age, county future, next winners\n" C_RESET);
+    printf(C_GOLD "\n  ─── LEGAL BRIGHT (legal_bright_iq_calendar.sql) ───\n" C_RESET);
+    printf(C_WHITE "  TOP HALF:      personal interest, county benefit, ideals, totals, INT, IQ\n");
+    printf("  BOTTOM HALF:   treasure fiduciary, evident approach, state nuisance\n");
+    printf("  TREASURE:      law structure approach, evidence, standing, capability\n");
+    printf("  NUISANCE:      state nuisance, try-nuisance, council resolution\n");
+    printf("  TRY:           profitable ideas, try authority, venture, attempt\n");
+    printf("  COUNCIL:       deliberation, wisdom, resolution, able, usual path\n" C_RESET);
     printf(C_DIM "\n  Commands: help, yield, architecture, records, quit\n" C_RESET);
     printf("\n");
 }
