@@ -14,7 +14,7 @@
 </head><body>
 <nav class="nav"><div class="nav-inner"><span class="nav-brand">Gray85 Crème™</span>
 <ul class="nav-links"><li><a href="index.jsp" class="active">Overview</a></li><li><a href="leases.jsp">Leases</a></li><li><a href="bindings.jsp">Bindings</a></li><li><a href="creme.jsp">Crème</a></li><li><a href="status.jsp">Status</a></li></ul>
-</div></nav>
+<div class="nav-actions"><%@ include file="auth-buttons.jsp" %></div></div></nav>
 <section class="hero"><div class="hero-inner"><span class="hero-tag">Planetary Auditor Control</span>
 <h1>Gray85 Crème Registry™</h1><p>85% open ports ($10 lease) + 15% Crème-locked ($1000/unlock/hour). Planetary auditor control layer. Port 10085.</p></div></section>
 <!-- CD1 Connector Button + Floating Dialog (BMA Template) -->

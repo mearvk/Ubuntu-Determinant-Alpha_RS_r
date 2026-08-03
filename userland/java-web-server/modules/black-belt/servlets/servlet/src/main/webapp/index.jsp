@@ -24,7 +24,7 @@
 </head><body>
 <nav class="nav"><div class="nav-inner"><span class="nav-brand">Black Belt™</span>
 <ul class="nav-links"><li><a href="index.jsp" class="active">Overview</a></li><li><a href="ask.jsp">Ask</a></li><li><a href="belts.jsp">Belt Ranks</a></li><li><a href="history.jsp">History</a></li></ul>
-</div></nav>
+<div class="nav-actions"><%@ include file="auth-buttons.jsp" %></div></div></nav>
 <section class="hero"><div class="hero-inner"><span class="hero-tag">Discipline · Mastery · Methodology</span>
 <h1>Black Belt</h1><p>Systems design methodology built on progressive mastery. Each belt represents a level of understanding, responsibility, and IQ requirement. Ask questions about the methodology below.</p></div></section>
 <div style="text-align:center;padding:0.5rem;font-size:0.7rem;color:<%= authorized ? "#22c55e" : "#dc2626" %>;"><%= authMsg %></div>

@@ -20,7 +20,7 @@
         <li><a href="request.jsp">Request</a></li>
         <li><a href="status.jsp">Status</a></li>
     </ul>
-</div></nav>
+<div class="nav-actions"><%@ include file="auth-buttons.jsp" %></div></div></nav>
 
 <section class="hero">
     <div class="hero-inner">

@@ -14,7 +14,7 @@
 </head><body>
 <nav class="nav"><div class="nav-inner"><span class="nav-brand">GrayPortRegistry™</span>
 <ul class="nav-links"><li><a href="index.jsp" class="active">Overview</a></li><li><a href="leases.jsp">Leases</a></li><li><a href="bindings.jsp">Bindings</a></li><li><a href="status.jsp">Status</a></li></ul>
-</div></nav>
+<div class="nav-actions"><%@ include file="auth-buttons.jsp" %></div></div></nav>
 <section class="hero"><div class="hero-inner"><span class="hero-tag">Installer ID Tech™</span>
 <h1>GrayPortRegistry™</h1><p>30,000,000 port block leasing via Bitcoin or Dashcoin. $10 USD minimum donation. 1000 blocks available. Port 9999.</p></div></section>
 <!-- CD1 Connector Button + Floating Dialog (BMA Template) -->

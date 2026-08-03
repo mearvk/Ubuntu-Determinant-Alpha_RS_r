@@ -198,6 +198,30 @@ MODULES = {
         "description": "CalendarD44™ scheduling engine. Date routing, interaction logging, scheduled delivery, timezone support.",
         "installer_tech_id": "Max Rupplin",
     },
+    # ── TandemEquals™ — White/Red Module (Saimptom Resolution) ─────────────────
+    "tandem-equals": {
+        "path": "modules/tandem-equals/servlets/servlet/src/main/webapp",
+        "theme": "White Red",
+        "port": 49223,
+        "description": "TandemEquals™ — Outward dilemma resolution via 42x42 saimptom matrix. Stereo mind recovery in ~12 answers. CHOICE + EQUAL NOISE + province wisdom. Kernel-aligned.",
+        "installer_tech_id": "Max Rupplin",
+    },
+    # ── Analytics™ — GitHub Dark Module (Traffic Graphs) ────────────────────────
+    "analytics": {
+        "path": "modules/analytics/servlets/servlet/src/main/webapp",
+        "theme": "GitHub Dark",
+        "port": None,
+        "description": "Analytics™ — GitHub-style traffic graphs. Page views, unique visitors, uploads, new users, referrers, popular content. Chart.js + MySQL.",
+        "installer_tech_id": "Max Rupplin",
+    },
+    # ── Dictionary™ — Dark Scholarly / Gold Module ────────────────────────────
+    "dictionary": {
+        "path": "modules/dictionary/servlets/servlet/src/main/webapp",
+        "theme": "Scholarly Gold",
+        "port": None,
+        "description": "Dictionary™ — Defines all rare, new, or system-specific terms (dolyene, saimptom, negamane, etc.). 12 domains, 25+ terms.",
+        "installer_tech_id": "Max Rupplin",
+    },
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -239,6 +263,8 @@ tr:hover { background: #1a1a1a; }
 .cyan { background: #042f2e; color: #06b6d4; border: 1px solid #0e4f4e; }
 .bitcoin-orange { background: #1a1610; color: #f7931a; border: 1px solid #3d3528; }
 .fall-colors { background: #1c1610; color: #ea580c; border: 1px solid #4a3828; }
+.github-dark { background: #0d1117; color: #58a6ff; border: 1px solid #30363d; }
+.scholarly-gold { background: #0c0c10; color: #d4af37; border: 1px solid #2a2a3a; }
 .section { margin: 1rem 0; padding: 1rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; }
 .affirmation { color: #d4af37; font-style: italic; margin: 1rem 0; padding: 1rem; border-left: 3px solid #d4af37; }
 code { background: #222; padding: 2px 6px; border-radius: 3px; font-size: 0.9rem; }
@@ -407,6 +433,8 @@ index_html += """</tbody></table>
 <tr><td>SpectrumTandem™</td><td><a href="http://localhost:8080/spectrum-tandem/">http://localhost:8080/spectrum-tandem/</a></td><td><span class="theme-badge white-red">White Red</span></td><td>49222</td></tr>
 <tr><td>Communicator™</td><td><a href="http://localhost:8080/chat/">http://localhost:8080/chat/</a></td><td><span class="theme-badge deep-blue">Deep Blue</span></td><td>49230</td></tr>
 <tr><td>UNCW™</td><td><a href="http://localhost:8080/uncw/">http://localhost:8080/uncw/</a></td><td><span class="theme-badge seacoast-teal">SeaCoast Teal</span></td><td>49231</td></tr>
+<tr><td>TandemEquals™</td><td><a href="http://localhost:8080/tandem-equals/">http://localhost:8080/tandem-equals/</a></td><td><span class="theme-badge white-red">White Red</span></td><td>49223</td></tr>
+<tr><td>Analytics™</td><td><a href="http://localhost:8080/analytics/">http://localhost:8080/analytics/</a></td><td><span class="theme-badge github-dark">GitHub Dark</span></td><td>—</td></tr>
 </tbody></table>
 </div>
 
@@ -546,6 +574,8 @@ print(f"""
 ║    http://localhost:8080/spectrum-tandem/  (White Red — port 49222)      ║
 ║    http://localhost:8080/chat/             (Deep Blue — 49230)    ║
 ║    http://localhost:8080/uncw/             (SeaCoast Teal — port 49231)  ║
+║    http://localhost:8080/tandem-equals/   (White Red — port 49223)      ║
+║    http://localhost:8080/analytics/       (GitHub Dark — traffic)       ║
 ║    http://localhost:8080/gray-registry/    (Gray — port 9999)            ║
 ║    http://localhost:8080/gray85-registry/  (Crème — port 10085)          ║
 ║    http://localhost:8080/gdgh/             (Green — port 20000)          ║
@@ -566,6 +596,8 @@ print(f"""
 ║    http://localhost:{PORT}/spectrum-tandem/ (SpectrumTandem White/Red)      ║
 ║    http://localhost:{PORT}/chat/           (Communicator™ Deep Blue)          ║
 ║    http://localhost:{PORT}/uncw/           (UNCW SeaCoast Teal/Gold)        ║
+║    http://localhost:{PORT}/tandem-equals/  (TandemEquals™ White/Red)        ║
+║    http://localhost:{PORT}/analytics/      (Analytics GitHub Dark)           ║
 ║                                                                           ║
 ║  NOTE: JSP scriptlets show as raw text. CSS/JS/layout works normally.     ║
 ║  Press Ctrl+C to stop.                                                    ║
