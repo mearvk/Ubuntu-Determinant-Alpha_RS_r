@@ -47,6 +47,15 @@
         <p>Lux Libertas. The Tar Heels. America's first public university (1789). 14 schools, 30,000+ students. AI-assisted academic queries via Strernary™. Chapel Hill, North Carolina.</p>
     </div>
 </section>
+
+<div style="display:flex;justify-content:center;gap:1.5rem;padding:1rem 0;flex-wrap:wrap;">
+    <a href="index.jsp" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#0f1d30;border:1px solid #1e3a5f;color:#8fafc8;font-size:0.85rem;text-decoration:none;font-weight:500;">
+        <span style="color:#22c55e;">&#9679;</span> Local Page (This Server)
+    </a>
+    <a href="https://www.unc.edu" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#4B9CD3;border:1px solid #7BB8E0;color:#fff;font-size:0.85rem;text-decoration:none;font-weight:600;">
+        &#127891; Visit unc.edu &#8594;
+    </a>
+</div>
 <div style="text-align:center;padding:0.5rem;font-size:0.7rem;color:<%= authorized ? "#22c55e" : "#dc2626" %>;"><%= authMsg %></div>
 
 

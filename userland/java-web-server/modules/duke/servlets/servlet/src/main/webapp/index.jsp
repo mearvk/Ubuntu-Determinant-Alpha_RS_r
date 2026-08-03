@@ -31,6 +31,15 @@
     </div>
 </section>
 
+<div style="display:flex;justify-content:center;gap:1.5rem;padding:1rem 0;flex-wrap:wrap;">
+    <a href="index.jsp" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#1a1a2e;border:1px solid #27272a;color:#a1a1aa;font-size:0.85rem;text-decoration:none;font-weight:500;">
+        <span style="color:#22c55e;">&#9679;</span> Local Page (This Server)
+    </a>
+    <a href="https://www.duke.edu" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#001A57;border:1px solid #003087;color:#fff;font-size:0.85rem;text-decoration:none;font-weight:600;">
+        &#127891; Visit duke.edu &#8594;
+    </a>
+</div>
+
 <!-- CD1 Connector Button + Floating Dialog (BMA Template) -->
 <div style="display:flex;justify-content:center;align-items:center;width:100%;padding:2rem 0;">
     <button id="cd1-btn" type="button" aria-pressed="false" style="all:unset;display:block;margin:0 auto;cursor:pointer;padding:0;border:none;background:transparent;transition:transform 0.3s cubic-bezier(0.42,-1.84,0.42,1.84),filter 0.3s ease;">
@@ -104,6 +113,10 @@
             <tr><td>Protocol</td><td><code>NWE-DUKE</code></td></tr>
             <tr><td>Database</td><td><code>nwe_duke</code> (MySQL)</td></tr>
             <tr><td>AI Inference</td><td><code>Strernary™ port 20000</code></td></tr>
+            <tr><td>University URL</td><td><a href="https://www.duke.edu" target="_blank">duke.edu</a></td></tr>
+            <tr><td>Location</td><td>Durham, North Carolina</td></tr>
+            <tr><td>Founded</td><td>1838 (Trinity College); 1924 (Duke University)</td></tr>
+            <tr><td>Enrollment</td><td>17,000+ students</td></tr>
             <tr><td>Installer ID Tech™</td><td>Required for table writes</td></tr>
         </tbody></table></div>
     </div>

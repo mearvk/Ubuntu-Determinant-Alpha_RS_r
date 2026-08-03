@@ -47,6 +47,15 @@
         <p>Think and Do. The Wolfpack. 12 colleges, 37,000+ students. AI-assisted academic queries via Strernary™. Raleigh, North Carolina.</p>
     </div>
 </section>
+
+<div style="display:flex;justify-content:center;gap:1.5rem;padding:1rem 0;flex-wrap:wrap;">
+    <a href="index.jsp" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#220000;border:1px solid #4d1a1a;color:#bb9999;font-size:0.85rem;text-decoration:none;font-weight:500;">
+        <span style="color:#22c55e;">&#9679;</span> Local Page (This Server)
+    </a>
+    <a href="https://www.ncsu.edu" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.2rem;border-radius:8px;background:#CC0000;border:1px solid #ff3333;color:#fff;font-size:0.85rem;text-decoration:none;font-weight:600;">
+        &#127891; Visit ncsu.edu &#8594;
+    </a>
+</div>
 <div style="text-align:center;padding:0.5rem;font-size:0.7rem;color:<%= authorized ? "#22c55e" : "#dc2626" %>;"><%= authMsg %></div>
 
 
