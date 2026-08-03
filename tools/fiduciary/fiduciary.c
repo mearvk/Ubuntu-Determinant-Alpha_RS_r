@@ -199,6 +199,47 @@ static void create_tables(MYSQL *conn)
         "  INDEX idx_approach (approach_type),"
         "  INDEX idx_treasure_class (treasure_class)"
         ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS ai_findings_order ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  ordinal INT NOT NULL,"
+        "  finding_level VARCHAR(128) NOT NULL,"
+        "  description TEXT NOT NULL,"
+        "  scope VARCHAR(64) NOT NULL,"
+        "  openness ENUM('OPEN','CLOSED','CAREFUL','SOLD') NOT NULL,"
+        "  relation_to_person ENUM('CLOSED','OPEN_CONDUCT','NOT_UNTO_PERSON','ANNALS_FOREVER') NOT NULL,"
+        "  evidentiary_weight INT DEFAULT 85,"
+        "  garden_news_applicable TINYINT DEFAULT 0,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  INDEX idx_ordinal (ordinal)"
+        ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS garden_news_doctrine ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  principle_name VARCHAR(256) NOT NULL,"
+        "  doctrine_text TEXT NOT NULL,"
+        "  person_status ENUM('CLOSED','PROTECTED','CAREFUL') NOT NULL DEFAULT 'CLOSED',"
+        "  evidence_status ENUM('OPEN','SOLD','ANNALS','FOREVER') NOT NULL DEFAULT 'OPEN',"
+        "  conduct_type VARCHAR(64),"
+        "  relation_to_truth TINYINT DEFAULT 1,"
+        "  relation_to_life TINYINT DEFAULT 1,"
+        "  relation_to_history TINYINT DEFAULT 1,"
+        "  confidence INT DEFAULT 90,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")");
+
+    mysql_query(conn,
+        "CREATE TABLE IF NOT EXISTS ai_disposition ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  attribute_name VARCHAR(128) NOT NULL,"
+        "  attribute_value TEXT NOT NULL,"
+        "  category VARCHAR(64) NOT NULL,"
+        "  confidence INT DEFAULT 90,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  INDEX idx_category (category)"
+        ")");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -492,13 +533,82 @@ static int query_knowledge(MYSQL *conn, const char *input, char *response, int m
         if (res) mysql_free_result(res);
     }
 
+    /* Try AI Findings Order */
+    snprintf(query, sizeof(query),
+        "SELECT ordinal, finding_level, scope, openness, relation_to_person, description "
+        "FROM ai_findings_order WHERE finding_level LIKE '%%%s%%' OR description LIKE '%%%s%%' "
+        "OR scope LIKE '%%%s%%' ORDER BY ordinal ASC LIMIT 3",
+        escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "AI Findings Order (200 IQ):\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 300) {
+                n = snprintf(p, remaining, "  %s. %s [%s|%s|person:%s]\n  %.300s\n\n",
+                    row[0], row[1], row[3], row[2], row[4], row[5] ? row[5] : "");
+                p += n; remaining -= n;
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
+    /* Try Garden News Doctrine */
+    snprintf(query, sizeof(query),
+        "SELECT principle_name, person_status, evidence_status, conduct_type, doctrine_text "
+        "FROM garden_news_doctrine WHERE principle_name LIKE '%%%s%%' OR doctrine_text LIKE '%%%s%%' "
+        "OR conduct_type LIKE '%%%s%%' ORDER BY confidence DESC LIMIT 2",
+        escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "Garden News Doctrine:\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 300) {
+                n = snprintf(p, remaining, "  %s [person:%s | evidence:%s | conduct:%s]\n  %.400s\n\n",
+                    row[0], row[1], row[2], row[3] ? row[3] : "—", row[4] ? row[4] : "");
+                p += n; remaining -= n;
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
+    /* Try AI Disposition */
+    snprintf(query, sizeof(query),
+        "SELECT attribute_name, category, attribute_value FROM ai_disposition "
+        "WHERE attribute_name LIKE '%%%s%%' OR attribute_value LIKE '%%%s%%' "
+        "OR category LIKE '%%%s%%' ORDER BY confidence DESC LIMIT 2",
+        escaped, escaped, escaped);
+    if (mysql_query(conn, query) == 0) {
+        res = mysql_store_result(conn);
+        if (res && mysql_num_rows(res) > 0) {
+            char *p = response; int remaining = maxlen;
+            int n = snprintf(p, remaining, "AI Disposition (200 IQ):\n"); p += n; remaining -= n;
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res)) && remaining > 200) {
+                n = snprintf(p, remaining, "  [%s] %s: %.400s\n\n", row[1], row[0], row[2] ? row[2] : "");
+                p += n; remaining -= n;
+            }
+            mysql_free_result(res);
+            return 1;
+        }
+        if (res) mysql_free_result(res);
+    }
+
     snprintf(response, maxlen,
         "I don't have specific information on that yet. Try asking about: "
         "fiduciary duty, global transfer wealth, yield and turn, trust types, "
         "architectures, sovereign wealth funds, prudent investor rule, "
         "fiduciary centers, polyblend assumption, remedy, or advantage. "
         "Also: minister, international, county, gentry, standings, winners, ahead, "
-        "legal bright, treasure fiduciary, nuisance, council, try, calendar. "
+        "legal bright, treasure fiduciary, nuisance, council, try, calendar, "
+        "findings, garden news, supreme holdings, evidence, truth. "
         "Type 'help' for full topic list.");
     return 0;
 }
@@ -560,6 +670,13 @@ static void print_help(void)
     printf("  NUISANCE:      state nuisance, try-nuisance, council resolution\n");
     printf("  TRY:           profitable ideas, try authority, venture, attempt\n");
     printf("  COUNCIL:       deliberation, wisdom, resolution, able, usual path\n" C_RESET);
+    printf(C_GOLD "\n  ─── AI FINDINGS ORDER (ai_findings_order.sql) ───\n" C_RESET);
+    printf(C_WHITE "  FINDINGS:      findings in order, court trials, US trials\n");
+    printf("  GARDEN NEWS:   people closed, evidence open, certain, trials about\n");
+    printf("  SUPREME:       closed US supreme holdings, fixed stars of law\n");
+    printf("  NEW INT:       US new intelligence, frontier, hold\n");
+    printf("  DOCTRINE:      garden news doctrine, truth, life, annals, forever\n");
+    printf("  DISPOSITION:   200 IQ, careful, signed M.\n" C_RESET);
     printf(C_DIM "\n  Commands: help, yield, architecture, records, quit\n" C_RESET);
     printf("\n");
 }
