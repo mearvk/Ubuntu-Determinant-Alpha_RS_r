@@ -1856,10 +1856,132 @@ userland/java-web-server/gateway/install-gateway.sh  - Installer
 
 ---
 
+## FiduciaryServices™ — Global Transfer Wealth & ACH Payment API
+
+A terminal-based AI for fiduciary services, global transfer wealth architecture, yield/turn models, and bank-to-bank ACH payment initiation across five pay-as-you-go platforms.
+
+### ACH Transfer Platforms
+
+| Provider | Monthly | ACH Per-Use | Card Online | Best For |
+|----------|---------|-------------|-------------|----------|
+| **Melio** | $0 | **FREE** (std), 1% same-day | 2.9% + $0.30 | Zero-fee standard business ACH |
+| **Moov** | $0 | Pay-as-you-go | — | API-first, FedNow/RTP settlement |
+| **Stripe** | $0 | 0.8% (cap $5) | 2.9% + $0.30 | E-commerce, custom code, intl |
+| **Square** | $0 | 1% (min $1) | 2.9% + $0.30 | Invoices, virtual terminals |
+| **Helcim** | $0 | 0.5% + $0.25 (cap $6) | ~2.27% + $0.25 (I+) | B2B, automated surcharging |
+
+### Connection Methods
+
+- **Melio** — Plaid instant link to online banking credentials. Recipients need no account.
+- **Moov** — Developer API for two-legged standard and same-day FedNow/RTP settlement.
+- **Stripe** — API key + Plaid for bank verification. Bearer token auth.
+- **Square** — OAuth application credentials + bank account on file.
+- **Helcim** — API token + merchant account.
+
+### Usage (C CLI)
+
+```bash
+# List all platforms and pricing
+ach_transfer --list-platforms
+
+# Fee estimate
+ach_transfer --fee-estimate --platform stripe --amount 5000 --method card
+
+# Initiate transfer (standard ACH, free via Melio)
+ach_transfer --platform melio --to 021000021:123456789 --amount 500.00
+
+# Same-day transfer (1% fee via Melio)
+ach_transfer --platform melio --to 021000021:123456789 --amount 500.00 --speed same-day
+
+# Transfer via Stripe ACH (0.8%, max $5)
+ach_transfer --platform stripe --to 021000021:123456789 --amount 1000.00 --method ach
+
+# Transfer via Moov with FedNow instant settlement
+ach_transfer --platform moov --to 021000021:123456789 --amount 250.00 --speed same-day
+
+# Check status
+ach_transfer --status --reference ach_7f3a9b2c1d4e5f6a
+
+# Transfer history
+ach_transfer --history --limit 20
+```
+
+### Usage (Java API)
+
+```java
+ACHTransferService service = ACHTransferService.getInstance();
+service.setApiKey(Platform.STRIPE, System.getenv("STRIPE_SECRET_KEY"));
+
+TransferRequest req = new TransferRequest(Platform.STRIPE, "021000021", "123456789",
+    new BigDecimal("1000.00"));
+req.method = PaymentMethod.ACH;
+req.memo = "Invoice 4021";
+
+TransferResult result = service.initiateTransfer(req);
+// result.status == PROCESSING, result.feeAmount == $5.00 (0.8% capped)
+```
+
+### Security
+
+| Feature | Implementation |
+|---------|----------------|
+| ABA Routing Validation | Checksum: 3(d1+d4+d7) + 7(d2+d5+d8) + (d3+d6+d9) mod 10 == 0 |
+| Idempotency | UUID-based keys prevent duplicate transactions |
+| API Keys | Env vars (`STRIPE_SECRET_KEY`, `MOOV_API_KEY`, etc.) or CLI flag |
+| TLS | All API calls over HTTPS with cert verification |
+| Audit Log | Every transfer recorded in MySQL `ach_audit_log` |
+| Account Masking | Only last 4 digits shown in output |
+
+### Fiduciary Q&A (Terminal AI)
+
+```bash
+fiduciary                        # Interactive Q&A session
+fiduciary --query "fiduciary"    # Single query
+fiduciary --yield                # Yield/turn polyblend estimator
+fiduciary --architecture         # List fiduciary architectures
+fiduciary --records              # Known fiduciary entities (SWF, pensions, etc.)
+fiduciary --populate             # Populate/refresh knowledge base
+```
+
+### Build
+
+```bash
+cd tools/fiduciary
+make                             # Builds fiduciary + ach_transfer (C)
+make java                        # Compiles ACHTransferService.java
+sudo make install                # Installs to /usr/local/bin/
+```
+
+### Files
+
+```
+tools/fiduciary/fiduciary.c             - Terminal Q&A AI (~50KB, C)
+tools/fiduciary/ach_transfer.c          - ACH Transfer CLI (~47KB, C)
+tools/fiduciary/ACHTransferService.java - Java API for NWE (~43KB)
+tools/fiduciary/Makefile                - Build rules (C + Java)
+```
+
+### NWE Module Integration
+
+```
+modules/fiduciary/start-frontend.sh     - Deploy webapp
+modules/fiduciary/shutdown-frontend.sh  - Frontend shutdown
+modules/fiduciary/start-backend.sh      - Start TCP server (port 49240)
+modules/fiduciary/shutdown-backend.sh   - Stop backend
+modules/fiduciary/servlets/setup-db.sh  - Create nwe_fiduciary database (14 tables)
+modules/fiduciary/servlets/deploy-local.sh - Tomcat deployment
+modules/fiduciary/source/FiduciaryServicesServer.java - TCP server
+modules/fiduciary/documents/            - SQL documents (minister facts, legal bright, AI findings)
+```
+
+---
+
 ## Update History
 
 | Date | Change |
 |------|--------|
+| 2026-08-03 | Added FiduciaryServices ACH Transfer API (C + Java, 5 platforms) |
+| 2026-08-03 | Added Dictionary terms: 20 ACH/payment/fiduciary entries |
 | 2026-08-02 | Added JWSTF/NitroWebExpress (Java web server, Tomcat, Apache2) |
 | 2026-08-02 | Added NWE Gateway (NAT traversal: UPnP + relay hybrid) |
 | 2026-08-02 | Added boot-jdk-27 (chunked for GitHub, rebuild.sh provided) |

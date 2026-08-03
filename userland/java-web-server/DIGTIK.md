@@ -47,6 +47,7 @@ Each module in NitroWebExpress™ has a **servlet webapp edition** — a JSP-dri
 | Analytics™ | `/analytics` | GitHub Dark (#58a6ff) | — | `nwe_analytics` |
 | TandemEquals™ | `/tandem-equals` | White/Red (#cc0000) | 49223 | `nwe_tandem_equals` |
 | Dictionary™ | `/dictionary` | Scholarly Gold (#d4af37) | — | `nwe_dictionary` |
+| FiduciaryServices™ | `/fiduciary` | Trust Green (#10b981) | 49240 | `nwe_fiduciary` |
 
 ## Interfacing Websites with Running Servers
 
@@ -1232,4 +1233,220 @@ modules/tandem-equals/servlets/deploy-local.sh                - Tomcat deploymen
 modules/tandem-equals/servlets/servlet/src/main/webapp/       - Webapp (5 JSP pages + CSS)
 modules/tandem-equals/configuration/tandem-equals-config.xml  - Module configuration
 modules/tandem-equals/README.md                               - Documentation
+```
+
+---
+
+## FiduciaryServices™ — Global Transfer Wealth & ACH Payment API
+
+A terminal-based AI for fiduciary services, global transfer wealth architecture, yield/turn models, and bank-to-bank ACH payment initiation across five pay-as-you-go platforms. Port 49240.
+
+### ACH Transfer Platforms
+
+| Provider | Monthly | ACH Per-Use | Card Online | Best For |
+|----------|---------|-------------|-------------|----------|
+| **Melio** | $0 | **FREE** (std), 1% same-day | 2.9% + $0.30 | Zero-fee standard business ACH |
+| **Moov** | $0 | Pay-as-you-go | — | API-first, FedNow/RTP settlement |
+| **Stripe** | $0 | 0.8% (cap $5) | 2.9% + $0.30 | E-commerce, custom code, intl |
+| **Square** | $0 | 1% (min $1) | 2.9% + $0.30 | Invoices, virtual terminals |
+| **Helcim** | $0 | 0.5% + $0.25 (cap $6) | ~2.27% + $0.25 (I+) | B2B, automated surcharging |
+
+### Connection Methods
+
+- **Melio** — Plaid instant link to online banking credentials. Recipients need no account.
+- **Moov** — Developer API for two-legged standard and same-day FedNow/RTP settlement.
+- **Stripe** — API key + Plaid for bank verification. Bearer token auth.
+- **Square** — OAuth application credentials + bank account on file.
+- **Helcim** — API token + merchant account.
+
+### Database Schema (nwe_fiduciary)
+
+| Table | Purpose |
+|-------|---------|
+| `knowledge_base` | Fiduciary Q&A knowledge |
+| `architectures` | Trust, SWF, pension, foundation, escrow structures |
+| `records` | Known fiduciary entities (Norway SWF, BlackRock, CalPERS, etc.) |
+| `yield_models` | Polyblend yield components (treasury, equity, credit, real, alt) |
+| `sessions` | Interactive Q&A session log |
+| `original_documents` | Minister fiduciary facts, international records |
+| `legal_bright` | INT/IQ Calendar (top/bottom half legal concerns) |
+| `treasure_fiduciary` | Law structures, evidence basis, council resolutions |
+| `ai_findings_order` | AI ordinal findings (open/closed/careful/sold) |
+| `garden_news_doctrine` | Doctrine principles (person status, evidence status) |
+| `ai_disposition` | AI attribute/value pairs by category |
+| `ach_platforms` | Registered payment platforms (5 seeded) |
+| `ach_accounts` | Known bank accounts (encrypted) |
+| `ach_transfers` | Transfer ledger (amount, fee, status, audit) |
+| `ach_audit_log` | Immutable audit trail for all transfers |
+
+### TCP Protocol (Port 49240)
+
+| Command | Response |
+|---------|----------|
+| `ASK\|query` | Fiduciary Q&A answer from knowledge base |
+| `ARCHITECTURE` | List all fiduciary architectures |
+| `RECORDS` | Known fiduciary entities |
+| `YIELD` | Polyblend yield model |
+| `TRANSFER\|platform\|routing:account\|amount` | Initiate ACH transfer |
+| `STATUS\|reference` | Transfer status |
+| `HISTORY` | Recent transfers |
+| `PLATFORMS` | List ACH platforms and fees |
+
+### C CLI Tools (tools/fiduciary/)
+
+```bash
+fiduciary                        # Interactive Q&A session
+fiduciary --query "fiduciary"    # Single query
+fiduciary --yield                # Yield/turn polyblend estimator
+fiduciary --architecture         # List fiduciary architectures
+fiduciary --records              # Known fiduciary entities
+fiduciary --populate             # Populate/refresh knowledge base
+
+ach_transfer --list-platforms    # Show all platforms and pricing
+ach_transfer --platform melio --to 021000021:123456789 --amount 500.00
+ach_transfer --fee-estimate --platform stripe --amount 5000 --method card
+ach_transfer --status --reference ach_7f3a9b2c1d4e5f6a
+ach_transfer --history --limit 20
+```
+
+### Java API (ACHTransferService.java)
+
+```java
+ACHTransferService service = ACHTransferService.getInstance();
+service.setApiKey(Platform.STRIPE, System.getenv("STRIPE_SECRET_KEY"));
+TransferRequest req = new TransferRequest(Platform.STRIPE, "021000021", "123456789",
+    new BigDecimal("1000.00"));
+req.method = PaymentMethod.ACH;
+req.memo = "Invoice 4021";
+TransferResult result = service.initiateTransfer(req);
+```
+
+### Security
+
+| Feature | Implementation |
+|---------|----------------|
+| ABA Routing Validation | Checksum: 3(d1+d4+d7) + 7(d2+d5+d8) + (d3+d6+d9) mod 10 == 0 |
+| Idempotency | UUID-based keys prevent duplicate transactions |
+| API Keys | Env vars or CLI flag (never stored in code) |
+| TLS | All API calls over HTTPS with cert verification |
+| Audit Log | Every transfer recorded in MySQL `ach_audit_log` |
+| Account Masking | Only last 4 digits shown in output |
+
+### Deploy
+
+```bash
+# Database
+bash modules/fiduciary/servlets/setup-db.sh
+
+# Webapp
+sudo bash modules/fiduciary/servlets/deploy-local.sh
+
+# Backend TCP server
+bash modules/fiduciary/start-backend.sh
+
+# C tools (OS-level install)
+cd tools/fiduciary && make && sudo make install
+```
+
+### Files
+
+```
+modules/fiduciary/start-frontend.sh                           - Deploy webapp
+modules/fiduciary/shutdown-frontend.sh                        - Frontend shutdown
+modules/fiduciary/start-backend.sh                            - Start TCP server (port 49240)
+modules/fiduciary/shutdown-backend.sh                         - Stop backend
+modules/fiduciary/servlets/setup-db.sh                        - Database creation (14 tables)
+modules/fiduciary/servlets/deploy-local.sh                    - Tomcat deployment
+modules/fiduciary/source/FiduciaryServicesServer.java         - TCP server
+modules/fiduciary/configuration/                              - Module configuration
+modules/fiduciary/documents/minister_fiduciary_facts.sql      - Minister facts (55KB)
+modules/fiduciary/documents/legal_bright_iq_calendar.sql      - Legal bright (32KB)
+modules/fiduciary/documents/ai_findings_order.sql             - AI findings (24KB)
+tools/fiduciary/fiduciary.c                                   - Terminal Q&A AI (~50KB, C)
+tools/fiduciary/ach_transfer.c                                - ACH Transfer CLI (~47KB, C)
+tools/fiduciary/ACHTransferService.java                       - Java API (~43KB)
+tools/fiduciary/Makefile                                      - Build rules (C + Java)
+```
+
+---
+
+## Dictionary™ — NWE System Terminology (45+ Terms)
+
+Defines all rare, new, or system-specific terms used across NitroWebExpress and the OS. Database-only module (no TCP server). Scholarly Gold (#d4af37).
+
+### Term Domains (13)
+
+| Domain | Color | Scope |
+|--------|-------|-------|
+| Spectrum | #cc0000 | SpectrumTandem and TandemEquals |
+| Kernel | #f59e0b | Linux kernel modules |
+| Ethics | #22c55e | White Ethics, moral philosophy |
+| Intelligence | #3b82f6 | Dave, AI, cognitive systems |
+| Security | #ef4444 | HPM, ClamAV, rootkit, encryption |
+| Protocol | #8b5cf6 | EPMP, NWE TCP, network |
+| Identity | #06b6d4 | User classes, nnet, permissions |
+| Filesystem | #ec4899 | NEGAMANE, branding, immutability |
+| Module | #f97316 | NWE module-specific |
+| Architecture | #6366f1 | System design, build, structure |
+| Mathematics | #14b8a6 | Simplex, matrix, curve, computational |
+| Medical | #84cc16 | System health, diagnostics |
+| Finance | #10b981 | ACH, banking, payment processing, fiduciary |
+
+### ACH/Payment Terms Added (Aug 2026)
+
+20 new terms for the payment processing domain:
+
+| Term | Part of Speech | Domain |
+|------|---------------|--------|
+| ACH | protocol | Finance |
+| routing number | noun | Finance |
+| Melio | module | Finance |
+| Moov | module | Finance |
+| Stripe | module | Finance |
+| Square | module | Finance |
+| Helcim | module | Finance |
+| FedNow | protocol | Finance |
+| RTP | protocol | Finance |
+| Plaid | module | Finance |
+| idempotency key | noun | Protocol |
+| interchange-plus | concept | Finance |
+| pay-as-you-go | adjective | Architecture |
+| surcharging | noun | Finance |
+| fiduciary | noun | Architecture |
+| global transfer wealth | concept | Architecture |
+| yield and turn | concept | Mathematics |
+| polyblend assumption | noun | Mathematics |
+| ach_transfer | system | Module |
+| NACHA | noun | Finance |
+
+### Module Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `start-frontend.sh` | Deploy webapp to Tomcat |
+| `shutdown-frontend.sh` | Frontend shutdown notice |
+| `start-backend.sh` | Initialize database (no TCP server) |
+| `shutdown-backend.sh` | No-op (DB-only module) |
+| `servlets/setup-db.sh` | Create nwe_dictionary (4 tables, 13 domains, 45+ terms) |
+| `servlets/deploy-local.sh` | Tomcat deployment |
+
+### Deploy
+
+```bash
+bash modules/dictionary/servlets/setup-db.sh
+sudo bash modules/dictionary/servlets/deploy-local.sh
+```
+
+### Files
+
+```
+modules/dictionary/start-frontend.sh                          - Deploy webapp
+modules/dictionary/shutdown-frontend.sh                       - Frontend shutdown
+modules/dictionary/start-backend.sh                           - Initialize database
+modules/dictionary/shutdown-backend.sh                        - No-op (DB-only)
+modules/dictionary/servlets/setup-db.sh                       - Database creation (45+ terms)
+modules/dictionary/servlets/deploy-local.sh                   - Tomcat deployment
+modules/dictionary/servlets/servlet/src/main/webapp/          - Webapp (JSP pages)
+modules/dictionary/source/                                    - (future: DictionaryServer.java)
+modules/dictionary/configuration/                             - (future: dictionary-config.xml)
 ```
