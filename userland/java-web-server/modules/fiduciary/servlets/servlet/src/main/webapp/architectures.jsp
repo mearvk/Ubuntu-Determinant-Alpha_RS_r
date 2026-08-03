@@ -38,7 +38,9 @@
         <li><a href="yield.jsp">Yield & Turn</a></li>
         <li><a href="records.jsp">Records</a></li>
         <li><a href="datapool.jsp">Datapool</a></li>
-        <li><a href="messaging.jsp">Messages</a></li>
+        <li><a href="documents.jsp">Documents</a></li>
+        <li><a href="bright.jsp">Legal Bright</a></li>
+        <li><a href="findings.jsp">AI Findings</a></li>
     </ul>
 </div></nav>
 

@@ -91,7 +91,8 @@ INSERT IGNORE INTO domains (domain_name, description, color) VALUES
     ('Module', 'NWE module-specific terminology', '#f97316'),
     ('Architecture', 'System design, build, structure terms', '#6366f1'),
     ('Mathematics', 'Simplex, matrix, curve, computational terms', '#14b8a6'),
-    ('Medical', 'System health, diagnostics, certification', '#84cc16');
+    ('Medical', 'System health, diagnostics, certification', '#84cc16'),
+    ('Finance', 'ACH, banking, payment processing, fiduciary transfer terms', '#10b981');
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- SEED TERMS — Rare, new, or system-specific
@@ -253,10 +254,131 @@ INSERT IGNORE INTO terms (term, pronunciation, part_of_speech, definition, etymo
  'The integer classification system governing term ordering and spectral weight within SpectrumTandem. Each term has an int discipline index determining its position in the dolyene.',
  'Int = integer (mathematical). Discipline = ordered system of classification.',
  'The int discipline of \"dolyene\" is 1 — primary position in its own spectrum.',
- 'SpectrumTandem', 'Spectrum', 'SpectrumTandem v1.0 (July 2026)', 'Max Rupplin');
+ 'SpectrumTandem', 'Spectrum', 'SpectrumTandem v1.0 (July 2026)', 'Max Rupplin'),
+
+-- Finance / ACH / Fiduciary terms
+('ACH', 'A-C-H', 'noun',
+ 'Automated Clearing House. Electronic network for financial transactions between banks. Handles direct deposits, bill payments, B2B transfers. Settles in 1-2 business days (standard) or same-day. Governed by NACHA rules.',
+ 'Acronym: Automated Clearing House. Established 1974.',
+ 'ACH standard transfers settle in 1-2 business days; same-day ACH settles within hours.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('routing number', 'ROOT-ing NUM-ber', 'noun',
+ '9-digit ABA (American Bankers Association) code identifying a financial institution. Validated via weighted checksum: 3(d1+d4+d7) + 7(d2+d5+d8) + (d3+d6+d9) mod 10 == 0.',
+ 'ABA routing transit number. Introduced 1910 by the American Bankers Association.',
+ 'Routing number 021000021 identifies JPMorgan Chase. Checksum: 3(0+0+0) + 7(2+0+2) + (1+0+1) = 0+28+2 = 30; 30 mod 10 == 0 ✓.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Melio', 'MEL-ee-oh', 'noun',
+ 'Pay-as-you-go ACH platform. Zero-fee standard business transactions. 1% same-day expedited. Connects via Plaid instant link to online banking credentials. Best for zero-fee standard business ACH.',
+ 'Company name. Latin melio = to improve, make better.',
+ 'Melio processes zero-fee ACH for standard business payments with Plaid-linked bank accounts.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Moov', 'MOOV', 'noun',
+ 'API-first payment platform. Pure pay-as-you-go pricing, no monthly fees. Built for developers needing API for two-legged standard and same-day FedNow/RTP settlement windows.',
+ 'Company name. Stylized \"move\" — moving money programmatically.',
+ 'Moov API supports standard ACH, same-day ACH, FedNow, and RTP settlement rails.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Stripe', 'stryp', 'noun',
+ 'Hybrid payment processor. $0/month. ACH: 0.8% capped at $5. Card: 2.9% + $0.30. Best for e-commerce web checkouts, custom code integrations, international currencies.',
+ 'Company name. Reference to the magnetic stripe on payment cards.',
+ 'Stripe ACH charges 0.8% per transaction capped at $5 — predictable ceiling for large transfers.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Square', 'skwair', 'noun',
+ 'Hybrid payment processor. $0/month. ACH: 1% per transaction (min $1). Card: 2.9% + $0.30. Best for quick invoice links, virtual terminals, immediate day-after payouts.',
+ 'Company name (now Block, Inc.). Named for the square card reader hardware.',
+ 'Square ACH: 1% per transaction with $1 minimum. Funds available next business day.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Helcim', 'HEL-sim', 'noun',
+ 'Hybrid payment processor. $0/month. ACH: 0.5% + $0.25 (capped at $6). Card: ~2.27% + $0.25 (Interchange-plus). Best for wholesale, B2B invoicing, automated surcharging.',
+ 'Company name. Canadian payment processor, interchange-plus model.',
+ 'Helcim interchange-plus pricing averages 2.27% + $0.25 with automated surcharging available.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('FedNow', 'FED-now', 'noun',
+ 'Federal Reserve instant payment service (2023). Real-time gross settlement, 24/7/365. Transfers complete in seconds, not days. Supported by Moov platform API.',
+ 'Federal Reserve + Now. Launched July 2023 by the Federal Reserve System.',
+ 'FedNow settles transfers in seconds — no batching, no waiting for end-of-day clearing.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('RTP', 'R-T-P', 'noun',
+ 'Real-Time Payments network operated by The Clearing House. Instant settlement for US banks. Available 24/7/365. Complements FedNow as an instant payment rail.',
+ 'Acronym: Real-Time Payments. Launched 2017 by The Clearing House.',
+ 'RTP processes instant payments 24/7/365 alongside FedNow as a parallel real-time rail.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('Plaid', 'playd', 'noun',
+ 'Financial data aggregation platform. Links user bank accounts instantly via online banking credentials. Used by Melio, Stripe, and other payment platforms for bank verification.',
+ 'Company name. Reference to interwoven connections (plaid pattern = intersecting lines).',
+ 'Plaid instant link verifies bank accounts in seconds using online banking credentials.',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('idempotency key', 'eye-dem-POH-ten-see kee', 'noun',
+ 'Unique identifier sent with payment API requests to prevent duplicate transactions. If the same key is resubmitted, the platform returns the original result without processing again.',
+ 'Idempotent (mathematics): applying operation multiple times yields same result as applying once. Key = unique identifier.',
+ 'POST /v1/transfers with Idempotency-Key: uuid-abc-123 — safe to retry on timeout.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('interchange-plus', 'IN-ter-chaynj plus', 'noun',
+ 'Credit card pricing model where merchant pays actual interchange fee (set by card networks) plus a fixed markup. More transparent than flat-rate. Used by Helcim.',
+ 'Interchange = fee between banks. Plus = the processors added margin.',
+ 'Interchange-plus: Visa interchange 1.65% + Helcim markup 0.30% + $0.25 = total 1.95% + $0.25.',
+ 'Fiduciary', 'Architecture', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('pay-as-you-go', 'pay az yoo GO', 'adjective',
+ 'Pricing model with no monthly subscription fees. Charges only per transaction. Zero cost when idle. Used by Melio, Moov, Stripe, Square, and Helcim for ACH/card processing.',
+ 'Common English: pay only for what you use, when you use it.',
+ 'Pay-as-you-go ACH: $0/month base. Only charged when transfers actually execute.',
+ 'Fiduciary', 'Architecture', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('surcharging', 'SUR-char-jing', 'noun',
+ 'Practice of passing payment processing fees directly to the customer as a line item. Automated by Helcim. Legal in most US states for credit cards (not debit).',
+ 'Sur- (above/additional) + charge. An additional charge above the listed price.',
+ 'Helcim automated surcharging adds 2.27% to credit card transactions — merchant pays net zero on processing.',
+ 'Fiduciary', 'Architecture', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('fiduciary', 'fih-DOO-shee-air-ee', 'noun',
+ 'Person or institution holding legal/ethical obligation to act in anothers best interest. Highest standard of care in law. Applies to trustees, advisors, executors, directors.',
+ 'Latin fiduciarius, from fiducia (trust). One who holds something in trust for another.',
+ 'A fiduciary must place the clients interest above their own — the highest legal standard of care.',
+ 'Fiduciary', 'Architecture', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('global transfer wealth', 'GLOH-bul TRANS-fer welth', 'concept',
+ 'The balance of internal design and remedy across fiduciary structures. The means by which wealth moves between parties, jurisdictions, and generations while preserving value.',
+ 'Global = worldwide scope. Transfer = movement between parties. Wealth = accumulated value.',
+ 'Global transfer wealth mechanisms ensure value preservation across jurisdictional and generational boundaries.',
+ 'Fiduciary', 'Architecture', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('yield and turn', 'yeeld and tern', 'concept',
+ 'Yield: return generated by a fiduciary structure over time. Turn: frequency at which yield materializes. Together they define productive capacity of a fiduciary arrangement.',
+ 'Yield = produce/return. Turn = cycle/rotation. Financial pair measuring rate and frequency of return.',
+ 'Yield and turn of 4.2% quarterly means 4.2% return materializing every 90 days.',
+ 'Fiduciary', 'Mathematics', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('polyblend assumption', 'POL-ee-blend ah-SUMP-shun', 'noun',
+ 'Weighted combination of multiple yield expectations into a single composite projection. Blends fixed income, equity, real assets, and alternatives by reliability weight.',
+ 'Poly = many. Blend = mix. Assumption = forward projection based on weighted inputs.',
+ 'Polyblend assumption: 40% fixed (3.8%) + 30% equity (7.2%) + 20% real (5.1%) + 10% alt (9.0%) = 5.58% composite.',
+ 'Fiduciary', 'Mathematics', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('ach_transfer', 'A-C-H TRANS-fer', 'system',
+ 'Command-line tool and API for initiating bank-to-bank transfers via Melio, Moov, Stripe, Square, or Helcim. Validates ABA routing numbers, calculates fees, records transfers to MySQL.',
+ 'ACH = Automated Clearing House. Transfer = movement of funds between accounts.',
+ 'ach_transfer --platform melio --amount 5000 --routing 021000021 --account 123456789 --memo \"Invoice 4401\"',
+ 'Kernel', 'Module', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin'),
+
+('NACHA', 'NAH-chah', 'noun',
+ 'National Automated Clearing House Association. Governs the ACH network rules and standards. Processes over 30 billion transactions annually worth $80+ trillion.',
+ 'Acronym: National Automated Clearing House Association. Founded 1974.',
+ 'NACHA rules govern all ACH transactions — file formats, settlement timing, return codes, and compliance.',
+ 'Fiduciary', 'Protocol', 'FiduciaryServices ACH v1.0 (Aug 2026)', 'Max Rupplin');
 "
 
 echo "[OK] nwe_dictionary database ready."
 echo "     4 tables: terms, domains, term_revisions, cross_references"
-echo "     12 domains seeded. 25 terms defined."
+echo "     12 domains seeded. 45+ terms defined."
 echo "     Installer Tech ID: Max Rupplin"

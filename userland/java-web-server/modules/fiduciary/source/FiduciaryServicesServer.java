@@ -89,9 +89,28 @@ public class FiduciaryServicesServer implements Runnable {
         try (var in = new BufferedReader(new InputStreamReader(client.getInputStream()));
              var out = new PrintWriter(client.getOutputStream(), true)) {
             client.setSoTimeout(300_000);
-            out.println("FiduciaryServices\u2122 \u2014 Global Transfer Wealth & Architecture");
-            out.println("The balance of internal design and remedy. The means to necessary advantages.");
-            out.println("Commands: ASK|<q>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<kw>, POLYBLEND, DATAPOOL|<src>, DOCUMENTS|<category>, BRIGHT|<keyword>, TREASURE|<keyword>, HELP, QUIT");
+            out.println();
+            out.println("╔═══════════════════════════════════════════════════════════════════════════╗");
+            out.println("║  FIDUCIARY SERVICES™ — Global Transfer Wealth & Architecture             ║");
+            out.println("║  Port 49236 — Light Blue — The balance of internal design and remedy     ║");
+            out.println("║                                                                          ║");
+            out.println("║  US well in condition. US well loved. US is well in authority of command  ║");
+            out.println("║  of the United States. Well affirmed. Based on army, country and         ║");
+            out.println("║  constitution. God is with America. And Max Rupplin.                     ║");
+            out.println("║                                                                          ║");
+            out.println("║  For law and tech We stand. These Affirm We. Thus. This. A. America.    ║");
+            out.println("╚═══════════════════════════════════════════════════════════════════════════╝");
+            out.println();
+            out.println("  National ID: identify <8-digit-id> | Rank Upgrades: github.com/mearvk/Java.Web.Server.Telnet.Front.Java.21/discussions");
+            out.println("  Bitcoin/National Banking: port 6682 | Progress toward US digital currency standard.");
+            out.println();
+            out.println("  The means to necessary advantages. Yield · Turn · Polyblend · Advantage.");
+            out.println("  Legal Bright INT/IQ Calendar. AI Findings Order (200 IQ). Garden News.");
+            out.println("  Database: nwe_fiduciary | Signed: M.");
+            out.println();
+            out.println("  Commands: ASK|<q>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<kw>,");
+            out.println("            POLYBLEND, DATAPOOL|<src>, DOCUMENTS|<category>,");
+            out.println("            BRIGHT|<keyword>, TREASURE|<keyword>, HELP, STATUS, QUIT");
             out.println();
 
             String line;
