@@ -155,23 +155,29 @@ void JvmCircuit::start_listeners() {
   }
 
   if (_socket_enabled) {
-    log_info(os)("JvmCircuit: Unix socket listener ready at %s", _socket_path);
-    // Create the socket for local observer connection
-    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sock_fd >= 0) {
-      struct sockaddr_un addr;
-      memset(&addr, 0, sizeof(addr));
-      addr.sun_family = AF_UNIX;
-      strncpy(addr.sun_path, _socket_path, sizeof(addr.sun_path) - 1);
-      unlink(_socket_path);  // Remove stale socket
-      if (bind(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-        listen(sock_fd, 5);
-        chmod(_socket_path, 0600);  // Owner only
-        log_info(os)("JvmCircuit: Unix socket bound and listening");
-      } else {
-        log_warning(os)("JvmCircuit: failed to bind socket: %s", strerror(errno));
-        close(sock_fd);
+    // Skip socket bind during bootstrap/build (non-writable /var/run)
+    bool can_bind = (access("/var/run", W_OK) == 0);
+    if (can_bind) {
+      log_info(os)("JvmCircuit: Unix socket listener ready at %s", _socket_path);
+      // Create the socket for local observer connection
+      int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+      if (sock_fd >= 0) {
+        struct sockaddr_un addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        strncpy(addr.sun_path, _socket_path, sizeof(addr.sun_path) - 1);
+        unlink(_socket_path);  // Remove stale socket
+        if (bind(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+          listen(sock_fd, 5);
+          chmod(_socket_path, 0600);  // Owner only
+          log_info(os)("JvmCircuit: Unix socket bound and listening");
+        } else {
+          log_info(os)("JvmCircuit: socket bind deferred (permission denied — build context)");
+          close(sock_fd);
+        }
       }
+    } else {
+      log_info(os)("JvmCircuit: socket bind skipped (build/bootstrap context)");
     }
   }
 }
