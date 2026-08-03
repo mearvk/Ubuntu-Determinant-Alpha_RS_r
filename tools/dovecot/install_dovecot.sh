@@ -2,6 +2,11 @@
 # ═══════════════════════════════════════════════════════════════════════════════════
 # Ubuntu Determinant Alpha RS — Dovecot IMAP/POP3 Server Installation
 #
+# INSTALLER AUTHORITY:
+#   Minimum Grade: Level 3 (Local Tech) — can execute this script
+#   Design Grade:  Level 9 (Installer Tech) — authored configuration decisions
+#   TechID:        mearvk - Installer Tech 2 (Max Rupplin)
+#
 # Installs Dovecot with:
 #   - TLS required on all connections (Let's Encrypt certs)
 #   - IMAP (993/143) and POP3 (995/110) support

@@ -2,6 +2,11 @@
 # ═══════════════════════════════════════════════════════════════════════════════════
 # Ubuntu Determinant Alpha RS — Postfix Mail Transfer Agent Installation
 #
+# INSTALLER AUTHORITY:
+#   Minimum Grade: Level 3 (Local Tech) — can execute this script
+#   Design Grade:  Level 9 (Installer Tech) — authored configuration decisions
+#   TechID:        mearvk - Installer Tech 2 (Max Rupplin)
+#
 # Installs Postfix with:
 #   - TLS on all ports (Let's Encrypt certs)
 #   - SASL via Dovecot (port 587 submission)

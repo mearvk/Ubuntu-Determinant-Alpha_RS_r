@@ -2,6 +2,17 @@
 # ═══════════════════════════════════════════════════════════════════════════════════
 # Ubuntu Determinant Alpha RS — Dovecot/Postfix Configuration Script
 #
+# INSTALLER AUTHORITY:
+#   Minimum Grade: Level 3 (Local Tech) — can execute this script
+#   Design Grade:  Level 9 (Installer Tech) — authored the configuration choices
+#   TechID:        mearvk - Installer Tech 2 (Max Rupplin)
+#
+# A Level 3 Local Tech runs this script. The script itself encodes Level 9
+# decisions: cipher suites, protocol versions, DH parameters, certificate
+# strategy, rate limits, restriction chains. The Level 3 does not need to
+# understand WHY these choices are correct — only that they ARE correct,
+# because the Level 9 authored them with full knowledge of consequence.
+#
 # Writes secure, elegant, production-ready configuration files for Postfix and
 # Dovecot. Does NOT install packages — only writes config. Run install scripts
 # first, then this to finalize settings.
@@ -14,13 +25,16 @@
 #   - LMTP for local delivery (Sieve-capable, quota-aware)
 #   - Sensible rate limits without blocking legitimate use
 #   - Clean, commented files — an admin can read and understand every line
+#   - Certificate watchdog: auto-refresh on expiry, revocation, corruption
 #
 # Usage:
 #   sudo bash configure-mail.sh
 #   sudo bash configure-mail.sh --domain example.com --ip 1.2.3.4
 #
-# Installer Tech ID: Max Rupplin
+# Installer Tech ID: Max Rupplin — Level 9
+# Execution Grade: Level 3 (Local Tech) or higher
 # Date: August 2026
+# Edition: Galactic Cherry Marvell 98
 # ═══════════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 

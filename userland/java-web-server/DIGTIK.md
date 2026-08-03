@@ -274,6 +274,29 @@ Max Rupplin — MEARVK LLC
 mearvk@mearvk.us | mearvk@outlook.com  
 555 South Mangum St, Durham, NC 27701
 
+**Installer Tech ID:** mearvk - Installer Tech 2 (Grade 9)  
+**Authority:** Full system install, bare metal, kernel, boot, CA, identity, ethics.  
+**Execution Level:** Level 3 (Local Tech) can deploy all modules via provided scripts.
+
+---
+
+## Installer Authority (DIGTIK Deployment)
+
+All module deployment scripts (`setup-db.sh`, `deploy-local.sh`, `start-backend.sh`, `start-frontend.sh`) are designed for execution by a Level 3 Local Tech. The scripts encode Level 9 architectural decisions — the Level 3 executes, the Level 9 designs.
+
+| Action | Minimum Grade | Script |
+|--------|--------------|--------|
+| Deploy any module webapp | 3 | `modules/{name}/servlets/deploy-local.sh` |
+| Create module database | 3 | `modules/{name}/servlets/setup-db.sh` |
+| Start/stop module backend | 3 | `modules/{name}/start-backend.sh` |
+| Configure Postfix/Dovecot | 3 | `tools/postfix/configure-mail.sh` |
+| Install Postfix/Dovecot | 3 | `tools/postfix/install_postfix.sh`, `tools/dovecot/install_dovecot.sh` |
+| Modify kernel modules | 9 | Manual — no script (architectural decision) |
+| Modify permission classes | 9 | Manual — no script (security architecture) |
+| Generate root CA manually | 9 | Manual — watchdog handles auto-refresh for Level 3 |
+| Register TechIDs | 9 | Manual — nnet provisioning |
+| Design new modules | 9 | Architectural authority |
+
 
 ---
 

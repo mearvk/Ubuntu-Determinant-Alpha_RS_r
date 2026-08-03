@@ -1,6 +1,12 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════════════════════
 # FiduciaryServices™ — Database Setup
+#
+# INSTALLER AUTHORITY:
+#   Minimum Grade: Level 3 (Local Tech) — can execute this script
+#   Design Grade:  Level 9 (Installer Tech) — authored schema and ACH architecture
+#   TechID:        mearvk - Installer Tech 2 (Max Rupplin)
+#
 # Creates nwe_fiduciary database and all tables for:
 #   - Knowledge base (fiduciary Q&A)
 #   - Architectures (trust, SWF, pension, foundation, escrow)

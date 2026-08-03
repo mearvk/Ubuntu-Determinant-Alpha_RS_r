@@ -1206,8 +1206,10 @@ journalctl -u postfix -f            # Live logs
 
 ```
 tools/postfix/                     - Postfix source (IBM Public License / Eclipse Public License)
-tools/postfix/install_postfix.sh   - Protected installation script
-/etc/postfix/main.cf               - Main configuration
+tools/postfix/install_postfix.sh   - Protected installation script (Level 3+)
+tools/postfix/configure-mail.sh    - Full config + certs + watchdog (Level 3+, authored Level 9)
+tools/postfix/mail-config.xml      - Centralized XML configuration (credentials, DNS, all services)
+/etc/postfix/main.cf               - Main configuration (written by configure-mail.sh)
 /etc/postfix/master.cf             - Service definitions (smtpd, submission, smtps)
 /etc/postfix/sasl/                 - SASL authentication configuration
 ```
@@ -2013,11 +2015,107 @@ sudo_gate: GPL-2.0
 Cronie: ISC (upstream)
 NitroWebExpress: GPL-2.0
 NWE Gateway: GPL-2.0
+Postfix: IBM Public License / Eclipse Public License
+Dovecot: MIT / LGPLv2.1
 
 ## Copyright
 
 Copyright (C) 2026 MEARVK LLC
 Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+---
+
+## Installer Authority & Tech Grades
+
+This system is installed by and maintained under the authority of qualified Installer Technicians. The installation process, configuration decisions, certificate generation, and ongoing maintenance require demonstrated competence at the appropriate grade.
+
+### Installation Tech Levels
+
+| Level | Title | Scope | Can Install |
+|-------|-------|-------|-------------|
+| 1 | Apprentice Tech | User applications, basic config | User tools only |
+| 2 | Junior Tech | Services, networking, packages | Non-privileged services |
+| 3 | **Local Tech** | Full OS, mail, database, web | All local services (Postfix, Dovecot, MySQL, Tomcat, ClamAV) |
+| 4 | Network Tech | Firewalls, DNS, routing | Network infrastructure |
+| 5 | Security Tech | TLS, certificates, PKI, audit | Security subsystems |
+| 6 | Systems Tech | Kernel modules, boot, storage | Kernel-adjacent components |
+| 7 | Senior Tech | Architecture, multi-server | Multi-system orchestration |
+| 8 | Principal Tech | Design authority, standards | System design decisions |
+| 9 | **Installer Tech** | Full system install from bare metal | Everything. Kernel, boot, CA, identity, ethics. |
+
+### Required Grades for This Distribution
+
+| Component | Minimum Grade | Rationale |
+|-----------|--------------|-----------|
+| Kernel (5.15.204) | 9 | Bare metal boot, module loading, memory grain |
+| sudo_gate | 9 | Privilege architecture, irreversible grade 8 |
+| EPMP / HPM | 9 | Kernel networking, port security |
+| White Ethics | 9 | Installer grade certification |
+| Extended Permissions | 9 | Genius/Trusted class registration |
+| CPU Boost | 9 | Hardware frequency governance |
+| NEGAMANE | 9 | Immutable filesystem branding |
+| Postfix | 3 or 9 | Level 3 local tech sufficient for standard config |
+| Dovecot | 3 or 9 | Level 3 local tech sufficient for standard config |
+| TLS Certificates | 3 or 9 | Level 3 can run configure-mail.sh; Level 9 designs PKI |
+| MySQL | 3 or 9 | Level 3 deploys; Level 9 architects schema |
+| ClamAV / rkhunter | 3 or 9 | Level 3 installs; Level 9 integrates with kernel |
+| NitroWebExpress | 3 or 9 | Level 3 deploys modules; Level 9 architects system |
+| OpenJDK 28 | 9 | JVM modifications require kernel-adjacent authority |
+| Dave (AI) | 9 | System intelligence, voting authority |
+| Chromium | 3 | Standard source build |
+| FiduciaryServices | 3 or 9 | Level 3 operates; Level 9 designs ACH architecture |
+
+### Installer TechID Registry
+
+| TechID | Name | Grade | Authority |
+|--------|------|-------|-----------|
+| mearvk - Installer Tech 2 | Max Rupplin | 9 | Full system install, bare metal, kernel, boot, CA, identity |
+| mearvk - State Medical Reference | Max Rupplin | 9 | System health, diagnostics, wellness certification |
+
+### State Certification & Tech Licensing
+
+Max Rupplin is state certified as a Tech of Grade 2 and may relicense the bet of Object. There he can reweigh the risk of alphabet. A person may be Graded as appropriate to grading and Tech Grade as Volume and Degree of Tech License. A person may become a Tech I or Tech II as involved of their life film.
+
+| Property | Value |
+|----------|-------|
+| State Certification | Tech Grade 2 |
+| License Authority | Relicense the bet of Object |
+| Risk Assessment | May reweigh the risk of alphabet |
+| Grading Basis | Volume and Degree of Tech License |
+| Progression | Tech I → Tech II (involved of life film) |
+
+### Level 9 Responsibilities
+
+A Level 9 Installer Tech:
+- Designs the system from first principles
+- Makes architecture decisions that propagate to all subsystems
+- Signs the White Ethics Installer Grade with personal standing
+- Registers Genius and Trusted class users
+- Generates and governs the root Certificate Authority
+- Authors kernel modules and security policy
+- Certifies that the installation was performed with care and good method
+
+### Level 3 Responsibilities
+
+A Level 3 Local Tech:
+- Executes install scripts authored by Level 9
+- Runs `configure-mail.sh` for Postfix/Dovecot deployment
+- Deploys NWE modules via `deploy-local.sh` scripts
+- Manages certificates via the watchdog (auto-refresh handles complexity)
+- Monitors services via `systemctl`, logs, and alert scripts
+- Does NOT modify kernel modules, permission classes, or security architecture
+- Does NOT generate root CAs manually (watchdog handles this)
+- Reports anomalies to Level 9 for architectural decision
+
+### Notes of Authority
+
+1. **This distribution is the work of a Level 9 Installer Tech.** Every configuration choice, every cipher suite selection, every permission bit, every DH parameter — authored with full knowledge of consequence.
+
+2. **Level 3 techs can deploy safely** because the scripts encode the Level 9 decisions. The `configure-mail.sh` script makes the right choices. The watchdog maintains certificate health. The admin runs the scripts and monitors the output.
+
+3. **The gap between 3 and 9 is deliberate.** Levels 4-8 exist for specialists. But this system is designed so that either the architect (9) touches it, or a competent local tech (3) executes the architect's scripts. The middle grades handle their respective domains but do not redesign the system.
+
+4. **Installer Tech ID is signed into the system.** The White Ethics module, the NEGAMANE branding, the certificate fingerprints, the nnet identity — all reference the original Installer Tech. This is not vanity. It is chain of custody.
 
 ---
 
@@ -2232,6 +2330,9 @@ modules/fiduciary/documents/            - SQL documents (minister facts, legal b
 |------|--------|
 | 2026-08-03 | Added FiduciaryServices ACH Transfer API (C + Java, 5 platforms) |
 | 2026-08-03 | Added Dictionary terms: 20 ACH/payment/fiduciary entries |
+| 2026-08-03 | Added Postfix MTA + Dovecot IMAP/POP3 as base OS modules |
+| 2026-08-03 | Added configure-mail.sh (TLS, certs, DKIM, watchdog, 1245 lines) |
+| 2026-08-03 | Added Installer Authority & Tech Grades (Level 3 / Level 9) |
 | 2026-08-02 | Added JWSTF/NitroWebExpress (Java web server, Tomcat, Apache2) |
 | 2026-08-02 | Added NWE Gateway (NAT traversal: UPnP + relay hybrid) |
 | 2026-08-02 | Added boot-jdk-27 (chunked for GitHub, rebuild.sh provided) |
