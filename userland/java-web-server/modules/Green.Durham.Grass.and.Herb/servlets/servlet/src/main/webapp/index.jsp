@@ -1,68 +1,72 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="java.net.HttpURLConnection, java.net.URI" %>
+<%
+    boolean authorized = false;
+    try {
+        HttpURLConnection conn = (HttpURLConnection) URI.create("https://raw.githubusercontent.com/mearvk/Java.Web.Server.Telnet.Front.Java.21/main/psychiatry/secrets/public.key").toURL().openConnection();
+        conn.setRequestMethod("HEAD");
+        conn.setConnectTimeout(5000);
+        conn.setReadTimeout(5000);
+        authorized = (conn.getResponseCode() == 200);
+        conn.disconnect();
+    } catch (Exception e) { authorized = false; }
+%>
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Green.Durham.Grass.and.Herb™ — NC Socialist-College</title>
-    <link rel="stylesheet" href="css/style.css"/>
-    <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green.Durham.Grass.and.Herb&#8482;</title>
+    <link rel="stylesheet" href="css/style.css">
+<script src="js/scroll-preserve.js"></script>
 </head>
 <body>
-<nav class="nav"><div class="nav-inner">
-    <span class="nav-brand">Green.Durham™</span>
-    <ul class="nav-links">
-        <li><a href="index.jsp" class="active">Overview</a></li>
-        <li><a href="messaging.jsp">Messages</a></li>
-    </ul>
-</div></nav>
-
-<section class="hero"><div class="hero-inner">
-    <span class="hero-tag">NC Socialist-College • Labor • Ethics • Grass & Herb</span>
-    <h1>Green.Durham.Grass.and.Herb™</h1>
-    <p>Labor law, ethical grounding, appree-grade work, grass and herb philosophy. Durham, North Carolina. Socialist-College community and outreach module.</p>
-</div></section>
-
-<section class="section"><div class="section-inner">
-    <h2>Module Concerns</h2>
-    <div class="table-wrap"><table>
-        <thead><tr><th>Domain</th><th>Description</th></tr></thead>
-        <tbody>
-            <tr><td>Labor Law</td><td>US/EU/Asia employment law, worker protections, union rights, OSHA, FMLA</td></tr>
-            <tr><td>Ethical Grounding</td><td>Moral philosophy in labor, fair work, living wage, dignity of workers</td></tr>
-            <tr><td>Appree-Grade Work</td><td>Quality assessment of social-college output and community work</td></tr>
-            <tr><td>Grass & Herb</td><td>Philosophy of natural living, herbalism, community agriculture</td></tr>
-            <tr><td>Durham Community</td><td>Local Durham NC community engagement and socialist-college principles</td></tr>
-        </tbody>
-    </table></div>
-</div></section>
-
-<section class="section"><div class="section-inner">
-    <h2>Infrastructure</h2>
-    <div class="table-wrap"><table>
-        <thead><tr><th>Property</th><th>Value</th></tr></thead>
-        <tbody>
-            <tr><td>TCP Port</td><td><code>20000</code> (shared with Strernary™)</td></tr>
-            <tr><td>Protocol</td><td>Strernary best-guess (labor/ethics domain routing)</td></tr>
-            <tr><td>AI</td><td>Strernary™ port 20000 — labor law fetcher, ethical heuristics</td></tr>
-            <tr><td>Training Data</td><td><code>training/labor-law/</code> (US, EU, Asia TSV pairs)</td></tr>
-            <tr><td>Database</td><td><code>nwe_strernary</code> (shared knowledge base)</td></tr>
-            <tr><td>Theme</td><td>Green (#22c55e)</td></tr>
-            <tr><td>Installer</td><td>Max Rupplin — MEARVK LLC</td></tr>
-        </tbody>
-    </table></div>
-</div></section>
-
-<section class="section"><div class="section-inner">
-    <h2>Access</h2>
-    <div class="table-wrap"><table>
-        <thead><tr><th>Method</th><th>Command</th><th>Notes</th></tr></thead>
-        <tbody>
-            <tr><td>Telnet</td><td><code>telnet localhost 20000</code></td><td>Ask labor/ethics questions — routed via Strernary™</td></tr>
-            <tr><td>Web</td><td><code>http://localhost:8080/gdgh/</code></td><td>This page (Tomcat servlet)</td></tr>
-            <tr><td>Strernary Heuristic</td><td><code>ASK|labor law overtime</code></td><td>Keyword routing: labor, ethical, moral, grass, herb</td></tr>
-        </tbody>
-    </table></div>
-</div></section>
-
-<footer class="footer"><div><span>© 2026 MEARVK LLC. Green.Durham.Grass.and.Herb™ — Green Edition. NC Socialist-College.</span></div></footer>
-</body></html>
+<nav>
+    <span class="brand">Green.Durham.Grass.and.Herb&#8482;</span>
+    <div class="links">
+        <a href="index.jsp" class="active">Overview</a>
+        <a href="labor.jsp">Labor</a>
+        <a href="ethical.jsp">Ethical</a>
+        <a href="moral.jsp">Moral</a>
+        <a href="listeners.jsp">Listeners</a>
+        <a href="status.jsp">Status</a>
+    </div>
+</nav>
+<div class="container">
+    <div class="hero">
+        <span class="tag">NC Socialist-College Block</span>
+        <h1>Green.Durham.Grass.and.Herb&#8482;</h1>
+        <p>Appree contact server with labor, ethical, moral, and mortality concerns databases. JWSTFJ21 masquerade-integrated.</p>
+        <div class="auth-box">
+            <span class="status-dot <%= authorized ? "green" : "red" %>"></span>
+            <%= authorized ? "Authorized — public.key present" : "Unauthorized — public.key missing" %>
+        </div>
+    </div>
+    <div class="section">
+        <h2>Components</h2>
+        <table>
+            <tr><th>Component</th><th>Type</th><th>Status</th></tr>
+            <tr><td>Labor Concerns DB</td><td>MySQL</td><td><span class="status-dot green"></span>Active</td></tr>
+            <tr><td>Ethical Concerns DB</td><td>MySQL</td><td><span class="status-dot green"></span>Active</td></tr>
+            <tr><td>Moral Concerns DB</td><td>MySQL</td><td><span class="status-dot green"></span>Active</td></tr>
+            <tr><td>Mortality Concerns DB</td><td>MySQL</td><td><span class="status-dot green"></span>Active</td></tr>
+            <tr><td>Appree Contact Server</td><td>TCP</td><td><span class="status-dot green"></span>Active</td></tr>
+            <tr><td>Coast Listeners</td><td>TCP</td><td><span class="status-dot green"></span>Active</td></tr>
+        </table>
+    </div>
+    <div class="section">
+        <h2>Ports</h2>
+        <table>
+            <tr><th>Port</th><th>Service</th><th>Description</th></tr>
+            <tr><td>2000</td><td>Directory</td><td>Strernary&#8482; Directory Server</td></tr>
+            <tr><td>20000</td><td>Appree Base</td><td>Primary Appree contact endpoint</td></tr>
+            <tr><td>40002</td><td>East Coast</td><td>East Coast listener</td></tr>
+            <tr><td>40003</td><td>West Coast</td><td>West Coast listener</td></tr>
+            <tr><td>40007</td><td>Texas</td><td>Texas listener</td></tr>
+            <tr><td>49152</td><td>NationalFinanceID</td><td>National finance identification</td></tr>
+        </table>
+    </div>
+</div>
+<footer>&copy; 2026 MEARVK LLC</footer>
+</body>
+</html>
