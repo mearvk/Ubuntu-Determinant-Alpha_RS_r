@@ -22,6 +22,10 @@ KERNEL_DIR="$PROJECT_DIR/kernels/linux-5.15.204/linux-5.15.204"
 NPROC=$(nproc)
 LOG_FILE="$PROJECT_DIR/build/build-timing.log"
 
+# Silent warnings by default (WARNINGS=0 passes -w to gcc and filters output)
+WARNINGS="${WARNINGS:-0}"
+export WARNINGS
+
 DRY_RUN=0
 PHASE="all"
 
@@ -150,7 +154,7 @@ clean_phase() {
 do_modules() {
     clean_phase "kernel"
     run_timed "Kernel Modules (custom extensions)" \
-        "make -C '$KERNEL_DIR' modules -j$NPROC"
+        "make -C '$KERNEL_DIR' modules -j$NPROC W=0 2>&1 | grep -v 'warning:' || true"
 }
 
 # ==============================================================================
@@ -159,7 +163,7 @@ do_modules() {
 do_kernel() {
     clean_phase "kernel"
     run_timed "Kernel (full build: vmlinuz + modules)" \
-        "make -C '$KERNEL_DIR' -j$NPROC"
+        "make -C '$KERNEL_DIR' -j$NPROC W=0 2>&1 | grep -v 'warning:' || true"
 }
 
 # ==============================================================================
@@ -168,7 +172,7 @@ do_kernel() {
 do_tools() {
     clean_phase "tools"
     run_timed "Tools (sudo_gate, chat, nnet, negamane)" \
-        "make -C '$PROJECT_DIR' tools"
+        "make -C '$PROJECT_DIR' WARNINGS=0 tools"
 }
 
 # ==============================================================================
@@ -177,7 +181,7 @@ do_tools() {
 do_x11() {
     clean_phase "x11"
     run_timed "X11 (X.Org Server + libraries)" \
-        "make -C '$PROJECT_DIR' x11"
+        "make -C '$PROJECT_DIR' WARNINGS=0 x11"
 }
 
 # ==============================================================================
@@ -186,7 +190,7 @@ do_x11() {
 do_rootfs() {
     clean_phase "rootfs"
     run_timed "Root Filesystem Assembly" \
-        "make -C '$PROJECT_DIR' rootfs-full"
+        "make -C '$PROJECT_DIR' WARNINGS=0 rootfs-full"
 }
 
 # ==============================================================================
@@ -195,7 +199,7 @@ do_rootfs() {
 do_iso() {
     clean_phase "iso"
     run_timed "ISO Generation (bootable image)" \
-        "make -C '$PROJECT_DIR' iso"
+        "make -C '$PROJECT_DIR' WARNINGS=0 iso"
 }
 
 # ==============================================================================
