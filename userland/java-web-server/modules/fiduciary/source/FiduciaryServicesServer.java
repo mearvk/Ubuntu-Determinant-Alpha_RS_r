@@ -58,6 +58,7 @@ public class FiduciaryServicesServer implements Runnable {
     private volatile boolean running = true;
     private ServerSocket server;
     private final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
+    private final FiduciaryOutboundConnector outbound = new FiduciaryOutboundConnector();
 
     public FiduciaryServicesServer() {
         print(". FiduciaryServices\u2122 starting on port " + PORT + " .");
@@ -110,7 +111,9 @@ public class FiduciaryServicesServer implements Runnable {
             out.println();
             out.println("  Commands: ASK|<q>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<kw>,");
             out.println("            POLYBLEND, DATAPOOL|<src>, DOCUMENTS|<category>,");
-            out.println("            BRIGHT|<keyword>, TREASURE|<keyword>, HELP, STATUS, QUIT");
+            out.println("            BRIGHT|<keyword>, TREASURE|<keyword>,");
+            out.println("            TLS|<host>, CONNECT|<host:port>, NAT|<platform>, PORTS,");
+            out.println("            HELP, STATUS, QUIT");
             out.println();
 
             String line;
@@ -118,7 +121,7 @@ public class FiduciaryServicesServer implements Runnable {
                 line = line.trim();
                 if (line.equalsIgnoreCase("QUIT")) { out.println("Trust well, steward carefully. Farewell."); break; }
                 if (line.equalsIgnoreCase("STATUS")) { out.println("OK|port=" + PORT + "|db=nwe_fiduciary|module=FiduciaryServices"); continue; }
-                if (line.equalsIgnoreCase("HELP")) { out.println("HELP|ASK|<question>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<keyword>, POLYBLEND, DATAPOOL|<source>, DOCUMENTS|<category>, BRIGHT|<keyword>, TREASURE|<keyword>, STATUS, QUIT"); continue; }
+                if (line.equalsIgnoreCase("HELP")) { out.println("HELP|ASK|<question>, YIELD|<model>, ARCHITECTURE|<name>, RECORDS|<keyword>, POLYBLEND, DATAPOOL|<source>, DOCUMENTS|<category>, BRIGHT|<keyword>, TREASURE|<keyword>, TLS|<host>, CONNECT|<host:port>, NAT|<platform>, PORTS, STATUS, QUIT"); continue; }
                 if (line.equalsIgnoreCase("POLYBLEND")) { out.println(computePolyblend()); continue; }
                 if (line.startsWith("ASK|")) { out.println(askQuestion(line.substring(4).trim())); continue; }
                 if (line.startsWith("YIELD|")) { out.println(queryYield(line.substring(6).trim())); continue; }
@@ -128,6 +131,9 @@ public class FiduciaryServicesServer implements Runnable {
                 if (line.startsWith("DOCUMENTS|")) { out.println(queryDocuments(line.substring(10).trim())); continue; }
                 if (line.startsWith("BRIGHT|")) { out.println(queryLegalBright(line.substring(7).trim())); continue; }
                 if (line.startsWith("TREASURE|")) { out.println(queryTreasureFiduciary(line.substring(9).trim())); continue; }
+                if (line.startsWith("TLS|") || line.startsWith("CONNECT|") || line.startsWith("NAT|") || line.equalsIgnoreCase("PORTS")) {
+                    out.println(outbound.handleCommand(line)); continue;
+                }
                 out.println(askQuestion(line));
             }
         } catch (Exception ignored) {}

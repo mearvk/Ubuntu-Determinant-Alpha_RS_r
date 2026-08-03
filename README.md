@@ -43,18 +43,20 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 16. [chkrootkit — Rootkit Detection](#chkrootkit--rootkit-detection)
 17. [rkhunter — Rootkit Hunter](#rkhunter--rootkit-hunter)
 18. [MySQL — Protected Database](#mysql--protected-database)
-19. [Chromium Browser — Open Source](#chromium-browser--open-source)
-20. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
-21. [Certificates](#certificates)
-22. [OpenJDK 28 — Secure JVM](#openjdk-28--secure-jvm)
-23. [Secure JVM: XML Configuration Reader](#secure-jvm-xml-configuration-reader)
-24. [Secure JVM: ClassLoadGuard](#secure-jvm-classloadguard)
-25. [Secure JVM: Integrity Guardian](#secure-jvm-integrity-guardian)
-26. [Secure JVM: Pause-Frame Inspector](#secure-jvm-pause-frame-inspector)
-27. [Secure JVM: Observer Grade Circuit](#secure-jvm-observer-grade-circuit)
-28. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
-29. [Secure JVM: System Codex](#secure-jvm-system-codex)
-30. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
+19. [Postfix — Mail Transfer Agent](#postfix--mail-transfer-agent)
+20. [Dovecot — IMAP/POP3 Server](#dovecot--imappop3-server)
+21. [Chromium Browser — Open Source](#chromium-browser--open-source)
+22. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+23. [Certificates](#certificates)
+24. [OpenJDK 28 — Secure JVM](#openjdk-28--secure-jvm)
+25. [Secure JVM: XML Configuration Reader](#secure-jvm-xml-configuration-reader)
+26. [Secure JVM: ClassLoadGuard](#secure-jvm-classloadguard)
+27. [Secure JVM: Integrity Guardian](#secure-jvm-integrity-guardian)
+28. [Secure JVM: Pause-Frame Inspector](#secure-jvm-pause-frame-inspector)
+29. [Secure JVM: Observer Grade Circuit](#secure-jvm-observer-grade-circuit)
+30. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
+31. [Secure JVM: System Codex](#secure-jvm-system-codex)
+32. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
 
 ---
 
@@ -1114,6 +1116,254 @@ tools/mysql/install_mysql.sh   - Protected installation script
 tools/mysql/apt_mysql_hook.sh  - APT post-invoke hook
 tools/mysql/99mysql-registry.conf - APT configuration
 tools/mysql/pkg-info           - Registry query tool
+```
+
+---
+
+## Postfix — Mail Transfer Agent
+
+Postfix is the system's MTA (Mail Transfer Agent), handling all outbound and inbound SMTP mail. Runs in Memory Grain 3 with process isolation. Configured for TLS by default on all ports.
+
+### Ports
+
+| Port | Protocol | Direction | Purpose |
+|------|----------|-----------|---------|
+| 25 | SMTP | Inbound/Outbound | Server-to-server mail relay (MX delivery) |
+| 465 | SMTPS | Outbound | Implicit TLS submission (legacy, still used) |
+| 587 | Submission | Outbound | STARTTLS authenticated submission (preferred) |
+
+### Configuration
+
+| Setting | Value | File |
+|---------|-------|------|
+| `myhostname` | `mail.lauradei.us` | `/etc/postfix/main.cf` |
+| `mydomain` | `lauradei.us` | `/etc/postfix/main.cf` |
+| `myorigin` | `$mydomain` | `/etc/postfix/main.cf` |
+| `inet_interfaces` | `all` | `/etc/postfix/main.cf` |
+| `smtpd_tls_cert_file` | `/etc/letsencrypt/live/lauradei.us/fullchain.pem` | `/etc/postfix/main.cf` |
+| `smtpd_tls_key_file` | `/etc/letsencrypt/live/lauradei.us/privkey.pem` | `/etc/postfix/main.cf` |
+| `smtpd_tls_security_level` | `may` (opportunistic TLS) | `/etc/postfix/main.cf` |
+| `smtp_tls_security_level` | `may` (outbound TLS when available) | `/etc/postfix/main.cf` |
+| `smtpd_sasl_auth_enable` | `yes` | `/etc/postfix/main.cf` |
+| `smtpd_sasl_type` | `dovecot` | `/etc/postfix/main.cf` |
+| `smtpd_sasl_path` | `private/auth` | `/etc/postfix/main.cf` |
+
+### TLS / Key Exchange
+
+Postfix performs TLS handshake on every inbound and outbound connection:
+
+| Phase | What Happens |
+|-------|-------------|
+| ClientHello | Remote server or client announces supported cipher suites |
+| ServerHello | Postfix selects strongest mutual cipher (prefer ECDHE) |
+| Certificate | Postfix presents Let's Encrypt certificate chain |
+| Key Exchange | ECDHE (X25519 or P-256) — ephemeral, forward-secret |
+| Finished | AES-256-GCM session established |
+
+**Outbound (port 587/465):** Postfix acts as client — connects to remote SMTP servers using STARTTLS. Verifies remote certificates. Falls back to plaintext only if TLS unavailable (configurable).
+
+**Inbound (port 25):** Postfix acts as server — presents its own certificate. Accepts TLS from sending servers. Required for modern email delivery (many senders reject non-TLS receivers).
+
+### NAT Awareness
+
+On home internet connections:
+- **Outbound port 587** is always open — used for sending via ISP or relay
+- **Outbound port 25** is often ISP-blocked — configure relay host (`relayhost = [smtp.isp.com]:587`)
+- **Inbound port 25** requires port forwarding or public IP for receiving mail
+- Postfix `smtp_tls_security_level = encrypt` forces TLS on outbound (recommended)
+
+### Protection
+
+| Mechanism | Effect |
+|-----------|--------|
+| `ProtectProc=invisible` | Postfix master/workers invisible in /proc |
+| `smtpd_helo_required` | Rejects clients that skip HELO/EHLO |
+| `smtpd_recipient_restrictions` | Reject relay from unauthorized senders |
+| `smtpd_client_restrictions` | Rate limiting, RBL checks |
+| `milter` integration | ClamAV scans all inbound mail |
+| Binaries branded (negamane) | Immutable executables |
+
+### Integration with FiduciaryServices
+
+The Fiduciary module uses Postfix (via port 587 STARTTLS or 465 SMTPS) to send:
+- Transfer confirmation notifications
+- Fiduciary hold alerts (TLS key change detected)
+- Daily polyblend yield reports
+- ACH settlement confirmations
+
+### Usage
+
+```bash
+systemctl status postfix           # Status
+postqueue -p                        # View mail queue
+postqueue -f                        # Flush queue (retry all)
+postconf -n                         # Show non-default configuration
+echo "Test" | mail -s "Test" user@example.com   # Send test
+journalctl -u postfix -f            # Live logs
+```
+
+### Files
+
+```
+tools/postfix/                     - Postfix source (IBM Public License / Eclipse Public License)
+tools/postfix/install_postfix.sh   - Protected installation script
+/etc/postfix/main.cf               - Main configuration
+/etc/postfix/master.cf             - Service definitions (smtpd, submission, smtps)
+/etc/postfix/sasl/                 - SASL authentication configuration
+```
+
+---
+
+## Dovecot — IMAP/POP3 Server
+
+Dovecot provides IMAP and POP3 access to user mailboxes. Works in tandem with Postfix — Postfix delivers mail, Dovecot serves it to clients. Runs in Memory Grain 3 with TLS on all connections.
+
+### Ports
+
+| Port | Protocol | Direction | Purpose |
+|------|----------|-----------|---------|
+| 143 | IMAP | Inbound | IMAP with STARTTLS (mailbox access) |
+| 993 | IMAPS | Inbound | IMAP over implicit TLS (preferred) |
+| 110 | POP3 | Inbound | POP3 with STARTTLS (download & delete) |
+| 995 | POP3S | Inbound | POP3 over implicit TLS |
+
+### Configuration
+
+| Setting | Value | File |
+|---------|-------|------|
+| `protocols` | `imap pop3 lmtp` | `/etc/dovecot/dovecot.conf` |
+| `ssl` | `required` | `/etc/dovecot/conf.d/10-ssl.conf` |
+| `ssl_cert` | `/etc/letsencrypt/live/lauradei.us/fullchain.pem` | `/etc/dovecot/conf.d/10-ssl.conf` |
+| `ssl_key` | `/etc/letsencrypt/live/lauradei.us/privkey.pem` | `/etc/dovecot/conf.d/10-ssl.conf` |
+| `ssl_min_protocol` | `TLSv1.2` | `/etc/dovecot/conf.d/10-ssl.conf` |
+| `ssl_cipher_list` | `ECDHE+AESGCM:ECDHE+CHACHA20:!aNULL:!MD5:!RC4` | `/etc/dovecot/conf.d/10-ssl.conf` |
+| `mail_location` | `maildir:~/Maildir` | `/etc/dovecot/conf.d/10-mail.conf` |
+| `auth_mechanisms` | `plain login` | `/etc/dovecot/conf.d/10-auth.conf` |
+
+### TLS / Key Exchange
+
+Dovecot performs the same TLS handshake as Postfix for client connections:
+
+| Parameter | Preferred Value |
+|-----------|----------------|
+| Protocol | TLS 1.3 (fallback TLS 1.2) |
+| Key Exchange | ECDHE X25519 (forward-secret) |
+| Cipher | AES-256-GCM or ChaCha20-Poly1305 |
+| Certificate | Let's Encrypt (auto-renewed) |
+| OCSP Stapling | Enabled |
+
+### SASL Authentication (Postfix ↔ Dovecot)
+
+Dovecot provides SASL authentication services to Postfix via Unix socket:
+
+```
+Postfix (submission/587)
+    │
+    │ SASL auth request via /var/spool/postfix/private/auth
+    ▼
+Dovecot auth worker
+    │
+    │ Verify credentials against system users or virtual users DB
+    ▼
+OK/FAIL → Postfix accepts/rejects SMTP submission
+```
+
+Configuration in `/etc/dovecot/conf.d/10-master.conf`:
+```
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+```
+
+### LMTP Delivery (Postfix → Dovecot)
+
+Postfix delivers mail to Dovecot via LMTP (Local Mail Transfer Protocol) for Sieve filtering, quota enforcement, and Maildir delivery:
+
+```
+Internet → Postfix (port 25) → LMTP → Dovecot → ~/Maildir/
+```
+
+### NAT Awareness
+
+On home internet:
+- **Inbound ports 993/143** require port forwarding for remote email client access
+- **Alternative:** Use NWE Gateway relay + persistent outbound to fetch mail
+- **Alternative:** Webmail interface via Tomcat (no inbound port needed)
+- Dovecot itself makes no outbound connections (purely serves local mailboxes)
+
+### Protection
+
+| Mechanism | Effect |
+|-----------|--------|
+| `ssl = required` | No plaintext connections accepted |
+| `ssl_min_protocol = TLSv1.2` | Rejects TLS 1.0/1.1 |
+| `auth_failure_delay = 2s` | Brute-force slowdown |
+| `login_trusted_networks` | Whitelist trusted IPs |
+| `mail_max_userip_connections = 20` | DoS protection |
+| Process isolation | Each user served by dedicated worker |
+| Binaries branded (negamane) | Immutable executables |
+
+### Mail Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SENDING (Outbound)                                             │
+│                                                                 │
+│  User/App → Postfix (587/STARTTLS) → Remote MX (port 25/TLS)  │
+│                     ↓                                           │
+│              Dovecot SASL auth                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  RECEIVING (Inbound)                                            │
+│                                                                 │
+│  Remote MTA → Postfix (25/TLS) → ClamAV milter → LMTP →       │
+│              Dovecot → ~/Maildir/new/                           │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  READING (Client Access)                                        │
+│                                                                 │
+│  Email Client → Dovecot (993/IMAPS) → ~/Maildir/               │
+│  Webmail      → Tomcat JSP → Dovecot (143/localhost)            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### User Accounts
+
+Mail accounts map to system users (UID 1000+):
+
+| User | Email | Maildir |
+|------|-------|---------|
+| mearvk | mearvk@lauradei.us | /home/mearvk/Maildir/ |
+| admin | admin@lauradei.us | /home/admin/Maildir/ |
+| truth | truth@lauradei.us | /home/truth/Maildir/ |
+
+### Usage
+
+```bash
+systemctl status dovecot           # Status
+doveadm mailbox list -u mearvk     # List mailboxes
+doveadm fetch -u mearvk "subject" mailbox INBOX   # Query inbox
+doveconf -n                         # Show non-default configuration
+journalctl -u dovecot -f            # Live logs
+```
+
+### Files
+
+```
+tools/dovecot/                     - Dovecot source (MIT/LGPLv2.1)
+tools/dovecot/install_dovecot.sh   - Protected installation script
+/etc/dovecot/dovecot.conf          - Main configuration
+/etc/dovecot/conf.d/               - Modular config directory
+/etc/dovecot/conf.d/10-ssl.conf    - TLS settings
+/etc/dovecot/conf.d/10-mail.conf   - Maildir location
+/etc/dovecot/conf.d/10-auth.conf   - Authentication methods
+/etc/dovecot/conf.d/10-master.conf - Service definitions (LMTP, SASL)
 ```
 
 ---

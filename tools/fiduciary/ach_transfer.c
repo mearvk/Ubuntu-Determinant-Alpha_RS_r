@@ -880,13 +880,19 @@ static void print_usage(void)
     printf("    ach_transfer --list-platforms\n");
     printf("    ach_transfer --fee-estimate --platform <name> --amount <USD> [--method ach|card]\n");
     printf("    ach_transfer --status --reference <txn_id>\n");
-    printf("    ach_transfer --history [--limit N]\n\n");
+    printf("    ach_transfer --history [--limit N]\n");
+    printf("    ach_transfer --ports\n");
+    printf("    ach_transfer --nat <platform>\n\n");
     printf("  Platforms: melio, moov, stripe, square, helcim\n\n");
+    printf("  Outbound Connectivity:\n");
+    printf("    --ports            Show permitted outbound ports and NAT awareness\n");
+    printf("    --nat <platform>   Explain return-path strategy for a platform\n\n");
     printf("  Examples:\n");
     printf("    ach_transfer --platform melio --to 021000021:123456789 --amount 500.00\n");
     printf("    ach_transfer --platform stripe --to 021000021:123456789 --amount 1000 --method ach\n");
     printf("    ach_transfer --platform moov --to 021000021:123456789 --amount 250 --speed same-day\n");
     printf("    ach_transfer --fee-estimate --platform helcim --amount 5000 --method card\n");
+    printf("    ach_transfer --nat stripe\n");
     printf("\n");
 }
 
@@ -933,6 +939,100 @@ static Platform parse_platform(const char *name)
     return PLATFORM_COUNT; /* invalid */
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Outbound Ports & NAT Strategy
+   ═══════════════════════════════════════════════════════════════════════ */
+
+static void print_outbound_ports(void)
+{
+    printf(C_LTBLUE "\n  ╔══════════════════════════════════════════════════════════════════════╗\n");
+    printf("  ║  OUTBOUND PORT MANIFEST — FiduciaryServices™                        ║\n");
+    printf("  ╠══════════════════════════════════════════════════════════════════════╣\n");
+    printf("  ║                                                                      ║\n");
+    printf("  ║  Port   Protocol      Purpose                                        ║\n");
+    printf("  ║  ─────  ────────────  ───────────────────────────────────────────    ║\n");
+    printf("  ║  20     FTP Data      File transfer (active mode data channel)       ║\n");
+    printf("  ║  21     FTP Control   File transfer (command channel)                ║\n");
+    printf("  ║  22     SSH           Secure shell, SFTP, tunnel establishment       ║\n");
+    printf("  ║  25     SMTP          Email relay (ISPs may block; use 587)          ║\n");
+    printf("  ║  80     HTTP          Plaintext web (→ redirect to 443 typical)      ║\n");
+    printf("  ║  443    HTTPS         Encrypted web, API calls, payment platforms    ║\n");
+    printf("  ║  465    SMTPS         SMTP over implicit TLS (submission)            ║\n");
+    printf("  ║  587    SMTP Sub      SMTP with STARTTLS (authenticated mail send)   ║\n");
+    printf("  ║  8080   HTTP Alt      Application servers, proxies, dev endpoints    ║\n");
+    printf("  ║  8443   HTTPS Alt     Application servers over TLS, admin panels     ║\n");
+    printf("  ║                                                                      ║\n");
+    printf("  ╠══════════════════════════════════════════════════════════════════════╣\n");
+    printf("  ║  NAT AWARENESS:                                                      ║\n");
+    printf("  ║  • Outbound ports are OPEN by default on home internet               ║\n");
+    printf("  ║  • Inbound ports are BLOCKED by NAT (router)                         ║\n");
+    printf("  ║  • Return packets work via NAT table mapping (auto, 60-300s TTL)     ║\n");
+    printf("  ║  • Keepalive every 45s prevents NAT expiry on persistent conns       ║\n");
+    printf("  ║  • ISPs commonly block outbound port 25 (use 587/465 for email)      ║\n");
+    printf("  ╚══════════════════════════════════════════════════════════════════════╝\n" C_RESET);
+    printf("\n");
+    printf(C_DIM "  TLS/SSL Intelligence: Fiduciary captures public key, cipher suite, cert chain,\n");
+    printf("  key exchange method (ECDHE/DHE/RSA), and certificate fingerprint for every\n");
+    printf("  outbound HTTPS connection. Key changes are detected (fiduciary hold).\n" C_RESET);
+    printf("\n");
+}
+
+static void print_nat_strategy(const char *platform_name)
+{
+    printf(C_LTBLUE "\n  NAT Return-Path Strategy — %s\n" C_RESET, platform_name);
+    printf("  ────────────────────────────────────────────────────────────────\n\n");
+
+    printf("  " C_WHITE "Problem:" C_RESET " Most home internet is behind NAT.\n");
+    printf("    • Outbound 80/443/587 are open (we connect TO payment APIs)\n");
+    printf("    • Inbound ports are CLOSED (APIs cannot connect back to us)\n");
+    printf("    • NAT table maps return packets for active connections only\n");
+    printf("    • NAT entries expire after 60-300s of inactivity\n\n");
+
+    if (strcasecmp(platform_name, "stripe") == 0) {
+        printf("  " C_GREEN "Strategy: PERSISTENT OUTBOUND" C_RESET "\n");
+        printf("    Stripe supports server-sent events and long-poll on /v1/events.\n");
+        printf("    Maintain a persistent TLS connection to api.stripe.com:443.\n");
+        printf("    Send TCP keepalive every 45s to prevent NAT table expiry.\n");
+        printf("    All transfer status updates arrive on this persistent channel.\n");
+        printf("    No inbound port required.\n");
+    } else if (strcasecmp(platform_name, "moov") == 0) {
+        printf("  " C_GREEN "Strategy: PERSISTENT OUTBOUND" C_RESET "\n");
+        printf("    Moov has streaming API and supports webhook-via-websocket.\n");
+        printf("    Maintain a persistent TLS/WebSocket to api.moov.io:443.\n");
+        printf("    FedNow/RTP settlement confirmations arrive via this stream.\n");
+        printf("    TCP keepalive every 45s. No inbound port required.\n");
+    } else if (strcasecmp(platform_name, "melio") == 0) {
+        printf("  " C_GOLD "Strategy: WEBHOOK RELAY" C_RESET "\n");
+        printf("    Melio requires a webhook URL for payment status callbacks.\n");
+        printf("    Register relay.mearvk.us as webhook endpoint with Melio.\n");
+        printf("    Relay has a public IP and accepts callbacks from Melio.\n");
+        printf("    We maintain persistent outbound TLS to relay.mearvk.us:443.\n");
+        printf("    When Melio POSTs to relay, relay forwards to us on our\n");
+        printf("    already-open outbound connection. No inbound port needed.\n");
+    } else if (strcasecmp(platform_name, "helcim") == 0) {
+        printf("  " C_GOLD "Strategy: WEBHOOK RELAY" C_RESET "\n");
+        printf("    Helcim requires a webhook URL for transaction notifications.\n");
+        printf("    Same relay pattern as Melio: relay.mearvk.us forwards events.\n");
+        printf("    Persistent outbound TLS connection to relay handles delivery.\n");
+    } else if (strcasecmp(platform_name, "square") == 0) {
+        printf("  " C_CYAN "Strategy: POLLING" C_RESET "\n");
+        printf("    Square — poll GET /v2/payments/{id} for status updates.\n");
+        printf("    Poll every 15s during active transfers, 5min during idle.\n");
+        printf("    Each poll is a fresh outbound HTTPS request to port 443.\n");
+        printf("    Works universally, no inbound port or relay needed.\n");
+    } else {
+        printf("  " C_CYAN "Strategy: POLLING (default)" C_RESET "\n");
+        printf("    Periodically query platform API for transfer status.\n");
+        printf("    Active: every 15s. Idle: every 5min. Outbound port 443.\n");
+    }
+
+    printf("\n  " C_DIM "SSL/TLS: On each outbound connection, Fiduciary captures the server's\n");
+    printf("  public key, certificate chain, cipher suite, and key exchange method.\n");
+    printf("  If the public key changes unexpectedly → fiduciary hold BROKEN (alert).\n");
+    printf("  Private keys are NEVER captured (impossible). Only public handshake data.\n" C_RESET);
+    printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
     if (argc < 2) {
@@ -943,6 +1043,8 @@ int main(int argc, char *argv[])
 
     /* Parse arguments */
     int do_list = 0, do_fee = 0, do_status = 0, do_history = 0;
+    int do_ports = 0, do_nat = 0;
+    char nat_platform[32] = {0};
     TransferRequest req = {0};
     req.platform = PLATFORM_COUNT;
     req.method = METHOD_ACH;
@@ -960,6 +1062,11 @@ int main(int argc, char *argv[])
             do_status = 1;
         } else if (strcmp(argv[i], "--history") == 0) {
             do_history = 1;
+        } else if (strcmp(argv[i], "--ports") == 0) {
+            do_ports = 1;
+        } else if (strcmp(argv[i], "--nat") == 0 && i + 1 < argc) {
+            do_nat = 1;
+            strncpy(nat_platform, argv[++i], sizeof(nat_platform) - 1);
         } else if (strcmp(argv[i], "--platform") == 0 && i + 1 < argc) {
             req.platform = parse_platform(argv[++i]);
         } else if (strcmp(argv[i], "--to") == 0 && i + 1 < argc) {
@@ -1013,6 +1120,18 @@ int main(int argc, char *argv[])
     /* Handle list-platforms (no DB needed) */
     if (do_list) {
         list_platforms();
+        return 0;
+    }
+
+    /* Handle outbound ports display (no DB needed) */
+    if (do_ports) {
+        print_outbound_ports();
+        return 0;
+    }
+
+    /* Handle NAT strategy display (no DB needed) */
+    if (do_nat) {
+        print_nat_strategy(nat_platform);
         return 0;
     }
 

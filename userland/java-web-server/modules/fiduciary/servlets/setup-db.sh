@@ -256,6 +256,46 @@ CREATE TABLE IF NOT EXISTS ach_audit_log (
     INDEX idx_event_time (event_time)
 ) ENGINE=InnoDB;
 
+-- TLS Intelligence (outbound connection key exchange capture)
+CREATE TABLE IF NOT EXISTS tls_intelligence (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    hostname VARCHAR(256) NOT NULL,
+    port INT NOT NULL,
+    protocol VARCHAR(16),
+    cipher_suite VARCHAR(128),
+    key_exchange_method VARCHAR(128),
+    server_cert_subject TEXT,
+    server_cert_issuer TEXT,
+    server_cert_serial VARCHAR(128),
+    public_key_algorithm VARCHAR(16),
+    public_key_bits INT,
+    public_key_fingerprint VARCHAR(128),
+    cert_chain TEXT,
+    not_before TIMESTAMP NULL,
+    not_after TIMESTAMP NULL,
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fiduciary_hold_intact TINYINT DEFAULT 1,
+    INDEX idx_host_port (hostname, port),
+    INDEX idx_fingerprint (public_key_fingerprint),
+    INDEX idx_captured (captured_at)
+) ENGINE=InnoDB;
+
+-- Outbound connection log (NAT strategy tracking)
+CREATE TABLE IF NOT EXISTS outbound_connections (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    hostname VARCHAR(256) NOT NULL,
+    port INT NOT NULL,
+    protocol VARCHAR(16),
+    strategy ENUM('persistent','relay','polling','upnp') NOT NULL DEFAULT 'polling',
+    purpose VARCHAR(128),
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    disconnected_at TIMESTAMP NULL,
+    keepalive_count INT DEFAULT 0,
+    nat_detected TINYINT DEFAULT 1,
+    INDEX idx_host (hostname),
+    INDEX idx_strategy (strategy)
+) ENGINE=InnoDB;
+
 -- Seed ACH platforms
 INSERT IGNORE INTO ach_platforms (name, display_name, api_base_url, monthly_fee, ach_pct, ach_flat, ach_cap, card_pct, card_flat, supports_ach, supports_card, supports_fednow, supports_rtp, best_for) VALUES
     ('melio', 'Melio', 'https://api.melio.com/v1', 0.00, 0.000, 0.00, 0.00, 2.900, 0.30, 1, 1, 0, 0, 'Zero-fee standard business ACH transactions'),
@@ -266,6 +306,7 @@ INSERT IGNORE INTO ach_platforms (name, display_name, api_base_url, monthly_fee,
 "
 
 echo "[OK] nwe_fiduciary database ready."
-echo "     14 tables created."
+echo "     16 tables created."
 echo "     ACH platforms seeded: Melio, Moov, Stripe, Square, Helcim."
+echo "     TLS intelligence + outbound connections tracked."
 echo "     Installer Tech ID: Max Rupplin"
