@@ -403,8 +403,8 @@ wine-install:
 		echo "  ERROR: Wine not built. Run 'make wine' first."; exit 1; \
 	fi
 	@$(MAKE) -C $(WINE_DIR)/build64 install DESTDIR=$(abspath $(ROOTFS_DIR))
-	@# Install configuration and integration files via installer script
-	@bash $(SCRIPTS_DIR)/install-wine.sh "$(ROOTFS_DIR)" --clone-only 2>/dev/null || true
+	@# Install native .exe handlers (desktop + CLI binfmt_misc)
+	@bash $(SCRIPTS_DIR)/install-wine-handlers.sh "$(ROOTFS_DIR)"
 	@# Install environment and desktop integration
 	@install -d $(ROOTFS_DIR)/etc/profile.d
 	@cat > $(ROOTFS_DIR)/etc/profile.d/wine.sh <<'WINEPROFILE'
@@ -413,10 +413,8 @@ export WINEARCH="$${WINEARCH:-win64}"
 export WINEPREFIX="$${WINEPREFIX:-$$HOME/.wine}"
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 WINEPROFILE
-	@install -d $(ROOTFS_DIR)/usr/share/applications
-	@printf '[Desktop Entry]\nName=Wine Configuration\nComment=Configure Wine\nExec=winecfg\nTerminal=false\nType=Application\nIcon=wine\nCategories=System;Settings;\n' \
-		> $(ROOTFS_DIR)/usr/share/applications/wine-config.desktop
 	@echo "  ✓ Wine installed to $(ROOTFS_DIR)/usr/local"
+	@echo "  ✓ Native .exe handlers active (desktop + CLI)"
 
 wine-binary:
 	@echo "=== Installing Wine from WineHQ binary repository ==="
