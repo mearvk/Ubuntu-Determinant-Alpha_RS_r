@@ -63,6 +63,7 @@ PREFIX        := /usr
         tools-rkhunter tools-rkhunter-install \
         wine wine-fetch wine-build wine-install wine-binary wine-clean wine-distclean \
         darling darling-build darling-install darling-clean \
+        vault-rootkits \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -492,6 +493,27 @@ darling-clean:
 	@echo "  ✓ Darling build directory removed"
 
 # ==============================================================================
+# Negamane Vault — Rootkit Study Material
+# ==============================================================================
+#
+# Disassembles rootkit detection signatures from chkrootkit and rkhunter
+# into a negamane-branded immutable vault. The material is:
+#   - Fragmented into 3 non-functional parts each
+#   - Branded immutable (cannot be modified)
+#   - Cannot be quickly installed (no reassembly script provided)
+#   - Requires sudo_gate level 7 + negamane passphrase to access
+#
+# Rootkits vaulted: Reptile, BPFDoor, Symbiote, Lightning, Orbit,
+#   FontOnLake, RotaJakiro, Pandora, Melofee, Kinsing, Perfctl, Bootkitty
+
+vault-rootkits:
+	@echo "=== Securing rootkit study material in negamane vault ==="
+	@bash $(SCRIPTS_DIR)/vault-rootkit-references.sh "$(ROOTFS_DIR)"
+	@echo "  ✓ Rootkit references disassembled and vaulted"
+	@echo "  ✓ Quick install: BLOCKED"
+	@echo "  ✓ Negamane brand: IMMUTABLE"
+
+# ==============================================================================
 # Custom Tools - Core (simple Makefile-based)
 # ==============================================================================
 
@@ -854,7 +876,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install darling-install tools-all-install desktop jwstf-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install darling-install tools-all-install vault-rootkits desktop jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
