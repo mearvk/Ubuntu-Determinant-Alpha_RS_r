@@ -25,6 +25,7 @@ WINE_DIR      := $(USERLAND_DIR)/wine
 WINE_VERSION  := 9.0
 WINE_TAG      := wine-$(WINE_VERSION)
 WINE_GIT_URL  := https://gitlab.winehq.org/wine/wine.git
+DARLING_DIR   := $(USERLAND_DIR)/darling
 
 # Build output
 BUILD_DIR     := build
@@ -61,6 +62,7 @@ PREFIX        := /usr
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
         wine wine-fetch wine-build wine-install wine-binary wine-clean wine-distclean \
+        darling darling-build darling-install darling-clean \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -79,13 +81,13 @@ help:
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  deps             - Install all host build dependencies (requires sudo)"
-	@echo "  all              - Build asm + kernel + userland (incl. Wine)"
+	@echo "  all              - Build asm + kernel + userland (incl. Wine + Darling)"
 	@echo "  asm              - Compile x86_64 .S files (from linux base compressed)"
 	@echo "  asm-list         - List all .S assembly sources by directory"
 	@echo "  kernel           - Build Linux $(KERNEL_VER) with all extensions"
 	@echo "  kernel-defconfig - Apply Galactic Cherry defconfig"
 	@echo "  kernel-menuconfig- Interactive kernel configuration"
-	@echo "  userland         - Build X11, wallpapers, Wine, and custom tools"
+	@echo "  userland         - Build X11, wallpapers, Wine, Darling, and custom tools"
 	@echo "  x11              - Build X.Org Server 21.1.24 and libraries"
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Apply OpenJDK 28 source overlay (build with java-build)"
@@ -93,6 +95,8 @@ help:
 	@echo "  wine             - Shallow-clone and build Wine (Windows compatibility layer)"
 	@echo "  wine-fetch       - Shallow-clone Wine repo only (--depth 1)"
 	@echo "  wine-binary      - Install Wine from WineHQ APT repository"
+	@echo "  darling          - Build Darling (macOS compatibility layer)"
+	@echo "  darling-install  - Install Darling + Mach-O handlers into rootfs"
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
 	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
@@ -129,6 +133,7 @@ help:
 	@echo "  rootfs  - fakeroot, cpio, gzip"
 	@echo "  iso     - xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools"
 	@echo "  wine    - git, libfreetype-dev, libfontconfig-dev, libvulkan-dev, mingw-w64"
+	@echo "  darling - cmake, clang, libfuse-dev, libbsd-dev, linux-headers"
 	@echo ""
 	@echo "Options:"
 	@echo "  WARNINGS=1       - Show compiler warnings and notes (silent by default)"
@@ -276,7 +281,7 @@ asm-clean:
 # Userland (all user-space components)
 # ==============================================================================
 
-userland: x11 wallpapers java wine tools
+userland: x11 wallpapers java wine darling tools
 
 # ==============================================================================
 # X11 Display System
@@ -433,6 +438,58 @@ wine-distclean:
 	@echo "=== Removing Wine source (shallow clone) ==="
 	@rm -rf $(WINE_DIR)
 	@echo "  ✓ Wine source removed"
+
+# ==============================================================================
+# Darling (macOS Compatibility Layer)
+# ==============================================================================
+#
+# Darling translates Darwin/macOS API calls to Linux, allowing Mach-O
+# binaries to run natively. Uses a kernel module (darling-mach) for
+# Mach system call translation.
+#
+# Targets:
+#   darling         — Build Darling from source (CMake)
+#   darling-install — Install Darling + native Mach-O handlers into rootfs
+#   darling-clean   — Remove build directory
+#
+# Source is pre-committed at userland/darling/ (shallow clone from GitHub).
+
+darling: darling-build
+
+darling-build:
+	@echo "=== Building Darling (macOS compatibility layer) ==="
+	@if [ ! -f "$(DARLING_DIR)/CMakeLists.txt" ]; then \
+		echo "  ERROR: Darling source not found at $(DARLING_DIR)"; exit 1; \
+	fi
+	@mkdir -p $(DARLING_DIR)/build
+	cd $(DARLING_DIR)/build && \
+		cmake .. \
+			-DCMAKE_INSTALL_PREFIX=/usr/local \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DTARGET_i386=OFF \
+			-DENABLE_TESTS=OFF && \
+		$(MAKE) -j$$(nproc)
+	@echo "  ✓ Darling build complete"
+
+darling-install:
+	@echo "=== Installing Darling to $(ROOTFS_DIR) ==="
+	@if [ ! -d "$(DARLING_DIR)/build" ]; then \
+		echo "  ERROR: Darling not built. Run 'make darling' first."; exit 1; \
+	fi
+	@if [ -f "$(DARLING_DIR)/build/Makefile" ]; then \
+		$(MAKE) -C $(DARLING_DIR)/build install DESTDIR=$(abspath $(ROOTFS_DIR)) 2>/dev/null || true; \
+	fi
+	@# Run the installer script for configuration
+	@bash $(SCRIPTS_DIR)/install-darling.sh "$(ROOTFS_DIR)" --install-only
+	@# Install native Mach-O handlers (desktop + CLI binfmt_misc)
+	@bash $(SCRIPTS_DIR)/install-darling-handlers.sh "$(ROOTFS_DIR)"
+	@echo "  ✓ Darling installed to $(ROOTFS_DIR)/usr/local"
+	@echo "  ✓ Native Mach-O handlers active (desktop + CLI)"
+
+darling-clean:
+	@echo "=== Cleaning Darling build ==="
+	@rm -rf $(DARLING_DIR)/build
+	@echo "  ✓ Darling build directory removed"
 
 # ==============================================================================
 # Custom Tools - Core (simple Makefile-based)
@@ -797,7 +854,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install tools-all-install desktop jwstf-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install darling-install tools-all-install desktop jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
@@ -819,6 +876,7 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-f
 	@echo "    ✓ LightDM (graphical login)"
 	@echo "    ✓ OpenJDK 28 (default Java runtime)"
 	@echo "    ✓ Wine $(WINE_VERSION) (Windows compatibility layer)"
+	@echo "    ✓ Darling (macOS compatibility layer)"
 	@echo "    ✓ sudo_gate, chat, nnet, negamane"
 	@echo "    ✓ Cronie (cron with callbacks)"
 	@echo "    ✓ ClamAV (protected antivirus)"
@@ -889,3 +947,4 @@ distclean: clean
 		$(MAKE) -C $(TOOLS_DIR)/chkrootkit clean 2>/dev/null || true; fi
 	@if [ -d "$(WINE_DIR)/build64" ]; then rm -rf $(WINE_DIR)/build64; fi
 	@if [ -d "$(WINE_DIR)/build32" ]; then rm -rf $(WINE_DIR)/build32; fi
+	@if [ -d "$(DARLING_DIR)/build" ]; then rm -rf $(DARLING_DIR)/build; fi
