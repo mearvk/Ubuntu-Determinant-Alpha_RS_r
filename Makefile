@@ -79,13 +79,13 @@ help:
 	@echo ""
 	@echo "Build Targets:"
 	@echo "  deps             - Install all host build dependencies (requires sudo)"
-	@echo "  all              - Build asm + kernel + userland"
+	@echo "  all              - Build asm + kernel + userland (incl. Wine)"
 	@echo "  asm              - Compile x86_64 .S files (from linux base compressed)"
 	@echo "  asm-list         - List all .S assembly sources by directory"
 	@echo "  kernel           - Build Linux $(KERNEL_VER) with all extensions"
 	@echo "  kernel-defconfig - Apply Galactic Cherry defconfig"
 	@echo "  kernel-menuconfig- Interactive kernel configuration"
-	@echo "  userland         - Build X11, wallpapers, and custom tools"
+	@echo "  userland         - Build X11, wallpapers, Wine, and custom tools"
 	@echo "  x11              - Build X.Org Server 21.1.24 and libraries"
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Apply OpenJDK 28 source overlay (build with java-build)"
@@ -276,7 +276,7 @@ asm-clean:
 # Userland (all user-space components)
 # ==============================================================================
 
-userland: x11 wallpapers java tools
+userland: x11 wallpapers java wine tools
 
 # ==============================================================================
 # X11 Display System

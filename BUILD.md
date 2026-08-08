@@ -19,6 +19,8 @@ make iso
 
 This produces `build/galactic-cherry-98.iso` — a bootable hybrid ISO for CD/DVD/USB/UEFI.
 
+`make all` builds the kernel, assembly, and all userland components including Wine (shallow-cloned from WineHQ and compiled as part of the userland target).
+
 ---
 
 ## Prerequisites
@@ -99,7 +101,8 @@ Builds all user-space components in parallel:
 
 1. **X11** — X.Org Server 21.1.24 + libraries (dependency-ordered)
 2. **Wallpapers** — 9 Galactic Cherry SVG wallpapers
-3. **Core Tools** — sudo_gate, chat, nnet, negamane, accounts
+3. **Wine** — Shallow-clone and build Wine 9.0 (Windows compatibility)
+4. **Core Tools** — sudo_gate, chat, nnet, negamane, accounts
 
 ### Phase 4: Extended Tools
 
