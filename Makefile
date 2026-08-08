@@ -23,7 +23,8 @@ SCRIPTS_DIR   := scripts
 ROOTFS_TAR    := $(USERLAND_DIR)/ubuntu-base-24.04.4-base-amd64.tar.gz
 WINE_DIR      := $(USERLAND_DIR)/wine
 WINE_VERSION  := 9.0
-WINE_BRANCH   := stable
+WINE_TAG      := wine-$(WINE_VERSION)
+WINE_GIT_URL  := https://gitlab.winehq.org/wine/wine.git
 
 # Build output
 BUILD_DIR     := build
@@ -59,7 +60,7 @@ PREFIX        := /usr
         tools-rebate-certificates tools-rebate-certificates-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
-        wine wine-fetch wine-build wine-install wine-binary \
+        wine wine-fetch wine-build wine-install wine-binary wine-clean wine-distclean \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -89,8 +90,8 @@ help:
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Apply OpenJDK 28 source overlay (build with java-build)"
 	@echo "  chromium         - Fetch Chromium browser source (~5-8 GB shallow clone)"
-	@echo "  wine             - Fetch and build Wine (Windows compatibility layer)"
-	@echo "  wine-fetch       - Download Wine source only"
+	@echo "  wine             - Shallow-clone and build Wine (Windows compatibility layer)"
+	@echo "  wine-fetch       - Shallow-clone Wine repo only (--depth 1)"
 	@echo "  wine-binary      - Install Wine from WineHQ APT repository"
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
@@ -127,7 +128,7 @@ help:
 	@echo "  mysql   - cmake, g++, libssl-dev, libncurses-dev"
 	@echo "  rootfs  - fakeroot, cpio, gzip"
 	@echo "  iso     - xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools"
-	@echo "  wine    - libfreetype-dev, libfontconfig-dev, libvulkan-dev, mingw-w64"
+	@echo "  wine    - git, libfreetype-dev, libfontconfig-dev, libvulkan-dev, mingw-w64"
 	@echo ""
 	@echo "Options:"
 	@echo "  WARNINGS=1       - Show compiler warnings and notes (silent by default)"
@@ -334,41 +335,49 @@ chromium-install:
 # Wine (Windows Compatibility Layer)
 # ==============================================================================
 #
-# Wine allows running Windows applications on Linux. Three modes:
-#   wine-fetch   — Download Wine source only
-#   wine-build   — Build Wine from source (64-bit + optional WoW64 32-bit)
-#   wine         — Full fetch + build
+# Wine allows running Windows applications on Linux. Uses a shallow git clone
+# of the official WineHQ repository for minimal disk usage while keeping full
+# compilability.
+#
+# Targets:
+#   wine-fetch   — Shallow clone Wine repo (--depth 1, single tag)
+#   wine-build   — Configure and compile Wine 64-bit (+ WoW64 if multiarch)
+#   wine         — Full clone + build
 #   wine-install — Install compiled Wine into rootfs
-#   wine-binary  — Install prebuilt Wine from WineHQ APT (requires network in chroot)
+#   wine-binary  — Install prebuilt Wine from WineHQ APT (requires network)
 #
 # Configuration:
-#   WINE_VERSION=9.0    (override version)
-#   WINE_BRANCH=stable  (stable or devel)
+#   WINE_VERSION=9.0                       (override version)
+#   WINE_TAG=wine-9.0                      (override git tag)
+#   WINE_GIT_URL=https://gitlab.winehq.org/wine/wine.git
 
 wine: wine-fetch wine-build
 
 wine-fetch:
-	@echo "=== Fetching Wine $(WINE_VERSION) ($(WINE_BRANCH)) ==="
-	@mkdir -p $(WINE_DIR)
-	@if [ ! -d "$(WINE_DIR)/wine-$(WINE_VERSION)" ]; then \
-		echo "  Downloading wine-$(WINE_VERSION).tar.xz..."; \
-		wget -q --show-progress -O "$(WINE_DIR)/wine-$(WINE_VERSION).tar.xz" \
-			"https://dl.winehq.org/wine/source/$(WINE_BRANCH)/wine-$(WINE_VERSION).tar.xz"; \
-		echo "  Extracting..."; \
-		tar -xJf "$(WINE_DIR)/wine-$(WINE_VERSION).tar.xz" -C "$(WINE_DIR)"; \
-		echo "  ✓ Wine source: $(WINE_DIR)/wine-$(WINE_VERSION)"; \
+	@echo "=== Shallow-cloning Wine (tag: $(WINE_TAG)) ==="
+	@if [ -d "$(WINE_DIR)/.git" ]; then \
+		echo "  Wine repo already exists at $(WINE_DIR)"; \
+		echo "  Current tag: $$(cd $(WINE_DIR) && git describe --tags --exact-match 2>/dev/null || echo 'detached')"; \
 	else \
-		echo "  Wine source already present at $(WINE_DIR)/wine-$(WINE_VERSION)"; \
+		echo "  Cloning $(WINE_GIT_URL) (depth=1, tag=$(WINE_TAG))..."; \
+		git clone --depth 1 --branch "$(WINE_TAG)" --single-branch \
+			"$(WINE_GIT_URL)" "$(WINE_DIR)"; \
+		echo "  ✓ Wine source: $(WINE_DIR) ($$(du -sh $(WINE_DIR) | cut -f1))"; \
 	fi
+	@# Verify configure script exists (compilability check)
+	@if [ ! -f "$(WINE_DIR)/configure" ]; then \
+		echo "  ERROR: configure not found in cloned source"; exit 1; \
+	fi
+	@echo "  ✓ Wine source ready (configure present)"
 
 wine-build:
 	@echo "=== Building Wine $(WINE_VERSION) (64-bit) ==="
-	@if [ ! -d "$(WINE_DIR)/wine-$(WINE_VERSION)" ]; then \
+	@if [ ! -f "$(WINE_DIR)/configure" ]; then \
 		echo "  ERROR: Wine source not found. Run 'make wine-fetch' first."; exit 1; \
 	fi
 	@mkdir -p $(WINE_DIR)/build64
 	cd $(WINE_DIR)/build64 && \
-		../wine-$(WINE_VERSION)/configure \
+		../configure \
 			--prefix=/usr/local \
 			--enable-win64 \
 			--with-x \
@@ -394,9 +403,9 @@ wine-install:
 		echo "  ERROR: Wine not built. Run 'make wine' first."; exit 1; \
 	fi
 	@$(MAKE) -C $(WINE_DIR)/build64 install DESTDIR=$(abspath $(ROOTFS_DIR))
-	@# Install configuration and integration files
-	@bash $(SCRIPTS_DIR)/install-wine.sh "$(ROOTFS_DIR)" --source-only 2>/dev/null || true
-	@# Install runtime components (Mono, Gecko) and config
+	@# Install configuration and integration files via installer script
+	@bash $(SCRIPTS_DIR)/install-wine.sh "$(ROOTFS_DIR)" --clone-only 2>/dev/null || true
+	@# Install environment and desktop integration
 	@install -d $(ROOTFS_DIR)/etc/profile.d
 	@cat > $(ROOTFS_DIR)/etc/profile.d/wine.sh <<'WINEPROFILE'
 # Wine environment — Galactic Cherry Marvell Edition 98
@@ -421,6 +430,11 @@ wine-clean:
 	@echo "=== Cleaning Wine build ==="
 	@rm -rf $(WINE_DIR)/build64 $(WINE_DIR)/build32
 	@echo "  ✓ Wine build directories removed"
+
+wine-distclean:
+	@echo "=== Removing Wine source (shallow clone) ==="
+	@rm -rf $(WINE_DIR)
+	@echo "  ✓ Wine source removed"
 
 # ==============================================================================
 # Custom Tools - Core (simple Makefile-based)

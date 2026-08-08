@@ -1,28 +1,28 @@
 #!/bin/bash
 # =============================================================================
-# install-wine.sh — Download, build, and install Wine into the rootfs
+# install-wine.sh — Shallow-clone, build, and install Wine into the rootfs
 #
 # Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
 #
 # Wine is the Windows compatibility layer that allows running Windows
-# applications on Linux. This script fetches the Wine source, compiles
-# it for both 64-bit and 32-bit targets (WoW64), and installs into
-# the target rootfs or system prefix.
+# applications on Linux. This script performs a shallow git clone of the
+# official Wine repository, compiles it for 64-bit (with optional WoW64
+# 32-bit), and installs into the target rootfs.
 #
 # Usage:
 #   scripts/install-wine.sh <rootfs_dir>
-#   scripts/install-wine.sh <rootfs_dir> --source-only
+#   scripts/install-wine.sh <rootfs_dir> --clone-only
 #   scripts/install-wine.sh <rootfs_dir> --binary
 #
 # Modes:
-#   (default)      Build Wine from source and install
-#   --source-only  Download source only (no build)
-#   --binary       Install prebuilt Wine from WineHQ repository
+#   (default)      Shallow clone, build, and install Wine from source
+#   --clone-only   Shallow clone the repo only (no build)
+#   --binary       Install prebuilt Wine from WineHQ APT repository
 #
 # Prerequisites (host):
-#   gcc, g++, make, flex, bison, pkg-config
+#   git, gcc, g++, make, flex, bison, pkg-config
 #   libx11-dev, libfreetype-dev, libfontconfig-dev
 #   libgstreamer1.0-dev, libvulkan-dev, libsdl2-dev
 #   mingw-w64 (for WoW64 PE builds)
@@ -36,8 +36,8 @@ set -euo pipefail
 # =============================================================================
 
 WINE_VERSION="${WINE_VERSION:-9.0}"
-WINE_BRANCH="${WINE_BRANCH:-stable}"
-WINE_URL="https://dl.winehq.org/wine/source/${WINE_BRANCH}/wine-${WINE_VERSION}.tar.xz"
+WINE_TAG="${WINE_TAG:-wine-${WINE_VERSION}}"
+WINE_GIT_URL="${WINE_GIT_URL:-https://gitlab.winehq.org/wine/wine.git}"
 WINE_MONO_VERSION="9.0.0"
 WINE_GECKO_VERSION="2.47.4"
 
@@ -45,7 +45,7 @@ WINE_GECKO_VERSION="2.47.4"
 WINEHQ_REPO="https://dl.winehq.org/wine-builds/ubuntu/"
 WINEHQ_KEY_URL="https://dl.winehq.org/wine-builds/winehq.key"
 
-# Source build directory
+# Source directory (shallow clone destination)
 WINE_SRC_DIR="userland/wine"
 WINE_BUILD_DIR64="userland/wine/build64"
 WINE_BUILD_DIR32="userland/wine/build32"
@@ -63,8 +63,8 @@ MODE="source"
 shift || true
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --source-only)
-            MODE="source-only"
+        --clone-only)
+            MODE="clone-only"
             shift
             ;;
         --binary)
@@ -73,16 +73,29 @@ while [[ $# -gt 0 ]]; do
             ;;
         --version)
             WINE_VERSION="$2"
-            WINE_URL="https://dl.winehq.org/wine/source/${WINE_BRANCH}/wine-${WINE_VERSION}.tar.xz"
+            WINE_TAG="wine-${WINE_VERSION}"
             shift 2
             ;;
-        --branch)
-            WINE_BRANCH="$2"
-            WINE_URL="https://dl.winehq.org/wine/source/${WINE_BRANCH}/wine-${WINE_VERSION}.tar.xz"
+        --tag)
+            WINE_TAG="$2"
             shift 2
             ;;
         --help|-h)
-            echo "Usage: $0 <rootfs_dir> [--source-only|--binary] [--version X.Y] [--branch stable|devel]"
+            echo "Usage: $0 <rootfs_dir> [--clone-only|--binary] [--version X.Y] [--tag TAG]"
+            echo ""
+            echo "Modes:"
+            echo "  (default)    Shallow clone + build + install"
+            echo "  --clone-only Shallow clone only (no compilation)"
+            echo "  --binary     Install from WineHQ APT repository"
+            echo ""
+            echo "Options:"
+            echo "  --version X.Y   Set Wine version (default: 9.0)"
+            echo "  --tag TAG       Override git tag (default: wine-<version>)"
+            echo ""
+            echo "Environment:"
+            echo "  WINE_GIT_URL    Git repo URL (default: https://gitlab.winehq.org/wine/wine.git)"
+            echo "  WINE_VERSION    Wine version (default: 9.0)"
+            echo "  WINE_TAG        Git tag to checkout (default: wine-<version>)"
             exit 0
             ;;
         *)
@@ -106,7 +119,7 @@ error() {
 
 check_deps_source() {
     local missing=()
-    for cmd in gcc g++ make flex bison pkg-config wget tar xz; do
+    for cmd in git gcc g++ make flex bison pkg-config; do
         if ! command -v "$cmd" &>/dev/null; then
             missing+=("$cmd")
         fi
@@ -116,72 +129,65 @@ check_deps_source() {
     fi
 }
 
-install_wine_deps() {
-    log "Installing Wine build dependencies..."
-    if command -v apt-get &>/dev/null; then
-        apt-get install -y \
-            gcc-multilib g++-multilib \
-            libx11-dev libx11-dev:i386 \
-            libfreetype-dev libfreetype-dev:i386 \
-            libfontconfig-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libvulkan-dev libvulkan-dev:i386 \
-            libsdl2-dev \
-            libpulse-dev libpulse-dev:i386 \
-            libasound2-dev libasound2-dev:i386 \
-            libcups2-dev \
-            libdbus-1-dev \
-            libgnutls28-dev libgnutls28-dev:i386 \
-            libusb-1.0-0-dev \
-            libv4l-dev \
-            libgphoto2-dev \
-            liblcms2-dev \
-            libldap2-dev \
-            libsane-dev \
-            libpcap-dev \
-            libunwind-dev \
-            mingw-w64 \
-            gettext \
-            2>/dev/null || log "Some i386 packages unavailable (non-multiarch host)"
-    fi
-}
-
 # =============================================================================
-# Source Build Mode
+# Shallow Clone
 # =============================================================================
 
-fetch_wine_source() {
-    log "Fetching Wine ${WINE_VERSION} (${WINE_BRANCH}) source..."
-    mkdir -p "${WINE_SRC_DIR}"
+clone_wine_source() {
+    log "Shallow-cloning Wine (tag: ${WINE_TAG}) from ${WINE_GIT_URL}..."
+    mkdir -p "$(dirname "${WINE_SRC_DIR}")"
 
-    if [[ -d "${WINE_SRC_DIR}/wine-${WINE_VERSION}" ]]; then
-        log "Source already exists at ${WINE_SRC_DIR}/wine-${WINE_VERSION}"
+    if [[ -d "${WINE_SRC_DIR}/.git" ]]; then
+        log "Wine repo already exists at ${WINE_SRC_DIR}"
+        log "Verifying checkout..."
+        cd "${WINE_SRC_DIR}"
+        local current_tag
+        current_tag=$(git describe --tags --exact-match 2>/dev/null || echo "unknown")
+        if [[ "$current_tag" == "${WINE_TAG}" ]]; then
+            log "Already at tag ${WINE_TAG} — nothing to do."
+            cd - >/dev/null
+            return 0
+        fi
+        log "Current tag: ${current_tag}, switching to ${WINE_TAG}..."
+        git fetch --depth 1 origin "refs/tags/${WINE_TAG}:refs/tags/${WINE_TAG}"
+        git checkout "${WINE_TAG}"
+        cd - >/dev/null
         return 0
     fi
 
-    local tarball="${WINE_SRC_DIR}/wine-${WINE_VERSION}.tar.xz"
-    if [[ ! -f "$tarball" ]]; then
-        wget -q --show-progress -O "$tarball" "$WINE_URL" || \
-            error "Failed to download Wine source from ${WINE_URL}"
+    # Perform shallow clone at specific tag
+    git clone --depth 1 --branch "${WINE_TAG}" --single-branch \
+        "${WINE_GIT_URL}" "${WINE_SRC_DIR}"
+
+    if [[ $? -ne 0 ]]; then
+        error "Shallow clone failed. Check network and tag name: ${WINE_TAG}"
     fi
 
-    log "Extracting Wine source..."
-    tar -xJf "$tarball" -C "${WINE_SRC_DIR}"
-    log "Wine source extracted to ${WINE_SRC_DIR}/wine-${WINE_VERSION}"
+    log "Wine source cloned to ${WINE_SRC_DIR} (shallow, tag: ${WINE_TAG})"
+    log "Source size: $(du -sh "${WINE_SRC_DIR}" | cut -f1)"
 }
 
-build_wine_source() {
-    local srcdir="${WINE_SRC_DIR}/wine-${WINE_VERSION}"
+# =============================================================================
+# Source Build
+# =============================================================================
 
-    if [[ ! -d "$srcdir" ]]; then
-        error "Wine source not found at $srcdir. Run fetch first."
+build_wine_source() {
+    if [[ ! -f "${WINE_SRC_DIR}/configure" ]]; then
+        error "Wine source not found at ${WINE_SRC_DIR}. Run clone first."
     fi
 
-    log "Building Wine ${WINE_VERSION} (64-bit)..."
+    log "Building Wine (64-bit) from ${WINE_SRC_DIR}..."
     mkdir -p "${WINE_BUILD_DIR64}"
-    cd "${WINE_BUILD_DIR64}"
 
-    "../../wine-${WINE_VERSION}/configure" \
+    # Configure 64-bit build (out-of-tree)
+    cd "${WINE_BUILD_DIR64}"
+    local src_abs
+    src_abs="$(cd "../../${WINE_SRC_DIR}" 2>/dev/null && pwd)" || \
+    src_abs="$(realpath "../../$(basename "${WINE_SRC_DIR}")")" || \
+    src_abs="$(pwd)/../../wine"
+
+    # Use relative path from build dir to source
+    ../configure \
         --prefix="${WINE_PREFIX}" \
         --enable-win64 \
         --with-x \
@@ -199,21 +205,24 @@ build_wine_source() {
         --with-pcap \
         --with-unwind \
         --with-mingw \
-        2>&1 | tail -5
+        2>&1 | tail -10
 
-    make -j"$(nproc)" 2>&1 | tail -3
+    log "Compiling Wine 64-bit (using $(nproc) cores)..."
+    make -j"$(nproc)" 2>&1 | tail -5
     cd - >/dev/null
+
+    log "Wine 64-bit build complete."
 
     # 32-bit (WoW64) build — only if multilib available
     if dpkg --print-foreign-architectures 2>/dev/null | grep -q i386 || \
        [[ -f /usr/lib32/libc.so ]]; then
-        log "Building Wine ${WINE_VERSION} (32-bit WoW64)..."
+        log "Building Wine (32-bit WoW64)..."
         mkdir -p "${WINE_BUILD_DIR32}"
         cd "${WINE_BUILD_DIR32}"
 
-        "../../wine-${WINE_VERSION}/configure" \
+        ../configure \
             --prefix="${WINE_PREFIX}" \
-            --with-wine64="../../${WINE_BUILD_DIR64}" \
+            --with-wine64="../build64" \
             --with-x \
             --with-gstreamer \
             --with-pulse \
@@ -224,6 +233,7 @@ build_wine_source() {
 
         make -j"$(nproc)" 2>&1 | tail -3
         cd - >/dev/null
+        log "Wine 32-bit WoW64 build complete."
     else
         log "Skipping 32-bit build (no multiarch/multilib detected)"
     fi
@@ -262,28 +272,24 @@ install_wine_binary() {
     if [[ "$(id -u)" == "0" ]] && [[ -f "${ROOTFS_DIR}/bin/bash" ]]; then
         log "Installing via chroot..."
 
-        # Add i386 architecture
         chroot "${ROOTFS_DIR}" dpkg --add-architecture i386
 
-        # Add WineHQ repository key
         mkdir -p "${ROOTFS_DIR}/etc/apt/keyrings"
         wget -qO "${ROOTFS_DIR}/etc/apt/keyrings/winehq-archive.key" "${WINEHQ_KEY_URL}"
 
-        # Add repository source
         local codename
         codename=$(chroot "${ROOTFS_DIR}" lsb_release -cs 2>/dev/null || echo "noble")
         cat > "${ROOTFS_DIR}/etc/apt/sources.list.d/winehq.list" <<EOF
 deb [signed-by=/etc/apt/keyrings/winehq-archive.key] ${WINEHQ_REPO} ${codename} main
 EOF
 
-        # Install Wine
         chroot "${ROOTFS_DIR}" apt-get update
-        chroot "${ROOTFS_DIR}" apt-get install -y --install-recommends winehq-${WINE_BRANCH}
+        chroot "${ROOTFS_DIR}" apt-get install -y --install-recommends winehq-stable
 
-        log "Wine (${WINE_BRANCH}) installed via APT in chroot."
+        log "Wine installed via APT in chroot."
     else
-        # Prepare install script for first boot
-        log "Preparing Wine install script for first boot..."
+        # Stage first-boot installer
+        log "Staging first-boot Wine installer..."
         install -d "${ROOTFS_DIR}/usr/sbin"
         cat > "${ROOTFS_DIR}/usr/sbin/install-wine-firstboot.sh" <<'FIRSTBOOT'
 #!/bin/bash
@@ -303,28 +309,12 @@ EOF2
 apt-get update
 apt-get install -y --install-recommends winehq-stable
 
-# Install Wine Mono and Gecko
-WINE_MONO_VER="9.0.0"
-WINE_GECKO_VER="2.47.4"
-SHARE_DIR="/usr/share/wine"
-mkdir -p "${SHARE_DIR}/mono" "${SHARE_DIR}/gecko"
-
-wget -qO "${SHARE_DIR}/mono/wine-mono-${WINE_MONO_VER}-x86.msi" \
-    "https://dl.winehq.org/wine/wine-mono/${WINE_MONO_VER}/wine-mono-${WINE_MONO_VER}-x86.msi" || true
-wget -qO "${SHARE_DIR}/gecko/wine-gecko-${WINE_GECKO_VER}-x86.msi" \
-    "https://dl.winehq.org/wine/wine-gecko/${WINE_GECKO_VER}/wine-gecko-${WINE_GECKO_VER}-x86.msi" || true
-wget -qO "${SHARE_DIR}/gecko/wine-gecko-${WINE_GECKO_VER}-x86_64.msi" \
-    "https://dl.winehq.org/wine/wine-gecko/${WINE_GECKO_VER}/wine-gecko-${WINE_GECKO_VER}-x86_64.msi" || true
-
 echo "[Wine] Installation complete: $(wine --version 2>/dev/null || echo 'wine installed')"
-
-# Self-disable
 rm -f /etc/systemd/system/multi-user.target.wants/wine-firstboot.service
 echo "[Wine] First-boot service disabled."
 FIRSTBOOT
         chmod 755 "${ROOTFS_DIR}/usr/sbin/install-wine-firstboot.sh"
 
-        # Create systemd service for first boot
         install -d "${ROOTFS_DIR}/etc/systemd/system"
         cat > "${ROOTFS_DIR}/etc/systemd/system/wine-firstboot.service" <<EOF
 [Unit]
@@ -343,13 +333,11 @@ StandardOutput=journal+console
 WantedBy=multi-user.target
 EOF
 
-        # Enable the service
         install -d "${ROOTFS_DIR}/etc/systemd/system/multi-user.target.wants"
         ln -sf /etc/systemd/system/wine-firstboot.service \
             "${ROOTFS_DIR}/etc/systemd/system/multi-user.target.wants/wine-firstboot.service"
 
-        log "First-boot Wine installer staged."
-        log "Wine will be installed automatically on first network-connected boot."
+        log "First-boot installer staged (runs on first network-connected boot)."
     fi
 }
 
@@ -367,7 +355,7 @@ install_wine_runtime_components() {
     local mono_url="https://dl.winehq.org/wine/wine-mono/${WINE_MONO_VERSION}/wine-mono-${WINE_MONO_VERSION}-x86.msi"
     if [[ ! -f "${share_dir}/mono/wine-mono-${WINE_MONO_VERSION}-x86.msi" ]]; then
         wget -q --show-progress -O "${share_dir}/mono/wine-mono-${WINE_MONO_VERSION}-x86.msi" \
-            "$mono_url" 2>/dev/null || log "Wine Mono download skipped (no network)"
+            "$mono_url" 2>/dev/null || log "Wine Mono download deferred (no network)"
     fi
 
     # Wine Gecko (IE replacement)
@@ -375,11 +363,11 @@ install_wine_runtime_components() {
     local gecko_url64="https://dl.winehq.org/wine/wine-gecko/${WINE_GECKO_VERSION}/wine-gecko-${WINE_GECKO_VERSION}-x86_64.msi"
     if [[ ! -f "${share_dir}/gecko/wine-gecko-${WINE_GECKO_VERSION}-x86.msi" ]]; then
         wget -q --show-progress -O "${share_dir}/gecko/wine-gecko-${WINE_GECKO_VERSION}-x86.msi" \
-            "$gecko_url32" 2>/dev/null || log "Wine Gecko (x86) download skipped"
+            "$gecko_url32" 2>/dev/null || log "Wine Gecko (x86) download deferred"
     fi
     if [[ ! -f "${share_dir}/gecko/wine-gecko-${WINE_GECKO_VERSION}-x86_64.msi" ]]; then
         wget -q --show-progress -O "${share_dir}/gecko/wine-gecko-${WINE_GECKO_VERSION}-x86_64.msi" \
-            "$gecko_url64" 2>/dev/null || log "Wine Gecko (x86_64) download skipped"
+            "$gecko_url64" 2>/dev/null || log "Wine Gecko (x86_64) download deferred"
     fi
 
     log "Wine runtime components staged."
@@ -474,25 +462,27 @@ main() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════╗"
     echo "║  Wine Integration — Galactic Cherry Marvell Edition 98      ║"
-    echo "║  Wine ${WINE_VERSION} (${WINE_BRANCH})                     ║"
+    echo "║  Wine ${WINE_VERSION} (shallow clone, tag: ${WINE_TAG})    ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo ""
     log "Mode: ${MODE}"
+    log "Git URL: ${WINE_GIT_URL}"
+    log "Tag: ${WINE_TAG}"
     log "Target rootfs: ${ROOTFS_DIR}"
     echo ""
 
     case "${MODE}" in
         source)
             check_deps_source
-            fetch_wine_source
+            clone_wine_source
             build_wine_source
             install_wine_source
             install_wine_runtime_components
             install_wine_config
             ;;
-        source-only)
-            fetch_wine_source
-            log "Source downloaded. Build manually with:"
+        clone-only)
+            clone_wine_source
+            log "Source cloned. Build manually with:"
             log "  make wine-build"
             ;;
         binary)
@@ -507,7 +497,7 @@ main() {
     log "Wine integration complete."
     log ""
     log "Installed components:"
-    log "  - Wine ${WINE_VERSION} (${WINE_BRANCH}) — Windows compatibility layer"
+    log "  - Wine ${WINE_VERSION} (shallow clone: ${WINE_GIT_URL})"
     log "  - Wine Mono ${WINE_MONO_VERSION} — .NET Framework replacement"
     log "  - Wine Gecko ${WINE_GECKO_VERSION} — Internet Explorer replacement"
     log "  - Desktop integration (.desktop files, MIME types)"

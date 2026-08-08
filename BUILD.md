@@ -44,7 +44,7 @@ sudo apt install -y \
 | ClamAV | cmake, rustc, cargo, libssl-dev, libjson-c-dev |
 | MySQL | cmake, g++, libssl-dev, libncurses-dev |
 | OpenJDK 28 | wget (download) or boot JDK 26/27 (source build) |
-| Wine | libfreetype-dev, libfontconfig-dev, libvulkan-dev, libgstreamer1.0-dev, mingw-w64 |
+| Wine | git, libfreetype-dev, libfontconfig-dev, libvulkan-dev, libgstreamer1.0-dev, mingw-w64 |
 | Rootfs | fakeroot, cpio, gzip |
 | ISO | xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools |
 | chkrootkit | gcc (cc) |
@@ -137,13 +137,13 @@ make -C userland/java build-from-source BOOT_JDK=/usr/lib/jvm/jdk-27
 make wine
 ```
 
-Downloads and builds Wine 9.0 (stable) from source. This provides full Windows application compatibility on the Galactic Cherry system. The build produces a 64-bit Wine with MinGW PE support.
+Performs a shallow git clone (`--depth 1`) of the official Wine repository from `https://gitlab.winehq.org/wine/wine.git` at tag `wine-9.0`, then compiles a 64-bit Wine with MinGW PE support. The shallow clone keeps only the single tagged commit, minimizing disk usage (~250 MB) while providing the full compilable source tree.
 
 **Individual steps:**
 
 ```bash
-make wine-fetch    # Download Wine source only (~250 MB)
-make wine-build    # Configure and compile (64-bit)
+make wine-fetch    # Shallow-clone Wine repo (--depth 1, tag wine-9.0)
+make wine-build    # Configure and compile (64-bit, out-of-tree build)
 make wine-install  # Install into rootfs
 ```
 
@@ -158,7 +158,8 @@ make wine-binary   # Stages APT-based install (requires network in chroot/first 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WINE_VERSION` | `9.0` | Wine version to build |
-| `WINE_BRANCH` | `stable` | Release branch (`stable` or `devel`) |
+| `WINE_TAG` | `wine-9.0` | Git tag to checkout |
+| `WINE_GIT_URL` | `https://gitlab.winehq.org/wine/wine.git` | Source repository |
 
 **Output:** `userland/wine/build64/` → installs to `build/rootfs/usr/local/`
 
@@ -258,10 +259,10 @@ Produces the final bootable ISO: `build/galactic-cherry-98.iso`
 │   │   ├── humanity-icon-theme_0.6.16.tar.xz
 │   │   └── adwaita-icon-theme-46.2.tar.xz
 │   ├── wallpapers/                  # 9 SVG wallpapers
-│   ├── wine/                        # Wine (Windows compatibility layer)
-│   │   ├── wine-9.0.tar.xz         # Wine source archive (~250 MB)
-│   │   ├── wine-9.0/               # Extracted Wine source tree
-│   │   ├── build64/                 # 64-bit build output
+│   ├── wine/                        # Wine (shallow git clone from gitlab.winehq.org)
+│   │   ├── .git/                    # Shallow clone metadata (depth=1)
+│   │   ├── configure               # Autotools configure (entry point for build)
+│   │   ├── build64/                 # 64-bit out-of-tree build output
 │   │   └── build32/                 # 32-bit WoW64 build (if multiarch)
 │   └── java/                        # OpenJDK 28
 │       ├── Makefile
@@ -345,23 +346,23 @@ Usage: fetch-openjdk.sh <dest_dir> [install_dir]
 
 ### `scripts/install-wine.sh`
 
-**Purpose:** Downloads, builds, and installs Wine into the rootfs.
+**Purpose:** Shallow-clones, builds, and installs Wine into the rootfs.
 
 ```
-Usage: scripts/install-wine.sh <rootfs_dir> [--source-only|--binary] [--version X.Y] [--branch stable|devel]
+Usage: scripts/install-wine.sh <rootfs_dir> [--clone-only|--binary] [--version X.Y] [--tag TAG]
 ```
 
 **Modes:**
 
 | Mode | Flag | Description |
 |------|------|-------------|
-| Source build | (default) | Full download, compile, and install |
-| Source only | `--source-only` | Download source without building |
+| Source build | (default) | Shallow clone, compile, and install |
+| Clone only | `--clone-only` | Shallow clone the repo without building |
 | Binary | `--binary` | Install from WineHQ APT repository (chroot or first-boot) |
 
 **Features:**
 
-- Downloads Wine source from `dl.winehq.org` (~250 MB)
+- Shallow git clone from `gitlab.winehq.org` (`--depth 1 --branch wine-9.0`)
 - Builds 64-bit Wine with MinGW PE (WoW64 32-bit if multiarch available)
 - Installs Wine Mono (`.NET` replacement) and Wine Gecko (IE replacement)
 - Configures `/etc/profile.d/wine.sh` environment
@@ -397,12 +398,13 @@ Usage: scripts/install-wine.sh <rootfs_dir> [--source-only|--binary] [--version 
 
 | Target | Description |
 |--------|-------------|
-| `make wine` | Fetch and build Wine from source (64-bit) |
-| `make wine-fetch` | Download Wine source only |
-| `make wine-build` | Build Wine (requires source fetched first) |
+| `make wine` | Shallow-clone and build Wine from source (64-bit) |
+| `make wine-fetch` | Shallow-clone Wine repo only (`--depth 1`) |
+| `make wine-build` | Build Wine (requires source cloned first) |
 | `make wine-install` | Install Wine into rootfs |
 | `make wine-binary` | Install Wine from WineHQ APT repository |
 | `make wine-clean` | Remove Wine build directories |
+| `make wine-distclean` | Remove entire Wine shallow clone |
 
 ### Tool Targets
 
@@ -573,6 +575,7 @@ Wine requires several development libraries. Install all dependencies:
 
 ```bash
 sudo apt install -y \
+    git \
     libfreetype-dev libfontconfig-dev libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev libvulkan-dev libsdl2-dev \
     libpulse-dev libasound2-dev libcups2-dev libdbus-1-dev \
@@ -585,13 +588,19 @@ make wine-clean
 make wine
 ```
 
-**Wine download fails:**
+**Wine clone fails:**
 
-The source is fetched from `dl.winehq.org`. Verify network connectivity:
+The source is shallow-cloned from `gitlab.winehq.org`. Verify network connectivity:
 
 ```bash
-wget -q --spider https://dl.winehq.org/wine/source/stable/wine-9.0.tar.xz && echo "OK"
+git ls-remote --tags https://gitlab.winehq.org/wine/wine.git wine-9.0
 make wine-fetch
+```
+
+If the tag does not exist, override with a valid tag:
+
+```bash
+make wine-fetch WINE_TAG=wine-9.0.2
 ```
 
 **Alternative — use binary install (no compilation required):**
@@ -608,6 +617,13 @@ This stages a first-boot installer that pulls Wine from the WineHQ APT repositor
 sudo dpkg --add-architecture i386
 sudo apt update
 sudo apt install -y gcc-multilib g++-multilib libfreetype-dev:i386 libgnutls28-dev:i386
+```
+
+**Remove and re-clone Wine source:**
+
+```bash
+make wine-distclean   # Removes entire shallow clone
+make wine-fetch       # Fresh shallow clone
 ```
 
 ---
