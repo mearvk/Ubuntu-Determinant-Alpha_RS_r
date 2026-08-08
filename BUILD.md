@@ -44,6 +44,7 @@ sudo apt install -y \
 | ClamAV | cmake, rustc, cargo, libssl-dev, libjson-c-dev |
 | MySQL | cmake, g++, libssl-dev, libncurses-dev |
 | OpenJDK 28 | wget (download) or boot JDK 26/27 (source build) |
+| Wine | libfreetype-dev, libfontconfig-dev, libvulkan-dev, libgstreamer1.0-dev, mingw-w64 |
 | Rootfs | fakeroot, cpio, gzip |
 | ISO | xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools |
 | chkrootkit | gcc (cc) |
@@ -129,6 +130,37 @@ Downloads the prebuilt OpenJDK 28 EA binary (~227 MB). Alternatively, build from
 ```bash
 make -C userland/java build-from-source BOOT_JDK=/usr/lib/jvm/jdk-27
 ```
+
+### Phase 5b: Wine (Windows Compatibility Layer)
+
+```bash
+make wine
+```
+
+Downloads and builds Wine 9.0 (stable) from source. This provides full Windows application compatibility on the Galactic Cherry system. The build produces a 64-bit Wine with MinGW PE support.
+
+**Individual steps:**
+
+```bash
+make wine-fetch    # Download Wine source only (~250 MB)
+make wine-build    # Configure and compile (64-bit)
+make wine-install  # Install into rootfs
+```
+
+**Alternative — binary install from WineHQ APT repository:**
+
+```bash
+make wine-binary   # Stages APT-based install (requires network in chroot/first boot)
+```
+
+**Configuration variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WINE_VERSION` | `9.0` | Wine version to build |
+| `WINE_BRANCH` | `stable` | Release branch (`stable` or `devel`) |
+
+**Output:** `userland/wine/build64/` → installs to `build/rootfs/usr/local/`
 
 ### Phase 6: Root Filesystem Assembly
 
@@ -226,6 +258,11 @@ Produces the final bootable ISO: `build/galactic-cherry-98.iso`
 │   │   ├── humanity-icon-theme_0.6.16.tar.xz
 │   │   └── adwaita-icon-theme-46.2.tar.xz
 │   ├── wallpapers/                  # 9 SVG wallpapers
+│   ├── wine/                        # Wine (Windows compatibility layer)
+│   │   ├── wine-9.0.tar.xz         # Wine source archive (~250 MB)
+│   │   ├── wine-9.0/               # Extracted Wine source tree
+│   │   ├── build64/                 # 64-bit build output
+│   │   └── build32/                 # 32-bit WoW64 build (if multiarch)
 │   └── java/                        # OpenJDK 28
 │       ├── Makefile
 │       ├── fetch-openjdk.sh         # Download script
@@ -306,6 +343,33 @@ Usage: fetch-openjdk.sh <dest_dir> [install_dir]
 - Verifies SHA-256 checksum
 - If install_dir provided: extracts, symlinks binaries, sets JAVA_HOME
 
+### `scripts/install-wine.sh`
+
+**Purpose:** Downloads, builds, and installs Wine into the rootfs.
+
+```
+Usage: scripts/install-wine.sh <rootfs_dir> [--source-only|--binary] [--version X.Y] [--branch stable|devel]
+```
+
+**Modes:**
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Source build | (default) | Full download, compile, and install |
+| Source only | `--source-only` | Download source without building |
+| Binary | `--binary` | Install from WineHQ APT repository (chroot or first-boot) |
+
+**Features:**
+
+- Downloads Wine source from `dl.winehq.org` (~250 MB)
+- Builds 64-bit Wine with MinGW PE (WoW64 32-bit if multiarch available)
+- Installs Wine Mono (`.NET` replacement) and Wine Gecko (IE replacement)
+- Configures `/etc/profile.d/wine.sh` environment
+- Registers `.exe` binfmt for direct execution
+- Creates `.desktop` files for Wine Configuration and File Manager
+- Adds MIME type associations for `.exe` and `.msi` files
+- Binary mode stages a first-boot systemd service if chroot unavailable
+
 ---
 
 ## Individual Build Targets
@@ -328,6 +392,17 @@ Usage: fetch-openjdk.sh <dest_dir> [install_dir]
 | `make x11` | Build X.Org Server 21.1.24 + libraries |
 | `make wallpapers` | Prepare desktop wallpapers |
 | `make java` | Fetch OpenJDK 28 binary |
+
+### Wine Targets
+
+| Target | Description |
+|--------|-------------|
+| `make wine` | Fetch and build Wine from source (64-bit) |
+| `make wine-fetch` | Download Wine source only |
+| `make wine-build` | Build Wine (requires source fetched first) |
+| `make wine-install` | Install Wine into rootfs |
+| `make wine-binary` | Install Wine from WineHQ APT repository |
+| `make wine-clean` | Remove Wine build directories |
 
 ### Tool Targets
 
@@ -407,8 +482,18 @@ build/rootfs/
 │       ├── backgrounds/          # 9 Galactic Cherry wallpapers
 │       └── man/                  # Manual pages
 ├── usr/local/
+│   ├── bin/
+│   │   ├── wine                  # Wine launcher (64-bit)
+│   │   ├── wine64                # Wine 64-bit explicit
+│   │   ├── wineserver            # Wine server process
+│   │   ├── winecfg              # Wine configuration GUI
+│   │   ├── wineboot            # Wine prefix initialization
+│   │   ├── regedit             # Windows registry editor
+│   │   ├── msiexec             # MSI installer
+│   │   └── winepath            # Path conversion utility
 │   ├── sbin/chkrootkit           # Rootkit detection
 │   ├── bin/rkhunter              # Rootkit Hunter
+│   ├── lib/wine/                 # Wine libraries and DLLs
 │   └── lib/
 │       ├── chkrootkit/           # chkrootkit helpers
 │       └── rkhunter/scripts/     # rkhunter scripts
@@ -416,6 +501,7 @@ build/rootfs/
 │   ├── rkhunter/rkhunter.conf    # rkhunter configuration
 │   ├── mysql/                    # MySQL configuration
 │   ├── profile.d/java.sh         # JAVA_HOME
+│   ├── profile.d/wine.sh         # Wine environment (WINEARCH, WINEPREFIX)
 │   └── apt/apt.conf.d/           # APT MySQL hook
 ├── var/
 │   ├── lib/mysql/                # MySQL data directory
@@ -479,6 +565,49 @@ ClamAV's `libclamav_rust` component needs the Rust toolchain:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 make tools-clamav
+```
+
+### Wine build fails
+
+Wine requires several development libraries. Install all dependencies:
+
+```bash
+sudo apt install -y \
+    libfreetype-dev libfontconfig-dev libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev libvulkan-dev libsdl2-dev \
+    libpulse-dev libasound2-dev libcups2-dev libdbus-1-dev \
+    libgnutls28-dev libusb-1.0-0-dev libunwind-dev \
+    libgphoto2-dev liblcms2-dev libldap2-dev libsane-dev libpcap-dev \
+    mingw-w64 gettext
+
+# Clean and retry:
+make wine-clean
+make wine
+```
+
+**Wine download fails:**
+
+The source is fetched from `dl.winehq.org`. Verify network connectivity:
+
+```bash
+wget -q --spider https://dl.winehq.org/wine/source/stable/wine-9.0.tar.xz && echo "OK"
+make wine-fetch
+```
+
+**Alternative — use binary install (no compilation required):**
+
+```bash
+make wine-binary
+```
+
+This stages a first-boot installer that pulls Wine from the WineHQ APT repository.
+
+**32-bit (WoW64) build requires multiarch:**
+
+```bash
+sudo dpkg --add-architecture i386
+sudo apt update
+sudo apt install -y gcc-multilib g++-multilib libfreetype-dev:i386 libgnutls28-dev:i386
 ```
 
 ---

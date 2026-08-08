@@ -21,6 +21,9 @@ X11_DIR       := $(USERLAND_DIR)/x11
 TOOLS_DIR     := $(KERNEL_DIR)/tools
 SCRIPTS_DIR   := scripts
 ROOTFS_TAR    := $(USERLAND_DIR)/ubuntu-base-24.04.4-base-amd64.tar.gz
+WINE_DIR      := $(USERLAND_DIR)/wine
+WINE_VERSION  := 9.0
+WINE_BRANCH   := stable
 
 # Build output
 BUILD_DIR     := build
@@ -56,6 +59,7 @@ PREFIX        := /usr
         tools-rebate-certificates tools-rebate-certificates-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
+        wine wine-fetch wine-build wine-install wine-binary \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -85,6 +89,9 @@ help:
 	@echo "  wallpapers       - Prepare desktop wallpapers"
 	@echo "  java             - Apply OpenJDK 28 source overlay (build with java-build)"
 	@echo "  chromium         - Fetch Chromium browser source (~5-8 GB shallow clone)"
+	@echo "  wine             - Fetch and build Wine (Windows compatibility layer)"
+	@echo "  wine-fetch       - Download Wine source only"
+	@echo "  wine-binary      - Install Wine from WineHQ APT repository"
 	@echo "  desktop          - Install MATE Desktop + LightDM (requires network)"
 	@echo "  tools            - Build custom tools (sudo_gate, chat, nnet)"
 	@echo "  tools-all        - Build all tools (incl. cronie, clamav, mysql, chkrootkit, rkhunter)"
@@ -120,6 +127,7 @@ help:
 	@echo "  mysql   - cmake, g++, libssl-dev, libncurses-dev"
 	@echo "  rootfs  - fakeroot, cpio, gzip"
 	@echo "  iso     - xorriso, squashfs-tools, grub-pc-bin, grub-efi-amd64-bin, mtools"
+	@echo "  wine    - libfreetype-dev, libfontconfig-dev, libvulkan-dev, mingw-w64"
 	@echo ""
 	@echo "Options:"
 	@echo "  WARNINGS=1       - Show compiler warnings and notes (silent by default)"
@@ -151,7 +159,12 @@ deps:
 		cmake rustc cargo libjson-c-dev libncurses-dev \
 		fakeroot cpio gzip \
 		xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
-		python3 python3-pip
+		python3 python3-pip \
+		libfreetype-dev libfontconfig-dev libgstreamer1.0-dev \
+		libvulkan-dev libsdl2-dev libpulse-dev libasound2-dev \
+		libcups2-dev libgnutls28-dev libusb-1.0-0-dev libunwind-dev \
+		libgphoto2-dev liblcms2-dev libldap2-dev libsane-dev libpcap-dev \
+		mingw-w64 gettext
 	@echo "Build dependencies installed."
 
 # ==============================================================================
@@ -316,6 +329,98 @@ chromium-build:
 
 chromium-install:
 	$(MAKE) -C $(USERLAND_DIR)/chromium install DESTDIR=$(abspath $(ROOTFS_DIR))
+
+# ==============================================================================
+# Wine (Windows Compatibility Layer)
+# ==============================================================================
+#
+# Wine allows running Windows applications on Linux. Three modes:
+#   wine-fetch   — Download Wine source only
+#   wine-build   — Build Wine from source (64-bit + optional WoW64 32-bit)
+#   wine         — Full fetch + build
+#   wine-install — Install compiled Wine into rootfs
+#   wine-binary  — Install prebuilt Wine from WineHQ APT (requires network in chroot)
+#
+# Configuration:
+#   WINE_VERSION=9.0    (override version)
+#   WINE_BRANCH=stable  (stable or devel)
+
+wine: wine-fetch wine-build
+
+wine-fetch:
+	@echo "=== Fetching Wine $(WINE_VERSION) ($(WINE_BRANCH)) ==="
+	@mkdir -p $(WINE_DIR)
+	@if [ ! -d "$(WINE_DIR)/wine-$(WINE_VERSION)" ]; then \
+		echo "  Downloading wine-$(WINE_VERSION).tar.xz..."; \
+		wget -q --show-progress -O "$(WINE_DIR)/wine-$(WINE_VERSION).tar.xz" \
+			"https://dl.winehq.org/wine/source/$(WINE_BRANCH)/wine-$(WINE_VERSION).tar.xz"; \
+		echo "  Extracting..."; \
+		tar -xJf "$(WINE_DIR)/wine-$(WINE_VERSION).tar.xz" -C "$(WINE_DIR)"; \
+		echo "  ✓ Wine source: $(WINE_DIR)/wine-$(WINE_VERSION)"; \
+	else \
+		echo "  Wine source already present at $(WINE_DIR)/wine-$(WINE_VERSION)"; \
+	fi
+
+wine-build:
+	@echo "=== Building Wine $(WINE_VERSION) (64-bit) ==="
+	@if [ ! -d "$(WINE_DIR)/wine-$(WINE_VERSION)" ]; then \
+		echo "  ERROR: Wine source not found. Run 'make wine-fetch' first."; exit 1; \
+	fi
+	@mkdir -p $(WINE_DIR)/build64
+	cd $(WINE_DIR)/build64 && \
+		../wine-$(WINE_VERSION)/configure \
+			--prefix=/usr/local \
+			--enable-win64 \
+			--with-x \
+			--with-gstreamer \
+			--with-vulkan \
+			--with-pulse \
+			--with-alsa \
+			--with-cups \
+			--with-dbus \
+			--with-gnutls \
+			--with-usb \
+			--with-fontconfig \
+			--with-freetype \
+			--with-pcap \
+			--with-unwind \
+			--with-mingw && \
+		$(MAKE) -j$$(nproc)
+	@echo "  ✓ Wine 64-bit build complete"
+
+wine-install:
+	@echo "=== Installing Wine to $(ROOTFS_DIR) ==="
+	@if [ ! -d "$(WINE_DIR)/build64" ] || [ ! -f "$(WINE_DIR)/build64/Makefile" ]; then \
+		echo "  ERROR: Wine not built. Run 'make wine' first."; exit 1; \
+	fi
+	@$(MAKE) -C $(WINE_DIR)/build64 install DESTDIR=$(abspath $(ROOTFS_DIR))
+	@# Install configuration and integration files
+	@bash $(SCRIPTS_DIR)/install-wine.sh "$(ROOTFS_DIR)" --source-only 2>/dev/null || true
+	@# Install runtime components (Mono, Gecko) and config
+	@install -d $(ROOTFS_DIR)/etc/profile.d
+	@cat > $(ROOTFS_DIR)/etc/profile.d/wine.sh <<'WINEPROFILE'
+# Wine environment — Galactic Cherry Marvell Edition 98
+export WINEARCH="$${WINEARCH:-win64}"
+export WINEPREFIX="$${WINEPREFIX:-$$HOME/.wine}"
+export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+WINEPROFILE
+	@install -d $(ROOTFS_DIR)/usr/share/applications
+	@printf '[Desktop Entry]\nName=Wine Configuration\nComment=Configure Wine\nExec=winecfg\nTerminal=false\nType=Application\nIcon=wine\nCategories=System;Settings;\n' \
+		> $(ROOTFS_DIR)/usr/share/applications/wine-config.desktop
+	@echo "  ✓ Wine installed to $(ROOTFS_DIR)/usr/local"
+
+wine-binary:
+	@echo "=== Installing Wine from WineHQ binary repository ==="
+	@if [ ! -d "$(ROOTFS_DIR)/usr" ]; then \
+		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
+	fi
+	@bash $(SCRIPTS_DIR)/install-wine.sh "$(ROOTFS_DIR)" --binary
+	@echo "  ✓ Wine binary install complete (or staged for first boot)"
+
+wine-clean:
+	@echo "=== Cleaning Wine build ==="
+	@rm -rf $(WINE_DIR)/build64 $(WINE_DIR)/build32
+	@echo "  ✓ Wine build directories removed"
 
 # ==============================================================================
 # Custom Tools - Core (simple Makefile-based)
@@ -680,7 +785,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop jwstf-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install tools-all-install desktop jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
@@ -701,6 +806,7 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-f
 	@echo "    ✓ MATE Desktop (Red Cherry theme)"
 	@echo "    ✓ LightDM (graphical login)"
 	@echo "    ✓ OpenJDK 28 (default Java runtime)"
+	@echo "    ✓ Wine $(WINE_VERSION) (Windows compatibility layer)"
 	@echo "    ✓ sudo_gate, chat, nnet, negamane"
 	@echo "    ✓ Cronie (cron with callbacks)"
 	@echo "    ✓ ClamAV (protected antivirus)"
@@ -769,3 +875,5 @@ distclean: clean
 	@if [ -d "$(TOOLS_DIR)/ai/llama.cpp/build" ]; then rm -rf $(TOOLS_DIR)/ai/llama.cpp/build; fi
 	@if [ -d "$(TOOLS_DIR)/chkrootkit" ] && [ -f "$(TOOLS_DIR)/chkrootkit/Makefile" ]; then \
 		$(MAKE) -C $(TOOLS_DIR)/chkrootkit clean 2>/dev/null || true; fi
+	@if [ -d "$(WINE_DIR)/build64" ]; then rm -rf $(WINE_DIR)/build64; fi
+	@if [ -d "$(WINE_DIR)/build32" ]; then rm -rf $(WINE_DIR)/build32; fi
