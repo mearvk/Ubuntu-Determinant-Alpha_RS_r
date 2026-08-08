@@ -63,7 +63,7 @@ PREFIX        := /usr
         tools-rkhunter tools-rkhunter-install \
         wine wine-fetch wine-build wine-install wine-binary wine-clean wine-distclean \
         darling darling-build darling-install darling-clean \
-        vault-rootkits \
+        vault-rootkits privilege-drop \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -514,6 +514,19 @@ vault-rootkits:
 	@echo "  ✓ Negamane brand: IMMUTABLE"
 
 # ==============================================================================
+# sudo_gate Privilege Drop — Install High, Run Low
+# ==============================================================================
+#
+# Programs that install at grade 7/8 thereafter run at grade 1/2.
+# Prevents privilege creep — software cannot re-escalate without
+# full gate re-authorization.
+
+privilege-drop:
+	@echo "=== Installing sudo_gate privilege drop system ==="
+	@bash $(SCRIPTS_DIR)/sudo-gate-privilege-drop.sh "$(ROOTFS_DIR)"
+	@echo "  ✓ Privilege drop registry installed"
+
+# ==============================================================================
 # Custom Tools - Core (simple Makefile-based)
 # ==============================================================================
 
@@ -876,7 +889,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install darling-install tools-all-install vault-rootkits desktop jwstf-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source wine-install darling-install tools-all-install vault-rootkits privilege-drop desktop jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
