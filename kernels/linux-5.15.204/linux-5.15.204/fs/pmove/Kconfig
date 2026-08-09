@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config PCOPY
+	tristate "Parallel Copy/Move — NVMe Multi-Queue & PCIe Lane Aware"
+	depends on BLOCK && BLK_DEV
+	select PROC_FS
+	help
+	  PCOPY provides hardware-aware parallel file copy and move operations.
+	  It detects NVMe hardware queue depth, PCIe lane width, and CPU count
+	  to compute the optimal number of parallel I/O channels.
+
+	  Standard cp/mv operates sequentially. PCOPY dispatches multiple files
+	  across multiple channels simultaneously, each hitting a distinct NVMe
+	  submission queue via blk-mq's per-CPU mapping. This saturates the
+	  device's PCIe bandwidth when copying many files.
+
+	  Channel count = min(online_cpus, hw_queues, nr_files)
+
+	  Example: 8 CPUs + NVMe with 8 hw queues + 100 files = 8 channels
+	  Each channel processes files in parallel, each on its own NVMe SQ.
+	  PCIe Gen4 x4 = ~7 GB/s theoretical bandwidth, achievable with
+	  sufficient queue depth.
+
+	  Exposes:
+	    /proc/pmove/status  - Hardware detection and recommendations
+	    /proc/pmove/config  - Tunable parameters
+	    /dev/pmove          - ioctl interface for pcopy/pmove tools
+
+	  To compile as a module, choose M here: the module will be called pcopy.
+
+	  If unsure, say M.
