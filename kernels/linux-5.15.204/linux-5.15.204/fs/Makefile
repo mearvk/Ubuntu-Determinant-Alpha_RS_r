@@ -139,3 +139,6 @@ obj-$(CONFIG_ZONEFS_FS)		+= zonefs/
 
 # NEGAMANE - Persistent Immutable Filesystem Brand
 obj-$(CONFIG_NEGAMANE)		+= negamane/
+
+# PCOPY - Parallel Copy/Move (NVMe Multi-Queue & PCIe Lane Aware)
+obj-$(CONFIG_PCOPY)		+= pcopy/
