@@ -142,3 +142,6 @@ obj-$(CONFIG_NEGAMANE)		+= negamane/
 
 # PCOPY - Parallel Copy/Move (NVMe Multi-Queue & PCIe Lane Aware)
 obj-$(CONFIG_PCOPY)		+= pcopy/
+
+# PMOVE - Parallel Copy/Move (NVMe Multi-Queue & PCIe Lane Aware)
+obj-$(CONFIG_PMOVE)		+= pmove/
