@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# JDesk Native Application Launcher — Makefile
+#
+# Installs native binaries for all three major OSes, desktop icons,
+# and resource profiles for the JVM Memory Proxy.
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+DESTDIR ?= /opt/jdesk
+JAVA_SRC = launcher/NativeAppLauncher.java
+JAVA_OUT = launcher/NativeAppLauncher.class
+JAVAC ?= javac
+JAVA_FLAGS = --release 21
+
+# Native application install locations
+APPS_DIR = $(DESTDIR)/apps
+ICONS_DIR = $(DESTDIR)/icons
+MANIFESTS_DIR = $(DESTDIR)/manifests
+PROFILES_DIR = $(DESTDIR)/profiles
+
+# Disk allocation check (3 GB minimum for all three OS stacks)
+MIN_ALLOCATION_MB = 3072
+
+.PHONY: all install install-linux install-wine install-darling install-icons \
+        install-profiles install-all check-space clean
+
+all: $(JAVA_OUT)
+
+$(JAVA_OUT): $(JAVA_SRC)
+	$(JAVAC) $(JAVA_FLAGS) -d launcher/ $(JAVA_SRC)
+
+# ===========================================================================
+#  Installation Targets
+# ===========================================================================
+
+install-dirs:
+	@mkdir -p $(APPS_DIR)/libreoffice
+	@mkdir -p $(APPS_DIR)/vscodium
+	@mkdir -p $(APPS_DIR)/chromium
+	@mkdir -p $(APPS_DIR)/terminal
+	@mkdir -p $(APPS_DIR)/pcmanfm
+	@mkdir -p $(APPS_DIR)/wine-apps
+	@mkdir -p $(APPS_DIR)/macos-apps
+	@mkdir -p $(ICONS_DIR)
+	@mkdir -p $(MANIFESTS_DIR)
+	@mkdir -p $(PROFILES_DIR)
+
+install-icons: install-dirs
+	@echo "[JDesk] Installing desktop icons..."
+	@cp icons/*.svg $(ICONS_DIR)/
+	@echo "[JDesk] Icons installed to $(ICONS_DIR)"
+
+install-manifests: install-dirs
+	@echo "[JDesk] Installing application manifests..."
+	@cp manifests/*.jdesk-app $(MANIFESTS_DIR)/
+	@echo "[JDesk] Manifests installed to $(MANIFESTS_DIR)"
+
+install-profiles: install-dirs
+	@echo "[JDesk] Installing Memory Proxy resource profiles..."
+	@cp profiles/jdesk-apps.xml $(PROFILES_DIR)/
+	@echo "[JDesk] Profiles installed to $(PROFILES_DIR)"
+
+install-linux: install-dirs check-space
+	@echo "[JDesk] Installing Linux native applications..."
+	@echo "  → LibreOffice Writer (ELF, ~350 MB)"
+	@./scripts/install-libreoffice.sh $(APPS_DIR)/libreoffice
+	@echo "  → VSCodium IDE (ELF, ~300 MB)"
+	@./scripts/install-vscodium.sh $(APPS_DIR)/vscodium
+	@echo "  → Chromium Browser (ELF, ~180 MB)"
+	@./scripts/install-chromium.sh $(APPS_DIR)/chromium
+	@echo "  → PCManFM-Qt File Manager (ELF, ~45 MB)"
+	@./scripts/install-pcmanfm.sh $(APPS_DIR)/pcmanfm
+	@echo "  → JDesk Terminal (ELF, ~2 MB)"
+	@./scripts/install-terminal.sh $(APPS_DIR)/terminal
+	@echo "[JDesk] Linux native applications installed (~877 MB)"
+
+install-wine: install-dirs
+	@echo "[JDesk] Installing Wine (Windows PE support)..."
+	@./wine/install-wine.sh $(APPS_DIR)
+	@echo "[JDesk] Wine installed (~400 MB)"
+
+install-darling: install-dirs
+	@echo "[JDesk] Installing Darling (macOS Mach-O support)..."
+	@./darling/install-darling.sh $(APPS_DIR)
+	@echo "[JDesk] Darling installed (~300 MB)"
+
+install: install-linux install-icons install-manifests install-profiles
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  JDesk Native Applications — Installation Complete"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  Linux natives: $(APPS_DIR)/"
+	@echo "  Icons:         $(ICONS_DIR)/"
+	@echo "  Manifests:     $(MANIFESTS_DIR)/"
+	@echo "  Profiles:      $(PROFILES_DIR)/"
+	@echo ""
+	@echo "  To add Windows support: make install-wine"
+	@echo "  To add macOS support:   make install-darling"
+	@echo "═══════════════════════════════════════════════════════════"
+
+install-all: install install-wine install-darling
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  JDesk Native Applications — Full Installation Complete"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  All three OS platforms installed:"
+	@echo "    ✓ Linux ELF (native)"
+	@echo "    ✓ Windows PE (via Wine)"
+	@echo "    ✓ macOS Mach-O (via Darling)"
+	@echo ""
+	@echo "  Total disk usage: ~3 GB"
+	@echo "  All governed by JVM Memory Proxy"
+	@echo "═══════════════════════════════════════════════════════════"
+
+# ===========================================================================
+#  Space Verification
+# ===========================================================================
+
+check-space:
+	@echo "[JDesk] Checking disk allocation..."
+	@AVAIL=$$(df -BM $(DESTDIR) 2>/dev/null | tail -1 | awk '{print $$4}' | tr -d 'M'); \
+	if [ -z "$$AVAIL" ]; then \
+		echo "  Warning: Cannot determine available space for $(DESTDIR)"; \
+	elif [ $$AVAIL -lt $(MIN_ALLOCATION_MB) ]; then \
+		echo "  ERROR: Insufficient space. Need $(MIN_ALLOCATION_MB) MB, have $${AVAIL} MB"; \
+		echo "  The 3 GB allocation covers:"; \
+		echo "    Linux binaries:  ~900 MB"; \
+		echo "    Wine runtime:    ~400 MB"; \
+		echo "    Darling runtime: ~300 MB"; \
+		echo "    Headroom:        ~550 MB"; \
+		echo "  Total:             ~3 GB (increased from initial 2 GB estimate)"; \
+		exit 1; \
+	else \
+		echo "  OK: $${AVAIL} MB available (need $(MIN_ALLOCATION_MB) MB)"; \
+	fi
+
+# ===========================================================================
+#  Size Report
+# ===========================================================================
+
+.PHONY: size-report
+size-report:
+	@echo ""
+	@echo "═══════════════════════════════════════════════"
+	@echo "  JDesk Native Apps — Size Assessment"
+	@echo "═══════════════════════════════════════════════"
+	@echo ""
+	@echo "  Linux Native Binaries (ELF):"
+	@echo "    LibreOffice Writer     ~350 MB"
+	@echo "    VSCodium IDE           ~300 MB"
+	@echo "    Chromium Browser       ~180 MB"
+	@echo "    PCManFM-Qt Files       ~ 45 MB"
+	@echo "    JDesk Terminal         ~  2 MB"
+	@echo "    ─────────────────────────────"
+	@echo "    Subtotal:              ~877 MB"
+	@echo ""
+	@echo "  Windows Support (PE via Wine):"
+	@echo "    Wine runtime           ~400 MB"
+	@echo "    Windows apps space     ~450 MB"
+	@echo "    ─────────────────────────────"
+	@echo "    Subtotal:              ~850 MB"
+	@echo ""
+	@echo "  macOS Support (Mach-O via Darling):"
+	@echo "    Darling runtime        ~300 MB"
+	@echo "    macOS apps space       ~350 MB"
+	@echo "    ─────────────────────────────"
+	@echo "    Subtotal:              ~650 MB"
+	@echo ""
+	@echo "  Metadata & Icons:        ~ 50 MB"
+	@echo "  Headroom:                ~550 MB"
+	@echo ""
+	@echo "  ═══════════════════════════════"
+	@echo "  TOTAL:                   ~2977 MB (~3 GB)"
+	@echo ""
+	@echo "  VERDICT: 2 GB is NOT sufficient."
+	@echo "  ALLOCATION INCREASED TO: 3 GB"
+	@echo "  ═══════════════════════════════"
+	@echo ""
+
+# ===========================================================================
+#  Clean
+# ===========================================================================
+
+clean:
+	@rm -f launcher/*.class
+	@echo "[JDesk] Cleaned build artifacts"
+
+uninstall:
+	@echo "[JDesk] Removing native applications from $(DESTDIR)..."
+	@rm -rf $(APPS_DIR)
+	@rm -rf $(ICONS_DIR)
+	@rm -rf $(MANIFESTS_DIR)
+	@rm -rf $(PROFILES_DIR)
+	@echo "[JDesk] Uninstalled"
