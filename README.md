@@ -57,7 +57,8 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 30. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
 31. [Secure JVM: System Codex](#secure-jvm-system-codex)
 32. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
-33. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
+33. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
+34. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
 
 ---
 
@@ -1993,6 +1994,403 @@ This system is of design principles, of design head and love of measure. When a 
 src/hotspot/share/runtime/jvmMySQLBridge.hpp
 src/hotspot/share/runtime/jvmMySQLBridge.cpp
 ```
+
+---
+
+## Secure JVM: Memory Proxy
+
+A virtual private proxy layer within the JVM that intercepts and manages all native memory and I/O calls that would otherwise go directly to the operating system. Programs running under the Secure JVM (`.exe`, `.bin`, `.dmg`, JNI libraries, native processes launched via `ProcessBuilder`) have their memory allocation, disk I/O, and CPU usage mediated through this proxy — preventing naive overuse of system resources and providing continuous telemetry.
+
+**Any user can run any native binary under the proxy directly from the command line** — no Java code required. The JVM acts as a resource governance shell:
+
+### Command-Line Usage
+
+Run **any native binary** under the JVM Memory Proxy directly from the command line. The JVM launches, wraps the native process, and governs all its memory, disk, and CPU through the proxy layer.
+
+```bash
+# Basic: run a native binary under memory guard
+java -memory-guard ./myprogram.bin
+
+# With explicit budget overrides
+java -memory-guard -Xguard:ram=1g -Xguard:disk-write=200m ./encoder.exe
+
+# Run an ELF binary with full telemetry output
+java -memory-guard -Xguard:verbose ./simulation.elf --iterations 5000
+
+# Run a native with specific CPU and thread limits
+java -memory-guard -Xguard:cpu=80 -Xguard:threads=32 /opt/tools/render.bin -o output.png
+
+# Specify soft AND hard limits
+java -memory-guard -Xguard:ram-soft=512m -Xguard:ram-hard=4g ./server.bin
+
+# Run with disk I/O throttling
+java -memory-guard -Xguard:disk-read=500m -Xguard:disk-write=100m ./database.bin
+
+# Use a budget profile from jvm-config.xml
+java -memory-guard -Xguard:profile=heavy-compute ./neural_net.bin
+
+# Pass arguments to the native binary (everything after the binary path)
+java -memory-guard -Xguard:ram=2g ./ffmpeg -i video.mp4 -c:v libx264 output.mp4
+
+# Interactive status during execution (prints every 5s)
+java -memory-guard -Xguard:status=5s ./long_running.bin
+
+# Quiet mode (only alerts)
+java -memory-guard -Xguard:quiet ./background_task.bin &
+```
+
+### Guard Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-memory-guard` | — | **Required.** Enables the Memory Proxy for the following native binary. |
+| `-Xguard:ram=SIZE` | 2g | Hard RAM ceiling (e.g., `512m`, `4g`, `16g`) |
+| `-Xguard:ram-soft=SIZE` | 512m | Soft RAM limit (warnings begin here) |
+| `-Xguard:ram-hard=SIZE` | 2g | Hard RAM limit (allocations denied) |
+| `-Xguard:disk-write=RATE` | 500m | Hard disk write rate limit (bytes/sec) |
+| `-Xguard:disk-read=RATE` | 1g | Hard disk read rate limit (bytes/sec) |
+| `-Xguard:cpu=PERCENT` | 100 | CPU percentage ceiling (e.g., `80` = max 80%) |
+| `-Xguard:threads=N` | 256 | Maximum thread count |
+| `-Xguard:children=N` | 32 | Maximum child processes |
+| `-Xguard:fds=N` | 1024 | Maximum open file descriptors |
+| `-Xguard:verbose` | off | Print detailed telemetry to stdout |
+| `-Xguard:status=INTERVAL` | off | Print status summary every N seconds (e.g., `5s`, `30s`) |
+| `-Xguard:quiet` | off | Suppress all output except FATAL alerts |
+| `-Xguard:profile=NAME` | — | Load named budget profile from `jvm-config.xml` |
+| `-Xguard:log=PATH` | — | Write telemetry log to file |
+| `-Xguard:on-breach=ACTION` | `throttle` | Action on hard breach: `throttle`, `kill`, `pause` |
+
+### Supported Binary Formats
+
+| Format | Extension | Platform | Detection |
+|--------|-----------|----------|-----------|
+| ELF 64-bit | `.bin`, `.elf`, (none) | Linux | Magic: `\x7fELF` |
+| ELF 32-bit | `.bin`, `.elf` | Linux | Magic: `\x7fELF` |
+| PE/COFF | `.exe` | Windows (via Wine) | Magic: `MZ` |
+| Mach-O | `.dmg`, (none) | macOS | Magic: `\xfe\xed\xfa\xce` |
+| Shell script | `.sh` | Any | Magic: `#!` (shebang) |
+| Any executable | — | Any | `+x` permission bit |
+
+### How It Works (CLI Mode)
+
+```
+User: java -memory-guard -Xguard:ram=1g ./myprogram.bin --arg1 value1
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  JVM starts in proxy-launcher mode (minimal footprint)          │
+│  • Parses -Xguard flags into ResourceBudget                    │
+│  • Validates binary exists and is executable                    │
+│  • Creates /dev/shm/jvm-proxy-<PID> shared memory              │
+│  • Sets LD_PRELOAD=jvmMemoryProxy_shim.so                      │
+│  • Installs seccomp-bpf filter for fork/clone tracking          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ fork + exec
+┌───────────────────────────┴─────────────────────────────────────┐
+│  Native Binary (myprogram.bin)                                   │
+│  • Shim intercepts: malloc, free, read, write, open, close, fork│
+│  • All allocations checked against budget                        │
+│  • All I/O metered and rate-limited                             │
+│  • CPU time tracked per 10s window                              │
+│  • Reports counters to JVM via shared memory                    │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ shared memory + signals
+┌───────────────────────────┴─────────────────────────────────────┐
+│  JVM Monitor Thread                                              │
+│  • Reads /dev/shm counters every 1s                             │
+│  • Reads /proc/<PID>/stat for CPU                               │
+│  • Enforces soft limits (warnings, nice adjustment)             │
+│  • Enforces hard limits (deny via shm flags, SIGSTOP)           │
+│  • Detects naive patterns (churn, leaks, fork bombs)            │
+│  • Prints status / writes log                                   │
+└─────────────────────────────────────────────────────────────────┘
+
+Native exits → JVM reports final summary → JVM exits with native's exit code
+```
+
+### Example Session
+
+```bash
+$ java -memory-guard -Xguard:ram=1g -Xguard:verbose ./simulator.elf --steps 10000
+
+JVM Memory Proxy v1.0 — Galactic Cherry Marvell Edition 98
+Binary:  ./simulator.elf
+Args:    --steps 10000
+Budget:  RAM 512m/1g | Disk W 100m/500m R 200m/1g | CPU 80%/100% | Threads 64/256
+
+[00:00:01] RAM: 23 MB | Disk R: 4.2 MB/s W: 0.1 MB/s | CPU: 34% | Threads: 4   HEALTHY ✓
+[00:00:06] RAM: 89 MB | Disk R: 0.0 MB/s W: 2.3 MB/s | CPU: 98% | Threads: 8   HEALTHY ✓
+[00:00:11] RAM: 201 MB | Disk R: 0.0 MB/s W: 5.1 MB/s | CPU: 99% | Threads: 8  HEALTHY ✓
+[00:00:16] RAM: 478 MB | Disk R: 0.0 MB/s W: 5.1 MB/s | CPU: 99% | Threads: 8  CAUTION ⚠
+  ⚠ WARN: RAM approaching soft limit (478 MB / 512 MB soft)
+[00:00:21] RAM: 534 MB | Disk R: 0.0 MB/s W: 5.2 MB/s | CPU: 99% | Threads: 8  OVERUSE ⚡
+  ⚠ WARN: RAM exceeded soft limit (534 MB / 512 MB soft)
+[00:00:26] RAM: 612 MB | Disk R: 0.0 MB/s W: 5.1 MB/s | CPU: 87% | Threads: 8  OVERUSE ⚡
+[00:00:31] RAM: 614 MB | Disk R: 12 MB/s W: 45 MB/s  | CPU: 72% | Threads: 8   OVERUSE ⚡
+[00:00:34] Process exited (code 0)
+
+═══════════════════════════════════════════════════════════════
+  FINAL SUMMARY
+═══════════════════════════════════════════════════════════════
+  Runtime:     34 seconds
+  Peak RAM:    614 MB (61% of hard limit)
+  Total I/O:   Read 52 MB | Write 167 MB
+  CPU avg:     84%
+  Alerts:      2 (0 fatal, 0 error, 2 warn, 0 info)
+  Verdict:     COMPLETED — within hard limits
+  Exit code:   0
+═══════════════════════════════════════════════════════════════
+```
+
+### Purpose
+
+Native code called from Java (JNI, `Runtime.exec()`, `ProcessBuilder`) traditionally escapes JVM governance entirely. The Memory Proxy reclaims oversight by intercepting:
+
+- `malloc` / `calloc` / `realloc` / `mmap` — RAM allocation
+- `read` / `write` / `pread` / `pwrite` — Disk I/O
+- `open` / `close` / `dup` — File descriptor management
+- `fork` / `exec` / `posix_spawn` — Child process creation
+
+The JVM becomes a **virtual private proxy** standing between the native executable and the OS kernel.
+
+Additionally, the `-memory-guard` CLI mode allows **any user** to run any native binary under the proxy without writing Java code — the JVM acts purely as a resource governance shell.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Java Application                                               │
+│  (ProcessBuilder, JNI, Runtime.exec)                            │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+┌───────────────────────────┴─────────────────────────────────────┐
+│  MEMORY PROXY — Virtual Private Proxy Layer                      │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ Allocation Governor                                        │ │
+│  │  • Per-process RAM budget (soft + hard ceiling)            │ │
+│  │  • Allocation rate monitoring (MB/s)                       │ │
+│  │  • Fragmentation detection (external/internal)             │ │
+│  │  • Leak detection (unreleased after timeout)               │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ I/O Mediator                                               │ │
+│  │  • Disk read/write rate limiting (per-process)             │ │
+│  │  • File descriptor ceiling (prevent fd exhaustion)         │ │
+│  │  • Sequential vs random I/O pattern detection              │ │
+│  │  • Buffered write coalescing (reduce syscall frequency)    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ CPU Accountant                                             │ │
+│  │  • Per-child CPU time tracking (user + system)             │ │
+│  │  • Runaway detection (CPU > threshold for > duration)      │ │
+│  │  • Nice/priority enforcement for child processes           │ │
+│  │  • Thread count ceiling                                    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ Telemetry & Status                                         │ │
+│  │  • Real-time dashboard via /proc/jvm-proxy/PID/status      │ │
+│  │  • Historical usage graphs (ring buffer, last 1h)          │ │
+│  │  • Overuse alerts → JVM observer circuit                   │ │
+│  │  • Export to MySQL knowledge base (Dave awareness)         │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ (governed syscalls)
+┌───────────────────────────┴─────────────────────────────────────┐
+│  Operating System Kernel                                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Interception Method
+
+| Platform | Mechanism | Notes |
+|----------|-----------|-------|
+| Linux | `LD_PRELOAD` shim + `seccomp-bpf` filter | Shim intercepts libc; seccomp blocks direct syscalls |
+| Linux (JNI) | In-process hooking via `dlsym(RTLD_NEXT, ...)` | Transparent to native libraries |
+| macOS (.dmg) | `DYLD_INSERT_LIBRARIES` + Endpoint Security | Similar to LD_PRELOAD for Darwin |
+| Windows (.exe) | IAT patching + ETW tracing | Import Address Table redirection |
+
+### Resource Budgets
+
+Each managed process receives a resource budget. Budgets are configurable per-application or use system defaults:
+
+| Resource | Default Soft Limit | Default Hard Limit | On Soft Breach | On Hard Breach |
+|----------|-------------------|-------------------|----------------|----------------|
+| RAM | 512 MB | 2 GB | Log + alert | Deny allocation (ENOMEM) |
+| Disk write rate | 100 MB/s | 500 MB/s | Throttle (backpressure) | Block writes |
+| Disk read rate | 200 MB/s | 1 GB/s | Log | Throttle |
+| File descriptors | 256 | 1024 | Log + alert | Deny open (EMFILE) |
+| CPU time (per 10s window) | 8s | 10s (100%) | Reduce priority (nice +10) | SIGSTOP + alert |
+| Thread count | 64 | 256 | Log | Deny clone (EAGAIN) |
+| Child processes | 8 | 32 | Log | Deny fork (EAGAIN) |
+
+### Naive Overuse Detection
+
+The proxy identifies naive/wasteful resource patterns:
+
+| Pattern | Detection | Response |
+|---------|-----------|----------|
+| Allocation churn | >1000 malloc/free cycles per second on same size | Log "allocation churn" warning |
+| Unbounded growth | Monotonic allocation increase without free for >60s | Alert "possible memory leak" |
+| Read amplification | Same file region read >10× without cache | Suggest mmap or buffer |
+| Write flooding | >50 MB/s sustained for >30s with <1 MB logical data | Alert "write amplification" |
+| Fork bomb | >4 child processes spawned within 1s | Hard deny + SIGKILL children |
+| Spin-wait | CPU 100% with zero I/O for >5s | Alert "possible spin-lock" |
+| fd leak | >50 fds opened without close within 10s | Alert "fd leak detected" |
+
+### Status Interface
+
+```bash
+# Real-time status of all proxied processes
+cat /proc/jvm-proxy/status
+
+# Per-process detail
+cat /proc/jvm-proxy/12345/status
+cat /proc/jvm-proxy/12345/memory
+cat /proc/jvm-proxy/12345/io
+cat /proc/jvm-proxy/12345/cpu
+cat /proc/jvm-proxy/12345/alerts
+
+# Historical telemetry (last 1 hour, 1-second granularity)
+cat /proc/jvm-proxy/12345/history
+```
+
+### Status Output Example
+
+```
+═══════════════════════════════════════════════════════════════
+  JVM MEMORY PROXY — Process Status
+═══════════════════════════════════════════════════════════════
+  PID: 12345  Binary: /opt/app/native/encoder.bin
+  Launched by: ProcessBuilder (Java PID 9001)
+  Uptime: 4m 32s
+
+  MEMORY
+    Allocated:    187 MB / 512 MB (soft) / 2048 MB (hard)
+    Peak:         223 MB (at +2m 14s)
+    Alloc rate:   12.4 MB/s (avg), 45.1 MB/s (peak)
+    Free rate:    11.8 MB/s (avg)
+    Leak risk:    LOW (growth: +0.6 MB/s net)
+    Fragments:    3.2% external
+
+  DISK I/O
+    Read:         34.2 MB/s (avg), 156 MB/s (peak)
+    Write:        8.7 MB/s (avg), 42 MB/s (peak)
+    Open fds:     23 / 256 (soft) / 1024 (hard)
+    Pattern:      Sequential read, buffered write
+
+  CPU
+    User time:    3m 48s (83.7%)
+    System time:  0m 44s (16.3%)
+    Threads:      12 / 64 (soft) / 256 (hard)
+    Load (10s):   6.2s / 8s soft / 10s hard
+    Priority:     nice 0 (normal)
+
+  ALERTS (last 10m)
+    [+1m 02s] INFO  allocation_churn: 1247 cycles/s on 4096-byte blocks
+    [+2m 14s] WARN  soft_ram_approach: 223 MB (43% of soft ceiling)
+
+  VERDICT: HEALTHY ✓
+═══════════════════════════════════════════════════════════════
+```
+
+### Configuration
+
+```xml
+<!-- In jvm-config.xml -->
+<jvm-config version="1">
+  <memory-proxy enabled="true">
+    <default-budget>
+      <ram soft="512m" hard="2g"/>
+      <disk-write-rate soft="100m" hard="500m"/>
+      <disk-read-rate soft="200m" hard="1g"/>
+      <file-descriptors soft="256" hard="1024"/>
+      <cpu-window seconds="10" soft="8" hard="10"/>
+      <threads soft="64" hard="256"/>
+      <children soft="8" hard="32"/>
+    </default-budget>
+
+    <!-- Per-application overrides -->
+    <application path="/opt/app/native/encoder.bin">
+      <ram soft="1g" hard="4g"/>
+      <cpu-window seconds="10" soft="10" hard="10"/>
+    </application>
+
+    <application path="/usr/bin/ffmpeg">
+      <ram soft="2g" hard="8g"/>
+      <disk-write-rate soft="500m" hard="2g"/>
+      <threads soft="128" hard="512"/>
+    </application>
+
+    <!-- Alerts -->
+    <alerts>
+      <notify method="observer-circuit" level="2"/>
+      <notify method="chat" target="ops-team"/>
+      <notify method="mysql" database="dave_knowledge"/>
+    </alerts>
+  </memory-proxy>
+</jvm-config>
+```
+
+### Java API
+
+```java
+// Query proxy status from Java
+MemoryProxyStatus status = MemoryProxy.getStatus(process.pid());
+System.out.println("RAM used: " + status.getAllocatedBytes());
+System.out.println("Disk I/O: " + status.getDiskWriteRate() + " MB/s");
+System.out.println("CPU load: " + status.getCpuPercent() + "%");
+System.out.println("Verdict: " + status.getVerdict());
+
+// Set custom budget before launching
+MemoryProxy.setBudget(builder, new ResourceBudget()
+    .ram(Size.gigabytes(4), Size.gigabytes(8))
+    .diskWriteRate(Size.megabytes(500), Size.gigabytes(1))
+    .threads(128, 512));
+
+Process p = builder.start();  // Proxy automatically wraps the child
+
+// Register alert callback
+MemoryProxy.onAlert(p.pid(), alert -> {
+    if (alert.severity() >= AlertSeverity.WARN) {
+        logger.warn("Native process overuse: " + alert.message());
+    }
+});
+```
+
+### Integration with Secure JVM Modules
+
+| Module | Integration |
+|--------|-------------|
+| Integrity Guardian | Memory Proxy validates allocation ratios (1:1, 1:2 grid) for native code too |
+| Observer Circuit | Alerts route to Circuit 1 (inspectors) and Circuit 2 (forensic) |
+| ClassLoadGuard | Native libraries loaded via JNI are counted against resource budgets |
+| XML Config Reader | Proxy budgets read from `jvm-config.xml` (validated, no DTD) |
+| MySQL Bridge | Telemetry exported to Dave's knowledge base for system-wide awareness |
+| CPU Boost | Proxy respects boost designation — boosted processes get relaxed CPU ceilings |
+
+### Safety Philosophy
+
+The Memory Proxy is not adversarial toward native code. It is a **careful steward**:
+
+- Programs that behave well never notice the proxy (zero overhead on normal paths)
+- Soft limits produce warnings and gentle backpressure, not termination
+- Hard limits protect the system from genuine runaway behavior
+- Historical telemetry enables post-hoc analysis without real-time disruption
+- The proxy learns typical behavior per-binary over time (adaptive baselines)
+
+The goal is safe cohabitation — Java governs native code the way a careful landlord governs tenants. Not restrictive, but aware. Not punitive, but protective.
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmMemoryProxy.hpp   - Header (budget structs, API, status types)
+src/hotspot/share/runtime/jvmMemoryProxy.cpp   - Core proxy engine (~800 lines)
+src/hotspot/share/runtime/jvmMemoryProxy_linux.cpp  - Linux interception (LD_PRELOAD, seccomp)
+src/hotspot/share/runtime/jvmMemoryProxy_shim.c    - Native shim library (preloaded into children)
+src/hotspot/os/linux/os_linux.cpp              - Modified (ProcessBuilder launch wraps with proxy)
+```
+
+Admin: `/proc/jvm-proxy/{status, PID/status, PID/memory, PID/io, PID/cpu, PID/alerts, PID/history}`
 
 ---
 

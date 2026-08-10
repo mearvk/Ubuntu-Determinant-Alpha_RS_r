@@ -1,0 +1,828 @@
+{
+  "title": "Executable File Formats — Global Survey & Safety Assessment",
+  "author": "MEARVK LLC — Galactic Cherry Marvell Edition 98",
+  "date": "2026-08-10",
+  "purpose": "Assess all known executable formats for use, age, usefulness, structure, and safety.",
+  "rating_scale": "1 (worst/dangerous) to 10 (best/safest)",
+
+  "formats": [
+
+    {
+      "name": "ELF",
+      "full_name": "Executable and Linkable Format",
+      "extensions": [".elf", ".so", ".o", ".bin", "(none)"],
+      "magic": "0x7F 0x45 0x4C 0x46 (\\x7fELF)",
+      "year_introduced": 1983,
+      "origin": "AT&T Unix System V Release 4",
+      "platforms": ["Linux", "FreeBSD", "Solaris", "Android", "PlayStation", "Nintendo Switch"],
+      "status": "Active — dominant on all Unix/Linux systems",
+      "structure": {
+        "header": "ELF header (52 or 64 bytes) identifies class (32/64), endianness, ABI, type",
+        "segments": "Program headers define loadable segments (LOAD, DYNAMIC, INTERP, NOTE)",
+        "sections": "Section headers define .text, .data, .bss, .rodata, .symtab, .strtab, .rel",
+        "linking": "Supports static and dynamic linking via PLT/GOT",
+        "relocation": "REL and RELA relocation entries",
+        "notes": "Segment-based for execution, section-based for linking/debugging"
+      },
+      "max_size": "No inherent limit (64-bit offsets)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 10,
+        "maturity": 10,
+        "flexibility": 10,
+        "tooling_support": 10,
+        "safety": 6,
+        "safety_notes": "No built-in code signing. Relies on OS-level protections (SELinux, ASLR, NX bit). LD_PRELOAD injection is trivial. Malware commonly distributed as ELF. Rootkits (Symbiote, BPFDoor, Reptile) all use ELF. Format itself is neutral — safety depends entirely on the OS enforcement layer.",
+        "overall": 9
+      }
+    },
+
+    {
+      "name": "PE / PE32+",
+      "full_name": "Portable Executable (COFF-derived)",
+      "extensions": [".exe", ".dll", ".sys", ".scr", ".ocx", ".drv"],
+      "magic": "0x4D 0x5A (MZ) — DOS stub, then PE\\0\\0 at offset in e_lfanew",
+      "year_introduced": 1993,
+      "origin": "Microsoft (Windows NT 3.1), derived from COFF",
+      "platforms": ["Windows (all versions)", "ReactOS", "Wine/Proton (Linux)", "UEFI firmware"],
+      "status": "Active — dominant on all Windows systems",
+      "structure": {
+        "dos_stub": "Legacy MZ header (64 bytes) + DOS stub program",
+        "pe_header": "PE signature + COFF file header (machine, section count, timestamp)",
+        "optional_header": "Entry point, image base, section alignment, subsystem, DLL characteristics",
+        "sections": ".text, .data, .rdata, .bss, .rsrc (resources), .reloc (relocations)",
+        "data_directories": "Import table, export table, resource table, exception table, certificate table, debug, TLS, IAT, delay import",
+        "overlay": "Arbitrary data appended after last section (installers, packers abuse this)"
+      },
+      "max_size": "4 GB (PE32), effectively unlimited (PE32+/64-bit)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 10,
+        "maturity": 10,
+        "flexibility": 9,
+        "tooling_support": 10,
+        "safety": 5,
+        "safety_notes": "Authenticode code signing exists but is optional. The most targeted executable format on Earth — vast majority of malware is PE. UAC and SmartScreen provide user-facing gates but are frequently bypassed. DLL side-loading and IAT hooking are systemic attack vectors. Overlay abuse for packed/encrypted payloads. Format complexity enables evasion techniques (section manipulation, header abuse, PE anomalies).",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "Mach-O",
+      "full_name": "Mach Object File Format",
+      "extensions": [".dylib", ".bundle", ".app (within)", "(none)"],
+      "magic": "0xFEEDFACE (32-bit), 0xFEEDFACF (64-bit), 0xCAFEBABE (universal/fat)",
+      "year_introduced": 1989,
+      "origin": "NeXTSTEP / Carnegie Mellon Mach kernel",
+      "platforms": ["macOS", "iOS", "iPadOS", "watchOS", "tvOS", "visionOS"],
+      "status": "Active — sole native format for Apple platforms",
+      "structure": {
+        "header": "Mach header (magic, cpu type, cpu subtype, file type, load command count)",
+        "load_commands": "Ordered list: LC_SEGMENT_64, LC_DYLIB, LC_SYMTAB, LC_DYSYMTAB, LC_CODE_SIGNATURE, LC_ENCRYPTION_INFO",
+        "segments": "__TEXT (code), __DATA (mutable), __LINKEDIT (symbol/signature data)",
+        "sections": "Up to 256 sections per segment",
+        "fat_binary": "Multi-architecture container (arm64 + x86_64 in one file)",
+        "code_signature": "Mandatory on iOS, enforced on macOS (notarization)"
+      },
+      "max_size": "No inherent limit (64-bit)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 9,
+        "maturity": 9,
+        "flexibility": 8,
+        "tooling_support": 8,
+        "safety": 8,
+        "safety_notes": "Apple enforces mandatory code signing on iOS and notarization on macOS. Gatekeeper prevents unsigned execution. Hardened runtime disables dangerous capabilities by default. DYLD_INSERT_LIBRARIES (the macOS LD_PRELOAD) is blocked for hardened binaries. The format itself includes LC_CODE_SIGNATURE as a first-class citizen. Strongest safety posture of the three major native formats due to Apple's walled-garden enforcement.",
+        "overall": 9
+      }
+    },
+
+    {
+      "name": "a.out",
+      "full_name": "Assembler Output",
+      "extensions": ["a.out", "(none)"],
+      "magic": "Various (0x0107 OMAGIC, 0x0108 NMAGIC, 0x010B ZMAGIC)",
+      "year_introduced": 1971,
+      "origin": "PDP-7 Unix (Ken Thompson)",
+      "platforms": ["Historical Unix systems", "Early Linux (pre-1.2)", "BSD (historical)"],
+      "status": "Obsolete — replaced by ELF in ~1995",
+      "structure": {
+        "header": "32 bytes: magic, text size, data size, bss size, symbol table size, entry point, text reloc size, data reloc size",
+        "segments": "Fixed three: text, data, bss",
+        "limitations": "No shared libraries (originally), no section flexibility, fixed layout"
+      },
+      "max_size": "Limited by 32-bit size fields",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": false,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 10,
+        "flexibility": 2,
+        "tooling_support": 2,
+        "safety": 3,
+        "safety_notes": "No security features whatsoever. No signing, no ASLR support, no dynamic linking guards. Purely historical. Any system still running a.out binaries is critically exposed. The simplicity is both its charm and its danger — there is nothing to enforce.",
+        "overall": 2
+      }
+    },
+
+    {
+      "name": "COFF",
+      "full_name": "Common Object File Format",
+      "extensions": [".o", ".obj"],
+      "magic": "Machine-dependent (0x014C for i386, 0x8664 for x86-64)",
+      "year_introduced": 1983,
+      "origin": "AT&T Unix System V",
+      "platforms": ["Historical Unix", "Windows (as object format, basis of PE)"],
+      "status": "Partially active — lives on as PE's internal object format and in embedded toolchains",
+      "structure": {
+        "header": "File header (machine, section count, timestamp, symbol pointer, flags)",
+        "sections": "Named sections with virtual/physical addresses, raw data pointer, relocations",
+        "symbols": "Symbol table with storage class and auxiliary entries",
+        "notes": "Predecessor to both PE and ELF. More structured than a.out but less flexible than ELF."
+      },
+      "max_size": "32-bit offsets in classic COFF",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 4,
+        "maturity": 10,
+        "flexibility": 5,
+        "tooling_support": 6,
+        "safety": 4,
+        "safety_notes": "No signing, no runtime protections built into format. As an intermediate object format it is not directly executed by users, reducing attack surface. Its DNA lives on in PE where security was eventually bolted on.",
+        "overall": 4
+      }
+    },
+
+    {
+      "name": "MZ (DOS EXE)",
+      "full_name": "Mark Zbikowski Executable",
+      "extensions": [".exe"],
+      "magic": "0x4D 0x5A (MZ)",
+      "year_introduced": 1981,
+      "origin": "Microsoft (PC-DOS 1.0, Mark Zbikowski)",
+      "platforms": ["MS-DOS", "PC-DOS", "FreeDOS"],
+      "status": "Obsolete as standalone — survives as PE stub header",
+      "structure": {
+        "header": "28-byte header: magic, last page bytes, page count, relocations, header size, min/max memory, initial SS:SP, checksum, initial CS:IP, relocation offset",
+        "body": "Relocatable real-mode 16-bit code",
+        "notes": "Every PE file still begins with a valid MZ header for backward compatibility"
+      },
+      "max_size": "~1 MB practical (real-mode segment limits)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": false,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 10,
+        "flexibility": 1,
+        "tooling_support": 3,
+        "safety": 2,
+        "safety_notes": "No protections of any kind. Real-mode execution means full hardware access. No memory protection, no privilege separation, no signing. Only relevant today as the backward-compatible header in PE files or for retro computing.",
+        "overall": 2
+      }
+    },
+
+    {
+      "name": "NE",
+      "full_name": "New Executable",
+      "extensions": [".exe", ".dll"],
+      "magic": "NE after MZ stub (at offset e_lfanew)",
+      "year_introduced": 1985,
+      "origin": "Microsoft (Windows 1.0, OS/2 1.x)",
+      "platforms": ["Windows 1.0–3.x", "Windows 9x (16-bit)", "OS/2 1.x"],
+      "status": "Obsolete",
+      "structure": {
+        "header": "NE header after MZ stub: module name, segment table, resource table, entry table",
+        "segments": "Named segments with attributes (moveable, preload, discardable)",
+        "resources": "Resource table for icons, dialogs, strings"
+      },
+      "max_size": "16-bit segment limits (~16 MB theoretical, ~640KB practical)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": false,
+      "supports_debug_info": false,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 10,
+        "flexibility": 3,
+        "tooling_support": 2,
+        "safety": 2,
+        "safety_notes": "16-bit cooperative multitasking environment. No memory protection between processes. No code signing. Purely historical — any system running NE binaries in production is dangerously obsolete.",
+        "overall": 2
+      }
+    },
+
+    {
+      "name": "COM",
+      "full_name": "Command File (flat binary)",
+      "extensions": [".com"],
+      "magic": "None (raw binary, loaded at offset 0x100)",
+      "year_introduced": 1974,
+      "origin": "CP/M (Digital Research), adopted by MS-DOS",
+      "platforms": ["CP/M", "MS-DOS", "FreeDOS"],
+      "status": "Obsolete — historical curiosity",
+      "structure": {
+        "header": "NONE. Zero bytes of metadata.",
+        "body": "Raw machine code, loaded verbatim at CS:0100h",
+        "size_limit": "65,280 bytes maximum (64KB segment minus 256-byte PSP)",
+        "notes": "The simplest possible executable format — pure code, no structure, no relocations"
+      },
+      "max_size": "65,280 bytes (practically ~63 KB)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": false,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 10,
+        "flexibility": 1,
+        "tooling_support": 3,
+        "safety": 1,
+        "safety_notes": "Absolute zero safety. No header means no validation possible — any 64KB blob of bytes is a valid COM file. No metadata, no signing, no structure to verify. Full real-mode hardware access. Trivial to craft malicious payloads. The only saving grace is the 64KB size limit constrains payload complexity.",
+        "overall": 1
+      }
+    },
+
+    {
+      "name": "DEX",
+      "full_name": "Dalvik Executable",
+      "extensions": [".dex"],
+      "magic": "0x6465780A (dex\\n) followed by version string",
+      "year_introduced": 2008,
+      "origin": "Google (Android)",
+      "platforms": ["Android (Dalvik VM, ART runtime)"],
+      "status": "Active — all Android applications",
+      "structure": {
+        "header": "Magic, checksum (Adler32), SHA-1 signature, file size, header size, endian tag",
+        "sections": "string_ids, type_ids, proto_ids, field_ids, method_ids, class_defs, data, map_list",
+        "encoding": "Register-based bytecode (not stack-based like JVM)",
+        "optimizations": "ODEX (optimized DEX), VDEX, ART profiles for ahead-of-time compilation"
+      },
+      "max_size": "~4 GB per DEX file (64K method limit per file, multidex for larger apps)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 9,
+        "maturity": 8,
+        "flexibility": 7,
+        "tooling_support": 9,
+        "safety": 7,
+        "safety_notes": "APK signing enforces integrity. Android 10+ supports embedded DEX execution directly from APK to prevent local tampering. Sandboxed execution within ART runtime with permission model. However, obfuscation techniques are common in malware. DEX can be trivially decompiled (jadx, apktool). Sideloading bypasses Play Protect. The format's safety depends heavily on the Play Store gate and device policy.",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "Mach-O Fat / Universal Binary",
+      "full_name": "Multi-Architecture Mach-O Container",
+      "extensions": ["(none)", ".dylib", ".framework"],
+      "magic": "0xCAFEBABE (big-endian) or 0xBEBAFECA (little-endian)",
+      "year_introduced": 1994,
+      "origin": "NeXT (multi-architecture support), popularized by Apple for PowerPC→Intel→ARM transitions",
+      "platforms": ["macOS", "iOS"],
+      "status": "Active — used for arm64/x86_64 universal binaries",
+      "structure": {
+        "fat_header": "Magic + architecture count",
+        "fat_arch_entries": "One per architecture: cpu type, cpu subtype, offset, size, alignment",
+        "body": "Concatenated Mach-O binaries (one per architecture)",
+        "notes": "The loader selects the appropriate slice at runtime"
+      },
+      "max_size": "No limit",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 8,
+        "maturity": 9,
+        "flexibility": 9,
+        "tooling_support": 8,
+        "safety": 8,
+        "safety_notes": "Inherits Mach-O security properties. Each slice is individually signed and notarized. The 0xCAFEBABE magic is shared with Java class files — this caused historical confusion in tooling but is not a security risk. Apple's code signing covers the entire fat binary.",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "WebAssembly (Wasm)",
+      "full_name": "WebAssembly Binary Format",
+      "extensions": [".wasm"],
+      "magic": "0x00 0x61 0x73 0x6D (\\0asm) followed by version (0x01 0x00 0x00 0x00)",
+      "year_introduced": 2017,
+      "origin": "W3C (Mozilla, Google, Microsoft, Apple collaboration)",
+      "platforms": ["All modern browsers", "Node.js", "WASI (server-side)", "Edge computing", "Blockchain"],
+      "status": "Active — rapidly growing, standardized by W3C",
+      "structure": {
+        "header": "Magic number + version (8 bytes)",
+        "sections": "Ordered: Type, Import, Function, Table, Memory, Global, Export, Start, Element, Code, Data, DataCount",
+        "encoding": "Binary format with LEB128 integers, structured stack-based bytecode",
+        "validation": "Statically validated before execution — all types checked, all branches verified",
+        "memory_model": "Linear memory (resizable ArrayBuffer), no direct access to host memory"
+      },
+      "max_size": "Implementation-defined (browsers typically 2-4 GB)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 9,
+        "maturity": 7,
+        "flexibility": 8,
+        "tooling_support": 8,
+        "safety": 9,
+        "safety_notes": "Security-by-design. Sandboxed execution with no direct access to host OS. Memory safety enforced by bounds-checked linear memory. No raw pointers to host. Static validation rejects malformed modules before execution. Cannot access filesystem, network, or hardware without explicit host imports. However: Wasm has been used for cryptomining malware (in-browser), and its opacity makes behavioral analysis harder than JavaScript. WASI extends capabilities but maintains capability-based security model.",
+        "overall": 9
+      }
+    },
+
+    {
+      "name": "JAR",
+      "full_name": "Java Archive",
+      "extensions": [".jar"],
+      "magic": "0x50 0x4B 0x03 0x04 (PK — ZIP format)",
+      "year_introduced": 1996,
+      "origin": "Sun Microsystems (Java 1.1)",
+      "platforms": ["Any platform with JVM (cross-platform)"],
+      "status": "Active — standard Java deployment format",
+      "structure": {
+        "container": "ZIP archive",
+        "manifest": "META-INF/MANIFEST.MF — defines Main-Class, Class-Path, permissions",
+        "contents": "Compiled .class files, resources, nested JARs, native libraries",
+        "signing": "META-INF/*.SF (signature file) + META-INF/*.RSA/.DSA/.EC (certificate)",
+        "variants": "WAR (web), EAR (enterprise), Spring Boot fat JAR"
+      },
+      "max_size": "Limited by ZIP format (~4 GB classic, ZIP64 for larger)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 9,
+        "maturity": 10,
+        "flexibility": 9,
+        "tooling_support": 10,
+        "safety": 7,
+        "safety_notes": "JVM provides sandboxed execution with bytecode verification. JAR signing is well-defined but rarely enforced in practice. Deserialization vulnerabilities (Log4Shell, etc.) are a systemic Java security concern. The ZIP-based format means JARs can be trivially inspected/modified. Classpath poisoning and dependency confusion attacks are real threats. SecurityManager was deprecated (Java 17) and removed, reducing in-process security boundaries.",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "Shebang Script",
+      "full_name": "Interpreted Script (via #! directive)",
+      "extensions": [".sh", ".py", ".pl", ".rb", ".js", ".php", "(any)"],
+      "magic": "0x23 0x21 (#!)",
+      "year_introduced": 1980,
+      "origin": "BSD Unix (Dennis Ritchie, Unix Version 8)",
+      "platforms": ["All Unix/Linux/macOS", "Windows (via WSL, Git Bash, Cygwin)"],
+      "status": "Active — universal mechanism for interpreter dispatch",
+      "structure": {
+        "header": "First line: #!<interpreter-path> [optional-arg]",
+        "body": "Plain text source code in the target language",
+        "execution": "Kernel reads shebang, exec()s the named interpreter with the script as argument",
+        "notes": "Not a true binary format — delegates to an interpreter. The script itself is just text."
+      },
+      "max_size": "No inherent limit (filesystem limit)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 10,
+        "maturity": 10,
+        "flexibility": 10,
+        "tooling_support": 10,
+        "safety": 5,
+        "safety_notes": "Scripts are plaintext — trivially inspectable, which aids auditing. However: no signing mechanism built into the format. The shebang path can be manipulated (PATH hijacking). Scripts inherit the full privileges of the invoking user. Interpreter vulnerabilities (shell injection, eval abuse) are the primary attack vector. World-writable scripts are a classic privilege escalation target. No binary obfuscation means both easier auditing AND easier malicious modification.",
+        "overall": 7
+      }
+    },
+
+    {
+      "name": "AppImage",
+      "full_name": "AppImage (self-contained Linux application)",
+      "extensions": [".AppImage"],
+      "magic": "ELF header (it's a self-extracting ELF with embedded filesystem)",
+      "year_introduced": 2004,
+      "origin": "Simon Peter (originally klik, then AppImage project)",
+      "platforms": ["Linux (all distributions)"],
+      "status": "Active — popular for portable Linux apps",
+      "structure": {
+        "runtime": "Small ELF binary (the AppImage runtime)",
+        "filesystem": "SquashFS image appended to the ELF",
+        "contents": "Application binary + all dependencies + desktop entry + icon",
+        "execution": "Runtime mounts SquashFS via FUSE, then exec()s the contained AppRun",
+        "signing": "Optional GPG signature (appended)"
+      },
+      "max_size": "No inherent limit",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 7,
+        "maturity": 7,
+        "flexibility": 7,
+        "tooling_support": 6,
+        "safety": 4,
+        "safety_notes": "No sandboxing whatsoever — the contained app runs with full user privileges. No mandatory signing (GPG is optional and rarely verified by users). Users download and chmod +x random files from the internet. No centralized update mechanism. No confinement, no permission model. Bundled libraries may contain known vulnerabilities that never get patched. The format trusts the user to trust the publisher.",
+        "overall": 6
+      }
+    },
+
+    {
+      "name": "Snap",
+      "full_name": "Snap Package",
+      "extensions": [".snap"],
+      "magic": "SquashFS magic (hsqs)",
+      "year_introduced": 2014,
+      "origin": "Canonical (Ubuntu)",
+      "platforms": ["Ubuntu", "Linux (with snapd)"],
+      "status": "Active — default on Ubuntu",
+      "structure": {
+        "container": "SquashFS compressed filesystem image",
+        "metadata": "snap.yaml (name, version, confinement, plugs/slots)",
+        "confinement": "strict (AppArmor + seccomp), devmode, classic (no sandbox)",
+        "store": "Canonical Snap Store (centralized, signed)",
+        "updates": "Automatic delta updates, transactional (rollback on failure)"
+      },
+      "max_size": "No inherent limit",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 8,
+        "maturity": 7,
+        "flexibility": 7,
+        "tooling_support": 7,
+        "safety": 7,
+        "safety_notes": "Mandatory store signing. AppArmor confinement in strict mode. Automatic security updates. However: 'classic' confinement (required by many dev tools) provides NO sandboxing. Snap Store has had incidents of malicious packages. The centralized store is a single point of trust/failure. snapd daemon runs as root.",
+        "overall": 7
+      }
+    },
+
+    {
+      "name": "Flatpak",
+      "full_name": "Flatpak (formerly xdg-app)",
+      "extensions": [".flatpak", ".flatpakref"],
+      "magic": "OSTree repository format internally",
+      "year_introduced": 2015,
+      "origin": "Red Hat / freedesktop.org (Alexander Larsson)",
+      "platforms": ["Linux (all major distributions)"],
+      "status": "Active — default on Fedora, available everywhere",
+      "structure": {
+        "container": "OSTree-based content-addressed storage",
+        "metadata": "Manifest (JSON/YAML): permissions, finish-args, shared runtimes",
+        "sandboxing": "bubblewrap (user namespace) + seccomp + portals for controlled access",
+        "runtimes": "Shared base runtimes (freedesktop, GNOME, KDE) reduce duplication",
+        "signing": "GPG signatures on repository metadata"
+      },
+      "max_size": "No inherent limit",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 8,
+        "maturity": 7,
+        "flexibility": 8,
+        "tooling_support": 7,
+        "safety": 8,
+        "safety_notes": "Strongest sandboxing model of the three Linux universal formats. Portal-based permission system (file access, notifications, etc. gated by portals). Decentralized — anyone can host a Flatpak repo (Flathub is primary but not sole). Permissions are declared and reviewable. However: many apps request broad filesystem access which undermines the sandbox. Portal system adds complexity.",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "XBE",
+      "full_name": "Xbox Executable",
+      "extensions": [".xbe"],
+      "magic": "XBEH (0x58 0x42 0x45 0x48)",
+      "year_introduced": 2001,
+      "origin": "Microsoft (Original Xbox)",
+      "platforms": ["Original Xbox"],
+      "status": "Obsolete — console discontinued 2009",
+      "structure": {
+        "header": "Magic, digital signature (256 bytes RSA), base address, header size, image size",
+        "sections": "Section headers with virtual address, size, flags (executable, writable, preload)",
+        "certificates": "Certificate area with title ID, title name, media types, game region, allowed media",
+        "libraries": "Library versions (XDK version tracking)",
+        "notes": "PE-derived but simplified for console. Mandatory RSA signing (Microsoft private key)."
+      },
+      "max_size": "Limited by DVD disc size (~6 GB)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 8,
+        "flexibility": 3,
+        "tooling_support": 3,
+        "safety": 7,
+        "safety_notes": "Mandatory RSA code signing — only Microsoft-signed XBEs run on retail hardware. The signing was eventually broken (softmod exploits), but the format itself enforces authentication. Closed platform means no user-facing execution of arbitrary code without exploit. Historical only.",
+        "overall": 3
+      }
+    },
+
+    {
+      "name": "XEX",
+      "full_name": "Xbox 360 Executable",
+      "extensions": [".xex"],
+      "magic": "XEX2 (0x58 0x45 0x58 0x32)",
+      "year_introduced": 2005,
+      "origin": "Microsoft (Xbox 360)",
+      "platforms": ["Xbox 360"],
+      "status": "Obsolete — console discontinued 2016",
+      "structure": {
+        "header": "Magic, module flags, PE data offset, security info offset",
+        "security": "RSA-2048 signature, SHA-256 content hashes, encrypted sections (AES-CBC)",
+        "compression": "LZX-compressed PE image inside",
+        "inner": "Standard PE32 image (decrypted at load time by hypervisor)",
+        "notes": "Stronger than XBE — encryption + signing + hypervisor verification"
+      },
+      "max_size": "DVD/digital download limits",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 1,
+        "maturity": 8,
+        "flexibility": 4,
+        "tooling_support": 3,
+        "safety": 8,
+        "safety_notes": "Hardware-enforced security chain: eFuses → bootloader → hypervisor → XEX verification. Encrypted content with per-title keys. RSA-2048 + SHA-256. The hypervisor validates every page load. One of the most secure consumer executable formats ever deployed (took years to break). Historical only.",
+        "overall": 3
+      }
+    },
+
+    {
+      "name": "AIF",
+      "full_name": "ARM Image Format",
+      "extensions": [".aif"],
+      "magic": "ARM branch instruction at offset 0 (BL to entry)",
+      "year_introduced": 1993,
+      "origin": "Acorn/ARM Ltd (RISC OS)",
+      "platforms": ["RISC OS", "ARM embedded systems (historical)"],
+      "status": "Obsolete — replaced by ELF on modern ARM",
+      "structure": {
+        "header": "128 bytes: decompress code, self-reloc code, zero-init code, image entry, RO size, RW size, debug size, ZI size, debug type, image base, workspace",
+        "body": "Read-only area (code) + read-write area (data)",
+        "notes": "Simple format for bare-metal ARM. The header itself is executable ARM code."
+      },
+      "max_size": "32-bit size fields",
+      "supports_shared_libraries": false,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "assessment": {
+        "usefulness": 2,
+        "maturity": 8,
+        "flexibility": 3,
+        "tooling_support": 2,
+        "safety": 3,
+        "safety_notes": "No signing, no protections. Bare-metal format for embedded ARM — security is not its concern. The header being executable code is novel but means the first 128 bytes are also attack surface.",
+        "overall": 3
+      }
+    },
+
+    {
+      "name": "Flat Binary",
+      "full_name": "Raw Binary Image (headerless)",
+      "extensions": [".bin", ".img", ".rom", ".fw"],
+      "magic": "None (raw machine code or data)",
+      "year_introduced": "~1950s (as old as computers)",
+      "origin": "Universal (any architecture)",
+      "platforms": ["Firmware", "Bootloaders", "Embedded systems", "BIOS/UEFI ROM"],
+      "status": "Active — ubiquitous in firmware and embedded",
+      "structure": {
+        "header": "NONE",
+        "body": "Raw bytes — could be code, data, or both",
+        "loading": "Loaded at a fixed address known by convention (e.g., 0x7C00 for BIOS boot sector)",
+        "notes": "The loader must know the load address, entry point, and size externally"
+      },
+      "max_size": "No inherent limit",
+      "supports_shared_libraries": false,
+      "supports_position_independent": false,
+      "supports_debug_info": false,
+      "assessment": {
+        "usefulness": 7,
+        "maturity": 10,
+        "flexibility": 5,
+        "tooling_support": 4,
+        "safety": 2,
+        "safety_notes": "No structure means no validation, no signing (unless externally applied), no metadata. Used for boot sectors, firmware blobs, and FPGA bitstreams. UEFI Secure Boot adds external signing to firmware images. Without external protection, a flat binary is completely unverifiable. Critical that surrounding infrastructure provides authentication.",
+        "overall": 5
+      }
+    },
+
+    {
+      "name": "PE/COFF for UEFI",
+      "full_name": "UEFI Application / Driver (PE32+ subset)",
+      "extensions": [".efi"],
+      "magic": "MZ + PE\\0\\0 (same as Windows PE)",
+      "year_introduced": 2005,
+      "origin": "Intel/UEFI Forum",
+      "platforms": ["All UEFI firmware (x86, x86-64, ARM, RISC-V)"],
+      "status": "Active — boots every modern PC",
+      "structure": {
+        "format": "Subset of PE32+ with EFI subsystem type",
+        "sections": ".text, .data, .reloc (mandatory for position independence)",
+        "entry": "EFI_MAIN entry point receives SystemTable and ImageHandle",
+        "notes": "Runs in firmware context — ring 0 equivalent, before OS loads"
+      },
+      "max_size": "Limited by firmware memory (typically 256 MB EFI partition)",
+      "supports_shared_libraries": false,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 9,
+        "maturity": 8,
+        "flexibility": 6,
+        "tooling_support": 7,
+        "safety": 7,
+        "safety_notes": "UEFI Secure Boot enforces code signing (Microsoft + vendor keys in db). Bootkits like Bootkitty (2024, first Linux UEFI bootkit) demonstrate that the pre-OS environment is a high-value target. If Secure Boot is bypassed or disabled, EFI binaries run with absolute hardware access. The format itself supports signing via the PE certificate table. Safety is strong WHEN Secure Boot is properly configured and key management is sound.",
+        "overall": 8
+      }
+    },
+
+    {
+      "name": "DMG (Apple Disk Image)",
+      "full_name": "Apple Disk Image (contains Mach-O applications)",
+      "extensions": [".dmg"],
+      "magic": "0x78 0x01 (zlib), or 'koly' trailer at end of file",
+      "year_introduced": 2001,
+      "origin": "Apple (Mac OS X 10.0)",
+      "platforms": ["macOS"],
+      "status": "Active — standard macOS application distribution format",
+      "structure": {
+        "format": "UDIF (Universal Disk Image Format) — a disk image, not an executable",
+        "compression": "zlib, bzip2, lzfse, or raw",
+        "filesystem": "Contains HFS+ or APFS filesystem with .app bundle",
+        "signing": "Code signing on the contained .app bundle (Mach-O inside)",
+        "notes": "DMG is a container/distribution format, not an executable format itself. The executable is the Mach-O inside the .app inside the filesystem inside the DMG."
+      },
+      "max_size": "No inherent limit (disk image)",
+      "supports_shared_libraries": true,
+      "supports_position_independent": true,
+      "supports_debug_info": true,
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 7,
+        "maturity": 9,
+        "flexibility": 6,
+        "tooling_support": 7,
+        "safety": 7,
+        "safety_notes": "The DMG itself can be signed and notarized by Apple. Gatekeeper checks the DMG and its contents. However: DMGs are routinely used to distribute macOS malware (user mounts, drags to Applications). The 'mount and drag' workflow bypasses fine-grained permission checks. Notarization requirement (macOS Catalina+) significantly improved safety for apps distributed outside the App Store.",
+        "overall": 7
+      }
+    },
+
+    {
+      "name": "MSI",
+      "full_name": "Windows Installer Package",
+      "extensions": [".msi", ".msp", ".mst"],
+      "magic": "0xD0 0xCF 0x11 0xE0 (OLE Compound Document)",
+      "year_introduced": 1999,
+      "origin": "Microsoft (Windows 2000)",
+      "platforms": ["Windows"],
+      "status": "Active — standard Windows installation format",
+      "structure": {
+        "container": "OLE Structured Storage (Compound Binary File)",
+        "database": "Relational database of installation tables (Component, File, Registry, CustomAction)",
+        "streams": "Cabinet (.cab) streams with compressed files",
+        "custom_actions": "Arbitrary code execution during install (DLLs, scripts, EXEs)",
+        "signing": "Authenticode signature on the MSI file"
+      },
+      "max_size": "2 GB (OLE limit)",
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 8,
+        "maturity": 9,
+        "flexibility": 8,
+        "tooling_support": 8,
+        "safety": 5,
+        "safety_notes": "CustomActions are arbitrary code that runs during installation — often with elevated privileges. MSI repair/reinstall can be triggered silently. The format's complexity enables abuse (DLL side-loading via CustomAction, privilege escalation via repair). Authenticode signing helps but is not mandatory. Enterprise deployment (GPO) trusts MSIs broadly. MSI transform files (.mst) can silently alter installation behavior.",
+        "overall": 7
+      }
+    },
+
+    {
+      "name": "MSIX / AppX",
+      "full_name": "Windows Modern Application Package",
+      "extensions": [".msix", ".appx", ".msixbundle", ".appxbundle"],
+      "magic": "ZIP (PK) with AppxManifest.xml",
+      "year_introduced": 2012,
+      "origin": "Microsoft (Windows 8, evolved to MSIX in 2018)",
+      "platforms": ["Windows 10/11"],
+      "status": "Active — Microsoft's recommended packaging format",
+      "structure": {
+        "container": "ZIP with required XML manifests",
+        "manifest": "AppxManifest.xml — identity, capabilities, visual elements",
+        "signing": "Mandatory code signing (cannot install unsigned)",
+        "capabilities": "Declared capability model (internetClient, documentsLibrary, etc.)",
+        "sandboxing": "Container-based isolation with declared access"
+      },
+      "max_size": "No inherent limit",
+      "supports_code_signing": true,
+      "assessment": {
+        "usefulness": 7,
+        "maturity": 6,
+        "flexibility": 6,
+        "tooling_support": 7,
+        "safety": 9,
+        "safety_notes": "Mandatory signing — unsigned MSIX cannot be installed. Declared capabilities restrict access (no silent filesystem access). Container isolation. Clean install/uninstall with no registry pollution. The strongest safety model in the Windows ecosystem. However: limited adoption for legacy Win32 apps, and the 'runFullTrust' capability effectively disables sandboxing for packaged desktop apps.",
+        "overall": 7
+      }
+    },
+
+    {
+      "name": "ELF Core Dump",
+      "full_name": "ELF Core File (process memory snapshot)",
+      "extensions": [".core", "core.*"],
+      "magic": "0x7F ELF (same as ELF, type ET_CORE)",
+      "year_introduced": 1983,
+      "origin": "Unix (with ELF adoption)",
+      "platforms": ["Linux", "FreeBSD", "Solaris"],
+      "status": "Active — standard crash dump format",
+      "structure": {
+        "header": "ELF header with e_type = ET_CORE (4)",
+        "segments": "PT_NOTE (process state, registers, signal info) + PT_LOAD (memory pages)",
+        "contents": "Complete process memory state at time of crash/signal",
+        "notes": "Not executable — contains the frozen state of a crashed process for post-mortem debugging"
+      },
+      "max_size": "Can be enormous (GBs for large processes)",
+      "assessment": {
+        "usefulness": 7,
+        "maturity": 10,
+        "flexibility": 5,
+        "tooling_support": 9,
+        "safety": 4,
+        "safety_notes": "Core dumps contain EVERYTHING that was in process memory at crash time — passwords, encryption keys, tokens, session data, private keys. A core dump is a security-sensitive artifact that should never be world-readable. Systems should limit core dump generation (ulimit -c 0) in production. The format itself is passive (not executable) but the data it contains is extremely sensitive.",
+        "overall": 6
+      }
+    }
+  ],
+
+  "summary_rankings": {
+    "safest_formats": [
+      {"rank": 1, "name": "WebAssembly (Wasm)", "safety": 9, "reason": "Security-by-design, sandboxed, validated before execution"},
+      {"rank": 2, "name": "MSIX/AppX", "safety": 9, "reason": "Mandatory signing, declared capabilities, container isolation"},
+      {"rank": 3, "name": "Mach-O", "safety": 8, "reason": "Mandatory code signing (iOS), notarization (macOS), hardened runtime"},
+      {"rank": 4, "name": "Flatpak", "safety": 8, "reason": "bubblewrap sandbox, portals, declared permissions"},
+      {"rank": 5, "name": "XEX (Xbox 360)", "safety": 8, "reason": "Hardware+hypervisor enforced, encrypted, RSA-2048 signed"}
+    ],
+    "most_dangerous_formats": [
+      {"rank": 1, "name": "COM", "safety": 1, "reason": "Zero structure, zero validation, raw code blob"},
+      {"rank": 2, "name": "MZ (DOS EXE)", "safety": 2, "reason": "Real-mode, no protections, full hardware access"},
+      {"rank": 3, "name": "NE", "safety": 2, "reason": "16-bit, no memory protection, no signing"},
+      {"rank": 4, "name": "Flat Binary", "safety": 2, "reason": "No structure, no validation, raw bytes"},
+      {"rank": 5, "name": "a.out", "safety": 3, "reason": "No security features, fixed layout, no signing"}
+    ],
+    "most_useful_today": [
+      {"rank": 1, "name": "ELF", "overall": 9, "reason": "Runs the internet (Linux servers), Android, embedded"},
+      {"rank": 2, "name": "Mach-O", "overall": 9, "reason": "All Apple devices — 2 billion active"},
+      {"rank": 3, "name": "WebAssembly", "overall": 9, "reason": "Cross-platform, browser-native, growing server-side (WASI)"},
+      {"rank": 4, "name": "PE", "overall": 8, "reason": "All Windows desktops + UEFI firmware worldwide"},
+      {"rank": 5, "name": "JAR", "overall": 8, "reason": "Enterprise Java — banks, government, enterprise systems"}
+    ]
+  },
+
+  "observations": {
+    "evolutionary_pattern": "a.out (1971) → COFF (1983) → ELF (1983/adopted 1995). MZ (1981) → NE (1985) → PE (1993). Each generation adds metadata, relocations, and eventually signing.",
+    "safety_trend": "Modern formats (Wasm, MSIX, Flatpak) design security in from day one. Legacy formats (ELF, PE, Mach-O) bolt security on via OS enforcement. The oldest formats (COM, a.out, MZ) have zero security by design.",
+    "convergence": "ELF, PE, and Mach-O have converged on similar feature sets: sections, symbols, relocations, dynamic linking, position independence. The differences are structural/historical rather than capability-based.",
+    "container_vs_executable": "Modern trend separates the container (signing, metadata, sandboxing) from the executable (native code). Flatpak, Snap, AppImage, MSIX, DMG are all containers around native binaries. This layered approach allows security policy without changing the binary format.",
+    "the_signing_gap": "ELF — the format running most of the internet's infrastructure — has NO built-in code signing. Linux relies entirely on OS-level mechanisms (dm-verity, IMA/EVM, package manager GPG). This is the single largest structural security gap in modern computing."
+  },
+
+  "relevance_to_galactic_cherry": {
+    "formats_supported_by_memory_proxy": ["ELF (64-bit)", "ELF (32-bit)", "PE/COFF (via Wine)", "Mach-O", "Shell script (#!)", "Any +x executable"],
+    "kernel_native": "ELF — all kernel modules (.ko), userspace, shared libraries",
+    "jvm_native": "JAR (.jar), WAR (.war) — NitroWebExpress, FiduciaryServices",
+    "dave_uses": "ELF (native inference), Mach-O detection (format awareness)",
+    "hpm_monitors": "All formats equally — HPM operates at network layer, format-agnostic",
+    "negamane_protects": "All format binaries equally — filesystem-level immutability",
+    "integrity_guardian_validates": "ELF shared objects (.so) loaded via dlopen() in JVM process space"
+  },
+
+  "references": [
+    {"source": "Wikipedia — Comparison of executable file formats", "url": "https://en.wikipedia.org/wiki/Comparison_of_executable_file_formats"},
+    {"source": "Wikipedia — Executable and Linkable Format", "url": "https://en.wikipedia.org/wiki/Executable_and_Linkable_Format"},
+    {"source": "Microsoft — PE Format Specification", "url": "https://learn.microsoft.com/en-us/windows/win32/debug/pe-format"},
+    {"source": "WebAssembly Security Model", "url": "https://webassembly.org/docs/security/"},
+    {"source": "Android — DEX Format", "url": "https://source.android.com/docs/core/runtime/dex-format"},
+    {"source": "OSDev Wiki — A.OUT, COFF, MZ, PE", "url": "https://wiki.osdev.org/"},
+    {"source": "Oracle — JAR File Specification", "url": "https://docs.oracle.com/en/java/javase/21/docs/specs/jar/jar.html"}
+  ]
+}
