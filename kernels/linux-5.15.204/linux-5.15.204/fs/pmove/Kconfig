@@ -1,31 +1,34 @@
 # SPDX-License-Identifier: GPL-2.0
 
-config PCOPY
-	tristate "Parallel Copy/Move — NVMe Multi-Queue & PCIe Lane Aware"
+config PMOVE
+	tristate "Parallel Move — Dynamic Lane & Channel Assignment"
 	depends on BLOCK && BLK_DEV
 	select PROC_FS
 	help
-	  PCOPY provides hardware-aware parallel file copy and move operations.
-	  It detects NVMe hardware queue depth, PCIe lane width, and CPU count
-	  to compute the optimal number of parallel I/O channels.
+	  PMOVE provides a dedicated parallel move engine with independent
+	  telemetry, abort capability, and move-specific optimizations.
 
-	  Standard cp/mv operates sequentially. PCOPY dispatches multiple files
-	  across multiple channels simultaneously, each hitting a distinct NVMe
-	  submission queue via blk-mq's per-CPU mapping. This saturates the
-	  device's PCIe bandwidth when copying many files.
+	  Move strategy:
+	    1. Attempt atomic do_renameat2() — O(1) inode swap (same-fs)
+	    2. If -EXDEV: splice-based data migration + unlink (cross-device)
+	    3. PMOVE_F_FORCE_COPY: always use splice path (benchmarking)
 
-	  Channel count = min(online_cpus, hw_queues, nr_files)
+	  Dynamic assignment mirrors pcopy's engine:
+	    - CPU load awareness (scales channels with available headroom)
+	    - Device class speed constants shared with pcopy module
+	    - PCIe lane utilization tracking
+	    - File count proportional scaling
 
-	  Example: 8 CPUs + NVMe with 8 hw queues + 100 files = 8 channels
-	  Each channel processes files in parallel, each on its own NVMe SQ.
-	  PCIe Gen4 x4 = ~7 GB/s theoretical bandwidth, achievable with
-	  sufficient queue depth.
+	  Reports move-specific metrics:
+	    - Atomic renames (instant, zero data copy)
+	    - Splice fallbacks (cross-device boundary detected)
+	    - Bytes actually transferred (excludes instant renames)
 
 	  Exposes:
-	    /proc/pmove/status  - Hardware detection and recommendations
+	    /proc/pmove/status  - Hardware detection and dynamic state
 	    /proc/pmove/config  - Tunable parameters
-	    /dev/pmove          - ioctl interface for pcopy/pmove tools
+	    /dev/pmove          - ioctl interface for pmove tool
 
-	  To compile as a module, choose M here: the module will be called pcopy.
+	  To compile as a module, choose M here: the module will be called pmove.
 
 	  If unsure, say M.

@@ -1,0 +1,571 @@
+{
+  "kernel": {
+    "name": "Linux 5.15.204 — Galactic Cherry Marvell Edition 98",
+    "version": "5.15.204",
+    "architecture": "x86_64",
+    "type": "monolithic with loadable modules",
+
+    "subsystems": {
+      "scheduler": {
+        "path": "kernel/sched/",
+        "threading_model": "preemptive multitasking, CFS (Completely Fair Scheduler)",
+        "key_files": [
+          "core.c (283K — main scheduler logic, task creation/destruction, context switch)",
+          "fair.c (329K — CFS implementation, vruntime, load balancing)",
+          "rt.c (70K — real-time scheduling, SCHED_FIFO/SCHED_RR)",
+          "deadline.c (81K — SCHED_DEADLINE, earliest deadline first)",
+          "idle.c (13K — idle task management)",
+          "topology.c (65K — CPU topology, NUMA awareness)",
+          "clock.c (12K — scheduler clock)",
+          "pelt.c (12K — per-entity load tracking)"
+        ],
+        "threading_concerns": {
+          "context_switch_cost": "~1-5µs per switch on modern hardware",
+          "runqueue_lock_contention": "per-CPU runqueues reduce lock contention",
+          "priority_inversion": "RT mutexes with priority inheritance prevent starvation",
+          "load_balancing": "periodic rebalancing across CPUs, NUMA-aware migration",
+          "preemption_points": "CONFIG_PREEMPT — full kernel preemption enabled"
+        },
+        "norms": {
+          "max_threads_per_process": "limited by RLIMIT_NPROC (default ~30000)",
+          "scheduling_latency": "CFS target latency 6ms for 1 runnable task, scales with load",
+          "time_slice": "dynamic based on weight/nice value, typically 1-100ms",
+          "min_granularity": "0.75ms minimum scheduling quantum"
+        }
+      },
+
+      "memory_management": {
+        "path": "mm/",
+        "key_areas": [
+          "page allocator (buddy system)",
+          "slab allocator (SLUB)",
+          "virtual memory (page tables, TLB)",
+          "memory mapping (mmap, brk)",
+          "swap management",
+          "OOM killer",
+          "huge pages (THP)",
+          "memory compaction",
+          "NUMA policy"
+        ],
+        "memory_concerns": {
+          "page_size": "4KB (default), 2MB/1GB huge pages",
+          "address_space": "48-bit virtual (256TB user), 47-bit kernel",
+          "stack_size_per_thread": "8KB kernel stack (configurable), 8MB default user stack",
+          "slab_overhead": "per-object metadata, cache coloring for alignment",
+          "fragmentation": "compaction daemon runs to defragment physical memory",
+          "overcommit": "vm.overcommit_memory controls allocation policy",
+          "oom_handling": "OOM killer selects process by badness score"
+        },
+        "security_concerns": {
+          "stack_overflow": "guard pages between kernel stacks, VMAP_STACK",
+          "heap_overflow": "SLUB red zones, poisoning, freelist randomization",
+          "use_after_free": "SLAB_TYPESAFE_BY_RCU, KASAN (debug)",
+          "kaslr": "kernel address space layout randomization",
+          "smep_smap": "supervisor mode execution/access prevention",
+          "page_table_isolation": "KPTI against Meltdown"
+        }
+      },
+
+      "process_management": {
+        "path": "kernel/",
+        "key_files": [
+          "fork.c (83K — process/thread creation, copy_process)",
+          "exit.c (48K — process termination, zombie reaping)",
+          "signal.c (127K — signal delivery, handlers)",
+          "pid.c (18K — PID allocation and namespace)",
+          "cred.c (25K — credentials management)",
+          "ptrace.c (39K — debugging interface)",
+          "exec_domain.c — execution domains"
+        ],
+        "norms": {
+          "process_creation_cost": "fork() ~100-500µs, vfork() ~10µs, clone() configurable",
+          "max_pid": "4194304 (2^22, configurable via pid_max)",
+          "max_threads_system": "limited by available memory for kernel stacks",
+          "signal_queue_depth": "RLIMIT_SIGPENDING (default ~30000)",
+          "file_descriptors_per_process": "RLIMIT_NOFILE (default 1024, max ~1M)"
+        },
+        "security_concerns": {
+          "credential_checks": "uid/gid/capabilities verified at every access point",
+          "namespace_isolation": "PID/mount/network/user namespaces for containers",
+          "seccomp": "syscall filtering via BPF programs",
+          "no_new_privs": "prevents privilege escalation via exec"
+        }
+      },
+
+      "inter_process_communication": {
+        "path": "ipc/",
+        "mechanisms": {
+          "pipes": "unidirectional byte stream, 64KB default buffer",
+          "unix_sockets": "bidirectional, supports fd passing, SCM_CREDENTIALS",
+          "shared_memory": "shmget/shmat or mmap MAP_SHARED",
+          "message_queues": "POSIX mq or SysV msgget/msgsnd",
+          "semaphores": "POSIX or SysV semaphore sets",
+          "signals": "asynchronous notification (32 standard + 32 real-time)",
+          "futex": "fast userspace mutex (kernel arbitrates contention only)",
+          "eventfd": "lightweight event notification counter",
+          "io_uring": "async I/O ring buffer (shared memory + submission/completion queues)"
+        },
+        "message_passing_concerns": {
+          "pipe_buffer_size": "64KB default, fcntl F_SETPIPE_SZ up to 1MB",
+          "socket_buffer_size": "wmem/rmem default 128KB-256KB, tunable to 16MB+",
+          "message_queue_max": "POSIX: /proc/sys/fs/mqueue/msg_max (default 10)",
+          "shared_memory_max": "SHMMAX sysctl (typically 50% of RAM)",
+          "copy_overhead": "pipes/sockets copy data; shared memory is zero-copy",
+          "ordering_guarantees": "FIFO within a single pipe/socket; no cross-channel ordering"
+        },
+        "security_concerns": {
+          "permission_checks": "IPC objects have owner/mode bits",
+          "namespace_isolation": "IPC namespaces separate SysV objects",
+          "resource_limits": "per-user limits on queues, segments, semaphores",
+          "covert_channels": "shared memory timing can leak information"
+        }
+      },
+
+      "networking": {
+        "path": "net/",
+        "key_subsystems": {
+          "ipv4": {
+            "path": "net/ipv4/",
+            "file_count": "~130 source files",
+            "key_files": [
+              "tcp.c (125K), tcp_input.c (209K), tcp_output.c (123K)",
+              "udp.c (87K), route.c (98K), ip_output.c (45K)",
+              "inet_connection_sock.c (38K — port binding, connection lifecycle)"
+            ]
+          },
+          "socket_layer": "net/socket.c — userspace API boundary",
+          "netfilter": "net/netfilter/ — packet filtering framework",
+          "xfrm": "IPsec framework"
+        },
+        "threading_model": {
+          "softirq_processing": "network packets processed in softirq context (NET_RX_SOFTIRQ)",
+          "napi_polling": "hybrid interrupt/polling for high throughput",
+          "per_cpu_backlog": "each CPU has its own packet processing queue",
+          "socket_locking": "per-socket spinlock, BH-disabled for protocol processing"
+        },
+        "security_concerns": {
+          "input_validation_order": "CRITICAL: headers parsed before security hooks fire",
+          "buffer_overflow_vectors": [
+            "SKB linear data vs. paged fragments — length validation essential",
+            "IP options parsing — bounded by header length field",
+            "TCP options — bounded by data offset field",
+            "Fragmentation reassembly — total size checks before allocation"
+          ],
+          "dos_protections": [
+            "SYN cookies (tcp_syncookies)",
+            "Connection rate limiting",
+            "Socket buffer memory limits (tcp_mem, udp_mem)",
+            "Backlog queue limits (tcp_max_syn_backlog)"
+          ],
+          "integer_overflow_risks": [
+            "Packet length fields (16-bit in IPv4)",
+            "Fragment offset calculations",
+            "Window scaling (shift count bounded to 14)",
+            "Sequence number wraparound (32-bit)"
+          ]
+        }
+      },
+
+      "filesystem": {
+        "path": "fs/",
+        "vfs_layer": "Virtual Filesystem Switch — uniform interface to all filesystems",
+        "key_files": [
+          "namei.c — path resolution (MODIFIED: eperm hook before DAC)",
+          "open.c — file open logic",
+          "read_write.c — read/write dispatch",
+          "inode.c — inode management",
+          "super.c — superblock operations"
+        ],
+        "security_concerns": {
+          "path_traversal": "symlink following limits (40 levels), LOOKUP_BENEATH",
+          "race_conditions": "TOCTOU between access check and use — O_NOFOLLOW, openat()",
+          "permission_bypass": "capability checks, DAC override",
+          "buffer_issues": "filename length limited to NAME_MAX (255), path to PATH_MAX (4096)"
+        }
+      },
+
+      "drivers": {
+        "path": "drivers/",
+        "subsystem_count": "138 subdirectories",
+        "key_areas": [
+          "usb/ — USB host controllers, device drivers",
+          "net/ — network device drivers",
+          "block/ — block device layer",
+          "gpu/drm/ — graphics/display",
+          "input/ — keyboard, mouse, touchscreen",
+          "pci/ — PCI bus enumeration",
+          "acpi/ — power management"
+        ],
+        "security_concerns": {
+          "dma_attacks": "IOMMU required to prevent DMA-based attacks from devices",
+          "usb_enumeration": "untrusted device descriptors parsed in kernel — length validation critical",
+          "ioctl_interface": "driver-specific ioctls are common attack surface — bounds checking",
+          "firmware_loading": "request_firmware() — integrity verification needed"
+        }
+      },
+
+      "security_framework": {
+        "path": "security/",
+        "lsm_modules": [
+          "SELinux (mandatory access control)",
+          "AppArmor (path-based MAC)",
+          "SMACK (simplified MAC)",
+          "TOMOYO (pathname-based)",
+          "Yama (ptrace restrictions)",
+          "Landlock (unprivileged sandboxing)",
+          "Lockdown (kernel integrity)",
+          "LoadPin (trusted module loading)",
+          "SafeSetID (UID transition control)"
+        ],
+        "security_hooks": "200+ LSM hooks throughout kernel (task, file, socket, ipc, etc.)",
+        "integrity": "IMA/EVM — file hash verification and extended attributes"
+      },
+
+      "cryptography": {
+        "path": "crypto/",
+        "algorithms": "AES, ChaCha20, SHA-256/512, RSA, ECDH, ECDSA, etc.",
+        "framework": "crypto API with hardware acceleration support (AES-NI)",
+        "concerns": {
+          "side_channels": "constant-time implementations required for crypto operations",
+          "rng_quality": "/dev/urandom seeded from hardware entropy (RDRAND, interrupts)",
+          "key_material": "must be zeroed after use (memzero_explicit)"
+        }
+      }
+    },
+
+    "custom_extensions": {
+      "epmp": {
+        "path": "net/ipv4/epmp.c",
+        "size": "~14KB source",
+        "purpose": "Extended Port Multiplexing Protocol — 64-bit port addressing via port 64444",
+        "threading": "TCP listener with per-connection state machine",
+        "security": {
+          "handshake": "DH key exchange → RSA auth → AES-256 session",
+          "frame_validation": "magic number check, CRC-32C integrity, sequence ordering",
+          "concerns": [
+            "State machine complexity — ensure all transitions are validated",
+            "DH parameter validation — check for small subgroup attacks",
+            "Frame length field — must validate before allocation to prevent OOM"
+          ]
+        }
+      },
+
+      "hpm": {
+        "path": "net/ipv4/hpm.c",
+        "size": "~31KB source (~700 lines mentioned in README)",
+        "purpose": "Heuristic Port Monitor — 3-stage security pipeline",
+        "threading": "Runs in packet processing path (softirq context)",
+        "security": {
+          "detection": [
+            "TCP flag analysis (NULL/XMAS/FIN scans)",
+            "Rate limiting per source IP",
+            "Port scan detection (distinct ports threshold)",
+            "Temporal profile analysis",
+            "IDS inversion detection"
+          ],
+          "concerns": [
+            "Performance impact in hot path — must be fast",
+            "False positive rate management",
+            "State table memory bounds — per-IP tracking needs limits",
+            "Atomic operations needed for per-CPU counters"
+          ]
+        }
+      },
+
+      "eperm": {
+        "path": "security/eperm/eperm.c",
+        "size": "~21KB source (~450 lines)",
+        "purpose": "Extended Permission Classes — Trusted (4) and Genius (5) bypass DAC",
+        "integration": "Hooked into generic_permission() in fs/namei.c BEFORE standard DAC",
+        "security": {
+          "design": "Registration via /proc/eperm/register — root only",
+          "audit": "Supreme-tier access logged for Genius class",
+          "concerns": [
+            "Registry integrity — must survive module reload",
+            "Race condition between permission check and class change",
+            "Proc interface input validation — UID/class parsing"
+          ]
+        }
+      },
+
+      "negamane": {
+        "path": "fs/negamane/",
+        "purpose": "Immutable filesystem branding — prevents write/delete/create",
+        "security": {
+          "release_gate": "Grade 7+ admin only (sudo touch system negamane-release)",
+          "concerns": [
+            "Must be enforced before VFS write path",
+            "Direct block device access bypasses filesystem checks",
+            "Mount options (remount) could theoretically bypass"
+          ]
+        }
+      },
+
+      "user_ko": {
+        "path": "kernel/user_ko.c",
+        "size": "~18KB source (~450 lines)",
+        "purpose": "Per-user kernel objects with 3-tier memory grain model",
+        "security": {
+          "grain_isolation": "Grain 1-2 sandboxed, Grain 3 requires sudo rank 4+",
+          "concerns": [
+            "Module verification for Grain 3 (secure boot)",
+            "Resource limits per user (max loaded modules, total memory)",
+            "Unload path must be clean (reference counting)"
+          ]
+        }
+      },
+
+      "cpuboost": {
+        "path": "kernel/cpuboost.c",
+        "size": "~16KB source (~400 lines)",
+        "purpose": "Per-process CPU frequency boost designation",
+        "security": {
+          "access_control": "Grade 7+ only for designation",
+          "concerns": [
+            "Thermal protection — must respect hardware thermal limits",
+            "Power budget tracking — aggregate boost across processes",
+            "Process impersonation — verify binary path, not just PID"
+          ]
+        }
+      },
+
+      "white_ethics": {
+        "path": "kernel/white_ethics.c",
+        "size": "~11KB source",
+        "purpose": "System presence module — glow cycle, ethics assertion",
+        "threading": "Timer-based glow cycle (8-36 hour interval, 2 hour duration)",
+        "security": {
+          "read_only": "Status reporting only via /proc, no dangerous operations"
+        }
+      },
+
+      "usb_swap": {
+        "path": "drivers/usb/storage/usbswap.c",
+        "purpose": "USB mass storage as dynamic swap pagefile",
+        "security": {
+          "safety_checks": "Won't touch devices with existing partitions/filesystems",
+          "health_monitor": "Auto-disable after 16 I/O errors",
+          "concerns": [
+            "Swap data confidentiality — data at rest on removable media",
+            "Hot-remove handling — must migrate pages before disconnect",
+            "Speed validation — reject USB 1.x to prevent performance collapse"
+          ]
+        }
+      },
+
+      "usb_fast_dma": {
+        "path": "drivers/usb/storage/usbdma_fast.c",
+        "purpose": "Hardware-direct DMA optimization for USB transfers",
+        "threading": "Batched interrupts, polled mode for latency-critical paths",
+        "security": {
+          "concerns": [
+            "DMA boundary validation — prevent writes outside allocated buffers",
+            "Timeout enforcement — polled mode must not spin indefinitely",
+            "TRB ring overflow — bounds checking on transfer ring entries"
+          ]
+        }
+      }
+    },
+
+    "threading_architecture": {
+      "kernel_threads": {
+        "kworker": "workqueue processing — per-CPU and system-wide",
+        "ksoftirqd": "deferred softirq processing when load is high",
+        "kswapd": "background page reclamation",
+        "migration": "per-CPU thread for task migration between CPUs",
+        "rcu_gp": "RCU grace period tracking",
+        "rcu_par_gp": "RCU parallel grace period",
+        "kcompactd": "memory compaction daemon",
+        "khugepaged": "transparent huge page promotion",
+        "writeback": "dirty page writeback coordination"
+      },
+      "synchronization_primitives": {
+        "spinlock": "busy-wait lock, IRQ-safe variants (spin_lock_irqsave)",
+        "mutex": "sleeping lock, supports priority inheritance",
+        "rwsem": "reader-writer semaphore (writer-preferring)",
+        "rcu": "read-copy-update — lock-free read-side, deferred reclamation",
+        "seqlock": "sequence counter lock — writer never blocks, reader retries",
+        "completion": "one-shot synchronization (thread waits for event)",
+        "futex": "fast userspace mutex — kernel mediates contention"
+      },
+      "locking_hierarchy": {
+        "rule": "always acquire locks in consistent global order to prevent deadlock",
+        "validation": "CONFIG_PROVE_LOCKING (lockdep) detects ordering violations at runtime",
+        "concerns": [
+          "ABBA deadlock — two locks acquired in opposite order by different paths",
+          "Softirq/hardirq context — cannot sleep while holding spinlock",
+          "RCU grace period stalls — callbacks blocked too long",
+          "Priority inversion — low-priority holder blocks high-priority waiter"
+        ]
+      }
+    },
+
+    "message_passing_architecture": {
+      "internal_kernel": {
+        "notifier_chains": "kernel subsystem event notification (blocking, atomic, raw)",
+        "netlink": "kernel ↔ userspace structured messaging (sockets)",
+        "workqueues": "deferred work scheduling (per-CPU or system-wide)",
+        "tasklets": "deferred softirq processing (deprecated, prefer workqueues)",
+        "kfifo": "lock-free single-producer/single-consumer FIFO",
+        "ring_buffer": "trace/perf event circular buffer (lockless)"
+      },
+      "kernel_to_user": {
+        "syscalls": "synchronous request/response (trap into kernel)",
+        "signals": "asynchronous notification to process",
+        "procfs": "virtual filesystem for kernel state (/proc)",
+        "sysfs": "virtual filesystem for device/driver hierarchy (/sys)",
+        "netlink_sockets": "structured async messaging (routing, audit, etc.)",
+        "io_uring": "shared ring buffers for async I/O (zero syscall I/O)",
+        "mmap": "shared memory pages between kernel and userspace",
+        "uevent": "hotplug event notification to udev"
+      }
+    },
+
+    "security_checklist": {
+      "input_validation": {
+        "INT_001": "All network packet length fields validated before memory allocation",
+        "INT_002": "All userspace-provided sizes checked against maximum bounds",
+        "INT_003": "All array indices validated against array size",
+        "INT_004": "All pointer arithmetic checked for wraparound (overflow)",
+        "INT_005": "All string inputs null-terminated or length-bounded",
+        "INT_006": "All ioctl cmd values validated via switch/case (not computed)",
+        "INT_007": "All copy_from_user() sizes validated before the copy",
+        "INT_008": "All file descriptor values validated (0 to NR_OPEN)",
+        "INT_009": "All PID values validated against pid_max",
+        "INT_010": "All signal numbers validated (1 to _NSIG)"
+      },
+      "buffer_overflow_prevention": {
+        "BUF_001": "Stack canaries enabled (CONFIG_STACKPROTECTOR_STRONG)",
+        "BUF_002": "SLAB red zones detect overflows in heap allocations",
+        "BUF_003": "FORTIFY_SOURCE compile-time and runtime bounds checking",
+        "BUF_004": "VMAP_STACK — kernel stacks in vmalloc space with guard pages",
+        "BUF_005": "strscpy() preferred over strcpy()/strncpy()",
+        "BUF_006": "No variable-length arrays on stack (VLA eliminated since 4.20)",
+        "BUF_007": "CONFIG_UBSAN — undefined behavior sanitizer",
+        "BUF_008": "Copy-to/from-user always uses hardened accessor functions",
+        "BUF_009": "SKB (network buffer) headroom/tailroom validated before push/put",
+        "BUF_010": "USB descriptor parsing bounds-checked against descriptor length"
+      },
+      "integer_overflow_prevention": {
+        "IOF_001": "size_t used for all memory sizes (unsigned, platform-width)",
+        "IOF_002": "check_add_overflow() / check_mul_overflow() for arithmetic",
+        "IOF_003": "array_size() / struct_size() for dynamic allocation sizing",
+        "IOF_004": "No signed integer for sizes or counts in allocation paths",
+        "IOF_005": "Network protocol field widths respected (16-bit port, 32-bit seq)",
+        "IOF_006": "Page count multiplied safely (shift, not multiply by 4096)",
+        "IOF_007": "Timer/timeout values bounds-checked against MAX_JIFFY_OFFSET"
+      },
+      "race_condition_prevention": {
+        "RCE_001": "All shared state protected by identified lock or RCU",
+        "RCE_002": "TOCTOU in permission checks mitigated by holding references",
+        "RCE_003": "Atomic operations for reference counts (refcount_t, not atomic_t)",
+        "RCE_004": "Memory barriers where ordering matters across CPUs",
+        "RCE_005": "No data races on non-atomic shared variables (KCSAN enforced)",
+        "RCE_006": "Signal handler safety — only async-signal-safe operations",
+        "RCE_007": "Double-fetch from userspace prevented (copy once, validate copy)"
+      },
+      "security_before_processing": {
+        "concern": "Data may be processed/parsed BEFORE security checks complete",
+        "SBP_001": "LSM hooks fire BEFORE operation executes (not after)",
+        "SBP_002": "Capability checks before resource allocation",
+        "SBP_003": "Permission checks before file content is read into memory",
+        "SBP_004": "Namespace isolation verified before IPC delivery",
+        "SBP_005": "Seccomp filter evaluated BEFORE syscall handler runs",
+        "SBP_006": "Network: netfilter INPUT chain before socket delivery",
+        "SBP_007": "EPMP: handshake authentication BEFORE payload processing",
+        "SBP_008": "HPM: packet scoring BEFORE forwarding to application",
+        "known_gaps": [
+          "TCP/IP headers parsed in NIC driver before netfilter — checksum/length already consumed",
+          "USB descriptors read into kernel memory before policy can evaluate device",
+          "BPF bytecode loaded into kernel before verifier runs (verifier is the gate)",
+          "Module binary loaded into memory before signature verification"
+        ]
+      }
+    },
+
+    "normality_concerns": {
+      "process_length": {
+        "description": "How long operations should normally take",
+        "syscall_duration": "< 1µs (trivial) to < 100ms (I/O bound)",
+        "context_switch": "1-5µs typical",
+        "interrupt_handler": "< 10µs (hard IRQ), rest deferred to softirq/workqueue",
+        "page_fault": "~1µs (minor, in page cache) to ~5ms (major, disk fetch)",
+        "module_load": "< 1s for normal module, several seconds for large subsystems",
+        "concern": "Anything exceeding 10x normal duration suggests attack or malfunction"
+      },
+      "process_verticality": {
+        "description": "Call stack depth and privilege escalation",
+        "normal_call_depth": "10-30 frames typical syscall path",
+        "max_kernel_stack": "8KB (2 pages) — deep recursion will overflow",
+        "privilege_boundaries": [
+          "User → Kernel (syscall/trap)",
+          "Kernel → Hardware (I/O ports, MMIO)",
+          "Process → Process (signals, IPC — mediated by kernel)",
+          "Container → Host (namespace boundary)"
+        ],
+        "concern": "Deep nesting in filesystem (40 symlinks max) or network (IP-in-IP tunnels)"
+      },
+      "process_breadth": {
+        "description": "Fan-out and parallel execution width",
+        "typical_threads_per_app": "1-50 (web server: 1 per CPU core)",
+        "max_concurrent_connections": "limited by fd limit and memory (10K-1M typical)",
+        "workqueue_concurrency": "per-CPU default, max_active configurable",
+        "interrupt_storm_threshold": "100K+ interrupts/sec indicates problem",
+        "concern": "Excessive breadth exhausts memory, file descriptors, or CPU time"
+      },
+      "input_normality": {
+        "description": "What constitutes normal vs. suspicious input patterns",
+        "packet_size": "64-1500 bytes Ethernet (jumbo: up to 9000)",
+        "tcp_window": "typically 16KB-1MB",
+        "http_header_size": "< 8KB normal, > 64KB suspicious",
+        "filename_length": "< 255 bytes (NAME_MAX)",
+        "path_depth": "< 20 components normal, > 40 suspicious",
+        "syscall_rate": "< 100K/sec per process normal",
+        "connection_rate": "< 1000/sec from single IP normal",
+        "concern": "Inputs at or near limits are often probing for off-by-one errors"
+      }
+    },
+
+    "counts": {
+      "kernel_source_files": "~25000 .c files, ~15000 .h files",
+      "total_lines_of_code": "~20 million lines (Linux 5.15)",
+      "syscalls_x86_64": "~450",
+      "loadable_modules_configured": "~6 custom + standard built-in",
+      "custom_extension_modules": {
+        "epmp.ko": "Extended Port Multiplexer",
+        "hpm.ko": "Heuristic Port Monitor",
+        "eperm.ko": "Extended Permission Classes",
+        "user_ko.ko": "Per-User Kernel Objects",
+        "cpuboost.ko": "CPU Boost Designation",
+        "white_ethics.ko": "White Ethics Installer Grade",
+        "usbswap.ko": "USB Dynamic RAM Expansion",
+        "usbdma_fast.ko": "USB Hardware-Direct DMA",
+        "negamane.ko": "Immutable Filesystem Brand"
+      },
+      "security_hooks": "200+ LSM hook points",
+      "interrupt_vectors_x86": "256 (0-31 exceptions, 32-255 device interrupts)",
+      "proc_interfaces_custom": [
+        "/proc/hpm/{status,toggle,log}",
+        "/proc/eperm/{register,persons,genius_log,config}",
+        "/proc/usbswap/status",
+        "/proc/user_ko/{status,modules}",
+        "/proc/cpuboost/{status,list,designate,remove,toggle}",
+        "/proc/white_ethics/{status,glow}"
+      ]
+    },
+
+    "build": {
+      "config_file": "kernels/linux-5.15.204/linux-5.15.204/.config",
+      "custom_kconfig_options": [
+        "CONFIG_EPMP=m",
+        "CONFIG_HPM=m",
+        "CONFIG_SECURITY_EPERM=m",
+        "CONFIG_USB_SWAP=m",
+        "CONFIG_USB_FAST_DMA=m",
+        "CONFIG_NEGAMANE=m"
+      ],
+      "compiled_vmlinux_size": "35.5MB (uncompressed)",
+      "system_map_entries": "~60000 symbols"
+    }
+  }
+}

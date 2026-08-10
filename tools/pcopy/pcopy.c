@@ -68,6 +68,8 @@
 #define PCOPY_F_MOVE            (1 << 3)
 #define PCOPY_F_CROSS_DEVICE    (1 << 4)
 #define PCOPY_F_VERBOSE         (1 << 5)
+#define PCOPY_F_LOW_PRIORITY    (1 << 6)
+#define PCOPY_F_HIGH_PRIORITY   (1 << 7)
 
 struct pcopy_file_pair {
 	char src_path[PATH_MAX];
@@ -88,9 +90,14 @@ struct pcopy_hw_status {
 	__u32 pcie_gen;
 	__u32 pcie_lanes;
 	__u32 bandwidth_mb_s;
+	__u32 device_speed_mb_s;
+	__u32 device_class;
 	__u32 recommended_channels;
 	__u32 chunk_size;
 	__u32 nvme_detected;
+	__u32 cpu_load_pct;
+	__u32 assigned_lanes;
+	__u32 lane_utilization_pct;
 };
 
 #define PCOPY_IOC_COPY   _IOW(PCOPY_IOCTL_MAGIC, 1, struct pcopy_batch_request)
@@ -127,29 +134,56 @@ static int pcopy_read_proc_status(struct pcopy_hw_status *hw)
 	return 0;
 }
 
+static const char *device_class_name(__u32 class) {
+	switch (class) {
+	case 1: return "IDE HDD";
+	case 2: return "SATA HDD";
+	case 3: return "SAS HDD";
+	case 4: return "SATA SSD";
+	case 5: return "NVMe Gen3";
+	case 6: return "NVMe Gen4";
+	case 7: return "NVMe Gen5";
+	case 8: return "USB 2.0";
+	case 9: return "USB 3.0";
+	case 10: return "USB 3.1 Gen2";
+	case 11: return "USB4/TB3";
+	default: return "Unknown";
+	}
+}
+
 static void print_hw_status(const struct pcopy_hw_status *hw)
 {
-	printf("╔══════════════════════════════════════════════╗\n");
-	printf("║  Parallel Copy/Move — Hardware Detection    ║\n");
-	printf("╠══════════════════════════════════════════════╣\n");
-	printf("║  Online CPUs:          %-4u                 ║\n", hw->online_cpus);
-	printf("║  NVMe HW Queues:       %-4u                 ║\n", hw->nr_hw_queues);
-	printf("║  NVMe Detected:        %-3s                  ║\n",
+	printf("╔══════════════════════════════════════════════════╗\n");
+	printf("║  Parallel Copy/Move — Dynamic Assignment Status ║\n");
+	printf("╠══════════════════════════════════════════════════╣\n");
+	printf("║  Online CPUs:          %-4u                     ║\n", hw->online_cpus);
+	printf("║  CPU Load:             %-3u%%                     ║\n", hw->cpu_load_pct);
+	printf("║  NVMe HW Queues:       %-4u                     ║\n", hw->nr_hw_queues);
+	printf("║  NVMe Detected:        %-3s                      ║\n",
 	       hw->nvme_detected ? "YES" : "no");
-	printf("║  PCIe Generation:      Gen%-1u                 ║\n", hw->pcie_gen);
-	printf("║  PCIe Lanes:           x%-2u                  ║\n", hw->pcie_lanes);
-	printf("║  Est. Bandwidth:       %-5u MB/s            ║\n", hw->bandwidth_mb_s);
-	printf("║  Recommended Channels: %-4u                 ║\n", hw->recommended_channels);
-	printf("║  Recommended Chunk:    %-4u KB              ║\n",
+	printf("║  PCIe Generation:      Gen%-1u                     ║\n", hw->pcie_gen);
+	printf("║  PCIe Lanes:           x%-2u                      ║\n", hw->pcie_lanes);
+	printf("║  PCIe Bandwidth:       %-5u MB/s                ║\n", hw->bandwidth_mb_s);
+	printf("║  Device Class:         %-14s           ║\n",
+	       device_class_name(hw->device_class));
+	printf("║  Device Speed:         %-5u MB/s                ║\n", hw->device_speed_mb_s);
+	printf("╠══════════════════════════════════════════════════╣\n");
+	printf("║  Dynamic Assignment (sample: 100 files)         ║\n");
+	printf("║  Recommended Channels: %-4u                     ║\n", hw->recommended_channels);
+	printf("║  Assigned PCIe Lanes:  %-2u                       ║\n", hw->assigned_lanes);
+	printf("║  Lane Utilization:     %-3u%%                     ║\n", hw->lane_utilization_pct);
+	printf("║  Recommended Chunk:    %-5u KB                  ║\n",
 	       hw->chunk_size / 1024);
-	printf("╠══════════════════════════════════════════════╣\n");
-	printf("║  Theory:                                    ║\n");
-	printf("║  channels = min(CPUs, HW_Queues, files)     ║\n");
-	printf("║  Each channel → distinct NVMe SQ            ║\n");
-	printf("║  All SQs processed in parallel by NVMe ctrl ║\n");
-	printf("║  Throughput ≈ channels × single-stream BW   ║\n");
-	printf("║  Capped by PCIe lane bandwidth              ║\n");
-	printf("╚══════════════════════════════════════════════╝\n");
+	printf("╠══════════════════════════════════════════════════╣\n");
+	printf("║  Device Speed Constants (MB/s):                 ║\n");
+	printf("║    IDE HDD:   80    SATA HDD:  150   SAS:  200  ║\n");
+	printf("║    SATA SSD: 550    NVMe G3:  3500   G4:  7000  ║\n");
+	printf("║    NVMe G5: 14000   USB2:  35  USB3:  400       ║\n");
+	printf("║    USB3.1G2: 900    USB4: 3000                  ║\n");
+	printf("╠══════════════════════════════════════════════════╣\n");
+	printf("║  CPU Load Policy:                               ║\n");
+	printf("║    <25%%→80%% cores  <50%%→50%%  <75%%→25%%  >90%%→~2  ║\n");
+	printf("╚══════════════════════════════════════════════════╝\n");
 }
 
 /*

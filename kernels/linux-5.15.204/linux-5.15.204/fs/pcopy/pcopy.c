@@ -1,27 +1,34 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * pcopy.c — Parallel Copy/Move with NVMe Multi-Queue & PCIe Lane Awareness
+ * pcopy.c — Parallel Copy/Move with Dynamic Lane & Channel Assignment
  *
- * This module provides hardware-aware parallel file copy and move operations.
- * It detects the underlying block device capabilities (NVMe queue depth,
- * PCIe lane width, CPU count) and schedules concurrent I/O across multiple
- * channels to saturate available hardware bandwidth.
+ * This module provides hardware-aware parallel file copy and move operations
+ * with dynamic assignment of PCIe lanes and NVMe parallelization based on:
+ *
+ *   1. Overall processor usage — scales channels inversely with CPU load
+ *   2. Total number of files — matches parallelism to workload breadth
+ *   3. Device class speed constants — won't over-parallelize slow devices
+ *   4. PCIe bandwidth ceiling — respects physical bus limitations
+ *
+ * The dynamic optimizer continuously adjusts during batch operations:
+ *   - At batch start: compute initial channel allocation
+ *   - During operation: monitor CPU load and throttle if system stressed
+ *   - Per-device: classify storage and cap parallelism at device ceiling
  *
  * Theory of operation:
- *   - Standard cp/mv operates sequentially: read → write → read → write
- *   - NVMe SSDs expose multiple hardware submission queues (often 1 per CPU)
- *   - PCIe Gen4 x4 provides ~7 GB/s per device
- *   - This module issues parallel I/O across multiple files simultaneously,
- *     using a channel count derived from: min(online_cpus, hw_queues, file_count)
+ *   channels = min(
+ *       cpu_cores_available_at_current_load,
+ *       hw_queues_on_device,
+ *       files_in_batch,
+ *       device_speed_ceiling / per_channel_throughput,
+ *       pcie_lanes * lane_bandwidth / chunk_throughput
+ *   )
  *
  * The module exposes:
- *   /proc/pcopy/status       - Current state and hardware detection
+ *   /proc/pcopy/status       - Current state, hardware, and dynamic decision
  *   /proc/pcopy/config       - Tunable parameters
+ *   /proc/pcopy/decision     - Last dynamic assignment decision (detailed)
  *   /dev/pcopy               - ioctl interface for userspace pcopy/pmove tools
- *
- * Syscall extension:
- *   sys_pcopy_file_range()   - Parallel multi-file copy_file_range
- *   sys_pmove()              - Parallel multi-file rename/move with fallback
  *
  * Copyright (C) 2026 MEARVK LLC
  * Author: Maximilian Eric Alexander Rupplin von Keffikon
@@ -51,91 +58,65 @@
 #include <linux/mutex.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/sched/loadavg.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/kernel_stat.h>
+
+#include "pcopy.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Maximilian Eric Alexander Rupplin von Keffikon");
-MODULE_DESCRIPTION("Parallel Copy/Move — NVMe Multi-Queue & PCIe Lane Aware");
-MODULE_VERSION("1.0");
+MODULE_DESCRIPTION("Parallel Copy/Move — Dynamic Lane & Channel Assignment");
+MODULE_VERSION("2.0");
 
 /* ===========================================================================
- * Constants & Configuration
+ * Device Class Speed Table
+ *
+ * Maps device class enum to practical throughput ceiling in MB/s.
+ * Used to judge how many CPU cores and PCIe lanes are useful.
  * ===========================================================================
  */
 
-#define PCOPY_MAX_CHANNELS      64      /* Max parallel copy channels */
-#define PCOPY_MAX_FILES         4096    /* Max files in one batch operation */
-#define PCOPY_CHUNK_SIZE        (4 * 1024 * 1024)  /* 4MB per I/O chunk */
-#define PCOPY_CHUNK_SIZE_MIN    (64 * 1024)        /* 64KB minimum */
-#define PCOPY_CHUNK_SIZE_MAX    (64 * 1024 * 1024) /* 64MB maximum */
-#define PCOPY_PIPE_BUFS         16      /* Splice pipe buffer count */
-#define PCOPY_IOCTL_MAGIC       0xPC
-#define PCOPY_WQ_NAME           "pcopy_wq"
-
-/* ioctl commands */
-#define PCOPY_IOC_COPY          _IOW(PCOPY_IOCTL_MAGIC, 1, struct pcopy_batch_request)
-#define PCOPY_IOC_MOVE          _IOW(PCOPY_IOCTL_MAGIC, 2, struct pcopy_batch_request)
-#define PCOPY_IOC_STATUS        _IOR(PCOPY_IOCTL_MAGIC, 3, struct pcopy_hw_status)
-#define PCOPY_IOC_CANCEL        _IO(PCOPY_IOCTL_MAGIC, 4)
-
-/* PCIe generation bandwidth per lane (MB/s, approximate) */
-#define PCIE_GEN1_LANE_BW       250
-#define PCIE_GEN2_LANE_BW       500
-#define PCIE_GEN3_LANE_BW       985
-#define PCIE_GEN4_LANE_BW       1969
-#define PCIE_GEN5_LANE_BW       3938
+static const struct {
+	enum pcopy_device_class class;
+	unsigned int speed_mb_s;
+	unsigned int min_channels;      /* Minimum useful channels */
+	unsigned int max_channels;      /* Max channels before diminishing returns */
+	unsigned int optimal_chunk_kb;  /* Optimal chunk size for this class */
+	const char *name;
+} pcopy_device_table[PCOPY_DEV_CLASS_COUNT] = {
+	[PCOPY_DEV_UNKNOWN]    = { PCOPY_DEV_UNKNOWN,    200,  1, 4,   1024, "Unknown" },
+	[PCOPY_DEV_IDE_HDD]    = { PCOPY_DEV_IDE_HDD,    PCOPY_SPEED_IDE_HDD,     1, 1,   512,  "IDE HDD" },
+	[PCOPY_DEV_SATA_HDD]   = { PCOPY_DEV_SATA_HDD,   PCOPY_SPEED_SATA_HDD,    1, 2,   1024, "SATA HDD" },
+	[PCOPY_DEV_SAS_HDD]    = { PCOPY_DEV_SAS_HDD,    PCOPY_SPEED_SAS_HDD,     1, 2,   1024, "SAS HDD" },
+	[PCOPY_DEV_SATA_SSD]   = { PCOPY_DEV_SATA_SSD,   PCOPY_SPEED_SATA_SSD,    1, 4,   4096, "SATA SSD" },
+	[PCOPY_DEV_NVME_GEN3]  = { PCOPY_DEV_NVME_GEN3,  PCOPY_SPEED_NVME_GEN3_X4, 2, 16,  4096, "NVMe Gen3" },
+	[PCOPY_DEV_NVME_GEN4]  = { PCOPY_DEV_NVME_GEN4,  PCOPY_SPEED_NVME_GEN4_X4, 4, 32,  16384, "NVMe Gen4" },
+	[PCOPY_DEV_NVME_GEN5]  = { PCOPY_DEV_NVME_GEN5,  PCOPY_SPEED_NVME_GEN5_X4, 8, 64,  16384, "NVMe Gen5" },
+	[PCOPY_DEV_USB2]       = { PCOPY_DEV_USB2,       PCOPY_SPEED_USB2,         1, 1,   256,  "USB 2.0" },
+	[PCOPY_DEV_USB3_GEN1]  = { PCOPY_DEV_USB3_GEN1,  PCOPY_SPEED_USB3_GEN1,    1, 2,   2048, "USB 3.0" },
+	[PCOPY_DEV_USB3_GEN2]  = { PCOPY_DEV_USB3_GEN2,  PCOPY_SPEED_USB3_GEN2,    1, 4,   4096, "USB 3.1 Gen2" },
+	[PCOPY_DEV_USB4]       = { PCOPY_DEV_USB4,       PCOPY_SPEED_USB4,         2, 8,   8192, "USB4/TB3" },
+	[PCOPY_DEV_NFS_1GBE]   = { PCOPY_DEV_NFS_1GBE,   PCOPY_SPEED_NFS_1GBE,     1, 2,   1024, "NFS/1GbE" },
+	[PCOPY_DEV_NFS_10GBE]  = { PCOPY_DEV_NFS_10GBE,  PCOPY_SPEED_NFS_10GBE,    2, 8,   4096, "NFS/10GbE" },
+};
 
 /* ===========================================================================
- * Data Structures
+ * Internal: per-file work item
  * ===========================================================================
  */
 
-/* Per-file copy/move request from userspace */
-struct pcopy_file_pair {
-	char src_path[PATH_MAX];
-	char dst_path[PATH_MAX];
-};
-
-/* Batch request from userspace */
-struct pcopy_batch_request {
-	__u32 nr_files;                         /* Number of file pairs */
-	__u32 flags;                            /* PCOPY_F_* flags */
-	__u32 max_channels;                     /* 0 = auto-detect */
-	__u32 chunk_size;                       /* 0 = auto-tune */
-	struct pcopy_file_pair __user *pairs;   /* Array of src/dst pairs */
-};
-
-/* Flags for batch request */
-#define PCOPY_F_SYNC            (1 << 0)    /* fsync after each file */
-#define PCOPY_F_PRESERVE        (1 << 1)    /* Preserve permissions/timestamps */
-#define PCOPY_F_OVERWRITE       (1 << 2)    /* Overwrite existing destinations */
-#define PCOPY_F_MOVE            (1 << 3)    /* Move (copy + unlink source) */
-#define PCOPY_F_CROSS_DEVICE    (1 << 4)    /* Allow cross-device copy for move */
-#define PCOPY_F_VERBOSE         (1 << 5)    /* Track per-file progress */
-
-/* Hardware status report */
-struct pcopy_hw_status {
-	__u32 online_cpus;
-	__u32 nr_hw_queues;         /* From block device */
-	__u32 pcie_gen;             /* 1-5 */
-	__u32 pcie_lanes;           /* x1, x2, x4, x8, x16 */
-	__u32 bandwidth_mb_s;       /* Estimated total bandwidth */
-	__u32 recommended_channels; /* Computed optimal channel count */
-	__u32 chunk_size;           /* Recommended chunk size */
-	__u32 nvme_detected;        /* 1 if NVMe device found on path */
-};
-
-/* Internal: per-file work item */
 struct pcopy_work_item {
 	struct work_struct work;
-	struct pcopy_batch_ctx *ctx;     /* Parent batch context */
-	unsigned int index;              /* File index in batch */
+	struct pcopy_batch_ctx *ctx;
+	unsigned int index;
 	char src_path[PATH_MAX];
 	char dst_path[PATH_MAX];
-	ssize_t bytes_copied;            /* Result: bytes copied */
-	int error;                       /* Result: error code or 0 */
-	struct completion done;          /* Signaled on completion */
+	ssize_t bytes_copied;
+	int error;
+	struct completion done;
 };
 
 /* Internal: batch operation context */
@@ -150,6 +131,7 @@ struct pcopy_batch_ctx {
 	atomic64_t total_bytes;
 	struct workqueue_struct *wq;
 	bool cancelled;
+	struct pcopy_dynamic_decision decision;
 };
 
 /* Module-global state */
@@ -160,25 +142,102 @@ static struct {
 	struct mutex op_lock;
 	atomic_t active_ops;
 	unsigned int default_chunk_size;
-	unsigned int max_channels;
+	unsigned int max_channels_override;
 
-	/* Cached hardware detection */
-	unsigned int cached_cpus;
-	unsigned int cached_hw_queues;
-	unsigned int cached_pcie_gen;
-	unsigned int cached_pcie_lanes;
-	unsigned int cached_bandwidth;
+	/* Last decision (for /proc/pcopy/decision) */
+	struct pcopy_dynamic_decision last_decision;
+	struct mutex decision_lock;
 } pcopy_state;
+
+/* ===========================================================================
+ * CPU Load Measurement
+ *
+ * Reads the system's current CPU utilization as a percentage (0-100).
+ * Uses the 1-minute load average normalized against online CPU count.
+ * ===========================================================================
+ */
+
+static unsigned int pcopy_get_cpu_load_pct(void)
+{
+	unsigned long avnrun[3];
+	unsigned int online_cpus;
+	unsigned int load_pct;
+
+	get_avenrun(avnrun, FIXED_1 / 200, 0);
+	online_cpus = num_online_cpus();
+
+	if (online_cpus == 0)
+		return 100;
+
+	/*
+	 * avnrun[0] is the 1-minute load average in fixed-point.
+	 * Convert to percentage of total CPU capacity.
+	 * load_avg / nr_cpus * 100 = percent utilized
+	 */
+	load_pct = (unsigned int)((avnrun[0] * 100) / (online_cpus * FIXED_1));
+
+	return min(load_pct, (unsigned int)100);
+}
+
+/* ===========================================================================
+ * Device Class Detection
+ *
+ * Classifies the storage device backing a filesystem path.
+ * Uses hw_queues, PCIe gen/lanes, rotational flag, and bus type.
+ * ===========================================================================
+ */
+
+static enum pcopy_device_class pcopy_classify_device(const char *path,
+						     unsigned int hw_queues,
+						     unsigned int pcie_gen,
+						     unsigned int pcie_lanes)
+{
+	struct path p;
+	struct request_queue *q;
+	int rotational = 1;  /* default: assume spinning */
+	int err;
+
+	err = kern_path(path, LOOKUP_FOLLOW, &p);
+	if (err)
+		return PCOPY_DEV_UNKNOWN;
+
+	if (p.dentry && p.dentry->d_inode &&
+	    p.dentry->d_inode->i_sb &&
+	    p.dentry->d_inode->i_sb->s_bdev) {
+		q = bdev_get_queue(p.dentry->d_inode->i_sb->s_bdev);
+		if (q)
+			rotational = !blk_queue_nonrot(q);
+	}
+	path_put(&p);
+
+	/* NVMe detection: high queue count + PCIe attachment */
+	if (hw_queues > 2 && pcie_gen > 0) {
+		if (pcie_gen >= 5)
+			return PCOPY_DEV_NVME_GEN5;
+		if (pcie_gen >= 4)
+			return PCOPY_DEV_NVME_GEN4;
+		return PCOPY_DEV_NVME_GEN3;
+	}
+
+	/* Non-rotational, single queue: SATA SSD */
+	if (!rotational && hw_queues <= 2)
+		return PCOPY_DEV_SATA_SSD;
+
+	/* Rotational: classify by queue count */
+	if (rotational) {
+		if (hw_queues >= 2)
+			return PCOPY_DEV_SAS_HDD;
+		return PCOPY_DEV_SATA_HDD;
+	}
+
+	return PCOPY_DEV_UNKNOWN;
+}
 
 /* ===========================================================================
  * Hardware Detection
  * ===========================================================================
  */
 
-/*
- * Detect the number of hardware queues on the block device backing a path.
- * NVMe devices typically expose nr_hw_queues == num_online_cpus().
- */
 static unsigned int pcopy_detect_hw_queues(const char *path)
 {
 	struct path p;
@@ -202,13 +261,6 @@ static unsigned int pcopy_detect_hw_queues(const char *path)
 	return hw_queues ? hw_queues : 1;
 }
 
-/*
- * Detect PCIe generation and lane width for the block device.
- * Returns bandwidth estimate in MB/s.
- *
- * For NVMe: the PCI device is the NVMe controller.
- * We read the PCIe Link Status register to get speed and width.
- */
 static unsigned int pcopy_detect_pcie_bandwidth(const char *path,
 						unsigned int *out_gen,
 						unsigned int *out_lanes)
@@ -237,18 +289,10 @@ static unsigned int pcopy_detect_pcie_bandwidth(const char *path,
 
 	bdev = p.dentry->d_inode->i_sb->s_bdev;
 
-	/*
-	 * Walk up the device hierarchy to find the PCI device.
-	 * For NVMe, the gendisk's parent device is the NVMe controller,
-	 * which is a PCI device.
-	 */
 	if (bdev->bd_disk && bdev->bd_disk->driverfs_dev) {
 		struct device *dev = bdev->bd_disk->driverfs_dev;
-
-		/* Walk up to find PCI device */
 		while (dev && !dev_is_pci(dev))
 			dev = dev->parent;
-
 		if (dev && dev_is_pci(dev))
 			pdev = to_pci_dev(dev);
 	}
@@ -258,11 +302,10 @@ static unsigned int pcopy_detect_pcie_bandwidth(const char *path,
 	if (!pdev)
 		return 0;
 
-	/* Read PCIe Link Status register */
 	pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &link_status);
 
-	speed = link_status & PCI_EXP_LNKSTA_CLS;  /* Link speed */
-	width = (link_status & PCI_EXP_LNKSTA_NLW) >> 4;  /* Link width */
+	speed = link_status & PCI_EXP_LNKSTA_CLS;
+	width = (link_status & PCI_EXP_LNKSTA_NLW) >> 4;
 
 	switch (speed) {
 	case 1: *out_gen = 1; bw_per_lane = PCIE_GEN1_LANE_BW; break;
@@ -277,97 +320,209 @@ static unsigned int pcopy_detect_pcie_bandwidth(const char *path,
 	return bw_per_lane * width;
 }
 
-/*
- * Compute the optimal number of parallel channels for a batch operation.
+/* ===========================================================================
+ * Dynamic Channel & Lane Assignment Engine
  *
- * The formula:
- *   channels = min(online_cpus, hw_queues, nr_files)
+ * This is the core optimizer. Given:
+ *   - Number of files to transfer
+ *   - Device class and speed ceiling
+ *   - Available PCIe bandwidth
+ *   - Current CPU load
+ *   - Hardware queue depth
  *
- * Rationale:
- *   - Each channel occupies one CPU for splice/copy work
- *   - Each channel should map to a distinct hardware queue (NVMe SQ)
- *   - No point having more channels than files
- *   - PCIe bandwidth caps total throughput regardless of queue count
- *
- * For cross-device copies (src NVMe → dst NVMe), channels can be doubled
- * since read and write go to different devices with independent lanes.
+ * It produces:
+ *   - Optimal channel count (parallelism)
+ *   - Effective PCIe lanes to utilize
+ *   - Chunk size tuned to device class
+ *   - Throttle reason (if reduced from maximum)
+ * ===========================================================================
  */
-static unsigned int pcopy_compute_channels(unsigned int nr_files,
-					   unsigned int hw_queues,
-					   unsigned int max_override)
+
+static void pcopy_dynamic_assign(unsigned int nr_files,
+				 unsigned int hw_queues,
+				 unsigned int pcie_gen,
+				 unsigned int pcie_lanes,
+				 unsigned int pcie_bandwidth_mb_s,
+				 enum pcopy_device_class dev_class,
+				 unsigned int flags,
+				 struct pcopy_dynamic_decision *out)
 {
-	unsigned int cpus = num_online_cpus();
-	unsigned int channels;
+	unsigned int cpu_load_pct;
+	unsigned int online_cpus;
+	unsigned int device_speed;
+	unsigned int cpu_alloc_pct;
+	unsigned int cpu_channels;
+	unsigned int device_channels;
+	unsigned int pcie_channels;
+	unsigned int file_channels;
+	unsigned int final_channels;
+	unsigned int assigned_lanes;
+	unsigned int chunk_kb;
+	unsigned int per_channel_bw;
+	unsigned int throttle = PCOPY_THROTTLE_NONE;
 
-	/* Base: min of all constraints */
-	channels = min3(cpus, hw_queues, nr_files);
+	memset(out, 0, sizeof(*out));
 
-	/* Cap at configured maximum */
-	if (channels > PCOPY_MAX_CHANNELS)
-		channels = PCOPY_MAX_CHANNELS;
+	online_cpus = num_online_cpus();
+	cpu_load_pct = pcopy_get_cpu_load_pct();
+	device_speed = pcopy_device_table[dev_class].speed_mb_s;
 
-	/* User override (non-zero) takes precedence but still capped */
-	if (max_override > 0 && max_override < channels)
-		channels = max_override;
+	/* Record inputs */
+	out->nr_files = nr_files;
+	out->device_class = dev_class;
+	out->device_speed_mb_s = device_speed;
+	out->pcie_bandwidth_mb_s = pcie_bandwidth_mb_s;
+	out->cpu_load_pct = cpu_load_pct;
+	out->available_cores = online_cpus;
 
-	/* Always at least 1 */
-	return channels ? channels : 1;
-}
-
-/*
- * Compute optimal chunk size based on device characteristics.
- *
- * NVMe devices with high queue depth benefit from larger chunks
- * (fewer I/O submissions, better coalescing). SATA/slow devices
- * benefit from smaller chunks (lower latency, better interleaving).
- */
-static unsigned int pcopy_compute_chunk_size(unsigned int bandwidth_mb_s,
-					     unsigned int hw_queues)
-{
-	unsigned int chunk;
-
-	if (bandwidth_mb_s >= 5000) {
-		/* PCIe Gen4 x4 or better: 16MB chunks */
-		chunk = 16 * 1024 * 1024;
-	} else if (bandwidth_mb_s >= 2000) {
-		/* PCIe Gen3 x4: 8MB chunks */
-		chunk = 8 * 1024 * 1024;
-	} else if (bandwidth_mb_s >= 500) {
-		/* SATA SSD / PCIe Gen3 x1: 4MB chunks */
-		chunk = 4 * 1024 * 1024;
+	/*
+	 * Step 1: CPU-load-based channel allocation
+	 *
+	 * The higher the current system load, the fewer cores we claim.
+	 * Priority flags can override this: HIGH_PRIORITY takes more,
+	 * LOW_PRIORITY takes less.
+	 */
+	if (flags & PCOPY_F_HIGH_PRIORITY) {
+		/* High priority: ignore load, use up to 90% */
+		cpu_alloc_pct = 90;
+	} else if (flags & PCOPY_F_LOW_PRIORITY) {
+		/* Low priority: be gentle regardless of load */
+		cpu_alloc_pct = 15;
+		if (cpu_load_pct > PCOPY_CPU_LOAD_MEDIUM)
+			cpu_alloc_pct = 5;
 	} else {
-		/* HDD or USB: 1MB chunks */
-		chunk = 1024 * 1024;
+		/* Normal: scale inversely with load */
+		if (cpu_load_pct < PCOPY_CPU_LOAD_LOW)
+			cpu_alloc_pct = PCOPY_ALLOC_IDLE;
+		else if (cpu_load_pct < PCOPY_CPU_LOAD_MEDIUM)
+			cpu_alloc_pct = PCOPY_ALLOC_MODERATE;
+		else if (cpu_load_pct < PCOPY_CPU_LOAD_HIGH)
+			cpu_alloc_pct = PCOPY_ALLOC_HEAVY;
+		else
+			cpu_alloc_pct = PCOPY_ALLOC_CRITICAL;
 	}
 
-	/* Scale down if few hw queues (device can't absorb many large I/Os) */
-	if (hw_queues <= 2)
-		chunk = min(chunk, (unsigned int)(2 * 1024 * 1024));
+	cpu_channels = (online_cpus * cpu_alloc_pct) / 100;
+	if (cpu_channels < PCOPY_CHANNELS_MIN)
+		cpu_channels = PCOPY_CHANNELS_MIN;
 
-	return clamp(chunk, (unsigned int)PCOPY_CHUNK_SIZE_MIN,
-		     (unsigned int)PCOPY_CHUNK_SIZE_MAX);
-}
+	/*
+	 * Step 2: Device-speed-based channel limit
+	 *
+	 * Each channel produces roughly (chunk_size / latency) MB/s.
+	 * For NVMe Gen4, one channel can push ~1-2 GB/s via splice.
+	 * For SATA SSD, one channel saturates at ~550 MB/s.
+	 * For HDD, one channel is already near device ceiling.
+	 *
+	 * We estimate per-channel throughput and cap so total doesn't
+	 * exceed device speed ceiling (no benefit, just CPU waste).
+	 */
+	per_channel_bw = device_speed / max(pcopy_device_table[dev_class].min_channels, 1U);
+	if (per_channel_bw == 0)
+		per_channel_bw = 100;  /* safety */
 
-/*
- * Populate a hardware status structure for the given path.
- */
-static void pcopy_get_hw_status(const char *path, struct pcopy_hw_status *st)
-{
-	unsigned int pcie_gen, pcie_lanes;
+	device_channels = device_speed / per_channel_bw;
+	device_channels = clamp(device_channels,
+				pcopy_device_table[dev_class].min_channels,
+				pcopy_device_table[dev_class].max_channels);
 
-	memset(st, 0, sizeof(*st));
+	/*
+	 * Step 3: PCIe bandwidth-based channel limit
+	 *
+	 * Total throughput cannot exceed PCIe lane bandwidth.
+	 * More channels won't help if the bus is saturated.
+	 * Assigned lanes = min(physical_lanes, lanes_needed_for_channels).
+	 */
+	if (pcie_bandwidth_mb_s > 0) {
+		pcie_channels = pcie_bandwidth_mb_s / per_channel_bw;
+		if (pcie_channels < 1)
+			pcie_channels = 1;
+	} else {
+		/* Non-PCIe device (USB, NFS) — no PCIe constraint */
+		pcie_channels = PCOPY_MAX_CHANNELS;
+	}
 
-	st->online_cpus = num_online_cpus();
-	st->nr_hw_queues = pcopy_detect_hw_queues(path);
-	st->bandwidth_mb_s = pcopy_detect_pcie_bandwidth(path,
-							 &pcie_gen, &pcie_lanes);
-	st->pcie_gen = pcie_gen;
-	st->pcie_lanes = pcie_lanes;
-	st->nvme_detected = (st->nr_hw_queues > 2) ? 1 : 0;
-	st->chunk_size = pcopy_compute_chunk_size(st->bandwidth_mb_s,
-						  st->nr_hw_queues);
-	st->recommended_channels = pcopy_compute_channels(
-		PCOPY_MAX_FILES, st->nr_hw_queues, 0);
+	/*
+	 * Step 4: File count constraint
+	 *
+	 * No benefit from more channels than files.
+	 * For few files, don't spin up excessive workqueue threads.
+	 */
+	file_channels = nr_files;
+	if (file_channels > PCOPY_MAX_CHANNELS)
+		file_channels = PCOPY_MAX_CHANNELS;
+
+	/*
+	 * Step 5: Take the minimum of all constraints
+	 *
+	 * The final channel count is the tightest bottleneck.
+	 */
+	final_channels = min(cpu_channels, device_channels);
+	final_channels = min(final_channels, pcie_channels);
+	final_channels = min(final_channels, file_channels);
+	final_channels = min(final_channels, hw_queues);
+
+	/* Respect hard cap */
+	if (final_channels > PCOPY_MAX_CHANNELS)
+		final_channels = PCOPY_MAX_CHANNELS;
+	if (final_channels < PCOPY_CHANNELS_MIN)
+		final_channels = PCOPY_CHANNELS_MIN;
+
+	/* Determine throttle reason (which constraint bound us) */
+	if (final_channels == cpu_channels && cpu_channels < device_channels)
+		throttle = PCOPY_THROTTLE_CPU_LOAD;
+	else if (final_channels == device_channels && device_channels < cpu_channels)
+		throttle = PCOPY_THROTTLE_DEVICE_LIMIT;
+	else if (final_channels == file_channels && file_channels < device_channels)
+		throttle = PCOPY_THROTTLE_FILE_COUNT;
+	else if (final_channels == pcie_channels && pcie_channels < device_channels)
+		throttle = PCOPY_THROTTLE_PCIE_BW;
+
+	/*
+	 * Step 6: Compute assigned lanes
+	 *
+	 * How many PCIe lanes are effectively utilized by our channel count.
+	 * If device has x4 but we only need 2 channels, we use ~x2 effective.
+	 */
+	if (pcie_lanes > 0 && pcie_bandwidth_mb_s > 0) {
+		unsigned int needed_bw = final_channels * per_channel_bw;
+		unsigned int bw_per_lane = pcie_bandwidth_mb_s / pcie_lanes;
+
+		if (bw_per_lane > 0)
+			assigned_lanes = (needed_bw + bw_per_lane - 1) / bw_per_lane;
+		else
+			assigned_lanes = pcie_lanes;
+
+		if (assigned_lanes > pcie_lanes)
+			assigned_lanes = pcie_lanes;
+		if (assigned_lanes < 1)
+			assigned_lanes = 1;
+	} else {
+		assigned_lanes = 0;  /* Non-PCIe path */
+	}
+
+	/*
+	 * Step 7: Compute chunk size based on device class
+	 *
+	 * Fast devices benefit from large chunks (fewer I/O ops).
+	 * Slow devices benefit from smaller chunks (better interleaving,
+	 * lower latency per individual file).
+	 */
+	chunk_kb = pcopy_device_table[dev_class].optimal_chunk_kb;
+
+	/* Scale up chunk for very high channel counts (reduce per-file overhead) */
+	if (final_channels >= 16 && chunk_kb < 16384)
+		chunk_kb = min(chunk_kb * 2, (unsigned int)16384);
+
+	/* Scale down chunk for CPU-stressed scenarios (reduce per-op CPU time) */
+	if (cpu_load_pct > PCOPY_CPU_LOAD_HIGH && chunk_kb > 2048)
+		chunk_kb = chunk_kb / 2;
+
+	/* Write outputs */
+	out->assigned_channels = final_channels;
+	out->assigned_lanes = assigned_lanes;
+	out->chunk_size = chunk_kb * 1024;
+	out->throttle_reason = throttle;
 }
 
 /* ===========================================================================
@@ -375,13 +530,6 @@ static void pcopy_get_hw_status(const char *path, struct pcopy_hw_status *st)
  * ===========================================================================
  */
 
-/*
- * Copy a single file using kernel splice (zero-copy when possible).
- * This is the work function executed on each channel's workqueue thread.
- *
- * Uses do_splice_direct() which leverages the page cache and can achieve
- * zero-copy on same-filesystem operations where the fs supports it.
- */
 static ssize_t pcopy_copy_single_file(const char *src_path,
 				      const char *dst_path,
 				      unsigned int chunk_size,
@@ -397,14 +545,12 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 	int open_flags;
 	int err;
 
-	/* Open source for reading */
 	src_file = filp_open(src_path, O_RDONLY | O_LARGEFILE, 0);
 	if (IS_ERR(src_file))
 		return PTR_ERR(src_file);
 
 	src_size = i_size_read(file_inode(src_file));
 	if (src_size == 0) {
-		/* Zero-length file: just create destination */
 		open_flags = O_WRONLY | O_CREAT | O_TRUNC | O_LARGEFILE;
 		if (!(flags & PCOPY_F_OVERWRITE))
 			open_flags |= O_EXCL;
@@ -420,7 +566,6 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 		return 0;
 	}
 
-	/* Open destination for writing */
 	open_flags = O_WRONLY | O_CREAT | O_TRUNC | O_LARGEFILE;
 	if (!(flags & PCOPY_F_OVERWRITE))
 		open_flags |= O_EXCL;
@@ -432,7 +577,6 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 		return ret;
 	}
 
-	/* Copy loop: splice in chunks */
 	while (src_pos < src_size) {
 		size_t to_copy = min_t(loff_t, chunk_size, src_size - src_pos);
 
@@ -441,18 +585,15 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 				       to_copy, SPLICE_F_MOVE);
 		if (ret <= 0) {
 			if (ret == 0)
-				break;  /* EOF */
-			total = ret;  /* Error */
+				break;
+			total = ret;
 			goto out;
 		}
 
 		total += ret;
-
-		/* Allow other work to proceed */
 		cond_resched();
 	}
 
-	/* Optionally sync to stable storage */
 	if (flags & PCOPY_F_SYNC) {
 		ret = vfs_fsync(dst_file, 0);
 		if (ret < 0) {
@@ -461,7 +602,6 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 		}
 	}
 
-	/* Preserve permissions and timestamps if requested */
 	if (flags & PCOPY_F_PRESERVE) {
 		struct inode *src_inode = file_inode(src_file);
 
@@ -471,7 +611,6 @@ static ssize_t pcopy_copy_single_file(const char *src_path,
 		attr.ia_atime = src_inode->i_atime;
 		attr.ia_mtime = src_inode->i_mtime;
 
-		/* Best-effort: don't fail the copy if attrs can't be set */
 		err = kern_path(dst_path, LOOKUP_FOLLOW, &src_p);
 		if (!err) {
 			notify_change(&init_user_ns, src_p.dentry, &attr, NULL);
@@ -485,25 +624,15 @@ out:
 	return total;
 }
 
-/*
- * Attempt atomic rename (same filesystem). Falls back to copy+unlink
- * for cross-device moves.
- */
 static int pcopy_move_single_file(const char *src_path,
 				  const char *dst_path,
 				  unsigned int chunk_size,
 				  unsigned int flags)
 {
-	struct path old_path, new_parent_path;
-	struct dentry *old_dentry, *new_dentry;
 	struct filename *from, *to;
 	ssize_t ret;
 	int err;
 
-	/*
-	 * First attempt: vfs_rename (atomic, same filesystem).
-	 * This is the fast path — no data copy needed.
-	 */
 	from = getname_kernel(src_path);
 	if (IS_ERR(from))
 		return PTR_ERR(from);
@@ -517,22 +646,16 @@ static int pcopy_move_single_file(const char *src_path,
 	err = do_renameat2(AT_FDCWD, from, AT_FDCWD, to, 0);
 
 	if (err != -EXDEV)
-		return err;  /* Success or non-cross-device error */
+		return err;
 
-	/*
-	 * Cross-device move: copy data then unlink source.
-	 * Only proceed if PCOPY_F_CROSS_DEVICE is set.
-	 */
 	if (!(flags & PCOPY_F_CROSS_DEVICE))
 		return -EXDEV;
 
-	/* Copy the file data */
 	ret = pcopy_copy_single_file(src_path, dst_path, chunk_size,
 				     flags | PCOPY_F_PRESERVE);
 	if (ret < 0)
 		return (int)ret;
 
-	/* Unlink source after successful copy */
 	from = getname_kernel(src_path);
 	if (IS_ERR(from))
 		return PTR_ERR(from);
@@ -546,9 +669,6 @@ static int pcopy_move_single_file(const char *src_path,
  * ===========================================================================
  */
 
-/*
- * Per-file work function. Executed in parallel across workqueue threads.
- */
 static void pcopy_work_fn(struct work_struct *work)
 {
 	struct pcopy_work_item *item =
@@ -565,7 +685,7 @@ static void pcopy_work_fn(struct work_struct *work)
 			item->src_path, item->dst_path,
 			ctx->chunk_size, ctx->flags);
 		if (item->error == 0)
-			item->bytes_copied = 0;  /* Rename, no data copy */
+			item->bytes_copied = 0;
 	} else {
 		item->bytes_copied = pcopy_copy_single_file(
 			item->src_path, item->dst_path,
@@ -586,27 +706,19 @@ done:
 	complete(&item->done);
 }
 
-/*
- * Execute a batch of copy/move operations in parallel.
- *
- * Channel allocation:
- *   - Creates a workqueue with max_active = nr_channels
- *   - Each channel processes one file at a time
- *   - Files are dispatched round-robin across channels
- *   - Workqueue threads are CPU-affinitized by the scheduler
- *
- * NVMe multi-queue benefit:
- *   - blk-mq maps software queues to hardware queues per-CPU
- *   - With N channels on N CPUs, we hit N distinct hardware submission queues
- *   - NVMe controller processes all N queues in parallel (hardware parallelism)
- *   - Result: N × single-queue throughput (up to PCIe bandwidth limit)
+/* ===========================================================================
+ * Batch Execution with Dynamic Assignment
+ * ===========================================================================
  */
+
 static int pcopy_execute_batch(struct pcopy_batch_request __user *ureq)
 {
 	struct pcopy_batch_request req;
 	struct pcopy_batch_ctx *ctx = NULL;
 	struct pcopy_file_pair pair;
-	struct pcopy_hw_status hw;
+	struct pcopy_dynamic_decision decision;
+	unsigned int hw_queues, pcie_gen, pcie_lanes, pcie_bw;
+	enum pcopy_device_class dev_class;
 	unsigned int i;
 	int ret = 0;
 
@@ -638,37 +750,45 @@ static int pcopy_execute_batch(struct pcopy_batch_request __user *ureq)
 	atomic64_set(&ctx->total_bytes, 0);
 	ctx->cancelled = false;
 
-	/* Copy file pairs from userspace and detect hardware on first path */
+	/* Get first file pair to detect device characteristics */
 	if (copy_from_user(&pair, &req.pairs[0], sizeof(pair))) {
 		ret = -EFAULT;
 		goto out_free;
 	}
 
-	/* Detect hardware capabilities from first source path */
-	pcopy_get_hw_status(pair.src_path, &hw);
-
-	/* Compute channel count */
-	ctx->nr_channels = pcopy_compute_channels(req.nr_files,
-						  hw.nr_hw_queues,
-						  req.max_channels);
-
-	/* Compute chunk size */
-	ctx->chunk_size = req.chunk_size ? req.chunk_size : hw.chunk_size;
-	ctx->chunk_size = clamp(ctx->chunk_size,
-				(unsigned int)PCOPY_CHUNK_SIZE_MIN,
-				(unsigned int)PCOPY_CHUNK_SIZE_MAX);
+	/* Detect hardware */
+	hw_queues = pcopy_detect_hw_queues(pair.src_path);
+	pcie_bw = pcopy_detect_pcie_bandwidth(pair.src_path, &pcie_gen, &pcie_lanes);
+	dev_class = pcopy_classify_device(pair.src_path, hw_queues, pcie_gen, pcie_lanes);
 
 	/*
-	 * Create a dedicated workqueue with bounded concurrency.
-	 *
-	 * WQ_UNBOUND: threads not pinned (scheduler distributes across CPUs)
-	 * max_active = nr_channels: at most N files processed simultaneously
-	 *
-	 * This naturally maps to blk-mq's per-CPU hardware queue mapping:
-	 * each worker thread, running on its own CPU, submits I/O to that
-	 * CPU's associated NVMe submission queue.
+	 * Dynamic assignment: compute optimal channels, lanes, chunk size
+	 * based on device class, CPU load, file count, and PCIe bandwidth.
 	 */
-	ctx->wq = alloc_workqueue(PCOPY_WQ_NAME,
+	pcopy_dynamic_assign(req.nr_files, hw_queues, pcie_gen, pcie_lanes,
+			     pcie_bw, dev_class, req.flags, &decision);
+
+	/* User override (non-zero max_channels) caps but doesn't increase */
+	if (req.max_channels > 0 && req.max_channels < decision.assigned_channels)
+		decision.assigned_channels = req.max_channels;
+
+	/* User chunk override */
+	if (req.chunk_size > 0)
+		decision.chunk_size = clamp(req.chunk_size,
+					    (unsigned int)PCOPY_CHUNK_SIZE_MIN,
+					    (unsigned int)PCOPY_CHUNK_SIZE_MAX);
+
+	ctx->nr_channels = decision.assigned_channels;
+	ctx->chunk_size = decision.chunk_size;
+	ctx->decision = decision;
+
+	/* Store last decision for /proc */
+	mutex_lock(&pcopy_state.decision_lock);
+	pcopy_state.last_decision = decision;
+	mutex_unlock(&pcopy_state.decision_lock);
+
+	/* Create bounded workqueue */
+	ctx->wq = alloc_workqueue("pcopy_wq",
 				  WQ_UNBOUND | WQ_HIGHPRI | WQ_MEM_RECLAIM,
 				  ctx->nr_channels);
 	if (!ctx->wq) {
@@ -676,7 +796,7 @@ static int pcopy_execute_batch(struct pcopy_batch_request __user *ureq)
 		goto out_free;
 	}
 
-	/* Initialize and dispatch all work items */
+	/* Dispatch all work items */
 	for (i = 0; i < req.nr_files; i++) {
 		struct pcopy_work_item *item = &ctx->items[i];
 
@@ -698,17 +818,15 @@ static int pcopy_execute_batch(struct pcopy_batch_request __user *ureq)
 		queue_work(ctx->wq, &item->work);
 	}
 
-	/* Wait for all dispatched items to complete */
+	/* Wait for all items */
 	for (i = 0; i < req.nr_files; i++) {
-		if (ctx->items[i].ctx)  /* Only wait if dispatched */
+		if (ctx->items[i].ctx)
 			wait_for_completion(&ctx->items[i].done);
 	}
 
-	/* Drain and destroy the workqueue */
 	destroy_workqueue(ctx->wq);
 	ctx->wq = NULL;
 
-	/* Return first error encountered, or 0 for complete success */
 	if (atomic_read(&ctx->errors) > 0 && ret == 0) {
 		for (i = 0; i < req.nr_files; i++) {
 			if (ctx->items[i].error) {
@@ -718,11 +836,12 @@ static int pcopy_execute_batch(struct pcopy_batch_request __user *ureq)
 		}
 	}
 
-	pr_info("pcopy: batch complete — %u files, %u channels, "
-		"%lld bytes, %u errors\n",
-		req.nr_files, ctx->nr_channels,
+	pr_info("pcopy: batch complete — %u files, %u channels, %u lanes, "
+		"%lld bytes, device=%s, cpu_load=%u%%, throttle=%u\n",
+		req.nr_files, ctx->nr_channels, decision.assigned_lanes,
 		(long long)atomic64_read(&ctx->total_bytes),
-		atomic_read(&ctx->errors));
+		pcopy_device_table[dev_class].name,
+		decision.cpu_load_pct, decision.throttle_reason);
 
 out_free:
 	kfree(ctx->items);
@@ -735,36 +854,70 @@ out_free:
  * ===========================================================================
  */
 
+static const char *pcopy_throttle_name(unsigned int reason)
+{
+	switch (reason) {
+	case PCOPY_THROTTLE_NONE:         return "none";
+	case PCOPY_THROTTLE_CPU_LOAD:     return "cpu_load";
+	case PCOPY_THROTTLE_DEVICE_LIMIT: return "device_limit";
+	case PCOPY_THROTTLE_FILE_COUNT:   return "file_count";
+	case PCOPY_THROTTLE_PCIE_BW:      return "pcie_bandwidth";
+	default:                          return "unknown";
+	}
+}
+
 static int pcopy_status_show(struct seq_file *m, void *v)
 {
-	struct pcopy_hw_status hw;
+	struct pcopy_dynamic_decision d;
+	unsigned int cpu_load = pcopy_get_cpu_load_pct();
 
-	/* Refresh hardware detection (use root fs as reference) */
-	pcopy_get_hw_status("/", &hw);
-
-	seq_puts(m, "=== Parallel Copy/Move — Hardware Status ===\n\n");
-	seq_printf(m, "Online CPUs:            %u\n", hw.online_cpus);
-	seq_printf(m, "Block HW Queues:        %u\n", hw.nr_hw_queues);
-	seq_printf(m, "NVMe Detected:          %s\n",
-		   hw.nvme_detected ? "YES" : "no");
-	seq_printf(m, "PCIe Generation:        Gen%u\n", hw.pcie_gen);
-	seq_printf(m, "PCIe Lanes:             x%u\n", hw.pcie_lanes);
-	seq_printf(m, "Est. Bandwidth:         %u MB/s\n", hw.bandwidth_mb_s);
-	seq_printf(m, "Recommended Channels:   %u\n", hw.recommended_channels);
-	seq_printf(m, "Recommended Chunk:      %u KB\n",
-		   hw.chunk_size / 1024);
-	seq_puts(m, "\n");
+	seq_puts(m, "=== Parallel Copy/Move — Dynamic Assignment Status ===\n\n");
+	seq_printf(m, "Online CPUs:            %u\n", num_online_cpus());
+	seq_printf(m, "Current CPU Load:       %u%%\n", cpu_load);
 	seq_printf(m, "Active Operations:      %d\n",
 		   atomic_read(&pcopy_state.active_ops));
 	seq_puts(m, "\n");
-	seq_puts(m, "--- Theory ---\n");
-	seq_puts(m, "Standard cp:  1 read + 1 write per chunk (sequential)\n");
-	seq_printf(m, "pcopy:        %u files × %u KB chunks in parallel\n",
-		   hw.recommended_channels, hw.chunk_size / 1024);
-	seq_printf(m, "              Each channel → distinct NVMe SQ → "
-		   "hardware parallelism\n");
-	seq_printf(m, "              PCIe Gen%u x%u = %u MB/s total bandwidth\n",
-		   hw.pcie_gen, hw.pcie_lanes, hw.bandwidth_mb_s);
+
+	seq_puts(m, "--- Device Class Speed Constants (MB/s) ---\n");
+	seq_printf(m, "  IDE HDD:        %5u    SATA HDD:    %5u    SAS HDD:     %5u\n",
+		   PCOPY_SPEED_IDE_HDD, PCOPY_SPEED_SATA_HDD, PCOPY_SPEED_SAS_HDD);
+	seq_printf(m, "  SATA SSD:       %5u    NVMe Gen3:   %5u    NVMe Gen4:   %5u\n",
+		   PCOPY_SPEED_SATA_SSD, PCOPY_SPEED_NVME_GEN3_X4, PCOPY_SPEED_NVME_GEN4_X4);
+	seq_printf(m, "  NVMe Gen5:      %5u    USB 2.0:     %5u    USB 3.0:     %5u\n",
+		   PCOPY_SPEED_NVME_GEN5_X4, PCOPY_SPEED_USB2, PCOPY_SPEED_USB3_GEN1);
+	seq_printf(m, "  USB 3.1 Gen2:   %5u    USB4/TB3:    %5u\n",
+		   PCOPY_SPEED_USB3_GEN2, PCOPY_SPEED_USB4);
+	seq_puts(m, "\n");
+
+	seq_puts(m, "--- Dynamic Assignment Policy ---\n");
+	seq_printf(m, "  CPU <25%%: use %u%% cores | CPU <50%%: use %u%% | "
+		   "CPU <75%%: use %u%% | CPU >90%%: use %u%%\n",
+		   PCOPY_ALLOC_IDLE, PCOPY_ALLOC_MODERATE,
+		   PCOPY_ALLOC_HEAVY, PCOPY_ALLOC_CRITICAL);
+	seq_puts(m, "\n");
+
+	/* Show last decision */
+	mutex_lock(&pcopy_state.decision_lock);
+	d = pcopy_state.last_decision;
+	mutex_unlock(&pcopy_state.decision_lock);
+
+	if (d.nr_files > 0) {
+		seq_puts(m, "--- Last Dynamic Decision ---\n");
+		seq_printf(m, "  Files:            %u\n", d.nr_files);
+		seq_printf(m, "  Device Class:     %s (%u MB/s ceiling)\n",
+			   pcopy_device_table[d.device_class].name,
+			   d.device_speed_mb_s);
+		seq_printf(m, "  PCIe Bandwidth:   %u MB/s\n", d.pcie_bandwidth_mb_s);
+		seq_printf(m, "  CPU Load:         %u%%\n", d.cpu_load_pct);
+		seq_printf(m, "  Available Cores:  %u\n", d.available_cores);
+		seq_printf(m, "  → Channels:       %u\n", d.assigned_channels);
+		seq_printf(m, "  → PCIe Lanes:     %u\n", d.assigned_lanes);
+		seq_printf(m, "  → Chunk Size:     %u KB\n", d.chunk_size / 1024);
+		seq_printf(m, "  → Throttle:       %s\n",
+			   pcopy_throttle_name(d.throttle_reason));
+	} else {
+		seq_puts(m, "--- No operations performed yet ---\n");
+	}
 
 	return 0;
 }
@@ -781,15 +934,80 @@ static const struct proc_ops pcopy_status_ops = {
 	.proc_release = single_release,
 };
 
+static int pcopy_decision_show(struct seq_file *m, void *v)
+{
+	struct pcopy_dynamic_decision d;
+
+	mutex_lock(&pcopy_state.decision_lock);
+	d = pcopy_state.last_decision;
+	mutex_unlock(&pcopy_state.decision_lock);
+
+	seq_puts(m, "=== Last Dynamic Assignment Decision ===\n\n");
+
+	if (d.nr_files == 0) {
+		seq_puts(m, "No decision recorded. Run a pcopy/pmove operation first.\n");
+		return 0;
+	}
+
+	seq_puts(m, "INPUT:\n");
+	seq_printf(m, "  nr_files           = %u\n", d.nr_files);
+	seq_printf(m, "  device_class       = %s\n",
+		   pcopy_device_table[d.device_class].name);
+	seq_printf(m, "  device_speed       = %u MB/s\n", d.device_speed_mb_s);
+	seq_printf(m, "  pcie_bandwidth     = %u MB/s\n", d.pcie_bandwidth_mb_s);
+	seq_printf(m, "  cpu_load           = %u%%\n", d.cpu_load_pct);
+	seq_printf(m, "  available_cores    = %u\n", d.available_cores);
+	seq_puts(m, "\n");
+
+	seq_puts(m, "OUTPUT:\n");
+	seq_printf(m, "  assigned_channels  = %u\n", d.assigned_channels);
+	seq_printf(m, "  assigned_lanes     = %u\n", d.assigned_lanes);
+	seq_printf(m, "  chunk_size         = %u KB\n", d.chunk_size / 1024);
+	seq_printf(m, "  throttle_reason    = %s (%u)\n",
+		   pcopy_throttle_name(d.throttle_reason), d.throttle_reason);
+	seq_puts(m, "\n");
+
+	seq_puts(m, "REASONING:\n");
+	if (d.throttle_reason == PCOPY_THROTTLE_CPU_LOAD)
+		seq_puts(m, "  Channels reduced due to high CPU load.\n"
+			    "  System needs headroom for other processes.\n");
+	else if (d.throttle_reason == PCOPY_THROTTLE_DEVICE_LIMIT)
+		seq_puts(m, "  Channels capped by device throughput ceiling.\n"
+			    "  More parallelism would waste CPU without speed gain.\n");
+	else if (d.throttle_reason == PCOPY_THROTTLE_FILE_COUNT)
+		seq_puts(m, "  Channels limited by number of files.\n"
+			    "  Cannot parallelize more than file count.\n");
+	else if (d.throttle_reason == PCOPY_THROTTLE_PCIE_BW)
+		seq_puts(m, "  Channels limited by PCIe bus bandwidth.\n"
+			    "  Bus is the bottleneck, not device or CPU.\n");
+	else
+		seq_puts(m, "  No throttling. Operating at full device potential.\n");
+
+	return 0;
+}
+
+static int pcopy_decision_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pcopy_decision_show, NULL);
+}
+
+static const struct proc_ops pcopy_decision_ops = {
+	.proc_open    = pcopy_decision_open,
+	.proc_read    = seq_read,
+	.proc_lseek   = seq_lseek,
+	.proc_release = single_release,
+};
+
 static int pcopy_config_show(struct seq_file *m, void *v)
 {
-	seq_puts(m, "=== pcopy Configuration ===\n\n");
-	seq_printf(m, "max_channels:       %u (0 = auto)\n",
-		   pcopy_state.max_channels);
-	seq_printf(m, "default_chunk_size: %u KB\n",
+	seq_puts(m, "=== pcopy Dynamic Configuration ===\n\n");
+	seq_printf(m, "max_channels_override: %u (0 = dynamic)\n",
+		   pcopy_state.max_channels_override);
+	seq_printf(m, "default_chunk_size:    %u KB (0 = dynamic)\n",
 		   pcopy_state.default_chunk_size / 1024);
-	seq_printf(m, "max_files_per_batch: %u\n", PCOPY_MAX_FILES);
-	seq_puts(m, "\nWrite 'channels=N' or 'chunk=N' to configure.\n");
+	seq_printf(m, "max_files_per_batch:   %u\n", PCOPY_MAX_FILES);
+	seq_puts(m, "\nWrite 'channels=N' or 'chunk=N' to override.\n");
+	seq_puts(m, "Write 'channels=0' or 'chunk=0' to restore dynamic mode.\n");
 	return 0;
 }
 
@@ -814,14 +1032,18 @@ static ssize_t pcopy_config_write(struct file *file, const char __user *buf,
 	if (sscanf(kbuf, "channels=%u", &val) == 1) {
 		if (val > PCOPY_MAX_CHANNELS)
 			return -EINVAL;
-		pcopy_state.max_channels = val;
-		pr_info("pcopy: max_channels set to %u\n", val);
+		pcopy_state.max_channels_override = val;
+		pr_info("pcopy: max_channels_override set to %u (%s)\n",
+			val, val == 0 ? "dynamic" : "fixed");
 	} else if (sscanf(kbuf, "chunk=%u", &val) == 1) {
-		val *= 1024;  /* Input in KB */
-		if (val < PCOPY_CHUNK_SIZE_MIN || val > PCOPY_CHUNK_SIZE_MAX)
-			return -EINVAL;
+		if (val > 0) {
+			val *= 1024;
+			if (val < PCOPY_CHUNK_SIZE_MIN || val > PCOPY_CHUNK_SIZE_MAX)
+				return -EINVAL;
+		}
 		pcopy_state.default_chunk_size = val;
-		pr_info("pcopy: default_chunk_size set to %u KB\n", val / 1024);
+		pr_info("pcopy: default_chunk_size set to %u KB (%s)\n",
+			val / 1024, val == 0 ? "dynamic" : "fixed");
 	} else {
 		return -EINVAL;
 	}
@@ -865,7 +1087,6 @@ static long pcopy_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				atomic_dec(&pcopy_state.active_ops);
 				return -EFAULT;
 			}
-			/* Force MOVE flag */
 			req.flags |= PCOPY_F_MOVE | PCOPY_F_CROSS_DEVICE;
 			if (copy_to_user(ureq, &req, sizeof(req))) {
 				atomic_dec(&pcopy_state.active_ops);
@@ -880,8 +1101,50 @@ static long pcopy_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case PCOPY_IOC_STATUS:
 		{
 			struct pcopy_hw_status hw;
-			pcopy_get_hw_status("/", &hw);
+			struct pcopy_dynamic_decision d;
+			unsigned int pcie_gen, pcie_lanes, pcie_bw, hw_q;
+			enum pcopy_device_class dclass;
+
+			memset(&hw, 0, sizeof(hw));
+
+			hw_q = pcopy_detect_hw_queues("/");
+			pcie_bw = pcopy_detect_pcie_bandwidth("/",
+							      &pcie_gen, &pcie_lanes);
+			dclass = pcopy_classify_device("/", hw_q, pcie_gen, pcie_lanes);
+
+			hw.online_cpus = num_online_cpus();
+			hw.nr_hw_queues = hw_q;
+			hw.pcie_gen = pcie_gen;
+			hw.pcie_lanes = pcie_lanes;
+			hw.bandwidth_mb_s = pcie_bw;
+			hw.device_speed_mb_s = pcopy_device_table[dclass].speed_mb_s;
+			hw.device_class = dclass;
+			hw.nvme_detected = (hw_q > 2) ? 1 : 0;
+			hw.cpu_load_pct = pcopy_get_cpu_load_pct();
+
+			/* Compute a sample dynamic assignment for status */
+			pcopy_dynamic_assign(100, hw_q, pcie_gen, pcie_lanes,
+					     pcie_bw, dclass, 0, &d);
+			hw.recommended_channels = d.assigned_channels;
+			hw.chunk_size = d.chunk_size;
+			hw.assigned_lanes = d.assigned_lanes;
+			hw.lane_utilization_pct = pcie_bw > 0 ?
+				(d.assigned_lanes * 100 / pcie_lanes) : 0;
+
 			if (copy_to_user((void __user *)arg, &hw, sizeof(hw)))
+				return -EFAULT;
+			return 0;
+		}
+
+	case PCOPY_IOC_DECISION:
+		{
+			struct pcopy_dynamic_decision d;
+
+			mutex_lock(&pcopy_state.decision_lock);
+			d = pcopy_state.last_decision;
+			mutex_unlock(&pcopy_state.decision_lock);
+
+			if (copy_to_user((void __user *)arg, &d, sizeof(d)))
 				return -EFAULT;
 			return 0;
 		}
@@ -906,15 +1169,14 @@ static int __init pcopy_init(void)
 {
 	int ret;
 
-	pr_info("pcopy: initializing Parallel Copy/Move engine\n");
+	pr_info("pcopy: initializing Parallel Copy/Move with Dynamic Assignment\n");
 
 	mutex_init(&pcopy_state.op_lock);
+	mutex_init(&pcopy_state.decision_lock);
 	atomic_set(&pcopy_state.active_ops, 0);
-	pcopy_state.default_chunk_size = PCOPY_CHUNK_SIZE;
-	pcopy_state.max_channels = 0;  /* auto-detect */
-
-	/* Cache initial hardware state */
-	pcopy_state.cached_cpus = num_online_cpus();
+	pcopy_state.default_chunk_size = 0;  /* 0 = dynamic */
+	pcopy_state.max_channels_override = 0;  /* 0 = dynamic */
+	memset(&pcopy_state.last_decision, 0, sizeof(pcopy_state.last_decision));
 
 	/* Create /proc/pcopy/ directory */
 	pcopy_state.proc_dir = proc_mkdir("pcopy", NULL);
@@ -925,6 +1187,7 @@ static int __init pcopy_init(void)
 
 	proc_create("status", 0444, pcopy_state.proc_dir, &pcopy_status_ops);
 	proc_create("config", 0644, pcopy_state.proc_dir, &pcopy_config_ops);
+	proc_create("decision", 0444, pcopy_state.proc_dir, &pcopy_decision_ops);
 
 	/* Register /dev/pcopy misc device */
 	pcopy_state.misc.minor = MISC_DYNAMIC_MINOR;
@@ -939,16 +1202,17 @@ static int __init pcopy_init(void)
 		return ret;
 	}
 
-	pr_info("pcopy: ready — %u CPUs available, /dev/pcopy registered\n",
-		pcopy_state.cached_cpus);
-	pr_info("pcopy: use 'cat /proc/pcopy/status' for hardware detection\n");
+	pr_info("pcopy: ready — %u CPUs, dynamic assignment active\n",
+		num_online_cpus());
+	pr_info("pcopy: device classes: IDE=%u, SATA_SSD=%u, NVMe_G4=%u, NVMe_G5=%u MB/s\n",
+		PCOPY_SPEED_IDE_HDD, PCOPY_SPEED_SATA_SSD,
+		PCOPY_SPEED_NVME_GEN4_X4, PCOPY_SPEED_NVME_GEN5_X4);
 
 	return 0;
 }
 
 static void __exit pcopy_exit(void)
 {
-	/* Wait for any active operations */
 	while (atomic_read(&pcopy_state.active_ops) > 0) {
 		pr_info("pcopy: waiting for %d active operations...\n",
 			atomic_read(&pcopy_state.active_ops));

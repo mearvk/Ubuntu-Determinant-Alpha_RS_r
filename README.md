@@ -57,6 +57,7 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 30. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
 31. [Secure JVM: System Codex](#secure-jvm-system-codex)
 32. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
+33. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
 
 ---
 
@@ -1995,6 +1996,269 @@ src/hotspot/share/runtime/jvmMySQLBridge.cpp
 
 ---
 
+## Parallel Copy/Move (pcopy/pmove)
+
+Hardware-aware parallel file copy and move operations with **dynamic assignment** of PCIe lanes and NVMe parallelization. The engine considers overall processor usage, total number of files being copied, and relative device speed constants to judge the optimal number of CPU cores and PCIe lanes for transfer optimization.
+
+Standard `cp`/`mv` operates sequentially — pcopy/pmove dispatches multiple files across multiple channels simultaneously, dynamically scaled to current system conditions.
+
+### Theory of Operation
+
+```
+Standard cp:    read → write → read → write → ... (1 stream, 1 queue)
+pcopy/pmove:    ┌─ Channel 0: file_a → NVMe SQ 0 ─┐
+                ├─ Channel 1: file_b → NVMe SQ 1 ─┤  ALL PARALLEL
+                ├─ Channel 2: file_c → NVMe SQ 2 ─┤  (hardware DMA)
+                └─ Channel N: file_d → NVMe SQ N ─┘
+```
+
+**Dynamic Channel Formula:**
+```
+channels = min(
+    cpu_cores_available_at_current_load,
+    hw_queues_on_device,
+    files_in_batch,
+    device_speed_ceiling / per_channel_throughput,
+    pcie_lanes × lane_bandwidth / chunk_throughput
+)
+```
+
+The engine dynamically adjusts based on five constraints — the tightest bottleneck determines parallelism.
+
+### Device Class Speed Constants
+
+Relative speed constants for each storage device class. These represent the practical throughput ceiling and determine how many CPU cores and PCIe lanes are useful:
+
+| Device Class | Speed (MB/s) | Min Channels | Max Channels | Optimal Chunk |
+|-------------|-------------|-------------|-------------|--------------|
+| IDE HDD | 80 | 1 | 1 | 512 KB |
+| SATA HDD | 150 | 1 | 2 | 1 MB |
+| SAS HDD (10K/15K) | 200 | 1 | 2 | 1 MB |
+| SATA SSD | 550 | 1 | 4 | 4 MB |
+| NVMe Gen3 x4 | 3,500 | 2 | 16 | 4 MB |
+| NVMe Gen4 x4 | 7,000 | 4 | 32 | 16 MB |
+| NVMe Gen5 x4 | 14,000 | 8 | 64 | 16 MB |
+| USB 2.0 | 35 | 1 | 1 | 256 KB |
+| USB 3.0 / 3.1 Gen1 | 400 | 1 | 2 | 2 MB |
+| USB 3.1 Gen2 | 900 | 1 | 4 | 4 MB |
+| USB4 / Thunderbolt 3 | 3,000 | 2 | 8 | 8 MB |
+| NFS over 1GbE | 110 | 1 | 2 | 1 MB |
+| NFS over 10GbE | 1,100 | 2 | 8 | 4 MB |
+
+The optimizer will not assign more parallelism than the device can absorb. An HDD gets 1-2 channels (more would just increase seek contention). NVMe Gen5 can use up to 64 channels.
+
+### CPU Load-Aware Dynamic Assignment
+
+The engine scales channels inversely with system CPU load:
+
+| System CPU Load | Core Allocation | Rationale |
+|----------------|----------------|-----------|
+| < 25% (idle) | 80% of cores | System has headroom, use it |
+| < 50% (moderate) | 50% of cores | Share fairly with other work |
+| < 75% (heavy) | 25% of cores | Preserve responsiveness |
+| > 90% (critical) | ~1-2 cores only | System stressed, be minimal |
+
+Priority flags override this policy:
+- `--high-priority` / `PCOPY_F_HIGH_PRIORITY`: Use up to 90% of cores regardless of load
+- `--low-priority` / `PCOPY_F_LOW_PRIORITY`: Cap at 15% even when idle
+
+### Dynamic PCIe Lane Assignment
+
+The engine computes how many PCIe lanes are effectively utilized:
+
+```
+needed_bandwidth = assigned_channels × per_channel_throughput
+assigned_lanes = needed_bandwidth / bandwidth_per_lane
+```
+
+If the device has x4 lanes but only 2 channels are needed (e.g., SATA SSD), only ~x1-x2 equivalent bandwidth is consumed. The remaining lanes are available for other devices.
+
+### Throttle Reasons
+
+When the optimizer reduces parallelism below maximum, it reports why:
+
+| Reason | Code | Meaning |
+|--------|------|---------|
+| none | 0 | Operating at full device potential |
+| cpu_load | 1 | Reduced channels due to high CPU pressure |
+| device_limit | 2 | Device can't absorb more parallelism (speed ceiling) |
+| file_count | 3 | Fewer files than potential channels |
+| pcie_bandwidth | 4 | PCIe bus is the bottleneck |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Userspace: pcopy / pmove CLI                               │
+│  Collects files, detects hardware via ioctl, dispatches     │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ ioctl(/dev/pcopy)
+┌───────────────────────────┴─────────────────────────────────┐
+│  Kernel: pcopy.c / pmove.c                                  │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Hardware Detection                                     │ │
+│  │  • NVMe HW queue count (blk-mq nr_hw_queues)         │ │
+│  │  • PCIe gen + lanes (PCI_EXP_LNKSTA register)        │ │
+│  │  • Online CPU count                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Parallel Engine                                        │ │
+│  │  • Bounded workqueue (WQ_UNBOUND, max_active=channels)│ │
+│  │  • Per-file work items with splice zero-copy           │ │
+│  │  • Completion-based synchronization                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Move Strategy                                          │ │
+│  │  • Same-fs: atomic rename (vfs_rename, zero-copy)     │ │
+│  │  • Cross-device: splice copy + unlink source           │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### PCIe Bandwidth Awareness
+
+| PCIe Gen | Bandwidth/Lane | x4 Total | Chunk Size |
+|----------|---------------|----------|------------|
+| Gen 1 | 250 MB/s | 1 GB/s | 1 MB |
+| Gen 2 | 500 MB/s | 2 GB/s | 4 MB |
+| Gen 3 | 985 MB/s | ~4 GB/s | 4 MB |
+| Gen 4 | 1969 MB/s | ~7.8 GB/s | 16 MB |
+| Gen 5 | 3938 MB/s | ~15.7 GB/s | 16 MB |
+
+Chunk size auto-tunes based on detected bandwidth. Devices with ≤2 hardware queues are capped at 2 MB chunks.
+
+### Performance Comparison
+
+```
+Example: Copying 100 files (1 GB each) on NVMe Gen4 x4
+
+Standard cp (sequential):
+  1 file at a time → ~3.5 GB/s effective → ~29 seconds
+
+pcopy (8 channels, 8 CPUs, 8 NVMe SQs):
+  8 files at a time → ~7 GB/s effective → ~14 seconds
+  (Saturates PCIe Gen4 x4 bandwidth)
+```
+
+### Usage (Userspace Tools)
+
+```bash
+# Parallel copy (auto-detect channels)
+pcopy *.log /backup/logs/
+
+# Force 8 channels, sync after each file
+pcopy -j 8 -s data/ /mnt/backup/
+
+# Parallel move with preserved permissions
+pmove -p old/ new/
+
+# Show hardware detection
+pcopy --status
+
+# Dry run (plan without executing)
+pcopy -n large_dir/ /mnt/ssd/
+
+# Verbose per-file progress
+pcopy -v -p project/ /backup/project/
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-j N` | Force N parallel channels (default: auto-detect) |
+| `-c SIZE` | Chunk size in KB (default: auto-tune) |
+| `-s` | Sync (fsync) after each file |
+| `-p` | Preserve permissions and timestamps |
+| `-f` | Force overwrite existing files |
+| `-v` | Verbose output (per-file progress) |
+| `-n` | Dry run (show what would be done) |
+| `--status` | Show NVMe/PCIe/CPU detection and exit |
+
+### Kernel Module Interface
+
+```bash
+# Load the module
+modprobe pcopy
+
+# Hardware status
+cat /proc/pcopy/status
+
+# Configure channels (0 = auto)
+echo "channels=8" > /proc/pcopy/config
+
+# Configure chunk size (in KB)
+echo "chunk=4096" > /proc/pcopy/config
+```
+
+### ioctl Interface (/dev/pcopy)
+
+| Command | Direction | Purpose |
+|---------|-----------|---------|
+| `PCOPY_IOC_COPY` | User → Kernel | Execute parallel copy batch |
+| `PCOPY_IOC_MOVE` | User → Kernel | Execute parallel move batch |
+| `PCOPY_IOC_STATUS` | Kernel → User | Return hardware detection |
+| `PCOPY_IOC_CANCEL` | User → Kernel | Cancel active operation |
+
+### Batch Request Flags
+
+| Flag | Effect |
+|------|--------|
+| `PCOPY_F_SYNC` | fsync after each file |
+| `PCOPY_F_PRESERVE` | Preserve permissions/timestamps |
+| `PCOPY_F_OVERWRITE` | Overwrite existing destinations |
+| `PCOPY_F_MOVE` | Move mode (copy + unlink source) |
+| `PCOPY_F_CROSS_DEVICE` | Allow cross-device move (copy fallback) |
+| `PCOPY_F_VERBOSE` | Track per-file progress |
+
+### Kernel Module — pcopy.c
+
+The copy engine. Handles both copy and move operations. Exposes `/proc/pcopy/`, `/dev/pcopy`.
+
+- Detects NVMe hardware queues via `bdev_get_queue()` → `nr_hw_queues`
+- Detects PCIe gen/lanes via `pcie_capability_read_word()` → `PCI_EXP_LNKSTA`
+- Dispatches work via bounded `alloc_workqueue()` with `max_active = channels`
+- Copy engine uses `do_splice_direct()` for zero-copy page cache transfers
+- Move uses `do_renameat2()` for same-fs atomic rename, fallback to splice+unlink
+
+### Kernel Module — pmove.c
+
+Dedicated move engine with independent telemetry and abort capability. Same hardware detection, separate `/dev/pmove` ioctl namespace.
+
+- Attempts atomic `do_renameat2()` first (instant, zero data copy)
+- Falls back to splice-based data migration on cross-device boundary (`-EXDEV`)
+- Unlinks source only after successful data transfer
+- `PMOVE_F_FORCE_COPY` flag bypasses rename attempt (useful for testing)
+
+### Installation
+
+```bash
+# Kernel modules (built with kernel)
+modprobe pcopy
+modprobe pmove
+
+# Userspace tools
+cd tools/pcopy && make && sudo make install
+# Installs: /usr/local/bin/pcopy, /usr/local/bin/pmove (symlink)
+```
+
+### Files
+
+```
+fs/pcopy/pcopy.c               - Kernel module: parallel copy/move engine (~550 lines)
+fs/pcopy/pcopy.h               - Header (structures, ioctl definitions)
+fs/pcopy/Kconfig               - CONFIG_PCOPY
+fs/pcopy/Makefile              - Kernel build entry
+fs/pmove/pmove.c               - Kernel module: dedicated parallel move engine (~345 lines)
+fs/pmove/pmove.h               - Header (structures, ioctl definitions)
+fs/pmove/Kconfig               - CONFIG_PCOPY (pmove variant)
+fs/pmove/Makefile              - Kernel build entry
+tools/pcopy/pcopy.c            - Userspace CLI tool (~400 lines)
+tools/pcopy/Makefile           - Build/install (produces pcopy + pmove symlink)
+```
+
+---
+
 ## Build Configuration
 
 Enable all extensions in your kernel `.config`:
@@ -2006,7 +2270,102 @@ CONFIG_SECURITY_EPERM=m
 CONFIG_USB_SWAP=m
 CONFIG_USB_FAST_DMA=m
 CONFIG_NEGAMANE=m
+CONFIG_PCOPY=m
+CONFIG_PMOVE=m
 ```
+
+## Security & Architectural Promise (JSON Sketch)
+
+The file `kernel-structure.json` at the repository root is the system's formal **promise over security and architectural concern**. It is a structured JSON sketch that declares:
+
+1. **What the kernel does** — every subsystem, its purpose, its files, its threading model
+2. **What can go wrong** — enumerated security concerns per subsystem
+3. **What we check** — a numbered security checklist (INT_001–INT_010, BUF_001–BUF_010, IOF_001–IOF_007, RCE_001–RCE_007, SBP_001–SBP_008)
+4. **What is normal** — process length, verticality, breadth, input normality
+5. **What we admit we cannot prevent** — known gaps documented honestly
+
+### Promise Structure
+
+```json
+{
+  "kernel": {
+    "subsystems": { ... },           // Architecture: what exists and why
+    "custom_extensions": { ... },    // Our modules: purpose, security, concerns
+    "threading_architecture": { ... }, // How concurrency is managed
+    "message_passing_architecture": { ... }, // How components communicate
+    "security_checklist": { ... },   // Numbered guarantees
+    "normality_concerns": { ... },   // What "normal" looks like
+    "counts": { ... },               // Scale: files, symbols, hooks
+    "build": { ... }                 // Reproducibility: config, output
+  }
+}
+```
+
+### Security Checklist Categories
+
+| Category | Code | Count | Covers |
+|----------|------|-------|--------|
+| Input Validation | INT_001–010 | 10 | Length fields, bounds, pointers, user copies, fd/PID/signal |
+| Buffer Overflow Prevention | BUF_001–010 | 10 | Canaries, red zones, FORTIFY, guard pages, strscpy, SKBs, USB |
+| Integer Overflow Prevention | IOF_001–007 | 7 | size_t, check_overflow, array_size, protocol widths, timers |
+| Race Condition Prevention | RCE_001–007 | 7 | Lock discipline, TOCTOU, refcount_t, barriers, double-fetch |
+| Security Before Processing | SBP_001–008 | 8 | LSM hooks, capabilities, permissions, seccomp, netfilter, EPMP, HPM |
+
+### Known Gaps (Declared Honestly)
+
+The promise explicitly documents what **cannot** be prevented at the point of initial processing:
+
+- TCP/IP headers parsed in NIC driver before netfilter evaluates
+- USB descriptors read into kernel memory before policy evaluates device
+- BPF bytecode loaded before verifier runs (verifier is the gate)
+- Module binary loaded into memory before signature verification
+
+### Normality Bounds
+
+The sketch defines what "normal" looks like for this system:
+
+| Dimension | Normal | Suspicious |
+|-----------|--------|-----------|
+| Syscall duration | < 100ms | > 1s |
+| Context switch | 1–5µs | > 50µs |
+| Call stack depth | 10–30 frames | > 40 frames |
+| Packet size | 64–1500 bytes | > 9000 bytes |
+| Path depth | < 20 components | > 40 components |
+| Connection rate/IP | < 1000/sec | > 10,000/sec |
+| Syscall rate/process | < 100K/sec | > 500K/sec |
+
+### Custom Extension Security Declarations
+
+Each custom kernel module has a declared security profile in the sketch:
+
+| Module | Key Promise |
+|--------|-------------|
+| EPMP | Handshake authentication BEFORE payload processing; DH parameter validation; frame length validation before allocation |
+| HPM | Runs in softirq — must be fast; state table memory bounded; atomic per-CPU counters |
+| EPERM | Registry root-only; race-protected; proc input validated |
+| NEGAMANE | Enforced before VFS write path; direct block device acknowledged as bypass vector |
+| User KO | Grain 3 requires secure boot verification; per-user resource limits; clean unload via refcount |
+| CPU Boost | Thermal hardware limits respected; binary path verified, not PID |
+| USB Swap | Won't touch partitioned devices; auto-disable after 16 I/O errors; rejects USB 1.x |
+| USB Fast DMA | DMA boundary validation; timeout enforcement; TRB ring bounds checked |
+
+### Usage
+
+```bash
+cat kernel-structure.json | python3 -m json.tool   # Pretty-print the promise
+```
+
+### Philosophy
+
+This sketch is not documentation-after-the-fact. It is a **contract** — written before and during development — declaring what the system promises about its security posture and architectural integrity. It is reviewable, diffable, and machine-parseable. When the system is audited, this JSON is the first artifact an auditor reads.
+
+### File
+
+```
+kernel-structure.json  - Security & architectural promise (JSON, machine-readable)
+```
+
+---
 
 ## License
 

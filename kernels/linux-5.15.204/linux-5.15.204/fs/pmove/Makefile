@@ -1,3 +1,3 @@
 # SPDX-License-Identifier: GPL-2.0
 
-obj-$(CONFIG_PCOPY)	+= pmove.o
+obj-$(CONFIG_PMOVE)	+= pmove.o

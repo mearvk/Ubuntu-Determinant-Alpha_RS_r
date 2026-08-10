@@ -1,30 +1,41 @@
 # SPDX-License-Identifier: GPL-2.0
 
 config PCOPY
-	tristate "Parallel Copy/Move — NVMe Multi-Queue & PCIe Lane Aware"
+	tristate "Parallel Copy/Move — Dynamic Lane & Channel Assignment"
 	depends on BLOCK && BLK_DEV
 	select PROC_FS
 	help
-	  PCOPY provides hardware-aware parallel file copy and move operations.
-	  It detects NVMe hardware queue depth, PCIe lane width, and CPU count
-	  to compute the optimal number of parallel I/O channels.
+	  PCOPY provides hardware-aware parallel file copy and move operations
+	  with dynamic assignment of PCIe lanes and NVMe parallelization.
 
-	  Standard cp/mv operates sequentially. PCOPY dispatches multiple files
-	  across multiple channels simultaneously, each hitting a distinct NVMe
-	  submission queue via blk-mq's per-CPU mapping. This saturates the
-	  device's PCIe bandwidth when copying many files.
+	  The engine dynamically adjusts parallelism based on:
+	    - Current CPU load (scales channels inversely with system pressure)
+	    - Total file count in the batch operation
+	    - Device class speed constants (IDE, SATA, NVMe Gen3/4/5, USB)
+	    - PCIe bandwidth ceiling (gen × lanes = max throughput)
+	    - NVMe hardware queue depth (blk-mq nr_hw_queues)
 
-	  Channel count = min(online_cpus, hw_queues, nr_files)
+	  Device speed constants (MB/s practical ceiling):
+	    IDE HDD:       80     SATA HDD:     150    SAS HDD:      200
+	    SATA SSD:     550     NVMe Gen3:   3500    NVMe Gen4:   7000
+	    NVMe Gen5:  14000     USB 2.0:       35    USB 3.0:      400
+	    USB 3.1G2:    900     USB4/TB3:    3000
 
-	  Example: 8 CPUs + NVMe with 8 hw queues + 100 files = 8 channels
-	  Each channel processes files in parallel, each on its own NVMe SQ.
-	  PCIe Gen4 x4 = ~7 GB/s theoretical bandwidth, achievable with
-	  sufficient queue depth.
+	  The optimizer will not assign more parallelism than the device can
+	  absorb. An HDD gets 1-2 channels; NVMe Gen5 gets up to 64.
+
+	  Channel formula:
+	    channels = min(cpu_available, hw_queues, files, device_ceiling, pcie_bw)
+
+	  CPU load policy (normal priority):
+	    Load <25%: use 80% of cores    Load <50%: use 50%
+	    Load <75%: use 25%             Load >90%: use 1-2 cores
 
 	  Exposes:
-	    /proc/pcopy/status  - Hardware detection and recommendations
-	    /proc/pcopy/config  - Tunable parameters
-	    /dev/pcopy          - ioctl interface for pcopy/pmove tools
+	    /proc/pcopy/status    - Hardware detection and dynamic state
+	    /proc/pcopy/config    - Tunable parameters (override dynamic)
+	    /proc/pcopy/decision  - Last assignment decision with reasoning
+	    /dev/pcopy            - ioctl interface for pcopy/pmove tools
 
 	  To compile as a module, choose M here: the module will be called pcopy.
 
