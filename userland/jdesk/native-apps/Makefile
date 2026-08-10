@@ -86,18 +86,41 @@ install-darling: install-dirs
 	@./darling/install-darling.sh $(APPS_DIR)
 	@echo "[JDesk] Darling installed (~300 MB)"
 
-install: install-linux install-icons install-manifests install-profiles
+install-provisioner:
+	@echo "[JDesk] Installing provisioner..."
+	@mkdir -p /opt/jdesk/native-apps
+	@cp jdesk-provision /opt/jdesk/native-apps/jdesk-provision
+	@chmod +x /opt/jdesk/native-apps/jdesk-provision
+	@cp jdesk-packages.json /opt/jdesk/native-apps/jdesk-packages.json
+	@cp -r icons/ /opt/jdesk/native-apps/icons/
+	@cp -r manifests/ /opt/jdesk/native-apps/manifests/
+	@cp -r profiles/ /opt/jdesk/native-apps/profiles/
+	@cp jdesk-provision.service /etc/systemd/system/jdesk-provision.service
+	@systemctl daemon-reload
+	@systemctl enable jdesk-provision.service
+	@ln -sf /opt/jdesk/native-apps/jdesk-provision /usr/local/sbin/jdesk-provision
+	@echo "[JDesk] Provisioner installed. Will run at first boot."
+	@echo "  Manual run: sudo jdesk-provision"
+	@echo "  Status:     sudo jdesk-provision --status"
+
+install: install-provisioner install-icons install-manifests install-profiles
 	@echo ""
 	@echo "═══════════════════════════════════════════════════════════"
 	@echo "  JDesk Native Applications — Installation Complete"
 	@echo "═══════════════════════════════════════════════════════════"
-	@echo "  Linux natives: $(APPS_DIR)/"
-	@echo "  Icons:         $(ICONS_DIR)/"
-	@echo "  Manifests:     $(MANIFESTS_DIR)/"
-	@echo "  Profiles:      $(PROFILES_DIR)/"
+	@echo "  Provisioner: /usr/local/sbin/jdesk-provision"
+	@echo "  Manifest:    /opt/jdesk/native-apps/jdesk-packages.json"
+	@echo "  Service:     jdesk-provision.service (first-boot auto)"
+	@echo "  Icons:       $(ICONS_DIR)/"
+	@echo "  Manifests:   $(MANIFESTS_DIR)/"
+	@echo "  Profiles:    $(PROFILES_DIR)/"
 	@echo ""
-	@echo "  To add Windows support: make install-wine"
-	@echo "  To add macOS support:   make install-darling"
+	@echo "  The provisioner installs native apps from upstream repos"
+	@echo "  at first boot (Grade 3 privilege). No binaries in git."
+	@echo ""
+	@echo "  Manual provision: sudo jdesk-provision"
+	@echo "  Full (optional):  sudo jdesk-provision --full"
+	@echo "  Offline cache:    sudo jdesk-provision --build-cache /media/usb/"
 	@echo "═══════════════════════════════════════════════════════════"
 
 install-all: install install-wine install-darling
