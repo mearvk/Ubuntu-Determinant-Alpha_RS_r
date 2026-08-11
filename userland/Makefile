@@ -13,7 +13,7 @@ PREFIX  ?= /usr
 DESTDIR ?=
 
 # Userland components
-COMPONENTS := x11 wallpapers java chromium
+COMPONENTS := x11 wallpapers java chromium jdesk
 
 .PHONY: all $(COMPONENTS) rootfs-extract install clean help
 
@@ -64,6 +64,16 @@ chromium:
 	$(MAKE) -C chromium
 
 # ==============================================================================
+# JDesk Desktop Environment
+# ==============================================================================
+
+jdesk:
+	@echo "[JDesk] Building native library..."
+	$(MAKE) -C jdesk/native/linux JAVA_HOME=$(JAVA_HOME)
+	@echo "[JDesk] Compiling launcher Java sources..."
+	$(MAKE) -C jdesk/native-apps compile
+
+# ==============================================================================
 # Root Filesystem Extraction
 # ==============================================================================
 
@@ -88,6 +98,8 @@ install: all
 	$(MAKE) -C x11 install DESTDIR=$(DESTDIR)
 	$(MAKE) -C wallpapers install DESTDIR=$(DESTDIR)
 	$(MAKE) -C java install DESTDIR=$(DESTDIR)
+	$(MAKE) -C jdesk/native/linux install DESTDIR=$(DESTDIR)
+	$(MAKE) -C jdesk/native-apps install DESTDIR=$(DESTDIR)
 	@if [ -f chromium/chromium-src/out/Release/chrome ]; then \
 		$(MAKE) -C chromium install DESTDIR=$(DESTDIR); \
 	else \

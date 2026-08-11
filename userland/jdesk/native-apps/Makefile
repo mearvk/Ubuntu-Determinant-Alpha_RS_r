@@ -227,7 +227,7 @@ size-report:
 # ===========================================================================
 
 clean:
-	@rm -f launcher/*.class
+	@rm -rf $(JAVA_OUT_DIR)
 	@echo "[JDesk] Cleaned build artifacts"
 
 uninstall:
