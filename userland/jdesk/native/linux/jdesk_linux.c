@@ -16,7 +16,7 @@
  * Author: Maximilian Eric Alexander Rupplin von Keffikon
  */
 
-#define _GNU_SOURCE
+/* _GNU_SOURCE defined via -D_GNU_SOURCE on compiler command line */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -481,6 +481,7 @@ void jdesk_window_hide(jdesk_window_t *win)
 
 void jdesk_window_set_fullscreen(jdesk_window_t *win, uint32_t flags)
 {
+	(void)flags;
 	if (!win) return;
 
 	XEvent event;
@@ -702,7 +703,6 @@ void jdesk_system_info(struct jdesk_system_info *info)
 {
 	struct sysinfo si;
 	struct utsname un;
-	struct jdesk_screen screens[8];
 	jdesk_display_t *dpy;
 
 	if (!info) return;
@@ -719,9 +719,12 @@ void jdesk_system_info(struct jdesk_system_info *info)
 
 	/* OS info */
 	if (uname(&un) == 0) {
-		strncpy(info->os_name, un.sysname, sizeof(info->os_name) - 1);
-		strncpy(info->os_version, un.release, sizeof(info->os_version) - 1);
-		strncpy(info->hostname, un.nodename, sizeof(info->hostname) - 1);
+		snprintf(info->os_name,    sizeof(info->os_name),
+			 "%.*s", (int)(sizeof(info->os_name)    - 1), un.sysname);
+		snprintf(info->os_version, sizeof(info->os_version),
+			 "%.*s", (int)(sizeof(info->os_version) - 1), un.release);
+		snprintf(info->hostname,   sizeof(info->hostname),
+			 "%.*s", (int)(sizeof(info->hostname)   - 1), un.nodename);
 	}
 
 	strncpy(info->desktop_session, "jdesk", sizeof(info->desktop_session) - 1);
