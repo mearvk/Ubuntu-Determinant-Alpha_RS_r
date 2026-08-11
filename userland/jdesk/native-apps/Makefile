@@ -10,6 +10,7 @@
 
 DESTDIR ?= /opt/jdesk
 JAVA_SRC_DIR = launcher
+JAVA_SRC_TREE= ../src
 JAVA_SRCS    = $(JAVA_SRC_DIR)/NativeAppLauncher.java \
                $(JAVA_SRC_DIR)/DesktopIconGrid.java
 JAVA_OUT_DIR = $(JAVA_SRC_DIR)/classes
@@ -48,7 +49,7 @@ all: compile
 compile: $(JAVA_SRCS)
 	@echo "[JDesk] Compiling launcher Java sources (release 17, JavaFX cp)..."
 	@mkdir -p $(JAVA_OUT_DIR)
-	$(JAVAC) $(JAVAC_FLAGS) -d $(JAVA_OUT_DIR) $(JAVA_SRCS)
+	$(JAVAC) $(JAVAC_FLAGS) -sourcepath "$(JAVA_SRC_TREE)" -d $(JAVA_OUT_DIR) $(JAVA_SRCS)
 	@echo "[JDesk] Compiled: $(JAVA_OUT_DIR)/"
 
 # ===========================================================================
