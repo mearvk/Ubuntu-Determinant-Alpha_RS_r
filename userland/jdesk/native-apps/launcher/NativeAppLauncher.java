@@ -180,30 +180,102 @@ public class NativeAppLauncher {
     //  Launch Engine
     // =========================================================================
 
+    // =========================================================================
+    //  Security: Allowed binary root directories and profile names
+    // =========================================================================
+
+    /** Binary must reside under one of these directory prefixes. */
+    private static final List<String> ALLOWED_BINARY_ROOTS = List.of(
+        "/opt/jdesk/apps/",
+        "/usr/bin/",
+        "/usr/local/bin/",
+        "/bin/"
+    );
+
+    /** Profile names must match this pattern — alphanumeric, dash only. */
+    private static final java.util.regex.Pattern SAFE_PROFILE =
+        java.util.regex.Pattern.compile("^[a-zA-Z0-9\\-]{1,64}$");
+
+    /** App name must be safe for use in thread names and log messages. */
+    private static final java.util.regex.Pattern SAFE_NAME =
+        java.util.regex.Pattern.compile("^[\\w\\-. ]{1,128}$");
+
+    /**
+     * Validate that a binary path is canonical and under an allowed root.
+     * Prevents path traversal and manifest injection attacks.
+     */
+    private static Path validateBinaryPath(String rawPath) throws IOException {
+        if (rawPath == null || rawPath.isBlank()) {
+            throw new SecurityException("Binary path is null or empty");
+        }
+        // Resolve to real absolute path — eliminates symlink chains and ../
+        Path canonical;
+        try {
+            canonical = Path.of(rawPath).toRealPath();
+        } catch (IOException e) {
+            throw new FileNotFoundException("Binary not found or unresolvable: " + rawPath);
+        }
+        String canonicalStr = canonical.toString();
+        for (String root : ALLOWED_BINARY_ROOTS) {
+            if (canonicalStr.startsWith(root)) {
+                return canonical;
+            }
+        }
+        throw new SecurityException(
+            "Binary path '" + canonicalStr + "' is outside allowed roots: " + ALLOWED_BINARY_ROOTS);
+    }
+
+    /**
+     * Validate a profile name — must be alphanumeric + dash only.
+     */
+    private static String validateProfile(String profile) {
+        if (profile == null || !SAFE_PROFILE.matcher(profile).matches()) {
+            System.err.printf("[JDesk] Warning: unsafe profile name '%s' — using 'default'%n", profile);
+            return "default";
+        }
+        return profile;
+    }
+
+    /**
+     * Validate app name — safe for use in thread names and env vars.
+     */
+    private static String validateName(String name) {
+        if (name == null || !SAFE_NAME.matcher(name).matches()) {
+            return "Unknown";
+        }
+        return name;
+    }
+
     /**
      * Launch a native application under JVM Memory Proxy governance.
+     *
+     * Security: binary path is validated against allowed roots before exec.
+     * Profile name is validated against a safe pattern.
+     * Manifest fields are sanitized before use in command construction.
      *
      * @param manifest Application manifest
      * @return Process handle for the launched application
      */
     public static Process launch(AppManifest manifest) throws IOException {
-        Path binaryPath = Path.of(manifest.binaryPath);
+        // Validate and canonicalize binary path — prevents path traversal
+        Path binaryPath = validateBinaryPath(manifest.binaryPath);
 
-        if (!Files.exists(binaryPath)) {
-            throw new FileNotFoundException("Binary not found: " + manifest.binaryPath);
-        }
+        // Sanitize name and profile before use in command / env
+        String safeName    = validateName(manifest.name);
+        String safeProfile = validateProfile(manifest.profile);
 
         BinaryFormat format = detectFormat(binaryPath);
-        List<String> command = buildCommand(format, manifest);
+        List<String> command = buildCommand(format, manifest, binaryPath.toString(), safeProfile);
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.inheritIO();
-        pb.environment().put("JDESK_APP_NAME", manifest.name);
-        pb.environment().put("JDESK_APP_PROFILE", manifest.profile);
+        // Env values: name is validated, profile is validated
+        pb.environment().put("JDESK_APP_NAME",    safeName);
+        pb.environment().put("JDESK_APP_PROFILE", safeProfile);
 
-        System.out.printf("[JDesk] Launching: %s (%s)%n", manifest.name, format.getDescription());
+        System.out.printf("[JDesk] Launching: %s (%s)%n", safeName, format.getDescription());
         System.out.printf("[JDesk] Profile: %s | RAM: %s/%s | CPU: %s%%%n",
-                manifest.profile,
+                safeProfile,
                 formatSize(manifest.ramSoft),
                 formatSize(manifest.ramHard),
                 manifest.cpuPercent != null ? manifest.cpuPercent : "default");
@@ -214,17 +286,22 @@ public class NativeAppLauncher {
     /**
      * Build the full command line based on binary format.
      */
-    private static List<String> buildCommand(BinaryFormat format, AppManifest manifest) {
+    /**
+     * Build the full command line based on binary format.
+     * Uses pre-validated binaryPath and safeProfile — never raw manifest values.
+     */
+    private static List<String> buildCommand(BinaryFormat format, AppManifest manifest,
+                                             String validatedPath, String safeProfile) {
         List<String> cmd = new ArrayList<>();
 
         // JVM memory-guard prefix
         cmd.add("java");
         cmd.add("-memory-guard");
 
-        // Resource profile
-        cmd.add("-Xguard:profile=" + manifest.profile);
+        // Resource profile — validated safe string
+        cmd.add("-Xguard:profile=" + safeProfile);
 
-        // Resource overrides
+        // Resource overrides — numeric values, no injection possible
         if (manifest.ramSoft != null) {
             cmd.add("-Xguard:ram-soft=" + formatSizeFlag(manifest.ramSoft));
         }
@@ -244,47 +321,49 @@ public class NativeAppLauncher {
         // Status reporting to JDesk panel
         cmd.add("-Xguard:status=5s");
 
-        // Platform-specific execution wrapper
+        // Platform-specific execution wrapper — use validated canonical path
         switch (format) {
             case ELF_64:
             case ELF_32:
             case SCRIPT:
-                // Direct execution — no translation layer needed
-                cmd.add(manifest.binaryPath);
+                cmd.add(validatedPath);
                 break;
-
             case PE:
-                // Windows binary — invoke via Wine
                 cmd.add("wine");
-                cmd.add(manifest.binaryPath);
+                cmd.add(validatedPath);
                 break;
-
             case MACHO_64:
             case MACHO_32:
             case MACHO_FAT:
-                // macOS binary — invoke via Darling
                 cmd.add("darling");
                 cmd.add("shell");
-                cmd.add(manifest.binaryPath);
+                cmd.add(validatedPath);
                 break;
-
             default:
-                // Try direct execution for unknown formats with +x bit
-                cmd.add(manifest.binaryPath);
+                cmd.add(validatedPath);
                 break;
         }
 
-        // Application arguments
+        // Arguments — reject shell metacharacters; each arg is discrete (no shell parsing)
         if (manifest.arguments != null) {
             for (String arg : manifest.arguments) {
-                if (!arg.isEmpty()) {
-                    cmd.add(arg);
+                if (arg != null && !arg.isBlank()) {
+                    String safeArg = arg.trim();
+                    if (!safeArg.contains(";") && !safeArg.contains("&")
+                            && !safeArg.contains("|") && !safeArg.contains("`")
+                            && !safeArg.contains("$") && !safeArg.contains(">")
+                            && !safeArg.contains("<") && !safeArg.contains("\n")) {
+                        cmd.add(safeArg);
+                    } else {
+                        System.err.printf("[JDesk] Warning: rejected unsafe argument '%s'%n", safeArg);
+                    }
                 }
             }
         }
 
         return cmd;
     }
+
 
     // =========================================================================
     //  Desktop Icon Registration
