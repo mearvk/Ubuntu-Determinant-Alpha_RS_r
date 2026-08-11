@@ -27,8 +27,16 @@ CFLAGS     += -march=x86-64-v3  # Baseline: SSE4.2, AVX, AVX2, BMI1/2, FMA
 # using vector operations for pixel blending and layout math.
 OPTFLAGS    = -ftree-vectorize -ffast-math -funroll-loops
 
-# JNI headers
-JAVA_HOME  ?= /usr/lib/jvm/java-28-openjdk-amd64
+# JNI headers — detect installed JDK (prefer 28, fall back to 25, then default-java)
+ifeq ($(JAVA_HOME),)
+  ifneq ($(wildcard /usr/lib/jvm/java-28-openjdk-amd64/include/jni.h),)
+    JAVA_HOME := /usr/lib/jvm/java-28-openjdk-amd64
+  else ifneq ($(wildcard /usr/lib/jvm/java-25-openjdk-amd64/include/jni.h),)
+    JAVA_HOME := /usr/lib/jvm/java-25-openjdk-amd64
+  else
+    JAVA_HOME := $(shell readlink -f /usr/lib/jvm/default-java 2>/dev/null || echo /usr/lib/jvm/java-25-openjdk-amd64)
+  endif
+endif
 JNI_INCLUDE = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 
 # X11 libraries

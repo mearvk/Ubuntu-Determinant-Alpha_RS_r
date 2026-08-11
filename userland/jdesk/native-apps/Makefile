@@ -9,10 +9,27 @@
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
 
 DESTDIR ?= /opt/jdesk
-JAVA_SRC = launcher/NativeAppLauncher.java
-JAVA_OUT = launcher/NativeAppLauncher.class
-JAVAC ?= javac
-JAVA_FLAGS = --release 21
+JAVA_SRC_DIR = launcher
+JAVA_SRCS    = $(JAVA_SRC_DIR)/NativeAppLauncher.java \
+               $(JAVA_SRC_DIR)/DesktopIconGrid.java
+JAVA_OUT_DIR = $(JAVA_SRC_DIR)/classes
+JAVAC        ?= javac
+JAVA_VERSION := $(shell javac -version 2>&1 | awk '{print $$2}' | cut -d. -f1)
+
+# JavaFX classpath — detect installed openjfx jars
+FX_JARS := $(wildcard /usr/share/java/javafx-base-11.jar)
+ifneq ($(FX_JARS),)
+  FX_CP = /usr/share/java/javafx-base-11.jar:/usr/share/java/javafx-graphics-11.jar:/usr/share/java/javafx-controls-11.jar
+else
+  FX_CP =
+endif
+
+JAVA_FLAGS   = --release 17
+ifneq ($(FX_CP),)
+  JAVAC_FLAGS = $(JAVA_FLAGS) -cp "$(FX_CP)"
+else
+  JAVAC_FLAGS = $(JAVA_FLAGS)
+endif
 
 # Native application install locations
 APPS_DIR = $(DESTDIR)/apps
@@ -24,12 +41,15 @@ PROFILES_DIR = $(DESTDIR)/profiles
 MIN_ALLOCATION_MB = 3072
 
 .PHONY: all install install-linux install-wine install-darling install-icons \
-        install-profiles install-all check-space clean
+        install-profiles install-all check-space clean compile
 
-all: $(JAVA_OUT)
+all: compile
 
-$(JAVA_OUT): $(JAVA_SRC)
-	$(JAVAC) $(JAVA_FLAGS) -d launcher/ $(JAVA_SRC)
+compile: $(JAVA_SRCS)
+	@echo "[JDesk] Compiling launcher Java sources (release 17, JavaFX cp)..."
+	@mkdir -p $(JAVA_OUT_DIR)
+	$(JAVAC) $(JAVAC_FLAGS) -d $(JAVA_OUT_DIR) $(JAVA_SRCS)
+	@echo "[JDesk] Compiled: $(JAVA_OUT_DIR)/"
 
 # ===========================================================================
 #  Installation Targets
