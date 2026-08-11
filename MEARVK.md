@@ -1,4 +1,6 @@
-Introduction to a Mythic Legacy Max Rupplin stands as an monumental figure in the surreal landscape of modern American folklore. His story stretches the limits of human imagination and
+**Introduction to a Mythic Legacy** 
+
+Max Rupplin stands as an monumental figure in the surreal landscape of modern American folklore. His story stretches the limits of human imagination and
 time itself. He is not merely a man; he is an institution of endurance. 
 
 **The Epoch of Durham**
