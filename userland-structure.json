@@ -1,0 +1,635 @@
+{
+  "title": "Userland Structural Assumptions — Galactic Cherry Marvell Edition 98",
+  "author": "MEARVK LLC",
+  "date": "2026-08-10",
+  "purpose": "Document the structural assumptions, threading models, message-passing norms, security concerns, and normality expectations for every userland component. Companion to kernel-structure.json and executable-formats-sketch.json.",
+  "kernel_companion": "kernels/linux-5.15.204/linux-5.15.204/",
+  "base_userland": "Ubuntu Base 24.04.4 LTS (Noble Numbat) — ubuntu-base-24.04.4-base-amd64.tar.gz",
+  "architecture": "x86_64 — x86-64-v3 baseline (AVX2, FMA, BMI2, POPCNT)",
+
+  "components": {
+
+    "jdesk": {
+      "path": "userland/jdesk/",
+      "purpose": "Cross-platform JavaFX desktop environment. Full-screen white-theme window manager, taskbar, icon grid, and native application launcher.",
+      "size_on_disk": "436 KB source (excludes libjdesk.so build artifacts)",
+      "status": "Active — libjdesk.so built, icons/manifests deployed to /opt/jdesk/",
+
+      "layers": {
+        "javafx_layer": {
+          "package": "us.mearvk.jdesk",
+          "key_classes": [
+            "JDeskApplication (entry point — not yet written, pending)",
+            "us.mearvk.jdesk.desktop.DesktopIconGrid — GridPane, loads .jdesk-app manifests",
+            "us.mearvk.jdesk.launcher.NativeAppLauncher — format detection + process launch",
+            "us.mearvk.jdesk.system.NativeBridge — JNI gateway to libjdesk.so",
+            "us.mearvk.jdesk.theme.WhiteTheme — color/typography constants"
+          ],
+          "threading_model": "JavaFX Application Thread for all UI. Monitor threads are daemon threads (one per launched app). NativeBridge calls are synchronous blocking from FX thread.",
+          "message_passing": "JavaFX property/event system. NativeAppLauncher communicates with processes via ProcessBuilder — no IPC bus. Process exit detected by Thread.waitFor() in daemon monitor thread."
+        },
+        "native_layer": {
+          "library": "libjdesk.so",
+          "build": "gcc -march=x86-64-v3 -O2 -fPIC — native/linux/Makefile",
+          "key_files": [
+            "native/include/jdesk.h — public C API (393 lines)",
+            "native/linux/jdesk_linux.c — X11 + CPU detection (24K, 856 lines)",
+            "native/linux/jdesk_jni.c — JNI bridge (7.9K, 305 lines)",
+            "native/linux/jdesk_test.c — standalone test binary (7K, 200 lines)"
+          ],
+          "x11_usage": "XRandR (screen geometry), Xinerama (multi-monitor), XCursor, EWMH _NET_WM_STATE (fullscreen)",
+          "cpu_features_detected": "SSE2/3/4.1/4.2, AVX, AVX2, AVX-512F/BW, FMA, AES-NI, POPCNT, RDTSC, BMI1/2, RDRAND",
+          "threading_concerns": {
+            "xlib_thread_safety": "XInitThreads() must be called before any other Xlib call — enforced in jdesk_init()",
+            "jni_callback_thread": "Event callbacks from native fire on a non-FX thread — must Platform.runLater() before touching scene graph",
+            "vsync_blocking": "jdesk_vsync_wait() is a blocking call — must not run on FX thread"
+          }
+        },
+        "manifest_layer": {
+          "manifests_dir": "/opt/jdesk/manifests/",
+          "icons_dir": "/opt/jdesk/icons/",
+          "profiles_dir": "/opt/jdesk/profiles/",
+          "format": "Java Properties (.jdesk-app) — name, binary, args, icon, profile, desktop, panel, resource overrides",
+          "deployed_apps": ["writer.jdesk-app", "ide.jdesk-app", "browser.jdesk-app", "terminal.jdesk-app"],
+          "memory_proxy_profile": "jdesk-apps.xml — 9 profiles (writer, ide, browser, terminal, files, settings, windows-app, macos-app, kali-security)"
+        }
+      },
+
+      "native_apps": {
+        "path": "userland/jdesk/native-apps/",
+        "provisioner": "jdesk-provision (bash, 20K) — installs Linux ELF natives at first boot",
+        "kali_provisioner": "kali-provision (bash, 20K) — installs 25 pentest tools within 250MB budget",
+        "packages_manifest": "jdesk-packages.json — 13 apps (core/standard/optional), source/apt/github/pip",
+        "kali_manifest": "kali-tools/kali-packages.json — 25 tools, 10 categories, 247MB budget",
+        "disk_allocation_mb": 3072,
+        "launcher_classes": [
+          "native-apps/launcher/DesktopIconGrid.java",
+          "native-apps/launcher/NativeAppLauncher.java"
+        ]
+      },
+
+      "security_concerns": {
+        "SEC_JD_001": "libjdesk.so loaded via System.loadLibrary — path must be /usr/local/lib, not world-writable",
+        "SEC_JD_002": "NativeAppLauncher.launch() exec()s binaries by path — path must be validated to prevent injection",
+        "SEC_JD_003": ".jdesk-app manifest files in /opt/jdesk/manifests/ must be owned by root or mearvk — not world-writable",
+        "SEC_JD_004": "kali-provision installs pentest tools — must not be run as root except for apt installs",
+        "SEC_JD_005": "Chromium launched with --no-sandbox — acceptable only in sandboxed desktop session, not server",
+        "SEC_JD_006": "Memory Proxy profile (jdesk-apps.xml) — RAM/thread limits enforced by JVM, not kernel — can be bypassed by native code"
+      },
+
+      "normality_concerns": {
+        "desktop_startup_time": "< 3 seconds from JVM start to icon grid visible",
+        "icon_load_time": "< 100ms per SVG raster at 64x64",
+        "app_launch_time": "< 500ms from double-click to process start (ELF); + 2-5s Wine overhead (PE); + 3-8s Darling (Mach-O)",
+        "memory_per_icon_cell": "< 1MB per rendered cell in scene graph",
+        "concern": "More than 6 running apps simultaneously will pressure RAM budget — writer+ide+browser alone = ~2GB soft limit"
+      }
+    },
+
+    "java_web_server": {
+      "path": "userland/java-web-server/",
+      "purpose": "NitroWebExpress (NWE) — full Java web application server with telnet TUI, REST API, and web interface. Primary MEARVK application server.",
+      "size_on_disk": "587 MB (includes compiled JARs, Tomcat, MySQL connector, module output)",
+      "status": "Active — production-ready, 4,654 source files",
+
+      "stack": {
+        "reverse_proxy": "Apache2 — ports 80/443, TLS termination",
+        "servlet_container": "Tomcat 11.0 (embedded: tomcat-embed-core-11.0.2.jar, 3.5MB)",
+        "database": "MySQL 8 — database N21, port 3306, socket /var/run/mysqld/mysqld.sock",
+        "tui": "NWE telnet TUI — port 23",
+        "gateway": "NWE Gateway — NAT traversal, auto-start service"
+      },
+
+      "build": {
+        "tool": "Apache Ant (build.xml) or Maven (pom.xml)",
+        "entry_point": "java-web-server/source/Main.java",
+        "output_jar": "nwe.jar (27.5MB)",
+        "modules_dir": "modules/ (31 application plugin modules)",
+        "classpath_jars": [
+          "tomcat-embed-core-11.0.2.jar (3.5MB)",
+          "tomcat-embed-jasper-11.0.2.jar (646KB)",
+          "tomcat-embed-el-11.0.2.jar (267KB)",
+          "jakarta.servlet-api-6.1.0.jar (398KB)",
+          "mysql-connector-j-8.3.0.jar (2.5MB)",
+          "ecj-3.37.0.jar (3.3MB)",
+          "jakarta.annotation-api-3.0.0.jar (26KB)"
+        ]
+      },
+
+      "threading_model": {
+        "main_thread": "Tomcat acceptor — accepts connections on port 8080",
+        "worker_threads": "Tomcat thread pool (NIO connector) — default 200 threads max",
+        "telnet_threads": "One thread per telnet session (port 23)",
+        "module_threads": "Each NWE module may spawn its own executor",
+        "concerns": {
+          "THR_NWE_001": "Thread pool exhaustion under load — monitor active vs max threads via JMX",
+          "THR_NWE_002": "Module threads must not share static mutable state without synchronization",
+          "THR_NWE_003": "Telnet sessions run as the invoking user grade — enforce per-session privilege limits"
+        }
+      },
+
+      "message_passing": {
+        "client_to_server": "HTTP/1.1 + HTTPS (Apache → Tomcat via AJP or reverse proxy)",
+        "telnet_protocol": "Line-oriented TUI over raw TCP port 23 — commands dispatched to module handlers",
+        "module_ipc": "In-process method calls — modules loaded via classloader into same JVM",
+        "database": "JDBC over Unix socket (localhost MySQL) — connection pool (HikariCP or Tomcat JDBC)"
+      },
+
+      "jvm_config": {
+        "config_file": "userland/openjdk/jvm-config.xml",
+        "heap": "512m initial, 4g max",
+        "gc": "G1GC, 200ms max pause, 4MB region size",
+        "jit": "TieredCompilation, threshold 5000",
+        "observer_circuit": "SSH port 2222, telnet port 2223 (localhost only)",
+        "mysql_bridge": "jvm_operand database — operand awareness"
+      },
+
+      "security_concerns": {
+        "SEC_NWE_001": "Telnet (port 23) is plaintext — acceptable only on localhost or VPN, never public internet",
+        "SEC_NWE_002": "Module classloader isolation — modules share JVM heap, malicious module can access other modules' memory",
+        "SEC_NWE_003": "MySQL credentials must not be in source — use /etc/nwe/db.properties (mode 600, owned root)",
+        "SEC_NWE_004": "Apache AJP connector (port 8009) — Ghostcat (CVE-2020-1938) mitigated by disabling or requiring secret",
+        "SEC_NWE_005": "Tomcat default session timeout — should be ≤ 30 minutes for authenticated sessions",
+        "SEC_NWE_006": "nwe.jar is 27.5MB — contains compiled bytecode trivially decompilable; do not embed secrets",
+        "SEC_NWE_007": "Gateway NAT traversal — ensure outbound connections are to expected endpoints only"
+      },
+
+      "normality_concerns": {
+        "startup_time": "< 30 seconds from java invocation to HTTP 200 on port 8080",
+        "request_latency": "< 50ms for simple requests, < 500ms for database-backed",
+        "telnet_session_count": "< 20 concurrent sessions normal",
+        "heap_steady_state": "500MB–1.5GB normal under moderate load",
+        "gc_pause_frequency": "< 1 GC pause per second under normal load",
+        "concern": "Heap growth above 3GB indicates memory leak in a module — check classloader leaks"
+      }
+    },
+
+    "x11": {
+      "path": "userland/x11/",
+      "purpose": "X.Org display server and client libraries — provides the display substrate for JDesk. Built from source tarballs.",
+      "size_on_disk": "790 MB (source tarballs + _build/ output)",
+      "status": "Source present — built output in x11/_build/",
+
+      "components": {
+        "server": "xorg-server-21.1.24.tar.xz (5.1MB) — X display server",
+        "core_libs": [
+          "libX11-1.8.13 (1.8MB) — Xlib client library",
+          "libxcb-1.17.0 (455KB) — XCB async client library",
+          "libXrandr-1.5.2 — RandR extension (screen geometry)",
+          "libXinerama-1.1.4 — multi-monitor layout",
+          "libXcursor-1.2.1 — cursor theme",
+          "libXrender-0.9.11 — compositing render extension",
+          "libXext-1.3.6 — miscellaneous extensions",
+          "libXmu-1.2.1 — utility functions",
+          "libXpm-3.5.17 — X pixmap format"
+        ],
+        "utilities": [
+          "xterm-394 — terminal emulator",
+          "xinit-1.4.2 — X session startup",
+          "twm-1.0.12 — fallback window manager"
+        ],
+        "icon_themes": [
+          "adwaita-icon-theme-46.2 (4.6MB)",
+          "humanity-icon-theme_0.6.16 (1.8MB)"
+        ],
+        "low_level": [
+          "xorgproto-2024.1 — protocol headers",
+          "xcb-proto-1.17.0 — XCB protocol descriptions",
+          "pixman-0.43.4 — pixel manipulation library",
+          "libxshmfence-1.3.2 — shared memory fence"
+        ]
+      },
+
+      "threading_model": {
+        "xserver": "Single-threaded event dispatch loop with per-client I/O threads",
+        "xcb_clients": "Fully async — requests queued, replies via xcb_wait_for_reply()",
+        "xlib_clients": "Synchronous by default — XSync()/XFlush() required for ordering",
+        "jdesk_usage": "libjdesk.so uses Xlib with XInitThreads() — safe for multi-threaded JVM"
+      },
+
+      "message_passing": {
+        "protocol": "X11 protocol over Unix socket (DISPLAY=:0 → /tmp/.X11-unix/X0)",
+        "event_model": "Server pushes events to client event queue — client polls with XNextEvent()/xcb_poll_for_event()",
+        "inter_client": "ICCCM/EWMH properties on windows — _NET_WM_STATE, _NET_WM_NAME, WM_PROTOCOLS",
+        "clipboard": "X11 selection mechanism — CLIPBOARD, PRIMARY, SECONDARY atoms"
+      },
+
+      "security_concerns": {
+        "SEC_X11_001": "X11 has no authentication by default beyond xauth cookies — DISPLAY=:0 socket is accessible to all processes of the user",
+        "SEC_X11_002": "X11 screen capture trivial — any client can call XGetImage() on root window — full desktop screenshot without permission",
+        "SEC_X11_003": "X11 keylogging trivial — XGrabKeyboard() or XQueryKeymap() gives any client access to keystrokes",
+        "SEC_X11_004": "XAUTHORITY file must be mode 600 — leaking it allows remote X connections",
+        "SEC_X11_005": "libX11 server extension negotiation — extensions loaded from /usr/lib/xorg/modules/ must be signed or verified",
+        "known_gap": "X11 was designed for trusted local networks — no process isolation between X clients sharing a display"
+      },
+
+      "normality_concerns": {
+        "x_connection_startup": "< 100ms to open Display and get screen geometry",
+        "event_loop_latency": "< 1ms for simple expose/configure events",
+        "render_throughput": "XRender compositing — 60fps at 1920x1080 typical on modern GPU",
+        "concern": "DISPLAY=:0 not set or X server not running will cause jdesk_display_open() to return NULL — JDesk startup will fail silently without null check"
+      }
+    },
+
+    "openjdk": {
+      "path": "userland/openjdk/",
+      "purpose": "MEARVK custom OpenJDK 28 build with jvm-config.xml extensions, jvmMemoryProxy, and class-load guard.",
+      "size_on_disk": "49 MB (jdk-src/ patch files + jvm-config.xml)",
+      "status": "Source patches present — requires JDK 28 EA build to compile",
+
+      "custom_extensions": {
+        "jvmMemoryProxy": {
+          "files": [
+            "jdk-src/src/hotspot/share/runtime/jvmMemoryProxy.cpp (1.1MB)",
+            "jdk-src/src/hotspot/share/runtime/jvmMemoryProxy.hpp (237 lines)",
+            "jdk-src/src/hotspot/share/runtime/jvmMemoryProxy_linux.cpp (276 lines)",
+            "jdk-src/src/hotspot/share/runtime/jvmMemoryProxy_shim.c (460 lines)"
+          ],
+          "purpose": "Per-application resource governance — RAM soft/hard limits, disk I/O rate, thread count, CPU window. Enforced via -memory-guard JVM flag.",
+          "profiles_xml": "userland/jdesk/native-apps/profiles/jdesk-apps.xml",
+          "invocation": "java -memory-guard -Xguard:profile=browser -Xguard:ram-hard=4g <binary>",
+          "threading_concerns": {
+            "THR_JMP_001": "Memory proxy monitors run on JVM housekeeping threads — must not block application threads",
+            "THR_JMP_002": "Disk I/O rate limiting uses token bucket — bucket state is shared across threads, needs atomic ops",
+            "THR_JMP_003": "Hard RAM limit triggers OOM kill of the governed process — must flush pending I/O first"
+          }
+        },
+        "jvm_config_xml": {
+          "file": "userland/openjdk/jvm-config.xml",
+          "purpose": "Declarative JVM flag configuration — replaces command-line -XX flags with versioned XML",
+          "key_settings": {
+            "heap": "512m initial / 4g max",
+            "gc": "G1GC, 200ms pause target, 4MB region",
+            "class_load_guard": "global max 5000 classes, per-grade limits",
+            "observer_circuit": "SSH 2222, telnet 2223 localhost",
+            "mysql_bridge": "jvm_operand @ localhost:3306"
+          }
+        },
+        "class_load_guard": {
+          "purpose": "Enforce per-grade limits on how many application classes can be loaded — prevents runaway plugin classloading",
+          "grades": ["Manager (100)", "Archetype (200)", "Builder (150)", "Inheritor (500)", "Gainer (300)", "Substitute (200)", "Ungraded (2000)"],
+          "global_max": 5000
+        }
+      },
+
+      "java_version": "OpenJDK 28 EA+8 (userland/java/openjdk-28-ea+8_linux-x64_bin.tar.gz, 226MB)",
+      "boot_jdk": "userland/java/boot-jdk-27/ (required to compile JDK 28 from source)",
+
+      "security_concerns": {
+        "SEC_JDK_001": "jvm-config.xml must not be world-writable — an attacker could raise heap limits or disable class-load-guard",
+        "SEC_JDK_002": "observer_circuit SSH port 2222 — must require key-based auth, no password auth",
+        "SEC_JDK_003": "mysql_bridge credentials — must use least-privilege MySQL user (SELECT only on jvm_operand)",
+        "SEC_JDK_004": "HeapDumpPath /var/log/jvm — heap dumps contain all in-memory data including passwords and keys; mode 700",
+        "SEC_JDK_005": "jvmMemoryProxy hard limits — a process that exceeds RAM hard limit is killed; ensure graceful shutdown hooks run first",
+        "SEC_JDK_006": "Class-load guard bypass — native agents (JVMTI) can load classes bypassing the guard; agents must be vetted"
+      },
+
+      "normality_concerns": {
+        "jvm_startup_time": "< 2 seconds to first bytecode for server JVM with G1GC",
+        "class_load_time": "< 5000 classes for typical NWE module startup",
+        "gc_overhead": "< 5% of wall time in GC under normal load",
+        "metaspace_growth": "Metaspace stable after warmup — growth after stabilization indicates classloader leak",
+        "concern": "JDK 28 EA is pre-release — production deployments should pin to a specific EA build tag"
+      }
+    },
+
+    "wine": {
+      "path": "userland/wine/",
+      "purpose": "Win32/Win64 API translation layer — enables execution of Windows PE binaries on Linux under JDesk Memory Proxy governance.",
+      "size_on_disk": "303 MB source",
+      "version": "Wine (latest — see userland/wine/VERSION)",
+      "status": "Source present — requires ./configure && make to build",
+
+      "architecture": {
+        "wineserver": "Daemon process that implements Windows kernel services (registry, synchronization objects, process/thread management)",
+        "ntdll.dll.so": "Windows NT layer — maps Windows syscalls to Linux syscalls",
+        "kernel32.dll.so": "Win32 base API",
+        "user32.dll.so": "Win32 window management — translated to X11 via Xlib",
+        "gdi32.dll.so": "Graphics Device Interface — rendered via X11/XRender",
+        "loader": "wine64 / wine — PE loader, sets up process address space"
+      },
+
+      "threading_model": {
+        "model": "Each Windows thread maps to a Linux thread. wineserver is single-threaded with select() event loop.",
+        "concerns": {
+          "THR_WINE_001": "wineserver is a single point of contention — all synchronization objects (mutexes, events, semaphores) go through it",
+          "THR_WINE_002": "Windows TLS (Thread Local Storage) implemented via pthread keys — max 64 keys per process",
+          "THR_WINE_003": "Windows fibers (cooperative coroutines) implemented with setjmp/longjmp — stack switching not signal-safe"
+        }
+      },
+
+      "message_passing": {
+        "windows_messages": "WM_* messages dispatched via wineserver message queue — translated by user32.dll.so",
+        "ipc_to_linux": "Windows named pipes mapped to Unix FIFOs; mailslots emulated in wineserver",
+        "dde": "Dynamic Data Exchange — legacy, emulated via wineserver"
+      },
+
+      "memory_model": {
+        "base_overhead": "~200MB RAM for wineserver + core DLLs on first launch",
+        "per_app_overhead": "Windows process address space starts at 0x400000 (32-bit) or 0x140000000 (64-bit)",
+        "memory_proxy_wrap": "libjdesk.so wraps wine invocation: java -memory-guard -Xguard:profile=windows-app wine <binary>"
+      },
+
+      "security_concerns": {
+        "SEC_WINE_001": "Wine does NOT sandbox the Windows application — a malicious .exe has full access to the Linux filesystem via Wine's drive_c mapping",
+        "SEC_WINE_002": "wine drive_c maps to ~/.wine/drive_c by default — symlink attacks can escape to host filesystem",
+        "SEC_WINE_003": "Windows DLL injection techniques work in Wine — a malicious PE can load arbitrary DLLs",
+        "SEC_WINE_004": "WINEPREFIX isolation — each application should use a separate WINEPREFIX to limit cross-app interference",
+        "SEC_WINE_005": "wineserver socket in /tmp/.wine-<uid>/ — must be mode 700 to prevent other users connecting to it",
+        "known_gap": "Memory Proxy wraps the wine process but cannot inspect what the Windows binary does inside its address space"
+      },
+
+      "normality_concerns": {
+        "first_launch_time": "5-15 seconds (wineserver startup + DLL loading)",
+        "subsequent_launch_time": "2-5 seconds (wineserver already running)",
+        "base_memory": "200-400MB overhead before the Windows app itself loads",
+        "concern": "Wine cannot run all Windows applications — driver-dependent software (DirectX 12, anticheat) will fail"
+      }
+    },
+
+    "darling": {
+      "path": "userland/darling/",
+      "purpose": "macOS API translation layer — enables execution of Mach-O binaries on Linux under JDesk Memory Proxy governance.",
+      "size_on_disk": "130 MB source",
+      "status": "Source present — CMake build required; GUI support experimental",
+      "maturity": "Less mature than Wine — CLI tools work reliably, GUI apps experimental",
+
+      "architecture": {
+        "dyld": "Dynamic linker — loads Mach-O binaries and their dylib dependencies",
+        "libSystem_B_dylib": "macOS libc equivalent — wraps Linux syscalls",
+        "CoreFoundation": "macOS base framework — strings, collections, run loops",
+        "AppKit_stubs": "Partial GUI framework stubs — enough for some GUI apps",
+        "kernel_module": "darling-mach.ko — Mach port IPC emulation in Linux kernel"
+      },
+
+      "threading_model": {
+        "model": "macOS GCD (Grand Central Dispatch) implemented via libdispatch on top of pthreads",
+        "concerns": {
+          "THR_DARL_001": "Mach port IPC emulated via darling-mach.ko — message passing between Mach threads goes through kernel module",
+          "THR_DARL_002": "macOS run loops (CFRunLoop) implemented in userspace — correct nesting required for GUI apps",
+          "THR_DARL_003": "Objective-C runtime (libobjc) thread safety — +initialize is not reentrant"
+        }
+      },
+
+      "memory_model": {
+        "base_overhead": "~150MB RAM for dyld + base frameworks",
+        "memory_proxy_wrap": "java -memory-guard -Xguard:profile=macos-app darling shell <binary>"
+      },
+
+      "security_concerns": {
+        "SEC_DARL_001": "Darling does NOT sandbox the macOS application — same Linux filesystem exposure as Wine",
+        "SEC_DARL_002": "darling-mach.ko runs in kernel space — a vulnerability in it is a kernel-level privilege escalation",
+        "SEC_DARL_003": "macOS code signing not enforced by Darling — unsigned Mach-O runs freely",
+        "SEC_DARL_004": "SIP (System Integrity Protection) not emulated — macOS apps that rely on SIP restrictions will behave differently",
+        "known_gap": "Darling is under active development — security model not audited for production use"
+      },
+
+      "normality_concerns": {
+        "cli_tool_launch": "1-3 seconds",
+        "gui_app_launch": "5-20 seconds or may fail — experimental",
+        "concern": "Any macOS app that calls IOKit, Core Audio, or Metal will fail — these are not yet implemented in Darling"
+      }
+    },
+
+    "chromium": {
+      "path": "userland/chromium/",
+      "purpose": "Full Chromium browser source — used headlessly by Dave (AI inference) and as a native desktop browser under JDesk.",
+      "size_on_disk": "5.5 GB (chromium-src/ — full checkout)",
+      "status": "Source present — requires depot_tools + ninja build (hours)",
+
+      "headless_usage": {
+        "consumer": "Dave (AI system) — headless Chromium for web scraping and inference context",
+        "flags": "--headless --no-sandbox --disable-gpu --remote-debugging-port=9222",
+        "jdesk_manifest": "browser.jdesk-app — /opt/jdesk/apps/chromium/chrome with --no-sandbox --disable-gpu-sandbox"
+      },
+
+      "threading_model": {
+        "model": "Multi-process architecture: Browser process + one Renderer process per tab + GPU process + Network service process",
+        "browser_process": "UI thread + IO thread + file thread",
+        "renderer_process": "Main thread (Blink) + compositor thread + worker threads (Web Workers)",
+        "concerns": {
+          "THR_CHR_001": "Each tab is a separate process — 10 open tabs = 10+ renderer processes = significant memory pressure",
+          "THR_CHR_002": "GPU process crash causes all renderers to repaint — visible freeze",
+          "THR_CHR_003": "--no-sandbox disables renderer process sandbox — a renderer exploit has full user-level access"
+        }
+      },
+
+      "security_concerns": {
+        "SEC_CHR_001": "--no-sandbox is required under JDesk (unprivileged user namespace restriction) — significantly reduces security",
+        "SEC_CHR_002": "Remote debugging port 9222 must only bind localhost — never 0.0.0.0",
+        "SEC_CHR_003": "Chromium auto-update disabled in source builds — security patches must be manually applied",
+        "SEC_CHR_004": "PDF viewer (PDFium) is an attack surface — PDFs from untrusted sources should open in isolated profile",
+        "SEC_CHR_005": "Extensions disabled by default in source build — if enabled, must vet extension manifest permissions"
+      },
+
+      "normality_concerns": {
+        "startup_time": "2-4 seconds cold start",
+        "memory_per_tab": "50-200MB per renderer process depending on page complexity",
+        "memory_proxy_limits": "ram-soft=1g ram-hard=4g threads=256 (browser.jdesk-app)",
+        "concern": "5.5GB source tree — incremental builds require depot_tools and significant disk/CPU"
+      }
+    },
+
+    "drm": {
+      "path": "userland/drm/",
+      "purpose": "Deferred DRM (Digital Rights Management) userspace module with filesystem-level access control integration.",
+      "size_on_disk": "68 KB",
+      "status": "Source present — Makefile builds drm.o and drm_kernel.o",
+
+      "key_files": [
+        "drm.c (17.5KB) — userspace DRM logic",
+        "drm_kernel.c (36KB) — kernel-interfacing DRM component",
+        "drm_fs.h (3.8KB) — filesystem integration header",
+        "Makefile — build rules"
+      ],
+
+      "threading_model": "Single-threaded enforcement at open/read/write intercept points",
+      "integration": "Hooks into VFS layer — integrates with negamane (immutability) and eperm (permission classes)",
+
+      "security_concerns": {
+        "SEC_DRM_001": "DRM enforcement must happen before data is decrypted and placed in page cache — enforce at VFS open() hook",
+        "SEC_DRM_002": "drm_kernel.c runs in kernel space — buffer overflow in DRM parsing is a kernel exploit",
+        "SEC_DRM_003": "DRM keys must not persist in kernel memory after session — explicit zeroing required",
+        "SEC_DRM_004": "Feature branch origin/feature/add-drm-deferred-remove — deferred remove path must not leave dangling references"
+      },
+
+      "normality_concerns": {
+        "check_latency": "< 1ms per file open for DRM validation",
+        "concern": "DRM in the VFS hot path adds latency to all file opens — profile before enabling on high-throughput paths"
+      }
+    },
+
+    "wallpapers": {
+      "path": "userland/wallpapers/ and wallpapers/ (root)",
+      "purpose": "Desktop wallpaper assets for JDesk and Galactic Cherry installer.",
+      "size_on_disk": "25 MB (userland/wallpapers) + ~250MB (wallpapers/ root — BMP exports)",
+
+      "userland_set": {
+        "format": "SVG (source) — vector, infinite resolution",
+        "count": "10 SVGs (Galactic Cherry theme: aurora-cherry, cherry-blossom-night, cherry-dawn, cherry-light, cherry-nebula, galaxy-core, galactic-cherry-default, minimal-dark, moonlit-ocean) + 10 JPEG renders",
+        "selection_xml": "userland/wallpapers/galactic-cherry.xml — GNOME-format wallpaper rotation config"
+      },
+
+      "root_set": {
+        "format": "JPEG + BMP + SVG — Jessica Jones themed (14 scenes)",
+        "bmp_size": "24,883,254 bytes each (1920x1080 24-bit BMP — uncompressed)",
+        "scenes": "01-hellskitchen, 02-office-noir, 03-shattered-glass, 04-rooftop-vigil, 05-dark-alley, 06-surveillance, 07-portrait-noir, 08-portrait-defenders, 09-portrait-full-hd, 10-portrait-dark, 11-dinner-russian, 12-evening-city-view, 13-terrace-sunset, 14-cocktail-bar"
+      },
+
+      "jdesk_usage": "JDesk loads wallpaper from /opt/jdesk/wallpapers/ at startup — SVG preferred, JPEG fallback",
+
+      "normality_concerns": {
+        "concern": "BMP wallpapers are 24MB each — loading 14 into memory simultaneously would consume 336MB. Load one at a time."
+      }
+    }
+  },
+
+  "threading_architecture": {
+    "model": "Multi-process userland. Each component is a separate process or JVM. No shared memory between JDesk/NWE/Chromium by default.",
+    "process_map": {
+      "jdesk_jvm": "JDesk JavaFX process — PID managed by systemd or xinitrc",
+      "nwe_jvm": "NitroWebExpress JVM — managed by systemd nwe.service",
+      "chromium_browser": "Multi-process Chromium — browser process + N renderer processes",
+      "chromium_dave": "Headless Chromium — single renderer, remote debug on :9222",
+      "wineserver": "Wine daemon — one per WINEPREFIX",
+      "darling_shell": "Darling shell — spawned per-app invocation",
+      "apache2": "Multi-process (prefork) or multi-threaded (worker) — fronts NWE",
+      "tomcat": "Embedded in NWE JVM — not a separate process",
+      "mysql": "mysqld — separate daemon, socket /var/run/mysqld/mysqld.sock",
+      "xserver": "Xorg — single process, multi-client via sockets"
+    },
+    "inter_process_communication": {
+      "jdesk_to_x11": "Xlib/XCB over Unix socket /tmp/.X11-unix/X0",
+      "jdesk_to_native_apps": "ProcessBuilder — launch and monitor only, no ongoing IPC",
+      "nwe_to_mysql": "JDBC over Unix socket",
+      "nwe_to_apache": "AJP connector (port 8009) or HTTP reverse proxy",
+      "chromium_internal": "Mojo IPC (Chrome's internal IPC — shared memory + message pipes)",
+      "dave_to_chromium": "Chrome DevTools Protocol over WebSocket :9222",
+      "jdesk_to_nwe": "HTTP REST or telnet TUI (port 23) — no direct IPC"
+    },
+    "synchronization_primitives_used": {
+      "java_level": "java.util.concurrent (ExecutorService, CompletableFuture, AtomicReference)",
+      "javafx_level": "Platform.runLater() for cross-thread scene graph updates",
+      "native_level": "pthreads (mutex, rwlock, cond) in libjdesk.so",
+      "x11_level": "XLockDisplay/XUnlockDisplay when multiple threads use same Display*"
+    }
+  },
+
+  "message_passing_architecture": {
+    "intra_jvm_nwe": {
+      "module_api": "Direct Java method calls — modules implement NWE module interface",
+      "event_bus": "NWE internal event bus (custom) for module-to-module notifications",
+      "database_bus": "MySQL jvm_operand — shared state for multi-JVM observer circuit"
+    },
+    "intra_jvm_jdesk": {
+      "javafx_events": "Node event system — mouse, key, action events bubble up scene graph",
+      "process_monitor": "Daemon thread per launched app — communicates exit code back via shared AtomicReference",
+      "native_callbacks": "JNI callbacks from libjdesk.so — dispatched to Platform.runLater() queue"
+    },
+    "cross_process": {
+      "nwe_to_client": "HTTP/HTTPS responses, WebSocket frames, telnet line protocol",
+      "dave_protocol": "Chrome DevTools Protocol (CDP) — JSON-RPC over WebSocket",
+      "kernel_to_user": "Standard Linux mechanisms: /proc, signals, netlink, uevent (via udev)"
+    }
+  },
+
+  "security_checklist": {
+    "process_isolation": {
+      "ISO_001": "JDesk JVM and NWE JVM are separate processes — a crash in one does not take down the other",
+      "ISO_002": "Wine and Darling apps run as separate processes — Memory Proxy can kill them without affecting JDesk",
+      "ISO_003": "Chromium renderer processes are isolated from browser process via seccomp (when sandbox enabled)",
+      "ISO_004": "MySQL runs as mysql user — NWE connects as least-privilege jvm user",
+      "ISO_005": "X11 display isolation — JDesk runs on :0; any other X clients on same display can capture screen/keys (see SEC_X11_002/003)"
+    },
+    "privilege_boundaries": {
+      "PRV_001": "JDesk runs as user mearvk — no root privileges required at runtime",
+      "PRV_002": "jdesk-provision runs as mearvk with sudo for apt-get only — sudo configuration must be scoped",
+      "PRV_003": "kali-provision installs pentest tools — must not grant those tools SUID/SGID bits",
+      "PRV_004": "wineserver socket — accessible only to mearvk (mode 700 /tmp/.wine-1000/)",
+      "PRV_005": "darling-mach.ko — loaded by root at boot; exposes /dev/mach to the mearvk user only"
+    },
+    "data_flow_validation": {
+      "DFV_001": ".jdesk-app manifest binary path — must be validated against allowlist before exec()",
+      "DFV_002": "NWE HTTP input — all user-supplied parameters validated and sanitized before database queries (parameterized only)",
+      "DFV_003": "Telnet TUI input — command parsing must handle NUL bytes, long lines, and control characters",
+      "DFV_004": "jvm-config.xml — parsed at JVM startup with root permissions; XML injection must be prevented (DTD disabled)",
+      "DFV_005": "Chromium --remote-debugging-port 9222 — must bind 127.0.0.1 only; SSRF from NWE could reach it"
+    },
+    "secrets_management": {
+      "SEC_SM_001": "MySQL password must not appear in jvm-config.xml or any committed file — use secrets injection at deploy time",
+      "SEC_SM_002": "SSH private keys for observer circuit — stored in /etc/jdesk/ssh/, mode 600, owned root",
+      "SEC_SM_003": "XAUTHORITY — mode 600, stored in /tmp/ with mktemp, not committed",
+      "SEC_SM_004": "GitHub PAT — must be invalidated after use in CLI; never stored in git config",
+      "SEC_SM_005": "Heap dumps at /var/log/jvm/ — may contain in-memory secrets; rotate and encrypt at rest"
+    }
+  },
+
+  "normality_concerns": {
+    "system_wide": {
+      "total_memory_budget": {
+        "jdesk_jvm": "512MB–2GB depending on open apps",
+        "nwe_jvm": "512MB–1.5GB",
+        "chromium": "200MB–1GB (headless Dave) or 500MB–4GB (desktop browser)",
+        "wine_overhead": "200–400MB per active Windows app",
+        "darling_overhead": "150–300MB per active macOS app",
+        "xserver": "50–200MB",
+        "mysql": "256MB–1GB",
+        "total_comfortable": "8GB RAM minimum for full stack with 2-3 open apps",
+        "concern": "16GB RAM recommended if running JDesk + NWE + Chromium + one Wine app simultaneously"
+      },
+      "disk_io_norms": {
+        "nwe_database_writes": "< 10MB/s sustained normal",
+        "chromium_cache": "< 500MB cache dir growth per day",
+        "jvm_heap_dump": "Heap dump to /var/log/jvm/ can be 1-4GB — ensure disk space before enabling HeapDumpOnOutOfMemoryError",
+        "wine_prefix": "~500MB per WINEPREFIX after typical app install"
+      },
+      "process_count_norms": {
+        "jdesk_running": "1 JVM + up to 6 native app processes",
+        "chromium_running": "1 browser + 1-N renderer processes (one per tab) + 1 GPU + 1 network",
+        "wine_running": "1 wineserver + 1 wine process per Windows app",
+        "total_normal": "15-30 user processes under typical load",
+        "concern": "Process count above 100 under normal usage suggests a runaway process or fork bomb"
+      }
+    }
+  },
+
+  "counts": {
+    "userland_components": 11,
+    "total_source_size_gb": "~11.7GB (chromium 5.5GB dominates)",
+    "java_source_files_nwe": 4654,
+    "intellij_community_files": 279065,
+    "deployed_jdesk_manifests": 4,
+    "deployed_kali_tools": 25,
+    "wallpapers_total": 38,
+    "native_libraries_built": ["libjdesk.so (32KB, x86-64-v3/AVX2)"],
+    "jvm_instances_at_runtime": 2,
+    "processes_at_full_runtime": "~25-40",
+    "mysql_databases": ["N21 (NWE application data)", "jvm_operand (observer circuit)"],
+    "open_ports": {
+      "22": "SSH (system)",
+      "23": "NWE telnet TUI",
+      "80": "Apache HTTP",
+      "443": "Apache HTTPS",
+      "2222": "JVM observer circuit SSH",
+      "2223": "JVM observer circuit telnet (localhost only)",
+      "3306": "MySQL (localhost only)",
+      "8080": "Tomcat HTTP",
+      "8443": "Tomcat HTTPS",
+      "9222": "Chromium DevTools Protocol (localhost only)"
+    }
+  },
+
+  "build_order": {
+    "step_1": "ubuntu-base — extract rootfs tarball to /mnt/rootfs",
+    "step_2": "x11 — build xorg-server + libs (make -C userland/x11/)",
+    "step_3": "openjdk — extract boot-jdk-27, build openjdk-28 from source",
+    "step_4": "jdesk native — JAVA_HOME=... make -C userland/jdesk/native/linux/",
+    "step_5": "jdesk java — compile JDeskApp + DesktopIconGrid + NativeAppLauncher with JavaFX 11",
+    "step_6": "nwe — ant compile -f userland/java-web-server/build.xml",
+    "step_7": "wine — ./configure && make -j$(nproc) (in userland/wine/)",
+    "step_8": "darling — cmake .. && make -j$(nproc) (in userland/darling/build/)",
+    "step_9": "chromium — fetch chromium && autoninja -C out/Default chrome (hours)",
+    "step_10": "provision — sudo userland/jdesk/native-apps/scripts/install-natives.sh",
+    "step_11": "deploy — sudo cp manifests/icons/profiles to /opt/jdesk/"
+  }
+}
