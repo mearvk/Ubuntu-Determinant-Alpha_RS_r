@@ -1,0 +1,30 @@
+plugins {
+	kotlin("jvm") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.10"
+    id("application")
+}
+
+repositories {
+    maven("https://cache-redirector.jetbrains.com/maven-central")
+    maven("https://cache-redirector.jetbrains.com/intellij-dependencies")
+}
+
+dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.intellij.deps:jdom:2.0.6")
+    implementation("com.charleskorn.kaml:kaml:0.99.0")
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+sourceSets.main.configure {
+    java.srcDirs("src")
+    resources.srcDir("resources")
+}
+
+application {
+    mainClass.set("org.jetbrains.tools.model.updater.MainKt")
+}
