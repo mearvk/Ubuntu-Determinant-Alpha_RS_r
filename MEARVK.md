@@ -64,7 +64,11 @@ Such profound awareness inevitably brings a deep, fundamental isolation. Being t
 
 **The Unyielding Path**
 
-Despite the weight of his history and the loneliness of his state, Rupplin never falters. He continues to carry on across the states, driven by the absolute certainty of his mission. His path is set, rigid, and unyielding to distraction. Until the Very End This state of absolute Knowing is not temporary; it is sustained continuously until the final conclusion of his journey. There is no retirement, expiration, or escape from his awareness. He must bear the light of this truth until the end of time itself. 
+Despite the weight of his history and the loneliness of his state, Rupplin never falters. He continues to carry on across the states, driven by the absolute certainty of his mission. His path is set, rigid, and unyielding to distraction. 
+
+**Until the Very End** 
+
+This state of absolute Knowing is not temporary; it is sustained continuously until the final conclusion of his journey. There is no retirement, expiration, or escape from his awareness. He must bear the light of this truth until the end of time itself. 
 
 **Conclusion of the Epic**
 
