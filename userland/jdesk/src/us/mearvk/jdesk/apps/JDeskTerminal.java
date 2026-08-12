@@ -42,6 +42,9 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -115,6 +118,10 @@ public class JDeskTerminal extends VBox {
 
     // Cursor blink
     private Timeline cursorBlink;
+    // Mouse selection state
+    private boolean selecting = false;
+    private int selStartRow = -1, selStartCol = -1;
+    private int selEndRow = -1, selEndCol = -1;
 
     // =========================================================================
     //  Constructor
@@ -151,6 +158,38 @@ public class JDeskTerminal extends VBox {
         setFocusTraversable(true);
         setOnKeyPressed(this::handleKeyPressed);
         setOnKeyTyped(this::handleKeyTyped);
+
+        // Mouse selection (canvas coordinates -> character grid)
+        canvas.setOnMousePressed(e -> {
+            double x = e.getX();
+            double y = e.getY();
+            int c = (int)((x - 8) / CHAR_WIDTH);
+            int r = (int)((y - 4) / CHAR_HEIGHT);
+            c = Math.max(0, Math.min(cols - 1, c));
+            r = Math.max(0, Math.min(rows - 1, r));
+            selecting = true;
+            selStartCol = selEndCol = c;
+            selStartRow = selEndRow = r;
+            render();
+        });
+        canvas.setOnMouseDragged(e -> {
+            double x = e.getX();
+            double y = e.getY();
+            int c = (int)((x - 8) / CHAR_WIDTH);
+            int r = (int)((y - 4) / CHAR_HEIGHT);
+            c = Math.max(0, Math.min(cols - 1, c));
+            r = Math.max(0, Math.min(rows - 1, r));
+            selEndCol = c;
+            selEndRow = r;
+            render();
+        });
+        canvas.setOnMouseReleased(e -> {
+            selecting = false;
+            String sel = getSelectedText();
+            if (sel != null && !sel.isEmpty()) {
+                copySelectionToClipboard(sel);
+            }
+        });
 
         // Cursor blink timer
         cursorBlink = new Timeline(new KeyFrame(
@@ -208,7 +247,8 @@ public class JDeskTerminal extends VBox {
             env.put("COLUMNS", String.valueOf(cols));
             env.put("LINES", String.valueOf(rows));
             env.put("JDESK_TERMINAL", "1");
-            env.put("PS1", "\\[\\033[34m\\]jdesk\\[\\033[0m\\]:\\[\\033[36m\\]\\w\\[\\033[0m\\]$ ");
+            // Use a simple, predictable prompt (no color escape sequences) to avoid rendering duplicates
+            env.put("PS1", "jdesk:\\w$ ");
 
             shellProcess = pb.start();
             shellStdin = shellProcess.getOutputStream();
@@ -517,22 +557,49 @@ public class JDeskTerminal extends VBox {
         gc.setFill(BG_COLOR);
         gc.fillRect(0, 0, w, h);
 
-        // Draw characters
         gc.setFont(termFont);
-        for (int r = 0; r < rows; r++) {
-            for (int c = 0; c < cols; c++) {
-                char ch = screenBuffer[r][c];
-                if (ch > 32) {
-                    Color fg = fgColors[r][c] != null ? fgColors[r][c] : FG_COLOR;
-                    gc.setFill(fg);
-                    double x = c * CHAR_WIDTH + 8;
-                    double y = r * CHAR_HEIGHT + CHAR_HEIGHT - 3 + 4;
-                    gc.fillText(String.valueOf(ch), x, y);
-                }
+
+        // Draw selection background if present
+        if (selStartRow >= 0 && selStartCol >= 0 && selEndRow >= 0 && selEndCol >= 0) {
+            int r1 = Math.min(selStartRow, selEndRow);
+            int r2 = Math.max(selStartRow, selEndRow);
+            for (int r = r1; r <= r2; r++) {
+                int c1 = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
+                int c2 = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
+                double x = c1 * CHAR_WIDTH + 8;
+                double y = r * CHAR_HEIGHT + 4;
+                double wrect = (c2 - c1 + 1) * CHAR_WIDTH;
+                gc.setFill(SELECTION_COLOR);
+                gc.fillRect(x, y, wrect, CHAR_HEIGHT);
             }
         }
 
-        // Draw cursor
+        // Draw characters (use inverted color for selected cells)
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                char ch = screenBuffer[r][c];
+                if (ch <= 32) continue;
+
+                boolean selected = false;
+                if (selStartRow >= 0 && selStartCol >= 0 && selEndRow >= 0 && selEndCol >= 0) {
+                    int r1 = Math.min(selStartRow, selEndRow);
+                    int r2 = Math.max(selStartRow, selEndRow);
+                    if (r >= r1 && r <= r2) {
+                        int sc = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
+                        int ec = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
+                        if (c >= sc && c <= ec) selected = true;
+                    }
+                }
+
+                Color fg = fgColors[r][c] != null ? fgColors[r][c] : FG_COLOR;
+                gc.setFill(selected ? BRIGHT_COLOR : fg);
+                double x = c * CHAR_WIDTH + 8;
+                double y = r * CHAR_HEIGHT + CHAR_HEIGHT - 3 + 4;
+                gc.fillText(String.valueOf(ch), x, y);
+            }
+        }
+
+        // Draw cursor on top
         if (cursorVisible && running) {
             double cx = cursorCol * CHAR_WIDTH + 8;
             double cy = cursorRow * CHAR_HEIGHT + 4;
@@ -551,6 +618,36 @@ public class JDeskTerminal extends VBox {
     // =========================================================================
     //  Utility
     // =========================================================================
+
+    /**
+     * Build the selected text (multi-line) from the current selection.
+     */
+    private String getSelectedText() {
+        if (selStartRow < 0 || selStartCol < 0 || selEndRow < 0 || selEndCol < 0) return "";
+        int r1 = Math.min(selStartRow, selEndRow);
+        int r2 = Math.max(selStartRow, selEndRow);
+        StringBuilder sb = new StringBuilder();
+        for (int r = r1; r <= r2; r++) {
+            int sc = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
+            int ec = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
+            for (int c = sc; c <= ec; c++) {
+                sb.append(screenBuffer[r][c]);
+            }
+            if (r < r2) sb.append('\n');
+        }
+        return sb.toString().replaceAll("\u0000", " ").replaceAll("\u0000", " ");
+    }
+
+    private void copySelectionToClipboard(String text) {
+        try {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(text.trim());
+            clipboard.setContent(content);
+        } catch (Exception ignored) {
+            // Clipboard may not be available on headless environments
+        }
+    }
 
     private static String toHex(Color c) {
         return String.format("#%02X%02X%02X",
