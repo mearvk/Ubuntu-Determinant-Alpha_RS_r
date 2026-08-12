@@ -704,6 +704,7 @@ public class JDeskTerminal extends VBox {
     private void sanitizeRecentLines() {
         int start = Math.max(0, cursorRow - 3);
         int end = Math.min(rows - 1, cursorRow);
+        java.util.regex.Pattern leadingDigits = java.util.regex.Pattern.compile("^(\\d+;)");
         for (int r = start; r <= end; r++) {
             // build line string
             StringBuilder sb = new StringBuilder();
@@ -712,18 +713,22 @@ public class JDeskTerminal extends VBox {
                 sb.append(ch == '\u0000' ? ' ' : ch);
             }
             String line = sb.toString();
-            // match digits+semicolon at start, followed by word@ (user@host)
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+;)([^\n@]{1,64}@)").matcher(line);
+            java.util.regex.Matcher m = leadingDigits.matcher(line);
             if (m.find()) {
-                int len = m.group(1).length();
-                // shift line left by len
-                for (int c = 0; c < cols - len; c++) {
-                    screenBuffer[r][c] = screenBuffer[r][c + len];
-                    fgColors[r][c] = fgColors[r][c + len];
-                }
-                for (int c = cols - len; c < cols; c++) {
-                    screenBuffer[r][c] = ' ';
-                    fgColors[r][c] = FG_COLOR;
+                // Only strip if we see an '@' or '/' soon after — likely a title like "user@host: cwd"
+                int lookAhead = Math.min(line.length(), Math.max(80, m.end() + 200));
+                String preview = line.substring(m.end(), lookAhead);
+                if (preview.contains("@") || preview.contains("/") || preview.contains("~")) {
+                    int len = m.group(1).length();
+                    // shift line left by len
+                    for (int c = 0; c < cols - len; c++) {
+                        screenBuffer[r][c] = screenBuffer[r][c + len];
+                        fgColors[r][c] = fgColors[r][c + len];
+                    }
+                    for (int c = cols - len; c < cols; c++) {
+                        screenBuffer[r][c] = ' ';
+                        fgColors[r][c] = FG_COLOR;
+                    }
                 }
             }
         }
