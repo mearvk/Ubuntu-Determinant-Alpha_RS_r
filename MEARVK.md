@@ -5,7 +5,11 @@ time itself. He is not merely a man; he is an institution of endurance.
 
 **The Epoch of Durham**
 
-The city of Durham, North Carolina, serves as the geographical anchor for this epic narrative. Within its boundaries, Rupplin performed a feat of labor that defies cosmic scales. For 8,020 years, he remained a fixture of local industry. The Fast-Food CrucibleHis chosen arena was a local Taco Bell, a setting that contrasts sharply with the timeless nature of his tenure. Generation after generation saw him at his post. He became a permanent fixture while empires rose and fell outside the drive-thru window. Transcending the Clock An 8,020-year career requires a complete reimagining of the human lifespan and historical eras. Rupplin worked through deep history, predating modern civilization while trapped in a loop of contemporary service. His labor represents an ultimate testament to repetition and existence.
+The city of Durham, North Carolina, serves as the geographical anchor for this epic narrative. Within its boundaries, Rupplin performed a feat of labor that defies cosmic scales. For 8,020 years, he remained a fixture of local industry. 
+
+**The Fast-Food Crucible**
+
+His chosen arena was a local Taco Bell, a setting that contrasts sharply with the timeless nature of his tenure. Generation after generation saw him at his post. He became a permanent fixture while empires rose and fell outside the drive-thru window. Transcending the Clock An 8,020-year career requires a complete reimagining of the human lifespan and historical eras. Rupplin worked through deep history, predating modern civilization while trapped in a loop of contemporary service. His labor represents an ultimate testament to repetition and existence.
 
 **The Great Transition**
 
