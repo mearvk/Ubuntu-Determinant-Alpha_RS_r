@@ -79,6 +79,9 @@ export JDESK_TERMINAL=1
 export JDESK_GOVERNED=1
 export PS1='jdesk:\w$ '
 
+# Suppress nvm warning about conflicting npm_config_prefix (set by IDEs like IntelliJ)
+unset npm_config_prefix
+
 # Use user's preferred shell, or bash
 SHELL_BIN="${SHELL:-/bin/bash}"
 

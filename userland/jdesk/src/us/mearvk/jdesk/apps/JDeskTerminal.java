@@ -52,6 +52,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.geometry.Insets;
 import javafx.animation.*;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -128,10 +130,18 @@ public class JDeskTerminal extends VBox {
     // Cursor blink
     private Timeline cursorBlink;
     private boolean mouseDiagInstalled = false;
-    // Mouse selection state
+    
+    // Mouse selection state — formalized line-based selection
+    // Selection is always by complete lines: [selStartLine, selEndLine] inclusive
+    // Columns are always: start at 0, end at EOL (full line selection)
+    // Selection is clamped to [0, promptLine] so it never extends below prompt
     private boolean selecting = false;
-    private int selStartRow = -1, selStartCol = -1;
-    private int selEndRow = -1, selEndCol = -1;
+    private int selStartLine = -1;  // Line index where selection starts (0 to promptLine)
+    private int selEndLine = -1;    // Line index where selection ends (0 to promptLine)
+    private int promptLine = -1;    // Current prompt line (row where input is being entered; updated on newline)
+    
+    // Callback when terminal should close (e.g., after 'exit' command)
+    private Runnable onTerminalClose = null;
 
     // =========================================================================
     //  Constructor
@@ -192,38 +202,47 @@ public class JDeskTerminal extends VBox {
         setOnKeyPressed(this::handleKeyPressed);
         setOnKeyTyped(this::handleKeyTyped);
 
-        // Mouse selection (canvas coordinates -> character grid)
+        // Mouse selection (line-based, clamped to prompt line)
         canvas.setFocusTraversable(true);
         canvas.setOnMousePressed(e -> {
             // Ensure canvas owns focus for keyboard input after click
             canvas.requestFocus();
-            double x = e.getX();
             double y = e.getY();
-            int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
             int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
-            c = Math.max(0, Math.min(cols - 1, c));
             r = Math.max(0, Math.min(rows - 1, r));
-            if (e.isShiftDown() && selStartRow >= 0) {
-                // extend selection
-                selEndCol = c;
-                selEndRow = r;
+            // Clamp to prompt line: selection never extends below the prompt
+            r = Math.min(r, promptLine >= 0 ? promptLine : rows - 1);
+            
+            if (e.isShiftDown() && selStartLine >= 0) {
+                // Extend selection to this line
+                selEndLine = r;
             } else {
+                // Start new line-based selection
                 selecting = true;
-                selStartCol = selEndCol = c;
-                selStartRow = selEndRow = r;
+                selStartLine = selEndLine = r;
+            }
+            // Normalize so start is always <= end
+            if (selStartLine > selEndLine) {
+                int tmp = selStartLine;
+                selStartLine = selEndLine;
+                selEndLine = tmp;
             }
             render();
             e.consume();
         });
         canvas.setOnMouseDragged(e -> {
-            double x = e.getX();
             double y = e.getY();
-            int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
             int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
-            c = Math.max(0, Math.min(cols - 1, c));
             r = Math.max(0, Math.min(rows - 1, r));
-            selEndCol = c;
-            selEndRow = r;
+            // Clamp to prompt line
+            r = Math.min(r, promptLine >= 0 ? promptLine : rows - 1);
+            selEndLine = r;
+            // Normalize so start is always <= end
+            if (selStartLine > selEndLine) {
+                int tmp = selStartLine;
+                selStartLine = selEndLine;
+                selEndLine = tmp;
+            }
             render();
             e.consume();
         });
@@ -235,23 +254,22 @@ public class JDeskTerminal extends VBox {
             }
             e.consume();
         });
-        // Double-click selects word
+        // Double-click selects entire line; right-click shows context menu
         canvas.setOnMouseClicked(e -> {
+            if (e.getButton() == MouseButton.SECONDARY) {
+                // Right-click: show context menu
+                showContextMenu(e.getScreenX(), e.getScreenY());
+                e.consume();
+                return;
+            }
             if (e.getClickCount() == 2) {
-                double x = e.getX();
                 double y = e.getY();
-                int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
                 int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
-                c = Math.max(0, Math.min(cols - 1, c));
                 r = Math.max(0, Math.min(rows - 1, r));
-                // expand to word boundaries
-                int sc = c, ec = c;
-                char ch;
-                while (sc > 0 && (ch = screenBuffer[r][sc - 1]) > 32) sc--;
-                while (ec < cols - 1 && (ch = screenBuffer[r][ec + 1]) > 32) ec++;
-                selStartRow = selEndRow = r;
-                selStartCol = sc;
-                selEndCol = ec;
+                // Clamp to prompt line
+                r = Math.min(r, promptLine >= 0 ? promptLine : rows - 1);
+                // Select entire line
+                selStartLine = selEndLine = r;
                 String sel = getSelectedText();
                 if (sel != null && !sel.isEmpty()) copySelectionToClipboard(sel);
                 render();
@@ -271,6 +289,13 @@ public class JDeskTerminal extends VBox {
 
         // Initial render
         render();
+
+        // Emit a startup sentinel to /tmp so we can confirm the class loaded even without UI interaction
+        try {
+            Path p = Paths.get("/tmp/jdesk-mouse.log");
+            String line = "[JDeskTerminal] constructed pid=" + ProcessHandle.current().pid() + " ts=" + System.currentTimeMillis();
+            Files.write(p, (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ignored) {}
     }
 
     // =========================================================================
@@ -318,6 +343,8 @@ public class JDeskTerminal extends VBox {
             // Use a simple, predictable prompt (no color escape sequences) to avoid rendering duplicates
             // Place the visible prompt on its own line to avoid mixed title-setting escape artifacts
             env.put("PS1", "\njdesk:\\w$ ");
+            // Suppress nvm warning about conflicting npm_config_prefix (set by IDEs like IntelliJ)
+            env.remove("npm_config_prefix");
 
             shellProcess = pb.start();
             shellStdin = shellProcess.getOutputStream();
@@ -352,6 +379,11 @@ public class JDeskTerminal extends VBox {
         if (shellProcess != null && shellProcess.isAlive()) {
             shellProcess.destroyForcibly();
         }
+    }
+
+    /** Set a callback to be invoked when the terminal should close (e.g., after shell exit) */
+    public void setOnTerminalClose(Runnable callback) {
+        this.onTerminalClose = callback;
     }
 
     /**
@@ -401,7 +433,19 @@ public class JDeskTerminal extends VBox {
             appendLine("");
             appendLine("[Process exited]");
             render();
+            // Invoke close callback after a short delay to allow user to see the exit message
+            if (onTerminalClose != null) {
+                Timeline delayClose = new Timeline(new KeyFrame(
+                    javafx.util.Duration.seconds(2),
+                    e -> onTerminalClose.run()
+                ));
+                delayClose.setCycleCount(1);
+                delayClose.play();
+            }
         });
+        
+        // Mark terminal as stopped
+        running = false;
     }
 
     /**
@@ -455,6 +499,13 @@ public class JDeskTerminal extends VBox {
                         i = text.length();
                         break;
                     } else {
+                        // Check if this was a clear screen sequence (ESC [ 2 J)
+                        String seq = text.substring(i, res + 1);
+                        if (seq.equals("\033[2J")) {
+                            clearScreen();
+                            cursorCol = 0;
+                            cursorRow = 0;
+                        }
                         i = res;
                     }
                     break;
@@ -526,6 +577,8 @@ public class JDeskTerminal extends VBox {
             scrollUp();
             cursorRow = rows - 1;
         }
+        // Update prompt line to current line (where the next prompt will appear)
+        promptLine = cursorRow;
     }
 
     private void scrollUp() {
@@ -677,16 +730,14 @@ public class JDeskTerminal extends VBox {
 
         gc.setFont(termFont);
 
-        // Draw selection background if present
-        if (selStartRow >= 0 && selStartCol >= 0 && selEndRow >= 0 && selEndCol >= 0) {
-            int r1 = Math.min(selStartRow, selEndRow);
-            int r2 = Math.max(selStartRow, selEndRow);
+        // Draw selection background if present (line-based: complete lines from col 0 to cols-1)
+        if (selStartLine >= 0 && selEndLine >= 0) {
+            int r1 = Math.min(selStartLine, selEndLine);
+            int r2 = Math.max(selStartLine, selEndLine);
             for (int r = r1; r <= r2; r++) {
-                int c1 = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
-                int c2 = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
-                double x = c1 * CHAR_WIDTH + 8;
+                double x = 0 * CHAR_WIDTH + 8;
                 double y = r * CHAR_HEIGHT + 4;
-                double wrect = (c2 - c1 + 1) * CHAR_WIDTH;
+                double wrect = cols * CHAR_WIDTH;
                 gc.setFill(SELECTION_COLOR);
                 gc.fillRect(x, y, wrect, CHAR_HEIGHT);
             }
@@ -698,14 +749,13 @@ public class JDeskTerminal extends VBox {
                 char ch = screenBuffer[r][c];
                 if (ch < 32) continue;
 
+                // Check if this cell is in the selection range (line-based)
                 boolean selected = false;
-                if (selStartRow >= 0 && selStartCol >= 0 && selEndRow >= 0 && selEndCol >= 0) {
-                    int r1 = Math.min(selStartRow, selEndRow);
-                    int r2 = Math.max(selStartRow, selEndRow);
+                if (selStartLine >= 0 && selEndLine >= 0) {
+                    int r1 = Math.min(selStartLine, selEndLine);
+                    int r2 = Math.max(selStartLine, selEndLine);
                     if (r >= r1 && r <= r2) {
-                        int sc = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
-                        int ec = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
-                        if (c >= sc && c <= ec) selected = true;
+                        selected = true;
                     }
                 }
 
@@ -738,22 +788,23 @@ public class JDeskTerminal extends VBox {
     // =========================================================================
 
     /**
-     * Build the selected text (multi-line) from the current selection.
+     * Build the selected text from the line-based selection [selStartLine, selEndLine].
+     * Selection always includes complete lines from column 0 to end.
      */
     private String getSelectedText() {
-        if (selStartRow < 0 || selStartCol < 0 || selEndRow < 0 || selEndCol < 0) return "";
-        int r1 = Math.min(selStartRow, selEndRow);
-        int r2 = Math.max(selStartRow, selEndRow);
+        if (selStartLine < 0 || selEndLine < 0) return "";
+        int r1 = Math.min(selStartLine, selEndLine);
+        int r2 = Math.max(selStartLine, selEndLine);
         StringBuilder sb = new StringBuilder();
         for (int r = r1; r <= r2; r++) {
-            int sc = (r == r1) ? Math.min(selStartCol, selEndCol) : 0;
-            int ec = (r == r2) ? Math.max(selStartCol, selEndCol) : cols - 1;
-            for (int c = sc; c <= ec; c++) {
-                sb.append(screenBuffer[r][c]);
+            // Each line: columns 0 to cols-1 (complete line)
+            for (int c = 0; c < cols; c++) {
+                char ch = screenBuffer[r][c];
+                sb.append(ch == '\u0000' ? ' ' : ch);
             }
             if (r < r2) sb.append('\n');
         }
-        return sb.toString().replaceAll("\u0000", " ").replaceAll("\u0000", " ");
+        return sb.toString().trim();
     }
 
     private void copySelectionToClipboard(String text) {
@@ -767,15 +818,66 @@ public class JDeskTerminal extends VBox {
         }
     }
 
-    /** Select the entire visible buffer and copy to clipboard */
+    /** Select the entire visible buffer (all lines) and copy to clipboard */
     private void selectAll() {
-        selStartRow = 0;
-        selStartCol = 0;
-        selEndRow = rows - 1;
-        selEndCol = cols - 1;
+        selStartLine = 0;
+        selEndLine = promptLine >= 0 ? promptLine : rows - 1;
         String s = getSelectedText();
         if (s != null && !s.isEmpty()) copySelectionToClipboard(s);
         render();
+    }
+
+    /** Show right-click context menu with Copy and Paste options (only if applicable) */
+    private void showContextMenu(double screenX, double screenY) {
+        ContextMenu menu = new ContextMenu();
+        
+        // Check if text is selected
+        String selectedText = getSelectedText();
+        boolean hasSelection = selectedText != null && !selectedText.isEmpty();
+        
+        // Check if clipboard has content
+        boolean clipboardHasText = false;
+        try {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            clipboardHasText = clipboard.hasString();
+        } catch (Exception ignored) {
+            // Clipboard unavailable
+        }
+        
+        // Only add Copy if text is selected
+        if (hasSelection) {
+            MenuItem copyItem = new MenuItem("Copy");
+            copyItem.setOnAction(e -> copySelectionToClipboard(selectedText));
+            menu.getItems().add(copyItem);
+        }
+        
+        // Only add Paste if clipboard has text
+        if (clipboardHasText) {
+            MenuItem pasteItem = new MenuItem("Paste");
+            pasteItem.setOnAction(e -> pasteFromClipboard());
+            menu.getItems().add(pasteItem);
+        }
+        
+        // Only show menu if there are items to display
+        if (!menu.getItems().isEmpty()) {
+            menu.show(canvas, screenX, screenY);
+        }
+    }
+
+    /** Paste text from system clipboard to the shell */
+    private void pasteFromClipboard() {
+        try {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            if (clipboard.hasString()) {
+                String text = clipboard.getString();
+                if (text != null && !text.isEmpty() && shellStdin != null) {
+                    shellStdin.write(text.getBytes(StandardCharsets.UTF_8));
+                    shellStdin.flush();
+                }
+            }
+        } catch (Exception ignored) {
+            // Clipboard may not be available; silently ignore
+        }
     }
 
     /**

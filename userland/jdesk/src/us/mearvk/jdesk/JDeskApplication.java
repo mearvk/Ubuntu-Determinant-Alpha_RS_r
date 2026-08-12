@@ -76,6 +76,15 @@ public class JDeskApplication extends Application {
         // === Root Layout ===
         root = new BorderPane();
 
+        // Startup sentinel: write an early marker so external scripts know the JavaFX app started
+        try {
+            String ts = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            Files.writeString(Paths.get("/tmp/jdesk-startup.log"), ts + " JDeskApplication.start invoked\n",
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException ignored) {
+            // Best-effort only
+        }
+
         // === Desktop Surface (center) ===
         desktopSurface = new Pane();
         desktopSurface.setStyle(
@@ -741,6 +750,12 @@ public class JDeskApplication extends Application {
         // Enable edge/corner resize
         enableWindowResize(termWindow, 400, 200);
 
+        // Set terminal close callback to close the window when shell exits
+        terminal.setOnTerminalClose(() -> {
+            terminal.stop();
+            desktopSurface.getChildren().remove(termWindow);
+        });
+
         // Start the shell
         terminal.start();
 
@@ -748,6 +763,19 @@ public class JDeskApplication extends Application {
         Platform.runLater(terminal::requestFocus);
 
         System.out.println("[JDesk] ✓ Terminal opened (JavaFX GUI → /bin/bash native)");
+
+        // Write guaranteed startup sentinels for diagnostics so external runs can detect
+        try {
+            String ts = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            Path startupLog = Paths.get("/tmp/jdesk-startup.log");
+            Files.writeString(startupLog, ts + " TERMINAL_OPENED - JDeskApplication\n",
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            Path mouseLog = Paths.get("/tmp/jdesk-mouse.log");
+            Files.writeString(mouseLog, ts + " JDeskApplication: terminal opened (sentinel)\n",
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException ioe) {
+            System.err.println("[JDesk] Failed to write startup sentinel: " + ioe.getMessage());
+        }
     }
 
     // =========================================================================
