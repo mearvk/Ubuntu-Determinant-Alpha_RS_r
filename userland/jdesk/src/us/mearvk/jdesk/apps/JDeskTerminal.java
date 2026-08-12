@@ -248,7 +248,8 @@ public class JDeskTerminal extends VBox {
             env.put("LINES", String.valueOf(rows));
             env.put("JDESK_TERMINAL", "1");
             // Use a simple, predictable prompt (no color escape sequences) to avoid rendering duplicates
-            env.put("PS1", "jdesk:\\w$ ");
+            // Place the visible prompt on its own line to avoid mixed title-setting escape artifacts
+            env.put("PS1", "\njdesk:\\w$ ");
 
             shellProcess = pb.start();
             shellStdin = shellProcess.getOutputStream();
