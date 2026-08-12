@@ -123,6 +123,7 @@ public class JDeskTerminal extends VBox {
 
     // Cursor blink
     private Timeline cursorBlink;
+    private boolean mouseDiagInstalled = false;
     // Mouse selection state
     private boolean selecting = false;
     private int selStartRow = -1, selStartCol = -1;
@@ -163,77 +164,24 @@ public class JDeskTerminal extends VBox {
         canvas.setPickOnBounds(true);
         canvas.setMouseTransparent(false);
 
-        // Attach scene-level filters and forwarding when scene becomes available.
-        // Some compositors or parent handlers may swallow events; forward scene clicks
-        // that fall within the canvas bounds to the canvas so selection works reliably.
+        // Attach scene-level diagnostic mouse listeners when scene is available.
+        // These listeners log concise mouse event information to stdout to diagnose
+        // whether events reach the scene and what node they target.
         canvas.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (oldScene != null) {
-                oldScene.removeEventFilter(MouseEvent.MOUSE_PRESSED, this::noopMouseEvent);
-                oldScene.removeEventFilter(MouseEvent.MOUSE_DRAGGED, this::noopMouseEvent);
-                oldScene.removeEventFilter(MouseEvent.MOUSE_RELEASED, this::noopMouseEvent);
-            }
-            if (newScene != null) {
-                // Forward pressed
-                newScene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-                    try {
-                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
-                        double sx = e.getSceneX();
-                        double sy = e.getSceneY();
-                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
-                            // If the target is not the canvas, synthesize and forward
-                            if (e.getTarget() != canvas) {
-                                double lx = sx - b.getMinX();
-                                double ly = sy - b.getMinY();
-                                PickResult pr = new PickResult(canvas, lx, ly);
-                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_PRESSED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
-                                canvas.fireEvent(me);
-                                e.consume();
-                            }
-                        }
-                    } catch (Exception ex) {
-                        // Don't let diagnostics break the terminal
-                    }
-                });
+            if (newScene != null && !mouseDiagInstalled) {
+                mouseDiagInstalled = true;
 
-                // Forward dragged
-                newScene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
-                    try {
-                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
-                        double sx = e.getSceneX();
-                        double sy = e.getSceneY();
-                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
-                            if (e.getTarget() != canvas) {
-                                double lx = sx - b.getMinX();
-                                double ly = sy - b.getMinY();
-                                PickResult pr = new PickResult(canvas, lx, ly);
-                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_DRAGGED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
-                                canvas.fireEvent(me);
-                                e.consume();
-                            }
-                        }
-                    } catch (Exception ex) {}
-                });
+                java.util.function.Consumer<MouseEvent> logger = e -> logMouseEvent(e.getEventType().getName(), e);
 
-                // Forward released
-                newScene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
-                    try {
-                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
-                        double sx = e.getSceneX();
-                        double sy = e.getSceneY();
-                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
-                            if (e.getTarget() != canvas) {
-                                double lx = sx - b.getMinX();
-                                double ly = sy - b.getMinY();
-                                PickResult pr = new PickResult(canvas, lx, ly);
-                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_RELEASED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
-                                canvas.fireEvent(me);
-                                e.consume();
-                            }
-                        }
-                    } catch (Exception ex) {}
-                });
+                newScene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> logger.accept(e));
+                newScene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> logger.accept(e));
+                newScene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> logger.accept(e));
+                newScene.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> logger.accept(e));
+                newScene.addEventFilter(MouseEvent.MOUSE_MOVED, e -> logger.accept(e));
             }
         });
+
+    // --- end scene listener ---
 
         // Key input
         setFocusTraversable(true);
@@ -860,6 +808,18 @@ public class JDeskTerminal extends VBox {
                     }
                 }
             }
+        }
+    }
+
+    private void logMouseEvent(String label, MouseEvent e) {
+        try {
+            javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
+            boolean inCanvas = e.getSceneX() >= b.getMinX() && e.getSceneX() <= b.getMaxX() && e.getSceneY() >= b.getMinY() && e.getSceneY() <= b.getMaxY();
+            String targetClass = e.getTarget() != null ? e.getTarget().getClass().getSimpleName() : "null";
+            System.out.println(String.format("[JDeskTerminal][MOUSE] %s scene=(%.1f,%.1f) inCanvas=%b target=%s click=%d button=%s shift=%b ctrl=%b",
+                label, e.getSceneX(), e.getSceneY(), inCanvas, targetClass, e.getClickCount(), e.getButton(), e.isShiftDown(), e.isControlDown()));
+        } catch (Throwable t) {
+            System.out.println("[JDeskTerminal][MOUSE] log error: " + t.getMessage());
         }
     }
 
