@@ -621,6 +621,11 @@ public class JDeskTerminal extends VBox {
                         sendToShell("\014"); // form feed
                     } else if (event.getCode() == KeyCode.Z) {
                         sendToShell("\032"); // SIGTSTP
+                    } else if (event.getCode() == KeyCode.A) {
+                        // Ctrl+A: select all visible buffer and copy
+                        selectAll();
+                        event.consume();
+                        return;
                     }
                 }
                 break;
@@ -740,6 +745,17 @@ public class JDeskTerminal extends VBox {
         } catch (Exception ignored) {
             // Clipboard may not be available on headless environments
         }
+    }
+
+    /** Select the entire visible buffer and copy to clipboard */
+    private void selectAll() {
+        selStartRow = 0;
+        selStartCol = 0;
+        selEndRow = rows - 1;
+        selEndCol = cols - 1;
+        String s = getSelectedText();
+        if (s != null && !s.isEmpty()) copySelectionToClipboard(s);
+        render();
     }
 
     /**
