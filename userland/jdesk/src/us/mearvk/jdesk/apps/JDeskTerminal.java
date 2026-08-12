@@ -697,6 +697,38 @@ public class JDeskTerminal extends VBox {
         }
     }
 
+    /**
+     * Sanitize recent lines for accidental numeric OSC prefixes (e.g., "0;")
+     * that may appear when title-setting escape sequences are partially lost.
+     */
+    private void sanitizeRecentLines() {
+        int start = Math.max(0, cursorRow - 3);
+        int end = Math.min(rows - 1, cursorRow);
+        for (int r = start; r <= end; r++) {
+            // build line string
+            StringBuilder sb = new StringBuilder();
+            for (int c = 0; c < cols; c++) {
+                char ch = screenBuffer[r][c];
+                sb.append(ch == '\u0000' ? ' ' : ch);
+            }
+            String line = sb.toString();
+            // match digits+semicolon at start, followed by word@ (user@host)
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+;)([^\n@]{1,64}@)").matcher(line);
+            if (m.find()) {
+                int len = m.group(1).length();
+                // shift line left by len
+                for (int c = 0; c < cols - len; c++) {
+                    screenBuffer[r][c] = screenBuffer[r][c + len];
+                    fgColors[r][c] = fgColors[r][c + len];
+                }
+                for (int c = cols - len; c < cols; c++) {
+                    screenBuffer[r][c] = ' ';
+                    fgColors[r][c] = FG_COLOR;
+                }
+            }
+        }
+    }
+
     private static String toHex(Color c) {
         return String.format("#%02X%02X%02X",
             (int)(c.getRed() * 255),
