@@ -116,6 +116,9 @@ public class JDeskTerminal extends VBox {
     private Thread outputReader;
     private boolean running = false;
 
+    // Pending bytes for ANSI sequences split across stdout read chunks
+    private String pendingAnsi = "";
+
     // Cursor blink
     private Timeline cursorBlink;
     // Mouse selection state
@@ -354,6 +357,12 @@ public class JDeskTerminal extends VBox {
     // =========================================================================
 
     private void processOutput(String text) {
+        // Prepend any pending partial ANSI sequence from previous chunk
+        if (!pendingAnsi.isEmpty()) {
+            text = pendingAnsi + text;
+            pendingAnsi = "";
+        }
+
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
 
@@ -372,8 +381,17 @@ public class JDeskTerminal extends VBox {
                     cursorCol = Math.min(tabStop, cols - 1);
                     break;
                 case '\033':
-                    // Skip ANSI escape sequences (consume until letter)
-                    i = skipAnsiSequence(text, i);
+                    // Skip ANSI escape sequences (consume until terminator).
+                    // If the sequence is split across chunks, save the tail in pendingAnsi
+                    int res = skipAnsiSequence(text, i);
+                    if (res < 0) {
+                        // incomplete sequence: stash remainder and stop
+                        pendingAnsi = text.substring(i);
+                        i = text.length();
+                        break;
+                    } else {
+                        i = res;
+                    }
                     break;
                 default:
                     if (c >= 32) {
@@ -387,7 +405,7 @@ public class JDeskTerminal extends VBox {
 
     private int skipAnsiSequence(String text, int start) {
         int i = start + 1;
-        if (i >= text.length()) return i;
+        if (i >= text.length()) return -1; // signal incomplete sequence
 
         char t = text.charAt(i);
         // CSI sequences: ESC [ ... letter
@@ -398,7 +416,7 @@ public class JDeskTerminal extends VBox {
                 if (Character.isLetter(c)) return i;
                 i++;
             }
-            return i;
+            return -1; // incomplete
         }
 
         // OSC sequences: ESC ] ... BEL or ESC \
@@ -420,11 +438,11 @@ public class JDeskTerminal extends VBox {
                 }
                 i++;
             }
-            return i;
+            return -1; // incomplete
         }
 
-        // Other single-character sequences: skip the next character
-        return i;
+        // Other single-character sequences: if the next character exists, return its index; otherwise incomplete
+        if (i < text.length()) return i; else return -1;
     }
 
     private void putChar(char c) {
