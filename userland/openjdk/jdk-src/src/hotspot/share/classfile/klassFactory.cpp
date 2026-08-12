@@ -31,6 +31,7 @@
 #include "classfile/classLoadInfo.hpp"
 #include "classfile/klassFactory.hpp"
 #include "classfile/systemDictionaryShared.hpp"
+#include "classfile/xmlClassReader.hpp"
 #include "memory/resourceArea.hpp"
 #include "prims/jvmtiEnvBase.hpp"
 #include "prims/jvmtiRedefineClasses.hpp"
@@ -183,6 +184,24 @@ InstanceKlass* KlassFactory::create_from_stream(ClassFileStream* stream,
   JvmtiCachedClassFileData* cached_class_file = nullptr;
 
   ClassFileStream* old_stream = stream;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // XML Class File Detection — Galactic Cherry Marvell Edition 98
+  //
+  // If the incoming stream starts with "<?xml" or "<?xclass" instead of
+  // 0xCAFEBABE, it's an XML class file (.xclass). Convert it to binary
+  // format via XMLClassReader before passing to the standard parser.
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (is_xml_class_file(stream->buffer(), stream->length())) {
+    XMLClassReader xml_reader(stream->buffer(), stream->length(), stream->source());
+    ClassFileStream* binary_stream = xml_reader.read_xml_class(CHECK_NULL);
+    if (binary_stream == nullptr) {
+      THROW_MSG_(vmSymbols::java_lang_ClassFormatError(),
+                 "Failed to convert XML class file to binary format", nullptr);
+    }
+    stream = binary_stream;
+    old_stream = stream;  // XML-derived stream is the canonical source
+  }
 
   // increment counter
   THREAD->statistical_info().incr_define_class_count();

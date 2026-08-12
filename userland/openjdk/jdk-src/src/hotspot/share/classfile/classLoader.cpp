@@ -1026,6 +1026,27 @@ const char* ClassLoader::file_name_for_class_name(const char* class_name,
   return file_name;
 }
 
+// XML class file variant — returns "ClassName.xclass"
+// Used as a fallback when .class is not found on the classpath.
+// caller needs ResourceMark
+const char* ClassLoader::file_name_for_xml_class(const char* class_name,
+                                                 int class_name_len) {
+  assert(class_name != nullptr, "invariant");
+  assert((int)strlen(class_name) == class_name_len, "invariant");
+
+  static const char xclass_suffix[] = ".xclass";
+  size_t xclass_suffix_len = sizeof(xclass_suffix);
+
+  char* const file_name = NEW_RESOURCE_ARRAY(char,
+                                             class_name_len +
+                                             xclass_suffix_len); // includes term null
+
+  strncpy(file_name, class_name, class_name_len);
+  strncpy(&file_name[class_name_len], xclass_suffix, xclass_suffix_len);
+
+  return file_name;
+}
+
 static ClassPathEntry* find_first_module_cpe(ModuleEntry* mod_entry,
                                              const GrowableArray<ModuleClassPathList*>* const module_list) {
   int num_of_entries = module_list->length();
@@ -1182,6 +1203,35 @@ InstanceKlass* ClassLoader::load_class(Symbol* name, PackageEntry* pkg_entry, bo
       }
       e = e->next();
       ++classpath_index;
+    }
+  }
+
+  if (nullptr == stream) {
+    // ═══════════════════════════════════════════════════════════════════════
+    // XML Class File Fallback — Galactic Cherry Marvell Edition 98
+    //
+    // If no .class file was found, try .xclass (XML class file format).
+    // The XMLClassReader in klassFactory will detect and convert it.
+    // ═══════════════════════════════════════════════════════════════════════
+    const char* const xclass_file_name = file_name_for_xml_class(class_name,
+                                                                  name->utf8_length());
+    // Search append path for .xclass
+    classpath_index = 1;
+    e = first_append_entry();
+    while (e != nullptr) {
+      stream = e->open_stream(THREAD, xclass_file_name);
+      if (nullptr != stream) {
+        break;
+      }
+      e = e->next();
+      ++classpath_index;
+    }
+
+    // Also try exploded/jrt for .xclass
+    if (nullptr == stream && !search_append_only) {
+      if (has_jrt_entry()) {
+        stream = _jrt_entry->open_stream(THREAD, xclass_file_name);
+      }
     }
   }
 

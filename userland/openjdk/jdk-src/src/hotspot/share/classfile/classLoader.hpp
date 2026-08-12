@@ -250,6 +250,8 @@ class ClassLoader: AllStatic {
   static char* get_canonical_path(const char* orig, Thread* thread);
   static const char* file_name_for_class_name(const char* class_name,
                                               int class_name_len);
+  static const char* file_name_for_xml_class(const char* class_name,
+                                             int class_name_len);
   static PackageEntry* get_package_entry(Symbol* pkg_name, ClassLoaderData* loader_data);
   static int crc32(int crc, const char* buf, int len);
   static bool update_class_path_entry_list(JavaThread* current,
