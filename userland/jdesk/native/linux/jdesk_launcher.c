@@ -342,7 +342,7 @@ static void build_classpath(struct jdesk_config *cfg)
         if (cfg->javafx_path[0]) {
             snprintf(compile_cmd, sizeof(compile_cmd),
                      "%s/../bin/javac --release 17 --module-path %s "
-                     "--add-modules javafx.controls,javafx.graphics "
+                     "--add-modules javafx.controls,javafx.graphics,javafx.web "
                      "-sourcepath %s/src -d %s/classes "
                      "$(find %s/src -name '*.java')",
                      cfg->java_bin, cfg->javafx_path,
@@ -658,7 +658,7 @@ int main(int argc, char *argv[])
         snprintf(module_path_flag, sizeof(module_path_flag),
                  "--module-path=%s", cfg.javafx_path);
         exec_argv[ai++] = module_path_flag;
-        exec_argv[ai++] = (char *)"--add-modules=javafx.controls,javafx.graphics,javafx.swing";
+        exec_argv[ai++] = (char *)"--add-modules=javafx.controls,javafx.graphics,javafx.swing,javafx.web";
     }
 
     /* Classpath */
