@@ -36,6 +36,29 @@ public final class WhiteTheme {
     }
 
     // =========================================================================
+    //  Theme CSS File
+    // =========================================================================
+
+    /** Path to the default theme stylesheet. */
+    public static final String DEFAULT_THEME_CSS = "/opt/jdesk/themes/cool-white.css";
+    public static final String THEME_DIR = "/opt/jdesk/themes/";
+
+    /**
+     * Get the CSS file URL for applying the theme to a JavaFX Scene.
+     * Usage: scene.getStylesheets().add(WhiteTheme.getInstance().getStylesheetUrl());
+     */
+    public String getStylesheetUrl() {
+        java.io.File f = new java.io.File(DEFAULT_THEME_CSS);
+        if (f.exists()) {
+            return f.toURI().toString();
+        }
+        // Fallback: use internal resource
+        return getClass().getResource("/themes/cool-white.css") != null
+            ? getClass().getResource("/themes/cool-white.css").toExternalForm()
+            : "";
+    }
+
+    // =========================================================================
     //  Colors — hex strings (CSS)
     // =========================================================================
 

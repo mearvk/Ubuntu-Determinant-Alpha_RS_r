@@ -460,6 +460,64 @@ public class NativeAppLauncher {
     }
 
     // =========================================================================
+    //  Library Co-Linking Support (.so / .dll / .dylib)
+    // =========================================================================
+
+    /**
+     * Launch a shared library (.so, .dll, .dylib) as a runnable program.
+     * Delegates to the LibraryLinker co-linking engine for format detection,
+     * dependency resolution, entry point discovery, and execution.
+     *
+     * @param manifest Application manifest (binary path points to .so/.dll/.dylib)
+     * @return Process handle for the launched library host
+     */
+    public static Process launchLibrary(AppManifest manifest) throws IOException {
+        Path libPath = Path.of(manifest.binaryPath);
+        String profile = validateProfile(manifest.profile);
+
+        System.out.printf("[JDesk] Library launch: %s (profile: %s)%n",
+                libPath.getFileName(), profile);
+
+        // Inspect the library (format, symbols, dependencies, entry point)
+        LibraryLinker.LibraryDescriptor desc = LibraryLinker.inspect(libPath);
+
+        // Override entry point if manifest specifies one
+        // (manifest can declare entry=myCustomInit in properties)
+        // Otherwise use the auto-discovered entry point
+
+        // Build args from manifest
+        String[] args = manifest.arguments;
+
+        // Launch via LibraryLinker co-linking engine
+        return LibraryLinker.load(desc, profile, args);
+    }
+
+    /**
+     * Detect if a file is a shared library (as opposed to an executable).
+     * Used by the desktop icon handler to route to the correct launcher.
+     */
+    public static boolean isSharedLibrary(Path path) {
+        String name = path.getFileName().toString().toLowerCase();
+        if (name.endsWith(".so") || name.contains(".so.") ||
+            name.endsWith(".dll") || name.endsWith(".dylib")) {
+            return true;
+        }
+        // Check magic bytes for ELF ET_DYN without .so extension
+        try {
+            byte[] header = new byte[20];
+            try (InputStream is = java.nio.file.Files.newInputStream(path)) {
+                int read = is.read(header);
+                if (read >= 18 && header[0] == 0x7F && header[1] == 'E' &&
+                    header[2] == 'L' && header[3] == 'F') {
+                    int eType = (header[16] & 0xFF) | ((header[17] & 0xFF) << 8);
+                    return eType == 3; // ET_DYN = shared object
+                }
+            }
+        } catch (IOException ignored) {}
+        return false;
+    }
+
+    // =========================================================================
     //  Main (for testing / CLI usage)
     // =========================================================================
 
@@ -468,14 +526,17 @@ public class NativeAppLauncher {
             System.out.println("Usage: NativeAppLauncher <manifest.jdesk-app>");
             System.out.println("       NativeAppLauncher --detect <binary>");
             System.out.println("       NativeAppLauncher --list");
+            System.out.println("       NativeAppLauncher --lib-inspect <library.so|.dll>");
+            System.out.println("       NativeAppLauncher --lib-load <library.so|.dll> [args...]");
             System.exit(1);
         }
 
         if ("--detect".equals(args[0]) && args.length >= 2) {
             Path p = Path.of(args[1]);
             BinaryFormat fmt = detectFormat(p);
-            System.out.printf("File: %s%nFormat: %s%nPlatform: %s%n",
-                    p, fmt.getDescription(), fmt.getPlatform());
+            boolean isLib = isSharedLibrary(p);
+            System.out.printf("File: %s%nFormat: %s%nPlatform: %s%nShared Library: %s%n",
+                    p, fmt.getDescription(), fmt.getPlatform(), isLib);
             return;
         }
 
@@ -485,15 +546,40 @@ public class NativeAppLauncher {
             for (AppManifest m : apps) {
                 Path bp = Path.of(m.binaryPath);
                 BinaryFormat fmt = Files.exists(bp) ? detectFormat(bp) : BinaryFormat.UNKNOWN;
-                System.out.printf("  %-20s  %-15s  %s%n", m.name, fmt.getDescription(), m.binaryPath);
+                boolean isLib = Files.exists(bp) && isSharedLibrary(bp);
+                System.out.printf("  %-20s  %-15s  %s  %s%n", m.name, fmt.getDescription(),
+                        isLib ? "[LIB]" : "[EXE]", m.binaryPath);
             }
             return;
         }
 
-        // Load manifest and launch
+        if ("--lib-inspect".equals(args[0]) && args.length >= 2) {
+            // Delegate to LibraryLinker for full inspection
+            LibraryLinker.main(new String[]{"--inspect", args[1]});
+            return;
+        }
+
+        if ("--lib-load".equals(args[0]) && args.length >= 2) {
+            String[] loadArgs = args.length > 2 ? Arrays.copyOfRange(args, 2, args.length) : null;
+            LibraryLinker.main(new String[]{"--load", args[1]});
+            return;
+        }
+
+        // Load manifest and launch (auto-detect library vs executable)
         AppManifest manifest = AppManifest.load(Path.of(args[0]));
-        Process proc = launch(manifest);
-        proc.waitFor();
-        System.out.printf("[JDesk] %s exited with code %d%n", manifest.name, proc.exitValue());
+        Path binaryPath = Path.of(manifest.binaryPath);
+
+        Process proc;
+        if (Files.exists(binaryPath) && isSharedLibrary(binaryPath)) {
+            System.out.printf("[JDesk] Detected shared library — using LibraryLinker%n");
+            proc = launchLibrary(manifest);
+        } else {
+            proc = launch(manifest);
+        }
+
+        if (proc != null) {
+            proc.waitFor();
+            System.out.printf("[JDesk] %s exited with code %d%n", manifest.name, proc.exitValue());
+        }
     }
 }

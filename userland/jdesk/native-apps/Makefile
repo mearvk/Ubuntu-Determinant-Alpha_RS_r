@@ -12,6 +12,7 @@ DESTDIR ?= /opt/jdesk
 JAVA_SRC_DIR = launcher
 JAVA_SRC_TREE= ../src
 JAVA_SRCS    = $(JAVA_SRC_DIR)/NativeAppLauncher.java \
+               $(JAVA_SRC_DIR)/LibraryLinker.java \
                $(JAVA_SRC_DIR)/DesktopIconGrid.java
 JAVA_OUT_DIR = $(JAVA_SRC_DIR)/classes
 JAVAC        ?= javac
@@ -42,15 +43,63 @@ PROFILES_DIR = $(DESTDIR)/profiles
 MIN_ALLOCATION_MB = 3072
 
 .PHONY: all install install-linux install-wine install-darling install-icons \
-        install-profiles install-all check-space clean compile
+        install-profiles install-all check-space clean compile compile-native
 
-all: compile
+all: compile compile-native
 
 compile: $(JAVA_SRCS)
 	@echo "[JDesk] Compiling launcher Java sources (release 17, JavaFX cp)..."
 	@mkdir -p $(JAVA_OUT_DIR)
 	$(JAVAC) $(JAVAC_FLAGS) -sourcepath "$(JAVA_SRC_TREE)" -d $(JAVA_OUT_DIR) $(JAVA_SRCS)
 	@echo "[JDesk] Compiled: $(JAVA_OUT_DIR)/"
+
+# ===========================================================================
+#  Native Host Binaries (LibraryLinker Co-Linking Engine)
+# ===========================================================================
+
+CC       ?= gcc
+MINGW_CC ?= x86_64-w64-mingw32-gcc
+CFLAGS    = -O2 -Wall -Wextra -march=x86-64-v2
+LDFLAGS   = -ldl
+
+LIBHOST_SRC  = $(JAVA_SRC_DIR)/jdesk-libhost.c
+LIBHOST_BIN  = $(JAVA_SRC_DIR)/jdesk-libhost
+DLLHOST_SRC  = $(JAVA_SRC_DIR)/jdesk-dllhost.c
+DLLHOST_BIN  = $(JAVA_SRC_DIR)/jdesk-dllhost.exe
+
+compile-native: $(LIBHOST_BIN) $(DLLHOST_BIN)
+
+$(LIBHOST_BIN): $(LIBHOST_SRC)
+	@echo "[JDesk] Compiling jdesk-libhost (Linux ELF, host for .so)..."
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "[JDesk] Built: $@"
+
+$(DLLHOST_BIN): $(DLLHOST_SRC)
+	@echo "[JDesk] Cross-compiling jdesk-dllhost.exe (PE, host for .dll via Wine)..."
+	@if command -v $(MINGW_CC) >/dev/null 2>&1; then \
+		$(MINGW_CC) -O2 -Wall -o $@ $<; \
+		echo "[JDesk] Built: $@"; \
+	else \
+		echo "[JDesk] SKIP: MinGW not installed ($(MINGW_CC) not found)"; \
+		echo "[JDesk]   Install: sudo apt install gcc-mingw-w64-x86-64"; \
+		echo "[JDesk]   Or skip Windows DLL support for now."; \
+	fi
+
+install-native: compile-native install-dirs
+	@echo "[JDesk] Installing library host binaries..."
+	@mkdir -p $(DESTDIR)/bin
+	@cp -f $(LIBHOST_BIN) $(DESTDIR)/bin/jdesk-libhost
+	@chmod 755 $(DESTDIR)/bin/jdesk-libhost
+	@if [ -f $(DLLHOST_BIN) ]; then \
+		cp -f $(DLLHOST_BIN) $(DESTDIR)/bin/jdesk-dllhost.exe; \
+		echo "[JDesk] Installed: $(DESTDIR)/bin/jdesk-dllhost.exe"; \
+	fi
+	@mkdir -p $(DESTDIR)/libs
+	@mkdir -p $(DESTDIR)/plugins
+	@echo "[JDesk] Library host installed to $(DESTDIR)/bin/"
+	@echo "[JDesk] Library drop paths:"
+	@echo "         Trusted libs:    $(DESTDIR)/libs/"
+	@echo "         JDesk plugins:   $(DESTDIR)/plugins/"
 
 # ===========================================================================
 #  Installation Targets
@@ -229,6 +278,7 @@ size-report:
 
 clean:
 	@rm -rf $(JAVA_OUT_DIR)
+	@rm -f $(LIBHOST_BIN) $(DLLHOST_BIN)
 	@echo "[JDesk] Cleaned build artifacts"
 
 uninstall:

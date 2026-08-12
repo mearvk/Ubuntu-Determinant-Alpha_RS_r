@@ -22,6 +22,7 @@ import javafx.geometry.*;
 import us.mearvk.jdesk.launcher.NativeAppLauncher;
 import us.mearvk.jdesk.launcher.NativeAppLauncher.AppManifest;
 import us.mearvk.jdesk.launcher.NativeAppLauncher.BinaryFormat;
+import us.mearvk.jdesk.launcher.LibraryLinker;
 import us.mearvk.jdesk.theme.WhiteTheme;
 
 /**
@@ -125,6 +126,7 @@ public class DesktopIconGrid extends GridPane {
 
     /**
      * Launch an application via the NativeAppLauncher.
+     * Automatically routes shared libraries (.so/.dll) to LibraryLinker.
      */
     private void launchApp(AppManifest app) {
         try {
@@ -139,27 +141,40 @@ public class DesktopIconGrid extends GridPane {
                 runningApps.remove(app.name);
             }
 
-            // Detect binary format for logging
+            // Detect binary format and determine if it's a library
             Path binaryPath = Path.of(app.binaryPath);
+            Process proc;
+
             if (Files.exists(binaryPath)) {
-                BinaryFormat fmt = NativeAppLauncher.detectFormat(binaryPath);
-                System.out.printf("[JDesk] Launching %s (%s)%n", app.name, fmt.getDescription());
+                if (NativeAppLauncher.isSharedLibrary(binaryPath)) {
+                    // Shared library (.so / .dll / .dylib) — use LibraryLinker
+                    System.out.printf("[JDesk] Launching %s via LibraryLinker (shared library)%n", app.name);
+                    proc = NativeAppLauncher.launchLibrary(app);
+                } else {
+                    // Standard executable — use direct launcher
+                    BinaryFormat fmt = NativeAppLauncher.detectFormat(binaryPath);
+                    System.out.printf("[JDesk] Launching %s (%s)%n", app.name, fmt.getDescription());
+                    proc = NativeAppLauncher.launch(app);
+                }
+            } else {
+                // Binary not found — attempt launch anyway (might be in PATH)
+                proc = NativeAppLauncher.launch(app);
             }
 
-            // Launch under Memory Proxy governance
-            Process proc = NativeAppLauncher.launch(app);
-            runningApps.put(app.name, proc);
+            if (proc != null) {
+                runningApps.put(app.name, proc);
 
-            // Monitor process in background thread
-            Thread monitor = new Thread(() -> {
-                try {
-                    int exitCode = proc.waitFor();
-                    runningApps.remove(app.name);
-                    System.out.printf("[JDesk] %s exited (code %d)%n", app.name, exitCode);
-                } catch (InterruptedException ignored) {}
-            }, "jdesk-monitor-" + app.name);
-            monitor.setDaemon(true);
-            monitor.start();
+                // Monitor process in background thread
+                Thread monitor = new Thread(() -> {
+                    try {
+                        int exitCode = proc.waitFor();
+                        runningApps.remove(app.name);
+                        System.out.printf("[JDesk] %s exited (code %d)%n", app.name, exitCode);
+                    } catch (InterruptedException ignored) {}
+                }, "jdesk-monitor-" + app.name);
+                monitor.setDaemon(true);
+                monitor.start();
+            }
 
         } catch (IOException e) {
             System.err.printf("[JDesk] Failed to launch %s: %s%n", app.name, e.getMessage());
