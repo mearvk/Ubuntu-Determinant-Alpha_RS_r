@@ -765,7 +765,30 @@ static bool parse_java(CompilerState* state) {
             is_interface = true;
             p += 9;
         } else if (strncmp(p, "class", 5) == 0 && !isalnum((unsigned char)p[5])) {
-            p += 5;
+            /* Lookahead to confirm a real class declaration.
+             * Allow use of the token 'class' as an identifier when it's not
+             * followed by a valid class name + class-body/introduction tokens.
+             */
+            const char* q = p + 5;
+            skip_whitespace_and_comments(&q);
+            bool is_decl = false;
+            if (isalpha((unsigned char)*q) || *q == '_') {
+                char tmp[XMC_MAX_NAME];
+                if (read_identifier(&q, tmp, XMC_MAX_NAME)) {
+                    skip_whitespace_and_comments(&q);
+                    if (*q == '{' ||
+                        (strncmp(q, "extends", 7) == 0 && !isalnum((unsigned char)q[7])) ||
+                        (strncmp(q, "implements", 10) == 0 && !isalnum((unsigned char)q[10])) ||
+                        *q == '<') {
+                        is_decl = true;
+                    }
+                }
+            }
+            if (is_decl) {
+                p += 5;
+            } else {
+                /* treat 'class' as ordinary token/identifier — fall through */
+            }
         } else {
             /* Not a class declaration — advance */
             if (*p == '{') { skip_block(&p); }
