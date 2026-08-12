@@ -4,14 +4,14 @@
  *
  * xmc — XML Metaclass Compiler
  *
- * Compiles Java (.java) or Python (.py) source files into the SecureJDK 28
- * XML class file format (.xclass). The .xclass format carries rich metadata
- * beyond binary .class: provenance, design intent, security grades,
- * dependencies, optimization hints, contracts, quality democracy, and
- * quality woman assessments.
+ * Compiles Java (.java), Python (.py), or Rust (.rs) source files into the
+ * SecureJDK 28 XML class file format (.xclass). The .xclass format carries
+ * rich metadata beyond binary .class: provenance, design intent, security
+ * grades, dependencies, optimization hints, contracts, quality democracy,
+ * and quality woman assessments.
  *
  * The xmc compiler:
- *   1. Parses source (Java or Python)
+ *   1. Parses source (Java, Python, or Rust)
  *   2. Extracts structural identity (classes, methods, fields, inheritance)
  *   3. Assigns Quality Democracy grade (voice, representation, participation)
  *   4. Assigns Quality Woman grade (care, integrity, nurture, resolve, grace)
@@ -38,6 +38,7 @@
  *   xmc --frame=eu MyModule.py          # EU conduct frame
  *   xmc --tier=3 --color=blue Art.java  # Force tier/color override
  *   xmc --sign-as="mearvk - Installer Tech 2" Main.java
+ *   xmc engine.rs                        # Rust struct/impl → .xclass
  *
  * Output goes to SecureJDK 28 (jvmINTLoader, classLoadGuard, xmlConfigReader).
  *
@@ -122,6 +123,7 @@
 typedef enum {
     LANG_JAVA,
     LANG_PYTHON,
+    LANG_RUST,
     LANG_UNKNOWN
 } SourceLanguage;
 
@@ -214,6 +216,7 @@ static bool read_source(const char* path, CompilerState* state);
 static bool detect_language(const char* path, SourceLanguage* lang);
 static bool parse_java(CompilerState* state);
 static bool parse_python(CompilerState* state);
+static bool parse_rust(CompilerState* state);
 static void compute_quality_democracy(ClassInfo* cls, const CompilerOptions* opts);
 static void compute_quality_woman(ClassInfo* cls, const CompilerOptions* opts);
 static void compute_wet_structure(ClassInfo* cls);
@@ -345,6 +348,9 @@ int main(int argc, char** argv) {
             break;
         case LANG_PYTHON:
             parse_ok = parse_python(state);
+            break;
+        case LANG_RUST:
+            parse_ok = parse_rust(state);
             break;
         default:
             fprintf(stderr, "xmc: unsupported language\n");
@@ -504,6 +510,9 @@ static bool parse_args(int argc, char** argv, CompilerOptions* opts) {
         else if (strcmp(argv[i], "--python") == 0) {
             opts->language = LANG_PYTHON;
         }
+        else if (strcmp(argv[i], "--rust") == 0) {
+            opts->language = LANG_RUST;
+        }
         else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             opts->verbose = true;
         }
@@ -611,6 +620,10 @@ static bool detect_language(const char* path, SourceLanguage* lang) {
     }
     if (strcasecmp(ext, ".py") == 0) {
         *lang = LANG_PYTHON;
+        return true;
+    }
+    if (strcasecmp(ext, ".rs") == 0) {
+        *lang = LANG_RUST;
         return true;
     }
 
@@ -1158,6 +1171,691 @@ static bool parse_python(CompilerState* state) {
         /* Advance to next line */
         while (*p && *p != '\n') p++;
         if (*p == '\n') p++;
+    }
+
+    return true;
+}
+
+/* ============================================================================
+ * Rust Parser (Structural Extraction)
+ *
+ * Rust maps to xclass as follows:
+ *   - struct/enum         → ClassInfo (is_interface=false)
+ *   - trait               → ClassInfo (is_interface=true)
+ *   - impl Block methods  → MethodInfo
+ *   - struct fields       → FieldInfo
+ *   - use/extern crate    → dependencies
+ *   - trait bounds (:)    → interfaces (implements)
+ *   - pub visibility      → is_public
+ *
+ * Rust does not have inheritance (no superclass), but traits serve as
+ * interface contracts. Structs with impl blocks are concrete classes.
+ * Enums with impl blocks are treated as sealed class hierarchies.
+ * ============================================================================ */
+
+static bool parse_rust(CompilerState* state) {
+    const char* p = state->source;
+
+    /* Helper: skip Rust comments — reuses existing skip_whitespace_and_comments */
+
+    while (*p) {
+        skip_whitespace_and_comments(&p);
+        if (!*p) break;
+
+        /* use statements → dependencies */
+        if (strncmp(p, "use ", 4) == 0) {
+            p += 4;
+            char dep[XMC_MAX_NAME] = {0};
+            int di = 0;
+            while (*p && *p != ';' && *p != '\n' && di < XMC_MAX_NAME - 1) {
+                if (!isspace((unsigned char)*p))
+                    dep[di++] = *p;
+                p++;
+            }
+            dep[di] = '\0';
+            if (*p == ';') p++;
+
+            /* Attach to most recent class or hold for next */
+            if (state->class_count > 0) {
+                ClassInfo* cls = &state->classes[state->class_count - 1];
+                if (cls->dependency_count < XMC_MAX_DEPS) {
+                    strncpy(cls->dependencies[cls->dependency_count++], dep, XMC_MAX_NAME - 1);
+                }
+            }
+            continue;
+        }
+
+        /* extern crate → dependency */
+        if (strncmp(p, "extern crate ", 13) == 0) {
+            p += 13;
+            char dep[XMC_MAX_NAME] = {0};
+            int di = 0;
+            while (*p && *p != ';' && *p != '\n' && di < XMC_MAX_NAME - 1) {
+                if (!isspace((unsigned char)*p))
+                    dep[di++] = *p;
+                p++;
+            }
+            dep[di] = '\0';
+            if (*p == ';') p++;
+
+            if (state->class_count > 0) {
+                ClassInfo* cls = &state->classes[state->class_count - 1];
+                if (cls->dependency_count < XMC_MAX_DEPS) {
+                    strncpy(cls->dependencies[cls->dependency_count++], dep, XMC_MAX_NAME - 1);
+                }
+            }
+            continue;
+        }
+
+        /* Detect visibility and attributes */
+        bool is_public = false;
+
+        /* Skip attributes: #[...] and #![...] */
+        while (*p == '#') {
+            p++;
+            if (*p == '!') p++;
+            if (*p == '[') {
+                int bdepth = 1;
+                p++;
+                while (*p && bdepth > 0) {
+                    if (*p == '[') bdepth++;
+                    else if (*p == ']') bdepth--;
+                    p++;
+                }
+            }
+            skip_whitespace_and_comments(&p);
+        }
+
+        if (strncmp(p, "pub", 3) == 0 && !isalnum((unsigned char)p[3]) && p[3] != '_') {
+            is_public = true;
+            p += 3;
+            skip_whitespace_and_comments(&p);
+            /* pub(crate), pub(super), etc. */
+            if (*p == '(') {
+                int pdepth = 1;
+                p++;
+                while (*p && pdepth > 0) {
+                    if (*p == '(') pdepth++;
+                    else if (*p == ')') pdepth--;
+                    p++;
+                }
+                skip_whitespace_and_comments(&p);
+            }
+        }
+
+        /* struct declaration */
+        if (strncmp(p, "struct ", 6) == 0) {
+            p += 6;
+            skip_whitespace_and_comments(&p);
+
+            if (state->class_count >= XMC_MAX_CLASSES) break;
+
+            ClassInfo* cls = &state->classes[state->class_count];
+            memset(cls, 0, sizeof(ClassInfo));
+            cls->is_public = is_public;
+            cls->is_abstract = false;
+            cls->is_interface = false;
+            cls->is_final = true; /* Rust structs are "final" — no inheritance */
+            strncpy(cls->superclass, "(none)", XMC_MAX_NAME - 1);
+
+            /* Name */
+            read_identifier(&p, cls->name, XMC_MAX_NAME);
+            skip_whitespace_and_comments(&p);
+
+            /* Generic parameters <...> — skip */
+            if (*p == '<') {
+                int gdepth = 1;
+                p++;
+                while (*p && gdepth > 0) {
+                    if (*p == '<') gdepth++;
+                    else if (*p == '>') gdepth--;
+                    p++;
+                }
+                skip_whitespace_and_comments(&p);
+            }
+
+            /* where clause — skip to { or ; */
+            if (strncmp(p, "where", 5) == 0) {
+                while (*p && *p != '{' && *p != ';') p++;
+            }
+
+            /* Struct body: { field: Type, ... } or tuple struct (Type, Type); or unit struct; */
+            if (*p == '{') {
+                p++;
+                int depth = 1;
+                while (*p && depth > 0) {
+                    skip_whitespace_and_comments(&p);
+                    if (*p == '{') { depth++; p++; continue; }
+                    if (*p == '}') { depth--; p++; continue; }
+
+                    /* Parse field: [pub] name: Type */
+                    bool f_pub = false;
+                    if (strncmp(p, "pub", 3) == 0 && !isalnum((unsigned char)p[3]) && p[3] != '_') {
+                        f_pub = true;
+                        p += 3;
+                        skip_whitespace_and_comments(&p);
+                        if (*p == '(') {
+                            int pd = 1; p++;
+                            while (*p && pd > 0) { if (*p == '(') pd++; else if (*p == ')') pd--; p++; }
+                            skip_whitespace_and_comments(&p);
+                        }
+                    }
+
+                    char fname[XMC_MAX_NAME] = {0};
+                    if (read_identifier(&p, fname, XMC_MAX_NAME)) {
+                        skip_whitespace_and_comments(&p);
+                        if (*p == ':') {
+                            p++;
+                            skip_whitespace_and_comments(&p);
+                            char ftype[XMC_MAX_NAME] = {0};
+                            int ti = 0;
+                            /* Read type until , or } */
+                            while (*p && *p != ',' && *p != '}' && ti < XMC_MAX_NAME - 1) {
+                                ftype[ti++] = *p++;
+                            }
+                            ftype[ti] = '\0';
+                            /* Trim trailing whitespace */
+                            while (ti > 0 && isspace((unsigned char)ftype[ti-1])) ftype[--ti] = '\0';
+
+                            if (cls->field_count < XMC_MAX_FIELDS) {
+                                FieldInfo* f = &cls->fields[cls->field_count++];
+                                strncpy(f->name, fname, XMC_MAX_NAME - 1);
+                                strncpy(f->type, ftype, XMC_MAX_NAME - 1);
+                                f->is_public = f_pub;
+                                f->is_static = false;
+                                f->is_final = false;
+                            }
+                        }
+                    }
+                    if (*p == ',') p++;
+                    else if (*p && *p != '}') p++;
+                }
+            } else if (*p == '(') {
+                /* Tuple struct: struct Name(Type, Type); */
+                p++;
+                int field_idx = 0;
+                while (*p && *p != ')') {
+                    skip_whitespace_and_comments(&p);
+                    bool f_pub = false;
+                    if (strncmp(p, "pub", 3) == 0 && !isalnum((unsigned char)p[3])) {
+                        f_pub = true;
+                        p += 3;
+                        skip_whitespace_and_comments(&p);
+                    }
+                    char ftype[XMC_MAX_NAME] = {0};
+                    int ti = 0;
+                    while (*p && *p != ',' && *p != ')' && ti < XMC_MAX_NAME - 1) {
+                        ftype[ti++] = *p++;
+                    }
+                    ftype[ti] = '\0';
+                    while (ti > 0 && isspace((unsigned char)ftype[ti-1])) ftype[--ti] = '\0';
+
+                    if (ti > 0 && cls->field_count < XMC_MAX_FIELDS) {
+                        FieldInfo* f = &cls->fields[cls->field_count++];
+                        snprintf(f->name, XMC_MAX_NAME, "%d", field_idx);
+                        strncpy(f->type, ftype, XMC_MAX_NAME - 1);
+                        f->is_public = f_pub;
+                    }
+                    field_idx++;
+                    if (*p == ',') p++;
+                }
+                if (*p == ')') p++;
+                if (*p == ';') p++;
+            } else if (*p == ';') {
+                /* Unit struct */
+                p++;
+            }
+
+            state->class_count++;
+            continue;
+        }
+
+        /* enum declaration — treated as sealed class */
+        if (strncmp(p, "enum ", 5) == 0) {
+            p += 5;
+            skip_whitespace_and_comments(&p);
+
+            if (state->class_count >= XMC_MAX_CLASSES) break;
+
+            ClassInfo* cls = &state->classes[state->class_count];
+            memset(cls, 0, sizeof(ClassInfo));
+            cls->is_public = is_public;
+            cls->is_abstract = true; /* enum is abstract in xclass terms (variants are concrete) */
+            cls->is_interface = false;
+            cls->is_final = false;
+            strncpy(cls->superclass, "(none)", XMC_MAX_NAME - 1);
+
+            read_identifier(&p, cls->name, XMC_MAX_NAME);
+            skip_whitespace_and_comments(&p);
+
+            /* Generics */
+            if (*p == '<') {
+                int gdepth = 1; p++;
+                while (*p && gdepth > 0) { if (*p == '<') gdepth++; else if (*p == '>') gdepth--; p++; }
+                skip_whitespace_and_comments(&p);
+            }
+
+            /* where clause */
+            if (strncmp(p, "where", 5) == 0) {
+                while (*p && *p != '{') p++;
+            }
+
+            /* Enum body: variants as "fields" */
+            if (*p == '{') {
+                p++;
+                int depth = 1;
+                while (*p && depth > 0) {
+                    skip_whitespace_and_comments(&p);
+                    if (*p == '{') { depth++; p++; continue; }
+                    if (*p == '}') { depth--; p++; continue; }
+
+                    /* Variant name */
+                    char vname[XMC_MAX_NAME] = {0};
+                    if (read_identifier(&p, vname, XMC_MAX_NAME)) {
+                        if (cls->field_count < XMC_MAX_FIELDS) {
+                            FieldInfo* f = &cls->fields[cls->field_count++];
+                            strncpy(f->name, vname, XMC_MAX_NAME - 1);
+                            strncpy(f->type, "Variant", XMC_MAX_NAME - 1);
+                            f->is_public = is_public;
+                            f->is_static = true; /* variants are like static members */
+                        }
+                        /* Skip variant payload (...) or {...} */
+                        skip_whitespace_and_comments(&p);
+                        if (*p == '(') {
+                            int pd = 1; p++;
+                            while (*p && pd > 0) { if (*p == '(') pd++; else if (*p == ')') pd--; p++; }
+                        } else if (*p == '{') {
+                            skip_block(&p);
+                        }
+                    }
+                    skip_whitespace_and_comments(&p);
+                    if (*p == ',') p++;
+                }
+            }
+
+            state->class_count++;
+            continue;
+        }
+
+        /* trait declaration — maps to interface */
+        if (strncmp(p, "trait ", 6) == 0) {
+            p += 6;
+            skip_whitespace_and_comments(&p);
+
+            if (state->class_count >= XMC_MAX_CLASSES) break;
+
+            ClassInfo* cls = &state->classes[state->class_count];
+            memset(cls, 0, sizeof(ClassInfo));
+            cls->is_public = is_public;
+            cls->is_abstract = true;
+            cls->is_interface = true;
+            cls->is_final = false;
+            strncpy(cls->superclass, "(none)", XMC_MAX_NAME - 1);
+
+            read_identifier(&p, cls->name, XMC_MAX_NAME);
+            skip_whitespace_and_comments(&p);
+
+            /* Generics */
+            if (*p == '<') {
+                int gdepth = 1; p++;
+                while (*p && gdepth > 0) { if (*p == '<') gdepth++; else if (*p == '>') gdepth--; p++; }
+                skip_whitespace_and_comments(&p);
+            }
+
+            /* Supertrait bounds: trait Name: SuperA + SuperB */
+            if (*p == ':') {
+                p++;
+                skip_whitespace_and_comments(&p);
+                while (*p && *p != '{' && *p != '\n') {
+                    char bound[XMC_MAX_NAME] = {0};
+                    if (read_identifier(&p, bound, XMC_MAX_NAME)) {
+                        if (cls->interface_count < XMC_MAX_DEPS) {
+                            strncpy(cls->interfaces[cls->interface_count++], bound, XMC_MAX_NAME - 1);
+                        }
+                    }
+                    skip_whitespace_and_comments(&p);
+                    /* Skip generic args on bounds */
+                    if (*p == '<') {
+                        int gd = 1; p++;
+                        while (*p && gd > 0) { if (*p == '<') gd++; else if (*p == '>') gd--; p++; }
+                        skip_whitespace_and_comments(&p);
+                    }
+                    if (*p == '+') { p++; skip_whitespace_and_comments(&p); }
+                    else break;
+                }
+            }
+
+            /* where clause */
+            if (strncmp(p, "where", 5) == 0) {
+                while (*p && *p != '{') p++;
+            }
+
+            /* Trait body: method signatures and default methods */
+            if (*p == '{') {
+                p++;
+                int depth = 1;
+                while (*p && depth > 0) {
+                    skip_whitespace_and_comments(&p);
+                    if (*p == '{') { depth++; p++; continue; }
+                    if (*p == '}') { depth--; p++; continue; }
+
+                    /* fn declaration */
+                    if (strncmp(p, "fn ", 3) == 0) {
+                        p += 3;
+                        skip_whitespace_and_comments(&p);
+
+                        if (cls->method_count < XMC_MAX_METHODS) {
+                            MethodInfo* m = &cls->methods[cls->method_count];
+                            memset(m, 0, sizeof(MethodInfo));
+                            m->is_public = true; /* trait methods are pub by nature */
+
+                            read_identifier(&p, m->name, XMC_MAX_NAME);
+                            skip_whitespace_and_comments(&p);
+
+                            /* Generics on method */
+                            if (*p == '<') {
+                                int gd = 1; p++;
+                                while (*p && gd > 0) { if (*p == '<') gd++; else if (*p == '>') gd--; p++; }
+                                skip_whitespace_and_comments(&p);
+                            }
+
+                            /* Parameters */
+                            if (*p == '(') {
+                                p++;
+                                m->param_count = 0;
+                                bool has_params = false;
+                                while (*p && *p != ')') {
+                                    if (*p == ',') m->param_count++;
+                                    if (!isspace((unsigned char)*p) && *p != ')') has_params = true;
+                                    p++;
+                                }
+                                if (has_params) m->param_count++;
+                                /* Subtract &self/&mut self/self */
+                                if (m->param_count > 0) m->param_count--;
+                                if (*p == ')') p++;
+                            }
+
+                            /* Return type: -> Type */
+                            skip_whitespace_and_comments(&p);
+                            if (p[0] == '-' && p[1] == '>') {
+                                p += 2;
+                                skip_whitespace_and_comments(&p);
+                                char rtype[XMC_MAX_NAME] = {0};
+                                int ri = 0;
+                                while (*p && *p != '{' && *p != ';' && *p != '\n' &&
+                                       ri < XMC_MAX_NAME - 1) {
+                                    rtype[ri++] = *p++;
+                                }
+                                rtype[ri] = '\0';
+                                while (ri > 0 && isspace((unsigned char)rtype[ri-1])) rtype[--ri] = '\0';
+                                strncpy(m->return_type, rtype, XMC_MAX_NAME - 1);
+                            } else {
+                                strncpy(m->return_type, "()", XMC_MAX_NAME - 1);
+                            }
+
+                            skip_whitespace_and_comments(&p);
+
+                            /* Body or ; (abstract) */
+                            if (*p == '{') {
+                                const char* body_start = p;
+                                skip_block(&p);
+                                m->line_count = count_lines_in_block(body_start, p);
+                                m->complexity = estimate_complexity(body_start, p);
+                                m->is_abstract = false;
+                            } else {
+                                if (*p == ';') p++;
+                                m->is_abstract = true;
+                                m->line_count = 0;
+                                m->complexity = 0;
+                            }
+
+                            cls->method_count++;
+                        } else {
+                            /* Skip */
+                            while (*p && *p != ';' && *p != '{') p++;
+                            if (*p == '{') skip_block(&p);
+                            else if (*p == ';') p++;
+                        }
+                    } else {
+                        /* type aliases or other trait items — skip */
+                        while (*p && *p != ';' && *p != '{' && *p != '}') p++;
+                        if (*p == '{') skip_block(&p);
+                        else if (*p == ';') p++;
+                    }
+                }
+            }
+
+            state->class_count++;
+            continue;
+        }
+
+        /* impl block — attaches methods to an existing struct/enum */
+        if (strncmp(p, "impl", 4) == 0 && !isalnum((unsigned char)p[4]) && p[4] != '_') {
+            p += 4;
+            skip_whitespace_and_comments(&p);
+
+            /* Generics on impl */
+            if (*p == '<') {
+                int gdepth = 1; p++;
+                while (*p && gdepth > 0) { if (*p == '<') gdepth++; else if (*p == '>') gdepth--; p++; }
+                skip_whitespace_and_comments(&p);
+            }
+
+            /* Read the type name (or trait name for trait impl) */
+            char impl_name[XMC_MAX_NAME] = {0};
+            read_identifier(&p, impl_name, XMC_MAX_NAME);
+            skip_whitespace_and_comments(&p);
+
+            /* Check for "impl Trait for Type" pattern */
+            char trait_name[XMC_MAX_NAME] = {0};
+            char target_name[XMC_MAX_NAME] = {0};
+
+            /* Skip generics on the first identifier */
+            if (*p == '<') {
+                int gd = 1; p++;
+                while (*p && gd > 0) { if (*p == '<') gd++; else if (*p == '>') gd--; p++; }
+                skip_whitespace_and_comments(&p);
+            }
+
+            if (strncmp(p, "for ", 4) == 0) {
+                /* impl Trait for Type */
+                strncpy(trait_name, impl_name, XMC_MAX_NAME - 1);
+                p += 4;
+                skip_whitespace_and_comments(&p);
+                read_identifier(&p, target_name, XMC_MAX_NAME);
+                skip_whitespace_and_comments(&p);
+                /* Skip generics on target */
+                if (*p == '<') {
+                    int gd = 1; p++;
+                    while (*p && gd > 0) { if (*p == '<') gd++; else if (*p == '>') gd--; p++; }
+                    skip_whitespace_and_comments(&p);
+                }
+            } else {
+                /* impl Type (inherent impl) */
+                strncpy(target_name, impl_name, XMC_MAX_NAME - 1);
+            }
+
+            /* Find the target class in already-parsed classes */
+            ClassInfo* target_cls = NULL;
+            for (int i = 0; i < state->class_count; i++) {
+                if (strcmp(state->classes[i].name, target_name) == 0) {
+                    target_cls = &state->classes[i];
+                    break;
+                }
+            }
+
+            /* If target not found, create a new class entry for it */
+            if (!target_cls && state->class_count < XMC_MAX_CLASSES) {
+                target_cls = &state->classes[state->class_count];
+                memset(target_cls, 0, sizeof(ClassInfo));
+                strncpy(target_cls->name, target_name, XMC_MAX_NAME - 1);
+                strncpy(target_cls->superclass, "(none)", XMC_MAX_NAME - 1);
+                target_cls->is_public = true;
+                target_cls->is_final = true;
+                state->class_count++;
+            }
+
+            /* Register trait as an interface on the target */
+            if (target_cls && trait_name[0] != '\0') {
+                if (target_cls->interface_count < XMC_MAX_DEPS) {
+                    strncpy(target_cls->interfaces[target_cls->interface_count++],
+                            trait_name, XMC_MAX_NAME - 1);
+                }
+                /* Implementing a trait means it's not purely final in xclass sense */
+                target_cls->is_final = false;
+            }
+
+            /* where clause */
+            if (strncmp(p, "where", 5) == 0) {
+                while (*p && *p != '{') p++;
+            }
+
+            /* Parse impl body for methods */
+            skip_whitespace_and_comments(&p);
+            if (*p == '{') {
+                p++;
+                int depth = 1;
+                while (*p && depth > 0) {
+                    skip_whitespace_and_comments(&p);
+                    if (*p == '{') { depth++; p++; continue; }
+                    if (*p == '}') { depth--; p++; continue; }
+
+                    /* Skip attributes */
+                    while (*p == '#') {
+                        p++;
+                        if (*p == '[') {
+                            int bd = 1; p++;
+                            while (*p && bd > 0) { if (*p == '[') bd++; else if (*p == ']') bd--; p++; }
+                        }
+                        skip_whitespace_and_comments(&p);
+                    }
+
+                    /* pub modifier */
+                    bool m_pub = false;
+                    if (strncmp(p, "pub", 3) == 0 && !isalnum((unsigned char)p[3]) && p[3] != '_') {
+                        m_pub = true;
+                        p += 3;
+                        skip_whitespace_and_comments(&p);
+                        if (*p == '(') {
+                            int pd = 1; p++;
+                            while (*p && pd > 0) { if (*p == '(') pd++; else if (*p == ')') pd--; p++; }
+                            skip_whitespace_and_comments(&p);
+                        }
+                    }
+
+                    /* const/async/unsafe modifiers */
+                    if (strncmp(p, "const ", 6) == 0) { p += 6; skip_whitespace_and_comments(&p); }
+                    if (strncmp(p, "async ", 6) == 0) { p += 6; skip_whitespace_and_comments(&p); }
+                    if (strncmp(p, "unsafe ", 7) == 0) { p += 7; skip_whitespace_and_comments(&p); }
+
+                    /* fn declaration */
+                    if (strncmp(p, "fn ", 3) == 0) {
+                        p += 3;
+                        skip_whitespace_and_comments(&p);
+
+                        if (target_cls && target_cls->method_count < XMC_MAX_METHODS) {
+                            MethodInfo* m = &target_cls->methods[target_cls->method_count];
+                            memset(m, 0, sizeof(MethodInfo));
+                            m->is_public = m_pub;
+                            m->is_static = true; /* assume static until we see self */
+
+                            read_identifier(&p, m->name, XMC_MAX_NAME);
+                            skip_whitespace_and_comments(&p);
+
+                            /* Generics */
+                            if (*p == '<') {
+                                int gd = 1; p++;
+                                while (*p && gd > 0) { if (*p == '<') gd++; else if (*p == '>') gd--; p++; }
+                                skip_whitespace_and_comments(&p);
+                            }
+
+                            /* Parameters */
+                            if (*p == '(') {
+                                p++;
+                                m->param_count = 0;
+                                bool has_params = false;
+                                const char* params_start = p;
+                                while (*p && *p != ')') {
+                                    if (*p == ',') m->param_count++;
+                                    if (!isspace((unsigned char)*p)) has_params = true;
+                                    p++;
+                                }
+                                if (has_params) m->param_count++;
+                                /* Check for self parameter */
+                                size_t params_len = (size_t)(p - params_start);
+                                if (params_len > 0) {
+                                    /* Look for &self, &mut self, self, mut self */
+                                    const char* sp = params_start;
+                                    while (sp < p && isspace((unsigned char)*sp)) sp++;
+                                    if (strncmp(sp, "&self", 5) == 0 ||
+                                        strncmp(sp, "&mut self", 9) == 0 ||
+                                        strncmp(sp, "self", 4) == 0 ||
+                                        strncmp(sp, "mut self", 8) == 0) {
+                                        m->is_static = false;
+                                        if (m->param_count > 0) m->param_count--;
+                                    }
+                                }
+                                if (*p == ')') p++;
+                            }
+
+                            /* Return type */
+                            skip_whitespace_and_comments(&p);
+                            if (p[0] == '-' && p[1] == '>') {
+                                p += 2;
+                                skip_whitespace_and_comments(&p);
+                                char rtype[XMC_MAX_NAME] = {0};
+                                int ri = 0;
+                                while (*p && *p != '{' && *p != ';' &&
+                                       ri < XMC_MAX_NAME - 1) {
+                                    if (strncmp(p, "where", 5) == 0 && !isalnum((unsigned char)p[5])) break;
+                                    rtype[ri++] = *p++;
+                                }
+                                rtype[ri] = '\0';
+                                while (ri > 0 && isspace((unsigned char)rtype[ri-1])) rtype[--ri] = '\0';
+                                strncpy(m->return_type, rtype, XMC_MAX_NAME - 1);
+                            } else {
+                                strncpy(m->return_type, "()", XMC_MAX_NAME - 1);
+                            }
+
+                            /* where clause */
+                            if (strncmp(p, "where", 5) == 0) {
+                                while (*p && *p != '{') p++;
+                            }
+
+                            /* Method body */
+                            skip_whitespace_and_comments(&p);
+                            if (*p == '{') {
+                                const char* body_start = p;
+                                skip_block(&p);
+                                m->line_count = count_lines_in_block(body_start, p);
+                                m->complexity = estimate_complexity(body_start, p);
+                                m->is_abstract = false;
+                            } else {
+                                if (*p == ';') p++;
+                                m->is_abstract = true;
+                            }
+
+                            target_cls->method_count++;
+                        } else {
+                            /* Skip the fn */
+                            while (*p && *p != '{' && *p != ';') p++;
+                            if (*p == '{') skip_block(&p);
+                            else if (*p == ';') p++;
+                        }
+                    } else {
+                        /* type alias, const, or other impl item */
+                        while (*p && *p != ';' && *p != '{' && *p != '}') p++;
+                        if (*p == '{') skip_block(&p);
+                        else if (*p == ';') p++;
+                    }
+                }
+            }
+            continue;
+        }
+
+        /* Skip anything else (functions, modules, etc.) */
+        if (*p == '{') { skip_block(&p); }
+        else { p++; }
     }
 
     return true;
@@ -1900,9 +2598,9 @@ static bool emit_xclass(const CompilerState* state, const ClassInfo* cls) {
 static void print_usage(void) {
     printf(
         "xmc — XML Metaclass Compiler for SecureJDK 28\n"
-        "Usage: xmc [options] <source.java|source.py>\n"
+        "Usage: xmc [options] <source.java|source.py|source.rs>\n"
         "\n"
-        "Compiles Java or Python source to .xclass (XML class file format)\n"
+        "Compiles Java, Python, or Rust source to .xclass (XML class file format)\n"
         "with quality democracy, quality woman, and INT tier assessments.\n"
         "\n"
         "Options:\n"
@@ -1913,6 +2611,7 @@ static void print_usage(void) {
         "  --no-sign         Emit without signature\n"
         "  --java            Force Java language detection\n"
         "  --python          Force Python language detection\n"
+        "  --rust            Force Rust language detection\n"
         "  -o PATH           Output directory for .xclass files\n"
         "  -v, --verbose     Show detailed compilation info\n"
         "  -n, --dry-run     Parse and compute without writing output\n"
@@ -1942,6 +2641,8 @@ static void print_usage(void) {
         "  xmc --frame=eu --verbose UserService.java\n"
         "  xmc --tier=3 --color=blue ArtEngine.py\n"
         "  xmc --sign-as=\"mearvk - Installer Tech 2\" Main.java\n"
+        "  xmc engine.rs\n"
+        "  xmc --frame=intl --verbose network.rs\n"
         "\n"
         "Output: SecureJDK 28 .xclass XML format (for jvmINTLoader)\n"
         "Copyright (C) 2026 MEARVK LLC\n"
