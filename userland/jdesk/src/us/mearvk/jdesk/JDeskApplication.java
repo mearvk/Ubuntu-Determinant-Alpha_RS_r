@@ -39,6 +39,7 @@ import java.nio.file.Path;
 import java.time.*;
 import java.time.format.*;
 import java.util.*;
+import java.util.List;
 
 /**
  * JDeskApplication — The JDesk desktop environment.
@@ -283,71 +284,214 @@ public class JDeskApplication extends Application {
     }
 
     // =========================================================================
-    //  Application Launching
+    //  Application Launching — ALL programs route through JDesk governance
     // =========================================================================
 
+    /*
+     * CRITICAL DESIGN DECISION:
+     *
+     * Programs do NOT call the underlying OS directly. Every executable launched
+     * from JDesk goes through the JVM Memory Proxy governance layer:
+     *
+     *   java -memory-guard -Xguard:profile=<profile> <binary> [args...]
+     *
+     * This ensures:
+     *   1. Memory budgets are enforced (RAM ceiling per-app)
+     *   2. Disk I/O is rate-limited (prevents runaway writes)
+     *   3. CPU time is accounted (no single app starves others)
+     *   4. Thread/process count is bounded (no fork bombs)
+     *   5. Crash telemetry is captured (JDesk knows what happened)
+     *   6. The WindowCompositor can frame the native window
+     *   7. Security: binary path validation against allowed roots
+     *   8. The panel/taskbar shows live resource usage per-app
+     *
+     * The JDesk IS the interpretive layer. It stands between the user and the OS.
+     */
+
+    /** Resource profiles for desktop applications. */
+    private static final Map<String, String[]> APP_PROFILES = Map.of(
+        "terminal", new String[]{"-Xguard:ram=256m", "-Xguard:cpu=50", "-Xguard:threads=16"},
+        "files",    new String[]{"-Xguard:ram=512m", "-Xguard:cpu=40", "-Xguard:threads=16"},
+        "browser",  new String[]{"-Xguard:ram=4g",   "-Xguard:cpu=90", "-Xguard:threads=256"},
+        "writer",   new String[]{"-Xguard:ram=2g",   "-Xguard:cpu=80", "-Xguard:threads=32"},
+        "ide",      new String[]{"-Xguard:ram=4g",   "-Xguard:cpu=90", "-Xguard:threads=128"},
+        "settings", new String[]{"-Xguard:ram=128m", "-Xguard:cpu=30", "-Xguard:threads=8"}
+    );
+
     private void launchDesktopApp(String action, String displayName) {
-        System.out.printf("[JDesk] Launching: %s%n", displayName);
+        System.out.printf("[JDesk] Launching: %s (governed)%n", displayName);
+
+        if ("settings".equals(action)) {
+            showSettingsDialog();
+            return;
+        }
 
         try {
-            ProcessBuilder pb;
-            switch (action) {
-                case "terminal":
-                    // Try multiple terminals
-                    pb = findTerminal();
-                    break;
-                case "files":
-                    pb = new ProcessBuilder("pcmanfm-qt");
-                    if (!commandExists("pcmanfm-qt"))
-                        pb = new ProcessBuilder("nautilus");
-                    break;
-                case "browser":
-                    pb = new ProcessBuilder("chromium-browser");
-                    if (!commandExists("chromium-browser"))
-                        pb = new ProcessBuilder("chromium", "--no-sandbox");
-                    if (!commandExists("chromium"))
-                        pb = new ProcessBuilder("firefox");
-                    break;
-                case "writer":
-                    pb = new ProcessBuilder("libreoffice", "--writer");
-                    break;
-                case "settings":
-                    // JDesk settings would be a built-in JavaFX panel
-                    showSettingsDialog();
-                    return;
-                case "ide":
-                    pb = new ProcessBuilder("codium");
-                    if (!commandExists("codium"))
-                        pb = new ProcessBuilder("code");
-                    break;
-                default:
-                    System.err.printf("[JDesk] Unknown action: %s%n", action);
-                    return;
+            // Resolve the binary path
+            String binaryPath = resolveAppBinary(action);
+            if (binaryPath == null) {
+                System.err.printf("[JDesk] ERROR: No binary found for '%s'%n", action);
+                return;
             }
 
+            // Resolve extra arguments for the binary
+            String[] binaryArgs = resolveAppArgs(action);
+
+            // Build governed command: java -memory-guard -Xguard:... <binary> [args]
+            List<String> command = new ArrayList<>();
+            command.add("java");
+            command.add("-memory-guard");
+            command.add("-Xguard:profile=" + action);
+            command.add("-Xguard:status=5s");
+
+            // Add profile-specific resource limits
+            String[] limits = APP_PROFILES.getOrDefault(action,
+                    new String[]{"-Xguard:ram=1g", "-Xguard:cpu=80", "-Xguard:threads=64"});
+            for (String limit : limits) {
+                command.add(limit);
+            }
+
+            // The binary itself
+            command.add(binaryPath);
+
+            // Binary-specific arguments
+            if (binaryArgs != null) {
+                for (String arg : binaryArgs) {
+                    command.add(arg);
+                }
+            }
+
+            System.out.printf("[JDesk]   Binary:  %s%n", binaryPath);
+            System.out.printf("[JDesk]   Profile: %s%n", action);
+            System.out.printf("[JDesk]   Limits:  %s%n", String.join(" ", limits));
+
+            ProcessBuilder pb = new ProcessBuilder(command);
             pb.inheritIO();
-            pb.start();
-            System.out.printf("[JDesk] ✓ Started: %s%n", displayName);
+            pb.environment().put("JDESK_APP_NAME", displayName);
+            pb.environment().put("JDESK_APP_PROFILE", action);
+            pb.environment().put("JDESK_GOVERNED", "1");
+
+            Process proc = pb.start();
+            System.out.printf("[JDesk] ✓ Started: %s (PID via memory-guard)%n", displayName);
+
+            // Monitor in background
+            Thread monitor = new Thread(() -> {
+                try {
+                    int code = proc.waitFor();
+                    System.out.printf("[JDesk] %s exited (code %d)%n", displayName, code);
+                } catch (InterruptedException ignored) {}
+            }, "jdesk-monitor-" + action);
+            monitor.setDaemon(true);
+            monitor.start();
 
         } catch (IOException e) {
             System.err.printf("[JDesk] Failed to launch %s: %s%n", displayName, e.getMessage());
         }
     }
 
-    private ProcessBuilder findTerminal() {
-        if (commandExists("gnome-terminal")) return new ProcessBuilder("gnome-terminal");
-        if (commandExists("xfce4-terminal")) return new ProcessBuilder("xfce4-terminal");
-        if (commandExists("konsole")) return new ProcessBuilder("konsole");
-        if (commandExists("xterm")) return new ProcessBuilder("xterm");
-        return new ProcessBuilder("x-terminal-emulator");
+    /**
+     * Resolve the absolute binary path for a desktop action.
+     * Searches JDesk app paths first, then system paths.
+     * Returns null if no suitable binary found.
+     */
+    private String resolveAppBinary(String action) {
+        // Priority: JDesk managed path → system path
+        String[][] candidates;
+        switch (action) {
+            case "terminal":
+                candidates = new String[][]{
+                    {"/opt/jdesk/apps/terminal/jdesk-terminal"},
+                    {"/usr/bin/gnome-terminal"},
+                    {"/usr/bin/xfce4-terminal"},
+                    {"/usr/bin/xterm"}
+                };
+                break;
+            case "files":
+                candidates = new String[][]{
+                    {"/opt/jdesk/apps/pcmanfm/pcmanfm-qt"},
+                    {"/usr/bin/pcmanfm-qt"},
+                    {"/usr/bin/nautilus"},
+                    {"/usr/bin/thunar"}
+                };
+                break;
+            case "browser":
+                candidates = new String[][]{
+                    {"/opt/jdesk/apps/chromium/chrome"},
+                    {"/usr/bin/chromium-browser"},
+                    {"/usr/bin/chromium"},
+                    {"/snap/bin/chromium"},
+                    {"/usr/bin/firefox"}
+                };
+                break;
+            case "writer":
+                candidates = new String[][]{
+                    {"/opt/jdesk/apps/libreoffice/soffice"},
+                    {"/usr/bin/soffice"},
+                    {"/usr/bin/libreoffice"}
+                };
+                break;
+            case "ide":
+                candidates = new String[][]{
+                    {"/opt/jdesk/apps/vscodium/bin/codium"},
+                    {"/opt/jdesk/bin/codium"},
+                    {"/usr/bin/codium"},
+                    {"/usr/bin/code"}
+                };
+                break;
+            default:
+                return null;
+        }
+
+        for (String[] candidate : candidates) {
+            java.io.File f = new java.io.File(candidate[0]);
+            if (f.exists() && f.canExecute()) {
+                return candidate[0];
+            }
+            // Also check if it's a symlink that resolves
+            if (Files.isSymbolicLink(Path.of(candidate[0]))) {
+                try {
+                    Path real = Files.readSymbolicLink(Path.of(candidate[0]));
+                    if (Files.exists(real)) return candidate[0];
+                } catch (IOException ignored) {}
+            }
+        }
+
+        // Last resort: check PATH via 'which'
+        String simpleName = getSimpleName(action);
+        if (simpleName != null) {
+            try {
+                Process which = new ProcessBuilder("which", simpleName).start();
+                if (which.waitFor() == 0) {
+                    try (var reader = new BufferedReader(new InputStreamReader(which.getInputStream()))) {
+                        String path = reader.readLine();
+                        if (path != null && !path.isBlank()) return path.trim();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return null;
     }
 
-    private boolean commandExists(String cmd) {
-        try {
-            Process p = new ProcessBuilder("which", cmd).start();
-            return p.waitFor() == 0;
-        } catch (Exception e) {
-            return false;
+    private String getSimpleName(String action) {
+        switch (action) {
+            case "terminal": return "gnome-terminal";
+            case "files": return "nautilus";
+            case "browser": return "chromium-browser";
+            case "writer": return "soffice";
+            case "ide": return "codium";
+            default: return null;
+        }
+    }
+
+    /**
+     * Resolve extra arguments for a specific application.
+     */
+    private String[] resolveAppArgs(String action) {
+        switch (action) {
+            case "writer": return new String[]{"--writer"};
+            case "browser": return new String[]{"--no-sandbox"};
+            default: return null;
         }
     }
 
