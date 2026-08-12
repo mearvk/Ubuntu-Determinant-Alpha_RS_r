@@ -43,6 +43,8 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.PickResult;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
@@ -161,14 +163,74 @@ public class JDeskTerminal extends VBox {
         canvas.setPickOnBounds(true);
         canvas.setMouseTransparent(false);
 
-        // Attach scene-level debug filters when scene becomes available (helps diagnose event routing)
+        // Attach scene-level filters and forwarding when scene becomes available.
+        // Some compositors or parent handlers may swallow events; forward scene clicks
+        // that fall within the canvas bounds to the canvas so selection works reliably.
         canvas.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null) {
+                oldScene.removeEventFilter(MouseEvent.MOUSE_PRESSED, this::noopMouseEvent);
+                oldScene.removeEventFilter(MouseEvent.MOUSE_DRAGGED, this::noopMouseEvent);
+                oldScene.removeEventFilter(MouseEvent.MOUSE_RELEASED, this::noopMouseEvent);
+            }
             if (newScene != null) {
-                newScene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
-                    System.out.println("[JDeskTerminal] scene MOUSE_PRESSED target=" + e.getTarget());
+                // Forward pressed
+                newScene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+                    try {
+                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
+                        double sx = e.getSceneX();
+                        double sy = e.getSceneY();
+                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
+                            // If the target is not the canvas, synthesize and forward
+                            if (e.getTarget() != canvas) {
+                                double lx = sx - b.getMinX();
+                                double ly = sy - b.getMinY();
+                                PickResult pr = new PickResult(canvas, lx, ly);
+                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_PRESSED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
+                                canvas.fireEvent(me);
+                                e.consume();
+                            }
+                        }
+                    } catch (Exception ex) {
+                        // Don't let diagnostics break the terminal
+                    }
                 });
-                newScene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
-                    System.out.println("[JDeskTerminal] scene MOUSE_CLICKED target=" + e.getTarget() + " count=" + e.getClickCount());
+
+                // Forward dragged
+                newScene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+                    try {
+                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
+                        double sx = e.getSceneX();
+                        double sy = e.getSceneY();
+                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
+                            if (e.getTarget() != canvas) {
+                                double lx = sx - b.getMinX();
+                                double ly = sy - b.getMinY();
+                                PickResult pr = new PickResult(canvas, lx, ly);
+                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_DRAGGED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
+                                canvas.fireEvent(me);
+                                e.consume();
+                            }
+                        }
+                    } catch (Exception ex) {}
+                });
+
+                // Forward released
+                newScene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+                    try {
+                        javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
+                        double sx = e.getSceneX();
+                        double sy = e.getSceneY();
+                        if (sx >= b.getMinX() && sx <= b.getMaxX() && sy >= b.getMinY() && sy <= b.getMaxY()) {
+                            if (e.getTarget() != canvas) {
+                                double lx = sx - b.getMinX();
+                                double ly = sy - b.getMinY();
+                                PickResult pr = new PickResult(canvas, lx, ly);
+                                MouseEvent me = new MouseEvent(MouseEvent.MOUSE_RELEASED, lx, ly, e.getScreenX(), e.getScreenY(), e.getButton(), e.getClickCount(), e.isShiftDown(), e.isControlDown(), e.isAltDown(), e.isMetaDown(), e.isPrimaryButtonDown(), e.isMiddleButtonDown(), e.isSecondaryButtonDown(), true, e.isPopupTrigger(), e.isStillSincePress(), pr);
+                                canvas.fireEvent(me);
+                                e.consume();
+                            }
+                        }
+                    } catch (Exception ex) {}
                 });
             }
         });
@@ -189,9 +251,15 @@ public class JDeskTerminal extends VBox {
             int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
             c = Math.max(0, Math.min(cols - 1, c));
             r = Math.max(0, Math.min(rows - 1, r));
-            selecting = true;
-            selStartCol = selEndCol = c;
-            selStartRow = selEndRow = r;
+            if (e.isShiftDown() && selStartRow >= 0) {
+                // extend selection
+                selEndCol = c;
+                selEndRow = r;
+            } else {
+                selecting = true;
+                selStartCol = selEndCol = c;
+                selStartRow = selEndRow = r;
+            }
             render();
             e.consume();
         });
