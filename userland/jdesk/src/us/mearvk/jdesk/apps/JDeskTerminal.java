@@ -163,34 +163,63 @@ public class JDeskTerminal extends VBox {
         setOnKeyTyped(this::handleKeyTyped);
 
         // Mouse selection (canvas coordinates -> character grid)
+        canvas.setFocusTraversable(true);
         canvas.setOnMousePressed(e -> {
+            // Ensure canvas owns focus for keyboard input after click
+            canvas.requestFocus();
             double x = e.getX();
             double y = e.getY();
-            int c = (int)((x - 8) / CHAR_WIDTH);
-            int r = (int)((y - 4) / CHAR_HEIGHT);
+            int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
+            int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
             c = Math.max(0, Math.min(cols - 1, c));
             r = Math.max(0, Math.min(rows - 1, r));
             selecting = true;
             selStartCol = selEndCol = c;
             selStartRow = selEndRow = r;
             render();
+            e.consume();
         });
         canvas.setOnMouseDragged(e -> {
             double x = e.getX();
             double y = e.getY();
-            int c = (int)((x - 8) / CHAR_WIDTH);
-            int r = (int)((y - 4) / CHAR_HEIGHT);
+            int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
+            int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
             c = Math.max(0, Math.min(cols - 1, c));
             r = Math.max(0, Math.min(rows - 1, r));
             selEndCol = c;
             selEndRow = r;
             render();
+            e.consume();
         });
         canvas.setOnMouseReleased(e -> {
             selecting = false;
             String sel = getSelectedText();
             if (sel != null && !sel.isEmpty()) {
                 copySelectionToClipboard(sel);
+            }
+            e.consume();
+        });
+        // Double-click selects word
+        canvas.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                double x = e.getX();
+                double y = e.getY();
+                int c = (int)Math.floor((x - 8) / CHAR_WIDTH);
+                int r = (int)Math.floor((y - 4) / CHAR_HEIGHT);
+                c = Math.max(0, Math.min(cols - 1, c));
+                r = Math.max(0, Math.min(rows - 1, r));
+                // expand to word boundaries
+                int sc = c, ec = c;
+                char ch;
+                while (sc > 0 && (ch = screenBuffer[r][sc - 1]) > 32) sc--;
+                while (ec < cols - 1 && (ch = screenBuffer[r][ec + 1]) > 32) ec++;
+                selStartRow = selEndRow = r;
+                selStartCol = sc;
+                selEndCol = ec;
+                String sel = getSelectedText();
+                if (sel != null && !sel.isEmpty()) copySelectionToClipboard(sel);
+                render();
+                e.consume();
             }
         });
 
