@@ -1,0 +1,12 @@
+s/cx/æ/g
+s/gx/ø/g
+s/hx/¶/g
+s/jx/¼/g
+s/sx/þ/g
+s/ux/ý/g
+s/Cx/Æ/g
+s/Gx/Ø/g
+s/Hx/¦/g
+s/Jx/¬/g
+s/Sx/Þ/g
+s/Ux/Ý/g

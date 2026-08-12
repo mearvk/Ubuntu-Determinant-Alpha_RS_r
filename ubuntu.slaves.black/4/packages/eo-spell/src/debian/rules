@@ -1,0 +1,93 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Make sure build is always done in a reproducible and working
+# language environment
+LC_ALL = C
+export LC_ALL
+
+# Useful only to build aspell official dir
+ASPELL6BASENAME = aspell6-eo
+ASPELL6DIR      = $(CURDIR)/debian/$(ASPELL6BASENAME)
+ASPELLPROC      = /usr/share/aspell-lang/proc    # Location of proc script
+
+TMP_BUILD       = tmp-build
+
+MUNCHED_WORDS   = kerno.txt \
+  komputo.txt \
+  etnoland.txt \
+  kancero.txt \
+  movado.txt \
+  personoj.txt
+
+%:
+	dh $@
+
+
+override_dh_auto_build:
+	mkdir -p $(TMP_BUILD)
+
+	cp README $(TMP_BUILD)/README.ispell
+	cp legumin.l3 $(TMP_BUILD)/legumin.l3.ispell
+	cat $(MUNCHED_WORDS) | sort -uf > $(TMP_BUILD)/kune.txt
+	gzip -9n -c $(TMP_BUILD)/kune.txt > $(TMP_BUILD)/esperanto.mwl.gz
+	cp eo.aff $(TMP_BUILD)/esperanto.aff
+
+	# Create ispell latin3 munched wordlist and affix file from cx default.
+	sed -f debian/cx2latin3.sed $(TMP_BUILD)/kune.txt > $(TMP_BUILD)/eo.wl
+	sed -f debian/cx2latin3.sed eo.aff                > $(TMP_BUILD)/eo-latin3-base.aff
+
+	# Create myspell latin3 munched wordlist and affix file
+	( echo `cat $(TMP_BUILD)/eo.wl | wc -l`; cat $(TMP_BUILD)/eo.wl ) > $(TMP_BUILD)/eo.dic
+	ispellaff2myspell --charset=latin3 --myheader=debian/eo_ALL.header \
+		$(TMP_BUILD)/eo-latin3-base.aff > $(TMP_BUILD)/eo.aff
+
+	# Copy aspell affix file with preferred name and prepare .cwl
+	cat $(TMP_BUILD)/eo.wl | prezip -s -c | gzip -9n -c > $(TMP_BUILD)/eo.cwl.gz
+	cp  $(TMP_BUILD)/eo.aff $(TMP_BUILD)/eo_affix.dat
+
+	# Build stuff for aspell cx pseudocharset
+	buildhash $(TMP_BUILD)/kune.txt eo.aff eo.hash
+	cat $(TMP_BUILD)/kune.txt | ispell -d ./eo -e | tr -s ' ' '\n' | sort -u > $(TMP_BUILD)/eo-cx.wl
+	cat $(TMP_BUILD)/eo-cx.wl | grep -v -e "-'$$" | prezip -s -c | gzip -9n -c > $(TMP_BUILD)/eo-cx.cwl.gz
+
+	# Build esperanto wordlist
+	unmunch $(TMP_BUILD)/eo.dic $(TMP_BUILD)/eo.aff \
+		| iconv -f latin3 -t utf-8 \
+		| sed -f debian/cx2utf8.sed > $(TMP_BUILD)/esperanto
+
+override_dh_auto_clean:
+	rm -rf $(TMP_BUILD)
+	rm -f eo.hash kune.txt.cnt kune.txt.stat
+	if [ -d $(ASPELL6DIR) ]; then \
+		rm $(ASPELL6DIR)/* && rmdir $(ASPELL6DIR); fi
+
+	dh_auto_clean
+
+override_dh_auto_install:
+	installdeb-ispell   -piesperanto
+	installdeb-aspell   -paspell-eo
+	installdeb-aspell   -paspell-eo-cx7
+	installdeb-hunspell -pmyspell-eo
+	installdeb-wordlist -pwesperanto
+	dh_auto_install
+
+# Useful only to build aspell official dir
+aspelltgz: clean build
+	mkdir -p $(ASPELL6DIR)
+	install -m 644 debian/aspell/Copyright $(ASPELL6DIR)
+	install -m 644 debian/aspell/info $(ASPELL6DIR)
+	install -m 644 debian/aspell/eo.dat $(ASPELL6DIR)
+	install -m 644 $(TMP_BUILD)/README.ispell $(TMP_BUILD)/legumin.l3.ispell $(ASPELL6DIR)
+	install -m 644 debian/README.aspell $(ASPELL6DIR)/README
+	install -m 644$(TMP_BUILD)/eo.aff $(ASPELL6DIR)/eo_affix.dat
+	cat $(TMP_BUILD)/eo.dic | sed 1d | LC_COLLATE=C sort -u | \
+		aspell --local-data-dir=$(ASPELL6DIR) --lang=eo  clean > $(ASPELL6DIR)/eo.wl
+	( cd $(ASPELL6DIR) && \
+		ln -sf $(ASPELLPROC) proc && \
+		perl proc && \
+		./configure && \
+		make dist )
+	mv $(ASPELL6DIR)/$(ASPELL6BASENAME)*.tar.bz2 ..

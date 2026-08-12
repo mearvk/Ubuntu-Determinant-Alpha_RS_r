@@ -1,0 +1,116 @@
+#!/usr/bin/make -f
+# This file is public domain software, originally written by Joey Hess
+# and modified by Anton Zinoviev.
+
+# Uncomment this to turn on verbose mode. 
+#export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+export LANG=C
+
+build_dir=bin/build_dictionaries
+
+build-arch build-indep: build
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	cd ${build_dir} && ./build_aspell.sh
+	cd ${build_dir} && ./build_OOo.sh
+	awk '{ \
+		if($$1 == "SET") \
+			print "SET cp1251"; \
+		else if ($$1 == "SFX" && $$5 == "." && $$3 != "0") { \
+			print $$1, $$2, $$3, $$4, $$3; \
+		} else { \
+			print; \
+		} \
+	     }' ${build_dir}/bg_BG.aff >debian/bg_affix.dat
+	LANG=bg_BG aspell munch-list --dict-dir=debian/ \
+	    < ${build_dir}/bg_words.dat \
+	    > debian/bg.wl
+	awk '{ \
+		if($$1 == "SET") \
+			print "SET UTF-8"; \
+		else \
+			print; \
+	     }' ${build_dir}/bg_BG.aff | konwert cp1251-utf8 > debian/bg_BG.aff
+	awk -f debian/oo2ispell.awk <${build_dir}/bg_BG.aff >${build_dir}/bulgarian.aff
+	tail -n +2 <${build_dir}/bg_BG.dic | sort -t/ -k1,1 -f >${build_dir}/bulgarian.dic
+	konwert -O cp1251-utf8 ${build_dir}/bg_BG.dic
+	cd ${build_dir} && buildhash bulgarian.dic bulgarian.aff bulgarian.hash
+	LC_ALL=bg_BG sort ${build_dir}/bg_words.dat \
+	       | konwert cp1251-utf8 \
+	       > ${build_dir}/bulgarian
+	mkdir -p debian/docs
+	konwert cp1251-utf8 README >debian/docs/README
+	konwert cp1251-utf8 THANKS >debian/docs/THANKS
+	konwert cp1251-utf8 TODO >debian/docs/TODO
+	konwert cp1251-utf8 ChangeLog > debian/docs/changelog
+	touch build-stamp
+
+clean:
+	dh_testdir
+#	dh_testroot
+	rm -rf debian/docs
+	dh_clean
+
+install: DH_OPTIONS=
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	dh_install
+#	Installing dict-common stuff
+	installdeb-wordlist --package=wbulgarian # calls dh_installdebconf
+	installdeb-ispell --package=ibulgarian # calls dh_installdebconf
+# Install the wordlists compressed as .mwl.gz, .wl.gz, or .cwl.gz to
+# /usr/share/aspell.
+	install -m644 debian/bg.wl debian/aspell-bg/usr/share/aspell/bg.wl
+	gzip -9vn debian/aspell-bg/usr/share/aspell/bg.wl
+# Install our version of the British word list
+	zcat /usr/share/aspell/en-common.cwl.gz \
+		/usr/share/aspell/en_GB-ise-wo_accents-only.cwl.gz >en.cwl
+	precat <en.cwl >debian/aspell-bg/usr/share/aspell/bg-en.wl
+	gzip -9vn debian/aspell-bg/usr/share/aspell/bg-en.wl
+	rm en.cwl
+# Append the $WORDLIST to the file
+# "/usr/share/aspell/$DICT_LANG/.contents".  The .contents file should
+# contain one $WORDLIST per line.
+	install -m644 debian/bg.contents debian/aspell-bg/usr/share/aspell/bg.contents
+# Add a postinst call to "/usr/sbin/update-dictcommon-aspell"--the
+# easiest way to do this is to build-depend on dictionaries-common-dev
+# (>= 0.9.1) and run installdeb-aspell from debian/rules.
+	installdeb-aspell --package=aspell-bg
+	dh_installdebconf -paspell-bg
+
+binary-common:
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs debian/docs/changelog
+	dh_installdocs -A debian/docs/*
+#	dh_installdebconf
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture independant packages using the common target.
+binary-indep: install
+	 $(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
+
+# Build architecture dependant packages using the common target.
+binary-arch: install
+	$(MAKE) -f debian/rules DH_OPTIONS=-a binary-common
+
+# Any other binary targets build just one binary package at a time.
+binary-%: install
+	make -f debian/rules binary-common DH_OPTIONS=-p$*
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

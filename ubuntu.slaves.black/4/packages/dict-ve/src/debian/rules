@@ -1,0 +1,94 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+export SHELL = /bin/bash
+lc=ve
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+
+
+build: build-stamp
+build-stamp:
+	$(MAKE) -C $(lc) myspell
+#	$(MAKE) -C $(lc) aspell
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+	-$(MAKE) -C utils clean
+	-$(MAKE) -C $(lc) clean
+	rm -f $(lc)/myspell/*.zip $(lc)/myspell/*.xpi
+	rm -f $(lc)/wordlists/*.zip
+	dh_clean 
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k 
+
+	: # install myspell
+	dh_installdirs -pmyspell-$(lc) \
+		usr/share/myspell/dicts
+
+#	install -m644 $(lc)/hyph/hyph_ve_ZA.dic \
+#		debian/myspell-$(lc)/usr/share/myspell/dicts/
+	installdeb-myspell -pmyspell-$(lc) --srcdir=$(lc)/myspell
+
+ifeq (0,1)
+	: # install aspell
+	dh_installdirs -paspell-$(lc) \
+		var/lib/aspell usr/lib/aspell usr/share/aspell
+
+	install -m644 */aspell/*.{alias,dat,multi} \
+		debian/aspell-$(lc)/usr/lib/aspell
+
+	for f in */aspell/*.cwl; do \
+	    bf=`basename $$f .cwl`; \
+	    gzip -9 -c $$f > debian/aspell-$(lc)/usr/share/aspell/$$bf.cwl.gz; \
+	    WL=`echo $$f | sed 's/\.cwl$$//'`; \
+	    touch debian/aspell-$(lc)/var/lib/aspell/$$bf.rws; \
+	    dh_link -paspell-$(lc) \
+		var/lib/aspell/$$bf.rws usr/lib/aspell/$$bf.rws; \
+	    echo "$$bf" >> "debian/aspell-$(lc)/usr/share/aspell/$(lc).contents"; \
+	done
+
+	installdeb-aspell -paspell-$(lc)
+endif
+
+
+# Must not depend on anything. This is to be called by
+# binary-arch/binary-indep
+# in another 'make' thread.
+binary-common:
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress 
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture independant packages using the common target.
+binary-indep: build install
+	$(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
+
+# Build architecture dependant packages using the common target.
+binary-arch:
+# nothing to do
+
+binary: binary-arch binary-indep
+.PHONY: build clean binary-indep binary-arch binary install

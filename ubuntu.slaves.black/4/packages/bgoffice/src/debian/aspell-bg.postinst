@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        VAR=/var/lib/aspell
+        for f in $VAR/bg-en.rws $VAR/bg.rws $VAR/bg.compat; do
+            [ -e $f ] || touch $f
+        done
+
+        DIR="/usr/lib/aspell"
+        update-alternatives --install $DIR/bg.multi \
+	    bulgarian-aspell-dictionary $DIR/bg-w_english.multi 60
+        update-alternatives --install $DIR/bg.multi \
+	    bulgarian-aspell-dictionary $DIR/bg-wo_english.multi 40
+	;;
+    
+    abort-upgrade|abort-remove|abort-deconfigure)
+	;;
+    
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+	;;
+esac
+
+if dpkg-maintscript-helper supports rm_conffile; then
+    dpkg-maintscript-helper rm_conffile \
+      /etc/emacs21/site-start.d/90aspell-bg.el 3.0-10 aspell-bg -- "$@"
+fi
+
+#DEBHELPER#
+
+exit 0
