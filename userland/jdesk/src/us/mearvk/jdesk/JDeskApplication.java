@@ -445,8 +445,13 @@ public class JDeskApplication extends Application {
     private void launchDesktopApp(String action, String displayName) {
         System.out.printf("[JDesk] Launching: %s (governed)%n", displayName);
 
+        // --- JDesk-native apps (skinned in JavaFX, call native binary) ---
         if ("settings".equals(action)) {
             showSettingsDialog();
+            return;
+        }
+        if ("terminal".equals(action)) {
+            openJDeskTerminal();
             return;
         }
 
@@ -617,6 +622,105 @@ public class JDeskApplication extends Application {
             case "browser": return new String[]{"--no-sandbox"};
             default: return null;
         }
+    }
+
+    // =========================================================================
+    //  JDesk Terminal (JavaFX GUI, native shell backend)
+    // =========================================================================
+
+    /**
+     * Open a JDesk Terminal window — JavaFX renders the GUI,
+     * /bin/bash runs as a governed subprocess.
+     * This is the model for unified JDesk app skinning.
+     */
+    private void openJDeskTerminal() {
+        // Create terminal widget
+        us.mearvk.jdesk.apps.JDeskTerminal terminal = new us.mearvk.jdesk.apps.JDeskTerminal(100, 28);
+
+        // Wrap in a floating window on the desktop
+        VBox termWindow = new VBox(0);
+        termWindow.setPrefSize(terminal.getTerminalWidth() + 2, terminal.getTerminalHeight() + 40);
+        termWindow.setLayoutX(120);
+        termWindow.setLayoutY(80);
+        termWindow.setStyle(
+            "-fx-background-color: #1A1D23;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #3A3E48;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 20, 0, 0, 6);"
+        );
+
+        // Title bar with circular close button
+        HBox titleBar = new HBox(8);
+        titleBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        titleBar.setPadding(new Insets(8, 12, 8, 12));
+        titleBar.setStyle("-fx-background-color: #22252B; -fx-background-radius: 10 10 0 0;");
+
+        // Circular close button (pearl style)
+        Button closeBtn = new Button("");
+        closeBtn.setMinSize(13, 13);
+        closeBtn.setMaxSize(13, 13);
+        closeBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        );
+        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
+            "-fx-background-color: #FF5F56;" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #E04840;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        closeBtn.setOnAction(e -> {
+            terminal.stop();
+            desktopSurface.getChildren().remove(termWindow);
+        });
+
+        Label titleLabel = new Label("Terminal");
+        titleLabel.setStyle(
+            "-fx-text-fill: #A0A8B0;" +
+            "-fx-font-size: 12px;" +
+            "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+            "-fx-font-weight: 500;"
+        );
+
+        titleBar.getChildren().addAll(closeBtn, titleLabel);
+
+        // Enable dragging the window
+        final double[] dragOffset = new double[2];
+        titleBar.setOnMousePressed(e -> {
+            dragOffset[0] = e.getSceneX() - termWindow.getLayoutX();
+            dragOffset[1] = e.getSceneY() - termWindow.getLayoutY();
+        });
+        titleBar.setOnMouseDragged(e -> {
+            termWindow.setLayoutX(e.getSceneX() - dragOffset[0]);
+            termWindow.setLayoutY(e.getSceneY() - dragOffset[1]);
+        });
+
+        termWindow.getChildren().addAll(titleBar, terminal);
+        desktopSurface.getChildren().add(termWindow);
+
+        // Start the shell
+        terminal.start();
+
+        // Focus the terminal for keyboard input
+        Platform.runLater(terminal::requestFocus);
+
+        System.out.println("[JDesk] ✓ Terminal opened (JavaFX GUI → /bin/bash native)");
     }
 
     // =========================================================================
