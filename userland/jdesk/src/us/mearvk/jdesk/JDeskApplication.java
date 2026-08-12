@@ -80,8 +80,8 @@ public class JDeskApplication extends Application {
         desktopSurface = new Pane();
         desktopSurface.setStyle(
             "-fx-background-color: radial-gradient(" +
-            "center 50% 40%, radius 80%, " +
-            "#FAFCFF 0%, #F4F7FC 60%, #EDF1F8 100%);"
+            "center 50% 45%, radius 70%, " +
+            "#2A2A2E 0%, #1E1E22 50%, #141418 100%);"
         );
 
         // === Icon Grid on Desktop ===
@@ -137,76 +137,123 @@ public class JDeskApplication extends Application {
 
     private GridPane createDesktopIcons() {
         GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(16);
-        grid.setPadding(new Insets(32));
-        grid.setLayoutX(32);
-        grid.setLayoutY(32);
+        grid.setHgap(24);
+        grid.setVgap(24);
+        grid.setPadding(new Insets(48));
+        grid.setLayoutX(40);
+        grid.setLayoutY(40);
 
-        // Desktop icon entries: name, emoji/placeholder, action
+        // Load the single JDesk icon (Java cup, used for all apps)
+        Image jdeskIcon = loadJDeskIcon();
+
+        // Desktop icon entries: name, action
         String[][] icons = {
-            {"Terminal",   "🖥", "terminal"},
-            {"Files",      "📁", "files"},
-            {"Browser",    "🌐", "browser"},
-            {"Writer",     "📝", "writer"},
-            {"Settings",   "⚙", "settings"},
-            {"IDE",        "💻", "ide"},
+            {"Settings",  "settings"},
+            {"Terminal",  "terminal"},
+            {"IDE",       "ide"},
+            {"Browser",   "browser"},
+            {"Writer",    "writer"},
+            {"Files",     "files"},
+            {"Software",  "software"},
+            {"Launcher",  "launcher"},
         };
 
         int col = 0, row = 0;
         for (String[] entry : icons) {
-            VBox cell = createIconCell(entry[0], entry[1], entry[2]);
+            VBox cell = createIconCell(entry[0], entry[1], jdeskIcon);
             grid.add(cell, col, row);
             col++;
-            if (col >= 2) { col = 0; row++; }
+            if (col >= 4) { col = 0; row++; }
         }
+
+        // Enable drag-to-reorder on the grid
+        enableGridDrag(grid);
 
         return grid;
     }
 
-    private VBox createIconCell(String name, String emoji, String action) {
-        VBox cell = new VBox(4);
+    /**
+     * Load the JDesk icon PNG. Tries multiple paths.
+     */
+    private Image loadJDeskIcon() {
+        String[] paths = {
+            "userland/jdesk/native-apps/icons/jdesk-icon.png",
+            "native-apps/icons/jdesk-icon.png",
+            "/opt/jdesk/icons/jdesk-icon.png",
+            "icons/jdesk-icon.png"
+        };
+
+        for (String path : paths) {
+            java.io.File f = new java.io.File(path);
+            if (f.exists()) {
+                return new Image(f.toURI().toString(), 64, 64, true, true);
+            }
+        }
+
+        // Fallback: return null (icon cell will be empty)
+        System.err.println("[JDesk] Warning: jdesk-icon.png not found");
+        return null;
+    }
+
+    /**
+     * Create a desktop icon cell with the JDesk icon and gray/white label.
+     */
+    private VBox createIconCell(String name, String action, Image icon) {
+        VBox cell = new VBox(8);
         cell.setAlignment(Pos.CENTER);
-        cell.setPrefSize(88, 88);
+        cell.setPrefSize(100, 110);
         cell.setPadding(new Insets(8));
-        cell.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-background-radius: 10;"
-        );
+        cell.setStyle("-fx-background-color: transparent;");
 
-        // Icon (emoji as text for now — real version uses SVG)
-        Label iconLabel = new Label(emoji);
-        iconLabel.setStyle(
-            "-fx-font-size: 32px;" +
-            "-fx-text-fill: #4A90D9;"
-        );
+        // Icon image (the Java cup PNG — same for all)
+        ImageView iconView = new ImageView();
+        iconView.setFitWidth(64);
+        iconView.setFitHeight(64);
+        iconView.setSmooth(true);
+        iconView.setPreserveRatio(true);
+        if (icon != null) {
+            iconView.setImage(icon);
+        }
 
-        // Name
+        // Name label — gray and white
         Label nameLabel = new Label(name);
         nameLabel.setStyle(
-            "-fx-font-size: 11px;" +
+            "-fx-font-size: 12px;" +
             "-fx-font-family: 'Inter', system-ui, sans-serif;" +
-            "-fx-text-fill: #1B2433;" +
-            "-fx-font-weight: 500;"
+            "-fx-text-fill: #E8E8E8;" +
+            "-fx-font-weight: 500;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 2, 0, 0, 1);"
         );
-        nameLabel.setMaxWidth(80);
+        nameLabel.setMaxWidth(92);
         nameLabel.setWrapText(true);
         nameLabel.setAlignment(Pos.CENTER);
 
-        cell.getChildren().addAll(iconLabel, nameLabel);
+        cell.getChildren().addAll(iconView, nameLabel);
 
-        // Hover
-        cell.setOnMouseEntered(e -> cell.setStyle(
-            "-fx-background-color: rgba(74, 144, 217, 0.06);" +
-            "-fx-background-radius: 10;" +
-            "-fx-border-color: rgba(74, 144, 217, 0.15);" +
-            "-fx-border-radius: 10;" +
-            "-fx-border-width: 1;"
-        ));
-        cell.setOnMouseExited(e -> cell.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-background-radius: 10;"
-        ));
+        // Hover effect
+        cell.setOnMouseEntered(e -> {
+            cell.setStyle(
+                "-fx-background-color: rgba(255, 255, 255, 0.08);" +
+                "-fx-background-radius: 12;"
+            );
+            nameLabel.setStyle(
+                "-fx-font-size: 12px;" +
+                "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+                "-fx-text-fill: #FFFFFF;" +
+                "-fx-font-weight: 600;" +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 2, 0, 0, 1);"
+            );
+        });
+        cell.setOnMouseExited(e -> {
+            cell.setStyle("-fx-background-color: transparent;");
+            nameLabel.setStyle(
+                "-fx-font-size: 12px;" +
+                "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+                "-fx-text-fill: #E8E8E8;" +
+                "-fx-font-weight: 500;" +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 2, 0, 0, 1);"
+            );
+        });
 
         // Double-click to launch
         cell.setOnMouseClicked(event -> {
@@ -219,6 +266,84 @@ public class JDeskApplication extends Application {
     }
 
     // =========================================================================
+    //  Grid Drag-to-Reorder (move icons freely on grid)
+    // =========================================================================
+
+    private double dragStartX, dragStartY;
+    private VBox draggedCell = null;
+
+    private void enableGridDrag(GridPane grid) {
+        for (javafx.scene.Node node : grid.getChildren()) {
+            if (node instanceof VBox) {
+                VBox cell = (VBox) node;
+                enableCellDrag(cell, grid);
+            }
+        }
+    }
+
+    private void enableCellDrag(VBox cell, GridPane grid) {
+        cell.setOnMousePressed(e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY && e.getClickCount() == 1) {
+                draggedCell = cell;
+                dragStartX = e.getSceneX();
+                dragStartY = e.getSceneY();
+                cell.setOpacity(0.7);
+                cell.toFront();
+            }
+        });
+
+        cell.setOnMouseDragged(e -> {
+            if (draggedCell == cell) {
+                double deltaX = e.getSceneX() - dragStartX;
+                double deltaY = e.getSceneY() - dragStartY;
+                cell.setTranslateX(deltaX);
+                cell.setTranslateY(deltaY);
+            }
+        });
+
+        cell.setOnMouseReleased(e -> {
+            if (draggedCell == cell) {
+                cell.setOpacity(1.0);
+
+                // Determine new grid position from drop location
+                double dropX = e.getSceneX() - grid.getLayoutX() - grid.getPadding().getLeft();
+                double dropY = e.getSceneY() - grid.getLayoutY() - grid.getPadding().getTop();
+
+                int newCol = Math.max(0, Math.min(3, (int)(dropX / 120)));
+                int newRow = Math.max(0, (int)(dropY / 130));
+
+                // Get current position
+                Integer oldCol = GridPane.getColumnIndex(cell);
+                Integer oldRow = GridPane.getRowIndex(cell);
+                if (oldCol == null) oldCol = 0;
+                if (oldRow == null) oldRow = 0;
+
+                // Swap with whatever is at the new position
+                for (javafx.scene.Node other : grid.getChildren()) {
+                    Integer otherCol = GridPane.getColumnIndex(other);
+                    Integer otherRow = GridPane.getRowIndex(other);
+                    if (otherCol == null) otherCol = 0;
+                    if (otherRow == null) otherRow = 0;
+
+                    if (otherCol == newCol && otherRow == newRow && other != cell) {
+                        GridPane.setColumnIndex(other, oldCol);
+                        GridPane.setRowIndex(other, oldRow);
+                        break;
+                    }
+                }
+
+                GridPane.setColumnIndex(cell, newCol);
+                GridPane.setRowIndex(cell, newRow);
+
+                // Reset translation
+                cell.setTranslateX(0);
+                cell.setTranslateY(0);
+                draggedCell = null;
+            }
+        });
+    }
+
+    // =========================================================================
     //  Panel (Taskbar)
     // =========================================================================
 
@@ -228,10 +353,9 @@ public class JDeskApplication extends Application {
         bar.setPrefHeight(48);
         bar.setPadding(new Insets(0, 16, 0, 16));
         bar.setStyle(
-            "-fx-background-color: rgba(242, 245, 250, 0.92);" +
-            "-fx-border-color: #D8E0EA transparent transparent transparent;" +
-            "-fx-border-width: 1 0 0 0;" +
-            "-fx-effect: dropshadow(gaussian, rgba(30,50,80,0.06), 6, 0, 0, -2);"
+            "-fx-background-color: rgba(30, 30, 34, 0.95);" +
+            "-fx-border-color: #3A3A40 transparent transparent transparent;" +
+            "-fx-border-width: 1 0 0 0;"
         );
 
         // JDesk logo / activities button
@@ -240,7 +364,7 @@ public class JDeskApplication extends Application {
             "-fx-font-size: 13px;" +
             "-fx-font-family: 'Inter', system-ui, sans-serif;" +
             "-fx-font-weight: 600;" +
-            "-fx-text-fill: #4A90D9;"
+            "-fx-text-fill: #A0A0A8;"
         );
 
         // Spacer
@@ -253,14 +377,14 @@ public class JDeskApplication extends Application {
             "-fx-font-size: 12px;" +
             "-fx-font-family: 'Inter', system-ui, sans-serif;" +
             "-fx-font-weight: 500;" +
-            "-fx-text-fill: #5C6B7A;"
+            "-fx-text-fill: #B0B0B8;"
         );
 
         // System indicators
         Label indicators = new Label("⚡ 🔊 🌐");
         indicators.setStyle(
             "-fx-font-size: 12px;" +
-            "-fx-text-fill: #5C6B7A;"
+            "-fx-text-fill: #888890;"
         );
 
         bar.getChildren().addAll(logo, spacer, indicators, clockLabel);
