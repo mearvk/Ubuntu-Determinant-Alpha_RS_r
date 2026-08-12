@@ -2401,6 +2401,44 @@ Admin: `/proc/jvm-proxy/{status, PID/status, PID/memory, PID/io, PID/cpu, PID/al
 
 A 4-tier loading structure for the Secure JDK 28 that organizes intellectual (INT) concerns into a self-supporting hierarchy. The system provides an **inferrer** that determines the correct tier for incoming work, and an **orderer** that sequences INT operations through the correct channels.
 
+### XML Class File Type Association
+
+The SecureJDK 28 has an XML-based class file type (`.xclass`) that carries rich metadata: provenance, design intent, security grades, dependencies, optimization hints, and contracts. Because the XML class file declares structure **explicitly**, we can derive a basic inheritance about the overall math of structure at load time:
+
+| .xclass Element | Structural Derivation |
+|-----------------|----------------------|
+| `<identity>` (bytecode, super, interfaces) | Module weight W(C) |
+| `<dependencies>` + interfaces | Lateral count L(C) |
+| `<design>` (intent, pattern, contracts) | INT complexity I(C) |
+| `<security>` (trust-grade, classload-grade) | Executive concern / Tier 4 |
+| `<hints>` (hot methods, inline) | Optimization intelligence |
+
+### Basic Inheritance — Math of Structure
+
+Given the XML class file type, every class has a computable position in the loading structure:
+
+```
+W_total(C) = W(C) + W(super(C)) + W(super(super(C))) + ...
+L_total(C) = L(C) + Σ L(interface_i)
+I_total(C) = max(I(C), I(super(C)), I(interface_1), ..., I(interface_n))
+S(C) >= W_total(subclasses_of(C))
+```
+
+| Equation | Meaning |
+|----------|---------|
+| W_total | Total inherited weight — class carries its ancestry |
+| L_total | Total lateral reach — interfaces define connectivity |
+| I_total | Effective INT level — rises through inheritance, never falls |
+| S >= W_sub | Support obligation — a class must carry all its inheritors |
+
+This creates a **structural tree** where:
+- `Object` is the heaviest support (carries everything)
+- Abstract classes carry their implementors
+- Interfaces define lateral reach
+- Final classes are leaves (carry no one, can be lightweight)
+
+For binary `.class` files (0xCAFEBABE), the inferrer uses heuristics (approximate). For XML `.xclass` files, placement is **exact** because the metadata is declared explicitly.
+
 ### The Four Tiers
 
 | Tier | Name | Role | Self-Support |
