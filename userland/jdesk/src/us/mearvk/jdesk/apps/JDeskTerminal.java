@@ -157,6 +157,22 @@ public class JDeskTerminal extends VBox {
         setPadding(new Insets(4));
         getChildren().add(canvas);
 
+        // Ensure canvas receives pointer events
+        canvas.setPickOnBounds(true);
+        canvas.setMouseTransparent(false);
+
+        // Attach scene-level debug filters when scene becomes available (helps diagnose event routing)
+        canvas.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+                    System.out.println("[JDeskTerminal] scene MOUSE_PRESSED target=" + e.getTarget());
+                });
+                newScene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
+                    System.out.println("[JDeskTerminal] scene MOUSE_CLICKED target=" + e.getTarget() + " count=" + e.getClickCount());
+                });
+            }
+        });
+
         // Key input
         setFocusTraversable(true);
         setOnKeyPressed(this::handleKeyPressed);
