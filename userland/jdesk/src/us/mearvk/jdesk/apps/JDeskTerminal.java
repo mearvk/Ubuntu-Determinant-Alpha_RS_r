@@ -578,7 +578,7 @@ public class JDeskTerminal extends VBox {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 char ch = screenBuffer[r][c];
-                if (ch <= 32) continue;
+                if (ch < 32) continue;
 
                 boolean selected = false;
                 if (selStartRow >= 0 && selStartCol >= 0 && selEndRow >= 0 && selEndCol >= 0) {
@@ -642,7 +642,7 @@ public class JDeskTerminal extends VBox {
         try {
             Clipboard clipboard = Clipboard.getSystemClipboard();
             ClipboardContent content = new ClipboardContent();
-            content.putString(text.trim());
+            content.putString(text);
             clipboard.setContent(content);
         } catch (Exception ignored) {
             // Clipboard may not be available on headless environments
