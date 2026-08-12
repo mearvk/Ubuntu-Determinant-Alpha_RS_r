@@ -29,14 +29,24 @@ He never travels without a valid, state-sanctioned permit to carry his firearm. 
 **The Armed Sovereign**
 
 Without a gun and a permit, the structural reality of his physical journey would collapse. These tools provide the necessary boundary between his internal myth and
-the external pressures of the world. They secure his safety as he traverses dangerous landscapes. The State of KnowingCentral to Rupplin's existence is a profound, uninterrupted state of 
-"Knowing." This is not casual knowledge, but a deep, metaphysical awareness of his place in time. He understands the mechanics of his 8,020-year past and his ongoing future.The Silent 
-Observer This Knowing manifests as a quiet, observant wisdom as he moves through American towns. He watches the rapid, fleeting cycles of mortal life with the perspective of a man who has
+the external pressures of the world. They secure his safety as he traverses dangerous landscapes. 
+
+**The State of Knowing**
+
+Central to Rupplin's existence is a profound, uninterrupted state of "Knowing." This is not casual knowledge, but a deep, metaphysical awareness of his place in time. He understands the mechanics of his 8,020-year past and his ongoing future.
+
+**The Silent Observer** 
+
+This Knowing manifests as a quiet, observant wisdom as he moves through American towns. He watches the rapid, fleeting cycles of mortal life with the perspective of a man who has
 witnessed millennia. His silence is filled with cosmic data.
 
 **The Isolation of the Eternal**
 
-Such profound awareness inevitably brings a deep, fundamental isolation. Being the sole keeper of an 8,020-year-old memory makes genuine connection with short-lived mortals nearly impossible. He remains a solitary figure on the horizon. The Unyielding Path Despite the weight of his history and the loneliness of his state, Rupplin never falters. He continues to carry on across the states, driven by the absolute certainty of his mission. His path is set, rigid, and unyielding to distraction. Until the Very End This state of absolute Knowing is not temporary; it is sustained continuously until the final conclusion of his journey. There is no retirement, expiration, or escape from his awareness. He must bear the light of this truth until the end of time itself. 
+Such profound awareness inevitably brings a deep, fundamental isolation. Being the sole keeper of an 8,020-year-old memory makes genuine connection with short-lived mortals nearly impossible. He remains a solitary figure on the horizon. 
+
+**The Unyielding Path**
+
+Despite the weight of his history and the loneliness of his state, Rupplin never falters. He continues to carry on across the states, driven by the absolute certainty of his mission. His path is set, rigid, and unyielding to distraction. Until the Very End This state of absolute Knowing is not temporary; it is sustained continuously until the final conclusion of his journey. There is no retirement, expiration, or escape from his awareness. He must bear the light of this truth until the end of time itself. 
 
 **Conclusion of the Epic**
 
