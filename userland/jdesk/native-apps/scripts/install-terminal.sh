@@ -1,127 +1,96 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
+#
+# install-terminal.sh — Install JDesk Terminal components
+#
+# Mostly symlinks (bash is already present). Also installs tmux
+# and creates a JDesk terminal wrapper script.
+#
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
-#
-# install-terminal.sh — Install terminal environment for JDesk
-# Size estimate: ~2 MB
 
 set -euo pipefail
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# --- Configuration ---
 INSTALL_DIR="${1:-/opt/jdesk/apps/terminal}"
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-info()    { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[SKIP]${NC} $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+echo -e "${GREEN}[JDesk]${NC} Terminal Components Installer"
+echo "  Target: $INSTALL_DIR"
+echo "  Size:   ~2 MB (symlinks + tmux)"
+echo ""
 
-# --- Check if already installed ---
-if [ -d "$INSTALL_DIR" ] && [ -x "$INSTALL_DIR/jdesk-terminal" ]; then
-    warn "JDesk terminal is already installed. Nothing to do."
-    echo "  Wrapper: $INSTALL_DIR/jdesk-terminal"
+# Check if already set up
+if [ -x "$INSTALL_DIR/jdesk-terminal" ]; then
+    echo -e "${YELLOW}[SKIP]${NC} JDesk terminal already configured."
     exit 0
 fi
 
-# --- Create INSTALL_DIR ---
+# Create directory
+echo -e "${GREEN}[1/4]${NC} Creating terminal directory..."
 mkdir -p "$INSTALL_DIR"
 
-# --- Symlink shells ---
-SHELLS_LINKED=0
+# Symlink shells
+echo -e "${GREEN}[2/4]${NC} Creating shell symlinks..."
+ln -sf /usr/bin/bash "$INSTALL_DIR/bash"
+ln -sf /usr/bin/sh "$INSTALL_DIR/sh"
 
-if [ -x /bin/bash ]; then
-    ln -sf /bin/bash "$INSTALL_DIR/bash"
-    info "Symlink: $INSTALL_DIR/bash -> /bin/bash"
-    SHELLS_LINKED=$((SHELLS_LINKED + 1))
+if command -v zsh &>/dev/null; then
+    ln -sf "$(which zsh)" "$INSTALL_DIR/zsh"
+    echo "  ✓ zsh"
 fi
 
-if [ -x /bin/sh ]; then
-    ln -sf /bin/sh "$INSTALL_DIR/sh"
-    info "Symlink: $INSTALL_DIR/sh -> /bin/sh"
-    SHELLS_LINKED=$((SHELLS_LINKED + 1))
+if command -v fish &>/dev/null; then
+    ln -sf "$(which fish)" "$INSTALL_DIR/fish"
+    echo "  ✓ fish"
 fi
 
-if [ -x /usr/bin/zsh ]; then
-    ln -sf /usr/bin/zsh "$INSTALL_DIR/zsh"
-    info "Symlink: $INSTALL_DIR/zsh -> /usr/bin/zsh"
-    SHELLS_LINKED=$((SHELLS_LINKED + 1))
-elif [ -x /bin/zsh ]; then
-    ln -sf /bin/zsh "$INSTALL_DIR/zsh"
-    info "Symlink: $INSTALL_DIR/zsh -> /bin/zsh"
-    SHELLS_LINKED=$((SHELLS_LINKED + 1))
+echo "  ✓ bash"
+echo "  ✓ sh"
+
+# Install tmux if not present
+echo -e "${GREEN}[3/4]${NC} Ensuring tmux is installed..."
+if command -v tmux &>/dev/null; then
+    echo -e "  ${YELLOW}[ALREADY]${NC} tmux present"
+    ln -sf "$(which tmux)" "$INSTALL_DIR/tmux"
 else
-    warn "zsh not found — skipping (optional)"
-fi
-
-# --- Install tmux if not present ---
-if command -v tmux >/dev/null 2>&1; then
-    TMUX_BIN=$(command -v tmux)
-    warn "tmux already installed at $TMUX_BIN"
-else
-    info "Installing tmux via apt..."
-    export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y --no-install-recommends tmux \
-        || error "Failed to install tmux"
-    TMUX_BIN=$(command -v tmux)
-    info "tmux installed: $TMUX_BIN"
+    apt-get install -y --no-install-recommends tmux
+    ln -sf /usr/bin/tmux "$INSTALL_DIR/tmux"
+    echo -e "  ${GREEN}✓${NC} tmux installed"
 fi
 
-ln -sf "$TMUX_BIN" "$INSTALL_DIR/tmux"
-info "Symlink: $INSTALL_DIR/tmux -> $TMUX_BIN"
-
-# --- Create JDesk terminal wrapper script ---
+# Create JDesk terminal wrapper
+echo -e "${GREEN}[4/4]${NC} Creating JDesk terminal wrapper..."
 cat > "$INSTALL_DIR/jdesk-terminal" << 'WRAPPER'
 #!/bin/bash
 # JDesk Terminal Wrapper
-# Launches bash in the JDesk desktop environment.
+# Launches a shell session with JDesk environment configured.
 
 export TERM="${TERM:-xterm-256color}"
-export COLORTERM="truecolor"
 export JDESK_TERMINAL=1
-export JDESK_SESSION="${JDESK_SESSION:-default}"
+export PS1='\[\033[01;34m\]jdesk\[\033[00m\]:\[\033[01;36m\]\w\[\033[00m\]\$ '
 
-# Use user's preferred shell, fallback to bash
-USER_SHELL="${SHELL:-/bin/bash}"
-if [ ! -x "$USER_SHELL" ]; then
-    USER_SHELL="/bin/bash"
-fi
+# Use user's preferred shell, or bash
+SHELL_BIN="${SHELL:-/bin/bash}"
 
-# If arguments provided, execute them
-if [ $# -gt 0 ]; then
-    exec "$USER_SHELL" -c "$*"
-fi
-
-# Interactive login shell
-exec "$USER_SHELL" --login
-WRAPPER
-
-chmod +x "$INSTALL_DIR/jdesk-terminal"
-info "JDesk terminal wrapper created: $INSTALL_DIR/jdesk-terminal"
-
-# --- Verify ---
-if "$INSTALL_DIR/jdesk-terminal" -c 'echo OK' >/dev/null 2>&1; then
-    info "Verification passed: jdesk-terminal executes correctly"
+if [ "$1" = "--tmux" ] || [ "$1" = "-t" ]; then
+    shift
+    exec tmux new-session -s "jdesk-$$" "$SHELL_BIN" "$@"
 else
-    warn "Wrapper created but verification inconclusive (may need tty)"
+    exec "$SHELL_BIN" "$@"
 fi
+WRAPPER
+chmod +x "$INSTALL_DIR/jdesk-terminal"
 
-BASH_VER=$(bash --version | head -1 || echo "unknown")
-TMUX_VER=$(tmux -V 2>/dev/null || echo "unknown")
+# Also link into /opt/jdesk/bin for PATH
+mkdir -p /opt/jdesk/bin
+ln -sf "$INSTALL_DIR/jdesk-terminal" /opt/jdesk/bin/jdesk-terminal
 
-# --- Summary ---
 echo ""
-echo "========================================"
-info "JDesk terminal installation complete"
-echo "  Install dir   : $INSTALL_DIR"
-echo "  Wrapper       : $INSTALL_DIR/jdesk-terminal"
-echo "  Shells linked : $SHELLS_LINKED"
-echo "  tmux          : $TMUX_VER"
-echo "  bash          : $BASH_VER"
-echo "  Size est.     : ~2 MB"
-echo "========================================"
+echo "═══════════════════════════════════════════════════"
+echo "  ✓ JDesk Terminal installed to $INSTALL_DIR"
+echo "  Shells: bash, sh$(command -v zsh &>/dev/null && echo ', zsh')$(command -v fish &>/dev/null && echo ', fish')"
+echo "  Extras: tmux"
+echo "  Wrapper: $INSTALL_DIR/jdesk-terminal"
+echo "  Profile: terminal"
+echo "═══════════════════════════════════════════════════"

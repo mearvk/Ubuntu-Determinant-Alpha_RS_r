@@ -1,164 +1,212 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
-# Copyright (C) 2026 MEARVK LLC
-# Author: Maximilian Eric Alexander Rupplin von Keffikon
 #
 # install-darling.sh — Install Darling (macOS translation layer) for JDesk
-# Size estimate: ~300 MB
 #
-# NOTE: Darling is experimental and not in standard apt repositories.
-# This script attempts automatic installation where possible, and provides
-# manual instructions as fallback.
+# Darling provides macOS API compatibility on Linux, similar to Wine for Windows.
+# It is experimental but functional for CLI tools and some GUI applications.
+#
+# Source: github.com/darlinghq/darling
+# License: GPL-3.0
+#
+# Copyright (C) 2026 MEARVK LLC
+# Author: Maximilian Eric Alexander Rupplin von Keffikon
 
 set -euo pipefail
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# --- Configuration ---
 INSTALL_DIR="${1:-/opt/jdesk/apps}"
 DARLING_PREFIX="/opt/jdesk/darling-prefix"
+CACHE_DIR="/opt/jdesk/.cache"
 GITHUB_REPO="darlinghq/darling"
-TMP_DIR="/tmp/jdesk-darling-$$"
 
-info()    { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[SKIP]${NC} $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
-cleanup() { rm -rf "$TMP_DIR"; }
-trap cleanup EXIT
+echo -e "${GREEN}[JDesk]${NC} Darling Installer (macOS Translation Layer)"
+echo "  Target: $INSTALL_DIR"
+echo "  Prefix: $DARLING_PREFIX"
+echo "  Size:   ~300 MB"
+echo "  Status: EXPERIMENTAL"
+echo ""
 
-# --- Check architecture ---
+# Check if already installed
+if command -v darling &>/dev/null; then
+    echo -e "${YELLOW}[SKIP]${NC} Darling already installed."
+    darling --version 2>/dev/null || echo "(version check not supported)"
+    exit 0
+fi
+
+# Architecture check
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
-    error "Darling requires x86_64 architecture. Detected: $ARCH"
+    echo -e "${RED}[ERROR]${NC} Darling requires x86_64. Current arch: $ARCH"
+    exit 1
 fi
 
-# --- Check if already installed ---
-if command -v darling >/dev/null 2>&1; then
-    warn "Darling is already installed. Nothing to do."
-    darling --version 2>/dev/null || true
-    exit 0
-fi
+# Check kernel version (Darling needs specific kernel module support)
+KERNEL_VER=$(uname -r)
+echo "  Kernel: $KERNEL_VER"
+echo ""
 
-if [ -x "$INSTALL_DIR/darling" ]; then
-    warn "Darling wrapper exists at $INSTALL_DIR/darling. Nothing to do."
-    exit 0
-fi
-
-# --- Create directories ---
-mkdir -p "$INSTALL_DIR"
-mkdir -p "$TMP_DIR"
-
-# --- Attempt to download .deb from GitHub releases ---
-info "Checking GitHub for Darling releases..."
+# Strategy: Try .deb package first, then build from source
 INSTALLED=false
 
-DEB_URL=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null \
-    | grep '"browser_download_url"' \
-    | grep -i '\.deb"' \
-    | grep -i 'amd64\|x86_64' \
-    | head -1 \
-    | sed 's/.*"\(https[^"]*\)".*/\1/' || echo "")
+# --- Strategy 1: Check for .deb in cache ---
+echo -e "${GREEN}[1/4]${NC} Checking for cached Darling package..."
+mkdir -p "$CACHE_DIR"
+DEB_PATH=$(find "$CACHE_DIR" -name "darling_*.deb" -type f 2>/dev/null | head -1)
 
-if [ -n "$DEB_URL" ]; then
-    info "Found .deb package: $DEB_URL"
-    DEB_FILE="$TMP_DIR/darling.deb"
+if [ -n "$DEB_PATH" ] && [ -f "$DEB_PATH" ]; then
+    echo "  Found cached .deb: $DEB_PATH"
+    echo "  Installing..."
+    apt-get install -y "$DEB_PATH" && INSTALLED=true || true
+fi
 
-    info "Downloading..."
-    if curl -fSL --progress-bar -o "$DEB_FILE" "$DEB_URL"; then
-        info "Installing .deb package..."
-        export DEBIAN_FRONTEND=noninteractive
-        if dpkg -i "$DEB_FILE" 2>/dev/null; then
-            apt-get install -f -y 2>/dev/null || true
-            INSTALLED=true
-            info "Darling installed from .deb package"
+# --- Strategy 2: Try GitHub release download ---
+if [ "$INSTALLED" = false ]; then
+    echo -e "${GREEN}[2/4]${NC} Querying GitHub for Darling release..."
+
+    RELEASE_INFO=$(curl -fsSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest" 2>/dev/null || echo "")
+
+    if [ -n "$RELEASE_INFO" ]; then
+        # Look for .deb asset
+        DEB_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url"' | grep '\.deb"' | head -1 | sed 's/.*"browser_download_url": "//;s/".*//')
+
+        if [ -n "$DEB_URL" ]; then
+            DEB_NAME=$(basename "$DEB_URL")
+            echo "  Found release: $DEB_NAME"
+            echo "  Downloading..."
+
+            curl -fSL --progress-bar -o "$CACHE_DIR/$DEB_NAME" "$DEB_URL"
+
+            echo "  Installing .deb..."
+            apt-get install -y "$CACHE_DIR/$DEB_NAME" && INSTALLED=true || {
+                echo -e "  ${YELLOW}[WARN]${NC} .deb install failed. Trying dpkg with dependency fix..."
+                dpkg -i "$CACHE_DIR/$DEB_NAME" 2>/dev/null || true
+                apt-get install -f -y && INSTALLED=true || true
+            }
         else
-            warn "dpkg install failed — attempting dependency fix..."
-            apt-get install -f -y 2>/dev/null || true
-            if dpkg -l darling 2>/dev/null | grep -q '^ii'; then
-                INSTALLED=true
-                info "Darling installed after dependency resolution"
-            fi
+            echo -e "  ${YELLOW}[WARN]${NC} No .deb found in latest release."
         fi
     else
-        warn "Download failed"
+        echo -e "  ${YELLOW}[WARN]${NC} Could not reach GitHub API."
     fi
-else
-    warn "No .deb release found on GitHub"
 fi
 
-# --- Create Darling shell wrapper ---
-mkdir -p "$DARLING_PREFIX"
+# --- Strategy 3: Install build dependencies and build from source ---
+if [ "$INSTALLED" = false ]; then
+    echo -e "${GREEN}[3/4]${NC} Attempting build from source..."
+    echo -e "  ${CYAN}NOTE:${NC} Building Darling from source takes 30-60 minutes and requires ~10 GB disk."
+    echo ""
 
-if [ "$INSTALLED" = true ] && command -v darling >/dev/null 2>&1; then
-    DARLING_BIN=$(command -v darling)
-    ln -sf "$DARLING_BIN" "$INSTALL_DIR/darling"
-    info "Symlink created: $INSTALL_DIR/darling -> $DARLING_BIN"
+    # Check if user wants to proceed
+    if [ -t 0 ]; then
+        read -p "  Build Darling from source? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "  ${YELLOW}[SKIP]${NC} Darling build skipped."
+            INSTALLED=false
+        fi
+    fi
 
-    VERSION=$(darling --version 2>/dev/null || echo "unknown")
-    info "Verification: Darling $VERSION"
-else
-    # Create a wrapper script that provides instructions
-    cat > "$INSTALL_DIR/darling" << 'DARLING_WRAPPER'
+    if [ "$INSTALLED" = false ]; then
+        # Install build deps
+        echo "  Installing build dependencies..."
+        apt-get install -y --no-install-recommends \
+            cmake clang bison flex pkg-config \
+            linux-headers-$(uname -r) \
+            libfuse-dev libbsd-dev \
+            libelf-dev libcap-dev \
+            git 2>/dev/null || {
+            echo -e "  ${YELLOW}[WARN]${NC} Some build deps unavailable."
+        }
+
+        # Clone and build
+        BUILD_DIR="/tmp/darling-build"
+        rm -rf "$BUILD_DIR"
+        git clone --recursive --depth 1 "https://github.com/$GITHUB_REPO.git" "$BUILD_DIR" 2>/dev/null && {
+            cd "$BUILD_DIR"
+            mkdir -p build && cd build
+            cmake .. -DCMAKE_INSTALL_PREFIX=/usr && make -j"$(nproc)" && make install && INSTALLED=true
+            cd /
+            rm -rf "$BUILD_DIR"
+        } || {
+            echo -e "  ${RED}[ERROR]${NC} Build from source failed."
+            rm -rf "$BUILD_DIR"
+        }
+    fi
+fi
+
+# --- Setup (if installed) ---
+echo -e "${GREEN}[4/4]${NC} Configuring..."
+
+if [ "$INSTALLED" = true ] && command -v darling &>/dev/null; then
+    # Create prefix
+    mkdir -p "$DARLING_PREFIX"
+    mkdir -p "$INSTALL_DIR/runtimes"
+    mkdir -p /opt/jdesk/bin
+
+    ln -sf "$(which darling)" "$INSTALL_DIR/runtimes/darling"
+    ln -sf "$(which darling)" /opt/jdesk/bin/darling
+
+    # Create a wrapper for JDesk's LibraryLinker
+    cat > /opt/jdesk/bin/jdesk-dylibhost << 'WRAPPER'
 #!/bin/bash
-# Darling shell wrapper — JDesk macOS translation layer
-# Darling could not be auto-installed. This wrapper provides guidance.
+# JDesk dylib host — loads macOS dynamic libraries via Darling
+# Usage: jdesk-dylibhost <library.dylib> [entry_point] [args...]
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+DYLIB="$1"; shift
+ENTRY="${1:-}"; [ -n "$ENTRY" ] && shift
 
-if command -v darling >/dev/null 2>&1; then
-    exec darling "$@"
+if [ -z "$DYLIB" ]; then
+    echo "Usage: jdesk-dylibhost <library.dylib> [entry_point] [args...]"
+    exit 1
 fi
 
-echo -e "${YELLOW}[DARLING]${NC} Darling is not installed on this system."
-echo ""
-echo "Darling (macOS translation layer) requires building from source:"
-echo ""
-echo "  1. Install build dependencies:"
-echo "     sudo apt install cmake clang bison flex pkg-config"
-echo "     sudo apt install libfuse-dev libbsd-dev linux-headers-\$(uname -r)"
-echo ""
-echo "  2. Clone and build:"
-echo "     git clone --recursive https://github.com/darlinghq/darling.git"
-echo "     cd darling && mkdir build && cd build"
-echo "     cmake .. -DCMAKE_INSTALL_PREFIX=/opt/jdesk/apps"
-echo "     make -j\$(nproc)"
-echo "     sudo make install"
-echo ""
-echo "  3. Load kernel module:"
-echo "     sudo modprobe darling-mach"
-echo ""
-echo "For more info: https://docs.darlinghq.org/build-instructions.html"
-exit 1
-DARLING_WRAPPER
+exec darling shell /usr/local/bin/dyld_load "$DYLIB" "$ENTRY" "$@"
+WRAPPER
+    chmod +x /opt/jdesk/bin/jdesk-dylibhost
 
-    chmod +x "$INSTALL_DIR/darling"
-    warn "Darling could not be auto-installed."
-    warn "A guidance wrapper was created at $INSTALL_DIR/darling"
-    INSTALLED=false
-fi
+    # Create Darling environment config
+    cat > /opt/jdesk/darling.env << EOF
+# JDesk Darling Environment Configuration
+# Source this before running Darling commands:
+#   source /opt/jdesk/darling.env
 
-# --- Summary ---
-echo ""
-echo "========================================"
-if [ "$INSTALLED" = true ]; then
-    info "Darling installation complete"
-    echo "  Install dir   : $INSTALL_DIR"
-    echo "  Prefix        : $DARLING_PREFIX"
-    echo "  Status        : INSTALLED"
+export DARLING_PREFIX="$DARLING_PREFIX"
+EOF
+
+    echo ""
+    echo "═══════════════════════════════════════════════════"
+    echo "  ✓ Darling installed"
+    echo "  Binary:    $(which darling)"
+    echo "  Prefix:    $DARLING_PREFIX"
+    echo "  DylibHost: /opt/jdesk/bin/jdesk-dylibhost"
+    echo "  Config:    /opt/jdesk/darling.env"
+    echo ""
+    echo "  macOS .dylib files can now be launched from JDesk"
+    echo "  via the LibraryLinker co-linking engine."
+    echo ""
+    echo "  ⚠ NOTE: Darling is EXPERIMENTAL."
+    echo "  CLI tools work reliably. GUI apps may not."
+    echo "═══════════════════════════════════════════════════"
 else
-    warn "Darling installation incomplete (manual build required)"
-    echo "  Install dir   : $INSTALL_DIR"
-    echo "  Prefix        : $DARLING_PREFIX"
-    echo "  Status        : WRAPPER ONLY (run $INSTALL_DIR/darling for instructions)"
+    echo ""
+    echo "═══════════════════════════════════════════════════"
+    echo -e "  ${YELLOW}⚠ Darling NOT installed${NC}"
+    echo ""
+    echo "  Darling is not available as a pre-built package"
+    echo "  for this system. macOS .dylib execution will be"
+    echo "  unavailable until Darling is installed manually."
+    echo ""
+    echo "  Manual install:"
+    echo "    git clone --recursive https://github.com/darlinghq/darling.git"
+    echo "    cd darling && mkdir build && cd build"
+    echo "    cmake .. && make -j\$(nproc) && sudo make install"
+    echo ""
+    echo "  Or download a .deb from:"
+    echo "    https://github.com/darlinghq/darling/releases"
+    echo "  and place it in: $CACHE_DIR/"
+    echo "  then re-run this script."
+    echo "═══════════════════════════════════════════════════"
+    exit 0  # Not a hard error — Darling is optional
 fi
-echo "  Architecture  : $ARCH"
-echo "  Size est.     : ~300 MB"
-echo "========================================"

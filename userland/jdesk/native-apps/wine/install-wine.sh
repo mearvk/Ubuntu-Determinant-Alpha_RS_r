@@ -1,112 +1,122 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
+#
+# install-wine.sh — Install Wine (Windows PE execution layer) for JDesk
+#
+# Provides the ability to run Windows .dll and .exe files from the
+# JDesk desktop via the LibraryLinker co-linking engine.
+#
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
-#
-# install-wine.sh — Install Wine (Windows compatibility layer) for JDesk
-# Size estimate: ~400 MB
 
 set -euo pipefail
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# --- Configuration ---
 INSTALL_DIR="${1:-/opt/jdesk/apps}"
 WINE_PREFIX="/opt/jdesk/wine-prefix"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DLLHOST_SRC="${SCRIPT_DIR}/../launcher/jdesk-dllhost.exe"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-info()    { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[SKIP]${NC} $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-# --- Check if already installed ---
-if command -v wine64 >/dev/null 2>&1 && [ -d "$WINE_PREFIX" ]; then
-    if [ -f "$WINE_PREFIX/system.reg" ]; then
-        warn "Wine is already installed and prefix initialized. Nothing to do."
-        wine64 --version 2>/dev/null || true
-        exit 0
-    fi
+echo -e "${GREEN}[JDesk]${NC} Wine Installer (Windows PE Support)"
+echo "  Target:      $INSTALL_DIR"
+echo "  WINEPREFIX:  $WINE_PREFIX"
+echo "  Size:        ~400 MB"
+echo ""
+
+# Check if already installed
+if command -v wine64 &>/dev/null && [ -d "$WINE_PREFIX" ]; then
+    echo -e "${YELLOW}[SKIP]${NC} Wine already installed and configured."
+    wine64 --version 2>/dev/null || true
+    exit 0
 fi
 
-# --- Add i386 architecture if needed ---
-if ! dpkg --print-foreign-architectures 2>/dev/null | grep -q i386; then
-    info "Adding i386 architecture for Wine32 support..."
+# Step 1: Enable 32-bit architecture (needed for wine32)
+echo -e "${GREEN}[1/5]${NC} Enabling i386 architecture..."
+if ! dpkg --print-foreign-architectures | grep -q i386; then
     dpkg --add-architecture i386
     apt-get update -qq
-fi
-
-# --- Install Wine packages ---
-info "Installing Wine packages..."
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y --no-install-recommends wine64 wine32 \
-    || error "Failed to install wine64 wine32"
-
-# --- Verify Wine binary ---
-WINE_BIN=""
-if [ -x /usr/bin/wine64 ]; then
-    WINE_BIN="/usr/bin/wine64"
-elif command -v wine64 >/dev/null 2>&1; then
-    WINE_BIN=$(command -v wine64)
+    echo "  ✓ i386 architecture enabled"
 else
-    error "Cannot locate wine64 binary after installation"
+    echo -e "  ${YELLOW}[ALREADY]${NC} i386 already enabled"
 fi
 
-info "Wine binary: $WINE_BIN"
+# Step 2: Install Wine packages
+echo -e "${GREEN}[2/5]${NC} Installing Wine packages..."
+apt-get install -y --no-install-recommends \
+    wine64 \
+    wine32 \
+    wine \
+    winbind \
+    cabextract
 
-# --- Create directories ---
-mkdir -p "$INSTALL_DIR"
+# Step 3: Create WINEPREFIX
+echo -e "${GREEN}[3/5]${NC} Initializing Wine prefix..."
 mkdir -p "$WINE_PREFIX"
-
-# --- Initialize Wine prefix ---
-info "Initializing Wine prefix at $WINE_PREFIX..."
 export WINEPREFIX="$WINE_PREFIX"
 export WINEDEBUG="-all"
 
-# wineboot --init creates the prefix structure
-wineboot --init 2>/dev/null || warn "wineboot --init had warnings (non-fatal)"
-
-# Wait for wineserver to finish
-wineserver --wait 2>/dev/null || true
-
-if [ -f "$WINE_PREFIX/system.reg" ]; then
-    info "Wine prefix initialized successfully"
+# Initialize the prefix (creates the Windows directory structure)
+if [ ! -f "$WINE_PREFIX/system.reg" ]; then
+    wineboot --init 2>/dev/null || true
+    # Wait for wineserver to finish
+    wineserver --wait 2>/dev/null || true
+    echo "  ✓ Wine prefix initialized"
 else
-    warn "Wine prefix may be incomplete — system.reg not found"
+    echo -e "  ${YELLOW}[ALREADY]${NC} Wine prefix exists"
 fi
 
-# --- Create symlink ---
-ln -sf "$WINE_BIN" "$INSTALL_DIR/wine64"
-info "Symlink created: $INSTALL_DIR/wine64 -> $WINE_BIN"
+# Step 4: Create JDesk symlinks
+echo -e "${GREEN}[4/5]${NC} Creating JDesk symlinks..."
+mkdir -p "$INSTALL_DIR/runtimes"
+ln -sf "$(which wine64)" "$INSTALL_DIR/runtimes/wine64"
+ln -sf "$(which wine)" "$INSTALL_DIR/runtimes/wine"
 
-# --- Install jdesk-dllhost.exe if available ---
+mkdir -p /opt/jdesk/bin
+ln -sf "$(which wine64)" /opt/jdesk/bin/wine
+ln -sf "$(which wineboot)" /opt/jdesk/bin/wineboot
+
+# Step 5: Install jdesk-dllhost.exe if available
+echo -e "${GREEN}[5/5]${NC} Installing JDesk DLL host..."
+DLLHOST_SRC="$SCRIPT_DIR/../launcher/jdesk-dllhost.exe"
+DLLHOST_DEST="$WINE_PREFIX/drive_c/jdesk/jdesk-dllhost.exe"
+
 if [ -f "$DLLHOST_SRC" ]; then
-    info "Installing jdesk-dllhost.exe into Wine prefix..."
     mkdir -p "$WINE_PREFIX/drive_c/jdesk"
-    cp "$DLLHOST_SRC" "$WINE_PREFIX/drive_c/jdesk/jdesk-dllhost.exe"
-    info "Installed: $WINE_PREFIX/drive_c/jdesk/jdesk-dllhost.exe"
+    cp -f "$DLLHOST_SRC" "$DLLHOST_DEST"
+    # Also put in /opt/jdesk/bin for the LibraryLinker to find
+    cp -f "$DLLHOST_SRC" /opt/jdesk/bin/jdesk-dllhost.exe
+    echo "  ✓ jdesk-dllhost.exe installed"
 else
-    warn "jdesk-dllhost.exe not found at $DLLHOST_SRC — skipping"
+    echo -e "  ${YELLOW}[SKIP]${NC} jdesk-dllhost.exe not found (build with: make compile-native)"
+    echo "          Expected at: $DLLHOST_SRC"
 fi
 
-# --- Verify ---
-VERSION=$(wine64 --version 2>/dev/null || echo "unknown")
-info "Verification: $VERSION"
+# Create Wine environment config for JDesk
+cat > /opt/jdesk/wine.env << EOF
+# JDesk Wine Environment Configuration
+# Source this before running Wine commands:
+#   source /opt/jdesk/wine.env
 
-# --- Summary ---
+export WINEPREFIX="$WINE_PREFIX"
+export WINEDEBUG="-all"
+export WINEARCH="win64"
+EOF
+
+# Verify
 echo ""
-echo "========================================"
-info "Wine installation complete"
-echo "  Install dir  : $INSTALL_DIR"
-echo "  Wine prefix  : $WINE_PREFIX"
-echo "  Symlink      : $INSTALL_DIR/wine64 -> $WINE_BIN"
-echo "  Version      : $VERSION"
-echo "  WINEPREFIX   : $WINE_PREFIX"
-echo "  DLL host     : $([ -f "$WINE_PREFIX/drive_c/jdesk/jdesk-dllhost.exe" ] && echo 'installed' || echo 'not available')"
-echo "  Size est.    : ~400 MB"
-echo "========================================"
+if command -v wine64 &>/dev/null; then
+    VERSION=$(wine64 --version 2>/dev/null || echo "unknown")
+    echo "═══════════════════════════════════════════════════"
+    echo "  ✓ Wine installed: $VERSION"
+    echo "  Prefix:   $WINE_PREFIX"
+    echo "  Symlinks: $INSTALL_DIR/runtimes/wine64"
+    echo "  DLLHost:  ${DLLHOST_DEST:-not installed}"
+    echo "  Config:   /opt/jdesk/wine.env"
+    echo ""
+    echo "  Windows .dll and .exe files can now be launched"
+    echo "  from JDesk via the LibraryLinker co-linking engine."
+    echo "═══════════════════════════════════════════════════"
+else
+    echo -e "${RED}[ERROR]${NC} Wine installation failed."
+    exit 1
+fi

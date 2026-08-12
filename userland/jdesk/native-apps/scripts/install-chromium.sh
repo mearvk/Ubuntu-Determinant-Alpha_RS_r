@@ -1,98 +1,75 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
+#
+# install-chromium.sh — Install Chromium Browser for JDesk
+#
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
-#
-# install-chromium.sh — Install Chromium browser for JDesk
-# Size estimate: ~180 MB
 
 set -euo pipefail
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# --- Configuration ---
 INSTALL_DIR="${1:-/opt/jdesk/apps/chromium}"
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-info()    { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn()    { echo -e "${YELLOW}[SKIP]${NC} $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+echo -e "${GREEN}[JDesk]${NC} Chromium Browser Installer"
+echo "  Target: $INSTALL_DIR"
+echo "  Size:   ~180 MB"
+echo ""
 
-# --- Determine package name ---
-CHROMIUM_PKG=""
-CHROMIUM_BIN=""
-
-if dpkg -l chromium-browser 2>/dev/null | grep -q '^ii'; then
-    CHROMIUM_PKG="chromium-browser"
-    CHROMIUM_BIN="/usr/bin/chromium-browser"
-elif dpkg -l chromium 2>/dev/null | grep -q '^ii'; then
-    CHROMIUM_PKG="chromium"
-    CHROMIUM_BIN="/usr/bin/chromium"
-fi
-
-# --- Check if already installed ---
-if [ -n "$CHROMIUM_BIN" ] && [ -x "$CHROMIUM_BIN" ] && [ -L "$INSTALL_DIR/chrome" ]; then
-    warn "Chromium is already installed and symlinked. Nothing to do."
-    "$CHROMIUM_BIN" --version 2>/dev/null || true
+# Check if already installed
+if [ -L "$INSTALL_DIR/chrome" ] && command -v chromium-browser &>/dev/null; then
+    echo -e "${YELLOW}[SKIP]${NC} Chromium already installed."
+    chromium-browser --version 2>/dev/null || true
     exit 0
 fi
 
-# --- Install via apt ---
-if [ -z "$CHROMIUM_BIN" ]; then
-    info "Installing Chromium via apt..."
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq
+# Determine package name (varies by distro)
+CHROMIUM_PKG=""
+CHROMIUM_BIN=""
 
-    if apt-cache show chromium-browser >/dev/null 2>&1; then
-        CHROMIUM_PKG="chromium-browser"
-        apt-get install -y --no-install-recommends chromium-browser \
-            || error "Failed to install chromium-browser"
-        CHROMIUM_BIN="/usr/bin/chromium-browser"
-    elif apt-cache show chromium >/dev/null 2>&1; then
-        CHROMIUM_PKG="chromium"
-        apt-get install -y --no-install-recommends chromium \
-            || error "Failed to install chromium"
-        CHROMIUM_BIN="/usr/bin/chromium"
-    else
-        error "Neither 'chromium-browser' nor 'chromium' available in apt"
-    fi
-fi
-
-# --- Verify binary exists ---
-if [ ! -x "$CHROMIUM_BIN" ]; then
-    for candidate in /usr/bin/chromium-browser /usr/bin/chromium /snap/bin/chromium; do
-        if [ -x "$candidate" ]; then
-            CHROMIUM_BIN="$candidate"
-            break
-        fi
-    done
-fi
-
-[ -x "$CHROMIUM_BIN" ] || error "Cannot locate Chromium binary after installation"
-
-# --- Create INSTALL_DIR and symlink ---
-mkdir -p "$INSTALL_DIR"
-ln -sf "$CHROMIUM_BIN" "$INSTALL_DIR/chrome"
-info "Symlink created: $INSTALL_DIR/chrome -> $CHROMIUM_BIN"
-
-# --- Verify ---
-VERSION=$("$CHROMIUM_BIN" --version 2>/dev/null || echo "unknown")
-if [ "$VERSION" != "unknown" ]; then
-    info "Verification passed: $VERSION"
+if apt-cache show chromium-browser &>/dev/null 2>&1; then
+    CHROMIUM_PKG="chromium-browser"
+    CHROMIUM_BIN="/usr/bin/chromium-browser"
+elif apt-cache show chromium &>/dev/null 2>&1; then
+    CHROMIUM_PKG="chromium"
+    CHROMIUM_BIN="/usr/bin/chromium"
 else
-    warn "Version check needs display. Binary exists at $CHROMIUM_BIN."
+    echo -e "${RED}[ERROR]${NC} Neither chromium-browser nor chromium found in apt repos."
+    echo "  Try: sudo add-apt-repository universe && sudo apt update"
+    exit 1
 fi
 
-# --- Summary ---
+echo -e "${GREEN}[1/3]${NC} Installing $CHROMIUM_PKG..."
+apt-get update -qq
+apt-get install -y --no-install-recommends "$CHROMIUM_PKG"
+
+# Create directory and symlinks
+echo -e "${GREEN}[2/3]${NC} Creating JDesk symlinks..."
+mkdir -p "$INSTALL_DIR"
+
+if [ -x "$CHROMIUM_BIN" ]; then
+    ln -sf "$CHROMIUM_BIN" "$INSTALL_DIR/chrome"
+elif [ -x "/snap/bin/chromium" ]; then
+    # Ubuntu may install as snap
+    ln -sf "/snap/bin/chromium" "$INSTALL_DIR/chrome"
+    CHROMIUM_BIN="/snap/bin/chromium"
+else
+    echo -e "${RED}[ERROR]${NC} Chromium binary not found after install."
+    exit 1
+fi
+
+# Verify
+echo -e "${GREEN}[3/3]${NC} Verifying..."
+if "$CHROMIUM_BIN" --version &>/dev/null; then
+    VERSION=$("$CHROMIUM_BIN" --version 2>/dev/null | head -1)
+    echo -e "${GREEN}[OK]${NC} $VERSION"
+else
+    echo -e "${YELLOW}[WARN]${NC} --version check failed (may need display); binary exists."
+fi
+
 echo ""
-echo "========================================"
-info "Chromium installation complete"
-echo "  Install dir : $INSTALL_DIR"
-echo "  Symlink     : $INSTALL_DIR/chrome -> $CHROMIUM_BIN"
-echo "  Package     : $CHROMIUM_PKG"
-echo "  Version     : $VERSION"
-echo "  Size est.   : ~180 MB"
-echo "========================================"
+echo "═══════════════════════════════════════════════════"
+echo "  ✓ Chromium installed to $INSTALL_DIR"
+echo "  Binary:  $INSTALL_DIR/chrome → $CHROMIUM_BIN"
+echo "  Profile: browser"
+echo "═══════════════════════════════════════════════════"
