@@ -77,7 +77,7 @@ cat > "$INSTALL_DIR/jdesk-terminal" << 'WRAPPER'
 export TERM="${TERM:-xterm-256color}"
 export JDESK_TERMINAL=1
 export JDESK_GOVERNED=1
-export PS1='\[\033[01;34m\]jdesk\[\033[00m\]:\[\033[01;36m\]\w\[\033[00m\]\$ '
+export PS1='jdesk:\w$ '
 
 # Use user's preferred shell, or bash
 SHELL_BIN="${SHELL:-/bin/bash}"
