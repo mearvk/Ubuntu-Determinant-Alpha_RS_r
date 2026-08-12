@@ -53,16 +53,18 @@ OBJS        = $(SRCS:.c=.o)
 # Output
 TARGET      = libjdesk.so
 TEST_BIN    = jdesk_test
+LAUNCHER    = jdesk-bin
 
 # Installation
 PREFIX      = /usr/local
+BINDIR      = $(PREFIX)/bin
 LIBDIR      = $(PREFIX)/lib
 INCLUDEDIR  = $(PREFIX)/include/jdesk
 SHAREDIR    = $(PREFIX)/share/jdesk
 
-.PHONY: all install uninstall clean test
+.PHONY: all install uninstall clean test launcher
 
-all: $(TARGET)
+all: $(TARGET) $(LAUNCHER)
 
 $(TARGET): $(OBJS)
 	$(CC) -shared -o $@ $(OBJS) $(X11_LIBS) $(SYS_LIBS)
@@ -79,19 +81,33 @@ test: jdesk_linux.c ../include/jdesk.h
 		$(X11_LIBS) $(SYS_LIBS)
 	./$(TEST_BIN)
 
-install: $(TARGET)
+# Native launcher binary (standalone ELF that discovers and execs into JVM)
+launcher: $(LAUNCHER)
+
+$(LAUNCHER): jdesk_launcher.c
+	$(CC) -Wall -Wextra -O2 -D_GNU_SOURCE \
+		-Wno-format-truncation -Wno-stringop-truncation \
+		-o $@ $< -lX11
+	@echo "Built: $(LAUNCHER) (native Linux launcher)"
+	@echo "  Install: sudo install -m 755 $(LAUNCHER) /usr/local/bin/jdesk"
+
+install: $(TARGET) $(LAUNCHER)
+	install -d $(DESTDIR)$(BINDIR)
 	install -d $(DESTDIR)$(LIBDIR)
 	install -d $(DESTDIR)$(INCLUDEDIR)
 	install -d $(DESTDIR)$(SHAREDIR)/icons
+	install -m 755 $(LAUNCHER) $(DESTDIR)$(BINDIR)/jdesk
 	install -m 755 $(TARGET) $(DESTDIR)$(LIBDIR)/$(TARGET)
 	install -m 644 ../include/jdesk.h $(DESTDIR)$(INCLUDEDIR)/jdesk.h
 	ldconfig 2>/dev/null || true
-	@echo "Installed: $(DESTDIR)$(LIBDIR)/$(TARGET)"
+	@echo "Installed: $(DESTDIR)$(BINDIR)/jdesk (launcher)"
+	@echo "Installed: $(DESTDIR)$(LIBDIR)/$(TARGET) (native library)"
 
 uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/jdesk
 	rm -f $(DESTDIR)$(LIBDIR)/$(TARGET)
 	rm -f $(DESTDIR)$(INCLUDEDIR)/jdesk.h
 	rmdir $(DESTDIR)$(INCLUDEDIR) 2>/dev/null || true
 
 clean:
-	rm -f $(OBJS) $(TARGET) $(TEST_BIN)
+	rm -f $(OBJS) $(TARGET) $(TEST_BIN) $(LAUNCHER)

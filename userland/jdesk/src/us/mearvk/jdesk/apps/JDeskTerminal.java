@@ -183,12 +183,28 @@ public class JDeskTerminal extends VBox {
      */
     public void start(String shellPath) {
         try {
-            ProcessBuilder pb = new ProcessBuilder(shellPath, "-i");
+            /*
+             * We wrap the shell with `script` to allocate a PTY.
+             * Without a PTY, programs detect they're writing to a pipe and
+             * switch to full buffering (4-8KB blocks). This causes network
+             * commands like ping, curl, ssh to appear "stuck" — their output
+             * sits in libc's buffer until it fills or the command exits.
+             *
+             * `script -qfc <shell> /dev/null` allocates a PTY and connects
+             * the shell to it, which forces line-buffered output.
+             *
+             * Alternative: `stdbuf -oL` — but that only works for programs
+             * linked against glibc and doesn't help builtins or statically
+             * linked binaries.
+             */
+            ProcessBuilder pb = new ProcessBuilder(
+                "script", "-qfc", shellPath + " -i", "/dev/null"
+            );
             pb.redirectErrorStream(true);
 
             // Set terminal environment
             Map<String, String> env = pb.environment();
-            env.put("TERM", "dumb");  // We handle rendering, not the shell
+            env.put("TERM", "xterm");  // Pretend to be xterm so programs line-buffer
             env.put("COLUMNS", String.valueOf(cols));
             env.put("LINES", String.valueOf(rows));
             env.put("JDESK_TERMINAL", "1");
@@ -247,16 +263,23 @@ public class JDeskTerminal extends VBox {
     /**
      * Read output from the native shell and display it.
      * Runs in a background thread.
+     *
+     * IMPORTANT: We use a raw InputStream (NOT BufferedReader) to avoid
+     * buffering delays. Network commands like ping, curl, ssh produce output
+     * incrementally — a BufferedReader would hold partial data in its internal
+     * 8KB buffer waiting for more, causing the terminal to appear stuck.
+     *
+     * We read raw bytes as they arrive, decode UTF-8 ourselves, and push
+     * each chunk immediately to the JavaFX thread for rendering.
      */
     private void readShellOutput() {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(shellProcess.getInputStream(), StandardCharsets.UTF_8))) {
-
-            char[] buf = new char[4096];
+        try {
+            InputStream is = shellProcess.getInputStream();
+            byte[] buf = new byte[4096];
             int bytesRead;
 
-            while (running && (bytesRead = reader.read(buf)) != -1) {
-                String chunk = new String(buf, 0, bytesRead);
+            while (running && (bytesRead = is.read(buf)) != -1) {
+                final String chunk = new String(buf, 0, bytesRead, StandardCharsets.UTF_8);
                 Platform.runLater(() -> processOutput(chunk));
             }
         } catch (IOException e) {

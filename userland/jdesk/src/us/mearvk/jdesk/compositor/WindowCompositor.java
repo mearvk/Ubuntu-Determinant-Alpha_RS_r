@@ -683,8 +683,103 @@ public class WindowCompositor {
                 }
             });
 
-            // Resize drag would go here — omitted for brevity
-            // (standard edge-drag resize logic)
+            setOnMousePressed(e -> {
+                ResizeDirection dir = getResizeDirection(e.getX(), e.getY());
+                if (dir != ResizeDirection.NONE) {
+                    resizing = true;
+                    resizeDir = dir;
+                    dragStartX = e.getScreenX();
+                    dragStartY = e.getScreenY();
+                    dragOffsetX = getLayoutX();
+                    dragOffsetY = getLayoutY();
+                    frameWidth = (int) getPrefWidth();
+                    frameHeight = (int) getPrefHeight();
+                    e.consume();
+                }
+            });
+
+            setOnMouseDragged(e -> {
+                if (!resizing) return;
+
+                double dx = e.getScreenX() - dragStartX;
+                double dy = e.getScreenY() - dragStartY;
+                double newX = dragOffsetX;
+                double newY = dragOffsetY;
+                double newW = frameWidth;
+                double newH = frameHeight;
+
+                switch (resizeDir) {
+                    case E:
+                        newW = frameWidth + dx;
+                        break;
+                    case W:
+                        newW = frameWidth - dx;
+                        newX = dragOffsetX + dx;
+                        break;
+                    case S:
+                        newH = frameHeight + dy;
+                        break;
+                    case N:
+                        newH = frameHeight - dy;
+                        newY = dragOffsetY + dy;
+                        break;
+                    case SE:
+                        newW = frameWidth + dx;
+                        newH = frameHeight + dy;
+                        break;
+                    case SW:
+                        newW = frameWidth - dx;
+                        newX = dragOffsetX + dx;
+                        newH = frameHeight + dy;
+                        break;
+                    case NE:
+                        newW = frameWidth + dx;
+                        newH = frameHeight - dy;
+                        newY = dragOffsetY + dy;
+                        break;
+                    case NW:
+                        newW = frameWidth - dx;
+                        newH = frameHeight - dy;
+                        newX = dragOffsetX + dx;
+                        newY = dragOffsetY + dy;
+                        break;
+                    default:
+                        break;
+                }
+
+                // Enforce minimum size
+                if (newW < MIN_WINDOW_WIDTH) {
+                    if (newX != dragOffsetX) newX = dragOffsetX + frameWidth - MIN_WINDOW_WIDTH;
+                    newW = MIN_WINDOW_WIDTH;
+                }
+                if (newH < MIN_WINDOW_HEIGHT + TITLE_BAR_HEIGHT) {
+                    if (newY != dragOffsetY) newY = dragOffsetY + frameHeight - MIN_WINDOW_HEIGHT - TITLE_BAR_HEIGHT;
+                    newH = MIN_WINDOW_HEIGHT + TITLE_BAR_HEIGHT;
+                }
+
+                setLayoutX(newX);
+                setLayoutY(newY);
+                setPrefSize(newW, newH);
+                contentBox.setPrefSize(newW, newH);
+                embedArea.setPrefSize(newW - BORDER_WIDTH * 2, newH - TITLE_BAR_HEIGHT - BORDER_WIDTH * 2);
+
+                // Notify native window of resize
+                if (xWindowId != 0) {
+                    nativeResizeWindow(xWindowId,
+                        (int)(newW - BORDER_WIDTH * 2),
+                        (int)(newH - TITLE_BAR_HEIGHT - BORDER_WIDTH * 2));
+                }
+
+                e.consume();
+            });
+
+            setOnMouseReleased(e -> {
+                if (resizing) {
+                    resizing = false;
+                    resizeDir = ResizeDirection.NONE;
+                    e.consume();
+                }
+            });
         }
 
         private ResizeDirection getResizeDirection(double x, double y) {

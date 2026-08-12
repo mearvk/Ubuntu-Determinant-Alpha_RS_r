@@ -4,7 +4,8 @@
 #
 # Reassembles source ISOs, mounts them, and extracts individual source packages
 # whose total extracted size is ≤50 MB. Packages are placed into ordered
-# directories /1, /2, /3, /4, /5 corresponding to their source disc.
+# directories /1/packages, /2/packages, /3/packages, /4/packages, /5/packages
+# corresponding to their source disc.
 #
 # GitHub file size concern: extracted packages ≤50 MB are safe for version control.
 # Packages exceeding 50 MB are logged but skipped.
@@ -14,7 +15,7 @@
 #   ./extract-small-packages.sh --dry-run           # Report sizes only
 #   ./extract-small-packages.sh --threshold 100     # Custom MB threshold
 #
-# Default output: ./extracted-packages/
+# Default output: ./{1,2,3,4,5}/packages/
 # Prerequisites: dpkg-source (dpkg-dev), sudo for mount
 
 set -euo pipefail
@@ -41,13 +42,13 @@ while [ $# -gt 0 ]; do
             echo "  --help, -h          This help"
             echo ""
             echo "Output structure:"
-            echo "  output_dir/1/  — Packages from Source Disc 1"
-            echo "  output_dir/2/  — Packages from Source Disc 2"
-            echo "  output_dir/3/  — Packages from Source Disc 3"
-            echo "  output_dir/4/  — Packages from Source Disc 4"
-            echo "  output_dir/5/  — Reserved / overflow"
-            echo "  output_dir/manifest.txt    — Full manifest of extracted packages"
-            echo "  output_dir/skipped.txt     — Packages exceeding threshold"
+            echo "  output_dir/1/packages/  — Packages from Source Disc 1"
+            echo "  output_dir/2/packages/  — Packages from Source Disc 2"
+            echo "  output_dir/3/packages/  — Packages from Source Disc 3"
+            echo "  output_dir/4/packages/  — Packages from Source Disc 4"
+            echo "  output_dir/5/packages/  — Reserved / overflow"
+            echo "  output_dir/manifest.txt — Full manifest of extracted packages"
+            echo "  output_dir/skipped.txt  — Packages exceeding threshold"
             exit 0
             ;;
         -*) echo "Unknown option: $1"; exit 1 ;;
@@ -55,7 +56,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/extracted-packages}"
+OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}}"
 THRESHOLD_BYTES=$((THRESHOLD_MB * 1024 * 1024))
 MOUNT_BASE="/tmp/ubuntu-source-extract-$$"
 ISO_DIR="${SCRIPT_DIR}"
@@ -239,7 +240,7 @@ echo ""
 
 # Create output structure
 if [ $DRY_RUN -eq 0 ]; then
-    mkdir -p "$OUTPUT_DIR"/{1,2,3,4,5}
+    mkdir -p "$OUTPUT_DIR"/{1,2,3,4,5}/packages
 fi
 
 TOTAL_EXTRACTED=0
@@ -291,7 +292,7 @@ for DISC in "${MOUNTED_DISCS[@]}"; do
             fi
 
             if [ $DRY_RUN -eq 0 ]; then
-                extract_package "$DSC" "$OUTPUT_DIR/$DISC"
+                extract_package "$DSC" "$OUTPUT_DIR/$DISC/packages"
                 echo "${DISC}/${PKG_NAME}  ${COMPRESSED_MB}  extracted" >> "$MANIFEST_FILE"
             fi
 
@@ -324,16 +325,16 @@ echo "╠═══════════════════════�
 printf "║  %-60s ║\n" "Threshold:       ${THRESHOLD_MB} MB"
 printf "║  %-60s ║\n" "Packages ≤ ${THRESHOLD_MB} MB:  ${TOTAL_EXTRACTED} ($(echo "scale=1; $TOTAL_SIZE_EXTRACTED / 1048576" | bc) MB total)"
 printf "║  %-60s ║\n" "Packages > ${THRESHOLD_MB} MB:  ${TOTAL_SKIPPED} ($(echo "scale=1; $TOTAL_SIZE_SKIPPED / 1048576" | bc) MB total)"
-printf "║  %-60s ║\n" "$([ $DRY_RUN -eq 1 ] && echo 'DRY RUN — no files written' || echo "Output: $OUTPUT_DIR/{1,2,3,4,5}/")"
+printf "║  %-60s ║\n" "$([ $DRY_RUN -eq 1 ] && echo 'DRY RUN — no files written' || echo "Output: $OUTPUT_DIR/{1,2,3,4,5}/packages/")"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 
 if [ $DRY_RUN -eq 0 ]; then
     echo "  Directory structure:"
     for d in 1 2 3 4 5; do
-        COUNT=$(find "$OUTPUT_DIR/$d" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-        SIZE=$(du -sh "$OUTPUT_DIR/$d" 2>/dev/null | cut -f1)
-        echo "    $OUTPUT_DIR/$d/ — $COUNT packages ($SIZE)"
+        COUNT=$(find "$OUTPUT_DIR/$d/packages" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+        SIZE=$(du -sh "$OUTPUT_DIR/$d/packages" 2>/dev/null | cut -f1)
+        echo "    $OUTPUT_DIR/$d/packages/ — $COUNT packages ($SIZE)"
     done
     echo ""
     echo "  Manifest: $MANIFEST_FILE"

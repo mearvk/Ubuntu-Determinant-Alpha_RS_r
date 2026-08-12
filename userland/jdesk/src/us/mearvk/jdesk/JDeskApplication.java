@@ -24,6 +24,7 @@ import javafx.application.Platform;
 import javafx.scene.*;
 import javafx.scene.control.*;
 import javafx.scene.image.*;
+import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.*;
 import javafx.scene.shape.Rectangle;
@@ -34,8 +35,7 @@ import javafx.stage.*;
 import javafx.animation.*;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.time.*;
 import java.time.format.*;
 import java.util.*;
@@ -454,6 +454,30 @@ public class JDeskApplication extends Application {
             openJDeskTerminal();
             return;
         }
+        if ("ide".equals(action)) {
+            openJDeskIDE();
+            return;
+        }
+        if ("browser".equals(action)) {
+            openJDeskBrowser();
+            return;
+        }
+        if ("writer".equals(action)) {
+            openJDeskWriter();
+            return;
+        }
+        if ("files".equals(action)) {
+            openJDeskFiles();
+            return;
+        }
+        if ("software".equals(action)) {
+            openJDeskSoftware();
+            return;
+        }
+        if ("launcher".equals(action)) {
+            openJDeskLauncher();
+            return;
+        }
 
         try {
             // Resolve the binary path
@@ -714,6 +738,9 @@ public class JDeskApplication extends Application {
         termWindow.getChildren().addAll(titleBar, terminal);
         desktopSurface.getChildren().add(termWindow);
 
+        // Enable edge/corner resize
+        enableWindowResize(termWindow, 400, 200);
+
         // Start the shell
         terminal.start();
 
@@ -721,6 +748,410 @@ public class JDeskApplication extends Application {
         Platform.runLater(terminal::requestFocus);
 
         System.out.println("[JDesk] ✓ Terminal opened (JavaFX GUI → /bin/bash native)");
+    }
+
+    // =========================================================================
+    //  JDesk IDE (JavaFX GUI, IntelliJ backend)
+    // =========================================================================
+
+    /**
+     * Open a JDesk IDE window — JavaFX renders the full IDE chrome
+     * (project tree, tabs, editor, build/run, terminal).
+     * IntelliJ IDEA runs as a governed subprocess for code intelligence.
+     */
+    private void openJDeskIDE() {
+        // Create IDE widget
+        us.mearvk.jdesk.apps.JDeskIDE ide = new us.mearvk.jdesk.apps.JDeskIDE();
+
+        // Wrap in a floating window on the desktop
+        VBox ideWindow = new VBox(0);
+        ideWindow.setPrefSize(ide.getIDEWidth() + 2, ide.getIDEHeight() + 40);
+        ideWindow.setLayoutX(60);
+        ideWindow.setLayoutY(30);
+        ideWindow.setStyle(
+            "-fx-background-color: #1E1F22;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #393B3D;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 24, 0, 0, 8);"
+        );
+
+        // Title bar with traffic light buttons
+        HBox titleBar = new HBox(8);
+        titleBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        titleBar.setPadding(new Insets(8, 12, 8, 12));
+        titleBar.setStyle("-fx-background-color: #1E1F22; -fx-background-radius: 10 10 0 0;");
+
+        // Close button (red circle)
+        Button closeBtn = new Button("");
+        closeBtn.setMinSize(13, 13);
+        closeBtn.setMaxSize(13, 13);
+        closeBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        );
+        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
+            "-fx-background-color: #FF5F56;" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #E04840;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        closeBtn.setOnAction(e -> {
+            ide.stopIntelliJ();
+            desktopSurface.getChildren().remove(ideWindow);
+        });
+
+        // Minimize button (yellow circle)
+        Button minBtn = new Button("");
+        minBtn.setMinSize(13, 13);
+        minBtn.setMaxSize(13, 13);
+        minBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        );
+        minBtn.setOnMouseEntered(e -> minBtn.setStyle(
+            "-fx-background-color: #FFBD2E;" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #E0A820;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        minBtn.setOnMouseExited(e -> minBtn.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #3A3E48 0%, #2A2E38 100%);" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        minBtn.setOnAction(e -> ideWindow.setVisible(false));
+
+        Label titleLabel = new Label("JDesk IDE — IntelliJ IDEA");
+        titleLabel.setStyle(
+            "-fx-text-fill: #A0A8B0;" +
+            "-fx-font-size: 12px;" +
+            "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+            "-fx-font-weight: 500;"
+        );
+
+        titleBar.getChildren().addAll(closeBtn, minBtn, titleLabel);
+
+        // Enable dragging the window
+        final double[] dragOffset = new double[2];
+        titleBar.setOnMousePressed(e -> {
+            dragOffset[0] = e.getSceneX() - ideWindow.getLayoutX();
+            dragOffset[1] = e.getSceneY() - ideWindow.getLayoutY();
+        });
+        titleBar.setOnMouseDragged(e -> {
+            ideWindow.setLayoutX(e.getSceneX() - dragOffset[0]);
+            ideWindow.setLayoutY(e.getSceneY() - dragOffset[1]);
+        });
+
+        // Assemble window
+        VBox.setVgrow(ide, Priority.ALWAYS);
+        ideWindow.getChildren().addAll(titleBar, ide);
+        desktopSurface.getChildren().add(ideWindow);
+
+        // Enable edge/corner resize
+        enableWindowResize(ideWindow, 640, 400);
+
+        // Try to open the user's home IdeaProjects as default
+        String home = System.getProperty("user.home");
+        if (home != null) {
+            Path projects = Path.of(home, "IdeaProjects");
+            if (Files.isDirectory(projects)) {
+                try (java.nio.file.DirectoryStream<Path> stream =
+                        Files.newDirectoryStream(projects)) {
+                    for (Path p : stream) {
+                        if (Files.isDirectory(p)) {
+                            ide.openProject(p);
+                            break;
+                        }
+                    }
+                } catch (IOException ignored) {}
+            }
+        }
+
+        // Start IntelliJ backend (falls back to built-in if not installed)
+        ide.startIntelliJ(null);
+
+        // Focus
+        Platform.runLater(ide::requestFocus);
+
+        System.out.println("[JDesk] ✓ IDE opened (JavaFX GUI → IntelliJ IDEA native)");
+    }
+
+    // =========================================================================
+    //  JDesk Browser (JavaFX WebView, tabbed)
+    // =========================================================================
+
+    private void openJDeskBrowser() {
+        us.mearvk.jdesk.apps.JDeskBrowser browser = new us.mearvk.jdesk.apps.JDeskBrowser();
+
+        VBox browserWindow = new VBox(0);
+        browserWindow.setPrefSize(browser.getBrowserWidth() + 2, browser.getBrowserHeight() + 40);
+        browserWindow.setLayoutX(80);
+        browserWindow.setLayoutY(40);
+        browserWindow.setStyle(
+            "-fx-background-color: #1E1F22;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #393B3D;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 20, 0, 0, 6);"
+        );
+
+        HBox titleBar = createDarkTitleBar("Browser", browserWindow, () -> {
+            desktopSurface.getChildren().remove(browserWindow);
+        });
+
+        VBox.setVgrow(browser, Priority.ALWAYS);
+        browserWindow.getChildren().addAll(titleBar, browser);
+        desktopSurface.getChildren().add(browserWindow);
+        enableWindowResize(browserWindow, 500, 300);
+
+        Platform.runLater(browser::requestFocus);
+        System.out.println("[JDesk] ✓ Browser opened (JavaFX WebView)");
+    }
+
+    // =========================================================================
+    //  JDesk Writer (JavaFX HTMLEditor, word processor)
+    // =========================================================================
+
+    private void openJDeskWriter() {
+        us.mearvk.jdesk.apps.JDeskWriter writer = new us.mearvk.jdesk.apps.JDeskWriter();
+
+        VBox writerWindow = new VBox(0);
+        writerWindow.setPrefSize(writer.getWriterWidth() + 2, writer.getWriterHeight() + 40);
+        writerWindow.setLayoutX(100);
+        writerWindow.setLayoutY(50);
+        writerWindow.setStyle(
+            "-fx-background-color: #F7F8FA;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #DADCE0;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(30,50,80,0.15), 20, 0, 0, 6);"
+        );
+
+        HBox titleBar = createLightTitleBar("Writer", writerWindow, () -> {
+            desktopSurface.getChildren().remove(writerWindow);
+        });
+
+        VBox.setVgrow(writer, Priority.ALWAYS);
+        writerWindow.getChildren().addAll(titleBar, writer);
+        desktopSurface.getChildren().add(writerWindow);
+        enableWindowResize(writerWindow, 500, 350);
+
+        Platform.runLater(writer::requestFocus);
+        System.out.println("[JDesk] ✓ Writer opened (JavaFX HTMLEditor)");
+    }
+
+    // =========================================================================
+    //  JDesk Files (JavaFX file manager)
+    // =========================================================================
+
+    private void openJDeskFiles() {
+        us.mearvk.jdesk.apps.JDeskFiles files = new us.mearvk.jdesk.apps.JDeskFiles();
+
+        VBox filesWindow = new VBox(0);
+        filesWindow.setPrefSize(files.getFilesWidth() + 2, files.getFilesHeight() + 40);
+        filesWindow.setLayoutX(120);
+        filesWindow.setLayoutY(60);
+        filesWindow.setStyle(
+            "-fx-background-color: #FFFFFF;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #DADCE0;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(30,50,80,0.15), 20, 0, 0, 6);"
+        );
+
+        HBox titleBar = createLightTitleBar("Files", filesWindow, () -> {
+            desktopSurface.getChildren().remove(filesWindow);
+        });
+
+        VBox.setVgrow(files, Priority.ALWAYS);
+        filesWindow.getChildren().addAll(titleBar, files);
+        desktopSurface.getChildren().add(filesWindow);
+        enableWindowResize(filesWindow, 450, 300);
+
+        Platform.runLater(files::requestFocus);
+        System.out.println("[JDesk] ✓ Files opened (JavaFX file manager)");
+    }
+
+    // =========================================================================
+    //  JDesk Software (JavaFX package manager)
+    // =========================================================================
+
+    private void openJDeskSoftware() {
+        us.mearvk.jdesk.apps.JDeskSoftware software = new us.mearvk.jdesk.apps.JDeskSoftware();
+
+        VBox softwareWindow = new VBox(0);
+        softwareWindow.setPrefSize(software.getSoftwareWidth() + 2, software.getSoftwareHeight() + 40);
+        softwareWindow.setLayoutX(90);
+        softwareWindow.setLayoutY(45);
+        softwareWindow.setStyle(
+            "-fx-background-color: #FFFFFF;" +
+            "-fx-background-radius: 10;" +
+            "-fx-border-color: #DADCE0;" +
+            "-fx-border-radius: 10;" +
+            "-fx-border-width: 1;" +
+            "-fx-effect: dropshadow(gaussian, rgba(30,50,80,0.15), 20, 0, 0, 6);"
+        );
+
+        HBox titleBar = createLightTitleBar("Software", softwareWindow, () -> {
+            desktopSurface.getChildren().remove(softwareWindow);
+        });
+
+        VBox.setVgrow(software, Priority.ALWAYS);
+        softwareWindow.getChildren().addAll(titleBar, software);
+        desktopSurface.getChildren().add(softwareWindow);
+        enableWindowResize(softwareWindow, 500, 350);
+
+        Platform.runLater(software::requestFocus);
+        System.out.println("[JDesk] ✓ Software Center opened (JavaFX → apt/dpkg)");
+    }
+
+    // =========================================================================
+    //  JDesk Launcher (overlay search)
+    // =========================================================================
+
+    private void openJDeskLauncher() {
+        us.mearvk.jdesk.apps.JDeskLauncher launcher = new us.mearvk.jdesk.apps.JDeskLauncher();
+
+        // Launcher is a full-desktop overlay
+        launcher.setPrefSize(desktopSurface.getWidth(), desktopSurface.getHeight());
+        launcher.setLayoutX(0);
+        launcher.setLayoutY(0);
+        launcher.setOnClose(() -> desktopSurface.getChildren().remove(launcher));
+
+        // Click outside results to close
+        launcher.setOnMouseClicked(e -> {
+            if (e.getTarget() == launcher) {
+                desktopSurface.getChildren().remove(launcher);
+            }
+        });
+
+        desktopSurface.getChildren().add(launcher);
+        System.out.println("[JDesk] ✓ Launcher overlay opened");
+    }
+
+    // =========================================================================
+    //  Window Title Bar Helpers (reusable dark/light title bars)
+    // =========================================================================
+
+    private HBox createDarkTitleBar(String title, Region window, Runnable onClose) {
+        HBox titleBar = new HBox(8);
+        titleBar.setAlignment(Pos.CENTER_LEFT);
+        titleBar.setPadding(new Insets(8, 12, 8, 12));
+        titleBar.setStyle("-fx-background-color: #1E1F22; -fx-background-radius: 10 10 0 0;");
+
+        Button closeBtn = trafficLightBtn("#3A3E48", "#FF5F56", "#E04840");
+        closeBtn.setOnAction(e -> onClose.run());
+
+        Button minBtn = trafficLightBtn("#3A3E48", "#FFBD2E", "#E0A820");
+        minBtn.setOnAction(e -> window.setVisible(false));
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(
+            "-fx-text-fill: #A0A8B0;" +
+            "-fx-font-size: 12px;" +
+            "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+            "-fx-font-weight: 500;"
+        );
+
+        titleBar.getChildren().addAll(closeBtn, minBtn, titleLabel);
+        enableTitleBarDrag(titleBar, window);
+        return titleBar;
+    }
+
+    private HBox createLightTitleBar(String title, Region window, Runnable onClose) {
+        HBox titleBar = new HBox(8);
+        titleBar.setAlignment(Pos.CENTER_LEFT);
+        titleBar.setPadding(new Insets(8, 12, 8, 12));
+        titleBar.setStyle("-fx-background-color: #F7F8FA; -fx-background-radius: 10 10 0 0;");
+
+        Button closeBtn = trafficLightBtn("#E8E8EC", "#FF5F56", "#E04840");
+        closeBtn.setOnAction(e -> onClose.run());
+
+        Button minBtn = trafficLightBtn("#E8E8EC", "#FFBD2E", "#E0A820");
+        minBtn.setOnAction(e -> window.setVisible(false));
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(
+            "-fx-text-fill: #5C6B7A;" +
+            "-fx-font-size: 12px;" +
+            "-fx-font-family: 'Inter', system-ui, sans-serif;" +
+            "-fx-font-weight: 500;"
+        );
+
+        titleBar.getChildren().addAll(closeBtn, minBtn, titleLabel);
+        enableTitleBarDrag(titleBar, window);
+        return titleBar;
+    }
+
+    private Button trafficLightBtn(String restColor, String hoverColor, String borderColor) {
+        Button btn = new Button("");
+        btn.setMinSize(13, 13);
+        btn.setMaxSize(13, 13);
+        btn.setStyle(
+            "-fx-background-color: " + restColor + ";" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        );
+        btn.setOnMouseEntered(e -> btn.setStyle(
+            "-fx-background-color: " + hoverColor + ";" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: " + borderColor + ";" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        btn.setOnMouseExited(e -> btn.setStyle(
+            "-fx-background-color: " + restColor + ";" +
+            "-fx-background-radius: 50%;" +
+            "-fx-border-color: #4A4E58;" +
+            "-fx-border-radius: 50%;" +
+            "-fx-border-width: 1;" +
+            "-fx-cursor: hand;"
+        ));
+        return btn;
+    }
+
+    private void enableTitleBarDrag(HBox titleBar, Region window) {
+        final double[] dragOffset = new double[2];
+        titleBar.setOnMousePressed(e -> {
+            dragOffset[0] = e.getSceneX() - window.getLayoutX();
+            dragOffset[1] = e.getSceneY() - window.getLayoutY();
+        });
+        titleBar.setOnMouseDragged(e -> {
+            window.setLayoutX(e.getSceneX() - dragOffset[0]);
+            window.setLayoutY(e.getSceneY() - dragOffset[1]);
+        });
     }
 
     // =========================================================================
@@ -807,7 +1238,127 @@ public class JDeskApplication extends Application {
         dialog.getChildren().addAll(titleBar, sep, themeLabel, versionLabel, kernelLabel, compositorLabel,
                 new Separator(), ethicsLabel);
 
+        // Enable resize on settings dialog
+        enableWindowResize(dialog, 300, 200);
+
         desktopSurface.getChildren().add(dialog);
+    }
+
+    // =========================================================================
+    //  Window Resize (shared helper for all floating JDesk windows)
+    // =========================================================================
+
+    /**
+     * Enable edge/corner drag-to-resize on any Region placed on the desktop.
+     * Detects mouse position within 6px of edges and allows dragging to resize.
+     *
+     * @param window The Region to make resizable
+     * @param minW   Minimum width
+     * @param minH   Minimum height
+     */
+    private void enableWindowResize(Region window, double minW, double minH) {
+        final int EDGE = 6;
+        final double[] resizeState = new double[6];
+        // [0]=startX, [1]=startY, [2]=origX, [3]=origY, [4]=origW, [5]=origH
+        final int[] dir = {0};
+        // dir encoding: 1=N, 2=S, 4=E, 8=W (combined for corners)
+
+        window.setOnMouseMoved(e -> {
+            int d = getEdgeDirection(e.getX(), e.getY(), window.getWidth(), window.getHeight(), EDGE);
+            switch (d) {
+                case 1: case 2:     window.setCursor(Cursor.N_RESIZE); break;
+                case 4: case 8:     window.setCursor(Cursor.E_RESIZE); break;
+                case 5: case 10:    window.setCursor(Cursor.NE_RESIZE); break;  // N+E=5, S+W=10
+                case 9: case 6:     window.setCursor(Cursor.NW_RESIZE); break;  // N+W=9, S+E=6
+                default:            window.setCursor(Cursor.DEFAULT); break;
+            }
+        });
+
+        window.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            int d = getEdgeDirection(e.getX(), e.getY(), window.getWidth(), window.getHeight(), EDGE);
+            if (d != 0) {
+                dir[0] = d;
+                resizeState[0] = e.getScreenX();
+                resizeState[1] = e.getScreenY();
+                resizeState[2] = window.getLayoutX();
+                resizeState[3] = window.getLayoutY();
+                resizeState[4] = window.getWidth();
+                resizeState[5] = window.getHeight();
+                e.consume();
+            }
+        });
+
+        window.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+            if (dir[0] == 0) return;
+
+            double dx = e.getScreenX() - resizeState[0];
+            double dy = e.getScreenY() - resizeState[1];
+            double newX = resizeState[2];
+            double newY = resizeState[3];
+            double newW = resizeState[4];
+            double newH = resizeState[5];
+
+            // East (grow right)
+            if ((dir[0] & 4) != 0) {
+                newW = resizeState[4] + dx;
+            }
+            // West (grow left, move origin)
+            if ((dir[0] & 8) != 0) {
+                newW = resizeState[4] - dx;
+                newX = resizeState[2] + dx;
+            }
+            // South (grow down)
+            if ((dir[0] & 2) != 0) {
+                newH = resizeState[5] + dy;
+            }
+            // North (grow up, move origin)
+            if ((dir[0] & 1) != 0) {
+                newH = resizeState[5] - dy;
+                newY = resizeState[3] + dy;
+            }
+
+            // Enforce minimums
+            if (newW < minW) {
+                if (newX != resizeState[2]) newX = resizeState[2] + resizeState[4] - minW;
+                newW = minW;
+            }
+            if (newH < minH) {
+                if (newY != resizeState[3]) newY = resizeState[3] + resizeState[5] - minH;
+                newH = minH;
+            }
+
+            window.setLayoutX(newX);
+            window.setLayoutY(newY);
+            window.setPrefWidth(newW);
+            window.setPrefHeight(newH);
+            e.consume();
+        });
+
+        window.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+            if (dir[0] != 0) {
+                dir[0] = 0;
+                e.consume();
+            }
+        });
+    }
+
+    /**
+     * Determine which edge/corner of a window the mouse is near.
+     * Returns a bitmask: 1=N, 2=S, 4=E, 8=W (combined for corners).
+     * Returns 0 if not near any edge.
+     */
+    private int getEdgeDirection(double x, double y, double w, double h, int edge) {
+        boolean top    = y < edge;
+        boolean bottom = y > h - edge;
+        boolean left   = x < edge;
+        boolean right  = x > w - edge;
+
+        int d = 0;
+        if (top) d |= 1;
+        if (bottom) d |= 2;
+        if (right) d |= 4;
+        if (left) d |= 8;
+        return d;
     }
 
     // =========================================================================
