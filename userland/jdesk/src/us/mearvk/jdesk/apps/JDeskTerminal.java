@@ -55,6 +55,10 @@ import javafx.animation.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 /**
@@ -816,8 +820,16 @@ public class JDeskTerminal extends VBox {
             javafx.geometry.Bounds b = canvas.localToScene(canvas.getBoundsInLocal());
             boolean inCanvas = e.getSceneX() >= b.getMinX() && e.getSceneX() <= b.getMaxX() && e.getSceneY() >= b.getMinY() && e.getSceneY() <= b.getMaxY();
             String targetClass = e.getTarget() != null ? e.getTarget().getClass().getSimpleName() : "null";
-            System.out.println(String.format("[JDeskTerminal][MOUSE] %s scene=(%.1f,%.1f) inCanvas=%b target=%s click=%d button=%s shift=%b ctrl=%b",
-                label, e.getSceneX(), e.getSceneY(), inCanvas, targetClass, e.getClickCount(), e.getButton(), e.isShiftDown(), e.isControlDown()));
+            String line = String.format("[JDeskTerminal][MOUSE] %s scene=(%.1f,%.1f) inCanvas=%b target=%s click=%d button=%s shift=%b ctrl=%b",
+                label, e.getSceneX(), e.getSceneY(), inCanvas, targetClass, e.getClickCount(), e.getButton(), e.isShiftDown(), e.isControlDown());
+            // Append to diagnostics file so logs survive when GUI isn't launched from terminal
+            try {
+                Path p = Paths.get("/tmp/jdesk-mouse.log");
+                Files.write(p, (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } catch (IOException ioe) {
+                // Fallback to stdout if file write fails
+                System.out.println(line + " (file write failed: " + ioe.getMessage() + ")");
+            }
         } catch (Throwable t) {
             System.out.println("[JDeskTerminal][MOUSE] log error: " + t.getMessage());
         }
