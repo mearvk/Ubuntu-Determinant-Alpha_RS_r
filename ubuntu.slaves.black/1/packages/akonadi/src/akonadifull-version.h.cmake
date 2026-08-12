@@ -1,0 +1,2 @@
+#pragma once
+#define AKONADI_FULL_VERSION "@AKONADI_FULL_VERSION@"

@@ -1,0 +1,53 @@
+From: Steve Kowalik <stevenk@debian.org>
+Subject: Removes calls to depmod at install-modules time, and call install with
+         a user and group of root in install-scripts.
+Last-Update: 2010-05-23
+
+Index: alsa-driver-1.0.25/Makefile
+===================================================================
+--- alsa-driver-1.0.25.orig/Makefile	2012-02-08 20:12:17.258514112 +1100
++++ alsa-driver-1.0.25/Makefile	2012-02-08 20:12:20.942514206 +1100
+@@ -228,18 +228,18 @@
+ 	rm -f $(DESTDIR)$(moddir)/snd*.*o.gz $(DESTDIR)$(moddir)/persist.o.gz $(DESTDIR)$(moddir)/isapnp.o.gz
+ endif
+ 	@for d in $(SUBDIRS); do if ! $(MAKE) -C $$d modules_install; then exit 1; fi; done
+-ifeq ($(DESTDIR),)
+-	-/sbin/depmod -a $(kaversion) $(SYSTEM_MAP_OPT)
+-else
+-	@echo "*** This is a \`staged' install using the prefix"
+-	@echo "***	\"$(DESTDIR)\"."
+-	@echo "***"
+-	@echo "*** Once the modules have been moved to their final destination you must run the command"
+-	@echo "***	\"/sbin/depmod -a $(kaversion) $(SYSTEM_MAP_OPT)\"."
+-	@echo "***"
+-	@echo "*** Alternatively, if you build a package (e.g. rpm), include the"
+-	@echo "*** depmode command above in the post-(un)install procedure."
+-endif
++#ifeq ($(DESTDIR),)
++#	-/sbin/depmod -a $(kaversion) $(SYSTEM_MAP_OPT)
++#else
++#	@echo "*** This is a \`staged' install using the prefix"
++#	@echo "***	\"$(DESTDIR)\"."
++#	@echo "***"
++#	@echo "*** Once the modules have been moved to their final destination you must run the command"
++#	@echo "***	\"/sbin/depmod -a $(kaversion) $(SYSTEM_MAP_OPT)\"."
++#	@echo "***"
++#	@echo "*** Alternatively, if you build a package (e.g. rpm), include the"
++#	@echo "*** depmode command above in the post-(un)install procedure."
++#endif
+ 
+ .PHONY: install-scripts
+ install-scripts:
+@@ -247,10 +247,9 @@
+ 	 if [ -d $(DESTDIR)$$d ]; then \
+ 	   if [ -f $(DESTDIR)$$d/alsasound ]; then \
+ 	     cmp -s utils/alsasound $(DESTDIR)$$d/alsasound || \
+-	       install -m 755 -g $(IGROUP) -o $(IUSER) utils/alsasound $(DESTDIR)$$d/alsasound.new; \
+-	     break; \
++	       install -m 755 -g $(IGROUP) -o $(IUSER) utils/alsasound $(DESTDIR)$$d/alsasound.new; \	     break; \
+ 	   fi; \
+-	   install -m 755 -g $(IGROUP) -o $(IUSER) utils/alsasound $(DESTDIR)$$d/alsasound; \
++	   install -m 755 -g root -o root utils/alsasound $(DESTDIR)$$d/alsasound; \
+ 	   break; \
+ 	fi; done
+ 

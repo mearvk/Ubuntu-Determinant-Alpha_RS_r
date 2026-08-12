@@ -1,0 +1,9 @@
+#cmakedefine HAVE_UNISTD_H 1
+
+#cmakedefine HAVE_MALLOC_TRIM 1
+
+#define AKONADI_DATABASE_BACKEND "@AKONADI_DATABASE_BACKEND@"
+
+#cmakedefine WITH_3RDPARTY_OPTIONAL 1
+
+#cmakedefine WITH_ACCOUNTS 1

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: 2007 Volker Krause <vkrause@kde.org>
+
+    SPDX-License-Identifier: LGPL-2.0-or-later
+
+-->
+
+
+<!--
+  Akonadi Database Schema Update Description
+
+  update element:
+    text: SQL statement to execute for update
+    version attribute: the new schmema version
+    abortOnFailure attribute: if true, the update must succeed, otherwise failures are ignored
+
+  Please note: if you're adding a column to the db then you DON'T need to add an update
+  statement here. Add your column to akonadidb.xml instead: it will be added to the db automagically.
+-->
+<updates>
+
+  <update version="2" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable DROP COLUMN existCount;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable DROP COLUMN recentCount;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable DROP COLUMN unseenCount;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable DROP COLUMN firstUnseen;</raw-sql>
+  </update>
+
+  <update version="3" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE LocationTable SET subscribed = true;</raw-sql>
+  </update>
+
+  <update version="4" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable DROP COLUMN cachePolicyId;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE ResourceTable DROP COLUMN cachePolicyId;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">DROP TABLE CachePolicyTable;</raw-sql>
+  </update>
+
+  <update version="8" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE PartTable SET name = 'PLD:ENVELOPE' WHERE name = 'ENVELOPE';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">UPDATE PartTable SET name = 'PLD:RFC822' WHERE name = 'RFC822';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">UPDATE PartTable SET name = 'PLD:HEAD' WHERE name = 'HEAD';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">UPDATE PartTable SET name = concat( 'ATR:', name ) WHERE substr( name, 1, 4 ) != 'PLD:';</raw-sql>
+  </update>
+
+  <!-- the initializer runs first, so we will have all the new tables and columns already
+       therefore we have to clean that up first -->
+  <update version="10" abortOnFailure="true">
+    <raw-sql backends="mysql,psql,sqlite">DROP TABLE CollectionTable;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationTable RENAME TO CollectionTable;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PimItemTable DROP COLUMN collectionId;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PimItemTable CHANGE locationId collectionId BIGINT;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">DROP TABLE CollectionAttributeTable;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationAttributeTable CHANGE locationId collectionId BIGINT;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationAttributeTable RENAME TO CollectionAttributeTable;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">DROP TABLE CollectionMimeTypeRelation;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationMimeTypeRelation CHANGE Location_Id Collection_Id BIGINT NOT NULL DEFAULT '0';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationMimeTypeRelation RENAME TO CollectionMimeTypeRelation;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">DROP TABLE CollectionPimItemRelation;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationPimItemRelation CHANGE Location_Id Collection_Id BIGINT NOT NULL DEFAULT '0';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE LocationPimItemRelation RENAME TO CollectionPimItemRelation;</raw-sql>
+  </update>
+
+  <update version="12" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PartTable CHANGE datasize datasize BIGINT;</raw-sql>
+  </update>
+
+  <update version="13" abortOnFailure="true">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE CollectionTable SET parentId = NULL WHERE parentId = 0;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE CollectionTable CHANGE parentId parentId BIGINT DEFAULT NULL;</raw-sql>
+  </update>
+
+  <update version="14" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE ResourceTable SET isVirtual = true WHERE name = 'akonadi_nepomuktag_resource';</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">UPDATE ResourceTable SET isVirtual = true WHERE name = 'akonadi_search_resource';</raw-sql>
+  </update>
+
+  <update version="15" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE CollectionTable SET queryString = remoteId WHERE resourceId = 1 AND parentId IS NOT NULL;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">UPDATE CollectionTable SET queryLanguage = 'SPARQL' WHERE resourceId = 1 AND parentId IS NOT NULL;</raw-sql>
+  </update>
+
+  <update version="16" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE CollectionAttributeTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE CollectionMimeTypeRelation CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE CollectionPimItemRelation CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE CollectionTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE FlagTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE MimeTypeTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PartTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PimItemFlagRelation CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE PimitemTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE ResourceTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">ALTER TABLE SchemaVersionTable CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci;</raw-sql>
+  </update>
+
+  <!-- change all string based columns to use BINARY flag, this makes the comparison operator
+       finally work -->
+  <update version="17" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE ResourceTable CHANGE name name VARCHAR(255) BINARY UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE remoteId remoteId VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE remoteRevision remoteRevision VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE name name VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE cachePolicyLocalParts cachePolicyLocalParts VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryString queryString VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryLanguage queryLanguage VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE MimeTypeTable CHANGE name name VARCHAR(255) BINARY UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable CHANGE remoteId remoteId VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable CHANGE remoteRevision remoteRevision VARCHAR(255) BINARY;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE FlagTable CHANGE name name VARCHAR(255) BINARY UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PartTable CHANGE name name VARCHAR(255) BINARY;</raw-sql>
+  </update>
+
+  <!-- change all string based columns to VARBINARY to make indexes and comparison operator work -->
+  <update version="18" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE ResourceTable CHANGE name name VARBINARY(255) UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE remoteId remoteId VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE remoteRevision remoteRevision VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE name name VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE cachePolicyLocalParts cachePolicyLocalParts VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryString queryString VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryLanguage queryLanguage VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE MimeTypeTable CHANGE name name VARBINARY(255) UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable CHANGE remoteId remoteId VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable CHANGE remoteRevision remoteRevision VARBINARY(255);</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE FlagTable CHANGE name name VARBINARY(255) UNIQUE;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PartTable CHANGE name name VARBINARY(255);</raw-sql>
+  </update>
+  <update version="19" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE PimItemFlagRelation SET Flag_id=(SELECT id FROM FlagTable WHERE name='\\SEEN') WHERE Flag_id=(SELECT id FROM FlagTable WHERE name='\\Seen');</raw-sql>
+    <raw-sql backends="mysql,psql,sqlite">DELETE FROM FlagTable WHERE name='\\Seen';</raw-sql>
+  </update>
+
+  <!-- wider query column (only affects MySQL) -->
+  <update version="20" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryString queryString VARBINARY(1024);</raw-sql>
+  </update>
+
+  <!-- even wider query column (only affects MySQL) -->
+  <update version="21" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE CollectionTable CHANGE queryString queryString VARBINARY(32768);</raw-sql>
+  </update>
+
+  <!-- fix previously wrongly used 32bit column type on n:m helper tables (TODO: also needed for the other backends) -->
+  <update version="22" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE PimItemFlagRelation CHANGE PimItem_id PimItem_id BIGINT NOT NULL</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemFlagRelation CHANGE Flag_id Flag_id BIGINT NOT NULL</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionMimeTypeRelation CHANGE Collection_id Collection_id BIGINT NOT NULL</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionMimeTypeRelation CHANGE MimeType_id MimeType_id BIGINT NOT NULL</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionPimItemRelation CHANGE Collection_id Collection_id BIGINT NOT NULL</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE CollectionPimItemRelation CHANGE PimItem_id PimItem_id BIGINT NOT NULL</raw-sql>
+  </update>
+
+  <update version="23" abortOnFailure="false">
+    <raw-sql backends="mysql,psql">UPDATE CollectionTable SET isVirtual = true WHERE resourceId IN (SELECT id FROM ResourceTable WHERE isVirtual = true)</raw-sql>
+    <raw-sql backends="sqlite">UPDATE CollectionTable SET isVirtual = 1 WHERE resourceId IN (SELECT id FROM ResourceTable WHERE isVirtual = 1)</raw-sql>
+  </update>
+
+  <update version="24" abortOnFailure="false">
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER remoteId TYPE text USING convert_from(remoteId,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER remoteRevision TYPE text USING convert_from(remoteRevision,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER name TYPE text USING convert_from(name,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER cachePolicyLocalParts TYPE text USING convert_from(cachePolicyLocalParts,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER queryString TYPE text USING convert_from(queryString,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE CollectionTable ALTER queryLanguage TYPE text USING convert_from(queryLanguage,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE FlagTable ALTER name TYPE text USING convert_from(name,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE MimeTypeTable ALTER name TYPE text USING convert_from(name,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE PartTable ALTER name TYPE text USING convert_from(name,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE PimItemTable ALTER remoteId TYPE text USING convert_from(remoteId,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE PimItemTable ALTER remoteRevision TYPE text USING convert_from(remoteRevision,'utf8');</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE ResourceTable ALTER name TYPE text USING convert_from(name,'utf8');</raw-sql>
+  </update>
+
+  <!-- adapt to new part type table layout
+    (1) perform complex update by populating PartTypeTable and updating partTypeId column in PartTable
+    (2) drop the old part name column in the part table
+  -->
+  <update version="25" abortOnFailure="true">
+    <complex-update backends="mysql,psql,sqlite" />
+  </update>
+
+  <update version="26" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE CollectionTable SET queryAttributes = 'QUERYLANGUAGE SPARQL' WHERE queryLanguage = 'SPARQL';</raw-sql>
+    <raw-sql backends="mysql,psql">ALTER TABLE CollectionTable DROP COLUMN queryLanguage;</raw-sql>
+  </update>
+
+  <update version="28" abortOnFailure="false">
+    <raw-sql backends="mysql,psql,sqlite">UPDATE CollectionTable SET enabled = subscribed;</raw-sql>
+    <raw-sql backends="mysql,psql">ALTER TABLE CollectionTable DROP COLUMN subscribed;</raw-sql>
+  </update>
+
+  <!--
+   Update 30 fixes missing constraints on relation tables in PostgreSQL.
+   We cannot just let DbInitializer create the foreign keys there, because data
+   in the relation tables might reference rows from other tables that no longer
+   exist.
+  -->
+  <update version="30" abortOnFailure="false">
+    <!-- PimItemFlagRelation -->
+    <raw-sql backends="psql">DELETE FROM PimItemFlagRelation WHERE pimItem_id IN (
+                                SELECT pimItem_id FROM PimItemFlagRelation
+                                LEFT JOIN PimItemTable ON PimItemFlagRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL)
+    </raw-sql>
+    <raw-sql backends="psql">DELETE FROM PimItemFlagRelation WHERE flag_id IN (
+                                SELECT flag_id FROM PimItemFlagRelation
+                                LEFT JOIN FlagTable ON PimItemFlagRelation.flag_id = FlagTable.id
+                                WHERE FlagTable.id IS NULL)
+    </raw-sql>
+    <!-- PimItemTagRelation -->
+    <raw-sql backends="psql">DELETE FROM PimItemTagRelation WHERE pimItem_id IN (
+                                SELECT pimItem_id FROM PimItemTagRelation
+                                LEFT JOIN PimItemTable ON PimItemTagRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL)
+    </raw-sql>
+    <raw-sql backends="psql">DELETE FROM PimItemTagRelation WHERE tag_id IN (
+                                SELECT tag_id FROM PimItemTagRelation
+                                LEFT JOIN TagTable ON PimItemTagRelation.tag_id = TagTable.id
+                                WHERE TagTable.id IS NULL)
+    </raw-sql>
+    <!-- CollectionMimeTypeRelation -->
+    <raw-sql backends="psql">DELETE FROM CollectionMimeTypeRelation WHERE collection_id IN (
+                                SELECT collection_id FROM CollectionMimeTypeRelation
+                                LEFT JOIN CollectionTable ON CollectionMimeTypeRelation.collection_id = CollectionTable.id
+                                WHERE CollectionTable.id IS NULL)
+    </raw-sql>
+    <raw-sql backends="psql">DELETE FROM CollectionMimeTypeRelation WHERE mimeType_id IN (
+                                SELECT mimeType_id FROM CollectionMimeTypeRelation
+                                LEFT JOIN MimeTypeTable ON CollectionMimeTypeRelation.mimeType_id = MimeTypeTable.id
+                                WHERE MimeTypeTable.id IS NULL)
+    </raw-sql>
+    <!-- CollectionPimItemRelation -->
+    <raw-sql backends="psql">DELETE FROM CollectionPimItemRelation WHERE collection_id IN (
+                                SELECT collection_id FROM CollectionPimItemRelation
+                                LEFT JOIN CollectionTable ON CollectionPimItemRelation.collection_id = CollectionTable.id
+                                WHERE CollectionTable.id IS NULL)
+    </raw-sql>
+    <raw-sql backends="psql">DELETE FROM CollectionPimItemRelation WHERE pimItem_id IN (
+                                SELECT pimItem_id FROM CollectionPimItemRelation
+                                LEFT JOIN PimItemTable ON CollectionPimItemRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL)
+    </raw-sql>
+  </update>
+  <!--
+   Update 31 fixes missing constraints on relation tables in MySQL.
+   We cannot just let DbInitializer create the foreign keys there, because data
+   in the relation tables might reference rows from other tables that no longer
+   exist.
+  -->
+  <update version="31" abortOnFailure="false">
+    <!-- PimItemFlagRelation -->
+    <raw-sql backends="mysql">DELETE FROM PimItemFlagRelation WHERE pimItem_id IN (
+                                SELECT id FROM (
+                                SELECT pimItem_id AS id FROM PimItemFlagRelation
+                                LEFT JOIN PimItemTable ON PimItemFlagRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL) x)
+    </raw-sql>
+    <raw-sql backends="mysql">DELETE FROM PimItemFlagRelation WHERE flag_id IN (
+                                SELECT id FROM (
+                                SELECT flag_id AS id FROM PimItemFlagRelation
+                                LEFT JOIN FlagTable ON PimItemFlagRelation.flag_id = FlagTable.id
+                                WHERE FlagTable.id IS NULL) x)
+    </raw-sql>
+    <!-- PimItemTagRelation -->
+    <raw-sql backends="mysql">DELETE FROM PimItemTagRelation WHERE pimItem_id IN (
+                                SELECT id FROM (
+                                SELECT pimItem_id AS id FROM PimItemTagRelation
+                                LEFT JOIN PimItemTable ON PimItemTagRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL) x)
+    </raw-sql>
+    <raw-sql backends="mysql">DELETE FROM PimItemTagRelation WHERE tag_id IN (
+                                SELECT id FROM (
+                                SELECT tag_id AS id FROM PimItemTagRelation
+                                LEFT JOIN TagTable ON PimItemTagRelation.tag_id = TagTable.id
+                                WHERE TagTable.id IS NULL) x)
+    </raw-sql>
+    <!-- CollectionMimeTypeRelation -->
+    <raw-sql backends="mysql">DELETE FROM CollectionMimeTypeRelation WHERE collection_id IN (
+                                SELECT id FROM (
+                                SELECT collection_id AS id  FROM CollectionMimeTypeRelation
+                                LEFT JOIN CollectionTable ON CollectionMimeTypeRelation.collection_id = CollectionTable.id
+                                WHERE CollectionTable.id IS NULL) x)
+    </raw-sql>
+    <raw-sql backends="mysql">DELETE FROM CollectionMimeTypeRelation WHERE mimeType_id IN (
+                                SELECT id FROM (
+                                SELECT mimeType_id AS id FROM CollectionMimeTypeRelation
+                                LEFT JOIN MimeTypeTable ON CollectionMimeTypeRelation.mimeType_id = MimeTypeTable.id
+                                WHERE MimeTypeTable.id IS NULL) x)
+    </raw-sql>
+    <!-- CollectionPimItemRelation -->
+    <raw-sql backends="mysql">DELETE FROM CollectionPimItemRelation WHERE collection_id IN (
+                                SELECT id FROM (
+                                SELECT collection_id AS id FROM CollectionPimItemRelation
+                                LEFT JOIN CollectionTable ON CollectionPimItemRelation.collection_id = CollectionTable.id
+                                WHERE CollectionTable.id IS NULL) x)
+    </raw-sql>
+    <raw-sql backends="mysql">DELETE FROM CollectionPimItemRelation WHERE pimItem_id IN (
+                                SELECT id FROM (
+                                SELECT pimItem_id AS id FROM CollectionPimItemRelation
+                                LEFT JOIN PimItemTable ON CollectionPimItemRelation.pimItem_id = PimItemTable.id
+                                WHERE PimItemTable.id IS NULL) x)
+    </raw-sql>
+  </update>
+  <update version="33" abortOnFailure="false">
+    <raw-sql backends="psql">SELECT setval('tagtypetable_id_seq', (SELECT max(id) FROM TagTypeTable))</raw-sql>
+    <raw-sql backends="psql">SELECT setval('relationtypetable_id_seq', (SELECT max(id) FROM RelationTypeTable))</raw-sql>
+  </update>
+
+  <update version="35" abortOnFailure="true">
+    <raw-sql backends="mysql,sqlite">UPDATE PartTable SET storage = external;</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PartTable DROP COLUMN external;</raw-sql>
+    <!-- TODO: SQLITE: drop the column as well, but SQLite does not have DROP COLUMN //-->
+    <raw-sql backends="psql">UPDATE PartTable SET storage = cast(external as integer);</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE PartTable DROP COLUMN external;</raw-sql>
+  </update>
+
+  <!-- Update 36 introduces foreign key support for SQLite //-->
+  <update version="36" abortOnFailure="true">
+    <complex-update backends="sqlite" />
+  </update>
+
+  <!-- Update 37 fixes TagRemoteIdResourceRelation RIDs being stored a BLOB instead of TEXT,
+  which broke querying tags by RID if the RID was passed as QString //-->
+  <update version="37" abortOnFailure="true">
+    <raw-sql backends="sqlite">UPDATE TagRemoteIdResourceRelationTable SET remoteId = printf('%s', remoteId)</raw-sql>
+  </update>
+
+  <update version="39" abortOnFailure="false">
+    <raw-sql backends="mysql">ALTER TABLE TagTable MODIFY COLUMN parentId BIGINT(20);</raw-sql>
+    <raw-sql backends="psql">ALTER TABLE TagTable ALTER COLUMN parentId DROP DEFAULT;</raw-sql>
+    <!-- FIXME: SQLite doesn't allow for a straight-forward migration, but this has never reached
+         a release, so we are mostly OK here. //-->
+  </update>
+
+  <update version="41" abortOnFailure="true">
+    <!-- Allow for up to 1024-character long indexes, used for PimItem.remoteId //-->
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable ROW_FORMAT=DYNAMIC</raw-sql>
+    <raw-sql backends="mysql">ALTER TABLE PimItemTable MODIFY COLUMN remoteId VARBINARY(1024)</raw-sql>
+  </update>
+</updates>

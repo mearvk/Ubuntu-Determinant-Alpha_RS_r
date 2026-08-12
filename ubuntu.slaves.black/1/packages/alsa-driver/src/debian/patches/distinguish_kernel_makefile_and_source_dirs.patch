@@ -1,0 +1,338 @@
+From: Ben Hutchings <ben@decadent.org.uk>
+Subject: [PATCH] Distinguish kernel makefile and source directories
+Last-Update: 2010-05-23
+
+The directory containing the top-level makefile is not the one
+containing source and/or headers when using Debian or SUSE kernel
+packages.  With current Debian kernel packages, the header file
+checks produce false negatives.
+
+Index: alsa-driver-1.0.25/configure.in
+===================================================================
+--- alsa-driver-1.0.25.orig/configure.in	2012-02-08 20:17:10.454521623 +1100
++++ alsa-driver-1.0.25/configure.in	2012-02-08 20:22:24.146529654 +1100
+@@ -86,8 +86,8 @@
+ AC_MSG_RESULT($ALSAKERNELDIR)
+ AC_SUBST(ALSAKERNELDIR)
+ 
+-dnl Check for directory with kernel source...
+-AC_MSG_CHECKING(for directory with kernel source)
++dnl Check for directory with kernel top-level makefile...
++AC_MSG_CHECKING(for directory with kernel top-level makefile)
+ if test -d "/lib/modules/`uname -r`/source" -o -L "/lib/modules/`uname -r`/source"; then
+   DEFAULT_KERNEL_DIR="/lib/modules/`uname -r`/source"
+   DEFAULT_KERNEL_BUILD="/lib/modules/`uname -r`/build"
+@@ -97,7 +97,7 @@
+   DEFAULT_KERNEL_DIR="/usr/src/linux"
+ fi
+ AC_ARG_WITH(kernel,
+-  [  --with-kernel=dir       give the directory with kernel sources]
++  [  --with-kernel=dir       give the directory with kernel top-level makefile]
+   [                        [[/usr/src/linux]]],
+   [kerneldir="$withval"
+    DEFAULT_KERNEL_BUILD=""],
+@@ -115,6 +115,25 @@
+ fi
+ AC_MSG_RESULT($kerneldir)
+ 
++dnl Check for directory with kernel source/headers...
++AC_MSG_CHECKING(for directory with kernel headers)
++dir="$(mktemp -d)"
++if test -z "$dir"; then
++  echo >&2 "failed to create temporary directory"
++  exit 1
++fi
++echo "\$(warning KBUILD_SRC=\$(KBUILD_SRC))" > "$dir"/Makefile
++kernelsrc=$(make -C "$CONFIG_SND_KERNELDIR" M="$dir" 2>&1 >/dev/null | \
++	    sed -n "s#^$dir/Makefile:.*: KBUILD_SRC=\(.*\)\$#\1#; T; p; q")
++rm -rf "$dir"
++if test -z "$kernelsrc"; then
++  AC_MSG_RESULT(failed)
++  exit 1
++else
++  CONFIG_SND_KERNELSRC="$kernelsrc"
++  AC_MSG_RESULT($kernelsrc)
++fi
++
+ dnl Check for directory with kernel build tree...
+ AC_MSG_CHECKING(for directory with kernel build)
+ AC_ARG_WITH(build,
+@@ -154,7 +173,7 @@
+       else
+         AC_MSG_RESULT(no)
+         cat << EOF
+-The file $CONFIG_SND_KERNELDIR/include/$1 does not exist.
++The file $CONFIG_SND_KERNELSRC/include/$1 does not exist.
+ Please install the package with full kernel sources for your distribution
+ or use --with-kernel=dir option to specify another directory with kernel
+ sources (default is $DEFAULT_KERNEL_DIR).
+@@ -172,14 +191,14 @@
+ AC_DEFUN([CHECK_POSSIBLE_KERNEL_HEADER], [
+   $1=""
+   AC_MSG_CHECKING(for kernel $2 $3)
+-  if test -r $CONFIG_SND_KERNELDIR/include/$2; then
++  if test -r $CONFIG_SND_KERNELSRC/include/$2; then
+     $1="$2"
+   else
+     if test -n "$kernelbuild" -a -f $kernelbuild/include/$2; then
+       $1="$2"
+     else
+       if test -n "$3"; then
+-	if test -r $CONFIG_SND_KERNELDIR/include/$3; then
++	if test -r $CONFIG_SND_KERNELSRC/include/$3; then
+ 	  $1="$3"
+         else
+ 	  if test -n "$kernelbuild" -a -f $kernelbuild/include/$3; then
+@@ -200,7 +219,7 @@
+ 
+ dnl Check for kernel version...
+ AC_MSG_CHECKING(for kernel version)
+-KERNEL_INC="-I$CONFIG_SND_KERNELDIR/include"
++KERNEL_INC="-I$CONFIG_SND_KERNELSRC/include"
+ MAKE_ADDS=""
+ if test -n "$kernelbuild"; then
+   kpath=""
+@@ -219,7 +238,7 @@
+ if test -n "$kernelbuild" -a -f $kernelbuild/include/$INCLUDE_VERSION_H; then
+   KERNDIR=$kernelbuild
+ else
+-  KERNDIR=$CONFIG_SND_KERNELDIR
++  KERNDIR=$CONFIG_SND_KERNELSRC
+ fi
+ AC_TRY_RUN([
+ #include <stdio.h>
+@@ -276,9 +295,9 @@
+ ksublevel=`expr $ksublevel + 0`
+ if test "$kversion" = "0" -a "$kpatchlevel" = "0" -a "$ksublevel" = "0"; then
+   AC_MSG_RESULT(failed)
+-  echo "  (probably missing $CONFIG_SND_KERNELDIR/include/linux/version.h or"
+-  echo "                    $CONFIG_SND_KERNELDIR/include/linux/utsrelease.h or"
+-  echo "                    $CONFIG_SND_KERNELDIR/include/generated/utsrelease.h)"
++  echo "  (probably missing $CONFIG_SND_KERNELSRC/include/linux/version.h or"
++  echo "                    $CONFIG_SND_KERNELSRC/include/linux/utsrelease.h or"
++  echo "                    $CONFIG_SND_KERNELSRC/include/generated/utsrelease.h)"
+   exit 1
+ fi
+ kaversion="$kversion.$kpatchlevel.$ksublevel$kextraversion"
+@@ -297,7 +316,7 @@
+ if test -n "$kernelbuild" -a -f $kernelbuild/include/linux/compile.h; then
+   KERNDIR=$kernelbuild
+ else
+-  KERNDIR=$CONFIG_SND_KERNELDIR
++  KERNDIR=$CONFIG_SND_KERNELSRC
+ fi
+ 
+ AC_TRY_RUN([
+@@ -313,7 +332,7 @@
+ #ifdef LINUX_COMPILER
+  f=fopen("./conftestdata","w");
+  if (f) {
+-   for (ptr = LINUX_COMPILER, dptr = compiler; *ptr != '\0' && *ptr != ' ' && *ptr != '\t'; ptr++, dptr++)
++for (ptr = LINUX_COMPILER, dptr = compiler; *ptr != '\0' && *ptr != ' ' && *ptr != '\t'; ptr++, dptr++)
+      *dptr = *ptr;
+    if (*ptr != '\0' && (*ptr == ' ' || *ptr == '\t'))
+      ptr++;
+@@ -447,7 +466,7 @@
+   if test -n "$kernelbuild" -a \( -f "$kernelbuild/include/$1" -o -f "$kernelbuild/include2/$1" -o -f "$kernelbuild/arch/$ARCHDIR/include/$1" \) ; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   if test -n "$3"; then
+     eval $3=""
+@@ -483,7 +502,7 @@
+   if test -n "$kernelbuild" -a \( -f "$kernelbuild/include/$1" -o -f "$kernelbuild/include2/$1" -o -f "$kernelbuild/arch/$ARCHDIR/include/$1" \) ; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   if grep -q $2 "$KERNDIR/include/$1" "$KERNDIR/include2/$1" "$KERNDIR/arch/$ARCHDIR/include/$1" > /dev/null 2>&1; then
+     AC_MSG_RESULT(no)
+@@ -510,7 +529,7 @@
+   if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   boolchk=""
+   AC_TRY_RUN([
+@@ -541,7 +560,7 @@
+   if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   boolchk=""
+   AC_TRY_RUN([
+@@ -572,7 +591,7 @@
+   if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   tristatechk=""
+   AC_TRY_RUN([
+@@ -618,7 +637,7 @@
+   AC_MSG_CHECKING(for exported symbol $2)
+   ac_save_CFLAGS="$CFLAGS"
+   boolchk=""
+-  if grep EXPORT_SYMBOL "$CONFIG_SND_KERNELDIR/kernel/ksyms.c" | grep "$2" > /dev/null; then
++  if grep EXPORT_SYMBOL "$CONFIG_SND_KERNELSRC/kernel/ksyms.c" | grep "$2" > /dev/null; then
+     AC_MSG_RESULT(yes);boolchk="y"
+     AC_DEFINE($1)
+   else
+@@ -684,6 +703,8 @@
+ dnl define kernel directory now
+ AC_DEFINE_UNQUOTED(CONFIG_SND_KERNELDIR, "$CONFIG_SND_KERNELDIR")
+ AC_SUBST(CONFIG_SND_KERNELDIR)
++AC_DEFINE_UNQUOTED(CONFIG_SND_KERNELSRC, "$CONFIG_SND_KERNELSRC")
++AC_SUBST(CONFIG_SND_KERNELSRC)
+ AC_SUBST(CONFIG_SND_KERNELBUILD)
+ AC_SUBST(MAKE_ADDS)
+ 
+@@ -845,7 +866,7 @@
+ if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+   KERNDIR=$kernelbuild
+ else
+-  KERNDIR=$CONFIG_SND_KERNELDIR
++  KERNDIR=$CONFIG_SND_KERNELSRC
+ fi
+ AC_TRY_RUN([
+ #include <stdio.h>
+@@ -1084,8 +1105,8 @@
+ 	ARCH=powerpc
+     fi
+     c_opts="-D__powerpc__ -fsigned-char -fno-builtin -msoft-float -ffixed-r2 -Wno-uninitialized -mmultiple -mstring"
+-    if test -d $CONFIG_SND_KERNELDIR/arch/ppc/include; then
+-      KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELDIR/arch/ppc/include"
++    if test -d $CONFIG_SND_KERNELSRC/arch/ppc/include; then
++      KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELSRC/arch/ppc/include"
+     fi
+     CONFIG_PPC=y
+     CONFIG_PPC32=y
+@@ -1239,8 +1260,8 @@
+       ARCHDIR=$ARCH
+       ;;
+    esac
+-   if test -d $CONFIG_SND_KERNELDIR/arch/$ARCHDIR/include; then
+-      KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELDIR/arch/$ARCHDIR/include"
++   if test -d $CONFIG_SND_KERNELSRC/arch/$ARCHDIR/include; then
++      KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELSRC/arch/$ARCHDIR/include"
+    fi
+ fi
+ 
+@@ -1254,8 +1275,8 @@
+       CONFIG_X86_32=y
+     fi
+     for i in include/asm-x86 include/asm-i386 include2/asm-x86 include2/asm-i386 arch/x86/include/asm; do
+-      if test -r $CONFIG_SND_KERNELDIR/$i/mach-default/mach_apic.h; then
+-        mach_dir="$CONFIG_SND_KERNELDIR/$i"
++      if test -r $CONFIG_SND_KERNELSRC/$i/mach-default/mach_apic.h; then
++        mach_dir="$CONFIG_SND_KERNELSRC/$i"
+ 	break
+       fi  
+       if test -n "$kernelbuild" -a -r $kernelbuild/$i/mach-default/mach_apic.h; then
+@@ -1266,8 +1287,8 @@
+     ;;
+   x86_64)
+     for i in include/asm-x86 include2/asm-x86 arch/x86/include/asm; do
+-      if test -r $CONFIG_SND_KERNELDIR/$i/mach-default/mach_apic.h; then
+-        mach_dir="$CONFIG_SND_KERNELDIR/$i"
++      if test -r $CONFIG_SND_KERNELSRC/$i/mach-default/mach_apic.h; then
++        mach_dir="$CONFIG_SND_KERNELSRC/$i"
+ 	break
+       fi  
+       if test -n "$kernelbuild" -a -r $kernelbuild/$i/mach-default/mach_apic.h; then
+@@ -1288,8 +1309,8 @@
+ 	checkarch="$ARCH"
+ 	;;
+     esac
+-    if test -d $CONFIG_SND_KERNELDIR/arch/$checkarch/include; then
+-	KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELDIR/arch/$checkarch/include"
++    if test -d $CONFIG_SND_KERNELSRC/arch/$checkarch/include; then
++	KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELSRC/arch/$checkarch/include"
+     fi
+     if test -d $CONFIG_SND_KERNELDIR/arch/$checkarch/include/generated; then
+ 	KERNEL_INC="$KERNEL_INC -I$CONFIG_SND_KERNELDIR/arch/$checkarch/include/generated"
+@@ -1305,7 +1326,7 @@
+   if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+     KERNDIR=$kernelbuild
+   else
+-    KERNDIR=$CONFIG_SND_KERNELDIR
++    KERNDIR=$CONFIG_SND_KERNELSRC
+   fi
+   AC_TRY_RUN([
+ #include <stdio.h>
+@@ -1356,7 +1377,7 @@
+ 	if test -n "$kernelbuild" -a -f "$kernelbuild/include/$INCLUDE_AUTOCONF_H"; then
+ 	  KERNDIR=$kernelbuild
+ 	else
+-	  KERNDIR=$CONFIG_SND_KERNELDIR
++	  KERNDIR=$CONFIG_SND_KERNELSRC
+ 	fi
+ 	AC_TRY_RUN([
+ #include <stdio.h>
+@@ -1430,7 +1451,7 @@
+ CONFIG_SGI=""
+ if test "$CONFIG_MIPS" = "y"; then
+   AC_MSG_CHECKING(for SGI/MIPS (HAL2) architecture)
+-  if test -r "$CONFIG_SND_KERNELDIR/include/asm/sgi/sgihpc.h"; then
++  if test -r "$CONFIG_SND_KERNELSRC/include/asm/sgi/sgihpc.h"; then
+     CONFIG_SGI="y"
+   fi
+   if test "$CONFIG_SGI" = "y"; then
+@@ -1695,7 +1716,7 @@
+ dnl Check for ISA PnP driver in kernel...
+ AC_MSG_CHECKING(for ISA PnP driver in kernel)
+ CONFIG_ISAPNP_KERNEL=
+-if test -r $CONFIG_SND_KERNELDIR/include/linux/isapnp.h; then
++if test -r $CONFIG_SND_KERNELSRC/include/linux/isapnp.h; then
+   AC_MSG_RESULT(yes)
+   AC_DEFINE(CONFIG_ISAPNP_KERNEL)
+   CONFIG_ISAPNP_KERNEL=y
+@@ -1707,7 +1728,7 @@
+ dnl Check for PnP layer (2.5+) in kernel...
+ AC_MSG_CHECKING(for PnP driver in kernel)
+ CONFIG_PNP_KERNEL=
+-if test -r $CONFIG_SND_KERNELDIR/include/linux/pnp.h; then
++if test -r $CONFIG_SND_KERNELSRC/include/linux/pnp.h; then
+   AC_MSG_RESULT(yes)
+   AC_DEFINE(CONFIG_PNP_KERNEL)
+   CONFIG_PNP_KERNEL=y
+@@ -3694,8 +3715,8 @@
+   mkdir -p include/linux include/generated
+   if test -n "$kernelbuild" -a -r $kernelbuild/include/$INCLUDE_AUTOCONF_H ; then
+     kernconf="$kernelbuild/include/$INCLUDE_AUTOCONF_H"
+-  elif test -r  $CONFIG_SND_KERNELDIR/include/$INCLUDE_AUTOCONF_H ; then
+-    kernconf="$CONFIG_SND_KERNELDIR/include/$INCLUDE_AUTOCONF_H"
++  elif test -r  $CONFIG_SND_KERNELSRC/include/$INCLUDE_AUTOCONF_H ; then
++    kernconf="$CONFIG_SND_KERNELSRC/include/$INCLUDE_AUTOCONF_H"
+   else
+       cat << EOF
+ File include/$INCLUDE_AUTOCONF_H does not exist in kernel tree.
+Index: alsa-driver-1.0.25/include/i2c-id_compat.h.in
+===================================================================
+--- alsa-driver-1.0.25.orig/include/i2c-id_compat.h.in	2012-01-25 18:56:49.000000000 +1100
++++ alsa-driver-1.0.25/include/i2c-id_compat.h.in	2012-02-08 20:22:24.146529654 +1100
+@@ -1,4 +1,4 @@
+-#include "@CONFIG_SND_KERNELDIR@/include/linux/i2c-id.h"
++#include "@CONFIG_SND_KERNELSRC@/include/linux/i2c-id.h"
+ 
+ #ifndef I2C_DRIVERID_WM8731
+ #define I2C_DRIVERID_WM8731		89	/* Wolfson WM8731 audio codec */
+Index: alsa-driver-1.0.25/include/pci_ids_compat.h.in
+===================================================================
+--- alsa-driver-1.0.25.orig/include/pci_ids_compat.h.in	2012-01-25 18:56:49.000000000 +1100
++++ alsa-driver-1.0.25/include/pci_ids_compat.h.in	2012-02-08 20:22:24.146529654 +1100
+@@ -1,5 +1,5 @@
+ #ifndef LINUX_2_2
+-#include "@CONFIG_SND_KERNELDIR@/include/linux/pci_ids.h"
++#include "@CONFIG_SND_KERNELSRC@/include/linux/pci_ids.h"
+ #endif
+ 
+ /* bt87x */
