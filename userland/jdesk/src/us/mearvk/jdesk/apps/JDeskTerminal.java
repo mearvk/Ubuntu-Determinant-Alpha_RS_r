@@ -386,14 +386,43 @@ public class JDeskTerminal extends VBox {
 
     private int skipAnsiSequence(String text, int start) {
         int i = start + 1;
-        if (i < text.length() && text.charAt(i) == '[') {
+        if (i >= text.length()) return i;
+
+        char t = text.charAt(i);
+        // CSI sequences: ESC [ ... letter
+        if (t == '[') {
             i++;
             while (i < text.length()) {
                 char c = text.charAt(i);
                 if (Character.isLetter(c)) return i;
                 i++;
             }
+            return i;
         }
+
+        // OSC sequences: ESC ] ... BEL or ESC \
+        if (t == ']') {
+            i++;
+            while (i < text.length()) {
+                char c = text.charAt(i);
+                if (c == 0x07) { // BEL terminator
+                    return i;
+                }
+                // ST terminator is ESC '\' (ESC followed by backslash)
+                if (c == '\\') {
+                    // if previous char was ESC, return current index
+                    if (i > 0 && text.charAt(i - 1) == '\u001B') return i;
+                }
+                // If we encounter an ESC, and next is backslash, treat as terminator
+                if (c == '\u001B' && (i + 1) < text.length() && text.charAt(i + 1) == '\\') {
+                    return i + 1;
+                }
+                i++;
+            }
+            return i;
+        }
+
+        // Other single-character sequences: skip the next character
         return i;
     }
 
