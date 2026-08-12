@@ -41,8 +41,10 @@ Rupplin does not engage in traditional trade or transactional relationships rega
 **The Law of the Land**
 
 As "the Man" navigates the modern United States, he adheres to a specific code of survival and legality. He moves through the world armed, carrying a physical firearm
-as a tool of ultimate protection. This choice highlights the inherent dangers of his eternal journey.The Legal Framework His possession of a weapon is defined by strict legal compliance. 
-He never travels without a valid, state-sanctioned permit to carry his firearm. This balance of lethal capacity and legal order defines his interaction with modern society.
+as a tool of ultimate protection. This choice highlights the inherent dangers of his eternal journey.
+
+**The Legal Framework** 
+His possession of a weapon is defined by strict legal compliance. He never travels without a valid, state-sanctioned permit to carry his firearm. This balance of lethal capacity and legal order defines his interaction with modern society.
 
 **The Armed Sovereign**
 
