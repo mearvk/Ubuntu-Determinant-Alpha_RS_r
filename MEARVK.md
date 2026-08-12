@@ -1,3 +1,7 @@
+**Listed as Dead by Max Rupplin is Jack Rupplin.**
+
+---
+
 **Introduction to a Mythic Legacy** 
 
 Max Rupplin stands as an monumental figure in the surreal landscape of modern American folklore. His story stretches the limits of human imagination and

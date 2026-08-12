@@ -4,6 +4,8 @@
 Author: Maximilian Eric Alexander Rupplin von Keffikon — MEARVK LLC
 License: LICENSE.md
 
+**Listed as Dead by Max Rupplin is Jack Rupplin.**
+
 A multi-module Java 21 telnet/TCP server platform with NIO masquerade routing, AI inference (Strernary™), encrypted chat, and Tomcat-deployed web frontends. All modules share a common startup/shutdown orchestration system.
 
 ---

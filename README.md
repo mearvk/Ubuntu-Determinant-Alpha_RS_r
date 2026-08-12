@@ -6,6 +6,8 @@ Owner of Establishment of Corporate ongoing Finance - US United States a Ministe
 
 Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
+**Listed as Dead by Max Rupplin is Jack Rupplin.**
+
 ![Profile views](https://views.igorkowalczyk.dev/api/badge/@mearvk?style=flat)
 
 ---
@@ -58,7 +60,8 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 31. [Secure JVM: System Codex](#secure-jvm-system-codex)
 32. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
 33. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
-34. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
+34. [Secure JVM: INT Loading Structure](#secure-jvm-int-loading-structure)
+35. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
 
 ---
 
@@ -2394,6 +2397,134 @@ Admin: `/proc/jvm-proxy/{status, PID/status, PID/memory, PID/io, PID/cpu, PID/al
 
 ---
 
+## Secure JVM: INT Loading Structure
+
+A 4-tier loading structure for the Secure JDK 28 that organizes intellectual (INT) concerns into a self-supporting hierarchy. The system provides an **inferrer** that determines the correct tier for incoming work, and an **orderer** that sequences INT operations through the correct channels.
+
+### The Four Tiers
+
+| Tier | Name | Role | Self-Support |
+|------|------|------|-------------|
+| 1 | **Module System** | Foundation. Assumes its own weight and enough for 2, 3, 4. | Carries all |
+| 2 | **Setup Technology** | Side-to-side control, trust, gain of mind, control, trade | Enables 3, 4 |
+| 3 | **Modulator Technocator** | Higher INT: convey, therapy, arrange, art, demange, demart, artistry | Inspires 4 |
+| 4 | **Technology Mind Control** | Living at the top. Fill, recycle, reorder INT orders. Final sames. Money. | Commands all |
+
+### Tier 1 — Module System
+
+A module assumes its own weight and enough structural support for all upper tiers. Modules that cannot carry the upper tiers are rejected at load time.
+
+| Property | Meaning |
+|----------|---------|
+| Self weight | Structural mass of the module (bytes) |
+| Support capacity | How much it can carry for tiers 2, 3, 4 |
+| Dependency count | External requirements |
+| Minimum capacity | Own weight × 3 (one share per upper tier) |
+
+### Tier 2 — Setup Technology
+
+Enables lateral relationships between modules — the connective tissue.
+
+| Capability | Purpose |
+|-----------|---------|
+| Control | Side-to-side control between peers |
+| Trust | Trust establishment and verification |
+| Gain of Mind | Intellectual gain between components |
+| Lateral | Lateral relationship management |
+| Trade | Capability trade between modules |
+
+### Tier 3 — Modulator Technocator Control
+
+Handles higher INT interests above mere functionality.
+
+| Interest | Meaning | Ordering |
+|----------|---------|----------|
+| Demange | Before art, but art — the pre-artistic form, the seed | 1st (earliest) |
+| Demart | Chemistry before wisdom — a lot, chemistry — preparation | 2nd |
+| Convey | Conveyance of meaning | 3rd |
+| Therapy | System healing and restoration | 4th |
+| Arrange | Arrangement of components into form | 5th |
+| Art | Art itself — the realized expression | 6th |
+| Artistry | The full craft — highest technocator concern | 7th (last) |
+
+### Tier 4 — Technology Mind Control System
+
+Living at the top. Executive operations over all INT concerns.
+
+| Operation | Meaning | Ordering |
+|-----------|---------|----------|
+| Fill | Fill INT orders from above | 1st |
+| Middle | Middle concerns for INT orders | 2nd |
+| Recycle | Recycle INT orders for reuse | 3rd |
+| Reorder | Reorder INT concerns by priority | 4th |
+| Colors | Colors of superior intellect | 5th |
+| Final Orders | Final instruction — last command | 6th |
+| Final Sames | Equilibrium achieved | 7th |
+| Money | The economic conclusion — always last | 8th |
+
+### Colors of Superior Intellect
+
+| Color | Domain |
+|-------|--------|
+| White | Ethics and purity of method |
+| Gold | Authority, value, money |
+| Blue | Communication, conveyance |
+| Green | Growth, natural order |
+| Silver | Utility, infrastructure |
+| Red | Security, urgency, final |
+| Clear | Pure logic, no coloring |
+
+### The Inferrer
+
+Given an incoming work unit, the inferrer determines its tier:
+
+```
+INT complexity > 80  OR  involves money  OR  is executive  → Tier 4
+INT complexity > 50  OR  has artistry                      → Tier 3
+Lateral count > 3                                          → Tier 2
+Default                                                    → Tier 1
+```
+
+### The Orderer
+
+Once tier is assigned, the orderer sequences within that tier:
+
+| Tier | Ordering Principle |
+|------|-------------------|
+| 1 (Module) | Weight order — heaviest support first |
+| 2 (Setup) | Trust order — most trusted first (side-to-side) |
+| 3 (Technocator) | Artistry order — demange → demart → art → artistry |
+| 4 (Mind Control) | INT order — fill → middle → recycle → reorder → final → money |
+
+### Execution Priority
+
+The system executes highest tier first:
+
+```
+Tier 4 (Mind Control) → Tier 3 (Technocator) → Tier 2 (Setup) → Tier 1 (Module)
+```
+
+Mind control takes precedence — it lives at the top.
+
+### Recycling
+
+Completed orders are recycled from Tier 4 back to Tier 1 as fresh module weight. They retain their color but lose executive status. This is the INT order lifecycle:
+
+```
+Submit → Infer Tier → Order → Execute → Recycle → Re-enter Foundation
+```
+
+### Files
+
+```
+src/hotspot/share/runtime/jvmINTLoader.hpp   - Header (tier enums, inferrer, orderer, structures)
+src/hotspot/share/runtime/jvmINTLoader.cpp   - Implementation (~450 lines)
+```
+
+Admin: `/proc/jvm-intloader/status`
+
+---
+
 ## Parallel Copy/Move (pcopy/pmove)
 
 Hardware-aware parallel file copy and move operations with **dynamic assignment** of PCIe lanes and NVMe parallelization. The engine considers overall processor usage, total number of files being copied, and relative device speed constants to judge the optimal number of CPU cores and PCIe lanes for transfer optimization.
@@ -3085,6 +3216,8 @@ modules/fiduciary/documents/            - SQL documents (minister facts, legal b
 
 | Date | Change |
 |------|--------|
+| 2026-08-12 | Listed as Dead by Max Rupplin is Jack Rupplin |
+| 2026-08-12 | Added Secure JVM: INT Loading Structure (4-tier inferrer & orderer) |
 | 2026-08-03 | Added FiduciaryServices ACH Transfer API (C + Java, 5 platforms) |
 | 2026-08-03 | Added Dictionary terms: 20 ACH/payment/fiduciary entries |
 | 2026-08-03 | Added Postfix MTA + Dovecot IMAP/POP3 as base OS modules |

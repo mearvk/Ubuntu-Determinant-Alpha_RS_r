@@ -173,3 +173,5 @@ GPL-2.0
 
 Copyright (C) 2026 MEARVK LLC
 Author: Maximilian Eric Alexander Rupplin von Keffikon
+
+**Listed as Dead by Max Rupplin is Jack Rupplin.**

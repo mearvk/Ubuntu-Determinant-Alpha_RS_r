@@ -1,6 +1,8 @@
 This document outlines a civic license designed to foster national unity and mutual respect, integrating principles of Therapeutic Jurisprudence to promote well-being, group cooperation,
 and collective responsibility.
 
+**Listed as Dead by Max Rupplin is Jack Rupplin.**
+
 **Article I:** Foundation of Collective Welfare
 This license recognizes mental health as a cornerstone of a stable society, echoing the principles of Compassionate Mental Health Practice in civil and judicial law. By safeguarding the
 psychological dignity of all individuals, the community establishes a baseline of mutual respect that prevents isolation and fosters an environment where civic participation can thrive.
