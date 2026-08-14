@@ -1,0 +1,221 @@
+#!/usr/bin/perl
+
+use v5.20;
+use warnings;
+use utf8;
+
+# Generate a list of packages that are provided by the Perl core packages
+# and also packaged separately at a (hopefully) newer version.
+# The list will have the package name and the upstream version of the
+# corresponding module integrated in the currently installed Perl version.
+
+# Copyright © 2008 Niko Tyni
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 2 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use Const::Fast;
+use List::SomeUtils qw(none);
+use Unicode::UTF8 qw(encode_utf8);
+
+# from /usr/share/doc/libapt-pkg-perl/examples/apt-cache
+use AptPkg::Config '$_config';
+use AptPkg::System '$_system';
+use AptPkg::Cache;
+
+const my $EMPTY => q{};
+const my $LAST_ITEM => -1;
+
+(my $self = $0) =~ s{.*/}{};
+
+# initialise the global config object with the default values and
+# setup the $_system object
+$_config->init;
+$_system = $_config->system;
+
+# suppress cache building messages
+$_config->{quiet} = 2;
+
+# set up the cache
+my $cache = AptPkg::Cache->new;
+# end from /usr/share/doc/libapt-pkg-perl/examples/apt-cache
+
+# special cases when libfoo-bar-perl => Foo::Bar doesn't work
+my %module_name = (
+    'libio-compress-perl' => 'IO::Compress::Gzip',
+    'libio-compress-zlib-perl' => 'IO::Compress::Gzip',
+);
+
+# special cases for where the code gets the prefix wrong
+my %manual_split
+  = ('libautodie-perl' => qr/\A (\d++\.) (\d{2}) (\d{2})? \Z/xsmo,);
+
+use Module::CoreList;
+my $versioning = $_system->versioning;
+
+my $perl_version = $];
+
+# Map 5.022002 into 5.22
+$perl_version =~ s/^(5)\.0*([1-9][0-9])\d+/$1.$2/;
+
+# we look at packages provided by these
+my @core_packages = (qw(perl-base perl), "perl-modules-$perl_version");
+
+# check we have a cache of Debian sid packages available
+warn encode_utf8(
+    join(q{ },
+        'Warning: this list should only be updated on a system',
+        'with an up to date APT cache of the Debian unstable distribution'))
+  if (
+    none {
+             defined $_->{Origin}
+          && defined $_->{Archive}
+          && $_->{Origin} eq 'Debian'
+          && $_->{Archive} eq 'unstable';
+    }
+    @{$cache->files});
+
+print encode_utf8(<<"EOF");
+# virtual packages provided by the Perl core packages that also have a
+# separate binary package available
+#
+# the listed version is the one included in the Perl core
+#
+# regenerate by running
+#   debian/rules refresh-perl-provides
+# in the lintian source tree
+#
+# last updated for PERL_VERSION=$]
+EOF
+
+for my $pkg (@core_packages) {
+    my $cached_versions = $cache->{$pkg}
+      or
+      die encode_utf8("no such binary package found in the APT cache: $pkg");
+    my $latest = bin_latest($cached_versions);
+
+    for my $provides (@{$latest->{ProvidesList}}) {
+        my $name = $provides->{Name};
+        # skip virtual-only packages
+        next if (!$cache->{$name}{VersionList});
+        my $cpan_version = find_core_version($name);
+
+        next if !$cpan_version;
+
+        # the number of digits is a pain
+        #  we use the current version in the Debian archive to determine
+        #  how many we need
+        # the epoch is easier, we just copy it
+
+        my ($epoch, $digits) = epoch_and_digits($name);
+        my $debian_version
+          = cpan_version_to_deb($name, $cpan_version, $epoch, $digits);
+
+        next if !$debian_version;
+
+        print encode_utf8("$name $debian_version\n");
+    }
+}
+
+# look up the CPAN version of a package in the core
+sub find_core_version {
+    my $module = shift;
+    my $ret;
+
+    return undef
+      if $module =~ /^perl(5|api)/;
+
+    if (exists $module_name{$module}) {
+        $module = $module_name{$module};
+    } else {
+        # mangle the package name into the module name
+        $module =~ s/^lib//;
+        $module =~ s/-perl$//;
+        $module =~ s/-/::/g;
+    }
+
+    for (Module::CoreList->find_modules(qr/^\Q$module\E$/i, 0+$])) {
+        $ret = $Module::CoreList::version{0+$]}{$_};
+        last;
+    }
+
+    return $ret;
+}
+
+sub cpan_version_to_deb {
+    my ($pkg, $cpan_version, $epoch, $digits) = @_;
+    $epoch ||= $EMPTY;
+
+    # cpan_version
+    #         digits
+    #                result
+    # 1.15_02,  2 => 1.15.02
+    # 1.15_02,  4 => 1.1502
+    # 1.15_02,  0 => 1.15.02
+    #
+    # 1.15_021, 2 => 1.15.021
+    # 1.15_021, 4 => 1.1500.021
+    # 1.15_021, 0 => 1.15.021
+    #
+    # 1.15,     1 => 1.15
+    # 1.15,     2 => 1.15
+    # 1.15,     4 => 1.1500
+    # 1.15,     0 => 1.15
+
+    # split 1.15_02 to (1, 15, 02)
+    my $regex = qr/^(\d+\.)(\d+)(?:_(\d+))?$/;
+    $regex = $manual_split{$pkg} if exists $manual_split{$pkg};
+    my ($major, $prefix, $suffix) = ($cpan_version =~ $regex);
+    die encode_utf8("no match with $cpan_version?") if !$major;
+
+    $suffix ||= $EMPTY;
+    if (length($suffix) + length($prefix) == $digits) {
+        $prefix .= $suffix;
+        $suffix = $EMPTY;
+    }
+    if (length($suffix) + length($prefix) < $digits) {
+        $prefix .= '0' while length($prefix) < $digits;
+    }
+    $suffix = ".$suffix" if $suffix ne $EMPTY;
+    return $epoch.$major.$prefix.$suffix;
+}
+
+# Given a Debian binary package name, look up its latest version
+# and return its epoch (including the colon) if available, and
+# the number of digits in its decimal part
+sub epoch_and_digits {
+    my $p = shift;
+    return (0, 0) if !exists $cache->{$p};
+    return (0, 0) if !exists $cache->{$p}{VersionList}; # virtual package
+    my $latest = bin_latest($cache->{$p});
+    my $v = $latest->{VerStr};
+    $v =~ s/\+dfsg//;
+    my ($epoch, $major, $prefix, $suffix, $revision)
+      = ($v =~ /^(?:(\d+:))?((?:\d+\.))+(\d+)(?:_(\d+))?(-[^-]+)$/);
+    return ($epoch, length $prefix);
+}
+
+sub bin_latest {
+    my $p = shift;
+    return (sort bin_byversion @{$p->{VersionList}})[$LAST_ITEM];
+}
+
+sub bin_byversion {
+    return $versioning->compare($a->{VerStr}, $b->{VerStr});
+}
+
+# Local Variables:
+# indent-tabs-mode: nil
+# cperl-indent-level: 4
+# End:
+# vim: syntax=perl sw=4 sts=4 sr et

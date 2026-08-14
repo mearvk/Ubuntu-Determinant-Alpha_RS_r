@@ -1,0 +1,196 @@
+{ head("Lintian Report for $name") }
+  <h1>{$name}</h1>
+
+  <p>
+    At the time of the last Lintian run, the following possible problems
+    were found in packages maintained by {$maintainer}, listed by source
+    package.
+{
+    if ($errors) {
+        qq(    See also the <a href="${path_prefix}full/$id">full report</a>, including)
+           . " info, experimental and overridden tags.";
+    } else {
+        qq(    See also the <a href="${path_prefix}maintainer/$id">report showing)
+           . " only errors and warnings</a>.";
+    }
+}
+    Also see their
+    <a href="https://qa.debian.org/developer.php?login={$email}">QA
+    overview</a>.
+  </p>
+
+{
+    # Show the summary only if the number of packages is within a certain
+    # range.
+    my $num_packages = keys(%packages) + keys(%uploads);
+    if ($num_packages) {
+        $OUT .= qq(  <nav id="summary">\n    <ul>\n);
+        foreach my $source (sort(keys(%packages), keys(%uploads))) {
+            # Only display a link for the package if either we're
+            # displaying the full report, or the package has error
+            # or warning tags
+            my @interesting = ();
+            my $versions = $packages{$source} || $uploads{$source};
+
+            if (!$errors) {
+                # Full report, so include the package
+                @interesting = sort by_version keys %$versions;
+                @interesting = map {
+                    [$_, $versions->{$_}[0]{pkg_info}{anchor}]
+                } @interesting;
+            } else {
+                for my $version (sort by_version keys %$versions) {
+                    my $tags = $versions->{$version};
+                    for my $tag (@$tags) {
+                        if (($tag->{code} eq 'E') or ($tag->{code} eq 'W')) {
+                            push(@interesting, [$version, $tag->{pkg_info}{anchor}]);
+                            last;
+                        }
+                    }
+                }
+            }
+
+            if (@interesting) {
+                foreach my $vdata (@interesting) {
+                    my ($version, $anchor) = @{$vdata};
+                    $OUT .= q{            } .
+                        qq(<li><a href="#${anchor}">$source ($version)</a></li>\n);
+                }
+            }
+        }
+        $OUT .= "    </ul>\n  </nav>\n";
+    }
+}
+  <div class="clear"></div>
+
+{
+    # We get a hash of package names to a hash of versions to a list of tags.
+    # Create a list with the package information as the title and the tags as
+    # the value.
+    for my $source (sort (keys (%packages), keys (%uploads))) {
+        my ($data, $upload);
+        my $first_version = 1;
+        if ($packages{$source}) {
+            $data = $packages{$source};
+        } else {
+            $data = $uploads{$source};
+            $upload = 1;
+        }
+        for my $version (sort by_version keys %$data) {
+            my @tags = @{$data->{$version}};
+            my @error_tags = grep { $_->{code} eq 'E' or $_->{code} eq 'W' } @tags;
+            my $first = 1;
+            my $binary = '';
+            my $tag = '';
+            my $firstcomponent = '';
+            # Tracks whether we have opened an "<ul>"-list for the tag "extra".
+            # We only do this if the tags have "extra" info to avoid an empty
+            # "<ul></ul>" (which is forbidden by XHTML 1.0 strict).
+            my $has_extra = 0;
+
+            if ($errors) {
+                @tags = @error_tags;
+                next if not @error_tags;
+            }
+
+            for my $info (@tags) {
+                my $pkg_info = $info->{pkg_info};
+                my $is_binary = ($pkg_info->{type} eq "binary" or $pkg_info->{type} eq "udeb");
+                my $new_binary = $pkg_info->{package} ne $binary if $is_binary;
+                my $tag_info = $info->{tag_info};
+                my $next_tag = $tag_info->name;
+
+                my $component = ($pkg_info->{component} eq 'main') ? '' : "; $pkg_info->{component}";
+                $firstcomponent = $pkg_info->{component} unless $firstcomponent;
+                if ($first) {
+                    my $state = $pkg_info->{'state_data'};
+                    my $anchor = $pkg_info->{'anchor'};
+                    my $status = 'up-to-date';
+                    my $last_processed_by = $state->{'last-processed-by'} // 'N/A';
+                    $status = '<i>outdated</i>' if (exists($state->{'out-of-date'}));
+                    $status = '<b class="processing-error">incomplete report; an error occurred during the last check</b>'
+                      if exists($state->{'last-error-by'}) and $state->{'last-error-by'};
+                    $OUT .= qq(  <div class="source-header">\n);
+                    $OUT .= qq(   <h2 id="$pkg_info->{anchor}">);
+                    $OUT .= "$source ($version$component)";
+                    $OUT .= " [Uploader]" if $upload;
+                    if ($first_version) {
+                        # Unversioned #<pkg> references just go to the first version.
+                        $first_version = 0;
+                        $OUT .= qq( <a href="#${source}" id="${source}">&sect;</a>)
+                    }
+                    $OUT .= "</h2>\n";
+                    $OUT .= qq(   <p class="info-links">\n);
+                    $OUT .= qq(    <a href="https://packages.debian.org/src:$source">Info</a>\n);
+                    $OUT .= qq(    <a href="https://tracker.debian.org/$source">Package Tracker</a>\n);
+                    $OUT .= qq(    <a href="https://bugs.debian.org/src:$source">Bugs</a>\n);
+                    $OUT .= qq(    <a href="https://sources.debian.org/src/$source/$version">Source</a>\n);
+                    if ($errors) {
+                        $OUT .= qq(    <a href="${path_prefix}full/$id#$anchor">Full report</a>\n);
+                    } elsif (@error_tags) {
+                        $OUT .= qq(    <a href="${path_prefix}maintainer/$id#$anchor">Short report</a>\n);
+                    }
+                    $OUT .= qq[  (${status}, last processed by Lintian/$last_processed_by)];
+                    $OUT .= qq(   </p>\n  </div>\n);
+                    $OUT .= qq(  <ul class="report">\n) unless $is_binary;
+                }
+
+                my $bin_version = '';
+                unless ($pkg_info->{version} eq $version
+                        and $pkg_info->{component} eq $firstcomponent) {
+                    $bin_version = " ($pkg_info->{version}; $pkg_info->{component})";
+                }
+
+                if ($tag ne $next_tag or $new_binary) {
+                    # Close the '<ul class="extra">' HTML tag if it is open
+                    $OUT .= "</ul>\n" if $has_extra;
+                    # Reset has_extra; if the tag has an "extra", we will check
+                    # for it later.
+                    $has_extra = 0;
+                    if ($new_binary) {
+                        $OUT .= "    </li>\n  </ul>\n" unless $first;
+                        $OUT .= qq(  <h3>$pkg_info->{package}$bin_version</h3>\n);
+                        $OUT .= qq(  <ul class="report">\n);
+                    }
+                }
+
+                my $class = '';
+                # No HTML quote needed; severity is from a fixed
+                # whitelist of known safe words.
+                my $severity = $tag_info->effective_severity;
+                $class = qq( title="$severity");
+
+                # Display tag name only once.
+                if ($tag ne $next_tag or $new_binary) {
+                    my $q_next_tag = html_quote($next_tag);
+                    $OUT .= "    </li>\n" unless $first or $new_binary;
+                    $OUT .= "    <li$class>\n";
+                    $OUT .= qq(      <span class="type-$info->{code}">);
+                    $OUT .= "$info->{code}</span> ";
+                    $OUT .= qq(<a href="${path_prefix}tags/${q_next_tag}.html">);
+                    $OUT .= "${q_next_tag}</a>\n";
+                }
+
+                if ($info->{extra}) {
+                    if (not $has_extra) {
+                        # Open a list for the "extra" info.
+                        $has_extra = 1;
+                        $OUT .= qq(      <ul class="extra">);
+                    }
+                    $OUT .= "<li>$info->{extra}";
+                    my @archs = sort keys %{ $info->{archs} };
+                    $OUT .= " <tt>[" . join(', ', @archs) . "]</tt>" if @archs > 1;
+                    $OUT .= "</li>";
+                }
+
+                $first = 0;
+                $binary = $pkg_info->{package} if $is_binary;
+                $tag = $next_tag;
+            }
+            # Close the "extra" info-list (if present) and the current setup
+            $OUT .= "</ul>\n" if $has_extra;
+            $OUT .= "    </li>\n  </ul>\n";
+        }
+    }
+}
+{ foot() }

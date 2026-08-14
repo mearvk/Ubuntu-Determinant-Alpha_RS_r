@@ -1,0 +1,782 @@
+# Copyright © 2010 Niels Thykier
+# Copyright © 2017, 2019 Chris Lamb <lamby@debian.org>
+#  - based on the work Richard Braakman and Christian
+#    Schwarz (copyrighted 1998).
+#
+# This manual page is free software.  It is distributed under the
+# terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# This manual page is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this manual page; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
+# USA
+#
+
+=head1 NAME
+
+lintian - Static analysis tool for Debian packages
+
+=head1 SYNOPSIS
+
+B<lintian> [I<action>] [I<options>] [I<packages>] ...
+
+=head1 DESCRIPTION
+
+Lintian dissects Debian packages and reports bugs and policy
+violations.  It contains automated checks for many aspects of Debian
+policy as well as some checks for common errors.
+
+There are two ways to specify binary, udeb or source packages for
+Lintian to process: by file name (the .deb file for a binary package
+or the .dsc file for a source package), or by naming a I<.changes>
+file.
+
+If you specify a I<.changes> file, Lintian will process all packages
+listed in that file.  This is convenient when checking a new package
+before uploading it.
+
+If you specify packages to be checked or use the option
+B<--packages-from-file>, the packages requested will be processed.
+Otherwise, if I<debian/changelog> exists, it is parsed to determine
+the name of the .changes file to look for in the parent directory.
+See L</CHECKING LAST BUILD> for more information.
+
+
+=head1 OPTIONS
+
+Actions of the lintian command: (Only one action can be specified per invocation)
+
+=over 4
+
+=item B<-c>, B<--check>
+
+Run all checks over the specified packages.  This is the default action.
+
+=item B<-C> chk1,chk2,..., B<--check-part> chk1,chk2,...
+
+Run only the specified checks.  You can either specify the name of the
+check script or the abbreviation.  For details, see the L</CHECKS> section
+below.
+
+=item B<-F>, B<--ftp-master-rejects>
+
+Run only the checks that issue tags that result in automatic rejects
+from the Debian upload queue.  The list of such tags is refreshed with
+each Lintian release, so may be slightly out of date if it has changed
+recently.
+
+This is implemented via a profile and thus this option cannot be used
+together with B<--profile>.
+
+=item B<-T> tag1,tag2,..., B<--tags> tag1,tag2,...
+
+Run only the checks that issue the requested tags.  The tests for
+other tags within the check scripts will be run but the tags will not
+be issued.
+
+With this options all tags listed will be displayed regardless of the
+display settings.
+
+=item B<--tags-from-file> filename
+
+Same functionality as B<--tags>, but read the list of tags from a
+file.  Blank lines and lines beginning with # are ignored.  All other
+lines are taken to be tag names or comma-separated lists of tag names
+to (potentially) issue.
+
+With this options all tags listed will be displayed regardless of the
+display settings.
+
+=item B<-X> chk1,chk2,..., B<--dont-check-part> chk1,chk2,...
+
+Run all but the specified checks.  You can either specify the name
+of the check script or the abbreviation.  For details, see the
+L</CHECKS> section below.
+
+=back
+
+General options:
+
+=over 4
+
+=item B<-h>, B<--help>
+
+Display usage information and exit.
+
+=item B<-q>, B<--quiet>
+
+Suppress all informational messages including override comments
+(normally shown with B<--show-overrides>).
+
+This option is silently ignored if B<--debug> is given.  Otherwise, if
+both B<--verbose> and B<--quiet> is used, the last of these two options
+take effect.
+
+This option overrides the B<verbose> and the B<quiet> variable in the
+configuration file.  In the configuration file, this option is enabled
+by using B<quiet> variable.  The B<verbose> and B<quiet> variables may
+not both appear in the config file.
+
+=item B<-v>, B<--verbose>
+
+Display verbose messages.
+
+If B<--debug> is used this option is always enabled.  Otherwise, if
+both B<--verbose> and B<--quiet> is used (and B<--debug> is not used),
+the last of these two options take effect.
+
+This option overrides the B<quiet> variable in the configuration file.
+In the configuration file, this option is enabled by using B<verbose>
+variable.  The B<verbose> and B<quiet> variables may not both appear
+in the config file.
+
+=item B<-V>, B<--version>
+
+Display lintian version number and exit.
+
+=item B<--print-version>
+
+Print unadorned version number and exit.
+
+=back
+
+Behavior options for B<lintian>.
+
+=over 4
+
+=item B<--color> (never|always|auto|html)
+
+Whether to colorize tags in lintian output based on their visibility.
+The default is "never", which never uses color.  "always" will always
+use color, "auto" will use color only if the output is going to a
+terminal, and "html" will use HTML E<lt>spanE<gt> tags with a color style
+attribute (instead of ANSI color escape sequences).
+
+This option overrides the B<color> variable in the configuration file.
+
+=item B<--hyperlinks> (on|off)
+
+Shows text-based hyperlinks to tag descriptions on lintian.debian.org on
+terminals that support it. The default is on for terminals that support
+it, unless the user selected '--color never'. This currently only works
+in GNOME Terminal.
+
+This option overrides the B<color> variable in the configuration file.
+
+=item B<--default-display-level>
+
+Reset the current display level to the default.  Basically, this
+option behaves exactly like passing the following options to lintian:
+
+=over 4
+
+B<-L> ">=warning"
+
+=back
+
+The primary use for this is to ensure that lintian's display level has
+been reset to the built-in default values.  Notably, this can be used
+to override display settings earlier on the command-line or in the
+lintian configuration file.
+
+Further changes to the display level can be done I<after> this option.
+Example: B<--default-display-level --display-info> gives you the
+default display level plus informational ("I:") tags.
+
+=item B<--display-source> X
+
+Only display tags from the source X (e.g. the Policy Manual or the
+Developer Reference).  This option can be used multiple times to
+add additional sources.  Example sources are "policy" or "devref"
+being the Policy Manual and the Developer Reference (respectively).
+
+The entire list of sources can be found in
+I<$LINTIAN_BASE/data/output/manual-references>
+
+=item B<-E>, B<--display-experimental>, B<--no-display-experimental>
+
+Control whether to display experimental ("X:") tags.  They are
+normally suppressed.
+
+If a tag is marked experimental, this means that the code that
+generates this message is not as well tested as the rest of Lintian,
+and might still give surprising results.  Feel free to ignore
+Experimental messages that do not seem to make sense, though of course
+bug reports are always welcome (particularly if they include fixes).
+
+These options overrides the B<display-experimental> variable in the
+configuration file.
+
+=item B<--fail-on> {error | warning | info | pedantic | experimental | override | none}
+
+Causes B<lintian> to exit with a program status of 2 for the given
+conditions. This option can be a comma-separated list, or it may be
+specified multiple times.
+
+The default is B<none>. Also, 'warning' does not imply 'error'.
+Please specify both if you want both.
+
+=item B<-i>, B<--info>
+
+Print explanatory information about each problem discovered in
+addition to the lintian error tags. To print a long tag description
+without running lintian, see L<lintian-explain-tags(1)> or check
+the website at https://lintian.debian.org.
+
+This option overrides B<info> variable in the configuration file.
+
+=item B<-I>, B<--display-info>
+
+Display informational ("I:") tags as well.  They are normally
+suppressed.  (This is equivalent to B<-L> ">=info").
+
+This option overrides the B<display-info> variable in the
+configuration file.
+
+Note: B<display-level> and B<display-info> may not both appear in the
+configuration file.
+
+=item B<-L> [+|-|=][>=|>|=|<|<=][S|C|S/C], B<--display-level> [+|-|=][>=|>|=|<|<=][S|C|S/C]
+
+Fine-grained selection of tags to be displayed. It is possible to add,
+remove or set the levels to display, specifying a visibility (error,
+warning, info, pedantic, or classification. The default settings are
+equivalent to B<-L> ">=warning".
+
+The value consists of 3 parts, where two of them are optional.  The
+parts are:
+
+=over 4
+
+=item modifier operator
+
+How to affect the current display level.  Can be one of add to ("+"),
+remove from ("-") or set to ("=") the display level(s) denoted by the
+following selection.
+
+The default value is "=" (i.e. set the display level).
+
+=item set operator
+
+The visibility to be selected.  The operator can be one of ">=", ">",
+"=", "<" or "<=".  As an example, this can be used to select all info
+(and more serious) tags via ">=info".
+
+The default value is "=", which means "exactly" the given visibility.
+
+=back
+
+This option overrides the B<display-level> variable in the
+configuration file.  The value of the B<display-level> in
+configuration file should be space separated entries in the same
+format as passed via command-line.
+
+Note: B<display-level> may not be used with B<display-info> or B<pedantic>
+in the configuration file.
+
+=item B<-o>, B<--no-override>
+
+Ignore all overrides provided by the package.  This option will overrule
+B<--show-overrides>.
+
+This option overrides the B<override> variable in the configuration
+file.
+
+=item B<--pedantic>
+
+Display pedantic ("P:") tags as well.  They are normally suppressed.
+(This is equivalent to B<-L> "+=pedantic").
+
+Pedantic tags are Lintian at its most pickiest and include checks for
+particular Debian packaging styles and checks that many people
+disagree with.  Expect false positives and Lintian tags that you don't
+consider useful if you use this option.  Adding overrides for pedantic
+tags is probably not worth the effort.
+
+This option overrides the B<pedantic> variable in the configuration
+file.
+
+Note: B<pedantic> and B<display-level> may not both appear in the
+configuration file.
+
+=item B<--profile> vendor[/prof]
+
+Use the profile from vendor (or the profile with that name).  If the
+profile name does not contain a slash, the default profile for than
+vendor is chosen.
+
+As an example, if you are on Ubuntu and want to use Lintian's Debian
+checks, you can use:
+
+  --profile debian
+
+Likewise, on a Debian machine you can use this to request the Ubuntu
+checks.
+
+If the token I<{VENDOR}> appears in the profile name, B<lintian> will
+substitute the token with a vendor name to find the profile.
+B<lintian> uses L<Dpkg::Vendor> to determine the best vendor to use
+(the closer to the current vendor, the better).  This is mostly useful
+for people implementing their own checks on top of Lintian.
+
+If not specified, the default value is I<{VENDOR}/main>.
+
+Please Refer to the Lintian User Manual for the full documentation of
+profiles.
+
+=item B<--show-overrides>, B<--hide-overrides>
+
+Controls whether tags that have been overridden should be shown.
+
+The B<--show-overrides> differs from B<--no-overrides> in that shown overridden
+tags will still be marked as overridden (using an "O" code).
+
+If the overridden tags are shown, the related override comments will
+also be displayed (unless --quiet is used).  Please refer to the Lintian
+User Manual for the documentation on how lintian relates comments to a
+given override.
+
+
+These options override the B<show-overrides> variable in the
+configuration file.
+
+=item B<--suppress-tags> tag1,tag2,...
+
+Suppress the listed tags.  They will not be reported if they occur and
+will not affect the exit status of Lintian.  This option can be given
+multiple times and can be mixed with B<--suppress-tags-from-file>.
+
+This option can be used together with B<--dont-check-part> ("Not those
+checks nor these tags") and B<--check-part> ("Only those checks, but
+not these tags (from those checks)") to further reduce the selection of
+tags.
+
+When used with B<--tags>, this option is mostly ignored.
+
+=item B<--suppress-tags-from-file> file
+
+Suppress all tags listed in the given file.  Blank lines and lines
+beginning with # are ignored.  All other lines are taken to be tag
+names or comma-separated lists of tag names to suppress.  The
+suppressed tags will not be reported if they occur and will not affect
+the exit status of Lintian.
+
+Tags parsed from the file will be handled as if they had been given to
+the B<--suppress-tags> option (e.g. ignored if B<--tags> is used).
+
+=item B<--tag-display-limit>[=X]
+
+By default, lintian limits itself to emitting at most 4 instances of each
+tag per processable when STDOUT is a TTY.  This option specified that limit.
+See also B<--no-tag-display-limit>.
+
+=item B<--no-tag-display-limit>
+
+By default, lintian limits itself to emitting at most 4 instances of each
+tag per processable when STDOUT is a TTY.  This option disables that limit.
+
+When STDOUT is not a TTY, lintian has no limit. See also
+B<--tag-display-limit>.
+
+=back
+
+Configuration options:
+
+=over 4
+
+=item B<--cfg> configfile
+
+Read the configuration from configfile rather than the default
+locations.  This option overrides the B<LINTIAN_CFG> environment
+variable.
+
+=item B<--no-cfg>
+
+Do not read any configuration file.  This option overrides the
+B<--cfg> above.
+
+=item B<--ignore-lintian-env>
+
+Ignore all environment variables starting with I<LINTIAN_>.
+
+This option is mostly useful for applications running B<lintian> for
+checking packages and do not want the invoking user to affect the
+result (by setting LINTIAN_PROFILE etc.).
+
+Note it does I<not> cause B<lintian> to ignore the entire environment
+like I<TMPDIR> or I<DEB_VENDOR>.  The latter can affect the default
+profile (or "{VENDOR}" token for B<--profile>).
+
+Should usually be combined with B<--no-user-dirs> (or unsetting $HOME
+and all I<XDG_> variables).
+
+=item B<--include-dir> dir
+
+Use dir as an additional "LINTIAN_BASE".  The directory is expected
+have a similar layout to the LINTIAN_BASE (if it exists), but does not
+need to be a full self-contained root.
+
+B<lintian> will check this directory for (additional) profiles, data
+files, support libraries and checks.  The latter two imply that
+Lintian may attempt to I<load and execute code> from this directory.
+
+This option may appear more than once; each time adding an additional
+directory.  Directories are searched in the order they appear on the
+command line.
+
+The additional directories will be checked I<after> the user
+directories (though see B<--no-user-dirs>) and I<before> the core
+LINTIAN_BASE.
+
+B<Note>: This option should be the very first if given.
+
+=item B<-j> X, B<--jobs>=X
+
+Set the limit for how many jobs Lintian will run in parallel. This
+option overrides the B<jobs> variable in the configuration file.
+
+By default Lintian will use I<nproc> to determine a reasonable default
+(or 2, if the nproc fails).
+
+=item B<--user-dirs>, B<--no-user-dirs>
+
+By default, B<lintian> will check I<$HOME> and I</etc> for files
+supplied by the user or the local sysadmin (e.g. config files and
+profiles).  This default can be disabled (and re-enabled) by using
+B<--no-user-dirs> (and B<--user-dirs>, respectively).
+
+These options will I<not> affect the inclusion of LINTIAN_BASE, which
+is always included.
+
+These option can appear multiple times, in which case the last of them
+to appear determines the result.
+
+Note that if the intention is only to disable the user's I<$HOME>,
+then unsetting I<$HOME> and I<XDG_*_HOME> may suffice.  Alternatively,
+I</etc> can be "re-added" by using I<--include-dir> (caveat:
+I</etc/lintianrc> will be ignored by this).
+
+If the intention is to avoid (unintentional) side-effects from the
+calling user, then this option could be combined with
+B<--ignore-lintian-env>.
+
+If for some reason B<--no-user-dirs> cannot be used, then consider
+unsetting I<$HOME> and all the I<$XDG_*> variables (not just the
+I<$XDG_*_HOME> ones).
+
+B<Note>: This option should be the very first if given.
+
+=back
+
+Developer/Special usage options:
+
+=over 4
+
+=item B<--allow-root>
+
+Override lintian's warning when it is run with superuser privileges.
+
+=item B<--packages-from-file> X
+
+The line is read as the path to a file to process (all whitespace is
+included!).
+
+If X is "-", Lintian will read the packages from STDIN.
+
+=item B<--perf-debug>
+
+Enable performance related debug logging to STDERR.
+
+The data logged and the format used is subject to change with every
+release.
+
+Note that some of the information may also be available (possibly in
+a different format) with the B<--debug> option.
+
+=back
+
+=head1 FILES
+
+Lintian looks for its configuration file in the following locations,
+in this order:
+
+=over 4
+
+=item * The argument given to B<--cfg>
+
+=item * I<$LINTIAN_CFG>
+
+=item * I<$XDG_CONFIG_HOME/lintian/lintianrc>
+
+=item * I<XDG_DIR/lintian/lintianrc>
+
+Where XDG_DIR is a directory listed in I<$XDG_CONFIG_DIRS> (or
+I</etc/xdg> if I<$XDG_CONFIG_DIRS> is unset).
+
+=item * I<$HOME/.lintianrc>
+
+Please consider using the XDG based variant above (usually, in
+I<~/.config>).
+
+=item * I</etc/lintianrc>
+
+=back
+
+Lintian uses the following directories:
+
+=over 4
+
+=item I</tmp>
+
+Lintian defaults to creating a temporary lab directory in I</tmp>.  To
+change the directory used, set the TMPDIR environment variable to a
+suitable directory.  TMPDIR can be set in the configuration file.
+
+=item I</usr/share/lintian/checks>
+
+Scripts that check aspects of a package.
+
+=item I</usr/share/lintian/collection>
+
+Scripts that collect information about a package and store it for use
+by the check scripts.
+
+=item I</usr/share/lintian/data>
+
+Supporting data used by Lintian checks and for output formatting.
+
+=item I</usr/share/lintian/lib>
+
+Utility scripts used by the other lintian scripts.
+
+=back
+
+For binary packages, Lintian looks for overrides in a file named
+I<usr/share/lintian/overrides/E<lt>packageE<gt>> inside the binary
+package, where I<E<lt>packageE<gt>> is the name of the binary
+package.  For source packages, Lintian looks for overrides in
+I<debian/source/lintian-overrides> and then in
+I<debian/source.lintian-overrides> if the first file is not found.
+The first path is preferred.  See the Lintian User's Manual for the
+syntax of overrides.
+
+=head1 CONFIGURATION FILE
+
+The configuration file can be used to specify default values for some
+options.  The general format is:
+
+ option = value
+
+All whitespace adjacent to the "=" sign as well as leading and
+trailing whitespace is ignored.  However whitespace within the
+value is respected, as demonstrated by this example:
+
+ # Parsed as "opt1" with value "val1"
+    opt1    =   val1
+ # Parsed as "opt2" with value "val2.1  val2.2     val2.3"
+ opt2 = val2.1  val2.2     val2.3
+
+Unless otherwise specified, no option may appear more than once.
+Lintian will ignore empty lines or lines starting with the
+B<#>-character.
+
+Generally options will be the long form of the command-line option
+without the leading dashes.  There some exceptions (such as
+--profile), where Lintian uses the same name as the environment
+variable.
+
+Lintian only allows a subset of the options specified in the
+configuration file; please refer to the individual options in
+L</OPTIONS>.
+
+In the configuration file, all options listed must have a value, even
+if they do not accept a value on command line (e.g. --pedantic).  The
+values "yes", "y", "1", or "true" will enable such an option and "no",
+"n", "0" or "false" will disable it.  Prior to the 2.5.2 release,
+these values were case sensitive.
+
+For other options, they generally take the same values as they do on
+the command line.  Though some options allow a slightly different
+format (e.g. --display-level).  These exceptions are explained for the
+relevant options in L</OPTIONS>.
+
+Beyond command line options, it is also allowed to specify the
+environment variable "TMPDIR" in the configuration file.
+
+A sample configuration file could look like:
+
+ # Sample configuration file for lintian
+ #
+ # Set the default profile (--profile)
+ LINTIAN_PROFILE = debian
+
+ # Set the default TMPDIR for lintian to /var/tmp/lintian
+ # - useful if /tmp is tmpfs with "limited" size.
+ TMPDIR = /var/tmp/lintian/
+
+ # Show info (I:) tags by default (--display-info)
+ #  NB: this cannot be used with display-level
+ display-info=yes
+
+ # Ignore all overrides (--no-override)
+ #  NB: called "override" in the config file
+ #      and has inverted value!
+ override = no
+
+ # Automatically determine if color should be used
+ color = auto
+
+=head1 EXIT STATUS
+
+=over 4
+
+=item B<0>
+
+Normal operation.
+
+=item B<1>
+
+Lintian run-time error. An error message is sent to stderr.
+
+=item B<2>
+
+Detected a condition specified via the B<--fail-on> option. This can
+be used to trigger a non-zero exit value in case of policy violations.
+
+=back
+
+=head1 CHECKING LAST BUILD
+
+When run in an unpacked package dir (with no package selection
+arguments), Lintian will use I<debian/changelog> to determine the
+source and version of the package.  Lintian will then attempt to find
+a matching I<.changes> file for this source and version combination.
+
+Lintian will (in order) search the following directories:
+
+=over 4
+
+=item ..
+
+Used by dpkg-buildpackage(1).
+
+=item ../build-area
+
+Used by svn-buildpackage(1).
+
+=item /var/cache/pbuilder/result
+
+Used by pbuilder(1) and cowbuilder(1).
+
+=back
+
+In each directory, Lintian will attempt to find a I<.changes> file
+using the following values as architecture (in order):
+
+=over 4
+
+=item I<$DEB_BUILD_ARCH> (or I<dpkg --print-architecture>)
+
+The environment variable DEB_BUILD_ARCH (if not set, "dpkg
+--print-architecture" will be used instead)
+
+=item I<$DEB_HOST_ARCH>
+
+The environment variable DEB_HOST_ARCH.
+
+=item I<dpkg --print-foreign-architectures>
+
+If dpkg(1) appears to support multi-arch, then any architecture listed
+by "dpkg --print-foreign-architectures" will be used (in the order
+returned by dpkg).
+
+=item I<multi>
+
+Pseudo architecture used by mergechanges(1).
+
+=item I<all>
+
+Used when building architecture indep packages only (e.g.
+dpkg-buildpackage -A).
+
+=item I<source>
+
+Used for "source only" builds (e.g. dpkg-buildpackage -S).
+
+=back
+
+If a I<.changes> file matches any combination above exists, Lintian
+will process the first match as if you had passed it per command line.
+If no I<.changes> file can be found, Lintian will print a list of attempted
+locations on STDERR and exit 0.
+
+=head1 EXAMPLES
+
+=over 4
+
+=item B<$ lintian foo.changes>
+
+Check the changes file itself and any (binary, udeb or source) package
+listed in it.
+
+=item B<$ lintian foo.deb>
+
+Check binary package foo given by foo.deb.
+
+=item B<$ lintian foo.dsc>
+
+Check source package foo given by foo.dsc.
+
+=item B<$ lintian foo.dsc -L +info>
+
+Check source package foo given by foo.dsc, including info tags.
+
+=item B<$ lintian -i foo.changes>
+
+Check the changes file and, if listed, the source and binary package
+of the upload. The output will contain detailed information about the
+reported tags.
+
+=item B<$ lintian>
+
+Assuming I<debian/changelog> exists, look for a changes file for the
+source in the parent dir.  Otherwise, print usage information and
+exit.
+
+=back
+
+=head1 BUGS
+
+Lintian does not have any locking mechanisms yet.  (Running several
+Lintian processes on the same laboratory simultaneously is likely to fail
+or corrupt the laboratory.)
+
+If you discover any other bugs in lintian, please contact the authors.
+
+=head1 SEE ALSO
+
+L<lintian-explain-tags(1)>, Lintian User Manual
+(/usr/share/doc/lintian/lintian.html)
+
+Packaging tools: L<debhelper(7)>, L<dh_make(8)>,
+L<dpkg-buildpackage(1)>.
+
+=head1 AUTHORS
+
+Niels Thykier <niels@thykier.net>
+
+Richard Braakman <dark@xs4all.nl>
+
+Christian Schwarz <schwarz@monet.m.isar.de>
+
+Please use the email address <lintian-maint@debian.org> for
+Lintian related comments.
+
+=cut

@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# called with '--upstream-version' <version> <file>
+
+set -ev
+
+PACKAGE="ispell-fo"
+[ -n "${REPACK_SUFFIX}" ] || REPACK_SUFFIX="repack1"
+
+VERSION=${VERSION:-$2}
+VERSION_REPACKED="${VERSION}+${REPACK_SUFFIX}"
+
+Debian_TARBALL_IN="../${PACKAGE}_${VERSION}.orig.tar.gz"
+Debian_TARBALL_OUT="../${PACKAGE}_${VERSION_REPACKED}.orig.tar.xz"
+
+TMPDIR=`mktemp -d /tmp/kk.XXXXXX`
+target_DIR="${TMPDIR}/${PACKAGE}-${VERSION_REPACKED}"
+# mkdir "${target_DIR}"
+
+tar -xvzf "${Debian_TARBALL_IN}" -C "${TMPDIR}" 
+mv "${TMPDIR}/${PACKAGE}-${VERSION}" "${target_DIR}"
+( cd "${target_DIR}" \
+      && recode latin1..utf8 Makefile \
+      && convmv --notest -f ISO-8859-1 -t UTF-8 *.aff )
+fakeroot tar -cvJf "${Debian_TARBALL_OUT}" -C "${TMPDIR}" .
+

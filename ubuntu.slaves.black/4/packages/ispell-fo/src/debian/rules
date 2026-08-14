@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Make sure build is always done in a reproducible and working
+# language environment
+LC_ALL = C
+export LC_ALL
+
+TMP_BUILD    = tmp-build
+name_8       = føroyskt
+
+%:
+	dh $@
+
+
+override_dh_auto_build:
+	mkdir -p $(TMP_BUILD)
+
+	make $(name_8).hash
+	ln -fs $(name_8).hash faroese.hash
+	ln -fs $(name_8).aff faroese.aff
+	iconv -f ISO-8859-1 -t UTF-8 < README > $(TMP_BUILD)/README
+	iconv -f ISO-8859-1 -t UTF-8 < contributors > $(TMP_BUILD)/contributors
+
+# --------- ifaroese ------------------
+	gzip -9n -c words-fo.ispell > $(TMP_BUILD)/faroese.mwl.gz
+	cp $(name_8).aff $(TMP_BUILD)/faroese.aff
+
+# --------- myspell-fo-fo -------------
+	ispellaff2myspell --charset=latin1 \
+			  --printcomments \
+			  --myheader=debian/fo_FO.header \
+			  faroese.aff > $(TMP_BUILD)/fo.aff
+	( echo `cat  words-fo.ispell | wc -l`; cat words-fo.ispell ) \
+		> $(TMP_BUILD)/fo.dic
+
+# --------- aspell-fo -----------------
+	grep -v -e '--' words-fo.ispell | prezip -s -c | gzip -9n -c \
+		> $(TMP_BUILD)/fo.cwl.gz
+	cp $(TMP_BUILD)/fo.aff $(TMP_BUILD)/fo_affix.dat
+	echo "add fo.rws"   > $(TMP_BUILD)/fo.multi
+	echo "add fo.multi" > $(TMP_BUILD)/faroese.alias
+
+# --------- wfaroese ------------------
+	cat words-fo.ispell | ispell -d ./faroese -e | \
+		tr -s ' ' '\n' | sort -u | iconv -f ISO-8859-1 -t UTF-8 \
+		> $(TMP_BUILD)/faroese
+
+override_dh_auto_clean:
+	rm -rf $(TMP_BUILD)
+
+	dh_auto_clean
+
+override_dh_auto_install:
+	installdeb-ispell   -pifaroese
+	installdeb-aspell   -paspell-fo
+	installdeb-hunspell -pmyspell-fo
+	installdeb-myspell  -pmyspell-fo --srcdir=$(TMP_BUILD)
+	installdeb-wordlist -pwfaroese

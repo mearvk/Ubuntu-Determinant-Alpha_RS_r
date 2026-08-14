@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+# [debian/rules] for ispell-et
+#
+# COPYRIGHT © 2003-2011 Martin-Éric Racine <martin-eric.racine@iki.fi>
+# COPYRIGHT © 2012-2015 Agustín Martín Domingo <agmartin@debian.org>
+#
+# LICENSE
+# This package is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License or (at
+# your option) any later version.
+#
+
+# Build in reproducible and known to work LC_ALL=C language environment
+LC_ALL = C
+export LC_ALL
+
+
+%:
+	dh $@
+
+ILANGUAGE=estonian
+LANG_COUNTRY=et_EE
+DICT_LANG=et
+SRCDIR=latin-9
+
+override_dh_auto_build:
+	# Generate gzipped munched wordlist for ispell 3.3 dictionary.
+	grep -v '\.' $(SRCDIR)/$(ILANGUAGE).dict | gzip -nc --best > $(SRCDIR)/$(ILANGUAGE).mwl.gz
+	# Keep upstream myspell dictionary as-is.
+	# Generate aspell dictionary; build-depends on aspell because of prezip.
+	cp $(SRCDIR)/$(LANG_COUNTRY).aff $(DICT_LANG)_affix.dat
+	cat $(SRCDIR)/$(LANG_COUNTRY).dic | \
+		sed 1d | \
+		grep -v 'm\.o\.t\.t\.' | \
+		prezip -s -c | \
+		gzip -9 -nc > $(DICT_LANG).cwl.gz
+	echo "add $(DICT_LANG).rws" > $(DICT_LANG).multi
+	echo "add $(DICT_LANG).multi" > $(ILANGUAGE).alias
+
+override_dh_auto_clean:
+	# Clean ispell files.
+	rm -f $(SRCDIR)/*.cnt $(SRCDIR)/*.hash $(SRCDIR)/*.stat $(SRCDIR)/*.mwl.gz
+	# Clean myspell files (nothing to clean).
+	# Clean aspell files.
+	rm -f *.alias *_affix.dat *.compat *.multi *.rws *.*wl*
+
+override_dh_auto_install:
+	installdeb-ispell --package=i$(ILANGUAGE)
+	installdeb-hunspell --package=myspell-$(DICT_LANG)
+	installdeb-myspell --package=myspell-$(DICT_LANG)
+	installdeb-aspell --package=aspell-$(DICT_LANG)
+#EOF

@@ -1,0 +1,203 @@
+#!/usr/bin/perl
+#
+# annotate-lintian-hints -- transform lintian tags into descriptive text
+#
+# Copyright © 1998 Christian Schwarz and Richard Braakman
+# Copyright © 2013 Niels Thykier
+# Copyright © 2017 Chris Lamb <lamby@debian.org>
+# Copyright © 2020 Felix Lechner
+#
+# This program is free software.  It is distributed under the terms of
+# the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, you can find it on the World Wide
+# Web at http://www.gnu.org/copyleft/gpl.html, or write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+
+use v5.20;
+use warnings;
+use utf8;
+
+use Cwd qw(realpath);
+use File::Basename qw(dirname);
+
+# neither Path::This nor lib::relative are in Debian
+use constant THISFILE => realpath __FILE__;
+use constant THISDIR => dirname realpath __FILE__;
+
+# use Lintian modules that belong to this program
+use lib THISDIR . '/../lib';
+
+# substituted during package build
+my $LINTIAN_VERSION;
+
+use Const::Fast;
+use Getopt::Long ();
+use IO::Interactive qw(is_interactive);
+use Term::ReadKey;
+use Unicode::UTF8 qw(encode_utf8 decode_utf8);
+
+use Lintian::Output::EWI;
+use Lintian::Profile;
+use Lintian::Version qw(guess_version);
+
+const my $EMPTY => q{};
+const my $SPACE => q{ };
+
+const my $NEW_PROGRAM_NAME => q{lintian-annotate-hints};
+
+my $TERMINAL_WIDTH;
+($TERMINAL_WIDTH, undef, undef, undef) = GetTerminalSize()
+  if is_interactive;
+
+if (my $coverage_arg = $ENV{'LINTIAN_COVERAGE'}) {
+    my $p5opt = $ENV{'PERL5OPT'}//$EMPTY;
+    $p5opt .= $SPACE if $p5opt ne $EMPTY;
+    $ENV{'PERL5OPT'} = "${p5opt} ${coverage_arg}";
+}
+
+$ENV{LINTIAN_BASE} = realpath(THISDIR . '/..')
+  // die encode_utf8('Cannot resolve LINTIAN_BASE');
+
+$ENV{LINTIAN_VERSION} = $LINTIAN_VERSION // guess_version($ENV{LINTIAN_BASE});
+die encode_utf8('Unable to determine the version automatically!?')
+  unless length $ENV{LINTIAN_VERSION};
+
+my $annotate;
+my @INCLUDE_DIRS;
+my $profile_name;
+my $user_dirs = 1;
+
+my %options = (
+    'annotate|a' => \$annotate,
+    'help|h' => \&show_help,
+    'include-dir=s' => \@INCLUDE_DIRS,
+    'output-width=i' => \$TERMINAL_WIDTH,
+    'profile=s' => \$profile_name,
+    'user-dirs!' => \$user_dirs,
+    'version' => \&show_version,
+);
+
+Getopt::Long::Configure('gnu_getopt');
+Getopt::Long::GetOptions(%options)
+  or die encode_utf8("error parsing options\n");
+
+my $profile = Lintian::Profile->new;
+$profile->load($profile_name, \@INCLUDE_DIRS, $user_dirs);
+
+my $output = Lintian::Output::EWI->new;
+
+# Matches something like:  (1:2.0-3) [arch1 arch2]
+# - captures the version and the architectures
+my $verarchre = qr{(?: \s* \(( [^)]++ )\) \s* \[ ( [^]]++ ) \])}x;
+
+my $type_re = qr/(?:binary|changes|source|udeb)/;
+
+my %already_displayed;
+
+# Otherwise, read input files or STDIN, watch for tags, and add
+# descriptions whenever we see one, can, and haven't already
+# explained that tag.
+while(my $bytes = <STDIN>) {
+
+    my $line = decode_utf8($bytes);
+    chomp $line;
+
+    say encode_utf8('N:');
+    say encode_utf8($line);
+
+    next
+      if $line =~ /^\s*$/;
+
+    # strip color
+    $line =~ s/\e[\[\d;]*m//g;
+
+    # strip HTML
+    $line =~ s/<span style=\"[^\"]+\">//g;
+    $line =~ s{</span>}{}g;
+
+    my $tag_name;
+    if ($annotate) {
+
+        # used for override files only; combine if possible
+
+        next
+          unless $line =~ m{^(?:                   # start optional part
+                    (?:\S+)?                       # Optionally starts with package name
+                    (?: \s*+ \[[^\]]+?\])?         # optionally followed by an [arch-list] (like in B-D)
+                    (?: \s*+ $type_re)?            # optionally followed by the type
+                  :\s++)?                          # end optional part
+                ([\-\.a-zA-Z_0-9]+ (?:\s.+)?)$}x;  # <tag-name> [extra] -> $1
+
+        my $tagdata = $1;
+        ($tag_name, undef) = split(/ /, $tagdata, 2);
+
+    } elsif ($line
+        =~ m{^([^N]): (\S+)(?: (\S+)(?:$verarchre)?)?: (\S+)(?:\s+(.*))?$}) {
+
+        # matches the full deal:
+        #    1  222 3333  4444444   5555   666  777
+        # -  T: pkg type (version) [arch]: tag [...]
+        #           ^^^^^^^^^^^^^^^^^^^^^
+        # Where the marked part(s) are optional values.  The numbers above
+        # the example are the capture groups.
+
+        my $pkg_type = $3 // 'binary';
+
+        $tag_name = $6;
+
+    } else {
+        next;
+    }
+
+    next
+      if $already_displayed{$tag_name}++;
+
+    my $tag = $profile->get_tag($tag_name);
+    next
+      unless defined $tag;
+
+    $output->describe_tag($tag, $TERMINAL_WIDTH);
+}
+
+exit;
+
+sub show_version {
+    say encode_utf8("$NEW_PROGRAM_NAME v$ENV{LINTIAN_VERSION}");
+
+    exit;
+}
+
+sub show_help {
+    my $message =<<"EOT";
+Usage: $NEW_PROGRAM_NAME [log-file...] ...
+       $NEW_PROGRAM_NAME --annotate [overrides ...]
+
+Options:
+    -a, --annotate     display descriptions of tags in Lintian overrides
+    --include-dir DIR  check for Lintian data in DIR
+    --profile X        use vendor profile X to determine severities
+    --output-width NUM set output width instead of probing terminal
+    --[no-]user-dirs   whether to include profiles from user directories
+    --version          show version info and exit
+EOT
+
+    print encode_utf8($message);
+
+    exit;
+}
+
+# Local Variables:
+# indent-tabs-mode: nil
+# cperl-indent-level: 4
+# End:
+# vim: syntax=perl sw=4 sts=4 sr et

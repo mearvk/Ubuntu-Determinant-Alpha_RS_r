@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+
+# Copyright © 1998 Christian Schwarz, Richard Braakman (and others)
+# Copyright © 2013 Niels Thykier
+# Copyright © 2014 Jakub Wilk <jwilk@jwilk.net>
+# Copyright © 2020 Felix Lechner
+
+# This program is free software.  It is distributed under the terms of
+# the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, you can find it on the World Wide
+# Web at <https://www.gnu.org/copyleft/gpl.html>, or write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+
+use v5.20;
+use warnings;
+use utf8;
+
+use Const::Fast;
+use Cwd qw(realpath);
+use File::Basename qw(dirname);
+
+# neither Path::This nor lib::relative are in Debian
+use constant THISFILE => realpath __FILE__;
+use constant THISDIR => dirname realpath __FILE__;
+
+# use Lintian modules that belong to this program
+use lib THISDIR . '/../lib';
+
+# substituted during package build
+my $LINTIAN_VERSION;
+
+use Const::Fast;
+use Getopt::Long ();
+use Path::Tiny;
+use Unicode::UTF8 qw(encode_utf8 decode_utf8);
+
+use Lintian::Spelling qw(check_spelling check_spelling_picky);
+use Lintian::Profile;
+use Lintian::Version qw(guess_version);
+
+const my $EMPTY => q{};
+const my $SPACE => q{ };
+
+$SIG{__WARN__} = sub {
+    my ($message) = @_;
+
+    $message =~ s/\A([[:upper:]])/lc($1)/e;
+    $message =~ s/\n+\z//;
+
+    die encode_utf8("spellintian: $message\n");
+};
+
+if (my $coverage_arg = $ENV{'LINTIAN_COVERAGE'}) {
+    my $p5opt = $ENV{'PERL5OPT'} // $EMPTY;
+    $p5opt .= $SPACE if $p5opt ne $EMPTY;
+    $ENV{'PERL5OPT'} = "${p5opt} ${coverage_arg}";
+}
+
+$ENV{LINTIAN_BASE} = realpath(THISDIR . '/..')
+  // die encode_utf8('Cannot resolve LINTIAN_BASE');
+
+$ENV{LINTIAN_VERSION} = $LINTIAN_VERSION // guess_version($ENV{LINTIAN_BASE});
+die encode_utf8('Unable to determine the version automatically!?')
+  unless length $ENV{LINTIAN_VERSION};
+
+my @INCLUDE_DIRS;
+my $picky = 0;
+my $user_dirs = 1;
+
+my %options = (
+    'h|help' => \&show_help,
+    'include-dir=s' => \@INCLUDE_DIRS,
+    'picky' => \$picky,
+    'user-dirs!' => \$user_dirs,
+    'version' => \&show_version,
+);
+
+Getopt::Long::Configure('gnu_getopt');
+
+Getopt::Long::GetOptions(%options)
+  or die encode_utf8("error parsing options\n");
+
+my $PROFILE = Lintian::Profile->new;
+$PROFILE->load(undef, \@INCLUDE_DIRS, $user_dirs);
+
+my $exit_code = 0;
+
+unless (@ARGV) {
+    my $text = do { local $/ = undef; decode_utf8(<STDIN>) };
+    spellcheck($PROFILE, undef, $picky, $text);
+}
+
+for my $path (@ARGV) {
+
+    unless (-r $path) {
+        print {*STDERR} encode_utf8("$path is not a readable file\n");
+        $exit_code = 1;
+
+        next;
+    }
+
+    my $text = path($path)->slurp_utf8;
+    spellcheck($PROFILE, $path, $picky, $text);
+}
+
+exit $exit_code;
+
+sub show_version {
+    say encode_utf8("spellintian v$ENV{LINTIAN_VERSION}");
+
+    exit;
+}
+
+sub show_help {
+    my $message =<<'EOF' ;
+Usage: spellintian [--picky] [FILE...]
+
+Options:
+    --picky            be extra picky
+    --include-dir DIR  check for Lintian data in DIR
+    --[no-]user-dirs   whether to include profiles from user directories
+    --version          show version info and exit
+EOF
+
+    print encode_utf8($message);
+
+    exit;
+}
+
+sub spellcheck {
+    my ($profile, $path, $be_picky, $text) = @_;
+
+    my $prefix = $path ? "$path: " : $EMPTY;
+
+    my $spelling_error_handler = sub {
+        my ($mistake, $correction) = @_;
+        say encode_utf8("$prefix$mistake -> $correction");
+    };
+
+    check_spelling($profile, $text, $spelling_error_handler);
+    check_spelling_picky($profile, $text, $spelling_error_handler)
+      if $be_picky;
+
+    return;
+}
+
+# Local Variables:
+# indent-tabs-mode: nil
+# cperl-indent-level: 4
+# End:
+# vim: syntax=perl sw=4 sts=4 sr et

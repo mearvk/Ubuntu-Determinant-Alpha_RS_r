@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+# Debhelper magic rule
+%:
+	dh $@
+
+
+override_dh_auto_build:
+	cp debian/language-file debian/imanx.info-ispell
+	cp debian/language-file debian/wmanx.info-wordlist
+	dh_auto_build
+
+override_dh_clean:
+	rm -f debian/imanx.info-ispell debian/wmanx.info-wordlist
+	$(MAKE) reallyclean
+	dh_clean
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/imanx
+	$(MAKE) install-words DESTDIR=$(CURDIR)/debian/wmanx
+	$(MAKE) install-myspell DESTDIR=$(CURDIR)/debian/myspell-gv
+	# For debian bug  #541923
+	mkdir -p debian/myspell-gv/usr/share/hunspell
+	mv debian/myspell-gv/usr/share/myspell/dicts/* debian/myspell-gv/usr/share/hunspell
+	installdeb-wordlist -p wmanx # calls internally dh_installdebconf
+	dh_installman -p wmanx wmanx/manx.5
+	dh_auto_install

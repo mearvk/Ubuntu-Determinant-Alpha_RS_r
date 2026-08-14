@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+# Debhelper magic rule
+%:
+	dh $@
+
+WORDLISTS:= var/lib/dictionaries-common/wordlist/wirish usr/share/dict/irish
+
+override_dh_auto_build:
+	cp debian/language-file debian/iirish.info-ispell
+	cp debian/language-file debian/wirish.info-wordlist
+	dh_auto_build
+
+override_dh_auto_clean:
+	rm -f debian/iirish.info-ispell debian/wirish.info-wordlist
+	$(MAKE) reallyclean
+	dh_auto_clean
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/iirish
+	$(MAKE) install-words DESTDIR=$(CURDIR)/debian/wirish
+	$(MAKE) install-myspell DESTDIR=$(CURDIR)/debian/myspell-ga
+	# For debian bug  #541923
+	mkdir -p debian/myspell-ga/usr/share/hunspell
+	mv debian/myspell-ga/usr/share/myspell/dicts/* debian/myspell-ga/usr/share/hunspell
+	installdeb-wordlist -p wirish # calls internally dh_installdebconf
+	# Should be UTF8
+	for f in $(WORDLISTS) ; do \
+		iconv --from-code=ISO-8859-1 --to-code=UTF8 debian/wirish/$$f > x ; \
+		mv x debian/wirish/$$f ; \
+		done
+	dh_installman -p wirish wirish/irish.5
+	dh_auto_install

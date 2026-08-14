@@ -1,0 +1,86 @@
+ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+name = [% $source %]
+version = [% $upstream_version %]
+type = [% $type %]
+
+packagedir = $(name)-$(version)
+underscored = $(name)_$(version)
+
+origdata = $(ROOT_DIR)/orig
+origstem = $(underscored).orig
+
+debiandata = $(ROOT_DIR)/debian
+
+formatfile = $(debiandata)/source/format
+
+watchfile = $(packagedir)/debian/watch
+
+post_clean = $(ROOT_DIR)/post-clean
+pre_orig = $(ROOT_DIR)/pre-orig
+tar_orig = $(ROOT_DIR)/tar-orig
+pre_build = $(ROOT_DIR)/pre-build
+post_build = $(ROOT_DIR)/post-build
+
+product = [% $build_product %]
+
+ifneq (,$(wildcard $(ROOT_DIR)/dpkg-overrides))
+dpkgoverrides = $(shell cat $(ROOT_DIR)/dpkg-overrides)
+endif
+
+ifeq ($(type),native)
+dpkgoptions = -sn
+else
+dpkgoptions = -sp
+endif
+
+.DEFAULT_GOAL := $(product)
+
+$(product):
+	-mkdir -p $(packagedir)
+	if [ -x $(post_clean) ] ; then \
+		$(post_clean) $(packagedir) ; \
+	fi
+
+	mkdir $(origdata) || true
+	cp -rp $(origdata)/. $(packagedir)
+
+	if [ "[% $type %]" != "native" ] ; then \
+		if [ -x $(pre_orig) ] ; then \
+			$(pre_orig) $(shell realpath $(packagedir)) ; \
+		fi ; \
+		if [ -x $(tar_orig) ] ; then \
+			$(tar_orig) $(origstem) $(packagedir) ; \
+		fi ; \
+		if [ -f $(formatfile) ] && grep --quiet "^3\.. (quilt)$$" $(formatfile) ; then \
+			rm -rf $(packagedir)/debian ; \
+		fi ; \
+	fi
+
+	-mkdir -p $(packagedir)/debian
+	if [ -d $(debiandata) ] ; then \
+		cp -rp $(debiandata)/. $(packagedir)/debian ; \
+	fi
+	if [ "[% $type %]" != "native" ] ; then \
+		if [ ! -f $(watchfile) ] ; then \
+			echo '# Empty watch file' > $(watchfile) ; \
+		fi ; \
+	fi
+
+	if [ -x $(pre_build) ] ; then \
+		$(pre_build) $(shell realpath $(packagedir)) ; \
+	fi
+	if [ -f $(formatfile) ] && grep --quiet "^3\.. (quilt)$$" $(formatfile) ; then \
+		dpkg-source $(dpkgoverrides) -b $(packagedir) ; \
+	else \
+		dpkg-source $(dpkgoverrides) $(dpkgoptions) -b $(packagedir) ; \
+	fi
+	if [ -x $(post_build) ] ; then \
+		$(post_build) $(product) ; \
+	fi
+
+
+.PHONY: clean
+clean:
+	rm -rf $(packagedir)
+	rm -f $(underscored)*

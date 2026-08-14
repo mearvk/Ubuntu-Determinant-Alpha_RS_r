@@ -1,0 +1,115 @@
+=encoding utf-8
+
+=head1 NAME
+
+Lintian::Tutorial::TestSuite -- Quick intro to running the Lintian testsuite
+
+=head1 SYNOPSIS
+
+Warning: This document may be out of date.
+
+This guide will quickly introduce you to running the Lintian test
+suite and some tricks.  The Lintian test suite is fairly large and
+accordingly it can take a substantial amount of time to run.  To speed
+up development, there are various options to limit the tests to run.
+
+If you are looking for a guide on how to write tests, please consult
+L<Lintian::Tutorial::WritingTests>.
+
+=head1 DESCRIPTION
+
+The Lintian test suite is an extensive collection of various test
+cases.  The test suite is divided into 4 "sub-suites".  The majority
+of tests are currently located in the "tests" sub-suite.
+
+To run the full suite:
+
+ $ rm -rf debian/test-out; private/build-test-packages; private/runtests
+
+While writing a new tag (or check) you probably only want to run a
+particular (subset of the) test(s).  See L</Running a subset of the
+tests> for the available options.
+
+=head2 Running a subset of the tests
+
+First, you have to build the test packages with:
+
+ $ rm -rf debian/test-out; private/build-test-packages;
+
+Then, the following options are available:
+
+=over 4
+
+=item Running a single test
+
+To run a single test by its name, use:
+
+ $ private/runtests --onlyrun=test:$name
+
+=item Running all tests for a check
+
+To run all tests for a given check, use:
+
+ $ private/runtests --onlyrun=check:$name
+
+$check must be the name of a check (it will test for
+checks/$check.desc) or "legacy".  This will run all tests that start
+with "$check-".
+
+=item Running all tests designed for a specific tag
+
+To run all tests that have a "Test-For" or a "Test-Against" for a given
+tag, use:
+
+ $ private/runtests --onlyrun=tag:$name
+
+=back
+
+=head2 Running tests under coverage
+
+This feature is currently untested.
+
+It is possible to run most of the tests under L<Devel::Cover>.  This is
+done by passing I<--coverage> to I<private/runtests>.  Example:
+
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out
+
+Please note that L<Devel::Cover> does not seem to handle multiple
+threads too well.  You may see spurious warnings/errors if you run the
+tests with 2 or more active worker threads.
+
+B<Caveat> 1: Coverage for collections (i.e. programs in I<collection/>)
+does not seem to work at the moment. Therefore, they often end up with
+(next to) zero coverage in the generated reports.
+
+B<Caveat> 2: L<Devel::Cover> sometimes changes the output of Lintian
+or tools called by Lintian. Obviously, this leads to test
+failures. Therefore, you may see weird test failures (or warnings)
+when running under coverage.
+
+=head3 Collecting the coverage you want in a reasonable time
+
+Collecting coverage is excruciatingly slow.  This is not helped by the
+fact that it becomes unreliable when run under 2 or more threads.
+
+Fortunately, L<Devel::Cover> "appends" to its cover database.  This
+allows you to "slowly" build up the coverage database over multiple
+runs. Example:
+
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out suite:scripts
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out suite:debs
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out suite:source
+  ...
+
+Or:
+
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out $check
+  $ private/runtests --coverage --dump-logs -j1 -k t debian/test-out legacy
+
+
+=head1 SEE ALSO
+
+L<Lintian::Tutorial::WritingTests>
+
+=cut
+

@@ -1,0 +1,157 @@
+#!/usr/bin/python2.2
+#
+# Copyright (C) 2003 Alastair McKinstry <mckinstry@debian.org>
+# Released under the GNU Public License; see the file "copyright" for details
+#
+# $ Id: $
+
+import ispelltest
+
+class IIrishTestCase(Ispell.TestCase):
+	# Prepositions
+	correct_preps = [ 
+		"agam", "agat", "aige", "aici", "againn", "agaibh", "acu", 
+		"orm", "ort", "air", "uirthi", "orainn", "oraibh", "orthu",
+		"asam", "asat", "as", "aisti", "asainn", "asaibh", "astu",
+		"chugam", "chugat", "chuige", "chuici", "chugainn", "chugaibh", "chucu",
+		"díom", "díot", "de", "di", "dínn", "díbh", "díobh",
+		"dom", "duit", "dó", "di", "dúinn", "daoibh", "dóibh",
+		"fúm", "fút" "faoi" "fúithi" "fúinn" "fúibh" "fúthu"
+		"ionam", "ionat", "ann", "inti", "ionainn", "ionaibh", "iontu",
+		"eadrainn", "eadraibh", "eatarthu", 
+		"ionsorm", "ionsort", "ionsair", "ionsuirthu", "ionsorainn", "ionsoraibh", "ionsorthu",
+		"liom", "leat", "leis", "léi", "linn", "libh", "leo",
+		"uaim", "uait", "uaidh", "uaithu", "uainn", "uaibh", "uathu",
+		"romhain", "romhat", "roimhe", "roimpi", "romhainn", "romhaibh", "rompu",
+		"tharam", "tharat", "thairis", "thairsti", "tharainn", "tharaibh", "tharstu",
+		"tríom", "tríot", "tríd", "tríthi", "trínn", "tríbh", "tríothu",
+		"umam", "umat", "uime", "uimpi", "umainn", "umaibh", "umpu" ]
+	# Irregular verbs
+	correct_irregular_verbs = [
+		"rinne mé" "rinne tú" "rinne sé" "rinne sí" "rinneamar"
+		"rinne sibh" "rinne siad" "rinneadh"
+		"ní dhearna mé" "ní dhearna tú" "ní dhearna sé" "ní dhearnamar"
+		"ní dhearna sibh" "ní dhearna siad" "ní dhearnadh"
+		"dhein mé" "níor dhein mé"
+		"mol"
+		"faighim" "faigheann tú" "faigheann sé" "faigheann sí" "faighimid"
+		"faigheann sibh" "faigheann siad" "faightear"
+		"fuair mé" "fuair tú" "fuair sé" "fuair sí" "fuaireamar"
+		"fuair sibh" "fuair siad" "fuarthas"
+		"d'fhaighinn" "d'fhaighteá" "d'fhaigheadh sé" "d'fhaigheadh sí" "d'fhaighimis"
+		"d'fhaigheadh sibh" "d'fhaighidís" "d'fhaightí"
+		"ní bhfaighidh mé" "ní bhfaighidh tú" "ní bhfaighidh sé" "ní bhfaighidh sí" "ní bhfaighimid"
+		"ní bhfaighidh sibh" "ní bhfaighidh siad" "ní bhfaightear"
+		"gheobhainn" "gheofá" "gheobhadh sé" "gheobhadh sí" "gheobhaimis"
+		"gheobhadh sibh" "gheobhaidís" "gheofaí"
+		"ní bhfaighinn" "ní bhfaighfeá" "ní bhfiagheadh sé" "ní bhfaigheadh sí" "ní bhfaighimis"
+		"ní bhfaigheadh sibh" "ní bhfaighidís" "ní bhfaighfí"
+		"faighe mé" "faigh tú" "faighe sé" "faighe sí" "faighimid"
+		"faighe sibh" "faighe siad" "faightear"
+		"faighim" "faigh" "faigheadh sé" "faigheadh sí" "faighimis"
+		"faighigí" "faighidís" "faightear"
+		"feicim" "feiceann tú" "feiceann sé" "feiceann sí" "feicimid"
+		"feiceann sibh" "feiceann siad" "feictear"
+		"chonaic mé" "chonaic tú" "chonaic sé" "chonaic sí" "chonaiceamar"
+		"chonaic sibh" "chonaic siad" "chonacthas"
+		"ní fhaca mé" "ní fhaca tú" "ní fhaca sé" "ní fhaca sí" "ní fhacamar"
+		"ní fhaca sibh" "ní fhaca siad" "ní fhacthas"
+		"d'fheicinn" "d'fheicteá" "d'fheiceadh sé" "d'fheiceadh sí" "d'fheicimis"
+		"d'fheiceadh sibh" "d'fheicidís" "d'fheictí"
+		"feicfidh mé" "feicfidh tú" "feicfidh sé" "feicfidh sí" "feicfimid"
+		"feicfidh sibh" "feicfidh siad" "feicfear"
+		"d'fheicfinn" "d'fheicfeá" "d'fheicfeadh sé" "d'fheicfeadh sí" "d'fheicfeadh sibh"
+		"d'fheicfidís" "d'fheicfí"
+		"feice mé" "feice tú" "feice sé" "feice sí" "feicimid" 
+		"feice sibh" "feice siad" "feictear"
+		"feicim" "feic" "feiceadh sé" "feiceadh sí" "feicimis"
+		"feicigí" "feicidís" "feictear"
+		"iosfaidh mé" "iosfaidth tú" "iosfaidh sé" "iosfaidh sí" "íosfaimid"
+		"íosfaidh sibh" "íosfaidh siad" "íosfar"
+		"d'íosfainn" "d'íosfá" "d'íosfadh sé" "d'íosfadh sí" "d'íosfaimis"
+		"d'íosfadh sibh" "d'íosfaidís" "d'íosfaí"
+		"ní íosfainn" "ní íosfá" "ní íosfadh sé" "ní íosfadh sí" "ní íosfaimis"
+		"ní íosfadh sibh" "ní íosfaidís" "ní íosfaí"
+		"bris"
+		"tugaim" "tugann tú" "tugann sé" "tugann sí" "tugaimid"
+		"tugann sibh" "tugann siad" "tugtar"
+		"thug mé" "thug tú" "thug sé" "thug sí" "thugamar"
+		"thug sibh" "thug siad" "tugadh"
+		"thugainn" "thugtá" "thugadh sé" "thugadh sí" "thugaimis"
+		"thugadh sibh" "thugadís" "thugtaí"
+		"tabharfaidh mé" "tabharfaidh tú" "tabharfaidh sé" "tabharfaidh sí" "tabharfaimid"
+		"tabharfaidh sibh" "tabharfaidh siad" "tabharfar"
+		"thabharfainn" "thabharfá" "thabharfadh sé" "thabharfadh sí" "thabharfaimis"
+		"thabharfadh sibh" "thabharfaidís" "thabharfaí"
+		"tuga mé" "tuga tú" "tuga sé" "tuga sí" "tugaimid"
+		"tuga sibh" "tuga siad" "tugtar"
+		"tugaim" "tabhair" "tugadh sé" "tugadh sí" "tugaimís"
+		"tugaigí" "tugaidís" "tugtar"
+		"tagaim" "tagann tú" "tagann sé" "tagann sí" "tagaimid"
+		"tagann sibh" "tagann siad" "tagtar"
+		"tháinig mé" "tháinig tú" "tháinig sé" "tháinig sí" "thángamar"
+		"tháinig sibh" "tháinig siad" "thángthas"
+		"thagainn" "thagtá" "thagadh sé" "thagadh sí" "thagaimis"
+		"thagadh sibh" "thagaidís" "thagtaí"
+		"tiocfaidh mé" "tiocfaidh tú" "tiocfaidh sé" "tiocfiadh sí" "tiocfaimid"
+		"tiocfaidh sibh" "tiocfaidh siad" "tioctar"
+		"thiocfainn" "thiocfá" "thiocfadh sé" "thiocfadh sí" "thiocfaimis"
+		"thiocfadh sibh" "thiocfaidís" "thiocfaí"
+		"taga mé" "taga tú" "taga sé" "taga sí" "tagaimid" "taga sibh" "taga siad" "tagtar"
+		"tagaim" "tar" "tagadh sé" "tagadh sí" "tagaimis" "tagaigí" "tagaidís" "tagtar"
+		"téim" "téann tú" "téann sé" "téann sí" "téimíd" "téann sibh" "téann siad" "téitar"
+		"chuaigh mé" "chuaigh tú" "chuaigh sé" "chuaigh sí" "chuamar" "chuaigh sibh" "chuaigh siad"
+		"chuathas"
+		"ní dheachaigh mé" "ní dheachaigh tú" "ní dheachaigh sé" "ní dheachaigh sí" "ní dheachamar"
+		"ní dheachaigh sibh" "ní dheachaigh siad" "ní dheachthas"
+		"théinn" "théiteá" "théadh sé" "théadh sí" "théimis" "théadh sibh" "théidís" "théití"
+		"rachaidh mé" "rachaidh tú" "rachaidh sé" "rachaidh sí" "rachaimid" "rachaidh sibh"
+		"rachaidh siad" "rachfar" "rachainn" "rachfá"
+		"rachadh sé" "rachadh sí" "rachaimis" "rachadh sibh" "rachaidís" "rachfaí"
+		"té mé" "té tú" "té sé" "té sí" "téimid" "té sibh" "té siad" "téitear"
+		"téim" "téigh" "téadh sé" "téadh sí" "téimis" "téigí" "téidís" "téitear"
+		"táim" "tá mé" "tá tú" "tá sé" "tá sí" "táimid" "tá sibh" "tá siad" "táthar"
+		"nílim" "níl mé" "níl tú" "níl sé" "níl sí" "nílimid" "níl sibh" "níl siad" "níltear"
+		"go bhfuilim" "go bhfuil mé" "go bhfuil tú" "go bhfuil sé" "go bhfuil sí" "go bhfuilimid"
+		"go bhfuil sibh" "go bhfuil siad" "go bhfuiltear"
+		"bím" "bíonn tú" "bíonn sé" "bíonn sí" "bímid" "bíonn sibh" "bíonn siad" "bítear"
+		"bhí mé" "bhí tú" "bhí sé" "bhí sí" "bhíomar" "bhí sibh" "bhí siad" "bhíothas"
+		"ní raibh mé" "ní raibh tú" "ní raibh sé" "ní raibh sí" "ní rabhamar" "ní riabh sibh"
+		"ní riabh siad" "ní rabhthas"
+		"bhínn" "bhíteá" "bhíodh sé" "bhíodh sí" "bhímis" "bhíodh sibh" "bhídís" "bhítí"
+		"beidh mé" "beidh tú" "beidh sé" "beidh sí" "beimid" "beidh sibh" "beidh siad" "beifear" "bheinn"
+		"bheifeá" "bheadh sé" "bheadh sí" "bheimis" "bheadh sibh" "bheidís" "bheifí"
+		"raibh mé" "riabh tú" "raibh sé" "raibh sí" "rabhaimid" "raibh sibh" "raibh siad" "rabhthar"
+		"beinn" "beifeá" "beadh sé" "beadh sí" "beimis" "beadh sibh" "beadís" "beifí"
+		"bím" "bí" "bíodh sé" "bíodh sí" "bímis" "bígí" "bídis" "bítear" "rá" "breith"
+		"cloisteáil" "cluinstin" "déanamh" "fáil" "feiceáil" "ithe" "tabhairt" "teacht"
+		"dul" "bheith" "ráite" "beirthe" "déanta" "faighte" "feicthe" "ite" "tugtha" "tagtha" "dulta" ]
+	# Test capitalisation rules
+	correct_caps = [ "héireann" ]
+	incorrect_caps = [ "hÉireann" ]
+	# verbs
+	correct_verbs = [ "molaim", "molann tú", "molaimid", "mhol mé",  
+		"mholamar", "moladh" ]
+	incorrect_verbs = [ "molamar", "fios", "bhfios", "bpointe", "phointe", "pointe " ]
+	
+
+
+#baile
+#Bhaile
+#bhaile
+#bhbaile
+#mBaile
+#Mbaile
+#Éire
+#hÉire
+#HÉire
+#Héire
+
+# Add standard factory method to ensure that autodetection of tests works
+def suite():
+        return unittest.makeSuite(IIrishTestCase)
+
+# Make this test module runnable from the command prompt
+if __name__ == "__main__":
+        unittest.main()
+

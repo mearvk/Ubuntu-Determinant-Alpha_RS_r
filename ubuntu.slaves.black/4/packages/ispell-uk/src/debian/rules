@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+LC_ALL = C.UTF-8
+LOCALE_PATH = $(CURDIR)/debian/locale
+export LC_ALL LOCALE_PATH
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir $(LOCALE_PATH)
+	localedef -i uk_UA -f UTF-8 $(LOCALE_PATH)/uk_UA.UTF-8
+	
+override_dh_auto_build:
+	LOCPATH=$(LOCALE_PATH) $(MAKE) ASPELL_ENC=utf-8 ASPELL_ENC_NAME=utf-8 myspell aspell uk.cwl.gz ukrainian
+
+override_dh_clean:
+	dh_clean $(LOCALE_PATH)/
+
+override_dh_auto_install:
+	cp dist/myspell-uk-*/uk_UA.aff debian/myspell-uk/usr/share/hunspell
+	cp dist/myspell-uk-*/uk_UA.dic debian/myspell-uk/usr/share/hunspell
+	LOCPATH=$(LOCALE_PATH) LC_ALL=uk_UA.UTF-8 sort -d ukrainian | uniq > debian/wukrainian/usr/share/dict/ukrainian
+	cp uk.cwl.gz debian/aspell-uk/usr/share/aspell
+
+override_dh_install:
+	dh_install --sourcedir=dist/aspell-uk-*
+
+execute_after_dh_install:
+	installdeb-myspell -p myspell-uk
+	installdeb-wordlist -p wukrainian
+	installdeb-aspell -p aspell-uk

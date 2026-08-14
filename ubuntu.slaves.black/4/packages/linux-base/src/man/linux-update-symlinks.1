@@ -1,0 +1,104 @@
+.TH LINUX-UPDATE-SYMLINKS 1 "5 June 2016"
+.SH NAME
+linux\-update\-symlinks \- maintain symlinks to default kernel and initramfs
+
+.SH SYNOPSIS
+.HP
+.BR linux\-update\-symlinks \ { install | upgrade | remove }
+.I VERSION IMAGE\-PATH
+
+.SH DESCRIPTION
+\fBlinux\-update\-symlinks\fR is intended to be called from the
+postinst and postrm maintainer scripts of Linux kernel packages.  The
+postinst script must pass the first argument \fBinstall\fR or
+\fBupgrade\fR depending on whether a fresh installation or an upgrade
+has taken place.
+.PP
+The \fIVERSION\fR argument must be the kernel version string as shown by
+\fBuname -r\fR and used in filenames.
+.PP
+The \fIIMAGE\-PATH\fR argument must be the absolute filename of the
+kernel image.
+.PP
+By default, this command maintains symlinks in the root directory.
+This behaviour can be modified by settings in
+\fI/etc/kernel\-img.conf\fR:
+.TP
+.PD 0
+.B image_dest
+Specifies the directory in which to maintain symlinks
+.TP
+.B link_in_boot
+If set to a true value, specifies that the directory is \fI/boot\fR
+.TP
+.B no_symlinks
+If set to a false value, disables maintenance of symlinks
+.PD 1
+.PP
+The symlinks for the primary default kernel version are named
+\fIvmlinuz\fR or \fIvmlinux\fR (depending on whether the architecture
+normally uses compressed kernel images) and \fIinitrd.img\fR (if it
+uses an initramfs).  The symlinks for the secondary default have the
+same names with the suffix \fI.old\fR.
+.PP
+If symlink maintenance is disabled, \fBlinux\-update\-symlinks\fR does
+nothing, successfully.  Otherwise it makes a list of kernel versions
+in decreasing order of priority:
+.IP \(bu 2
+The given \fIVERSION\fR, if the first argument is \fBinstall\fR
+.IP \(bu 2
+The current primary default version, if it exists and is not already
+listed
+.IP \(bu 2
+The current secondary default version, if it exists and is not already
+listed
+.IP \(bu 2
+All other versions whose files are installed, excluding the specified
+\fIVERSION\fR if the first argument is \fBremove\fR, in decreasing
+version order
+.PP
+The top two entries on the list are the new primary and secondary
+default versions, and it updates the symlinks accordingly.  In case
+there is only one entry, this is both the primary and secondary
+default version.  If there are no entries, there are no default
+versions and it removes the default symlinks.
+
+.SH ENVIRONMENT VARIABLES
+.PD 0
+.TP
+.IR INITRD
+When the first argument is \fBinstall\fR or \fBupgrade\fR,
+\fBlinux\-update\-symlinks\fR assumes that the given \fIVERSION\fR
+will use an initramfs unless this variable is set to \fBNo\fR.
+
+.SH FILES
+.PD 0
+.TP
+.IR /boot/initrd.img\- *
+Installed initramfs images
+.TP
+.IR /boot/vmlinuz\- *\ |\  /boot/vmlinux\- *
+Installed kernel images
+.TP
+.I /etc/kernel-img.conf
+Configuration file specifying whether and where to create symlinks
+.TP
+.I /initrd.img
+Symlink to the initramfs image for the primary default version
+.TP
+.I /initrd.img.old
+Symlink to the initramfs image for the secondary default version
+.TP
+.IR /vmlinuz \ |\  /vmlinux
+Symlink to the kernel image for the primary default version
+.TP
+.IR /vmlinuz.old \ |\  /vmlinux.old
+Symlink to the kernel image for the secondary default version
+
+.SH AUTHOR
+\fBlinux\-update\-symlinks\fR and this manual page were written by Ben
+Hutchings as part of the Debian \fBlinux\-base\fR package.
+
+.SH SEE ALSO
+.IR kernel\-img.conf (5),
+.IR linux\-version (1).

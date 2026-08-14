@@ -1,0 +1,70 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# This is the debhelper compatability version to use.
+
+build: build-stamp
+
+build-stamp: 
+	dh_testdir
+	$(MAKE)
+	cp debian/language-file debian/iirish.info-ispell
+	cp debian/language-file debian/wirish.info-wordlist
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp 
+	rm -f debian/iirish.info-ispell debian/wirish.info-wordlist
+	$(MAKE) reallyclean
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/iirish
+	$(MAKE) install-words DESTDIR=$(CURDIR)/debian/wirish
+	$(MAKE) install-myspell DESTDIR=$(CURDIR)/debian/myspell-ga
+	# For debian bug  #541923
+	mv debian/myspell-ga/usr/share/myspell/dicts/* debian/myspell-ga/usr/share/hunspell
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installdocs 
+	dh_installchangelogs 
+	installdeb-wordlist -p wirish # calls internally dh_installdebconf
+	dh_installman -p wirish wirish/irish.5
+	dh_link
+	dh_compress  
+	dh_fixperms 
+	dh_installdeb 
+	dh_gencontrol 
+	dh_md5sums 
+	dh_builddeb 
+
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installdocs -p iirish
+	dh_installchangelogs -p iirish
+	installdeb-ispell -p iirish # calls internally dh_installdebconf
+	dh_installman  -p iirish
+	dh_link -p iirish
+	dh_compress  -p iirish
+	dh_fixperms  -p iirish
+	dh_installdeb  -p iirish
+	dh_gencontrol  -p iirish
+	dh_md5sums  -p iirish
+	dh_builddeb  -p iirish
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install 

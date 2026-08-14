@@ -1,0 +1,219 @@
+Timer unit: 1e-06 s
+
+File: affix.py
+Function: __init__ at line 19
+Total time: 1.45749 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    19                                               @profile
+    20                                               def __init__(self, match_, pfx):
+    21      1167         1173      1.0      0.1          self.match = match_
+    22      1167          892      0.8      0.1          self.affixes = []
+    23                                           
+    24      1167          710      0.6      0.0          if pfx:
+    25         4          505    126.2      0.0            self.match_start_re = re.compile('^'+match_)
+    26                                                   else:
+    27      1163      1453172   1249.5     99.7            self.match_ends_re = re.compile(match_+'$')
+    28                                           
+    29      1167         1040      0.9      0.1          self.counter = 0
+
+File: affix.py
+Function: __init__ at line 34
+Total time: 0.060117 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    34                                               @profile
+    35                                               def __init__(self, from_, to_, tags_, pfx):
+    36      4762         3829      0.8      6.4          if from_ != '0':
+    37      4594         4509      1.0      7.5            self.fromm = from_
+    38                                                   else:
+    39       168          156      0.9      0.3            self.fromm = ''
+    40      4762         3271      0.7      5.4          if to_ != '0':
+    41      4743         3257      0.7      5.4            self.to = to_
+    42                                                   else:
+    43        19           12      0.6      0.0            self.to = ''
+    44                                                     
+    45      4762         3027      0.6      5.0          self.tags = tags_   # optional tags field for POS dictionary
+    46                                                   
+    47      4762         2762      0.6      4.6          if pfx:
+    48         4          249     62.2      0.4            self.sub_from_pfx = re.compile('^'+self.fromm)
+    49                                                   else:
+    50      4758        39045      8.2     64.9            self.sub_from_sfx = re.compile(self.fromm+'$')
+
+File: affix.py
+Function: expand_prefixes at line 57
+Total time: 0.806335 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    57                                           @profile
+    58                                           def expand_prefixes(word, affixFlags):
+    59    124355       107256      0.9     13.3      words = [ word ]
+    60                                           
+    61    314480       253803      0.8     31.5      for affixFlag in affixFlags:
+    62    190125       175954      0.9     21.8        if affixFlag not in prefixes:
+    63    186627       123864      0.7     15.4          continue
+    64                                                     
+    65      3498         2407      0.7      0.3        appliedCnt = 0
+    66      3498         2831      0.8      0.4        affixGroupMap = affixMap[affixFlag]
+    67      8598         8285      1.0      1.0        for affixGroup in affixGroupMap.values():
+    68      5100        10281      2.0      1.3          if affixGroup.match_start_re.match(word):
+    69      6996         6558      0.9      0.8              for affix in affixGroup.affixes:
+    70      3498        13078      3.7      1.6                  wrd = affix.sub_from_pfx.sub(affix.to, word)
+    71      3498         4065      1.2      0.5                  words.append( wrd )
+    72      3498         3100      0.9      0.4                  appliedCnt += 1
+    73      3498         4089      1.2      0.5              affixGroup.counter += 1
+    74                                           
+    75      3498         2892      0.8      0.4        if appliedCnt == 0:
+    76                                                   print("WARNING: Flag", affixFlag, "not applicable to", word, file=sys.stderr)
+    77                                               
+    78    124355        87872      0.7     10.9      return words
+
+File: affix.py
+Function: expand_suffixes at line 82
+Total time: 27.7025 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    82                                           @profile
+    83                                           def expand_suffixes(word, affixFlags):
+    84    127853       114439      0.9      0.4      words = [ word ]
+    85                                           
+    86    327266       281138      0.9      1.0      for affixFlag in affixFlags:
+    87    199413       202691      1.0      0.7        if affixFlag in prefixes:
+    88      6998         4938      0.7      0.0            continue
+    89                                                     
+    90    192415       159954      0.8      0.6        if not affixFlag in affixMap:
+    91                                                     print("ERROR: Invalid flag", affixFlag, "for", word, file=sys.stderr)
+    92                                                     continue
+    93                                                     
+    94    192415       142776      0.7      0.5        appliedCnt = 0
+    95                                                   
+    96    192415       162119      0.8      0.6        affixGroupMap = affixMap[affixFlag]
+    97   7767527      6612699      0.9     23.9        for match, affixGroup in affixGroupMap.items():
+    98   7575112     10664720      1.4     38.5          if affixGroup.match_ends_re.search(word):
+    99   1834229      1585336      0.9      5.7            for affix in affixGroup.affixes:
+   100   1392669      4307962      3.1     15.6               deriv = affix.sub_from_sfx.sub(affix.to, word)
+   101   1392669      1486046      1.1      5.4               words.append(deriv)
+   102   1392669      1199974      0.9      4.3               appliedCnt += 1
+   103    441560       506357      1.1      1.8            affixGroup.counter += 1
+   104                                                   
+   105    192415       170589      0.9      0.6        if appliedCnt == 0:
+   106                                                   print("WARNING: Flag", affixFlag, "not applicable to", word, file=sys.stderr)
+   107                                           
+   108    127853       100749      0.8      0.4      return words
+
+File: affix.py
+Function: load_affixes at line 112
+Total time: 1.73746 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   112                                           @profile
+   113                                           def load_affixes(filename):
+   114         1         5586   5586.0      0.3   re_afx=re.compile('^[SP]FX[ \t]+[a-zA-Z0-9][ \t]+[a-zA-Z0-9][ \t]+[0-9]+')
+   115         1         4003   4003.0      0.2   re_pfx=re.compile('^PFX[ \t]+[a-zA-Z][ \t]+[a-zA-Z][ \t]+[0-9]+')
+   116         1          733    733.0      0.0   re_whitespace=re.compile('[ \t]+')
+   117         1            2      2.0      0.0   decl_aff_counts = {}
+   118         1            1      1.0      0.0   real_aff_counts = {}
+   119                                           
+   120         1           54     54.0      0.0   with open(filename, "r") as aff_file:
+   121                                           
+   122      4819         8223      1.7      0.5    for line in aff_file:
+   123                                           
+   124      4818         7219      1.5      0.4      line = line.strip()
+   125                                               
+   126      4818         8209      1.7      0.5      is_pfx = line.startswith('PFX')
+   127      4818         7863      1.6      0.5      if not is_pfx and not line.startswith('SFX'):
+   128        12           18      1.5      0.0          continue
+   129                                           
+   130      4806        11551      2.4      0.7      if re_afx.match(line):
+   131        44          187      4.2      0.0          line_parts = re_whitespace.split(line)
+   132        44           63      1.4      0.0          affixFlag = line_parts[1]
+   133        44           64      1.5      0.0          affixMap[ affixFlag ] = {}
+   134        44          135      3.1      0.0          decl_aff_counts[ affixFlag ] = int(line_parts[3])
+   135        44           54      1.2      0.0          real_aff_counts[ affixFlag ] = 0
+   136                                                   
+   137        44           95      2.2      0.0          if re_pfx.match(line):
+   138         3            4      1.3      0.0              prefixes.append(affixFlag)
+   139                                           
+   140                                                   continue
+   141                                           
+   142      4762         9030      1.9      0.5      halfs = line.split('@')
+   143      4762        25295      5.3      1.5      parts = re_whitespace.split(halfs[0].strip())
+   144                                           
+   145      4762         7434      1.6      0.4      if len(parts) < 5:
+   146                                                   continue
+   147                                           
+   148      4762         6188      1.3      0.4      if len(halfs) > 1:
+   149                                                   tags = halfs[1].strip()
+   150                                               else:
+   151      4762         5241      1.1      0.3          tags = ''
+   152                                                   
+   153      4762         5561      1.2      0.3      affixFlag = parts[1]
+   154      4762         5359      1.1      0.3      fromm = parts[2]
+   155      4762         5361      1.1      0.3      to = parts[3]
+   156      4762         5485      1.2      0.3      match = parts[4]
+   157                                           
+   158      4762         5586      1.2      0.3      if not affixFlag in affixMap:
+   159                                                 affixMap[affixFlag] = {}
+   160                                           
+   161      4762         5752      1.2      0.3      affixGroupMap = affixMap[affixFlag]
+   162                                           
+   163      4762         6056      1.3      0.3      if not match in affixGroupMap:
+   164      1167      1467430   1257.4     84.5        affixGroup = AffixGroup(match, is_pfx)
+   165                                           #      print(affixGroupMap, file=sys.stderr)
+   166      1167         1667      1.4      0.1        affixGroupMap[match] = affixGroup
+   167                                               else:
+   168      3595         4225      1.2      0.2        affixGroup = affixGroupMap[match]
+   169                                           
+   170      4762       103297     21.7      5.9      affixObj = Affix(fromm, to, tags, is_pfx)
+   171      4762         7506      1.6      0.4      affixGroup.affixes.append(affixObj)
+   172                                           
+   173      4762         6763      1.4      0.4      real_aff_counts[ affixFlag ] += 1
+   174                                           
+   175         1            2      2.0      0.0    if len(affixMap) == 0:
+   176                                               print("ERROR: Failed to load affixes from", filename, file=sys.stderr)
+   177                                               sys.exit(1)
+   178                                               
+   179        45           51      1.1      0.0    for affixFlag in decl_aff_counts:
+   180        44           56      1.3      0.0      if decl_aff_counts[affixFlag] != real_aff_counts[affixFlag]:
+   181                                                 print("Declared count of ", decl_aff_counts[affixFlag], "for", affixFlag, "not equals real line count", real_aff_counts[affixFlag], file=sys.stderr)
+   182                                           
+   183         1           56     56.0      0.0    print("Loaded", len(affixMap), "affixes", ", prefixes:", prefixes, file=sys.stderr)
+
+File: affix.py
+Function: expand at line 186
+Total time: 50.0283 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   186                                           @profile
+   187                                           def expand(word, flags, flush_stdout):
+   188    124355      1980435     15.9      4.0    pfx_words = expand_prefixes(word, flags)
+   189    124355        87692      0.7      0.2    words = []
+   190    252208       190911      0.8      0.4    for w in pfx_words:
+   191    127853     46223285    361.5     92.4      sfx_words = expand_suffixes(w, flags)
+   192    127853       134121      1.0      0.3      words.extend( sfx_words )
+   193                                           
+   194    124355       543834      4.4      1.1    print(' '.join(words))
+   195    124355        96004      0.8      0.2    if flush_stdout:
+   196                                               sys.stdout.flush()
+   197                                           
+   198    124355       772035      6.2      1.5    logger.debug("expanded", ' '.join(words), file=sys.stderr)
+
+File: affix.py
+Function: expand_line at line 200
+Total time: 52.3834 s
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   200                                           @profile
+   201                                           def expand_line(line):
+   202    124355       632892      5.1      1.2      logger.debug("expanding", line, file=sys.stderr)
+   203    124355       217770      1.8      0.4      wsp = line.split('/')
+   204    124355       157156      1.3      0.3      flags = wsp[1] if len(wsp) > 1 else ''
+   205    124355     51375625    413.1     98.1      expand(wsp[0], list(flags), flush_stdout)
+

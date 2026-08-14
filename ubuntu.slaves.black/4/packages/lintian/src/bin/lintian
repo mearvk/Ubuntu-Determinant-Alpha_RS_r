@@ -1,0 +1,1024 @@
+#!/usr/bin/perl
+#
+# Lintian -- Debian package checker
+#
+# Copyright © 1998 Christian Schwarz and Richard Braakman
+# Copyright © 2013 Niels Thykier
+# Copyright © 2017-2019 Chris Lamb <lamby@debian.org>
+# Copyright © 2020 Felix Lechner
+#
+# This program is free software.  It is distributed under the terms of
+# the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, you can find it on the World Wide
+# Web at http://www.gnu.org/copyleft/gpl.html, or write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+# MA 02110-1301, USA.
+
+use v5.20;
+use warnings;
+use utf8;
+
+use Cwd qw(realpath);
+use File::Basename qw(dirname);
+
+# neither Path::This nor lib::relative are in Debian
+use constant THISFILE => realpath __FILE__;
+use constant THISDIR => dirname realpath __FILE__;
+
+# use Lintian modules that belong to this program
+use lib THISDIR . '/../lib';
+
+# substituted during package build
+my $LINTIAN_VERSION;
+
+use Carp qw(croak confess verbose);
+use Config::Tiny;
+use Const::Fast;
+use File::BaseDir qw(config_files);
+use Getopt::Long ();
+use IO::Interactive qw(is_interactive);
+use List::Compare;
+use List::SomeUtils qw(any none first_value);
+use Path::Tiny;
+use POSIX qw(:sys_wait_h);
+use Syntax::Keyword::Try;
+use Term::ReadKey;
+use Unicode::UTF8 qw(encode_utf8 decode_utf8);
+
+use Lintian::Deb822::Parser qw(parse_dpkg_control_string);
+use Lintian::Inspect::Changelog;
+use Lintian::IPC::Run3 qw(safe_qx);
+use Lintian::Pool;
+use Lintian::Processable::Installable;
+use Lintian::Processable::Buildinfo;
+use Lintian::Processable::Changes;
+use Lintian::Processable::Source;
+use Lintian::Profile;
+use Lintian::Version qw(guess_version);
+
+const my $EMPTY => q{};
+const my $SPACE => q{ };
+const my $NEWLINE => qq{\n};
+const my $COMMA => q{,};
+const my $SLASH => q{/};
+const my $DOT => q{.};
+const my $DOUBLE_DOT => q{..};
+const my $PLUS => q{+};
+const my $EQUAL => q{=};
+const my $HYPHEN => q{-};
+const my $OPEN_PIPE => q{-|};
+
+const my $DEFAULT_TAG_LIMIT => 4;
+const my $DEFAULT_OUTPUT_WIDTH => 80;
+
+# place early, may need original environment to determine terminal blacklist
+my $hyperlinks_capable = is_interactive;
+
+# Globally ignore SIGPIPE.  We'd rather deal with error returns from write
+# than randomly delivered signals.
+$SIG{PIPE} = 'IGNORE';
+
+my $TERMINAL_WIDTH;
+($TERMINAL_WIDTH, undef, undef, undef) = GetTerminalSize()
+  if is_interactive;
+$TERMINAL_WIDTH //= $DEFAULT_OUTPUT_WIDTH;
+
+my %PRESERVE_ENV = map { $_ => 1 } qw(
+  DEB_VENDOR
+  DEBRELEASE_DEBS_DIR
+  HOME
+  LANG
+  LC_ALL
+  LC_MESSAGES
+  PATH
+  TMPDIR
+  XDG_CACHE_HOME
+  XDG_CONFIG_DIRS
+  XDG_CONFIG_HOME
+  XDG_DATA_DIRS
+  XDG_DATA_HOME
+);
+
+my @disallowed= grep { !exists $PRESERVE_ENV{$_} && !/^LINTIAN_/ } keys %ENV;
+
+delete $ENV{$_} for @disallowed;
+
+# PATH may be unset in some environments; use sane default
+$ENV{PATH} //= '/bin:/usr/bin';
+
+# needed for tar
+$ENV{LC_ALL} = 'C';
+$ENV{TZ} = $EMPTY;
+
+$ENV{LINTIAN_BASE} = realpath(THISDIR . '/..')
+  // die encode_utf8('Cannot resolve LINTIAN_BASE');
+
+$ENV{LINTIAN_VERSION} = $LINTIAN_VERSION // guess_version($ENV{LINTIAN_BASE});
+die encode_utf8('Unable to determine the version automatically!?')
+  unless length $ENV{LINTIAN_VERSION};
+
+if (my $coverage_arg = $ENV{LINTIAN_COVERAGE}) {
+    my $p5opt = $ENV{PERL5OPT} // $EMPTY;
+    $p5opt .= $SPACE unless $p5opt eq $EMPTY;
+    $ENV{PERL5OPT} = "${p5opt} ${coverage_arg}";
+}
+
+my @getoptions = qw(
+  allow-root
+  cfg=s
+  check|c
+  check-part|C=s@
+  color=s
+  debug|d+
+  default-display-level
+  display-experimental|E!
+  display-level|L=s@
+  display-info|I
+  display-source=s@
+  dont-check-part|X=s@
+  exp-output:s
+  fail-on=s@
+  ftp-master-rejects|F
+  help|h
+  hide-overrides
+  hyperlinks=s
+  ignore-lintian-env
+  include-dir=s@
+  info|i
+  jobs|j=i
+  no-cfg
+  no-override|o
+  no-tag-display-limit
+  output-width=i
+  packages-from-file=s
+  pedantic
+  perf-debug
+  print-version
+  profile=s
+  quiet|q
+  show-overrides
+  status-log=s
+  suppress-tags=s@
+  suppress-tags-from-file=s
+  tag-display-limit=i
+  tags|T=s@
+  tags-from-file=s
+  user-dirs!
+  verbose|v
+  version|V
+);
+
+my %command_line;
+
+Getopt::Long::Configure('default', 'bundling',
+    'no_getopt_compat','no_auto_abbrev','permute');
+
+Getopt::Long::GetOptions(\%command_line, @getoptions)
+  or die encode_utf8("error parsing options\n");
+
+my @basenames = map { path($_)->basename } @ARGV;
+$0 = join($SPACE, THISFILE, @basenames);
+
+if (exists $command_line{'version'}) {
+    say encode_utf8("Lintian v$ENV{LINTIAN_VERSION}");
+    exit;
+}
+
+if (exists $command_line{'print-version'}) {
+    say encode_utf8($ENV{LINTIAN_VERSION});
+    exit;
+}
+
+show_help()
+  if exists $command_line{help};
+
+$command_line{'show-overrides'} = 0
+  if exists $command_line{'hide-overrides'};
+
+$command_line{'tag-display-limit'} = 0
+  if exists $command_line{'no-tag-display-limit'};
+
+my $LINTIAN_CFG = $command_line{cfg};
+
+$LINTIAN_CFG ||= $ENV{LINTIAN_CFG}
+  if length $ENV{LINTIAN_CFG} && -e $ENV{LINTIAN_CFG};
+
+unless ($command_line{'no-user-dirs'}) {
+
+    my @user_configs;
+
+    # XDG user config
+    push(@user_configs, config_files('lintian/lintianrc'));
+
+    # legacy per-user config
+    push(@user_configs, "$ENV{HOME}/.lintianrc")
+      if length $ENV{HOME};
+
+    # system wide user config
+    push(@user_configs, '/etc/lintianrc');
+
+    $LINTIAN_CFG ||= first_value { length && -e } @user_configs;
+}
+
+$LINTIAN_CFG = $EMPTY
+  if $command_line{'no-cfg'};
+
+my %config;
+
+# some environment variables can be set from the config file
+my @ENV_FROM_CONFIG = qw(
+  TMPDIR
+);
+
+if (length $LINTIAN_CFG) {
+
+    # for keys appearing multiple times, now uses the last value
+    my $object = Config::Tiny->read($LINTIAN_CFG, 'utf8');
+    my $error = Config::Tiny->errstr;
+    die encode_utf8(
+        "syntax error in configuration file $LINTIAN_CFG: $error\n")
+      if length $error;
+
+    # used elsewhere to check for values already set
+    %config = %{$object->{_} // {}};
+
+    my @allowed = qw(
+      color
+      display-experimental
+      display-info
+      display-level
+      hyperlinks
+      info
+      jobs
+      LINTIAN_PROFILE
+      override
+      pedantic
+      profile
+      quiet
+      show-overrides
+      suppress-tags
+      suppress-tags-from-file
+      tag-display-limit
+      TMPDIR
+      verbose
+    );
+
+    my $knownlc
+      = List::Compare->new([keys %config], [@allowed, @ENV_FROM_CONFIG]);
+    my @unknown = $knownlc->get_Lonly;
+    die encode_utf8(
+        "Unknown setting in $LINTIAN_CFG: ". join($SPACE, @unknown). $NEWLINE)
+      if @unknown;
+}
+
+# substitute home directory
+s{\$HOME/}{$ENV{HOME}/}g for values %config;
+s{\~/}{$ENV{HOME}/}g for values %config;
+
+# option inverted in config file
+$config{'no-override'} = !$config{'no-override'}
+  if exists $config{'no-override'};
+
+my @GETOPT_ARRAYS = qw(
+  display-level
+  suppress-tags
+);
+
+# convert some strings to array references
+for my $name (@GETOPT_ARRAYS) {
+    if (exists $config{$name}) {
+        $config{$name} = [$config{$name}];
+    } else {
+        $config{$name} = [];
+    }
+}
+
+# Translate boolean strings to "0" or "1"; ignore
+# errors as not all values are (intended to be)
+# booleans.
+my $booleanlc
+  = List::Compare->new([keys %config], [qw(jobs tag-display-limit)]);
+eval { $config{$_} = parse_boolean($config{$_}); }for $booleanlc->get_Lonly;
+
+# our defaults
+my %selected = (
+    'check-part'        => [],
+    'color'             => 'auto',
+    'debug'             => 0,
+    'display-level'     => [],
+    'display-source'    => [],
+    'dont-check-part'   => [],
+    'fail-on'           => [],
+    'include-dir'       => [],
+    'jobs'              => default_jobs(),
+    'output-width'      => $TERMINAL_WIDTH,
+    'tags'              => [],
+    'suppress-tags'     => [],
+    'user-dirs'         => 1,
+    'verbose'           => 0,
+);
+
+$selected{$_} = $config{$_} for keys %config;
+
+my @MUTUAL_OPTIONS = (
+    [qw(verbose quiet)],
+    [qw(default-display-level display-level display-info pedantic)],
+);
+
+# for precedence of command line
+for my $exclusive (@MUTUAL_OPTIONS) {
+
+    if (any { defined $command_line{$_} } @{$exclusive}) {
+        my @scalars = grep { ref $selected{$_} eq 'SCALAR' } @{$exclusive};
+        delete $selected{$_} for @scalars;
+
+        my @arrays = grep { ref $selected{$_} eq 'ARRAY' } @{$exclusive};
+        $selected{$_} = [] for @arrays;
+    }
+}
+
+$selected{$_} = $command_line{$_} for keys %command_line;
+
+@{$selected{'display-level'}}
+  = split(/\s*,\s*/, join($COMMA, @{$selected{'display-level'}}));
+
+my @display_level;
+
+push(@display_level,[$EQUAL, '>=', 'warning'])
+  if $selected{'default-display-level'};
+
+push(@display_level, [$PLUS, '>=', 'info'])
+  if $selected{'display-info'};
+
+push(@display_level, [$PLUS, $EQUAL, 'pedantic'])
+  if $selected{'pedantic'};
+
+sub display_classificationtags {
+    push(@display_level, [$PLUS, $EQUAL, 'classification']);
+    return;
+}
+
+for my $level (@{$selected{'display-level'}}) {
+
+    my $operator;
+    if ($level =~ s/^([+=-])//) {
+        $operator = $1;
+    }
+
+    my $relation;
+    if ($level =~ s/^([<>]=?|=)//) {
+        $relation = $1;
+    }
+
+    my $severity = $level;
+    $operator //= $EQUAL;
+    $relation //= $EQUAL;
+
+    push(@display_level, [$operator, $relation, $severity]);
+}
+
+@{$selected{'display-source'}}
+  = split(/\s*,\s*/, join($COMMA, @{$selected{'display-source'}}));
+
+@{$selected{'check-part'}}
+  = split(/\s*,\s*/, join($COMMA, @{$selected{'check-part'}}));
+@{$selected{'dont-check-part'}}
+  = split(/\s*,\s*/, join($COMMA, @{$selected{'dont-check-part'}}));
+
+@{$selected{tags}} = split(/\s*,\s*/, join($COMMA, @{$selected{tags}}));
+@{$selected{'suppress-tags'}}
+  = split(/\s*,\s*/, join($COMMA, @{$selected{'suppress-tags'}}));
+
+if (length $selected{'tags-from-file'}) {
+
+    my @lines = path($selected{'tags-from-file'})->lines_utf8;
+    for my $line (@lines) {
+
+        # trim both ends
+        $line =~ s/^\s+|\s+$//g;
+
+        next
+          unless length $line;
+        next
+          if $line =~ /^\#/;
+
+        my @activate = split(/\s*,\s*/, $line);
+        push(@{$selected{tags}}, @activate);
+    }
+}
+
+if (length $selected{'suppress-tags-from-file'}) {
+
+    my @lines = path($selected{'suppress-tags-from-file'})->lines_utf8;
+    for my $line (@lines) {
+
+        # trim both ends
+        $line =~ s/^\s+|\s+$//g;
+
+        next
+          unless length $line;
+        next
+          if $line =~ /^\#/;
+
+        my @suppress = split(/\s*,\s*/, $line);
+        push(@{$selected{'suppress-tags'}}, @suppress);
+    }
+}
+
+my $exit_code = 0;
+
+# root permissions?
+# check if effective UID is 0
+warn encode_utf8("running with root privileges is not recommended!\n")
+  if $> == 0 && !$selected{'allow-root'};
+
+if ($selected{'ignore-lintian-env'}) {
+    delete($ENV{$_}) for grep { m/^LINTIAN_/ } keys %ENV;
+}
+
+# option --all and packages specified at the same time?
+if ($selected{'packages-from-file'} && $#ARGV+1 > 0) {
+    warn encode_utf8(
+"option --packages-from-file cannot be mixed with package parameters!\n"
+    );
+    warn encode_utf8("(will ignore --packages-from-file option)\n");
+
+    delete($selected{'packages-from-file'});
+}
+
+die encode_utf8("Cannot use profile together with --ftp-master-rejects.\n")
+  if $selected{profile} && $selected{'ftp-master-rejects'};
+# --ftp-master-rejects is implemented in a profile
+$selected{profile} = 'debian/ftp-master-auto-reject'
+  if $selected{'ftp-master-rejects'};
+
+@{$selected{'fail-on'}} = split(/,/, join($COMMA, @{$selected{'fail-on'}}));
+my @known_fail_on = qw(
+  error
+  warning
+  info
+  pedantic
+  experimental
+  override
+  none
+);
+my $fail_on_lc = List::Compare->new($selected{'fail-on'}, \@known_fail_on);
+my @unknown_fail_on = $fail_on_lc->get_Lonly;
+die encode_utf8("Unrecognized fail-on argument: @unknown_fail_on\n")
+  if @unknown_fail_on;
+
+if (any { $_ eq 'none' } @{$selected{'fail-on'}}) {
+
+    die encode_utf8(
+"Cannot combine 'none' with other conditions: @{$selected{'fail-on'}}\n"
+    )if @{$selected{'fail-on'}} > 1;
+
+    $selected{'fail-on'} = [];
+}
+
+# environment variables override settings in conf file, so load them now
+# assuming they were not set by cmd-line options
+for my $var (@ENV_FROM_CONFIG) {
+# note $selected{$var} will usually always exists due to the call to GetOptions
+# so we have to use "defined" here
+    $selected{$var} = $ENV{$var} if $ENV{$var} && !defined $selected{$var};
+}
+
+my %output
+  = map { split(/=/) } split(/,/, ($selected{'exp-output'} // $EMPTY));
+$selected{'output-format'} = lc($output{format} // 'ewi');
+
+my $PROFILE = Lintian::Profile->new;
+
+# dies on error
+$PROFILE->load(
+    $selected{profile},
+    $selected{'include-dir'},
+    !$command_line{'no-user-dirs'});
+say {*STDERR} encode_utf8('Using profile ' . $PROFILE->name . $DOT)
+  if $selected{debug};
+
+my $envlc = List::Compare->new([keys %config], \@ENV_FROM_CONFIG);
+my @from_file = $envlc->get_intersection;
+
+my @already = grep { defined $ENV{$_} } @from_file;
+warn encode_utf8(
+        'The environment overrides these settings in the configuration file: '
+      . join($SPACE, @already)
+      . $NEWLINE)
+  if @already;
+
+my @not_yet = grep { !defined $ENV{$_} } @from_file;
+if (@not_yet) {
+    say {*STDERR}
+      encode_utf8('Setting environment variables from configuration file: '
+          . join($SPACE, @not_yet))
+      if $selected{debug};
+}
+$ENV{$_} = $config{$_} for @not_yet;
+
+die encode_utf8("The color value must be one of auto, always, or never.\n")
+  unless (any { $selected{color} eq $_ } qw(auto always never));
+
+$selected{hyperlinks} //= 'off'
+  if $selected{color} eq 'never';
+
+# change to 'on' after gcc's terminal blacklist was implemented here
+$selected{hyperlinks} //= 'on';
+
+die encode_utf8("The hyperlink value must be on or off\n")
+  unless any { $selected{hyperlinks} eq $_ } qw(on off);
+
+$selected{hyperlinks} = $hyperlinks_capable && $selected{hyperlinks} eq 'on';
+
+$selected{color} = $selected{color} eq 'always'
+  || ($selected{color} eq 'auto' && is_interactive);
+
+$selected{verbose} = 0
+  if $selected{quiet};
+
+if ($selected{verbose} || !is_interactive) {
+    $selected{'tag-display-limit'} //= 0;
+} else {
+    $selected{'tag-display-limit'} //= $DEFAULT_TAG_LIMIT;
+}
+
+if ($selected{debug}) {
+    $selected{verbose} = 1;
+    $ENV{LINTIAN_DEBUG} = $selected{debug};
+    $SIG{__DIE__} = sub {
+        confess(map { encode_utf8($_) } @_);
+    };
+}
+
+# check for arguments
+unless (@ARGV || $selected{'packages-from-file'}) {
+
+    my $ok = 0;
+    # If debian/changelog exists, assume an implied
+    # "../<source>_<version>_<arch>.changes" (or
+    # "../<source>_<version>_source.changes").
+    if (-e 'debian/changelog') {
+        my $file = _find_changes();
+        push @ARGV, $file;
+        $ok = 1;
+    }
+
+    show_help()
+      unless $ok;
+}
+
+if ($selected{debug}) {
+    say {*STDERR} encode_utf8("Lintian v$ENV{LINTIAN_VERSION}");
+    say {*STDERR} encode_utf8("Lintian root directory: $ENV{LINTIAN_BASE}");
+    say {*STDERR} encode_utf8("Configuration file: $LINTIAN_CFG");
+    say {*STDERR} encode_utf8('UTF-8: ✓ (☃)');
+}
+
+if (defined $selected{LINTIAN_PROFILE}) {
+    warn encode_utf8(
+        "Please use 'profile' in config file; LINTIAN_PROFILE is obsolete.\n");
+    $selected{profile} //= $selected{LINTIAN_PROFILE};
+    delete $selected{LINTIAN_PROFILE};
+}
+
+# if tags are listed explicitly (--tags) then show them even if
+# they are pedantic/experimental etc.  However, for --check-part
+# people explicitly have to pass the relevant options.
+
+if (@{$selected{'check-part'}} || @{$selected{tags}}) {
+
+    $PROFILE->disable_tag($_) for $PROFILE->enabled_tags;
+
+    if (@{$selected{tags}}) {
+        $selected{'display-experimental'} = 1;
+
+        # discard current display level; get everything
+        @display_level
+          = ([$PLUS, '>=', 'pedantic'], [$PLUS, $EQUAL, 'classification']);
+
+        $PROFILE->enable_tag($_) for @{$selected{tags}};
+
+    } else {
+        for my $checkname (@{$selected{'check-part'}}) {
+            if ($checkname eq 'all') {
+                my @tags = map { @{$PROFILE->tagnames_for_check->{$_} // []} }
+                  $PROFILE->known_checks;
+                $PROFILE->enable_tag($_) for @tags;
+                next;
+            }
+
+            die encode_utf8("Unrecognized check (via -C): $checkname\n")
+              unless exists $PROFILE->check_module_by_name->{$checkname};
+
+            $PROFILE->enable_tag($_)
+              for @{$PROFILE->tagnames_for_check->{$checkname} // []};
+        }
+    }
+
+} elsif (@{$selected{'dont-check-part'}}) {
+    # we are disabling checks
+    for my $checkname (@{$selected{'dont-check-part'}}) {
+
+        die encode_utf8("Unrecognized check (via -X): $checkname\n")
+          unless exists $PROFILE->check_module_by_name->{$checkname};
+
+        $PROFILE->disable_tag($_)
+          for @{$PROFILE->tagnames_for_check->{$checkname} // []};
+    }
+}
+
+# ignore --suppress-tags when used with --tags.
+if (@{$selected{'suppress-tags'}} && !@{$selected{tags}}) {
+    $PROFILE->disable_tag($_) for @{$selected{'suppress-tags'}};
+}
+
+# initialize display level settings; dies on error
+$PROFILE->display(@{$_}) for @display_level;
+
+my @subjects;
+push(@subjects, @ARGV);
+
+if ($selected{'packages-from-file'}){
+    my $fd = open_file_or_fd($selected{'packages-from-file'}, '<');
+
+    while (my $bytes = <$fd>) {
+        my $line = decode_utf8($bytes);
+        chomp $line;
+
+        next
+          if $line =~ /^\s*$/;
+
+        push(@subjects, $line);
+    }
+
+    # close unless it is STDIN (else we will see a lot of warnings
+    # about STDIN being reopened as "output only")
+    close($fd)
+      unless fileno($fd) == fileno(STDIN);
+}
+
+my $pool = Lintian::Pool->new;
+
+for my $subject (@subjects) {
+    die encode_utf8("$subject is not a readable file\n") unless -r $subject;
+
+    # in ubuntu, automatic dbgsym packages end with .ddeb
+    die encode_utf8(
+"bad package file name $subject (neither .deb, .udeb, .ddeb, .changes, .dsc or .buildinfo file)\n"
+    ) unless $subject =~ /\.(?:[u|d]?deb|dsc|changes|buildinfo)$/;
+
+    try {
+        # create a new group
+        my $group = Lintian::Group->new;
+        $group->pooldir($pool->basedir);
+        $group->profile($PROFILE);
+
+        my $processable = create_processable_from_file($subject);
+        $group->add_processable($processable);
+
+        my $parent = path($subject)->parent->stringify;
+
+        my @files;
+
+        # pull in any additional files
+        @files = keys %{$processable->files}
+          if $processable->can('files');
+
+        for my $basename (@files) {
+
+            # ignore traversal attempts
+            next
+              if $basename =~ m{/};
+
+            die encode_utf8("$parent/$basename does not exist, exiting\n")
+              unless -e "$parent/$basename";
+
+            # only care about some files; ddeb is ubuntu dbgsym
+            next
+              unless $basename =~ /\.[ud]?deb$/
+              || $basename =~ /\.dsc$/
+              || $basename =~ /\.buildinfo$/;
+
+            my $additional = create_processable_from_file("$parent/$basename");
+            $group->add_processable($additional);
+        }
+
+        $pool->add_group($group);
+
+    } catch {
+        warn encode_utf8("Skipping $subject: $@\n");
+        $exit_code = 1;
+    }
+}
+
+$pool->process($PROFILE, \$exit_code, \%selected);
+
+exit $exit_code;
+
+=item create_processable_from_file
+
+=cut
+
+sub create_processable_from_file {
+    my ($path) = @_;
+
+    croak encode_utf8("Cannot resolve $path: $!")
+      unless -e $path;
+
+    my $processable;
+
+    if ($path =~ /\.dsc$/) {
+        $processable = Lintian::Processable::Source->new;
+
+    } elsif ($path =~ /\.buildinfo$/) {
+        $processable = Lintian::Processable::Buildinfo->new;
+
+    } elsif ($path =~ /\.d?deb$/) {
+        # in ubuntu, automatic dbgsym packages end with .ddeb
+        $processable = Lintian::Processable::Installable->new;
+        $processable->type('binary');
+
+    } elsif ($path =~ /\.udeb$/) {
+        $processable = Lintian::Processable::Installable->new;
+        $processable->type('udeb');
+
+    } elsif ($path =~ /\.changes$/) {
+        $processable = Lintian::Processable::Changes->new;
+
+    } else {
+        croak encode_utf8("$path is not a known type of package");
+    }
+
+    $processable->init_from_file($path);
+
+    return $processable;
+}
+
+=item parse_boolean (STR)
+
+Attempt to parse STR as a boolean and return its value.
+If STR is not a valid/recognised boolean, the sub will
+invoke croak.
+
+The following values recognised (string checks are not
+case sensitive):
+
+=over 4
+
+=item The integer 0 is considered false
+
+=item Any non-zero integer is considered true
+
+=item "true", "y" and "yes" are considered true
+
+=item "false", "n" and "no" are considered false
+
+=back
+
+=cut
+
+sub parse_boolean {
+    my ($str) = @_;
+
+    return $str == 0 ? 0 : 1
+      if $str =~ /^-?\d++$/;
+
+    $str = lc $str;
+
+    return 1
+      if $str eq 'true' || $str =~ m/^y(?:es)?$/;
+
+    return 0
+      if $str eq 'false' || $str =~ m/^no?$/;
+
+    croak encode_utf8("'$str' is not a valid boolean value");
+}
+
+sub _find_changes {
+    # read bytes to side-step any encoding errors
+    my $contents = path('debian/changelog')->slurp;
+    my $changelog = Lintian::Inspect::Changelog->new;
+    $changelog->parse($contents);
+    my @entries = @{$changelog->entries};
+    my $latest = @entries ? $entries[0] : undef;
+    my ($source, $version);
+    my $changes;
+    my @archs;
+    my @dirs = ($DOUBLE_DOT, '../build-area', '/var/cache/pbuilder/result');
+
+    unshift(@dirs, $ENV{DEBRELEASE_DEBS_DIR})
+      if exists $ENV{DEBRELEASE_DEBS_DIR};
+
+    if (not $latest) {
+        my @errors = @{$changelog->errors};
+        if (@errors) {
+            warn encode_utf8("Cannot parse debian/changelog due to errors:\n");
+            for my $error (@errors) {
+                warn encode_utf8("$error->[2] (line $error->[1])\n");
+            }
+        } else {
+            warn encode_utf8("debian/changelog does not have any data?\n");
+        }
+        exit 1;
+    }
+    $version = $latest->Version;
+    $source = $latest->Source;
+    unless (defined $version && defined $source) {
+        $version //= '<N/A>';
+        $source //= '<N/A>';
+        warn encode_utf8(
+            "Cannot determine source and version from debian/changelog:\n");
+        warn encode_utf8("Source: $source\n");
+        warn encode_utf8("Version: $source\n");
+        exit 1;
+    }
+    # remove the epoch
+    $version =~ s/^\d+://;
+    if (exists $ENV{DEB_BUILD_ARCH}) {
+        push(@archs, decode_utf8($ENV{DEB_BUILD_ARCH}));
+    } else {
+        my $arch = decode_utf8(safe_qx('dpkg', '--print-architecture'));
+        chomp $arch;
+        push(@archs, $arch) if length $arch;
+    }
+    push(@archs, decode_utf8($ENV{DEB_HOST_ARCH}))
+      if exists $ENV{DEB_HOST_ARCH};
+    # Maybe cross-built for something dpkg knows about...
+    my @command = qw{dpkg --print-foreign-architectures};
+    open(my $foreign, $OPEN_PIPE, @command)
+      or die encode_utf8("Cannot open pipe to @command");
+
+    while (my $bytes = <$foreign>) {
+        my $line = decode_utf8($bytes);
+        chomp($line);
+        # Skip already attempted architectures (e.g. via DEB_BUILD_ARCH)
+        next
+          if any { $_ eq $line } @archs;
+        push(@archs, $line);
+    }
+    close($foreign);
+    push @archs, qw(multi all source);
+    for my $dir (@dirs) {
+        for my $arch (@archs) {
+            $changes = "$dir/${source}_${version}_${arch}.changes";
+            return $changes if -e $changes;
+        }
+    }
+
+    warn encode_utf8(
+"Cannot find a changes file for ${source}/${version}. It would be named like:\n"
+    );
+
+    warn encode_utf8("    ${source}_${version}_${_}.changes\n") for @archs;
+
+    warn encode_utf8(" in any of those places:\n");
+    warn encode_utf8("    $_\n") for @dirs;
+
+    exit 0;
+}
+
+=item open_file_or_fd
+
+=cut
+
+# open_file_or_fd(TO_OPEN, MODE)
+#
+# Open a given file or FD based on TO_OPEN and MODE and returns the
+# open handle.  Will croak / throw a trappable error on failure.
+#
+# MODE can be one of "<" (read) or ">" (write).
+#
+# TO_OPEN is one of:
+#  * "-", alias of "&0" or "&1" depending on MODE
+#  * "&N", reads/writes to the file descriptor numbered N
+#          based on MODE.
+#  * "+FILE" (MODE eq '>' only), open FILE in append mode
+#  * "FILE", open FILE in read or write depending on MODE.
+#            Note that this will truncate the file if MODE
+#            is ">".
+sub open_file_or_fd {
+    my ($to_open, $mode) = @_;
+
+    my $fd;
+    # autodie trips this for some reasons (possibly fixed
+    # in v2.26)
+    no autodie qw(open);
+    if ($mode eq '<') {
+        if ($to_open eq $HYPHEN || $to_open eq '&0') {
+            $fd = \*STDIN;
+        } elsif ($to_open =~ m/^\&\d+$/) {
+            open($fd, '<&=', substr($to_open, 1))
+              or die encode_utf8("fdopen $to_open for reading: $!\n");
+        } else {
+            open($fd, '<', $to_open)
+              or die encode_utf8("open $to_open for reading: $!\n");
+        }
+
+    } elsif ($mode eq '>') {
+        if ($to_open eq $HYPHEN || $to_open eq '&1') {
+            $fd = \*STDOUT;
+        } elsif ($to_open =~ m/^\&\d+$/) {
+            open($fd, '>&=', substr($to_open, 1))
+              or die encode_utf8("fdopen $to_open for writing: $!\n");
+        } else {
+            $mode = ">$mode" if $to_open =~ s/^\+//;
+            open($fd, $mode, $to_open)
+              or
+              die encode_utf8("open $to_open for write/append ($mode): $!\n");
+        }
+
+    } else {
+        croak encode_utf8("Invalid mode '$mode' for open_file_or_fd");
+    }
+
+    return $fd;
+}
+
+=item default_jobs
+
+=cut
+
+sub default_jobs {
+
+    my $cpus = decode_utf8(safe_qx('nproc'));
+
+    return 2
+      unless $cpus =~ m/^\d+$/;
+
+    # could be 2x
+    return $cpus + 1;
+}
+
+sub show_help {
+
+    say encode_utf8("Lintian v$ENV{LINTIAN_VERSION}");
+
+    my $message =<<"EOT";
+Syntax: lintian [action] [options] [--] [packages] ...
+Actions:
+    -c, --check               check packages (default action)
+    -C X, --check-part X      check only certain aspects
+    -F, --ftp-master-rejects  only check for automatic reject tags
+    -T X, --tags X            only run checks needed for requested tags
+    --tags-from-file X        like --tags, but read list from file
+    -X X, --dont-check-part X don't check certain aspects
+General options:
+    -h, --help                display this help text
+    --print-version           print unadorned version number and exit
+    -q, --quiet               suppress all informational messages
+    -v, --verbose             verbose messages
+    -V, --version             display Lintian version and exit
+Behavior options:
+    --color never/always/auto disable, enable, or enable color for TTY
+    --hyperlinks on/off       hyperlinks for TTY (when supported)
+    --default-display-level   reset the display level to the default
+    --display-source X        restrict displayed tags by source
+    -E, --display-experimental display "X:" tags (normally suppressed)
+    --no-display-experimental suppress "X:" tags
+    --fail-on error,warning,info,pedantic,experimental,override
+                              define condition for exit status 2 (default: error)
+    -i, --info                give detailed info about tags
+    -I, --display-info        display "I:" tags (normally suppressed)
+    -L, --display-level       display tags with the specified level
+    -o, --no-override         ignore overrides
+    --output-width NUM        set output width instead of probing terminal
+    --pedantic                display "P:" tags (normally suppressed)
+    --profile X               Use the profile X or use vendor X checks
+    --show-overrides          output tags that have been overridden
+    --hide-overrides          do not output tags that have been overridden (default)
+    --suppress-tags T,...     don't show the specified tags
+    --suppress-tags-from-file X don't show the tags listed in file X
+    --tag-display-limit X     Specify "tag per package" display limit
+    --no-tag-display-limit    Disable "tag per package" display limit
+                              (equivalent to --tag-display-limit=0)
+Configuration options:
+    --cfg CONFIGFILE          read CONFIGFILE for configuration
+    --no-cfg                  do not read any config files
+    --ignore-lintian-env      ignore LINTIAN_* env variables
+    --include-dir DIR         include checks, libraries (etc.) from DIR
+    -j X, --jobs X            limit the number of parallel unpacking jobs to X
+    --[no-]user-dirs          whether to use files from user directories
+
+Some options were omitted. Please check the manual page for the complete list.
+EOT
+
+    print encode_utf8($message);
+
+    exit;
+}
+
+# Local Variables:
+# indent-tabs-mode: nil
+# cperl-indent-level: 4
+# End:
+# vim: syntax=perl sw=4 sts=4 sr et
