@@ -1027,7 +1027,8 @@ const char* ClassLoader::file_name_for_class_name(const char* class_name,
 }
 
 // XML class file variant — returns "ClassName.xclass"
-// Used as a fallback when .class is not found on the classpath.
+// Primary class file format for SecureJVM (Galactic Cherry Marvell Edition 98).
+// .xclass is searched FIRST; .class is the fallback for legacy compatibility.
 // caller needs ResourceMark
 const char* ClassLoader::file_name_for_xml_class(const char* class_name,
                                                  int class_name_len) {
@@ -1132,11 +1133,49 @@ InstanceKlass* ClassLoader::load_class(Symbol* name, PackageEntry* pkg_entry, bo
                                                          name->utf8_length());
   assert(file_name != nullptr, "invariant");
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SecureJVM PRIMARY: Try .xclass (XML class file) FIRST
+  // Galactic Cherry Marvell Edition 98 — .xclass is the native format.
+  // Falls through to legacy .class if no .xclass is found.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const char* const xclass_primary_name = file_name_for_xml_class(class_name,
+                                                                    name->utf8_length());
+
   // Lookup stream for parsing .class file
   ClassFileStream* stream = nullptr;
   s2 classpath_index = 0;
   ClassPathEntry* e = nullptr;
   bool is_patched = false;
+
+  // .xclass primary search on append path (application classpath)
+  if (!search_append_only) {
+    // Try jrt/exploded for .xclass first
+    if (has_jrt_entry()) {
+      stream = _jrt_entry->open_stream(THREAD, xclass_primary_name);
+    }
+  }
+  if (nullptr == stream) {
+    classpath_index = 1;
+    e = first_append_entry();
+    while (e != nullptr) {
+      stream = e->open_stream(THREAD, xclass_primary_name);
+      if (nullptr != stream) {
+        break;
+      }
+      e = e->next();
+      ++classpath_index;
+    }
+  }
+
+  // Reset for .class fallback search if .xclass not found
+  if (nullptr == stream) {
+    classpath_index = 0;
+    e = nullptr;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LEGACY FALLBACK: .class file search (only if .xclass was not found)
+  // ═══════════════════════════════════════════════════════════════════════════
 
   // If search_append_only is true, boot loader visibility boundaries are
   // set to be _first_append_entry to the end. This includes:
@@ -1206,13 +1245,12 @@ InstanceKlass* ClassLoader::load_class(Symbol* name, PackageEntry* pkg_entry, bo
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SecureJVM: .xclass is searched as FALLBACK when .class not found.
+  // For application classpath, .xclass takes priority (see primary search above).
+  // This fallback covers boot classpath and append entries.
+  // ═══════════════════════════════════════════════════════════════════════════
   if (nullptr == stream) {
-    // ═══════════════════════════════════════════════════════════════════════
-    // XML Class File Fallback — Galactic Cherry Marvell Edition 98
-    //
-    // If no .class file was found, try .xclass (XML class file format).
-    // The XMLClassReader in klassFactory will detect and convert it.
-    // ═══════════════════════════════════════════════════════════════════════
     const char* const xclass_file_name = file_name_for_xml_class(class_name,
                                                                   name->utf8_length());
     // Search append path for .xclass
