@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+
+DEB_INSTALL_CHANGELOGS_ALL := doc/ChangeLog
+DEB_INSTALL_DOCS_ALL := doc/SCOWL-README
+
+DICT_LANG := en
+
+DEB_DH_MD5SUMS_ARGS += -Xvar/lib/aspell
+
+makebuilddir/aspell-en:: extrawords-stamp
+
+extrawords-stamp:
+	mv en-common.cwl en-common.cwl.orig && (prezip-bin -d < en-common.cwl.orig ; cat debian/extrawords.txt) | LC_ALL=C sort -u | prezip-bin -z > en-common.cwl
+	touch extrawords-stamp
+
+cleanbuilddir/aspell-en::
+	test -f extrawords-stamp && mv en-common.cwl.orig en-common.cwl || true
+	rm -f extrawords-stamp
+
+install/aspell-$(DICT_LANG)::
+	for f in `LC_ALL=C ls *.cwl`; do \
+	    gzip -9 -n -c "$$f" > "$(DEB_DESTDIR)/usr/share/aspell/"$$f".gz"; \
+	    WL=`echo $$f | sed 's/\.cwl$$//'`; \
+	    touch "$(DEB_DESTDIR)/var/lib/aspell/$$WL.rws"; \
+	    dh_link "var/lib/aspell/$$WL.rws" "usr/lib/aspell/$$WL.rws"; \
+	    echo "$$WL" >> "$(DEB_DESTDIR)/usr/share/aspell/$(DICT_LANG).contents"; \
+	done
+
+	touch $(DEB_DESTDIR)/var/lib/aspell/$(DICT_LANG).compat
+
+	installdeb-aspell

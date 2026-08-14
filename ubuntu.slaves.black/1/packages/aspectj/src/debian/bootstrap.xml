@@ -1,0 +1,62 @@
+<!-- Bootstraps AspectJ build parts                                -->
+<!-- Written by Thomas Girard <thomas.g.girard@free.fr>            -->
+<!-- and Damien Raude-Morvan <drazzib@drazzib.com> for Debian      -->
+<project name="bootstrap" default="all" basedir="..">
+
+  <taskdef resource="org/aspectj/tools/ant/taskdefs/aspectjTaskdefs.properties" classpath="/usr/share/java/aspectjtools.jar"/>
+
+  <target name="clean">
+    <delete dir="bcel-builder/bin"/>
+    <delete file="lib/bcel/*.jar"/>
+    <delete dir="org.eclipse.jdt.core/classes"/>
+    <delete file="org.eclipse.jdt.core/*.jar"/>
+  </target>
+
+  <target name="all">
+    <!-- Build lib/bcel/bcel.jar and lib/bcel/bcel-verifier.jar -->
+    <ant antfile="build.xml" dir="bcel-builder"/>
+
+    <!-- Build org.eclipse.jdt.core/jdtcore-for-aspectj.jar -->
+    <property name="module.dir" value="org.eclipse.jdt.core"/>
+    <mkdir dir="${module.dir}/classes"/>
+    <iajc sourceroots="${module.dir}/src"
+          source="1.8"
+          target="1.8"
+          destDir="${module.dir}/classes">
+      <classpath>
+        <path id="classpath.jdtcore">
+          <fileset dir="/usr/share/java/">
+            <include name="aspectjrt.jar"/>
+            <include name="ant.jar"/>
+            <include name="eclipse-osgi.jar"/>
+            <include name="eclipse-core-filesystem.jar"/>
+            <include name="eclipse-core-jobs.jar"/>
+            <include name="eclipse-core-contenttype.jar"/>
+            <include name="eclipse-core-resources.jar"/>
+            <include name="eclipse-core-runtime.jar"/>
+            <include name="eclipse-text.jar"/>
+            <include name="equinox-app.jar"/>
+            <include name="equinox-common.jar"/>
+            <include name="equinox-preferences.jar"/>
+            <include name="equinox-registry.jar"/>
+          </fileset>
+        </path>
+      </classpath>
+    </iajc>
+
+    <jar jarfile="${module.dir}/jdtcore-for-aspectj.jar">
+    <fileset dir="${module.dir}/classes"/>
+    <fileset dir="${module.dir}/src">
+      <include name="**/*.properties"/>
+      <include name="**/*.rsc"/>
+      <include name="**/*.props"/>
+    </fileset>
+    </jar>
+
+    <!-- Rebuild and overwrite lib/build/build.jar from build/**/*.java -->
+    <ant antfile="build.xml" dir="build" target="build"/>
+    <copy file="aj-build/jars/build.jar" tofile="lib/build/build.jar"/>
+
+  </target>
+
+</project>

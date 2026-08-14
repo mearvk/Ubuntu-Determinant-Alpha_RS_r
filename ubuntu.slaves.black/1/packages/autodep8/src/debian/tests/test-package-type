@@ -1,0 +1,75 @@
+#!/bin/sh
+
+set -eu
+
+pkgtype="${1}"
+pkg="${2}"
+
+autopkgtest=autopkgtest
+if ! autopkgtest --help | grep -q '[-][-]validate'; then
+  echo "W: skipping autopkgtest validation as autopkgtest does not support --validate" >&2
+  autopkgtest=:
+fi
+
+if [ -z "${AUTOPKGTEST_TMP:-}" ]; then
+  AUTOPKGTEST_TMP=$(mktemp --directory)
+  trap "rm -rf ${AUTOPKGTEST_TMP}" INT TERM EXIT
+fi
+
+run() {
+  echo '$' "$@"
+  "$@"
+}
+
+DOWNLOAD_ATTEMPTS=3
+get_source() {
+  local pkg i
+  pkg="${1}"
+  i=0
+  while [ "$i" -lt "${DOWNLOAD_ATTEMPTS}" ]; do
+    if run chronic apt-get source "${pkg}"; then
+      break
+    else
+      sleep 10
+    fi
+    i=$((i+1))
+  done
+}
+
+banner() {
+  char="${1}"
+  shift
+  echo
+  echo
+  echo "========================================================================" | tr = "${char}"
+  echo "$@"
+  echo "========================================================================" | tr = "${char}"
+}
+
+banner = "${pkgtype}"
+
+tmpdir="$(mktemp --directory --tmpdir="${AUTOPKGTEST_TMP}" "${pkg}.XXXXXXXXX")"
+cd "${tmpdir}"
+get_source "${pkg}"
+cd "${pkg}"-*
+
+# basic
+banner - "${pkgtype} plain test"
+run autodep8
+run $autopkgtest --quiet --no-built-binaries --validate . -- null
+
+# with conf
+mkdir -p "debian/tests"
+printf "extra_depends=foo\n" > "debian/tests/autopkgtest-pkg-${pkgtype}.conf"
+banner - "${pkgtype} test with extra_depends=foo"
+run cat debian/tests/autopkgtest-pkg-${pkgtype}.conf
+run autodep8
+run $autopkgtest --quiet --no-built-binaries --validate . -- null
+run sh -ec 'autodep8 | grep "^Depends:.*, foo\$"'
+
+printf "extra_restrictions=foo\n" > "debian/tests/autopkgtest-pkg-${pkgtype}.conf"
+banner - "${pkgtype} test with extra_restrictions=foo"
+run cat debian/tests/autopkgtest-pkg-${pkgtype}.conf
+run autodep8
+run $autopkgtest --quiet --no-built-binaries --validate . -- null
+run sh -ec 'autodep8 | grep "^Restrictions:.*, foo\$"'

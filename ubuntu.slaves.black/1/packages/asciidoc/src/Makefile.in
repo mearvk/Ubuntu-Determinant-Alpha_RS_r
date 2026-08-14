@@ -1,0 +1,145 @@
+#
+# Make file to install/uninstall AsciiDoc
+#
+# Run `make help` to print out directions on running
+# this file. To add new messages to help, prepend
+# the line with ## and then one additional character,
+# e.g. `## help` to show "help" or `##   help` will show
+# "  help" or `##.` will show a blank line.
+
+.NOTPARALLEL:
+
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+
+docdir = @docdir@
+mandir = @mandir@
+srcdir = @srcdir@
+
+# unused setting, but keeping it to avoid warning when running ./configure
+datarootdir = @datarootdir@
+
+ASCIIDOCVERSION = @PACKAGE_VERSION@
+ASCIIDOCDATE = @PACKAGE_DATE@
+
+manp = $(patsubst %1.txt,%1,$(wildcard doc/*.1.txt))
+manpdir = $(mandir)/man1
+
+doc = $(wildcard README*) $(wildcard BUGS*) $(wildcard INSTALL*) $(wildcard CHANGELOG*)
+
+TARGETS = doc
+
+DESTDIR ?= /
+
+INSTDIRS = $(TARGETS:%=%dir)
+
+.PHONY: $(TARGETS)
+
+# this needs to be above help so that it runs
+# by default
+all: build
+
+.PHONY : help
+help : Makefile
+	@sed -n 's/^##.//p' $<
+
+## Makefile for AsciiDoc @PACKAGE_VERSION@ (@PACKAGE_DATE@)
+## Usage: make [VARIABLE=value] ... [TARGET]
+##.
+##   all: runs the build target
+
+# create directories used during the install
+$(INSTDIRS):
+	$(INSTALL) -d $(DESTDIR)$($@)
+
+$(manp): %.1 : %.1.txt
+	python3 -m asciidoc.a2x -f manpage $<
+
+##.
+
+DOC_FILES = CHANGELOG.adoc README.asciidoc BUGS.adoc INSTALL.adoc doc/a2x.1.txt \
+	 		doc/faq.txt doc/asciidocapi.txt doc/testasciidoc.txt \
+			doc/epub-notes.txt doc/publishing-ebooks-with-asciidoc.txt \
+			doc/source-highlight-filter.txt doc/slidy.txt doc/slidy-example.txt
+
+##   spell: run aspell over all files under doc/
+.PHONY: spell
+spell:
+	@for f in $(DOC_FILES); do \
+		echo "aspell check -p ./doc/asciidoc.dict $$f"; \
+		aspell check -p ./doc/asciidoc.dict $$f; \
+	done
+
+##   doc_spell: (deprecated) runs spell target
+.PHONY: doc_spell
+doc_spell: spell
+
+##.
+
+.PHONY: pip
+pip:
+	python3 -m pip install --root $(DESTDIR) .
+
+##   install: install asciidoc to target directory
+.PHONY: install
+install: all pip $(DATATARGETS)
+
+##   build: runs manpages
+.PHONY: build
+build: manpages
+
+##   manpages: generate manpages for asciidoc, a2x, and testasciidoc
+manpages: doc/asciidoc.1 doc/a2x.1 doc/testasciidoc.1
+
+##   docs: install documentation files to filesystem (e.g. /usr/local/share/doc/asciidoc)
+docs:
+	$(INSTALL) -d $(DESTDIR)$(docdir)
+	$(INSTALL_DATA) $(doc) $(DESTDIR)$(docdir)
+	$(INSTALL) -d $(DESTDIR)$(docdir)/docbook-xsl
+	$(INSTALL_DATA) asciidoc/resources/docbook-xsl/asciidoc-docbook-xsl.txt $(DESTDIR)$(docdir)/docbook-xsl
+	$(INSTALL) -d $(DESTDIR)$(docdir)/dblatex
+	$(INSTALL_DATA) asciidoc/resources/dblatex/dblatex-readme.txt $(DESTDIR)$(docdir)/dblatex
+	$(INSTALL) -d $(DESTDIR)$(docdir)/images
+	( cd images && \
+		cp -R * $(DESTDIR)$(docdir)/images )
+	$(INSTALL) -d $(DESTDIR)$(docdir)/doc
+	( cd doc && \
+		cp -R * $(DESTDIR)$(docdir)/doc )
+
+##   uninstall: uninstall asciidoc
+.PHONY: uninstall
+uninstall:
+	python3 -m pip uninstall asciidoc
+	rm -f $(DESTDIR)$(manpdir)/asciidoc.1
+	rm -f $(DESTDIR)$(manpdir)/testasciidoc.1
+	rm -f $(DESTDIR)$(manpdir)/a2x.1
+	rm -rf $(DESTDIR)$(docdir)
+
+##   clean: delete built asciidoc doc files
+.PHONY: clean
+clean:
+	rm -f $(manp)
+
+MANIFEST: MANIFEST.in build_manifest.sh
+	bash build_manifest.sh
+
+##.
+##   dist: creates the zip and tarball for release
+.PHONY: dist
+dist: manpages MANIFEST
+	mkdir -p build
+	rm -rf build/*
+	tar -czf build/asciidoc-tmp.tar.gz -T MANIFEST
+	mkdir -p build/asciidoc-$(ASCIIDOCVERSION)
+	tar -xf build/asciidoc-tmp.tar.gz -C build/asciidoc-$(ASCIIDOCVERSION)
+	cd build && tar -czf asciidoc-$(ASCIIDOCVERSION).tar.gz asciidoc-$(ASCIIDOCVERSION) && zip -r asciidoc-$(ASCIIDOCVERSION).zip asciidoc-$(ASCIIDOCVERSION)
+	rm -rf build/asciidoc-tmp.tar.gz
+	rm -rf build/asciidoc-$(ASCIIDOCVERSION)
+
+##.
+##   test: run the asciidoc test suite
+.PHONY: test
+test:
+	python3 -m asciidoc.asciidoc --doctest
+	python3 -m pytest
+	python3 tests/testasciidoc.py run

@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+# export DH_OPTIONS=-v
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_install:
+	dh_install
+	mv debian/asciidoc-base/usr/bin/asciidoc.sh debian/asciidoc-base/usr/bin/asciidoc
+	mv debian/asciidoc-base/usr/bin/a2x.sh debian/asciidoc-base/usr/bin/a2x
+	mv debian/asciidoc-tests/usr/bin/testasciidoc.py debian/asciidoc-tests/usr/bin/testasciidoc
+	find debian -type d -name __pycache__ -prune -exec rm -rf {} \;
+	rm -rf debian/asciidoc-base/usr/lib/python*/dist-packages/asciidoc/resources
+	rm -rf debian/asciidoc-base/usr/lib/python*/dist-packages/asciidoc-*.egg-info
+	rm -rf debian/asciidoc-common/etc/asciidoc/dblatex
+	rm -rf debian/asciidoc-common/etc/asciidoc/icons
+	rm -rf debian/asciidoc-common/etc/asciidoc/javascripts
+	rm -rf debian/asciidoc-common/etc/asciidoc/filters
+	rm -rf debian/tmp/usr/bin/*
+
+override_dh_installman:
+	python3 -m asciidoc.a2x -f manpage doc/asciidoc.1.txt
+	python3 -m asciidoc.a2x -f manpage doc/a2x.1.txt
+	python3 -m asciidoc.a2x -f manpage doc/testasciidoc.1.txt
+	mkdir -p debian/tmp/usr/share/man/man1
+	mv doc/*.1 debian/tmp/usr/share/man/man1
+	dh_installman
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	python3 tests/testasciidoc.py run
+endif

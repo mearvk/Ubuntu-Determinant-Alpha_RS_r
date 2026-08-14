@@ -1,0 +1,67 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export JAVA_HOME=/usr/lib/jvm/default-java/
+
+VERSION := $(shell echo $(DEB_VERSION_UPSTREAM) | sed 's/+dfsg//')
+
+%:
+	dh $@ --buildsystem=ant --with maven-repo-helper
+
+override_dh_auto_configure:
+	# Setup symlinks: ant
+	mkdir -p lib/ant/lib
+	ln -sf /usr/share/ant/lib/ant.jar lib/ant/lib
+
+	# JUnit
+	mkdir -p lib/junit
+	ln -sf /usr/share/java/junit.jar  lib/junit
+
+	# commons-logging
+	mkdir -p lib/commons
+	ln -sf /usr/share/java/commons-logging.jar lib/commons/commons.jar
+
+	# asm5
+	mkdir -p lib/asm
+	ln -sf /usr/share/java/asm-all.jar lib/asm/asm-7.0-beta.20181001.jar
+	ln -sf /usr/share/java/asm-all.jar lib/asm/asm-7.0-beta.renamed.jar
+
+	# regexp
+	mkdir -p lib/regexp
+	ln -sf /usr/share/java/regexp.jar lib/regexp/regexp.jar
+
+	# eclipse (JDT)
+	mkdir -p lib/eclipse
+	ln -sf /usr/share/java/equinox-common.jar         lib/eclipse/org.eclipse.equinox.common.jar
+	ln -sf /usr/share/java/equinox-registry.jar       lib/eclipse/org.eclipse.equinox.registry.jar
+	ln -sf /usr/share/java/eclipse-core-resources.jar lib/eclipse/org.eclipse.core.resources.jar
+	ln -sf /usr/share/java/eclipse-core-runtime.jar   lib/eclipse/org.eclipse.core.runtime.jar
+	ln -sf /usr/share/java/eclipse-core-jobs.jar      lib/eclipse/org.eclipse.core.jobs.jar
+	ln -sf /usr/share/java/eclipse-osgi.jar           lib/eclipse/org.eclipse.osgi.jar
+
+override_dh_auto_build:
+	# Build the manpages
+	docbook-to-man debian/aj.sgml        > debian/aj.1
+	docbook-to-man debian/ajbrowser.sgml > debian/ajbrowser.1
+	sh debian/manpage_from.sh docs/devGuideDB/ajc.xml   > debian/ajc.1
+	sh debian/manpage_from.sh docs/devGuideDB/ajdoc.xml > debian/ajdoc.1
+
+	# Build AspectJ
+	dh_auto_build -- -f debian/bootstrap.xml
+	dh_auto_build -- -f build/build.xml aspectj '-Dbuild.time=$(shell date '--date=@$(SOURCE_DATE_EPOCH)' --utc +'%A %b %d, %Y at %H:%M:%S %Z')'
+
+override_dh_auto_install:
+	mh_installpom -plibaspectj-java -e$(VERSION) build/aspectjrt.pom
+	mh_installjar -plibaspectj-java -e$(VERSION) -l build/aspectjrt.pom aj-build/dist/tools/lib/aspectjrt.jar
+	mh_installpom -plibaspectj-java -e$(VERSION) build/aspectjtools.pom
+	mh_installjar -plibaspectj-java -e$(VERSION) -l build/aspectjtools.pom aj-build/dist/tools/lib/aspectjtools.jar
+	mh_installpom -plibaspectj-java -e$(VERSION) build/aspectjweaver.pom
+	mh_installjar -plibaspectj-java -e$(VERSION) -l build/aspectjweaver.pom aj-build/dist/tools/lib/aspectjweaver.jar
+
+	mv docs/dist/doc/changes.html docs/dist/doc/changelog.html
+	html2text -o docs/dist/doc/changelog.txt docs/dist/doc/changelog.html
+	dh_installchangelogs docs/dist/doc/changelog.html
+	dh_installchangelogs docs/dist/doc/changelog.txt
+
+override_dh_auto_clean:

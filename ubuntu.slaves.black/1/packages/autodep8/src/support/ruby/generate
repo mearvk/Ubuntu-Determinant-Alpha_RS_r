@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -e
+
+# remove debhelper and gem2deb
+if [ -f debian/control ]; then
+  builddeps=$(
+    grep-dctrl -n -s Build-Depends -F Build-Depends -r . debian/control \
+    | grep -v '^\s*#' \
+    | sed -e 's/,\s*/\n/g; s/^\s*//' \
+    | sed -e 's/\s*<[^)]*>\s*$//' \
+    | sed '/^\s*$/ d; /debhelper/ d; /gem2deb/ d; s/\n/, /' \
+    | tr '\n' ',' \
+    | sed -e 's/,/, /g'
+  )
+else
+  builddeps=''
+fi
+
+cat <<EOF
+Test-Command: gem2deb-test-runner --autopkgtest --check-dependencies 2>&1
+Depends: @, $builddeps gem2deb-test-runner, ${pkg_ruby_extra_depends:-}
+Features: test-name=gem2deb-test-runner
+Restrictions: skippable, ${pkg_ruby_extra_restrictions:-}
+EOF

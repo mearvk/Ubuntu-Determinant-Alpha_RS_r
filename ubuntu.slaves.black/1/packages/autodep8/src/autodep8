@@ -1,0 +1,79 @@
+#!/bin/sh
+
+set -eu
+
+if [ $# -gt 1 ]; then
+  echo "usage: $(basename $0) [SOURCEDIR]"
+  exit 128
+fi
+
+if [ -n "${1:-}" ]; then
+  cd "${1}"
+fi
+
+detect_by_control_field() {
+  local pkgtype="$1"
+  [ -f debian/control ] &&
+    grep-dctrl --quiet \
+    -F XS-Testsuite,Testsuite \
+    -r "^autopkgtest-pkg-$packagetype\$" debian/control
+}
+
+detect_by_source_contents() {
+  local pkgdir="$1"
+  $pkgdir/detect
+}
+
+if [ ! -f debian/control ]; then
+  echo "E: not inside a Debian source package" >&2
+  exit 1
+fi
+
+rc=1
+
+if [ -f debian/tests/control.autodep8 ]; then
+  cat debian/tests/control.autodep8
+
+  # 2 newlines to cope with control.autodep8 having no trailing newline
+  echo
+  echo
+
+  rc=0 # will now exit successfully even if we can't detect a package type.
+fi
+if [ -f debian/tests/control ]; then
+  cat debian/tests/control
+
+  # 2 newlines to cope with control having no trailing newline
+  echo
+  echo
+
+  rc=0 # will now exit successfully even if we can't detect a package type.
+fi
+
+program_path="$(dirname $(readlink -f $0))"
+case "${program_path}" in
+  */bin):
+    # installed
+    prefix="$(dirname $program_path)"
+    support_dir="${prefix}/share/autodep8/support"
+    ;;
+  *)
+    # development
+    support_dir="${program_path}/support"
+    ;;
+esac
+
+. "${support_dir}"/autodep8lib.sh
+
+for packagedir in $(find $support_dir -mindepth 1 -type d | LC_ALL=C.UTF-8 sort); do
+  packagetype=$(basename $packagedir)
+  if detect_by_control_field $packagetype ||
+    detect_by_source_contents "$packagedir"
+  then
+    read_config $packagetype
+    $support_dir/$packagetype/generate
+    exit 0
+  fi
+done
+
+exit $rc

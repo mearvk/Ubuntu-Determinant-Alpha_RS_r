@@ -1,0 +1,78 @@
+# -*- mode: sh -*-
+# Common functions for autodep8
+# 
+
+parse_control(){
+    # Function to extract items in a field of debian/control return comma
+    # separated
+    # tested with Build-Depends
+    # Don't use with Recommends as some packages add substvars (like cdbs)
+    #
+    # input1: control field
+    # input2: items to filter out (optional)
+    
+    control_field=$1
+    filter="$2"
+    if [ -f debian/control ]; then
+        out=$(
+            grep-dctrl -n -s $control_field -F $control_field -r . debian/control \
+                | grep -v '^\s*#' \
+                | sed -e 's/,\s*/\n/g; s/^\s*//' \
+                | sed -e 's/\s*<[^)]*>\s*$//' \
+                | tr '\n' ', ' \
+                | sed 's/,,/,/g')
+    else
+        out=''
+    fi
+    for pkg in $filter ; do
+        out=$(echo ,$out | sed -e "s/,$pkg,/,/" -e "s/,$pkg ([^,]*),/,/" -e 's/,,/,/')
+        out=${out#,}
+    done
+
+    echo $out
+}
+
+parse_descr_r(){
+    # Function to extract items from the Suggests field of DESCRIPTION (R packages) return comma
+    # separated
+    #
+    # input1: items to filter out (optional)
+    #
+    # Although R DESCRIPTION files use the debian control file format
+    # https://cran.r-project.org/doc/manuals/r-devel/R-exts.html#The-DESCRIPTION-file
+    # The R policy differs from the Debian policy in the sense that the packages required
+    # for testing R packages are in the Suggests fields.
+
+    filter="$1"
+    if [ -f DESCRIPTION ]; then
+        out=$(
+            # Catch available Debian R packages
+            deb_pkgs=$(grep-aptavail -P -s Package -n -e ^r- | sort -u)
+            # List R packages required
+            r_pkgs=$(grep-dctrl -n -s "Suggests" -F "Suggests" -r . DESCRIPTION \
+                | grep -v '^\s*#' \
+                | sed -e 's/,\s*/\n/g; s/^\s*//' \
+                | sed -e 's/\s*<[^)]*>\s*$//' \
+                | sed -e 's/([^"]*)//' \
+                | tr '[:upper:]' '[:lower:]')
+            # Check if package is available in Debian
+            deb_r_pkgs=""
+            for pkg in $r_pkgs
+            do
+              r_pkg_debconverted=$(echo "$deb_pkgs" | grep -w "r-cran-$pkg\|r-bioc-$pkg")
+              deb_r_pkgs="${deb_r_pkgs} ${r_pkg_debconverted}"
+            done
+            echo $deb_r_pkgs \
+                | tr ' ' ',' \
+                | tr '\n' ', ' \
+                | sed 's/,,/,/g')
+    else
+        out=''
+    fi
+    for pkg in $filter ; do
+        out=$(echo ,$out | sed -e "s/,$pkg,/,/" -e 's/,,/,/')
+        out=${out#,}
+    done
+
+    echo $out
+}

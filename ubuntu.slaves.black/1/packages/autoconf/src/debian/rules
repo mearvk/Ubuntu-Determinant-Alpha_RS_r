@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+%:
+ifeq ($(DEB_BUILD_PROFILE),stage1)
+	dh $@ -Nautoconf-doc
+else
+	dh $@
+endif
+
+# Ensure texlive respects SOURCE_DATE_EPOCH
+export FORCE_SOURCE_DATE=1
+
+override_dh_auto_clean:
+	[ ! -f Makefile ] || $(MAKE) distclean
+
+override_dh_auto_configure:
+	# Ensure nothing tries to re-bootstrap Autoconf with itself.
+	touch configure `find . -name Makefile.in`
+	dh_auto_configure -- EMACS=no --with-lispdir= SHELL=/bin/sh
+	# Force manpages to get rebuilt with correct version number.
+	touch man/*.x
+
+override_dh_auto_build:
+	dh_auto_build
+ifneq ($(DEB_BUILD_PROFILE),stage1)
+	$(MAKE) html info pdf ps
+endif
+
+override_dh_auto_test:
+
+override_dh_auto_install:
+	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install
+ifneq ($(DEB_BUILD_PROFILE),stage1)
+	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp \
+	    install-html install-info install-pdf install-ps install-man
+endif
+	perl -pi -e 's/^my \$$VERSION.*/my \$$VERSION = "'"`dpkg-parsechangelog -SDate`"'";/;' \
+	    debian/tmp/usr/share/autoconf/Autom4te/C4che.pm
+
+override_dh_missing:
+	dh_missing --list-missing

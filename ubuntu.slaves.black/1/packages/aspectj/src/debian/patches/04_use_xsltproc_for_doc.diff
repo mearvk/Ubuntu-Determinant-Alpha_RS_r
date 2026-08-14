@@ -1,0 +1,92 @@
+Description: Use "xsltproc" to process Docbook transformation
+Author: Thomas Girard <thomas.g.girard@free.fr>
+Forwarded: not-needed
+Last-Update: 2009-08-18
+--- a/docs/build.xml
++++ b/docs/build.xml
+@@ -69,10 +69,6 @@
+         <property name="nochunk.xsl.source"
+                   location="/usr/share/xml/docbook/stylesheet/nwalsh/html/docbook.xsl"
+         />
+-        <!-- default xml-html nochunking file (0-length dummy created when chunking) -->
+-        <property name="xml-target-file"
+-                  location="${docs.temp.dir}/xml-target-file.dummy"
+-        />
+         <!-- default value for xml-html copying (copy all graphics) -->
+         <property name="xml-html-copy" value="*.gif,*.png" />
+         <property name="xml-html-stylesheet" value="aspectj-docs.css" />
+@@ -274,7 +270,7 @@
+                    value="${nochunk.xsl.source}"
+             />
+             <param name="xml-target-dir" value="${docs.dist.dir}" />
+-            <param name="xml-target-file"
++            <param name="xml-target"
+                    value="${docs.dist.dir}/doc/faq.html"
+             />
+             <param name="xml-html-stylesheet" value="aspectj-faq.css" />
+@@ -360,6 +356,9 @@
+             <param name="xml-target-dir"
+                    value="${docs.dist.dir}/doc/${guide.name}"
+             />
++            <param name="xml-target"
++                   value="${docs.dist.dir}/doc/${guide.name}/"
++            />
+         </antcall>
+         <!-- single -->
+         <antcall target="xml-html">
+@@ -373,7 +372,7 @@
+             <param name="xml-target-dir"
+                    value="${docs.dist.dir}/doc/${guide.name}"
+             />
+-            <param name="xml-target-file"
++            <param name="xml-target"
+                    value="${docs.dist.dir}/doc/${guide.name}/printable.html"
+             />
+         </antcall>
+@@ -484,13 +483,13 @@
+     </target>
+ 
+     <target name="xml-html"
+-            description="antcall(xml-source-dir, xml-source-root, xml-target-dir, xml-target-file)
++            description="antcall(xml-source-dir, xml-source-root, xml-target-dir, xml-target)
+      convert xml to html using docbook. parameters: 
+      xml-source-dir  # base directory of source 
+      xml-source-root # base file of source (relative to xml-source-dir)
+      xsl-source-file # xsl transform to apply (use chunk.xsl.source by default) 
+      xml-target-dir  # target directory for output (used as xsl param base.dir)
+-     xml-target-file # full path to output file in xml-source-dir, ignored when chunking
++     xml-target      # full path to output file or dir in xml-source-dir
+      xml-html-copy   # copy files to target (defaults to *.gif,*.png)
+      xml-html-stylesheet   # style sheet to use (defaults to ${xml-html-stylesheet})"
+     >
+@@ -501,20 +500,21 @@
+                      includes="${xml-html-copy}"
+             />
+         </copy>
+-        <java classname="com.icl.saxon.StyleSheet"
+-              classpath="${aspectj.modules.lib.dir}/saxon/saxon.jar"
+-              fork="yes"
++        <exec executable="xsltproc"
+               failonerror="yes"
+         >
+             <!-- todo: establish failure policy -->
+             <arg value="-o" />
+-            <arg value="${xml-target-file}" />
+-            <arg value="${xml-source-dir}/${xml-source-root}" />
++            <arg value="${xml-target}" />
++            <arg value="--stringparam" />
++            <arg value="use.id.as.filename" />
++            <arg value="1" />
++            <arg value="--stringparam" />
++            <arg value="html.stylesheet" />
++            <arg value="${xml-html-stylesheet}" />
+             <arg value="${xsl-source-file}" />
+-            <arg value="base.dir=${xml-target-dir}/" />
+-            <arg value="use.id.as.filename=1" />
+-            <arg value="html.stylesheet=${xml-html-stylesheet}" />
+-        </java>
++            <arg value="${xml-source-dir}/${xml-source-root}" />
++        </exec>
+     </target>
+ 
+ </project>

@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+package=automake1.11
+version=1.11
+infodir=doc
+
+%:
+	dh $@ --without autoreconf
+
+# Explicitly call configure since old configure doesn't understand
+# --runstatedir.
+override_dh_auto_configure:
+	./configure --build=$(DEB_BUILD_GNU_TYPE) \
+		--prefix=/usr --includedir=\$${prefix}/include \
+		--mandir=\$${prefix}/share/man \
+		--infodir=\$${prefix}/share/info \
+		--sysconfdir=/etc --localstatedir=/var --disable-silent-rules \
+		--disable-maintainer-mode --disable-dependency-tracking
+
+override_dh_auto_test:
+# Don't run the test suite, it's old and fails.
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp
+#  remove automake's versions
+	rm -f $(CURDIR)/debian/tmp/usr/share/automake-$(version)/config.sub
+	rm -f \
+		$(CURDIR)/debian/tmp/usr/share/automake-$(version)/config.guess
+# Rebuild the info files
+	cd $(infodir) && makeinfo automake.texi
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f $(infodir)/automake-$(version).info*

@@ -1,0 +1,62 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Allow setting of dictionary path independently from libdir and datadir.
+
+This is needed for multiarch, see http://bugs.debian.org/667592
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -51,6 +51,15 @@ fi
+ 
+ AC_SUBST(pkglibdir)
+ 
++dnl Explicit dict dir selection for Debian
++
++AC_ARG_ENABLE(debian-dict-dir,
++  AS_HELP_STRING([--enable-debian-dict-dir=DIR],[dictionaries dir PKGLIBDIR]),
++  debdictdir=$enable_debian_dict_dir,
++  debdictdir=$pkglibdir)
++
++AC_SUBST(debdictdir)
++
+ dnl optional features
+ 
+ AC_ARG_ENABLE(win32-relocatable,
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -299,7 +299,7 @@ CLEANFILES = gen/static_filters.src.cpp
+ ${srcdir}/common/config.cpp: gen/dirs.h
+ 
+ gen/dirs.h: gen/mk-dirs_h.pl
+-	perl ${srcdir}/gen/mk-dirs_h.pl ${prefix} ${pkgdatadir} ${pkglibdir}  ${sysconfdir} >  gen/dirs.h
++	perl ${srcdir}/gen/mk-dirs_h.pl ${prefix} ${pkgdatadir} ${pkglibdir}  ${sysconfdir} ${debdictdir} >  gen/dirs.h
+ 
+ EXTRA_DIST += gen/mk-dirs_h.pl
+ CLEANFILES += gen/dirs.h
+--- a/common/config.cpp
++++ b/common/config.cpp
+@@ -1385,7 +1385,7 @@ namespace acommon {
+        N_("location of language data files")}
+     , {"dict-alias", KeyInfoList, "",
+        N_("create dictionary aliases")}
+-    , {"dict-dir", KeyInfoString, DICT_DIR,
++    , {"dict-dir", KeyInfoString, DEBIAN_DICT_DIR,
+        N_("location of the main word list")}
+     , {"encoding",   KeyInfoString, "!encoding",
+        N_("encoding to expect data to be in"), KEYINFO_COMMON}
+--- a/gen/mk-dirs_h.pl
++++ b/gen/mk-dirs_h.pl
+@@ -1,7 +1,7 @@
+ 
+ foreach (@ARGV) {s|/+|/|g; s|/$||;}
+ 
+-($prefix, $data, $lib, $conf) = @ARGV;
++($prefix, $data, $lib, $conf,$debdictdir) = @ARGV;
+ 
+ sub def ( $ ) {
+   return qq|"<prefix:$1>"| if $_[0] =~ m|^$prefix/?(.+)$|;
+@@ -13,4 +13,4 @@ printf qq|#define DATA_DIR %s\n|, def($d
+ print  qq|#define DICT_DIR "<data-dir>"\n| if $lib eq $data;
+ printf qq|#define DICT_DIR %s\n|, def($lib) if $lib ne $data;
+ printf qq|#define CONF_DIR %s\n|, def($conf);
+-
++printf qq|#define DEBIAN_DICT_DIR %s\n|, def($debdictdir);

@@ -1,0 +1,68 @@
+#!/usr/bin/make -f
+# Model by Ian Jackson.
+# Debhelper model by Joey Hess.
+# Autoconf details by Ben Pfaff.
+# Released under the GNU GPL.
+
+SHELL = /bin/bash
+
+# This makes sure that [a-z]*.1 does not match ChangeLog.1 (Bug #801885).
+export LC_ALL = C
+
+build-indep build: build-stamp
+build-stamp:
+	dh_testdir
+	AWK=awk ./configure --prefix=/usr --program-suffix=2.13
+	$(MAKE) CFLAGS=-O2 LDFLAGS=-s
+	makeinfo --html --no-split autoconf.texi
+	touch build-stamp
+build-arch:
+
+clean:
+	dh_testdir
+	dh_testroot
+	 [ ! -f Makefile ] || $(MAKE) distclean
+	rm -f autoconf.info
+	rm -f autoconf.html
+	rm -f *.m4f
+	dh_clean
+
+D = debian/autoconf2.13
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) CFLAGS=-O2 LDFLAGS=-s prefix=$D/usr datadir=$D/usr/share infodir=$D/usr/share/info install
+	rm -f $D/usr/{share/,}info/{standards*.info*,maintain*.info*}
+
+export DH_OPTIONS
+M = $D/usr/share/man/man1
+binary-indep: DH_OPTIONS = -pautoconf2.13
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	install -d $M
+	cp [a-z]*.1 $M
+	for d in auto{{re,}conf,scan,update,header} ifnames; do	\
+		mv $D/usr/share/man/man1/$${d}{,2.13}.1;	\
+	done
+	install -d $D/etc/autoconf2.13
+	mv $D/usr/share/autoconf2.13/acconfig.h $D/etc/autoconf2.13/acconfig.h
+	mv $D/usr/share/info/autoconf{,2.13}.info
+	dh_lintian
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary-arch: build install
+# We have nothing to do by default.
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

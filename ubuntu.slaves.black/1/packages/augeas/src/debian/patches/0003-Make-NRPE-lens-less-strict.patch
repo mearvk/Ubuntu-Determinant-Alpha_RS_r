@@ -1,0 +1,55 @@
+From: Hilko Bengen <bengen@debian.org>
+Date: Sat, 18 Mar 2017 21:06:52 +0100
+Subject: Make NRPE lens less strict
+
+---
+ lenses/nrpe.aug            |  4 +++-
+ lenses/tests/test_nrpe.aug | 13 +++++++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/lenses/nrpe.aug b/lenses/nrpe.aug
+index c8b0fb4..dedacea 100644
+--- a/lenses/nrpe.aug
++++ b/lenses/nrpe.aug
+@@ -18,6 +18,8 @@ let eq = Sep.equal
+ (* View: word *)
+ let word = /[^=\n\t ]+/
+ 
++let words = word . ( / +/ . word )*
++
+ (* View: item_re *)
+ let item_re = /[^#=\n\t\/ ]+/ - (/command\[[^]\/\n]+\]/ | "include" | "include_dir")
+ 
+@@ -41,7 +43,7 @@ let command =
+ 
+      > allow_bash_command_substitution=0
+ *)
+-let item = [ key item_re . eq . store word . eol ]
++let item = [ key item_re . eq . store words . eol ]
+ 
+ (* View: include
+     An include entry.
+diff --git a/lenses/tests/test_nrpe.aug b/lenses/tests/test_nrpe.aug
+index 8bfe475..e86a241 100644
+--- a/lenses/tests/test_nrpe.aug
++++ b/lenses/tests/test_nrpe.aug
+@@ -34,6 +34,19 @@ module Test_nrpe =
+     { }
+ 
+ 
++  (* Debian bug #749919 *)
++  let allowed_hosts_1 = "allowed_hosts=127.0.0.1\n"
++
++  test Nrpe.item get allowed_hosts_1 =
++    { "allowed_hosts" = "127.0.0.1" }
++
++
++  let allowed_hosts_2 = "allowed_hosts=127.0.0.1, 127.0.0.2\n"
++
++  test Nrpe.item get allowed_hosts_2 =
++    { "allowed_hosts" = "127.0.0.1, 127.0.0.2" }
++
++
+   let lns = "
+ #
+ # server address:

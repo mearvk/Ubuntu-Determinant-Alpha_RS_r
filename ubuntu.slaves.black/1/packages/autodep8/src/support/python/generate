@@ -1,0 +1,98 @@
+#!/bin/sh
+
+module=
+py3_package=
+pypy_package=
+
+# Try source package
+source_package=$(grep-dctrl -n -s Source -F Source -r '^python3\?-.*$' debian/control || true)
+if [ -n "$source_package" ] ; then
+    module=${source_package#python-}
+    py3_package=python3-$module
+fi
+
+if [ -z "$module" ]; then
+    source_package=$(grep-dctrl -n -s Source -F Source -r '^pypy-.*$' debian/control || true)
+    if [ -n "$source_package" ] ; then
+        module=${source_package#pypy-}
+        pypy_package=pypy-$module
+    fi
+fi
+
+# Try binary package(s)
+if [ -z "$source_package" ] ; then
+    binary_packages=$(grep-dctrl -n -s Package -F Package -r '^python3\?-.*$' debian/control || true)
+    if [ -n "$binary_packages" ] ; then
+        for binary_package in $binary_packages ; do
+            module=${binary_package#*-}
+            case $module in
+                *-doc|*-dbg|*-dbgsym|*-dev)
+                    continue
+                ;;
+            esac
+
+            py3_package=python3-$module
+            break
+        done
+    fi
+fi
+
+# Try binary package(s)
+if [ -z "$pypy_package" ]; then
+    binary_packages=$(grep-dctrl -n -s Package -F Package -r '^pypy-.*$' debian/control || true)
+    if [ -n "$binary_packages" ] ; then
+        for binary_package in $binary_packages ; do
+            module=${binary_package#*-}
+            case $module in
+                *-doc|*-dbg|*-dbgsym|*-dev)
+                    continue
+                ;;
+            esac
+
+            pypy_package=pypy-$module
+            break
+        done
+    fi
+fi
+
+module=$(echo "$module" | sed 's/-/_/g')
+
+if [ -n "${pkg_python_import_name:-}" ]; then
+    module="${pkg_python_import_name}"
+elif [ -e debian/tests/pkg-python/import-name ]; then
+    echo "W: using debian/tests/pkg-python/import-name is deprecated; please set \`import_name\` in debian/tests/autopkgtest-pkg-python.conf instead." >&2
+    module=$(perl -ne 'next if /^\s*(#|$)/; print; last;' debian/tests/pkg-python/import-name)
+fi
+
+# Python3
+if [ -n "$py3_package" ]; then
+    python3_dev=$(grep-dctrl -n -sBuild-Depends -FBuild-Depends -w python3-dev -a '!' -FBuild-Depends -w python3-all-dev debian/control || true)
+    if [ -n "$python3_dev" ]; then
+        pyvers_arg=-d
+    else
+        pyvers_arg=-r
+    fi
+
+    if [ $(grep-dctrl -n -s Package -F Package -X "$py3_package" debian/control) ] ; then
+        cat <<EOF
+Test-Command: set -e ; for py in \$(py3versions $pyvers_arg 2>/dev/null) ; do cd "\$AUTOPKGTEST_TMP" ; echo "Testing with \$py:" ; \$py -c "import $module; print($module)" ; done
+Depends: python3-all, $py3_package, ${pkg_python_extra_depends:-}
+Restrictions: allow-stderr, superficial, ${pkg_python_extra_restrictions:-}
+Features: test-name=autodep8-python3
+
+EOF
+    fi
+fi
+
+# PyPy
+if [ -n "$pypy_package" ]; then
+    if [ $(grep-dctrl -n -s Package -F Package -X "$pypy_package" debian/control) ] ; then
+        cat <<EOF
+Test-Command: cd "\$AUTOPKGTEST_TMP" ; pypy -c "import $module; print $module"
+Depends: $pypy_package, ${pkg_python_extra_depends:-}
+Restrictions: allow-stderr, superficial, ${pkg_python_extra_restrictions:-}
+Features: test-name=autodep8-pypy
+
+EOF
+    fi
+fi
