@@ -336,6 +336,24 @@ void DevToolsFileSystemIndexer::FileSystemIndexingJob::CollectFilesToIndex() {
       if (excluded)
         break;
     }
+    // GALACTIC CHERRY: Always exclude .git directories from DevTools indexing.
+    //
+    // PROBLEM: .git/objects/ directories in large repositories (e.g., Chromium
+    // source with 505K files, 40 GB .git) contain hundreds of thousands of
+    // loose objects and packfiles. Indexing these is:
+    //   1. Pointless — they're binary git internals, not source code
+    //   2. Extremely slow — triggers stat() on every object hash file
+    //   3. Causes I/O pressure that cascades into compositor stalls
+    //
+    // This also skips node_modules which has the same pathology.
+    if (!excluded) {
+      const auto basename = file_path.BaseName().value();
+      if (basename == FILE_PATH_LITERAL(".git") ||
+          basename == FILE_PATH_LITERAL("node_modules") ||
+          basename == FILE_PATH_LITERAL(".hg")) {
+        excluded = true;
+      }
+    }
     if (!excluded)
       pending_folders_.push_back(file_path);
     impl_task_runner()->PostTask(

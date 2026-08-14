@@ -902,4 +902,100 @@ The correct approach for Chromium source in this distribution:
 
 ---
 
+## Applied Fixes — Galactic Cherry Marvell Edition 98
+
+The following source modifications address the GUI threading lock and system freeze issues at the Chromium code level. These changes ensure that I/O pressure from external processes (git, file indexing, swap thrash) cannot cause unbounded blocking of the GUI thread.
+
+### Fix 1: CompletionEvent Timeout (`cc/base/completion_event.h`)
+
+**Problem:** `CompletionEvent::Wait()` blocked the main thread indefinitely. If the impl thread stalled on I/O, the entire GUI froze.
+
+**Fix:** `Wait()` now uses a timed wait with a 4-second default ceiling. When I/O pressure is detected (via PSI), the timeout shortens to 500ms. If the timeout fires, the main thread is released and a warning is logged.
+
+| Condition | Timeout |
+|-----------|---------|
+| Normal | 4000ms (more than enough for any frame commit) |
+| I/O pressure detected | 500ms (system is already saturated) |
+| Custom (per-event) | Configurable via `SetTimeout()` |
+
+**File:** `cc/base/completion_event.h`
+
+### Fix 2: I/O Pressure Monitor (`cc/base/io_pressure_monitor.{h,cc}`)
+
+**Problem:** No mechanism to detect system-wide I/O saturation before deciding to block.
+
+**Fix:** New singleton reads `/proc/pressure/io` (Linux PSI) every 500ms. Reports whether the system is under I/O pressure. Thread-safe, zero-allocation, minimal overhead (one cached file read per 500ms).
+
+| Threshold | Trigger |
+|-----------|---------|
+| `some avg10 > 25.0` | 25% of last 10s had at least one I/O-stalled task |
+| `full avg10 > 5.0` | 5% of last 10s was a complete I/O stall |
+
+**Files:** `cc/base/io_pressure_monitor.h`, `cc/base/io_pressure_monitor.cc`, `cc/base/BUILD.gn`
+
+### Fix 3: WaitForCommitCompletion Timeout (`cc/trees/layer_tree_host.cc`)
+
+**Problem:** `LayerTreeHost::WaitForCommitCompletion()` blocked forever waiting for the impl thread. If tile raster was stalled on I/O, the main thread (and all UI) froze.
+
+**Fix:** After `Wait()` returns (with or without timeout), the code checks `DidTimeOut()`. On timeout, the completion event pointer is NOT nulled — the impl thread will still signal when it finishes. The main thread continues, and the next frame will see the signal.
+
+**File:** `cc/trees/layer_tree_host.cc`
+
+### Fix 4: Inotify Lock Inversion (`base/files/file_path_watcher_inotify.cc`)
+
+**Problem:** `InotifyReader::AddWatch()` held a global `Lock` while calling `inotify_add_watch()` — a blocking syscall. Under I/O pressure, this syscall blocks for seconds. During that time, the inotify event reader thread cannot dispatch events (it also needs the lock), causing a cascade where GUI update callbacks stall.
+
+**Fix:** The blocking `inotify_add_watch()` syscall is now performed OUTSIDE the lock. The lock is held only for the brief map update. Similarly, `RemoveWatch()` removes from the map first, then calls `inotify_rm_watch()` outside the lock.
+
+**Before:**
+```
+lock → inotify_add_watch(BLOCKS) → update map → unlock
+```
+
+**After:**
+```
+inotify_add_watch(BLOCKS) → lock → update map → unlock
+```
+
+**File:** `base/files/file_path_watcher_inotify.cc`
+
+### Fix 5: Skip .git in Recursive Watchers (`base/files/file_path_watcher_inotify.cc`)
+
+**Problem:** Recursive inotify watchers would add watches to `.git/objects/` subdirectories. A large git repo can have hundreds of thousands of these. During git gc/repack, massive inotify event floods are generated, saturating the reader thread.
+
+**Fix:** `UpdateRecursiveWatchesForPath()` now skips any directory named `.git` and all paths containing `/.git/`. These are internal git structures and should never trigger application-level file notifications.
+
+**File:** `base/files/file_path_watcher_inotify.cc`
+
+### Fix 6: Skip .git in DevTools Indexer (`chrome/browser/devtools/devtools_file_system_indexer.cc`)
+
+**Problem:** DevTools file system indexing would traverse into `.git/objects/` when indexing a workspace. On large repos, this meant stat()ing and reading hundreds of thousands of binary git objects — saturating the disk and triggering memory pressure.
+
+**Fix:** `CollectFilesToIndex()` now excludes directories named `.git`, `node_modules`, and `.hg` by default, in addition to user-specified exclusions.
+
+**File:** `chrome/browser/devtools/devtools_file_system_indexer.cc`
+
+### Fix 7: DetachInputDelegate Timeout (`cc/trees/proxy_main.cc`)
+
+**Problem:** `DetachInputDelegateAndRenderFrameObserver()` used an unbounded `Wait()`. Called during navigation, if the impl thread was I/O-blocked, the browser would freeze during page transitions.
+
+**Fix:** Uses a 2-second timeout. On timeout, logs a warning and continues. The detach will still complete asynchronously.
+
+**File:** `cc/trees/proxy_main.cc`
+
+### Summary of Changed Files
+
+| File | Change |
+|------|--------|
+| `cc/base/completion_event.h` | Timed wait + I/O pressure awareness |
+| `cc/base/io_pressure_monitor.h` | NEW: I/O pressure monitor header |
+| `cc/base/io_pressure_monitor.cc` | NEW: I/O pressure monitor (Linux PSI) |
+| `cc/base/BUILD.gn` | Added new source files |
+| `cc/trees/layer_tree_host.cc` | Timeout-aware commit completion |
+| `cc/trees/proxy_main.cc` | Timeout documentation + DetachInputDelegate fix |
+| `base/files/file_path_watcher_inotify.cc` | Lock inversion fix + .git skip |
+| `chrome/browser/devtools/devtools_file_system_indexer.cc` | .git exclusion |
+
+---
+
 *Document generated for Galactic Cherry Marvell Edition 98. Source commit 5006852cd6.*

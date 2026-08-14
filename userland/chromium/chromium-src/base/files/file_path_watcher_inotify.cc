@@ -361,8 +361,18 @@ InotifyReader::Watch InotifyReader::AddWatch(const FilePath& path,
     return kWatchLimitExceeded;
   }
 
-  AutoLock auto_lock(lock_);
-
+  // GALACTIC CHERRY MODIFICATION: Split the blocking syscall from the lock.
+  //
+  // PROBLEM: The original code held lock_ while calling inotify_add_watch(),
+  // which is a blocking syscall. If the filesystem is under heavy I/O pressure
+  // (e.g., git gc repacking 40 GB, USB swap thrash, or large directory
+  // enumeration), this syscall can block for seconds. During that time, ALL
+  // other threads waiting on lock_ (including the inotify event reader thread
+  // in OnInotifyEvent) are blocked. Since OnInotifyEvent dispatches to UI
+  // task runners, this cascades into GUI thread stalls.
+  //
+  // FIX: Perform the blocking inotify_add_watch() OUTSIDE the lock, then
+  // take the lock only briefly to update the watchers_ map.
   ScopedBlockingCall scoped_blocking_call(FROM_HERE, BlockingType::WILL_BLOCK);
   const int watch_int =
       inotify_add_watch(inotify_fd_, path.value().c_str(),
@@ -373,7 +383,11 @@ InotifyReader::Watch InotifyReader::AddWatch(const FilePath& path,
   }
   const Watch watch = static_cast<Watch>(watch_int);
 
-  watchers_[watch].emplace(std::make_pair(watcher, watcher->GetWatcherEntry()));
+  {
+    AutoLock auto_lock(lock_);
+    watchers_[watch].emplace(
+        std::make_pair(watcher, watcher->GetWatcherEntry()));
+  }
 
   return watch;
 }
@@ -383,19 +397,27 @@ void InotifyReader::RemoveWatch(Watch watch, FilePathWatcherImpl* watcher) {
     return;
   }
 
-  AutoLock auto_lock(lock_);
+  // GALACTIC CHERRY MODIFICATION: Remove from map under lock first, then
+  // perform the blocking inotify_rm_watch() outside the lock.
+  bool should_remove_kernel_watch = false;
+  {
+    AutoLock auto_lock(lock_);
 
-  auto watchers_it = watchers_.find(watch);
-  if (watchers_it == watchers_.end()) {
-    return;
+    auto watchers_it = watchers_.find(watch);
+    if (watchers_it == watchers_.end()) {
+      return;
+    }
+
+    auto& watcher_map = watchers_it->second;
+    watcher_map.erase(watcher);
+
+    if (watcher_map.empty()) {
+      watchers_.erase(watchers_it);
+      should_remove_kernel_watch = true;
+    }
   }
 
-  auto& watcher_map = watchers_it->second;
-  watcher_map.erase(watcher);
-
-  if (watcher_map.empty()) {
-    watchers_.erase(watchers_it);
-
+  if (should_remove_kernel_watch) {
     ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                             BlockingType::WILL_BLOCK);
     inotify_rm_watch(inotify_fd_, watch);
@@ -795,6 +817,28 @@ bool FilePathWatcherImpl::UpdateRecursiveWatchesForPath(const FilePath& path) {
   for (FilePath current = enumerator.Next(); !current.empty();
        current = enumerator.Next()) {
     DUMP_WILL_BE_CHECK(enumerator.GetInfo().IsDirectory());
+
+    // GALACTIC CHERRY MODIFICATION: Skip .git directories.
+    //
+    // PROBLEM: When a recursive watcher is set on a project directory that
+    // contains a git repository, the .git/objects/ tree can contain hundreds
+    // of thousands of subdirectories (one per object hash prefix). Adding
+    // inotify watches to all of them:
+    //   1. Exhausts the system inotify watch limit (default 8192)
+    //   2. Causes inotify_add_watch() to block for seconds while the kernel
+    //      allocates watch structures
+    //   3. During git operations (gc, repack, commit), produces a flood of
+    //      events that saturate the inotify reader thread's lock
+    //
+    // FIX: Skip any directory named ".git" and all its descendants. These
+    // directories are internal to git and should never trigger application-
+    // level file change notifications. IDEs and file watchers that need git
+    // status should use `git status` or libgit2, not inotify on .git/.
+    if (current.BaseName().value() == FILE_PATH_LITERAL(".git") ||
+        current.value().find(FILE_PATH_LITERAL("/.git/")) !=
+            FilePath::StringType::npos) {
+      continue;
+    }
 
     // Check `recursive_watches_by_path_` as a heuristic to determine if this
     // needs to be an add or update operation.

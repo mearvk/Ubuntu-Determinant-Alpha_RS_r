@@ -532,6 +532,12 @@ void ProxyMain::BeginMainFrame(
   // begin the commit process, which is blocking from the main thread's
   // point of view, but asynchronously performed on the impl thread,
   // coordinated by the Scheduler.
+  //
+  // GALACTIC CHERRY: The blocking wait now has a safety timeout (see
+  // CompletionEvent). If the impl thread is stalled on I/O (disk saturation
+  // from git operations, memory pressure, USB swap thrash), the main thread
+  // will be released after the timeout to prevent GUI freezing. The commit
+  // will still complete asynchronously on the impl thread.
   begin_impl_frame_idle_ = false;
   int source_frame_number = commit_state->source_frame_number;
   CommitTimestamps commit_timestamps;
@@ -761,12 +767,21 @@ void ProxyMain::DetachInputDelegateAndRenderFrameObserver() {
   DCHECK(IsMainThread());
   auto completion_event = std::make_unique<CompletionEvent>(
       base::WaitableEvent::ResetPolicy::MANUAL);
+  // GALACTIC CHERRY: Use a shorter timeout for detach operations.
+  // This is called during navigation/shutdown. If the impl thread is stalled,
+  // we cannot wait indefinitely — the user may be navigating away from a page
+  // whose renderer is blocked on I/O.
+  completion_event->SetTimeout(base::Milliseconds(2000));
   ImplThreadTaskRunner()->PostTask(
       FROM_HERE,
       base::BindOnce(&ProxyImpl::DetachInputDelegateAndRenderFrameObserver,
                      base::Unretained(proxy_impl_.get()),
                      completion_event.get()));
   completion_event->Wait();
+  if (completion_event->DidTimeOut()) {
+    LOG(WARNING) << "DetachInputDelegateAndRenderFrameObserver timed out. "
+                 << "Impl thread may be stalled on I/O.";
+  }
 }
 
 bool ProxyMain::RequestedAnimatePending() {
@@ -826,6 +841,15 @@ void ProxyMain::SetInputResponsePending() {
   // we pause execution on the main thread until the compositor thread finishes
   // processing the commit. This is done to minimize thread contention while
   // the compositor is doing critical-path work.
+  //
+  // GALACTIC CHERRY: The blocking wait now has a timeout (4000ms default,
+  // configured in CompletionEvent). Under normal conditions the impl thread
+  // completes in <16ms (one frame). The timeout only fires when the system
+  // is under severe I/O pressure (git gc, swap thrash, disk saturation).
+  // In that case, blocking the main thread provides no benefit — the impl
+  // thread is I/O-bound, not CPU-contention-bound — and the block only
+  // causes a GUI freeze. The timeout allows the main thread to continue
+  // processing input events and maintaining responsiveness.
   block_on_next_commit_ = true;
 }
 

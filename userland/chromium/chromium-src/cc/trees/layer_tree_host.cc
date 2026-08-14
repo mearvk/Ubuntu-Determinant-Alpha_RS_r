@@ -531,7 +531,24 @@ void LayerTreeHost::WaitForCommitCompletion(bool for_protected_sequence) const {
   if (commit_completion_event_) {
     TRACE_EVENT0("cc", "LayerTreeHost::WaitForCommitCompletion");
     commit_completion_event_->Wait();
-    commit_completion_event_ = nullptr;
+    // GALACTIC CHERRY: If the wait timed out, log the stall but continue.
+    // The main thread must remain responsive even if the impl thread is
+    // blocked on I/O (e.g., tile raster stalled by disk saturation from git
+    // gc, large file indexing, or USB swap thrash). The impl thread will
+    // eventually complete and signal; we just don't wait forever.
+    if (commit_completion_event_->DidTimeOut()) {
+      TRACE_EVENT_INSTANT("cc",
+          "LayerTreeHost::WaitForCommitCompletion::TIMED_OUT");
+      LOG(WARNING) << "LayerTreeHost::WaitForCommitCompletion() released "
+                   << "after timeout (for_protected_sequence="
+                   << for_protected_sequence << "). "
+                   << "Impl thread likely stalled on I/O. "
+                   << "Main thread released to prevent GUI freeze.";
+      // Do NOT null the event — impl thread will still signal it.
+      // Next frame will re-check IsSignaled() before blocking.
+    } else {
+      commit_completion_event_ = nullptr;
+    }
   }
 }
 
