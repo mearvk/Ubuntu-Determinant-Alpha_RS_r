@@ -1,0 +1,328 @@
+From 63f952b987bd848ac278c714c81c47250214adc7 Mon Sep 17 00:00:00 2001
+From: Adam Cozzette <acozzette@google.com>
+Date: Wed, 20 Oct 2021 14:51:07 -0700
+Subject: [PATCH] Fix Python 3.10 C++ tests (#9128)
+
+The first change is to make sure we always define PY_SSIZE_T_CLEAN
+before including Python.h. Starting from Python 3.10 this is required.
+Otherwise we get errors like this:
+
+SystemError: PY_SSIZE_T_CLEAN macro must be defined for '#' formats
+
+The second change is to update reflection_test.py to account for the
+fact that with Python 3.10, we get a TypeError even with the C++
+implementation when trying to assign a float to a bool field. I'm not
+sure why this changed with Python 3.10, but it seems like a good thing
+since this is the desired behavior anyway.
+---
+ python/google/protobuf/internal/api_implementation.cc       | 1 +
+ python/google/protobuf/internal/reflection_test.py          | 4 +++-
+ python/google/protobuf/proto_api.h                          | 1 +
+ python/google/protobuf/pyext/descriptor.cc                  | 1 +
+ python/google/protobuf/pyext/descriptor.h                   | 1 +
+ python/google/protobuf/pyext/descriptor_containers.cc       | 1 +
+ python/google/protobuf/pyext/descriptor_containers.h        | 1 +
+ python/google/protobuf/pyext/descriptor_database.h          | 1 +
+ python/google/protobuf/pyext/descriptor_pool.cc             | 1 +
+ python/google/protobuf/pyext/descriptor_pool.h              | 1 +
+ python/google/protobuf/pyext/extension_dict.h               | 1 +
+ python/google/protobuf/pyext/field.h                        | 1 +
+ python/google/protobuf/pyext/map_container.h                | 1 +
+ python/google/protobuf/pyext/message.h                      | 1 +
+ python/google/protobuf/pyext/message_factory.cc             | 1 +
+ python/google/protobuf/pyext/message_factory.h              | 1 +
+ python/google/protobuf/pyext/message_module.cc              | 1 +
+ python/google/protobuf/pyext/repeated_composite_container.h | 1 +
+ python/google/protobuf/pyext/repeated_scalar_container.h    | 1 +
+ python/google/protobuf/pyext/scoped_pyobject_ptr.h          | 1 +
+ python/google/protobuf/pyext/unknown_fields.cc              | 1 +
+ python/google/protobuf/pyext/unknown_fields.h               | 1 +
+ python/google/protobuf/python_protobuf.h                    | 1 +
+ 23 files changed, 25 insertions(+), 1 deletion(-)
+
+Index: protobuf-3.12.4/python/google/protobuf/internal/api_implementation.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/internal/api_implementation.cc
++++ protobuf-3.12.4/python/google/protobuf/internal/api_implementation.cc
+@@ -28,6 +28,7 @@
+ // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ namespace google {
+Index: protobuf-3.12.4/python/google/protobuf/internal/reflection_test.py
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/internal/reflection_test.py
++++ protobuf-3.12.4/python/google/protobuf/internal/reflection_test.py
+@@ -40,6 +40,7 @@
+ import operator
+ import six
+ import struct
++import sys
+ import warnings
+ 
+ try:
+@@ -387,7 +388,8 @@
+     self.assertRaises(TypeError, setattr, proto, 'optional_float', 'foo')
+     self.assertRaises(TypeError, setattr, proto, 'optional_double', 'foo')
+     # TODO(jieluo): Fix type checking difference for python and c extension
+-    if api_implementation.Type() == 'python':
++    if (api_implementation.Type() == 'python' or
++        (sys.version_info.major, sys.version_info.minor) >= (3, 10)):
+       self.assertRaises(TypeError, setattr, proto, 'optional_bool', 1.1)
+     else:
+       proto.optional_bool = 1.1
+Index: protobuf-3.12.4/python/google/protobuf/proto_api.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/proto_api.h
++++ protobuf-3.12.4/python/google/protobuf/proto_api.h
+@@ -45,6 +45,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_PROTO_API_H__
+ #define GOOGLE_PROTOBUF_PYTHON_PROTO_API_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/descriptor_database.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor.cc
+@@ -30,6 +30,7 @@
+ 
+ // Author: petar@google.com (Petar Petrov)
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ #include <frameobject.h>
+ #include <string>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor.h
+@@ -33,6 +33,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/descriptor.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor_containers.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor_containers.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor_containers.cc
+@@ -49,6 +49,7 @@
+ // because the Python API is based on C, and does not play well with C++
+ // inheritance.
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/descriptor.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor_containers.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor_containers.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor_containers.h
+@@ -34,6 +34,7 @@
+ // Mappings and Sequences of descriptors.
+ // They implement containers like fields_by_name, EnumDescriptor.values...
+ // See descriptor_containers.cc for more description.
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ namespace google {
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor_database.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor_database.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor_database.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_DATABASE_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_DATABASE_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/descriptor_database.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor_pool.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor_pool.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor_pool.cc
+@@ -32,6 +32,7 @@
+ 
+ #include <unordered_map>
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/descriptor.pb.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/descriptor_pool.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/descriptor_pool.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/descriptor_pool.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_POOL_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_DESCRIPTOR_POOL_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <unordered_map>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/extension_dict.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/extension_dict.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/extension_dict.h
+@@ -34,6 +34,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_EXTENSION_DICT_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_EXTENSION_DICT_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/field.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/field.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/field.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_FIELD_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_FIELD_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ namespace google {
+Index: protobuf-3.12.4/python/google/protobuf/pyext/map_container.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/map_container.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/map_container.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_MAP_CONTAINER_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_MAP_CONTAINER_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/message.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/message.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/message.h
+@@ -34,6 +34,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/message_factory.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/message_factory.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/message_factory.cc
+@@ -30,6 +30,7 @@
+ 
+ #include <unordered_map>
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/dynamic_message.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/message_factory.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/message_factory.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/message_factory.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_FACTORY_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_MESSAGE_FACTORY_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <unordered_map>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/message_module.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/message_module.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/message_module.cc
+@@ -28,6 +28,7 @@
+ // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <google/protobuf/pyext/descriptor_pool.h>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/repeated_composite_container.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/repeated_composite_container.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/repeated_composite_container.h
+@@ -34,6 +34,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_REPEATED_COMPOSITE_CONTAINER_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_REPEATED_COMPOSITE_CONTAINER_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/repeated_scalar_container.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/repeated_scalar_container.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/repeated_scalar_container.h
+@@ -34,6 +34,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_REPEATED_SCALAR_CONTAINER_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_REPEATED_SCALAR_CONTAINER_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/scoped_pyobject_ptr.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/scoped_pyobject_ptr.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/scoped_pyobject_ptr.h
+@@ -35,6 +35,7 @@
+ 
+ #include <google/protobuf/stubs/common.h>
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ namespace google {
+ namespace protobuf {
+Index: protobuf-3.12.4/python/google/protobuf/pyext/unknown_fields.cc
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/unknown_fields.cc
++++ protobuf-3.12.4/python/google/protobuf/pyext/unknown_fields.cc
+@@ -30,6 +30,7 @@
+ 
+ #include <google/protobuf/pyext/unknown_fields.h>
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ #include <set>
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/pyext/unknown_fields.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/pyext/unknown_fields.h
++++ protobuf-3.12.4/python/google/protobuf/pyext/unknown_fields.h
+@@ -31,6 +31,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_CPP_UNKNOWN_FIELDS_H__
+ #define GOOGLE_PROTOBUF_PYTHON_CPP_UNKNOWN_FIELDS_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ #include <memory>
+Index: protobuf-3.12.4/python/google/protobuf/python_protobuf.h
+===================================================================
+--- protobuf-3.12.4.orig/python/google/protobuf/python_protobuf.h
++++ protobuf-3.12.4/python/google/protobuf/python_protobuf.h
+@@ -36,6 +36,7 @@
+ #ifndef GOOGLE_PROTOBUF_PYTHON_PYTHON_PROTOBUF_H__
+ #define GOOGLE_PROTOBUF_PYTHON_PYTHON_PROTOBUF_H__
+ 
++#define PY_SSIZE_T_CLEAN
+ #include <Python.h>
+ 
+ namespace google {

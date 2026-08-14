@@ -1,0 +1,68 @@
+<project name="protobuf-java" default="jar" basedir="..">
+    <property name="srcdir" value="src" />
+    <property name="javacoredir" value="java/core" />
+    <property name="javautildir" value="java/util" />
+    <property name="javacoresrcdir" value="${javacoredir}/src" />
+    <property name="javautilsrcdir" value="${javautildir}/src" />
+    <property name="coretargetdir" value="${javacoredir}/target" />
+    <property name="utiltargetdir" value="${javautildir}/target" />
+    <property name="coreclassesdir" value="${coretargetdir}/classes" />
+    <property name="utilclassesdir" value="${utiltargetdir}/classes" />
+    <property name="coregenerateddir" value="${coretargetdir}/generated-sources" />
+
+ <path id="util-classpath">
+   <fileset dir="/usr/share/java/">
+     <include name="gson.jar"/>
+     <include name="guava.jar"/>
+   </fileset>
+ </path>
+
+    <target name="clean">
+        <delete dir="${coretargetdir}"/>
+        <delete dir="${utiltargetdir}"/>
+    </target>
+
+    <target name="generate">
+        <mkdir dir="${coregenerateddir}" />
+        <echo message="${srcdir}" />
+        <exec executable="${srcdir}/protoc">
+            <arg value="--java_out=${coregenerateddir}" />
+            <arg value="--proto_path=${srcdir}" />
+            <arg value="${srcdir}/google/protobuf/any.proto" />
+            <arg value="${srcdir}/google/protobuf/api.proto" />
+            <arg value="${srcdir}/google/protobuf/descriptor.proto" />
+            <arg value="${srcdir}/google/protobuf/duration.proto" />
+            <arg value="${srcdir}/google/protobuf/empty.proto" />
+            <arg value="${srcdir}/google/protobuf/field_mask.proto" />
+            <arg value="${srcdir}/google/protobuf/source_context.proto" />
+            <arg value="${srcdir}/google/protobuf/struct.proto" />
+            <arg value="${srcdir}/google/protobuf/timestamp.proto" />
+            <arg value="${srcdir}/google/protobuf/type.proto" />
+            <arg value="${srcdir}/google/protobuf/wrappers.proto" />
+	    <arg value="${srcdir}/google/protobuf/compiler/plugin.proto" />
+        </exec>
+    </target>
+
+    <target name="compile" depends="generate">
+        <mkdir dir="${coreclassesdir}"/>
+        <javac srcdir="${coregenerateddir}:${javacoresrcdir}/main/java"
+               destdir="${coreclassesdir}" source="1.7" target="1.7"
+               includeantruntime="false" />
+    </target>
+
+    <target name="compile-util" depends="compile">
+        <mkdir dir="${utilclassesdir}"/>
+        <javac srcdir="${coregenerateddir}:${javacoresrcdir}/main/java:${javautilsrcdir}/main/java"
+               destdir="${utilclassesdir}" source="1.7" target="1.7"
+               classpathref="util-classpath"
+               includeantruntime="false" />
+    </target>
+
+    <target name="jar" depends="compile">
+        <jar destfile="${coretargetdir}/protobuf.jar" basedir="${coreclassesdir}" />
+    </target>
+
+    <target name="jar-util" depends="compile-util">
+        <jar destfile="${utiltargetdir}/protobuf-util.jar" basedir="${utilclassesdir}" />
+    </target>
+</project>

@@ -1,0 +1,51 @@
+From: "Igor V. Kovalenko" <igor.v.kovalenko@gmail.com>
+Date: Mon, 6 Feb 2023 09:38:45 +0300
+Subject: bluetooth: Amend writeout to send more initial frames
+
+When bluetooth transport has both both sink and source, pulseaudio would
+synchronize writing out frames with reading frames from peer to make fair
+schedule of reads and writes. Pulseaudio allows two blocks of data to be sent to
+peer before synchronizing writes with reads just in case that peer implements
+similar write schedule.
+
+It could happen that first blocks are still missed by peer, which would cause
+pulseaudio writes to stall waiting for first frames from peer.
+
+Fix this by allowing more data frames out until data from peer is actually
+received.
+
+Closes: https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/1424
+Part-of: <https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/merge_requests/777>
+Signed-off-by: Kai-Heng Feng <kai.heng.feng@canonical.com>
+---
+ src/modules/bluetooth/module-bluez5-device.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/bluetooth/module-bluez5-device.c b/src/modules/bluetooth/module-bluez5-device.c
+index 767482e..a30372e 100644
+--- a/src/modules/bluetooth/module-bluez5-device.c
++++ b/src/modules/bluetooth/module-bluez5-device.c
+@@ -1523,8 +1523,8 @@ static void thread_func(void *userdata) {
+                     writable = true;
+ 
+                 /* If we have a source, we let the source determine the timing
+-                 * for the sink */
+-                if (have_source) {
++                 * for the sink unless peer has not sent any data yet */
++                if (have_source && u->read_index > 0) {
+ 
+                     /* If the stream is writable, send some data if necessary */
+                     if (writable) {
+@@ -1635,6 +1635,12 @@ static void thread_func(void *userdata) {
+                             goto fail;
+ 
+                         if (result) {
++                            if (have_source && u->read_index <= 0) {
++                                /* We have a source but peer has not sent any data yet, log this */
++                                if (pa_log_ratelimit(PA_LOG_DEBUG))
++                                    pa_log_debug("Still no data received from source, sent one more block to sink");
++                            }
++
+                             writable = false;
+                             have_written = true;
+                         }

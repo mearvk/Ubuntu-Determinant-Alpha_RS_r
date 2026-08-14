@@ -1,0 +1,23 @@
+Description: fix FTBFS on x32 due to versioned glibc symbols
+ protobuf assumes that glibc 2.2.5 memcpy symbols will be available #if
+ defined(__x86-64__); however, x32 also defines this, but was not
+ supported prior to 2.16.
+Author: Laurence Parry <greenreaper@gmail.com>
+Origin: other, https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=931503#5
+Forwarded: not-needed
+Bug-Debian: https://bugs.debian.org/931503
+Last-Update: 2019-08-06
+
+---
+
+--- protobuf-3.9.1.orig/ruby/ext/google/protobuf_c/wrap_memcpy.c
++++ protobuf-3.9.1/ruby/ext/google/protobuf_c/wrap_memcpy.c
+@@ -38,7 +38,7 @@
+ // This wrapper is enabled by passing the linker flags -Wl,-wrap,memcpy in
+ // extconf.rb.
+ #ifdef __linux__
+-#if defined(__x86_64__) && defined(__GNU_LIBRARY__)
++#if defined(__x86_64__) && !defined(__ILP32__) && defined(__GNU_LIBRARY__)
+ __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
+ void *__wrap_memcpy(void *dest, const void *src, size_t n) {
+     return memcpy(dest, src, n);

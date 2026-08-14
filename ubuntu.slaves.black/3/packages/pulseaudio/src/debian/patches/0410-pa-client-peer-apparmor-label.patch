@@ -1,0 +1,195 @@
+From: James Henstridge <james.henstridge@canonical.com>
+Date: Mon, 21 Sep 2020 16:56:08 +0800
+Subject: pulsecore: expose peer AppArmor label on pa_client
+
+Forwarded: not-needed
+
+This patch uses aa_getpeercon to get the AppArmor label of the peer
+and store it in the pa_client struct.  Only the native protocol
+connection handler has been updated, as that is the only protocol with
+access control hooks.
+---
+ configure.ac                    |  6 ++++++
+ src/Makefile.am                 | 10 ++++++++++
+ src/pulsecore/client.c          |  3 +++
+ src/pulsecore/client.h          |  3 +++
+ src/pulsecore/iochannel.c       | 17 +++++++++++++++++
+ src/pulsecore/iochannel.h       |  4 ++++
+ src/pulsecore/protocol-native.c |  1 +
+ 7 files changed, 44 insertions(+)
+
+
+Index: pulseaudio-15.99.1/src/pulsecore/client.c
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/client.c
++++ pulseaudio-15.99.1/src/pulsecore/client.c
+@@ -49,6 +49,7 @@ void pa_client_new_data_done(pa_client_n
+     pa_assert(data);
+ 
+     pa_proplist_free(data->proplist);
++    pa_xfree(data->apparmor_label);
+ }
+ 
+ pa_client *pa_client_new(pa_core *core, pa_client_new_data *data) {
+@@ -62,6 +63,7 @@ pa_client *pa_client_new(pa_core *core,
+ 
+     c = pa_xnew0(pa_client, 1);
+     c->core = core;
++    c->apparmor_label = pa_xstrdup(data->apparmor_label);
+     c->proplist = pa_proplist_copy(data->proplist);
+     c->driver = pa_xstrdup(pa_path_get_filename(data->driver));
+     c->module = data->module;
+@@ -103,6 +105,7 @@ void pa_client_free(pa_client *c) {
+ 
+     pa_proplist_free(c->proplist);
+     pa_xfree(c->driver);
++    pa_xfree(c->apparmor_label);
+     pa_xfree(c);
+ 
+     pa_core_check_idle(core);
+Index: pulseaudio-15.99.1/src/pulsecore/client.h
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/client.h
++++ pulseaudio-15.99.1/src/pulsecore/client.h
+@@ -35,6 +35,8 @@ struct pa_client {
+     uint32_t index;
+     pa_core *core;
+ 
++    char *apparmor_label;
++
+     pa_proplist *proplist;
+     pa_module *module;
+     char *driver;
+@@ -53,6 +55,7 @@ typedef struct pa_client_new_data {
+     pa_proplist *proplist;
+     const char *driver;
+     pa_module *module;
++    char *apparmor_label;
+ } pa_client_new_data;
+ 
+ pa_client_new_data *pa_client_new_data_init(pa_client_new_data *data);
+Index: pulseaudio-15.99.1/src/pulsecore/iochannel.c
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/iochannel.c
++++ pulseaudio-15.99.1/src/pulsecore/iochannel.c
+@@ -30,6 +30,10 @@
+ #include <sys/un.h>
+ #endif
+ 
++#ifdef HAVE_APPARMOR
++#include <sys/apparmor.h>
++#endif
++
+ #include <pulse/xmalloc.h>
+ 
+ #include <pulsecore/core-error.h>
+@@ -516,6 +520,19 @@ void pa_iochannel_socket_peer_to_string(
+     pa_socket_peer_to_string(io->ifd, s, l);
+ }
+ 
++char *pa_iochannel_socket_get_peer_apparmor_label(pa_iochannel *io) {
++    pa_assert(io);
++
++#ifdef HAVE_APPARMOR
++    char *label = NULL;
++    if (aa_getpeercon(io->ifd, &label, NULL) == -1)
++        return NULL;
++    return label;
++#else
++    return NULL;
++#endif
++}
++
+ int pa_iochannel_socket_set_rcvbuf(pa_iochannel *io, size_t l) {
+     pa_assert(io);
+ 
+Index: pulseaudio-15.99.1/src/pulsecore/iochannel.h
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/iochannel.h
++++ pulseaudio-15.99.1/src/pulsecore/iochannel.h
+@@ -75,6 +75,10 @@ void pa_iochannel_set_callback(pa_iochan
+ /* In case the file descriptor is a socket, return a pretty-printed string in *s which describes the peer connected */
+ void pa_iochannel_socket_peer_to_string(pa_iochannel*io, char*s, size_t l);
+ 
++/* In case the file descriptor is a socket, return the apparmor label
++ * of the peer, if available. */
++char *pa_iochannel_socket_get_peer_apparmor_label(pa_iochannel *io);
++
+ /* Use setsockopt() to tune the receive and send buffers of TCP sockets */
+ int pa_iochannel_socket_set_rcvbuf(pa_iochannel*io, size_t l);
+ int pa_iochannel_socket_set_sndbuf(pa_iochannel*io, size_t l);
+Index: pulseaudio-15.99.1/src/pulsecore/protocol-native.c
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/protocol-native.c
++++ pulseaudio-15.99.1/src/pulsecore/protocol-native.c
+@@ -5297,6 +5297,7 @@ void pa_native_protocol_connect(pa_nativ
+     pa_client_new_data_init(&data);
+     data.module = o->module;
+     data.driver = __FILE__;
++    data.apparmor_label = pa_iochannel_socket_get_peer_apparmor_label(io);
+     pa_iochannel_socket_peer_to_string(io, pname, sizeof(pname));
+     pa_proplist_setf(data.proplist, PA_PROP_APPLICATION_NAME, "Native client (%s)", pname);
+     pa_proplist_sets(data.proplist, "native-protocol.peer", pname);
+Index: pulseaudio-15.99.1/meson.build
+===================================================================
+--- pulseaudio-15.99.1.orig/meson.build
++++ pulseaudio-15.99.1/meson.build
+@@ -722,6 +722,11 @@ if get_option('daemon')
+     cdata.set('HAVE_WEBRTC', 1)
+   endif
+ 
++  libapparmor_dep = dependency('libapparmor', required : get_option('apparmor'))
++  if libapparmor_dep.found()
++    cdata.set('HAVE_APPARMOR', 1)
++  endif
++
+   systemd_dep = dependency('systemd', required : get_option('systemd'))
+   if systemd_dep.found() and systemduserunitdir == ''
+     systemduserunitdir = systemd_dep.get_pkgconfig_variable('systemduserunitdir')
+@@ -956,6 +961,7 @@ summary = [
+   'Enable Valgrind:               @0@'.format(cdata.has('HAVE_VALGRIND_MEMCHECK_H')),
+   'Enable man pages:              @0@'.format(get_option('man')),
+   'Enable unit tests:             @0@'.format(get_option('tests')),
++  'Enable apparmor:               @0@'.format(libapparmor_dep.found()),
+ ]
+ 
+ if get_option('client')
+Index: pulseaudio-15.99.1/meson_options.txt
+===================================================================
+--- pulseaudio-15.99.1.orig/meson_options.txt
++++ pulseaudio-15.99.1/meson_options.txt
+@@ -177,3 +177,8 @@ option('adrian-aec',
+ option('webrtc-aec',
+        type : 'feature', value : 'auto',
+        description : 'Optional WebRTC-based echo canceller')
++       
++# AppArmor support (optional)
++option('apparmor',
++       type : 'feature', value : 'auto',
++       description : 'AppArmor support library is available.')
+Index: pulseaudio-15.99.1/src/meson.build
+===================================================================
+--- pulseaudio-15.99.1.orig/src/meson.build
++++ pulseaudio-15.99.1/src/meson.build
+@@ -206,7 +206,7 @@ else
+       libm_dep, thread_dep, dl_dep, shm_dep, iconv_dep, sndfile_dep, dbus_dep,
+       x11_dep, libsystemd_dep, glib_dep.partial_dependency(compile_args: true),
+       gtk_dep.partial_dependency(compile_args: true), asyncns_dep, libintl_dep,
+-      platform_dep, platform_socket_dep, execinfo_dep,
++      platform_dep, platform_socket_dep, execinfo_dep, libapparmor_dep,
+     ],
+     implicit_include_directories : false)
+ 
+Index: pulseaudio-15.99.1/src/pulsecore/meson.build
+===================================================================
+--- pulseaudio-15.99.1.orig/src/pulsecore/meson.build
++++ pulseaudio-15.99.1/src/pulsecore/meson.build
+@@ -224,7 +224,7 @@ libpulsecore = shared_library('pulsecore
+   install_rpath : privlibdir,
+   install_dir : privlibdir,
+   link_with : libpulsecore_simd_lib,
+-  dependencies : [libm_dep, libpulsecommon_dep, ltdl_dep, shm_dep, sndfile_dep, database_dep, dbus_dep, libatomic_ops_dep, orc_dep, samplerate_dep, soxr_dep, speex_dep, x11_dep, libsystemd_dep, libintl_dep, platform_dep, tcpwrap_dep, platform_socket_dep,],
++  dependencies : [libm_dep, libpulsecommon_dep, ltdl_dep, shm_dep, sndfile_dep, database_dep, dbus_dep, libatomic_ops_dep, orc_dep, samplerate_dep, soxr_dep, speex_dep, x11_dep, libsystemd_dep, libintl_dep, platform_dep, tcpwrap_dep, platform_socket_dep, libapparmor_dep,],
+   implicit_include_directories : false)
+ 
+ libpulsecore_dep = declare_dependency(link_with: libpulsecore)

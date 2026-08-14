@@ -1,0 +1,32 @@
+From: David Henningsson <david.henningsson@canonical.com>
+Date: Wed, 22 Jul 2015 16:37:19 +0200
+Subject: [PATCH 4/5] Fix command argument parsing after async hook execution
+
+---
+ src/pulsecore/protocol-native.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+Index: pulseaudio/src/pulsecore/protocol-native.c
+===================================================================
+--- pulseaudio.orig/src/pulsecore/protocol-native.c
++++ pulseaudio/src/pulsecore/protocol-native.c
+@@ -5719,6 +5719,7 @@ typedef struct pa_protocol_native_access
+ } pa_protocol_native_access_data;
+ 
+ static void check_access_finish_cb(pa_access_data *data, bool res) {
++    uint32_t command, tag;
+     pa_protocol_native_access_data *d = (pa_protocol_native_access_data *) data;
+     pa_native_connection *c = PA_NATIVE_CONNECTION(d->userdata);
+ 
+@@ -5727,6 +5728,11 @@ static void check_access_finish_cb(pa_ac
+         goto finish;
+     }
+ 
++    pa_assert_se(pa_tagstruct_getu32(d->tc, &command) >= 0);
++    pa_assert_se(pa_tagstruct_getu32(d->tc, &tag) >= 0);
++    pa_assert(command == d->command);
++    pa_assert(tag == d->tag);
++
+     /* call the dispatcher again, hopefully this time, the access check will
+      * fail or succeed immediately */
+     command_table[d->command](d->pd, d->command, d->tag, d->tc, d->userdata);

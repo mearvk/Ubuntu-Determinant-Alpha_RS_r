@@ -1,0 +1,119 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+PACKAGE="procps"
+DEBROOT=$(CURDIR)/debian/tmp
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_ARCH_OS ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_OS)
+DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+configure_flags += --host=$(DEB_HOST_GNU_TYPE)
+CROSS = PKG_CONFIG=$(DEB_HOST_GNU_TYPE)-pkg-config \
+	ac_cv_func_malloc_0_nonnull=yes \
+	ac_cv_func_realloc_0_nonnull=yes
+else
+CROSS=
+endif
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+LINUX_CONFIGURE_EXTRA_FLAGS = --with-systemd --enable-libselinux
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	$(CROSS) ./configure \
+	  $(configure_flags) \
+	  --build=$(DEB_BUILD_GNU_TYPE) \
+	  --disable-silent-rules \
+	  --enable-watch8bit --enable-w-from \
+	  --enable-skill ${LINUX_CONFIGURE_EXTRA_FLAGS} \
+	  --disable-pidof \
+	  --disable-modern-top \
+	  --prefix=/usr \
+	  --exec-prefix=/ \
+	  --libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+	  --build=$(DEB_BUILD_GNU_TYPE) \
+	  --host=$(DEB_HOST_GNU_TYPE) \
+
+
+override_dh_auto_install: $(autogen-files)
+	dh_auto_install
+	mkdir $(DEBROOT)/bbin
+	mv $(DEBROOT)/bin/kill $(DEBROOT)/bbin/
+	mv $(DEBROOT)/bin/ps $(DEBROOT)/bbin/
+
+	# Build up sysctl.d
+	install -d $(DEBROOT)/etc/sysctl.d/
+	install --mode 644 -o root -g root debian/sysctl.d/*.conf $(DEBROOT)/etc/sysctl.d/
+ifneq (,$(wildcard debian/sysctl.d/*.conf.$(DEB_HOST_ARCH)))
+	# If a non-arch-specific default exists, install the arch-specific
+	# version of the conf in place of it, otherwise, build up a general
+	# 10-arch-specific.conf file.
+	for archconf in debian/sysctl.d/*.conf.$(DEB_HOST_ARCH); do \
+	    conf=$$(basename $$archconf .$(DEB_HOST_ARCH)); \
+	    if [ -f debian/sysctl.d/$$conf ]; then \
+		install --mode 644 -o root -g root $$archconf $(DEBROOT)/etc/sysctl.d/$$conf; \
+	    else \
+		cat $$archconf >> $(DEBROOT)/etc/sysctl.d/10-arch-specific.conf; \
+	    fi; \
+	done
+endif
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	# Rename pwait to pidwait as pwait is in extrace
+	(cd $(DEBROOT)/bin && mv pwait pidwait )
+	(cd $(DEBROOT)/usr/share/man/man1 && mv pwait.1 pidwait.1 )
+endif
+
+ifneq ($(DEB_HOST_ARCH_OS), linux)
+	rm -f \
+		$(DEBROOT)/bin/slabtop \
+		$(DEBROOT)/usr/share/man/man1/slabtop.1 \
+		$(DEBROOT)/sbin/sysctl \
+		$(DEBROOT)/usr/share/man/man8/sysctl.8 \
+		$(DEBROOT)/usr/share/man/man5/sysctl.conf.5 \
+		$(NULL)
+
+    # Rename kill as there are two of them
+	(cd $(DEBROOT)/bbin && mv kill kill.procps )
+	(cd $(DEBROOT)/usr/share/man/man1 && mv kill.1 kill.procps.1 )
+endif
+ifeq ($(DEB_HOST_ARCH_OS), hurd)
+	rm -f \
+		$(DEBROOT)/bin/pmap \
+		$(DEBROOT)/usr/share/man/man1/pmap.1 \
+		$(NULL)
+
+	# Rename vmstat as there are two of them
+	(cd $(DEBROOT)/bin && mv vmstat vmstat.procps )
+	(cd $(DEBROOT)/usr/share/man/man8 && mv vmstat.8 vmstat.procps.8 )
+
+	# Rename uptime as there are two of them
+	(cd $(DEBROOT)/bin && mv uptime uptime.procps )
+	(cd $(DEBROOT)/usr/share/man/man1 && mv uptime.1 uptime.procps.1 )
+
+	# Rename ps as there are two of them
+	(cd $(DEBROOT)/bbin && mv ps ps.procps )
+	(cd $(DEBROOT)/usr/share/man/man1 && mv ps.1 ps.procps.1 )
+endif
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+override_dh_installinit:
+ifeq ($(DEB_HOST_ARCH_OS), linux)
+	dh_installinit --no-start
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V 'libprocps8 (>=2:3.3.16-1)'
+

@@ -1,0 +1,297 @@
+From 46c263acc976a9615a322cff5ead41928c68e6ce Mon Sep 17 00:00:00 2001
+From: Tanu Kaskinen <tanuk@iki.fi>
+Date: Tue, 26 May 2020 14:45:12 +0300
+Subject: [PATCH 1/3] stream-restore: Drop the version field from the entry
+ struct
+
+Storing the version in the entry struct is pointless. We should always
+write entries using the current version. When we encounter older
+versions when reading, those need to be converted to the current version
+anyway, because all code that uses the entry struct assumes that the
+data is stored according to the current version semantics.
+
+We're currently at the first version of the database entries, so
+currently there's no version conversion happening. I have a patch that
+will increment the entry version, so this is preparation for that.
+---
+ src/modules/module-stream-restore.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/module-stream-restore.c b/src/modules/module-stream-restore.c
+index 0ef30f179..b6358fcca 100644
+--- a/src/modules/module-stream-restore.c
++++ b/src/modules/module-stream-restore.c
+@@ -116,7 +116,6 @@ struct userdata {
+ #define ENTRY_VERSION 1
+ 
+ struct entry {
+-    uint8_t version;
+     bool muted_valid, volume_valid, device_valid, card_valid;
+     bool muted;
+     pa_channel_map channel_map;
+@@ -968,7 +967,6 @@ static void save_time_callback(pa_mainloop_api*a, pa_time_event* e, const struct
+ 
+ static struct entry* entry_new(void) {
+     struct entry *r = pa_xnew0(struct entry, 1);
+-    r->version = ENTRY_VERSION;
+     return r;
+ }
+ 
+@@ -990,7 +988,7 @@ static bool entry_write(struct userdata *u, const char *name, const struct entry
+     pa_assert(e);
+ 
+     t = pa_tagstruct_new();
+-    pa_tagstruct_putu8(t, e->version);
++    pa_tagstruct_putu8(t, ENTRY_VERSION);
+     pa_tagstruct_put_boolean(t, e->volume_valid);
+     pa_tagstruct_put_channel_map(t, &e->channel_map);
+     pa_tagstruct_put_cvolume(t, &e->volume);
+@@ -1108,6 +1106,7 @@ static struct entry *entry_read(struct userdata *u, const char *name) {
+     pa_datum key, data;
+     struct entry *e = NULL;
+     pa_tagstruct *t = NULL;
++    uint8_t version;
+     const char *device, *card;
+ 
+     pa_assert(u);
+@@ -1124,8 +1123,8 @@ static struct entry *entry_read(struct userdata *u, const char *name) {
+     t = pa_tagstruct_new_fixed(data.data, data.size);
+     e = entry_new();
+ 
+-    if (pa_tagstruct_getu8(t, &e->version) < 0 ||
+-        e->version > ENTRY_VERSION ||
++    if (pa_tagstruct_getu8(t, &version) < 0 ||
++        version > ENTRY_VERSION ||
+         pa_tagstruct_get_boolean(t, &e->volume_valid) < 0 ||
+         pa_tagstruct_get_channel_map(t, &e->channel_map) < 0 ||
+         pa_tagstruct_get_cvolume(t, &e->volume) < 0 ||
+@@ -1694,7 +1693,6 @@ static int fill_db(struct userdata *u, const char *filename) {
+                 struct entry e;
+ 
+                 pa_zero(e);
+-                e.version = ENTRY_VERSION;
+                 e.volume_valid = true;
+                 pa_cvolume_set(&e.volume, 1, pa_sw_volume_from_dB(db));
+                 pa_channel_map_init_mono(&e.channel_map);
+-- 
+2.26.2
+
+
+From 2ac2b445fcb81a3e6439e94cdefc2a482eab4fd1 Mon Sep 17 00:00:00 2001
+From: Tanu Kaskinen <tanuk@iki.fi>
+Date: Tue, 26 May 2020 14:57:42 +0300
+Subject: [PATCH 2/3] stream-restore: Fix a potential crash in
+ pa_namereg_is_valid_name()
+
+pa_namereg_is_valid_name() will hit an assertion if the name string is
+NULL. Maybe it would make sense to change pa_namereg_is_valid_name() so
+that it would return false on NULL, but I didn't want to change the
+function semantics at this time.
+
+e->device and e->card can be NULL even when device_valid and card_valid
+are set to true if the database contains bad data.
+
+I ran into this crash while developing new code, I haven't seen the
+crash in the wild.
+---
+ src/modules/module-stream-restore.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/module-stream-restore.c b/src/modules/module-stream-restore.c
+index b6358fcca..a86e6bc31 100644
+--- a/src/modules/module-stream-restore.c
++++ b/src/modules/module-stream-restore.c
+@@ -1144,12 +1144,12 @@ static struct entry *entry_read(struct userdata *u, const char *name) {
+     if (!pa_tagstruct_eof(t))
+         goto fail;
+ 
+-    if (e->device_valid && !pa_namereg_is_valid_name(e->device)) {
++    if (e->device_valid && (!e->device || !pa_namereg_is_valid_name(e->device))) {
+         pa_log_warn("Invalid device name stored in database for stream %s", name);
+         goto fail;
+     }
+ 
+-    if (e->card_valid && !pa_namereg_is_valid_name(e->card)) {
++    if (e->card_valid && (!e->card || !pa_namereg_is_valid_name(e->card))) {
+         pa_log_warn("Invalid card name stored in database for stream %s", name);
+         goto fail;
+     }
+-- 
+2.26.2
+
+
+From 1fe37e6d4bd5b2d183244538b250dae82ea27d47 Mon Sep 17 00:00:00 2001
+From: Tanu Kaskinen <tanuk@iki.fi>
+Date: Tue, 26 May 2020 15:04:59 +0300
+Subject: [PATCH 3/3] stream-restore: Forget pre-14.0 stream routing
+
+Prior to commits f899d5f4669dcd536cc142cee99fe359dd8af3d6 and
+f62a49b8cf109c011a9818d2358beb6834e6ec25, GNOME's sound settings
+overwrote the routing for all entries in the stream-restore database
+when selecting a device. Now we prevent that from happening (see the
+aforementioned commits), but the old overwritten settings can still be in
+the database after updating to PulseAudio 14.0, and they can cause
+problems, as documented here:
+https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832
+
+We can't distinguish between devices set by GNOME's sound settings
+and devices set by the user, so this patch discards all old device
+settings, even though that is going to cause PulseAudio to forget routing
+settings for many users. This is less bad than keeping the incorrect
+routing settings in the database, because it's difficult for users to
+figure out how to fix the situation when e.g. speaker test tones go to
+the internal speakers no matter what device is selected as the default,
+whereas old manual configuration can be restored restored by doing the
+manual configuration again. Also, it's probably more common to have at
+some point changed the default device in GNOME's sound settings than it
+is to have any manual per-stream routing settings.
+
+This is disabled by default, because this causes data loss, but
+distributions that use GNOME are recommended to enable this with
+the --enable-stream-restore-clear-old-devices (Autotools) or
+-Dstream-restore-clear-old-devices=true (Meson) build option.
+
+Fixes: https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832
+---
+ configure.ac                        |  9 +++++++
+ meson.build                         |  6 +++++
+ meson_options.txt                   |  3 +++
+ src/modules/module-stream-restore.c | 42 ++++++++++++++++++++++++++++-
+ 4 files changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index fa93172b7..11142cdd6 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1477,6 +1477,12 @@ if test "x$enable_legacy_database_entry_format" != "xno" ; then
+         AC_DEFINE(ENABLE_LEGACY_DATABASE_ENTRY_FORMAT, [1], [Legacy database entry format])
+ fi
+ 
++AC_ARG_ENABLE([stream-restore-clear-old-devices],
++    AS_HELP_STRING([--enable-stream-restore-clear-old-devices], [Forget per-stream routing settings that have been set before version 14.0. Recommended when using GNOME. See https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832]))
++if test "x$enable_stream_restore_clear_old_devices" == "xyes" ; then
++    AC_DEFINE(STREAM_RESTORE_CLEAR_OLD_DEVICES, [1], [module-stream-restore: Clear old devices])
++fi
++
+ AC_ARG_ENABLE([static-bins],
+     AS_HELP_STRING([--enable-static-bins],[Statically link executables.]))
+ AM_CONDITIONAL([STATIC_BINS], [test "x$enable_static_bins" = "xyes"])
+@@ -1639,6 +1645,7 @@ AS_IF([test "x$HAVE_ESOUND" = "x1" -a "x$USE_PER_USER_ESOUND_SOCKET" = "x1"], EN
+ AS_IF([test "x$HAVE_GCOV" = "x1"], ENABLE_GCOV=yes, ENABLE_GCOV=no)
+ AS_IF([test "x$HAVE_LIBCHECK" = "x1"], ENABLE_TESTS=yes, ENABLE_TESTS=no)
+ AS_IF([test "x$enable_legacy_database_entry_format" != "xno"], ENABLE_LEGACY_DATABASE_ENTRY_FORMAT=yes, ENABLE_LEGACY_DATABASE_ENTRY_FORMAT=no)
++AS_IF([test "x$enable_stream_restore_clear_old_devices" == "xyes"], ENABLE_STREAM_RESTORE_CLEAR_OLD_DEVICES=yes, ENABLE_STREAM_RESTORE_CLEAR_OLD_DEVICES=no)
+ 
+ echo "
+  ---{ $PACKAGE_NAME $VERSION }---
+@@ -1710,6 +1717,8 @@ echo "
+     Preopened modules:             ${PREOPEN_MODS}
+ 
+     Legacy Database Entry Support: ${ENABLE_LEGACY_DATABASE_ENTRY_FORMAT}
++    module-stream-restore:
++      Clear old devices:           ${ENABLE_STREAM_RESTORE_CLEAR_OLD_DEVICES}
+ "
+ 
+ if test "${ENABLE_SPEEX}" = "no" && test "${ENABLE_WEBRTC}" = "no" && test "${ENABLE_ADRIAN_EC}" = "no" ; then
+diff --git a/meson.build b/meson.build
+index 88394e4b9..abb0ba21c 100644
+--- a/meson.build
++++ b/meson.build
+@@ -522,6 +522,10 @@ if get_option('legacy-database-entry-format')
+   cdata.set('ENABLE_LEGACY_DATABASE_ENTRY_FORMAT', 1)
+ endif
+ 
++if get_option('stream-restore-clear-old-devices')
++  cdata.set('STREAM_RESTORE_CLEAR_OLD_DEVICES', 1)
++endif
++
+ if get_option('running-from-build-tree')
+   cdata.set('HAVE_RUNNING_FROM_BUILD_TREE', 1)
+ endif
+@@ -835,6 +839,8 @@ summary = [
+   '',
+   'Database:                      @0@'.format(get_option('database')),
+   'Legacy Database Entry Support: @0@'.format(get_option('legacy-database-entry-format')),
++  'module-stream-restore:',
++  '  Clear old devices:           @0@'.format(get_option('stream-restore-clear-old-devices')),
+   'Running from build tree:       @0@'.format(get_option('running-from-build-tree')),
+   'System User:                   @0@'.format(cdata.get_unquoted('PA_SYSTEM_USER')),
+   'System Group:                  @0@'.format(cdata.get_unquoted('PA_SYSTEM_GROUP')),
+diff --git a/meson_options.txt b/meson_options.txt
+index 817889271..c11b67ea8 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -24,6 +24,9 @@ option('database',
+ option('legacy-database-entry-format',
+        type : 'boolean',
+        description : 'Try to load legacy (< 1.0) database files (card, device and volume restore)')
++option('stream-restore-clear-old-devices',
++       type : 'boolean', value : false,
++       description : 'Forget per-stream routing settings that have been set before version 14.0. Recommended when using GNOME. See https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832')
+ option('running-from-build-tree',
+        type : 'boolean',
+        description : 'Enable running from build tree')
+diff --git a/src/modules/module-stream-restore.c b/src/modules/module-stream-restore.c
+index a86e6bc31..a3c76714c 100644
+--- a/src/modules/module-stream-restore.c
++++ b/src/modules/module-stream-restore.c
+@@ -113,7 +113,7 @@ struct userdata {
+ #endif
+ };
+ 
+-#define ENTRY_VERSION 1
++#define ENTRY_VERSION 2
+ 
+ struct entry {
+     bool muted_valid, volume_valid, device_valid, card_valid;
+@@ -1167,6 +1167,46 @@ static struct entry *entry_read(struct userdata *u, const char *name) {
+     pa_tagstruct_free(t);
+     pa_datum_free(&data);
+ 
++#ifdef STREAM_RESTORE_CLEAR_OLD_DEVICES
++    if (version < ENTRY_VERSION && e->device_valid) {
++        /* Prior to PulseAudio 14.0, GNOME's sound settings overwrote the
++         * routing for all entries in the stream-restore database when
++         * selecting a device. PulseAudio 14.0 prevents that from happening,
++         * but the old overwritten settings can still be in the database after
++         * updating to PulseAudio 14.0, and they can cause problems, as
++         * documented here:
++         * https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832
++         *
++         * We can't distinguish between devices set by GNOME's sound settings
++         * and devices set by the user, so we discard all old device settings,
++         * even though that is going to cause PulseAudio to forget routing
++         * settings for many users. This is less bad than keeping the incorrect
++         * routing settings in the database, because it's difficult for users
++         * to figure out how to fix the situation when e.g. speaker test tones
++         * go to the internal speakers no matter what device is selected as the
++         * default, whereas old manual configuration can be restored restored
++         * by doing the manual configuration again. Also, it's probably more
++         * common to have at some point changed the default device in GNOME's
++         * sound settings than it is to have any manual per-stream routing
++         * settings. */
++        pa_log_warn("Device set, but it might be incorrect. Clearing the device. If this messes up your manual stream "
++                    "routing configuration, sorry about that. This is a workaround for this bug: "
++                    "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/issues/832");
++        pa_log_warn("%s: device: %s -> (unset)", name, e->device);
++        pa_xfree(e->device);
++        e->device = NULL;
++        e->device_valid = false;
++        if (e->card_valid) {
++            pa_log_warn("%s: card: %s -> (unset)", name, e->card);
++            pa_xfree(e->card);
++            e->card = NULL;
++            e->card_valid = false;
++        }
++        entry_write(u, name, e, true);
++        trigger_save(u);
++    }
++#endif
++
+     return e;
+ 
+ fail:
+-- 
+2.26.2
+
+

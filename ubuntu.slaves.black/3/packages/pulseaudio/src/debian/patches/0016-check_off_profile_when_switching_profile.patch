@@ -1,0 +1,54 @@
+From: Jeremy Szu <jeremy.szu@canonical.com>
+Date: Tue, 25 May 2021 12:30:57 +0000
+Subject: check_off_profile_when_switching_profile
+
+If the current active profile is off, it has no sinks and sources, and
+if users plug a headset to the audio port, the profile including this
+audio port becomes available and should be selected as active profile.
+
+But with the current design, the profile_good_for_output() will return
+false because the sources in off profile and target profile doesn't
+match.
+
+For example:
+(Before users plug headset)
+Profiles:
+         HiFi (Speaker): Default (sinks: 1, sources: 1, priority: 8100, available: no)
+         HiFi (Headphones): Default (sinks: 1, sources: 1, priority: 8200, available: no)
+         off: Off (sinks: 0, sources: 0, priority: 0, available: yes)
+Active Profile: off
+
+(After users plug headset)
+Profiles:
+         HiFi (Speaker): Default (sinks: 1, sources: 1, priority: 8100, available: yes)
+         HiFi (Headphones): Default (sinks: 1, sources: 1, priority: 8200, available: yes)
+         off: Off (sinks: 0, sources: 0, priority: 0, available: yes)
+Active Profile: off
+---
+ src/modules/module-switch-on-port-available.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+Index: pulseaudio/src/modules/module-switch-on-port-available.c
+===================================================================
+--- pulseaudio.orig/src/modules/module-switch-on-port-available.c
++++ pulseaudio/src/modules/module-switch-on-port-available.c
+@@ -74,6 +74,9 @@ static bool profile_good_for_output(pa_c
+     if (pa_safe_streq(card->active_profile->name, "off"))
+         return true;
+ 
++    if (pa_safe_streq(card->active_profile->name, "off"))
++        return true;
++
+     if (!pa_safe_streq(card->active_profile->input_name, profile->input_name))
+         return false;
+ 
+@@ -108,6 +111,9 @@ static bool profile_good_for_input(pa_ca
+ 
+     if (pa_safe_streq(card->active_profile->name, "off"))
+         return true;
++
++    if (pa_safe_streq(card->active_profile->name, "off"))
++        return true;
+ 
+     if (!pa_safe_streq(card->active_profile->output_name, profile->output_name))
+         return false;

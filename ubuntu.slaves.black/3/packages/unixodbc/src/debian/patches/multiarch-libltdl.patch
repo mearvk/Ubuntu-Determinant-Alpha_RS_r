@@ -1,0 +1,79 @@
+Description: Replace the auto-generated libltdl library search path with a 
+ multi-arch-friendly search path.
+Author: Steve Langasek <vorlon@debian.org>
+Last-Update: 2020-12-31
+Forwarded: https://github.com/lurcher/unixODBC/pull/61
+
+--- a/DriverManager/SQLConnect.c
++++ b/DriverManager/SQLConnect.c
+@@ -1118,6 +1118,7 @@
+     mutex_lib_entry();      /* warning, this doesn't protect from other libs in the application */
+                             /* in their own threads calling dlinit(); */
+     lt_dlinit();
++    lt_dlsetsearchpath(MODULEDIR);
+     mutex_lib_exit();
+ 
+     /*
+--- a/configure.ac
++++ b/configure.ac
+@@ -185,6 +185,10 @@
+ AC_MSG_RESULT($SHLIBEXT)
+ AC_SUBST(SHLIBEXT,$SHLIBEXT)
+ 
++dnl Export libdir, so we can have a multi-arch-friendly search path
++dnl for ODBC drivers.
++AC_DEFINE_UNQUOTED([MODULEDIR], ["`eval echo $libdir/odbc`"], [ODBC driver search path])
++
+ AC_DEFINE_UNQUOTED([SHLIBEXT], "$shrext_cmds", [Shared lib extension])
+ AC_DEFINE_DIR([DEFLIB_PATH], [libdir], [Lib directory])
+ AC_DEFINE_DIR([LIB_PREFIX], [libdir], [Lib directory])
+--- a/odbcinst/ODBCINSTConstructProperties.c
++++ b/odbcinst/ODBCINSTConstructProperties.c
+@@ -165,6 +165,7 @@
+      */
+ 
+     lt_dlinit();
++    lt_dlsetsearchpath(MODULEDIR);
+ 
+ 	/* TRY GET FUNC FROM DRIVER SETUP */
+ 	if ( !(hDLL = lt_dlopen( szDriverSetup ))  )
+--- a/odbcinst/SQLConfigDataSource.c
++++ b/odbcinst/SQLConfigDataSource.c
+@@ -80,6 +80,7 @@
+      */
+ 
+     lt_dlinit();
++    lt_dlsetsearchpath(MODULEDIR);
+ 
+ #ifdef PLATFORM64
+ 	if ( iniPropertySeek( hIni, (char *)pszDriver, "Setup64", "" ) == INI_SUCCESS || 
+--- a/odbcinst/SQLConfigDriver.c
++++ b/odbcinst/SQLConfigDriver.c
+@@ -84,6 +84,7 @@
+      */
+ 
+     lt_dlinit();
++    lt_dlsetsearchpath(MODULEDIR);
+ 
+ 	/* process request */
+ 	switch ( nRequest )
+--- a/odbcinst/SQLCreateDataSource.c
++++ b/odbcinst/SQLCreateDataSource.c
+@@ -232,6 +232,7 @@
+         inst_logPushMsg( __FILE__, __FILE__, __LINE__, LOG_CRITICAL, ODBC_ERROR_GENERAL_ERR, "lt_dlinit() failed" );
+         return FALSE;
+     }
++    lt_dlsetsearchpath(MODULEDIR);
+ 
+     /* get plugin name */
+     _appendUIPluginExtension( szNameAndExtension, _getUIPluginName( szName, hODBCInstWnd->szUI ) );
+--- a/odbcinst/SQLManageDataSources.c
++++ b/odbcinst/SQLManageDataSources.c
+@@ -143,6 +143,7 @@
+         inst_logPushMsg( __FILE__, __FILE__, __LINE__, LOG_CRITICAL, ODBC_ERROR_GENERAL_ERR, "lt_dlinit() failed" );
+ 		return FALSE;
+     }
++    lt_dlsetsearchpath(MODULEDIR);
+ 
+     /* get plugin name */
+     _appendUIPluginExtension( szNameAndExtension, _getUIPluginName( szName, hODBCInstWnd->szUI ) );

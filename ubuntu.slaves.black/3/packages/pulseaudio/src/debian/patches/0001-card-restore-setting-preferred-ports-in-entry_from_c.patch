@@ -1,0 +1,43 @@
+From 484b69863f0740cabf1a4e37eae92ffa8d18ee32 Mon Sep 17 00:00:00 2001
+From: Hui Wang <hui.wang@canonical.com>
+Date: Thu, 11 Nov 2021 19:05:20 +0800
+Subject: [PATCH] card-restore: setting preferred ports in entry_from_card
+
+If the preferred ports are not set in this function, the
+entrys_equal() always returns false in the card_put_hook_callback().
+This will make the entry be written into the metadata and the
+preferred ports will be cleaned by a mistake.
+
+And we met a hdmi audio bug which has sth to do with this issue, on
+the machines with the legacy HDA audio driver, the hdmi port has lower
+priority than speaker, users need to manually select the hdmi to be
+active output port, then the preferred output port is hdmi for this
+sound card, after reboot, the card_put_hook_callback() in the
+module-card-restore.c will be called and the preferred ports are
+cleaned by a mistake, then the hdmi output port or hdmi sink couldn't
+switch to be active after reboot or resume automatically. That is
+because the preferred ports are cleaned and hdmi port has lower
+priority than speaker, the profile_good_for_output() in the
+module-switch-on-port-available.c always returns false.
+
+Signed-off-by: Hui Wang <hui.wang@canonical.com>
+---
+ src/modules/module-card-restore.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+Index: pulseaudio-15.99.1/src/modules/module-card-restore.c
+===================================================================
+--- pulseaudio-15.99.1.orig/src/modules/module-card-restore.c
++++ pulseaudio-15.99.1/src/modules/module-card-restore.c
+@@ -163,6 +163,11 @@ static struct entry *entry_from_card(pa_
+     if (card->preferred_output_port)
+         entry->preferred_output_port = pa_xstrdup(card->preferred_output_port->name);
+ 
++    if (card->preferred_input_port)
++        entry->preferred_input_port = pa_xstrdup(card->preferred_input_port->name);
++    if (card->preferred_output_port)
++        entry->preferred_output_port = pa_xstrdup(card->preferred_output_port->name);
++
+     PA_HASHMAP_FOREACH(port, card->ports, state) {
+         p_info = port_info_new(port);
+         pa_assert_se(pa_hashmap_put(entry->ports, p_info->name, p_info) >= 0);

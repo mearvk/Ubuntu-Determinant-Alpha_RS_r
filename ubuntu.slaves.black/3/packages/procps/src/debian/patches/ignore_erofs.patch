@@ -1,0 +1,26 @@
+Description: Ignore EROFS when writing a new setting
+ If we are running in a container, we're not allowed to write to any
+ non-namespaced sysctls.
+Author: Vincent Fazio <vfazio@xes-inc.com>
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1419554
+Last-Update: 2020-11-06
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: procps-3.3.17-5ubuntu1/sysctl.c
+===================================================================
+--- procps-3.3.17-5ubuntu1.orig/sysctl.c
++++ procps-3.3.17-5ubuntu1/sysctl.c
+@@ -457,11 +457,12 @@ static int WriteSetting(const char *sett
+ 			}
+ 			break;
+ 		case EPERM:
+-		case EROFS:
+ 		case EACCES:
+ 			ignore_failure = true;
+ 			xwarnx(_("permission denied on key \"%s\"%s"), outname, (ignore_failure?_(", ignoring"):""));
+ 			break;
++		case EROFS:
++			ignore_failure = true;
+ 		default:
+ 			xwarn(_("setting key \"%s\"%s"), outname, (ignore_failure?_(", ignoring"):""));
+ 			break;

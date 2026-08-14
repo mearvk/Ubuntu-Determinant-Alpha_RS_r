@@ -1,0 +1,92 @@
+#!/bin/sh
+
+set -eu
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+  CROSS_COMPILE="$DEB_HOST_GNU_TYPE-gcc"
+else
+  CROSS_COMPILE="cc"
+fi
+
+cat <<EOF > simple_test_compile.c
+#include <popt.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(int argc, const char **argv) {
+
+	int test = 0;
+	int flag = 0;
+	const char *string = NULL;
+	const char **files;
+	int arg;
+
+	const struct poptOption options[] = {
+		{ "test", 't', POPT_ARG_NONE, NULL, 't', "Help message for test", NULL },
+		{ "flag", 'f', POPT_ARG_NONE, &flag, 0, "Help message for flag", NULL },
+		{ "string", 's', POPT_ARG_STRING, &string, 0, "Help message for string", "command"},
+		POPT_AUTOHELP { NULL, 0, 0, NULL, 0, NULL, NULL }
+	};
+
+	poptContext optCon = poptGetContext("simple-test-compile", argc, argv, options, 0);
+
+	poptSetOtherOptionHelp(optCon, "[OPTION...] <file>");
+
+	while ((arg = poptGetNextOpt(optCon)) >= 0) {
+		switch (arg) {
+		case 't':
+			test = 1;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (arg < -1) {
+		fprintf(stderr, "bad argument: %s\n", poptBadOption(optCon, POPT_BADOPTION_NOALIAS));
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	files = poptGetArgs(optCon);
+	if (!files) {
+		fprintf(stderr, "no arguments\n");
+		poptPrintUsage(optCon, stderr, 0);
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	if (!test) {
+		fprintf(stderr, "test not set\n");
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	if (!flag) {
+		fprintf(stderr, "flag not set\n");
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	if (!string || 0 != strcmp(string, "string")) {
+		fprintf(stderr, "string not set\n");
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	if (!files || 0 != strcmp(files[0], "file1") || 0 != strcmp(files[1], "file2") || files[2] != NULL) {
+		fprintf(stderr, "files not set\n");
+		poptFreeContext(optCon);
+		return EXIT_FAILURE;
+	}
+
+	poptFreeContext(optCon);
+
+	printf("success\n");
+
+	return EXIT_SUCCESS;
+}
+EOF
+
+${CROSS_COMPILE} -Wall -Wextra -Werror -O2 simple_test_compile.c -o simple_test_compile_runner -lpopt
+./simple_test_compile_runner -t -f --string string file1 file2

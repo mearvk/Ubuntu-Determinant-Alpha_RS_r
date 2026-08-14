@@ -1,0 +1,30 @@
+commit a4e690bda598cdd1870f0ec7e69fe6341ac5d218
+Author: Igor V. Kovalenko <igor.v.kovalenko@gmail.com>
+Date:   Thu May 5 21:21:58 2022 +0300
+
+    bluetooth: Make sure there is at least one SBC frame to encode
+    
+    If SBC frame plus RTP header exceeds MTU size, let block size be at least one
+    frame to make sure bluetooth code can make progress reading and writing data.
+    
+    Part-of: <https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/merge_requests/695>
+
+diff --git a/src/modules/bluetooth/a2dp-codec-sbc.c b/src/modules/bluetooth/a2dp-codec-sbc.c
+index 61e8ac224..54e52ae4c 100644
+--- a/src/modules/bluetooth/a2dp-codec-sbc.c
++++ b/src/modules/bluetooth/a2dp-codec-sbc.c
+@@ -731,6 +731,14 @@ static size_t get_block_size(void *codec_info, size_t link_mtu) {
+     if (frame_count > 15)
+         frame_count = 15;
+ 
++    /* Code dealing with read/write block size expects it to be
++     * non-zero to make progress, make it at least one frame.
++     */
++    if (frame_count < 1) {
++        pa_log_warn("SBC packet size %lu is larger than link MTU %lu", sbc_info->frame_length + rtp_size, link_mtu);
++        frame_count = 1;
++    }
++
+     return frame_count * sbc_info->codesize;
+ }
+ 

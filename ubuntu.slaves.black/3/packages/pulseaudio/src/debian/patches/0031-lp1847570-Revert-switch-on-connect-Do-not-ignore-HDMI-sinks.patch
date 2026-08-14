@@ -1,0 +1,34 @@
+Description: Revert "switch-on-connect: Do not ignore HDMI sinks"
+ This reverts commit bae8c16bfadb43c596b03f9c7ff7c9e9f1709b76.
+ While upstream is aware of this commit causing problems they are instead
+ aiming for some kind of non-reverting fix in future for PulseAudio 14.0.
+Author: Daniel van Vugt <daniel.van.vugt@canonical.com>
+Bug: https://gitlab.freedesktop.org/pulseaudio/pulseaudio/issues/749
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1847570
+Forwarded: not-needed
+Last-Update: 2019-12-11
+
+Index: pulseaudio-13.99.1/src/modules/module-switch-on-connect.c
+===================================================================
+--- pulseaudio-13.99.1.orig/src/modules/module-switch-on-connect.c
++++ pulseaudio-13.99.1/src/modules/module-switch-on-connect.c
+@@ -76,14 +76,11 @@ static pa_hook_result_t sink_put_hook_ca
+ 
+     pa_log_debug("Trying to switch to new sink %s", sink->name);
+ 
+-    /* Don't switch to any internal devices except HDMI */
+-    s = pa_proplist_gets(sink->proplist, PA_PROP_DEVICE_STRING);
+-    if (s && !pa_startswith(s, "hdmi")) {
+-        s = pa_proplist_gets(sink->proplist, PA_PROP_DEVICE_BUS);
+-        if (pa_safe_streq(s, "pci") || pa_safe_streq(s, "isa")) {
+-            pa_log_debug("Refusing to switch to sink on %s bus", s);
+-            return PA_HOOK_OK;
+-        }
++    /* Don't switch to any internal devices */
++    s = pa_proplist_gets(sink->proplist, PA_PROP_DEVICE_BUS);
++    if (pa_safe_streq(s, "pci") || pa_safe_streq(s, "isa")) {
++        pa_log_debug("Refusing to switch to sink on %s bus", s);
++        return PA_HOOK_OK;
+     }
+ 
+     /* Ignore sinks matching the blacklist regex */
