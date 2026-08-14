@@ -1,0 +1,150 @@
+=== modified file 'axi-cache'
+Index: apt-xapian-index-0.49ubuntu2/axi-cache
+===================================================================
+--- apt-xapian-index-0.49ubuntu2.orig/axi-cache
++++ apt-xapian-index-0.49ubuntu2/axi-cache
+@@ -43,6 +43,9 @@
+ XDG_CACHE_HOME = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+ CACHEFILE = os.path.join(XDG_CACHE_HOME, "axi-cache.state")
+ 
++# Activate support for the CJK tokenizer
++os.environ["XAPIAN_CJK_NGRAM"] = "1"
++
+ try:
+     from ConfigParser import RawConfigParser
+     import re
+Index: apt-xapian-index-0.49ubuntu2/axi/indexer.py
+===================================================================
+--- apt-xapian-index-0.49ubuntu2.orig/axi/indexer.py
++++ apt-xapian-index-0.49ubuntu2/axi/indexer.py
+@@ -641,6 +641,9 @@
+         self.progress.end()
+         return unchanged, outdated, obsolete
+ 
++    def is_cjk_enabled (self):
++        return "XAPIAN_CJK_NGRAM" in os.environ
++
+     def updateIndex(self, pathname):
+         """
+         Update the index
+@@ -650,6 +653,12 @@
+         except xapian.DatabaseLockError:
+             self.progress.warning("DB Update failed, database locked")
+             return
++
++        # Make sure the index CJK-compatible
++        if self.is_cjk_enabled() and db.get_metadata("cjk_ngram") != b"1":
++            self.progress.notice("The index %s is not CJK-compatible, rebuilding it" % axi.XAPIANINDEX)
++            return self.rebuild()
++
+         cache = self.aptcache()
+         count = len(cache)
+ 
+@@ -710,6 +719,11 @@
+ 
+         # Create a new Xapian index
+         db = xapian.WritableDatabase(pathname, xapian.DB_CREATE_OR_OVERWRITE)
++
++        # Mark the new index as CJK-enabled if relevant
++        if self.is_cjk_enabled():
++            db.set_metadata("cjk_ngram", "1")
++
+         # It seems to be faster without transactions, at the moment
+         #db.begin_transaction(False)
+ 
+Index: apt-xapian-index-0.49ubuntu2/test/test_indexer.py
+===================================================================
+--- apt-xapian-index-0.49ubuntu2.orig/test/test_indexer.py
++++ apt-xapian-index-0.49ubuntu2/test/test_indexer.py
+@@ -6,6 +6,7 @@
+ import shutil
+ import subprocess
+ import tools
++import xapian
+ 
+ def smallcache(pkglist=["apt", "libept-dev", "gedit"]):
+     class sc(object):
+@@ -61,6 +62,11 @@
+         # Ensure that we have an index
+         self.assertCleanIndex()
+ 
++    def testAptRebuildWithCJK(self):
++        os.environ["XAPIAN_CJK_NGRAM"] = "1"
++        self.testAptRebuild()
++        del os.environ["XAPIAN_CJK_NGRAM"]
++
+     def testDeb822Rebuild(self):
+         pkgfile = os.path.join(axi.XAPIANDBPATH, "packages")
+         subprocess.check_call("apt-cache show apt libept-dev gedit > " + pkgfile, shell=True)
+@@ -117,6 +123,55 @@
+         # Ensure that we did not create a new index
+         self.assertEqual(open(axi.XAPIANINDEX).read(), curidx)
+ 
++    def testIncrementalRebuildWithCJK(self):
++        os.environ["XAPIAN_CJK_NGRAM"] = "1"
++        self.testIncrementalRebuild()
++        del os.environ["XAPIAN_CJK_NGRAM"]
++
++    def testIncrementalRebuildUpgradingtoCJK(self):
++        # Perform the initial indexing without CJK enabled
++        self.assertFalse("XAPIAN_CJK_NGRAM" in os.environ)
++        progress = axi.indexer.SilentProgress()
++        pre_indexer = axi.indexer.Indexer(progress, True)
++        pre_indexer._test_wrap_apt_cache(smallcache(["apt", "libept-dev", "gedit"]))
++        self.assert_(pre_indexer.lock())
++        self.assert_(pre_indexer.setupIndexing())
++        pre_indexer.rebuild()
++        pre_indexer = None
++        curidx = open(axi.XAPIANINDEX).read()
++
++        # Ensure that we have an index
++        self.assertCleanIndex()
++
++        # Prepare an incremental update
++        self.indexer._test_wrap_apt_cache(smallcache(["apt", "coreutils", "gedit"]))
++
++        # No other indexers are running, ensure lock succeeds
++        self.assert_(self.indexer.lock())
++
++        # An index exists the plugin modification timestamps are the same, so
++        # we need to force the indexer to run
++        self.assert_(not self.indexer.setupIndexing())
++        self.assert_(self.indexer.setupIndexing(force=True))
++
++        # Perform a rebuild with CJK enabled
++        os.environ["XAPIAN_CJK_NGRAM"] = "1"
++        self.indexer.incrementalUpdate()
++        del os.environ["XAPIAN_CJK_NGRAM"]
++
++        # Close the indexer
++        self.indexer = None
++
++        # Ensure that we have an index
++        self.assertCleanIndex()
++
++        # Ensure that we created a new index (because we reindexed to get CJK)
++        self.assertNotEqual(open(axi.XAPIANINDEX).read(), curidx)
++
++        # Double check that we set the CJK flag in the index
++        db = xapian.Database(axi.XAPIANINDEX)
++        self.assertEqual(db.get_metadata("cjk_ngram"), b"1")
++
+     def testIncrementalRebuildFromEmpty(self):
+         # Prepare an incremental update
+         self.indexer._test_wrap_apt_cache(smallcache())
+Index: apt-xapian-index-0.49ubuntu2/update-apt-xapian-index
+===================================================================
+--- apt-xapian-index-0.49ubuntu2.orig/update-apt-xapian-index
++++ apt-xapian-index-0.49ubuntu2/update-apt-xapian-index
+@@ -24,6 +24,11 @@
+ 
+ from __future__ import print_function
+ 
++import os
++# Activate support for the CJK tokenizer
++os.environ["XAPIAN_CJK_NGRAM"] = "1"
++
++
+ #
+ # Main program body
+ #

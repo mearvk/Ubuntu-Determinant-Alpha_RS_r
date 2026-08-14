@@ -1,0 +1,571 @@
+From b295094698da11b81487924d46b43bf57116b9be Mon Sep 17 00:00:00 2001
+From: Georgia Garcia <georgia.garcia@canonical.com>
+Date: Tue, 15 Mar 2022 21:21:00 +0000
+Subject: [PATCH 03/11] utils: add message queue rules parsing in python tools
+
+Based on what was done in the parser, replicate the logic
+so it can be used in the python tools.
+
+Signed-off-by: Georgia Garcia <georgia.garcia@canonical.com>
+---
+ utils/apparmor/profile_storage.py |   3 +
+ utils/apparmor/regex.py           |   1 +
+ utils/apparmor/rule/mqueue.py     | 240 +++++++++++++++++++++++++++
+ utils/test/test-mqueue.py         | 258 ++++++++++++++++++++++++++++++
+ 4 files changed, 502 insertions(+)
+ create mode 100644 utils/apparmor/rule/mqueue.py
+ create mode 100644 utils/test/test-mqueue.py
+
+diff --git a/utils/apparmor/profile_storage.py b/utils/apparmor/profile_storage.py
+index 19e62383f..4d2474d78 100644
+--- a/utils/apparmor/profile_storage.py
++++ b/utils/apparmor/profile_storage.py
+@@ -26,6 +26,7 @@ from apparmor.rule.network          import NetworkRuleset
+ from apparmor.rule.ptrace           import PtraceRuleset
+ from apparmor.rule.rlimit           import RlimitRuleset
+ from apparmor.rule.signal           import SignalRuleset
++from apparmor.rule.mqueue           import MessageQueueRuleset
+ 
+ from apparmor.rule import quote_if_needed
+ 
+@@ -44,6 +45,7 @@ ruletypes = {
+     'ptrace':           {'ruleset': PtraceRuleset},
+     'rlimit':           {'ruleset': RlimitRuleset},
+     'signal':           {'ruleset': SignalRuleset},
++    'mqueue':           {'ruleset': MessageQueueRuleset},
+ }
+ 
+ class ProfileStorage:
+@@ -151,6 +153,7 @@ class ProfileStorage:
+             'network',
+             'dbus',
+             'mount',
++            'mqueue',
+             'signal',
+             'ptrace',
+             'pivot_root',
+diff --git a/utils/apparmor/regex.py b/utils/apparmor/regex.py
+index 868e3cc14..f525b8283 100644
+--- a/utils/apparmor/regex.py
++++ b/utils/apparmor/regex.py
+@@ -51,6 +51,7 @@ RE_PROFILE_SIGNAL       = re.compile(RE_AUDIT_DENY + '(signal\s*,|signal(?P<deta
+ RE_PROFILE_PTRACE       = re.compile(RE_AUDIT_DENY + '(ptrace\s*,|ptrace(?P<details>\s+[^#]*)\s*,)' + RE_EOL)
+ RE_PROFILE_PIVOT_ROOT   = re.compile(RE_AUDIT_DENY + '(pivot_root\s*,|pivot_root\s+[^#]*\s*,)' + RE_EOL)
+ RE_PROFILE_UNIX         = re.compile(RE_AUDIT_DENY + '(unix\s*,|unix\s+[^#]*\s*,)' + RE_EOL)
++RE_PROFILE_MQUEUE       = re.compile(RE_AUDIT_DENY + '(mqueue\s*,|mqueue(?P<details>\s+[^#]*)\s*,)' + RE_EOL)
+ 
+ # match anything that's not " or #, or matching quotes with anything except quotes inside
+ __re_no_or_quoted_hash = '([^#"]|"[^"]*")*'
+diff --git a/utils/apparmor/rule/mqueue.py b/utils/apparmor/rule/mqueue.py
+new file mode 100644
+index 000000000..659dbae52
+--- /dev/null
++++ b/utils/apparmor/rule/mqueue.py
+@@ -0,0 +1,240 @@
++# ----------------------------------------------------------------------
++#    Copyright (C) 2022 Canonical, Ltd.
++#
++#    This program is free software; you can redistribute it and/or
++#    modify it under the terms of version 2 of the GNU General Public
++#    License as published by the Free Software Foundation.
++#
++#    This program is distributed in the hope that it will be useful,
++#    but WITHOUT ANY WARRANTY; without even the implied warranty of
++#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++#    GNU General Public License for more details.
++#
++# ----------------------------------------------------------------------
++
++import re
++
++from apparmor.regex import RE_PROFILE_MQUEUE, RE_PROFILE_NAME
++from apparmor.common import AppArmorBug, AppArmorException
++from apparmor.rule import BaseRule, BaseRuleset, check_and_split_list, logprof_value_or_all, parse_modifiers, quote_if_needed
++
++# setup module translations
++from apparmor.translations import init_translation
++_ = init_translation()
++
++
++access_keywords_read = ['r', 'read']
++access_keywords_write = ['w', 'write']
++access_keywords_rw = ['rw', 'wr']
++access_keywords_other = ['create', 'open', 'delete', 'getattr', 'setattr']
++access_keywords = access_keywords_read + access_keywords_write + access_keywords_rw + access_keywords_other
++
++joint_access_keyword = r'\s*(' + '|'.join(access_keywords) + r')\s*'
++RE_ACCESS_KEYWORDS = (joint_access_keyword +  # one of the access_keyword or
++                      '|' +                                           # or
++                      r'\(' + joint_access_keyword + '(' + r'(\s|,)+' + joint_access_keyword + ')*' + r'\)'  # one or more access_keyword in (...)
++                      )
++
++RE_MQUEUE_NAME = r'(?P<%s>(/\S+|\d*))'  # / + string for posix, or digits for sys
++RE_MQUEUE_TYPE = r'(?P<%s>(sysv|posix))'  # type can be sysv or posix
++
++RE_MQUEUE_DETAILS = re.compile(
++    '^' +
++    r'(\s+(?P<access>' + RE_ACCESS_KEYWORDS + '))?' +  # optional access keyword(s)
++    r'(\s+(type=' + RE_MQUEUE_TYPE % 'mqueue_type' + '))?' +  # optional type
++    r'(\s+(label=' + RE_PROFILE_NAME % 'label' + '))?' +  # optional label
++    r'(\s+(' + RE_MQUEUE_NAME % 'mqueue_name' + '))?' +  # optional mqueue name
++    r'\s*$')
++
++
++class MessageQueueRule(BaseRule):
++    '''Class to handle and store a single mqueue rule'''
++
++    # Nothing external should reference this class, all external users
++    # should reference the class field MessageQueueRule.ALL
++    class __MessageQueueAll(object):
++        pass
++
++    ALL = __MessageQueueAll
++
++    rule_name = 'mqueue'
++
++    def __init__(self, access, mqueue_type, label, mqueue_name,
++                 audit=False, deny=False, allow_keyword=False,
++                 comment='', log_event=None):
++
++        super(MessageQueueRule, self).__init__(audit=audit, deny=deny,
++                                               allow_keyword=allow_keyword,
++                                               comment=comment,
++                                               log_event=log_event)
++
++        self.access, self.all_access, unknown_items = check_and_split_list(access, access_keywords, MessageQueueRule.ALL, 'MessageQueueRule', 'access')
++        if unknown_items:
++            raise AppArmorException(_('Passed unknown access keyword to MessageQueueRule: %s') % ' '.join(unknown_items))
++
++        self.label, self.all_labels = self._aare_or_all(label, 'label', is_path=False, log_event=log_event)
++        self.mqueue_type, self.all_mqueue_types = self._aare_or_all(mqueue_type, 'type', is_path=False, log_event=log_event)
++        self.mqueue_name, self.all_mqueue_names = self._aare_or_all(mqueue_name, 'mqueue_name', is_path=False, log_event=log_event)
++        self.validate_mqueue_name()
++
++    def validate_mqueue_name(self):
++        # The regex checks if it starts with / or if it's numeric
++        if self.all_mqueue_types or self.all_mqueue_names:
++            return
++
++        if self.mqueue_type.regex == 'sysv' and not self.mqueue_name.regex.isnumeric():
++            raise AppArmorException(_('Queue name for SYSV must be a positive integer'))
++        elif self.mqueue_type.regex == 'posix' and not self.mqueue_name.regex.startswith('/'):
++            raise AppArmorException(_('Queue name for POSIX must begin with /'))
++
++    @classmethod
++    def _match(cls, raw_rule):
++        return RE_PROFILE_MQUEUE.search(raw_rule)
++
++    @classmethod
++    def _parse(cls, raw_rule):
++        '''parse raw_rule and return MessageQueueRule'''
++
++        matches = cls._match(raw_rule)
++        if not matches:
++            raise AppArmorException(_("Invalid mqueue rule '%s'") % raw_rule)
++
++        audit, deny, allow_keyword, comment = parse_modifiers(matches)
++
++        rule_details = ''
++        if matches.group('details'):
++            rule_details = matches.group('details')
++
++        if rule_details:
++            details = RE_MQUEUE_DETAILS.search(rule_details)
++            if not details:
++                raise AppArmorException(_("Invalid or unknown keywords in 'mqueue %s" % rule_details))
++
++            if details.group('access'):
++                access = details.group('access')
++                if access.startswith('(') and access.endswith(')'):
++                    access = access[1:-1]
++                access = access.replace(',', ' ').split()  # split by ',' or whitespace
++            else:
++                access = MessageQueueRule.ALL
++
++            if details.group('mqueue_type'):
++                mqueue_type = details.group('mqueue_type')
++            else:
++                mqueue_type = MessageQueueRule.ALL
++
++            if details.group('label'):
++                label = details.group('label')
++            else:
++                label = MessageQueueRule.ALL
++
++            if details.group('mqueue_name'):
++                mqueue_name = details.group('mqueue_name')
++            else:
++                mqueue_name = MessageQueueRule.ALL
++        else:
++            access = MessageQueueRule.ALL
++            mqueue_type = MessageQueueRule.ALL
++            label = MessageQueueRule.ALL
++            mqueue_name = MessageQueueRule.ALL
++
++        return MessageQueueRule(access, mqueue_type, label, mqueue_name,
++                                audit=audit, deny=deny, allow_keyword=allow_keyword, comment=comment)
++
++    def get_clean(self, depth=0):
++        '''return rule (in clean/default formatting)'''
++
++        space = '  ' * depth
++
++        if self.all_access:
++            access = ''
++        elif len(self.access) == 1:
++            access = ' %s' % ' '.join(self.access)
++        elif self.access:
++            access = ' (%s)' % ' '.join(sorted(self.access))
++        else:
++            raise AppArmorBug('Empty access in mqueue rule')
++
++        if self.all_mqueue_types:
++            mqueue_type = ''
++        elif self.mqueue_type:
++            mqueue_type = ' type=%s' % self.mqueue_type.regex
++        else:
++            raise AppArmorBug('Empty type in mqueue rule')
++
++        if self.all_labels:
++            label = ''
++        elif self.label:
++            label = ' label=%s' % quote_if_needed(self.label.regex)
++        else:
++            raise AppArmorBug('Empty label in mqueue rule')
++
++        if self.all_mqueue_names:
++            mqueue_name = ''
++        elif self.mqueue_name:
++            mqueue_name = ' %s' % self.mqueue_name.regex
++        else:
++            raise AppArmorBug('Empty mqueue_name in mqueue rule')
++
++        return('%s%smqueue%s%s%s%s,%s' % (space, self.modifiers_str(), access, mqueue_type, label, mqueue_name, self.comment))
++
++    def is_covered_localvars(self, other_rule):
++        '''check if other_rule is covered by this rule object'''
++
++        if not self._is_covered_list(self.access, self.all_access, other_rule.access, other_rule.all_access, 'access'):
++            return False
++
++        if not self._is_covered_aare(self.mqueue_type, self.all_mqueue_types, other_rule.mqueue_type, other_rule.all_mqueue_types, 'mqueue_type'):
++            return False
++
++        if not self._is_covered_aare(self.label, self.all_labels, other_rule.label, other_rule.all_labels, 'label'):
++            return False
++
++        if not self._is_covered_aare(self.mqueue_name, self.all_mqueue_names, other_rule.mqueue_name, other_rule.all_mqueue_names, 'mqueue_name'):
++            return False
++
++        # still here? -> then it is covered
++        return True
++
++    def is_equal_localvars(self, rule_obj, strict):
++        '''compare if rule-specific variables are equal'''
++
++        if not type(rule_obj) == MessageQueueRule:
++            raise AppArmorBug('Passed non-mqueue rule: %s' % str(rule_obj))
++
++        if (self.access != rule_obj.access or
++                self.all_access != rule_obj.all_access):
++            return False
++
++        if not self._is_equal_aare(self.mqueue_type, self.all_mqueue_types, rule_obj.mqueue_type, rule_obj.all_mqueue_types, 'mqueue_type'):
++            return False
++
++        if not self._is_equal_aare(self.label, self.all_labels, rule_obj.label, rule_obj.all_labels, 'label'):
++            return False
++
++        if not self._is_equal_aare(self.mqueue_name, self.all_mqueue_names, rule_obj.mqueue_name, rule_obj.all_mqueue_names, 'mqueue_name'):
++            return False
++
++        return True
++
++    def logprof_header_localvars(self):
++        access = logprof_value_or_all(self.access, self.all_access)
++        mqueue_type = logprof_value_or_all(self.mqueue_type, self.all_mqueue_types)
++        label = logprof_value_or_all(self.label, self.all_labels)
++        mqueue_name = logprof_value_or_all(self.mqueue_name, self.all_mqueue_names)
++
++        return (
++            _('Access mode'), access,
++            _('Type'), mqueue_type,
++            _('Label'), label,
++            _('Message queue name'), mqueue_name
++        )
++
++
++class MessageQueueRuleset(BaseRuleset):
++    '''Class to handle and store a collection of mqueue rules'''
++
++    def get_glob(self, path_or_rule):
++        '''Return the next possible glob. For mqueue rules, that means removing access, label or mqueue_name'''
++        # XXX only remove one part, not all
++        return 'mqueue,'
+diff --git a/utils/test/test-mqueue.py b/utils/test/test-mqueue.py
+new file mode 100644
+index 000000000..8c7627080
+--- /dev/null
++++ b/utils/test/test-mqueue.py
+@@ -0,0 +1,258 @@
++#!/usr/bin/python3
++# ----------------------------------------------------------------------
++#    Copyright (C) 2022 Canonical, Ltd.
++#
++#    This program is free software; you can redistribute it and/or
++#    modify it under the terms of version 2 of the GNU General Public
++#    License as published by the Free Software Foundation.
++#
++#    This program is distributed in the hope that it will be useful,
++#    but WITHOUT ANY WARRANTY; without even the implied warranty of
++#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++#    GNU General Public License for more details.
++#
++# ----------------------------------------------------------------------
++
++import unittest
++from collections import namedtuple
++from common_test import AATest, setup_all_loops
++
++from apparmor.rule.mqueue import MessageQueueRule, MessageQueueRuleset
++from apparmor.common import AppArmorException, AppArmorBug
++from apparmor.translations import init_translation
++_ = init_translation()
++
++
++class MessageQueueTestParse(AATest):
++    tests = (
++        #                                                           access type label mqueue_name audit deny allow comment
++        ('mqueue,'                               , MessageQueueRule(MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue create,'                        , MessageQueueRule(('create'), MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue (create,open,delete),'          , MessageQueueRule(('create', 'open', 'delete'), MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue (getattr,setattr),'             , MessageQueueRule(('getattr', 'setattr'), MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue (write,read),'                  , MessageQueueRule(('write', 'read'), MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue (open,delete),'                 , MessageQueueRule(('open', 'delete'), MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue write label=foo,'               , MessageQueueRule(('write'), MessageQueueRule.ALL, 'foo', MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue read label=foo /queue,'         , MessageQueueRule(('read'), MessageQueueRule.ALL, 'foo', '/queue', False, False, False, '')),
++        ('audit mqueue read label=foo /queue,'   , MessageQueueRule(('read'), MessageQueueRule.ALL, 'foo', '/queue', True, False, False, '')),
++        ('deny mqueue rw label=foo /queue,'      , MessageQueueRule(('rw'), MessageQueueRule.ALL, 'foo', '/queue', False, True, False, '')),
++        ('audit allow mqueue r label=foo /queue,', MessageQueueRule(('r'), MessageQueueRule.ALL, 'foo', '/queue', True, False, True, '')),
++        ('mqueue w label=foo 1234, # cmt'        , MessageQueueRule(('w'), MessageQueueRule.ALL, 'foo', '1234', False, False, False, ' # cmt')),
++        ('mqueue wr 1234,'                       , MessageQueueRule(('wr'), MessageQueueRule.ALL, MessageQueueRule.ALL, '1234', False, False, False, '')),
++        ('mqueue 1234,'                          , MessageQueueRule(MessageQueueRule.ALL, MessageQueueRule.ALL, MessageQueueRule.ALL, '1234', False, False, False, '')),
++        ('mqueue type=sysv,'                     , MessageQueueRule(MessageQueueRule.ALL, 'sysv', MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue type=posix,'                    , MessageQueueRule(MessageQueueRule.ALL, 'posix', MessageQueueRule.ALL, MessageQueueRule.ALL, False, False, False, '')),
++        ('mqueue type=sysv 1234,'                , MessageQueueRule(MessageQueueRule.ALL, 'sysv', MessageQueueRule.ALL, '1234', False, False, False, '')),
++        ('mqueue type=posix /queue,'             , MessageQueueRule(MessageQueueRule.ALL, 'posix', MessageQueueRule.ALL, '/queue', False, False, False, '')),
++        ('mqueue open type=sysv label=foo 1234,' , MessageQueueRule(('open'), 'sysv', 'foo', '1234', False, False, False, '')),
++    )
++
++    def _run_test(self, rawrule, expected):
++        self.assertTrue(MessageQueueRule.match(rawrule))
++        obj = MessageQueueRule.parse(rawrule)
++        expected.raw_rule = rawrule.strip()
++        self.assertTrue(obj.is_equal(expected, True))
++
++
++class MessageQueueTestParseInvalid(AATest):
++    tests = (
++        ('mqueue label=,'                  , AppArmorException),
++        ('mqueue invalidaccess /queuename,', AppArmorException),
++        ('mqueue invalidqueuename,'        , AppArmorException),
++        ('mqueue invalidqueuename1234,'    , AppArmorException),
++        ('mqueue foo label foo bar,'       , AppArmorException),
++        ('mqueue type=,'                   , AppArmorException),
++        ('mqueue type=sysv /foo,'          , AppArmorException),
++        ('mqueue type=posix 1234,'         , AppArmorException),
++    )
++
++    def _run_test(self, rawrule, expected):
++        self.assertTrue(MessageQueueRule.match(rawrule))  # the above invalid rules still match the main regex!
++        with self.assertRaises(expected):
++            MessageQueueRule.parse(rawrule)
++
++    def test_parse_fail(self):
++        with self.assertRaises(AppArmorException):
++            MessageQueueRule.parse('foo,')
++
++    def test_diff_non_mqueuerule(self):
++        exp = namedtuple('exp', ('audit', 'deny'))
++        obj = MessageQueueRule(('open'), 'posix', 'bar', '/foo')
++        with self.assertRaises(AppArmorBug):
++            obj.is_equal(exp(False, False), False)
++
++    def test_diff_access(self):
++        obj1 = MessageQueueRule(('open'), 'posix', 'bar', '/foo')
++        obj2 = MessageQueueRule(('create'), 'posix', 'bar', '/foo')
++        self.assertFalse(obj1.is_equal(obj2, False))
++
++    def test_diff_type(self):
++        obj1 = MessageQueueRule(('open'), 'sysv', 'bar', MessageQueueRule.ALL)
++        obj2 = MessageQueueRule(('open'), 'posix', 'inv', MessageQueueRule.ALL)
++        self.assertFalse(obj1.is_equal(obj2, False))
++
++    def test_diff_label(self):
++        obj1 = MessageQueueRule(('open'), 'posix', 'bar', '/foo')
++        obj2 = MessageQueueRule(('open'), 'posix', 'inv', '/foo')
++        self.assertFalse(obj1.is_equal(obj2, False))
++
++    def test_diff_mqueue_name(self):
++        obj1 = MessageQueueRule(('open'), MessageQueueRule.ALL, 'bar', '/foo')
++        obj2 = MessageQueueRule(('open'), MessageQueueRule.ALL, 'bar', '123')
++        self.assertFalse(obj1.is_equal(obj2, False))
++
++
++class InvalidMessageQueueInit(AATest):
++    tests = (
++        # init params                               expected exception
++        (('write', 'sysv', '', '/foo'), AppArmorBug),  # empty label
++        (('write', '', 'bar', '/foo'), AppArmorBug),  # empty type
++        (('', 'sysv', 'bar', '/foo'), AppArmorBug),  # empty access
++        (('write', 'sysv', 'bar', ''), AppArmorBug),  # empty mqueue_name
++        (('    ', 'sysv', 'bar', '/foo'), AppArmorBug),  # whitespace access
++        (('write', '    ', 'bar', '/foo'), AppArmorBug),  # whitespace type
++        (('write', 'sysv', '   ', '/foo'), AppArmorBug),  # whitespace label
++        (('write', 'sysv', 'bar', '    '), AppArmorBug),  # whitespace mqueue_name
++        (('xyxy', 'sysv', 'bar', '/foo'), AppArmorException),  # invalid access
++        ((dict(), '', 'bar', '/foo'), AppArmorBug),  # wrong type for access
++        ((None, '', 'bar', '/foo'), AppArmorBug),  # wrong type for access
++        (('write', dict(), 'bar', '/foo'), AppArmorBug),  # wrong type for type
++        (('write', None, 'bar', '/foo'), AppArmorBug),  # wrong type for type
++        (('write', '', dict(), '/foo'), AppArmorBug),  # wrong type for label
++        (('write', '', None, '/foo'), AppArmorBug),  # wrong type for label
++        (('write', '', 'bar', dict()), AppArmorBug),  # wrong type for mqueue_name
++        (('write', '', 'bar', None), AppArmorBug),  # wrong type for mqueue_name
++    )
++
++    def _run_test(self, params, expected):
++        with self.assertRaises(expected):
++            MessageQueueRule(*params)
++
++    def test_missing_params_1(self):
++        with self.assertRaises(TypeError):
++            MessageQueueRule()
++
++    def test_missing_params_2(self):
++        with self.assertRaises(TypeError):
++            MessageQueueRule('r')
++
++    def test_missing_params_3(self):
++        with self.assertRaises(TypeError):
++            MessageQueueRule('r', 'sysv')
++
++    def test_missing_params_4(self):
++        with self.assertRaises(TypeError):
++            MessageQueueRule('r', 'sysv', 'foo')
++
++
++class WriteMessageQueueTestAATest(AATest):
++    tests = (
++        #  raw rule                                               clean rule
++        ('     mqueue         ,    # foo        '               , 'mqueue, # foo'),
++        ('    audit     mqueue create,'                         , 'audit mqueue create,'),
++        ('    audit     mqueue (open  ),'                       , 'audit mqueue open,'),
++        ('    audit     mqueue (delete , read ),'               , 'audit mqueue (delete read),'),
++        ('   deny mqueue         write      label=bar,# foo bar', 'deny mqueue write label=bar, # foo bar'),
++        ('   deny mqueue         open      ,# foo bar'          , 'deny mqueue open, # foo bar'),
++        ('   allow mqueue             label=tst    ,# foo bar'  , 'allow mqueue label=tst, # foo bar'),
++        ('mqueue,'                                              , 'mqueue,'),
++        ('mqueue (read),'                                       , 'mqueue read,'),
++        ('mqueue (create),'                                     , 'mqueue create,'),
++        ('mqueue (write read),'                                 , 'mqueue (read write),'),
++        ('mqueue (open,create,open,delete,write,read),'         , 'mqueue (create delete open read write),'),
++        ('mqueue r,'                                            , 'mqueue r,'),
++        ('mqueue w,'                                            , 'mqueue w,'),
++        ('mqueue rw,'                                           , 'mqueue rw,'),
++        ('mqueue delete label="tst",'                           , 'mqueue delete label="tst",'),
++        ('mqueue (getattr) label=bar,'                          , 'mqueue getattr label=bar,'),
++        ('mqueue getattr /foo,'                                 , 'mqueue getattr /foo,'),
++        ('mqueue (setattr getattr) 1234,'                       , 'mqueue (getattr setattr) 1234,'),
++        ('mqueue wr label=tst 1234,'                            , 'mqueue wr label=tst 1234,'),
++        ('mqueue wr  type=sysv   label=tst 1234,'               , 'mqueue wr type=sysv label=tst 1234,'),
++        ('mqueue wr   type=posix label=tst /foo,'               , 'mqueue wr type=posix label=tst /foo,'),
++    )
++
++    def _run_test(self, rawrule, expected):
++        self.assertTrue(MessageQueueRule.match(rawrule))
++        obj = MessageQueueRule.parse(rawrule)
++        clean = obj.get_clean()
++        raw = obj.get_raw()
++
++        self.assertEqual(expected.strip(), clean, 'unexpected clean rule')
++        self.assertEqual(rawrule.strip(), raw, 'unexpected raw rule')
++
++    def test_write_manually(self):
++        obj = MessageQueueRule('setattr', 'posix', 'bar', '/foo', allow_keyword=True)
++
++        expected = '    allow mqueue setattr type=posix label=bar /foo,'
++
++        self.assertEqual(expected, obj.get_clean(2), 'unexpected clean rule')
++        self.assertEqual(expected, obj.get_raw(2), 'unexpected raw rule')
++
++    def test_write_invalid_access(self):
++        obj = MessageQueueRule('setattr', 'posix', 'bar', '/foo')
++        obj.access = ''
++        with self.assertRaises(AppArmorBug):
++            obj.get_clean()
++
++    def test_write_invalid_type(self):
++        obj = MessageQueueRule('setattr', 'posix', 'bar', '/foo')
++        obj.mqueue_type = ''
++        with self.assertRaises(AppArmorBug):
++            obj.get_clean()
++
++    def test_write_invalid_label(self):
++        obj = MessageQueueRule('setattr', 'posix', 'bar', '/foo')
++        obj.label = ''
++        with self.assertRaises(AppArmorBug):
++            obj.get_clean()
++
++    def test_write_invalid_mqueue_name(self):
++        obj = MessageQueueRule('setattr', 'posix', 'bar', '/foo')
++        obj.mqueue_name = ''
++        with self.assertRaises(AppArmorBug):
++            obj.get_clean()
++
++
++class MessageQueueIsCoveredTest(AATest):
++    def test_is_covered(self):
++        obj = MessageQueueRule(('create'), MessageQueueRule.ALL, 'f*', MessageQueueRule.ALL)
++        self.assertTrue(obj.is_covered(MessageQueueRule(('create'), 'sysv', 'f*', '1234')))
++        self.assertTrue(obj.is_covered(MessageQueueRule(('create'), 'posix', 'f*', MessageQueueRule.ALL)))
++        self.assertTrue(obj.is_covered(MessageQueueRule(('create'), 'sysv', 'foo', MessageQueueRule.ALL)))
++        self.assertTrue(obj.is_covered(MessageQueueRule(('create'), 'sysv', 'foo', '1234')))
++
++    def test_is_not_covered(self):
++        obj = MessageQueueRule(('getattr'), 'sysv', 'f*', '1234')
++        self.assertFalse(obj.is_covered(MessageQueueRule(('create'), 'sysv', 'foo', MessageQueueRule.ALL)))
++        self.assertFalse(obj.is_covered(MessageQueueRule(('getattr'), 'posix', 'foo', MessageQueueRule.ALL)))
++        self.assertFalse(obj.is_covered(MessageQueueRule(('getattr'), 'sysv', 'bar', MessageQueueRule.ALL)))
++        self.assertFalse(obj.is_covered(MessageQueueRule(('getattr'), 'sysv', 'foo', '123')))
++
++
++class MessageQueueLogprofHeaderTest(AATest):
++    tests = (
++        ('mqueue,',                     [                               _('Access mode'), _('ALL'),         _('Type'), _('ALL'), _('Label'), _('ALL'), _('Message queue name'), _('ALL'), ]),
++        ('mqueue (create,getattr) 12,', [                               _('Access mode'), 'create getattr', _('Type'), _('ALL'), _('Label'), _('ALL'), _('Message queue name'), '12', ]),
++        ('mqueue write label=bar,',     [                               _('Access mode'), 'write',          _('Type'), _('ALL'), _('Label'), 'bar',    _('Message queue name'), _('ALL'), ]),
++        ('mqueue write type=sysv,',     [                               _('Access mode'), 'write',          _('Type'), 'sysv',   _('Label'), _('ALL'), _('Message queue name'), _('ALL'), ]),
++        ('mqueue read type=posix,',     [                               _('Access mode'), 'read',           _('Type'), 'posix',  _('Label'), _('ALL'), _('Message queue name'), _('ALL'), ]),
++        ('deny mqueue read /foo,',      [_('Qualifier'), 'deny',        _('Access mode'), 'read',           _('Type'), _('ALL'), _('Label'), _('ALL'), _('Message queue name'), '/foo', ]),
++        ('allow mqueue setattr,',       [_('Qualifier'), 'allow',       _('Access mode'), 'setattr',        _('Type'), _('ALL'), _('Label'), _('ALL'), _('Message queue name'), _('ALL'), ]),
++        ('audit mqueue r label=ba 12,', [_('Qualifier'), 'audit',       _('Access mode'), 'r',              _('Type'), _('ALL'), _('Label'), 'ba',     _('Message queue name'), '12', ]),
++        ('audit deny mqueue rw,',       [_('Qualifier'), 'audit deny',  _('Access mode'), 'rw',             _('Type'), _('ALL'), _('Label'), _('ALL'), _('Message queue name'), _('ALL'), ]),
++    )
++
++    def _run_test(self, params, expected):
++        obj = MessageQueueRule.parse(params)
++        self.assertEqual(obj.logprof_header(), expected)
++
++
++class ModuleGlobTestAATest(AATest):
++    def test_glob(self):
++        self.assertEqual(MessageQueueRuleset().get_glob('mqueue create,'), 'mqueue,')
++
++
++setup_all_loops(__name__)
++if __name__ == '__main__':
++    unittest.main(verbosity=1)
+-- 
+2.34.1
+

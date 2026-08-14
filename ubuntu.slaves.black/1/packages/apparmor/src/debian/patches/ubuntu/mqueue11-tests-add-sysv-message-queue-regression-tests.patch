@@ -1,0 +1,545 @@
+From 4044e3eb38f8e65767fc3e723ba3975e8190c7a0 Mon Sep 17 00:00:00 2001
+From: Georgia Garcia <georgia.garcia@canonical.com>
+Date: Wed, 13 Apr 2022 13:41:28 +0000
+Subject: [PATCH 11/11] tests: add sysv message queue regression tests
+
+Signed-off-by: Georgia Garcia <georgia.garcia@canonical.com>
+---
+ .gitignore                              |   2 +
+ tests/regression/apparmor/Makefile      |   3 +
+ tests/regression/apparmor/sysv_ipc.sh   |   9 ++
+ tests/regression/apparmor/sysv_mq.h     |  35 +++++
+ tests/regression/apparmor/sysv_mq.sh    | 171 ++++++++++++++++++++++
+ tests/regression/apparmor/sysv_mq_rcv.c | 187 ++++++++++++++++++++++++
+ tests/regression/apparmor/sysv_mq_snd.c |  55 +++++++
+ 7 files changed, 462 insertions(+)
+ create mode 100755 tests/regression/apparmor/sysv_ipc.sh
+ create mode 100644 tests/regression/apparmor/sysv_mq.h
+ create mode 100755 tests/regression/apparmor/sysv_mq.sh
+ create mode 100644 tests/regression/apparmor/sysv_mq_rcv.c
+ create mode 100644 tests/regression/apparmor/sysv_mq_snd.c
+
+diff --git a/.gitignore b/.gitignore
+index 6580951e3..70ec7d217 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -274,6 +274,8 @@ tests/regression/apparmor/syscall_setpriority
+ tests/regression/apparmor/syscall_setscheduler
+ tests/regression/apparmor/syscall_sysctl
+ tests/regression/apparmor/sysctl_proc
++tests/regression/apparmor/sysv_mq_rcv
++tests/regression/apparmor/sysv_mq_snd
+ tests/regression/apparmor/tcp
+ tests/regression/apparmor/unix_fd_client
+ tests/regression/apparmor/unix_fd_server
+diff --git a/tests/regression/apparmor/Makefile b/tests/regression/apparmor/Makefile
+index b3bb30888..153c2c032 100644
+--- a/tests/regression/apparmor/Makefile
++++ b/tests/regression/apparmor/Makefile
+@@ -136,6 +136,8 @@ SRC=access.c \
+     syscall_setdomainname.c \
+     syscall_setscheduler.c \
+     sysctl_proc.c \
++    sysv_mq_rcv.c \
++    sysv_mq_snd.c \
+     tcp.c \
+     transition.c \
+     unix_fd_client.c \
+@@ -248,6 +250,7 @@ TESTS=aa_exec \
+       setattr \
+       symlink \
+       syscall \
++      sysv_ipc \
+       tcp \
+       unix_fd_server \
+       unix_socket_pathname \
+diff --git a/tests/regression/apparmor/sysv_ipc.sh b/tests/regression/apparmor/sysv_ipc.sh
+new file mode 100755
+index 000000000..d68fcd594
+--- /dev/null
++++ b/tests/regression/apparmor/sysv_ipc.sh
+@@ -0,0 +1,9 @@
++# Test semaphores first, as they could be used for synchronization
++
++## TODO
++# sysv_sem.sh
++
++## TODO
++# sysv_shm.sh
++
++./sysv_mq.sh
+diff --git a/tests/regression/apparmor/sysv_mq.h b/tests/regression/apparmor/sysv_mq.h
+new file mode 100644
+index 000000000..d716947c7
+--- /dev/null
++++ b/tests/regression/apparmor/sysv_mq.h
+@@ -0,0 +1,35 @@
++#ifndef SYSV_MQ_H_
++#define SYSV_MQ_H_
++
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/types.h>
++#include <sys/ipc.h>
++#include <sys/sem.h>
++#include <sys/msg.h>
++#include <sys/stat.h>
++
++#define MQ_KEY (123)
++#define MQ_TYPE (0)
++#define SHM_KEY (456)
++#define SEM_KEY (789)
++#define OBJ_PERMS (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
++
++#define BUF_SIZE 1024
++struct msg_buf {
++	long mtype;
++	char mtext[BUF_SIZE];
++};
++
++union semun {
++	int              val;
++	struct semid_ds *buf;
++	unsigned short  *array;
++	struct seminfo  *__buf;
++};
++
++
++char *msg = "hello world";
++
++#endif /* #ifndef SYSV_MQ_H_ */
+diff --git a/tests/regression/apparmor/sysv_mq.sh b/tests/regression/apparmor/sysv_mq.sh
+new file mode 100755
+index 000000000..a9a2739a3
+--- /dev/null
++++ b/tests/regression/apparmor/sysv_mq.sh
+@@ -0,0 +1,171 @@
++#! /bin/bash
++#Copyright (C) 2022 Canonical, Ltd.
++#
++#This program is free software; you can redistribute it and/or
++#modify it under the terms of the GNU General Public License as
++#published by the Free Software Foundation, version 2 of the
++#License.
++
++#=NAME sysv_mq
++#=DESCRIPTION
++# This test verifies if mediation of sysv message queues is working
++#=END
++
++pwd=`dirname $0`
++pwd=`cd $pwd ; /bin/pwd`
++
++bin=$pwd
++
++. $bin/prologue.inc
++
++requires_kernel_features ipc/sysv_mqueue
++requires_parser_support "mqueue,"
++
++settest sysv_mq_rcv
++
++sender="$bin/sysv_mq_snd"
++receiver="$bin/sysv_mq_rcv"
++qkey=123
++qkey2=124
++semaphore=456
++
++user="foo"
++adduser --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --no-create-home --disabled-password $user >/dev/null
++echo "$user:password" | sudo chpasswd
++userid=$(id -u $user)
++
++# workaround to not have to set o+x
++chmod 6755 $receiver
++setcap cap_dac_read_search+pie $receiver
++
++cleanup()
++{
++    ipcrm --queue-key $qkey >/dev/null 2>&1
++    ipcrm --queue-key $qkey2 >/dev/null 2>&1
++    ipcrm --semaphore-key $semaphore >/dev/null 2>&1
++    deluser foo >/dev/null
++}
++do_onexit="cleanup"
++
++do_test()
++{
++    local desc="SYSV MQUEUE ($1)"
++    shift
++    runchecktest "$desc" "$@"
++}
++
++do_tests()
++{
++    prefix=$1
++    expect_send=$2
++
++    all_args=("$@")
++    rest_args=("${all_args[@]:2}")
++
++    do_test "$prefix" "$expect_send" -c $sender -k $qkey -s $semaphore "${rest_args[@]}"
++}
++
++for username in "root" "$userid" ; do
++    if [ $username == "root" ] ; then
++	usercmd=""
++    else
++	usercmd="-u $userid"
++    fi
++
++    do_tests "unconfined $username" pass $usercmd
++
++    # No mqueue perms
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "$sender:px" -- image=$sender
++    do_tests "confined $username - no perms" fail $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "deny:mqueue" "$sender:px" -- image=$sender "deny mqueue"
++    do_tests "confined $username - deny perms" fail $usercmd
++
++    # generic mqueue
++    # 2 Potential failures caused by missing other x permission in path
++    # to tests. Usually on the user home dir as it is now default to
++    # create a user without that
++    # * if you seen a capability dac_read_search denied failure from
++    #   apparmor when doing "root" username tests
++    # * if doing the $userid set of tests and you see
++    #   Permission denied in the test output
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue" "$sender:px" -- image=$sender "mqueue"
++    do_tests "confined $username - mqueue" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:type=sysv" "$sender:px" -- image=$sender "mqueue:type=sysv"
++    do_tests "confined $username - mqueue type=sysv" pass $usercmd
++
++    # queue name
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:$qkey" "$sender:px" -- image=$sender "mqueue:$qkey"
++    do_tests "confined $username - mqueue /name 1" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue" "$sender:px" -- image=$sender "mqueue:$qkey"
++    do_tests "confined $username - mqueue /name 2" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:$qkey" "$sender:px" -- image=$sender "mqueue"
++    do_tests "confined $username - mqueue /name 3" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:$qkey" "$sender:px" -- image=$sender "mqueue:$qkey2"
++    do_tests "confined $username - mqueue /name 4" fail $usercmd -t 1
++
++
++    # specific permissions
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 1" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 2" fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 3" fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 4" fail $usercmd -t 1
++    # we need to remove queue since the previous test didn't
++    ipcrm --queue-key $qkey >/dev/null 2>&1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete,setattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 5" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete,getattr)" "$sender:px" -- image=$sender "mqueue:(open,write)"
++    do_tests "confined $username - specific 6" pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:(open,read)"
++    do_tests "confined $username - specific 7" fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 7" fail $usercmd -t 1
++
++
++    # unconfined receiver
++    genprofile image=$sender "mqueue"
++    do_tests "confined sender $username - unconfined receiver" pass $usercmd
++
++
++    # unconfined sender
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue" "$sender:ux"
++    do_tests "confined receiver $username - unconfined sender" pass $usercmd
++
++
++    # queue label
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:label=$receiver" "$sender:px" -- image=$sender "mqueue:label=$receiver"
++    do_tests "confined $username - mqueue label 1" xpass $usercmd
++
++
++    # queue name and label
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "mqueue:(create,read,delete):type=sysv:label=$receiver:$qkey" "$sender:px" -- image=$sender "mqueue:(open,write):type=sysv:label=$receiver:$qkey"
++    do_tests "confined $username - mqueue label 2" xpass $usercmd
++
++
++    # ensure we are cleaned up for next pass
++    removeprofile
++done
++
++
++# confined root with cap ??override
++
++
++# confined root without cap ??override
++
++
++# deliver message by mtype (posix lacks this)
+diff --git a/tests/regression/apparmor/sysv_mq_rcv.c b/tests/regression/apparmor/sysv_mq_rcv.c
+new file mode 100644
+index 000000000..903e58d62
+--- /dev/null
++++ b/tests/regression/apparmor/sysv_mq_rcv.c
+@@ -0,0 +1,187 @@
++#define _GNU_SOURCE
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++
++#include "sysv_mq.h"
++
++int timeout = 5; //seconds
++key_t mqkey = MQ_KEY;
++long mqtype = MQ_TYPE;
++key_t semkey = SEM_KEY;
++
++// missing getattr and setattr
++int receive_message(int qid, long qtype)
++{
++	struct msg_buf mb;
++	ssize_t nbytes;
++
++	nbytes = msgrcv(qid, &mb, sizeof(mb.mtext), qtype,
++			MSG_NOERROR | IPC_NOWAIT);
++	if (nbytes < 0) {
++		perror("FAIL - could not receive msg");
++		return EXIT_FAILURE;
++	}
++
++	mb.mtext[nbytes] = 0;
++
++	if (strncmp(mb.mtext, msg, BUF_SIZE) != 0) {
++		fprintf(stderr, "FAIL - msg received does not match: %s - %s\n", mb.mtext, msg);
++		return EXIT_FAILURE;
++	}
++
++	printf("PASS\n");
++	return EXIT_SUCCESS;
++}
++
++int receive(int qid, long qtype, int semid)
++{
++	struct sembuf sop;
++	sop.sem_num = 0;
++	sop.sem_op = 0;
++	sop.sem_flg = 0;
++
++	struct timespec ts;
++	ts.tv_sec = timeout;
++	ts.tv_nsec = 0;
++
++	if (semtimedop(semid, &sop, 1, &ts) < 0) {
++		perror("FAIL - could not wait for semaphore");
++		return EXIT_FAILURE;
++	}
++
++	return receive_message(qid, qtype);
++}
++
++static void usage(char *prog_name, char *msg)
++{
++	if (msg != NULL)
++		fprintf(stderr, "%s\n", msg);
++
++	fprintf(stderr, "Usage: %s [options]\n", prog_name);
++	fprintf(stderr, "Options are:\n");
++	fprintf(stderr, "-k        message queue key (default is %d)\n", MQ_KEY);
++	fprintf(stderr, "-e        message queue type (default is %d)\n", MQ_TYPE);
++	fprintf(stderr, "-c        path of the client binary\n");
++	fprintf(stderr, "-u        run test as specified UID\n");
++	fprintf(stderr, "-t        timeout in seconds\n");
++	fprintf(stderr, "-s        semaphore key (default is %d)\n", SEM_KEY);
++	exit(EXIT_FAILURE);
++}
++
++int main(int argc, char *argv[])
++{
++	char opt = 0;
++	char *client = NULL;
++	int uid;
++	int qid;
++	int semid;
++	int rc = EXIT_SUCCESS;
++	const int stringsize = 50;
++	char smqkey[stringsize];
++	char ssemkey[stringsize];
++
++	while ((opt = getopt(argc, argv, "k:c:u:t:e:s:")) != -1) {
++		switch (opt) {
++		case 'k':
++			mqkey = atoi(optarg);
++			break;
++		case 'c':
++			client = optarg;
++			if (client == NULL)
++				usage(argv[0], "-c option must specify the client binary\n");
++			break;
++		case 'u':
++			/* change file mode on output before setuid drops
++			 * privs. This is required to make sure we can
++			 * write to the output file and in some cases
++			 * even exec with our inherited output file
++			 *
++			 * This assume test infrastructure creates the
++			 * file as root and dups stderr to stdout
++			 */
++			if (fchmod(fileno(stdout), 0666) == -1) {
++				perror("FAIL - could not set output file mode");
++				exit(EXIT_FAILURE);
++			}
++			if (fchmod(fileno(stderr), 0666) == -1) {
++				perror("FAIL - could not set output file mode");
++				exit(EXIT_FAILURE);
++			}
++			uid = atoi(optarg);
++			if (setuid(uid) < 0) {
++				perror("FAIL - could not setuid");
++				exit(EXIT_FAILURE);
++			}
++			break;
++		case 't':
++			timeout = atoi(optarg);
++			break;
++		case 'e':
++			mqtype = atoi(optarg);
++			break;
++		case 's':
++			semkey = atoi(optarg);
++			break;
++		default:
++			usage(argv[0], "Unrecognized option\n");
++		}
++	}
++
++
++	qid = msgget(mqkey, IPC_CREAT | OBJ_PERMS);
++	if (qid == -1) {
++		perror("FAIL - could not msgget");
++		return EXIT_FAILURE;
++	}
++
++	semid = semget(semkey, 1, IPC_CREAT | OBJ_PERMS);
++	if (semid == -1) {
++		perror("FAIL - could not get semaphore");
++		rc = EXIT_FAILURE;
++		goto out_mq;
++	}
++
++	union semun arg;
++	arg.val = 1;
++	if (semctl(semid, 0, SETVAL, arg) == -1) {
++		perror("FAIL - could not get semaphore");
++		rc = EXIT_FAILURE;
++		goto out;
++	}
++
++	/* exec the client */
++	int pid = fork();
++	if (pid == -1) {
++		perror("FAIL - could not fork");
++		rc = EXIT_FAILURE;
++		goto out;
++	} else if (!pid) {
++		if (client == NULL) {
++			usage(argv[0], "client not specified");
++			exit(EXIT_FAILURE);
++			/* execution of the main thread continues
++			 * in case the client will be manually executed
++			 */
++		}
++		snprintf(smqkey, stringsize - 1, "%d", mqkey);
++		snprintf(ssemkey, stringsize - 1, "%d", semkey);
++		execl(client, client, smqkey, ssemkey, NULL);
++		printf("FAIL %d - execl %s %d - %m\n", getuid(), client, mqkey);
++		exit(EXIT_FAILURE);
++	}
++
++	rc = receive(qid, mqtype, semid);
++out:
++	if (semctl(semid, 0, IPC_RMID) == -1) {
++		perror("FAIL - could not remove semaphore");
++		rc = EXIT_FAILURE;
++	}
++out_mq:
++	if (msgctl(qid, IPC_RMID, NULL) < 0) {
++		perror("FAIL - could not remove msg queue");
++		rc = EXIT_FAILURE;
++	}
++
++	return rc;
++}
+diff --git a/tests/regression/apparmor/sysv_mq_snd.c b/tests/regression/apparmor/sysv_mq_snd.c
+new file mode 100644
+index 000000000..35296072c
+--- /dev/null
++++ b/tests/regression/apparmor/sysv_mq_snd.c
+@@ -0,0 +1,55 @@
++#include "sysv_mq.h"
++
++int main(int argc, char *argv[])
++{
++	key_t mqkey = MQ_KEY;
++	key_t semkey = SEM_KEY;
++	long qtype = 1;
++	int qid, semid;
++	struct msg_buf mb;
++
++	if (argc != 1 && argc != 3) {
++		fprintf(stderr, "FAIL sender - specify values for message queue"
++			" key and semaphore key, respectively \n");
++		return EXIT_FAILURE;
++	}
++	if (argc > 1) {
++		mqkey = atoi(argv[1]);
++		semkey = atoi(argv[2]);
++	}
++
++	qid = msgget(mqkey, IPC_CREAT | OBJ_PERMS);
++	if (qid == -1) {
++		perror("FAIL sender - could not msgget");
++		exit(EXIT_FAILURE);
++	}
++
++	semid = semget(semkey, 1, IPC_CREAT | OBJ_PERMS);
++	if (semid == -1) {
++		perror("FAIL sender - could not get semaphore");
++		exit(EXIT_FAILURE);
++	}
++
++	snprintf(mb.mtext, sizeof(mb.mtext), "%s", msg);
++	mb.mtype = qtype;
++
++	if (msgsnd(qid, &mb, sizeof(struct msg_buf),
++		   IPC_NOWAIT) == -1) {
++		perror("FAIL sender - could not msgsnd");
++		exit(EXIT_FAILURE);
++	}
++
++	/* notify using semaphore */
++
++	struct sembuf sop;
++	sop.sem_num = 0;
++	sop.sem_op = -1;
++	sop.sem_flg = 0;
++
++	if (semop(semid, &sop, 1) == -1) {
++		perror("FAIL sender - could not notify using semaphore");
++		exit(EXIT_FAILURE);
++	}
++
++	return EXIT_SUCCESS;
++}
+-- 
+2.34.1
+

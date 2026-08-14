@@ -1,0 +1,51 @@
+From: Henrique de Moraes Holschuh <hmh@debian.org>
+Date: Tue, 25 Sep 2018 08:03:32 +1000
+Subject: Support Debian conf.d style out-of-the-box without perl hackery in
+ the main legacy config file.
+
+---
+ amavisd | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
+
+--- a/amavisd
++++ b/amavisd
+@@ -4356,6 +4356,25 @@
+ #   map { untaint($_) } @config_files;
+ # }
+ 
++# attempt to read a list of config files to use instead of the default
++# one, through an external help script. Used by the Debian distribution.
++sub find_config_files(@) {
++  my(@dirs) = @_;
++  my(@config_files);
++
++# my($old_path) = $ENV{PATH};
++# $ENV{PATH} = "/bin:/usr/bin";
++  foreach my $dir (@dirs) {
++    push(@config_files, `run-parts --list "$dir"`);
++  }
++# $ENV{PATH} = $old_path;
++
++  # untaint and chomp.  This data is secure as we check the files
++  # themselves later
++  chomp(@config_files);
++  map { untaint($_) } @config_files;
++}
++
+ #use CDB_File;
+ #sub tie_hash($$) {
+ # my($hashref, $filename) = @_;
+@@ -19149,10 +19168,9 @@
+ 
+ # default location of the config file if none specified
+ if (!@config_files) {
+-  @config_files = ( '/etc/amavisd.conf' );
+-# # Debian/Ubuntu specific:
+-# @config_files = Amavis::Util::find_config_files('/usr/share/amavis/conf.d',
+-#                                                 '/etc/amavis/conf.d');
++  # Debian/Ubuntu specific:
++  @config_files = Amavis::Util::find_config_files('/usr/share/amavis/conf.d',
++    '/etc/amavis/conf.d');
+ }
+ 
+ # Read and evaluate config files, which may override default settings

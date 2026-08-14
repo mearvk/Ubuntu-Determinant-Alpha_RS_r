@@ -1,0 +1,99 @@
+Origin: upstream, https://svn.apache.org/viewvc?view=revision&revision=1901234
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/apache2/+bug/1988224
+Reviewed-By: Bryce Harrington <bryce@canonical.com>
+Last-Update: 2022-09-28
+
+Merge /httpd/httpd/trunk:r1899858,1899865,1899884,1900991
+
+  *) mpm_event, mpm_worker: Handle children killed pathologically.
+  *) MPM event: Restart chilren processes killed before idle maintenance.
+     PR 65769.  [Yann Ylavic, Ruediger Pluem]
+
+--- a/server/mpm/event/event.c
++++ b/server/mpm/event/event.c
+@@ -3001,6 +3001,7 @@
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int num_buckets = retained->mpm->num_buckets;
++    int successive_kills = 0;
+     int child_slot;
+     apr_exit_why_e exitwhy;
+     int status, processed_status;
+@@ -3090,11 +3091,30 @@
+             /* Don't perform idle maintenance when a child dies,
+              * only do it when there's a timeout.  Remember only a
+              * finite number of children can die, and it's pretty
+-             * pathological for a lot to die suddenly.
++             * pathological for a lot to die suddenly.  If a child is
++             * killed by a signal (faulting) we want to restart it ASAP
++             * though, up to 3 successive faults or we stop this until
++             * a timeout happens again (to avoid the flood of fork()ed
++             * processes that keep being killed early).
+              */
+-            continue;
++            if (child_slot < 0 || !APR_PROC_CHECK_SIGNALED(exitwhy)) {
++                continue;
++            }
++            if (++successive_kills >= 3) {
++                if (successive_kills % 10 == 3) {
++                    ap_log_error(APLOG_MARK, APLOG_WARNING, 0,
++                                 ap_server_conf, APLOGNO(10392)
++                                 "children are killed successively!");
++                }
++                continue;
++            }
++            ++remaining_children_to_start;
+         }
+-        else if (remaining_children_to_start) {
++        else {
++            successive_kills = 0;
++        }
++
++        if (remaining_children_to_start) {
+             /* we hit a 1 second timeout in which none of the previous
+              * generation of children needed to be reaped... so assume
+              * they're all done, and pick up the slack if any is left.
+--- a/server/mpm/worker/worker.c
++++ b/server/mpm/worker/worker.c
+@@ -1575,6 +1575,7 @@
+ static void server_main_loop(int remaining_children_to_start)
+ {
+     int num_buckets = retained->mpm->num_buckets;
++    int successive_kills = 0;
+     ap_generation_t old_gen;
+     int child_slot;
+     apr_exit_why_e exitwhy;
+@@ -1669,11 +1670,30 @@
+             /* Don't perform idle maintenance when a child dies,
+              * only do it when there's a timeout.  Remember only a
+              * finite number of children can die, and it's pretty
+-             * pathological for a lot to die suddenly.
++             * pathological for a lot to die suddenly.  If a child is
++             * killed by a signal (faulting) we want to restart it ASAP
++             * though, up to 3 successive faults or we stop this until
++             * a timeout happens again (to avoid the flood of fork()ed
++             * processes that keep being killed early).
+              */
+-            continue;
++            if (child_slot < 0 || !APR_PROC_CHECK_SIGNALED(exitwhy)) {
++                continue;
++            }
++            if (++successive_kills >= 3) {
++                if (successive_kills % 10 == 3) {
++                    ap_log_error(APLOG_MARK, APLOG_WARNING, 0,
++                                 ap_server_conf, APLOGNO(10392)
++                                 "children are killed successively!");
++                }
++                continue;
++            }
++            ++remaining_children_to_start;
+         }
+-        else if (remaining_children_to_start) {
++        else {
++            successive_kills = 0;
++        }
++
++        if (remaining_children_to_start) {
+             /* we hit a 1 second timeout in which none of the previous
+              * generation of children needed to be reaped... so assume
+              * they're all done, and pick up the slack if any is left.

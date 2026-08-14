@@ -1,0 +1,150 @@
+amavisd-new for Debian
+===========================================================
+
+* It is a very good idea to read NEWS.Debian often, or to use
+  apt-listchanges.
+
+* The LDAP schema for amavisd-new is installed in 
+  /etc/ldap/schema/amavis.schema.
+
+
+Configuration layout
+--------------------
+
+Configuration is split into two directories, and processed in the order below:
+
+Read-only configuration:  /usr/share/amavis/conf.d/
+  10-debian_scripts:		Stuff you'd better not override
+  20-package:			Packaging decisions, override at will
+
+Read-write conffiles: /etc/amavis/conf.d/
+  01-debian:			Rarely modified settings
+  05-domain_id:			mydomain autodetection, local_domains config
+  05-node_id:			myhostname autodetection
+  15-av_scanners:		AV scanner interface configuration
+  15-content_filter_mode:	Use this to re-enable spamassassin/av checks
+  20-debian_defaults:		Commonly modified settings
+  21-ubuntu_defaults:		Additional Ubuntu specific changes
+  40-policy_banks:		DKIM whitelist
+  50-user:			Place your overrides here, if you want
+
+If the package detects legacy config files, it renames them adding a
+".disabled" extension, and the amavisd-new initscript will refuse to start the
+service until these files with a ".disabled" extension are removed or renamed.
+The legacy config files are /etc/amavis.conf and /etc/amavis/amavis.conf.
+
+
+Sendmail Milter
+---------------
+
+Please see README.milter for Debian specific instructions on getting milter
+support running with amavisd-new-milter.  We recommend you use the
+dual-sendmail setup described in README.sendmail-dual, though.  DO notice that
+there are *two* different sockets when using milter.
+
+
+Permissions
+-----------
+
+In order to make amavisd-new default installation safer the permissions on some
+directories have been thightend - namely these are:
+
+/var/lib/amavis
+/var/lib/amavis/db
+/var/lib/amavis/tmp
+/var/lib/amavis/virusmails
+
+Be aware that this can cause problems with other software which may need access
+to some of these directories to do their work, for example web-based quarantine
+management tools. To make them work you will need to change the ownership of
+the directory /var/lib/amavis/virusmails to amavis.www-data and also adjust its
+permissions to 0770 so that the webserver is able to access and modify the
+quarantined mails (you can achieve this with the "dpkg-statoverride" command
+using the optional flags "--force" and "--update"). Other programs which may
+also face such issues are unprivileged command-line tools and daemonized virus
+scanners (for specific solutions concerning them see below).
+
+
+Antivirus and spam-checking
+---------------------------
+
+amavisd-new does not depend on any antivirus, so antivirus checking is not
+enabled by default. It also does not depend on spamassassin, so spam checking
+is not enabled by default. They are turned off in
+/usr/share/amavis/conf.d/20-package. To enable them, edit
+/etc/amavis/conf.d/15-content_filter_mode.
+
+If you use clamav-daemon, add the clamav user to the amavis group by running
+"adduser clamav amavis" as root. The preferred method for using other virus
+scanners which run as a different unprivileged user is to change their primary
+group to amavis (you can change this with "usermod -g").
+
+If you use spamassassin with the Bayes database system, you should make sure
+that the spamassassin configuration option "bayes_auto_expire 0" is set in
+spamassassin configure files.  This disables the automatic expiration of tokens
+which causes problems for amavisd-new when activated.  The amavisd-new package
+includes cron jobs that take care of syncing and expiring the token database
+frequently.
+
+Quarantine Directory
+--------------------
+
+By default amavis saves banned mail (like virus or banned attachments) 
+for later investigation in /var/lib/amavis/virusmail. You should keep an
+eye on the directory and clean it up regularly. To prevent accidental loss
+of legitimate mail, this isn't done by the package.
+
+Debugging
+---------
+
+To debug amavis, run:
+/etc/init.d/amavis debug
+or
+/etc/init.d/amavis debug-sa
+
+amavisd-status
+--------------
+
+2.9.0-1 introduced support for the amavisd-status script. 
+The amavisd-status script gets notified via zeromq about the 
+current state of the amavis children and displays it. If you want 
+to use this feature you have to install libzeromq-perl and enable
+the amavis-mc service in /etc/default/amavis-mc
+
+amavisd-snmp-subagent
+---------------------
+
+Amavis supports exporting status and statistical information 
+via snmp. If you want to use this feature your snmpd needs to have
+AgentX support enabled and tcp6 support via localhost (::1). 
+
+"master          agentx"
+and
+"agentXSocket    tcp6:[::1]:705" 
+should do the trick. 
+
+You also have to enable the snmp-subagent service via
+/etc/default/amavisd-snmp-subagent. 
+The subagent can either use zeromq or bdb for fetching the data from amavis.
+If you want to use zeromq the amavic-mc service has to be enabled via
+/etc/default/amavis-mc and libzeromq-perl needs to be installed on your
+system.
+
+You can change the backend in /etc/default/amavisd-snmp-subagent.
+
+ -- Your amavisd-new maintainers (and contributors)
+
+Ubuntu Changes
+--------------
+
+The Ubuntu variant of this package is generally very similar to the standard
+Debian package.  The major difference is that we enable DKIM verification by
+default and provide an additional config file, 40-policy_banks, to for easy
+DKIM based whitelisting.  Domains recommended by upstream are whitelisted by
+default.  You can over-ride DKIM verification in 50-user if you don't want it.
+
+At any given moment there may be bug fixes applied in the Ubuntu package, but
+not yet in Debian.  It is the goal of Ubuntu to feed these back to Debian.
+
+
+ -- Scott Kitterman <scott@kitterman.com>  

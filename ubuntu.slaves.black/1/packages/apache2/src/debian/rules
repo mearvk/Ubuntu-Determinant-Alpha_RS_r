@@ -1,0 +1,210 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+DEB_BUILD_ARCH_OS    ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)
+
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+bindnow
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/pkg-info.mk
+
+LSB_RELEASE := $(shell lsb_release -i -s)
+BUILD_DATETIME := $(shell date -u --date="`dpkg-parsechangelog -S Date`" +%FT%T)
+MODULE_DIR := /usr/lib/apache2/modules/
+API := $(shell perl -ne 'print $$1 if m/define\s+MODULE_MAGIC_NUMBER_MAJOR\s+?(.*)$$/' < include/ap_mmn.h)
+OPENSSL := openssl1.1
+AP2_CFLAGS = -pipe $(CFLAGS)
+AP2_LDFLAGS = -Wl,--as-needed $(LDFLAGS)
+AP2_CPPFLAGS = -DPLATFORM='\"$(LSB_RELEASE)\"' -DBUILD_DATETIME='\"$(BUILD_DATETIME)\"' $(CPPFLAGS)
+AP2_LTFLAGS = --no-silent
+
+support/suexec-custom.c: support/suexec.c debian/patches/suexec-custom.patch
+	cp support/suexec.c support/suexec-custom.c
+	patch -p1 -i debian/patches/suexec-custom.patch
+
+prebuild-checks-stamp:
+	ERRS="" ;\
+	for a in $$(find debian/config-dir/ -type f) ; do \
+		t="$$a.$$$$" ;\
+		unexpand < "$$a" > "$$t" ;\
+		cmp -s "$$a" "$$t" || ERRS="$$ERRS $$a" ;\
+		rm "$$t" ;\
+	done ;\
+	if [ -n "$$ERRS" ] ; then \
+		echo 'ERROR: The following files contain spaces instead of tabs. Run through unexpand!' ;\
+		ls -1 $$ERRS ;\
+		false ;\
+	fi
+	MD5=$$(md5sum debian/index.html 2> /dev/null |cut -d' ' -f 1) ; \
+	if ! grep -q $$MD5 debian/apache2.postrm ; then \
+		echo "ERROR: index.html's md5 is missing in postrm!" ;\
+		false ; \
+	fi
+	touch $@
+
+debian/fixup_conffiles.tgz: \
+    debian/config-dir/sites-available/000-default.conf \
+    debian/config-dir/sites-available/default-ssl.conf \
+    debian/config-dir/conf-available/charset.conf \
+    debian/config-dir/conf-available/localized-error-pages.conf \
+    debian/config-dir/conf-available/other-vhosts-access-log.conf \
+    debian/config-dir/conf-available/security.conf \
+    debian/config-dir/mods-available/cern_meta.load \
+    debian/config-dir/mods-available/ident.load \
+    debian/config-dir/mods-available/imagemap.load
+	@# mtime/owner/group/mode are for reproducible build
+	tar \
+		--mtime=2000-01-01T00:00Z \
+		--owner=root:0 \
+		--group=root:0 \
+		--mode=0644 \
+		--transform 's,.*/,,' \
+		-c $^ | gzip -n > $@
+
+debian/fixup_conffiles.b64: debian/fixup_conffiles.tgz
+	base64 < $< > $@
+
+debian/apache2.preinst: debian/apache2.preinst.in debian/fixup_conffiles.b64 debian/create_preinst
+	debian/create_preinst
+
+clean-config-vars-stamp: debian/tmp/usr/share/apache2/build/config_vars.mk debian/clean_config_vars
+	# Clean up config_vars.mk so that flags that are only intended for the
+	# compilation of apache2 itself are not used by apxs for compiling
+	# modules.
+	perl ./debian/clean_config_vars '$(AP2_CFLAGS)' '$(AP2_CPPFLAGS)' '$(AP2_LDFLAGS)' '$(CXXFLAGS)'
+	touch $@
+
+%: %.in
+	sed 's#__SERVER_VERSION__#$(DEB_VERSION_EPOCH_UPSTREAM)#; s#__MODULE_DIR__#$(MODULE_DIR)#; s#__API__#$(API)#; s#__OPENSSL__#$(OPENSSL)#;' $< > $@
+	chmod `/usr/bin/stat -c '%a' "$<"` $@
+
+substvars-stamp: debian/rules include/ap_mmn.h
+	(grep -s -v apache2:API debian/apache2-bin.substvars; echo "apache2:API=apache2-api-$(API), apache2-api-$(API)-$(OPENSSL)") > debian/apache2-bin.substvars.new
+	mv debian/apache2-bin.substvars.new debian/apache2-bin.substvars
+	touch $@
+
+suexec-scripts-stamp: $(wildcard debian/debian/apache2-suexec.*.in)
+	set -e ; \
+	for type in custom pristine ; do \
+		for f in postinst preinst prerm links dirs lintian-overrides postrm; do \
+			if [ -e debian/apache2-suexec.$$f.in ] ; then \
+				perl -pe "s{__TYPE__}{$$type}g" < debian/apache2-suexec.$$f.in > debian/apache2-suexec-$$type.$$f ;\
+				chmod `/usr/bin/stat -c '%a' "debian/apache2-suexec.$$f.in"` debian/apache2-suexec-$$type.$$f ;\
+			fi ;\
+		done ;\
+	done
+	touch $@
+
+clean build build-arch build-indep binary binary-arch binary-indep: %:
+	dh $@
+
+override_dh_auto_configure: configure-stamp
+configure-stamp: prebuild-checks-stamp support/suexec-custom.c
+	AWK=awk \
+	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
+		--enable-layout=Debian --enable-so --with-program-name=apache2 \
+		--enable-suexec --with-suexec-caller=www-data \
+		--with-suexec-bin=/usr/lib/apache2/suexec --with-suexec-docroot=/var/www \
+		--with-suexec-userdir=public_html --with-suexec-logfile=/var/log/apache2/suexec.log \
+		--with-suexec-uidmin=100 --enable-suexec=shared --enable-log-config=static \
+		--with-apr=/usr/bin/apr-1-config --with-apr-util=/usr/bin/apu-1-config \
+		--with-pcre=yes \
+		--enable-pie \
+		--enable-mpms-shared=all \
+		--enable-mods-shared="all brotli cgi ident authnz_fcgi imagemap cern_meta proxy_fdpass proxy_http2 bucketeer case_filter case_filter_in" \
+		--enable-mods-static="unixd logio watchdog version" \
+		CFLAGS="$(AP2_CFLAGS)" CPPFLAGS="$(AP2_CPPFLAGS)" LDFLAGS="$(AP2_LDFLAGS)" \
+		LTFLAGS="$(AP2_LTFLAGS)" SHELL=/bin/bash GREP=/bin/grep
+	touch $@
+
+debian/config-dir/apache2.conf: debian/config-dir/apache2.conf.in
+	@# Sanity check that the marker is actually there
+	grep -q ___MUTEX___ $<
+ifeq "$(DEB_BUILD_ARCH_OS)" "linux"
+	@# On linux, we use the default pthread mutex. Comment out
+	@# Mutex directive.
+	perl -p -e 's,___MUTEX___,#,' < $< > $@
+else
+	@# On kfreebsd/hurd, pthread mutexes are not robust. There, we need to
+	@# use fcntl and set the directory explicitly for multi-instance setups.
+	perl -p -i -e 's,___MUTEX___,,' < $< > $@
+endif
+
+override_dh_install: clean-config-vars-stamp \
+		     substvars-stamp \
+		     debian/config-dir/apache2.conf \
+		     debian/a2query \
+		     debian/debhelper/dh_apache2 \
+		     debian/apache2.preinst \
+		     suexec-scripts-stamp
+	# don't install mod_ssl_openssl.h in apache2-dev
+	dh_install -papache2-dev -Xopenssl
+	dh_install --remaining-packages
+
+override_dh_missing:
+	dh_missing --list-missing
+
+override_dh_fixperms-arch:
+	# standard suexec
+	chmod 4754 debian/apache2-suexec-pristine/usr/lib/apache2/suexec-pristine
+	chgrp www-data debian/apache2-suexec-pristine/usr/lib/apache2/suexec-pristine
+	# configurable suexec
+	chmod 4754 debian/apache2-suexec-custom/usr/lib/apache2/suexec-custom
+	chgrp www-data debian/apache2-suexec-custom/usr/lib/apache2/suexec-custom
+	dh_fixperms -a -Xusr/lib/apache2/suexec-custom -Xusr/lib/apache2/suexec-pristine
+	chown -R www-data:www-data debian/apache2/var/cache/apache2/mod_cache_disk
+	chown root:adm debian/apache2/var/log/apache2
+	chmod o-rx debian/apache2/var/log/apache2
+
+override_dh_fixperms-indep:
+	dh_fixperms -i
+
+override_dh_installinit:
+	dh_installinit --error-handler=true
+	# We enable apache-htcacheclean but we don't start it, some
+	# custom postinst code will then manually either disable it or
+	# start the service
+	dh_installinit --name apache-htcacheclean --no-start
+
+override_dh_installsystemd:
+	dh_installsystemd -papache2 apache2.service
+	dh_installsystemd -papache2 --name=apache2@ apache2@.service
+	dh_installsystemd -papache2 --name=apache-htcacheclean apache-htcacheclean.service
+	dh_installsystemd -papache2 --name=apache-htcacheclean@ apache-htcacheclean@.service
+
+override_dh_installdocs-indep:
+	perl debian/convert_docs debian/apache2-doc/usr/share/doc/apache2-doc/manual
+	dh_installdocs -i
+
+override_dh_installdocs-arch:
+	dh_installdocs --link-doc=apache2 -papache2 -plibapache2-mod-md -plibapache2-mod-proxy-uwsgi
+	dh_installdocs --link-doc=apache2-dev -papache2-ssl-dev
+	dh_installdocs -a
+
+override_dh_link:
+	dh_link
+	if test -e debian/apache2-doc/usr/share/doc; then \
+		jdupes -rl debian/apache2-doc/usr/share/doc; \
+	fi
+
+override_dh_installchangelogs:
+	# Do not install changelogs the -data package not to reduce
+	# disk space usage.
+	dh_installchangelogs -Napache2-data
+
+override_dh_installman:
+	mv debian/tmp/usr/share/man/man8/suexec.8 debian/tmp/usr/share/man/man8/suexec-pristine.8
+	mv debian/tmp/usr/share/man/man1/httxt2dbm.1 debian/tmp/usr/share/man/man8/httxt2dbm.8
+	pod2man debian/debhelper/dh_apache2 > debian/manpages/dh_apache2.1
+	pod2man debian/a2query.in > debian/manpages/a2query.8
+	dh_installman
+
+override_dh_auto_install:
+	dh_auto_install -- -j1
+	rm -f debian/tmp/usr/share/apache2/error/README
+	rm -f debian/tmp/usr/share/apache2/icons/README*
+
+.PHONY: clean build build-arch build-indep binary binary-arch binary-indep

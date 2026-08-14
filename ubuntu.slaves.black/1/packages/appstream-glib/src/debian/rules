@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+#export DH_VERBOSE=1
+
+AS_CONFIGURE_ARGS = -Ddep11=true \
+		-Dbuilder=false \
+		-Drpm=false \
+		-Dalpm=false \
+		-Dstemmer=true \
+		-Dman=true \
+		-Dgtk-doc=true \
+		-Dintrospection=true
+
+# Define install target dir
+INSTALLDIR = $(CURDIR)/debian/tmp
+
+%:
+	dh $@ -Smeson --with=gir
+
+override_dh_clean:
+	dh_clean
+	rm -rf $(CURDIR)/debian/tmp-xdg-runtime-dir
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(AS_CONFIGURE_ARGS)
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(INSTALLDIR)
+
+	rm -f $(INSTALLDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.a
+	rm -f $(INSTALLDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.la
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_auto_test:
+	XDG_RUNTIME_DIR=$(CURDIR)/debian/tmp-xdg-runtime-dir dh_auto_test

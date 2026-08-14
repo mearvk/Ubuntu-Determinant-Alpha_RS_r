@@ -1,0 +1,703 @@
+From 8481df57d705f05ffeedff59060ce3e5071108fe Mon Sep 17 00:00:00 2001
+From: Georgia Garcia <georgia.garcia@canonical.com>
+Date: Fri, 11 Mar 2022 16:40:43 +0000
+Subject: [PATCH 02/11] tests: add posix message queue regression tests
+
+Signed-off-by: Georgia Garcia <georgia.garcia@canonical.com>
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+---
+ .gitignore                               |   2 +
+ tests/regression/apparmor/Makefile       |   9 +
+ tests/regression/apparmor/mkprofile.pl   |  22 ++
+ tests/regression/apparmor/posix_ipc.sh   |  12 +
+ tests/regression/apparmor/posix_mq.h     |  31 +++
+ tests/regression/apparmor/posix_mq.sh    | 179 +++++++++++++
+ tests/regression/apparmor/posix_mq_rcv.c | 306 +++++++++++++++++++++++
+ tests/regression/apparmor/posix_mq_snd.c |  32 +++
+ 8 files changed, 593 insertions(+)
+ create mode 100644 tests/regression/apparmor/posix_ipc.sh
+ create mode 100644 tests/regression/apparmor/posix_mq.h
+ create mode 100755 tests/regression/apparmor/posix_mq.sh
+ create mode 100644 tests/regression/apparmor/posix_mq_rcv.c
+ create mode 100644 tests/regression/apparmor/posix_mq_snd.c
+
+diff --git a/.gitignore b/.gitignore
+index 43336813b..6580951e3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -253,6 +253,8 @@ tests/regression/apparmor/net_raw
+ tests/regression/apparmor/open
+ tests/regression/apparmor/openat
+ tests/regression/apparmor/pipe
++tests/regression/apparmor/posix_mq_rcv
++tests/regression/apparmor/posix_mq_snd
+ tests/regression/apparmor/ptrace
+ tests/regression/apparmor/ptrace_helper
+ tests/regression/apparmor/pwrite
+diff --git a/tests/regression/apparmor/Makefile b/tests/regression/apparmor/Makefile
+index 5c275a3cd..b3bb30888 100644
+--- a/tests/regression/apparmor/Makefile
++++ b/tests/regression/apparmor/Makefile
+@@ -114,6 +114,8 @@ SRC=access.c \
+     openat.c \
+     pipe.c \
+     pivot_root.c \
++    posix_mq_rcv.c \
++    posix_mq_snd.c \
+     ptrace.c \
+     ptrace_helper.c \
+     pwrite.c \
+@@ -232,6 +234,7 @@ TESTS=aa_exec \
+       openat \
+       pipe \
+       pivot_root \
++      posix_ipc \
+       ptrace \
+       pwrite \
+       query_label \
+@@ -305,6 +308,12 @@ dbus_service: dbus_message dbus_service.c dbus_common.o
+ dbus_unrequested_reply: dbus_service dbus_unrequested_reply.c dbus_common.o
+ 	${CC} ${CFLAGS} ${LDFLAGS} $(filter-out dbus_service, $^) -o $@ ${LDLIBS} $(shell pkg-config --cflags --libs dbus-1)
+ 
++posix_mq_rcv: posix_mq_rcv.c
++	${CC} ${CFLAGS} ${LDFLAGS} $< -o $@ ${LDLIBS} -lrt
++
++posix_mq_snd: posix_mq_snd.c
++	${CC} ${CFLAGS} ${LDFLAGS} $< -o $@ ${LDLIBS} -lrt
++
+ transition: transition.c
+ 	${CC} ${CFLAGS} ${TRANSITION_CFLAGS} ${LDFLAGS} $< -o $@ ${LDLIBS}
+ 
+diff --git a/tests/regression/apparmor/mkprofile.pl b/tests/regression/apparmor/mkprofile.pl
+index 201d53cb5..72c7e1927 100755
+--- a/tests/regression/apparmor/mkprofile.pl
++++ b/tests/regression/apparmor/mkprofile.pl
+@@ -404,6 +404,26 @@ sub gen_path($) {
+   }
+ }
+ 
++sub gen_mqueue($) {
++  my $rule = shift;
++  my @rules = split (/:/, $rule);
++  if (@rules == 2) {
++      if ($rules[1] =~ /^ALL$/) {
++	  push (@{$output_rules{$hat}}, "  mqueue,\n");
++      } else {
++	  push (@{$output_rules{$hat}}, "  mqueue $rules[1],\n");
++      }
++  } elsif (@rules == 3) {
++      push (@{$output_rules{$hat}}, "  mqueue $rules[1] $rules[2],\n");
++  } elsif (@rules == 4) {
++      push (@{$output_rules{$hat}}, "  mqueue $rules[1] $rules[2] $rules[3],\n");
++  } elsif (@rules == 5) {
++      push (@{$output_rules{$hat}}, "  mqueue $rules[1] $rules[2] $rules[3] $rules[4],\n");
++  } else {
++      (!$nowarn) && print STDERR "Warning: invalid mqueue description '$rule', ignored\n";
++  }
++}
++
+ sub emit_flags($) {
+   my $hat = shift;
+ 
+@@ -463,6 +483,8 @@ sub gen_from_args() {
+       gen_xattr($rule);
+     } elsif ($rule =~ /^path:/) {
+       gen_path($rule);
++    } elsif ($rule =~ /^mqueue:/) {
++      gen_mqueue($rule);
+     } else {
+       gen_file($rule);
+     }
+diff --git a/tests/regression/apparmor/posix_ipc.sh b/tests/regression/apparmor/posix_ipc.sh
+new file mode 100644
+index 000000000..5fd10bc75
+--- /dev/null
++++ b/tests/regression/apparmor/posix_ipc.sh
+@@ -0,0 +1,12 @@
++
++# Test semaphores first, as they could be used for synchronization
++
++## TODO
++# posix_sem.sh
++
++## TODO
++# posix_shm.sh
++
++./posix_mq.sh
++
++
+diff --git a/tests/regression/apparmor/posix_mq.h b/tests/regression/apparmor/posix_mq.h
+new file mode 100644
+index 000000000..5b2376800
+--- /dev/null
++++ b/tests/regression/apparmor/posix_mq.h
+@@ -0,0 +1,31 @@
++#ifndef POSIX_MQ_H_
++#define POSIX_MQ_H_
++
++#include <sys/types.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <stdio.h>
++#include <string.h>
++#include <semaphore.h>
++
++#define QNAME "/testmq"
++#define SHM_PATH "/unnamedsemtest"
++#define SEM_PATH "/namedsemtest"
++#define OBJ_PERMS (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
++
++#define BUF_SIZE 1024
++struct shmbuf { // Buffer in shared memory
++	sem_t sem;
++	int cnt; // Number of bytes used in 'buf'
++	char buf[BUF_SIZE]; // Data being transferred
++};
++
++struct msgbuf {
++	long mtype;
++	char mtext[BUF_SIZE];
++};
++
++char *msg = "hello world";
++
++#endif /* #ifndef POSIX_MQ_H_ */
+diff --git a/tests/regression/apparmor/posix_mq.sh b/tests/regression/apparmor/posix_mq.sh
+new file mode 100755
+index 000000000..5c827d468
+--- /dev/null
++++ b/tests/regression/apparmor/posix_mq.sh
+@@ -0,0 +1,179 @@
++#! /bin/bash
++#Copyright (C) 2022 Canonical, Ltd.
++#
++#This program is free software; you can redistribute it and/or
++#modify it under the terms of the GNU General Public License as
++#published by the Free Software Foundation, version 2 of the
++#License.
++
++#=NAME posix_mq
++#=DESCRIPTION
++# This test verifies if mediation of posix message queues is working
++#=END
++
++pwd=`dirname $0`
++pwd=`cd $pwd ; /bin/pwd`
++
++bin=$pwd
++
++. $bin/prologue.inc
++
++requires_kernel_features ipc/posix_mqueue
++requires_parser_support "mqueue,"
++
++settest posix_mq_rcv
++
++sender="$bin/posix_mq_snd"
++receiver="$bin/posix_mq_rcv"
++queuename="/queuename"
++queuename2="/queuename2"
++
++user="foo"
++adduser --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --no-create-home --disabled-password $user >/dev/null
++echo "$user:password" | sudo chpasswd
++userid=$(id -u $user)
++
++# workaround to not have to set o+x
++chmod 6755 $receiver
++setcap cap_dac_read_search+pie $receiver
++
++cleanup()
++{
++    rm -f /dev/mqueue/$queuename
++    rm -f /dev/mqueue/$queuename2
++    deluser foo >/dev/null
++}
++do_onexit="cleanup"
++
++do_test()
++{
++    local desc="POSIX MQUEUE ($1)"
++    shift
++    runchecktest "$desc" "$@"
++}
++
++
++do_tests()
++{
++    prefix=$1
++    expect_send=$2
++    expect_recv=$3
++    expect_open=$4
++
++    all_args=("$@")
++    rest_args=("${all_args[@]:5}")
++
++    do_test "$prefix" "$expect_send" $sender "$expect_recv" -c $sender -k $queuename "${rest_args[@]}"
++
++    # notify requires netlink permissions
++    do_test "$prefix : mq_notify" "$expect_send" $sender "$expect_recv" -c $sender -k $queuename -n mq_notify "${rest_args[@]}"
++
++    do_test "$prefix : select" "$expect_open" -c $sender -k $queuename -n select "${rest_args[@]}"
++
++    do_test "$prefix : poll" "$expect_open" -c $sender -k $queuename -n poll "${rest_args[@]}"
++
++    do_test "$prefix : epoll" "$expect_open" -c $sender -k $queuename -n epoll "${rest_args[@]}"
++}
++
++
++for username in "root" "$userid" ; do
++    if [ $username == "root" ] ; then
++	usercmd=""
++    else
++	usercmd="-u $userid"
++    fi
++
++    do_tests "unconfined $username" pass pass pass pass $usercmd
++
++    # No mqueue perms
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "$sender:px" -- image=$sender
++    do_tests "confined $username - no perms" fail fail fail fail $usercmd
++
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "deny:mqueue" "$sender:px" -- image=$sender "deny mqueue"
++    do_tests "confined $username - deny perms" fail fail fail fail $usercmd
++
++
++    # generic mqueue
++    # 2 Potential failures caused by missing other x permission in path
++    # to tests. Usually on the user home dir as it is now default to
++    # create a user without that
++    # * if you seen a capability dac_read_search denied failure from
++    #   apparmor when doing "root" username tests
++    # * if doing the $userid set of tests and you see
++    #   Permission denied in the test output
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue" "$sender:px" -- image=$sender "mqueue"
++    do_tests "confined $username - mqueue" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:type=posix" "$sender:px" -- image=$sender "mqueue:type=posix"
++    do_tests "confined $username - mqueue type=posix" pass pass pass pass $usercmd
++
++    # queue name
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:$queuename" "$sender:px" -- image=$sender "mqueue:$queuename"
++    do_tests "confined $username - mqueue /name 1" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue" "$sender:px" -- image=$sender "mqueue:$queuename"
++    do_tests "confined $username - mqueue /name 2" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:$queuename" "$sender:px" -- image=$sender "mqueue"
++    do_tests "confined $username - mqueue /name 3" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:$queuename" "$sender:px" -- image=$sender "mqueue:$queuename2"
++    do_tests "confined $username - mqueue /name 4" fail fail fail fail $usercmd -t 1
++
++
++    # specific permissions
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 1" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 2" fail fail fail fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 3" fail fail fail fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 4" fail fail fail fail $usercmd -t 1
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,delete,setattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 5" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,delete,getattr)" "$sender:px" -- image=$sender "mqueue:write"
++    do_tests "confined $username - specific 6" pass pass pass pass $usercmd
++
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,delete,getattr,setattr)" "$sender:px" -- image=$sender "mqueue:read"
++    do_tests "confined $username - specific 7" fail fail fail fail $usercmd -t 1
++
++    # unconfined receiver
++    genprofile image=$sender "mqueue"
++    do_tests "confined sender $username - unconfined receiver" pass pass pass pass $usercmd
++
++
++    # unconfined sender
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink"  "mqueue" "$sender:ux"
++    do_tests "confined receiver $username - unconfined sender" pass pass pass pass $usercmd
++
++
++    # queue label
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:label=$receiver" "$sender:px" -- image=$sender "mqueue:label=$receiver"
++    do_tests "confined $username - mqueue label 1" xpass xpass xpass xpass $usercmd
++
++
++    # queue name and label
++    genprofile "cap:sys_resource:deny" "cap:setuid" "cap:fowner" "network:netlink" "mqueue:(create,read,delete):type=posix:label=$receiver:$queuename" "$sender:px" -- image=$sender "mqueue:(open,write):type=posix:label=$receiver:$queuename"
++    do_tests "confined $username - mqueue label 2" xpass xpass xpass xpass $usercmd
++
++    # ensure we are cleaned up for next pass
++    removeprofile
++    rm -f /dev/mqueue/$queuename
++    rm -f /dev/mqueue/$queuename2
++done
++
++# cross user tests
++
++
++# confined root with cap ??override
++
++
++# confined root without cap ??override
++
+diff --git a/tests/regression/apparmor/posix_mq_rcv.c b/tests/regression/apparmor/posix_mq_rcv.c
+new file mode 100644
+index 000000000..f9ffc4d7e
+--- /dev/null
++++ b/tests/regression/apparmor/posix_mq_rcv.c
+@@ -0,0 +1,306 @@
++#include <mqueue.h>
++#include <stdlib.h>
++#include <signal.h>
++#include <poll.h>
++#include <sys/epoll.h>
++#include <time.h>
++
++#include "posix_mq.h"
++
++int timeout = 5; //seconds
++char *queuename = QNAME;
++
++enum notify_options {
++	DO_NOT_NOTIFY,
++	MQ_NOTIFY,
++	SELECT,
++	POLL,
++	EPOLL
++};
++
++int receive_message(mqd_t mqd, char needs_timeout) {
++	ssize_t nbytes;
++	struct mq_attr attr;
++	char *buf = NULL;
++
++	if (mq_getattr(mqd, &attr) == -1) {
++		perror("FAIL - could not mq_getattr");
++		goto out;
++	}
++
++	buf = malloc(attr.mq_msgsize);
++	if (buf == NULL) {
++		perror("FAIL - could not malloc");
++		goto out;
++	}
++
++	if (needs_timeout) { /* do we need this or should we just use mq_timedreceive always? */
++		struct timespec ts;
++		clock_gettime(CLOCK_REALTIME, &ts);
++		ts.tv_sec += timeout;
++		nbytes = mq_timedreceive(mqd, buf, attr.mq_msgsize,
++					 NULL, &ts);
++	} else {
++		attr.mq_flags |= O_NONBLOCK;
++		if (mq_setattr(mqd, &attr, NULL) == -1){
++			perror("FAIL - could not mq_setattr");
++			goto out;
++		}
++		nbytes = mq_receive(mqd, buf, attr.mq_msgsize, NULL);
++	}
++
++	if (nbytes < 0) {
++		perror("FAIL - could not receive msg");
++		goto out;
++	}
++
++	buf[nbytes] = 0;
++
++	if (strncmp(buf, msg, BUF_SIZE) != 0) {
++		fprintf(stderr, "FAIL - msg received does not match: %s - %s\n", buf, msg);
++		goto out;
++	}
++
++	printf("PASS\n");
++
++out:
++	free(buf);
++
++	if (mq_close(mqd) == (mqd_t) -1) {
++		perror("FAIL - could not close mq");
++		exit(EXIT_FAILURE);
++	}
++	if (mq_unlink(queuename) == (mqd_t) -1) {
++		perror("FAIL - could unlink mq");
++		exit(EXIT_FAILURE);
++	}
++
++	exit(EXIT_SUCCESS);
++}
++
++static void handle_signal(union sigval sv) {
++	mqd_t mqd = *((mqd_t *) sv.sival_ptr);
++	receive_message(mqd, 0);
++}
++
++static void usage(char *prog_name, char *msg)
++{
++	if (msg != NULL)
++		fprintf(stderr, "%s\n", msg);
++
++	fprintf(stderr, "Usage: %s [options]\n", prog_name);
++	fprintf(stderr, "Options are:\n");
++	fprintf(stderr, "-n        get notified if there's an item in the queue\n");
++	fprintf(stderr, "          available options are: mq_notify, select, poll and epoll\n");
++	fprintf(stderr, "-k        message queue name (default is %s)\n", QNAME);
++	fprintf(stderr, "-c        path of the client binary\n");
++	fprintf(stderr, "-u        run test as specified UID\n");
++	fprintf(stderr, "-t        timeout in seconds\n");
++	exit(EXIT_FAILURE);
++}
++
++void receive_mq_notify(mqd_t mqd)
++{
++	struct sigevent sev;
++	sev.sigev_notify = SIGEV_THREAD;
++	sev.sigev_notify_function = handle_signal;
++	sev.sigev_notify_attributes = NULL;
++	sev.sigev_value.sival_ptr = &mqd;
++
++	if (mq_notify(mqd, &sev) == -1) {
++		perror(" FAIL - could not mq_notify");
++		exit(EXIT_FAILURE);
++	}
++	sleep(timeout);
++	fprintf(stderr, "FAIL - could not mq_notify: Connection timed out\n");
++}
++
++void receive_select(mqd_t mqd)
++{
++	fd_set read_fds;
++	struct timeval tv;
++	tv.tv_sec = timeout;
++	tv.tv_usec = 0;
++
++	FD_ZERO(&read_fds);
++	FD_SET(mqd, &read_fds);
++
++	if (select(mqd + 1, &read_fds, NULL, NULL, &tv) == -1) {
++		perror("FAIL - could not select");
++		exit(EXIT_FAILURE);
++	} else {
++		if (FD_ISSET(mqd, &read_fds))
++			receive_message(mqd, 0);
++	}
++}
++
++void receive_poll(mqd_t mqd)
++{
++	struct pollfd fds[1];
++	fds[0].fd = mqd;
++	fds[0].events = POLLIN;
++
++	if (poll(fds, 1, timeout * 1000) == -1) {
++		perror("FAIL - could not poll");
++		exit(EXIT_FAILURE);
++	} else {
++		if (fds[0].revents & POLLIN)
++			receive_message(mqd, 0);
++	}
++}
++
++void receive_epoll(mqd_t mqd)
++{
++	int epfd = epoll_create(1);
++	if (epfd == -1) {
++		perror("FAIL - could not create epoll");
++		exit(EXIT_FAILURE);
++	}
++
++	struct epoll_event ev, rev[1];
++	ev.events = EPOLLIN;
++	ev.data.fd = mqd;
++	if (epoll_ctl(epfd, EPOLL_CTL_ADD, mqd, &ev) == -1) {
++		perror("FAIL - could not add mqd to epoll");
++		exit(EXIT_FAILURE);
++	}
++
++	if (epoll_wait(epfd, rev, 1, timeout * 1000) == -1) {
++		perror("FAIL - could not epoll_wait");
++		exit(EXIT_FAILURE);
++	} else {
++		if (rev[0].data.fd == mqd && rev[0].events & EPOLLIN)
++			receive_message(mqd, 0);
++	}
++}
++
++void receive(enum notify_options notify, mqd_t mqd)
++{
++	switch(notify) {
++	case DO_NOT_NOTIFY:
++		receive_message(mqd, 1);
++		return;
++	case MQ_NOTIFY:
++		receive_mq_notify(mqd);
++		break;
++	case SELECT:
++		receive_select(mqd);
++		break;
++	case POLL:
++		receive_poll(mqd);
++		break;
++	case EPOLL:
++		receive_epoll(mqd);
++		break;
++	}
++}
++
++int main(int argc, char *argv[])
++{
++	char opt = 0;
++	enum notify_options notify = DO_NOT_NOTIFY;
++	mqd_t mqd;
++	char *client = NULL;
++	int uid;
++	struct mq_attr attr;
++	attr.mq_flags = 0;
++	attr.mq_maxmsg = 10;
++	attr.mq_msgsize = BUF_SIZE;
++	attr.mq_curmsgs = 0;
++
++	while ((opt = getopt(argc, argv, "n:k:c:u:t:")) != -1) {
++		switch (opt) {
++		case 'n':
++			if (strcmp(optarg, "mq_notify") == 0)
++				notify = MQ_NOTIFY;
++			else if (strcmp(optarg, "select") == 0)
++				notify = SELECT;
++			else if (strcmp(optarg, "poll") == 0)
++				notify = POLL;
++			else if (strcmp(optarg, "epoll") == 0)
++				notify = EPOLL;
++			else
++				usage(argv[0], "invalid option for -n");
++			break;
++		case 'k':
++			queuename = optarg;
++			if (queuename == NULL)
++				usage(argv[0], "-k option must specify the queue name\n");
++			break;
++		case 'c':
++			client = optarg;
++			if (client == NULL)
++				usage(argv[0], "-c option must specify the client binary\n");
++			break;
++		case 'u':
++			/* change file mode on output before setuid drops
++			 * privs. This is required to make sure we can
++			 * write to the output file and in some cases
++			 * even exec with our inherited output file
++			 *
++			 * This assume test infrastructure creates the
++			 * file as root and dups stderr to stdout
++			 */
++			if (fchmod(fileno(stdout), 0666) == -1) {
++				perror("FAIL - could not set output file mode");
++				exit(EXIT_FAILURE);
++			}
++			if (fchmod(fileno(stderr), 0666) == -1) {
++				perror("FAIL - could not set output file mode");
++				exit(EXIT_FAILURE);
++			}
++			uid = atoi(optarg);
++			if (setuid(uid) < 0) {
++				perror("FAIL - could not setuid");
++				exit(EXIT_FAILURE);
++			}
++			break;
++		case 't':
++			timeout = atoi(optarg);
++			break;
++		default:
++			usage(argv[0], "Unrecognized option\n");
++		}
++	}
++
++	mqd = mq_open(queuename, O_CREAT | O_RDONLY, OBJ_PERMS, &attr);
++	if (mqd == (mqd_t) -1) {
++		perror("FAIL - could not open mq");
++		exit(EXIT_FAILURE);
++	}
++
++	/* exec the client */
++	int pid = fork();
++	if (pid == -1) {
++		perror("FAIL - could not fork");
++		exit(EXIT_FAILURE);
++	} else if (!pid) {
++		if (client == NULL) {
++			usage(argv[0], "client not specified");
++			exit(EXIT_FAILURE);
++			/* execution of the main thread continues
++			 * in case the client will be manually executed
++			 */
++		}
++		execl(client, client, queuename, NULL);
++		printf("FAIL %d - execlp %s %s- %m\n", getuid(), client, queuename);
++		exit(EXIT_FAILURE);
++	}
++
++	receive(notify, mqd);
++
++	/* when the notification fails because of timeout, it ends up here
++	 * so, clean up the mqueue
++	 */
++
++	if (mq_close(mqd) == (mqd_t) -1) {
++		perror("FAIL - could not close mq");
++		exit(EXIT_FAILURE);
++	}
++	if (mq_unlink(queuename) == (mqd_t) -1) {
++		perror("FAIL - could unlink mq");
++		exit(EXIT_FAILURE);
++	}
++
++	return 0;
++}
+diff --git a/tests/regression/apparmor/posix_mq_snd.c b/tests/regression/apparmor/posix_mq_snd.c
+new file mode 100644
+index 000000000..e560b632f
+--- /dev/null
++++ b/tests/regression/apparmor/posix_mq_snd.c
+@@ -0,0 +1,32 @@
++#include <mqueue.h>
++#include <stdlib.h>
++
++#include "posix_mq.h"
++
++int main(int argc, char * argv[])
++{
++	mqd_t mqd;
++	char *queuename = QNAME;
++
++	if (argc > 1) {
++		queuename = argv[1];
++	}
++	mqd = mq_open(queuename, O_WRONLY);
++	if (mqd == (mqd_t) -1) {
++		perror("FAIL sender - could not open mq");
++		return 1;
++	}
++
++	if (mq_send(mqd, msg, strnlen(msg, BUF_SIZE), 0) == -1) {
++		perror("FAIL sender - could not send");
++		return 1;
++	}
++
++	if (mq_close(mqd) == (mqd_t) -1) {
++		perror("FAIL sender - could not close mq");
++		return 1;
++	}
++
++	//printf("PASS client\n");
++	return 0;
++}
+-- 
+2.34.1
+

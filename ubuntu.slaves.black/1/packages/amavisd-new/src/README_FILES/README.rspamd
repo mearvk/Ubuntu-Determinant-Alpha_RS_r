@@ -1,0 +1,77 @@
+=pod
+
+=head1 Using Rspamd as a spam checker for Amavis
+
+Amavis can use Rspamd as a spam checker, with Rspamd running either on
+the same server or on a remote machine.
+
+=head2 Example configuration #1 (local Rspamd)
+
+  # Rspamd running on the same machine as Amavis. Default URL
+  # is http://127.0.0.1:11333/checkv2 , matching Rspamd's
+  # "normal" worker defaults.
+  @spam_scanners = ( [
+      'Local Rspamd', 'Amavis::SpamControl::RspamdClient',
+
+      # Adjust scores according to Rspamd's "required score"
+      # setting (defaults to 15). Scores reported by Rspamd
+      # will be multiplied with this factor. The following
+      # adjusts Rspamd scores to SpamAssassin scores. While
+      # this setting is technically optional, not adjusting
+      # scores is prone to cause headaches.
+      score_factor => $sa_tag2_level_deflt / 15.0,
+
+      # MTA name is used to assess validity of existing
+      # Authentication-Results headers, e.g. if DKIM/DMARC
+      # validation has already happened.
+      mta_name => 'mail.example.com',
+  ] );
+
+=head2 Example configuration #2 (remote Rspamd)
+
+  # Rspamd running behind HTTPS-capable proxy using basic
+  # authentication to control access.
+  @spam_scanners = ( [
+      'Remote Rspamd', 'Amavis::SpamControl::RspamdClient',
+      url => 'https://rspamd-proxy.example.com/checkv2',
+
+      # Response timeout in seconds. Default is 60, matching
+      # Rspamd's standard config for the "normal" worker.
+      timeout => 42,
+
+      # SSL-options and -credentials passed to LWP::UserAgent,
+      # see https://metacpan.org/pod/LWP::UserAgent . Default:
+      # ssl_opts => { verify_hostname => 1 },
+      credentials => {
+          # The following <host>:<port> must match the 'url'
+          # defined above or credentials won't be transmitted.
+          netloc => 'rspamd-proxy.example.com:443',
+          # Remote authentication realm
+          realm => 'Rspamd restricted access',
+          username => 'Marco',
+          password => 'Polo',
+      },
+
+      # Don't scan messages remotely if the body size extends
+      # the following limit (optional setting).
+      mail_body_size_limit => 32 * 1024,
+
+      score_factor => $sa_tag2_level_deflt / 15.0,
+      mta_name => 'mail.example.com',
+  ] );
+
+=head2 Requirements
+
+In addition to Amavis' core requirements, this extension needs
+the following additional Perl modules:
+
+  JSON
+  HTTP::Message
+  LWP::UserAgent
+  LWP::Protocol::https
+  Net::SSLeay
+
+Should your host OS not provide the necessary packages, these
+modules can be obtained via https://www.cpan.org .
+
+=cut

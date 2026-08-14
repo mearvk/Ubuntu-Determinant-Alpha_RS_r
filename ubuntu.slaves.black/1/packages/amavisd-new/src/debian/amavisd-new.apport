@@ -1,0 +1,30 @@
+'''Apport package hook for amavisd-new.
+
+(c) 2019 Canonical Ltd.
+Contributors:
+Christian Ehrhardt <christian.ehrhardt@canonical.com>
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.  See http://www.gnu.org/copyleft/gpl.html for
+the full text of the license.
+'''
+
+import re
+import apport
+import apport.hookutils
+
+def add_info(report, ui):
+    out = apport.hookutils.command_output(['systemctl', 'status',
+                                           'amavis']).strip()
+    fqdnbug = re.search("You must explicitly assign a FQDN of this host", out)
+    if fqdnbug:
+        ui.information("Your amavisd service fails to start as you have not \n"
+                       "configured hostname to be a Fully Qualified Domain \n"
+                       "Name. You will see the same reported by amavis, see \n"
+                       " $ systemctl status amavis\n"
+                       "Consider fixing either your hostname or set the \n"
+                       "desired value at /etc/amavis/conf.d/05-node_id")
+        report['UnreportableReason'] = 'Known local configuation issue'
+        return

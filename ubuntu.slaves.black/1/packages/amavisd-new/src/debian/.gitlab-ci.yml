@@ -1,0 +1,61 @@
+stages:
+  - build
+  - test-config
+
+.upgrade: &upgrade
+  - apt-get update
+  - apt-get -y dist-upgrade
+
+.build:
+  stage: build
+  before_script: *upgrade
+  script:
+    - apt-get -y install git-buildpackage
+    - mk-build-deps --install --tool 'apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes'
+    - git clean -f -d
+    - gbp buildpackage --git-ignore-branch -uc -us --git-export-dir=build
+  artifacts:
+    paths:
+      - build/*
+    expire_in: 1 week
+
+build stable:
+  extends: .build
+  image: debian:stable-slim
+
+build testing:
+  extends: .build
+  image: debian:testing-slim
+
+build unstable:
+  extends: .build
+  image: debian:unstable-slim
+  allow_failure: true
+
+.test-config:
+  stage: test-config
+  before_script: *upgrade
+  script:
+    - 'dpkg -i build/*.deb || :'
+    - apt-get -f -y install
+    - touch /etc/mailname
+    - amavisd-new test-config
+
+test-config stable:
+  dependencies:
+    - build stable
+  extends: .test-config
+  image: debian:stable-slim
+
+test-config testing:
+  dependencies:
+    - build testing
+  extends: .test-config
+  image: debian:testing-slim
+
+test-config unstable:
+  dependencies:
+    - build unstable
+  extends: .test-config
+  image: debian:unstable-slim
+  allow_failure: true

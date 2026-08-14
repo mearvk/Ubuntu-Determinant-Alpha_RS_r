@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with python3
+
+debian/%: debian/%.in debian/debconf-helper.py debian/rules
+	sed -e '/#DEBCONF_HELPER_PY#/ { ' -e 'r debian/debconf-helper.py' -ed -e' }' < $< > $@
+	echo >> $@
+	echo 'exit 0' >> $@
+	echo '# Make lintian happy' >> $@
+	sed -ne "s/^.*'\(apt.*\)' *: \[.*_handle.*$$/db_get \1/p" < debian/debconf-helper.py >> $@
+	chmod 444 $@
+
+override_dh_auto_clean:
+	rm -f debian/postinst debian/config
+	dh_auto_clean
+
+override_dh_auto_install: debian/postinst debian/config
+	$(MAKE) install DESTDIR=$(shell pwd)/debian/apt-listchanges

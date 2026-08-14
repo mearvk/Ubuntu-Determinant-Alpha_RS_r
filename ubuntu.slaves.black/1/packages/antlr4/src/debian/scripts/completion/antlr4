@@ -1,0 +1,66 @@
+#
+# antlr4(1) completion
+#
+
+_antlr4()
+{
+    local cur cur2 prev options
+
+    _get_comp_words_by_ref -n = cur
+    prev=${COMP_WORDS[COMP_CWORD-1]}
+
+    options=("-D")
+
+    # complete the grammar options
+    if [[ " $cur" =~ " -D" ]] ; then
+        # complete the language options
+        if [[ "$cur" =~ "-Dlanguage=" ]] ; then
+            cur2=`_get_cword`
+            if [[ $cur2 == "=" ]] ; then cur2=""; fi
+            COMPREPLY=( $( compgen -W 'Java CSharp JavaScript Python2 Python3' -- $cur2 ) )
+        else
+            COMPREPLY=( $( compgen -W '-Dlanguage= -DsuperClass= -DtokenVocab= -DTokenLabelType=' -- $cur ) )
+            compopt -o nospace
+        fi
+        return 0
+    fi
+
+    if [[ ! "${COMP_WORDS[@]}" =~ " -o " ]];              then options+=("-o"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -lib " ]];            then options+=("-lib"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -atn " ]];            then options+=("-atn"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -encoding " ]];       then options+=("-encoding"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -message-format " ]]; then options+=("-message-format"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -long-messages " ]];  then options+=("-long-messages"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ "-listener " ]];        then options+=("-listener -no-listener"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ "-visitor " ]];         then options+=("-visitor -no-visitor"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -package " ]];        then options+=("-package"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -depend " ]];         then options+=("-depend"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -Werror " ]];         then options+=("-Werror"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -XdbgST " ]];         then options+=("-XdbgST"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -XdbgSTWait " ]];     then options+=("-XdbgSTWait"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -Xforce-atn " ]];     then options+=("-Xforce-atn"); fi
+    if [[ ! "${COMP_WORDS[@]}" =~ " -Xlog " ]];           then options+=("-Xlog"); fi
+
+    case "$prev" in
+        -o|-lib)
+            # suggest a directory
+            COMPREPLY=( $( compgen -o dirnames -- $cur ) )
+            for ((i=0; i < ${#COMPREPLY[@]}; i++)); do
+                [ -d "${COMPREPLY[$i]}" ] && COMPREPLY[$i]=${COMPREPLY[$i]}/
+            done
+            ;;
+        -package|-encoding)
+            COMPREPLY=( )
+            ;;
+        -message-format)
+            COMPREPLY=( $( compgen -W 'antlr gnu vs2005' -- $cur )  )
+            ;;
+        *)
+            # suggest an option or a grammar file
+            COMPREPLY=( $( compgen -W '${options[@]}' -- $cur ) $( compgen -f -X '!*.g4' -- $cur ) )
+            ;;
+    esac
+
+    return 0
+} &&
+complete -F _antlr4 antlr4

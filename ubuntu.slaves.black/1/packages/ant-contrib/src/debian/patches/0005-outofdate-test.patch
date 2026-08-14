@@ -1,0 +1,73 @@
+Description: address intermittent test failures
+ Update "outofdate" test case to ensure that the simulated build artifacts
+ (outofdate/gen/*) have dates strictly later than the source files.
+ .
+ It appears that the tests were failure due to a race where "file.done"
+ was considered out of date and thus appeared in the source set, despite
+ being configured as up to date in the test case.  
+ .
+ That said, it's not clear to me how it ever worked in the first place
+ given the logic in OutOfData.outOfDate():
+ .
+        if ((!ret)  && (sourceFile != null)) {
+            ret = sourceFile.lastModified() > targetFile.lastModified();
+        }
+ .
+ My assumption is that the test was previously broken/flaky, but that time
+ was chunkier (larger quanta) until recently and so the source files had
+ the same timestamp and so weren't strictly newer.
+ .
+ This patch also adds the fork=true attribute to the junit task, which
+ resolves spurious test failures observed after the OutOfDate test was
+ patched.
+Author: tony mancill <tmancill@debian.org>
+Origin: vendor
+Bug-Debian: https://bugs.debian.org/907763
+Forwarded: no
+Last-Update: 2018-09-03
+
+--- a/test/resources/logic/outofdate.xml
++++ b/test/resources/logic/outofdate.xml
+@@ -92,14 +92,6 @@
+   </target>
+ 
+   <target name="outofdate.init">
+-    <!-- generated -->
+-    <mkdir dir="outofdate/gen/1/2/3"/>
+-    <touch file="outofdate/gen/index.done"/>
+-    <touch file="outofdate/gen/1/2/file.done"/>
+-    <touch file="outofdate/gen/1/done.c"/>
+-    <touch file="outofdate/gen/1/done.h"/>
+-    <touch file="outofdate/gen/1/partial.c"/>
+-
+       <!-- sources -->
+       <mkdir dir="outofdate/source/1/2/3"/>
+       <touch file="outofdate/source/newer.text"/>
+@@ -108,6 +100,16 @@
+       <touch file="outofdate/source/1/done.y"/>
+       <touch file="outofdate/source/1/partial.y"/>
+ 
++    <!-- guarantee that some time has elapsed -->
++    <sleep milliseconds="1"/>
++
++    <!-- generated -->
++    <mkdir dir="outofdate/gen/1/2/3"/>
++    <touch file="outofdate/gen/index.done"/>
++    <touch file="outofdate/gen/1/2/file.done"/>
++    <touch file="outofdate/gen/1/done.c"/>
++    <touch file="outofdate/gen/1/done.h"/>
++    <touch file="outofdate/gen/1/partial.c"/>
+   </target>
+ 
+   <target name="outofdate.test" depends="outofdate.init">
+--- a/build.xml
++++ b/build.xml
+@@ -279,7 +279,7 @@
+ 			<path refid="test.classpath" />
+ 		</pathconvert>
+ 
+-		<junit haltonfailure="false" haltonerror="false"
++		<junit fork="true" haltonfailure="false" haltonerror="false"
+ 	           errorproperty="junit.error" failureproperty="junit.failure">
+ 	      <formatter type="brief" usefile="false"/>
+ 	      <batchtest>

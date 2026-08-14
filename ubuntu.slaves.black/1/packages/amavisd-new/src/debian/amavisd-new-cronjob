@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# amavisd-new cronjob helper
+#
+# Run it as the amavis user
+#
+# First parameter specifies which cronjob routine to run:
+# 		sa-sync:	spamassassin fast sync
+# 		sa-clean:	spamassassin cleanup
+
+test -e /usr/bin/sa-learn || exit 0
+test -e /usr/sbin/amavisd-new || exit 0
+
+if [ "$(id --name -u)" != "amavis" ]
+then
+    echo "Please run this cronjob as user amavis"
+    exit 1
+fi
+
+set -e
+umask 022
+
+if ! perl -MMail::SpamAssassin -e "my \$spamtest = Mail::SpamAssassin->new();
+\$spamtest->compile_now (); \$spamtest->{conf}->{use_bayes} ? exit 0 : exit 1" >/dev/null 2>&1
+then
+	#bayes is disabled - just exit
+	exit
+fi
+
+case $1 in
+	sa-sync)
+		/usr/bin/sa-learn --sync >/dev/null 2>&1
+		;;
+	sa-clean)
+		/usr/bin/sa-learn --sync --force-expire >/dev/null 2>&1
+		;;
+	*)
+		echo "$0: unknown cron routine $1" >&2
+		exit 1
+		;;
+esac
+
+exit 0

@@ -1,0 +1,43 @@
+From d6ce8216494157502160e47bf31a00529c7e1c1f Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Sun, 27 Mar 2022 21:19:33 -0700
+Subject: [PATCH 07/11] parser: place perm on name as well as name && label
+ combination
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+---
+ parser/mqueue.cc | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/parser/mqueue.cc b/parser/mqueue.cc
+index 92f075060..9fe122b57 100644
+--- a/parser/mqueue.cc
++++ b/parser/mqueue.cc
+@@ -191,7 +191,7 @@ int mqueue_rule::gen_policy_re(Profile &prof)
+ 
+ 	if (qtype == mqueue_posix && !features_supports_posix_mqueue) {
+ 		warn_once(prof.name);
+-	//	return RULE_NOT_SUPPORTED;
++		return RULE_NOT_SUPPORTED;
+ 	} else if (qtype == mqueue_sysv && !features_supports_sysv_mqueue) {
+ 		warn_once(prof.name);
+ 		//	return RULE_NOT_SUPPORTED;
+@@ -231,8 +231,13 @@ int mqueue_rule::gen_policy_re(Profile &prof)
+ 		}
+ 
+ 		if (mode & AA_VALID_POSIX_MQ_PERMS) {
+-			if (!prof.policy.rules->add_rule_vec(deny, mode, audit, size, vec,
+-							     dfaflags, false))
++			/* store perms at name match so label doesn't need
++			 * to be checked
++			 */
++			if (!label && !prof.policy.rules->add_rule_vec(deny, mode, audit, 1, vec, dfaflags, false))
++				goto fail;
++			/* also provide label match with perm */
++			if (!prof.policy.rules->add_rule_vec(deny, mode, audit, size, vec, dfaflags, false))
+ 				goto fail;
+ 		}
+ 	}
+-- 
+2.34.1
+

@@ -1,0 +1,41 @@
+#!/bin/sh
+# vim:set fileencoding=utf-8 et ts=4 sts=4 sw=4:
+
+set -e
+
+PREFERENCES=/etc/apt/listchanges.conf
+PYTHON3=/usr/bin/python3
+
+. /usr/share/debconf/confmodule
+
+runPython()
+{
+    tempdir=`mktemp --directory --suffix=.aptlc`
+    trap "rm -rf $tempdir" EXIT
+    temp="$tempdir/debconf-helper.py"
+    cat > "$temp" << 'EOF'
+#DEBCONF_HELPER_PY#
+EOF
+    "$PYTHON3" -B "$temp" "$@"
+}
+
+    
+if [ "$1" = "configure" ]
+then
+    runPython postinst "$PREFERENCES" "$@"
+    ucfr 'apt-listchanges' "$PREFERENCES"
+    # Ignore whitespace-only difference (see #823514)
+    diff -qwB "$PREFERENCES".new "$PREFERENCES" >/dev/null 2>&1 || \
+      ucf --debconf-ok "$PREFERENCES".new "$PREFERENCES"
+    rm -f "$PREFERENCES".new
+fi
+
+[ -z "$DEBCONF_RECONFIGURE" ] || exit 0
+
+# Fix a bug introduced in 3.0
+dbfile=/var/lib/apt/listchanges.db
+if [ "$1" = "configure" ] && [ "$2" = "3.0" ] && [ "$dbfile.db" -nt "$dbfile" ]; then
+    mv -f "$dbfile.db" "$dbfile"
+fi
+
+#DEBHELPER#

@@ -1,0 +1,56 @@
+From eaafacd0efc6bae4e2a9de616bf487b8a55437c1 Mon Sep 17 00:00:00 2001
+From: Eric Covener <covener@apache.org>
+Date: Tue, 29 Nov 2022 13:24:16 +0000
+Subject: [PATCH] Merge r1904516 from trunk:
+Description: Fix the mod_proxy_hcheck module
+Origin: backport, https://github.com/apache/httpd/commit/eaafacd0efc6bae4e2a9de616bf487b8a55437c1
+Bug: https://bz.apache.org/bugzilla/show_bug.cgi?id=66300
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/apache2/+bug/1998311
+Last-Update: 2022-03-01
+---
+ modules/proxy/mod_proxy_hcheck.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
+
+--- a/modules/proxy/mod_proxy_hcheck.c
++++ b/modules/proxy/mod_proxy_hcheck.c
+@@ -1070,6 +1070,18 @@
+     hctp = NULL;
+     tpsize = HC_THREADPOOL_SIZE;
+ #endif
++
++    ajp_handle_cping_cpong = APR_RETRIEVE_OPTIONAL_FN(ajp_handle_cping_cpong);
++    if (ajp_handle_cping_cpong) {
++       proxy_hcmethods_t *method = proxy_hcmethods;
++       for (; method->name; method++) {
++           if (method->method == CPING) {
++               method->implemented = 1;
++               break;
++           }
++       }
++    }
++
+     return OK;
+ }
+ static int hc_post_config(apr_pool_t *p, apr_pool_t *plog,
+@@ -1126,17 +1138,6 @@
+         s = s->next;
+     }
+ 
+-    ajp_handle_cping_cpong = APR_RETRIEVE_OPTIONAL_FN(ajp_handle_cping_cpong);
+-    if (ajp_handle_cping_cpong) {
+-       proxy_hcmethods_t *method = proxy_hcmethods;
+-       for (; method->name; method++) {
+-           if (method->method == CPING) {
+-               method->implemented = 1;
+-               break;
+-           }
+-       }
+-    }
+-
+     return OK;
+ }
+ 
+--- /dev/null
++++ b/mod_proxy_hcheck_jammy_fix_to_detect_support.patch
+@@ -0,0 +1 @@
++

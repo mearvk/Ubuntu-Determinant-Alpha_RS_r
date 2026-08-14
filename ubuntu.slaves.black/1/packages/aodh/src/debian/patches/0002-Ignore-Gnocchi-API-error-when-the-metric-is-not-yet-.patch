@@ -1,0 +1,41 @@
+From 214be56b3865d4d5bc30eaf0cb4b56bde9577f8c Mon Sep 17 00:00:00 2001
+From: Takashi Kajinami <tkajinam@redhat.com>
+Date: Mon, 30 May 2022 13:33:06 +0900
+Subject: [PATCH] Ignore Gnocchi API error when the metric is not yet created
+
+Change 74eadfbd58359b7ebe9e1e40ae6b6ff245146bb8 replaced usage of
+metric aggregate API by Dynamic aggregate API.
+
+However the Dynamic aggregate API returns a different response code
+(not 404, but 400) in Gnocchi <= 4.4 and this is causing the direct API
+error when the metric associated with the aggregation does not exist.
+
+This change adds 400 to the ignored response codes so that Aodh api
+does not return error even when the associated metric is not yet
+created in Gnocchi.
+
+Closes-Bug: #1974682
+Change-Id: Ief75ccdc0fe5c6a197fc05bc481a5be096447558
+---
+ aodh/api/controllers/v2/alarm_rules/gnocchi.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/aodh/api/controllers/v2/alarm_rules/gnocchi.py b/aodh/api/controllers/v2/alarm_rules/gnocchi.py
+index 47d2428b..14ba12ca 100644
+--- a/aodh/api/controllers/v2/alarm_rules/gnocchi.py
++++ b/aodh/api/controllers/v2/alarm_rules/gnocchi.py
+@@ -217,7 +217,10 @@ class AggregationMetricByResourcesLookupRule(AlarmGnocchiThresholdRule):
+             if e.code == 404:
+                 # NOTE(sileht): We are fine here, we just want to ensure the
+                 # 'query' payload is valid for Gnocchi If the metric
+-                # doesn't exists yet, it doesn't matter
++                # doesn't exists yet, it doesn't matter.
++                return
++            if e.code == 400 and 'Metrics not found' in e.message["cause"]:
++                # NOTE(tkajinam): Gnocchi<4.5 returns 400 instead of 404
+                 return
+             raise base.ClientSideError(e.message, status_code=e.code)
+         except Exception as e:
+-- 
+2.37.2
+

@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+
+ifeq ($(origin CC),default)
+	CC = $(DEB_HOST_GNU_TYPE)-gcc
+endif
+
+CFLAGS += -Wall -pedantic -D_FILE_OFFSET_BITS=64
+ifneq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+        CFLAGS += -DDEBUG
+else
+        CFLAGS += -DNDEBUG
+endif
+
+# The source code unpacks structures into variables that then only get used in
+# debug builds, which results in a lot of uninteresting warnings.
+CFLAGS += -Wno-unused-but-set-variable
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) -f Makefile.Linux CC=$(CC) LD=$(CC) LDFLAGS="$(LDFLAGS)" CFLAGS="$(CFLAGS) $(CPPFLAGS)"
+
+override_dh_auto_clean:
+	[ ! -f Makefile.Linux ] || $(MAKE) -f Makefile.Linux clean
+
+override_dh_auto_install:
+	$(MAKE) -f Makefile.Linux global_install GLOBAL_INSTALL_DIR=/usr/bin DESTDIR=debian/antiword
+	# Don't ship kantiword - it's broken and apparently unused.
+	rm -f debian/antiword/usr/bin/kantiword
+
+	mkdir -p debian/antiword/usr/share/doc/antiword
+	cp -f Docs/History debian/antiword/usr/share/doc/antiword/TODO
+	cp -f Docs/ChangeLog debian/antiword/usr/share/doc/antiword/changelog

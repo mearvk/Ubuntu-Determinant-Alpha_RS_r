@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell debian/vercheck)
+RELEASE_PACKAGE=apt-xapian-index
+PFX=$(CURDIR)/debian/apt-xapian-index
+
+%:
+	dh $@ --with=python3,quilt --buildsystem=pybuild
+
+override_dh_auto_build:
+	dh_auto_build
+	help2man --name='rebuild the Apt Xapian Index' --section=8 --no-info ./update-apt-xapian-index > update-apt-xapian-index.8
+	COLUMNS=200 help2man --name='query the Apt Xapian Index' --section=1 --no-info ./axi-cache > axi-cache.1
+
+override_dh_auto_test:
+ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	# run test suite
+	./runtests -v
+endif
+
+override_dh_auto_install:
+	dh_auto_install
+	mv $(PFX)/usr/bin/update-apt-xapian-index \
+	   $(PFX)/usr/sbin/update-apt-xapian-index
+	# Install the plugins
+	install -o root -g root -m 755 -d $(PFX)/usr/share/apt-xapian-index/plugins
+	install -o root -g root -m 644 aliases/* $(PFX)/usr/share/apt-xapian-index/aliases/
+	install -o root -g root -m 644 plugins/*.py $(PFX)/usr/share/apt-xapian-index/plugins/
+	# Install bash completion
+	dh_bash-completion
+
+override_dh_auto_clean:
+	dh_auto_clean
+	find . -name "*.pyc" -delete
+	rm -rf testdb
+	rm -f update-apt-xapian-index.8 axi-cache.1
+
+vercheck:
+	debian/vercheck > /dev/null
+
+debsrc: vercheck
+	git-buildpackage -S -us -uc
+	rm -f ../$(RELEASE_PACKAGE)_$(VERSION)_source.changes
+
+#release: clean
+#	( cd .. && FAKEROOTKEY= LD_PRELOAD= sbuild -c sid -A --nolog -s $(RELEASE_PACKAGE)_$(RELEASE_VERSION).dsc )
+#	( cd .. && FAKEROOTKEY= LD_PRELOAD= lintian $(RELEASE_PACKAGE)_$(RELEASE_VERSION)_*.changes )
+#	git tag -s -m "Tagged version $(RELEASE_VERSION)" v$(RELEASE_VERSION)

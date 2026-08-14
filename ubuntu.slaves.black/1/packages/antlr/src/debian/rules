@@ -1,0 +1,60 @@
+#!/usr/bin/make -f
+
+PYTHON3S:=$(shell py3versions -vr 2>/dev/null)
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --with maven-repo-helper --with python3
+
+override_dh_auto_configure:
+	cp /usr/share/misc/config.* scripts
+	JAVAC='/usr/lib/jvm/default-java/bin/javac -source 1.7' CLASSPATH=`pwd` JAVA=/usr/lib/jvm/default-java/bin/java \
+	./configure --prefix=/usr --mandir=\$${prefix}/share/man
+
+override_dh_auto_build-indep:
+	mkdir -p target/classes
+	javac -source 1.7 -target 1.7 -d target/classes $(shell find antlr -name '*.java')
+	jar cvf antlr.jar -C target/classes .
+
+	cp bin/antlr target/runantlr
+
+override_dh_auto_build-arch:
+	$(MAKE) -C lib/cpp CXXFLAGS="+ -fPIC -DPIC"
+	mv -f lib/cpp/src/libantlr.a debian/libantlr-pic.a
+
+	$(MAKE) -C lib/cpp clean all
+
+override_dh_auto_test:
+
+override_dh_auto_install-indep:
+	set -e && cd lib/python && for pyvers in $(PYTHON3S); do \
+		python$$pyvers setup.py install --install-layout=deb --root $(CURDIR)/debian/python3-antlr ; \
+	done && cd ..
+
+override_dh_auto_install-arch:
+	$(MAKE) -C lib/cpp install prefix=`pwd`/debian/libantlr-dev/usr
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- CHANGES.txt
+
+override_dh_installdocs:
+	dh_installdocs
+	rm -f debian/antlr-doc/usr/share/doc/antlr/csharp-runtime.html
+	rm -f debian/antlr-doc/usr/share/doc/antlr/Makefile*
+
+override_dh_installexamples:
+	dh_installexamples
+	find debian/antlr-doc/usr/share/doc/antlr/examples -type f -print | xargs -r chmod 0644
+	# Remove example Makefiles containing build paths and binary paths
+	test ! -d debian/antlr-doc/usr/share/doc/antlr/examples || find debian/antlr-doc/usr/share/doc/antlr/examples -name Makefile -print -delete
+	rm -rf debian/antlr-doc/usr/share/doc/antlr/examples/csharp
+
+override_dh_auto_clean:
+	-cd lib/cpp; $(MAKE) clean
+	-find -name Makefile | xargs rm -f
+	-rm -rf lib/python/build
+	-rm -rf scripts/run-antlr
+
+get-orig-pom:
+	wget -O debian/pom.xml http://repository.sonatype.org/service/local/repositories/central/content/antlr/antlr/$(DEB_VERSION_UPSTREAM)/antlr-$(DEB_VERSION_UPSTREAM).pom

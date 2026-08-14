@@ -1,0 +1,63 @@
+From 000f603a24cab8960fac6907a56dc5f98bf7d61e Mon Sep 17 00:00:00 2001
+From: Mike Gabriel <mike.gabriel@das-netzwerkteam.de>
+Date: Mon, 12 Apr 2021 15:05:51 +0200
+Subject: [PATCH] guest-session: Make path to lightdm-guest-session executable
+ adaptable to the lightdm package this greeter is co-installed with.
+
+ Fixes ArcticaProject/arctica-greeter#15.
+---
+ configure.ac                                  | 15 +++++++++++++++
+ data/50-arctica-greeter-guest-wrapper.conf.in |  2 +-
+ data/Makefile.am                              |  2 +-
+ 3 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 9426e75..8b062dd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -54,6 +54,21 @@ else
+     AC_DEFINE_UNQUOTED([SD_BINARY], ["$SD_BINARY"], [Path to g-s-d])
+ fi
+ 
++dnl customize path/name to/of lightdm-guest-session wrapper binary
++
++#AC_ARG_VAR([GUEST_WRAPPER_BINARY],
++#           [AC_HELP_STRING([GUEST_WRAPPER_BINARY=@<:@path-to-lightdm-guest-session@:>@],
++#                           [Explicitly set full path to LightDM's lightdm-guest-session wrapper executable @<:@default=${libexecdir}/lightdm/lightdm-guest-session@:>@])]
++
++AC_ARG_VAR([GUEST_WRAPPER_BINARY],
++           [Explicitly set full path to LightDM's lightdm-guest-session wrapper executable @<:@default=${libexecdir}/lightdm/lightdm-guest-session@:>@]
++)
++if test -z "${GUEST_WRAPPER_BINARY}"; then
++    GUEST_WRAPPER_BINARY="${libexecdir}/lightdm/lightdm-guest-session"
++fi
++AC_MSG_NOTICE([Using guest wrapper executable: ${GUEST_WRAPPER_BINARY}])
++AC_SUBST(GUEST_WRAPPER_BINARY)
++
+ AC_CHECK_PROG(VALGRIND, valgrind, valgrind --trace-children=yes --num-callers=256)
+ AC_SUBST(VALGRIND)
+ 
+diff --git a/data/50-arctica-greeter-guest-wrapper.conf.in b/data/50-arctica-greeter-guest-wrapper.conf.in
+index 1ccd04d..c124c84 100644
+--- a/data/50-arctica-greeter-guest-wrapper.conf.in
++++ b/data/50-arctica-greeter-guest-wrapper.conf.in
+@@ -1,2 +1,2 @@
+ [Seat:*]
+-guest-wrapper=@libexecdir@/lightdm/lightdm-guest-session
++guest-wrapper=@GUEST_WRAPPER_BINARY@
+diff --git a/data/Makefile.am b/data/Makefile.am
+index 0cd1c67..55a9d5b 100644
+--- a/data/Makefile.am
++++ b/data/Makefile.am
+@@ -4,7 +4,7 @@
+ 	$(AM_V_GEN) sed -e "s|\@pkglibexecdir\@|$(pkglibexecdir)|" $< > $@
+ 
+ 50-arctica-greeter-guest-wrapper.conf: 50-arctica-greeter-guest-wrapper.conf.in
+-	$(AM_V_GEN) sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@
++	$(AM_V_GEN) sed -e "s|\@GUEST_WRAPPER_BINARY\@|$(GUEST_WRAPPER_BINARY)|" $< > $@
+ 
+ lightdm_confdir = $(datadir)/lightdm/lightdm.conf.d
+ lightdm_conf_DATA = \
+-- 
+2.30.2
+

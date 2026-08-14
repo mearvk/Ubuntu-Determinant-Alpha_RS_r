@@ -1,0 +1,134 @@
+Description: Adjust the source compatibility automatically for Debian builds with Java 9
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/src/main/org/apache/tools/ant/taskdefs/Javac.java
++++ b/src/main/org/apache/tools/ant/taskdefs/Javac.java
+@@ -188,7 +188,7 @@
+      */
+     public String getSource() {
+         return source != null
+-            ? source : getProject().getProperty(MagicNames.BUILD_JAVAC_SOURCE);
++            ? source : LanguageLevel.adjust(getProject().getProperty(MagicNames.BUILD_JAVAC_SOURCE), MagicNames.BUILD_JAVAC_SOURCE, this);
+     }
+ 
+     /**
+@@ -767,7 +767,7 @@
+     public String getTarget() {
+         return targetAttribute != null
+             ? targetAttribute
+-            : getProject().getProperty(MagicNames.BUILD_JAVAC_TARGET);
++            : LanguageLevel.adjust(getProject().getProperty(MagicNames.BUILD_JAVAC_TARGET), MagicNames.BUILD_JAVAC_TARGET, this);
+     }
+ 
+     /**
+@@ -1079,7 +1079,7 @@
+     public void execute() throws BuildException {
+         checkParameters();
+         resetFileLists();
+-
++        adjustLevels();
+         // scan source directories and dest directory to build up
+         // compile list
+         if (hasPath(src)) {
+@@ -1661,4 +1661,11 @@
+         0x00, 0x00, 0x00, 0x02, 0x00, 0x04
+     };
+ 
++    /**
++     * Adjusts the value of the source/target attributes.
++     */
++    private void adjustLevels() {
++        source = LanguageLevel.adjust(source, "javac -source", this);
++        targetAttribute = LanguageLevel.adjust(targetAttribute, "javac -target", this);
++    }
+ }
+--- a/src/main/org/apache/tools/ant/taskdefs/Javadoc.java
++++ b/src/main/org/apache/tools/ant/taskdefs/Javadoc.java
+@@ -2238,7 +2238,7 @@
+         final String sourceArg = source != null ? source : getProject().getProperty(MagicNames.BUILD_JAVAC_SOURCE);
+         if (sourceArg != null) {
+             toExecute.createArgument().setValue("-source");
+-            toExecute.createArgument().setValue(sourceArg);
++            toExecute.createArgument().setValue(LanguageLevel.adjust(sourceArg, "javadoc -source", this));
+         }
+     }
+ 
+--- /dev/null
++++ b/src/main/org/apache/tools/ant/taskdefs/LanguageLevel.java
+@@ -0,0 +1,76 @@
++package org.apache.tools.ant.taskdefs;
++
++import java.util.ArrayList;
++import java.util.List;
++import org.apache.tools.ant.Project;
++import org.apache.tools.ant.Task;
++import org.apache.tools.ant.util.JavaEnvUtils;
++
++class LanguageLevel {
++
++    /** Detect if a Debian build is in process */
++    static boolean isDebianBuild() {
++        return System.getenv("DEB_BUILD_ARCH") != null;
++    }
++
++    /**
++     * Tells if the specified language level is supported by the current javac.
++     */
++    static boolean isLevelSupported(String level) {
++        List<String> unsupportedLevels = new ArrayList<>();
++        if (JavaEnvUtils.isAtLeastJavaVersion("9")) {
++            unsupportedLevels.add("1.1");
++            unsupportedLevels.add("1.2");
++            unsupportedLevels.add("1.3");
++            unsupportedLevels.add("1.4");
++            unsupportedLevels.add("1.5");
++            unsupportedLevels.add("5");
++        }
++        if (JavaEnvUtils.isAtLeastJavaVersion("12")) {
++            unsupportedLevels.add("1.6");
++            unsupportedLevels.add("6");
++        }
++
++        return !unsupportedLevels.contains(level);
++    }
++
++    /**
++     * Returns the minimum language level supported by the current javac.
++     */
++    static String getMinimumLevel() {
++        if (JavaEnvUtils.isAtLeastJavaVersion("12")) {
++            return "7";
++        }
++
++        return "6";
++    }
++
++    /**
++     * Adjust the source/target level automatically for Debian builds with Java 9 or later.
++     *
++     * @param level    the source/target level to be adjusted
++     * @param location the command or property referring to the specified level
++     * @param logger   the calling task used for logging purpose
++     */
++    static String adjust(String level, String location, Task logger) {
++        if (level == null) {
++            return level;
++        }
++
++        if (!isDebianBuild()) {
++            // only do this is it's a Debian package build
++            return level;
++        }
++
++        if (isLevelSupported(level)) {
++            return level;
++        }
++
++	String minLevel = getMinimumLevel();
++        if (logger != null) {
++            logger.log("Using " + location + " "  + level + " is no longer supported, switching to " + minLevel, Project.MSG_WARN);
++        }
++
++        return minLevel;
++    }
++}

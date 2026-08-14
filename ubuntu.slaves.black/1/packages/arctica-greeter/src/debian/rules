@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_autoreconf:
+	if [ ! -e po/arctica-greeter.pot.bak ]; then \
+	    cp po/arctica-greeter.pot po/arctica-greeter.pot.bak; \
+	fi
+	NOCONFIGURE=1 dh_autoreconf ./autogen.sh
+
+override_dh_auto_configure:
+	# LightDM in Debian 11 has lightdm-guest-session in the path given below.
+	# This might need adjustments if LightDM gets packaged differently.
+	dh_auto_configure -- GUEST_WRAPPER_BINARY=/usr/lib/$(DEB_HOST_MULTIARCH)/lightdm/lightdm-guest-session
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_auto_install:
+	dh_auto_install
+	mkdir -p debian/tmp/var/lib/polkit-1/localauthority/10-vendor.d/
+	cp debian/arctica-greeter.pkla debian/tmp/var/lib/polkit-1/localauthority/10-vendor.d/
+	mkdir -p debian/tmp/etc/lightdm/lightdm.conf.d/
+	cp debian/90-arctica-greeter.conf debian/tmp/etc/lightdm/lightdm.conf.d/
+	cp debian/91-arctica-greeter-guest-session.conf debian/tmp/etc/lightdm/lightdm.conf.d/
+	cp debian/92-arctica-greeter-remote-logon.conf debian/tmp/etc/lightdm/lightdm.conf.d/
+
+override_dh_auto_clean:
+	dh_auto_clean
+	if [ -e po/arctica-greeter.pot.bak ]; then \
+	    mv -f po/arctica-greeter.pot.bak po/arctica-greeter.pot; \
+	fi
+	rm -f src/arctica_greeter_vala.stamp
+	rm -f src/logo_generator_vala.stamp
+	rm -f tests/arctica_greeter_test_vala.stamp
+	rm -f src/*.c
+	rm -f tests/*.c
+	rm -f debian/theme-debian-logo.png
+
+override_dh_auto_test:
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+get-orig-source:
+	uscan --noconf --force-download --rename --download-current-version --destdir=..

@@ -1,0 +1,66 @@
+#!/bin/bash
+
+. /etc/apache2/envvars
+set -xeu
+set -o pipefail
+export LANG=C
+export PATH=/usr/lib/ccache:$PATH
+# set to "-v t/modules/ext_filter.t ..." to run only a few test, but verbose
+TESTS=""
+TESTUSER=tuser
+
+# The test framework assumes localhost resolves exclusively to 127.0.0.1
+# (and not to ::1). So remove 'localhost' from the ::1 entry.
+perl -p -i -e ' if (/^\s*::1\s+/) { s/\s+localhost\s+/ /g }' /etc/hosts
+
+useradd --user-group --system --create-home -s /bin/bash $TESTUSER
+cp -a debian/perl-framework $AUTOPKGTEST_TMP
+cd $AUTOPKGTEST_TMP/perl-framework
+
+export HARNESS_VERBOSE=1
+
+run_tests () {
+	local MPM=$1
+	shift
+	local LOG=testlog.$MPM
+
+	echo =============Running-with-${MPM}==========
+	rm -f apache2.conf.debian
+	cp /etc/apache2/apache2.conf apache2.conf.debian
+	cat /etc/apache2/mods-available/$MPM.load >> apache2.conf.debian
+	ls /etc/apache2/mods-available/*.load | grep -v mpm_ | xargs cat >> apache2.conf.debian
+	# these are only for tests and don't have a .load file
+	for m in bucketeer case_filter case_filter_in ; do
+		echo "LoadModule ${m}_module /usr/lib/apache2/modules/mod_${m}.so" >> apache2.conf.debian
+	done
+	# need TypesConfig from mime.conf for t/modules/filter.t
+	cat /etc/apache2/mods-available/mime.conf >> apache2.conf.debian
+	echo "Servername localhost" >> apache2.conf.debian
+	make clean || true
+	perl -p -i -e 's,^Include,#Include,' apache2.conf.debian
+	chown -R $TESTUSER: $AUTOPKGTEST_TMP
+	su $TESTUSER -c "perl Makefile.PL -apxs /usr/bin/apxs2 -httpd_conf $PWD/apache2.conf.debian" \
+	    || return 1
+	su $TESTUSER -c "t/TEST $TESTS" | tee $LOG
+	if ! grep -E "^Files=[0-9]+, Tests=[0-9]+" $LOG ; then
+		echo "Message about Files/Tests not found in $LOG" >&2
+		return 1
+	fi
+	if ! grep -E "^Result: PASS" $LOG ; then
+		echo "PASS message not found in $LOG" >&2
+		return 1
+	fi
+	if grep -E "^Result: FAIL" $LOG ; then >&2
+		echo "Test suite failed"
+		return 1
+	fi
+	if grep -E "server dumped core" $LOG ; then >&2
+		echo "segfault detected"
+		return 1
+	fi
+	return 0
+}
+
+run_tests mpm_prefork
+run_tests mpm_worker
+run_tests mpm_event

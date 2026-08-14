@@ -1,0 +1,65 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/maven.mk
+
+DEB_MAVEN_INSTALL_TO_USJ := false
+DEB_MAVEN_BUILD_TARGET := package install
+DEB_MAVEN_DOC_TARGET := generate-sources javadoc:jar javadoc:aggregate
+PACKAGE              := $(DEB_SOURCE_PACKAGE)
+VERSION              := $(shell echo $(DEB_UPSTREAM_VERSION) | cut -d'+' -f1 -)
+JAVA_HOME            := /usr/lib/jvm/default-java
+DEB_MAVEN_ARGS := -DbuildNumber="debian-$(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/.*-//')"
+
+# Bootstrap the build with the generated sources taken from a normal run of
+# mvn install on the Antlr source code
+before-mvn-build:: PLUGIN_ARGS += -Dmaven.test.skip=true -Duse.maven.repo.local=true
+before-mvn-build:: unpatch-poms
+	cp -r debian/generated-sources/antlr3/* tool/src/main/java
+	rm -Rf debian/maven-repo/org/antlr/antlr
+	rm -Rf debian/maven-repo/org/antlr/antlr-master
+	rm -Rf debian/maven-repo/org/antlr/antlr-runtime
+	rm -Rf debian/maven-repo/org/antlr/antlr3-maven-plugin
+	mh_patchpoms -pantlr3 --debian-build --keep-pom-version -idebian/maven.bootstrap.ignoreRules --maven-repo=$(DEB_MAVEN_REPO)
+	$(DEB_MAVEN_INVOKE) $(PLUGIN_ARGS) -N $(DEB_MAVEN_BUILD_TARGET) $(DEB_MAVEN_INSTALL_TARGET)
+	cd runtime/Java        && $(DEB_MAVEN_INVOKE) $(PLUGIN_ARGS) $(DEB_MAVEN_BUILD_TARGET) $(DEB_MAVEN_INSTALL_TARGET)
+	cd tool                && $(DEB_MAVEN_INVOKE) $(PLUGIN_ARGS) $(DEB_MAVEN_BUILD_TARGET) $(DEB_MAVEN_INSTALL_TARGET)
+	cd antlr3-maven-plugin && $(DEB_MAVEN_INVOKE) $(PLUGIN_ARGS) $(DEB_MAVEN_BUILD_TARGET) $(DEB_MAVEN_INSTALL_TARGET)
+	mh_unpatchpoms -pantlr3
+
+common-post-build-indep::
+	# Generate OSGi metadata
+	bnd wrap --properties debian/antlr3.bnd --output tool/target/antlr-$(VERSION).jar.tmp \
+		tool/target/antlr-$(VERSION).jar
+	bnd wrap --properties debian/antlr3-runtime.bnd --output runtime/Java/target/antlr-runtime-$(VERSION).jar.tmp \
+		runtime/Java/target/antlr-runtime-$(VERSION).jar
+	mv tool/target/antlr-$(VERSION).jar.tmp tool/target/antlr-$(VERSION).jar
+	mv runtime/Java/target/antlr-runtime-$(VERSION).jar.tmp runtime/Java/target/antlr-runtime-$(VERSION).jar
+
+	# Build the Ant task
+	javac -source 7 -target 7 -encoding ISO-8859-1 -g -cp /usr/share/java/ant.jar antlr-ant/main/antlr3-task/antlr3-src/org/apache/tools/ant/antlr/ANTLR3.java
+	jar -cvf antlr-ant/main/antlr3-task/antlr3-task.jar -C antlr-ant/main/antlr3-task/antlr3-src .
+	zip --delete antlr-ant/main/antlr3-task/antlr3-task.jar *.java
+
+binary-post-install/antlr3::
+	mh_linkrepojar -pantlr3 tool/pom.xml /usr/share/java/antlr3.jar
+	mh_linkrepojar -plibantlr3-gunit-java gunit/pom.xml /usr/share/java/antlr3-gunit.jar
+	dh_installman -pantlr3
+
+clean::
+	mh_clean
+	rm -Rf antlr3-maven-plugin/target
+	rm -Rf gunit/target
+	rm -Rf gunit-maven-plugin/target
+	rm -Rf tool/target
+	rm -Rf target
+	rm -Rf runtime/Java/target
+	rm -rf tool/src/main/java/*.tokens
+	rm -rf tool/src/main/java/org/antlr/grammar/v3
+	rm -f antlr-ant/main/antlr3-task/antlr3-task.jar antlr-ant/main/antlr3-task/antlr3-src/org/apache/tools/ant/antlr/*.class
+
+get-orig-source:
+	-uscan --download-version $(DEB_UPSTREAM_VERSION) --force-download --rename --repack

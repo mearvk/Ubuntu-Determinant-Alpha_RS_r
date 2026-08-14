@@ -1,0 +1,239 @@
+From d732bc8b9b101375bb34b1505e401909baf1406f Mon Sep 17 00:00:00 2001
+From: Georgia Garcia <georgia.garcia@canonical.com>
+Date: Wed, 6 Apr 2022 17:09:01 +0000
+Subject: [PATCH 09/11] libapparmor: add support for class in logparsing
+
+We want to use the class field to identify operations such as
+posix_mqueue
+
+Signed-off-by: Georgia Garcia <georgia.garcia@canonical.com>
+---
+ libraries/libapparmor/include/aalogparse.h               | 2 ++
+ libraries/libapparmor/src/grammar.y                      | 3 +++
+ libraries/libapparmor/src/libaalogparse.c                | 2 ++
+ libraries/libapparmor/src/scanner.l                      | 2 ++
+ libraries/libapparmor/swig/python/test/test_python.py.in | 3 ++-
+ libraries/libapparmor/testsuite/test_multi.c             | 2 ++
+ utils/apparmor/logparser.py                              | 1 +
+ utils/test/test-capability.py                            | 1 +
+ utils/test/test-change_profile.py                        | 1 +
+ utils/test/test-dbus.py                                  | 1 +
+ utils/test/test-file.py                                  | 1 +
+ utils/test/test-logparser.py                             | 1 +
+ utils/test/test-network.py                               | 1 +
+ utils/test/test-ptrace.py                                | 1 +
+ utils/test/test-signal.py                                | 1 +
+ 15 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/libraries/libapparmor/include/aalogparse.h b/libraries/libapparmor/include/aalogparse.h
+index 1eee33a68..aab0093ff 100644
+--- a/libraries/libapparmor/include/aalogparse.h
++++ b/libraries/libapparmor/include/aalogparse.h
+@@ -159,6 +159,8 @@ typedef struct
+ 	char *fs_type;
+ 	char *flags;
+ 	char *src_name;
++
++	char *class;
+ } aa_log_record;
+ 
+ /**
+diff --git a/libraries/libapparmor/src/grammar.y b/libraries/libapparmor/src/grammar.y
+index 4181a9439..8e9549e70 100644
+--- a/libraries/libapparmor/src/grammar.y
++++ b/libraries/libapparmor/src/grammar.y
+@@ -185,6 +185,7 @@ aa_record_event_type lookup_aa_event(unsigned int type)
+ %token TOK_KEY_FSTYPE
+ %token TOK_KEY_FLAGS
+ %token TOK_KEY_SRCNAME
++%token TOK_KEY_CLASS
+ 
+ %token TOK_SOCKLOGD_KERNEL
+ %token TOK_SYSLOG_KERNEL
+@@ -425,6 +426,8 @@ key: TOK_KEY_OPERATION TOK_EQUALS TOK_QUOTED_STRING
+ 		ret_record->event = AA_RECORD_INVALID;
+ 		ret_record->info = $1;
+ 	}
++	| TOK_KEY_CLASS TOK_EQUALS TOK_QUOTED_STRING
++	{ ret_record->class = $3; }
+ 	;
+ 
+ apparmor_event:
+diff --git a/libraries/libapparmor/src/libaalogparse.c b/libraries/libapparmor/src/libaalogparse.c
+index 6e7c4b797..d4f0c1737 100644
+--- a/libraries/libapparmor/src/libaalogparse.c
++++ b/libraries/libapparmor/src/libaalogparse.c
+@@ -103,6 +103,8 @@ void free_record(aa_log_record *record)
+ 			free(record->flags);
+ 		if (record->src_name != NULL)
+ 			free(record->src_name);
++		if (record->class != NULL)
++			free(record->class);
+ 
+ 		free(record);
+ 	}
+diff --git a/libraries/libapparmor/src/scanner.l b/libraries/libapparmor/src/scanner.l
+index 87f2d7ea6..66eb7f956 100644
+--- a/libraries/libapparmor/src/scanner.l
++++ b/libraries/libapparmor/src/scanner.l
+@@ -168,6 +168,7 @@ key_peer		"peer"
+ key_fstype		"fstype"
+ key_flags		"flags"
+ key_srcname		"srcname"
++key_class		"class"
+ audit			"audit"
+ 
+ /* network addrs */
+@@ -355,6 +356,7 @@ yy_flex_debug = 0;
+ {key_fstype}		{ return(TOK_KEY_FSTYPE); }
+ {key_flags}		{ BEGIN(safe_string); return(TOK_KEY_FLAGS); }
+ {key_srcname}		{ BEGIN(safe_string); return(TOK_KEY_SRCNAME); }
++{key_class}		{ BEGIN(safe_string); return(TOK_KEY_CLASS); }
+ 
+ {socklogd_kernel}	{ BEGIN(dmesg_timestamp); return(TOK_SOCKLOGD_KERNEL); }
+ {syslog_kernel}		{ BEGIN(dmesg_timestamp); return(TOK_SYSLOG_KERNEL); }
+diff --git a/libraries/libapparmor/swig/python/test/test_python.py.in b/libraries/libapparmor/swig/python/test/test_python.py.in
+index 75c71415e..51baef0a3 100644
+--- a/libraries/libapparmor/swig/python/test/test_python.py.in
++++ b/libraries/libapparmor/swig/python/test/test_python.py.in
+@@ -34,6 +34,7 @@ OUTPUT_MAP = {
+     'Local port':       'net_local_port',
+     'Foreign port':     'net_foreign_port',
+     'Audit subid':      'audit_sub_id',
++    'Class':            '_class',
+ }
+ 
+ # FIXME: pull this automatically out of LibAppArmor, but swig
+@@ -108,7 +109,7 @@ class AAPythonBindingsTests(unittest.TestCase):
+         '''parse the swig created record and construct a dict from it'''
+ 
+         new_record = dict()
+-        for key in [x for x in dir(record) if not (x.startswith('_') or x == 'this')]:
++        for key in [x for x in dir(record) if not (x.startswith('__') or x == 'this')]:
+             value = getattr(record, key)
+             if key == "event" and value in EVENT_MAP:
+                 new_record[key] = EVENT_MAP[value]
+diff --git a/libraries/libapparmor/testsuite/test_multi.c b/libraries/libapparmor/testsuite/test_multi.c
+index 016077192..f4092a870 100644
+--- a/libraries/libapparmor/testsuite/test_multi.c
++++ b/libraries/libapparmor/testsuite/test_multi.c
+@@ -134,6 +134,8 @@ int print_results(aa_log_record *record)
+ 		print_string("Flags", record->flags);
+ 		print_string("Src name", record->src_name);
+ 
++		print_string("Class", record->class);
++
+ 		print_long("Epoch", record->epoch, 0);
+ 		print_long("Audit subid", (long) record->audit_sub_id, 0);
+ 	return(0);
+diff --git a/utils/apparmor/logparser.py b/utils/apparmor/logparser.py
+index a64b64b10..8c6bed2c6 100644
+--- a/utils/apparmor/logparser.py
++++ b/utils/apparmor/logparser.py
+@@ -104,6 +104,7 @@ class ReadLog:
+         ev['family'] = event.net_family
+         ev['protocol'] = event.net_protocol
+         ev['sock_type'] = event.net_sock_type
++        ev['class'] = event._class
+ 
+         if event.ouid != ctypes.c_ulong(-1).value:  # ULONG_MAX
+             ev['fsuid'] = event.fsuid
+diff --git a/utils/test/test-capability.py b/utils/test/test-capability.py
+index ab25223c4..cc8317faa 100644
+--- a/utils/test/test-capability.py
++++ b/utils/test/test-capability.py
+@@ -122,6 +122,7 @@ class CapabilityTest(AATest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         obj = CapabilityRule(parsed_event['name'], log_event=parsed_event)
+diff --git a/utils/test/test-change_profile.py b/utils/test/test-change_profile.py
+index 3fe3c4891..c0fb170ee 100644
+--- a/utils/test/test-change_profile.py
++++ b/utils/test/test-change_profile.py
+@@ -123,6 +123,7 @@ class ChangeProfileTestParseFromLog(ChangeProfileTest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         obj = ChangeProfileRule(None, ChangeProfileRule.ALL, parsed_event['name2'], log_event=parsed_event)
+diff --git a/utils/test/test-dbus.py b/utils/test/test-dbus.py
+index 069445089..c8f753828 100644
+--- a/utils/test/test-dbus.py
++++ b/utils/test/test-dbus.py
+@@ -154,6 +154,7 @@ class DbusTestParseFromLog(DbusTest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+ # XXX send rules must not contain name conditional, but the log event includes it - how should we handle this in logparser.py?
+diff --git a/utils/test/test-file.py b/utils/test/test-file.py
+index 3e285cfef..0015da487 100644
+--- a/utils/test/test-file.py
++++ b/utils/test/test-file.py
+@@ -169,6 +169,7 @@ class FileTestParseFromLog(FileTest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         #FileRule#     path,                 perms,                         exec_perms, target,         owner,  file_keyword,   leading_perms
+diff --git a/utils/test/test-logparser.py b/utils/test/test-logparser.py
+index b3d8e105a..e9863faf1 100644
+--- a/utils/test/test-logparser.py
++++ b/utils/test/test-logparser.py
+@@ -95,6 +95,7 @@ class TestParseEvent(AATest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         self.assertIsNotNone(ReadLog.RE_LOG_ALL.search(event))
+diff --git a/utils/test/test-network.py b/utils/test/test-network.py
+index afff4de91..6c96f2657 100644
+--- a/utils/test/test-network.py
++++ b/utils/test/test-network.py
+@@ -122,6 +122,7 @@ class NetworkTestParseFromLog(NetworkTest):
+             'attr': None,
+             'name2': None,
+             'name': None,
++            'class': None,
+         })
+ 
+         obj = NetworkRule(parsed_event['family'], parsed_event['sock_type'], log_event=parsed_event)
+diff --git a/utils/test/test-ptrace.py b/utils/test/test-ptrace.py
+index e8b637fbe..9b7da8932 100644
+--- a/utils/test/test-ptrace.py
++++ b/utils/test/test-ptrace.py
+@@ -112,6 +112,7 @@ class PtraceTestParseFromLog(PtraceTest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         obj = PtraceRule(parsed_event['denied_mask'], parsed_event['peer'], log_event=parsed_event)
+diff --git a/utils/test/test-signal.py b/utils/test/test-signal.py
+index f95a17885..3098da9b6 100644
+--- a/utils/test/test-signal.py
++++ b/utils/test/test-signal.py
+@@ -117,6 +117,7 @@ class SignalTestParseFromLog(SignalTest):
+             'family': None,
+             'protocol': None,
+             'sock_type': None,
++            'class': None,
+         })
+ 
+         obj = SignalRule(parsed_event['denied_mask'], parsed_event['signal'], parsed_event['peer'], log_event=parsed_event)
+-- 
+2.34.1
+

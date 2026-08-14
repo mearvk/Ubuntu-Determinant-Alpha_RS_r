@@ -1,0 +1,78 @@
+Description: Add support for the SOURCE_DATE_EPOCH variable in the Tstamp task
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/src/main/org/apache/tools/ant/taskdefs/Tstamp.java
++++ b/src/main/org/apache/tools/ant/taskdefs/Tstamp.java
+@@ -78,11 +78,13 @@
+         try {
+             Date d = getNow();
+             // Honour reproducible builds https://reproducible-builds.org/specs/source-date-epoch/#idm55
++            boolean reproducibleBuild = false;
+             final String epoch = System.getenv(ENV_SOURCE_DATE_EPOCH);
+             try {
+                 if (epoch != null) {
+                     // Value of SOURCE_DATE_EPOCH will be an integer, representing seconds.
+                     d = new Date(Integer.parseInt(epoch) * 1000);
++                    reproducibleBuild = true;
+                     log("Honouring environment variable " + ENV_SOURCE_DATE_EPOCH + " which has been set to " + epoch);
+                 }
+             } catch(NumberFormatException e) {
+@@ -91,16 +93,35 @@
+                         + " environment variable", Project.MSG_DEBUG);
+             }
+             final Date date = d;
+-            customFormats.forEach(cts -> cts.execute(getProject(), date, getLocation()));
++            for (CustomFormat cts : customFormats) {
++                if (reproducibleBuild) {
++                    if (cts.getTimezone() == null) {
++                        cts.setTimezone("UTC");
++                    }
++                    if (cts.getLanguage() == null) {
++                        cts.setLocale("en_US");
++                    }
++                }
++                cts.execute(getProject(), d, getLocation());
++            }
+ 
+             SimpleDateFormat dstamp = new SimpleDateFormat("yyyyMMdd");
++            if (reproducibleBuild) {
++                dstamp.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
++            }
+             setProperty("DSTAMP", dstamp.format(d));
+ 
+             SimpleDateFormat tstamp = new SimpleDateFormat("HHmm");
++            if (reproducibleBuild) {
++                tstamp.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
++            }
+             setProperty("TSTAMP", tstamp.format(d));
+ 
+             SimpleDateFormat today
+                 = new SimpleDateFormat("MMMM d yyyy", Locale.US);
++            if (reproducibleBuild) {
++                today.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
++            }
+             setProperty("TODAY", today.format(d));
+ 
+         } catch (Exception e) {
+@@ -235,6 +256,10 @@
+             }
+         }
+ 
++        String getLanguage() {
++            return language;
++        }
++
+         /**
+          * The timezone to use for displaying time.
+          * The values are as defined by the Java TimeZone class.
+@@ -245,6 +270,10 @@
+             timeZone = TimeZone.getTimeZone(id);
+         }
+ 
++        TimeZone getTimezone() {
++            return timeZone;
++        }
++
+         /**
+          * The numeric offset to the current time.
+          * @param offset the offset to use.

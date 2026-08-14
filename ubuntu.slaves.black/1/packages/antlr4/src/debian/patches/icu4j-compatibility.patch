@@ -1,0 +1,77 @@
+Description: Split Unicode properties to resolve "code too large" error with icu4j >= 64.1
+Author: Jerry James <loganjerry@gmail.com>
+Bug: https://github.com/antlr/antlr4/pull/2739
+diff --git a/tool/resources/org/antlr/v4/tool/templates/unicodedata.st b/tool/resources/org/antlr/v4/tool/templates/unicodedata.st
+index 0f22c7334d..6c275d276a 100644
+--- a/tool/resources/org/antlr/v4/tool/templates/unicodedata.st
++++ b/tool/resources/org/antlr/v4/tool/templates/unicodedata.st
+@@ -1,4 +1,4 @@
+-unicodedata(propertyCodePointRanges, propertyAliases) ::= <<
++unicodedata(propertyCodePointRanges, propertyAliases1, propertyAliases2) ::= <<
+ package org.antlr.v4.unicode;
+ 
+ import java.util.Arrays;
+@@ -15,7 +15,7 @@ import org.antlr.v4.runtime.misc.Interval;
+  */
+ public abstract class UnicodeData {
+        private static final Map\<String, IntervalSet> propertyCodePointRanges = new HashMap\<>(<length(propertyCodePointRanges)>);
+-       private static final Map\<String, String> propertyAliases = new HashMap\<>(<length(propertyAliases)>);
++       private static final Map\<String, String> propertyAliases = new HashMap\<>(<length(propertyAliases1)> + <length(propertyAliases2)>);
+ 
+        // Work around Java 64k bytecode method limit by splitting up static
+        // initialization into one method per Unicode property
+@@ -31,14 +31,19 @@ static private void addProperty<i>() {
+ \}}; separator="\n\n">
+ 
+        // Property aliases
+-       static private void addPropertyAliases() {
+-              <propertyAliases.keys:{ k | propertyAliases.put("<k>".toLowerCase(Locale.US), "<propertyAliases.(k)>".toLowerCase(Locale.US)); }; separator="\n">
++       static private void addPropertyAliases1() {
++              <propertyAliases1.keys:{ k | propertyAliases.put("<k>".toLowerCase(Locale.US), "<propertyAliases1.(k)>".toLowerCase(Locale.US)); }; separator="\n">
++       }
++
++       static private void addPropertyAliases2() {
++              <propertyAliases2.keys:{ k | propertyAliases.put("<k>".toLowerCase(Locale.US), "<propertyAliases2.(k)>".toLowerCase(Locale.US)); }; separator="\n">
+        }
+ 
+        // Put it all together
+        static {
+               <propertyCodePointRanges.keys:{ k | addProperty<i>(); }; separator="\n">
+-              addPropertyAliases();
++              addPropertyAliases1();
++              addPropertyAliases2();
+        }
+ 
+        private static String normalize(String propertyCodeOrAlias) {
+diff --git a/tool/src/org/antlr/v4/unicode/UnicodeDataTemplateController.java b/tool/src/org/antlr/v4/unicode/UnicodeDataTemplateController.java
+index da244a3a85..2f02db05f4 100644
+--- a/tool/src/org/antlr/v4/unicode/UnicodeDataTemplateController.java
++++ b/tool/src/org/antlr/v4/unicode/UnicodeDataTemplateController.java
+@@ -78,17 +78,19 @@ private static void addPropertyAlias(
+ 		addTR35ExtendedPictographicPropertyCodesToCodePointRanges(propertyCodePointRanges);
+ 		addEmojiPresentationPropertyCodesToCodePointRanges(propertyCodePointRanges);
+ 
+-		Map<String, String> propertyAliases = new LinkedHashMap<>();
+-		addUnicodeCategoryCodesToNames(propertyAliases);
+-		addUnicodeBinaryPropertyCodesToNames(propertyAliases);
+-		addUnicodeScriptCodesToNames(propertyAliases);
+-		addUnicodeBlocksToNames(propertyAliases);
+-		addUnicodeIntPropertyCodesToNames(propertyAliases);
+-		propertyAliases.put("EP", "Extended_Pictographic");
++		Map<String, String> propertyAliases1 = new LinkedHashMap<>();
++		addUnicodeCategoryCodesToNames(propertyAliases1);
++		addUnicodeBinaryPropertyCodesToNames(propertyAliases1);
++		addUnicodeScriptCodesToNames(propertyAliases1);
++		addUnicodeBlocksToNames(propertyAliases1);
++		Map<String, String> propertyAliases2 = new LinkedHashMap<>();
++		addUnicodeIntPropertyCodesToNames(propertyAliases2);
++		propertyAliases2.put("EP", "Extended_Pictographic");
+ 
+ 		Map<String, Object> properties = new LinkedHashMap<>();
+ 		properties.put("propertyCodePointRanges", propertyCodePointRanges);
+-		properties.put("propertyAliases", propertyAliases);
++		properties.put("propertyAliases1", propertyAliases1);
++		properties.put("propertyAliases2", propertyAliases2);
+ 		return properties;
+ 	}
+ 

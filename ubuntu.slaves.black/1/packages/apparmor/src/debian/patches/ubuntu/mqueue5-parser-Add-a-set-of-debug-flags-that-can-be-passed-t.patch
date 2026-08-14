@@ -1,0 +1,97 @@
+From 2050b456395ee78df12f30c2f52a8951a99c804e Mon Sep 17 00:00:00 2001
+From: John Johansen <john.johansen@canonical.com>
+Date: Sat, 26 Mar 2022 16:29:37 -0700
+Subject: [PATCH 05/11] parser: Add a set of debug flags that can be passed to
+ the kernel
+
+The kernel will allow for a couple of debug flags on a profile that
+can be used to trigger debug messages for only profiles/labels that
+have the flag set. Add basic support for these to the parser.
+
+Signed-off-by: John Johansen <john.johansen@canonical.com>
+---
+ parser/parser_interface.c | 2 +-
+ parser/parser_policy.c    | 2 +-
+ parser/parser_yacc.y      | 4 ++--
+ parser/profile.h          | 8 ++++++--
+ 4 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/parser/parser_interface.c b/parser/parser_interface.c
+index ab1077b4f..310f8ab1f 100644
+--- a/parser/parser_interface.c
++++ b/parser/parser_interface.c
+@@ -420,7 +420,7 @@ void sd_serialize_profile(std::ostringstream &buf, Profile *profile,
+ 
+ 	sd_write_struct(buf, "flags");
+ 	/* used to be flags.debug, but that's no longer supported */
+-	sd_write_uint32(buf, profile->flags.hat);
++	sd_write_uint32(buf, profile->flags.flags);
+ 	sd_write_uint32(buf, profile_mode_packed(profile->flags.mode));
+ 	sd_write_uint32(buf, profile->flags.audit);
+ 	sd_write_structend(buf);
+diff --git a/parser/parser_policy.c b/parser/parser_policy.c
+index f18d0a13c..2f66ab26f 100644
+--- a/parser/parser_policy.c
++++ b/parser/parser_policy.c
+@@ -243,7 +243,7 @@ void post_process_rule_entries(Profile *prof)
+ static int profile_add_hat_rules(Profile *prof)
+ {
+ 	/* don't add hat rules if not hat or profile doesn't have hats */
+-	if (!prof->flags.hat && prof->hat_table.empty())
++	if (!(prof->flags.flags & FLAG_HAT) && prof->hat_table.empty())
+ 		return 0;
+ 
+ 	if (!add_proc_access(prof, CHANGEHAT_PATH))
+diff --git a/parser/parser_yacc.y b/parser/parser_yacc.y
+index 1d98aacbd..c4f5643f1 100644
+--- a/parser/parser_yacc.y
++++ b/parser/parser_yacc.y
+@@ -428,7 +428,7 @@ profile:  opt_profile_flag profile_base
+ 			yyerror(_("Profile names must begin with a '/', namespace or keyword 'profile' or 'hat'."));
+ 
+ 		if ($1 == 2)
+-			prof->flags.hat = 1;
++			prof->flags.flags |= FLAG_HAT;
+ 		$$ = prof;
+ 	};
+ 
+@@ -455,7 +455,7 @@ hat: hat_start profile_base
+ 		if ($2->xattrs.list)
+ 			yyerror("hat profiles can't use xattrs matches");
+ 
+-		prof->flags.hat = 1;
++		prof->flags.flags |= FLAG_HAT;
+ 		$$ = prof;
+ 	};
+ 
+diff --git a/parser/profile.h b/parser/profile.h
+index f54467c07..5606baa46 100644
+--- a/parser/profile.h
++++ b/parser/profile.h
+@@ -110,9 +110,13 @@ static inline enum profile_mode str_to_mode(const char *str)
+ 	return MODE_UNSPECIFIED;
+ };
+ 
++#define FLAG_HAT 1
++#define FLAG_DEBUG1 2
++#define FLAG_DEBUG2 4
++
+ class flagvals {
+ public:
+-	int hat;
++	int flags;
+ 	enum profile_mode mode;
+ 	int audit;
+ 	int path;
+@@ -124,7 +128,7 @@ public:
+ 		if (audit)
+ 			os << ", Audit";
+ 
+-		if (hat)
++		if (flags & FLAG_HAT)
+ 			os << ", Hat";
+ 
+ 		os << "\n";
+-- 
+2.34.1
+

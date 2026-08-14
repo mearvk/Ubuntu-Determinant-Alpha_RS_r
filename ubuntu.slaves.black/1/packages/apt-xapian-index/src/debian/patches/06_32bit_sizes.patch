@@ -1,0 +1,47 @@
+Description: On 32 bit systems, large packages like  astrometry-data-2mass-00
+ can have an installed size that doesn't fit in 32 bits, generating an
+ OverflowError.  Xapian doesn't catch this and thus returns a value with an
+ exception set, causing a chained SystemError.  In either case, catch the
+ exception and treat it as if the size is -1, i.e. don't add it to the
+ document.
+Author: Barry Warsaw <barry@ubuntu.com>
+Bug: https://bugs.launchpad.net/ubuntu/+source/xapian1.3-bindings/+bug/1527745
+
+--- a/plugins/sizes.py
++++ b/plugins/sizes.py
+@@ -95,9 +95,15 @@
+             return
+ 
+         if self.val_inst_size != -1:
+-            document.add_value(self.val_inst_size, xapian.sortable_serialise(instSize));
++            try:
++                document.add_value(self.val_inst_size, xapian.sortable_serialise(instSize));
++            except (OverflowError, SystemError):
++                pass
+         if self.val_pkg_size != -1:
+-            document.add_value(self.val_pkg_size, xapian.sortable_serialise(pkgSize));
++            try:
++                document.add_value(self.val_pkg_size, xapian.sortable_serialise(pkgSize));
++            except (OverflowError, SystemError):
++                pass
+ 
+     def indexDeb822(self, document, pkg):
+         """
+@@ -116,9 +122,15 @@
+             return
+ 
+         if self.val_inst_size != -1:
+-            document.add_value(self.val_inst_size, xapian.sortable_serialise(instSize));
++            try:
++                document.add_value(self.val_inst_size, xapian.sortable_serialise(instSize));
++            except (OverflowError, SystemError):
++                pass
+         if self.val_pkg_size != -1:
+-            document.add_value(self.val_pkg_size, xapian.sortable_serialise(pkgSize));
++            try:
++                document.add_value(self.val_pkg_size, xapian.sortable_serialise(pkgSize));
++            except (OverflowError, SystemError):
++                pass
+ 
+ def init():
+     """

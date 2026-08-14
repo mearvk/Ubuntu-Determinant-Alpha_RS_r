@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#expose DH_VERBOSE=1
+
+export HOME="$(CURDIR)/debian/test"
+SHELL := /bin/sh -e
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/~/./g')
+export PBR_VERSION=$(VERSION)
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@  --with apache2,python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_clean:
+	dh_clean
+	rm -rf .testrepository
+
+override_dh_auto_install:
+	pkgos-dh_auto_install --no-py2
+
+override_dh_install:
+	mkdir -p $(CURDIR)/debian/tmp/etc/aodh
+	PYTHONPATH=$(CURDIR) oslo-config-generator --config-file=$(CURDIR)/aodh/cmd/aodh-config-generator.conf \
+		--output-file=$(CURDIR)/debian/tmp/etc/aodh/aodh.conf
+	crudini --merge $(CURDIR)/debian/tmp/etc/aodh/aodh.conf < $(CURDIR)/debian/aodh.conf.dist
+	dh_install -Xusr/etc/aodh/aodh-config-generator.conf -Xusr/bin/aodh-api \
+		-Xusr/etc/aodh/policy.json -Xusr/etc/aodh/api_paste.ini
+	dh_missing --fail-missing -Xusr/etc/aodh/aodh-config-generator.conf -Xusr/bin/aodh-api \
+		-Xusr/etc/aodh/policy.json -Xusr/etc/aodh/api_paste.ini
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf .testrepository
+	find . -iname '*.pyc' -delete
+	rm -f debian/*.init debian/*.service debian/*.upstart
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	pkgos-dh_auto_test --no-py2 'aodh\.tests\.unit.(?!test_bin.*)'
+endif
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=. sphinx-build -b html doc/source $(CURDIR)/debian/aodh-doc/usr/share/doc/aodh-doc/html
+	mkdir -p $(CURDIR)/debian/aodh-doc/usr/share/doc/aodh-doc/html/_static
+	touch $(CURDIR)/debian/aodh-doc/usr/share/doc/aodh-doc/html/_static/toggle.js
+	dh_sphinxdoc -O--buildsystem=pybuild
+endif
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

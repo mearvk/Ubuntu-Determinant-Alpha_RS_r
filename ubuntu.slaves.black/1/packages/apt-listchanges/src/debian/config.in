@@ -1,0 +1,28 @@
+#!/bin/sh
+# vim:set fileencoding=utf-8 et ts=4 sts=4 sw=4:
+
+set -e
+
+PREFERENCES=/etc/apt/listchanges.conf
+PYTHON3=/usr/bin/python3
+
+. /usr/share/debconf/confmodule
+
+runPython()
+{
+    tempdir=`mktemp --directory --suffix=.aptlc`
+    trap "rm -rf $tempdir" EXIT
+    temp="$tempdir/debconf-helper.py"
+    cat > "$temp" << 'EOF'
+#DEBCONF_HELPER_PY#
+EOF
+    "$PYTHON3" -B "$temp" "$@"
+}
+
+if [ -x "$PYTHON3" ] && "$PYTHON3" -B -c 'import debconf' 2>/dev/null; then
+    runPython config "$PREFERENCES" "$@"
+else
+    echo "Deferring configuration of apt-listchanges until $PYTHON3" >&2
+    echo "and python's debconf module are available" >&2
+    exit 0
+fi

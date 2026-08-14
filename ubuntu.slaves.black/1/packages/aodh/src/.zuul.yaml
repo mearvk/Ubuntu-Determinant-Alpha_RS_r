@@ -1,0 +1,74 @@
+- project:
+    templates:
+      - openstack-python3-yoga-jobs
+      - publish-openstack-docs-pti
+      - release-notes-jobs-python3
+    check:
+      jobs:
+        - aodh-tempest-plugin-mysql
+        - aodh-tempest-plugin-postgresql
+        - telemetry-dsvm-integration:
+            irrelevant-files: &aodh-irrelevant-files
+              - ^(test-|)requirements.txt$
+              - ^setup.cfg$
+              - ^doc/.*$
+              - ^.*\.rst$
+              - ^releasenotes/.*$
+              - ^aodh/tests/.*$
+              - ^aodh/locale/.*$
+              - ^tools/.*$
+              - ^tox.ini$
+        - telemetry-dsvm-integration-ipv6-only:
+            irrelevant-files: *aodh-irrelevant-files
+        - telemetry-dsvm-integration-centos-8s:
+            irrelevant-files: *aodh-irrelevant-files
+        - telemetry-dsvm-integration-centos-8s-fips:
+            irrelevant-files: *aodh-irrelevant-files
+    gate:
+      jobs:
+        - aodh-tempest-plugin-mysql
+        - aodh-tempest-plugin-postgresql
+        - telemetry-dsvm-integration:
+            irrelevant-files: *aodh-irrelevant-files
+        - telemetry-dsvm-integration-ipv6-only:
+            irrelevant-files: *aodh-irrelevant-files
+        - telemetry-dsvm-integration-centos-8s:
+            irrelevant-files: *aodh-irrelevant-files
+        - telemetry-dsvm-integration-centos-8s-fips:
+            irrelevant-files: *aodh-irrelevant-files
+    experimental:
+      jobs:
+        # TripleO jobs that deploy Telemetry.
+        # Note we don't use a project-template here, so it's easier
+        # to disable voting on one specific job if things go wrong.
+        # If you need any support to debug these jobs in case of
+        # failures, please reach us on #tripleo IRC channel.
+        # NOTE(sileht): These job takes 3 hours and fail most of the times.
+        # While other jobs take 20-30 minutes
+        # We can reenable it when they take less times.
+        - tripleo-ci-centos-8-scenario001-standalone
+        - tripleo-ci-centos-8-scenario002-standalone
+
+- job:
+    name: aodh-tempest-plugin-postgresql
+    parent: telemetry-tempest-base
+    irrelevant-files: *aodh-irrelevant-files
+    vars:
+      devstack_services:
+        postgresql: true
+        mysql: false
+      devstack_localrc:
+        DATABASE_TYPE: "postgresql"
+        AODH_BACKEND: "postgresql"
+        USE_PYTHON3: True
+      tempest_test_regex: telemetry_tempest_plugin.aodh
+
+- job:
+    name: aodh-tempest-plugin-mysql
+    parent: telemetry-tempest-base
+    irrelevant-files: *aodh-irrelevant-files
+    vars:
+      devstack_localrc:
+        AODH_BACKEND: "mysql"
+        USE_PYTHON3: True
+      tempest_test_regex: telemetry_tempest_plugin.aodh

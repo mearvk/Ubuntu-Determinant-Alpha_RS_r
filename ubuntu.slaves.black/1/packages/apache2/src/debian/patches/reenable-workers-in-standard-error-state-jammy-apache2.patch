@@ -1,0 +1,59 @@
+From f34e6c027bf566cef7bdb9ecd8e64a2fae69cde2 Mon Sep 17 00:00:00 2001
+From: Eric Covener <covener@apache.org>
+Date: Mon, 9 Jan 2023 13:22:44 +0000
+Subject: [PATCH] Merge r1904518 from trunk:
+Description: Re-enable workers in standard error state
+Origin: upstream, https://github.com/apache/httpd/commit/f34e6c027bf566cef7bdb9ecd8e64a2fae69cde2
+Bug: https://bz.apache.org/bugzilla/show_bug.cgi?id=66302
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/apache2/+bug/2003189
+Last-Update: 2023-02-22
+---
+ CHANGES                          | 3 +++
+ include/ap_mmn.h                 | 3 ++-
+ modules/proxy/mod_proxy.h        | 2 ++
+ modules/proxy/mod_proxy_hcheck.c | 2 +-
+ 4 files changed, 8 insertions(+), 2 deletions(-)
+
+--- a/include/ap_mmn.h
++++ b/include/ap_mmn.h
+@@ -587,7 +587,8 @@
+  * 20120211.120 (2.4.51-dev) Add dav_liveprop_elem structure and
+  *                           dav_get_liveprop_element().
+  * 20120211.121 (2.4.51-dev) Add ap_post_read_request()
+- * 
++ * 20120211.126 (2.4.55-dev) Add additional hcmethod_t enums and
++                             PROXY_WORKER_IS_ERROR
+  */
+ 
+ #define MODULE_MAGIC_COOKIE 0x41503234UL /* "AP24" */
+@@ -595,7 +596,7 @@
+ #ifndef MODULE_MAGIC_NUMBER_MAJOR
+ #define MODULE_MAGIC_NUMBER_MAJOR 20120211
+ #endif
+-#define MODULE_MAGIC_NUMBER_MINOR 121                 /* 0...n */
++#define MODULE_MAGIC_NUMBER_MINOR 126                 /* 0...n */
+ 
+ /**
+  * Determine if the server's current MODULE_MAGIC_NUMBER is at least a
+--- a/modules/proxy/mod_proxy.h
++++ b/modules/proxy/mod_proxy.h
+@@ -354,6 +354,8 @@
+ 
+ #define PROXY_WORKER_IS_HCFAILED(f)   ( (f)->s->status &  PROXY_WORKER_HC_FAIL )
+ 
++#define PROXY_WORKER_IS_ERROR(f)   ( (f)->s->status &  PROXY_WORKER_IN_ERROR )
++
+ #define PROXY_WORKER_IS(f, b)   ( (f)->s->status & (b) )
+ 
+ /* default worker retry timeout in seconds */
+--- a/modules/proxy/mod_proxy_hcheck.c
++++ b/modules/proxy/mod_proxy_hcheck.c
+@@ -909,7 +909,7 @@
+                          (int)hc->s->method);
+     }
+     /* what state are we in ? */
+-    else if (PROXY_WORKER_IS_HCFAILED(worker)) {
++    else if (PROXY_WORKER_IS_HCFAILED(worker) || PROXY_WORKER_IS_ERROR(worker)) {
+         if (rv == APR_SUCCESS) {
+             worker->s->pcount += 1;
+             if (worker->s->pcount >= worker->s->passes) {

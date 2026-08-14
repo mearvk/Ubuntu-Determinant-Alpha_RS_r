@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+
+DEPENDENCIES := antlr bcel bsf commons-logging javax.activation javax.mail jdepend junit junit4 hamcrest-all log4j-1.2 oro regexp xalan2 serializer xml-resolver-1.2 commons-net jsch xz
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_configure:
+	# Link the dependencies in lib/optional
+	mkdir -p lib/optional
+	for DEPENDENCY in $(DEPENDENCIES); do ln -s /usr/share/java/$$DEPENDENCY.jar lib/optional/$$DEPENDENCY.jar; done
+
+	# Bootstrapping
+	JAVA_HOME=/usr/lib/jvm/default-java ./bootstrap.sh
+
+	# Normal build
+	bootstrap/bin/ant -propertyfile debian/ant.properties jars test-jar
+
+override_dh_auto_build-arch:
+override_dh_auto_build-indep:
+	bootstrap/bin/ant -propertyfile debian/ant.properties javadocs
+
+override_dh_installdocs:
+	dh_installdocs --exclude=manual/LICENSE
+
+override_mh_install:
+	# Override mh_install to install extra links in /usr/share/ant/lib/
+	mh_installpoms -pant
+	mh_installjar -pant -l src/etc/poms/ant/pom.xml          build/lib/ant.jar          /usr/share/ant/lib/ant.jar
+	mh_installjar -pant -l src/etc/poms/ant-launcher/pom.xml build/lib/ant-launcher.jar /usr/share/ant/lib/ant-launcher.jar
+
+	mh_installpoms -pant-optional
+	for MODULE in antlr apache-bcel apache-bsf apache-log4j apache-oro apache-regexp apache-resolver apache-xalan2 \
+	              commons-logging commons-net javamail jdepend jmf jsch junit junit4 swing testutil xz; do \
+	  mh_installjar -pant-optional -l src/etc/poms/ant-$$MODULE/pom.xml build/lib/ant-$$MODULE.jar /usr/share/ant/lib/ant-$$MODULE.jar; \
+	done
+
+override_dh_install-indep:
+	dh_install -i
+	dh_install -pant build/lib/ant-bootstrap.jar /usr/share/ant/etc/
+
+	# Installing these files does not work with dh_install because of the file permissions
+	mkdir -p debian/ant/usr/share/ant/bin
+	install -m 755 src/script/ant     debian/ant/usr/share/ant/bin
+	install -m 755 src/script/antRun  debian/ant/usr/share/ant/bin
+	install -m 755 src/script/*.pl    debian/ant/usr/share/ant/bin
+
+override_dh_compress:
+	dh_compress -XWHATSNEW
+
+override_dh_auto_clean:
+	rm -Rf bin build bootstrap lib/optional/*.jar

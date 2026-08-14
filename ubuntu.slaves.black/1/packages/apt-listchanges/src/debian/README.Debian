@@ -1,0 +1,92 @@
+apt-listchanges
+===============
+
+Please note that even though apt-listchanges can automatically display
+entries from both NEWS.Debian, and the changelog[.Debian] files during
+upgrades with APT, the default installation enables displaying of the
+NEWS.Debian entries only. To enable displaying the changelog entries
+as well, please run:
+  dpkg-reconfigure apt-listchanges
+
+
+******************************************************************************
+Due to the demand, here is a quick overview of how apt-listchanges works.
+******************************************************************************
+
+While upgrading a package _package_, apt-listchanges does the following:
+
+1. finds the name of its _source package_ ;
+2. see if this _source package_ has already showed up in its status database
+   or not; if it has take the last seen version from the database
+   and jump to 4 ;
+3. in case the status database does not contain _source package_ entry, check
+   with dpkg which version of the _package_ is installed (if any) and use
+   that version as the last seen version of _source package_;
+   otherwise skip this _package_;
+4. if the last seen version is not lesser than the version being upgraded,
+   then skip this _package_;
+5. read _package_ NEWS and/or changelog files from its .deb and append the data
+   to the data to be shown ;
+6. update this _source package_ as seen and save its version in the status
+   database.
+
+This is done for every package that is going to be installed or upgraded.
+
+The reasons for a NEWS and/or changelog not to show up are:
+* you never installed any binary package from that source package before,
+  meaning that `apt-listchanges` breaks each time a source package is renamed,
+  I can't fix that ;
+* there is no new NEWS/changelog entry:
+  - `apt-get install --reinstall`) ;
+  - or you already installed a binary package from the same source and the
+    same version.
+* `apt-listchanges` was unable to guess the package source name (should not
+  happen);
+* `apt-listchanges` was unable to find the Debian changelog in the binary
+  package (should not happen either).
+
+
+Workaround in case of libdb downgrade or similar issues
+-------------------------------------------------------
+
+During the early months of 2008, there was an unfortunate situation
+where Python bumped libdb to 4.6 to then downgrade it to 4.5 later
+on. That generates a situation where the apt-listchanges database was
+not readable anymore because updated to libdb2.6 format but then
+accessed with libdb2.5.
+
+You can read the full discussion at https://bugs.debian.org/469221 .
+
+In case situations like that one will happen again, we want to mention
+a way to recover the database:
+
+ # install utilities to handle both db4.6 and db4.5 libdb files
+ aptitude install db4.6-util db4.5-util
+ # define a temporary database location
+ TMPDB=$(mktemp -d)/listchanges.db
+ # convert the current apt-listchanges database from 4.6 to 4.5
+ db4.6_dump /var/lib/apt/listchanges.db | db4.5_load "$TMPDB"
+ # keep a copy of the old db and move the converted db in place
+ mv /var/lib/apt/listchanges.db /var/lib/apt/listchanges.db.old
+ mv "$TMPDB" /var/lib/apt/listchanges.db
+
+Adapt the solution to the situation you're facing.
+
+Alternatively you can try to replace the database with its previous
+version stored in /var/lib/apt/listchanges-old.db (since version 3.1
+of apt-listchanges) or as a last resort you can remove the database,
+in which case you lose the history, but apt-listchanges should still
+work, as it will switch to comparing the currently installed version
+of the package with the version being installed (see point 3 of the
+algorithm given at the top of this file).
+
+
+Sharing the status database between machines
+--------------------------------------------
+
+The status database can be shared between machines,
+see https://bugs.debian.org/658444 for a use case,
+using NFS-mounted storage, as long as you do not run more than one
+instance of apt-listchanges at time (otherwise the database might
+get corrupted due to lack of locking).  The '--dump-seen' option
+can be used to examine the contents of the database.

@@ -1,0 +1,129 @@
+From: Henrique de Moraes Holschuh <hmh@debian.org>
+Date: Tue, 25 Sep 2018 08:03:32 +1000
+Subject: Fix references to paths that are different in Debian
+
+---
+ README_FILES/README.chroot        | 3 +++
+ README_FILES/README.old.scanners  | 4 ++--
+ README_FILES/README.performance   | 2 +-
+ README_FILES/README.sendmail      | 6 +++---
+ README_FILES/README.sendmail-dual | 4 ++--
+ amavisd-agent                     | 2 +-
+ amavisd-nanny                     | 2 +-
+ 7 files changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/README_FILES/README.chroot b/README_FILES/README.chroot
+index 6e769a9..5ce033f 100644
+--- a/README_FILES/README.chroot
++++ b/README_FILES/README.chroot
+@@ -23,6 +23,9 @@ Clam Antivirus clamscan and clamd, Sophos sweep, SAVI-Perl and Sophie.
+ If you have Postfix, check its chroot setup script for further hints:
+ postfix-xxx/examples/chroot-setup/<YOUR-OS> and BASIC_CONFIGURATION_README.
+ 
++WARNING: Debian uses different paths, notably /var/lib/amavisd-new.  Be
++sure to adjust the directions in this document accordingly.
++
+ 
+ exit   # This is NOT an automatic script!!!
+        # Don't execute commands without knowing what they will do!!!
+diff --git a/README_FILES/README.old.scanners b/README_FILES/README.old.scanners
+index 0c99139..2786e2a 100644
+--- a/README_FILES/README.old.scanners
++++ b/README_FILES/README.old.scanners
+@@ -89,7 +89,7 @@ to verbose mode. Therefore setup a) is the one I currently recommend,
+ otherwise your logfiles don't show which file(s) is/are infected.
+ 
+ NOTE: AvpDaemon must be running as a daemon, so it should be started at
+-boot time via an init script (or whatver) as <path>/AvpDaemon -* /var/amavis
++boot time via an init script (or whatver) as <path>/AvpDaemon -* /var/lib/amavis
+ 
+ 3.1.2 Kaspersky Anti-Virus
+ AvpLinx fills the log with a lot of trash because of a simple progress
+@@ -799,7 +799,7 @@ else {
+ 
+ # Now restart AVP daemon to load updated virus library
+ system("/usr/local/AvpLinux/AvpDaemon -k");
+-system("/usr/local/AvpLinux/AvpDaemon -* /var/amavis");
++system("/usr/local/AvpLinux/AvpDaemon -* /var/lib/amavis");
+ 
+ # End of perl script
+ 
+diff --git a/README_FILES/README.performance b/README_FILES/README.performance
+index 337c323..10cb86f 100644
+--- a/README_FILES/README.performance
++++ b/README_FILES/README.performance
+@@ -16,7 +16,7 @@ Good choice in my opinion. (P.S.: add clamd to the mix)
+ Hopefully hardware matches expectations,
+ fast disks and enough memory are paramount.
+ 
+-You may want to put Postfix spool on different disk than /var/amavis,
++You may want to put Postfix spool on different disk than /var/lib/amavis,
+ where amavisd does mail unpacking.
+ 
+ | is there any suggested configuration for this
+diff --git a/README_FILES/README.sendmail b/README_FILES/README.sendmail
+index 0f1ba3f..ca3cf35 100644
+--- a/README_FILES/README.sendmail
++++ b/README_FILES/README.sendmail
+@@ -212,7 +212,7 @@ X-Authentification-Warning.
+ 
+ /var/spool/mqueue and /var/spool/mqamavis is owned by amavis.
+ 
+-NOTE: as amavis is run as user amavis, /var/virusmails must be owned
++NOTE: as amavis is run as user amavis, /var/lib/amavis/virusmails must be owned
+ by amavis and you have to specify a location for the AMaViS logfile
+ that is writable by user amavis, if writing to a log file directly
+ (not via syslog).
+@@ -291,9 +291,9 @@ O DeliveryMode=i
+ # i       Deliver interactively (synchronously)
+ 
+ 
+-NOTE: as amavis is run as amavis /var/virusmails must be owned
++NOTE: as amavis is run as amavis /var/lib/amavis/virusmails must be owned
+ by amavis and you have to specify a another location for the AMaViS
+-logfile (normally /var/amavis/amavis.log) to which amavis has
++logfile (normally /var/lib/amavis/amavis.log) to which amavis has
+ write access to.
+ 
+ NOTE: As sendmail will perform most tasks as user amavis now, it may
+diff --git a/README_FILES/README.sendmail-dual b/README_FILES/README.sendmail-dual
+index 06a4fb9..1b17342 100644
+--- a/README_FILES/README.sendmail-dual
++++ b/README_FILES/README.sendmail-dual
+@@ -427,8 +427,8 @@ PERFORMANCE NOTES
+ 
+ - Mail handling is I/O-intensive. For better performance one may place
+   the two mail queue areas (/var/spool/mqueue and /var/spool/mqueue-rx),
+-  and the /var/amavis work directory ($TEMPBASE) on three separate disks.
+-  The /var/amavis/tmp may be a tmpfs or a RAMdisk or delayed-sync fs.
++  and the /var/lib/amavis work directory ($TEMPBASE) on three separate disks.
++  The /var/lib/amavis/tmp may be a tmpfs or a RAMdisk or delayed-sync fs.
+ 
+ - One of the important arguments for choosing the dual-MTA setup is to be
+   able to keep the number of content filtering processes under control,
+diff --git a/amavisd-agent b/amavisd-agent
+index 1ebe2bb..17db41d 100755
+--- a/amavisd-agent
++++ b/amavisd-agent
+@@ -53,7 +53,7 @@ use BerkeleyDB;
+ 
+ my($dbfile) = 'snmp.db';
+ my($db_home) =  # DB databases directory
+-  defined $ENV{'AMAVISD_DB_HOME'} ? $ENV{'AMAVISD_DB_HOME'} : '/var/amavis/db';
++  defined $ENV{'AMAVISD_DB_HOME'} ? $ENV{'AMAVISD_DB_HOME'} : '/var/lib/amavis/db';
+ 
+ my($wakeuptime) = 10;  # -w, sleep time in seconds, may be fractional
+ my($repeatcount);      # -c, repeat count (when defined)
+diff --git a/amavisd-nanny b/amavisd-nanny
+index 80b84dc..67f0134 100755
+--- a/amavisd-nanny
++++ b/amavisd-nanny
+@@ -61,7 +61,7 @@ my($activettl) = 10*60; # stuck active children are sent a SIGTERM
+ 
+ my($dbfile) = 'nanny.db';
+ my($db_home) =  # DB databases directory
+-  defined $ENV{'AMAVISD_DB_HOME'} ? $ENV{'AMAVISD_DB_HOME'} : '/var/amavis/db';
++  defined $ENV{'AMAVISD_DB_HOME'} ? $ENV{'AMAVISD_DB_HOME'} : '/var/lib/amavis/db';
+ my($wakeuptime) = 2;  # -w, sleep time in seconds, may be fractional
+ my($repeatcount);     # -c, repeat count (when defined)
+ 

@@ -1,0 +1,41 @@
+#!/bin/sh
+set -uxe
+
+# http2 is rather new, check that it at least generally works
+# Author: Christian Ehrhardt <christian.ehrhardt@canonical.com>
+
+a2enmod http2
+a2enmod ssl
+a2ensite default-ssl
+# Enable globally
+echo "Protocols h2c h2 http/1.1" >> /etc/apache2/apache2.conf
+service apache2 restart
+
+# Use curl here. wget doesn't work on Debian, even with --no-check-certificate
+# wget on Debian gives me:
+#    GnuTLS: A TLS warning alert has been received.
+#    Unable to establish SSL connection.
+# Presumably this is due to the self-signed certificate, but I'm not sure how
+# to skip the warning with wget. curl will do for now.
+echo "Hello, world!" > /var/www/html/hello.txt
+
+testapache () {
+    cmd="${1}"
+    result=$(${cmd})
+
+    if [ "$result" != "Hello, world!" ]; then
+        echo "Unexpected result: ${result}" >&2
+        exit 1
+    else
+        echo OK
+    fi
+}
+
+# https shall not affect http
+testapache "curl -s -k http://localhost/hello.txt"
+# https shall not affect https
+testapache "curl -s -k https://localhost/hello.txt"
+#plain http2
+testapache "nghttp --no-verify-peer https://localhost/hello.txt"
+#http2 upgrade
+testapache "nghttp -u --no-verify-peer http://localhost/hello.txt"

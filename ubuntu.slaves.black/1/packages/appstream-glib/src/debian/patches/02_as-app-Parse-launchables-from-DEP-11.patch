@@ -1,0 +1,32 @@
+From 6309e2ebf05d932f374f1ab7e519d8c526e95f5c Mon Sep 17 00:00:00 2001
+From: Sebastian Krzyszkowiak <dos@dosowisko.net>
+Date: Mon, 30 Nov 2020 02:57:09 +0100
+Subject: [PATCH] as-app: Parse launchables from DEP-11
+
+---
+ libappstream-glib/as-app.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/libappstream-glib/as-app.c b/libappstream-glib/as-app.c
+index 293f0a06..2caba19b 100644
+--- a/libappstream-glib/as-app.c
++++ b/libappstream-glib/as-app.c
+@@ -5731,6 +5731,18 @@ as_app_node_parse_dep11 (AsApp *app, GNode *node,
+ 			}
+ 			continue;
+ 		}
++		if (g_strcmp0 (tmp, "Launchable") == 0) {
++			for (c = n->children; c != NULL; c = c->next) {
++				for (c2 = c->children; c2 != NULL; c2 = c2->next) {
++					g_autoptr(AsLaunchable) launchable = NULL;
++					launchable = as_launchable_new ();
++					as_launchable_set_kind (launchable, as_launchable_kind_from_string (as_yaml_node_get_key (c)));
++					as_launchable_set_value (launchable, as_yaml_node_get_key (c2));
++					as_app_add_launchable (app, launchable);
++				}
++			}
++			continue;
++		}
+ 		if (g_strcmp0 (tmp, "Screenshots") == 0) {
+ 			for (c = n->children; c != NULL; c = c->next) {
+ 				g_autoptr(AsScreenshot) ss = NULL;

@@ -1,0 +1,114 @@
+From f939f14774618fd07d7019e9d0c86e1e1ae5642a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Philip=20M=C3=BCller?= <philm@manjaro.org>
+Date: Mon, 14 Jun 2021 22:06:01 +0200
+Subject: [PATCH] Support em/code tags Some appstream-data packages add <em>
+ and </em> or <code> and </code> to the files. Not all package manager can
+ handle that. An example would be pamac from Manjaro
+
+---
+ libappstream-glib/as-node.c      | 36 ++++++++++++++++++++++++++++++++
+ libappstream-glib/as-self-test.c | 16 ++++++++++++++
+ 2 files changed, 52 insertions(+)
+
+diff --git a/libappstream-glib/as-node.c b/libappstream-glib/as-node.c
+index aafb16aa..b4159ea9 100644
+--- a/libappstream-glib/as-node.c
++++ b/libappstream-glib/as-node.c
+@@ -555,6 +555,8 @@ typedef struct {
+ 	AsNode			*current;
+ 	AsNodeFromXmlFlags	 flags;
+ 	const gchar * const	*locales;
++	guint8			 is_em_text;
++	guint8			 is_code_text;
+ } AsNodeToXmlHelper;
+ 
+ /**
+@@ -604,6 +606,16 @@ as_node_start_element_cb (GMarkupParseContext *context,
+ 	AsNode *current;
+ 	guint i;
+ 
++	/* do not create a child node for em and code tags */
++	if (g_strcmp0 (element_name, "em") == 0) {
++		helper->is_em_text = 1;
++		return;
++	}
++	if (g_strcmp0 (element_name, "code") == 0) {
++		helper->is_code_text = 1;
++		return;
++	}
++
+ 	/* check if we should ignore the locale */
+ 	data = g_slice_new0 (AsNodeData);
+ 
+@@ -662,6 +674,16 @@ as_node_end_element_cb (GMarkupParseContext *context,
+ 			GError             **error)
+ {
+ 	AsNodeToXmlHelper *helper = (AsNodeToXmlHelper *) user_data;
++
++	/* do not create a child node for em and code tags */
++	if (g_strcmp0 (element_name, "em") == 0) {
++		helper->is_em_text = 0;
++		return;
++	}
++	if (g_strcmp0 (element_name, "code") == 0) {
++		helper->is_code_text = 0;
++		return;
++	}
+ 	helper->current = helper->current->parent;
+ }
+ 
+@@ -695,6 +717,20 @@ as_node_text_cb (GMarkupParseContext *context,
+ 
+ 	/* split up into lines and add each with spaces stripped */
+ 	if (data->cdata != NULL) {
++		/* support em and code tags */
++		if (g_strcmp0 (as_tag_data_get_name (data), "p") == 0 ||
++			g_strcmp0 (as_tag_data_get_name (data), "li") == 0) {
++			g_autoptr(GString) str = g_string_new (data->cdata);
++			as_ref_string_unref (data->cdata);
++			if (helper->is_em_text)
++				g_string_append_printf (str, "<em>%s</em>", text);
++			else if (helper->is_code_text)
++				g_string_append_printf (str, "<code>%s</code>", text);
++			else
++				g_string_append (str, text);
++			data->cdata = as_ref_string_new_with_length (str->str, str->len);
++			return;
++		}
+ 		g_set_error (error,
+ 			     AS_NODE_ERROR,
+ 			     AS_NODE_ERROR_INVALID_MARKUP,
+diff --git a/libappstream-glib/as-self-test.c b/libappstream-glib/as-self-test.c
+index 2f0820fc..eafb15e1 100644
+--- a/libappstream-glib/as-self-test.c
++++ b/libappstream-glib/as-self-test.c
+@@ -2865,6 +2865,11 @@ as_test_node_xml_func (void)
+ 			     "<!-- this documents bar -->"
+ 			     "<bar key=\"value\">baz</bar>"
+ 			     "</foo>";
++	const gchar *valid_em_code = "<description>"
++			     "<p>"
++			     "It now also supports <em>em</em> and <code>code</code> tags."
++			     "</p>"
++			     "</description>";
+ 	GError *error = NULL;
+ 	AsNode *n2;
+ 	AsNode *root;
+@@ -2928,6 +2933,17 @@ as_test_node_xml_func (void)
+ 	g_string_free (xml, TRUE);
+ 	as_node_unref (root);
+ 
++	/* support em and code tags */
++	root = as_node_from_xml (valid_em_code, 0, &error);
++	g_assert_no_error (error);
++	g_assert (root != NULL);
++
++	n2 = as_node_find (root, "description/p");
++	g_assert (n2 != NULL);
++	printf ("<%s>\n", as_node_get_data (n2));
++	g_assert_cmpstr (as_node_get_data (n2), ==, "It now also supports<em>em</em> and <code>code</code> tags.");
++	as_node_unref (root);
++
+ 	/* keep comments */
+ 	root = as_node_from_xml (valid,
+ 				 AS_NODE_FROM_XML_FLAG_KEEP_COMMENTS,
