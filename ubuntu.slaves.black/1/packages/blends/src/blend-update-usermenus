@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# $Id$ 
+
+usage() {
+   echo "Usage: `basename $0` <Blend>"
+   echo "Blend:   `getBlendList|tr ' ' '|'`"
+   echo
+   echo "Updates user menus of all users registered for Blend"
+}
+
+# the base dir for Blend conffiles, where script expects to find dirs named like
+# each registered Blend
+CONFBASE=${CONFBASE:-/etc/blends}
+
+# a local per Blend conf is sourced later, after argument parsing
+. ${CONFBASE}/blends.conf
+
+# specific utilities for blend-update-menus
+. ${SHAREDIR}/blend-update-menus
+
+if ! amI root; then
+	blendLog "$0 must be called by root.  If you are a normal user just call update-menus ."
+	exit 0
+fi
+
+case $1 in
+	-h|--help|"")
+            usage
+            exit 0
+            ;;
+        *)
+	    set -e
+            checkBlend $1 || \
+                blendFail $? "Debian Pure Blend $1 does not exist"
+	    BLEND=$1
+            set +e
+esac
+
+if [ -s /etc/blends/${BLEND}/${BLEND}.conf ] ; then
+	. /etc/blends/${BLEND}/${BLEND}.conf
+fi
+
+for ROLE in `getBlendRoleList ${BLEND}`; do
+        for BLENDUSER in `getUsersInRole ${BLEND} ${ROLE} 1`; do
+		# Update user menus if UPDATEUSERMENU is set to yes
+            	blendLog "Adding menu for user ${BLENDUSER} of ${BLEND} ..."
+            	su ${BLENDUSER} -c "update-menus"
+        done
+done
+

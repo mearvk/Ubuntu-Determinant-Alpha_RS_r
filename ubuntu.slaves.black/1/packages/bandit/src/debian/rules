@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+UPSTREAM_GIT = https://github.com/PyCQA/bandit
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --buildsystem=python_distutils --with python3
+
+# We need this to have the binary when running tests
+export PATH:=$(PATH):$(CURDIR)/debian/tmp/usr/bin
+
+override_dh_auto_clean:
+	rm -rf build
+
+override_dh_auto_build:
+	echo "Do nothing..."
+
+override_dh_auto_install:
+	for i in $(PYTHON3S) ; do \
+		python3 setup.py install -f --install-layout=deb --root=$(CURDIR)/debian/tmp ; \
+	done
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=$(CURDIR)/debian/tmp/usr/lib/python3/dist-packages pkgos-dh_auto_test --no-py2 'tests\.(?!(.*unit\.cli\.test_baseline\.BanditBaselineToolTests\.test_bandit_baseline.*|.*functional\.test_runtime.*|.*functional\.test_baseline.*|.*functional\.test_functional\.FunctionalTests.*))'
+endif
+
+	# Generate the config file
+	mkdir -p $(CURDIR)/debian/bandit/etc/bandit
+	PYTHONPATH=$(CURDIR)/debian/tmp/usr/lib/python3/dist-packages bandit-config-generator -o $(CURDIR)/debian/bandit/etc/bandit/bandit.yaml
+
+
+override_dh_auto_test:
+	echo "Do nothing..."
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

@@ -1,0 +1,170 @@
+awstats for Debian
+==================
+
+Quick'n'dirty setup
+-------------------
+
+Do the following for a simple setup of a single website with Apache:
+
+  * Edit /etc/logrotate.d/apache2 to permit www-data access to
+    logfiles
+  * Copy /usr/share/doc/awstats/examples/apache.conf to
+    /etc/apache2/conf-available/awstats.conf
+  * Restrict access to Location /cgi-bin/awstats.pl with
+    password-based authentication or via host access control.  Please
+    read "Authentication, Authorization and Access Control" HOWTO on
+    the Apache docs website http://httpd.apache.org/docs/ to see
+    available opportunities.
+  * Run "a2enconf awstats"
+
+Optionally edit /etc/default/awstats to disable nightly build of static
+html reports (placed in /var/cache/awstats/).
+
+The above is _NOT_ supported or recommended!  Please read the rest of
+this document instead...
+
+
+No stats are generated due to logfile permissions
+-------------------------------------------------
+
+As AWStats is used both as a CGI-script and offline, it is by default
+run as uid=www-data in cron jobs so that generated files are
+accessible from CGI as well.  By default Apache stores (since version
+1.3.22-1) logfiles with uid=root and gid=adm, so you need to either...
+
+ 1) Change the rights of the logfiles so that www-data has at least read
+    access.  For example:
+
+    * change line in /etc/logrotate.d/apache2 to: "create 644 root adm"
+    * change permissions of existing files: chmod 644 /var/log/apache2/*.log
+
+ 2) As 1) but change to a specific user, and use the suEXEC feature of
+    Apache to run as same user (and either change the right of
+    /var/lib/awstats as well or use another directory).  This is more
+    complicated, but then the logs are not generally accessible to the
+    server (which was probably the point of the Apache default).
+
+ 3) Change awstats.pl to group adm (but beware that you are then
+    taking the risk of allowing a CGI-script access to admin stuff on
+    the machine!).
+
+With other webservers than Apache several things should probably be
+changed, like location and format of logfiles.
+
+
+A few minutes is lost each day/week/month
+-----------------------------------------
+
+By default AWStats scans logfiles each 10 minutes. When Apache (and
+other webservers) rotate their logfiles, the last entries in the old
+logfile may not have been read by AWStats.
+
+Make sure to run AWStats right _before_ web logs are rotated.  For
+example, insert the following lines in /etc/logrotate.d/apache2:
+
+    prerotate
+      if [ -x /usr/share/awstats/tools/update.sh ]; then
+        su -s /bin/sh -l -c /usr/share/awstats/tools/update.sh www-data
+      fi
+    endscript
+
+Also consider enabling lock files in /etc/awstats/awstats.conf with
+EnableLockForUpdate=1 so that only one AWStats update process is
+running at a time.  This will reduce system resources especially if
+the AWStats update process takes longer than 10 minutes to complete.
+This solution has some security drawbacks: lockfile with well-known
+name and writable by www-data user.
+
+
+The icons are missing
+---------------------
+
+You should redirect requests for /awstats-icon/ to
+/usr/share/awstats/icon/.
+
+In Apache, this is done by adding the following to
+/etc/apache2/httpd.conf:
+
+    Alias /awstats-icon/ /usr/share/awstats/icon/
+
+For other webservers you should either do something similar, or make a
+symlink from /var/www/awstats-icon to /usr/share/awstats/icon/.
+
+
+Multiple stats
+--------------
+
+To handle multiple stats (eg. using VirtualHosts in Apache) you
+should...
+
+ 1) Place all additional configs in /etc/awstats/.
+
+ 2) Name the new configs "awstats." + whatever you want + ".conf" (eg.
+    "awstats.example.com.conf"). But avoid "awstats.awstats.conf".
+
+    To retain use of a common config file containing defaults for all
+    of your sites, consider a scheme such as the following:
+
+    Make a bunch of awstats.[site_name_here].conf files, and have the
+    first line include the parent awstats.conf file (which by default
+    also includes awstats.conf.local).  The remainder of the file
+    should have your site-specific configuration settings, which
+    override the defaults specified in awstats.conf and
+    awstats.conf.local.
+
+    Here is an example of an awstats.example.com.conf file (of course,
+    tailor the file for your own configuration):
+
+        Include "/etc/awstats/awstats.conf"
+        SiteDomain="example.com"
+        HostAliases="example.com www.example.com"
+        DirData="/var/lib/awstats/example.com"
+        LogFile="/var/log/apache2/example.com_access_log"
+
+    This way you can leave awstats.conf alone, and put your
+    server-specific settings into awstats.conf.local, and your
+    site-specific settings into each awstats.[site_name_here].conf
+    file.
+
+    Note, that awstats package cannot safely handle upgrades to
+    locally added config files -- if config options change then the
+    main file is updated (with warnings if edited locally) but extra
+    config files are silently ignored and possibly broken.
+
+ 3) Default awstats crontabs in /etc/cron.d/awstats can handle
+    generation of the raw statistics data and html reports for above
+    config layout.  But you can comment out defaults and edit
+    /etc/cron.d/awstats for each site. Possibly add lines like this:
+
+        20 2 * * * www-data [ -x /usr/lib/cgi-bin/awstats.pl ] && \
+            /usr/lib/cgi-bin/awstats.pl -config=example.com -update >/dev/null
+
+
+Browser and referer stats are missing
+-------------------------------------
+
+Check, if the logfile has needed info about browser types and referer.
+It is recommended to use "combined" logfiles format (Apache in Debian
+uses one by default).
+
+
+Where is configure.pl?
+----------------------
+
+AWStats configure.pl script is not available as a CGI script on
+Debian.  Instead, it is located as awstats_configure.pl in
+/usr/share/doc/awstats/examples/.
+
+
+Cannot run configs outside of /etc/awstats/
+-------------------------------------------
+
+You can.  Please, use -configdir parameter for awstats.pl like this:
+
+  /usr/lib/cgi-bin/awstats.pl -configdir=/home/user/ \
+                              -config=example.com \
+                              ...
+
+If awstats.pl is used as CGI script, overwriting of configdir with a
+value that differs from a default value is only possible if the
+environment variable AWSTATS_ENABLE_CONFIG_DIR is defined.

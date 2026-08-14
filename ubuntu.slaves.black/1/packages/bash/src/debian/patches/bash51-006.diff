@@ -1,0 +1,41 @@
+			     BASH PATCH REPORT
+			     =================
+
+Bash-Release:	5.1
+Patch-ID:	bash51-006
+
+Bug-Reported-by:	oguzismailuysal@gmail.com
+Bug-Reference-ID:	<CAH7i3LoY7C+pV_yG2LxwPNtAw3kiRkxmB4KcL1dTsih0u2BdKA@mail.gmail.com>
+Bug-Reference-URL:	https://lists.gnu.org/archive/html/bug-bash/2020-12/msg00108.html
+
+Bug-Description:
+
+Make sure child processes forked to run command substitutions are in the
+proper process group.
+
+--- a/patchlevel.h
++++ b/patchlevel.h
+@@ -25,6 +25,6 @@
+    regexp `^#define[ 	]*PATCHLEVEL', since that's what support/mkversion.sh
+    looks for to find the patch level (for the sccs version string). */
+ 
+-#define PATCHLEVEL 5
++#define PATCHLEVEL 6
+ 
+ #endif /* _PATCHLEVEL_H_ */
+--- a/subst.c
++++ b/subst.c
+@@ -6412,6 +6412,13 @@ command_substitute (string, quoted, flag
+       /* The currently executing shell is not interactive. */
+       interactive = 0;
+ 
++#if defined (JOB_CONTROL)
++      /* Invariant: in child processes started to run command substitutions,
++	 pipeline_pgrp == shell_pgrp. Other parts of the shell assume this. */
++      if (pipeline_pgrp > 0 && pipeline_pgrp != shell_pgrp)
++	shell_pgrp = pipeline_pgrp;
++#endif
++
+       set_sigint_handler ();	/* XXX */
+ 
+       free_pushed_string_input ();

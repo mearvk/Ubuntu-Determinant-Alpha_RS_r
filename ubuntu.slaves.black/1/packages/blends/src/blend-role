@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# $Id$
+
+usage () {
+   echo "Usage:  `basename $0` <action> <Blend> [<role>]"
+   echo "action: add|del"
+   echo "Blend:  `getBlendList|tr ' ' '|'`"
+   echo "role:   `getBlendList|tr ' ' '|'` (default: Blend name)"
+}
+
+
+# the base dir for Blend conffiles, where script expects to find dirs named like
+# each registered Blend 
+CONFBASE=${CONFBASE:-/etc/blends}
+
+. ${CONFBASE}/blends.conf
+
+# Check consistency of passed arguments
+if [ $# -eq 0 ]; then
+   usage
+   exit 67 # EX_USAGE
+fi
+if [ "`toLower $1`" != "add" -a "`toLower $1`" != "del" ] ; then
+   echo "Missing or wrong action name."
+   echo
+   usage
+   exit 67 # EX_USAGE
+fi
+if [ -z "$2" ] ; then
+   echo "Missing Blend name."
+   echo
+   usage
+   exit 67 # EX_USAGE
+fi
+
+
+ACTION=`toLower $1`
+BLEND=$2
+ROLE=${3:-${BLEND}}
+
+# Now that we know the selected Blend, we can check if there is a local
+# configuration for it (ie differnt backend from the default one)
+test -n "${BLEND}" -a  -f ${CONFBASE}/${BLEND}/${BLEND}.conf &&
+	. ${CONFBASE}/${BLEND}/${BLEND}.conf
+
+
+if [ -n "${DBBACKEND}" ]; then
+	set -e
+	checkBlend ${BLEND} || blendFail $? "Debian Pure Blend ${BLEND} does not exist"
+
+	if [ "${ACTION}" = "add" ]; then
+		checkBlend ${BLEND} || blendFail $? "Blend ${BLEND} does not exist"
+		checkRole ${ROLE} && blendFail $? "Role ${ROLE} currently exist"
+		checkRoleInBlend ${BLEND} ${ROLE} || \
+			blendFail $? "Blend (${BLEND}) and Role (${ROLE}) are not correct or incompatible with the selected backend"
+
+		addRole ${BLEND} ${ROLE} || \
+			blendFail $? "Failed to add role ${ROLE}"
+	elif [ "${ACTION}" = "del" ]; then
+		checkBlend ${BLEND} || blendFail $? "Blend ${BLEND} doesn't exist"
+		checkRole ${ROLE} || blendFail $? "Role ${ROLE} doesn't exist"
+		checkRoleInBlend ${BLEND} ${ROLE} || \
+			blendFail $? "Blend (${BLEND} and Role (${ROLE}) are not correct"
+
+		delRole ${BLEND} ${ROLE} || \
+			blendFail $? "Failed to remove role ${ROLE}"
+		blendLog Role ${ROLE} successfully registered in Blend ${BLEND}
+	fi
+	set +e
+
+else
+	# EX_USAGE
+	blendFail 67 "You chose to not use Roles"
+fi

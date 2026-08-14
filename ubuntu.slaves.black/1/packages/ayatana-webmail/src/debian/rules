@@ -1,0 +1,47 @@
+#!/usr/bin/make -f
+# -*- mode: makefile; coding: utf-8 -*-
+
+export PYBUILD_SYSTEM=distutils
+export PYBUILD_NAME=ayatana-webmail
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_clean:
+	dh_clean
+	rm -Rfv .pybuild/
+	rm -Rfv data/usr/share/locale
+	rm -fv ayatanawebmail.egg-info/PKG-INFO
+	rm -fv ayatanawebmail.egg-info/SOURCES.txt
+	rm -fv ayatanawebmail.egg-info/dependency_links.txt
+	rm -fv ayatanawebmail.egg-info/requires.txt
+	rm -fv ayatanawebmail.egg-info/top_level.txt
+
+override_dh_auto_clean:
+	if [ -e data/etc/xdg/autostart/ayatana-webmail-autostart.desktop ] && [ ! -e data/etc/xdg/autostart/ayatana-webmail-autostart.desktop.in ]; then \
+		cp data/etc/xdg/autostart/ayatana-webmail-autostart.desktop data/etc/xdg/autostart/ayatana-webmail-autostart.desktop.in; \
+	fi
+	if [ -e data/usr/share/applications/ayatana-webmail.desktop ] && [ ! -e data/usr/share/applications/ayatana-webmail.desktop.in ]; then \
+		cp data/usr/share/applications/ayatana-webmail.desktop data/usr/share/applications/ayatana-webmail.desktop.in; \
+	fi
+	-dh_auto_clean
+	if [ -e data/etc/xdg/autostart/ayatana-webmail-autostart.desktop.in ]; then \
+		mv data/etc/xdg/autostart/ayatana-webmail-autostart.desktop.in data/etc/xdg/autostart/ayatana-webmail-autostart.desktop; \
+	fi
+	if [ -e data/usr/share/applications/ayatana-webmail.desktop.in ]; then \
+		mv data/usr/share/applications/ayatana-webmail.desktop.in data/usr/share/applications/ayatana-webmail.desktop; \
+	fi
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod a-x debian/*/usr/share/icons/hicolor/scalable/status/ayatanawebmail-messages-new.svg
+	chmod a-x debian/*/usr/share/icons/hicolor/scalable/status/ayatanawebmail-messages.svg
+	chmod a-x debian/*/usr/share/glib-2.0/schemas/org.ayatana.webmail.gschema.xml
+	chmod a-x debian/*/usr/share/icons/hicolor/scalable/apps/ayatanawebmail.svg
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+
+get-orig-source:
+	uscan --noconf --force-download --rename --download-current-version --repack --destdir=..

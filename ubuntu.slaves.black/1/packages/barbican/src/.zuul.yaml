@@ -1,0 +1,115 @@
+---
+- job:
+    name: barbican-tox-functional
+    parent: devstack-tox-functional
+    description: Functional testing
+    required-projects:
+      - name: openstack/barbican
+      - name: openstack/castellan
+      - name: openstack/openstacksdk
+    vars:
+      devstack_plugins:
+        barbican: https://opendev.org/openstack/barbican
+      tox_install_siblings: true
+
+- job:
+    name: barbican-dogtag-tox-functional
+    nodeset: devstack-single-node-fedora-latest
+    parent: barbican-tox-functional
+    description: |
+      Functional testing for DogTag backend
+    vars:
+      devstack_services:
+        barbican-dogtag: true
+
+- job:
+    name: barbican-tox-functional-fips
+    nodeset: devstack-single-node-centos-9-stream
+    parent: barbican-tox-functional
+    description: |
+      Functional testing for a FIPS enabled Centos 9 system
+    pre-run: playbooks/enable-fips.yaml
+    vars:
+      nslookup_target: 'opendev.org'
+
+- job:
+    name: barbican-vault-tox-functional
+    parent: barbican-tox-functional
+    description: |
+      Functional testing for Hashicorp Vault backend
+    vars:
+      devstack_services:
+        barbican-vault: true
+      tox_environment:
+        VAULT_PLUGIN_ENABLED: 1
+
+- job:
+    name: barbican-kmip-tox-functional
+    parent: devstack-tox-functional
+    description: |
+      Functional testing for KMIP backend using PyKMIP
+    vars:
+      devstack_services:
+        kmip: true
+
+- job:
+    name: barbican-simple-crypto-devstack-tempest
+    parent: barbican-tempest-plugin-simple-crypto-yoga
+    description: |
+      Compatibility alias for barbican-tempest-plugin-simple-crypto
+
+- job:
+    name: barbican-simple-crypto-devstack-tempest-ipv6-only
+    parent: barbican-tempest-plugin-simple-crypto-ipv6-only-yoga
+    description: |
+      Compatibility alias for barbican-tempest-plugin-simple-crypto-ipv6-only
+
+- job:
+    name: barbican-simple-crypto-devstack-tempest-castellan-from-git
+    parent: barbican-tempest-plugin-simple-crypto-castellan-src
+    description: |
+      Compatibility alias for barbican-tempest-plugin-simple-crypto-castellan-src
+
+- job:
+    name: barbican-simple-crypto-devstack-tempest-cursive
+    parent: barbican-tempest-plugin-simple-crypto-cursive
+    description: |
+      Compatibility alias for barbican-tempest-plugin-simple-crypto-cursive
+
+- job:
+    name: barbican-grenade
+    parent: grenade-py3
+    required-projects:
+      - openstack/grenade
+      - openstack/barbican
+      - openstack/barbican-tempest-plugin
+      - openstack/python-barbicanclient
+
+- project:
+    queue: barbican
+    templates:
+      - check-requirements
+      - openstack-cover-jobs
+      - openstack-python3-yoga-jobs
+      - publish-openstack-docs-pti
+      - release-notes-jobs-python3
+    check:
+      jobs:
+        - barbican-tox-functional
+        - barbican-vault-tox-functional:
+            voting: false
+        - barbican-grenade:
+            voting: false
+        - barbican-tempest-plugin-simple-crypto-yoga
+        - barbican-tempest-plugin-simple-crypto-secure-rbac-yoga
+        - barbican-tempest-plugin-simple-crypto-ipv6-only-yoga
+        - barbican-tox-functional-fips
+        - octavia-v2-dsvm-tls-barbican
+    gate:
+      jobs:
+        - barbican-tox-functional
+    experimental:
+      jobs:
+        - barbican-dogtag-tox-functional
+        - barbican-kmip-tox-functional
+

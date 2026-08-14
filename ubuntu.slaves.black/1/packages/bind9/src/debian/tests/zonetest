@@ -1,0 +1,49 @@
+#!/bin/sh
+
+set -e
+
+setup() (
+	systemctl stop bind9
+	systemctl stop named
+
+	cat <<EOF >/etc/bind/named.conf.options
+options { directory "/var/cache/bind"; listen-on port 53 { 127.0.0.1; }; allow-query { any; }; recursion yes; };
+EOF
+
+	cat <<EOF >/etc/bind/named.conf.local
+zone "localdomain.test" { type master; file "/etc/bind/zones/forward.localdomain.test"; };
+EOF
+
+	mkdir -p /etc/bind/zones/
+
+	cat <<EOF >/etc/bind/zones/forward.localdomain.test
+\$TTL	604800
+@	IN	SOA	localdomain.test. root.localdomain.test. (
+			      2		; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			 604800 )	; Negative Cache TTL
+;
+@	IN	NS	ns.localdomain.test.
+ns	IN	A	127.0.0.1
+EOF
+
+	systemctl start bind9
+	systemctl start named
+)
+
+run() (
+	named-checkconf
+	named-checkzone localdomain.test /etc/bind/zones/forward.localdomain.test
+	dig @localhost localdomain.test | grep 'NOERROR'
+)
+
+teardown() (
+	systemctl stop bind9
+	systemctl stop named
+)
+
+setup
+run
+teardown

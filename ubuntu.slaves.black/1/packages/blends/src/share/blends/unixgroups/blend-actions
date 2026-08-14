@@ -1,0 +1,276 @@
+# $Id$
+#
+# Backend dependant functions for blends package
+#
+# For error codes check in /usr/include/sysexits.h
+
+# CHECK Functions
+
+#checkBlend() is backend indep, and is defined in ${SHAREDIR}/blend-actions
+
+# Read adduser config to find out from which ID normal users start
+# Default = 1000
+FIRST_UID=1000
+[ -s /etc/adduser.conf ] && . /etc/adduser.conf
+
+# checks if User $1 exists as a system user
+checkUser() {
+	RET=0
+	BLENDUSER=$1
+	if [ $# -ne 1 ]; then
+		RET=64 # EX_USAGE
+	elif ! getent passwd "${BLENDUSER}" > /dev/null; then
+		RET=67 # EX_NOUSER
+	fi
+	return ${RET}
+}
+
+# checks if Role $1 is registered into system
+# actually a mere check if Unix group, named like the Blend, exists
+checkRole() {
+	RET=0
+	ROLE=$1
+	if [ "$#" -ne 1 ]; then
+		RET=64 # EX_USAGE
+	elif ! getent group "${ROLE}" > /dev/null; then
+		RET=67 # EX_NOUSER
+	fi
+	return ${RET}
+}
+
+
+# check if Blend ($1) has registered Role ($2) 
+# (or, in other words, if Role has been registerd as Debian Pure Blend)
+checkRoleInBlend() {
+	RET=0
+	BLEND=$1
+	ROLE=$2
+	if [ "$#" -ne 2 ]; then 
+		RET=64 # EX_USAGE
+	# currently there is no way to extract a Role from a Blend if
+	# they're named differently, using unixgroups backend
+	elif [ "${BLEND}" != "${ROLE}" ]; then
+		RET=69 # EX_UNAVAILABLE
+	fi
+	return ${RET}
+}
+
+# checks if user $2 is registered in Blend $1
+checkUserInBlend() {
+	RET=0
+	BLEND=$1
+	BLENDUSER=$2
+	if [ "$#" -ne 2 ]; then 
+		RET=64 # EX_USAGE
+	# currently the only way to check if user is registered in a Blend
+        # is check he covers any role the Blend, using unixgroups backend
+	elif [ -z "`getUserRoles ${BLEND} ${BLENDUSER}`" ]; then
+		RET=1 # user has no role, so is not registered in Blend
+	fi
+	return ${RET}
+}
+
+# GET Functions
+
+# getBlendList() is backend indep and is defined in ${SHAREDIR}/blend-actions
+
+# echos the roles registered by Blend
+# for Unix groups backend, it's actually the identity function
+getBlendRoleList() {
+	RET=0
+	BLEND=$1
+	if [ "$#" -ne 1 ]; then
+		RET=64 # EX_USAGE
+	else
+		checkRole ${BLEND} && echo ${BLEND}
+	fi
+	return ${RET}
+}
+
+# echoes list of users having role $2 in Blend $1
+# if $4 exists use ',' as separator between user names
+getUsersInRole() {
+	RET=0
+	BLEND=$1
+	ROLE=$2
+	SIMPLE=$3
+	USERS=""
+	if [ "$#" -ne 3 -a "$#" -ne 4 ]; then
+		return RET=64 # EX_USAGE
+	fi
+	for user in `getent group ${ROLE} | sed -ne "s/.*:\(.*\)$/\1/p" | tr "," " "` ; do
+		REALNAME=" "
+		if [ $SIMPLE -ne 1 ] ; then
+			REALNAME=" (`grep \"^$user:\" /etc/passwd | sed \"s/^$user:[^:]\+:[0-9]\+:[0-9]\+:\([^:]\+\):.*/\1/\" | sed \"s/,.*//\"`)"
+		fi
+		if [ "$#" -eq 4 ]; then
+			if [ "$USERS" != "" ] ; then
+				USERS="${USERS},"
+			fi
+		fi
+		if [ "$USERS" != "" ] ; then
+			USERS="${USERS} "
+		fi
+		USERS="${USERS}${user}${REALNAME}"
+	done
+	echo $USERS
+	return ${RET}
+}
+
+# echoes list of all users of the system
+# $1 = 1 - simply login names, $1 = 0 (or anything else) - login names and real name
+# if $2 exists use ',' as separator between user names
+getAllUsers() {
+	RET=0
+	if [ "$#" -ne 1 -a "$#" -ne 2 ]; then
+		RET=64 # EX_USAGE
+	else
+		SIMPLE=$1
+		TMPFILE=`mktemp`
+		(IFS=":"
+			while read user pass uid gid name rest ; do
+				if [ "$uid" != "" ] ; then
+					# in case NIS is used on the machine $uid remains
+					# empty and breaks the following condition.
+					if [ $uid -ge $FIRST_UID -a "$user" != "nobody" ] ; then
+        					name=`echo $name | sed "s/,.*//"`
+					        if [ $SIMPLE -eq 1 ] ; then
+					                echo "$user" >> ${TMPFILE}
+					        else
+				        	        echo "$user ($name)" >> ${TMPFILE}
+						fi
+					fi
+				fi
+			done < /etc/passwd
+		)
+		# Append ',' if second argument is given
+		if [ "$#" -eq 2 ]; then
+		    sort -u "${TMPFILE}" | tr '\n' ',' | sed 's/,/&\ /g' | sed 's/, *$//g'
+		else
+		    sort -u "${TMPFILE}"
+		fi
+		rm -f "${TMPFILE}"
+	fi
+	return ${RET}
+}
+# echo all Role covered by user $2 in Blend $1
+getUserRoles() {
+	RET=0
+	BLEND=$1
+	BLENDUSER=$2
+	if [ "$#" -ne 2 ]; then
+		RET=64 # EX_USAGE
+	else
+		BLENDROLES=`getBlendRoleList ${BLEND}`
+		ROLES=""
+		for ROLE in ${BLENDROLES}; do
+			for USER in `getUsersInRole ${BLEND} ${ROLE} 1`; do
+				test "${USER}" == "${BLENDUSER}" && \
+					ROLES="${ROLES} ${ROLE}"
+			done
+		done
+		blendDebug "getUserRoles(): roles covered by user ${BLENDUSER} in Debian Pure Blend ${BLEND}: ${ROLES}"
+		echo ${ROLES}
+	fi
+	return ${RET}
+}
+
+
+# echos the home directory of the system user
+getUserHome() {
+	RET=0
+	BLENDUSER=$1
+	if [ "$#" -ne 1 ]; then
+		RET=64 # EX_USAGE
+	else
+		if checkUser ${BLENDUSER}; then
+			getent passwd ${BLENDUSER} | sed "s/.*:\([^:]*\):[^:]*$/\1/"
+			RET=$?
+		else
+			RET=67 # EX_NOUSER
+		fi
+	fi
+
+	return ${RET}
+}
+
+
+
+# ADD/SET functions
+
+# adds role $2 to current unix groups for the specified Blend $1, as a system
+# dynamic allocated group
+addRole() {
+	RET=0
+	BLEND=$1
+	ROLE=$2
+	if [ "$#" -ne 2 ]; then 
+		RET=64 # EX_USAGE
+	else
+		# Check whether group yet exists
+		TESTGROUP="`getent group ${ROLE}`" || true
+		if [ -z "${TESTGROUP}" ] ; then
+			${DRYRUN} addgroup --system "${ROLE}" || true
+		fi
+		RET=$?
+	fi
+	return ${RET}
+}
+
+# set user $2 to have role $3, for the specified Blend $1
+setUserRole() {
+	RET=0
+	BLEND=$1
+	USER=$2
+	ROLE=$3
+	if [ "$#" -ne 3 ]; then 
+		RET=64 # EX_USAGE
+	else
+		${DRYRUN} adduser ${USER} ${ROLE}
+		RET=$?
+	fi
+	return ${RET}
+}
+
+# DEL/USET Functions
+
+# remove role $2 for the specified Blend $1 from current unix groups, as a
+# system dynamic allocated group
+delRole() {
+	RET=0
+	BLEND=$1
+	ROLE=$2
+	if [ "$#" -ne 2 ]; then 
+		RET=64 # EX_USAGE
+	else
+		if checkRole "${ROLE}"; then
+			${DRYRUN} delgroup "${ROLE}"
+			RET=$?
+		else
+			RET=67 # EX_NOUSER
+		fi
+	fi
+	return ${RET}
+}
+
+
+# unset user $2 from having role $3, for the specified Blend $1
+unsetUserRole() {
+	RET=0
+	BLEND=$1
+	BLENDUSER=$2
+	ROLE=$3
+	# Make sure BLENDUSER and ROLE are BOTH defined, 
+	# to avoid disasters using deluser
+	if [ "$#" -ne 3 ]; then 
+		RET=64 # EX_USAGE
+	else
+		if checkUser "${BLENDUSER}"; then
+			${DRYRUN} deluser "${BLENDUSER}" "${ROLE}"
+			RET=$?
+		else
+			RET=67 # EX_NOUSER
+		fi
+	fi
+	return ${RET}
+}

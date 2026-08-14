@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+
+DEB_VERSION := $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+DEB_UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | cut -d+ -f1)
+
+%:
+	dh $@
+
+override_dh_installchangelogs:
+	dh_installchangelogs docs/awstats_changelog.txt
+
+override_dh_auto_install:
+	dh_auto_install
+	dh_install \
+		wwwroot/classes/awgraphapplet-$(DEB_UPSTREAM_VERSION).jar \
+		usr/share/java/awstats/
+	cp wwwroot/cgi-bin/awstats.model.conf debian/awstats/etc/awstats/awstats.conf
+
+override_dh_link:
+	rm debian/awstats/usr/share/doc/awstats/html/images/awstats_logo6.png
+	dh_link
+	dh_link \
+		usr/share/java/awstats/awgraphapplet-$(DEB_UPSTREAM_VERSION).jar \
+		usr/share/java/awstats/awgraphapplet.jar
+
+override_dh_compress:
+	dh_compress -X.sh -X.pl -X.ico
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod +x debian/awstats/usr/share/doc/awstats/examples/*.pl
+	chmod +x debian/awstats/usr/share/doc/awstats/examples/*.sh
+	chmod +x debian/awstats/usr/share/awstats/tools/*.pl
+	chmod -x debian/awstats/usr/share/awstats/lang/tooltips*/*.txt
+	chmod -x debian/awstats/usr/share/awstats/lang/*.txt
+	chmod -x debian/awstats/usr/share/awstats/plugins/*.pm
+
+override_dh_auto_build:
+	dh_auto_build \
+		--buildsystem=ant \
+		--sourcedirectory=wwwroot/classes -- \
+		-Dversion=$(DEB_UPSTREAM_VERSION) bin-jar
+
+override_dh_auto_clean:
+	-dh_auto_clean \
+		--buildsystem=ant \
+		--sourcedirectory=wwwroot/classes -- \
+		-Dversion=$(DEB_UPSTREAM_VERSION)
+	-rm wwwroot/classes/awgraphapplet-$(DEB_UPSTREAM_VERSION).jar
+	-rm wwwroot/classes/src/AWGraphApplet.class

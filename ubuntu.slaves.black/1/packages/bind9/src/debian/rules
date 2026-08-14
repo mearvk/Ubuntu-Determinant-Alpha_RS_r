@@ -1,0 +1,122 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+
+export DEB_CFLAGS_MAINT_APPEND = -fno-strict-aliasing -fno-delete-null-pointer-checks -DNO_VERSION_DATE -DDIG_SIGCHASE
+
+export DPKG_GENSYMBOLS_CHECK_LEVEL := 4
+
+include /usr/share/dpkg/default.mk
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+COMMA = ,
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
+export arch = $(DEB_HOST_ARCH)
+
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
+EXTRA_FEATURES=--disable-linux-caps
+endif
+
+DEB_VERSION_REVISION := $(call dpkg_late_eval,DEB_VERSION_REVISION,echo '$(DEB_VERSION_UPSTREAM_REVISION)' | sed -e 's/^[^-]*//')
+
+SED_VERSION_EXTENSIONS := \
+	sed -e 's/\[bind_VERSION_EXTRA\], .*)/[bind_VERSION_EXTRA], $(DEB_VERSION_REVISION)-$(DEB_VENDOR))/'
+
+EXCLUDE_FILES :=			\
+	--exclude=.la			\
+	--exclude=lwresd		\
+	--exclude=__pycache_		\
+	--exclude=sample.so		\
+	--exclude=dlzexternal.so	\
+	--exclude=test-async.so		\
+	--exclude=libbind9.la		\
+	--exclude=libdns.la		\
+	--exclude=libirs.la		\
+	--exclude=libisccc.la		\
+	--exclude=libisccfg.la		\
+	--exclude=libisc.la		\
+	--exclude=libns.la
+
+%:
+	dh $@ --with apport
+
+prepare_version_extensions:
+	if [ ! -f configure.ac.bak ]; then \
+	  mv configure.ac configure.ac.bak; \
+	  $(SED_VERSION_EXTENSIONS) < configure.ac.bak > configure.ac; \
+	fi
+
+clean_version_extensions:
+	if [ -f configure.ac.bak ]; then \
+	  mv configure.ac.bak configure.ac; \
+	fi
+
+override_dh_autoreconf: prepare_version_extensions
+	dh_autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--sysconfdir=/etc/bind \
+		--with-python=python3 \
+		--localstatedir=/ \
+		--enable-threads \
+		--enable-largefile \
+		--with-libtool \
+		--enable-shared \
+		--disable-static \
+		--with-gost=no \
+		--with-openssl=/usr \
+		--with-gssapi=yes \
+		--with-libidn2 \
+		--with-json-c \
+		--with-lmdb=/usr \
+		--with-gnu-ld \
+		--with-maxminddb \
+		--with-atf=no \
+		--enable-ipv6 \
+		--enable-rrl \
+		--enable-filter-aaaa \
+		--disable-native-pkcs11 \
+		$(EXTRA_FEATURES)
+
+override_dh_auto_build:
+	sed -i 's/:gl:`\([#!][^`]*\)`/[GL \1]/g' doc/notes/*.rst
+	dh_auto_build -- all html
+
+override_dh_auto_clean: clean_version_extensions
+	sed -i 's/\[GL \([#!][^]]*\)]/:gl:`\1`/g' doc/notes/*.rst
+	dh_auto_clean
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp -- install install-html
+
+override_dh_auto_test:
+	:
+
+override_dh_installinit:
+	dh_installinit -pbind9 --name=named
+	dh_installinit --remaining
+
+override_dh_installsystemd:
+	dh_installsystemd -pbind9 --no-enable --name=named-resolvconf named-resolvconf.service
+	dh_installsystemd -pbind9 --name=named named.service
+	dh_installsystemd --remaining
+
+override_dh_install:
+	dh_install $(EXCLUDE_FILES)
+	# Install apparmor profile
+	dh_apparmor -pbind9 --profile-name=usr.sbin.named
+
+override_dh_missing:
+	dh_missing $(EXCLUDE_FILES)  --fail-missing
+
+.PHONY: prepare_version_extensions clean_version_extensions

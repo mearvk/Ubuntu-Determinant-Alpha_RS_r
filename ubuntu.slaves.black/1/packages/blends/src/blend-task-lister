@@ -1,0 +1,36 @@
+#!/bin/sh
+# This script respects its own file name to find out the Blend it belongs to
+# Names should be builded like <Blend>-task-files
+# The intended use is to create according symlinks to this file
+
+NAME=`basename $0`
+if [ _"$NAME" = _"blend-task-lister" ] ; then
+    exit
+fi
+
+# the base dir for Blend conffiles, where script expects to find dirs named like
+# each registered blend
+CONFBASE=${CONFBASE:-/etc/blends}
+
+# a local per Blend conf is sourced later, after argument parsing
+. ${CONFBASE}/blends.conf
+
+BLEND=`echo $NAME | sed 's/-task-files//'`
+
+# Now that we know the selected Blend, we can check if there is a local
+# configuration for it (ie different backend from the default one)
+test -n "${BLEND}" -a  -f ${CONFBASE}/${BLEND}/${BLEND}.conf &&
+	. ${CONFBASE}/${BLEND}/${BLEND}.conf
+
+if [ -n "${DBBACKEND}" ]; then
+	set -e
+	checkBlend ${BLEND} || blendFail $? "Debian Pure Blend ${BLEND} does not exist"
+fi
+
+# Check consistency of passed arguments
+if [ $# -ne 1 ] ; then
+    # printing usage makes no sense here
+    exit 67 # EX_USAGE
+fi
+
+cat /usr/share/blends/tasksel/${BLEND}/$1

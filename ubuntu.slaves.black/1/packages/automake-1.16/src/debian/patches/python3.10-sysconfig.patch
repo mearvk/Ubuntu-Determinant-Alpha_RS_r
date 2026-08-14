@@ -1,0 +1,60 @@
+Subject: [PATCH] python: use the posix_prefix sysconfig scheme on Debian
+
+Fixes Debian's bug: https://bugs.debian.org/1006784
+
+Debian adds a custom sysconfig scheme to system python installs,
+"posix_local". This is the default scheme, and it redirects local users'
+Python module installs to /usr/local even though Python is installed
+with a /usr prefix. Both are on Debian's python's sys.path module search
+path.
+
+Automake and its users understand prefixes, and are likely to select
+/usr/local, explicitly. Select the "posix_prefix" scheme, with the
+user-supplied prefix.
+
+Previously this custom sysconfig scheme was specified in
+distutils.sysconfig, but not sysconfig itself. As distutils is being
+deprecated, the custom scheme is now specified in sysconfig, since
+Debian's Python 3.10 (3.10.2-4).
+
+Author: Gianfranco Costamagna <locutusofborg@debian.org>
+Bug-Debian: https://bugs.debian.org/1006784
+Forwarded: http://debbugs.gnu.org/54412
+Last-Update: 2022-03-15
+
+diff --git a/m4/python.m4 b/m4/python.m4
+index 6653e4d89..c7db51814 100644
+--- a/m4/python.m4
++++ b/m4/python.m4
+@@ -255,7 +255,14 @@ except ImportError:
+    am_cv_python_pythondir=`$PYTHON -c "
+ $am_python_setup_sysconfig
+ if can_use_sysconfig:
+-  sitedir = sysconfig.get_path('purelib', vars={'base':'$am_py_prefix'})
++  if hasattr(sysconfig, 'get_default_scheme'):
++    scheme = sysconfig.get_default_scheme()
++  else:
++    scheme = sysconfig._get_default_scheme()
++  if scheme == 'posix_local':
++    # Debian's default scheme installs to /usr/local/ but we want to find headers in /usr/
++    scheme = 'posix_prefix'
++  sitedir = sysconfig.get_path('purelib', scheme, vars={'base':'$am_py_prefix'})
+ else:
+   from distutils import sysconfig
+   sitedir = sysconfig.get_python_lib(0, 0, prefix='$am_py_prefix')
+@@ -297,7 +304,14 @@ sys.stdout.write(sitedir)"`
+    am_cv_python_pyexecdir=`$PYTHON -c "
+ $am_python_setup_sysconfig
+ if can_use_sysconfig:
+-  sitedir = sysconfig.get_path('platlib', vars={'platbase':'$am_py_exec_prefix'})
++  if hasattr(sysconfig, 'get_default_scheme'):
++    scheme = sysconfig.get_default_scheme()
++  else:
++    scheme = sysconfig._get_default_scheme()
++  if scheme == 'posix_local':
++    # Debian's default scheme installs to /usr/local/ but we want to find headers in /usr/
++    scheme = 'posix_prefix'
++  sitedir = sysconfig.get_path('platlib', scheme, vars={'platbase':'$am_py_exec_prefix'})
+ else:
+   from distutils import sysconfig
+   sitedir = sysconfig.get_python_lib(1, 0, prefix='$am_py_exec_prefix')

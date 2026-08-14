@@ -1,0 +1,47 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE = 1
+
+include /usr/share/dpkg/pkg-info.mk
+
+export BUILD_DATE=$(shell LC_ALL=C date -u "+%B %d, %Y" -d @"$(SOURCE_DATE_EPOCH)")
+
+# Prevent setuptools/distribute from accessing the internet.
+export http_proxy = http://127.0.9.1:9
+
+export PYBUILD_NAME=black
+
+%:
+	echo "version = '$(DEB_VERSION_UPSTREAM)'" > _black_version.py
+	mkdir -p src
+	cp _black_version.py src/
+	dh $@ --with sphinxdoc,python3 --buildsystem=pybuild
+
+override_dh_auto_build:
+	python3 setup.py build
+	PYTHONPATH="..:../src/" make -C docs/ html SPHINXBUILD="/usr/share/sphinx/scripts/python3/sphinx-build" SPHINXOPTS="-j 4 -D today=\"$(BUILD_DATE)\""
+	${RM} ./build/lib/blackd.py
+
+override_dh_auto_install:
+	python3 setup.py install --root=$(CURDIR)/debian/black/ --install-layout=deb
+	rst2man debian/manpage.rst > debian/black.1
+	dh_installman debian/black.1
+	rst2man debian/manpage2.rst > debian/black-primer.1
+	dh_installman debian/black-primer.1
+	${RM} ./docs/_build/html/objects.inv
+	${RM} ./debian/black/usr/bin/blackd
+
+override_dh_auto_test:
+	# Ensure we have entry_points created
+	python3 setup.py develop --prefix=$(CURDIR)/testtmp
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	PATH=testtmp/bin:${PATH} PYTHONPATH=src pytest-3 tests --run-optional no_python2 --run-optional no_jupyter
+endif
+	${RM} -rf testtmp
+
+override_dh_auto_clean:
+	python3 setup.py clean -a
+	${RM} -r debian/black docs/_build/ docs/_static/pypi.svg
+	${RM} -r __pycache__ ./blib2to3/pgen2/__pycache__ ./blib2to3/__pycache__
+	${RM} -r tests/__pycache__ _black_version.py src/_black_version.py
+	find docs/ -type l -delete

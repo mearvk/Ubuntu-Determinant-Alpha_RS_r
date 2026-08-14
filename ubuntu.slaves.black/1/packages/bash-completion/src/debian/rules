@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+REMOVE=adb bts nmcli hwclock ionice mock modules mount rtcwake dmesg renice umount
+
+override_dh_compress:
+	dh_compress -Xcompletions
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGES
+
+dh_bash-completion.1: debian/extra/debhelper/dh_bash-completion
+	pod2man \
+		--center "Bash-Completion Debhelper" \
+		--release $(DEB_VERSION_UPSTREAM) \
+		$< > debian/extra/debhelper/$@
+
+override_dh_install: dh_bash-completion.1
+	dh_install
+	for i in $(REMOVE); do \
+	    rm -vf debian/bash-completion/usr/share/bash-completion/completions/$$i; \
+	done
+
+override_dh_auto_test:
+	# nothing
+
+%:
+	dh $@

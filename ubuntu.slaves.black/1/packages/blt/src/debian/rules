@@ -1,0 +1,83 @@
+#!/usr/bin/make -f
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/architecture.mk
+
+v = 2.5
+tclv = 8.6
+lib_so = libBLT.$(v).so.$(tclv)
+tcl_only_lib_so = libBLTlite.$(v).so.$(tclv)
+dtmp = $(shell pwd)/debian/tmp
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+			  --host=$(DEB_HOST_GNU_TYPE) \
+			  --with-tcl=/usr/lib/$(DEB_HOST_MULTIARCH)/tcl$(tclv) \
+			  --with-tk=/usr/lib/$(DEB_HOST_MULTIARCH)/tk$(tclv)
+
+override_dh_auto_build:
+	$(MAKE) lib_so=$(lib_so) \
+		tcl_only_lib_so=$(tcl_only_lib_so)
+
+override_dh_auto_install:
+	$(MAKE) lib_so=$(lib_so) \
+		tcl_only_lib_so=$(tcl_only_lib_so) \
+		INSTALL_ROOT=$(dtmp) install
+	#
+	# Now fix up the man pages
+	mv $(dtmp)/usr/share/man/mann/BLT.n \
+	   $(dtmp)/usr/share/man/mann/intro.n
+	(cd $(dtmp)/usr/share/man/mann ; for i in *.n ; do \
+	   sed -e's/^\.TH \+\([^ ]*\) \+n/.TH blt::\1 3tcl/' $$i >../man3/blt::`basename $$i .n`.3tcl ; \
+	done)
+	rm -r $(dtmp)/usr/share/man/mann
+	#
+	# Remove some misplaced documentation
+	(cd $(dtmp)/usr/lib/blt$(v) ; rm README PROBLEMS NEWS)
+	#
+	# Now we need to move the demos and examples over to /usr/share
+	mkdir -p $(dtmp)/usr/share/blt$(v)
+	mv $(dtmp)/usr/lib/blt$(v)/demos $(dtmp)/usr/share/blt$(v)
+	chmod a-x $(dtmp)/usr/share/blt$(v)/demos/*.txt
+	#
+	mkdir -p $(dtmp)/usr/share/blt$(v)/examples
+	cp examples/* $(dtmp)/usr/share/blt$(v)/examples
+	#
+	# Patch the demos and examples to use wish8.6
+	(cd $(dtmp)/usr/share/blt$(v) ; \
+	   for i in demos/*.tcl examples/*.tcl ; do \
+		sed -e '1c#!/usr/bin/wish$(tclv)' $$i >$$i.new ; \
+		mv $$i.new $$i ; \
+		chmod 755 $$i; \
+	   done)
+	#
+	chmod 644 $(dtmp)/usr/share/blt$(v)/demos/images/*
+	chmod 644 $(dtmp)/usr/share/blt$(v)/demos/scripts/*.tcl
+	chmod 755 $(dtmp)/usr/share/blt$(v)/demos/scripts/page.tcl
+
+override_dh_installdocs:
+	dh_installdocs
+	rm -f debian/blt-dev/usr/share/doc/blt-dev/html/*.vc
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V 'tk8.6-blt2.5 (>= 2.5.3)'
+
+get-orig-source:
+	CURDIR=`pwd` && TMPDIR=`mktemp -d /tmp/blt.XXXXXX` && \
+	cd $$TMPDIR && \
+	wget -O tmp.zip \
+	     http://prdownloads.sourceforge.net/wize/blt-src-$(v).3.zip && \
+	unzip tmp.zip && \
+	rm -rv blt$(v)/library/dd_protocols && \
+	(cd blt$(v) && patch -p1 <$$CURDIR/debian/patches/source.patch) && \
+	sed -i -e 's/\$$(ddFiles)//' blt$(v)/library/Makefile.in && \
+	tar -Jcf $$CURDIR/blt_$(v).3+dfsg.orig.tar.xz blt$(v) && \
+	rm -rf $$TMPDIR
+
+.PHONY: override_dh_auto_configure override_dh_auto_build \
+	override_dh_auto_install override_dh_makeshlibs override_dh_installdocs \
+	get-orig-source

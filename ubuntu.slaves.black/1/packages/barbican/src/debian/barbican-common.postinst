@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ]; then
+    if ! getent group barbican > /dev/null 2>&1; then
+        addgroup --system barbican >/dev/null
+    fi
+
+    if ! getent passwd barbican > /dev/null 2>&1; then
+        adduser --system --home /var/lib/barbican --ingroup barbican --no-create-home --shell /bin/false barbican
+    fi
+
+    chown barbican:adm /var/log/barbican
+    chmod 0750 /var/log/barbican
+
+    find /etc/barbican -exec chown root:barbican "{}" +
+    find /etc/barbican -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+
+    find /var/lib/barbican -exec chown barbican:barbican "{}" +
+    find /var/lib/barbican -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+fi
+
+#DEBHELPER#
+
+exit 0

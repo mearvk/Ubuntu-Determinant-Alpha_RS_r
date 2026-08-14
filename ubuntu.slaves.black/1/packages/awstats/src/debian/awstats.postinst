@@ -1,0 +1,41 @@
+#! /bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+	if [ ! -d /var/lib/awstats ]; then
+		if [ -d /var/cache/awstats ]; then
+			mv /var/cache/awstats /var/lib/awstats
+		fi
+		mkdir -p /var/lib/awstats
+		chown www-data:www-data /var/lib/awstats
+		chmod 750 /var/lib/awstats
+	fi
+	if [ ! -d /var/cache/awstats ]; then
+		mkdir -p /var/cache/awstats
+		chown www-data:www-data /var/cache/awstats
+		chmod 750 /var/cache/awstats
+	fi
+	# clean-up old script that didn't run
+	if [ -n "$2" ]; then
+	    if dpkg --compare-versions "$2" lt '7.8-1~'; then
+		rm -f /etc/logrotate.d/httpd-prerotate/awstats/prerotate.sh
+		rmdir /etc/logrotate.d/httpd-prerotate/awstats/ || true
+	    fi
+	fi
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 0
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

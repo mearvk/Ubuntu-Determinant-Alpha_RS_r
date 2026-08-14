@@ -1,0 +1,48 @@
+			     BASH PATCH REPORT
+			     =================
+
+Bash-Release:	5.1
+Patch-ID:	bash51-009
+
+Bug-Reported-by:	Julien Moutinho <julm+bash@sourcephile.fr>
+Bug-Reference-ID:	<20211004035906.5kiobuzkpeckmvwg@sourcephile.fr>
+Bug-Reference-URL:	https://lists.gnu.org/archive/html/bug-bash/2021-10/msg00022.html
+
+Bug-Description:
+
+The bash malloc implementation of malloc_usable_size() does not follow the
+specification. This can cause library functions that use it to overwrite
+memory bounds checking.
+
+--- a/lib/malloc/malloc.c
++++ b/lib/malloc/malloc.c
+@@ -1286,13 +1286,12 @@ malloc_usable_size (mem)
+       p = (union mhead *) ap - 1;
+     }
+ 
+-  /* XXX - should we return 0 if ISFREE? */
+-  maxbytes = binsize(p->mh_index);
+-
+-  /* So the usable size is the maximum number of bytes in the bin less the
+-     malloc overhead */
+-  maxbytes -= MOVERHEAD + MSLOP;
+-  return (maxbytes);
++  /* return 0 if ISFREE */
++  if (p->mh_alloc == ISFREE)
++    return 0;
++  
++  /* Since we use bounds checking, the usable size is the last requested size. */
++  return (p->mh_nbytes);
+ }
+ 
+ #if !defined (NO_VALLOC)
+--- a/patchlevel.h
++++ b/patchlevel.h
+@@ -25,6 +25,6 @@
+    regexp `^#define[ 	]*PATCHLEVEL', since that's what support/mkversion.sh
+    looks for to find the patch level (for the sccs version string). */
+ 
+-#define PATCHLEVEL 8
++#define PATCHLEVEL 9
+ 
+ #endif /* _PATCHLEVEL_H_ */

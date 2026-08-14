@@ -1,0 +1,53 @@
+# $Id$
+#
+# Backend independant functions for blends package
+#
+# For error codes check in /usr/include/sysexits.h
+
+# CHECK Functions
+
+# checks if Blend $1 exists as a Blend
+checkBlend() {
+	RET=0
+	BLEND=$1
+	if [ $# -ne 1 ]; then
+		RET=64 # EX_USAGE
+	elif ! [ -d ${CONFBASE}/`toLower ${BLEND}` ]; then
+		RET=67 # EX_NOUSER
+	fi
+	return ${RET}
+}
+
+# GET Functions
+
+# echos a space separated list of Blends registered into Blend subsystem
+getBlendList() {
+	# print out dir in CONFBASE and stript last space added by printf
+	find ${CONFBASE} -mindepth 1 -maxdepth 1 -not -name CVS -type d -printf "%f " | sed s/.$/\\n/g
+}
+
+# echoes a list of DBBACKEND for Blend present in the current system
+getBackendList() {
+	find ${SHAREDIR} -mindepth 1 -maxdepth 1 \
+		-not -name CVS -and -not -name menu \
+		-type d -printf "%f " | sed s/.$/\\n/g
+}
+
+# is user registered in at least one Blend?
+# it's a kludgy way :(, run a subshell and iterate on every registered Blend
+# checking if a user covers a Role in that Blend.
+isUserRegistered() {
+	RET=1 # return false
+	BLENDUSER=$1
+
+	for BLEND in `getBlendList`; do
+		# Run a subshell as a environment sandbox
+		(   test -f ${CONFBASE}/${BLEND}/${BLEND}.conf &&
+				. ${CONFBASE}/${BLEND}/${BLEND}.conf
+			. ${SHAREDIR}/${DBBACKEND}/blend-actions
+			checkUserInBlend ${BLEND} ${BLENDUSER} && exit 0
+		) && RET=0 && break 
+	done
+	return ${RET}
+}
+

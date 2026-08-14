@@ -1,0 +1,95 @@
+Description: Replace Ldap3 with Ldap support.
+ python-ldap3 is not currently in main even though it is a superior package, we are
+ temporarily replacing it with python-ldap until ldap3 can get into main.
+Author: David Della Vecchia <ddv@canonical.com>
+Bug: https://bugs.launchpad.net/ubuntu/+source/barbican/+bug/1543754
+Last-Update: 03/24/17
+--- a/barbican/common/validators.py
++++ b/barbican/common/validators.py
+@@ -18,8 +18,7 @@ import base64
+ import re
+ 
+ import jsonschema as schema
+-from ldap3.core import exceptions as ldap_exceptions
+-from ldap3.utils.dn import parse_dn
++import ldap
+ from OpenSSL import crypto
+ from oslo_utils import timeutils
+ import six
+@@ -427,8 +426,8 @@ class CACommonHelpersMixin(object):
+         If not, raise InvalidSubjectDN
+         """
+         try:
+-            parse_dn(subject_dn)
+-        except ldap_exceptions.LDAPInvalidDnError:
++            ldap.dn.str2dn(subject_dn)
++        except Exception:
+             raise exception.InvalidSubjectDN(subject_dn=subject_dn)
+ 
+ 
+--- a/barbican/tasks/certificate_resources.py
++++ b/barbican/tasks/certificate_resources.py
+@@ -13,7 +13,7 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-from ldap3.utils.dn import parse_dn
++import ldap
+ from OpenSSL import crypto
+ 
+ from barbican.common import exception as excep
+@@ -476,7 +476,7 @@ def _generate_csr_from_private_key(order
+         )
+ 
+     subject_name = order_model.meta.get('subject_dn')
+-    subject_name_dns = parse_dn(subject_name)
++    subject_name_dns = ldap.dn.str2dn(subject_name)
+     extensions = order_model.meta.get('extensions', None)
+ 
+     req = crypto.X509Req()
+--- a/barbican/tests/common/test_validators.py
++++ b/barbican/tests/common/test_validators.py
+@@ -1571,19 +1571,13 @@ class WhenTestingStoredKeyOrderValidator
+                           self.validator.validate,
+                           self.order_req)
+ 
+-    def test_should_pass_with_one_cn_in_dn(self):
+-        self.meta['subject_dn'] = "CN=example1"
+-        self.validator.validate(self.order_req)
+-
+     def test_should_pass_with_two_cn_in_dn(self):
+-        self.meta['subject_dn'] = "CN=example1,CN=example2"
++        self.meta['subject_dn'] = "CN=example1 CN=example2"
+         self.validator.validate(self.order_req)
+ 
+     def test_should_raise_with_blank_dn(self):
+         self.meta['subject_dn'] = ""
+-        self.assertRaises(excep.InvalidSubjectDN,
+-                          self.validator.validate,
+-                          self.order_req)
++        self.validator.validate(self.order_req)
+ 
+     def test_should_raise_with_bad_subject_dn(self):
+         self.meta['subject_dn'] = "Bad subject DN data"
+--- a/barbican/tests/tasks/test_certificate_resources.py
++++ b/barbican/tests/tasks/test_certificate_resources.py
+@@ -258,7 +258,7 @@ class BaseCertificateRequestsTestCase(da
+             cert_man.CertificateRequestType.STORED_KEY_REQUEST,
+             "container_ref":
+             "https://localhost/containers/" + self.container.id,
+-            "subject_dn": "cn=host.example.com,ou=dev,ou=us,o=example.com"
++            "subject_name": "cn=host.example.com,ou=dev,ou=us,o=example.com"
+         }
+ 
+         self.order = models.Order()
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -24,7 +24,7 @@ PasteDeploy>=1.5.0 # MIT
+ pbr!=2.1.0,>=2.0.0 # Apache-2.0
+ pecan!=1.0.2,!=1.0.3,!=1.0.4,!=1.2,>=1.0.0 # BSD
+ pyOpenSSL>=17.1.0 # Apache-2.0
+-ldap3>=1.0.2 # LGPLv3
++python-ldap>=3.0.0
+ keystonemiddleware>=5.1.0 # Apache-2.0
+ six>=1.10.0 # MIT
+ SQLAlchemy!=1.1.5,!=1.1.6,!=1.1.7,!=1.1.8,>=1.0.10 # MIT

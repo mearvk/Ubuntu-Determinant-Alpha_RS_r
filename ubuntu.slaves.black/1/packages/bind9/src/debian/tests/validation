@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+setup() (
+	service bind9 stop
+	service bind9 start
+)
+
+run() (
+	repeats=10
+	while [ "${repeats}" -gt "0" ]; do
+		# Make a query against an external nameserver and check for DNSSEC validation
+		echo "Checking for DNSSEC validation status of internetsociety.org"
+		dig -t a internetsociety.org @127.0.0.1 | grep -E 'flags:.+ad; QUERY' && break
+		repeats=$((repeats-1))
+		sleep 1
+	done
+	[ "$repeats" -eq "0" ] && exit 1
+)
+
+teardown() (
+	service bind9 stop
+)
+
+setup
+run
+teardown

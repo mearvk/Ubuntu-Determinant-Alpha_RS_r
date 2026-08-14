@@ -1,0 +1,228 @@
+#!/bin/bash
+
+# Script to handle menu profiles for Debian Pure Blends subsystem, installed
+# by your system administrator via blends-common package.
+#
+# It prints on STDOUT Debian menu entries for user
+
+CONFBASE=${CONFBASE:-/etc/blends}
+
+# read generic Blends conf ... in case it exists
+# Since menu 2.1.39 triggers are used to run update-menus for every change
+# in /usr/{lib,share}/menu - which fails finding ${CONFBASE}/blends.conf in
+# case you are installing blends-common the first time.  I do not regard this
+# as a reasonable behaviour because it is a real performance loss and
+# obviousely error prone (for instance in case of blends-common (see #484167)
+# but we have to deal with this somehow
+if [ -s "${CONFBASE}/blends.conf" ] ; then
+    . ${CONFBASE}/blends.conf
+else
+    exit 0
+fi
+
+BLENDUSER=`whoami`
+
+tasksdir=/usr/share/blends/tasks
+
+# it has to be run only by unprivileged users via update-menus
+test "${BLENDUSER}" == "root" && exit 0
+
+# Upper case the first letter of a string to have a nicer menu
+NameToUpper() {
+	if [ $# -ne 1 ] ; then
+		RET=64 # EX_USAGE
+		return ${RET}
+	fi
+	echo $1 | perl -ne 'print "\u\L$_";'
+	return 0
+}
+
+# Obtain title from HTML page for menu hints
+GetHTMLTitle () {
+        if [ $# -ne 1 ] ; then
+                RET=64 # EX_USAGE
+                return ${RET}
+        fi
+        perl -ne 'while (<>) {chomp; $all.="$_ ";}
+                    ($title) = ($all =~ /.*\<title\>(.*)\<\/title\>.*/i);
+                    $title =~ s/\s+/ /g ;
+                    print $title ; exit 0;' $1
+	return 0
+}
+
+# Obtain title (= first line) from text file for menu hints
+GetTxtTitle () {
+        if [ $# -ne 1 ] ; then
+                RET=64 # EX_USAGE
+                return ${RET}
+        fi
+	head -1 $1 | sed -e "s/[[:space:]]\+/ /g" -e "s/^[[:space:]]*\(.*\)[[:space:]]*$/\1/"
+	return 0
+}
+
+# Strip Blend name from metapackage name
+# FIXME: the Blend name does not necessarily match the metapackage
+#        prefix. Example: education-* packages of Debian Edu
+#        Proposed fix: Read Blend name from config file
+GetTaskNameFromPackage () {
+        if [ $# -ne 2 ] ; then
+                RET=64 # EX_USAGE
+                return ${RET}
+        fi
+	BLEND=$1 # Blend name
+	PKG=$2   # metapackage name
+	echo $PKG | sed "s/^${BLEND}-//"
+	return 0
+}
+
+# Obtain task title which has to be defined in the metapackage control templates
+GetTaskTitle () {
+        if [ $# -ne 1 ] ; then
+                RET=64 # EX_USAGE
+                return ${RET}
+        fi
+	PKG=$1  # metapackage name
+	cat "$tasksdir"/"$BLEND"/`GetTaskNameFromPackage "$BLEND" "$PKG"`
+	return 0
+}
+
+getMenuEntriesFromDependencies() {
+	RET=""
+	if [ $# -ne 1 ] ; then
+		RET=64 # EX_USAGE
+		return ${RET}
+	fi
+	PKG="$BLEND"-$1
+	TASK=`GetTaskTitle $PKG`
+	SECTION=`NameToUpper "$BLEND"`/`NameToUpper "$TASK"`
+
+	# find the list of Depends / Recommends / Suggests
+	DepPkgs=`dpkg --status "$PKG" | \
+		sed -e '/^Description/,$d' -e '/^Conffiles/,$d' | \
+		grep -v ^[A-CE-QT-Z] | \
+		grep -v ^S[eot] | \
+		sed -e "s/([^)]*)//" \
+		    -e "s/,* *${BLEND}-config//" \
+		    -e "s/^[^:]*: *//" \
+		    -e "s/, */\\n/g" | \
+		sort | uniq`
+
+	# check whether Blend maintainer provided menu override different from
+	# package maintainers menu file
+	# FIXME: This is outdated!  The concept of menu files named like the
+        #        metapackage is stopped in favour of single menu files named like
+        #        the dependant package.  The rationale is that you can get more
+        #        fine grained replacements.
+	blendmenufile=""
+	if   [ -s "$HOME"/.menu/"$PKG" ] ; then
+		blendmenufile="$HOME"/.menu/"$PKG"
+	elif [ -s /etc/blends/"$BLEND"/menu/"$PKG" ] ; then
+		blendmenufile=/etc/blends/"$BLEND"/menu/"$PKG"
+	elif [ -s /usr/lib/blends/"$BLEND"/menu/"$PKG" ] ; then
+		blendmenufile=/usr/lib/blends/"$BLEND"/menu/"$PKG"
+	elif [ -s /usr/share/blends/"$BLEND"/menu/"$PKG" ] ; then
+		blendmenufile=/usr/share/blends/"$BLEND"/menu/"$PKG"
+	fi
+
+	for pkg in $DepPkgs ; do
+	    # if Blend maintainer provided override just continue
+	    [ ! -z "$blendmenufile" ] && grep -q -i "?package($pkg)" "$blendmenufile" && continue
+
+	    # check for documentation text of Blend maintainer which should
+	    # be prefered over package maintainers menu
+	    docfile=""
+	    if   [ -s /usr/share/doc/"$PKG"/"$pkg".html ] ; then
+		docfile=/usr/share/doc/"$PKG"/"$pkg".html
+	    elif [ -s /usr/share/doc/"$PKG"/"$pkg".txt ] ; then
+		docfile=/usr/share/doc/"$PKG"/"$pkg".txt
+	    elif [ -s /usr/share/doc/"$PKG"/"$pkg" ] ; then
+		docfile=/usr/share/doc/"$PKG"/"$pkg"
+	    fi
+	    # if Blend maintainer provides documentation view this as menu entry ...
+	    if [ ! -z "$docfile" -a -s "$docfile" ] ; then
+		hint=""
+		if file "$docfile" | grep -q HTML ; then
+		    senspager=sensible-browser
+		    hint=`GetHTMLTitle "$docfile"`
+		else
+		    senspager=sensible-pager
+		    hint=`GetTxtTitle "$docfile"`
+		fi
+		if [ ! -z "$hint" ] ; then
+		    hint="hints=\""$hint"\""
+		fi
+		# Force menu-1 entry in case before this was menu-2 used
+		cat <<EOT
+!C menu-1
+?package($pkg): needs="text" \\
+        section="$SECTION" \\
+	title="`NameToUpper "$pkg"`" $hint \\
+	command="$senspager $docfile"
+EOT
+	    fi
+
+	    # search for a menu file with the following priority
+	    # ${HOME}/.menu, /etc/menu, /usr/share/blends/${BLEND}/menu, /usr/share/menu, /usr/lib/menu
+	    pkgmenufile=""
+	    donotchange=1
+	    if   [ -s "$HOME"/.menu/"$pkg" ] ; then
+		pkgmenufile="$HOME"/.menu/"$pkg"
+	    elif [ -s /etc/menu/"$pkg" ] ; then
+		pkgmenufile=/etc/menu/"$pkg"
+	    elif [ -s /usr/share/blends/"$BLEND"/menu/"$pkg" ] ; then
+		pkgmenufile=/usr/share/blends/"$BLEND"/menu/"$pkg"
+		donotchange=0
+	    elif [ -s /usr/share/menu/"$pkg" ] ; then
+		pkgmenufile=/usr/share/menu/"$pkg"
+	    elif [ -s /usr/lib/menu/"$pkg" ] ; then
+		pkgmenufile=/usr/lib/menu/"$pkg"
+	    fi
+            if [ ! -z "$pkgmenufile" ] ; then
+		# Force menu-1 entry in case before this was menu-2 used
+		## if ! grep -q -c '^!C' $pkgmenufile ; then
+		echo '!C menu-1'
+		## fi
+		if [ $donotchange -eq 1 ] ; then
+		    # the 2. and 3. -e - expression tries to fix missing '"' around the entries
+		    sed -e "/^[[:space:]]*$/d" \
+			-e 's?\([ :][^=^ ]*=\) *\([^"^=]*\)\( [^=]\+=\)?\1"\2"\3?g' \
+			-e 's?\([ :][^=^ ]*=\) *\([^"^=]*\)\( [^=]\+=\)?\1"\2"\3?g' \
+			-e 's?\( [^=]\+=\) *\([^"^=]\+[^"^\]\)$?\1"\2"?' \
+			-e "s?\(section\)[[:space:]]*=[[:space:]]*\"*[^\"\\]*\"*?\1=\"$SECTION\"?" $pkgmenufile
+		else
+		    # strip possible comments
+		    grep -v "^[[:space:]]*#" $pkgmenufile
+		fi
+	    fi
+	    # HACK: Add blank line which helps in case of missing newlines
+	    echo
+	done
+
+	[ -s "$blendmenufile" ] && cat "$blendmenufile"
+}
+
+ALLBLENDS=`getBlendList`
+for BLEND in ${ALLBLENDS}; do
+	# read per Blend conf
+	test -f  ${CONFBASE}/${BLEND}/${BLEND}.conf && \
+		. ${CONFBASE}/${BLEND}/${BLEND}.conf
+
+	if [ -d "$tasksdir"/"$BLEND" ] ; then
+		for PKG in `ls "$tasksdir"/"$BLEND"` ; do
+			getMenuEntriesFromDependencies "$PKG"
+		done
+	fi
+
+#	# print on STDOUT menu generic entries if user belongs to Blend
+#	checkUserInBlend ${BLEND} ${BLENDUSER} && \
+#		test -d ${CONFBASE}/${BLEND}/menu/ && \
+#			find ${CONFBASE}/${BLEND}/menu/ -maxdepth 1 -mindepth 1 -type f \
+#				-exec cat {} \;
+#
+#	# and role specific menu entries
+#	for ROLE in `getUserRoles ${BLEND} ${BLENDUSER}`; do
+#		test -d ${CONFBASE}/${BLEND}/menu/${ROLE} &&
+#			find ${CONFBASE}/${BLEND}/menu/${ROLE} -maxdepth 1 -mindepth 1 \
+#				-type f -exec cat {} \;
+#	done
+done

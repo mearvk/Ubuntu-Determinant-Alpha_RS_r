@@ -1,0 +1,175 @@
+			     BASH PATCH REPORT
+			     =================
+
+Bash-Release:	5.1
+Patch-ID:	bash51-012
+
+Bug-Reported-by:	Nikolay Borisov <nborisov@suse.com>
+Bug-Reference-ID:	<1a715205-06ce-413b-c1c0-2f5639ce06c0@suse.com>
+Bug-Reference-URL:	https://lists.gnu.org/archive/html/bug-bash/2020-11/msg00091.html
+
+Bug-Description:
+
+There is a possible race condition that arises when a child process receives
+a signal trapped by the parent before it can reset the signal dispositions.
+The child process is not supposed to trap the signal in this circumstance.
+
+--- a/command.h
++++ b/command.h
+@@ -124,6 +124,7 @@ enum command_type { cm_for, cm_case, cm_
+ #define SUBSHELL_PROCSUB 0x20	/* subshell caused by <(command) or >(command) */
+ #define SUBSHELL_COPROC	0x40	/* subshell from a coproc pipeline */
+ #define SUBSHELL_RESETTRAP 0x80	/* subshell needs to reset trap strings on first call to trap */
++#define SUBSHELL_IGNTRAP 0x100  /* subshell should reset trapped signals from trap_handler */
+ 
+ /* A structure which represents a word. */
+ typedef struct word_desc {
+--- a/execute_cmd.c
++++ b/execute_cmd.c
+@@ -1547,6 +1547,9 @@ execute_in_subshell (command, asynchrono
+   clear_pending_traps ();
+   reset_signal_handlers ();
+   subshell_environment |= SUBSHELL_RESETTRAP;
++  /* Note that signal handlers have been reset, so we should no longer
++    reset the handler and resend trapped signals to ourselves. */
++  subshell_environment &= ~SUBSHELL_IGNTRAP;
+ 
+   /* We are in a subshell, so forget that we are running a trap handler or
+      that the signal handler has changed (we haven't changed it!) */
+@@ -4320,7 +4323,8 @@ execute_simple_command (simple_command,
+ 	  already_forked = 1;
+ 	  cmdflags |= CMD_NO_FORK;
+ 
+-	  subshell_environment = SUBSHELL_FORK;		/* XXX */
++	  /* We redo some of what make_child() does with SUBSHELL_IGNTRAP */
++	  subshell_environment = SUBSHELL_FORK|SUBSHELL_IGNTRAP;	/* XXX */
+ 	  if (pipe_in != NO_PIPE || pipe_out != NO_PIPE)
+ 	    subshell_environment |= SUBSHELL_PIPE;
+ 	  if (async)
+@@ -4574,6 +4578,7 @@ run_builtin:
+ 	     trap strings if we run trap to change a signal disposition. */
+ 	  reset_signal_handlers ();
+ 	  subshell_environment |= SUBSHELL_RESETTRAP;
++	  subshell_environment &= ~SUBSHELL_IGNTRAP;
+ 
+ 	  if (async)
+ 	    {
+@@ -5514,6 +5519,7 @@ execute_disk_command (words, redirects,
+       reset_terminating_signals ();	/* XXX */
+       /* Cancel traps, in trap.c. */
+       restore_original_signals ();
++      subshell_environment &= ~SUBSHELL_IGNTRAP;
+ 
+ #if defined (JOB_CONTROL)
+       FREE (p);
+--- a/jobs.c
++++ b/jobs.c
+@@ -2217,6 +2217,8 @@ make_child (command, flags)
+ 	 signals to the default state for a new process. */
+       pid_t mypid;
+ 
++      subshell_environment |= SUBSHELL_IGNTRAP;
++
+       /* If this ends up being changed to modify or use `command' in the
+ 	 child process, go back and change callers who free `command' in
+ 	 the child process when this returns. */
+--- a/nojobs.c
++++ b/nojobs.c
+@@ -575,6 +575,8 @@ make_child (command, flags)
+ 	last_asynchronous_pid = getpid ();
+ #endif
+ 
++      subshell_environment |= SUBSHELL_IGNTRAP;
++
+       default_tty_job_signals ();
+     }
+   else
+--- a/patchlevel.h
++++ b/patchlevel.h
+@@ -25,6 +25,6 @@
+    regexp `^#define[ 	]*PATCHLEVEL', since that's what support/mkversion.sh
+    looks for to find the patch level (for the sccs version string). */
+ 
+-#define PATCHLEVEL 11
++#define PATCHLEVEL 12
+ 
+ #endif /* _PATCHLEVEL_H_ */
+--- a/sig.c
++++ b/sig.c
+@@ -55,7 +55,8 @@
+ #  include "bashhist.h"
+ #endif
+ 
+-extern void initialize_siglist ();
++extern void initialize_siglist PARAMS((void));
++extern void set_original_signal PARAMS((int, SigHandler *));
+ 
+ #if !defined (JOB_CONTROL)
+ extern void initialize_job_signals PARAMS((void));
+@@ -255,6 +256,13 @@ initialize_terminating_signals ()
+       sigaction (XSIG (i), &act, &oact);
+       XHANDLER(i) = oact.sa_handler;
+       XSAFLAGS(i) = oact.sa_flags;
++
++#if 0
++      set_original_signal (XSIG(i), XHANDLER(i));	/* optimization */
++#else
++      set_original_signal (XSIG(i), act.sa_handler);	/* optimization */
++#endif
++
+       /* Don't do anything with signals that are ignored at shell entry
+ 	 if the shell is not interactive. */
+       /* XXX - should we do this for interactive shells, too? */
+--- a/subst.c
++++ b/subst.c
+@@ -5951,6 +5951,7 @@ process_substitute (string, open_for_rea
+       free_pushed_string_input ();
+       /* Cancel traps, in trap.c. */
+       restore_original_signals ();	/* XXX - what about special builtins? bash-4.2 */
++      subshell_environment &= ~SUBSHELL_IGNTRAP;
+       QUIT;	/* catch any interrupts we got post-fork */
+       setup_async_signals ();
+ #if 0
+@@ -6382,6 +6383,7 @@ command_substitute (string, quoted, flag
+ 	}	
+       QUIT;	/* catch any interrupts we got post-fork */
+       subshell_environment |= SUBSHELL_RESETTRAP;
++      subshell_environment &= ~SUBSHELL_IGNTRAP;
+     }
+ 
+ #if defined (JOB_CONTROL)
+--- a/trap.c
++++ b/trap.c
+@@ -481,6 +481,32 @@ trap_handler (sig)
+       SIGRETURN (0);
+     }
+ 
++  /* This means we're in a subshell, but have not yet reset the handler for
++     trapped signals. We're not supposed to execute the trap in this situation;
++     we should restore the original signal and resend the signal to ourselves
++     to preserve the Posix "signal traps that are not being ignored shall be
++     set to the default action" semantics. */
++  if ((subshell_environment & SUBSHELL_IGNTRAP) && trap_list[sig] != (char *)IGNORE_SIG)
++    {
++      sigset_t mask;
++
++      /* Paranoia */
++      if (original_signals[sig] == IMPOSSIBLE_TRAP_HANDLER)
++	original_signals[sig] = SIG_DFL;
++
++      restore_signal (sig);
++
++      /* Make sure we let the signal we just caught through */
++      sigemptyset (&mask);
++      sigprocmask (SIG_SETMASK, (sigset_t *)NULL, &mask);
++      sigdelset (&mask, sig);
++      sigprocmask (SIG_SETMASK, &mask, (sigset_t *)NULL);
++
++      kill (getpid (), sig);
++
++      SIGRETURN (0);
++    }
++
+   if ((sig >= NSIG) ||
+       (trap_list[sig] == (char *)DEFAULT_SIG) ||
+       (trap_list[sig] == (char *)IGNORE_SIG))

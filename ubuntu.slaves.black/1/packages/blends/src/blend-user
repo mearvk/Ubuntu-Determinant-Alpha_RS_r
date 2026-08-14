@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# $Id$
+
+usage () {
+   echo "Usage:   `basename $0` <action> <Blend> <user> [<Role>]"
+   echo	"action:  add|del"
+   echo "Blend:   `getBlendList|tr ' ' '|'`"
+   echo "user:    user of the system who should be added to the Blend"
+   echo "Role:    a registered Role for specified Blend"
+   echo "          (default: the one named like Blend)"
+}
+
+
+# the base dir for Blend conffiles, where script expects to find dirs named like
+# each registered Blend
+CONFBASE=${CONFBASE:-/etc/blends}
+
+# a local per Blend conf is sourced later, after argoument parsing
+. ${CONFBASE}/blends.conf
+
+
+# Check consistency of passed arguments
+if [ $# -eq 0 ] ; then
+   usage
+   exit 67 # EX_USAGE
+fi
+if [ "`toLower $1`" != "add" -a "`toLower $1`" != "del" ] ; then
+   echo "Missing or wrong action name."
+   echo
+   usage
+   exit 67 # EX_USAGE
+fi
+if [ -z "$2" ] ; then
+   echo "Missing blend name."
+   echo
+   usage
+   exit 67 # EX_USAGE
+fi
+if [ -z "$3" ] ; then
+   echo "Missing user name."
+   echo
+   usage
+   exit 67 # EX_USAGE
+fi
+
+ACTION=$1
+BLEND=$2
+BLENDUSER=$3
+ROLE=${4:-${BLEND}}
+
+# Now that we know the selected Blend, we can check if there is a local
+# configuration for it (ie differnt backend from the default one)
+test -n "${BLEND}" -a  -f ${CONFBASE}/${BLEND}/${BLEND}.conf &&
+	. ${CONFBASE}/${BLEND}/${BLEND}.conf
+
+if [ -n "${DBBACKEND}" ]; then
+	set -e
+	checkBlend ${BLEND} || blendFail $? "Debian Pure Blend ${BLEND} does not exist"
+	checkUser ${BLENDUSER} || blendFail $? "User ${BLENDUSER} does not exist"
+	checkRole ${ROLE} || blendFail $? "Role ${ROLE} does not exist"
+	checkRoleInBlend ${BLEND} ${ROLE} || \
+			blendFail $? "Blend (${BLEND}) and Role (${ROLE}) are not correct or incompatible with the selected backend"
+
+	if [ "`toLower ${ACTION}`" = "add" ]; then
+		setUserRole ${BLEND} ${BLENDUSER} ${ROLE} || \
+			blendFail $? "Failed to set user ${BLENDUSER} to role ${ROLE}"
+	elif [ "`toLower ${ACTION}`" = "del" ]; then
+		unsetUserRole ${BLEND} ${BLENDUSER} ${ROLE} || \
+			blendFail $? "Failed to unset user ${BLENDUSER} to role ${ROLE}"
+	fi
+
+	set +e
+else
+	# EX_USAGE
+	blendFail 67 "You choose to not use Roles"
+fi

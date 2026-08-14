@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/default.mk
+
+DISTDIR := $(DEB_SOURCE)-$(DEB_VERSION)
+
+%:
+	dh $@ --with python3,sphinxdoc
+
+override_dh_auto_build:
+	$(MAKE) -C doc html txt pdf
+	$(MAKE) -C sphinxdoc html
+	dh_auto_build
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	pytest-3 --doctest-modules
+	rm -f education # clean up test remnants
+endif
+
+override_dh_installchangelogs:
+	for pkgnews in $(DEB_SOURCE)-common $(DEB_SOURCE)-dev ; do \
+	    cp -a debian/$$pkgnews.NEWS.Debian debian/$$pkgnews/usr/share/doc/$$pkgnews/NEWS.Debian ; \
+	done
+	dh_installchangelogs
+
+override_dh_auto_clean:
+	$(MAKE) -C doc clean
+	$(MAKE) -C sphinxdoc clean
+	dh_auto_clean
+
+override_dh_compress:
+	dh_compress -X.pdf
+
+dist: get-orig-source
+
+get-orig-source:
+	if [ ! -f debian/changelog ] ; then \
+	    echo "File debian/changelog is missing. Something is wrong!" ; \
+	    exit -1 ; \
+	fi
+	if [ "$(DEB_VERSION)" = "" ] ; then \
+	    echo "Unable to obtain version number from debian/changelog. Something is wrong!" ; \
+	    exit -1 ; \
+	fi ;
+	rm -rf $(DISTDIR)
+	mkdir $(DISTDIR)
+	chmod 777 $(DISTDIR)
+	rsync -a --exclude $(DISTDIR) --exclude CVS --exclude .svn --exclude svn-commit.tmp * $(DISTDIR)
+	ln -sf sources.list.unstable $(DISTDIR)/sources.list
+	# ln -s control.stub $(DISTDIR)/examples/debian/control
+	rm -f `find . -name "*~"`
+	GZIP=-9 tar -czf ../$(DEB_SOURCE)_$(DEB_VERSION).tar.gz $(DISTDIR)
+	rm -rf $(DISTDIR)

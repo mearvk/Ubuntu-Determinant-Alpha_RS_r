@@ -1,0 +1,45 @@
+#!/bin/sh
+# This program extracts from upstream GNU Bison source release the files needed
+# to build the non-DFSG-free documentation.  This program was originally
+# developed against Bison 3.0.4.
+
+# Command line check.
+if [ $# -ne 2 ] || [ "$1" != "--upstream-version" ]; then
+    echo "$0: This script must be called via uscan with watch version 4." >&2
+    exit 1
+fi
+rversion="$2"
+version="${rversion%+*}"
+
+# Create a temporary directory and delete it on exit.
+temp="$(mktemp -d)"
+trap '! [ -d "${temp}" ] || rm -rf -- "${temp}"' EXIT
+
+opackage="bison-${version}"
+npackage="bison-doc-${version}"
+otarball="../bison-${version}.tar.xz"
+ntarball="../bison-doc_${rversion}.orig.tar.xz"
+opath="${temp}/${opackage}"
+npath="${temp}/${npackage}"
+
+tar -C "${temp}" -Jxf "${otarball}"
+mkdir -p "${npath}/build-aux"
+mkdir -p "${npath}/doc"
+
+# These files are under GFDL with Front-Cover and Back-Cover Texts.
+mv \
+  "${opath}/doc/bison.info" \
+  "${opath}/doc/bison.texi" \
+  "${opath}/doc/figs" \
+  "${npath}/doc"
+
+# These files are needed to build the texi documentation.
+mv "${opath}"/build-aux/texinfo.tex "${npath}/build-aux"
+mv "${opath}"/doc/*.texi "${npath}/doc"
+
+# These files are used with GFDL documentation.
+mv "${opath}/examples" "${npath}"
+
+# Clean up mk-origtargz symlinks and repack.
+rm -f "${ntarball}" "${ntarball}.asc"
+tar -C "${temp}" -Jcf "${ntarball}" "${npackage}"

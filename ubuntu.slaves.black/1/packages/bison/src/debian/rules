@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+#export DH_OPTIONS=-v
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+SRCDIR = $(CURDIR)
+DESTDIR = $(CURDIR)/debian/tmp
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	[ ! -f $(SRCDIR)/Makefile ] || dh_auto_clean
+
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-silent-rules
+
+execute_before_dh_autoreconf:
+	echo '@setfilename bison.info' > $(SRCDIR)/doc/bison.texi
+
+execute_before_dh_auto_build:
+	# Touch all files in the dependency tree of bison.info to
+	# inhibit makeinfo invocation in the build process.
+	install -d $(SRCDIR)/doc/figs
+	touch --date="Jan 01 2000" \
+		$(SRCDIR)/doc/bison.info \
+		$(SRCDIR)/doc/bison.help \
+		$(SRCDIR)/doc/figs/example.txt \
+		$(SRCDIR)/doc/figs/example-reduce.txt \
+		$(SRCDIR)/doc/figs/example-shift.txt \
+		$(SRCDIR)/doc/*.texi \
+		$(SRCDIR)/build-aux/cross-options.pl \
+		$(SRCDIR)/src/getargs.c
+
+execute_after_dh_auto_install:
+	$(RM) -R $(DESTDIR)/usr/share/info/
+	mv $(DESTDIR)/usr/bin/yacc $(DESTDIR)/usr/bin/bison.yacc
+	mv $(DESTDIR)/usr/share/man/man1/yacc.1 \
+		$(DESTDIR)/usr/share/man/man1/bison.yacc.1

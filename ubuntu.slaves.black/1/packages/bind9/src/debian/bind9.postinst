@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = configure ]; then
+    # lets give them a bind user/group in all cases.
+    getent group bind >/dev/null 2>&1 || addgroup --system bind
+    getent passwd bind >/dev/null 2>&1 ||
+	adduser --system --home /var/cache/bind --no-create-home \
+		--disabled-password --ingroup bind bind
+
+    # create data directory on fresh install
+    if [ -z "$2" ]; then
+	mkdir -p /var/lib/bind
+	chown root:bind /var/lib/bind
+	chmod 775 /var/lib/bind
+    fi
+
+    if [ ! -s /etc/bind/rndc.key ] && [ ! -s /etc/bind/rndc.conf ]; then
+	rndc-confgen -a
+    fi
+
+    uid=$(ls -ln /etc/bind/rndc.key | awk '{print $3}')
+    if [ "$uid" = "0" ]; then
+	chown bind /etc/bind/rndc.key
+	chgrp bind /etc/bind
+	chmod g+s /etc/bind
+	chgrp bind /etc/bind/rndc.key /var/cache/bind
+	chgrp bind /etc/bind/named.conf* || true
+	chmod g+r /etc/bind/rndc.key /etc/bind/named.conf* || true
+	chmod g+rwx /var/cache/bind
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

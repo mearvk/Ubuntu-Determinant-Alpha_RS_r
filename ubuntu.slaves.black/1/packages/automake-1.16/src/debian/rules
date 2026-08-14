@@ -1,0 +1,49 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+package=automake
+version=1.16
+infodir=doc
+source_date = $(shell date -d "@$(SOURCE_DATE_EPOCH)")
+
+%:
+	dh $@ --without autoreconf --no-parallel
+
+ifeq ($(DEB_BUILD_PROFILE),stage1)
+MAKEINFO=true
+export MAKEINFO
+endif
+
+override_dh_auto_test:
+# Don't run the test suite, too many tests are flaky at the moment
+
+override_dh_auto_configure:
+	./bootstrap
+	dh_auto_configure
+ifneq ($(DEB_BUILD_PROFILE),stage1)
+# Touch with SOURCE_DATE_EPOCH so version.texi is generated with a stable
+# date.
+	touch -d "$(source_date)" doc/automake.texi
+endif
+
+override_dh_auto_build:
+ifeq ($(DEB_BUILD_PROFILE),stage1)
+	touch doc/automake.info
+endif
+	dh_auto_build
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(CURDIR)/debian/tmp
+#  remove automake's versions
+	rm -f $(CURDIR)/debian/tmp/usr/share/automake-$(version)/config.sub
+	rm -f \
+		$(CURDIR)/debian/tmp/usr/share/automake-$(version)/config.guess
+ifneq ($(DEB_BUILD_PROFILE),stage1)
+# Rebuild the info files
+	cd $(infodir) && makeinfo automake.texi
+endif
+
+override_dh_auto_clean:
+	[ -f Makefile ] && dh_auto_clean || true
+	rm -f $(infodir)/automake-$(version).info*

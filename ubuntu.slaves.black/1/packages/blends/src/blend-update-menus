@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# $Id$
+
+usage() {
+   echo "Usage: `basename $0` [ -u <user> | -b <Blend> ]"
+   echo "Blend: `getBlendList|tr ' ' '|'`"
+   echo "user:  system user registerd to a Blend"
+   echo
+   echo "run as user updates only the user's menu script"
+}
+
+# the base dir for Blends conffiles, where script expects to find dirs named like
+# each registered Blend
+CONFBASE=${CONFBASE:-/etc/blends}
+
+# a local per Blend conf is sourced later, after argument parsing
+if [ ! -s ${CONFBASE}/blends.conf ] ; then
+    echo "File ${CONFBASE}/blends.conf is missing.  Please check installation of package blends-common."
+    exit 13
+fi
+. ${CONFBASE}/blends.conf
+
+# specific utilities for blend-update-menus
+if [ ! -s ${SHAREDIR}/blend-update-menus ] ; then
+    echo "File ${SHAREDIR}/blend-update-menus is missing.  Please check installation of package blends-common."
+    exit 13
+fi
+. ${SHAREDIR}/blend-update-menus
+
+# Get command line arguments
+GETOPT=`getopt -o b:d:u:h --long blend:,user:,help -n "$0" -- "$@"`
+eval set -- "$GETOPT"
+while true
+do
+	case $1 in
+		-h|--help)
+            usage
+            exit 0
+            ;;
+		# get blend name
+		# for compatibility reasons we need to handle -d option
+		# here as well because postrm of previousely installed
+		# CDDs are using this option
+		-b|--blend|-d)
+			if ! amI root; then
+				blendLog "You must be root to specify --blend parameter"
+				blendLog ""
+				usage
+				exit 64
+			elif [ -n "${BLENDUSER}" ]; then
+				blendLog "You cannot specify --blend and --user at the same time" 
+				blendLog ""
+				usage
+				exit 0
+			else
+				BLEND=$2
+				shift 2
+			fi
+			;;
+		# get user name
+		-u|--user)
+			BLENDUSER=$2
+			shift 2
+
+			if ! amI root && ! amI "${BLENDUSER}"; then
+				blendLog  "You must be root to specify --user parameter with a user that's not you"
+				usage
+				exit 64
+			elif [ "${BLENDUSER}" == 'root' ]; then
+				blendFail 64 "err: Menus for user 'root' cannot be updated"
+			elif [ -n "${BLEND}" ]; then
+				usage
+				exit 0
+			fi
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			blendLog "$1 not recognized as option" >&2
+			exit 67 # EX_USAGE
+			;;
+	esac
+done
+
+
+# update menu scripts for BLENDUSER, for any Blend, if any
+if [ -n "${BLENDUSER}" ]; then
+	SYSSCRIPT="${SHAREDIR}/menu/blend-menu"
+	USERSCRIPT="`getUserHome ${BLENDUSER}`/.menu/blend-menu"
+
+	set -e
+	checkUser ${BLENDUSER} || \
+		blendFail 67 "User does not exist"
+	isUserRegistered ${BLENDUSER} || \
+		blendFail 67 "User ${BLENDUSER} is not registered to any Blend"
+
+	# there's nothing to do on per user basis criteria
+	#updateUser ${BLENDUSER} "${SYSSCRIPT}" "${USERSCRIPT}"
+	set +e
+
+# update menu scripts for any user registered into the specified Blend
+elif [ -n "${BLEND}" ]; then
+	# Now that we know the selected Blend, we can check if there is a local
+	# configuration for it (ie differnt backend from the default one)
+	test -n "${BLEND}" -a  -f ${CONFBASE}/${BLEND}/${BLEND}.conf &&
+		. ${CONFBASE}/${BLEND}/${BLEND}.conf
+
+	set -e
+	checkBlend ${BLEND} || \
+		blendFail $? "Debian Pure Blend ${BLEND} does not exist"
+
+	# there's nothing to do on per Blend basis criteria
+	#SYSSCRIPT="${SHAREDIR}/menu/blend-menu"
+	#updateBlend ${BLEND} "${SYSSCRIPT}"
+	set +e
+else
+    exec $0 --user `whoami`
+fi
