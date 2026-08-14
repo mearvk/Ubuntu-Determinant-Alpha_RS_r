@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+
+PYVER := $(shell py3versions -d)
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,--as-needed
+
+ifneq ($(DEB_BUILD_MULTIARCH),$(DEB_HOST_MULTIARCH))
+export _PYTHON_HOST_PLATFORM = $(DEB_HOST_GNU_CPU)
+export _PYTHON_SYSCONFIGDATA_NAME = $(shell basename -s .py /usr/lib/$(PYVER)/_sysconfigdata__*_$(DEB_HOST_MULTIARCH).py)
+endif
+
+%:
+	dh $@
+
+override_dh_clean:
+	dh_clean
+	rm -rf python/build
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--with-securedir=/lib/$(DEB_HOST_MULTIARCH)/security \
+		--with-python-binary=python3 \
+		--with-python-rev=$(subst python,,$(PYVER)) \
+		--with-pythonsitedir=/usr/lib/$(PYVER)/dist-packages/
+
+override_dh_install:
+	find debian/tmp -name '*.a' -print -delete
+	find debian/tmp -name '*.la' -print -delete
+	dh_install
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+override_dh_gnome:
+	dh_gnome --no-gnome-versions

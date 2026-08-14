@@ -1,0 +1,121 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# debian/rules for libpaper
+
+export DH_OPTIONS=
+
+include /usr/share/dpkg/architecture.mk
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+package	:= $(firstword $(shell dh_listpackages))
+prefix	:= $(CURDIR)/debian/tmp
+share	:= /usr/share
+
+config_flags	:= --prefix=/usr \
+	--libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
+	--sysconfdir=/etc \
+	--mandir=$(share)/man \
+	--infodir=$(share)/info \
+	--build=$(DEB_BUILD_GNU_TYPE)
+ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
+cross_config_flags	:=
+native_paperconf	:= debian/build/src/paperconf
+else
+cross_config_flags	:= --host=$(DEB_HOST_GNU_TYPE)
+native_paperconf	:= debian/build-native/src/paperconf
+endif
+
+version	:= $(shell dpkg-parsechangelog | \
+			sed -ne 's/^Version: *\([0-9]\+:\)*//p')
+
+tag:
+	cvs tag -c -F $(subst .,_,debian_version_$(version))
+ifeq ($(findstring -,$(version)),)
+	cvs tag -c -F $(subst .,_,upstream_version_$(version))
+endif
+
+config:	config-stamp
+config-stamp:
+	dh_testdir
+	dh_autoreconf
+	mkdir -p debian/build
+	cd debian/build && \
+		$(SHELL) ../../configure $(config_flags) $(cross_config_flags)
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	mkdir -p debian/build-native
+	cd debian/build-native && $(SHELL) ../../configure $(config_flags)
+endif
+	touch $@
+
+build-indep:	config libpaper1.config-stamp
+	$(MAKE) -C debian/build
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	$(MAKE) -C debian/build-native
+endif
+	touch $@
+
+build-arch:	build-indep
+build: build-arch
+
+libpaper1.config-stamp:
+	exec > debian/libpaper1.config.new \
+		&& sed -n '1,/^__BEGIN_PAPERSPECS__/p' debian/libpaper1.config \
+		&& cat lib/paperspecs \
+		&& sed -n '/^__END_PAPERSPECS__/,$$p' debian/libpaper1.config
+	mv debian/libpaper1.config.new debian/libpaper1.config
+	touch libpaper1.config-stamp
+
+clean:	checkroot
+	rm -f *-stamp build-indep
+	[ ! -f Makefile ] || $(MAKE) distclean
+	rm -rf debian/build debian/build-native
+	dh_autoreconf_clean
+	dh_clean
+	exec > debian/libpaper1.config.new \
+		&& sed -n '1,/^__BEGIN_PAPERSPECS__/p' debian/libpaper1.config \
+		&& sed -n '/^__END_PAPERSPECS__/,$$p' debian/libpaper1.config
+	mv debian/libpaper1.config.new debian/libpaper1.config
+
+binary-indep:	DH_OPTIONS=-i
+binary-indep:	checkroot build-indep
+	dh_prep
+	dh_installdirs
+
+	dh_link
+
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary-arch:	DH_OPTIONS=-a
+binary-arch:	checkroot build-arch
+	dh_prep
+	dh_installdirs
+
+	$(MAKE) -C debian/build install DESTDIR=$(prefix)
+
+	dh_install
+
+	dh_installchangelogs
+	dh_installdocs
+
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_makeshlibs
+	dh_installdebconf
+	dh_installdeb
+	dh_shlibdeps -L$(package) -ldebian/$(package)/usr/lib/$(DEB_HOST_MULTIARCH)
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_lintian -p libpaper1
+	dh_lintian -p libpaper-utils
+
+#binary: binary-indep binary-arch
+binary: binary-arch
+
+.PHONY:	binary binary-indep binary-arch clean checkroot build config tag

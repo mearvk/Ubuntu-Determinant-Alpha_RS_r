@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed -Wl,-O1 -Wl,-z,defs
+export QT_SELECT := 5
+
+include /usr/share/dpkg/default.mk
+
+PYVER=$(shell py3versions -vd)
+
+%:
+	dh $@ --with python3 --no-parallel
+
+override_dh_auto_configure:
+	dh_auto_configure -- PYTHON_VERSION=$(PYVER) PYTHON=python3 CYTHON=/usr/bin/cython3
+
+override_dh_auto_build:
+	dh_auto_build
+	doxygen doxygen.cfg
+
+override_dh_install:
+	# Remove files we won't install
+	rm -f $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/plist.a
+	rm -f $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/plist.la
+	rm -f $(CURDIR)/debian/tmp/usr/lib/*/*.la
+	rm -f $(CURDIR)/debian/tmp/usr/lib/*/*.a
+	# Symlinks old names for compatibility
+	ln -s libplist-2.0.so debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist.so
+	ln -s libplist-2.0.so.3 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist.so.3
+	ln -s libplist-2.0.so.3.3.0 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist.so.3.3.0
+	ln -s libplist++-2.0.so debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist++.so
+	ln -s libplist++-2.0.so.3 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist++.so.3
+	ln -s libplist++-2.0.so.3.3.0 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libplist++.so.3.3.0
+	ln -s libplist++-2.0.pc debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libplist++.pc
+	ln -s libplist-2.0.pc debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libplist.pc
+
+	# Continue with dh_install
+	dh_install
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf docs/html
+	rm -f test/data/*.out
+
+#override_dh_auto_test:
+#Make the test suit fatal on supported arches (See README.Debian)
+#ifneq (,$(filter $(DEB_HOST_ARCH),amd64 i386 kfreebsd-amd64 kfreebsd-amd64))
+#	dh_auto_test
+#else
+#	dh_auto_test || true
+#endif

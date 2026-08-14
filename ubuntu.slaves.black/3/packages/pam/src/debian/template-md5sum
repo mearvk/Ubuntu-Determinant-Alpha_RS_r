@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+use IPC::Open2;
+
+
+	my($template) = @ARGV;
+	my $state = 0;
+
+	open(INPUT,$template) || return '';
+	my($md5sum_fd,$output_fd);
+	my $pid = open2($md5sum_fd, $output_fd, 'md5sum');
+	return '' if (!$pid);
+
+	while (<INPUT>) {
+		if ($state == 1) {
+			if (/^# here's the fallback if no module succeeds/) {
+				print $output_fd $_;
+				$state++;
+			}
+			next;
+		}
+		if ($state == 3) {
+			if (/^# end of pam-auth-update config/) {
+				print $output_fd $_;
+				$state++;
+			}
+			next;
+		}
+
+		print $output_fd $_;
+
+		my ($pattern,$val);
+		if ($state == 0) {
+			$pattern = '^# here are the per-package modules \(the "Primary" block\)';
+		} elsif ($state == 2) {
+			$pattern = '^# and here are more per-package modules \(the "Additional" block\)';
+		} else {
+			next;
+		}
+
+		if (/$pattern/) {
+			$state++;
+		}
+	}
+	close(INPUT);
+	close($output_fd);
+	my $md5sum = <$md5sum_fd>;
+	close($md5sum_fd);
+	waitpid $pid, 0;
+
+	$md5sum = (split(/\s+/,$md5sum))[0];
+	print $md5sum;

@@ -1,0 +1,119 @@
+Description: Deprecate pam_unix' explicit "usergroups" option and instead read it from /etc/login.def's "USERGROUP_ENAB" option if umask is only defined there. This restores compatibility with the pre-PAM behaviour of login. See https://blueprints.launchpad.net/ubuntu/+spec/umask-to-0002.
+Author: Martin Pitt <martin.pitt@ubuntu.com>
+Bug-Debian: http://bugs.debian.org/583958
+Last-Update: 2019-02-12
+
+=== modified file 'modules/pam_umask/pam_umask.c'
+Index: pam/modules/pam_umask/pam_umask.c
+===================================================================
+--- pam.orig/modules/pam_umask/pam_umask.c
++++ pam/modules/pam_umask/pam_umask.c
+@@ -94,6 +94,8 @@ static int
+ get_options (pam_handle_t *pamh, options_t *options,
+ 	     int argc, const char **argv)
+ {
++  char *result;
++
+   memset (options, 0, sizeof (options_t));
+ 
+   options->usergroups = DEFAULT_USERGROUPS_SETTING;
+@@ -103,7 +105,24 @@ get_options (pam_handle_t *pamh, options
+     parse_option (pamh, *argv, options);
+ 
+   if (options->umask == NULL)
+-    options->umask = pam_modutil_search_key (pamh, LOGIN_DEFS, "UMASK");
++    {
++      options->umask = pam_modutil_search_key (pamh, LOGIN_DEFS, "UMASK");
++      /* login.defs' USERGROUPS_ENAB will modify the UMASK setting there by way
++       * of usergroups; but we don't want it to influence umask definitions
++       * from other places (like GECOS). This restores compatibility with
++       * shadow from the pre-PAM age.
++       */
++      if (options->umask != NULL)
++	{
++	  result = pam_modutil_search_key (pamh, LOGIN_DEFS, "USERGROUPS_ENAB");
++	  if (result != NULL)
++	    {
++	      options->usergroups = (strcasecmp (result, "yes") == 0);
++	      free (result);
++	    }
++	}
++    }
++
+   if (options->umask == NULL)
+     options->umask = pam_modutil_search_key (pamh, LOGIN_CONF, "UMASK");
+ 
+Index: pam/modules/pam_umask/pam_umask.8.xml
+===================================================================
+--- pam.orig/modules/pam_umask/pam_umask.8.xml
++++ pam/modules/pam_umask/pam_umask.8.xml
+@@ -61,7 +61,8 @@
+         </listitem>
+         <listitem>
+           <para>
+-            UMASK entry from /etc/login.defs
++            UMASK entry from /etc/login.defs (influenced by USERGROUPS_ENAB in
++	    /etc/login.defs)
+           </para>
+         </listitem>
+         <listitem>
+@@ -118,6 +119,11 @@
+               If the user is not root and the username is the same as
+               primary group name, the umask group bits are set to be the
+               same as owner bits (examples: 022 -> 002, 077 -> 007).
++	      Note that using this option explicitly is discouraged. pam_umask
++	      enables this functionality by default if /etc/login.defs enables
++	      USERGROUPS_ENAB, and the umask is not set explicitly in other
++	      places than /etc/login.defs (this is compatible with login's
++	      behaviour without PAM).
+             </para>
+           </listitem>
+         </varlistentry>
+Index: pam/modules/pam_umask/pam_umask.8
+===================================================================
+--- pam.orig/modules/pam_umask/pam_umask.8
++++ pam/modules/pam_umask/pam_umask.8
+@@ -68,7 +68,7 @@ umask= argument
+ .sp -1
+ .IP \(bu 2.3
+ .\}
+-UMASK entry from /etc/login\&.defs
++UMASK entry from /etc/login\&.defs (influenced by USERGROUPS_ENAB in /etc/login\&.defs)
+ .RE
+ .sp
+ .RS 4
+@@ -98,7 +98,7 @@ Don\*(Aqt print informative messages\&.
+ .PP
+ \fBusergroups\fR
+ .RS 4
+-If the user is not root and the username is the same as primary group name, the umask group bits are set to be the same as owner bits (examples: 022 \-> 002, 077 \-> 007)\&.
++If the user is not root and the username is the same as primary group name, the umask group bits are set to be the same as owner bits (examples: 022 \-> 002, 077 \-> 007)\&. Note that using this option explicitly is discouraged\&. pam_umask enables this functionality by default if /etc/login\&.defs enables USERGROUPS_ENAB, and the umask is not set explicitly in other places than /etc/login\&.defs (this is compatible with login\*(Aqs behaviour without PAM)\&.
+ .RE
+ .PP
+ \fBnousergroups\fR
+Index: pam/modules/pam_umask/README
+===================================================================
+--- pam.orig/modules/pam_umask/README
++++ pam/modules/pam_umask/README
+@@ -15,7 +15,8 @@ following order:
+ 
+   • umask= argument
+ 
+-  • UMASK entry from /etc/login.defs
++  • UMASK entry from /etc/login.defs (influenced by USERGROUPS_ENAB in /etc/
++    login.defs)
+ 
+   • UMASK= entry from /etc/default/login
+ 
+@@ -38,7 +39,10 @@ usergroups
+ 
+     If the user is not root and the username is the same as primary group name,
+     the umask group bits are set to be the same as owner bits (examples: 022 ->
+-    002, 077 -> 007).
++    002, 077 -> 007). Note that using this option explicitly is discouraged.
++    pam_umask enables this functionality by default if /etc/login.defs enables
++    USERGROUPS_ENAB, and the umask is not set explicitly in other places than /
++    etc/login.defs (this is compatible with login's behaviour without PAM).
+ 
+ nousergroups
+ 

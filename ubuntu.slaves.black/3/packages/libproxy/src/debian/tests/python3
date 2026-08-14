@@ -1,0 +1,34 @@
+#!/bin/bash
+# Copyright 2020 Simon McVittie
+# SPDX-License-Identifier: LGPL-2.1+
+
+set -eux
+set -o pipefail
+
+export _MM_DEBUG=1
+export _PX_DEBUG=1
+
+unset DESKTOP_SESSION
+unset FTP_PROXY
+unset GNOME_DESKTOP_SESSION_ID
+unset HTTPS_PROXY
+unset HTTP_PROXY
+unset KDE_FULL_SESSION
+unset NO_PROXY
+unset ftp_proxy
+unset http_proxy
+unset https_proxy
+unset no_proxy
+
+if [ $# -lt 1 ]; then
+    set -- python3
+fi
+
+for python in "$@"; do
+    answer="$(http_proxy=http://proxy.example.net https_proxy=http://sslproxy.example.net "$python" ./debian/tests/resolve-proxy.py http://example.com)"
+    test "$answer" = http://proxy.example.net
+    answer="$(http_proxy=http://proxy.example.net https_proxy=http://sslproxy.example.net "$python" ./debian/tests/resolve-proxy.py https://example.com)"
+    test "$answer" = http://sslproxy.example.net
+    answer="$(http_proxy=http://proxy.example.net no_proxy=example.com "$python" ./debian/tests/resolve-proxy.py https://example.com)"
+    test "$answer" = direct://
+done

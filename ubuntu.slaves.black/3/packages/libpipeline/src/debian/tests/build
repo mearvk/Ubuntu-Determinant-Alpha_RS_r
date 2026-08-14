@@ -1,0 +1,34 @@
+#! /bin/sh
+# autopkgtest check: Build and run a program against libpipeline, to verify
+# that the headers and pkg-config file are installed correctly
+# (C) 2013 Vibhav Pant
+# Author: Vibhav Pant <vibhavp@ubuntu.com>
+
+set -e
+
+CROSS_COMPILE="${DEB_HOST_GNU_TYPE:+$DEB_HOST_GNU_TYPE-}"
+
+WORKDIR="$(mktemp -d)"
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+cat <<EOF > libpipeline_test.c
+#include <pipeline.h>
+#include <assert.h>
+
+int main (int argc, char **argv)
+{
+	pipeline *p;
+	p = pipeline_new ();
+	pipeline_command_args (p, "true", NULL);
+	assert (pipeline_run (p) == 0);
+	return 0;
+}
+
+EOF
+
+${CROSS_COMPILE}gcc -o libpipeline_test libpipeline_test.c \
+	$(${CROSS_COMPILE}pkg-config --cflags --libs libpipeline) -Wall -Werror
+echo "build: OK"
+[ -x libpipeline_test ]
+./libpipeline_test
+echo "run: OK"

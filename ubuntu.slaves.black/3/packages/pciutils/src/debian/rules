@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/architecture.mk
+
+confflags =
+confflags += OPT="$(CFLAGS)"
+confflags += SHARED=yes
+confflags += HOST=$(DEB_HOST_GNU_CPU)-$(DEB_HOST_GNU_SYSTEM)
+ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+export PKG_CONFIG = $(DEB_HOST_GNU_TYPE)-pkg-config
+confflags += CROSS_COMPILE=$(DEB_HOST_GNU_TYPE)-
+endif
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+confflags += LIBKMOD=yes
+confflags += HWDB=yes
+endif
+confflags += PREFIX=/usr
+confflags += LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH)
+confflags += INCDIR=/usr/include/$(DEB_HOST_MULTIARCH)
+confflags += SBINDIR=/usr/bin
+confflags += IDSDIR=/usr/share/misc
+
+# These two are supposed to override only the update-pciids generator to force
+# a non compressed database.
+buildflags =
+buildflags += PCI_COMPRESSED_IDS=0
+buildflags += PCI_IDS=pci.ids
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	dh_auto_build -- $(confflags) $(buildflags)
+
+override_dh_auto_install:
+	dh_auto_install -- $(confflags) install-lib
+
+ifeq (,$(filter noudeb,$(DEB_BUILD_PROFILES)))
+	# pciutils-udeb
+	# Reduce by removing subsystem ids and comments.
+	cat /usr/share/misc/pci.ids | \
+	  perl -ne 'print unless /^(\s*#|\s*$|\t\t)/' | \
+	  gzip -9n >debian/pciutils-udeb/usr/share/misc/pci.ids.gz
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs -a -V 'libpci3 (>= 1:3.5.2-1)'

@@ -1,0 +1,39 @@
+#!/bin/sh
+# Copyright © 2020 Collabora Ltd.
+# Copyright © 2020 Guillem Jover <guillem@debian.org>
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+set -e
+set -u
+set -x
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+  CC="$DEB_HOST_GNU_TYPE-gcc"
+  PKG_CONFIG="$DEB_HOST_GNU_TYPE-pkg-config"
+else
+  CC=gcc
+  PKG_CONFIG=pkg-config
+fi
+
+CFLAGS="-Wall -g -O2 -D_GNU_SOURCE"
+LIBS=$($PKG_CONFIG --cflags --libs libpci)
+
+cd "$AUTOPKGTEST_TMP"
+
+cat <<EOF >test-libpci.c
+#include <pci/pci.h>
+
+int main(void)
+{
+  struct pci_access *a;
+  a = pci_alloc();
+  pci_init(a);
+  pci_cleanup(a);
+  return 0;
+}
+EOF
+
+# Test building minimal code against the installed library.
+$CC $CFLAGS -o test-dynamic test-libpci.c $LIBS
+ test -x ./test-dynamic
+./test-dynamic

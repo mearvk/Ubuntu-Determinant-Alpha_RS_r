@@ -1,0 +1,31 @@
+commit d54870f993e97fe75e2cd0470a3701d5af22877c
+Author: Changqing Li <changqing.li@windriver.com>
+Date:   Tue Jan 12 14:45:34 2021 +0800
+
+    faillock: create tallydir before creating tallyfile
+    
+    The default tallydir is "/var/run/faillock", and this default
+    tallydir may not exist.
+    
+    Function open may fail as tallydir does not exist when creating
+    the tallyfile. Therefore, faillock will not work well.
+    
+    Fix this problem by creating tallydir before creating tallyfile
+    when the tallydir does not exist.
+    
+    Signed-off-by: Changqing Li <changqing.li@windriver.com>
+
+Index: pam/modules/pam_faillock/faillock.c
+===================================================================
+--- pam.orig/modules/pam_faillock/faillock.c
++++ pam/modules/pam_faillock/faillock.c
+@@ -74,6 +74,9 @@ open_tally (const char *dir, const char
+ 
+ 	if (create) {
+ 		flags |= O_CREAT;
++		if (access(dir, F_OK) != 0) {
++			mkdir(dir, 0755);
++		}
+ 	}
+ 
+ 	fd = open(path, flags, 0600);

@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+export with_pcap=linux
+endif
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
+export with_pcap=bpf
+endif
+ifeq ($(DEB_HOST_ARCH_OS),hurd)
+export with_pcap=hurd
+endif
+
+%:
+	dh $@
+
+override_dh_install-arch:
+	dh_install
+	# pcap-filter man page goes into libpcap0.8 (#527599)
+	rm debian/libpcap0.8-dev/usr/share/man/man7/pcap-filter.7
+
+override_dh_strip-arch:
+	dh_strip --dbgsym-migration='libpcap0.8-dbg (<< 1.10.1-3~)'
+
+override_dh_makeshlibs-arch:
+	dh_makeshlibs -- -c4

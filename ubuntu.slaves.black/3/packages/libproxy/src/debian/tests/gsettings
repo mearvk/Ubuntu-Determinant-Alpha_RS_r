@@ -1,0 +1,65 @@
+#!/bin/bash
+# Copyright 2020 Simon McVittie
+# SPDX-License-Identifier: LGPL-2.1+
+
+set -eux
+set -o pipefail
+
+export _MM_DEBUG=1
+export _PX_DEBUG=1
+
+reset () {
+    unset DESKTOP_SESSION
+    unset FTP_PROXY
+    unset GNOME_DESKTOP_SESSION_ID
+    unset GSETTINGS_BACKEND
+    unset HTTPS_PROXY
+    unset HTTP_PROXY
+    unset KDE_FULL_SESSION
+    unset NO_PROXY
+    unset ftp_proxy
+    unset http_proxy
+    unset https_proxy
+    unset no_proxy
+}
+
+reset
+export DESKTOP_SESSION=gnome
+export GSETTINGS_BACKEND=keyfile
+export XDG_CONFIG_HOME="$AUTOPKGTEST_TMP/config"
+mkdir -p "$XDG_CONFIG_HOME/glib-2.0/settings"
+cat > "$XDG_CONFIG_HOME/glib-2.0/settings/keyfile" <<'EOF'
+[system/proxy]
+autoconfig-url=''
+ignore-hosts=['localhost']
+mode='manual'
+use-same-proxy=false
+
+[system/proxy/ftp]
+host='ftpproxy.example.net'
+port=8000
+
+[system/proxy/http]
+host='proxy.example.net'
+port=8000
+
+[system/proxy/https]
+host='sslproxy.example.net'
+port=8000
+
+[system/proxy/socks]
+host='socksproxy.example.net'
+port=8000
+EOF
+
+answer="$(proxy http://example.com)"
+test "${answer}" = "http://proxy.example.net:8000 socks://socksproxy.example.net:8000"
+
+answer="$(proxy https://example.com)"
+test "${answer}" = "http://sslproxy.example.net:8000 socks://socksproxy.example.net:8000"
+
+answer="$(proxy ftp://ftp.example.com)"
+test "${answer}" = "http://ftpproxy.example.net:8000 socks://socksproxy.example.net:8000"
+
+answer="$(proxy http://localhost)"
+test "${answer}" = direct://

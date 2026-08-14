@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+#export DH_VERBOSE = 1
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DPKG_EXPORT_BUILDFLAGS	 = yes
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/architecture.mk
+
+# Upstream does not use CPPFLAGS
+CFLAGS	+= $(CPPFLAGS)
+
+# architecture mapping $(DEB_HOST_ARCH) => libpfm4 ARCH
+# in case that can't be derived from the cpu correctly
+# e.g. cross-compiling for a 32-bit architecture on a 64-bit cpu
+LIBPFM4_ARCH_armel	 = arm
+LIBPFM4_ARCH_armhf	 = arm
+LIBPFM4_ARCH_i386	 = i386
+LIBPFM4_ARCH_ppc64el	 = powerpc
+
+LIBPFM4_ARCH_FLAG	 = $(foreach a,$(strip $(LIBPFM4_ARCH_$(DEB_HOST_ARCH))),ARCH=$a)
+
+%:
+	dh  $@
+
+override_dh_auto_build:
+	dh_auto_build -- $(LIBPFM4_ARCH_FLAG)
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	./tests/validate
+endif
+
+override_dh_auto_install:
+	$(MAKE) install \
+		DESTDIR=$(CURDIR)/debian/tmp \
+		PREFIX=/usr \
+		LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		LDCONFIG=true \
+		$(LIBPFM4_ARCH_FLAG)
+
+override_dh_missing:
+	dh_missing --list-missing
+
+override_dh_makeshlibs:
+	dh_makeshlibs -a -- -c4
+
+override_dh_shlibdeps:
+	dh_shlibdeps -a -- --warnings=7

@@ -1,0 +1,83 @@
+#!/usr/bin/make -f
+
+DEB_LDFLAGS_MAINT_APPEND := -Wl,-z,defs
+DEB_CFLAGS_MAINT_APPEND  := $(shell getconf LFS_CFLAGS)
+DEB_BUILD_MAINT_OPTIONS  := hardening=+bindnow
+export DEB_LDFLAGS_MAINT_APPEND DEB_CFLAGS_MAINT_APPEND DEB_BUILD_MAINT_OPTIONS
+ifeq ($(shell dpkg-architecture -qDEB_BUILD_ARCH_OS),hurd)
+DEB_LDFLAGS_MAINT_APPEND += -lpthread
+endif
+
+DEB_HOST_MULTIARCH	?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+LC_COLLATE=C
+export LC_COLLATE
+
+export QUILT_PATCH_DIR = debian/patches-applied
+
+d = $(CURDIR)/debian
+dl = $(d)/local
+
+%:
+	dh $@ --with quilt,autoreconf
+
+# avoid libaudit-dev when bootstrapping
+ifneq (,$(filter stage1,$(DEB_BUILD_PROFILES)))
+  CONFIGURE_OPTS += --disable-audit
+endif  
+
+override_dh_auto_configure:
+	dh_auto_configure -- --enable-static --enable-shared \
+		--libdir=/lib/$(DEB_HOST_MULTIARCH) \
+		--enable-isadir=/lib/security \
+		--enable-cracklib \
+		$(CONFIGURE_OPTS)
+	chmod 775 modules/pam_faillock/tst-pam_faillock
+
+# .install files don't have "except for" handling, so we need to exclude
+# our module that doesn't match right here
+override_dh_install:
+	sed -e"s/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g" $(d)/libpam0g-dev.install.in > $(d)/libpam0g-dev.install
+ifneq (,$(findstring libpam-modules, $(shell dh_listpackages)))
+	dh_install -plibpam-modules -Xpam_cracklib
+endif
+	dh_install -Nlibpam-modules
+	# Make sure the md5sums for the templates we ship are
+	# recognized by pam-auth-update.
+	for f in common-auth common-session common-session-noninteractive common-account common-password; do \
+	if grep -q $$(perl debian/template-md5sum debian/local/$$f ) debian/local/pam-auth-update; then \
+	    echo $$f okay; \
+	else \
+	    echo md5sum for $$f not registered in debian/local/pam-auth-update; \
+	    echo use debian/template-md5sum to compute; \
+	    exit 2; \
+	fi; \
+	done
+
+
+
+# again, excluding files by hand; also, build our local manpage for pam_getenv
+# from the XML
+override_dh_installman:
+	pod2man --section 8 --release="Debian GNU/Linux" $(dl)/pam_getenv >$(dl)/pam_getenv.8
+	dh_installman
+	rm -f $(d)/libpam-modules/usr/share/man/man5/pam.conf.5
+	rm -f $(d)/libpam-modules/usr/share/man/man8/pam_cracklib.8
+	rm -f $(d)/libpam-modules/usr/share/man/man8/pam_timestamp_check.8
+
+# dh_link doesn't do wildcards, so we can't auto-link to the right per-arch
+# directory
+override_dh_link:
+	sed -e"s/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g" $(d)/libpam0g-dev.links.in > $(d)/libpam0g-dev.links
+	dh_link
+
+# using perms that differ from upstream (sgid instead of suid) /and/ that
+# dh_fixperms doesn't want
+override_dh_fixperms:
+	dh_fixperms
+ifneq (,$(findstring libpam-modules, $(shell dh_listpackages)))
+	chgrp shadow $(d)/libpam-modules-bin/sbin/unix_chkpwd
+	chmod 02755 $(d)/libpam-modules-bin/sbin/unix_chkpwd
+	chgrp shadow $(d)/libpam-modules-bin/sbin/pam_extrausers_chkpwd
+	chmod 02755 $(d)/libpam-modules-bin/sbin/pam_extrausers_chkpwd
+endif

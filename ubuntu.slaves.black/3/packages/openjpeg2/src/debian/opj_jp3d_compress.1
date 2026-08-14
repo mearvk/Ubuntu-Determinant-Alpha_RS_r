@@ -1,0 +1,158 @@
+.TH OPJ_JP3D_COMPRESS "1" "October 2019" "opj_jp3d_compress 2.3.1" "User Commands"
+.SH NAME
+opj_jp3d_compress \- compress source file to jp3d
+.SH SYNOPSIS
+.B opj_jp3d_compress
+[optional arguments] -i source.{bin, pgx} -m characteristics.img -o destination.{jp3d}
+.SH OPTIONS
+.SS
+Required Parameters (except with \fB\-h\fR):
+.PP
+\fB\-i\fR           : source file  (\fB\-i\fR source.bin or source*.pgx)
+.PP
+\fB\-m\fR           : source characteristics file (\fB\-m\fR imgfile.img)
+.PP
+\fB\-o\fR           : destination file (\fB\-o\fR dest.jp3d)
+.SS
+Optional Parameters:
+.PP
+\fB\-h\fR           : display the help information
+.PP
+\fB\-n\fR           : number of resolutions (\fB\-n\fR 3,3,3)
+.PP
+\fB\-I\fR           : use the irreversible transforms: ICT + DWT 9\-7 (\fB\-I\fR)
+.PP
+\fB\-C\fR           : coding algorithm (\fB\-C\fR 2EB) [2EB, 3EB]
+.PP
+\fB\-r\fR           : different compression ratios for successive layers (\fB\-r\fR 20,10,5)
+.IP
+The rate specified for each quality level is the desired compression factor, rate 1 means
+lossless compression (options \fB\-r\fR and \fB\-q\fR cannot be used together).
+.PP
+\fB\-q\fR           : different psnr for successive layers (\fB\-q\fR 30,40,50)
+.IP
+(options \fB\-r\fR and \fB\-q\fR cannot be used together)
+.PP
+\fB\-b\fR           : size of code block (\fB\-b\fR 32,32,32)
+.PP
+\fB\-c\fR           : size of precinct (\fB\-c\fR 128,128,128)
+.PP
+\fB\-t\fR           : size of tile (\fB\-t\fR 512,512,512)
+.PP
+\fB\-p\fR           : progression order (\fB\-p\fR LRCP) [LRCP, RLCP, RPCL, PCRL, CPRL]
+.PP
+\fB\-s\fR           : subsampling factor (\fB\-s\fR 2,2,2) [\-s X,Y,Z]
+.IP
+Note: subsampling bigger than 2 can produce error.
+.PP
+\fB\-SOP\fR         : write SOP marker before each packet
+.PP
+\fB\-EPH\fR         : write EPH marker after each header packet
+.PP
+\fB\-M\fR           : code\-block style (\fB\-M\fR 0)
+.IP
+[1=BYPASS(LAZY) 2=RESET 4=RESTART(TERMALL) 8=VSC 16=PTERM 32=SEGSYM 64=3DCTXT]
+.IP
+Indicate multiple modes by adding their values, for example: RESTART(4) + RESET(2) + SEGMARK(32) = \fB\-M\fR 38
+.PP
+\fB\-D\fR           : define DC offset (\fB\-D\fR 12)
+.PP
+\fB\-x\fR           : create an index file *.Idx (\fB\-x\fR index_name.Idx)
+.PP
+\fB\-ROI\fR         : c=%d,U=%d
+.IP
+Quantization indices upshifted for component c=%d [%d = 0,1,2]
+with a value of U=%d [0 <= %d <= 37] (i.e. \fB\-ROI\fR:c=0,U=25)
+.PP
+\fB\-d\fR           : offset of the origin of the volume (\fB\-d\fR 150,300,100)
+.PP
+\fB\-l\fR           : offset of the origin of the tiles (\fB\-l\fR 100,75,25)
+.SS
+Default coding:
+.PP
+- Lossless
+.PP
+- 1 tile
+.PP
+- Size of precinct : 2^15 x 2^15 x 2^15 (means 1 precinct)
+.PP
+- Size of code\-block : 64 x 64 x 64
+.PP
+- Number of resolutions in x, y and z axis: 3
+.PP
+- No SOP marker in the codestream
+.PP
+- No EPH marker in the codestream
+.PP
+- No sub\-sampling in x, y or z direction
+.PP
+- No mode switch activated
+.PP
+- Progression order: LRCP
+.PP
+- No index file
+.PP
+- No ROI upshifted
+.PP
+- No offset of the origin of the volume
+.PP
+- No offset of the origin of the tiles
+.PP
+- Reversible DWT 5\-3 on each 2D slice
+.PP
+- Coding algorithm: 2D\-EBCOT
+.SS
+Remarks:
+.PP
+The markers written to the main_header are : SOC SIZ COD QCD COM.
+.PP
+COD and QCD markers will never appear in the tile_header.
+.PP
+You need enough disk space memory (twice the original) to encode the volume,
+i.e. for a 1.5 GB volume you need a minimum of 3GB of disk memory)
+.PP
+When loading *.pgx files, a relative path to directory is needed for input argument
+followed by the common prefix of the slices and a '*' character representing sequential numeration
+( \fB\-i\fR relativepath/slices*.pgx ).
+.PP
+The index file has the structure below:
+.IP
+Image_height Image_width Image_depth
+.IP
+Progression order: 0 (LRCP)
+.IP
+Tiles_size_X Tiles_size_Y Tiles_size_Z
+.IP
+Components_nb
+.IP
+Layers_nb
+.IP
+Decomposition_levels
+.IP
+[Precincts_size_X_res_Nr Precincts_size_Y_res_Nr Precincts_size_Z_res_Nr]
+.IP
+\&...
+.IP
+[Precincts_size_X_res_0 Precincts_size_Y_res_0 Precincts_size_Z_res_0]
+.IP
+Main_header_end_position
+.IP
+Codestream_size
+.IP
+Tile_0 [start_pos end_header end_pos TotalDisto NumPix MaxMSE]
+\&...
+.IP
+Tile_Nt [  ''         ''        ''        ''       ''    ''  ]
+.IP
+Tpacket_0 [Tile layer res. comp. prec. start_pos end_pos disto]
+\&...
+.IP
+Tpacket_Np [''   ''    ''   ''    ''       ''       ''     '' ]
+.IP
+MaxDisto
+.IP
+TotalDisto
+.SH AUTHOR
+This  manual  page was written by Mathieu Malaterre <malat@debian.org> and Hugo
+Lefeuvre <hle@debian.org> for the Debian GNU/Linux system, but may be used by
+others.

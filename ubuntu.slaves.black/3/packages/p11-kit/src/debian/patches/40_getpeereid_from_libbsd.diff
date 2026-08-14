@@ -1,0 +1,66 @@
+Description: Use getpeereid from libbsed on Hurd/kFreeBSD
+Author: Svante Signell <svante.signell@gmail.com>,
+  Andreas Metzler <ametzler@debian.org>
+Origin: vendor
+Bug-Debian: https://bugs.debian.org/995049
+Forwarded: no
+Last-Update: 2021-10-09
+
+--- a/common/unix-peer.c
++++ b/common/unix-peer.c
+@@ -34,11 +34,16 @@
+ 
+ #include "config.h"
+ 
+ #include "unix-peer.h"
+ 
++#ifdef HAVE_GETPEEREID_BSD
++#include <bsd/unistd.h>
++#else
+ #include <unistd.h>
++#endif
++
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <sys/uio.h>
+ #include <errno.h>
+@@ -71,11 +76,12 @@
+ 
+ 	if (pid)
+ 		*pid = cr.pid;
+ 
+ #elif defined(HAVE_GETPEEREID)
+-	/* *BSD/MacOSX */
++	/* *BSD/MacOSX/kFreeBSD/Hurd */
++
+ 	uid_t euid;
+ 	gid_t egid;
+ 
+ 	ret = getpeereid (cfd, &euid, &egid);
+ 
+--- a/configure.ac
++++ b/configure.ac
+@@ -130,10 +130,22 @@
+ 	AC_CHECK_FUNCS([fdwalk])
+ 	AC_CHECK_FUNCS([setenv])
+ 	AC_CHECK_FUNCS([getpeereid])
+ 	AC_CHECK_FUNCS([getpeerucred])
+ 	AC_CHECK_FUNCS([issetugid])
++	case "$host_os" in
++	kfreebsd*-gnu | gnu*)
++		have_getpeereid=no
++		PKG_CHECK_MODULES([LIBBSD], [libbsd], [have_getpeereid="yes"])
++		if test "x$have_getpeereid" = "xyes"; then
++			AC_DEFINE([HAVE_GETPEEREID_BSD], [1], [Using have getpeereid from libbsd])
++			AC_DEFINE([HAVE_GETPEEREID], [1], [have getpeereid])
++			LIBS="$LIBS ${LIBBSD_LIBS}"
++			CFLAGS="$CFLAGS ${LIBBSD_CFLAGS}"
++		fi
++	;;
++	esac
+ 
+ 	AC_CACHE_CHECK([for thread-local storage class],
+ 		[ac_cv_tls_keyword],
+ 		[ac_cv_tls_keyword=
+ 		for keyword in _Thread_local __thread; do

@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+#
+# Test for gcc-10 support
+#
+#export CC=gcc-10
+#export CXX=g++-10
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+VERSION = $(shell head -n1 debian/changelog | sed -e 's/.*(//;s/-.*).*//;s/\+/\-/')
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --enable-binary-compatible-posix-api=yes
+
+override_dh_install:
+	$(RM) debian/tmp/usr/bin/onig-config
+	$(RM) debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}/libonig.a
+	$(RM) debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}/libonig.la
+	dh_install -X.la -X.a
+
+override_dh_makeshlibs:
+	dh_makeshlibs
+	dpkg-gensymbols -v$(VERSION) -plibonig5

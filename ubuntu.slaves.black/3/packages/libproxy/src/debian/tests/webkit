@@ -1,0 +1,67 @@
+#!/bin/bash
+# Copyright 2020 Simon McVittie
+# SPDX-License-Identifier: LGPL-2.1+
+
+set -eux
+set -o pipefail
+
+export _MM_DEBUG=1
+export _PX_DEBUG=1
+
+reset () {
+    unset DESKTOP_SESSION
+    unset FTP_PROXY
+    unset GNOME_DESKTOP_SESSION_ID
+    unset GSETTINGS_BACKEND
+    unset HTTPS_PROXY
+    unset HTTP_PROXY
+    unset KDE_FULL_SESSION
+    unset NO_PROXY
+    unset ftp_proxy
+    unset http_proxy
+    unset https_proxy
+    unset no_proxy
+}
+
+reset
+export DESKTOP_SESSION=gnome
+export GSETTINGS_BACKEND=keyfile
+export XDG_CONFIG_HOME="$AUTOPKGTEST_TMP/config"
+mkdir -p "$XDG_CONFIG_HOME/glib-2.0/settings"
+
+escaped_autopkgtest_tmp="$(
+    ( cd "$AUTOPKGTEST_TMP" && pwd ) | perl -pe '
+        use bytes; chomp; s#([^-._~A-Za-z0-9/])#sprintf("%%%02X", ord($1))#ge;
+    '
+)"
+
+cat > "$XDG_CONFIG_HOME/glib-2.0/settings/keyfile" <<EOF
+[system/proxy]
+autoconfig-url='file://$escaped_autopkgtest_tmp/pac.js'
+ignore-hosts=[]
+mode='auto'
+use-same-proxy=false
+EOF
+
+cat > "$AUTOPKGTEST_TMP/pac.js" <<EOF
+function FindProxyForURL(url, host) {
+    if (host == "noproxy.example.com") {
+        return "DIRECT";
+    }
+
+    if (url == "http://special.example.com") {
+        return "PROXY specialproxy.example.net";
+    }
+
+    return "PROXY proxy.example.net; DIRECT";
+}
+EOF
+
+answer="$(proxy http://example.com)"
+test "${answer}" = "http://proxy.example.net direct://"
+
+answer="$(proxy http://special.example.com)"
+test "${answer}" = "http://specialproxy.example.net"
+
+answer="$(proxy http://noproxy.example.com)"
+test "${answer}" = direct://

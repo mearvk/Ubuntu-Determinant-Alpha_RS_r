@@ -1,0 +1,25 @@
+#! /usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --builddirectory=debian/build
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+bindnow,+pie
+
+override_dh_auto_test:
+	# libcheck.a isn't built with -fPIC, so we have trouble on amd64 if
+	# we link with -fPIC etc. here.
+	VERBOSE=1 dh_auto_test -- LDFLAGS=
+
+execute_after_dh_auto_install:
+	rm -f debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libpipeline.la
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=libpipeline1
+
+VERSION_MINOR = $(shell echo "$(DEB_VERSION_UPSTREAM)" | cut -d. -f1,2).0
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V'libpipeline1 (>= $(VERSION_MINOR))' -- -c4

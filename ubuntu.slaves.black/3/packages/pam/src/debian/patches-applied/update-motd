@@ -1,0 +1,113 @@
+Provide a more dynamic MOTD, based on the short-lived update-motd project.
+
+Authors: Dustin Kirkland <kirkland@canonical.com>
+
+Last-Update: 2019-02-12
+Forwarded: no
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/399071
+
+Index: pam/modules/pam_motd/pam_motd.c
+===================================================================
+--- pam.orig/modules/pam_motd/pam_motd.c
++++ pam/modules/pam_motd/pam_motd.c
+@@ -286,6 +286,7 @@
+ 			int argc, const char **argv)
+ {
+     int retval = PAM_IGNORE;
++    int do_update = 1;
+     const char *motd_path = NULL;
+     char *motd_path_copy = NULL;
+     unsigned int num_motd_paths = 0;
+@@ -295,6 +296,7 @@
+     unsigned int num_motd_dir_paths = 0;
+     char **motd_dir_path_split = NULL;
+     int report_missing;
++    struct stat st;
+ 
+     if (flags & PAM_SILENT) {
+ 	return retval;
+@@ -324,6 +326,9 @@
+ 			   "motd_dir= specification missing argument - ignored");
+ 	    }
+ 	}
++	else if (!strcmp(*argv,"noupdate")) {
++		do_update = 0;
++	}
+ 	else
+ 	    pam_syslog(pamh, LOG_ERR, "unknown option: %s", *argv);
+     }
+@@ -336,6 +341,19 @@
+ 	report_missing = 1;
+     }
+ 
++    /* Run the update-motd dynamic motd scripts, outputting to /run/motd.dynamic.
++       This will be displayed only when calling pam_motd with
++       motd=/run/motd.dynamic; current /etc/pam.d/login and /etc/pam.d/sshd
++       display both this file and /etc/motd. */
++    if (do_update && (stat("/etc/update-motd.d", &st) == 0)
++        && S_ISDIR(st.st_mode))
++    {
++       mode_t old_mask = umask(0022);
++       if (!system("/usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin run-parts --lsbsysinit /etc/update-motd.d > /run/motd.dynamic.new"))
++           rename("/run/motd.dynamic.new", "/run/motd.dynamic");
++       umask(old_mask);
++    }
++
+     if (motd_path != NULL) {
+ 	motd_path_copy = strdup(motd_path);
+     }
+Index: pam/modules/pam_motd/pam_motd.8.xml
+===================================================================
+--- pam.orig/modules/pam_motd/pam_motd.8.xml
++++ pam/modules/pam_motd/pam_motd.8.xml
+@@ -114,6 +114,17 @@
+           </para>
+         </listitem>
+       </varlistentry>
++      <varlistentry>
++        <term>
++          <option>noupdate</option>
++        </term>
++        <listitem>
++          <para>
++            Don't run the scripts in <filename>/etc/update-motd.d</filename>
++            to refresh the motd file.
++          </para>
++        </listitem>
++      </varlistentry>
+     </variablelist>
+     <para>
+       When no options are given, the default behavior applies for both
+Index: pam/modules/pam_motd/pam_motd.8
+===================================================================
+--- pam.orig/modules/pam_motd/pam_motd.8
++++ pam/modules/pam_motd/pam_motd.8
+@@ -109,6 +109,13 @@
+ /etc/motd\&.d:/run/motd\&.d:/usr/lib/motd\&.d\&.
+ .RE
+ .PP
++\fBnoupdate\fR
++.RS 4
++Don\*(Aqt run the scripts in
++/etc/update\-motd\&.d
++to refresh the motd file\&.
++.RE
++.PP
+ When no options are given, the default behavior applies for both options\&. Specifying either option (or both) will disable the default behavior for both options\&.
+ .SH "MODULE TYPES PROVIDED"
+ .PP
+Index: pam/modules/pam_motd/README
+===================================================================
+--- pam.orig/modules/pam_motd/README
++++ pam/modules/pam_motd/README
+@@ -51,6 +51,10 @@
+     colon-separated list. By default this option is set to /etc/motd.d:/run/
+     motd.d:/usr/lib/motd.d.
+ 
++noupdate
++
++    Don't run the scripts in /etc/update-motd.d to refresh the motd file.
++
+ When no options are given, the default behavior applies for both options.
+ Specifying either option (or both) will disable the default behavior for both
+ options.

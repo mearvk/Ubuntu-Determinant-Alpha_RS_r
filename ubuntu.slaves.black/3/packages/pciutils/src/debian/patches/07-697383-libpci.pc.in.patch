@@ -1,0 +1,47 @@
+From: Brice Goglin <bgoglin@debian.org>
+Subject: libpci-dev: libpci.pc misses -lresolv and -lz for static linking
+Date: Fri, 04 Jan 2013 17:31:14 +0100
+Debian-Bug: http://bugs.debian.org/697383
+Forwarded: https://github.com/pciutils/pciutils/pull/47
+
+libpci.pc doesn't seem to be correct for static linking.
+
+  $ pkg-config --libs --static libpci
+  -lpci  
+
+It brings no dependencies while -lresolv (and likely -lz) seems needed:
+
+  /usr/lib/gcc/x86_64-linux-gnu/4.7/../../../x86_64-linux-gnu/
+   libpci.a(names-net.o):function pci_id_net_lookup:
+   error: undefined reference to '__res_query'
+
+Something like:
+
+  Libs.private: -lresolv -lz
+
+---
+ lib/Makefile     |    3 ++-
+ lib/libpci.pc.in |    2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+--- a/lib/libpci.pc.in
++++ b/lib/libpci.pc.in
+@@ -7,5 +7,5 @@ Name: libpci
+ Description: libpci
+ Version: @VERSION@
+ Libs: -L${libdir} -lpci
+-Libs.private: @LDLIBS@
++Libs.private: @LDLIBS@ @WITH_LIBS@
+ Cflags: -I${includedir}
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -77,7 +77,8 @@ $(PCILIBPC): libpci.pc.in
+ 		-e 's,@LIBDIR@,$(LIBDIR),' \
+ 		-e 's,@IDSDIR@,$(IDSDIR),' \
+ 		-e 's,@VERSION@,$(VERSION),' \
+-		-e 's,@LDLIBS@,$(LDLIBS),'
++		-e 's,@LDLIBS@,$(LDLIBS),' \
++		-e 's,@WITH_LIBS@,$(WITH_LIBS),'
+ 
+ init.o: init.c $(INCL)
+ access.o: access.c $(INCL)
