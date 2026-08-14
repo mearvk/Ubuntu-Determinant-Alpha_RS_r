@@ -53,6 +53,10 @@ static void AppendString(PrintBuffer *buffer, const char *str) {
     if (buffer->text == NULL || strlen(buffer->text) + strlen(str) + 1 > buffer->size) {
         size_t newSize = buffer->size + max(4096, strlen(str));
         char *newData = (char *)malloc(newSize);
+        // GALACTIC CHERRY FIX: Check malloc return — NULL dereference on OOM.
+        if (newData == NULL) {
+            return;  // Silently fail rather than crash. Caller sees truncated output.
+        }
         if (buffer->text != NULL) {
             strcpy_s(newData, newSize, buffer->text);
             free(buffer->text);

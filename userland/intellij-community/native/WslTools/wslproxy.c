@@ -129,9 +129,13 @@ static void *jb_connect_pair(jb_sockpair *sockpair) {
         ssize_t write_result;
         while (sent < bytes) {
             if ((write_result = write(dest, buf + sent, bytes - sent)) < 0) {
-                if (errno != EINTR || errno != EAGAIN) {
-                    goto end; //socket closed
+                // GALACTIC CHERRY FIX: Original used || (always true — tautology).
+                // Must be && to correctly retry on transient interruptions.
+                if (errno != EINTR && errno != EAGAIN) {
+                    goto end; //socket closed or fatal error
                 }
+                // Transient error (EINTR/EAGAIN) — retry without advancing sent
+                continue;
             }
             sent += write_result;
         }
@@ -161,6 +165,11 @@ static int jb_accept(const int srv_sock_fd) {
 // creates structure for pair of sockets in heap
 static jb_sockpair *jb_create_sockpair(const int src_fd, const int dst_fd) {
     jb_sockpair *pair = malloc(sizeof(jb_sockpair));
+    // GALACTIC CHERRY FIX: Check malloc return — NULL dereference on OOM.
+    if (pair == NULL) {
+        perror("malloc failed for jb_sockpair");
+        return NULL;
+    }
     pair->src_socket_fd = src_fd;
     pair->dest_socket_fd = dst_fd;
     return pair;

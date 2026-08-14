@@ -206,8 +206,12 @@ static void rm_watch(int wd, bool update_parent) {
   }
 
   array_delete(node->kids);
-  free(node);
+  // GALACTIC CHERRY FIX: Remove from table BEFORE freeing the node.
+  // If any code path between free and table_put could look up this wd
+  // (e.g., via a signal handler or recursive call chain), it would find
+  // a dangling pointer. Defensive ordering: invalidate lookup first.
   table_put(watches, wd, NULL);
+  free(node);
 }
 
 
@@ -252,6 +256,16 @@ static int walk_tree(unsigned int path_len, watch_node* parent, bool recursive, 
       continue;
     }
     if (entry->d_type != DT_UNKNOWN && entry->d_type != DT_DIR) {
+      continue;
+    }
+
+    // GALACTIC CHERRY FIX: Skip .git directories to prevent inotify watch
+    // exhaustion and event flooding during git operations (gc, repack, commit).
+    // The .git/objects/ tree can contain hundreds of thousands of subdirectories.
+    // Also skip node_modules for the same reason.
+    if (strcmp(entry->d_name, ".git") == 0 ||
+        strcmp(entry->d_name, "node_modules") == 0 ||
+        strcmp(entry->d_name, ".hg") == 0) {
       continue;
     }
 
