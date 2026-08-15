@@ -1,0 +1,43 @@
+Description: Fix build on hurd #650820
+Author: Gabriele Giacone <1o5g4r8o@gmail.com>
+Last-Update: 2012-07-24
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/clplumbing/cl_pidfile.c
++++ b/lib/clplumbing/cl_pidfile.c
+@@ -79,7 +79,11 @@ static int IsRunning(long pid)
+ 	int rc = 0;
+ 	long mypid;
+ 	int running = 0;
++#ifdef __GNU__
++	char proc_path[4096], exe_path[4096], myexe_path[4096];
++#else
+ 	char proc_path[PATH_MAX], exe_path[PATH_MAX], myexe_path[PATH_MAX];
++#endif
+ 	
+ 	/* check if pid is running */
+ 	if (CL_KILL(pid, 0) < 0 && errno == ESRCH) {
+@@ -93,7 +97,11 @@ static int IsRunning(long pid)
+ 	/* check to make sure pid hasn't been reused by another process */
+ 	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", pid);
+ 	
++#ifdef __GNU__
++	rc = readlink(proc_path, exe_path, sizeof(exe_path)-1);
++#else
+ 	rc = readlink(proc_path, exe_path, PATH_MAX-1);
++#endif
+ 	if(rc < 0) {
+ 		cl_perror("Could not read from %s", proc_path);
+ 		goto bail;
+@@ -103,7 +111,11 @@ static int IsRunning(long pid)
+ 	mypid = (unsigned long) getpid();
+ 	
+ 	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", mypid);
++#ifdef __GNU__
++	rc = readlink(proc_path, myexe_path, sizeof(myexe_path)-1);
++#else
+ 	rc = readlink(proc_path, myexe_path, PATH_MAX-1);
++#endif
+ 	if(rc < 0) {
+ 		cl_perror("Could not read from %s", proc_path);
+ 		goto bail;

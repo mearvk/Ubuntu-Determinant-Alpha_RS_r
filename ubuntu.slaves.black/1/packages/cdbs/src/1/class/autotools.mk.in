@@ -1,0 +1,69 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2002,2003 Colin Walters <walters@debian.org>
+# Copyright © 2008-2010, 2014, 2016 Jonas Smedegaard <dr@jones.dk>
+# Description: A class to configure and build GNU autoconf+automake packages
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#PATH_RULES#
+
+ifndef _cdbs_class_autotools
+_cdbs_class_autotools = 1
+
+include $(_cdbs_class_path)/autotools-files.mk$(_cdbs_makefile_suffix)
+
+cdbs_autotools_configure_stamps = $(if $(cdbs_make_flavors),\
+	$(cdbs_make_builddir_check)$(patsubst %,debian/stamp-autotools/%,$(cdbs_make_flavors)),\
+	debian/stamp-autotools)
+cdbs_configure_flags += $(DEB_CONFIGURE_FLAGS_$(cdbs_make_curflavor))
+
+# Overriden from makefile-vars.mk.  We pass CFLAGS and friends to
+# ./configure, so no need to pass them to make.
+# FIXME: Restructure to allow early override
+DEB_MAKE_EXTRA_ARGS = $(DEB_MAKE_PARALLEL)
+
+pre-build::
+	$(if $(cdbs_make_flavors),mkdir -p debian/stamp-autotools)
+
+common-configure-arch common-configure-indep:: common-configure-impl
+common-configure-impl:: $(cdbs_autotools_configure_stamps)
+$(cdbs_autotools_configure_stamps):
+	chmod a+x $(DEB_CONFIGURE_SCRIPT)
+	$(if $(call cdbs_streq,$(cdbs_make_curbuilddir),$(DEB_BUILDDIR_$(cdbs_curpkg))),\
+		,\
+		mkdir -p $(cdbs_make_curbuilddir))
+	$(strip $(DEB_CONFIGURE_INVOKE) \
+		$(cdbs_configure_flags) \
+		$(DEB_CONFIGURE_EXTRA_FLAGS) \
+		$(DEB_CONFIGURE_USER_FLAGS))
+	$(if $(filter post,$(DEB_AUTO_UPDATE_LIBTOOL)),\
+		$(if $(wildcard $(cdbs_make_curbuilddir)/libtool),\
+			cp -f /usr/bin/libtool $(cdbs_make_curbuilddir)/libtool))
+	touch $@
+
+makefile-clean::
+	$(if $(cdbs_make_flavors),\
+		-rmdir --ignore-fail-on-non-empty \
+			debian/stamp-autotools,\
+		rm -f debian/stamp-autotools)
+
+$(cdbs_make_clean_nonstamps)::
+	$(if $(call cdbs_streq,$(cdbs_make_curbuilddir),$(DEB_BUILDDIR_$(cdbs_curpkg))),\
+		,\
+		-rmdir --ignore-fail-on-non-empty \
+			$(cdbs_make_curbuilddir))
+	$(if $(cdbs_make_flavors),\
+		rm -f $(@:makefile-clean%=debian/stamp-autotools%))
+
+endif

@@ -1,0 +1,93 @@
+#!/bin/bash
+# NEED_ROOT
+
+set -e
+
+[ "$(id -u)" = "0" ] ||
+	{ echo "sorry, must be root"; exit 1; }
+
+PT_TYPE="${PT_TYPE:-dos}" # dos or gpt
+size=${DISK_SIZE_NEW:-1000M}
+osize=${DISK_SIZE_ORIG:-500M}
+
+MP=""
+LODEV=""
+TEMP_D=""
+
+cleanup() {
+	if [ -n "$MP" ]; then
+		echo "unmount $MP";
+		umount "$MP";
+	fi
+	if [ -n "$LODEV" ]; then
+		echo "losetup --detach $LODEV";
+		losetup --detach "$LODEV";
+	fi
+	[ ! -d "${TEMP_D}" ] || rm -Rf "${TEMP_D}"
+}
+rq() {
+   local out="${TEMP_D}/out"
+	"$@" > "$out" 2>&1 || { echo "FAILED:" "$@"; cat "$out"; return 1; }
+}
+
+TEMP_D=$(mktemp -d ${TMPDIR:-/tmp}/${0##*/}.XXXXXX)
+trap cleanup EXIT
+
+img="${TEMP_D}/disk.img"
+mp="${TEMP_D}/mp"
+
+echo "Partitioning $PT_TYPE orig_size=$osize grow_size=$size."
+echo "growpart is $(which growpart)"
+rm -f $img
+[ ! -e $mp ] || rmdir $mp || { echo "failed rmdir $mp"; exit 1; }
+mkdir $mp
+
+truncate --size $osize "$img"
+
+label_flag="--label=${PT_TYPE}"
+echo "2048," | rq sfdisk $label_flag --force --unit=S "$img"
+
+truncate --size "$size" "$img"
+
+lodev=$(losetup --show --find --partscan "$img")
+LODEV=$lodev
+udevadm settle
+echo "set up $lodev"
+lodevpart="${lodev}p1"
+
+rq mkfs.ext4 "${lodevpart}"
+
+echo "mounting to $mp"
+mount "${lodevpart}" "$mp"
+MP="$mp"
+
+echo "==== before ===="
+grep "${lodev##*/}" /proc/partitions
+sfdisk --list --unit=S "$lodev"
+
+errfile="${TEMP_D}/growpart.err"
+growpart -v -v "$lodev" 1 2>"$errfile" || {
+	rc=$?
+	echo "failed [$rc]: growpart -v -v $lodev 1"
+	cat "$errfile" 1>&2
+	exit $rc
+}
+
+out=$(grep "FLOCK:.*releasing exclusive lock" "$errfile") || :
+if [ -z "$out" ]; then
+	echo "ERROR: growpart stderr did not mention releasing lock"
+	exit 1
+fi
+
+echo === growpart stderr ===
+cat "$errfile"
+
+echo "==== after ===="
+grep "${lodev##*/}" /proc/partitions
+
+resize2fs "${lodevpart}"
+
+echo "== df =="
+df -h "$mp"
+
+# vi: ts=4 noexpandtab

@@ -1,0 +1,63 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2003 Colin Walters <walters@debian.org>
+# Copyright © 2003,2008-2010, 2013-2016 Jonas Smedegaard <dr@jones.dk>
+# Description: Defines useful variables for Perl MakeMaker modules
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# TODO: rewrite to use $(cdbs_make_curdestdir)
+
+#PATH_RULES#
+
+ifndef _cdbs_class_perl_makemaker_vars
+_cdbs_class_perl_makemaker_vars = 1
+
+include $(_cdbs_class_path)/perl-vars.mk$(_cdbs_makefile_suffix)
+include $(_cdbs_class_path)/makefile-vars.mk$(_cdbs_makefile_suffix)
+
+# create verbose-output makefile
+DEB_MAKEMAKER_NORMAL_ARGS ?= NOECHO=
+
+# Override optimizations to follow Perl Policy 3.9.4 § 4.3
+# and extend to also pass CPPFLAGS and LDFLAGS
+# FIXME: Restructure to allow early override
+DEB_MAKE_EXTRA_ARGS = \
+	OPTIMIZE="$(strip \
+		$(or $(CFLAGS_$(cdbs_curpkg)),$(CFLAGS)) \
+		$(cdbs_perl_ccflags) \
+		$(or $(CPPFLAGS_$(cdbs_curpkg)),$(CPPFLAGS)) \
+		$(cdbs_perl_cppflags))" \
+	LDDLFLAGS="$(strip \
+		$(or $(LDFLAGS_$(cdbs_curpkg)),$(LDFLAGS)) \
+		$(cdbs_perl_lddlflags))" \
+	$(DEB_MAKE_PARALLEL)
+
+DEB_MAKEMAKER_INVOKE ?= $(strip \
+	/usr/bin/perl -I. Makefile.PL \
+	$(DEB_MAKEMAKER_NORMAL_ARGS) \
+	$(DEB_MAKEMAKER_USER_FLAGS) \
+	INSTALLDIRS=vendor)
+
+# Set some MakeMaker defaults
+DEB_MAKE_BUILD_TARGET ?= all
+DEB_MAKE_CLEAN_TARGET ?= distclean
+DEB_MAKE_CHECK_TARGET ?= test TEST_VERBOSE=1
+DEB_MAKE_INSTALL_TARGET ?= install DESTDIR="$(DEB_PERL_DESTDIR)"
+
+# deprecated variables
+cdbs_perl_makemaker_lddlflags = $(call cdbs_warn_deprecated,\
+	cdbs_perl_lddlflags,0.4.128)\
+	$(shell perl -MConfig -e 'print $$Config{lddlflags}')
+
+endif

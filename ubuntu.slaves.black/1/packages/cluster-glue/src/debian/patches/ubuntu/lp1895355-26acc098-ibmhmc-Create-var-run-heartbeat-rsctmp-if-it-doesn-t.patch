@@ -1,0 +1,39 @@
+From 26acc098f0fce9e109b91b4b0d307e83e8fa1dd1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Kristoffer=20Gr=C3=B6nlund?= <kgronlund@suse.com>
+Date: Mon, 10 Jun 2019 12:04:49 +0200
+Subject: [PATCH] ibmhmc: Create /var/run/heartbeat/rsctmp if it doesn't exist
+ (bsc#1131545)
+
+Since /var/run is considered a volatile / runtime location, agents
+shouldn't count on certain directories existing there. Besides, it
+was unclear who was actually supposed to have created the
+/var/run/heartbeat/rsctmp directory: Seems it used to be the
+resource-agents package once, so even then it didn't make sense for
+stonith agents to rely on it existing.
+
+ibmhmc seems to be the only case where this assumption was made.
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/26acc098f0fce9e109b91b4b0d307e83e8fa1dd1
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ lib/plugins/stonith/ibmhmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/plugins/stonith/ibmhmc.c b/lib/plugins/stonith/ibmhmc.c
+index 71ad9456..c1b6f66d 100644
+--- a/lib/plugins/stonith/ibmhmc.c
++++ b/lib/plugins/stonith/ibmhmc.c
+@@ -1135,7 +1135,7 @@ do_shell_cmd(const char* cmd, int* status, const char* password)
+ 		snprintf(cmd_password, MAX_CMD_LEN
+ 		,"umask 077;"
+ 		 "if [ ! -d  " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc ];"
+-		 "then mkdir " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
++		 "then mkdir -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
+ 		 "fi;"
+ 		 "export ibmhmc_tmp=`mktemp -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc/`;" 
+ 		 "echo \"echo '%s'\">$ibmhmc_tmp;" 
+-- 
+2.27.0
+

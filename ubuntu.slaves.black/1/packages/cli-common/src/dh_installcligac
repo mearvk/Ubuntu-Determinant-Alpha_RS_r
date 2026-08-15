@@ -1,0 +1,90 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_installcligac - register assemblies to be late installed into a GAC
+
+=cut
+
+use strict;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_installcligac> [S<I<debhelper options>>] [B<-n>]
+
+=head1 DESCRIPTION
+
+dh_installcligac is a debhelper program that is responsible for
+installing assemblies and related files used by the Debian cli-common
+package into GAC of all installed runtimes.
+
+It also automatically generates the postinst and prerm commands needed
+to late install the assemblies. See L<dh_installdeb(1)> for an
+explanation of how this works.
+
+This is based on L<dh_installemacsen(1)> in the emacsen-common package.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-n>, B<--noscripts>
+
+Do not modify postinst/prerm scripts.
+
+=back
+
+=head1 NOTES
+
+Note that this command is not idempotent. "dh_prep" should be called
+between invocations of this command. Otherwise, it may cause multiple
+instances of the same text to be added to maintainer scripts.
+
+=cut
+
+init();
+
+# PROMISE: DH NOOP WITHOUT installcligac
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+	my $tmp = tmpdir($package);
+
+	my $cligac = pkgfile($package, "installcligac");
+
+	if ($cligac ne '') {
+		# sanity check: do all files listed in the installcligac file exist?
+		open CLIGAC, "<$cligac" or
+			die "E: Can't open $cligac\n";
+		while (<CLIGAC>)
+		{
+			chomp;
+			if (! -f "$tmp$_") {
+				die "E: Can't find file $tmp$_!\n";
+			}
+		}
+		close CLIGAC;
+
+		install_dir("$tmp/usr/share/cli-common/packages.d");
+		install_file($cligac, "$tmp/usr/share/cli-common/packages.d/$package.installcligac");
+
+		if (! $dh{NOSCRIPTS}) {
+			autoscript($package, "postinst", "postinst-cligac",
+                                   { 'PACKAGE' => $package });
+			autoscript($package, "prerm", "prerm-cligac",
+                                   { 'PACKAGE' => $package });
+		}
+	}
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of cli-common-dev.
+
+=head1 AUTHOR
+
+Dylan R. E. Moonfire <debian@mfgames.com>
+
+=cut

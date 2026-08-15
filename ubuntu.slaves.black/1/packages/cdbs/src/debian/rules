@@ -1,0 +1,37 @@
+#!/usr/bin/make -f
+
+# cdbs uses itself to build itself.
+_cdbs_rules_path = 1/rules
+_cdbs_class_path = 1/class
+_cdbs_scripts_path = scripts
+_cdbs_makefile_suffix = .in
+
+DEB_AUTO_UPDATE_AUTOCONF = ,
+include 1/rules/utils.mk.in
+include 1/rules/debhelper.mk.in
+include 1/class/autotools.mk.in
+
+# Suppress build-dependency on ourselves
+CDBS_BUILD_DEPENDS_rules_buildvars =
+
+# Suppress build-dependency on licensecheck to ease backports + arch bootstrap
+CDBS_BUILD_DEPENDS_rules_utils_copyright-check =
+
+DEB_COPYRIGHT_CHECK_MERGE_SAME_LICENSE = yes
+
+# We use autotools too modern for default CDBS
+DEB_CONFIGURE_LIBEXECDIR = /usr/lib
+
+# emit testsuite errors, and don't fail on experimental builds
+DEB_SUITE_EXP = $(filter experimental% UNRELEASED,$(DEB_SUITE))
+DEB_MAKE_CHECK_TARGET = check \
+ || { cat test/test-suite.log; $(if $(DEB_SUITE_EXP),,false;) }
+
+# Unset these variables so config.guess/config.sub in the test suite are
+# not replaced (because the test suite is supposed to test the replacing
+# later).
+config_guess =
+config_sub =
+
+# preserve (and force regenerate) upstream-shipped autotools files
+DEB_UPSTREAM_CRUFT_MOVE = configure tests/testsuite

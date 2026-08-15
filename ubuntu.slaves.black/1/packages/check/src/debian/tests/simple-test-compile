@@ -1,0 +1,67 @@
+#!/bin/sh
+
+set -eu
+
+cat <<EOF > simple_test_compile.c
+#include <check.h>
+
+START_TEST (test_string) {
+
+	const char *str = "This is a string!";
+
+	ck_assert_ptr_nonnull(str);
+
+	const char *suffix = strrchr(str, ' ');
+
+	ck_assert_ptr_nonnull(suffix);
+
+	ck_assert_str_eq("string!", suffix + 1);
+
+	ck_assert_ptr_null(strchr(str, '-'));
+}
+END_TEST
+
+START_TEST (test_numbers) {
+	int n = 10;
+
+	ck_assert_int_eq(30, n + 20);
+
+	n /= 3;
+
+	ck_assert_int_ne(4, n);
+}
+END_TEST
+
+Suite *gen_suite(void) {
+	Suite *s;
+	TCase *tc_core;
+
+	s = suite_create("Suite");
+
+	tc_core = tcase_create("Core");
+
+	tcase_add_test(tc_core, test_string);
+	tcase_add_test(tc_core, test_numbers);
+	suite_add_tcase(s, tc_core);
+
+	return s;
+}
+
+int main(void) {
+
+	int number_failed = 0;
+	Suite *s;
+	SRunner *sr;
+
+	s = gen_suite();
+	sr = srunner_create(s);
+	srunner_run_all(sr, CK_NORMAL);
+	number_failed = srunner_ntests_failed(sr);
+	srunner_free(sr);
+
+	return (number_failed == 0)? 0 : -1;
+}
+EOF
+
+cc -Wall -Wextra -Werror simple_test_compile.c -o simple_test_compile_runner -lcheck -lpthread -lm -lrt -lsubunit
+./simple_test_compile_runner

@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# This file is maintained at http://git.mdcc.cx/caspar
+
+#
+# csp_sucp - mix scp with sudo
+#
+# usage:
+#  csp_sucp [user@]host dir file
+#
+# examples:
+#  csp_sucp rms@bilbo /etc file
+#  csp_sucp monty-python trailer.txt commit
+#
+# warning:
+#  csp_sucp won't prevent the given password from being echoed!
+#
+
+if test -z "$3"
+then
+    echo "usage: csp_sucp [user@]host dir file [file ...]"
+    exit 1
+fi
+
+# command line argument overrules environment variable
+test -n "$CSP_SUCP_USER" && opt_u="-u $CSP_SUCP_USER"
+
+# first make sure our sudo-timestamp is fresh
+ssh -t $1 sudo -v
+# now run sudo: we won't be prompted for a password; and
+# can use stdin for our data
+test -n "$CSP_DEBUG" && echo $1 $opt_u $2 $3
+
+#exec ssh $1 "sudo $opt_u sh -c \"cat - > $2/$3\"" < $3
+
+host=$1; shift
+dir=$1; shift
+# files now in $@
+
+test -n "$CSP_DEBUG" && echo exec tar c "$@" \| ssh -T $host sudo -n $opt_u tar xC $dir
+
+exec tar c "$@" | ssh -T $host sudo -n $opt_u tar xC $dir
+

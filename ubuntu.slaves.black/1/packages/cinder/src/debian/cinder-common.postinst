@@ -1,0 +1,36 @@
+#!/bin/sh -e
+
+CINDER_UID=64061
+CINDER_GID=64061
+
+if [ "$1" = "configure" ]; then
+    if ! getent group cinder > /dev/null 2>&1; then
+        addgroup --quiet --system \
+            --gid $CINDER_GID cinder 2>/dev/null
+    fi
+
+    if ! getent passwd cinder > /dev/null 2>&1; then
+        adduser --quiet --system \
+            --home /var/lib/cinder \
+            --no-create-home \
+            --uid $CINDER_UID \
+            --gid $CINDER_GID \
+            --shell /bin/false cinder 2>/dev/null
+    fi
+
+    chown cinder:adm /var/log/cinder
+    chmod 0750 /var/log/cinder
+
+    find /etc/cinder -exec chown root:cinder "{}" +
+    find /etc/cinder -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+
+    find /etc/cinder/rootwrap.d -exec chown root:root "{}" +
+    find /etc/cinder/rootwrap.d -type f -exec chmod 0644 "{}" + -o -type d -exec chmod 0755 "{}" +
+
+    chmod 0440 /etc/sudoers.d/cinder_sudoers
+
+    find /var/lib/cinder -exec chown cinder:cinder "{}" +
+    find /var/lib/cinder -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+fi
+
+#DEBHELPER#

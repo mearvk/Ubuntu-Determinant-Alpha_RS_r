@@ -1,0 +1,266 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2003 Colin Walters <walters@debian.org>
+# Copyright © 2005-2012, 2016-2017, 2019 Jonas Smedegaard <dr@jones.dk>
+# Description: Defines various random rules, including a list-missing rule
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#PATH_RULES#
+
+ifndef _cdbs_rules_utils
+_cdbs_rules_utils = 1
+
+include $(_cdbs_rules_path)/buildcore.mk$(_cdbs_makefile_suffix)
+
+# path to licensecheck executable
+DEB_COPYRIGHT_CHECK_LICENSECHECK ?= /usr/bin/licensecheck
+
+# Routines convenient for maintainers but unsuitable for build daemons
+#  * strict checking makes rule fail if changed/new hints are found
+ifneq (,$(DEB_MAINTAINER_MODE))
+  DEB_COPYRIGHT_CHECK_STRICT ?= yes
+endif
+
+# Space-delimited regular expressions for extensions/paths to ignore
+#DEB_COPYRIGHT_CHECK_IGNORE_EXTS =
+#DEB_COPYRIGHT_CHECK_IGNORE_PATHS =
+
+# Space-delimited regular expressions for extensions/paths to extract
+# metadata from
+#  * Supported extensions: gif icc jpeg jpg pdf pfa pfb png psd svg
+#DEB_COPYRIGHT_EXTRACT_EXTS =
+#DEB_COPYRIGHT_EXTRACT_PATHS_EXIF =
+#DEB_COPYRIGHT_EXTRACT_PATHS_TTF =
+
+# spacing between multiline file and copyright items
+DEB_COPYRIGHT_CHECK_DELIMITER ?= $(subst $(comma),,$(CDBS_BUILD_DEPENDS_DELIMITER))
+
+# Space-delimited lists of directories and files to move or copy aside
+# DEB_UPSTREAM_CRUFT_MOVE =
+# DEB_UPSTREAM_CRUFT_COPY =
+
+DEB_PHONY_RULES += list-missing debian/copyright_newhints
+
+CDBS_BUILD_DEPENDS_rules_utils_copyright-check ?= licensecheck
+CDBS_BUILD_DEPENDS +=, $(CDBS_BUILD_DEPENDS_rules_utils_copyright-check)
+
+CDBS_BUILD_DEPENDS_rules_utils_copyright-check-granular ?= cdbs (>= 0.4.131~)
+CDBS_BUILD_DEPENDS += $(if $(_cdbs_copyright_ignore_regex),\
+	$(comma) $(CDBS_BUILD_DEPENDS_rules_utils_copyright-check-granular))
+
+CDBS_BUILD_DEPENDS_rules_utils_copyright-extract ?= cdbs (>= 0.4.147~), \
+	libregexp-assemble-perl, libimage-exiftool-perl, libfont-ttf-perl
+CDBS_BUILD_DEPENDS += $(if $(_cdbs_copyright_extract_regex),\
+	$(comma) $(CDBS_BUILD_DEPENDS_rules_utils_copyright-extract))
+
+_cdbs_upstream_cruft_backupdir ?= debian/upstream-cruft
+
+_cdbs_copyright_ignore_regex = $(subst $(space),|,$(strip \
+	$(DEB_COPYRIGHT_CHECK_IGNORE_PATHS:/=/[^/]+)\
+	$(patsubst %,.+\.(%),$(subst $(space),|,$(strip \
+		$(DEB_COPYRIGHT_CHECK_IGNORE_EXTS))))))
+
+_cdbs_copyright_extract_regex = $(subst $(space),|,$(strip \
+	$(DEB_COPYRIGHT_EXTRACT_PATHS_TTF:/=/[^/]+) \
+	$(DEB_COPYRIGHT_EXTRACT_PATHS_EXIF:/=/[^/]+) \
+	$(patsubst %,.+\.(%),$(subst $(space),|,$(strip \
+		$(DEB_COPYRIGHT_EXTRACT_EXTS))))))
+
+_cdbs_copyright_check_remove_metadata = $(patsubst %,find -- * \
+	-regextype posix-extended \
+	$(patsubst %,'!' -regex '^(%)$$',\
+		$(_cdbs_copyright_ignore_regex)) \
+	-regex '^(%)\.metadata$$' \
+	-type f \
+	-delete,\
+	$(_cdbs_copyright_extract_regex))
+
+_cdbs_copyright_check_strict_check = $(if $(DEB_COPYRIGHT_CHECK_STRICT),\
+	$(error ERROR: Treating above warning as an error \
+		(unset DEB_COPYRIGHT_CHECK_STRICT \
+		or set DEB_MAINTAINER_MODE=1 to suppress)))
+
+_cdbs_copyright_check_enabled_ok = $(or \
+	$(wildcard debian/copyright_hints),$(strip \
+	$(call cdbs_warn,copyright-check disabled \
+		- touch debian/copyright_hints to enable.)\
+		$(_cdbs_copyright_check_strict_check)))
+
+_cdbs_copyright_check_licensecheck_installed_ok = $(or \
+	$(wildcard $(DEB_COPYRIGHT_CHECK_LICENSECHECK)),$(strip \
+	$(call cdbs_warn,copyright-check disabled \
+		- licensecheck is missing.)\
+		$(_cdbs_copyright_check_strict_check)))
+
+_cdbs_copyright_check_licensecheck_modern_ok = $(or \
+	$(shell licensecheck --deb-fmt --version > /dev/null 2>&1 && echo OK),$(strip \
+	$(call cdbs_warn,copyright-check disabled \
+		- licensecheck is too old.)\
+		$(_cdbs_copyright_check_strict_check)))
+
+_cdbs_copyright_check_regex_deprecated_check = $(and \
+	$(_cdbs_copyright_ignore_regex)$(_cdbs_copyright_extract_regex),\
+	$(filter-out $(DEB_COPYRIGHT_CHECK_IGNORE_REGEX),\
+		$(_cdbs_deprecated_DEB_COPYRIGHT_CHECK_IGNORE_REGEX_default)),\
+	$(error ERROR: Deprecated variable DEB_COPYRIGHT_CHECK_IGNORE_REGEX \
+		and granular regex variables cannot be used together.))
+
+list-missing:
+	@if test -d debian/tmp; then \
+	  (cd debian/tmp && find . -type f -o -type l | grep -v '/DEBIAN/' | sort) > debian/cdbs-install-list; \
+	  (for package in $(DEB_ALL_PACKAGES); do \
+	     (cd debian/$$package && find . -type f -o -type l); \
+	   done; \
+	   test -e debian/not-installed && grep -v '^#' debian/not-installed; \
+	   ) | sort -u > debian/cdbs-package-list; \
+	  diff -u debian/cdbs-install-list debian/cdbs-package-list | sed '1,2d' | egrep '^-' || true; \
+	else \
+	  echo "All files were installed into debian/$(DEB_SOURCE_PACKAGE)."; \
+	fi
+
+pre-build:: $(_cdbs_copyright_check_regex_deprecated_check)$(and \
+	$(_cdbs_copyright_check_enabled_ok),\
+	$(_cdbs_copyright_check_licensecheck_installed_ok),\
+	$(_cdbs_copyright_check_licensecheck_modern_ok),\
+	debian/stamp-copyright-check)
+debian/copyright_newhints:
+	@echo
+	@echo 'Scanning upstream source for new/changed copyright notices...'
+	@echo
+	$(patsubst %,set -e; find -- * \
+		-type f -regextype posix-extended \
+		$(patsubst %,'!' -regex '^(%)$$',\
+			$(_cdbs_copyright_ignore_regex)) \
+		-regex '^.+\.(%)$$' \
+		-print0 | \
+		perl -0 $(_cdbs_scripts_path)/license-miner,\
+		$(subst $(space),|,$(strip \
+			$(DEB_COPYRIGHT_EXTRACT_EXTS))))
+	$(patsubst %,set -e; find -- * \
+		-type f -regextype posix-extended \
+		$(patsubst %,'!' -regex '^(%)$$',\
+			$(_cdbs_copyright_ignore_regex)) \
+		-regex '^(%)$$' \
+		-printf 'exif:%p\0' | \
+		perl -0 $(_cdbs_scripts_path)/license-miner,\
+		$(subst $(space),|,$(strip \
+			$(DEB_COPYRIGHT_EXTRACT_PATHS_EXIF:/=/[^/]+))))
+	$(patsubst %,set -e; find -- * \
+		-type f -regextype posix-extended \
+		$(patsubst %,'!' -regex '^(%)$$',\
+			$(_cdbs_copyright_ignore_regex)) \
+		-regex '^(%)$$' \
+		-printf 'ttf:%p\0' | \
+		perl -0 $(_cdbs_scripts_path)/license-miner,\
+		$(subst $(space),|,$(strip \
+			$(DEB_COPYRIGHT_EXTRACT_PATHS_TTF:/=/[^/]+))))
+	$(strip set -e; \
+		LC_ALL=C.UTF-8 $(DEB_COPYRIGHT_CHECK_LICENSECHECK) \
+		--check '.*' \
+		--recursive \
+		--copyright \
+		--deb-fmt \
+		--ignore '$(strip \
+			$(or $(patsubst %,^(%|debian/(changelog|copyright(|_hints|_newhints)))$$,\
+					$(subst $(space),|,$(strip \
+						$(_cdbs_copyright_ignore_regex) \
+						$(_cdbs_copyright_extract_regex)))\
+				),$(DEB_COPYRIGHT_CHECK_IGNORE_REGEX)))' \
+		--lines 0 \
+		-- * \
+		| $(_cdbs_scripts_path)/licensecheck2dep5 \
+			$(if $(DEB_COPYRIGHT_CHECK_MERGE_SAME_LICENSE),\
+				--merge-licenses) \
+		> debian/copyright_newhints)
+debian/stamp-copyright-check: debian/copyright_newhints
+	@echo "$$(grep -c ^Files: debian/copyright_newhints) combinations of copyright and licensing found."
+	@set -e; \
+		newstrings=$$(\
+			diff -a -u debian/copyright_hints debian/copyright_newhints \
+			| sed '1,2d' \
+			| egrep -a '^\+' - \
+			| sed 's/^\+//'); \
+		if [ -n "$$newstrings" ]; then \
+			echo "$(if $(DEB_COPYRIGHT_CHECK_STRICT),ERROR,WARNING): \
+				New or changed notices discovered:"; \
+			echo; \
+			echo "$$newstrings" \
+				| perl -nC \
+					-e 's/[^[:print:][:space:]]+/…/g;' \
+					-e 's/^.{59}[^…]?\b\K.+$$/…/;' \
+					-e '$$_ ne $$prev and (($$prev) = $$_) and print' \
+				| sort -m \
+				| head -n 200; \
+			echo; \
+			echo "To fix the situation please do the following:"; \
+			echo "  1) Examine debian/copyright_* and referenced files"; \
+			echo "  2) Update debian/copyright as needed"; \
+			echo "  3) Replace debian/copyright_hints with debian/copyright_newhints"; \
+			$(if $(DEB_COPYRIGHT_CHECK_STRICT),exit 1,:); \
+		else \
+			echo 'No new copyright notices found - assuming no news is good news...'; \
+			rm -f debian/copyright_newhints; \
+		fi
+	$(_cdbs_copyright_check_remove_metadata)
+	touch $@
+
+clean::
+	$(if $(DEB_COPYRIGHT_CHECK_STRICT),\
+		,\
+		rm -f debian/copyright_newhints)
+	$(_cdbs_copyright_check_regex_deprecated_check)
+	$(_cdbs_copyright_check_remove_metadata)
+	$(strip rm -f \
+		debian/cdbs-install-list \
+		debian/cdbs-package-list \
+		debian/stamp-copyright-check)
+
+# put aside upstream cruft during build but after copyright-check
+pre-build:: debian/stamp-upstream-cruft
+debian/stamp-upstream-cruft: debian/stamp-copyright-check
+	$(if $(DEB_UPSTREAM_CRUFT_MOVE)$(DEB_UPSTREAM_CRUFT_COPY),\
+		mkdir -p "$(_cdbs_upstream_cruft_backupdir)")
+	$(foreach orig,$(DEB_UPSTREAM_CRUFT_MOVE),\
+		$(foreach backup,$(_cdbs_upstream_cruft_backupdir)/$(orig),\
+			$(if $(wildcard $(orig)),\
+				$(if $(wildcard $(backup)),\
+					,\
+					$(shell mkdir -p "$(dir $(backup))") \
+					mv "$(orig)" "$(backup)";))))
+	$(foreach orig,$(DEB_UPSTREAM_CRUFT_COPY),\
+		$(foreach backup,$(_cdbs_upstream_cruft_backupdir)/$(orig),\
+			$(if $(wildcard $(orig)),\
+				$(if $(wildcard $(backup)),\
+					,\
+					$(shell mkdir -p "$(dir $(backup))") \
+					cp -a "$(orig)" "$(backup)";))))
+	touch $@
+clean::
+	$(foreach orig,$(DEB_UPSTREAM_CRUFT_MOVE) $(DEB_UPSTREAM_CRUFT_COPY),\
+		$(foreach backup,$(_cdbs_upstream_cruft_backupdir)/$(orig),\
+			$(if $(wildcard $(backup)),\
+				$(if $(wildcard $(orig)),\
+					rm -rf "$(orig)";) \
+				mv "$(backup)" "$(orig)";)))
+	rm -rf "$(_cdbs_upstream_cruft_backupdir)"
+	rm -f debian/stamp-upstream-cruft
+
+# deprecated variable
+DEB_COPYRIGHT_CHECK_IGNORE_REGEX ?= $(patsubst %,^(%)$$,\
+	debian/(changelog|copyright(|_hints|_newhints)))
+_cdbs_deprecated_vars += DEB_COPYRIGHT_CHECK_IGNORE_REGEX,0.4.133
+_cdbs_deprecated_DEB_COPYRIGHT_CHECK_IGNORE_REGEX_default := $(strip \
+	$(DEB_COPYRIGHT_CHECK_IGNORE_REGEX))
+
+endif

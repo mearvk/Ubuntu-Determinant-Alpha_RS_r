@@ -1,0 +1,42 @@
+From bc7b874fa91328df85abd90df17a96a4a5ca57a0 Mon Sep 17 00:00:00 2001
+From: Lars Ellenberg <lars@linbit.com>
+Date: Thu, 16 Oct 2014 19:24:17 +0200
+Subject: [PATCH] fix syslogmsgfmt logging inconsistency for stderr/stdout
+
+For stderr/stdout, print_logline was called unconditionally.
+If syslog message format is enabled (which is the default),
+that differs from the log format used for other files.
+
+If we instead use append_log(...) for stderr and stdout as well,
+we take the same code path as for any other "file" target.
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/bc7b874fa91328df85abd90df17a96a4a5ca57a0
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ lib/clplumbing/cl_log.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/clplumbing/cl_log.c b/lib/clplumbing/cl_log.c
+index 13c33220..213e760c 100644
+--- a/lib/clplumbing/cl_log.c
++++ b/lib/clplumbing/cl_log.c
+@@ -719,12 +719,12 @@ cl_log(int priority, const char * fmt, ...)
+ 	}
+ 
+ 	if (stderr_enabled) {
+-		print_logline(stderr, cl_log_entity,cl_process_pid,
++		append_log(stderr, cl_log_entity,cl_process_pid,
+ 			NULLTIME, prio2str(priority), buf);
+ 	}
+ 
+ 	if (stdout_enabled) {
+-		print_logline(stdout, cl_log_entity,cl_process_pid,
++		append_log(stdout, cl_log_entity,cl_process_pid,
+ 			NULLTIME, prio2str(priority), buf);
+ 	}
+ 
+-- 
+2.27.0
+

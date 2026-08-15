@@ -1,0 +1,51 @@
+From 1d3f8bca11c8be83b5ec8711afdd2bcf67a4fa16 Mon Sep 17 00:00:00 2001
+From: Luciano Lo Giudice <luciano.logiudice@canonical.com>
+Date: Tue, 26 Oct 2021 19:08:07 -0300
+Subject: [PATCH] Fix QOS computation
+
+It's possible for a volume's node name to be `None` (because an
+API is not present, or the user doesn't have privileges, for example).
+For these cases, computing the QOS name can lead to a TypeError, since
+it needs to concatenate a prefix to the node name. This patchset fixes
+this problem by returning an empty string for the QOS if the node name
+is indeed None.
+
+Closes-Bug: #1948507
+Change-Id: I16d7bf9fb023f3bc7be0fc8e3e08421b2754d5a5
+---
+ cinder/tests/unit/volume/drivers/netapp/test_utils.py | 3 +++
+ cinder/volume/drivers/netapp/utils.py                 | 4 +++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/cinder/tests/unit/volume/drivers/netapp/test_utils.py b/cinder/tests/unit/volume/drivers/netapp/test_utils.py
+index fe24c7341..2f905c4ad 100644
+--- a/cinder/tests/unit/volume/drivers/netapp/test_utils.py
++++ b/cinder/tests/unit/volume/drivers/netapp/test_utils.py
+@@ -836,6 +836,9 @@ class NetAppDriverUtilsTestCase(test.TestCase):
+         else:
+             self.assertEqual('QOS_MIN_BLOCK_' + name, feature_name)
+ 
++        self.assertEqual('', na_utils.qos_min_feature_name(True, None))
++        self.assertEqual('', na_utils.qos_min_feature_name(False, None))
++
+ 
+ class OpenStackInfoTestCase(test.TestCase):
+ 
+diff --git a/cinder/volume/drivers/netapp/utils.py b/cinder/volume/drivers/netapp/utils.py
+index d30c2cafb..51366193d 100644
+--- a/cinder/volume/drivers/netapp/utils.py
++++ b/cinder/volume/drivers/netapp/utils.py
+@@ -542,7 +542,9 @@ def get_export_host_junction_path(share):
+ 
+ 
+ def qos_min_feature_name(is_nfs, node_name):
+-    if is_nfs:
++    if node_name is None:
++        return ''
++    elif is_nfs:
+         return 'QOS_MIN_NFS_' + node_name
+     else:
+         return 'QOS_MIN_BLOCK_' + node_name
+-- 
+2.34.1
+

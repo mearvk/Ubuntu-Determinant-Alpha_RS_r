@@ -1,0 +1,279 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_cligacpolicy - creates and installs a CLI policy file for a package
+
+=cut
+
+use strict;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_cligacpolicy> [S<I<debhelper options>>] [B<-n>]
+
+=head1 DESCRIPTION
+
+dh_cligacpolicy is a debhelper program that is responsible for creating,
+compiling, and installing policy files for a Debian package.  This
+automatically includes postinst and prerm commands needed to install
+these policies into the system.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-n>, B<--noscripts>
+
+Do not modify postinst/prerm scripts.
+
+=back
+
+=head1 FILE FORMAT
+
+This file uses the I<debian/cligacpolicy> files (either
+I<policyassemblies> or I<debian/packagename.cligacpolicy>) to generate
+the policy file. It supports multiple versions of the policy,
+including mapping multiple versions to a single file.
+
+The file format of the I<cligacpolicy> file consists of five
+properties per line, each one separated by whitespace.
+
+=over 4
+
+=item B<Keyfile> is a path, from the package root, to the .snk file
+used to sign the assembly.
+
+=item B<Assembly> is the name of the assembly, without the .dll
+extension. For example, for log4net.dll, use I<log4net>.
+
+=item B<Version Range> can be a single four-part version, such as
+1.2.3.4, or a full range, such as 1.2.3.4-1.2.6.7. For a single line,
+the first two numbers must be identical. To have an assembly apply to
+multiple versions, such as 1.2.0.0 to 2.4.0.0, there needs to be one
+line for each version range.
+
+=item B<Assembly version> is the version of the assembly being
+=built.
+
+=item B<Priority> defines the priority of the policy files.
+Typically, each version will increase the priority and
+contains all the policy controls for prior versions.
+
+=back
+
+The fields can be separated with spaces or tabs. Comments start the
+line with I<#> characters and blank lines are ignored.
+
+=head1 NOTES
+
+Note that this command is not idempotent. "dh_prep" should be called
+between invocations of this command. Otherwise, it may cause multiple
+instances of the same text to be added to maintainer scripts.
+
+=head1 EXAMPLE
+
+For the log4net 1.2.10.0 version, a policy file is used to map all
+versions from 1.2.8.0 to 1.2.9.99 into the current version.
+
+debian/log4net.snk log4net 1.2.8.0-1.2.9.99 1.2.10.0 10
+
+=cut
+
+# Set up debhelper
+init();
+
+{
+  local $/="";
+  open(FILE, 'debian/control');
+  my @filedata = <FILE>;
+  close(FILE);
+  if (!($filedata[0] =~ /Build-Depends(-Indep)?: .*cli-common-dev \(>= 0\.5\.7\)/)) {
+      warning("Warning! No Build-Depends(-Indep) on cli-common-dev (>= 0.5.7)!");
+  }
+}
+
+# Go through each of the packages being built
+my $errors = 0;
+
+# PROMISE: DH NOOP WITHOUT cligacpolicy
+
+foreach my $package (@{$dh{DOPACKAGES}})
+{
+    # Set up our internal variables
+    my $tmp = tmpdir($package);
+    my $policy = pkgfile($package, "cligacpolicy");
+    my %policies = ();
+    
+    # If $policy is blank, then there is no file
+    next if $policy eq "";
+
+    # Load the policy file into memory.
+    my ($keyfile, $pkg_tmp, $cli_dir, $token, $priority);
+    open POLICY, "<$policy" or die "E: Can't open $policy ($!)";
+
+    while (<POLICY>)
+    {
+	# Clean up the line and ignore blanks and comments
+	chomp;
+	s/^\s+//;
+	s/\s+$//;
+	next if /^\#/;
+	next if /^$/;
+
+	# Each line consists of six parts:
+	#   1. snk file for encryption, relative to the package root
+	#   2. Assembly name
+	#   3. Versions to map from
+	#   4. Versions to map to
+	#   5. Priority of this policy
+
+	my ($snk, $assembly, $map, $version, $priority) =
+	    split(/\s+/);
+
+	# Verify the fields
+	my $version_map;
+
+	# Remove the .dll to normalize it
+	$assembly =~ s/\.dll$//;
+
+	# Get the token from the file
+	my $cmd = "/usr/bin/cli-sn -t '$snk' | grep 'Public Key' "
+	    . "| cut -f 2- -d :";
+	my $token = `$cmd`;
+	# FIXME: error handling here!
+	$token =~ s/^\s*(.*?)\s*$/$1/sg;
+
+	# Check the version numbers
+	if ($map =~ /^(\d+\.\d+)\.\d+\.\d+$/)
+	{
+	    $version_map = $1;
+	}
+	else
+	{
+	    if ($map =~ /^(\d+\.\d+)\.\d+\.\d+-(\d+\.\d+)\.\d+\.\d+$/)
+	    {
+		if ($1 ne $2)
+		{
+		    $errors = 1;
+		    print STDERR "E: $package $.: Version ranges ($map) must "
+			. "have the first two digits of the version the same. "
+			. "Use two different lines for this line.\n";
+		    next;
+		}
+
+		$version_map = $1;
+	    }
+	    else
+	    {
+		$errors = 1;
+		print STDERR "E: $package $.: The version field ($map) "
+		    . "must be in the following format: "
+		    . "'A.B.C.D' or 'A.B.C.D-E.F.G.H'\n";
+		next;
+	    }
+	}
+
+	# We have now gathered up everything we need. We use a hash to
+	# consolidate all the various bindings into the unique
+	# combinations of policy files we need.
+	my $pk = join("--", $snk, $assembly, $version_map, $priority);
+
+ 	$policies{$pk} .=
+ 	    join("\n",
+ 		 '    <assemblyBinding '
+		 . 'xmlns="urn:schemas-microsoft-com:asm.v1">',
+ 		 '      <dependentAssembly>',
+ 		 "        <assemblyIdentity name=\"$assembly\" "
+		 . "publicKeyToken=\"$token\"/>",
+ 		 "          <bindingRedirect oldVersion="
+ 		 . "\"$map\" newVersion=\"$version\"/>",
+ 		 "      </dependentAssembly>",
+ 		 "    </assemblyBinding>") . "\n";
+    }
+
+    close POLICY;
+
+    # Make sure the policies.d directory exists
+    install_dir("$tmp/usr/share/cli-common/policies.d/$package");
+
+    # Once all the various <assemblyBinding> tags are consolidated, we
+    # then generate the policy files. This will result in one policy file for
+    # a given assembly, key file, and A.B version.
+    foreach my $pk (keys %policies)
+    {
+	# Get the pkg_dir
+	my ($snk, $assembly, $version_map, $priority) =
+	    split(/--/, $pk);
+	my $pkg_dir = "usr/share/cli-common/policies.d/$package";
+	my $tmp_pkg_dir = "$tmp/$pkg_dir";
+	my $policy_file = "$version_map.$assembly";
+
+	# Open the policy file chooser
+	open CHOOSER, ">$tmp/usr/share/cli-common/policies.d/"
+	    . sprintf("%03d-%s.%s", $priority, $version_map, $assembly);
+	print CHOOSER "/$pkg_dir/policy.$policy_file.dll\n";
+	close CHOOSER;
+
+	# Open up the file
+	unless (open PF, ">$tmp_pkg_dir/policy.$policy_file.config")
+	{
+	    $errors = 1;
+	    print STDERR "E: $package: Cannot write $policy_file.config\n";
+	    print STDERR "E: $package: $!\n";
+	    next;
+	}
+
+	# Write out the policy file
+	print PF "<configuration>\n  <runtime>\n";
+	print PF $policies{$pk};
+	print PF "  </runtime>\n</configuration>\n";
+	close PF;
+
+ 	# Compile the assembly file. We have to change directory first
+ 	# because of AL limitation.
+ 	system("cd $tmp_pkg_dir/ && /usr/bin/cli-al "
+ 	       . "/link:policy.$policy_file.config "
+ 	       . "/out:policy.$policy_file.dll "
+ 	       . "/keyfile:" . $ENV{PWD} . "/$snk");
+
+ 	# Clean up the config file
+ 	#unlink("$tmp_pkg_dir/policy.$policy_file.config");
+
+	# Set up the scripts
+	if (! $dh{NOSCRIPTS})
+	{
+	    autoscript($package, "postinst", "postinst-cligacpolicy",
+		       "s/#ASSEMBLY# #VERSION#/$assembly $version_map/");
+	    autoscript($package, "postrm", "postrm-cligacpolicy",
+		       "s/#ASSEMBLY# #VERSION#/$assembly $version_map/");
+	}
+    }    
+}
+
+# Finish up
+exit $errors;
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of cli-common-dev.
+
+=head1 AUTHOR
+
+Dylan R. E. Moonfire <debian@mfgames.com>
+
+=cut
+
+#      <configuration>
+#         <runtime>
+#            <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+#             <dependentAssembly>
+#               <assemblyIdentity name="foo" publicKeyToken="35e10195dab3c99f" />
+#               <bindingRedirect oldVersion="1.2.0.0-1.2.10.0" newVersion="1.3.0.0"/>
+#      	   </dependentAssembly>
+#            </assemblyBinding>
+#         </runtime>
+#      </configuration>

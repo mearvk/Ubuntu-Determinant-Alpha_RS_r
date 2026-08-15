@@ -1,0 +1,51 @@
+From a682f50b42d30604bfb618897d4f1cf3ce97438a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Kristoffer=20Gr=C3=B6nlund?= <krig@koru.se>
+Date: Tue, 18 Oct 2016 12:32:27 +0200
+Subject: [PATCH] Low: stonith: Convert gethostbyname() usage to getaddrinfo()
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/a682f50b42d30604bfb618897d4f1cf3ce97438a
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ lib/stonith/expect.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/lib/stonith/expect.c b/lib/stonith/expect.c
+index fe0d5170..008ffd92 100644
+--- a/lib/stonith/expect.c
++++ b/lib/stonith/expect.c
+@@ -480,13 +480,26 @@ OpenStreamSocket(const char * host, int port, const char * service)
+ 	}else if (inet_pton(AF_INET6, host, (void*)&sockun.si6.sin6_addr)<0){
+ 		sockun.si6.sin6_family = AF_INET6;
+ 	}else{
+-		struct hostent*	hostp = gethostbyname(host);
+-		if (hostp == NULL) {
++		struct addrinfo *res;
++		int rc;
++		rc = getaddrinfo(host, NULL, NULL, &res);
++		if (rc != 0) {
++			errno = EINVAL;
++			return -1;
++		}
++		if (res->ai_family == AF_INET6) {
++			sockun.si6.sin6_family = res->ai_family;
++			memcpy(&sockun.si6.sin6_addr, res->ai_addr, res->ai_addrlen);
++			freeaddrinfo(res);
++		} else if (res->ai_family == AF_INET) {
++			sockun.si4.sin_family = res->ai_family;
++			memcpy(&sockun.si4.sin_addr, res->ai_addr, res->ai_addrlen);
++			freeaddrinfo(res);
++		} else {
++			freeaddrinfo(res);
+ 			errno = EINVAL;
+ 			return -1;
+ 		}
+-		sockun.si4.sin_family = hostp->h_addrtype;
+-		memcpy(&sockun.si4.sin_addr, hostp->h_addr, hostp->h_length);
+ 	}
+ 	if ((sock = socket(sockun.si4.sin_family, SOCK_STREAM, 0)) < 0) {
+ 		return -1;
+-- 
+2.27.0
+

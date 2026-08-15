@@ -1,0 +1,48 @@
+Fix cl_times on x32
+
+On x32, sizeof(long) is 4, and sizeof(clock_t) is 8. cl_times as logic to
+reject that case. We fix this by setting the return type of the function to
+long long instead on x32.
+
+--- a/include/clplumbing/longclock.h
++++ b/include/clplumbing/longclock.h
+@@ -79,7 +79,11 @@
+  *
+  *	extern const longclock_t	zero_longclock;
+  */
++#if __ILP32__ && __x86_64__
++extern unsigned long long cl_times(void);
++#else
+ extern unsigned long cl_times(void);
++#endif
+ 
+ #ifdef CLOCK_T_IS_LONG_ENOUGH
+ #	ifndef	HAVE_LONGCLOCK_ARITHMETIC
+--- a/lib/clplumbing/longclock.c
++++ b/lib/clplumbing/longclock.c
+@@ -68,7 +68,11 @@ hz_longclock(void)
+ #	define	TIMES_PARAM	&dummy_longclock_tms_struct
+ #endif
+ 
++#if __ILP32__ && __x86_64__
++unsigned long long
++#else
+ unsigned long
++#endif
+ cl_times(void)	/* Make times(2) behave rationally on Linux */
+ {
+ 	clock_t		ret;
+@@ -114,9 +118,13 @@ cl_times(void)	/* Make times(2) behave r
+ 	 * because of sign extension.
+ 	 * We do expect sizeof(clock_t) <= sizeof(long), however.
+ 	 */
++#if __ILP32__ && __x86_64__
++	return ret;
++#else
+ 	BUILD_BUG_ON(sizeof(clock_t) > sizeof(unsigned long));
+ #define CLOCK_T_MAX	(~0UL >> (8*(sizeof(unsigned long) - sizeof(clock_t))))
+ 	return (unsigned long)ret & CLOCK_T_MAX;
++#endif
+ }
+ 
+ #ifdef CLOCK_T_IS_LONG_ENOUGH

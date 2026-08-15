@@ -1,0 +1,174 @@
+.\" Copyright (c) 2020 Joost van Baal-Ilić
+.TH "csp_helper" 1 "9 јун 2020" "csp_helper 20200609" "USER COMMANDS "
+.po 2m
+.de ZI
+.\" Zoem Indent/Itemize macro I.
+.br
+'in +\\$1
+.nr xa 0
+.nr xa -\\$1
+.nr xb \\$1
+.nr xb -\\w'\\$2'
+\h'|\\n(xau'\\$2\h'\\n(xbu'\\
+..
+.de ZJ
+.br
+.\" Zoem Indent/Itemize macro II.
+'in +\\$1
+'in +\\$2
+.nr xa 0
+.nr xa -\\$2
+.nr xa -\\w'\\$3'
+.nr xb \\$2
+\h'|\\n(xau'\\$3\h'\\n(xbu'\\
+..
+.if n .ll -2m
+.am SH
+.ie n .in 4m
+.el .in 8m
+..
+.SH NAME
+csp_helper \- A collection of caspar helper scripts
+.SH SYNOPSIS
+\fBcsp_install\fP \fBdir\fP (\fIdirectory\fP) \fBfile\fP (\fIfile\fP)
+
+\fBcsp_mkdircp\fP \fBdir\fP (\fIdirectory\fP) \fBfile\fP (\fIfile\fP)
+
+\fBcsp_scp_keep_mode\fP \fBh\fP (\fI[user@]host\fP) \fBdir\fP (\fIdirectory\fP) \fBfile\fP (\fIfile\fP)
+
+\fBcsp_sucp\fP
+\fBh\fP (\fI[user@]host\fP)
+\fBdir\fP (\fIdirectory\fP)
+\fBfile\fP (\fIfile\fP)
+.SH DESCRIPTION
+The scripts \fBcsp_install\fP, \fBcsp_mkdircp\fP, \fBcsp_scp_keep_mode\fP and \fBcsp_sucp\fP are helpers for
+\fBcaspar(7)\fP\&. These scripts typically are not invoked directly,
+but via a Makefile which uses \fBcaspar\fP\&. See the notes on csp_PUSH in
+\fBcaspar(7)\fP for information on how to link \fBcsp_install\fP,
+\fBcsp_scp_keep_mode\fP and \fBcsp_sucp\fP to \fBcaspar\fP\&.
+.SH install DESCRIPTION
+\fBcsp_install\fP creates the required directory (if needed) and installs the file,
+preserving timestamps\&. It uses install(1)\&.
+.SH install EXAMPLES
+
+.di ZV
+.in 0
+.nf \fC
+
+ csp_INSTALL_OPTIONS=\&'--owner=www-data --group=www-data\&' \e
+  csp_INSTALL_MODE=ugo=r \e
+  csp_install /srv/www index\&.html
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+.di ZV
+.in 0
+.nf \fC
+
+ csp_INSTALL_MODE=u=rwx,go= csp_install /usr/local/sbin mkpasswd
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+.SH install ENVIRONMENT
+\fBcsp_install\fP honors csp_INSTALL_OPTIONS and csp_INSTALL_MODE (default is
+u=rw,go=r)\&.
+.SH mkdircp DESCRIPTION
+\fBcsp_mkdircp\fP calls mkdir(1) and cp(1)\&.
+\fBcsp_mkdircp\fP is used like csp_CP\&. use \fBcsp_mkdircp\fP if you frequently have to
+bootstrap installation on a fresh system, on which needed directories don\&'t
+exist yet\&. \fBcsp_mkdircp\fP makes sure the target directory exists before calling
+cp(1), by calling mkdir -p first\&.
+.SH scp_keep_mode DESCRIPTION
+\fBcsp_scp_keep_mode\fP uses ssh to copy a file to a remote host, keeping its file
+permission mode\&. The trick used is a combination of mktemp(1) and mv(1)\&.
+Useful if you\&'d like to be sure a file gets installed e\&.g\&. group writable,
+without fiddling with permission bits on the remote host\&.
+.SH scp_keep_mode EXAMPLE
+
+.di ZV
+.in 0
+.nf \fC
+
+  chmod g+w rc
+  csp_scp_keep_mode root@gandalf /etc/uruk rc
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+.SH scp_keep_mode ENVIRONMENT
+\fBcsp_scp_keep_mode\fP honors csp_SSH ("ssh" by default)\&.
+.SH sucp DESCRIPTION
+\fBcsp_sucp\fP calls tar(1) from within sudo(1) from within ssh(1)\&. This allows one
+to copy files to accounts on hosts one can only reach by calling sudo on the
+ssh-reachable remote host\&.
+
+Typically, one wants to install a root-owned file, but one does not want to
+allow access to the root-account directly from ssh\&. Typically sudo is used as
+an extra line of defense\&.
+
+NB: if your sudo prompts for a password, be sure to have line
+
+.di ZV
+.in 0
+.nf \fC
+
+  Defaults !tty_tickets
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+in your sudoers file: we first call sudo -v, than we call sudo to write the
+data\&. Since we use ssh to get to the host, we\&'ll use a different tty for both
+sudo calls\&.
+.SH sucp EXAMPLES
+Some examples:
+
+.di ZV
+.in 0
+.nf \fC
+
+  csp_sucp rms@bilbo /etc fstab
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+.di ZV
+.in 0
+.nf \fC
+
+  csp_sucp monty-python commit/ trailer\&.txt
+.fi \fR
+.in
+.di
+.ne \n(dnu
+.nf \fC
+.ZV
+.fi \fR
+
+.SH AUTHOR
+Joost van Baal-Ilić
+.SH SEE ALSO
+\fBcaspar(7)\fP
+The caspar homepage is at http://mdcc\&.cx/caspar/ \&.

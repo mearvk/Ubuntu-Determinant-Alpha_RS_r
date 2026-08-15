@@ -1,0 +1,83 @@
+From 71bf150312da7ff6c0e7eca1ccea83e09dbba5a9 Mon Sep 17 00:00:00 2001
+From: Dejan Muhamedagic <dejan@hello-penguin.com>
+Date: Fri, 31 Oct 2014 15:43:17 +0100
+Subject: [PATCH] Medium: ha_logd: prevent race caused by pid reuse
+ (bsc#894272)
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/71bf150312da7ff6c0e7eca1ccea83e09dbba5a9
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ include/clplumbing/cl_pidfile.h |  1 +
+ lib/clplumbing/cl_pidfile.c     |  4 ++--
+ logd/ha_logd.c                  | 15 ++++++---------
+ 3 files changed, 9 insertions(+), 11 deletions(-)
+
+diff --git a/include/clplumbing/cl_pidfile.h b/include/clplumbing/cl_pidfile.h
+index 3dba50fc..d04e5cf7 100644
+--- a/include/clplumbing/cl_pidfile.h
++++ b/include/clplumbing/cl_pidfile.h
+@@ -21,5 +21,6 @@ int	cl_read_pidfile(const char *filename);
+ int	cl_read_pidfile_no_checking(const char *filename);
+ int	cl_lock_pidfile(const char *filename);
+ int	cl_unlock_pidfile(const char *filename);
++int IsRunning(long pid);
+ 
+ #endif
+diff --git a/lib/clplumbing/cl_pidfile.c b/lib/clplumbing/cl_pidfile.c
+index b94573ba..ae2f503d 100644
+--- a/lib/clplumbing/cl_pidfile.c
++++ b/lib/clplumbing/cl_pidfile.c
+@@ -74,7 +74,7 @@
+ /* This is what the FHS standard specifies for the size of our lock file */
+ #define	LOCKSTRLEN	11
+ #include <clplumbing/cl_log.h>
+-static int IsRunning(long pid)
++int IsRunning(long pid)
+ {
+ 	int rc = 0;
+ 	long mypid;
+@@ -224,7 +224,7 @@ cl_read_pidfile(const char*filename)
+ 	pid = cl_read_pidfile_no_checking(filename);
+ 	
+ 	if (pid < 0){
+-		return - LSB_STATUS_STOPPED;
++		return -LSB_STATUS_STOPPED;
+ 	}
+ 	
+ 	if (IsRunning(pid)){
+diff --git a/logd/ha_logd.c b/logd/ha_logd.c
+index c98b9d73..5f1f66e6 100644
+--- a/logd/ha_logd.c
++++ b/logd/ha_logd.c
+@@ -590,20 +590,17 @@ logd_stop(void)
+ 		alarm(0);
+ 		do {
+ 			sleep(1);
+-		}while (kill((pid_t)running_logd_pid, 0) >= 0);
+-	}
+-	err = errno;
+-	
+-	if(errno == ESRCH) {
+-		cl_log(LOG_INFO, "Pid %ld exited", running_logd_pid);
+-		exit(LSB_EXIT_OK);
+-	} else {
++		}while (IsRunning(running_logd_pid));
++	} else if (errno != ESRCH) {
++		err = errno;
+ 		cl_perror("Pid %ld not killed", running_logd_pid);
+ 		exit((err == EPERM || err == EACCES)
+ 		     ?	LSB_EXIT_EPERM
+ 		     :	LSB_EXIT_GENERIC);
+ 	}
+-	
++
++	cl_log(LOG_INFO, "Pid %ld exited", running_logd_pid);
++	exit(LSB_EXIT_OK);
+ }
+ 
+ 
+-- 
+2.27.0
+

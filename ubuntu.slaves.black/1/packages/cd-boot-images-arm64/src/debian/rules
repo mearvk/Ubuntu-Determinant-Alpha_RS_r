@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+# Build-depends to exclude from built-using field
+IGNORE_DEPENDS=debhelper-compat python3-apt dosfstools mtools
+
+BUILD_DEPENDS=$(shell python3 -c 'import apt_pkg; print(" ".join([i[0][0] for i in apt_pkg.parse_src_depends(next(apt_pkg.TagFile("debian/control"))["Build-Depends"], architecture="$(DEB_HOST_ARCH)")]))')
+BUILT_USING=$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), \n' -W $(filter-out $(IGNORE_DEPENDS), $(BUILD_DEPENDS)) | sort -u)
+override_dh_gencontrol:
+	dh_gencontrol -- -VBuilt-Using="$(BUILT_USING)"
+
+%:
+	dh $@
+
+override_dh_clean:
+	rm -rf images tree xorriso-cmd.txt
+	dh_clean
+
+# Do not strip things, otherwise things do not boot
+override_dh_strip:
+
+# The below is basically encoding things, in a reproducible manner that
+# grub-mkrescue --verbose -o foo.iso &>foo.log does
+override_dh_auto_build:
+	rm -rf tree
+
+	# Copy font
+	mkdir -p tree/boot/grub/fonts
+	cp /usr/share/grub/unicode.pf2 tree/boot/grub/fonts/unicode.pf2
+
+	mkdir -p tree/efi/boot/
+	# signed shim is our default bootaa64.efi
+	cp /usr/lib/shim/shimaa64.efi.signed tree/efi/boot/bootaa64.efi
+	# mok-manager just in case
+	cp /usr/lib/shim/mmaa64.efi tree/efi/boot/mmaa64.efi
+	# signed grub build for CD-ROM is the grub envoked by shim
+	cp /usr/lib/grub/arm64-efi-signed/gcdaa64.efi.signed tree/efi/boot/grubaa64.efi
+
+	# Create partition with 1MB to spare, for README.txt / autoinstall.yaml, etc.
+	mkdir -p images/boot/grub
+	mkfs.msdos -n ESP -C -v images/boot/grub/efi.img $$(( $$(du -s --apparent-size --block-size=1024 tree/efi/ | cut -f 1 ) + 1024))
+	mcopy -s -i images/boot/grub/efi.img tree/efi ::/.
+
+	# Copy modules
+	mkdir -p tree/boot/grub/arm64-efi
+	cp -r /usr/lib/grub/arm64-efi/*.mod tree/boot/grub/arm64-efi
+	cp -r /usr/lib/grub/arm64-efi/*.lst tree/boot/grub/arm64-efi
+
+	# check that all our efi binaries are signed
+	find tree -name '*.efi' -exec /usr/lib/shim/is-not-revoked {} +
+
+	echo 'xorriso -as mkisofs --efi-boot images/grub/efi.img -efi-boot-part --efi-boot-image --protective-msdos-label -r tree' > xorriso-cmd.txt

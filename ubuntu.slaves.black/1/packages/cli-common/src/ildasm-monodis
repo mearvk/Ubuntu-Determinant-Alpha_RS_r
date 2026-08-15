@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+
+#
+# Setup
+#
+
+# Directives
+use strict;
+use warnings;
+
+# Modules
+use Getopt::Long;
+
+#
+# Variables
+#
+
+# Filenames
+my $assemblyref;
+
+# Get the mode
+GetOptions(
+	   "assemblyref!" => \$assemblyref,
+	   );
+
+# Get the filenames
+my $dll_filename = shift;
+
+usage() if (!defined $dll_filename);
+
+# Figure out what to do
+if ($assemblyref)
+{
+    parse_assemblyref($dll_filename);
+}
+else
+{
+    # As per meeby, do assemblyref
+    parse_assemblyref($dll_filename);
+}
+
+#
+# Create a pipe to the 'ildasm' program and give it the given
+# DLL. Then, take the results, parse them, and write it out to stdout.
+#
+
+sub parse_assemblyref
+{
+    # Get the parameters
+    my $dll_filename = shift;
+
+    # Open the pipe
+    open PIPE, "/usr/bin/ildasm $dll_filename |"
+	or die "Cannot open /usr/bin/ildasm $dll_filename ($!)";
+    
+    # Print out the header
+    print "AssemblyRef Table\n";
+    
+    # Go through the results
+    my $count = 0;
+    while (<PIPE>)
+    {
+	# Clean up the line
+	chomp;
+	
+	# Check for assembly ref
+	if (/^\.assembly extern (.*?)$/)
+	{
+	    # We have an assembly reference
+	    my $name = $1;
+	    my $version = undef;
+	    my $key = "\tZero sized public key";
+	    $count++;
+
+	    # On occasion, the name has quotes around it, but monodis
+	    # doesn't.
+	    $name =~ s/\'//g;
+	    $name =~ s/\"//g;
+
+	    # Go through and parse the rest of the variables until we
+	    # get to a } which signals the end of the block.
+	    while (<PIPE>)
+	    {
+		# Stop if we get a }
+		last if /^\}/;
+		s/^\s+//;
+
+		# Check for the keys
+		if (/\.ver (\d+):(\d+):(\d+):(\d+)/)
+		{
+		    # Make it look like mono
+		    $version = "$1.$2.$3.$4";
+		    next;
+		}
+
+		# Check for public key
+		if (/\.publickeytoken = \((.*?)\)/)
+		{
+		    # Monodis adds a space at the end of this next line
+		    $key = "\tPublic Key:\n0x00000000: $1 ";
+		}
+	    }
+
+	    # Emit it
+	    print join("\n",
+		       "$count: Version=$version",
+		       "\tName=$name",
+		       $key,
+		       ), "\n";
+	}
+    }
+    
+    # Mono also has an extra space at the end
+    print "\n";
+
+    # Close the pipe
+    close PIPE;
+}
+
+#
+# Usage. Just your typical complain function that automatically exits
+# out of perl after complaining.
+#
+
+sub usage
+{
+    print STDERR join("\n",
+		      "USAGE: $0 [options] /path/to/something.dll",
+		      "",
+		      "Options:",
+		      sprintf("%-20.20s  %s",
+			      "--assemblyref",
+			      "Dumps output like 'monodis --assemblyref'"),
+		      ), "\n";
+    exit 1;
+}

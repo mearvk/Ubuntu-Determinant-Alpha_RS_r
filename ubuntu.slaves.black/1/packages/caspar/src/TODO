@@ -1,0 +1,359 @@
+# This file is maintained at http://git.mdcc.cx/caspar 
+
+
+уто,  2. апр 2019.:
+create package for arch linux and it's derivates. see
+
+https://wiki.archlinux.org/index.php/Arch_User_Repository#Getting_started
+https://wiki.archlinux.org/index.php/Arch_package_guidelines
+https://aur.archlinux.org/register/
+
+vi arch/PKGBUILD
+to be processed by makepkg to generated a pacman package for arch linux and
+derivatives like antergos
+
+
+as of april 2, we have an account joostvb at aur.archlinux.org
+
+
+as of сре,  3. апр 2019.  08:48:16 CEST, it only works with:
+
+сре 03 08:46 < vdrvenne> makepkg --skipchecksums --skippgpcheck
+сре 03 08:55 < vdrvenne> pacman -U /home/vdrvenne/caspar-20180315-1-any.pkg.tar
+
+
+
+ship in doc/examples oid: printallehosts getgroups in its-unix/systems/juptile/include/install.mk
+user interface (as of 2016-03-04)
+joostvb@incagijs:~/sv...its-unix/systems/juptile% make -f include/install.mk printallehosts | less
+
+link to : https://nulpunt.nu/ caspar users
+Patrick "Argure" Godschalk https://github.com/Argure
+
+--- release critical ---- 
+
+- decide upon scp keep_mode: purge, and suggest scp -p ?  it currently
+  lacks multisupport.
+
+- "make install" fails when csp_PUSH is set to function without multi-support.  
+  fix csp_install: add multisupport (also: keep_mode, sucp. rest might just
+  work)
+
+- caspar.mk is not completely tested yet, first and second example in manpage
+  succeed, test 3rd and later.
+
+   $ CSP_DEBUG=yes CSP_SUCP_USER=jantje csp_sucp joe@bilbo   /etc/ inittab
+
+  works fine.  "export CSP_SUCP_USER=joe; make" works fine too.
+  "make CSP_SUCP_USER=joe" works fine too. 
+
+   csp_SUCP_USER = joe
+   csp_PUSH = $(csp_sucp_FUNC)
+
+  make
+
+  works too.  at least, it did in release 20120508....
+
+- doc/Makefile.am: no longer ignore errors from tidy(1).
+
+- fix manpage typesetting: install tidy @ buildhost, my name in caspar.ps
+  looks like crap
+
+- The "csp_install -t dir file [file]" issue
+
+zo 13 17:34 < Fruit> die tooltjes die meegeleverd worden
+zo 13 17:35 < Fruit> die hebben typisch een destination directory en een stel 
+                     bestanden als argumenten
+zo 13 17:35 < Fruit> het zou handig zijn voor de shellscripter als die  
+                     destination directory het eerste argument was
+zo 13 17:38 < joostvb> das natuurlijk totaal backwards incompatible met alles
+zo 13 17:38 < Fruit> valt wel mee
+zo 13 17:38 < joostvb> maar iig wel n goed idee
+zo 13 17:38 < Fruit> cp -t destdir file1 file2
+zo 13 17:38 < joostvb> -t , die doet t m
+zo 13 17:38 < Fruit> ik weet niet of scp dat kent
+zo 13 17:39 < joostvb> nou ja, als 1ste arg van csp_PUSH -t is, dan
+zo 13 17:39 < Fruit> magoe dat maakt ook niet zoveel uit
+zo 13 17:39 < joostvb> implementeren volgens nieuw interface
+zo 13 17:39 < Fruit> want bij csp_PUSH kun je toch de volgorde van de 
+                     argumenten zelf bepalen
+zo 13 17:39 < Fruit> hm hacken op -t lijkt me een heel lelijk en slecht idee
+zo 13 17:40 < Fruit> je hoeft echt alleen maar die tooltjes aan te passen, en 
+                     de plaatsen in caspar zelf waar precies en alleen díe 
+                     tooltjes aangeroepen worden
+zo 13 17:40 < Fruit> er hoeft geen caspar api-wijziging 
+zo 13 17:40 < joostvb> en als mensen hun eigen tooltjes geschreven hebben?
+zo 13 17:40 < joostvb> hun eigen csp_PUSH gebouwd?
+zo 13 17:41 < Fruit> dan hebben ze de aanroep daarvan zelf onder controle
+zo 13 17:41 < Fruit> misschien nieuwe set tooltjes introduceren met andere namen
+zo 13 17:41 < Fruit> op dit moment accepteert elk van die tooltjes 1 file en 1 
+                     dir
+zo 13 17:41 < Fruit> da's jammer.
+zo 13 17:42 < Fruit> omdat shellscripts een beetje beperkt zijn, is n files 
+                     gevolgd door 1 dir moeilijk te implementeren
+zo 13 17:42 < joostvb> csp_install dir file [file]
+zo 13 17:42 < Fruit> dat idee
+zo 13 17:43 < Fruit> csp_mkdirscpomgwtfbbqrofl dir file1 [file2 ...]
+zo 13 17:43 < joostvb> ok, dan kan ik maken:
+zo 13 17:43 < joostvb> csp_install -t dir file [file]
+zo 13 17:43 < joostvb> naast:
+zo 13 17:43 < joostvb> csp_install file dir
+zo 13 17:43 < joostvb> das backwards compatible
+zo 13 17:43 < Fruit> true
+zo 13 17:44 < joostvb> en over 5 jaar wordt "-t" optioneel
+zo 13 17:44 < Fruit> en je kunt geen files meer installeren die ‘-t’ heten.
+zo 13 17:44 < joostvb> klopt
+zo 13 17:44 < joostvb> fuk die mensen
+zo 13 17:44 < joostvb> :)
+zo 13 17:44 < Fruit> maar robuust gedrag met spaties en andere tekens in 
+                     bestandsnamen is nooit een sterk punt van caspar geweest.
+zo 13 17:44 < joostvb> pcies
+zo 13 17:44 < joostvb> van make ook niet
+zo 13 17:45 < Fruit> ja! fuk die mensen. alle bestanden moeten gewoon foo.txt 
+                     heten. en die hippies met hun bar.txt kunnen de boom in
+zo 13 17:45 < joostvb> zo is t maar net
+
+
+
+
+0.-3) add to documentation:
+
+vr 25 16:37 < casper> bah, maar het werkt wel, de reverse cowboy:   make diff | 
+                      patch -R -p0
+ [16:43] [joostvb(+i)] [3:#root(+ips)] irc.uvt.nl
+
+0.-2) fix FIXME's in doc/caspar.azm
+
+0.-1) complete documentation of "make diff" and "make <file>-diff" in
+  caspar.azm, see NEWS (not trivial...)
+
+1.1) finish convert to git: announce on webpage, create public repo
+  ( http://git.fruit.je/caspar , http://git.mdcc.cx/ ,
+  ssh://git/~joostvb/git/caspar.git )
+  update README on git status (see FIXME's).  set up commit list.
+
+1.3) documenteer de new style loadtarget hack even better: run "make load"
+with: combining new load-style is usefull too:
+
+ csp_LOAD = lolwut
+ lolwut = echo ssh $1 DFHKSJDHFJKSDHJK
+ lolwut:
+        for h in $(csp_UHOSTS);do echo ssh $$h DFHKSJDHFJKSDHJK;done
+
+use case: /etc/nsd/zones/ , first push to auth servers, then ssh to al caches
+for a forced flush of cache.
+
+--- ook best wel belangrijk ---
+
+2.3) test & document rsync support
+
+2.5) Ideas insprired by a discussion with Fred Vos:
+  (Lots of users have asked for such a feature.)
+  a "make check" could be usefull: test wether previous svn version is on server
+  before scp-ing.
+za 14 21:29 < hoppie> en als je dan helemaal over the top wilt, kun je
+                      eventueel dat linken aan install, zodat alleen waar dat
+                      nodig is geïnstalleerd wordt. Maar da's echt optioneel.
+  Preliminary support added; Document this!  Nice trick:
+
+   make diff || make install
+   make foobar-diff || make foobar-install
+
+  Make this work out of the box for all push mechanisms: add generic csp_REXEC
+  next to csp_PUSH.
+
+
+--- typesetting stuff ---
+
+3.1) get toc printed in html mode. even while using nochunks mode.
+
+3.2) license should be printed, see rh vs deb doc.
+
+3.3) add zoem.mk, for zoem ( http://micans.org/zoem ) typesetting.
+
+
+--- install stuff ---
+
+4.1) ma 13 14:07 < arvid> joostvb, ik heb een feature request voor caspar :p
+  ma 13 14:13 < arvid> joostvb, een exclude host mogelijkheid
+  ma 13 14:13 < arvid> je bijv. een heleboel host en je wilt alleen 1 host 
+                     uitsluiten
+  ma 13 14:14 < arvid> s/host/hosts
+  ma 13 14:16 < joostvb> een csp_TABOOUHOSTS wil je dus, i c
+  ma 13 14:17 < arvid> joostvb, yep dat klopt 
+   [14:18] [joostvb(+i)] [13:meuknet/#root(+ips)] 
+  2009-07 Arvid Gibas
+
+4.2) add standard target: "make print-hosts"
+
+4.4) "install" should depend upon "load".  (should it?) ("make" currently does
+  both "install" and "load"; it does not do "build".  (really!?)).  and/or:
+  caspar should support "make build-recursive".
+
+4.5) csp_BUILD is a broken concept.
+
+Users are better off declaring csp_EXTRAFILES and creating rules for each
+file that needs to be built.
+csp_BUILD is an alias to csp_EXTRAFILES for backwards compatibility.
+
+4.6) caspar chokes on spaces in filenames:
+
+ Makefile:
+
+ csp_CPDIR = /var/php/public/jccpmanu/https
+ include caspar/mk/caspar.mk
+
+ joostvb@scriptix:~/sv...k/sources/jccpmanu/https% ls
+ JCCP logo.jpg  Makefile    index.html      logo.html
+ JCCPlogo.jpg   empty.html  loginform.html  php3
+ joostvb@scriptix:~/sv...k/sources/jccpmanu/https% make -n
+ /bin/sh: line 1: test: JCCP: binary operator expected
+ /bin/sh: line 1: test: JCCP: binary operator expected
+ cp  "JCCPlogo.jpg" /var/php/public/jccpmanu/https;
+ cp  "empty.html" /var/php/public/jccpmanu/https;
+ cp  "index.html" /var/php/public/jccpmanu/https;
+ cp  "loginform.html" /var/php/public/jccpmanu/https;
+ cp  "logo.html" /var/php/public/jccpmanu/https;
+
+  make does not support arrays, but space-separated strings, so: tag won't fix.
+
+4.7) caspar chokes on : in filenames:
+
+ Makefile:
+
+ csp_SCPDIR = /etc/sysconfig/network-scripts/
+ csp_SUH = root@cauchy
+ include caspar/mk/caspar.mk
+
+ joostvb@kovalevskaya:~/sv...ysconfig/network-scripts% ls
+ Makefile  ifcfg-eth0  ifcfg-eth0:1
+ joostvb@kovalevskaya:~/sv...ysconfig/network-scripts% make
+ caspar/mk/caspar.mk:87: *** multiple target patterns.  Stop.
+
+ Bug found by Johan Hoeke.
+
+4.29) caspar chokes on files named ";anything"
+
+ joostvb@bruhat:~% touch ';q'
+ joostvb@bruhat:~% make -n
+ caspar/mk/caspar.mk:94: *** missing rule before commands.  Stop.
+
+
+4.8) Suggest (or offer) a more generic interface than my_EXEC for the load
+  target.  Users are invited to extend the interface.
+  They can add extra variables to their push mechanisms.  So we might be
+  able to abstract LOAD one day.  Perhaps something like
+
+    $(foreach uh,$(csp_UHOSTS),$(call csp_EXEC,$(uh),$(csp_DIR),$(csp_XARG));)
+
+  could work.  If a user's exec wrapper needs more arguments, these can get
+  introduced as implicit variables, outside $1, $2, ...
+
+4.9) Explain why it's good practice to do
+    include ../../include/install.mk
+  in manpage example.
+
+4.10) Don't do
+   csp_scp_FUNC  = $(csp_SCP) $(csp_CPFLAGS) $(1) $(2):$(3)
+  but do
+   csp_scp_FUNC  = $(csp_SCP) $(4) $(1) $(2):$(3)
+  and use $(csp_CPFLAGS) for csp_XARGS.
+  _Do_ test this!
+
+4.11) load stuff:
+  - Create a ``load-recursive'' target.
+  - supply daemons.mk: csp_SSHDEBIANLOAD csp_URUKREDHATLOAD , etc, to use
+    in load targets
+
+4.12) install-recursive should call mkdir if appropriate.  install should, too.
+
+ Thu 31 15:16 < Fruit> kan ik 'm ook vertellen dat-ie voordat gaat kopiëren ff
+                       mkdir -p op de smurfer doet?
+ Thu 31 15:19 < joostvb> een eigen csp_PUSH schrijven
+ Thu 31 15:20 < joostvb> csp_PUSH krijgt zowel filenaam als directory mee als
+                         argument
+ Thu 31 15:20 < joostvb> dus das kei makkelijk
+ Thu 31 15:20 < Fruit> csp_OLD_PUSH := $(csp_PUSH)
+ Thu 31 15:20 < Fruit> csp_PUSH := ssh $iets mkdir $dir; $(csp_OLD_PUSH)
+
+4.13) The scp invocation is inefficient:
+
+   % make -n README.txt-install net.txt-install
+   scp "README.txt" pong:/data/www/doc/doc/;
+   scp "net.txt" pong:/data/www/doc/doc/;
+
+  Should be:
+
+   scp "README.txt" "net.txt" pong:/data/www/doc/doc/;
+
+  $@ vs $? might be helpful.
+
+4.14) test wether file is up to date before scp-ing it, in order to prevent us from
+  doing useless (and expensive) installs.   use ControlMaster
+  ssh_config(5) to reuse one ssh conection?  Perhaps this:
+
+   ControlMaster auto
+   ControlPath ~/.ssh/control/%r@%h:%p
+
+  in your ~/.ssh/config (and having an ssh connection open to all relevant
+  hosts) fixes all "troubles". (This option is not available on Debian sarge.)
+
+4.15) Ideas insprired by a discussion with Fred Vos:
+  Perhaps a note on how to use commit-hooks could be added to
+  documentation.  Perhaps a note on ssh forced commands could be added.  Perhaps
+  a note on a "make commit" could be added.
+
+4.16) document this: including an included Makefile:
+
+    here := $(dir $(lastword $(MAKEFILE_LIST)))
+    include $(here)../../foo/bar/install.mk
+
+  Thanks Wessel.
+
+  Alternative: /usr/local/foo, as used in svn/its-unix
+
+4.17) if one really wants, one can overrule caspar's default target:
+
+ ---------
+
+ csp_SCPDIR = /etc/ssl/chains/
+ csp_TABOOFILES_ADD = %.asc
+
+ all: install
+ install: check makedir
+
+ include ../../../include/install.mk
+
+ check:
+        for cert in *.pem; do \
+                echo "$$cert:"; \
+                gpg --verify $$cert.asc $$cert; \
+        done
+
+ makedir:
+        for suh in $(csp_SUHS); do \
+          ssh $$suh mkdir -p /etc/ssl/chains; \
+        done
+
+ .PHONY: check makedir
+
+ ---------
+
+ very likely, one could better use the "build" target for this.
+
+4.18) it's not necessary to have Makefile in all directories of a tree, provided
+caspar is fixed:
+
+replace
+
+ DIRS := $(shell for d in *; do test -d $$d && echo $$d; done)
+
+by
+
+ DIRS :=  $(patsubst %/Makefile,%,$(shell find * -mindepth 1 -name Makefile))
+
+thanks Wessel. (This might break for trees combining GNUmakefile with Makefile
+[za 14 22:29 <Fruit> dat breekt niet voor dat soort directories, ga maar na!
+;)] .) Once this fix is implemented, get rid of the example toplevel Makefile
+in caspar(7).
+

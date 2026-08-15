@@ -1,0 +1,117 @@
+#!/usr/bin/perl -w
+# -*- mode: cperl; coding: utf-8 -*-
+# Most of this code was stolen from Debhelper 7.3.16+. which is:
+# Joey Hess, GPL copyright 1997-2009.
+# Adapted for CDBS purposes by Colin Walters <walters@debian.org>
+# Copyright © 2010-2011, 2015-2016 Jonas Smedegaard <dr@jones.dk>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+sub error {
+  my $err = shift;
+  print STDERR $err;
+  exit 1;
+}
+
+sub samearch {
+	my $arch=shift;
+	my @archlist=split(/\s+/,shift);
+
+	foreach my $a (@archlist) {
+		system("dpkg-architecture", "-a$arch", "-i$a") == 0 && return 1;
+	}
+
+	return 0;
+}
+
+sub buildarch {
+	my $value=`dpkg-architecture -qDEB_HOST_ARCH` || error("dpkg-architecture failed: $!");
+	chomp $value;
+	return $value;
+}
+
+sub GetPackages {
+	my $type=shift;
+
+	$type="" if ! defined $type;
+
+	my $package="";
+	my $arch="";
+	my @list=();
+	my %seen;
+	my @profiles=();
+	my $included_in_build_profile;
+	if (exists $ENV{'DEB_BUILD_PROFILES'}) {
+		@profiles=split /\s+/, $ENV{'DEB_BUILD_PROFILES'};
+	}
+	open (CONTROL, 'debian/control') ||
+		error("cannot read debian/control: $!\n");
+	while (<CONTROL>) {
+		chomp;
+		s/\s+$//;
+		if (/^Package:\s*(.*)/i) {
+			$package=$1;
+			# Detect duplicate package names in the same control file.
+			if (! $seen{$package}) {
+				$seen{$package}=1;
+			}
+			else {
+				error("debian/control has a duplicate entry for $package");
+			}
+			$included_in_build_profile=1;
+		}
+		if (/^Architecture:\s*(.*)/i) {
+			$arch=$1;
+		}
+
+		# rely on libdpkg-perl providing the parsing functions because
+		# if we work on a package with a Build-Profiles field, then a
+		# high enough version of dpkg-dev is needed anyways
+		if (/^Build-Profiles:\s*(.*)/) {
+				my $build_profiles=$1;
+			eval {
+				require Dpkg::BuildProfiles;
+				my @restrictions=Dpkg::BuildProfiles::parse_build_profiles($build_profiles);
+				if (@restrictions) {
+					$included_in_build_profile=Dpkg::BuildProfiles::evaluate_restriction_formula(\@restrictions, \@profiles);
+				}
+			};
+			if ($@) {
+				error("The control file has a Build-Profiles field. Requires libdpkg-perl >= 1.17.14");
+			}
+		}
+
+		if (!$_ or eof) { # end of stanza.
+			if ($package && $included_in_build_profile &&
+#			    (($type eq 'indep' && $arch eq 'all') ||
+#			     ($type eq 'arch' && $arch ne 'all') ||
+#			     ($type eq 'same' && (samearch(buildarch(), $arch))) ||
+			    (($type eq 'indep' && $arch eq 'all') ||
+			     ($type eq 'arch' && $arch ne 'all') ||
+			     ($type eq 'same' && ($arch eq 'any' ||
+					     ($arch ne 'all' &&
+			                      samearch(buildarch(), $arch)))) ||
+			     ! $type)) {
+				push @list, $package;
+				$package="";
+				$arch="";
+			}
+		}
+	}
+	close CONTROL;
+
+	return @list;
+}
+
+print join(' ', GetPackages($ARGV[0])) . "\n";

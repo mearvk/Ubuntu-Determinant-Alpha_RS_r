@@ -1,0 +1,165 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2002,2003 Colin Walters <walters@debian.org>
+# Copyright © 2008-2010, 2012, 2014, 2016 Jonas Smedegaard <dr@jones.dk>
+# Copyright © 2013 IOhannes m zmölnig <zmoelnig@iem.at>
+# Description: Common variables for GNU autoconf+automake packages
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#PATH_RULES#
+
+ifndef _cdbs_class_autotools_vars
+_cdbs_class_autotools_vars = 1
+
+include $(_cdbs_class_path)/makefile.mk$(_cdbs_makefile_suffix)
+
+DEB_MAKE_INSTALL_TARGET ?= install DESTDIR=$(cdbs_make_curdestdir)
+# FIXME: Restructure to allow early override
+DEB_MAKE_CLEAN_TARGET = distclean
+#DEB_MAKE_CHECK_TARGET = check
+
+DEB_AC_AUX_DIR ?= $(DEB_SRCDIR)
+
+# Declare CC and CXX only if explicitly set in environment or makefile
+# (i.e. skip if builtin make default would have been used)
+# This is needed for proper cross-compilation - see bug#450483)
+DEB_CONFIGURE_SCRIPT_ENV ?= \
+	$(call cdbs_set_nondefaultvars,CC CXX) \
+	CFLAGS="$(CFLAGS)" \
+	CXXFLAGS="$(CXXFLAGS)" \
+	CPPFLAGS="$(CPPFLAGS)" \
+	LDFLAGS="$(LDFLAGS)"
+
+DEB_CONFIGURE_SCRIPT ?= $(CURDIR)/$(DEB_SRCDIR)/configure
+
+# Provide --host only if different from --build, to support cross-
+# compiling with autotools 2.52+ without slowing down normal builds.
+# Cross-compiling with autotools 2.13 is unsupported, as it needs
+# other tweaks (more info at autotools-dev README.Debian)
+DEB_CONFIGURE_CROSSBUILD_ARGS ?= \
+	--build=$(DEB_BUILD_GNU_TYPE) \
+	$(if $(cdbs_crossbuild),\
+		--host=$(DEB_HOST_GNU_TYPE))
+
+DEB_CONFIGURE_PREFIX ?=/usr
+DEB_CONFIGURE_INCLUDEDIR ?= "\$${prefix}/include"
+DEB_CONFIGURE_MANDIR ?= "\$${prefix}/share/man"
+DEB_CONFIGURE_INFODIR ?= "\$${prefix}/share/info"
+DEB_CONFIGURE_SYSCONFDIR ?= /etc
+DEB_CONFIGURE_LOCALSTATEDIR ?= /var
+DEB_CONFIGURE_LIBEXECDIR ?= "\$${prefix}/lib/$(DEB_SOURCE_PACKAGE)"
+# --srcdir=. is required because otherwise configure wants to analyse
+# $0 to see whether a VPATH build is needed.  This tells it with
+# absolute certainly that this is NOT a VPATH build.
+DEB_CONFIGURE_PATH_ARGS ?= \
+	--prefix=$(DEB_CONFIGURE_PREFIX) \
+	--includedir=$(DEB_CONFIGURE_INCLUDEDIR) \
+	--mandir=$(DEB_CONFIGURE_MANDIR) \
+	--infodir=$(DEB_CONFIGURE_INFODIR) \
+	--sysconfdir=$(DEB_CONFIGURE_SYSCONFDIR) \
+	--localstatedir=$(DEB_CONFIGURE_LOCALSTATEDIR) \
+	--libexecdir=$(DEB_CONFIGURE_LIBEXECDIR) \
+	$(if $(subst $(DEB_SRCDIR),,$(cdbs_make_curbuilddir)),\
+		,\
+		--srcdir=.)
+
+DEB_CONFIGURE_NORMAL_ARGS ?= \
+	$(DEB_CONFIGURE_CROSSBUILD_ARGS) \
+	$(DEB_CONFIGURE_PATH_ARGS) \
+	--disable-maintainer-mode \
+	--disable-dependency-tracking \
+	--disable-silent-rules
+
+# all environment settings for autotools configure execution
+# (potentially extended by other snippets)
+cdbs_autotools_configure_env = $(DEB_CONFIGURE_SCRIPT_ENV)
+
+DEB_CONFIGURE_INVOKE ?= cd $(cdbs_make_curbuilddir) && \
+	$(cdbs_autotools_configure_env) \
+	$(DEB_CONFIGURE_SCRIPT) \
+	$(DEB_CONFIGURE_NORMAL_ARGS) \
+	$(DEB_CONFIGURE_DEBUG_ARGS)
+
+#DEB_CONFIGURE_EXTRA_FLAGS =
+
+## calculate dependencies for an autotools package
+# call as: $(call cdbs_autotools_dependencies,$(VERSION),$(VERSIONEDPKG),$(PKG))
+# if VERSION is a single value,
+#   it returns $(VERSIONEDPKG)$(VERSION)
+# if VERSION is a comma-separated pair,
+#   it returns "$(PKG) (>=$(VERSION[0])),$(PKG) (<=$(VERSION[1]))"
+# one value of the pair can be omitted to not specify a min/max version
+# if both values of the pair are omitted (',') an unversioned dependency
+# on PKG is created
+#
+# example, with PKG=foo, VERSIONEDPKG=foob- and VERSION=...
+# 3         : foob-3
+# 4,7       : foo (>=4), foo (<=7)
+# 1.10,     : foo (>=1.10)
+# ,3.14     : foo (<=3.14)
+# ,         : foo
+
+cdbs_autotools_dependencies = $(if $(findstring $(comma),$(1)),\
+	$(or \
+		$(and \
+			$(filter $(1),$(comma)),\
+			$(3)),\
+		$(and \
+			$(filter-out $(1),$(patsubst %$(comma),%,$(1))),\
+			$(3) (>=$(patsubst %$(comma),%,$(1)))),\
+		$(and \
+			$(filter-out $(1),$(patsubst $(comma)%,%,$(1))),\
+			$(3) (<=$(patsubst $(comma)%,%,$(1)))),\
+		$(3) (>=$(firstword $(subst $(comma),$(space),$(1))))$(comma) \
+			$(3) (<=$(lastword $(subst $(comma),$(space),$(1))))),\
+	$(2)$(1))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_libtool ?= libtool
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_LIBTOOL),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_libtool))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_automake ?= \
+	$(call cdbs_autotools_dependencies,\
+		$(DEB_AUTO_UPDATE_AUTOMAKE),automake,automake)
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_AUTOMAKE),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_automake))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_aclocal ?= \
+	$(call cdbs_autotools_dependencies,\
+		$(DEB_AUTO_UPDATE_ACLOCAL),automake,automake)
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_ACLOCAL),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_aclocal))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_autoconf ?= \
+	$(if $(findstring $(comma),$(DEB_AUTO_UPDATE_AUTOCONF)),\
+		$(call cdbs_autotools_dependencies,\
+			$(DEB_AUTO_UPDATE_AUTOCONF),autoconf,autoconf),\
+		autoconf$(filter 2.13,$(DEB_AUTO_UPDATE_AUTOCONF)))
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_AUTOCONF),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_autoconf))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_autoheader ?= \
+	$(if $(findstring $(comma),$(DEB_AUTO_UPDATE_AUTOHEADER)),\
+		$(call cdbs_autotools_dependencies,\
+			$(DEB_AUTO_UPDATE_AUTOHEADER),autoconf,autoconf),\
+		autoconf$(filter 2.13,$(DEB_AUTO_UPDATE_AUTOHEADER)))
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_AUTOHEADER),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_autoheader))
+
+CDBS_BUILD_DEPENDS_class_autotools-vars_autopoint ?= \
+	autopoint, cdbs (>= 0.4.133~)
+CDBS_BUILD_DEPENDS += $(if $(DEB_AUTO_UPDATE_AUTOPOINT),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_autotools-vars_autopoint))
+
+endif

@@ -1,0 +1,84 @@
+#!/bin/sh
+
+set -e
+
+sourcename="cloud-utils"
+RELEASE=${RELEASE:-UNRELEASED}
+TEMP_D=""
+
+fail() { echo "$@" 1>&2; exit 1; }
+cleanup() {
+   [ -z "$TEMP_D" ] || rm -Rf "$TEMP_D"
+}
+
+if [ "$1" = "-h" -o "$1" = "--help" ]; then
+   cat <<EOF
+Usage: ${0##*/}
+   build a deb of from trunk directory
+   any options are passed straight through to debuild
+
+   Example:
+    * ${0##*/} -us -uc
+
+   Its not significantly different than what you'd get by modifying
+   the debian/changelog to have the current HEAD, and then running
+     debuild --no-tgz-check
+EOF
+exit
+fi
+
+bname=${0##*/}
+
+[ -n "$DEBEMAIL" ] || DEBEMAIL=$(git config user.email)
+[ -n "$DEBFULLNAME" ] || DEBFULLNAME=$(git config user.name)
+
+if [ -z "$DEBEMAIL" -o -z "$DEBFULLNAME" ]; then
+    echo "Must have DEBEMAIL and DEBFULLNAME in environment"
+    echo "or set git user.email and user.name."
+fi
+
+start_d=$PWD
+top_d=$(cd "$(dirname "${0}")"/.. && pwd)
+
+# git describe will output something either like '0.1.0' (a tag)
+# or TAG-N-gHASH where N is number of commits since TAG
+uver=$(git describe --abbrev=8) ||
+   fail "failed to get upstream version with 'git describe'"
+clogver_debian=${CLOGVER_DEBIAN:-0ubuntu1}
+
+clogver_new="${uver}-${clogver_debian}"
+
+TEMP_D=$(mktemp -d "${TMPDIR:-/tmp}/${bname}.XXXXXX")
+
+trap cleanup EXIT
+
+echo "building upstream version ${uver}, debian ver=${clogver_debian}"
+
+dir="${sourcename}-$uver"
+tarball="${sourcename}_$uver.orig.tar.gz"
+
+myd=$(dirname "$0")
+"$myd/make-tarball" "--output=${TEMP_D}/$tarball" HEAD
+echo "created ${tarball}"
+
+cd "${TEMP_D}"
+tar xzf "$tarball" || fail "failed extract tarball"
+cd "$dir" || fail "failed cd $dir"
+
+cat > debian/changelog <<EOF
+$sourcename ($uver-${clogver_debian}) $RELEASE; urgency=low
+
+  * Upstream Build
+
+ -- $DEBFULLNAME <$DEBEMAIL>  $(date -R)
+EOF
+
+debuild "$@" || fail "debuild failed"
+
+cd "$TEMP_D"
+for f in *; do
+   [ -f "$f" ] || continue
+   cp "$f" "$start_d" || fail "failed copy $f"
+   echo "wrote $f"
+done
+exit

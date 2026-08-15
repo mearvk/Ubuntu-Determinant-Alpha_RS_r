@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# PROVIDE: cloudfinal
+# REQUIRE: LOGIN cloudinit cloudconfig cloudinitlocal
+# REQUIRE: cron mail sshd swaplate
+
+. /etc/rc.subr
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+name="cloudfinal"
+command="/usr/local/bin/cloud-init"
+start_cmd="cloudfinal_start"
+stop_cmd=":"
+rcvar="cloudinit_enable"
+start_cmd="cloudfinal_start"
+
+cloudfinal_start()
+{
+	echo -n "${command} starting"
+    if kenv -q kernel_options | grep -q 'cloud-init=disabled'; then
+        warn "cloud-init is disabled via kernel_options."
+    elif test -e /etc/cloud/cloud-init.disabled; then
+        warn "cloud-init is disabled via cloud-init.disabled file."
+    else
+        ${command} modules --mode final
+    fi
+}
+
+load_rc_config 'cloudinit'
+
+: ${cloudinit_enable="NO"}
+
+run_rc_command "$1"

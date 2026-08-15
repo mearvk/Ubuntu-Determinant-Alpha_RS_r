@@ -1,0 +1,62 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2002 Colin Walters <walters@debian.org>
+# Copyright © 2009-2010, 2012, 2014, 2016 Jonas Smedegaard <dr@jones.dk>
+# Description: A class for GNOME packages; sets up gconf variables, etc
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# TODO: rewrite to use $(cdbs_make_curbuilddir)
+
+#PATH_RULES#
+
+ifndef _cdbs_class_gnome
+_cdbs_class_gnome = 1
+
+include $(_cdbs_class_path)/autotools.mk$(_cdbs_makefile_suffix)
+
+DEB_MAKE_ENVVARS += GCONF_DISABLE_MAKEFILE_SCHEMA_INSTALL=1
+
+# for dh_desktop
+CDBS_BUILD_DEPENDS_class_gnome ?= debhelper
+CDBS_BUILD_DEPENDS +=, $(CDBS_BUILD_DEPENDS_class_gnome)
+
+# Most GNOME upstreams don't bother to fix this.
+clean::
+	$(if $(wildcard $(DEB_BUILDDIR)),\
+		cd "$(DEB_BUILDDIR)" && rm -f \
+			intltool-extract \
+			intltool-merge \
+			intltool-update \
+			po/.intltool-merge-cache)
+	$(if $(wildcard doc),\
+		find doc -name '*.omf.out' -type f -delete)
+	$(if $(wildcard test),\
+		find test -name '*.omf.out' -type f -delete)
+
+# debhelper.mk targets, so silently ignored if debhelper.mk not included
+$(patsubst %,binary-install/%,$(DEB_PACKAGES)) :: binary-install/%:
+	$(if $(wildcard /usr/bin/dh_gconf),\
+		dh_gconf -p$(cdbs_curpkg) \
+			$(DEB_DH_GCONF_ARGS))
+	$(if $(wildcard /usr/bin/dh_icons),\
+		dh_icons -p$(cdbs_curpkg) \
+			$(DEB_DH_ICONS_ARGS))
+	$(if $(wildcard /usr/bin/dh_translations),\
+		dh_translations -p$(cdbs_curpkg) \
+			$(DEB_DH_TRANSLATIONS_ARGS))
+
+# Use xz compression.
+DEB_DH_BUILDDEB_ARGS ?= -u-Zxz
+
+endif

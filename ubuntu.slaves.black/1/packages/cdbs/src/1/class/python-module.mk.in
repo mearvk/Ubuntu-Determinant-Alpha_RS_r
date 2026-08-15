@@ -1,0 +1,61 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2003 Colin Walters <walters@debian.org>
+# Copyright © 2006 Marc Dequènes (Duck) <Duck@DuckCorp.org>
+# Copyright © 2003,2006-2012, 2014, 2016, 2018 Jonas Smedegaard <dr@jones.dk>
+# Description: Rules common to Python module packaging
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#PATH_RULES#
+
+ifndef _cdbs_class_python_module
+_cdbs_class_python_module = 1
+
+include $(_cdbs_rules_path)/buildcore.mk$(_cdbs_makefile_suffix)
+include $(_cdbs_class_path)/python-vars.mk$(_cdbs_makefile_suffix)
+
+_cdbs_deprecated_vars += DEB_PYTHON_PRIVATE_MODULES_DIRS,0.4.97
+DEB_PYTHON_PRIVATE_MODULES_DIRS_ALL ?= $(DEB_PYTHON_PRIVATE_MODULES_DIRS)
+
+# dh_python2 comes from python package
+CDBS_BUILD_DEPENDS_class_python-module_python2 ?= python2, dh-python
+CDBS_BUILD_DEPENDS_class_python-module_python3 ?= python3, dh-python
+CDBS_BUILD_DEPENDS_class_python-module_pypy ?= pypy, dh-python
+CDBS_BUILD_DEPENDS += $(foreach s,$(cdbs_python_systems),\
+	$(comma) $(CDBS_BUILD_DEPENDS_class_python-module_$s))
+
+$(patsubst %,testsanity/%,$(DEB_ALL_PACKAGES)):: testsanity/%:
+	$(if $(word 2,$(cdbs_curpythonsystems)),\
+		$(error ERROR: cannot determine which packaging system \
+			to use for binary package $(cdbs_curpkg) - \
+			either include it in DEB_PYTHON3_PACKAGES \
+			or another DEB_*_PACKAGES))
+
+# Optionally use debhelper (if not then these rules are simply ignored)
+# * invoke for all binary packages with legacy helpers (see bug#377965)
+#   TODO: limit to only python packages now that legacy systems are gone
+# * invoke public and private modules separately with default helpers
+$(patsubst %,binary-post-install/%,$(DEB_PACKAGES)):: binary-post-install/%: binary-install-python/%
+$(patsubst %,binary-install-python/%,$(DEB_PACKAGES)):: binary-install-python/%: binary-install/%
+	$(if $(cdbs_curpythonsystems),\
+		dh_$(cdbs_curpythonsystems) \
+			-p$(cdbs_curpkg) \
+			$(call cdbs_expand_curvar,DEB_DH_PYTHONHELPER_ARGS))
+	$(and $(cdbs_curpythonsystems),$(call cdbs_expand_curvar,DEB_PYTHON_PRIVATE_MODULES_DIRS),\
+		dh_$(cdbs_curpythonsystems) \
+			-p$(cdbs_curpkg) \
+			$(call cdbs_expand_curvar,DEB_DH_PYTHONHELPER_ARGS) \
+			$(call cdbs_expand_curvar,DEB_PYTHON_PRIVATE_MODULES_DIRS))
+
+endif

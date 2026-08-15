@@ -1,0 +1,59 @@
+Description: Fix FTBFS with openipmi 2.0.25
+ selector_t deprecated in new openipmi version
+Author: Valentin Vidic <Valentin.Vidic@CARNet.hr>
+Last-Update: 2018-05-29
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/plugins/stonith/ipmi_os_handler.c
++++ b/lib/plugins/stonith/ipmi_os_handler.c
+@@ -34,7 +34,7 @@
+ 
+ #include <time.h>
+ 
+-extern selector_t *os_sel;
++extern struct selector_s *os_sel;
+ 
+ #if 0
+ static void check_no_locks(os_handler_t *handler);
+@@ -107,7 +107,7 @@
+ };
+ 
+ static void
+-timer_handler(selector_t  *sel,
++timer_handler(struct selector_s  *sel,
+ 	      sel_timer_t *timer,
+ 	      void        *data)
+ {
+--- a/lib/plugins/stonith/ipmilan_command.c
++++ b/lib/plugins/stonith/ipmilan_command.c
+@@ -49,7 +49,7 @@
+ #define OPERATION_TIME_OUT 10
+ 
+ os_handler_t *os_hnd=NULL;
+-selector_t *os_sel;
++struct selector_s *os_sel;
+ static ipmi_con_t *con;
+ extern os_handler_t ipmi_os_cb_handlers;
+ static int reset_method;
+@@ -84,10 +84,10 @@
+ 
+ void send_ipmi_cmd(ipmi_con_t *con, int request);
+ 
+-void timed_out(selector_t *sel, sel_timer_t *timer, void *data);
++void timed_out(struct selector_s *sel, sel_timer_t *timer, void *data);
+ 
+ void 
+-timed_out(selector_t  *sel, sel_timer_t *timer, void *data)
++timed_out(struct selector_s  *sel, sel_timer_t *timer, void *data)
+ {
+ 	PILCallLog(PluginImports->log,PIL_CRIT, "IPMI operation timed out... :(\n");
+ 	gstatus = S_TIMEOUT;
+@@ -280,7 +280,7 @@
+ 		return 1;
+ 	}
+ 
+-	rv = sel_alloc_selector(os_hnd, &os_sel);
++	rv = sel_alloc_selector_nothread(&os_sel);
+ 	if (rv) {
+ 		PILCallLog(PluginImports->log,PIL_CRIT, "Could not allocate selector\n");
+ 		return rv;

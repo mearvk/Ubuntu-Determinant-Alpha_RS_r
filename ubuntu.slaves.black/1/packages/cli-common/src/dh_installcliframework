@@ -1,0 +1,168 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_installcliframework - install development links into framework paths
+
+=cut
+
+use strict;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_installcliframework> [S<I<debhelper options>>] [B<-n>]
+
+=head1 DESCRIPTION
+
+dh_installcliframework is a debhelper program that is responsible for
+installing assemblies and related files used by the Debian cli-common
+package into the framework paths.
+
+This is useful for third-party languages, such as F#, that add an automatic
+reference a core library in the same way that B<mcs> adds an automatic
+reference to B<mscorlib>.
+
+The format of a C<installcliframework> file is line based, treating any line
+starting with '#' as a comment. The first component of each line specifies the
+framework version to install to, multiplied by 10 to get an integer. The second
+component is the full path of the file to install into the framework path.
+
+dh_installcliframework only installs links for compile-time assembly resolution;
+it does B<not> provide any support for runtime assembly resolution, which is
+the responsibility of the GAC. Any assembly reference installed by
+dh_installcliframework will also need to be installed into the GAC. See
+L<dh_installcligac(1)> for how to do this.
+
+Note that, unlike the GAC, there is no mechanism for multiple versions of the
+same assembly to be installed into the framework paths. This means that it is
+usually incorrect for a package to call both dh_installcligac and
+dh_installcliframework.
+
+If the files installed by dh_installcliframework are provided by binary
+packages built from the same source package then appropriate dependencies
+are generated into the C<cli:Depends> field.
+
+It also automatically generates the postinst and prerm commands needed
+to late install the assemblies. See L<dh_installdeb(1)> for an
+explanation of how this works.
+
+This is based on L<dh_installemacsen(1)> in the emacsen-common package.
+
+=head1 EXAMPLE
+
+=over 4
+
+ # Example debian/pkgfoo.installcliframework file
+ # This is a comment.
+ # Blank lines are ignored:
+
+ # This assembly is installed into the .NET 4.0 framework path
+ # (usually /usr/lib/mono/4.0/):
+ 40 /usr/lib/cli/pkgfoo/Foo.dll
+
+ # This assembly is installed into the .NET 3.5 framework path:
+ 35 /usr/lib/cli/pkgfoo/Bar.dll
+
+ # You can also install ancilliary files, if needed:
+ 40 /usr/lib/cli/pkgfoo/Foo.dll.optdata
+
+ # It is valid to install the same file for different framework versions:
+ 40 /usr/lib/cli/pkgfoo/Baz.dll
+ 45 /usr/lib/cli/pkgfoo/Baz.dll
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-n>, B<--noscripts>
+
+Do not modify postinst/prerm scripts.
+
+=back
+
+=head1 NOTES
+
+Note that this command is not idempotent. "dh_prep" should be called
+between invocations of this command. Otherwise, it may cause multiple
+instances of the same text to be added to maintainer scripts.
+
+=cut
+
+init();
+
+my @allpackages = getpackages();
+
+# PROMISE: DH NOOP WITHOUT installcliframework
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+    my $tmp = tmpdir($package);
+
+    my $cliframework = pkgfile($package, "installcliframework");
+
+    if ($cliframework ne '') {
+	# sanity check: do all files listed in the installcliframework file exist?
+	open CLIFRAMEWORK, "<$cliframework" or
+	    die "E: Can't open $cliframework\n";
+	my $pkgref;
+	while (<CLIFRAMEWORK>)
+	{
+	    chomp;
+	    s/^\s+//;
+	    s/\s+$//;
+	    next if /^\#/;
+	    next if /^\s*$/;
+
+	    # Split on the space
+	    my @p = split(/\s+/);
+
+	    # Framework version is first...
+	    my $framework = shift @p;
+	    # ...then the file to install
+	    my $file = shift @p;
+
+	    if (! -f "$tmp$file") {
+		# Search through the other packages for our file
+		foreach my $binary_package (@allpackages) {
+		    verbose_print("Checking $binary_package for $file");
+		    if( -f (tmpdir($binary_package) . $file)) {
+			verbose_print("Found framework reference in $binary_package");
+			$pkgref = $binary_package . " (= \${binary:Version})";
+			verbose_print("pkgref is $pkgref");
+			addsubstvar($package, "cli:Depends", $binary_package, "(= \${binary:Version})");
+			last;
+		    }
+		}
+
+		if (! defined($pkgref)) {
+		    die "E: Can't find file $file in any binary package!\n";
+		}
+	    }
+	}
+	close CLIFRAMEWORK;
+
+	install_dir("$tmp/usr/share/cli-common/packages.d");
+	install_file($cliframework, "$tmp/usr/share/cli-common/packages.d/$package.installcliframework");
+
+	if (! $dh{NOSCRIPTS}) {
+	    autoscript($package, "postinst", "postinst-cliframework",
+                                   { 'PACKAGE' => $package });
+	    autoscript($package, "prerm", "prerm-cliframework",
+                                   { 'PACKAGE' => $package });
+	}
+    }
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of cli-common-dev.
+
+=head1 AUTHOR
+
+Christopher James Halse Rogers <raof@ubuntu.com>
+
+=cut

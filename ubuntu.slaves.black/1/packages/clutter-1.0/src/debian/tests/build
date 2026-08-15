@@ -1,0 +1,73 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against clutter, to verify that the
+# headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2019 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR=$(mktemp -d)
+export XDG_RUNTIME_DIR="$WORKDIR"
+cleanup () {
+    rm -fr "$WORKDIR"
+}
+trap cleanup 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > cally.c
+#include <cally/cally.h>
+
+int main(void)
+{
+    g_assert_cmpuint (CALLY_TYPE_ACTOR, !=, G_TYPE_INVALID);
+    return 0;
+}
+EOF
+cat <<EOF > clutter.c
+#include <clutter/clutter.h>
+
+int main(void)
+{
+    g_assert_true (clutter_check_version (1, 26, 0));
+    return 0;
+}
+EOF
+
+for lib in \
+    cally \
+    clutter \
+    clutter-cogl \
+    clutter-egl \
+    clutter-gdk \
+    clutter-glx \
+    clutter-wayland \
+    clutter-wayland-compositor \
+    clutter-x11 \
+; do
+    package="${lib}-1.0"
+
+    case "$lib" in
+        (cally)
+            code=cally.c
+            ;;
+
+        (*)
+            code=clutter.c
+            ;;
+    esac
+
+    # Deliberately word-splitting, that's how pkg-config works:
+    # shellcheck disable=SC2046
+    "${CROSS_COMPILE}gcc" -o "${lib}-test" "${code}" $("${CROSS_COMPILE}pkg-config" --cflags --libs "${package}")
+    echo "build ($lib): OK"
+    [ -x "${lib}-test" ]
+    dbus-run-session -- xvfb-run -a "./${lib}-test"
+    echo "run ($lib): OK"
+done

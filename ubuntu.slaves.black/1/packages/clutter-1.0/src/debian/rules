@@ -1,0 +1,67 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1
+binaries := $(shell dh_listpackages)
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	CONFFLAGS += \
+		--enable-wayland-backend=yes \
+		--enable-wayland-compositor=yes \
+		--enable-evdev-input=yes
+endif
+
+ifeq (,$(filter %-doc,$(binaries)))
+CONFFLAGS += --disable-gtk-doc
+else
+CONFFLAGS += --enable-gtk-doc
+endif
+
+%:
+	dh $@ --with gir,gnome
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-x11-backend=yes \
+		--enable-gdk-backend=yes \
+		--enable-egl-backend=yes \
+		--disable-docs \
+		--enable-installed-tests \
+		--enable-introspection=yes \
+		$(CONFFLAGS)
+
+override_dh_install:
+	find debian -name '*.la' -delete
+	dh_install
+
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+override_dh_fixperms:
+	dh_fixperms -Xusr/libexec/installed-tests
+ifneq ($(filter %-tests,$(binaries)),)
+	chmod --recursive --changes a+rX,u+w,og-w debian/*-tests/usr/libexec/installed-tests
+endif
+
+override_dh_compress:
+	dh_compress -X.c
+
+override_dh_gnome:
+	dh_gnome --no-gnome-versions
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V -- -c4
+
+override_dh_auto_test:
+# Don't run the tests on s390x since it hangs the build on Launchpad
+# Don't run on armel since it hung with
+# https://buildd.debian.org/status/logs.php?pkg=clutter-1.0&ver=1.26.2%2Bdfsg-5
+ifneq (,$(filter armel s390x,$(DEB_HOST_ARCH)))
+# Ignore test failures on architectures where they fail
+else ifneq (,$(filter hppa hurd-i386 kfreebsd-i386 kfreebsd-amd64 mips mipsel mips64el powerpc ppc64 sparc64,$(DEB_HOST_ARCH)))
+	-dbus-run-session -- xvfb-run -a dh_auto_test
+else
+	dbus-run-session -- xvfb-run -a dh_auto_test
+endif

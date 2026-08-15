@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+JAVA_HOME := /usr/lib/jvm/default-java
+RST2MAN = rst2man
+
+CP = "/usr/share/java/closure-compiler.jar /usr/share/java/args4j.jar /usr/share/java/guava.jar /usr/share/java/json.jar"
+
+%:
+	dh $@ --with maven_repo_helper
+
+override_dh_auto_build:
+	ant -propertyfile debian/ant.properties jar-nodeps javadoc
+	
+	# update the manifest
+	jh_manifest --verbose \
+		--classpath $(CP) \
+		--main com.google.javascript.jscomp.CommandLineRunner \
+		build/closure-compiler-v20130227.jar
+
+	# build the manpage
+	$(RST2MAN) debian/closure-compiler.1.txt > debian/closure-compiler.1.tmp
+	cat debian/manpage_encoding_declaration.UTF-8 debian/closure-compiler.1.tmp > debian/closure-compiler.1
+
+override_dh_auto_test:
+#	ant test
+
+override_dh_auto_clean:
+	dh_testdir
+	ant clean
+	$(RM) -rf gen
+	$(RM) -rf debian/closer-compiler.1.tmp debian/closure-compiler.1

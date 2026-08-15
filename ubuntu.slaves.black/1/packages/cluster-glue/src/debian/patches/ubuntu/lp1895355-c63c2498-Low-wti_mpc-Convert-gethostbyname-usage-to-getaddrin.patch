@@ -1,0 +1,49 @@
+From c63c24982757cf0bfc8713e4e1c43169b30c2059 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Kristoffer=20Gr=C3=B6nlund?= <krig@koru.se>
+Date: Tue, 18 Oct 2016 12:41:49 +0200
+Subject: [PATCH] Low: wti_mpc: Convert gethostbyname() usage to getaddrinfo()
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/c63c24982757cf0bfc8713e4e1c43169b30c2059
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ lib/plugins/stonith/wti_mpc.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/lib/plugins/stonith/wti_mpc.c b/lib/plugins/stonith/wti_mpc.c
+index 6f49568c..3546f129 100644
+--- a/lib/plugins/stonith/wti_mpc.c
++++ b/lib/plugins/stonith/wti_mpc.c
+@@ -650,6 +650,7 @@ static int
+ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
+ {
+ 	struct pluginDevice* sd = (struct pluginDevice *)s;
++	struct addrinfo *res;
+ 	int	rc;
+ 	char *	i;
+     int mo;
+@@ -679,7 +680,8 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
+ 	PluginImports->mfree(namestocopy[3].s_value);
+ 
+         /* try to resolve the hostname/ip-address */
+-	if (gethostbyname(sd->hostname) != NULL) {
++	if ((rc = getaddrinfo(sd->hostname, NULL, NULL, &res)) == 0) {
++		freeaddrinfo(res);
+         	/* init snmp library */
+ 		init_snmp("wti_mpc");
+ 
+@@ -732,8 +734,8 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
+ 			,       __FUNCTION__);
+ 		}
+ 	}else{
+-		LOG(PIL_CRIT, "%s: cannot resolve hostname '%s', h_errno %d."
+-		,       __FUNCTION__, sd->hostname, h_errno);
++		LOG(PIL_CRIT, "%s: cannot resolve hostname '%s', %s."
++		,       __FUNCTION__, sd->hostname, gai_strerror(rc));
+ 	}
+ 
+ 	/* not a valid config */
+-- 
+2.27.0
+

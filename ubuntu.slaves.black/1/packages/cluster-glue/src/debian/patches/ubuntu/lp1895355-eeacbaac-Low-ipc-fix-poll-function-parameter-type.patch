@@ -1,0 +1,66 @@
+From eeacbaac57b033682fb6249435b3db22c3445eb1 Mon Sep 17 00:00:00 2001
+From: Dejan Muhamedagic <dejan@hello-penguin.com>
+Date: Mon, 2 Jan 2017 12:53:18 +0100
+Subject: [PATCH] Low: ipc: fix poll function parameter type
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/eeacbaac57b033682fb6249435b3db22c3445eb1
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ include/clplumbing/ipc.h | 2 +-
+ lib/clplumbing/ipctest.c | 4 ++--
+ lib/clplumbing/ocf_ipc.c | 6 +++---
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/include/clplumbing/ipc.h b/include/clplumbing/ipc.h
+index 601c40bf..4b10682c 100644
+--- a/include/clplumbing/ipc.h
++++ b/include/clplumbing/ipc.h
+@@ -699,7 +699,7 @@ extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
+ /* Destroys an object constructed by ipc_set_auth or ipc_str_to_auth() */
+ extern void ipc_destroy_auth(IPC_Auth * auth);
+ 
+-extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
++extern void ipc_set_pollfunc(int (*)(struct pollfd*, nfds_t, int));
+ extern void ipc_bufpool_dump_stats(void);
+ 
+ #ifdef IPC_TIME_DEBUG
+diff --git a/lib/clplumbing/ipctest.c b/lib/clplumbing/ipctest.c
+index e2609108..2dc52d9b 100644
+--- a/lib/clplumbing/ipctest.c
++++ b/lib/clplumbing/ipctest.c
+@@ -52,8 +52,8 @@ static int mainloop_client(IPC_Channel* chan, int repcount);
+ static int checksock(IPC_Channel* channel);
+ static void checkifblocked(IPC_Channel* channel);
+ 
+-static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
+-=	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
++static int (*PollFunc)(struct pollfd * fds, nfds_t, int)
++=	(int (*)(struct pollfd * fds, nfds_t, int))  poll;
+ static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
+ 
+ static const char *procname;
+diff --git a/lib/clplumbing/ocf_ipc.c b/lib/clplumbing/ocf_ipc.c
+index 919131ea..cc4409f4 100644
+--- a/lib/clplumbing/ocf_ipc.c
++++ b/lib/clplumbing/ocf_ipc.c
+@@ -46,12 +46,12 @@ void	ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos);
+ struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
+ struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
+ 
+-int (*ipc_pollfunc_ptr)(struct pollfd*, unsigned int, int)
+-=	(int (*)(struct pollfd*, unsigned int, int)) poll;
++int (*ipc_pollfunc_ptr)(struct pollfd*, nfds_t, int)
++=	(int (*)(struct pollfd*, nfds_t, int)) poll;
+ 
+ /* Set the IPC poll function to the given function */
+ void
+-ipc_set_pollfunc(int (*pf)(struct pollfd*, unsigned int, int))
++ipc_set_pollfunc(int (*pf)(struct pollfd*, nfds_t, int))
+ {
+ 	ipc_pollfunc_ptr = pf;
+ }
+-- 
+2.27.0
+

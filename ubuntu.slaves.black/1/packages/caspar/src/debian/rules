@@ -1,0 +1,99 @@
+#!/usr/bin/make -f
+
+# Maintained using git at http://git.mdcc.cx/caspar.
+
+# Based upon sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# This is to turn on verbose mode.
+# export DH_VERBOSE=1
+
+# allow bashism's in commandlines
+SHELL = /bin/bash
+
+# These are used for cross-compiling and for saving the configure script
+# from having to guess our platform (since we know it already)
+DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+
+
+config.status: configure
+	dh_testdir
+#	# commands to configure the package.
+	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+
+build: build-arch build-indep
+
+build-arch:
+
+build-indep: build-stamp
+
+build-stamp: config.status
+	dh_testdir
+
+#	# commands to compile the package.
+	$(MAKE)
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+
+#	# commands to clean up after the build process.
+	dh_auto_clean
+	dh_clean
+
+#
+# we split the package in caspar and caspar-doc.  Rationale: as of 2005-03,
+# caspar-doc is more than twice the size of caspar.
+#
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+#	# commands to install the package into debian/caspar.
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/caspar
+
+#	# clean up unneeded docs
+	rm $(CURDIR)/debian/caspar/usr/share/doc/caspar/c*sp*.azm
+
+#	# process caspar-doc.install
+	dh_install --sourcedir=debian/caspar
+	dh_installdocs
+
+#	# clean up files copied to caspar-doc
+	rm $(CURDIR)/debian/caspar/usr/share/doc/caspar/{AUTHORS,THANKS,TODO,ChangeLog.2002}
+	rm $(CURDIR)/debian/caspar/usr/share/doc/caspar/{caspar*,csp_*}.{ps,html,txt}
+
+#	# get rid of COPYING (we use the debian/copyright file)
+	rm $(CURDIR)/debian/caspar/usr/share/doc/caspar/COPYING
+#	# get rid of ChangeLog (dealt with by dh_installchangelogs)
+	rm $(CURDIR)/debian/caspar/usr/share/doc/caspar/ChangeLog
+	dh_installchangelogs -p caspar ChangeLog
+	mv $(CURDIR)/debian/caspar/usr/share/doc/caspar/changelog $(CURDIR)/debian/caspar-doc/usr/share/doc/caspar/
+	dh_installchangelogs -p caspar-doc ChangeLog
+	rm $(CURDIR)/debian/caspar-doc/usr/share/doc/caspar-doc/changelog
+
+# Build architecture-independent files
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-dependent files
+binary-arch: build install
+# we are architecture-independent
+
+binary: binary-indep binary-arch
+
+.PHONY: build clean binary-indep binary-arch binary install

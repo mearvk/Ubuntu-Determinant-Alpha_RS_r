@@ -1,0 +1,1 @@
+m4_define([AD1_VERSION], [20200611])

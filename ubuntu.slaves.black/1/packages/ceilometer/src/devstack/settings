@@ -1,0 +1,65 @@
+# turn on all the ceilometer services by default (except for ipmi pollster)
+# Pollsters
+enable_service ceilometer-acompute ceilometer-acentral
+# Notification Agent
+enable_service ceilometer-anotification
+
+# Default directories
+CEILOMETER_DIR=$DEST/ceilometer
+CEILOMETER_CONF_DIR=/etc/ceilometer
+CEILOMETER_CONF=$CEILOMETER_CONF_DIR/ceilometer.conf
+CEILOMETER_AUTH_CACHE_DIR=${CEILOMETER_AUTH_CACHE_DIR:-/var/cache/ceilometer}
+CEILOMETER_WSGI_DIR=${CEILOMETER_WSGI_DIR:-/var/www/ceilometer}
+
+CEILOMETER_BACKEND=${CEILOMETER_BACKEND:-gnocchi}
+if [ "$CEILOMETER_BACKEND" = "gnocchi" ]; then
+    enable_service gnocchi-api gnocchi-metricd
+fi
+
+# Gnocchi default archive_policy for Ceilometer
+# TODO(sileht): when Gnocchi 4.0 is out use the tarball instead
+GNOCCHI_GIT_PATH=${GNOCCHI_GIT_PATH:-git+https://github.com/gnocchixyz/gnocchi#egg=gnocchi}
+if [ -n "$GNOCCHI_ARCHIVE_POLICY_TEMPEST" ]; then
+    GNOCCHI_ARCHIVE_POLICY=$GNOCCHI_ARCHIVE_POLICY_TEMPEST
+else
+    GNOCCHI_ARCHIVE_POLICY=${GNOCCHI_ARCHIVE_POLICY:-ceilometer-low}
+fi
+GNOCCHI_CONF_DIR=${GNOCCHI_CONF_DIR:-/etc/gnocchi}
+GNOCCHI_CONF=${GNOCCHI_CONF:-${GNOCCHI_CONF_DIR}/gnocchi.conf}
+GNOCCHI_COORDINATOR_URL=${CEILOMETER_COORDINATOR_URL:-redis://localhost:6379}
+GNOCCHI_METRICD_PROCESSING_DELAY=${GNOCCHI_METRICD_PROCESSING_DELAY:-5}
+GNOCCHI_AUTH_CACHE_DIR=${GNOCCHI_AUTH_CACHE_DIR:-/var/cache/gnocchi}
+
+GNOCCHI_UWSGI_FILE=${GNOCCHI_UWSGI_FILE:-${GNOCCHI_CONF_DIR}/uwsgi.ini}
+GNOCCHI_SERVICE_PROTOCOL=http
+GNOCCHI_SERVICE_HOST=${GNOCCHI_SERVICE_HOST:-${SERVICE_HOST}}
+GNOCCHI_WSGI_DIR=${GNOCCHI_WSGI_DIR:-/var/www/gnocchi}
+
+# FIXME(sileht): put 300 by default to match the archive policy
+# when the gate job have overrided this.
+CEILOMETER_ALARM_GRANULARITY=${CEILOMETER_ALARM_GRANULARITY:-60}
+CEILOMETER_ALARM_AGGREGATION_METHOD=${CEILOMETER_ALARM_AGGREGATION_METHOD:-rate:mean}
+CEILOMETER_ALARM_METRIC_NAME=${CEILOMETER_ALARM_METRIC_NAME:-cpu}
+CEILOMETER_ALARM_THRESHOLD=${CEILOMETER_ALARM_THRESHOLD:-10000000}
+
+# To enable OSprofiler change value of this variable to "notifications,profiler"
+CEILOMETER_NOTIFICATION_TOPICS=${CEILOMETER_NOTIFICATION_TOPICS:-notifications}
+
+CEILOMETER_COORDINATION_URL=${CEILOMETER_COORDINATION_URL:-redis://localhost:6379}
+CEILOMETER_PIPELINE_INTERVAL=${CEILOMETER_PIPELINE_INTERVAL:-}
+
+# Cache Options
+# NOTE(cdent): These are incomplete and specific for this testing.
+CEILOMETER_CACHE_BACKEND=${CEILOMETER_CACHE_BACKEND:-dogpile.cache.redis}
+CEILOMETER_CACHE_URL=${CEILOMETER_CACHE_URL:-redis://localhost:6379}
+
+CEILOMETER_EVENT_ALARM=${CEILOMETER_EVENT_ALARM:-False}
+
+# Set up default directories for middleware
+GITDIR["ceilometermiddleware"]=$DEST/ceilometermiddleware
+
+# Get rid of this before done.
+# Tell emacs to use shell-script-mode
+## Local variables:
+## mode: shell-script
+## End:

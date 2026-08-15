@@ -1,0 +1,2205 @@
+commit d490477f4e689020a2228111b39f9adb796b53fe
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Sep 15 12:46:44 2015 +0100
+
+    Release Clutter 1.24.0
+
+ NEWS         | 41 +++++++++++++++++++++++++++++++++++++++++
+ configure.ac |  4 ++--
+ 2 files changed, 43 insertions(+), 2 deletions(-)
+
+commit 0e7b18832a6c694fd2443abeecf91fefc47ee76e
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Tue Sep 15 00:32:05 2015 +0100
+
+    cogl: reset pending swaps counter on unrealize
+    
+    When removing the frame callback on the CoglOnscreen, we loose the ability
+    to get notified of swap events. This could leave us with a counter != 0
+    which leads to a deadlock situation after the next realize/draw cycle.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=755014
+
+ clutter/cogl/clutter-stage-cogl.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+commit ff1a5aae7ac374592f1a9f7ff7be6d0a4bd576c2
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Tue Sep 15 00:30:05 2015 +0100
+
+    x11: stage window: reset framebuffer on foreign window unrealize
+    
+    Similarly to 13dbb74c81bec861d3a135fb53966ae5562831a7, we need to reset the
+    framebuffer in the x11 for foreign windows.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=755014
+
+ clutter/clutter-backend-private.h |  5 +++++
+ clutter/clutter-backend.c         | 25 +++++++++++++++++++++++++
+ clutter/gdk/clutter-backend-gdk.c | 27 ---------------------------
+ clutter/gdk/clutter-backend-gdk.h |  4 ----
+ clutter/gdk/clutter-stage-gdk.c   |  3 +--
+ clutter/x11/clutter-stage-x11.c   | 14 ++++++++++++++
+ 6 files changed, 45 insertions(+), 33 deletions(-)
+
+commit 6c7f624f691415ca9ae8c1a95d41b359704d6f1b
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Sep 14 23:21:29 2015 +0100
+
+    master-clock-default: prevent deadlock with GLX_INTEL_swap_event
+    
+    If we call _clutter_stage_do_update() on a ClutterStage that isn't
+    mapped/visible, no GL command will be queued, and the Mesa/DRI2
+    implementation of SwapBuffers will do nothing. This causes
+    GLX_INTEL_swap_event to not be emitted by the X server because no swapping
+    has been requested through DRI2 and it eventually leads to a deadlock
+    situation in ClutterStageCogl because we're waiting for an event before we
+    start the next draw cycle.
+    
+    This patch removes the non mapped stages from the list of stages to process.
+    This is consistent with a previous patch for the ClutterMasterClockGdk [1].
+    
+    [1] : 5733ad58e5a3989f5cb836d42a1cebf3884e7c36
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=755014
+
+ clutter/clutter-master-clock-default.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+commit ee98a5bbe8ad21519d5e368ca5b2336e5d1da880
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Sep 14 01:00:12 2015 +0200
+
+    gdk: x11: notify Cogl immediately of a foreign window resize
+    
+    We want to avoid waiting for the acknowledgement event from the X
+    server as we might redraw the stage before that happens.
+    
+    This patch reimplements a bit of logic already in clutter-gtk [1].
+    
+    [1] : https://git.gnome.org/browse/clutter-gtk/tree/clutter-gtk/gtk-clutter-embed.c#n723
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754993
+
+ clutter/gdk/clutter-stage-gdk.c | 42 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 8 deletions(-)
+
+commit aeb19f2f4dcb6d25093802aaac1878c755dc16be
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Sun Sep 13 00:38:56 2015 +0200
+
+    gdk: move sync_to_vblank setup from master clock to backend
+    
+    Setting up the sync_to_vblank in the MasterClock is a bit too late as
+    the MasterClock can be created after a StageWindow has been created
+    and realized (and therefore all of its Cogl/GL state setup already).
+    So move the setup to the backend, prior to any StageWindow creation.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754938
+
+ clutter/gdk/clutter-backend-gdk.c      | 5 +++++
+ clutter/gdk/clutter-master-clock-gdk.c | 4 ----
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+commit 9f1db3f1b828a7f2e92877b44da6204c7ad3d505
+Author: Marek Černocký <marek@manet.cz>
+Date:   Mon Sep 14 13:24:00 2015 +0200
+
+    Updated Czech translation
+
+ po/cs.po | 863 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------------------------------------------------------------------
+ 1 file changed, 428 insertions(+), 435 deletions(-)
+
+commit 53bbd4801f870608fc49f51cc4b555636df9f22e
+Author: Bernd Homuth <dev@hmt.im>
+Date:   Sun Sep 13 05:27:22 2015 +0000
+
+    Updated German translation
+
+ po/de.po | 938 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------------------
+ 1 file changed, 476 insertions(+), 462 deletions(-)
+
+commit 13dbb74c81bec861d3a135fb53966ae5562831a7
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Fri Sep 11 17:24:05 2015 +0200
+
+    gdk: stage window: reset framebuffer on foreign window unrealize
+    
+    Clutter still uses part of the deprecated stateful API of Cogl (in
+    particulart cogl_set_framebuffer). It means Cogl can keep an internal
+    reference to the onscreen object we rendered to. In the case of
+    foreign window, we want to avoid this, as we don't know what's going
+    to happen to that window.
+    
+    This change sets the current Cogl framebuffer to a dummy 1x1
+    framebuffer if the current Cogl framebuffer is the one we're
+    unrealizing.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754890
+
+ clutter/gdk/clutter-backend-gdk.c | 29 ++++++++++++++++++++++++++++-
+ clutter/gdk/clutter-backend-gdk.h |  4 ++++
+ clutter/gdk/clutter-stage-gdk.c   | 21 ++++++++++++++++++++-
+ 3 files changed, 52 insertions(+), 2 deletions(-)
+
+commit cb4e88884bc811120dabcf473503d23a21044618
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Fri Sep 11 13:15:16 2015 +0200
+
+    gdk: master clock: hook ourselves to the paint signal
+    
+    We're currently hooked to the "update" signal of the FrameClock. When
+    embedding Clutter inside GTK+ we want to have the layout phase of GTK+
+    to notify us the size of our stage.
+    
+    This patch change to FrameClock signal we're listening to, to the
+    "paint" signal to make sure we've received the layout information from
+    GTK+, before painting. Otherwise we paint with a delay of one frame.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754889
+
+ clutter/gdk/clutter-master-clock-gdk.c | 6 +++---
+ clutter/gdk/clutter-stage-gdk.c        | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+commit 5d83260b19c06f216cfdb21a57f256ebee1affef
+Author: Jonas Ådahl <jadahl@gmail.com>
+Date:   Thu Sep 10 16:12:51 2015 +0800
+
+    actor: Fix transforming stage point when scale is less than 1
+    
+    The commit 6cd24faaa54de3246ca45d1c7426d8b7a74f71db (actor: Clean up
+    transform_stage_point()) changed the validation of the transformation
+    matrix to ignore the fraction part of the determinant. This caused
+    clutter_actor_transform_stage_point() to fail and return FALSE for
+    actors which scale was less than 1.
+    
+    Previously the validation was ('det' being a float):
+            det = (RQ[0][0] * ST[0][0])
+                + (RQ[0][1] * ST[0][1])
+                + (RQ[0][2] * ST[0][2]);
+            if (!det)
+                    return FALSE;
+    
+    Semantically, the if statement expression '!det' is equivalent to
+    'det == 0', i.e. 'det == 0.0f'. Post cleanup patches, 'det' was turned
+    into a double, and the if statement was changed to:
+    
+            if (CLUTTER_NEARBYINT (det) == 0)
+                    return FALSE;
+    
+    which, different from before, rounds the determinant to the nearest
+    integer value, meaning determinant in the range (-0.5, 0.5) would be
+    considered invalid.
+    
+    This patch reverts this part to the old behavior, while, because of the
+    inexact nature of floating point arithmetics, allowing a bit more liberal
+    meaning of "equals to 0" than '== 0.0'.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754766
+
+ clutter/clutter-actor.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+commit 63813ad398a38d5d7f304c497a1c3f0fda92bdd7
+Author: Dušan Kazik <prescott66@gmail.com>
+Date:   Thu Sep 10 17:28:07 2015 +0000
+
+    Updated Slovak translation
+
+ po/sk.po | 61 +++++++++++++++++++++++++++++--------------------------------
+ 1 file changed, 29 insertions(+), 32 deletions(-)
+
+commit 763a04e4dd140a79bad1c0c1364fd18970f4f2f3
+Author: Matej Urbančič <mateju@svn.gnome.org>
+Date:   Tue Sep 8 23:13:13 2015 +0200
+
+    Updated Slovenian translation
+
+ po/sl.po | 880 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------------------------------------------------
+ 1 file changed, 444 insertions(+), 436 deletions(-)
+
+commit 9432e67ee8f5884d883b6ce1e3ac3e84dcd7cd22
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Aug 31 22:58:11 2015 +0100
+
+    gdk: stage: create subsurface when dealing with foreign windows on wayland
+    
+    It is safer to create our own wayland surface when rendering into
+    someone else GdkWindow, otherwise we might draw somewhere we didn't
+    intend to.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754697
+
+ clutter/gdk/clutter-event-gdk.c |   9 +++++++++
+ clutter/gdk/clutter-stage-gdk.c | 143 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------
+ clutter/gdk/clutter-stage-gdk.h |  12 ++++++++++++
+ 3 files changed, 154 insertions(+), 10 deletions(-)
+
+commit 3771ef2f08054770ebc6110de14efd8fa2de3a26
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Aug 31 22:55:57 2015 +0100
+
+    gdk: stage: report geometry of the underlying surface for foreign windows
+    
+    When running on wayland, we might have our own subsurface
+    desynchronized from the foreign GdkWindow. It is important that we
+    report the size of the actually surface we're rendering to, otherwise
+    the logic in ClutterStage might discard resize operation that
+    resynchronize the subsurface with the stage's size.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754697
+
+ clutter/gdk/clutter-stage-gdk.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+commit 55dce70440dc27d6b0e38feccbf62422cfabe499
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Aug 31 23:20:29 2015 +0100
+
+    gdk: stage: do not ensure native windows are created with foreign windows
+    
+    For foreign windows this should be dealt with by the embedding
+    framework. In particular on Wayland with foreign windows, we might
+    want to create a subsurface and use the foreign window only for events
+    and frame clock synchronization.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754697
+
+ clutter/gdk/clutter-stage-gdk.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+commit a9b38fefdc097427cc33ca2b8d527415ee4f157b
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Sep 7 12:21:18 2015 +0100
+
+    gdk: stage: disable some operations for foreign windows
+    
+    Some operations like :
+         * resize
+         * show/hide
+         * set_title
+         * set_user_resizable
+    
+    should be handled by the embedding framework, so disable them for
+    foreign windows.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754671
+
+ clutter/gdk/clutter-stage-gdk.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
+
+commit 5733ad58e5a3989f5cb836d42a1cebf3884e7c36
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Sat Sep 5 23:08:09 2015 +0100
+
+    gdk: master clock: only process mapped & realized stages
+    
+    When using Clutter embed inside a Gtk application, a stage might end
+    up realized but not visible. In this case we might discard doing any
+    kind of animation processing.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754671
+
+ clutter/gdk/clutter-master-clock-gdk.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+commit 6183eb363282e5143bfd52aa36b5e6a318c4c992
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Mon Sep 7 12:27:26 2015 +0100
+
+    gdk: master-clock: disable vsync throttling
+    
+    When running with a master clock based on the GdkFrameClock, we get
+    synchronized with the compositor, so no need for throttling rendering.
+    
+    In particular when dealing with foreign windows, we run into deadlocks
+    in Mesa because of the way the Mesa wayland backend is implemented [1].
+    
+    [1] : http://cgit.freedesktop.org/mesa/mesa/tree/src/egl/drivers/dri2/platform_wayland.c#n330
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754671
+
+ clutter/gdk/clutter-master-clock-gdk.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+commit dbec3be99686685dfb704cba468cb807a8b5760d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Sep 4 13:53:04 2015 +0100
+
+    grid-layout: Clarify the scope of the orientation property
+    
+    Just like GtkGrid, changing the orientation of a ClutterGridLayout does
+    not change the existing layout; the orientation property is only used as
+    a hint when adding new children.
+
+ clutter/clutter-grid-layout.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+commit 41e18f795a6cd090fbe2fdf039ea555a5df735b0
+Author: Milo Casagrande <milo@ubuntu.com>
+Date:   Fri Sep 4 07:51:39 2015 +0000
+
+    Updated Italian translation
+
+ po/it.po | 556 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 279 insertions(+), 277 deletions(-)
+
+commit 7ed96aabd8c3703f5b0572ee7f000821a25d019d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Sep 3 14:15:11 2015 +0100
+
+    grid: Use the proper orientation for the request mode
+    
+    We automatically switch the request mode of the container depending on
+    the GridLayout's orientation, but we need to keep track of the request
+    mode during allocation, so that we don't get out of sync if the user
+    changed the request mode after adding the layout manager.
+    
+    This change also brings us closer to the code in GtkGrid.
+
+ clutter/clutter-grid-layout.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+commit 8a7304ee7d86fd3649a754a059a596c39792a97d
+Author: Aurimas Černius <aurisc4@gmail.com>
+Date:   Wed Sep 2 21:13:29 2015 +0300
+
+    Updated Lithuanian translation
+
+ po/lt.po | 50 ++++++++++++++++++++++++++------------------------
+ 1 file changed, 26 insertions(+), 24 deletions(-)
+
+commit 41bde79cf65a9a4c7c93aa4e5a03f5701161d5ee
+Author: Dušan Kazik <prescott66@gmail.com>
+Date:   Tue Sep 1 08:15:40 2015 +0000
+
+    Updated Slovak translation
+
+ po/sk.po | 75 +++++++++++++++++++++++++++++++++++----------------------------------------
+ 1 file changed, 35 insertions(+), 40 deletions(-)
+
+commit 5ae744c835032b75146a9869e01f5920de5c2e32
+Author: Balázs Úr <urbalazs@gmail.com>
+Date:   Mon Aug 31 15:32:01 2015 +0000
+
+    Updated Hungarian translation
+
+ po/hu.po | 871 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------------------------------------------------
+ 1 file changed, 438 insertions(+), 433 deletions(-)
+
+commit 3bb58de17064de7d9d9d209c26ccf5d8f49c5e83
+Author: Yosef Or Boczko <yoseforb@src.gnome.org>
+Date:   Sun Aug 30 11:12:55 2015 +0300
+
+    Updated Hebrew translation
+
+ po/he.po | 870 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 435 insertions(+), 435 deletions(-)
+
+commit dea5057fbd7e9e2f0199ec6df6e5716635f0e5ee
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Aug 29 20:19:51 2015 +0100
+
+    grid: Use the orientation of the request
+    
+    We use the orientation of the grid to get the preferred size of the
+    layout, but we should be using the orientation of the request instead.
+    The preferred width has an orizontal orientation, and the preferred
+    height has a vertical orientation.
+    
+    This allows us to refactor the get_preferred_* implementation into a
+    separate function.
+
+ clutter/clutter-grid-layout.c | 69 +++++++++++++++++++++++++++++++++++++++++----------------------------
+ 1 file changed, 41 insertions(+), 28 deletions(-)
+
+commit ed80a4bebb4c271e0f3f22208b38010d9ba4a812
+Author: Dušan Kazik <prescott66@gmail.com>
+Date:   Sat Aug 29 15:58:00 2015 +0000
+
+    Updated Slovak translation
+
+ po/sk.po | 636 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------
+ 1 file changed, 334 insertions(+), 302 deletions(-)
+
+commit 6b7cfceb5ee372269f22bcd3b785a245429c6998
+Author: Tom Tryfonidis <tomtryf@gmail.com>
+Date:   Fri Aug 28 20:50:07 2015 +0000
+
+    Updated Greek translation
+
+ po/el.po | 628 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 315 insertions(+), 313 deletions(-)
+
+commit 6bcbd1bfce75f82d95c6b15f8f4bdf1c3702f436
+Author: Andika Triwidada <andika@gmail.com>
+Date:   Fri Aug 28 13:02:13 2015 +0000
+
+    Updated Indonesian translation
+
+ po/id.po | 29 +++++++++++++----------------
+ 1 file changed, 13 insertions(+), 16 deletions(-)
+
+commit 0e4d11bcd8fca592215259568f2e816d3f501397
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Tue Aug 25 23:28:18 2015 +0100
+
+    gdk: master clock: fix incorrect symbol use
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754134
+
+ clutter/gdk/clutter-master-clock-gdk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 5b9c31a0cece7852a22a76e24a4738cb4c773d1d
+Author: Lionel Landwerlin <llandwerlin@gmail.com>
+Date:   Tue Aug 25 00:13:49 2015 +0100
+
+    gdk: fix memory corruption
+    
+    g_hash_table_replace will free the list pointer we're modifying.
+    Let's just do memory management ourselves.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=754134
+
+ clutter/gdk/clutter-master-clock-gdk.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit 84ad306a6598b831c4827cb6151a7f1bde33a6ff
+Author: Piotr Drąg <piotrdrag@gmail.com>
+Date:   Wed Aug 26 17:38:58 2015 +0200
+
+    Updated Polish translation
+
+ po/pl.po | 656 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 328 insertions(+), 328 deletions(-)
+
+commit 6e6d5b152b3d9c346bb6d02bd5234bf812ec325f
+Author: Chao-Hsiung Liao <j_h_liau@yahoo.com.tw>
+Date:   Tue Aug 25 22:51:41 2015 +0000
+
+    Updated Chinese (Taiwan) translation
+
+ po/zh_TW.po | 871 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------------------
+ 1 file changed, 438 insertions(+), 433 deletions(-)
+
+commit e26a0c3afc82bba1226403b05d5836c6dce8c4c9
+Author: Fran Dieguez <fran@openhost.es>
+Date:   Tue Aug 25 15:51:15 2015 +0200
+
+    Updated Galician translations
+
+ po/gl.po | 42 ++++++++++++++++++++----------------------
+ 1 file changed, 20 insertions(+), 22 deletions(-)
+
+commit e10fd2d4c01d339056a30f4d3dca713147986b9e
+Author: Daniel Mustieles <daniel.mustieles@gmail.com>
+Date:   Tue Aug 25 11:01:18 2015 +0200
+
+    Updated Spanish translation
+
+ po/es.po | 30 ++++++++++++++++--------------
+ 1 file changed, 16 insertions(+), 14 deletions(-)
+
+commit 8f20f86a80882ce3506a7feb2527c64e95045631
+Author: Pedro Albuquerque <palbuquerque73@gmail.com>
+Date:   Tue Aug 25 06:20:10 2015 +0000
+
+    Updated Portuguese translation
+
+ po/pt.po | 32 +++++++++++++++++---------------
+ 1 file changed, 17 insertions(+), 15 deletions(-)
+
+commit 81a560f9bf043c54a37c947a52f149fb4d5e0064
+Author: Alexandre Franke <alexandre.franke@gmail.com>
+Date:   Mon Aug 24 16:02:38 2015 +0000
+
+    Updated French translation
+
+ po/fr.po | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+
+commit 84c5846aa07080c825702af798d3bae4c888b240
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Aug 24 10:01:03 2015 +0100
+
+    image: Use internal function for the texture node
+    
+    ClutterActor has a convenience function that removes the need to query
+    the actor's state and apply it to a ClutterTextureNode, so we should use
+    it.
+
+ clutter/clutter-image.c | 41 +++--------------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
+
+commit af010d5e2daf09f8ce4e453e32efa4920b3d103a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Aug 24 09:59:53 2015 +0100
+
+    canvas: Use internal function for the texture node
+    
+    ClutterActor has a convenience function that removes the need to query
+    the actor's state and apply it to a ClutterTextureNode, so we should use
+    it.
+
+ clutter/clutter-canvas.c | 45 ++++++---------------------------------------
+ 1 file changed, 6 insertions(+), 39 deletions(-)
+
+commit cf7e37b53bb5f5a91d3a849e88e1cfeeada9aa0c
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Aug 24 09:59:16 2015 +0100
+
+    actor: Add internal "create textute node" function
+    
+    To avoid excessive copy and paste. We could even consider making it
+    public before release.
+
+ clutter/clutter-actor-private.h |  3 +++
+ clutter/clutter-actor.c         | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+
+commit 6cc12adf4d1b3ab5475caa98a7c99a5b577459e1
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Aug 21 15:02:47 2015 +0100
+
+    Post-release version bump to 1.23.7
+
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 113b7bac51ec4570b23d47ebb715cd95f7f4018f
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Aug 21 14:47:04 2015 +0100
+
+    Release Clutter 1.23.6
+
+ NEWS         | 27 +++++++++++++++++++++++++++
+ configure.ac |  2 +-
+ 2 files changed, 28 insertions(+), 1 deletion(-)
+
+commit 38e983b8e9e2b433ef6ba930dca9096958bae697
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Aug 21 12:11:05 2015 +0100
+
+    docs: Fix a typo in the BoxLayout:homogeneous description
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=753895
+
+ clutter/clutter-box-layout.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit fe422ab61c2bb7b23af6c4707a27b4de4d49beb1
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Aug 21 11:58:52 2015 +0100
+
+    gdk: Use non-deprecated/non-Clutter specific X11 API
+    
+    We are currently using deprecated/Clutter-specific API in Cogl to
+    retrieve the XVisualInfo associated with the (E)GLX context. Cogl 1.21.2
+    added new CoglRenderer API to achieve the same result.
+
+ clutter/gdk/clutter-backend-gdk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit f5409ecd3a28a9e32467652d34120aa77fcff0a2
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Aug 21 11:57:59 2015 +0100
+
+    Bump up requirement for Cogl
+    
+    We're going to use API added in Cogl 1.21.
+
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 956eec79647388b4c97cef093b407fe98d2ccfd4
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Aug 19 17:34:44 2015 +0100
+
+    conform/actor-pick: Add more verbose output on failure
+    
+    Should help diagnosing issues.
+
+ tests/conform/actor-pick.c | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+commit cff048a65048bc71f37b1f575ea765fde72081c3
+Author: Fran Dieguez <fran@openhost.es>
+Date:   Mon Aug 17 01:18:03 2015 +0200
+
+    Updated Galician translations
+
+ po/gl.po | 838 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 420 insertions(+), 418 deletions(-)
+
+commit 83869a17ea9cc69fad37a24dce99e34fefa2814b
+Author: Alexandre Franke <alexandre.franke@gmail.com>
+Date:   Sat Aug 15 11:37:47 2015 +0000
+
+    Updated French translation
+
+ po/fr.po | 825 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 413 insertions(+), 412 deletions(-)
+
+commit c73d8f82a0cc9f20b836e8782813271e1a948ef6
+Author: Daniel Mustieles <daniel.mustieles@gmail.com>
+Date:   Wed Aug 12 08:58:43 2015 +0200
+
+    Updated Spanish translation
+
+ po/es.po | 5804 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 2902 insertions(+), 2902 deletions(-)
+
+commit 9a10c3cbee284cd463d21cc80e13e35aaffec1ae
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Aug 11 09:14:19 2015 +0100
+
+    Add an explicit dep on GIO
+    
+    We use GIO types in the API, so we cannot just rely on our dependencies
+    to add GIO.
+
+ configure.ac | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit bdf12d359a8f88507d1ef8883c39474cfd2dc4ba
+Author: Aurimas Černius <aurisc4@gmail.com>
+Date:   Thu Aug 6 22:54:34 2015 +0300
+
+    Updated Lithuanian translation
+
+ po/lt.po | 828 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------------------------------------
+ 1 file changed, 415 insertions(+), 413 deletions(-)
+
+commit 3a52b688cb6c7e877145868c7fada8cde62cda5b
+Author: Pedro Albuquerque <palbuquerque73@gmail.com>
+Date:   Tue Aug 4 10:28:50 2015 +0000
+
+    Updated Portuguese translation
+
+ po/pt.po | 433 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------------------------------------------------
+ 1 file changed, 218 insertions(+), 215 deletions(-)
+
+commit 434f01c08fb099031ff9aa17cd1ef238684f8d04
+Author: Andika Triwidada <andika@gmail.com>
+Date:   Mon Aug 3 11:23:29 2015 +0000
+
+    Updated Indonesian translation
+
+ po/id.po | 421 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------------------------------------------------
+ 1 file changed, 212 insertions(+), 209 deletions(-)
+
+commit 6d649ec6d11833022f7e1bca8efc30274315080f
+Author: Anders Jonsson <anders.jonsson@norsjovallen.se>
+Date:   Mon Mar 16 12:57:33 2015 +0100
+
+    Fix typo (textues)
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=746279
+
+ clutter/deprecated/clutter-texture.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 7016bff34443665bffdd4d50f9f3ac16ffc0b62f
+Author: Jordi Mas <jmas@softcatala.org>
+Date:   Sat Aug 1 11:20:25 2015 +0200
+
+    Fixes to Catalan translation
+
+ po/ca.po | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+commit 9a510c011746ba7e0d258c76302e83e16e371ec7
+Author: Adel Gadllah <adel.gadllah@gmail.com>
+Date:   Sun Jul 26 11:29:10 2015 +0200
+
+    backend: Check for a known set of drivers
+    
+    We want to use the Cogl GL3 driver, if possible, and then go through a
+    known list of Cogl drivers, before giving up and using COGL_DRIVER_ANY.
+    
+    Based on original patch from Emmanuele Bassi.
+    
+    We have to create and tear down the whole context when trying
+    out the drivers though because the extension checks do not happen
+    until cogl_context_init.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=742678
+
+ clutter/clutter-backend.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 56 insertions(+), 13 deletions(-)
+
+commit 40f6a0135e9007c1830aa6e35b65399ce897e0fc
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Fri Jul 24 19:08:44 2015 +0200
+
+    evdev: Set missing dx/dy fields on ClutterTouchpadPinchEvents
+
+ clutter/evdev/clutter-device-manager-evdev.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+commit ec90e5c2bed1aa4ec0198d80a916e0446dd15602
+Author: Sebastian Rasmussen <sebras@gmail.com>
+Date:   Thu Jul 23 20:19:34 2015 +0000
+
+    Updated Swedish translation
+
+ po/sv.po | 2237 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------------------
+ 1 file changed, 1279 insertions(+), 958 deletions(-)
+
+commit 691be437ad034e19b201c05d6f6500e16c072455
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 22 19:25:01 2015 +0100
+
+    Post-release version bump to 1.23.5
+
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 23596a0ca600929f17669b171358342e8ea96c55
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 22 19:13:00 2015 +0100
+
+    Release Clutter 1.23.4
+
+ NEWS         | 32 ++++++++++++++++++++++++++++++++
+ README.in    | 22 ++++++++++++++++++++++
+ configure.ac |  2 +-
+ 3 files changed, 55 insertions(+), 1 deletion(-)
+
+commit b834503b7954b6563e786f2eb0223c3af57c665d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 22 19:12:42 2015 +0100
+
+    build: Fix for distcheck
+
+ clutter/Makefile.am | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit c74822159817ba1422b13d850deb337c7f60a438
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 22 18:46:47 2015 +0100
+
+    docs: Add missing symbols
+
+ doc/reference/clutter-sections.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+commit 8f976cad44461ff05946bb771baff8cfbe06a1b0
+Author: Stefan Sauer <ensonic@users.sf.net>
+Date:   Wed Jul 22 18:28:41 2015 +0200
+
+    docs: give more hints about how to replace the anchor-point
+    
+    In addition to pivot-point also mention _set_translation().
+
+ clutter/clutter-actor.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+commit 13c722c026f272fe9d9d2c67088bad02b5b1f0be
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Jul 20 13:05:06 2015 +0100
+
+    x11: Remove unused enumeration
+    
+    The ClutterX11XInputEventTypes enumeration has been unused inside
+    Clutter for the past 4 years and a half, since we switched to the
+    XInput 2 API.
+    
+    The enumeration itself has always been private, and nobody should
+    have used it in the first place, but if something breaks, we can
+    revert this commit.
+
+ clutter/x11/clutter-x11.h | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+commit 9d40fafa2a62db1a7bab5d339a0211b5cbce962e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Jul 20 13:00:12 2015 +0100
+
+    Do not generate backend-specific enumeration types
+    
+    They should be part of the backend-specific API.
+    
+    The only backend that has an enumeration type is the X11 one, and it's
+    small, so we can simply put it there.
+    
+    This is not an ABI change: the backend-specific symbols are still in
+    the same SO. You'll be required to import clutter-x11.h to have access
+    to the GType method at the source level, whereas before just importing
+    clutter.h would have sufficed. The only user of that enumeration was a
+    function declared in clutter-x11.h, anyway.
+
+ clutter/Makefile.am               |  2 +-
+ clutter/x11/clutter-backend-x11.c | 25 ++++++++++++++++++++++++-
+ clutter/x11/clutter-x11.h         |  3 +++
+ 3 files changed, 28 insertions(+), 2 deletions(-)
+
+commit c2e63cf16b41f5cec8b742eb1fd56deed1789a41
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jul 19 13:17:49 2015 +0100
+
+    build: Use the appropriate NAMESPACE variable everywhere
+    
+    We're inconsistently using the NAMESPACE variable instead of passing
+    the --identifier-prefix and --symbol-prefix command line arguments to
+    the introspection scanner.
+
+ clutter/Makefile.am | 25 +++++++++++--------------
+ 1 file changed, 11 insertions(+), 14 deletions(-)
+
+commit e474684f2bcf9a8a449c96afc393b73792637495
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 17 13:16:53 2015 +0100
+
+    deprecated: Regenerate the compatibility key symbols
+    
+    Now with the appropriate compiler warning that points to the replacement
+    key symbol.
+
+ clutter/deprecated/clutter-keysyms.h | 4198 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------
+ 1 file changed, 2099 insertions(+), 2099 deletions(-)
+
+commit 1506ec4a541938293d931a1bd1909d46a0d0a0e3
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 17 13:15:32 2015 +0100
+
+    keysyms-update: Add deprecation notice for compat symbols
+    
+    Now that we can warn about deprecated macros, we should finally do it
+    for the old, non-namespaced key symbol macros that we've been stringing
+    along since the 1.0 days.
+
+ clutter/clutter-keysyms-update.pl | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+commit ad690c61b1f590a904da7c3b4d3e94678b990547
+Author: Ting-Wei Lan <lantw@src.gnome.org>
+Date:   Sun Jul 12 14:30:05 2015 +0800
+
+    macros: Clang 3.4 and later versions can use deprecation macros for GCC
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=752272
+
+ clutter/clutter-macros.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit 4dfa4de5d01bf5817c939c23d738967e6f8922df
+Author: Nitin Sharma <nitin.s1@samsung.com>
+Date:   Mon Jul 13 17:21:57 2015 +0530
+
+    actor: Check for NULL pointer for pspec
+    
+    In function clutter_actor_set_final_state, the pspec pointer returned by calling
+    g_object_class_find_property is not checked for NULL.
+
+ clutter/clutter-actor.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+commit 332aa3cf215aa6b4c86565f589f01a4b4ac7e362
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 23:58:12 2015 +0100
+
+    macros: Add fallback defines for non-GCC compilers
+    
+    I forgot to add the fallback definitions in case we're not using GCC;
+    without them, anybody using non-GCC compilers will get a build error.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=752272
+
+ clutter/clutter-macros.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+commit 7e0f588c91923d0983e6ecaa904b559890c265c3
+Author: Ting-Wei Lan <lantw@src.gnome.org>
+Date:   Sat Jul 11 18:09:45 2015 +0800
+
+    trivial: Fix return value error in clutter_event_get_gesture_motion_delta
+
+ clutter/clutter-event.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+commit a722cbebef7b2bf8c5427631952889498b664148
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:13:23 2015 +0100
+
+    actor: Fully deprecate the state access macros
+    
+    Now that we can warn without breaking the build, we should deprecate the
+    state access macros for ClutterActor.
+
+ clutter/clutter-actor.h | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+commit 9bd3c8d2e6ef4c794396a3ccbfa45f08055c6b6b
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:16:11 2015 +0100
+
+    conform: Do not use deprecated macros
+    
+    Porting actor-graph is easier than porting actor-invariants, and we're
+    not really testing the internals of ClutterActor.
+
+ tests/conform/actor-graph.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+commit ccd3fa0355407f4b5ec7528cdef91e939647f344
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:12:33 2015 +0100
+
+    conform: Disable deprecation warnings
+    
+    When testing the invariants we do also test deprecated API; there's no
+    need to warn.
+
+ tests/conform/actor-invariants.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 4040f2d556801fa6aaba223b530b83616c73453e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:12:00 2015 +0100
+
+    gdk: Do not use deprecated macros
+    
+    Use the replacement functions instead.
+
+ clutter/gdk/clutter-master-clock-gdk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit eefbb88675b3a3f6d00d6fe7305625fe903b74da
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:11:35 2015 +0100
+
+    backend: Do not use deprecated macros
+    
+    Use the replacement functions instead.
+
+ clutter/clutter-backend.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+commit 02b44fcc60f5bf1aa335c9d6df003695f84fdb2d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:10:57 2015 +0100
+
+    cally: Drop use of deprecated macros
+    
+    Use the equivalent functions instead.
+
+ clutter/cally/cally-actor.c | 10 +++++-----
+ clutter/cally/cally-text.c  |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+commit 8a24ad83c91551e1c6eaa05a0f1dac022cf4887a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sat Jul 11 10:03:57 2015 +0100
+
+    Add macros for deprecating macros
+    
+    We want to be able to deprecate macros, but right now the best we can do
+    is to wrap them with things like:
+    
+      #ifndef CLUTTER_DISABLE_DEPRECATED
+      # define A_MACRO_I_WANT_TO_DEPRECATE ...
+      #endif
+    
+    Which requires adding a new symbol to the build, and will cause a build
+    error instead of a compiler/pre-processor warning.
+    
+    Fortunately, we can use the _Pragma() keyword introduced by C99 and
+    supported by GCC to add a warning to the output, while leaving the macro
+    itself intact.
+    
+    GCC does not have a "deprecated" pragma, so we have to use a generic
+    warning; this also means we cannot do nifty things like concatenating
+    strings and the like, as we do for the "deprecated" attribute.
+    
+    The macro deprecation symbol should have the same affordances as the
+    function deprecation one, and evaluate to nothing if the required
+    version is lower than the current version; or if the global toggle for
+    deprecation warnings is in effect.
+
+ clutter/clutter-macros.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+commit b151898534b08eb8bc0136883d2204c6b612bc36
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Wed Jul 1 15:15:41 2015 +0200
+
+    clutter-event: Add API around touchpad gesture events
+    
+    These are needed in order to make these events binding friendly
+
+ clutter/clutter-event.c            | 122 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-event.h            |  17 +++++++++++++++++
+ doc/reference/clutter-sections.txt |   5 +++++
+ 3 files changed, 144 insertions(+)
+
+commit 5b8a2a9e156395052a8adda670fdf3fd0d30c591
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Fri May 22 18:33:31 2015 +0200
+
+    evdev: Handle libinput touchpad swipe/pinch gesture events
+    
+    The translation from libinput events is fairly straightforward, as they
+    map almost 1:1.
+
+ clutter/evdev/clutter-device-manager-evdev.c | 165 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ configure.ac                                 |   2 +-
+ 2 files changed, 166 insertions(+), 1 deletion(-)
+
+commit c185a17783a1b7c0d270def5e02eb3f27ba4fcb8
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Fri May 22 18:30:09 2015 +0200
+
+    event: Add pinch/swipe gesture event types and structs
+    
+    We now have ClutterTouchpadPinchEvent and ClutterTouchpadSwipeEvent,
+    each bringing the necessary info for the specific gesture. Each
+    of these events is defined by begin/update/end/cancel phases.
+    
+    These events have been also made to propagate down/up the pointer
+    position, just like scroll and button events do.
+
+ clutter/clutter-enums.h            | 43 +++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-event.c            | 34 ++++++++++++++++++++++++++++++++++
+ clutter/clutter-event.h            | 82 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-main.c             |  2 ++
+ doc/reference/clutter-sections.txt |  3 +++
+ 5 files changed, 164 insertions(+)
+
+commit a4b79e1cd33274e20c4febdd15867bfea7c21033
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 10 15:48:07 2015 +0100
+
+    docs: Update all the links in the README
+    
+    We've been shipping with outdated links for a long while.
+
+ README.in | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
+
+commit 3e14d87188dabc6825190c9c3a2f67d5adf8a020
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 10 14:33:25 2015 +0100
+
+    actor: Use CLUTTER_NEARBYINT instead of C integer casting
+    
+    Otherwise we break because of rounding.
+
+ clutter/clutter-actor.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit b0e785c6c269f5223fe2beaa1794f850e270d9cd
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 10 11:26:34 2015 +0100
+
+    actor: Add bind_model_with_properties()
+    
+    When binding models to actors to map items to children we don't often
+    need the full control of a function; in many cases we just need to
+    specify the type of the child we want to construct and the properties
+    on both the item and the child that we want to bind.
+    
+    We should provide a simple convenience function that does all this for
+    us.
+
+ clutter/clutter-actor.c            | 135 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-actor.h            |   6 ++++++
+ doc/reference/clutter-sections.txt |   1 +
+ examples/actor-model.c             |  33 +++++++++------------------------
+ 4 files changed, 151 insertions(+), 24 deletions(-)
+
+commit eda436f0c40955908b9eaf588078680f2d27354e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri Jul 10 10:42:27 2015 +0100
+
+    examples/actor-model: Add activate transition
+    
+    Show a simple transition when the current menu item is activated.
+
+ examples/actor-model.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 68 insertions(+), 1 deletion(-)
+
+commit bf0ca916629f5034ff322642269c222e62efaf28
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jul 9 16:53:39 2015 +0100
+
+    examples/actor-model: Clean up and comment
+    
+    This is an example so it ought to be a bit more didactic.
+
+ examples/actor-model.c | 310 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------------------
+ 1 file changed, 169 insertions(+), 141 deletions(-)
+
+commit 365bd482fbce9ae61e810878afe685d21e6a801d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jul 9 14:34:11 2015 +0100
+
+    gdk: Use X11 API only when running under X11
+    
+    Avoid using GdkX11Screen API when the GDK backend being used is not the
+    X11 one.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=752143
+
+ clutter/gdk/clutter-backend-gdk.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+commit 41cd804f104ab51035c204868751f1876b7409c8
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jul 9 14:30:26 2015 +0100
+
+    actor: Rename internal function
+    
+    Map to the field name and the signal name, so it's clear what it does.
+
+ clutter/clutter-actor.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
+
+commit b0300a624719196a9e0291d140fe6166c791ae64
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 8 11:15:54 2015 +0100
+
+    cogl: Pack ClutterStageCogl a bit more
+    
+    We should rearrange the fields a bit so they get packed without holes,
+    and aligned with cacheline boundaries.
+
+ clutter/cogl/clutter-stage-cogl.h | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+commit 938eea175fffd6d6122f7e34a1d74dcf687b6f17
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 8 11:10:45 2015 +0100
+
+    backend: Remove unnecessary private data structure
+    
+    The whole of ClutterBackend is a final/protected type, so having a bunch
+    of instance fields and an instance private data structure is redundant
+    at best, and less efficient at worst.
+
+ clutter/clutter-backend-private.h |   9 ++++++++-
+ clutter/clutter-backend.c         | 119 ++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------------------------
+ 2 files changed, 46 insertions(+), 82 deletions(-)
+
+commit 19fbbcd35846453ac9ba77c321311faec39bb6e2
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jul 8 11:05:10 2015 +0100
+
+    build: Do not define Wayland support unconditionally
+    
+    Now that we discover at configure time if Wayland is available, we
+    should only enable support if we find it.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=752104
+
+ configure.ac | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+commit 02b69e4d76f7f94f8faa964ebca2d01df7aaa8cf
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Jul 7 15:51:13 2015 +0100
+
+    Move header inclusion guard at the top
+    
+    GCC has some optimization for the inclusion guard, but they only work if
+    the check is the outermost one.
+    
+    We're fairly inconsistent because of historical reasons, so we should
+    ensure that we follow the same pattern in every public header.
+
+ clutter/clutter-action.h                     | 6 +++---
+ clutter/clutter-actor-meta.h                 | 6 +++---
+ clutter/clutter-actor.h                      | 6 +++---
+ clutter/clutter-align-constraint.h           | 6 +++---
+ clutter/clutter-backend.h                    | 6 +++---
+ clutter/clutter-bin-layout.h                 | 6 +++---
+ clutter/clutter-bind-constraint.h            | 6 +++---
+ clutter/clutter-binding-pool.h               | 6 +++---
+ clutter/clutter-blur-effect.h                | 6 +++---
+ clutter/clutter-box-layout.h                 | 6 +++---
+ clutter/clutter-brightness-contrast-effect.h | 6 +++---
+ clutter/clutter-cairo.h                      | 6 +++---
+ clutter/clutter-canvas.h                     | 6 +++---
+ clutter/clutter-child-meta.h                 | 6 +++---
+ clutter/clutter-click-action.h               | 6 +++---
+ clutter/clutter-clone.h                      | 6 +++---
+ clutter/clutter-color-static.h               | 6 +++---
+ clutter/clutter-color.h                      | 6 +++---
+ clutter/clutter-colorize-effect.h            | 6 +++---
+ clutter/clutter-constraint.h                 | 6 +++---
+ clutter/clutter-container.h                  | 6 +++---
+ clutter/clutter-content.h                    | 6 +++---
+ clutter/clutter-deform-effect.h              | 6 +++---
+ clutter/clutter-desaturate-effect.h          | 6 +++---
+ clutter/clutter-device-manager.h             | 6 +++---
+ clutter/clutter-drag-action.h                | 6 +++---
+ clutter/clutter-drop-action.h                | 6 +++---
+ clutter/clutter-effect.h                     | 6 +++---
+ clutter/clutter-enums.h                      | 6 +++---
+ clutter/clutter-event.h                      | 6 +++---
+ clutter/clutter-feature.h                    | 6 +++---
+ clutter/clutter-fixed-layout.h               | 6 +++---
+ clutter/clutter-flow-layout.h                | 6 +++---
+ clutter/clutter-gesture-action.h             | 6 +++---
+ clutter/clutter-grid-layout.h                | 6 +++---
+ clutter/clutter-group.h                      | 6 +++---
+ clutter/clutter-image.h                      | 6 +++---
+ clutter/clutter-input-device.h               | 6 +++---
+ clutter/clutter-interval.h                   | 6 +++---
+ clutter/clutter-keyframe-transition.h        | 6 +++---
+ clutter/clutter-layout-manager.h             | 6 +++---
+ clutter/clutter-layout-meta.h                | 6 +++---
+ clutter/clutter-macros.h                     | 6 +++---
+ clutter/clutter-main.h                       | 6 +++---
+ clutter/clutter-offscreen-effect.h           | 6 +++---
+ clutter/clutter-page-turn-effect.h           | 6 +++---
+ clutter/clutter-paint-node.h                 | 6 +++---
+ clutter/clutter-paint-nodes.h                | 6 +++---
+ clutter/clutter-pan-action.h                 | 6 +++---
+ clutter/clutter-path-constraint.h            | 6 +++---
+ clutter/clutter-path.h                       | 6 +++---
+ clutter/clutter-property-transition.h        | 6 +++---
+ clutter/clutter-rotate-action.h              | 6 +++---
+ clutter/clutter-script.h                     | 6 +++---
+ clutter/clutter-scriptable.h                 | 6 +++---
+ clutter/clutter-scroll-actor.h               | 6 +++---
+ clutter/clutter-settings.h                   | 6 +++---
+ clutter/clutter-shader-effect.h              | 6 +++---
+ clutter/clutter-shader-types.h               | 6 +++---
+ clutter/clutter-snap-constraint.h            | 6 +++---
+ clutter/clutter-stage-manager.h              | 6 +++---
+ clutter/clutter-stage.h                      | 6 +++---
+ clutter/clutter-tap-action.h                 | 6 +++---
+ clutter/clutter-text-buffer.h                | 6 +++---
+ clutter/clutter-text.h                       | 6 +++---
+ clutter/clutter-transition-group.h           | 4 ++++
+ clutter/clutter-transition.h                 | 6 +++---
+ clutter/clutter-types.h                      | 6 +++---
+ clutter/clutter-units.h                      | 6 +++---
+ clutter/clutter-version.h.in                 | 6 +++---
+ clutter/clutter-zoom-action.h                | 6 +++---
+ 71 files changed, 214 insertions(+), 210 deletions(-)
+
+commit cffa243fbe675d0025a53cbc069e29ecfcc65176
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Jul 7 14:52:20 2015 +0100
+
+    Add autocleanup macros for Clutter types
+    
+    So that people can use the g_auto* macros, as well as the G_DECLARE_*
+    ones, from GLib 2.44.
+
+ clutter/Makefile.am            |   2 +-
+ clutter/clutter-autocleanups.h | 106 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter.h              |   2 ++
+ 3 files changed, 109 insertions(+), 1 deletion(-)
+
+commit 6cd24faaa54de3246ca45d1c7426d8b7a74f71db
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Jul 7 09:23:42 2015 +0100
+
+    actor: Clean up transform_stage_point()
+    
+    Use double precision floats for the intermediate computations, to avoid
+    loss of precision, and don't convert too integer when unnecessary, to
+    avoid rounding errors.
+
+ clutter/clutter-actor.c | 107 +++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------------
+ 1 file changed, 49 insertions(+), 58 deletions(-)
+
+commit 4b9e672bc18e80c541138743c19c9229764c20e9
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Jun 29 20:28:43 2015 +0100
+
+    examples: Add actor-model
+    
+    A basic example that shows how to build a composite actor starting from
+    a GListStore of model objects.
+
+ examples/Makefile.am   |   1 +
+ examples/actor-model.c | 442 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 443 insertions(+)
+
+commit bf9a71ae2381e3d0fdc9846f61777489befe1960
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Jun 29 20:22:56 2015 +0100
+
+    actor: Allow binding an actor to a GListModel
+    
+    It can be useful to bind the children list to set of objects inside a
+    GListModel implementation; the GListModel stores the objects, and every
+    time the model changes, a function is called that maps each object in
+    the model to a newly created ClutterActor, which is then added as a
+    child. This API, along with the property binding one inside GObject,
+    allows automatic creation of views based on object models that update
+    themselves without manual intervention.
+
+ clutter/clutter-actor.c            | 127 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-actor.h            |  27 +++++++++++++++++++++++++++
+ doc/reference/clutter-sections.txt |   2 ++
+ 3 files changed, 156 insertions(+)
+
+commit 7cde4486aaf860669cc4cf99f772238ac0e6a01f
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Jun 29 20:22:36 2015 +0100
+
+    build: Bump GLib dependency
+    
+    We need GListModel, in GIO since 2.44.
+
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit db8bb95817223b4fa3a93403b31af83ddde740d4
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jun 28 10:37:01 2015 +0100
+
+    Move ClutterModel to the deprecated area
+    
+    And deal with the fallout in the source tree.
+
+ clutter/Makefile.am                              | 6 +++---
+ clutter/clutter-deprecated.h                     | 1 +
+ clutter/clutter.h                                | 1 -
+ clutter/deprecated/clutter-list-model.h          | 2 +-
+ clutter/{ => deprecated}/clutter-model-private.h | 4 ++--
+ clutter/{ => deprecated}/clutter-model.c         | 0
+ clutter/{ => deprecated}/clutter-model.h         | 0
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+commit 31c2c57f8ba78f5245188f93ef6faa214a7bad2d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jun 28 10:29:37 2015 +0100
+
+    Move clutter-list-model.[ch] to the deprecated area
+
+ clutter/Makefile.am                           | 4 ++--
+ clutter/clutter-deprecated.h                  | 1 +
+ clutter/clutter.h                             | 1 -
+ clutter/{ => deprecated}/clutter-list-model.c | 0
+ clutter/{ => deprecated}/clutter-list-model.h | 0
+ 5 files changed, 3 insertions(+), 3 deletions(-)
+
+commit 52e8864aa30cc394b7c79cb17c43f2c877396a19
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jun 28 10:37:31 2015 +0100
+
+    conform: Disable deprecation warnings in the model units
+
+ tests/conform/model.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 6376eebd9bda84082609217f46ea7cffb72ec738
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jun 28 10:31:19 2015 +0100
+
+    Deprecate ClutterModel
+    
+    Now that we've deprecated the only concrete implementation of
+    ClutterModel, it's time we deprecate the base abstract class.
+
+ clutter/clutter-model.c | 106 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ clutter/clutter-model.h |  96 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------
+ 2 files changed, 158 insertions(+), 44 deletions(-)
+
+commit e1e6f7be481f1abeb06ec1fca18cfd8e1c9730e5
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun Jun 28 10:21:22 2015 +0100
+
+    Deprecate ClutterListModel
+    
+    The model API was an ad hoc addition to Clutter, back in the 0.6 days,
+    that was needed because GLib did not offer anything of sort, and the
+    only model-like storage was inside GTK+. The API design was heavily
+    based on GtkTreeModel and friends, with column-based collections of
+    generic data.
+    
+    Since then, the model API inside Clutter has not really been integrated
+    in the core API; on the other hand, GIO has grown a model API, and it's
+    seeing more use in the platform.
+    
+    This means that the ClutterModel API should finally be deprecated, and
+    we should move code to the GListModel API inside GIO.
+
+ clutter/clutter-list-model.c | 11 ++++++++++-
+ clutter/clutter-list-model.h | 10 +++++++---
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+commit d09c204a266385626c40d851b6fbadf7a134aaa0
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Jun 30 14:47:08 2015 +0100
+
+    build: Automatically detect Wayland support
+    
+    Like we do for X11, GDK, MacOS, and Windows, the Wayland backend can be
+    autodetected. We should only fail if the Wayland support was explicitly
+    asked at configure time, but the dependencies were not satisfied.
+
+ configure.ac | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
+
+commit 661078a4f2c7600837fb069b0e83c1b42383eba6
+Author: Peter Hutterer <peter.hutterer@who-t.net>
+Date:   Thu Jun 25 09:23:13 2015 +1000
+
+    x11: don't create the libinput tapping property
+    
+    If it doesn't exist, we don't have a touchpad. Don't create the property
+    and potentially confuse other pieces of the stack that do the same check.
+
+ clutter/x11/clutter-device-manager-xi2.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+commit 7668dd1c99d6396aac34b9866d8bcece8190a585
+Author: Pedro Albuquerque <palbuquerque73@gmail.com>
+Date:   Wed Jul 1 21:58:13 2015 +0000
+
+    Updated Portuguese translation
+
+ po/pt.po | 1569 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------------------------------------------
+ 1 file changed, 792 insertions(+), 777 deletions(-)
+
+commit 7c2ac712f73b26508fa5948dc266259b26fad0fa
+Author: Kalev Lember <klember@redhat.com>
+Date:   Sat Jun 20 18:55:01 2015 +0200
+
+    docs: Fix a typo in ClutterImage example
+
+ clutter/clutter-image.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 852ba2c08968b530a235d179e154c3e9375c8a0d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jun 18 16:39:17 2015 +0100
+
+    Post-release version bump to 1.23.3
+
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit f244d9383aa60ea3033585c167aa48e08c421c27
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jun 18 16:30:16 2015 +0100
+
+    Release Clutter 1.23.2
+
+ NEWS         | 43 +++++++++++++++++++++++++++++++++++++++++++
+ configure.ac |  2 +-
+ 2 files changed, 44 insertions(+), 1 deletion(-)
+
+commit b5fd0fe7fe8ac0e63f62788256f968ced51a7aaa
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Jun 18 16:29:26 2015 +0100
+
+    tests/interactive: Fix compiler warning
+    
+    Missing type for the closure argument.
+
+ tests/interactive/test-pixmap.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit 0c75e178145c3296f05deefed34be3691b1ffb3b
+Author: Gustavo Noronha Silva <gustavo.noronha@collabora.com>
+Date:   Wed Sep 11 12:33:57 2013 -0300
+
+    Add PanAxis mode that automatically pins scroll based on initial movement
+    
+    This code is inspired by the implementation of the same feature for the
+    Mx toolkit's MxKineticScrollView. See commit 4d08771.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=707982
+
+ clutter/clutter-enums.h            |   6 +++++-
+ clutter/clutter-pan-action.c       | 120 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------
+ clutter/clutter-pan-action.h       |   5 +++++
+ doc/reference/clutter-sections.txt |   1 +
+ examples/pan-action.c              |  58 ++++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 5 files changed, 167 insertions(+), 23 deletions(-)
+
+commit 2105055a347c8a35d091cabe118983f621f26965
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Sat Jun 6 20:11:33 2015 +0200
+
+    gdk: Enable GDK_TOUCH_MASK on the stage window
+    
+    This allows touch events to be received and translated.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=750496
+
+ clutter/gdk/clutter-stage-gdk.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 7ed3714a94dbac1022b3e123e9243b501b01c6cd
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Sat Jun 6 20:10:13 2015 +0200
+
+    gdk: Ignore synthesized leave events out of touch events
+    
+    Certain crossing modes notify about synthesized events, where
+    the pointer didn't really leave the window. Unsetting the stage
+    from the device at that time is incorrect, and will leave all
+    remaining touches unable to pick coordinates, so silently eaten
+    away.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=750496
+
+ clutter/gdk/clutter-event-gdk.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+commit 2d5b5aa82aacab7cc523e5877afbb864592b7651
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 12:02:13 2015 +0100
+
+    gdk: Add function to retrieve the GdkVisual
+    
+    Straight from Cogl.
+    
+    This allows us to propagate the GdkVisual Cogl and Clutter use to
+    embedding toolkits, like GTK+.
+    
+    The function is annotated as being added to the 1.22 development
+    cycle because it will be backported to the stable branch, so that
+    downstream developers can package up a version of Clutter that does
+    not crash on nVidia.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=747489
+
+ clutter/gdk/clutter-backend-gdk.c  | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/gdk/clutter-gdk.h          |  3 +++
+ doc/reference/clutter-sections.txt |  1 +
+ 3 files changed, 52 insertions(+)
+
+commit c91621e8c28bb190eaa9d59e08b180589a255cf3
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 11:55:50 2015 +0100
+
+    gdk: Use the Cogl visual on Xlib winsys
+    
+    GDK 3.16 started selecting different visuals, to best comply with the
+    requirements for OpenGL, and this has broken Clutter on GLX drivers that
+    are fairly picky in how they select visuals and GLXFBConfig.
+    
+    GDK selects GLXFBConfig that do not include depth or stencil buffers;
+    Cogl, on the other hand, needs both depth and stencil buffers, and keeps
+    selecting the first available visual, assuming that the GLX driver will
+    give us the best compliant one, as per specification. Sadly, some
+    drivers will return incompatible configurations, and then bomb out when
+    you try to embed Clutter inside GTK+, because of mismatched visuals.
+    
+    Cogl has an old, deprecated, Clutter-only API that allows us to retrieve
+    the XVisualInfo mapping to the GLXFBConfig it uses; this means we should
+    look up the GdkVisual for it when creating our own GdkWindows, instead
+    of relying on the RGBA and system GdkVisuals exposed by GDK — at least
+    on X11.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=747489
+
+ clutter/gdk/clutter-stage-gdk.c | 50 +++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 37 insertions(+), 13 deletions(-)
+
+commit dd9e43e98ddf321cd05b735022c8ef53a241a633
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 14:01:32 2015 +0100
+
+    build: No need to conditionally include -Wshadow
+    
+    Cogl is not in tree any more, and compiler warnings are properly
+    addressed.
+
+ configure.ac | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+commit 0eb300e2eeeedd4cc701ac58af5484155601fc9c
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 14:00:05 2015 +0100
+
+    build: Use the same pattern for the manual Mir check
+    
+    Ensure that the checks are similar and create similar results.
+
+ configure.ac | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
+
+commit 2fd47ce08e1017143f150ea26074bc138084683c
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 13:59:18 2015 +0100
+
+    build: Manually check for Wayland support in Cogl
+    
+    The Cogl pkg-config file does not specify the supported backends, which
+    means we need to manually check for the platform, like we do for Mir.
+
+ configure.ac | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+commit e5941ee810aa180e0993d75bd6984b146450309a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 12:32:26 2015 +0100
+
+    build: Remove unused internal defines
+    
+    We don't use them any more in the code base.
+    
+    I swear I keep deleting them, and they keep popping back up.
+
+ configure.ac | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+commit c4fa3514adac288b52eaa2582acc722e5fa86e4a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 12:31:51 2015 +0100
+
+    Use the public symbol for Wayland compositor support
+    
+    Instead of using a private one. This way, if things go out of sync,
+    we'll notice immediately.
+
+ clutter/clutter-backend.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+commit a1c4acf227c0f70d429e2cf49f4fe8351b3e87f8
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Jun 10 12:28:59 2015 +0100
+
+    Add missing include
+    
+    Some X11-related system header is leaking stdlib.h, so when we disable
+    the X11 backend we get a compiler warning for atol().
+
+ clutter/clutter-settings.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+commit 896e43cbd5dda3babb829ee59fe5c209e7dfc35e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Wed Apr 22 14:15:42 2015 +0100
+
+    gdk/device: Propagate more device details from GDK
+    
+    In order to do device matching we need to propagate more information,
+    like the device_id (only on X11 with the XInput2 extension enabled),
+    the vendor id, and the product id.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=747951
+
+ clutter/gdk/clutter-input-device-gdk.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+commit 71743ef660bc298da94c9a5963c40c3550ddc6b0
+Author: Dima Ryazanov <dima@gmail.com>
+Date:   Fri May 29 10:13:03 2015 +0100
+
+    Fix a compile error when the X11 backend is disabled
+    
+    When defining clutter_stage_gdk_update_foreign_event_mask, check for the
+    same macros as when actually using it.
+    
+    Signed-off-by: Dima Ryazanov <dima@gmail.com>
+    Reviewed-by: Emmanuele Bassi <ebassi@gnome.org>
+
+ clutter/gdk/clutter-stage-gdk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit fbe2c74e1999b5eda7e5635a5ca527e0504f9d8b
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Fri May 22 18:40:34 2015 +0200
+
+    swipe-action: Fix typo
+    
+    X coords are meant to compare with distance_x.
+
+ clutter/clutter-swipe-action.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit a4962c033674ce358e6ae2adc16c97a00cca9971
+Author: Carlos Garnacho <carlosg@gnome.org>
+Date:   Fri May 22 13:19:29 2015 +0200
+
+    swipe-action: Prepare for multifinger swipes
+    
+    Its ::gesture-end implementation used to check the press/release
+    coordinates for the first touchpoint. On multifinger swipes, we
+    can receive this vfunc called due to other touch sequence going
+    first, so we'd get 0/0 as the release coordinates for this still
+    active sequence, resulting in bogus directions.
+    
+    Instead, check the last event coordinates, that will be always
+    correct regardless of whether the touchpoint 0 finished yet or
+    not.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=749739
+
+ clutter/clutter-swipe-action.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+commit 67bf902022bfc042b55db87016d3a1b7cfba977a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 13:19:48 2015 +0100
+
+    Move API reference down one level
+    
+    Since we only have one API reference, we can drop the clutter/
+    sub-level, and have all the files under doc/reference.
+
+ .gitignore                                                 |  30 +++++++++++++++---------------
+ configure.ac                                               |   3 +--
+ doc/reference/Makefile.am                                  | 170 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ doc/reference/{clutter => }/actor-box.png                  | Bin
+ doc/reference/{clutter => }/actor-example.png              | Bin
+ doc/reference/{clutter => }/animator-key-frames.png        | Bin
+ doc/reference/{clutter => }/animator-key-frames.svg        |   0
+ doc/reference/{clutter => }/bin-layout.png                 | Bin
+ doc/reference/{clutter => }/box-layout.png                 | Bin
+ doc/reference/{clutter => }/building-clutter.xml           |   0
+ doc/reference/{clutter => }/clutter-docs.xml.in            |   0
+ doc/reference/{clutter => }/clutter-overview.xml           |   0
+ doc/reference/{clutter => }/clutter-sections.txt           |   0
+ doc/reference/{clutter => }/clutter.types                  |   0
+ doc/reference/clutter/Makefile.am                          | 169 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ doc/reference/{clutter => }/constraints-example.png        | Bin
+ doc/reference/{clutter => }/easing-modes.png               | Bin
+ doc/reference/{clutter => }/easing-modes.svg               |   0
+ doc/reference/{clutter => }/event-flow.dia                 | Bin
+ doc/reference/{clutter => }/event-flow.png                 | Bin
+ doc/reference/{clutter => }/flow-layout.png                | Bin
+ doc/reference/{clutter => }/glossary.xml                   |   0
+ doc/reference/{clutter => }/migrating-ClutterAnimation.xml |   0
+ doc/reference/{clutter => }/migrating-ClutterBehaviour.xml |   0
+ doc/reference/{clutter => }/migrating-ClutterEffect.xml    |   0
+ doc/reference/{clutter => }/migrating-ClutterPath.xml      |   0
+ doc/reference/{clutter => }/offscreen-redirect.png         | Bin
+ doc/reference/{clutter => }/path-alpha-func.png            | Bin
+ doc/reference/{clutter => }/running-clutter.xml            |   0
+ doc/reference/{clutter => }/table-layout.png               | Bin
+ 30 files changed, 185 insertions(+), 187 deletions(-)
+
+commit c7bbe2a9f6ca0b86eb53f2824a7e1c9bc519d590
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 13:14:05 2015 +0100
+
+    Remove the separate Cally API reference
+
+ .gitignore                             |  13 -------------
+ configure.ac                           |   2 --
+ doc/reference/cally/Makefile.am        |  49 -------------------------------------------------
+ doc/reference/cally/cally-docs.xml.in  | 145 -------------------------------------------------------------------------------------------------------------------------------------------------
+ doc/reference/cally/cally-overview.xml |  74 --------------------------------------------------------------------------
+ doc/reference/cally/cally-sections.txt | 176 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ doc/reference/cally/cally.types        |   9 ---------
+ 7 files changed, 468 deletions(-)
+
+commit 6088437786b76bb3f3dc400ce6d57bedf33b1def
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 12:58:08 2015 +0100
+
+    docs: Merge Clutter and Cally API reference
+    
+    It's pretty much pointless to have two API references:
+    
+     • the Cally API reference is fairly small
+     • the build system is already complicated as it is
+     • GTK-Doc isn't smart enough to ignore sub-directories
+     • Cally is not a separate library, just a separate namespace
+    
+    There are some issues with GTK-Doc not accepting multiple namespaces,
+    but nothing seriously tragic.
+
+ doc/reference/Makefile.am                  |   4 +---
+ doc/reference/clutter/Makefile.am          |  68 ++++++++++++++++----------------------------------------------------
+ doc/reference/clutter/clutter-docs.xml.in  |  34 ++++++++++++++++++++++++++++++++++
+ doc/reference/clutter/clutter-sections.txt | 177 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ doc/reference/clutter/clutter.types        |  50 ++++++++++++++++++++++++++++++++++++++++++++------
+ 5 files changed, 272 insertions(+), 61 deletions(-)
+
+commit c71dfa216290f92ec5f82564d75df0a5fbafab6a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 12:36:28 2015 +0100
+
+    docs: Remove stray XML element
+    
+    We moved to Markdown a while ago, but a stray </para> was left in.
+
+ clutter/deprecated/clutter-texture.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 27ea26cbafe7b414d4730718f9020609fe4ceec8
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 11:53:10 2015 +0100
+
+    build: Clean up Cally's API reference Makefile
+
+ doc/reference/cally/Makefile.am | 81 ++++++++++++++++++---------------------------------------------------------------
+ 1 file changed, 18 insertions(+), 63 deletions(-)
+
+commit 68df19790e4179c598d11d1b6143ecb625643734
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 19 11:52:54 2015 +0100
+
+    docs: Add missing version symbols
+
+ doc/reference/clutter/clutter-sections.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+commit c99ce18efb8c21e6af3b2b2625abacc586ab2a65
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri May 15 12:36:04 2015 +0100
+
+    actor: Guard against negative-sized allocations
+    
+    The allocate_align_fill() method may end up trying to allocate an actor
+    with a negative size, due to rounding and floating point operations.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=749420
+
+ clutter/clutter-actor.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+commit e72a1a44e6e339c55acecba67e2f99412982b832
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri May 15 12:34:53 2015 +0100
+
+    actor: Ensure allocation adjustment is safe against zero sizes
+    
+    We already copy with negative end results, but there's no point in doing
+    the work in the first place.
+
+ clutter/clutter-actor.c | 30 ++++++++++++++++++++++++++----
+ 1 file changed, 26 insertions(+), 4 deletions(-)
+
+commit 5dfd4445e23b662c40e97a9058bcca9899631ff8
+Author: Marek Černocký <marek@manet.cz>
+Date:   Mon May 18 13:56:25 2015 +0200
+
+    Updated Czech translation
+
+ po/cs.po | 154 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------------------------
+ 1 file changed, 71 insertions(+), 83 deletions(-)
+
+commit 9268bb914462fc6a6a760daae61a645f405cb8b1
+Author: Rui Matos <tiagomatos@gmail.com>
+Date:   Sun May 17 00:50:56 2015 +0200
+
+    x11: Fix touchpad detection
+    
+    Commit 79849ef1d5fff9acd310cd68d59df0c7cf2cb28f had a typo in the
+    device property format check. This property is formated in 8-bit
+    items, not 32-bit.
+    
+    This went unnoticed till now because some touchpads were still being
+    detected as such due to a second check below:
+    
+          else if (strstr (name, "touchpad") != NULL)
+            source = CLUTTER_TOUCHPAD_DEVICE;
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=749482
+
+ clutter/x11/clutter-device-manager-xi2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 9f329aed1d7c5b00be4d7e66285aeec328eb33ab
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 12 13:03:39 2015 +0100
+
+    docs: Fix 1.24 symbols reference title
+
+ doc/reference/clutter/clutter-docs.xml.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 38f3d7770e94dbf7c99b77729e94fbc029f9289c
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue May 12 11:51:04 2015 +0100
+
+    build: Fix the URLs in the release email template
+    
+    Use https:// URI consistently, and point at the right location for the
+    cookbook.
+
+ build/autotools/Makefile.am.release | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
+
+commit 8aea8bc463f446cb0f39ef3be12019a377daffc4
+Author: Matthieu Bouron <matthieu.bouron@collabora.com>
+Date:   Tue May 12 11:16:35 2015 +0200
+
+    clutter-backend-gdk: Only set setting on successful gdk_screen_get_setting call
+    
+    It could happen that gdk_screen_get_setting fails to retreive
+    Gdk/WindowScalingFactor which leads to the following warnings when
+    clutter_init is called:
+    
+    GLib-GObject-WARNING **: value "0" of type 'gint' is invalid or out of range for property 'window-scaling-factor' of type 'gint'
+    GLib-GObject-WARNING **: value "0" of type 'gint' is invalid or out of range for property 'dnd-drag-threshold' of type 'gint'
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=749256
+    
+    Slightly edited to fix up whitespace issues.
+    
+    Edited-by: Emmanuele Bassi <ebassi@gnome.org>
+
+ clutter/gdk/clutter-backend-gdk.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+commit f07b44e70c0e980293255919e030d4f57ab5c43a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Sun May 10 16:35:31 2015 +0100
+
+    docs: Add 1.24 symbols index
+
+ doc/reference/clutter/clutter-docs.xml.in | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+commit 8fc8a73580ceb810ee7f34eae0df26fac4cb277d
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu May 7 13:26:37 2015 +0100
+
+    gdk: Use RGBA visual if there is one
+    
+    The condition check for the has_rgba_visual flag is reversed, and thus
+    we relied on drivers returning an ARGB visual first by default.
+    
+    Referenced by: https://bugzilla.redhat.com/show_bug.cgi?id=1206960
+
+ clutter/gdk/clutter-backend-gdk.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit 9584b239589ba4b7b9b41e0966397088e50eca59
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Fri May 1 16:51:12 2015 +0100
+
+    docs: Fix typo in ClutterStage::deactivate
+
+ clutter/clutter-stage.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit e15f520a9e8a44ce45c5742caadca0698736cf0e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 30 13:04:32 2015 +0100
+
+    examples: Add transparency to the rounded rectangle
+    
+    Makes it a bit more fancy.
+
+ examples/rounded-rectangle.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+commit 54a2a20e3846704b54d02969facdde268c9024d5
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 30 12:42:44 2015 +0100
+
+    actor: Remove trailing new line
+    
+    The debug messages have a new line by default.
+
+ clutter/clutter-actor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit 8b8aa0b4927bc865b08b77b4e28237da0ff8597c
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 30 12:40:39 2015 +0100
+
+    actor: Use the real opacity when clearing the stage
+    
+    The paint opacity for a top level is always overridden to be the full
+    value, since it's a composited value and we want to paint our scene.
+    
+    When clearing the stage framebuffer, though, we want to use the actual
+    opacity, if ClutterStage:use-alpha is set.
+
+ clutter/clutter-actor.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+commit 21ce9bc08b72f0904c6b682341481798d05f7d8c
+Author: Jasper St. Pierre <jstpierre@mecheye.net>
+Date:   Tue Apr 28 16:05:55 2015 -0700
+
+    clutter-stage-cogl: Match EGL's behavior of eglSwapBuffersWithDamage
+    
+    -1 is explicitly an invalid value to pass to eglSwapBuffersWithDamage,
+    and the specification admits as much:
+    
+                                                             If
+        eglSwapBuffersWithDamageEXT is called and <n_rects>, is less
+        than zero or <n_rects> is greater than zero but <rects> is
+        NULL, EGL_BAD_PARAMETER is generated.
+    
+    Fix up our usage of SwapBuffersWithDamage to match the behavior in the
+    EGL specification.
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=745512
+
+ clutter/cogl/clutter-stage-cogl.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+commit 10a9657db021a9ca3fb681238146a54361b33737
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 23 21:33:30 2015 +0100
+
+    build: Skip gitignore files when not building from git
+    
+    There's really no point in going through the motions there.
+
+ build/autotools/Makefile.am.gitignore | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+commit a67997ef3998d099453f637d012315bf1126d67a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 23 21:23:50 2015 +0100
+
+    build: Create .gitignore files in the current directory
+    
+    We cannot touch srcdir when distchecking.
+
+ build/autotools/Makefile.am.gitignore | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+commit f8687f9430a5270818c945d4145abbd7f7693f3e
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 23 20:18:25 2015 +0100
+
+    tests: Remove calls to clutter_x11_enable_xinput()
+    
+    The function is deprecated and useless: support for XInput is always
+    enabled, if the extension is available.
+
+ tests/interactive/test-devices.c      | 5 -----
+ tests/interactive/test-events.c       | 4 ----
+ tests/interactive/test-rotate-zoom.c  | 4 ----
+ tests/interactive/test-touch-events.c | 4 ----
+ 4 files changed, 17 deletions(-)
+
+commit fc9388772877789ca0217072f56c692a8530e9be
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 23 20:12:25 2015 +0100
+
+    docs: Add new actor state methods
+
+ doc/reference/clutter/clutter-sections.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+commit dac33c5feaa7e5e04490c81b3431a3deb8dede46
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 23 17:39:30 2015 +0100
+
+    Stop using macros for accessing actor state
+    
+    Use the newly added functions instead.
+
+ clutter/clutter-bin-layout.c              |  6 +++---
+ clutter/clutter-box-layout.c              | 16 ++++++++--------
+ clutter/clutter-clone.c                   |  2 +-
+ clutter/clutter-drop-action.c             |  2 +-
+ clutter/clutter-flow-layout.c             |  6 +++---
+ clutter/clutter-grid-layout.c             | 10 +++++-----
+ clutter/deprecated/clutter-table-layout.c | 10 +++++-----
+ examples/layout-manager.c                 |  8 ++++----
+ 8 files changed, 30 insertions(+), 30 deletions(-)
+
+commit 4c6a550d130e2e3c2a0d4bd5198f8e79ee8ddab7
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Apr 14 12:46:49 2015 +0100
+
+    Soft-deprecation of actor state macros
+    
+    These are just terrible API that we've been stringing along since the
+    0.x days. We cannot truly deprecate them, because they are, in some
+    cases, the only actual API to perform some operation, and porting all
+    the code in the world is not going to make us any friends.
+    
+    For the time being, we use a deprecation notice in the documentation.
+
+ clutter/clutter-actor.c | 12 ++++++++++++
+ clutter/clutter-actor.h |  8 ++++++++
+ 2 files changed, 20 insertions(+)
+
+commit 849607316a36d733a7f0cba3b076c85f9b7d6249
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Apr 14 12:37:42 2015 +0100
+
+    actor: Add functions mapping to state query macros
+    
+    The macros are useless for language bindings, and are terribly unsafe
+    from C as well. There's always the option of using the GObject
+    properties they refer to, but it's more efficient to just have a simple
+    getter function.
+
+ clutter/clutter-actor.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ clutter/clutter-actor.h |  7 +++++++
+ 2 files changed, 67 insertions(+)
+
+commit 4006b8524d8aba496a3849822aed2254a0e25b89
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Tue Apr 14 12:29:58 2015 +0100
+
+    Add version macros for 1.24
+
+ clutter/clutter-macros.h     | 14 ++++++++++++++
+ clutter/clutter-version.h.in | 10 ++++++++++
+ 2 files changed, 24 insertions(+)
+
+commit 877e58a6b4ecc6e634891d31c877fb2baf447a18
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 9 12:35:23 2015 +0100
+
+    x11: Plug a leak on error path
+    
+    If XIGetProperty() does not return what we expect, but still returned
+    something, we need to free it.
+
+ clutter/x11/clutter-device-manager-xi2.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+commit 83cd36e95f57fd17eb705b963dcc1ca489bb0cc0
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Thu Apr 9 11:03:16 2015 +0100
+
+    x11: Improve touchpad detection heuristics
+    
+    We should use the same heuristics used by GDK in order to detect whether
+    a device is a touchpad or not.
+    
+    Based on the similar code from Carlos Garnacho for GDK:
+    https://git.gnome.org/browse/gtk+/commit/?id=6f07d5e7
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=747436
+
+ clutter/x11/clutter-device-manager-xi2.c | 34 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
+
+commit bb52fa81ce30be69369e043357d6fb569b7ee5e5
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Mar 23 13:30:50 2015 +0000
+
+    Post-branch version bump to 1.23.1
+
+ configure.ac | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit d362e373bbac6a277aff79f4304721eccde13060
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Mar 23 13:24:05 2015 +0000
+
+    actor: Fix a compiler warning
+
+ clutter/clutter-actor.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit 505801cd095d2535dfbebf819d0ac9ec94522b2a
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Mar 23 13:22:18 2015 +0000
+
+    gdk: Fix stage removal from the master clock
+    
+    Prevents a double-free in the conformance test suite.
+
+ clutter/gdk/clutter-master-clock-gdk.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+commit 83edd9c4c5a872b9092d9394ecef66749e8a6f6f
+Author: Emmanuele Bassi <ebassi@gnome.org>
+Date:   Mon Mar 23 11:27:58 2015 +0000
+
+    Post-release version bump to 1.22.1
+
+ configure.ac | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)

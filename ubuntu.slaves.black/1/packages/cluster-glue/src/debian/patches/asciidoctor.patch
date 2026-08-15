@@ -1,0 +1,45 @@
+Description: Replace deprecated asciidoc with asciidoctor
+Author: Valentin Vidic <vvidic@debian.org>
+Last-Update: 2018-10-12
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/doc/Makefile.am
++++ b/doc/Makefile.am
+@@ -42,12 +42,18 @@
+ XSLTPROC_HTML_OPTIONS 	?= $(XSLTPROC_OPTIONS)
+ XSLTPROC_FO_OPTIONS 	?= $(XSLTPROC_OPTIONS)
+ 
++if IS_A2X
++MANPAGE_GENERATOR = $(A2X) -f manpage
++else
++MANPAGE_GENERATOR = $(ASCIIDOCTOR) -b manpage
++endif
++
+ %.5 %.8 %.1: %.xml
+ 	$(XSLTPROC) \
+ 	$(XSLTPROC_MANPAGES_OPTIONS) \
+ 	$(MANPAGES_STYLESHEET) $<
+ 
+ hb_report.8: hb_report.8.txt
+-	a2x -f manpage $<
++	$(MANPAGE_GENERATOR) $<
+ 
+ endif
+--- a/configure.ac
++++ b/configure.ac
+@@ -526,9 +526,12 @@
+        if test "x$XSLTPROC" = "x"; then
+            AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
+        fi
+-       AC_PATH_PROGS(ASCIIDOC, asciidoc)
+-       if test "x$ASCIIDOC" = "x"; then
+-           AC_MSG_WARN([asciidoc not installed, unable to (re-)build manual pages])
++
++       AC_PATH_PROGS(A2X, a2x)
++       AC_PATH_PROGS(ASCIIDOCTOR, asciidoctor)
++       AM_CONDITIONAL(IS_A2X, test x"${A2X}" != x"")
++       if test "x$A2X" = "x" && test "x$ASCIIDOCTOR" = "x"; then
++           AC_MSG_WARN([asciidoc(tor) not installed, unable to (re-)build manual pages])
+        fi
+ fi
+ AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )

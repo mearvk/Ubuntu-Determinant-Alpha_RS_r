@@ -1,0 +1,65 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+# Build-depends to exclude from built-using field
+IGNORE_DEPENDS=debhelper-compat python3-apt dosfstools mtools
+
+BUILD_DEPENDS=$(shell python3 -c 'import apt_pkg; print(" ".join([i[0][0] for i in apt_pkg.parse_src_depends(next(apt_pkg.TagFile("debian/control"))["Build-Depends"], architecture="$(DEB_HOST_ARCH)")]))')
+BUILT_USING=$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), \n' -W $(filter-out $(IGNORE_DEPENDS), $(BUILD_DEPENDS)) | sort -u)
+override_dh_gencontrol:
+	dh_gencontrol -- -VBuilt-Using="$(BUILT_USING)"
+
+%:
+	dh $@
+
+override_dh_clean:
+	rm -rf images tree xorriso-cmd.txt
+	dh_clean
+
+# Do not strip things, otherwise things do not boot
+override_dh_strip:
+
+# The below is basically encoding things, in a reproducible manner that
+# grub-mkrescue --verbose -o foo.iso &>foo.log does
+override_dh_auto_build:
+	rm -rf tree
+
+	# Copy font
+	mkdir -p tree/boot/grub/fonts
+	cp /usr/share/grub/unicode.pf2 tree/boot/grub/fonts/unicode.pf2
+
+	mkdir -p tree/EFI/boot/
+	# signed shim is our default bootx64.efi
+	cp /usr/lib/shim/shimx64.efi.signed tree/EFI/boot/bootx64.efi
+	# mok-manager just in case
+	cp /usr/lib/shim/mmx64.efi tree/EFI/boot/mmx64.efi
+	# signed grub build for CD-ROM is the grub envoked by shim
+	cp /usr/lib/grub/x86_64-efi-signed/gcdx64.efi.signed tree/EFI/boot/grubx64.efi
+	# Create partition with 1MB to spare, for README.txt / autoinstall.yaml, etc.
+	mkdir -p images/boot/grub
+	mkfs.msdos -n ESP -C -v images/boot/grub/efi.img $$(( $$(du -s --apparent-size --block-size=1024 tree/EFI/ | cut -f 1 ) + 1024))
+	mcopy -s -i images/boot/grub/efi.img tree/EFI ::/.
+
+	# Copy bios modules
+	mkdir -p tree/boot/grub/i386-pc
+	cp -r /usr/lib/grub/i386-pc/*.mod tree/boot/grub/i386-pc
+	cp -r /usr/lib/grub/i386-pc/*.lst tree/boot/grub/i386-pc
+	cp -r /usr/lib/grub/i386-pc/*.o tree/boot/grub/i386-pc
+
+	# All efi modules are built-in
+	# But with secure-boot off, it might make it nice to be able to load them
+	mkdir -p tree/boot/grub/x86_64-efi
+	cp -r /usr/lib/grub/x86_64-efi/*.mod tree/boot/grub/x86_64-efi
+	cp -r /usr/lib/grub/x86_64-efi/*.lst tree/boot/grub/x86_64-efi
+
+	# check that all our efi binaries are signed
+	find tree -name '*.efi' -exec /usr/lib/shim/is-not-revoked {} +
+
+	# Generate eltorito image
+	grub-mkimage --verbose --directory '/usr/lib/grub/i386-pc' --prefix '/boot/grub' --output 'tree/boot/grub/i386-pc/eltorito.img' --format 'i386-pc-eltorito' --compression 'auto' biosdisk iso9660
+	# Copy hybrid image
+	mkdir -p images/boot/grub/i386-pc
+	cp /usr/lib/grub/i386-pc/boot_hybrid.img images/boot/grub/i386-pc/boot_hybrid.img
+
+	echo 'xorriso -as mkisofs -J -joliet-long -l -b boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr images/boot/grub/i386-pc/boot_hybrid.img -append_partition 2 0xef images/boot/grub/efi.img -appended_part_as_gpt --mbr-force-bootable -eltorito-alt-boot -e --interval:appended_partition_2:all:: -no-emul-boot -partition_offset 16 -r tree' > xorriso-cmd.txt

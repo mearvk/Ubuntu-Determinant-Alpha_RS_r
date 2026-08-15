@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+export MONO_SHARED_DIR=$(CURDIR)
+
+VERSION = $(shell dpkg-parsechangelog | grep ^Vers | cut -d\  -f2)
+
+build: build-stamp
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp:
+	dh_testdir
+	debiandoc2text cli-policy.sgml
+	debiandoc2html cli-policy.sgml
+	debiandoc2pdf cli-policy.sgml
+	for x in dh_clideps dh_makeclilibs dh_installcligac dh_clifixperms dh_clistrip dh_cligacpolicy dh_installcliframework; \
+	  do chmod +x $$x; pod2man -c "Debhelper for CLI (Common Language Infrastructure)" $$x > $$x.1; done
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f dh_clideps.1 dh_makeclilibs.1 dh_installcligac.1 dh_clifixperms.1 dh_clistrip.1 dh_cligacpolicy.1 dh_installcliframework.1
+	rm -fr cli-policy.html cli-policy.txt cli-policy.pdf cli-policy.tpt
+	rm -f build-stamp
+	rm -rf $(MONO_SHARED_DIR)/.wapi
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir -i
+	dh_testroot -i
+	dh_install -i
+	dh_link -i
+	dh_installchangelogs -i
+	dh_installexamples -i
+	dh_installdocs -i
+	dh_installman -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch:
+
+binary: binary-indep
+.PHONY: clean build install binary-indep binary-arch binary

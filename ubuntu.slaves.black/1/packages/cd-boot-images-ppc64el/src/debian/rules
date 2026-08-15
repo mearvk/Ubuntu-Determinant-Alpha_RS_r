@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+# Build-depends to exclude from built-using field
+IGNORE_DEPENDS=debhelper-compat python3-apt
+
+BUILD_DEPENDS=$(shell python3 -c 'import apt_pkg; print(" ".join([i[0][0] for i in apt_pkg.parse_src_depends(next(apt_pkg.TagFile("debian/control"))["Build-Depends"], architecture="$(DEB_HOST_ARCH)")]))')
+BUILT_USING=$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), \n' -W $(filter-out $(IGNORE_DEPENDS), $(BUILD_DEPENDS)) | sort -u)
+override_dh_gencontrol:
+	dh_gencontrol -- -VBuilt-Using="$(BUILT_USING)"
+
+%:
+	dh $@
+
+override_dh_clean:
+	rm -rf tree xorriso-cmd.txt
+	dh_clean
+
+# Do not strip things, otherwise things do not boot
+override_dh_strip:
+
+# The below is basically encoding things, in a reproducible manner that
+# grub-mkrescue --verbose -o foo.iso &>foo.log does
+override_dh_auto_build:
+	rm -rf tree
+
+	# Copy font
+	mkdir -p tree/boot/grub/fonts
+	cp /usr/share/grub/unicode.pf2 tree/boot/grub/fonts/unicode.pf2
+
+	# this is a bootable iso
+	mkdir -p tree/ppc
+	cp -p /usr/lib/grub/powerpc-ieee1275/bootinfo.txt tree/ppc
+	# this is what we boot
+	mkdir -p tree/boot/grub/powerpc-ieee1275
+	grub-mkimage --directory '/usr/lib/grub/powerpc-ieee1275' --prefix '()/boot/grub' --output 'tree/boot/grub/powerpc.elf' --format 'powerpc-ieee1275' --compression 'auto' linux minicmd normal reboot iso9660
+	# Copy modules
+	cp -r /usr/lib/grub/powerpc-ieee1275/*.mod tree/boot/grub/powerpc-ieee1275
+	cp -r /usr/lib/grub/powerpc-ieee1275/*.lst tree/boot/grub/powerpc-ieee1275
+	# And that's it
+	echo 'xorriso -as mkisofs --protective-msdos-label -r tree' > xorriso-cmd.txt

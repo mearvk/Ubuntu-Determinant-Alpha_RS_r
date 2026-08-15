@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+if [ "$AUTOPKGTEST_REBOOT_MARK" = fenced ]; then
+    echo "fence was successfull"
+    exit 0
+fi
+
+echo "=== list ==="
+stonith -L
+
+printf "\n=== metadata ===\n"
+stonith -t suicide -m
+
+printf "\n=== status ===\n"
+stonith -d -t suicide -S -l 2>&1
+
+printf "\n=== reset ===\n"
+/tmp/autopkgtest-reboot-prepare fenced
+sync
+stonith -d -t suicide -T reset $(hostname)

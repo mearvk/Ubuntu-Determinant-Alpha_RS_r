@@ -1,0 +1,126 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+# Build-depends to exclude from built-using field
+IGNORE_DEPENDS=debhelper-compat python3-apt
+
+BUILD_DEPENDS=$(shell python3 -c 'import apt_pkg; print(" ".join([i[0][0] for i in apt_pkg.parse_src_depends(next(apt_pkg.TagFile("debian/control"))["Build-Depends"], architecture="$(DEB_HOST_ARCH)")]))')
+BUILT_USING=$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), \n' -W $(filter-out $(IGNORE_DEPENDS), $(BUILD_DEPENDS)) | sort -u)
+
+CD_MODULES = \
+	all_video \
+	boot \
+	btrfs \
+	cat \
+	chain \
+	configfile \
+	echo \
+	efifwsetup \
+	efinet \
+	ext2 \
+	fat \
+	font \
+	gettext \
+	gfxmenu \
+	gfxterm \
+	gfxterm_background \
+	gzio \
+	halt \
+	help \
+	hfsplus \
+	iso9660 \
+	jpeg \
+	keystatus \
+	loadenv \
+	loopback \
+	linux \
+	ls \
+	lsefi \
+	lsefimmap \
+	lsefisystab \
+	lssal \
+	memdisk \
+	minicmd \
+	normal \
+	ntfs \
+	part_apple \
+	part_msdos \
+	part_gpt \
+	password_pbkdf2 \
+	png \
+	probe \
+	reboot \
+	regexp \
+	search \
+	search_fs_uuid \
+	search_fs_file \
+	search_label \
+	sleep \
+	smbios \
+	squash4 \
+	test \
+	true \
+	video \
+	xfs \
+	zfs \
+	zfscrypt \
+	zfsinfo
+
+override_dh_gencontrol:
+	dh_gencontrol -- -VBuilt-Using="$(BUILT_USING)"
+
+%:
+	dh $@
+
+override_dh_clean:
+	rm -rf images tree xorriso-cmd.txt
+	dh_clean
+
+# Do not strip things, otherwise things do not boot
+override_dh_strip:
+
+# The below is basically encoding things, in a reproducible manner that
+# grub-mkrescue --verbose -o foo.iso &>foo.log does
+override_dh_auto_build:
+	rm -rf tree
+
+	# Copy font
+	mkdir -p tree/boot/grub/fonts
+	cp /usr/share/grub/unicode.pf2 tree/boot/grub/fonts/unicode.pf2
+
+	mkdir -p tree/EFI/boot/
+	# As we have no packaged gcdriscv64.efi create one here.
+	grub-mkimage \
+	  --directory /usr/lib/grub/riscv64-efi \
+	  --prefix '/EFI/boot' \
+	  --output 'tree/EFI/boot/bootriscv64.efi' \
+	  --format 'riscv64-efi' \
+	  $(CD_MODULES)
+	
+	echo 'search.fs_label live-media root' > tree/EFI/boot/grub.cfg
+	echo 'set prefix=($$root)'\''/boot/grub'\''' >> tree/EFI/boot/grub.cfg
+	echo 'configfile $$prefix/grub.cfg' >> tree/EFI/boot/grub.cfg
+
+	mkdir -p tree/dtb
+	echo 'Place device-trees for U-Boot into this directory' > tree/dtb/README
+
+	# Create partition with 32 MiB which is enough for GRUB and device-trees.
+	mkdir -p images/boot/grub
+	mkfs.msdos -n ESP -C -v images/boot/grub/efi.img 32768
+	mcopy -s -i images/boot/grub/efi.img tree/EFI ::/.
+	mcopy -s -i images/boot/grub/efi.img tree/dtb ::/.
+
+	# Copy modules
+	mkdir -p tree/boot/grub/riscv64-efi
+	cp -r /usr/lib/grub/riscv64-efi/*.mod tree/boot/grub/riscv64-efi
+	cp -r /usr/lib/grub/riscv64-efi/*.lst tree/boot/grub/riscv64-efi
+
+	# Copy u-boot loader1 and loader2
+	mkdir -p images/boot/u-boot/sifive_unmatched
+	cp -r /usr/lib/u-boot/sifive_unmatched/u-boot-spl.bin \
+	  images/boot/u-boot/sifive_unmatched
+	cp -r /usr/lib/u-boot/sifive_unmatched/u-boot.itb \
+	  images/boot/u-boot/sifive_unmatched
+
+	echo 'xorriso -as mkisofs --efi-boot images/grub/efi.img -efi-boot-part --efi-boot-image --protective-msdos-label -r tree' > xorriso-cmd.txt

@@ -1,0 +1,30 @@
+From 0fabedc2249ff084e5c3af8775f980284e07cba2 Mon Sep 17 00:00:00 2001
+From: "Gao,Yan" <ygao@suse.com>
+Date: Tue, 1 Aug 2017 18:22:43 +0200
+Subject: [PATCH] Fix: stonith: external/vcenter: Reset returns success with
+ RESETPOWERON=0 if vm is already off
+
+Origin: upstream, https://github.com/ClusterLabs/cluster-glue/commit/0fabedc2249ff084e5c3af8775f980284e07cba2 
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1895355
+Reviewed-by: Rafael David Tinoco <rafaeldtinoco@ubuntu.com>
+Last-Update: 2020-09-15
+---
+ lib/plugins/stonith/external/vcenter | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib/plugins/stonith/external/vcenter b/lib/plugins/stonith/external/vcenter
+index c6b8091a..38ba36e3 100755
+--- a/lib/plugins/stonith/external/vcenter
++++ b/lib/plugins/stonith/external/vcenter
+@@ -209,6 +209,8 @@ elsif (grep /^\Q$command\E$/, @netCommands) {
+ 						if ($powerState eq "poweredOff" && (! exists $ENV{'RESETPOWERON'} || $ENV{'RESETPOWERON'} ne 0)) {
+ 							$vm->PowerOnVM();
+ 							system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been powered on");
++						} elsif ($powerState eq "poweredOff") {
++							system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} won't be powered on with configured parameter RESETPOWERON=0");
+ 						} else {
+ 							dielog("Could not complete $esx:$vm->{'name'} power cycle");
+ 						}
+-- 
+2.27.0
+

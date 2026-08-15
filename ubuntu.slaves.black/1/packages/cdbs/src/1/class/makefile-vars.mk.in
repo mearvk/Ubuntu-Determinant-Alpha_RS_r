@@ -1,0 +1,71 @@
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2002,2003 Colin Walters <walters@debian.org>
+# Copyright © 2008-2011,2014, 2016-2017 Jonas Smedegaard <dr@jones.dk>
+# Description: Defines useful variables for packages which have a Makefile
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#PATH_RULES#
+
+ifndef _cdbs_class_makefile_vars
+_cdbs_class_makefile_vars = 1
+
+include $(_cdbs_class_path)/langcore.mk$(_cdbs_makefile_suffix)
+
+#DEB_MAKE_MAKEFILE =
+DEB_MAKE_ENVVARS ?= $(if $(cdbs_crossbuild),\
+	CC="$(CC)" CXX="$(CXX)" PKG_CONFIG="$(DEB_HOST_GNU_TYPE)-pkg-config")
+DEB_MAKE_PARALLEL ?= $(and $(DEB_BUILD_PARALLEL),$(DEB_PARALLEL_JOBS),\
+	-j$(DEB_PARALLEL_JOBS))
+
+# Derived classes that supply the flags some other way (e.g., configure)
+# should set this variable to empty.
+DEB_MAKE_EXTRA_ARGS ?= \
+	CFLAGS="$(or $(CFLAGS_$(cdbs_curpkg)),$(CFLAGS))" \
+	CXXFLAGS="$(or $(CXXFLAGS_$(cdbs_curpkg)),$(CXXFLAGS))" \
+	CPPFLAGS="$(or $(CPPFLAGS_$(cdbs_curpkg)),$(CPPFLAGS))" \
+	LDFLAGS="$(or $(LDFLAGS_$(cdbs_curpkg)),$(LDFLAGS))" \
+	$(DEB_MAKE_PARALLEL)
+
+DEB_MAKE_INVOKE ?= $(strip \
+	$(DEB_MAKE_ENVVARS) $(MAKE) \
+	$(if $(DEB_MAKE_MAKEFILE),\
+		-f $(DEB_MAKE_MAKEFILE)) \
+	-C $(or $(cdbs_make_curbuilddir),$(cdbs_curbuilddir)) \
+	$(DEB_MAKE_EXTRA_ARGS))
+
+#DEB_MAKE_BUILD_TARGET =
+
+# If your Makefile provides an "install" target, you need to give the requisite commands
+# here to install it into the staging directory.  For automake-using programs, this
+# looks like: install DESTDIR=$(cdbs_make_curdestdir)
+# (which expands to either DEB_DESTDIR_xxx or DEB_DESTDIR)
+# If you're using automake though, you likely want to be including autotools.mk instead
+# of this file.
+
+DEB_MAKE_CLEAN_TARGET ?= clean
+
+#DEB_MAKE_CHECK_TARGET = test
+
+# If DEB_MAKE_FLAVORS is set compilation is done once per flavor.
+# NB! This must be declared _before_ including makefile.mk
+#DEB_MAKE_FLAVORS = light normal enhanced
+
+# If building multiple flavors, skeleton strings are used for
+# DEB_BUILDDIR and DEB_DESTDIR, with @FLAVOR@ expanding to actual
+# flavor.
+DEB_MAKE_BUILDDIRSKEL ?= $(cdbs_curbuilddir)/@FLAVOR@
+DEB_MAKE_DESTDIRSKEL ?= $(cdbs_curdestdir)/@FLAVOR@
+
+endif

@@ -1,0 +1,142 @@
+\: vim:syntax=tex
+\: This file is maintained at http://git.mdcc.cx/caspar
+\: this is a manpage in zoem format.  see http://micans.org/zoem/ and man_zmm(7)
+
+\import{pud/man.zmm}
+\import{./include.zmm}
+
+\begin{pud::man}{
+ {name}{csp_helper}
+ {html_title}{csp_helper}
+ {section}{1}
+ \man_share
+}
+
+\${html}{\"pud::man::maketoc"}
+
+\def{caspar}{\bf{caspar}}
+\def{csp_install}{\bf{csp_install}}
+\def{csp_mkdircp}{\bf{csp_mkdircp}}
+\def{csp_scp_keep_mode}{\bf{csp_scp_keep_mode}}
+\def{csp_sucp}{\bf{csp_sucp}}
+
+\sec{name}{NAME}
+\NAME{csp_helper}{A collection of caspar helper scripts}
+
+\sec{synopsis}{SYNOPSIS}
+  \csp_install \synreqopt{dir}{directory} \synreqopt{file}{file}
+
+\par{
+
+  \csp_mkdircp \synreqopt{dir}{directory} \synreqopt{file}{file}
+
+} \par{
+
+  \csp_scp_keep_mode \synreqopt{h}{[user@]host} \synreqopt{dir}{directory} \synreqopt{file}{file}
+
+} \par{
+
+  \csp_sucp
+    \synreqopt{h}{[user@]host}
+    \synreqopt{dir}{directory}
+    \synreqopt{file}{file}
+}
+
+\sec{description}{DESCRIPTION}
+
+The scripts \csp_install, \csp_mkdircp, \csp_scp_keep_mode and \csp_sucp are helpers for
+\sibref{caspar}{caspar(7)}.  These scripts typically are not invoked directly,
+but via a Makefile which uses \caspar.  See the notes on csp_PUSH in
+\sibref{caspar}{caspar(7)} for information on how to link \csp_install,
+\csp_scp_keep_mode and \csp_sucp to \caspar.
+
+\sec{install_description}{install DESCRIPTION}
+
+\csp_install creates the required directory (if needed) and installs the file,
+preserving timestamps.  It uses install(1).
+
+\sec{install_examples}{install EXAMPLES}
+
+\verbatim{
+ csp_INSTALL_OPTIONS='--owner=www-data --group=www-data' \\
+  csp_INSTALL_MODE=ugo=r \\
+  csp_install /srv/www index.html}
+
+\verbatim{
+ csp_INSTALL_MODE=u=rwx,go= csp_install /usr/local/sbin mkpasswd}
+
+\sec{install_environment}{install ENVIRONMENT}
+
+\csp_install honors csp_INSTALL_OPTIONS and csp_INSTALL_MODE (default is
+u=rw,go=r).  
+
+\sec{mkdircp_description}{mkdircp DESCRIPTION}
+
+\csp_mkdircp calls mkdir(1) and cp(1).
+
+\csp_mkdircp is used like csp_CP.  use \csp_mkdircp if you frequently have to
+bootstrap installation on a fresh system, on which needed directories don't
+exist yet.  \csp_mkdircp makes sure the target directory exists before calling
+cp(1), by calling mkdir -p first.
+
+
+\sec{scp_keep_mode_description}{scp_keep_mode DESCRIPTION}
+
+\csp_scp_keep_mode uses ssh to copy a file to a remote host, keeping its file
+permission mode.  The trick used is a combination of mktemp(1) and mv(1).
+Useful if you'd like to be sure a file gets installed e.g. group writable,
+without fiddling with permission bits on the remote host.
+
+\sec{scp_keep_mode_examples}{scp_keep_mode EXAMPLE}
+
+\verbatim{
+  chmod g+w rc
+  csp_scp_keep_mode root@gandalf /etc/uruk rc}
+
+\sec{scp_keep_mode_environment}{scp_keep_mode ENVIRONMENT}
+
+\csp_scp_keep_mode honors csp_SSH ("ssh" by default).
+
+\sec{sucp_description}{sucp DESCRIPTION}
+
+\csp_sucp calls tar(1) from within sudo(1) from within ssh(1).  This allows one
+to copy files to accounts on hosts one can only reach by calling sudo on the
+ssh-reachable remote host.
+  \par{
+Typically, one wants to install a root-owned file, but one does not want to
+allow access to the root-account directly from ssh.  Typically sudo is used as
+an extra line of defense.
+}
+
+   \par{NB: if your sudo prompts for a password, be sure to have line
+
+\verbatim{
+  Defaults !tty_tickets}
+
+in your sudoers file: we first call sudo -v, than we call sudo to write the
+data. Since we use ssh to get to the host, we'll use a different tty for both
+sudo calls.
+}
+
+\sec{sucp_examples}{sucp EXAMPLES}
+
+Some examples:
+
+\verbatim{
+  csp_sucp rms@bilbo /etc fstab}
+
+\verbatim{
+  csp_sucp monty-python commit/ trailer.txt}
+
+\sec{author}{AUTHOR}
+
+\"man::author"
+
+\sec{seealso}{SEE ALSO}
+
+\sibref{caspar}{caspar(7)}
+
+The caspar homepage is at \httpref{http://mdcc.cx/caspar/} .
+
+\end{pud::man}
+

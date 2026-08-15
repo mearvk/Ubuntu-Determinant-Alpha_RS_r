@@ -1,0 +1,168 @@
+#! /usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+export DEB_LDFLAGS_MAINT_APPEND=-lpthread -Wl,--as-needed
+
+debbuild=debian/build-deb
+udebbuild=debian/build-udeb
+
+include /usr/share/dpkg/architecture.mk
+
+ifeq (,$(filter noudeb, $(DEB_BUILD_PROFILES)))
+  with_udeb = yes
+endif
+
+CONFFILE=/etc/cdebconf.conf
+
+#package names
+LIBDEBCONFDEV=libdebconfclient0-dev
+LIBDEBCONF=libdebconfclient0
+
+DEB_FRONTENDS=passthrough text newt gtk
+UDEB_FRONTENDS=passthrough text newt gtk
+
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes) $(DEB_HOST_ARCH), yes i386)
+   UDEB_FRONTENDS:=$(filter-out gtk newt,$(UDEB_FRONTENDS))
+   skip_packages = -Ncdebconf-gtk-udeb -Ncdebconf-newt-udeb
+endif
+
+ifneq ($(filter pkg.cdebconf.nogtk,$(DEB_BUILD_PROFILES)),)
+    DEB_FRONTENDS:=$(filter-out gtk,$(DEB_FRONTENDS))
+    UDEB_FRONTENDS:=$(filter-out gtk,$(UDEB_FRONTENDS))
+endif
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+    SELINUXFLAG=--enable-selinux
+else
+    SELINUXFLAG=--disable-selinux
+endif
+
+SIZEOPTFLAG=-Os
+SPEEDOPTFLAG=-O2
+DEBUG_CONFIGURE_OPT=
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+	DEBUGOPTFLAG=-g
+	SIZEOPTFLAG=
+	SPEEDOPTFLAG=
+	DEBUG_CONFIGURE_OPT=--with-debug=yes
+endif
+
+build: build-deb $(if $(with_udeb),build-udeb)
+
+build-arch: build
+build-indep: build
+
+configure:
+	dh_autoreconf
+
+$(debbuild)/config.status: configure
+	DEB_CFLAGS_MAINT_APPEND="$(DEBUGOPTFLAG) $(SPEEDOPTFLAG)" \
+	dh_auto_configure -B$(debbuild) -- \
+		--libexecdir=\$${prefix}/lib \
+		--without-rpath \
+		--with-db="textdb rfc822db stack" \
+		--with-frontend="$(DEB_FRONTENDS)" \
+		--with-textwrap \
+		$(SELINUXFLAG) \
+		--with-conffile=$(CONFFILE) \
+		$(DEBUG_CONFIGURE_OPT)
+
+build-deb: build-deb-stamp
+build-deb-stamp: $(debbuild)/config.status
+	dh_testdir
+	dh_auto_build -B$(debbuild)
+	touch $@
+
+$(udebbuild)/config.status: configure
+	DEB_CFLAGS_MAINT_APPEND="$(DEBUGOPTFLAG) $(SIZEOPTFLAG) -fomit-frame-pointer" \
+	dh_auto_configure -B$(udebbuild) -- \
+		--libexecdir=\$${prefix}/lib \
+		--enable-d-i \
+		--without-rpath --with-db="rfc822db stack" \
+		--with-frontend="$(UDEB_FRONTENDS)" \
+		--with-default-frontend=newt \
+		--with-syslog-logging \
+		--with-textwrap \
+		--disable-selinux \
+		--with-conffile=$(CONFFILE) \
+		$(DEBUG_CONFIGURE_OPT)
+
+build-udeb: build-udeb-stamp
+build-udeb-stamp: $(udebbuild)/config.status
+	dh_testdir
+	dh_auto_build -B$(udebbuild)
+	touch $@
+
+clean:
+	dh_testdir
+	dh_auto_clean -B$(debbuild)
+	dh_auto_clean -B$(udebbuild)
+	[ ! -f globalmakeflags ] || $(MAKE) -C src/test clean
+	dh_auto_clean
+	dh_autoreconf_clean
+	dh_clean
+
+install: install-arch install-indep
+
+install-arch: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	$(MAKE) -C $(debbuild) install DESTDIR=$(CURDIR)/debian/tmp/deb
+ifeq ($(with_udeb),yes)
+	$(MAKE) -C $(udebbuild) install DESTDIR=$(CURDIR)/debian/tmp/udeb
+endif
+	dh_install -a $(skip_packages)
+
+install-indep:
+
+# Build architecture-independent files here.
+binary-indep: install-indep
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs -i
+	dh_installdocs -i
+	dh_installdebconf -i
+	dh_installdirs -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+# Build architecture-dependent files here.
+binary-arch: install-arch
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs -a
+	dh_installdocs -a
+	dh_installdebconf -a
+	dh_installdirs -a
+ifneq ($(filter pkg.cdebconf.nogtk,$(DEB_BUILD_PROFILES)),)
+	# If the pkg.cdebconf.nogtk build profile is enabled and therefore
+	# DEB_FRONTENDS doesn't include gtk, the main build system doesn't
+	# automatically include cdebconf_gtk.h in the libdebconfclient0-dev
+	# package.  As we want libdebconfclient0-dev to have identical
+	# contents whether the pkg.cdebconf.nogtk profile is used or not, we
+	# need to explicitly install cdebconf_gtk.h if the pkg.cdebconf.nogtk
+	# profile is enabled.
+	dh_install -plibdebconfclient0-dev src/modules/frontend/gtk/cdebconf_gtk.h usr/include/cdebconf/
+endif
+	dh_lintian -a
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_makeshlibs -a $(if $(with_udeb),--add-udeb=libdebconfclient0-udeb)
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a $(skip_packages)
+	dh_md5sums -a
+	dh_builddeb -a $(skip_packages)
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
