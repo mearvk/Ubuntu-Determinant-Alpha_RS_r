@@ -1,0 +1,54 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1
+
+%:
+	dh $@ --with gir,gnome
+
+ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH),armel armhf))
+CONFFLAGS += \
+	--with-default-driver=gles2
+else
+CONFFLAGS += \
+	--with-default-driver=gl
+endif
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+CONFFLAGS += \
+	--enable-wayland-egl-platform \
+	--enable-wayland-egl-server \
+	--enable-kms-egl-platform
+endif
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-gtk-doc \
+		--enable-gdk-pixbuf \
+		--enable-cogl-pango \
+		--enable-introspection \
+		--enable-gl \
+		--enable-xlib-egl-platform \
+		--enable-gles2 \
+		--with-gles2-libname=libGLESv2.so.2 \
+		$(CONFFLAGS)
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+override_dh_install:
+	find debian/tmp -name '*.la' -print -delete
+	dh_install
+
+override_dh_missing:
+	dh_missing --list-missing
+
+# Don't run tests on armel since they hang on Debian's buildd there
+override_dh_auto_test:
+ifeq (,$(findstring $(DEB_HOST_ARCH),"armel"))
+	-VERBOSE=1 xvfb-run -a dh_auto_test
+else
+endif

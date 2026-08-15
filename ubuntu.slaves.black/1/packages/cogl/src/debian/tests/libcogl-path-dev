@@ -1,0 +1,46 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against cogl, to verify that the
+# headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2020 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR=$(mktemp -d)
+export XDG_RUNTIME_DIR="$WORKDIR"
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="${DEB_HOST_GNU_TYPE}-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<'EOF' > path.c
+/* Ideally this would not be necessary, but there is a circular dependency
+ * between <cogl/cogl.h> and <cogl-path/cogl-path.h>. */
+#include <cogl/cogl.h>
+
+#include <cogl-path/cogl-path.h>
+
+int main(void)
+{
+    g_assert_cmpuint(COGL_TYPE_PATH_FILL_RULE, !=, G_TYPE_INVALID);
+    return 0;
+}
+EOF
+
+for lib in \
+    cogl-path-1.0 \
+    cogl-path-2.0-experimental \
+; do
+    # Deliberately word-splitting pkg-config's output:
+    # shellcheck disable=SC2046
+    "${CROSS_COMPILE}gcc" -o "${lib}-trivial" path.c $("${CROSS_COMPILE}pkg-config" --cflags --libs "${lib}")
+    echo "build ($lib): OK"
+    [ -x "${lib}-trivial" ]
+    xvfb-run -a "./${lib}-trivial"
+    echo "run ($lib): OK"
+done

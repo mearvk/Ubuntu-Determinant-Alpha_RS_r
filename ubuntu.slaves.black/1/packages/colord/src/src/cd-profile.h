@@ -1,0 +1,103 @@
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*-
+ *
+ * Copyright (C) 2010 Richard Hughes <richard@hughsie.com>
+ *
+ * Licensed under the GNU General Public License Version 2
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
+#ifndef __CD_PROFILE_H
+#define __CD_PROFILE_H
+
+#include <glib-object.h>
+
+#include "cd-common.h"
+
+G_BEGIN_DECLS
+
+#define CD_PROFILE_ERROR	cd_profile_error_quark()
+
+#define CD_TYPE_PROFILE (cd_profile_get_type ())
+G_DECLARE_DERIVABLE_TYPE (CdProfile, cd_profile, CD, PROFILE, GObject)
+
+struct _CdProfileClass
+{
+	GObjectClass		 parent_class;
+	void			(* invalidate)		(CdProfile	*profile);
+};
+
+CdProfile	*cd_profile_new				(void);
+GQuark		 cd_profile_error_quark			(void);
+
+/* accessors */
+const gchar	*cd_profile_get_id			(CdProfile	*profile);
+void		 cd_profile_set_id			(CdProfile	*profile,
+							 const gchar	*id);
+CdObjectScope	 cd_profile_get_scope			(CdProfile	*profile);
+void		 cd_profile_set_scope			(CdProfile	*profile,
+							 CdObjectScope	 object_scope);
+guint		 cd_profile_get_owner			(CdProfile	*profile);
+void		 cd_profile_set_owner			(CdProfile	*profile,
+							 guint		 owner);
+const gchar	*cd_profile_get_filename		(CdProfile	*profile);
+void		 cd_profile_set_is_system_wide		(CdProfile	*profile,
+							 gboolean	 is_system_wide);
+gboolean	 cd_profile_get_is_system_wide		(CdProfile	*profile);
+gboolean	 cd_profile_load_from_icc		(CdProfile	*profile,
+							 CdIcc		*icc,
+							 GError		**error)
+							 G_GNUC_WARN_UNUSED_RESULT;
+gboolean	 cd_profile_load_from_fd		(CdProfile	*profile,
+							 gint		 fd,
+							 GError		**error)
+							 G_GNUC_WARN_UNUSED_RESULT;
+gboolean	 cd_profile_load_from_filename		(CdProfile	*profile,
+							 const gchar	*filename,
+							 GError		**error)
+							 G_GNUC_WARN_UNUSED_RESULT;
+gboolean	 cd_profile_register_object		(CdProfile	*profile,
+							 GDBusConnection *connection,
+							 GDBusInterfaceInfo *info,
+							 GError		**error)
+							 G_GNUC_WARN_UNUSED_RESULT;
+const gchar	*cd_profile_get_qualifier		(CdProfile	*profile);
+void		 cd_profile_set_qualifier		(CdProfile	*profile,
+							 const gchar	*qualifier);
+void		 cd_profile_set_format			(CdProfile	*profile,
+							 const gchar	*format);
+const gchar	*cd_profile_get_checksum		(CdProfile	*profile);
+const gchar	*cd_profile_get_title			(CdProfile	*profile);
+const gchar	*cd_profile_get_object_path		(CdProfile	*profile);
+GHashTable	*cd_profile_get_metadata		(CdProfile	*profile);
+const gchar	*cd_profile_get_metadata_item		(CdProfile	*profile,
+							 const gchar	*key);
+CdProfileKind	 cd_profile_get_kind			(CdProfile	*profile);
+guint		 cd_profile_get_score			(CdProfile	*profile);
+CdColorspace	 cd_profile_get_colorspace		(CdProfile	*profile);
+gboolean	 cd_profile_get_has_vcgt		(CdProfile	*profile);
+void		 cd_profile_watch_sender		(CdProfile	*profile,
+							 const gchar	*sender);
+gboolean	 cd_profile_set_property_internal	(CdProfile	*profile,
+							 const gchar	*property,
+							 const gchar	*value,
+							 guint		 sender_uid,
+							 GError		**error);
+const gchar	**cd_profile_get_warnings		(CdProfile	*profile);
+
+G_END_DECLS
+
+#endif /* __CD_PROFILE_H */
+

@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with=python3 --buildsystem=pybuild
+
+override_dh_install: 
+	dh_install
+ifneq (,$(filter command-not-found,$(shell dh_listpackages)))
+	# Move our script from /usr/bin to /usr/lib (not meant for end-users)
+	install -d $(CURDIR)/debian/command-not-found/usr/lib
+	mv $(CURDIR)/debian/command-not-found/usr/bin/command-not-found $(CURDIR)/debian/command-not-found/usr/lib/command-not-found
+	mv $(CURDIR)/debian/command-not-found/usr/bin/cnf-update-db $(CURDIR)/debian/command-not-found/usr/lib/cnf-update-db
+	rmdir --ignore-fail-on-non-empty $(CURDIR)/debian/command-not-found/usr/bin
+	# Get rid of bash integration script, got merged to bash
+	rm $(CURDIR)/debian/command-not-found/etc/bash_command_not_found
+endif
+
+override_dh_auto_test:
+	python3 -m unittest discover

@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+# Override polkit checks for colord daemon. Normally this would allow
+# locally-logged-in users to do things, but our autopkgtest user isn't locally-logged-in.
+cp debian/tests/overrides/99-allow-all-colord.pkla /etc/polkit-1/localauthority/90-mandatory.d
+
+mkdir -p /etc/systemd/system/colord.service.d/
+cp debian/tests/overrides/colord.service /etc/systemd/system/colord.service.d/10-add-dummy-sensor.conf
+
+systemctl daemon-reload
+systemctl restart colord
+
+# One of the colord tests requires a session component to watch $XDG_DATA_HOME and import the
+# ICC files that get dumped there.
+
+if [ -z "${AUTOPKGTEST_NORMAL_USER}" ]
+then
+    adduser --disabled-password --gecos "" test
+    AUTOPKGTEST_NORMAL_USER=test
+fi
+
+# In GNOME the gsd-color component of gnome-settings-daemon is responsible for handling
+# user ICC files.
+NORMAL_USER_ID=$(id -u ${AUTOPKGTEST_NORMAL_USER})
+USER_RUNTIME_DIR="/run/user/${NORMAL_USER_ID}"
+
+systemctl start "user@${NORMAL_USER_ID}.service"
+eval $(su -l -c "XDG_RUNTIME_DIR=\"${USER_RUNTIME_DIR}\" systemctl --user show-environment" $AUTOPKGTEST_NORMAL_USER | grep DBUS_SESSION_BUS_ADDRESS)
+
+su -c "XDG_SESSION_TYPE=x11 XDG_RUNTIME_DIR=\"${USER_RUNTIME_DIR}\" DBUS_SESSION_BUS_ADDRESS=\"${DBUS_SESSION_BUS_ADDRESS}\" \
+    xvfb-run -a sh -c \"gnome-session & sleep 20 ; gnome-desktop-testing-runner colord\"" \
+    ${AUTOPKGTEST_NORMAL_USER}
+
+# xiccd also serves as a colord session bridge; test that too. 
+#sudo -u $AUTOPKGTEST_NORMAL_USER dbus-run-session -- xvfb-run -a sh -c "xiccd & sleep 10; gnome-desktop-testing-runner colord"
+

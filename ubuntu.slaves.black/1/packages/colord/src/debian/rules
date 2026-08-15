@@ -1,0 +1,63 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+confflags = \
+ -Dsession_example=false \
+ -Ddaemon_user=colord \
+ -Dvapi=true \
+ -Ddocs=false \
+ -Dinstalled_tests=true \
+ -Dargyllcms_sensor=false
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	confflags += -Dsane=true
+else
+	confflags += -Dsane=false -Dsystemd=false -Dudev_rules=false
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(confflags)
+
+execute_after_dh_fixperms-arch:
+	chmod 644 debian/colord/usr/share/bash-completion/completions/colormgr
+
+execute_before_dh_install:
+	# Exclude systemd and udev related files
+	grep -E -v 'lib/systemd|lib/udev|lib/tmpfiles\.d' debian/colord.install > debian/colord.install.kfreebsd
+	grep -E -v 'lib/systemd|lib/udev|lib/tmpfiles\.d' debian/colord.install > debian/colord.install.hurd
+
+execute_before_dh_clean:
+	rm -f debian/colord.install.kfreebsd
+	rm -f debian/colord.install.hurd
+
+override_dh_makeshlibs:
+	dh_makeshlibs -Xcolord-sensors -Xcolord-plugins -- -c4
+
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+override_dh_fixperms:
+	dh_fixperms -Xusr/libexec/installed-tests
+ifneq ($(filter %-tests,$(binaries)),)
+	chmod --recursive --changes a+rX,u+w,og-w debian/*-tests/usr/libexec/installed-tests
+endif
+
+override_dh_auto_test:
+ifeq ($(DEB_HOST_ARCH_ENDIAN),little)
+	dh_auto_test
+else
+	echo "Skipping tests; known broken on big endian systems"
+endif
+
+
+%:
+	dh $@

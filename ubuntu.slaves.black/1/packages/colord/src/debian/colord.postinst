@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+    
+# create the scanner group if it isn't already there
+# We need to check for the existence of the group to avoid system/non-system
+# group discrepencies. (Bug #648287, LP: #989921)
+        if ! getent group scanner >/dev/null; then
+	    addgroup --quiet --system scanner
+        fi
+
+# ...create colord user if it isn't already there...
+        adduser --system --group --home /var/lib/colord \
+	    --quiet --gecos "colord colour management daemon" colord
+
+# ...add system-wide icc profiles directory...
+        mkdir -p /var/lib/colord/icc
+# ...finally, ensure /var/lib/colord has the right permissions
+	chown colord:colord /var/lib/colord /var/lib/colord/icc
+# Restore selinux context (Bug #695085)
+        if which restorecon >/dev/null 2>&1; then
+            restorecon /var/lib/colord /var/lib/colord/icc
+        fi
+
+	;;
+esac	
+
+#DEBHELPER#
+
+exit 0

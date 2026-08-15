@@ -1,0 +1,139 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Material Blend Strings: Cogl Reference Manual</title>
+<meta name="generator" content="DocBook XSL Stylesheets Vsnapshot">
+<link rel="home" href="index.html" title="Cogl Reference Manual">
+<link rel="up" href="ch01.html" title="Cogl - a modern 3D graphics API">
+<link rel="prev" href="cogl-Textures.html" title="Textures">
+<link rel="next" href="cogl-Materials.html" title="Materials">
+<meta name="generator" content="GTK-Doc V1.32.1 (XML mode)">
+<link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
+<td width="100%" align="left" class="shortcuts">
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#cogl-Blend-Strings.description" class="shortcut">Cogl Blend Strings</a></span>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="cogl-Textures.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="cogl-Materials.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
+<div class="refentry">
+<a name="cogl-Blend-Strings"></a><div class="titlepage"></div>
+<div class="refnamediv"><table width="100%"><tr>
+<td valign="top">
+<h2><span class="refentrytitle"><a name="cogl-Blend-Strings.top_of_page"></a>Material Blend Strings</span></h2>
+<p>Material Blend Strings — A simple syntax and grammar for describing blending and texture
+combining functions.</p>
+</td>
+<td class="gallery_image" valign="top" align="right"></td>
+</tr></table></div>
+<div class="refsect1">
+<a name="cogl-Blend-Strings.description"></a><h2>Cogl Blend Strings</h2>
+<p>
+Describing GPU blending and texture combining states is rather awkward to do
+in a consise but also readable fashion. Cogl helps by supporting
+string based descriptions using a simple syntax.
+</p>
+<div class="section">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="id-1.2.6.3.3"></a>Some examples</h4></div></div></div>
+<p>Here is an example used for blending:</p>
+<pre class="programlisting">
+"RGBA = ADD (SRC_COLOR * (SRC_COLOR[A]), DST_COLOR * (1-SRC_COLOR[A]))"
+</pre>
+<p>In OpenGL terms this replaces glBlendFunc[Separate] and
+glBlendEquation[Separate]</p>
+<p>
+Actually in this case it's more verbose than the GL equivalent:
+</p>
+<pre class="programlisting">
+glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+</pre>
+<p>
+But unless you are familiar with OpenGL or refer to its API documentation
+you wouldn't know that the default function used by OpenGL is GL_FUNC_ADD
+nor would you know that the above arguments determine what the source color
+and destination color will be multiplied by before being adding.
+</p>
+<p>Here is an example used for texture combining:</p>
+<pre class="programlisting">
+"RGB = REPLACE (PREVIOUS)"
+"A = MODULATE (PREVIOUS, TEXTURE)"
+</pre>
+<p>
+In OpenGL terms this replaces glTexEnv, and the above example is equivalent
+to this OpenGL code:
+</p>
+<pre class="programlisting">
+  glTexEnvi (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+  glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_REPLACE);
+  glTexEnvi (GL_TEXTURE_ENV, GL_SRC0_RGB, GL_PREVIOUS);
+  glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+  glTexEnvi (GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_MODULATE);
+  glTexEnvi (GL_TEXTURE_ENV, GL_SRC0_ALPHA, GL_PREVIOUS);
+  glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_COLOR);
+  glTexEnvi (GL_TEXTURE_ENV, GL_SRC1_ALPHA, GL_TEXTURE);
+  glTexEnvi (GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_COLOR);
+</pre>
+</div>
+<div class="section">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="cogl-Blend-String-syntax"></a>Here's the syntax</h4></div></div></div>
+<pre class="programlisting">
+&lt;statement&gt;:
+  &lt;channel-mask&gt;=&lt;function-name&gt;(&lt;arg-list&gt;)
+
+  You can either use a single statement with an RGBA channel-mask or you can use
+  two statements; one with an A channel-mask and the other with an RGB
+  channel-mask.
+
+&lt;channel-mask&gt;:
+  A or RGB or RGBA
+
+&lt;function-name&gt;:
+  [A-Za-z_]*
+
+&lt;arg-list&gt;:
+  &lt;arg&gt;,&lt;arg&gt;
+  or &lt;arg&gt;
+  or ""
+
+  I.e. functions may take 0 or more arguments
+
+&lt;arg&gt;:
+  &lt;color-source&gt;
+  1 - &lt;color-source&gt;                : Only intended for texture combining
+  &lt;color-source&gt; * ( &lt;factor&gt; )     : Only intended for blending
+  0                                 : Only intended for blending
+
+  See the blending or texture combining sections for further notes and examples.
+
+&lt;color-source&gt;:
+  &lt;source-name&gt;[&lt;channel-mask&gt;]
+  &lt;source-name&gt;
+
+  See the blending or texture combining sections for the list of source-names
+  valid in each context.
+
+  If a channel mask is not given then the channel mask of the statement
+  is assumed instead.
+
+&lt;factor&gt;:
+  0
+  1
+  &lt;color-source&gt;
+  1-&lt;color-source&gt;
+  SRC_ALPHA_SATURATE
+</pre>
+</div>
+</div>
+</div>
+<div class="footer">
+<hr>Generated by GTK-Doc V1.32.1</div>
+</body>
+</html>
