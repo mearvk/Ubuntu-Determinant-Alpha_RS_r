@@ -266,7 +266,127 @@ make install-linux       # Install Linux native applications
 make install-wine        # Install Wine + Windows app support
 make install-darling     # Install Darling + macOS app support
 make install-icons       # Install desktop icons and manifests
+make install-vfs         # Create and mount JDesk VFS (EXT4 + NTFS images)
 make install-all         # Everything
+```
+
+## JDesk Virtual File System (VFS)
+
+The Files application provides access to JDesk's own internal file structure via two loop-mounted disk images, plus direct access to the native OS filesystem.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  JDesk Files Application (Sidebar)                                   │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │ ╔═══════════════════════════════════════════╗                 │   │
+│  │ ║ JDesk                                    ║                 │   │
+│  │ ║   📂 JDesk Home    → /opt/jdesk/home/   ║  EXT4 image     │   │
+│  │ ║   💾 JDesk Share   → /opt/jdesk/share/  ║  NTFS image     │   │
+│  │ ║   📁 JDesk Desktop                      ║  EXT4 subdir    │   │
+│  │ ║   📂 JDesk Projects                     ║  EXT4 subdir    │   │
+│  │ ╠═══════════════════════════════════════════╣                 │   │
+│  │ ║ Folders (within EXT4 VFS)                ║                 │   │
+│  │ ║   📄 Documents                           ║                 │   │
+│  │ ║   ⬇ Downloads                            ║                 │   │
+│  │ ║   🖼 Pictures / 🎵 Music / 🎬 Videos      ║                 │   │
+│  │ ╠═══════════════════════════════════════════╣                 │   │
+│  │ ║ Share (NTFS — Windows-compatible)        ║                 │   │
+│  │ ║   🔄 Exchange                            ║                 │   │
+│  │ ║   📤 Transfer                            ║                 │   │
+│  │ ║   📋 Shared Docs                         ║                 │   │
+│  │ ║   🔌 USB Import                          ║                 │   │
+│  │ ╠═══════════════════════════════════════════╣                 │   │
+│  │ ║ Native System (host OS)                  ║                 │   │
+│  │ ║   🏠 Home (~)                            ║  Native FS      │   │
+│  │ ║   💻 Computer (/)                        ║  Native FS      │   │
+│  │ ║   📦 /opt                                ║  Native FS      │   │
+│  │ ║   💿 /media (USB)                        ║  Native FS      │   │
+│  │ ║   📌 /mnt                                ║  Native FS      │   │
+│  │ ╚═══════════════════════════════════════════╝                 │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Disk Images
+
+| Image | Mount Point | Filesystem | Size | Purpose |
+|-------|-------------|-----------|------|---------|
+| `jdesk-ext4.img` | `/opt/jdesk/home/` | EXT4 | 2 GB (expandable to 8 GB) | Primary JDesk internal storage |
+| `jdesk-ntfs.img` | `/opt/jdesk/share/` | NTFS 3.1 | 1 GB (expandable to 4 GB) | Cross-platform file exchange |
+
+### Why Both EXT4 and NTFS?
+
+| Feature | EXT4 (JDesk Home) | NTFS (JDesk Share) |
+|---------|-------------------|-------------------|
+| Linux-native performance | ✓ Fast (journaled, extents) | Slower (FUSE translation) |
+| POSIX permissions | ✓ Full (rwx, ACLs, xattrs) | Partial (mapped) |
+| Windows-readable | ✗ Needs ext2fsd/WSL | ✓ Native on Windows |
+| macOS-readable | ✗ Needs driver | ✓ Via Paragon/macFUSE |
+| USB drive exchange | Manual copy | ✓ Direct (NTFS on USB) |
+| Journaling | ✓ Metadata + data | ✓ Metadata |
+| Sparse files | ✓ Efficient | ✓ Supported |
+| Hard links | ✓ Supported | ✓ Supported |
+| Max file size | 16 TB | 16 EB |
+
+### EXT4 Directory Structure (/opt/jdesk/home/)
+
+```
+/opt/jdesk/home/
+├── Desktop/                 - Desktop files
+├── Documents/               - User documents
+├── Downloads/               - Downloaded files
+├── Music/                   - Audio files
+├── Pictures/                - Image files
+├── Videos/                  - Video files
+├── Projects/                - Development workspace
+│   ├── java/
+│   ├── web/
+│   └── scripts/
+├── Templates/               - File templates
+├── Public/                  - Publicly shared files
+├── .jdesk/                  - JDesk configuration
+│   ├── settings/            - Application settings
+│   ├── cache/               - Temporary cache
+│   ├── themes/              - Custom themes
+│   └── plugins/             - JDesk plugins
+└── .config/                 - XDG config
+```
+
+### NTFS Directory Structure (/opt/jdesk/share/)
+
+```
+/opt/jdesk/share/
+├── Exchange/                - Quick file exchange (Windows ↔ Linux)
+├── Transfer/                - Outbound file transfers
+├── Shared Documents/        - Documents readable on all platforms
+└── USB Import/              - Files imported from USB drives
+```
+
+### Setup
+
+```bash
+# Create and mount VFS images (requires root for loop mount)
+sudo ./native-apps/scripts/jdesk-vfs-setup.sh
+
+# Enable auto-mount at boot (systemd)
+sudo cp native-apps/scripts/opt-jdesk-home.mount /etc/systemd/system/
+sudo cp native-apps/scripts/opt-jdesk-share.mount /etc/systemd/system/
+sudo systemctl enable opt-jdesk-home.mount opt-jdesk-share.mount
+
+# Expand later if needed
+sudo truncate -s 8G /opt/jdesk/vfs/jdesk-ext4.img && sudo resize2fs /opt/jdesk/vfs/jdesk-ext4.img
+sudo truncate -s 4G /opt/jdesk/vfs/jdesk-ntfs.img && sudo ntfsresize /opt/jdesk/vfs/jdesk-ntfs.img
+```
+
+### VFS Files
+
+```
+userland/jdesk/native-apps/scripts/
+├── jdesk-vfs-setup.sh          - VFS provisioner (creates + mounts images)
+├── opt-jdesk-home.mount         - Systemd mount unit (EXT4)
+└── opt-jdesk-share.mount        - Systemd mount unit (NTFS)
 ```
 
 ## Files
