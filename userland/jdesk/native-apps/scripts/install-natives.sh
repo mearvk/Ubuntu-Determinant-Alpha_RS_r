@@ -32,6 +32,7 @@ set -euo pipefail
 
 INSTALL_DIR="${1:-/opt/jdesk/apps}"
 MIN_SPACE_MB=3072
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  JDesk Native Applications Installer"
@@ -127,8 +128,23 @@ mkdir -p "$INSTALL_DIR/terminal"
 # Terminal is built from JDesk source — compiled separately
 echo "    (Built from jdesk source: make -C ../native/linux terminal)"
 
+# --- Kali Security Tools ---
+echo "  → Kali Tools (penetration testing toolkit, ~250 MB)"
+if [ -x "$SCRIPT_DIR/native-apps/kali-tools/kali-provision" ]; then
+    KALI_PROVISION="$SCRIPT_DIR/native-apps/kali-tools/kali-provision"
+elif [ -x "$SCRIPT_DIR/../kali-tools/kali-provision" ]; then
+    KALI_PROVISION="$SCRIPT_DIR/../kali-tools/kali-provision"
+else
+    KALI_PROVISION=""
+fi
+if [ -n "$KALI_PROVISION" ]; then
+    "$KALI_PROVISION" || echo "    (Kali provision completed with warnings — check /var/log/kali-provision.log)"
+else
+    echo "    (Manual install: sudo /opt/jdesk/native-apps/kali-tools/kali-provision)"
+fi
+
 echo ""
-echo "  Linux natives installed (~877 MB)"
+echo "  Linux natives installed (~877 MB + ~250 MB Kali)"
 echo ""
 
 # ============================================================================
@@ -173,8 +189,14 @@ echo ""
 
 echo "[5/6] Installing icons and manifests..."
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-JDESK_BASE="${SCRIPT_DIR}/.."
+# Locate native-apps directory (works whether run from jdesk/ or native-apps/scripts/)
+if [ -d "$SCRIPT_DIR/native-apps" ]; then
+    JDESK_BASE="$SCRIPT_DIR/native-apps"
+elif [ -d "$SCRIPT_DIR/../" ] && [ -d "$SCRIPT_DIR/../icons" ]; then
+    JDESK_BASE="$SCRIPT_DIR/.."
+else
+    JDESK_BASE="$SCRIPT_DIR/native-apps"
+fi
 
 # Install icons
 mkdir -p /opt/jdesk/icons
@@ -218,6 +240,7 @@ echo "    📝 Writer    — LibreOffice Writer (ELF)"
 echo "    💻 IDE       — VSCodium (ELF)"
 echo "    🌐 Browser   — Chromium (ELF)"
 echo "    🖥️  Terminal  — JDesk Terminal (ELF + Java)"
+echo "    🛡️  Kali      — Kali Security Tools (Terminal + Shell)"
 echo ""
 echo "  All applications launch under JVM Memory Proxy governance:"
 echo "    java -memory-guard -Xguard:profile=<name> <binary>"
