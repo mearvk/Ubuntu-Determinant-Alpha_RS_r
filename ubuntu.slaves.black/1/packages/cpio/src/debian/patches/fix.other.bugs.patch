@@ -1,0 +1,75 @@
+From: Anibal Monsalve Salazar <anibal@debian.org>
+Date: Wed, 20 Nov 2019 13:08:40 -0500
+Subject: fix other bugs
+
+---
+ lib/rtapelib.c |  2 ++
+ lib/sysdep.c   | 10 +++++++++-
+ lib/sysdep.h   |  4 +++-
+ src/main.c     |  2 ++
+ 4 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/lib/rtapelib.c b/lib/rtapelib.c
+index f6c4d5e..bd55e0c 100644
+--- a/lib/rtapelib.c
++++ b/lib/rtapelib.c
+@@ -426,7 +426,9 @@ rmt_open__ (const char *file_name, int open_mode, int bias,
+   }
+ 
+   /* FIXME: Should somewhat validate the decoding, here.  */
++#ifndef __WIN32__
+   if (gethostbyname (remote_host) == NULL)
++#endif
+     error (EXIT_ON_EXEC_ERROR, 0, _("Cannot connect to %s: resolve failed"),
+ 	   remote_host);
+ 
+diff --git a/lib/sysdep.c b/lib/sysdep.c
+index e903032..803afdc 100644
+--- a/lib/sysdep.c
++++ b/lib/sysdep.c
+@@ -188,4 +188,12 @@ chown ( const char *filename __attribute__ ((unused)) ,  int owner __attribute__
+   return -1;
+ }
+ #endif
+-
++#ifdef __WIN32__
++# warning "Providing stub placeholder for readlink function"
++int
++readlink ( const char *path __attribute__ ((unused)) ,  char *buf __attribute__ ((unused)) ,  size_t bufsiz __attribute__ ((unused)) )
++{
++  errno = ENOSYS;
++  return -1;
++}
++#endif
+diff --git a/lib/sysdep.h b/lib/sysdep.h
+index fd013ff..2709104 100644
+--- a/lib/sysdep.h
++++ b/lib/sysdep.h
+@@ -21,6 +21,8 @@
+    You should have received a copy of the GNU General Public License
+    along with GNU cpiio.  If not, see <http://www.gnu.org/licenses/>. */
+ 
++#ifndef LIB_SYSDEP_H
++#define LIB_SYSDEP_H 1
+ 
+ #ifdef HAVE_PROCESS_H
+ # include <process.h>
+@@ -142,4 +144,4 @@ int link (const char *oldname,const char *newname);
+ int chown (const char *filename,int owner,int group);
+ #endif
+ 
+-
++#endif
+diff --git a/src/main.c b/src/main.c
+index b1bc70a..7683500 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -777,6 +777,8 @@ main (int argc, char *argv[])
+   
+   initialize_buffers ();
+ 
++  SET_BINARY_MODE (1);
++
+   (*copy_function) ();
+ 
+   if (archive_des >= 0 && rmtclose (archive_des) == -1)

@@ -1,0 +1,87 @@
+--- a/scheduler/ipp.c
++++ b/scheduler/ipp.c
+@@ -5424,6 +5424,11 @@
+ 		*nameptr,		/* Pointer into name */
+ 		uri[1024];		/* printer-uri-supported value */
+   const char	*ptr;			/* Pointer into attribute value */
++  char		scheme[HTTP_MAX_URI],	/* Scheme portion of URI */
++		userpass[HTTP_MAX_URI],	/* Username portion of URI */
++		host[HTTP_MAX_URI],	/* Host portion of URI */
++		resource[HTTP_MAX_URI];	/* Resource portion of URI */
++  int		port;			/* Port portion of URI */
+ 
+ 
+  /*
+@@ -5487,6 +5492,13 @@
+ 
+     return;
+   }
++  ptr = ippGetString(device_uri, 0, NULL);
++  if (!ptr || !ptr[0])
++  {
++    send_ipp_status(con, IPP_STATUS_ERROR_BAD_REQUEST, _("Attribute \"%s\" has empty value."), "device-uri");
++
++    return;
++  }
+ 
+   printer_geo_location = ippFindAttribute(con->request, "printer-geo-location", IPP_TAG_URI);
+   printer_info         = ippFindAttribute(con->request, "printer-info", IPP_TAG_TEXT);
+@@ -5515,7 +5527,57 @@
+   printer->shared    = 0;
+   printer->temporary = 1;
+ 
+-  cupsdSetDeviceURI(printer, ippGetString(device_uri, 0, NULL));
++ /*
++  * Check device URI if it has the same hostname as we have, if so, replace
++  * the hostname by localhost. This way we assure that local-only services
++  * like ipp-usb or Printer Applications always work.
++  *
++  * When comparing our hostname with the one in the device URI, consider
++  * names with ¨.local(.)" suffix and names without suffix the same.
++  */
++
++#ifdef HAVE_DNSSD
++  if (DNSSDHostName)
++    nameptr = DNSSDHostName;
++  else
++#endif
++  if (ServerName)
++    nameptr = ServerName;
++  else
++    nameptr = NULL;
++
++  if (nameptr)
++  {
++    int host_len,
++        server_name_len;
++
++    httpSeparateURI(HTTP_URI_CODING_ALL, ptr,
++		    scheme, sizeof(scheme), userpass, sizeof(userpass), host,
++		    sizeof(host), &port, resource, sizeof(resource));
++
++    host_len = strlen(host);
++    if (strcmp(host + host_len - 6, ".local") == 0)
++      host_len -= 6;
++    if (strcmp(host + host_len - 7, ".local.") == 0)
++      host_len -= 7;
++
++    server_name_len = strlen(nameptr);
++    if (strcmp(nameptr + server_name_len - 6, ".local") == 0)
++      server_name_len -= 6;
++    if (strcmp(nameptr + server_name_len - 7, ".local.") == 0)
++      server_name_len -= 7;
++
++    if (host_len == server_name_len && strncmp(host, nameptr, host_len) == 0)
++      ptr = "localhost";
++    else
++      ptr = host;
++
++    httpAssembleURI(HTTP_URI_CODING_ALL, uri, sizeof(uri), scheme, userpass,
++		    ptr, port, resource);
++    cupsdSetDeviceURI(printer, uri);
++  }
++  else
++    cupsdSetDeviceURI(printer, ptr);
+ 
+   if (printer_geo_location)
+     cupsdSetString(&printer->geo_location, ippGetString(printer_geo_location, 0, NULL));

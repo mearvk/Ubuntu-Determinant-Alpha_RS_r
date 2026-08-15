@@ -1,0 +1,56 @@
+From: "Robert Millan rmh@aybabtu and Didier Raboud" <didier@raboud.com>
+Date: Wed, 20 Nov 2019 13:08:40 -0500
+Subject: Fix corrupted output in -win32 build
+
+Origin: vendor
+Bugs: http://bugs.debian.org/579533 http://bugs.debian.org/464172
+Last-Update: 2010-04-29
+---
+ gnu/fcntl.in.h | 5 ++++-
+ lib/system.h   | 5 -----
+ 2 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/gnu/fcntl.in.h b/gnu/fcntl.in.h
+index 4a1d40a..cb8e2c0 100644
+--- a/gnu/fcntl.in.h
++++ b/gnu/fcntl.in.h
+@@ -316,7 +316,10 @@ _GL_WARN_ON_USE (openat, "openat is not portable - "
+ # undef O_TEXT
+ #endif
+ 
+-#ifndef O_BINARY
++#ifdef O_BINARY
++# define SET_BINARY_MODE(arc) setmode(arc, O_BINARY)
++#else
++# define SET_BINARY_MODE(arc)
+ # define O_BINARY 0
+ # define O_TEXT 0
+ #endif
+diff --git a/lib/system.h b/lib/system.h
+index 1c1a5d0..2f22e18 100644
+--- a/lib/system.h
++++ b/lib/system.h
+@@ -109,9 +109,6 @@ extern int errno;
+ # define O_TRUNC	32	/* truncate file on open */
+ #endif
+ 
+-#ifndef O_BINARY
+-# define O_BINARY 0
+-#endif
+ #ifndef O_DIRECTORY
+ # define O_DIRECTORY 0
+ #endif
+@@ -469,13 +466,11 @@ char *getenv ();
+ 
+ #if MSDOS
+ # include <process.h>
+-# define SET_BINARY_MODE(arc) setmode(arc, O_BINARY)
+ # define ERRNO_IS_EACCES errno == EACCES
+ # define mkdir(file, mode) (mkdir) (file)
+ # define TTY_NAME "con"
+ # define sys_reset_uid_gid()
+ #else
+-# define SET_BINARY_MODE(arc)
+ # define ERRNO_IS_EACCES 0
+ # define TTY_NAME "/dev/tty"
+ # define sys_reset_uid_gid()					\

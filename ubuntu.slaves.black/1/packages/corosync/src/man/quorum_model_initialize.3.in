@@ -1,0 +1,165 @@
+.\"/*
+.\" * Copyright (c) 2012-2020 Red Hat, Inc.
+.\" *
+.\" * All rights reserved.
+.\" *
+.\" * Authors: Jan Friesse <jfriesse@redhat.com>
+.\" *          Fabio M. Di Nitto <fdinitto@redhat.com>
+.\" *
+.\" * This software licensed under BSD license, the text of which follows:
+.\" *
+.\" * Redistribution and use in source and binary forms, with or without
+.\" * modification, are permitted provided that the following conditions are met:
+.\" *
+.\" * - Redistributions of source code must retain the above copyright notice,
+.\" *   this list of conditions and the following disclaimer.
+.\" * - Redistributions in binary form must reproduce the above copyright notice,
+.\" *   this list of conditions and the following disclaimer in the documentation
+.\" *   and/or other materials provided with the distribution.
+.\" * - Neither the name of the MontaVista Software, Inc. nor the names of its
+.\" *   contributors may be used to endorse or promote products derived from this
+.\" *   software without specific prior written permission.
+.\" *
+.\" * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\" * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+.\" * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+.\" * THE POSSIBILITY OF SUCH DAMAGE.
+.\" */
+.TH QUORUM_MODEL_INITIALIZE 3 @BUILDDATE@ "corosync Man Page" "Corosync Cluster Engine Programmer's Manual"
+.SH NAME
+quorum_model_initialize \- Create a new connection to the Quorum service
+.SH SYNOPSIS
+.B #include <corosync/quorum.h>
+.sp
+.BI "cs_error_t quorum_model_initialize(quorum_handle_t *" handle ", quorum_model_t " model ", quorum_model_data_t *" model_data ", uint32_t *" quorum_type ",void *" context ");"
+.SH DESCRIPTION
+The
+.B quorum_model_initialize
+function is an enhanced way to initialize a connection to the quorum API.
+.PP
+Each application may have several connections to the quorum API.  Each application
+uses the
+.I handle
+argument to uniquely identify the connection.  The
+.I handle
+argument is then used in other function calls to identify the connection to be used
+for communication with the quorum service.
+.PP
+The
+.I model
+is used to explicitly choose set of callbacks and internal parameters. Currently two models
+.I QUORUM_MODEL_V0
+and
+.I QUORUM_MODEL_V1
+are defined.
+.I QUORUM_MODEL_V0
+exists only for compatibility reasons with
+.B quorum_initialize(3)
+function and it is not recommended to be used as an argument for
+.B quorum_model_initialize(3).
+
+The Following description is focused only on
+.I QUORUM_MODEL_V1
+model.
+
+.PP
+Every time the voting configuration changes (eg a node joins or leave the cluster) or the quorum status changes
+the quorum callback is called.
+The quorum callback function is described by the following type definitions:
+
+.nf
+typedef void (*quorum_v1_quorum_notification_fn_t) (
+        quorum_handle_t handle,
+        uint32_t quorate,
+        struct quorum_ring_id ring_id,
+        uint32_t member_list_entries,
+        const uint32_t *member_list
+);
+.fi
+.PP
+Also every time when membership configuration changes (eg a node joins or leave the cluster) the node list change
+callback is called before the quorum callback.
+The node list change callback function is described by the following type definitions:
+
+.nf
+typedef void (*quorum_v1_nodelist_notification_fn_t) (
+        quorum_handle_t handle,
+        struct quorum_ring_id ring_id,
+        uint32_t member_list_entries,
+        const uint32_t *member_list,
+        uint32_t joined_list_entries,
+        const uint32_t *joined_list,
+        uint32_t left_list_entries,
+        const uint32_t *left_list
+);
+.fi
+.PP
+The
+.I model_data
+argument for
+.I QUORUM_MODEL_V1
+is of the type:
+
+.nf
+typedef struct {
+        quorum_model_t model;
+        quorum_v1_quorum_notification_fn_t quorum_notify_fn;
+        quorum_v1_nodelist_notification_fn_t nodelist_notify_fn;
+} quorum_model_v1_data_t;
+.fi
+
+It's not required (nor recommended) to set
+.I model
+field in the structure. It is also fine if only some of notification callbacks are
+used (only these events will be delivered then).
+
+.PP
+The
+.I quorum_type
+argument is set to:
+
+.nf
+#define QUORUM_FREE     0
+#define QUORUM_SET      1
+.fi
+.PP
+.I QUORUM_FREE
+value means that no quorum algorithm is loaded and that no callbacks will take place.
+.PP
+.I QUORUM_SET
+value means that one quorum algorithm is configured and that callbacks will take place.
+.PP
+The
+.I context
+argument sets context same way as
+.B quorum_context_set(3).
+.PP
+When a configuration change occurs, the callback
+is called from the
+.B quorum_dispatch(3)
+function.
+.PP
+.SH RETURN VALUE
+This call returns the CS_OK value if successful, otherwise an error is returned.
+.PP
+.SH ERRORS
+@COMMONIPCERRORS@
+.SH "SEE ALSO"
+.BR quorum_overview (3),
+.BR quorum_initialize (3),
+.BR quorum_finalize (3),
+.BR quorum_getquorate (3),
+.BR quorum_trackstart (3),
+.BR quorum_trackstop (3),
+.BR quorum_fd_get (3),
+.BR quorum_dispatch (3),
+.BR quorum_context_set (3),
+.BR quorum_context_get (3)
+.PP

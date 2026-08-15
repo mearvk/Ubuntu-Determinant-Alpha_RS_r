@@ -1,0 +1,178 @@
+.\"/*
+.\" * Copyright (c) 2005 MontaVista Software, Inc.
+.\" * Copyright (c) 2006-2018 Red Hat, Inc.
+.\" *
+.\" * All rights reserved.
+.\" *
+.\" * Author: Steven Dake (sdake@redhat.com)
+.\" *
+.\" * This software licensed under BSD license, the text of which follows:
+.\" *
+.\" * Redistribution and use in source and binary forms, with or without
+.\" * modification, are permitted provided that the following conditions are met:
+.\" *
+.\" * - Redistributions of source code must retain the above copyright notice,
+.\" *   this list of conditions and the following disclaimer.
+.\" * - Redistributions in binary form must reproduce the above copyright notice,
+.\" *   this list of conditions and the following disclaimer in the documentation
+.\" *   and/or other materials provided with the distribution.
+.\" * - Neither the name of the MontaVista Software, Inc. nor the names of its
+.\" *   contributors may be used to endorse or promote products derived from this
+.\" *   software without specific prior written permission.
+.\" *
+.\" * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\" * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+.\" * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+.\" * THE POSSIBILITY OF SUCH DAMAGE.
+.\" */
+.TH COROSYNC_OVERVIEW 7 2018-11-13 "corosync Man Page" "Corosync Cluster Engine Programmer's Manual"
+.SH NAME
+corosync_overview \- Corosync overview
+.SH OVERVIEW
+The corosync project's purpose is to implement and support a production quality
+Revised BSD licensed implementation of a high performance low overhead high
+availability development toolkit.
+
+Faults occur for various reasons:
+.PP
+* Application Faults
+.PP
+* Middleware Faults
+.PP
+* Operating System Faults
+.PP
+* Hardware Faults
+
+The major focus of high availability in the past has been to mask hardware
+faults. Faults in other components of the system have gone unsolved until
+Corosync.  Corosync is designed for applications to replicate their state to
+up to 16 processors.  The processors all contain a replica of the application
+state.
+
+The corosync project provides a group message API called CPG.
+The project developers recommend CPG be used for most applications.  The CPG
+service implements a closed group messaging model presenting extended virtual
+synchrony guarantees.
+
+To manage conditions where the process executing the CPG application exchange
+fails, we provide the Simple Availability Manager (sam) to provide simple
+application restart.
+
+.SH QUICKSTART
+The corosync executive must be configured.  In the directory conf in the
+source distribution are several files that must be copied to the /etc/corosync
+directory.  If corosync is packaged by a distro, this may be complete.
+
+The directory contains the file corosync.conf.  Please read the corosync.conf(5)
+man page for details on the configuration options.  The corosync project will
+work out of the box with the default configuration options, although the
+administrator may desire different options.
+
+The corosync executive uses cryptographic techniques to ensure authenticity
+and privacy of the messages.  In order for corosync to be secure and operate,
+a private key must be generated and shared to all processors.
+
+First generate the key on one of the nodes:
+
+.nf
+unix# corosync-keygen
+Corosync Cluster Engine Authentication key generator.
+Gathering 2048 bits for key from /dev/urandom.
+Writing corosync key to /etc/corosync/authkey.
+.fi
+
+After this operation, a private key will be in the file /etc/corosync/authkey.
+This private key must be copied to every processor in the cluster.  If the
+private key isn't the same for every node, those nodes with nonmatching private
+keys will not be able to join the same configuration.
+
+Copy the key to some security transportable storage or use ssh to transmit the
+key from node to node.  Then install the key with the command:
+
+unix#: install -D --group=0 --owner=0 --mode=0400 /path_to_authkey/authkey /etc/corosync/authkey
+
+If a message "Invalid digest" appears from the corosync executive, the keys
+are not consistent between processors.
+
+Finally run the corosync executive.  If corosync is packaged from a distro, it
+may be set to start on system start.  It may also be turned off by default in
+which case the init script for corosync must be enabled.
+
+.SH USING LIBRARIES
+The corosync libraries have header files which must be included in the
+developer's application.  Once the header file is included, the developer can
+reference the corosync interfaces.
+
+The corosync project recommends to distros to place include files in
+/usr/include/corosync.
+
+.SH IPv6
+The corosync project supports both IPv4 and IPv6 network addresses.  The entire
+cluster must use either IPv4 or IPv6 for the cluster communication mechanism.
+In order to use IPv6, IPv6 addresses must be specified in the bindnetaddr and
+mcastaddr fields in the configuration file.  The nodeid field must also be
+set.
+
+An example of this is:
+nodeid: 2
+bindnetaddr: fec0::1:a800:4ff:fe00:20
+mcastaddr: ff05::1
+
+To configure a host for IPv6, use the ifconfig program to add interfaces:
+box20: ifconfig eth0 add fec0::1:a800:4ff:fe00:20/64
+box30: ifconfig eth0 add fec0::1:a800:4ff:fe00:30/64
+
+If the /64 is not specified, a route for the IPv6 network will not be configured
+which will cause significant problems.  Make sure a route is available for
+IPv6 traffic.
+
+.SH ARCHITECTURE
+The corosync libraries are a thin IPC interface to the corosync executive.  The
+corosync executive implements the functionality of the corosync APIs for
+distributed coming.
+
+The corosync executive uses the Totem extended virtual synchrony protocol.  The
+advantage to the end user is excellent performance characteristics and a proven
+protocol with excellent reliability.  This protocol connects the processors
+in a configuration together so they may communicate.
+
+.SH SECURITY
+The corosync executive optionally encrypts and signs all messages sent
+over the network. For more details see
+.B crypto_model,
+.B crypto_hash
+and
+.B crypto_cipher
+options in the
+.BR corosync.conf (5).
+
+If membership messages can be captured by intruders, it is possible to execute
+a denial of service attack on the cluster.  In this scenario, the cluster is
+likely already compromised and a DOS attack is the least of the administration's
+worries.
+
+The security in corosync does not offer perfect forward secrecy because the keys
+are reused.  It may be possible for an intruder by capturing packets in an
+automated fashion to determine the shared key.  No such automated attack has
+been published as of yet.  In this scenario, the cluster is likely already
+compromised to allow the long-term capture of transmitted data.
+
+For security reasons, the corosync executive binary should NEVER
+be setuid or setgid in the filesystem.
+
+.SH BUGS
+None that are known.
+
+.SH "SEE ALSO"
+.BR corosync.conf (5),
+.BR corosync-keygen (8),
+.BR cpg_overview (3),
+.BR sam_overview (3)
+.PP

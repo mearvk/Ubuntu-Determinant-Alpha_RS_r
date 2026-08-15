@@ -1,0 +1,37 @@
+From: Christian Kastner <ckk@kvr.at>
+Date: Sun, 20 Dec 2015 18:47:24 +0100
+Subject: Validate MAILTO input
+
+Validate the contents of the MAILTO variable. In particular, this prevents
+users from passing arbitrary options to sendmail.
+
+Fix provided by Steve Greenland <stevegr@debian.org>.
+
+Forwarded: no
+Last-Update: 2015-12-20
+Index: conv3/do_command.c
+===================================================================
+--- conv3.orig/do_command.c
++++ conv3/do_command.c
+@@ -96,6 +96,21 @@ child_process(e, u)
+ 	usernm = env_get("LOGNAME", e->envp);
+ 	mailto = env_get("MAILTO", e->envp);
+ 
++	/* Check for arguments */
++	if (mailto) {
++		const char	*end;
++
++		/* These chars have to match those cron_popen()
++		 * uses to split the command string */
++		mailto += strspn(mailto, " \t\n");
++		end = mailto + strcspn(mailto, " \t\n");
++		if (*mailto == '-' || *end != '\0') {
++			printf("Bad Mailto karma.\n");
++			log_it("CRON",getpid(),"error","bad mailto");
++			mailto = NULL;
++		}
++	}
++
+ #ifdef USE_SIGCHLD
+ 	/* our parent is watching for our death by catching SIGCHLD.  we
+ 	 * do not care to watch for our children's deaths this way -- we

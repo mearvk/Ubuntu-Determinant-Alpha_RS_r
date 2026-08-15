@@ -1,0 +1,55 @@
+Description: Decrease memlock limit to mimic Xenial builder behavior.
+ This approach prevents cryptsetup to FTBFS, since the PPA builders were
+ upgraded to Bionic, which has a bigger memlock limit (but not enough).
+ With this quirk, cryptsetup won't mlock() its memory allocationss, hence
+ it behaves exactly as the Xenial builders. Meanwhile, we pursue the
+ proper fix (systemd patch to bump memlock to a higher limit on Bionic).
+Author: Guilherme G. Piccoli <gpiccoli@canonical.com>
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1891473
+Last-Update: 2020-09-09
+
+Index: cryptsetup-2.3.3/tests/compat-test
+===================================================================
+--- cryptsetup-2.3.3.orig/tests/compat-test
++++ cryptsetup-2.3.3/tests/compat-test
+@@ -45,6 +45,10 @@ TEST_UUID="12345678-1234-1234-1234-12345
+ LOOPDEV=$(losetup -f 2>/dev/null)
+ [ -f /etc/system-fips ] && FIPS_MODE=$(cat /proc/sys/crypto/fips_enabled 2>/dev/null)
+ 
++# Circumvent test failure due to Bionic builder; we need to decrease
++# the memlock limit here to mimic Xenial builder (see LP #1891473).
++ulimit -l 0
++
+ function remove_mapping()
+ {
+ 	[ -b /dev/mapper/$DEV_NAME3 ] && dmsetup remove --retry $DEV_NAME3 >/dev/null 2>&1
+Index: cryptsetup-2.3.3/tests/luks2-validation-test
+===================================================================
+--- cryptsetup-2.3.3.orig/tests/luks2-validation-test
++++ cryptsetup-2.3.3/tests/luks2-validation-test
+@@ -21,6 +21,10 @@ FAILS=0
+ 
+ [ -z "$srcdir" ] && srcdir="."
+ 
++# Circumvent test failure due to Bionic builder; we need to decrease
++# the memlock limit here to mimic Xenial builder (see LP #1891473).
++ulimit -l 0
++
+ function remove_mapping()
+ {
+ 	rm -rf $IMG $TST_IMGS >/dev/null 2>&1
+Index: cryptsetup-2.3.3/tests/tcrypt-compat-test
+===================================================================
+--- cryptsetup-2.3.3.orig/tests/tcrypt-compat-test
++++ cryptsetup-2.3.3/tests/tcrypt-compat-test
+@@ -13,6 +13,10 @@ PIM=1234
+ 
+ [ -z "$srcdir" ] && srcdir="."
+ 
++# Circumvent test failure due to Bionic builder; we need to decrease
++# the memlock limit here to mimic Xenial builder (see LP #1891473).
++ulimit -l 0
++
+ function remove_mapping()
+ {
+ 	[ -b /dev/mapper/$MAP ] && dmsetup remove --retry $MAP

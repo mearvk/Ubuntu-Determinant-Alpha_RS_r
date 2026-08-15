@@ -1,0 +1,60 @@
+From: Carl Miller <chaz@energoncube.net>
+Date: Wed, 20 Nov 2019 13:08:40 -0500
+Subject: Better handle device nodes from cramfs.
+
+---
+ src/copyout.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/src/copyout.c b/src/copyout.c
+index 8b0beb6..8686a71 100644
+--- a/src/copyout.c
++++ b/src/copyout.c
+@@ -222,7 +222,8 @@ writeout_defered_file (struct cpio_file_stat *header, int out_file_des)
+ 			   header->c_name);
+   warn_if_file_changed(header->c_name, file_hdr.c_filesize, file_hdr.c_mtime);
+ 
+-  if (archive_format == arf_tar || archive_format == arf_ustar)
++  if ((archive_format == arf_tar || archive_format == arf_ustar)
++      && (file_hdr.c_nlink > 1))
+     add_inode (file_hdr.c_ino, file_hdr.c_name, file_hdr.c_dev_maj,
+ 	       file_hdr.c_dev_min);
+ 
+@@ -655,7 +656,7 @@ process_copy_out ()
+ 	  
+ 	  if (archive_format == arf_tar || archive_format == arf_ustar)
+ 	    {
+-	      if (file_hdr.c_mode & CP_IFDIR)
++             if ((file_hdr.c_mode & CP_IFMT) == CP_IFDIR)
+ 		{
+ 		  int len = strlen (input_name.ds_string);
+ 		  /* Make sure the name ends with a slash */
+@@ -677,7 +678,8 @@ process_copy_out ()
+ 	  switch (file_hdr.c_mode & CP_IFMT)
+ 	    {
+ 	    case CP_IFREG:
+-	      if (archive_format == arf_tar || archive_format == arf_ustar)
++             if ((archive_format == arf_tar || archive_format == arf_ustar)
++                 && (file_hdr.c_nlink > 1))
+ 		{
+ 		  char *otherfile;
+ 		  if ((otherfile = find_inode_file (file_hdr.c_ino,
+@@ -724,7 +726,8 @@ process_copy_out ()
+ 	      warn_if_file_changed(orig_file_name, file_hdr.c_filesize,
+                                    file_hdr.c_mtime);
+ 
+-	      if (archive_format == arf_tar || archive_format == arf_ustar)
++             if ((archive_format == arf_tar || archive_format == arf_ustar)
++                 && (file_hdr.c_nlink > 1))
+ 		add_inode (file_hdr.c_ino, orig_file_name, file_hdr.c_dev_maj,
+ 			   file_hdr.c_dev_min);
+ 
+@@ -758,7 +761,7 @@ process_copy_out ()
+ 			 orig_file_name);
+ 		  continue;
+ 		}
+-	      else if (archive_format == arf_ustar)
++             else if ((archive_format == arf_ustar) && (file_hdr.c_nlink > 1))
+ 		{
+ 		  char *otherfile;
+ 		  if ((otherfile = find_inode_file (file_hdr.c_ino,

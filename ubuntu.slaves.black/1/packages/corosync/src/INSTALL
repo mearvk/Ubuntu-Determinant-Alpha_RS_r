@@ -1,0 +1,167 @@
+----------------------------------------------
+The Corosync Cluster Engine Installation Guide
+----------------------------------------------
+Please read LICENSE for a description of the licensing of this software.
+
+---------------------
+* Building from git *
+---------------------
+When building and installing from git, autoconf 2.61, automake 1.11,
+libtool 2.2.6 and pkgconfig 0.23  (or later versions) are required.
+Prior versions may result in build failures.
+
+Step 1: check out a read only copy of the repository
+git clone git://github.com/corosync/corosync.git
+
+Find the version you want to build.  Usually this will be the "master" version.
+If you want to build a specific released version, use git checkout VERSION.
+
+Step 2: Generate the makefiles
+balance:~/corosync% ./autogen.sh
+
+Step 3: Run the configure script
+balance:~/corosync% ./configure
+
+Step 4: Install the binaries
+balance:~/corosync% su
+balance:~/corosync# make install
+
+-------------------------
+* Building from tarball *
+-------------------------
+The tarball is distributed with pregenerated makefiles.  There is no need
+to run the autogen.sh script in this case.
+
+Step 1: Run the configure script
+balance:~/corosync% ./configure
+
+Step 2: Install the binaries
+balance:~/corosync% su
+balance:~/corosync# make install
+
+-------------------------------
+* A notice about dependencies *
+-------------------------------
+We have strived very hard to avoid dependencies as much as possible, but there
+are two required libraries: LibQB (https://github.com/ClusterLabs/libqb)
+and KNET (https://kronosnet.org/).
+
+Optional dependencies are support for DBUS, SNMP and libstatgrab.
+
+Also don't forget to install pkgconfig.
+
+-----------------------------------------
+* Building with SNMP/DBUS support *
+-----------------------------------------
+
+You can get SNMP traps on the following corosync events:
+1) node joine/leave
+2) application connect/dissconnect from corosync
+3) quorum gain/lost
+
+There are 2 modes of achieving this DBUS + foghorn and snmp-agentx.
+
+Setting up to get dbus events.
+------------------------------
+foghorn (http://git.fedorahosted.org/git/foghorn.git) converts
+dbus signals into snmp traps. So install foghorn.
+
+$ ./configure --enable-dbus
+$ make && sudo make install
+$ /etc/init.d/corosync start
+$ echo "OPTIONS=\"-d\"" > /etc/sysconfig/corosync-notifyd
+$ /etc/init.d/corosync-notifyd start
+Start foghorn
+
+to see the dbus signals getting sent try:
+$ dbus-monitor --system
+
+Setting up snmp-agentx.
+-----------------------
+If you don't want to use dbus then you can use snmp-agentx.
+
+$ ./configure --enable-snmp
+$ make && sudo make install
+$ /etc/init.d/corosync start
+$ vim /etc/snmp/snmptrapd.conf
+
+Add the following:
+authCommunity   log,execute,net public
+$ /etc/init.d/snmptrapd start
+$ echo "OPTIONS=\"-s\"" > /etc/sysconfig/corosync-notifyd
+$ /etc/init.d/corosync-notifyd start
+
+I start up wireshark to see if there are any snmp traps been sent
+as I am too lazy to setup a manager to receive traps.
+
+run a program that talks to corosync e.g.
+$ corosync-cmapctl
+
+And you should get traps
+
+
+------------------------
+* Configuring Corosync *
+------------------------
+The configuration directory (usually /etc/corosync) contains an example
+configuration file (corosync.conf.example). Please copy it as corosync.conf
+and edit it as needed. At the very minimum, the nodelist section will have to be changed
+to list all cluster nodes. For more information about the configuration file
+please read the corosync.conf.5 manual page.
+
+Generate a private key
+----------------------
+corosync uses cryptographic techniques to ensure authenticity and privacy of
+messages.  A private key must be generated and shared by all processors for
+correct operation.
+
+First generate the key on one of the nodes:
+
+balance# corosync-keygen
+Corosync Authentication key generator.
+Gathering 8192 bits for key from /dev/random.
+Writing corosync key to /etc/corosync/authkey.
+
+After this is complete, a private key will be in the file /etc/corosync/authkey.
+This private key must be copied to every processor that will be a member of
+the cluster.  If the private key isn't the same for every node, those nodes
+with nonmatching private keys will not be able to join the same configuration.
+
+Copy the key to some transportable storage or use ssh to transmit the key
+from node to node.  Then install the key with the command:
+
+balance# install -D --group=0 --owner=0 --mode=0400 /path_to_authkey/authkey /etc/corosync/authkey
+
+If the message invalid digest appears, the keys are not the same on each node.
+
+Run the corosync executive
+-------------------------
+Get one or more nodes and run the corosync executive on each node.  Run the
+corosync daemon after following the previous directions.  The daemon must be
+run as UID 0(root).
+
+Before running any of the test programs
+---------------------------------------
+The corosync executive will ensure security by only allowing the UID 0(root) or
+GID 0(root) to connect to it.  To allow other users to access the corosync
+executive, create a directory called /etc/corosync/uidgid.d and place a file in
+it named in some way that is identifiable to you.  All files in this directory
+will be scanned and their contents added to the allowed uid gid database.  The
+contents of this file should be
+uidgid {
+	uid: username
+	gid: groupname
+}
+
+Please note that these users then have full ability to transmit and receive
+messages in the cluster.
+
+Try out the corosync cpg functionality
+--------------------------------------
+After corosync is running
+
+Run test/testcpg on multiple nodes or on the same node.  Messages can be typed
+which will then be sent to other testcpg applications in the cluster.
+
+To see a hashed verified output of data on all nodes, test/cpgverify can be
+run.

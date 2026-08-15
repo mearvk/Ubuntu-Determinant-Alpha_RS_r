@@ -1,0 +1,139 @@
+.\"/*
+.\" * Copyright (c) 2009,2012 Red Hat, Inc.
+.\" *
+.\" * All rights reserved.
+.\" *
+.\" * Author: Christine Caulfield <ccaulfie@redhat.com>
+.\" *
+.\" * This software licensed under BSD license, the text of which follows:
+.\" *
+.\" * Redistribution and use in source and binary forms, with or without
+.\" * modification, are permitted provided that the following conditions are met:
+.\" *
+.\" * - Redistributions of source code must retain the above copyright notice,
+.\" *   this list of conditions and the following disclaimer.
+.\" * - Redistributions in binary form must reproduce the above copyright notice,
+.\" *   this list of conditions and the following disclaimer in the documentation
+.\" *   and/or other materials provided with the distribution.
+.\" * - Neither the name of the MontaVista Software, Inc. nor the names of its
+.\" *   contributors may be used to endorse or promote products derived from this
+.\" *   software without specific prior written permission.
+.\" *
+.\" * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+.\" * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+.\" * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+.\" * THE POSSIBILITY OF SUCH DAMAGE.
+.\" */
+.TH VOTEQUORUM_INITIALIZE 3 @BUILDDATE@ "corosync Man Page" "Corosync Cluster Engine Programmer's Manual"
+.SH NAME
+votequorum_initialize \- Create a new connection to the VoteQuorum service
+.SH SYNOPSIS
+.B #include <corosync/votequorum.h>
+.sp
+.BI "int votequorum_initialize(votequorum_handle_t *" handle ", votequorum_callbacks_t *" callbacks ");"
+.SH DESCRIPTION
+The
+.B votequorum_initialize
+function is used to initialize a connection to the vote-based quorum database API.
+.PP
+Each application may have several connections to the votequorum API.  Each application
+uses the
+.I handle
+argument to uniquely identify the connection.  The
+.I handle
+argument is then used in other function calls to identify the connection to be used
+for communication with the votequorum service.
+.PP
+Every time the voting configuration is about to change (eg a node joins or leave the cluster), the callback is called.
+The callback function is described by the following type definitions:
+
+.nf
+typedef void (*votequorum_nodelist_notification_fn_t) (
+	votequorum_handle_t handle,
+	uint64_t context,
+	uint32_t node_list_entries,
+	uint32_t node_list[]
+	);
+
+.fi
+
+Current ring_id (one get in votequorum_quorum_notification_fn) must be passed to
+.B votequorum_qdevice_poll
+to make qdevice voting valid.
+
+.PP
+Every time the quorum state changes (eg a node joins or leave the cluster), the callback is called.
+The callback function is described by the following type definitions:
+
+.nf
+typedef void (*votequorum_quorum_notification_fn_t) (
+	votequorum_handle_t handle,
+	uint64_t context,
+	uint32_t quorate,
+	uint32_t node_list_entries,
+	votequorum_node_t node_list[]
+	);
+
+.fi
+
+The difference between votequorum_nodelist_notification_t and votequorum_quorum_notification_t is subtle but important.
+The 'nodelist' callback is sent at the start of a cluster state transition and contains the new ring_id and only the list of
+nodes that are included in the sync state - ie only active nodes. No quorum information is included this callback 
+because it is not available at that time.
+The 'quorum' callback is sent after the cluster state transition has completed and does contain quorum information. 
+In addition, the nodelist contains a list of all nodes known to votequorum (whether up or down) and their state as well 
+as information about the quorum device attached (if any). Quorum callbacks will not be sent for qdevice up and down
+events unless they affect quorum.
+
+.PP
+Every time the expected votes are changed, the callback is called.
+The expected votes callback function is described by the following type definitions:
+
+.nf
+typedef void (*votequorum_expectedvotes_notification_fn_t) (
+        votequorum_handle_t handle,
+        uint64_t context,
+        uint32_t expected_votes);
+.fi
+.PP
+The
+.I callbacks
+argument is of the type:
+
+.nf
+typedef struct {
+	votequorum_quorum_notification_fn_t votequorum_quorum_notify_fn;
+	votequorum_expectedvotes_notification_fn_t votequorum_expectedvotes_notify_fn;
+	votequorum_nodelist_notification_fn_t votequorum_nodelist_notify_fn;
+} votequorum_callbacks_t;
+.fi
+.PP
+When a configuration change occurs, the callback
+is called from the
+.B votequorum_dispatch()
+function.
+.PP
+.SH RETURN VALUE
+This call returns the CS_OK value if successful, otherwise an error is returned.
+.SH ERRORS
+@COMMONIPCERRORS@
+.SH "SEE ALSO"
+.BR votequorum_overview (3),
+.BR votequorum_finalize (3),
+.BR votequorum_getinfo (3),
+.BR votequorum_trackstart (3),
+.BR votequorum_trackstop (3),
+.BR votequorum_fd_get (3),
+.BR votequorum_dispatch (3),
+.BR votequorum_context_set (3),
+.BR votequorum_context_get (3),
+.BR votequorum_setexpected (3),
+.BR votequorum_setvotes (3)
+.PP
