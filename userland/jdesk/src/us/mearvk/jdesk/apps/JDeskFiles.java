@@ -2,14 +2,37 @@
  * Copyright (C) 2026 MEARVK LLC
  * Author: Maximilian Eric Alexander Rupplin von Keffikon
  *
- * JDesk Files — JavaFX File Manager.
+ * JDesk Files — JavaFX File Manager with Virtual Filesystem Support.
  *
  * A dual-pane file manager with:
- *   - Sidebar (bookmarks: Home, Documents, Downloads, /, USB)
+ *   - Sidebar (JDesk VFS, user bookmarks, native OS)
  *   - Main area (icon view or list view)
  *   - Path breadcrumb bar
  *   - File operations (copy, move, delete, rename, create)
  *   - Thumbnail previews for images
+ *
+ * Virtual Filesystem Architecture:
+ *   JDesk maintains its own internal file structure via two loop-mounted
+ *   disk images — one EXT4 (primary, journaled) and one NTFS (cross-platform
+ *   exchange). The Files app provides access to:
+ *
+ *   1. JDesk Home (/opt/jdesk/home/)  — EXT4 image, journaled, Linux-native
+ *      Desktop, Documents, Downloads, Music, Pictures, Videos, Projects
+ *      .jdesk/{settings, cache, themes, plugins}
+ *
+ *   2. JDesk Share (/opt/jdesk/share/) — NTFS image, Windows-compatible
+ *      Exchange, Transfer, Shared Documents, USB Import
+ *      Files here are readable on Windows/macOS without conversion.
+ *
+ *   3. Native OS (/)                   — Host operating system filesystem
+ *      Full access to the underlying Linux filesystem (EXT4, XFS, Btrfs)
+ *      Includes /home, /etc, /opt, /mnt, /media (USB), etc.
+ *
+ * Why both EXT4 and NTFS?
+ *   - EXT4: Optimal for Linux operations — inodes, permissions, xattrs,
+ *     hardlinks, sparse files, journaling, fast fsync
+ *   - NTFS: Cross-platform exchange — files readable on Windows, USB drives,
+ *     dual-boot systems. MFT, streams, compression-ready.
  *
  * Native backend: PCManFM-Qt or Nautilus for advanced operations.
  *
@@ -59,7 +82,9 @@ public class JDeskFiles extends BorderPane {
     private boolean showHidden = false;
 
     public JDeskFiles() {
-        this(Path.of(System.getProperty("user.home")));
+        // Default to JDesk Home (EXT4 VFS) if available, fall back to native home
+        Path jdeskHome = Path.of("/opt/jdesk/home");
+        this(Files.isDirectory(jdeskHome) ? jdeskHome : Path.of(System.getProperty("user.home")));
     }
 
     public JDeskFiles(Path startPath) {
@@ -193,7 +218,7 @@ public class JDeskFiles extends BorderPane {
 
     private VBox createSidebar() {
         VBox sidebar = new VBox(2);
-        sidebar.setPrefWidth(180);
+        sidebar.setPrefWidth(200);
         sidebar.setPadding(new Insets(8));
         sidebar.setStyle(
             "-fx-background-color: " + BG_SIDEBAR + ";" +
@@ -201,77 +226,148 @@ public class JDeskFiles extends BorderPane {
             "-fx-border-width: 0 1 0 0;"
         );
 
-        Label header = new Label("Places");
-        header.setStyle(
-            "-fx-text-fill: " + TEXT_SEC + ";" +
-            "-fx-font-size: 10px;" +
-            "-fx-font-weight: bold;" +
-            "-fx-font-family: " + FONT_UI + ";" +
-            "-fx-padding: 4 8 4 8;"
-        );
+        // === JDesk Virtual Filesystem ===
+        Label vfsHeader = sidebarHeader("JDesk");
+        sidebar.getChildren().add(vfsHeader);
 
-        sidebar.getChildren().add(header);
-
-        String home = System.getProperty("user.home");
-        addBookmark(sidebar, "🏠 Home", Path.of(home));
-        addBookmark(sidebar, "📄 Documents", Path.of(home, "Documents"));
-        addBookmark(sidebar, "⬇ Downloads", Path.of(home, "Downloads"));
-        addBookmark(sidebar, "🖼 Pictures", Path.of(home, "Pictures"));
-        addBookmark(sidebar, "🎵 Music", Path.of(home, "Music"));
-        addBookmark(sidebar, "🎬 Videos", Path.of(home, "Videos"));
+        addBookmark(sidebar, "📂 JDesk Home", Path.of("/opt/jdesk/home"),
+            "EXT4 — Internal storage (journaled, Linux-native)");
+        addBookmark(sidebar, "💾 JDesk Share", Path.of("/opt/jdesk/share"),
+            "NTFS — Cross-platform exchange (Windows-compatible)");
+        addBookmark(sidebar, "📁 JDesk Desktop", Path.of("/opt/jdesk/home/Desktop"),
+            "EXT4 — Desktop files");
+        addBookmark(sidebar, "📂 JDesk Projects", Path.of("/opt/jdesk/home/Projects"),
+            "EXT4 — Project workspace");
 
         sidebar.getChildren().add(new Separator());
 
-        Label sysHeader = new Label("System");
-        sysHeader.setStyle(
+        // === User Folders (within JDesk VFS) ===
+        Label userHeader = sidebarHeader("Folders");
+        sidebar.getChildren().add(userHeader);
+
+        addBookmark(sidebar, "📄 Documents", Path.of("/opt/jdesk/home/Documents"),
+            "EXT4 — User documents");
+        addBookmark(sidebar, "⬇ Downloads", Path.of("/opt/jdesk/home/Downloads"),
+            "EXT4 — Downloaded files");
+        addBookmark(sidebar, "🖼 Pictures", Path.of("/opt/jdesk/home/Pictures"),
+            "EXT4 — Image files");
+        addBookmark(sidebar, "🎵 Music", Path.of("/opt/jdesk/home/Music"),
+            "EXT4 — Audio files");
+        addBookmark(sidebar, "🎬 Videos", Path.of("/opt/jdesk/home/Videos"),
+            "EXT4 — Video files");
+
+        sidebar.getChildren().add(new Separator());
+
+        // === NTFS Exchange Folders ===
+        Label ntfsHeader = sidebarHeader("Share (NTFS)");
+        sidebar.getChildren().add(ntfsHeader);
+
+        addBookmark(sidebar, "🔄 Exchange", Path.of("/opt/jdesk/share/Exchange"),
+            "NTFS — Quick file exchange");
+        addBookmark(sidebar, "📤 Transfer", Path.of("/opt/jdesk/share/Transfer"),
+            "NTFS — Outbound transfers");
+        addBookmark(sidebar, "📋 Shared Docs", Path.of("/opt/jdesk/share/Shared Documents"),
+            "NTFS — Shared documents (Windows-readable)");
+        addBookmark(sidebar, "🔌 USB Import", Path.of("/opt/jdesk/share/USB Import"),
+            "NTFS — Files imported from USB drives");
+
+        sidebar.getChildren().add(new Separator());
+
+        // === Native OS Filesystem ===
+        Label nativeHeader = sidebarHeader("Native System");
+        sidebar.getChildren().add(nativeHeader);
+
+        String home = System.getProperty("user.home");
+        addBookmark(sidebar, "🏠 Home (" + Path.of(home).getFileName() + ")", Path.of(home),
+            "Native OS — User home directory");
+        addBookmark(sidebar, "💻 Computer (/)", Path.of("/"),
+            "Native OS — Root filesystem (EXT4/XFS/Btrfs)");
+        addBookmark(sidebar, "📦 /opt", Path.of("/opt"),
+            "Native OS — Optional software");
+        addBookmark(sidebar, "💿 /media", Path.of("/media"),
+            "Native OS — Removable media (USB, CD-ROM)");
+        addBookmark(sidebar, "📌 /mnt", Path.of("/mnt"),
+            "Native OS — Manual mount points");
+        addBookmark(sidebar, "🗑 Trash", Path.of(home, ".local/share/Trash/files"),
+            "Native OS — Deleted files");
+
+        sidebar.getChildren().add(new Separator());
+
+        // === VFS Info ===
+        Label infoLabel = new Label(
+            "  EXT4: /opt/jdesk/home (2 GB)\n" +
+            "  NTFS: /opt/jdesk/share (1 GB)"
+        );
+        infoLabel.setStyle(
+            "-fx-text-fill: " + TEXT_SEC + ";" +
+            "-fx-font-size: 9px;" +
+            "-fx-font-family: " + FONT_UI + ";" +
+            "-fx-padding: 8 4 4 4;"
+        );
+        sidebar.getChildren().add(infoLabel);
+
+        // Wrap in scroll pane for small screens
+        ScrollPane scroll = new ScrollPane(sidebar);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background: " + BG_SIDEBAR + "; -fx-border-width: 0;");
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+
+        // We return a VBox wrapping the scroll pane
+        VBox container = new VBox(scroll);
+        container.setPrefWidth(200);
+        container.setStyle("-fx-background-color: " + BG_SIDEBAR + ";");
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        return container;
+    }
+
+    private Label sidebarHeader(String text) {
+        Label header = new Label(text);
+        header.setStyle(
             "-fx-text-fill: " + TEXT_SEC + ";" +
             "-fx-font-size: 10px;" +
             "-fx-font-weight: bold;" +
             "-fx-font-family: " + FONT_UI + ";" +
             "-fx-padding: 8 8 4 8;"
         );
-        sidebar.getChildren().add(sysHeader);
-
-        addBookmark(sidebar, "💻 Computer", Path.of("/"));
-        addBookmark(sidebar, "📦 /opt", Path.of("/opt"));
-        addBookmark(sidebar, "🗑 Trash", Path.of(home, ".local/share/Trash/files"));
-
-        return sidebar;
+        return header;
     }
 
-    private void addBookmark(VBox sidebar, String label, Path path) {
+    private void addBookmark(VBox sidebar, String label, Path path, String tooltip) {
         Button btn = new Button(label);
         btn.setMaxWidth(Double.MAX_VALUE);
         btn.setAlignment(Pos.CENTER_LEFT);
+        btn.setTooltip(new Tooltip(tooltip));
         btn.setStyle(
             "-fx-background-color: transparent;" +
             "-fx-text-fill: " + TEXT_PRI + ";" +
-            "-fx-font-size: 12px;" +
+            "-fx-font-size: 11px;" +
             "-fx-font-family: " + FONT_UI + ";" +
-            "-fx-padding: 5 8 5 8;" +
+            "-fx-padding: 4 8 4 8;" +
             "-fx-background-radius: 6;" +
             "-fx-cursor: hand;"
         );
         btn.setOnMouseEntered(e -> btn.setStyle(
             "-fx-background-color: " + HOVER_BG + ";" +
             "-fx-text-fill: " + ACCENT + ";" +
-            "-fx-font-size: 12px;" +
+            "-fx-font-size: 11px;" +
             "-fx-font-family: " + FONT_UI + ";" +
-            "-fx-padding: 5 8 5 8;" +
+            "-fx-padding: 4 8 4 8;" +
             "-fx-background-radius: 6;" +
             "-fx-cursor: hand;"
         ));
         btn.setOnMouseExited(e -> btn.setStyle(
             "-fx-background-color: transparent;" +
             "-fx-text-fill: " + TEXT_PRI + ";" +
-            "-fx-font-size: 12px;" +
+            "-fx-font-size: 11px;" +
             "-fx-font-family: " + FONT_UI + ";" +
-            "-fx-padding: 5 8 5 8;" +
+            "-fx-padding: 4 8 4 8;" +
             "-fx-background-radius: 6;" +
             "-fx-cursor: hand;"
         ));
         btn.setOnAction(e -> {
             if (Files.isDirectory(path)) navigateTo(path);
+            else statusLabel.setText("Directory not available: " + path +
+                " (run jdesk-vfs-setup.sh to create VFS)");
         });
         sidebar.getChildren().add(btn);
     }

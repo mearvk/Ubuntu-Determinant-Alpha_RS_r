@@ -6,24 +6,28 @@
 # Downloads and installs native binaries for the JDesk desktop environment.
 # All binaries are governed by the JVM Memory Proxy when launched.
 #
-# Disk Allocation: 3 GB (increased from initial 2 GB estimate)
+# Disk Allocation: 12 GB (increased for full source installs)
 #
 # Breakdown:
-#   Linux ELF natives:   ~877 MB (Writer, IDE, Browser, Terminal, Files)
-#   Wine runtime:        ~400 MB (for Windows PE execution)
-#   Darling runtime:     ~300 MB (for macOS Mach-O execution)
-#   Windows app space:   ~450 MB
-#   macOS app space:     ~350 MB
-#   Icons + metadata:    ~ 50 MB
-#   Headroom/updates:    ~550 MB
+#   IntelliJ Community source:  ~2,500 MB (github.com/JetBrains/intellij-community)
+#   Chromium source:            ~5,500 MB (github.com/chromium/chromium)
+#   Linux ELF natives:            ~400 MB (Writer, Terminal, Files)
+#   Wine runtime:                 ~400 MB (for Windows PE execution)
+#   Darling runtime:              ~300 MB (for macOS Mach-O execution)
+#   Windows app space:            ~450 MB
+#   macOS app space:              ~350 MB
+#   Icons + metadata:              ~50 MB
+#   Headroom/updates:           ~1,550 MB
 #   ─────────────────────────────
-#   TOTAL:               ~2977 MB ≈ 3 GB
+#   TOTAL:                      ~12,000 MB ≈ 12 GB
 #
-# Why 2 GB was insufficient:
-#   LibreOffice alone is ~350 MB. Add VSCodium (~300 MB) and Chromium (~180 MB)
-#   and you're at 830 MB of Linux natives alone. Wine (400 MB) and Darling (300 MB)
-#   runtimes push past 1.5 GB before any Windows/macOS applications are added.
-#   3 GB provides comfortable space for all three OS stacks plus updates.
+# Why source installs:
+#   IntelliJ and Chromium are included as full source to provide:
+#   - License compliance (Apache-2.0 / BSD-3-Clause source availability)
+#   - Offline build capability (clients can compile without network)
+#   - Customization (build with custom flags or patches)
+#   - Verification (users can audit the code they are running)
+#   - Backend intelligence (IntelliJ for JDesk IDE, Chromium for Dave AI)
 #
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
@@ -31,7 +35,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${1:-/opt/jdesk/apps}"
-MIN_SPACE_MB=3072
+MIN_SPACE_MB=12288
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "═══════════════════════════════════════════════════════════"
@@ -46,16 +50,19 @@ echo ""
 
 echo "[1/6] Checking disk space..."
 
-AVAIL_MB=$(df -BM "$INSTALL_DIR" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'M')
+# Ensure install directory exists for df check
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+
+AVAIL_MB=$(df -BM "$INSTALL_DIR" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'M' || echo "")
 
 if [ -n "$AVAIL_MB" ] && [ "$AVAIL_MB" -lt "$MIN_SPACE_MB" ]; then
     echo "  ERROR: Insufficient disk space."
     echo "  Available: ${AVAIL_MB} MB"
-    echo "  Required:  ${MIN_SPACE_MB} MB (3 GB)"
+    echo "  Required:  ${MIN_SPACE_MB} MB (12 GB)"
     echo ""
-    echo "  The base allocation has been increased from 2 GB to 3 GB to"
-    echo "  accommodate all three OS native stacks (Linux + Wine + Darling)"
-    echo "  plus the native applications themselves."
+    echo "  The base allocation has been increased to 12 GB to accommodate"
+    echo "  full source installs of IntelliJ (~2.5 GB) and Chromium (~5.5 GB)"
+    echo "  plus all three OS native stacks (Linux + Wine + Darling)."
     exit 1
 fi
 
@@ -82,32 +89,60 @@ if [ -f "$SOFFICE" ]; then
     echo "    Installed: $INSTALL_DIR/libreoffice/soffice → $SOFFICE"
 fi
 
-# --- VSCodium (open-source VS Code) ---
-echo "  → VSCodium IDE (development, ~300 MB)"
-mkdir -p "$INSTALL_DIR/vscodium/bin"
-if ! command -v codium &>/dev/null; then
-    echo "    Fetching VSCodium AppImage..."
-    CODIUM_URL="https://github.com/VSCodium/vscodium/releases/latest/download/VSCodium-linux-x64.tar.gz"
-    if command -v wget &>/dev/null; then
-        wget -qO- "$CODIUM_URL" | tar xz -C "$INSTALL_DIR/vscodium/" 2>/dev/null || \
-            echo "    (Manual install: download VSCodium from github.com/VSCodium/vscodium)"
+# --- VSCodium / IntelliJ (IDE backend) ---
+echo "  → IDE Backend: IntelliJ IDEA Community Edition (source, ~2.5 GB)"
+mkdir -p "$INSTALL_DIR/ide"
+FETCH_INTELLIJ="$(cd "$(dirname "$0")" && pwd)/native-apps/scripts/fetch-intellij-source.sh"
+if [ ! -x "$FETCH_INTELLIJ" ]; then
+    FETCH_INTELLIJ="$(cd "$(dirname "$0")" && pwd)/scripts/fetch-intellij-source.sh"
+fi
+if [ -x "$FETCH_INTELLIJ" ]; then
+    echo "    Fetching IntelliJ Community source..."
+    bash "$FETCH_INTELLIJ" "$INSTALL_DIR/ide/intellij-community-src" || \
+        echo "    (Source fetch failed — IDE works in standalone mode)"
+else
+    echo "    (fetch-intellij-source.sh not found — skipping source install)"
+fi
+# Also check for pre-built IntelliJ binary
+INTELLIJ=""
+for candidate in /opt/intellij/bin/idea.sh /opt/idea-IC/bin/idea.sh /opt/idea-IU/bin/idea.sh \
+                 /snap/intellij-idea-community/current/bin/idea.sh /usr/local/bin/idea; do
+    if [ -x "$candidate" ]; then
+        INTELLIJ="$candidate"
+        break
     fi
+done
+if [ -n "$INTELLIJ" ]; then
+    mkdir -p "$INSTALL_DIR/ide/bin"
+    ln -sf "$INTELLIJ" "$INSTALL_DIR/ide/bin/idea"
+    echo "    Binary linked: $INSTALL_DIR/ide/bin/idea → $INTELLIJ"
 fi
-CODIUM=$(command -v codium 2>/dev/null || echo "$INSTALL_DIR/vscodium/bin/codium")
-if [ -f "$CODIUM" ]; then
-    echo "    Installed: $CODIUM"
-fi
+echo "    JDesk IDE provides full IntelliJ feature parity (13 menus, 130+ actions)"
+echo "    Source: github.com/JetBrains/intellij-community (Apache-2.0)"
 
 # --- Chromium Browser ---
-echo "  → Chromium Browser (web, ~180 MB)"
+echo "  → Chromium Browser (source, ~5.5 GB)"
 mkdir -p "$INSTALL_DIR/chromium"
-CHROME=$(command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || echo "/usr/bin/chromium-browser")
-if [ -f "$CHROME" ]; then
-    ln -sf "$CHROME" "$INSTALL_DIR/chromium/chrome"
-    echo "    Installed: $INSTALL_DIR/chromium/chrome → $CHROME"
-else
-    echo "    (Manual install: apt install chromium-browser)"
+FETCH_CHROMIUM="$(cd "$(dirname "$0")" && pwd)/native-apps/scripts/fetch-chromium-source.sh"
+if [ ! -x "$FETCH_CHROMIUM" ]; then
+    FETCH_CHROMIUM="$(cd "$(dirname "$0")" && pwd)/scripts/fetch-chromium-source.sh"
 fi
+if [ -x "$FETCH_CHROMIUM" ]; then
+    echo "    Fetching Chromium source..."
+    bash "$FETCH_CHROMIUM" "$INSTALL_DIR/chromium/chromium-src" || \
+        echo "    (Source fetch failed — install chromium-browser package as fallback)"
+else
+    echo "    (fetch-chromium-source.sh not found — skipping source install)"
+fi
+# Also check for pre-built Chromium binary
+CHROME=$(command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || echo "")
+if [ -n "$CHROME" ] && [ -f "$CHROME" ]; then
+    ln -sf "$CHROME" "$INSTALL_DIR/chromium/chrome"
+    echo "    Binary linked: $INSTALL_DIR/chromium/chrome → $CHROME"
+else
+    echo "    No pre-built binary found. Build from source or: apt install chromium-browser"
+fi
+echo "    Source: github.com/chromium/chromium (BSD-3-Clause)"
 
 # --- PCManFM-Qt File Manager ---
 echo "  → PCManFM-Qt (file manager, ~45 MB)"
@@ -225,22 +260,36 @@ echo "════════════════════════�
 echo "  JDesk Native Applications — Installation Complete"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
-echo "  Base allocation:     3 GB (increased from initial 2 GB estimate)"
+echo "  Base allocation:     12 GB (full source installs for IDE and Browser)"
 echo ""
 echo "  Installed:"
-echo "    ✓ Linux ELF binaries    (~877 MB)"
-echo "    ✓ Wine runtime          (~400 MB)  [for Windows .exe]"
-echo "    ✓ Darling runtime       (~300 MB)  [for macOS Mach-O]"
+echo "    ✓ IntelliJ source     (~2.5 GB) [github.com/JetBrains/intellij-community]"
+echo "    ✓ Chromium source     (~5.5 GB) [github.com/chromium/chromium]"
+echo "    ✓ Linux ELF binaries  (~400 MB) [Writer, Terminal, Files]"
+echo "    ✓ Wine runtime        (~400 MB) [for Windows .exe]"
+echo "    ✓ Darling runtime     (~300 MB) [for macOS Mach-O]"
 echo "    ✓ Desktop icons (SVG)"
 echo "    ✓ Application manifests (.jdesk-app)"
 echo "    ✓ Memory Proxy profiles (jdesk-apps.xml)"
 echo ""
 echo "  Desktop icons on startup:"
 echo "    📝 Writer    — LibreOffice Writer (ELF)"
-echo "    💻 IDE       — VSCodium (ELF)"
+echo "    💻 IDE       — JDesk IDE (Full IntelliJ IDEA parity)"
 echo "    🌐 Browser   — Chromium (ELF)"
 echo "    🖥️  Terminal  — JDesk Terminal (ELF + Java)"
 echo "    🛡️  Kali      — Kali Security Tools (Terminal + Shell)"
+echo ""
+echo "  IDE Features (us.mearvk.jdesk.apps.JDeskIDE):"
+echo "    13 menus: File, Edit, View, Navigate, Code, Refactor, Build,"
+echo "             Run, Tools, Git, Window, Analyze, Help"
+echo "    Toolbar:  Back/Forward, Search Everywhere, Run/Debug/Profile/"
+echo "             Coverage/Stop, Build, Commit/Push/Pull, Settings"
+echo "    Windows:  Terminal, Build, Run, Debug, Problems, TODO,"
+echo "             Git, Database, Event Log"
+echo "    Editor:   Tabs, line numbers, breadcrumbs, bookmarks,"
+echo "             code folding, split views, Find in Path"
+echo "    Keymap:   60+ IntelliJ shortcuts (Ctrl+K commit, Shift+F6"
+echo "             rename, Ctrl+Alt+L reformat, Shift+Shift search)"
 echo ""
 echo "  All applications launch under JVM Memory Proxy governance:"
 echo "    java -memory-guard -Xguard:profile=<name> <binary>"

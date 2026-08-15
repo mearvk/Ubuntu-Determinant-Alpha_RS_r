@@ -62,6 +62,7 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 33. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
 34. [Secure JVM: INT Loading Structure](#secure-jvm-int-loading-structure)
 35. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
+36. [Arena Pool — Hierarchical Memory Allocation](#arena-pool--hierarchical-memory-allocation)
 
 ---
 
@@ -2826,6 +2827,153 @@ tools/pcopy/Makefile           - Build/install (produces pcopy + pmove symlink)
 
 ---
 
+## Arena Pool — Hierarchical Memory Allocation
+
+Per-process 300 MB arena with binary halving cascade and logarithmic decay tiers. Provides safe `arena_malloc()`/`arena_free()` from a pre-mapped virtual address space with guard pages, canary words, and double-free detection.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         ARENA: 300 MB                            │
+│                                                                 │
+│  ┌──────────────────────────┬────────────────┬────┬───┬──┬─┐   │
+│  │  Tier 1: 150 MB          │ Tier 2: 75 MB  │ T3 │T4 │T5│…│   │
+│  │  (primary hot)           │ (overflow)     │50M │33M│22│…│   │
+│  │                          │                │    │   │  │ │   │
+│  │  Allocations land here   │ Spill at 80%   │ Logarithmic  │   │
+│  │  first (via priority)    │ occupancy      │ decay (2/3)  │   │
+│  └──────────────────────────┴────────────────┴────┴───┴──┴─┘   │
+│       ▲                            ▲              ▲             │
+│       │ Guard page (4 KB)          │              │             │
+│       └────────────────────────────┘──────────────┘             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Tier Table (Logarithmic Decay: base 2/3)
+
+| Tier | Size (MB) | Cumulative | Role |
+|------|-----------|-----------|------|
+| 1 | 150.000 | 150 MB | Primary hot working set |
+| 2 | 75.000 | 225 MB | Warm overflow (spill at 80%) |
+| 3 | 50.000 | 275 MB | Soft target 1 |
+| 4 | 33.333 | 308 MB* | Soft target 2 |
+| 5 | 22.222 | 330 MB* | Virtual (USB-backed) |
+| 6 | 14.815 | 345 MB* | Decay brush |
+| 7 | 9.877 | 355 MB* | Savings tail |
+| 8 | 6.584 | 362 MB* | Savings tail |
+
+*Tiers beyond 300 MB are virtual — backed by USB swap or secondary mmap.
+
+### Allocation Priority: (4, 3, 1, 2) → Soft → (5, 6, ...)
+
+```
+Request arrives
+    │
+    ├── Try Tier 4 (33 MB) — smallest, most aggressively reused
+    ├── Try Tier 3 (50 MB) — second choice
+    ├── Try Tier 1 (150 MB) — fallback to primary
+    ├── Try Tier 2 (75 MB) — last resort before soft concern
+    │
+    ▼ (all full)
+SOFT CONCERN MODE:
+    • Log pressure event
+    • Trigger compaction pass
+    • Try Tier 5, 6, 7, ... (decay tiers)
+    • If still unsatisfied → extend arena (USB backing)
+```
+
+### Front-Load (Zero-Fault Startup)
+
+New processes receive 1/8 of the arena (37.5 MB) pre-faulted:
+- All pages touched at creation → TLB warm, no page faults
+- CPU Boost designated processes always get pre-faulted upfront
+- After upfront consumed, growth follows: (2, 3, 1, 2) sequence
+
+### Safety Guarantees
+
+| Protection | Mechanism |
+|-----------|-----------|
+| Bounds checking | Every pointer validated: A₀ ≤ ptr < A₀ + arena_size |
+| Guard pages | 4 KB PROT_NONE between tier regions (SIGSEGV on overflow) |
+| Canary words | 8-byte sentinel before (0xDEADC0DEBEEFCAFE) and after allocation |
+| Double-free | Block header state flag (ALLOCATED / FREE) checked before free |
+| Thread safety | Spinlock on allocation path, per-tier free lists |
+| Grid alignment | Cache-line aligned (64 bytes) — satisfies Integrity Guardian 1:1/1:2 |
+
+### Savings Brush
+
+Tiers with < 50% occupancy contribute to "savings" — memory that can be:
+1. Released to kernel via `madvise(MADV_DONTNEED)`
+2. Offered to USB swap prefetch
+3. Reported to Dave as available headroom
+
+Brush threshold: `⌈log₃/₂(active_tiers)⌉` — engages at tier 5+.
+
+### Module Parameters
+
+```bash
+modprobe arena_pool default_arena_mb=300 max_arenas=256
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `default_arena_mb` | 300 | Arena size per process (16–4096 MB) |
+| `max_arenas` | 256 | Maximum concurrent arenas system-wide |
+
+### Usage
+
+```bash
+# Load the module
+modprobe arena_pool
+
+# View status
+cat /proc/arena_pool/status
+
+# Processes auto-enrolled via JVM Memory Proxy:
+java -memory-guard -Xguard:arena=300m ./myprogram.bin
+```
+
+### Integration
+
+| Component | How It Uses Arena Pool |
+|-----------|-----------------------|
+| JVM Memory Proxy | Configurable via `-Xguard:arena=SIZE`; native child processes allocated from arena |
+| USB Dynamic RAM | Decay tiers 5+ spill to USB swap (priority -5) when physical RAM full |
+| Per-User Kernel Objects | Each user_ko gets a scaled arena (Grain 1: 4 MB, Grain 3: 64 MB) |
+| CPU Boost | Boosted processes get pre-faulted upfront at fork time |
+| Dave | Monitors tier occupancy, predicts pressure 30s ahead, suggests compaction |
+| Integrity Guardian | Verifies allocations remain 1:1 or 1:2 grid-aligned within each tier |
+
+### Mathematical Summary
+
+```
+Arena:           A = 300 MB
+Primary:         P = A/2 = 150 MB
+Overflow:        O = A/4 = 75 MB
+Decay(n):        D(n) = O × (2/3)^(n-2),  n ≥ 3
+Convergence:     Σ D(n) for n=3..∞ = 150 MB
+Total capacity:  A + virtual extension = 375 MB theoretical
+Front-load:      F = A/8 = 37.5 MB
+Brush threshold: B = ⌈log₃/₂(N)⌉
+Priority order:  (4, 3, 1, 2) → soft → (5, 6, 7, ...) → extend
+```
+
+### Files
+
+```
+mm/arena_pool.h                    - Internal header (structures, constants)
+mm/arena_pool.c                    - Kernel module (~450 lines)
+mm/Kconfig                         - CONFIG_ARENA_POOL
+mm/Makefile                        - Build entry
+include/linux/arena_pool.h         - Public API header
+TECH.md                            - Full mathematical specification
+```
+
+Admin: `/proc/arena_pool/status`
+
+---
+
 ## Build Configuration
 
 Enable all extensions in your kernel `.config`:
@@ -2839,6 +2987,7 @@ CONFIG_USB_FAST_DMA=m
 CONFIG_NEGAMANE=m
 CONFIG_PCOPY=m
 CONFIG_PMOVE=m
+CONFIG_ARENA_POOL=m
 ```
 
 ## Security & Architectural Promise (JSON Sketch)

@@ -903,4 +903,31 @@ config SECRETMEM
 
 source "mm/damon/Kconfig"
 
+config ARENA_POOL
+	tristate "Hierarchical Pool Allocation with Logarithmic Decay"
+	default m
+	help
+	  Per-process arena allocator with binary halving cascade and
+	  logarithmic decay tiers. Provides a 300 MB contiguous arena
+	  (configurable) with safe malloc/free, guard pages, canary
+	  words, and double-free detection.
+
+	  Architecture:
+	    Level 1: 150 MB primary (hot working set)
+	    Level 2:  75 MB overflow (spill at 80% occupancy)
+	    Level 3+: 75 × (2/3)^(n-2) logarithmic decay
+
+	  Priority ordering: (4, 3, 1, 2) → soft concern → extend
+	  Front-load: 1/8 arena pre-faulted for zero-fault startup
+
+	  Integrates with:
+	    - JVM Memory Proxy (-Xguard:arena=SIZE)
+	    - USB Dynamic RAM (decay tiers 5+ backing)
+	    - CPU Boost (pre-faulted upfront at fork)
+	    - Integrity Guardian (1:1 / 1:2 grid alignment)
+
+	  Monitor via: /proc/arena_pool/status
+
+	  If unsure, say M.
+
 endmenu

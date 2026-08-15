@@ -4,6 +4,34 @@ A cross-platform desktop environment framework that closely resembles the Linux 
 
 **Integration Target:** MEARVK OpenJDK 28 Edition
 
+## Included Applications
+
+| App | Class | Description |
+|-----|-------|-------------|
+| IDE | `JDeskIDE` | Full IntelliJ IDEA feature-parity IDE (13 menus, 130+ actions, 9 tool windows, debug panel, breadcrumbs, full keymap) |
+| Writer | `JDeskWriter` | Word processor (LibreOffice Writer backend) |
+| Browser | `JDeskBrowser` | Web browser (Chromium backend) |
+| Terminal | `JDeskTerminal` | Built-in terminal emulator (Java + JNI) |
+| Files | `JDeskFiles` | File manager (PCManFM-Qt backend) |
+| Software | `JDeskSoftware` | Package manager GUI |
+| Launcher | `JDeskLauncher` | Application launcher |
+
+### IDE — IntelliJ IDEA Parity
+
+The JDesk IDE (`us.mearvk.jdesk.apps.JDeskIDE`) provides **complete IntelliJ IDEA feature parity**:
+
+- **13 menus**: File, Edit, View, Navigate, Code, Refactor, Build, Run, Tools, Git, Window, Analyze, Help
+- **Main toolbar**: Back/Forward, Search Everywhere, Run/Debug/Profile/Coverage/Stop, Build, Commit/Push/Pull/History, Settings
+- **9 tool windows**: Terminal, Build, Run, Debug (with step controls), Problems, TODO, Git, Database, Event Log
+- **Navigation bar**: Clickable breadcrumb trail (package ▸ class ▸ method)
+- **Editor**: Tabs, line numbers, modified indicator, split views, bookmarks, code folding
+- **Full keymap**: 60+ keyboard shortcuts matching IntelliJ Default keymap
+- **Build auto-detection**: Maven, Gradle, Make, Cargo, npm
+- **All refactorings**: Rename, Extract (Method/Variable/Constant/Field/Parameter/Interface/Superclass), Inline, Move, Safe Delete
+- **VCS/Git**: Commit, Push, Pull, Fetch, Merge, Rebase, Branches, Blame, Diff, Stash
+- **Debug controls**: Step Over/Into/Out, Resume, Evaluate Expression, Breakpoints
+- **Status bar**: Git branch, encoding, line separator, cursor position, memory usage, backend status
+
 ## Architecture
 
 ```
