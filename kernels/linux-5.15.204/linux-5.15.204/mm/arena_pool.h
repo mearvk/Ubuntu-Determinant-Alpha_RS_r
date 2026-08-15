@@ -138,6 +138,7 @@ struct arena_pool {
     u32                     soft_concern_count;
     pid_t                   pid;
     u32                     flags;
+    struct arena_intensity  intensity;  /* Falling decay intensification tracking */
 };
 
 /* Arena flags */
@@ -145,6 +146,113 @@ struct arena_pool {
 #define ARENA_F_USB_BACKED  0x02   /* Decay tiers 5+ backed by USB swap */
 #define ARENA_F_FRONTLOADED 0x04   /* 1/8 upfront region has been committed */
 #define ARENA_F_COMPACT_REQ 0x08   /* Compaction requested (GC hint) */
+#define ARENA_F_INTENSIFIED 0x10   /* Process is currently in intensification concern */
+#define ARENA_F_THROTTLED   0x20   /* Process under intensification throttle */
+
+/* =========================================================================
+ * Intensification Concern — Falling Decay Memory (Clear-in-3)
+ * =========================================================================
+ *
+ * Tracks processes that drive further intensification — repeated allocation
+ * pressure, tier exhaustion, or soft concern escalation beyond normal use.
+ *
+ * Mechanism:
+ *   Each intensification event increments an "intensity score" (0–255).
+ *   Every monitoring interval (configurable, default 10s), the score decays
+ *   by the falling decay constant (score = score × 2/3, integer division).
+ *
+ *   Clear-in-3 property:
+ *     After the last intensification event, the score reaches zero within
+ *     3 decay intervals if no further intensification occurs:
+ *       Interval 0: score = N
+ *       Interval 1: score = N × 2/3
+ *       Interval 2: score = N × 4/9
+ *       Interval 3: score = N × 8/27 (≈ 0.296 × N)
+ *     For typical scores (N ≤ 10), this reaches 0 in 3 integer-decay steps:
+ *       10 → 6 → 4 → 2 → (effectively cleared at threshold)
+ *     The concern threshold is 3 — below 3, the process is considered clear.
+ *
+ *   Scaled response:
+ *     - Score  0-2:  CLEAR — normal allocation, no concern
+ *     - Score  3-7:  WATCH — allocations logged, soft priority reduction
+ *     - Score  8-15: CONCERN — new allocations from lower-priority tiers only
+ *     - Score 16-31: THROTTLE — allocations rate-limited (yield between calls)
+ *     - Score 32+:   RESTRICT — hard deny from primary tiers, decay-only service
+ *
+ *   Intensification triggers:
+ *     +1 per soft concern event
+ *     +2 per tier exhaustion in priority order
+ *     +3 per hard denial (all tiers full)
+ *     +5 per fork/exec that inherits parent's high-pressure pool
+ *
+ *   The system is proportional: a process that briefly bursts and then
+ *   goes quiet clears in 30 seconds (3 × 10s intervals). A process that
+ *   continuously drives pressure accumulates and faces scaled restriction.
+ */
+
+#define ARENA_INTENSITY_CLEAR       0
+#define ARENA_INTENSITY_WATCH       3
+#define ARENA_INTENSITY_CONCERN     8
+#define ARENA_INTENSITY_THROTTLE    16
+#define ARENA_INTENSITY_RESTRICT    32
+#define ARENA_INTENSITY_MAX         255
+
+/* Decay: score = score × 2/3 per interval (same constants as tier decay) */
+#define ARENA_INTENSITY_DECAY_NUM   2
+#define ARENA_INTENSITY_DECAY_DEN   3
+
+/* Clear threshold: below this, the process is considered fully clear */
+#define ARENA_INTENSITY_CLEAR_THRESHOLD  3
+
+/* Default monitoring interval in seconds */
+#define ARENA_INTENSITY_INTERVAL_S  10
+
+/* Increment weights for intensification triggers */
+#define ARENA_INTENSITY_SOFT_CONCERN   1
+#define ARENA_INTENSITY_TIER_EXHAUST   2
+#define ARENA_INTENSITY_HARD_DENY      3
+#define ARENA_INTENSITY_FORK_PRESSURE  5
+
+/**
+ * enum arena_intensity_level - Current intensification level
+ */
+#ifndef _ARENA_INTENSITY_LEVEL_DEFINED
+#define _ARENA_INTENSITY_LEVEL_DEFINED
+enum arena_intensity_level {
+    ARENA_LEVEL_CLEAR    = 0,   /* No concern, normal service */
+    ARENA_LEVEL_WATCH    = 1,   /* Logged, soft priority reduction */
+    ARENA_LEVEL_CONCERN  = 2,   /* Lower-priority tier service only */
+    ARENA_LEVEL_THROTTLE = 3,   /* Rate-limited allocations */
+    ARENA_LEVEL_RESTRICT = 4,   /* Hard deny from primary, decay-only */
+};
+#endif
+
+/**
+ * struct arena_intensity - Per-arena intensification tracking
+ * @score:           Current intensity score (0-255, decays × 2/3 per interval)
+ * @level:           Derived level from score thresholds
+ * @peak_score:      Highest score reached (lifetime diagnostic)
+ * @events_total:    Total intensification events (lifetime)
+ * @last_event_jiffies: Jiffies of most recent intensification event
+ * @last_decay_jiffies: Jiffies of most recent decay pass
+ * @decay_count:     Number of decay passes applied since last event
+ * @clear_count:     Number of times the process has cleared from concern
+ * @throttle_count:  Number of allocations delayed due to throttle
+ * @restricted_count: Number of allocations denied due to restrict
+ */
+struct arena_intensity {
+    u8                      score;
+    u8                      level;
+    u8                      peak_score;
+    u8                      _reserved;
+    u32                     events_total;
+    unsigned long           last_event_jiffies;
+    unsigned long           last_decay_jiffies;
+    u32                     decay_count;
+    u32                     clear_count;
+    u32                     throttle_count;
+    u32                     restricted_count;
+};
 
 /* =========================================================================
  * API
@@ -246,5 +354,50 @@ void arena_frontload(struct arena_pool *pool);
  * Returns size in bytes according to the halving cascade + logarithmic decay.
  */
 size_t arena_tier_size(unsigned int arena_mb, unsigned int tier);
+
+/* =========================================================================
+ * Intensification API
+ * ========================================================================= */
+
+/**
+ * arena_intensity_event - Record an intensification event
+ * @pool:    Arena pool
+ * @weight:  Event weight (ARENA_INTENSITY_SOFT_CONCERN, etc.)
+ *
+ * Increments intensity score, updates level. Called internally when
+ * allocation pressure is detected.
+ */
+void arena_intensity_event(struct arena_pool *pool, u8 weight);
+
+/**
+ * arena_intensity_decay - Apply one falling decay step (score × 2/3)
+ * @pool:  Arena pool
+ *
+ * Called by monitoring timer every ARENA_INTENSITY_INTERVAL_S seconds.
+ * Clears the process from concern if score falls below threshold.
+ * Property: clears in 3 intervals if no further intensification.
+ */
+void arena_intensity_decay(struct arena_pool *pool);
+
+/**
+ * arena_intensity_level - Return the current intensification level
+ * @pool:  Arena pool
+ *
+ * Returns: enum arena_intensity_level (CLEAR, WATCH, CONCERN, THROTTLE, RESTRICT)
+ */
+enum arena_intensity_level arena_intensity_get_level(struct arena_pool *pool);
+
+/**
+ * arena_intensity_check_alloc - Gate allocation based on intensity level
+ * @pool:  Arena pool
+ * @size:  Requested allocation size
+ *
+ * Returns:
+ *   0    — proceed normally
+ *   1    — proceed but from lower-priority tiers only (CONCERN)
+ *   2    — yield first, then proceed from lower tiers (THROTTLE)
+ *   -1   — deny allocation entirely (RESTRICT)
+ */
+int arena_intensity_check_alloc(struct arena_pool *pool, size_t size);
 
 #endif /* _LINUX_ARENA_POOL_H */

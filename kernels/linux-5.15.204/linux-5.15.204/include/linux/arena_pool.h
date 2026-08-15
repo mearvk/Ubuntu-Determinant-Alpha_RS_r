@@ -17,12 +17,26 @@
 
 #include <linux/types.h>
 
-/* Forward declaration */
+/* Forward declarations */
 struct arena_pool;
 
 /* Arena creation flags */
 #define ARENA_F_BOOSTED     0x01   /* Pre-fault upfront region at creation */
 #define ARENA_F_USB_BACKED  0x02   /* Decay tiers 5+ backed by USB swap */
+#define ARENA_F_INTENSIFIED 0x10   /* Process in intensification concern */
+#define ARENA_F_THROTTLED   0x20   /* Process under intensification throttle */
+
+/* Intensification levels */
+#ifndef _ARENA_INTENSITY_LEVEL_DEFINED
+#define _ARENA_INTENSITY_LEVEL_DEFINED
+enum arena_intensity_level {
+    ARENA_LEVEL_CLEAR    = 0,   /* No concern, normal service */
+    ARENA_LEVEL_WATCH    = 1,   /* Logged, soft priority reduction */
+    ARENA_LEVEL_CONCERN  = 2,   /* Lower-priority tier service only */
+    ARENA_LEVEL_THROTTLE = 3,   /* Rate-limited allocations */
+    ARENA_LEVEL_RESTRICT = 4,   /* Hard deny from primary, decay-only */
+};
+#endif
 
 /* Create/Destroy */
 struct arena_pool *arena_pool_create(unsigned int size_mb, u32 flags);
@@ -36,6 +50,12 @@ void *arena_realloc(struct arena_pool *pool, void *ptr, size_t new_size);
 /* Maintenance */
 void arena_compact(struct arena_pool *pool);
 void arena_frontload(struct arena_pool *pool);
+
+/* Intensification Concern */
+void arena_intensity_event(struct arena_pool *pool, u8 weight);
+void arena_intensity_decay(struct arena_pool *pool);
+enum arena_intensity_level arena_intensity_get_level(struct arena_pool *pool);
+int arena_intensity_check_alloc(struct arena_pool *pool, size_t size);
 
 /* Status */
 void arena_get_status(struct arena_pool *pool,

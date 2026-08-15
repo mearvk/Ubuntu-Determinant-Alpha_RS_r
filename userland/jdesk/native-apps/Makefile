@@ -165,13 +165,18 @@ install-provisioner:
 	@cp -r icons/ /opt/jdesk/native-apps/icons/
 	@cp -r manifests/ /opt/jdesk/native-apps/manifests/
 	@cp -r profiles/ /opt/jdesk/native-apps/profiles/
+	@cp scripts/predictive-install.sh /opt/jdesk/native-apps/predictive-install.sh
+	@chmod +x /opt/jdesk/native-apps/predictive-install.sh
 	@cp jdesk-provision.service /etc/systemd/system/jdesk-provision.service
 	@systemctl daemon-reload
 	@systemctl enable jdesk-provision.service
 	@ln -sf /opt/jdesk/native-apps/jdesk-provision /usr/local/sbin/jdesk-provision
+	@ln -sf /opt/jdesk/native-apps/predictive-install.sh /usr/local/sbin/jdesk-predictive-install
 	@echo "[JDesk] Provisioner installed. Will run at first boot."
-	@echo "  Manual run: sudo jdesk-provision"
-	@echo "  Status:     sudo jdesk-provision --status"
+	@echo "  Standard:    sudo jdesk-provision"
+	@echo "  Predictive:  sudo jdesk-predictive-install"
+	@echo "  Check:       sudo jdesk-predictive-install --check"
+	@echo "  Plan:        sudo jdesk-predictive-install --plan"
 
 install: install-provisioner install-icons install-manifests install-profiles
 	@echo ""

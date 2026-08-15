@@ -134,6 +134,7 @@ struct arena_pool *arena_pool_create(unsigned int size_mb, u32 flags)
     pool->pid = current->pid;
     pool->flags = flags;
     spin_lock_init(&pool->lock);
+    memset(&pool->intensity, 0, sizeof(pool->intensity));
 
     /* Initialize tiers */
     offset = 0;
@@ -281,6 +282,12 @@ static void *try_alloc_tier(struct arena_pool *pool, unsigned int tier, size_t s
  * arena_malloc - Allocate from the arena using priority ordering
  *
  * Priority: (4, 3, 1, 2) → soft concern → (5, 6, 7, ...) → NULL
+ *
+ * Intensification gate:
+ *   CLEAR/WATCH: normal priority order
+ *   CONCERN:     skip primary tiers, serve from (5, 6, ...) only
+ *   THROTTLE:    yield then serve from decay tiers
+ *   RESTRICT:    deny from primary, decay-only service
  */
 void *arena_malloc(struct arena_pool *pool, size_t size)
 {
@@ -288,6 +295,7 @@ void *arena_malloc(struct arena_pool *pool, size_t size)
     void *ptr;
     unsigned int i, tier;
     unsigned long flags;
+    int intensity_gate;
 
     if (!pool || size == 0)
         return NULL;
@@ -298,25 +306,43 @@ void *arena_malloc(struct arena_pool *pool, size_t size)
 
     spin_lock_irqsave(&pool->lock, flags);
 
-    /* Try priority order: (4, 3, 1, 2) */
-    for (i = 0; i < 4; i++) {
-        tier = priority_order[i];
-        if (tier >= pool->num_tiers)
-            continue;
-        ptr = try_alloc_tier(pool, tier, size);
-        if (ptr) {
-            spin_unlock_irqrestore(&pool->lock, flags);
-            return ptr;
+    /* Check intensification level before allocation */
+    intensity_gate = arena_intensity_check_alloc(pool, size);
+
+    if (intensity_gate == 2) {
+        /* THROTTLE: release lock, yield, re-acquire */
+        spin_unlock_irqrestore(&pool->lock, flags);
+        cpu_relax();
+        spin_lock_irqsave(&pool->lock, flags);
+    }
+
+    /* Normal path: CLEAR/WATCH — try priority order (4, 3, 1, 2) */
+    if (intensity_gate <= 0 && intensity_gate != -1) {
+        for (i = 0; i < 4; i++) {
+            tier = priority_order[i];
+            if (tier >= pool->num_tiers)
+                continue;
+            ptr = try_alloc_tier(pool, tier, size);
+            if (ptr) {
+                spin_unlock_irqrestore(&pool->lock, flags);
+                return ptr;
+            }
         }
+
+        /* All primary tiers exhausted — intensification event */
+        arena_intensity_event(pool, ARENA_INTENSITY_TIER_EXHAUST);
     }
 
     /* Soft concern — try compaction */
     pool->soft_concern_count++;
+    arena_intensity_event(pool, ARENA_INTENSITY_SOFT_CONCERN);
+
     if (pool->tiers[1].occupancy_pct >= ARENA_SOFT_CONCERN_PCT) {
         pool->flags |= ARENA_F_COMPACT_REQ;
     }
 
-    /* Try decay tiers (5, 6, 7, ...) */
+    /* CONCERN/THROTTLE/RESTRICT path: serve from decay tiers only */
+    /* Also reached when primary tiers are genuinely full */
     for (tier = 5; tier < pool->num_tiers; tier++) {
         ptr = try_alloc_tier(pool, tier, size);
         if (ptr) {
@@ -325,11 +351,15 @@ void *arena_malloc(struct arena_pool *pool, size_t size)
         }
     }
 
+    /* Hard denial — highest intensification weight */
+    arena_intensity_event(pool, ARENA_INTENSITY_HARD_DENY);
+
     spin_unlock_irqrestore(&pool->lock, flags);
 
     /* All tiers exhausted */
-    pr_warn("arena_pool: allocation failed for PID %d, size %zu\n",
-            pool->pid, size);
+    pr_warn("arena_pool: allocation failed for PID %d, size %zu "
+            "(intensity score %u, level %u)\n",
+            pool->pid, size, pool->intensity.score, pool->intensity.level);
     return NULL;
 }
 EXPORT_SYMBOL(arena_malloc);
@@ -470,6 +500,193 @@ void arena_compact(struct arena_pool *pool)
 EXPORT_SYMBOL(arena_compact);
 
 /* =========================================================================
+ * Intensification Concern — Falling Decay Memory (Clear-in-3)
+ *
+ * Tracks processes driving further memory pressure. The intensity score
+ * decays by × 2/3 every interval. With integer division, any score ≤ 10
+ * clears to below threshold (3) within 3 intervals if left alone:
+ *
+ *   Score 10:  10 → 6 → 4 → 2 (CLEAR at interval 3)
+ *   Score  8:   8 → 5 → 3 → 2 (CLEAR at interval 3)
+ *   Score  5:   5 → 3 → 2 → 1 (CLEAR at interval 2-3)
+ *   Score  3:   3 → 2 → 1 → 0 (CLEAR at interval 1)
+ *
+ * Higher scores (persistent pressure) take longer to clear — proportional
+ * to the sustained abuse. Score 32: 32→21→14→9→6→4→2 = 6 intervals.
+ * The system rewards quiescence and punishes sustained intensification.
+ * ========================================================================= */
+
+/**
+ * intensity_derive_level - Derive level from raw score
+ */
+static enum arena_intensity_level intensity_derive_level(u8 score)
+{
+    if (score >= ARENA_INTENSITY_RESTRICT)
+        return ARENA_LEVEL_RESTRICT;
+    if (score >= ARENA_INTENSITY_THROTTLE)
+        return ARENA_LEVEL_THROTTLE;
+    if (score >= ARENA_INTENSITY_CONCERN)
+        return ARENA_LEVEL_CONCERN;
+    if (score >= ARENA_INTENSITY_WATCH)
+        return ARENA_LEVEL_WATCH;
+    return ARENA_LEVEL_CLEAR;
+}
+
+/**
+ * arena_intensity_event - Record an intensification event
+ */
+void arena_intensity_event(struct arena_pool *pool, u8 weight)
+{
+    struct arena_intensity *inten;
+    u16 new_score;
+
+    if (!pool)
+        return;
+
+    inten = &pool->intensity;
+
+    /* Saturating add */
+    new_score = (u16)inten->score + (u16)weight;
+    if (new_score > ARENA_INTENSITY_MAX)
+        new_score = ARENA_INTENSITY_MAX;
+
+    inten->score = (u8)new_score;
+    inten->events_total++;
+    inten->last_event_jiffies = jiffies;
+
+    /* Track peak */
+    if (inten->score > inten->peak_score)
+        inten->peak_score = inten->score;
+
+    /* Derive level */
+    inten->level = (u8)intensity_derive_level(inten->score);
+
+    /* Set flags on pool */
+    if (inten->level >= ARENA_LEVEL_CONCERN)
+        pool->flags |= ARENA_F_INTENSIFIED;
+    if (inten->level >= ARENA_LEVEL_THROTTLE)
+        pool->flags |= ARENA_F_THROTTLED;
+
+    /* Log escalation */
+    if (inten->level == ARENA_LEVEL_THROTTLE) {
+        pr_notice("arena_pool: PID %d intensification THROTTLE (score %u)\n",
+                  pool->pid, inten->score);
+    } else if (inten->level == ARENA_LEVEL_RESTRICT) {
+        pr_warn("arena_pool: PID %d intensification RESTRICT (score %u)\n",
+                pool->pid, inten->score);
+    }
+}
+EXPORT_SYMBOL(arena_intensity_event);
+
+/**
+ * arena_intensity_decay - Apply falling decay: score = score × 2/3
+ *
+ * Property: clears in 3 intervals for typical scores (≤ 10).
+ * Called every ARENA_INTENSITY_INTERVAL_S seconds by timer or monitor.
+ */
+void arena_intensity_decay(struct arena_pool *pool)
+{
+    struct arena_intensity *inten;
+    enum arena_intensity_level prev_level;
+
+    if (!pool)
+        return;
+
+    inten = &pool->intensity;
+
+    /* Nothing to decay */
+    if (inten->score == 0)
+        return;
+
+    prev_level = (enum arena_intensity_level)inten->level;
+
+    /* Falling decay: score = score × 2/3 (integer division floors toward 0) */
+    inten->score = (u8)((u16)inten->score * ARENA_INTENSITY_DECAY_NUM
+                        / ARENA_INTENSITY_DECAY_DEN);
+
+    inten->decay_count++;
+    inten->last_decay_jiffies = jiffies;
+
+    /* Check if cleared */
+    if (inten->score < ARENA_INTENSITY_CLEAR_THRESHOLD) {
+        inten->score = 0;
+        inten->level = (u8)ARENA_LEVEL_CLEAR;
+        inten->clear_count++;
+
+        /* Remove intensification flags */
+        pool->flags &= ~(ARENA_F_INTENSIFIED | ARENA_F_THROTTLED);
+
+        if (prev_level >= ARENA_LEVEL_CONCERN) {
+            pr_info("arena_pool: PID %d intensification CLEARED "
+                    "(decayed in %u intervals)\n",
+                    pool->pid, inten->decay_count);
+            inten->decay_count = 0;
+        }
+    } else {
+        /* Derive new level */
+        inten->level = (u8)intensity_derive_level(inten->score);
+
+        /* Remove flags if level dropped */
+        if (inten->level < ARENA_LEVEL_CONCERN)
+            pool->flags &= ~ARENA_F_INTENSIFIED;
+        if (inten->level < ARENA_LEVEL_THROTTLE)
+            pool->flags &= ~ARENA_F_THROTTLED;
+    }
+}
+EXPORT_SYMBOL(arena_intensity_decay);
+
+/**
+ * arena_intensity_get_level - Query current intensification level
+ */
+enum arena_intensity_level arena_intensity_get_level(struct arena_pool *pool)
+{
+    if (!pool)
+        return ARENA_LEVEL_CLEAR;
+    return (enum arena_intensity_level)pool->intensity.level;
+}
+EXPORT_SYMBOL(arena_intensity_get_level);
+
+/**
+ * arena_intensity_check_alloc - Gate allocation by intensification level
+ *
+ * Returns:
+ *   0  — normal service (CLEAR or WATCH)
+ *   1  — lower-priority tiers only (CONCERN)
+ *   2  — yield then lower-priority (THROTTLE)
+ *  -1  — deny allocation from primary tiers (RESTRICT)
+ */
+int arena_intensity_check_alloc(struct arena_pool *pool, size_t size)
+{
+    struct arena_intensity *inten;
+
+    if (!pool)
+        return 0;
+
+    inten = &pool->intensity;
+
+    switch ((enum arena_intensity_level)inten->level) {
+    case ARENA_LEVEL_CLEAR:
+    case ARENA_LEVEL_WATCH:
+        return 0;
+
+    case ARENA_LEVEL_CONCERN:
+        return 1;
+
+    case ARENA_LEVEL_THROTTLE:
+        inten->throttle_count++;
+        return 2;
+
+    case ARENA_LEVEL_RESTRICT:
+        inten->restricted_count++;
+        return -1;
+
+    default:
+        return 0;
+    }
+}
+EXPORT_SYMBOL(arena_intensity_check_alloc);
+
+/* =========================================================================
  * Front-Load: Pre-fault 1/8 upfront region
  * ========================================================================= */
 
@@ -538,6 +755,9 @@ EXPORT_SYMBOL(arena_get_status);
 
 static int arena_proc_show(struct seq_file *m, void *v)
 {
+    static const char * const level_names[] = {
+        "CLEAR", "WATCH", "CONCERN", "THROTTLE", "RESTRICT"
+    };
     unsigned int i, tier;
 
     seq_puts(m, "═══════════════════════════════════════════════════════════\n");
@@ -551,6 +771,7 @@ static int arena_proc_show(struct seq_file *m, void *v)
     spin_lock(&pools_lock);
     for (i = 0; i < pool_count; i++) {
         struct arena_pool *pool = active_pools[i];
+        struct arena_intensity *inten = &pool->intensity;
         size_t used = pool->total_allocated - pool->total_freed;
 
         seq_printf(m, "  Arena [%u] PID %d\n", i, pool->pid);
@@ -565,7 +786,40 @@ static int arena_proc_show(struct seq_file *m, void *v)
         if (pool->flags & ARENA_F_USB_BACKED)  seq_puts(m, " [USB]");
         if (pool->flags & ARENA_F_FRONTLOADED) seq_puts(m, " [FRONTLOADED]");
         if (pool->flags & ARENA_F_COMPACT_REQ) seq_puts(m, " [COMPACT_REQ]");
+        if (pool->flags & ARENA_F_INTENSIFIED) seq_puts(m, " [INTENSIFIED]");
+        if (pool->flags & ARENA_F_THROTTLED)   seq_puts(m, " [THROTTLED]");
         seq_puts(m, "\n");
+
+        /* Intensification concern display */
+        seq_puts(m, "    ┌── Intensification Concern ──────────────────────┐\n");
+        seq_printf(m, "    │ Score:    %3u / 255    Level: %-8s          │\n",
+                   inten->score,
+                   (inten->level <= ARENA_LEVEL_RESTRICT)
+                       ? level_names[inten->level] : "UNKNOWN");
+        seq_printf(m, "    │ Peak:     %3u          Events: %u              │\n",
+                   inten->peak_score, inten->events_total);
+        seq_printf(m, "    │ Decays:   %u           Clears: %u              │\n",
+                   inten->decay_count, inten->clear_count);
+        seq_printf(m, "    │ Throttled: %u          Denied: %u              │\n",
+                   inten->throttle_count, inten->restricted_count);
+        if (inten->score == 0) {
+            seq_puts(m, "    │ Status:  ◯ CLEAR — no pressure                 │\n");
+        } else if (inten->score < ARENA_INTENSITY_CLEAR_THRESHOLD) {
+            seq_puts(m, "    │ Status:  ◯ clearing (below threshold)           │\n");
+        } else {
+            unsigned int intervals_to_clear = 0;
+            u8 sim = inten->score;
+            while (sim >= ARENA_INTENSITY_CLEAR_THRESHOLD && intervals_to_clear < 20) {
+                sim = (u8)((u16)sim * ARENA_INTENSITY_DECAY_NUM
+                           / ARENA_INTENSITY_DECAY_DEN);
+                intervals_to_clear++;
+            }
+            seq_printf(m, "    │ Status:  ◉ ACTIVE — clears in ~%u intervals    │\n",
+                       intervals_to_clear);
+            seq_printf(m, "    │          (%u seconds if left alone)            │\n",
+                       intervals_to_clear * ARENA_INTENSITY_INTERVAL_S);
+        }
+        seq_puts(m, "    └──────────────────────────────────────────────────┘\n");
 
         seq_puts(m, "    ┌─────┬──────────┬──────────┬─────────┬──────┐\n");
         seq_puts(m, "    │ Tier│ Size     │ Used     │ Free Ct │ Occ% │\n");
@@ -593,6 +847,13 @@ static int arena_proc_show(struct seq_file *m, void *v)
     seq_puts(m, "    Priority: (4, 3, 1, 2) → soft → (5,6,...)\n");
     seq_puts(m, "    Front-load: 1/8 arena = 37.5 MB pre-faulted\n");
     seq_puts(m, "    Convergence: Σ decay = 150 MB virtual\n");
+    seq_puts(m, "\n");
+    seq_puts(m, "  Intensification Decay (Clear-in-3):\n");
+    seq_puts(m, "    I(t+1) = I(t) × 2/3          (integer floor)\n");
+    seq_puts(m, "    Clear threshold: score < 3\n");
+    seq_puts(m, "    Typical: score 10 → 6 → 4 → 2 → CLEAR (3 intervals)\n");
+    seq_puts(m, "    Interval: 10 seconds\n");
+    seq_puts(m, "    Levels: CLEAR(0-2) WATCH(3-7) CONCERN(8-15) THROTTLE(16-31) RESTRICT(32+)\n");
 
     return 0;
 }
@@ -626,6 +887,8 @@ static int __init arena_pool_init(void)
     pr_info("arena_pool: priority (4,3,1,2) → soft → (5,6,...) → extend\n");
     pr_info("arena_pool: front-load 1/8 = %u MB pre-faulted\n",
             default_arena_mb / 8);
+    pr_info("arena_pool: intensification concern: decay ×2/3 per %us, clear-in-3\n",
+            ARENA_INTENSITY_INTERVAL_S);
 
     return 0;
 }
