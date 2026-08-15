@@ -1,0 +1,470 @@
+#!/bin/bash
+# This file is part of curtin. See LICENSE file for copyright and license info.
+
+TEMP_D=""
+CR="
+"
+VERBOSITY=${VERBOSITY:-${CURTIN_VERBOSITY:-0}}
+
+error() { echo "$@" 1>&2; }
+debug() {
+    [ ${VERBOSITY:-0} -ge "$1" ] || return
+    shift
+    error "$@"
+}
+
+partition_main_usage() {
+    cat <<EOF
+Usage: ${0##*/} [ options ] target-dev
+
+   partition target-dev with a single partition
+   destroy any partition table that might be there already.
+
+   options:
+     -f | --format F   use partition table format F. [mbr, gpt, uefi, prep]
+                       default mbr
+     -E | --end E      end the partition at E (unit 1k bytes)
+     -b | --boot       create a boot partition (512 MiB - default)
+EOF
+    [ $# -eq 0 ] || echo "$@"
+}
+
+cleanup() {
+    if [ -d "$TEMP_D" ]; then
+        rm -Rf "$TEMP_D"
+    fi
+}
+
+
+wipe_partitions() {
+    # wipe_partition(blockdev, ptno)
+    local dev="" target="" ret="" part="" full="" out=""
+    if [ "$1" = "--full" ]; then
+        full="--full"
+        shift
+    fi
+    dev="$1"
+    shift
+    for part in "$@"; do
+        find_partno "$dev" $part ||
+            { ret=$?; error "did not find $part on $dev"; return $ret; }
+        target="$_RET"
+        wipedev $full "$target" false false ||
+            { ret=$?; error "failed to wipe $part on $dev"; return $ret; }
+    done
+    return 0
+}
+
+wipedev() {
+    # wipedev([--full,] target, wipe_end=true, reread=true)
+    # wipe the front and optionally end of $target
+    # if reread=true call rereadpt and settle
+    local full="0"
+    if [ "$1" = "--full" ]; then
+        full="1"
+        shift
+    fi
+    local target="$1" wipe_end=${2:-true} rereadpt=${3:-true}
+    local size="" out="" bs="" count="" seek="" mb=$((1024*1024))
+    local info=""
+    getsize "$target" ||
+        { error "failed to get size of $target"; return 1; }
+    size="$_RET"
+
+    # select a block size that evenly divides size. bigger is generally faster.
+    for bs in $mb 4096 1024 512 1; do
+        [ "$((size % bs))" = "0" ] && break
+    done
+    if [ "$bs" = "1" ]; then
+        error "WARN: odd sized '$target' ($size). not divisible by 512."
+    fi
+
+    if [ "$full" != "0" ]; then
+        count=$((size / bs))
+        info="size=$size conv=notrunc count=$count bs=$bs"
+        debug 1 "wiping full '$target' with ${info}."
+        out=$(LANG=C dd if=/dev/zero conv=notrunc "of=$target" \
+            bs=$bs count=$count 2>&1) || {
+            error "wiping entire '$target' with ${info} failed."
+            error "$out"
+            return 1
+        }
+    else
+        local fbs=$bs
+        count=$((size / bs))
+        if [ "$size" -ge "$mb" ]; then
+            count=1
+            fbs=$mb
+        fi
+        info="size=$size count=$count bs=$fbs"
+        debug 1 "wiping start of '$target' with ${info}."
+        # wipe the first MB (up to 'size')
+        out=$(dd if=/dev/zero conv=notrunc "of=$target" \
+                "bs=$fbs" "count=$count" 2>&1) || {
+            error "wiping start of '$target' with ${info} failed."
+            error "$out"
+            return 1
+        }
+
+        if $wipe_end && [ "$size" -gt "$mb" ]; then
+            # do the last 1MB
+            count=$((mb / bs))
+            seek=$(((size / bs) - $count))
+            info="size=$size count=$count bs=$bs seek=$seek"
+            debug 1 "wiping end of '$target' with ${info}."
+            out=$(dd if=/dev/zero conv=notrunc "of=$target" "seek=$seek" \
+                "bs=$bs" "count=$count" 2>&1)
+            if [ $? -ne 0 ]; then
+                error "wiping end of '$target' with ${info} failed."
+                error "$out";
+                return 1;
+            fi
+        fi
+    fi
+
+    if $rereadpt && [ -b "$target" ]; then
+        blockdev --rereadpt "$target"
+        udevadm settle
+    fi
+}
+
+find_partno() {
+    local devname="$1" partno="$2"
+    local devbname cand msg="" slash="/"
+    devbname="${devname#/dev/}"
+    # /dev/cciss/c0d0 -> ccis!c0d0
+    devbname="${devbname//$slash/!}"
+    if [ -d "/sys/class/block/${devbname}" ]; then
+        local cand candptno name partdev
+        debug 1 "using sys/class/block/$devbname"
+        for cand in /sys/class/block/$devbname/*/partition; do
+            [ -f "$cand" ] || continue
+            read candptno < "$cand"
+            [ "$candptno" = "$partno" ] || continue
+            name=${cand#/sys/class/block/${devbname}/}
+            name=${name%/partition}
+            # ccis!c0d0p1 -> ccis/c0d0p1
+            name=${name//!/$slash}
+            partdev="/dev/$name"
+            [ -b "$partdev" ] && _RET="$partdev" && return 0
+            msg="expected $partdev to exist as partition $partno on $devname"
+            error "WARN: $msg. it did not exist."
+        done
+    else
+        for cand in "${devname}$partno" "${devname}p${partno}"; do
+            [ -b "$cand" ] && _RET="$cand" && return 0
+        done
+    fi
+    return 1
+}
+
+part2bd() {
+    # part2bd given a partition, return the block device it is on
+    # and the number the partition is.  ie, 'sda2' -> '/dev/sda 2'
+    local dev="$1" fp="" sp="" bd="" ptnum=""
+    dev="/dev/${dev#/dev/}"
+    fp=$(readlink -f "$dev") || return 1
+    sp="/sys/class/block/${fp##*/}"
+    [ -f "$sp/partition" ] || { _RET="$fp 0"; return 0; }
+    read ptnum < "$sp/partition"
+    sp=$(readlink -f "$sp") || return 1
+    # sp now has some /sys/devices/pci..../0:2:0:0/block/sda/sda1
+    bd=${sp##*/block/}
+    bd="${bd%/*}"
+    _RET="/dev/$bd $ptnum"
+    return 0
+}
+
+pt_gpt() {
+    local target="$1" end=${2:-""} boot="$3" size="" s512=""
+    local start="2048" rootsize="" bootsize="1048576" maxend=""
+    local isblk=false
+    getsize "$target" ||
+        { error "failed to get size of $target"; return 1; }
+    size="$_RET"
+    if [ -z "$end" ]; then
+        end=$(($size/512))
+    else
+        end=$(($end/512))
+    fi
+
+    if [ "$boot" = true ]; then
+        maxend=$((($size/512)-$start-$bootsize))
+        if [ $maxend -lt 0 ]; then
+            error "Disk is not big enough for /boot partition on $target";
+            return 1;
+        fi
+    else
+        maxend=$((($size/512)-$start))
+    fi
+    [ "$end" -gt "$maxend" ] && end="$maxend"
+    debug 1 "maxend=$maxend end=$end size=$size"
+
+    [ -b "$target" ] && isblk=true
+
+    if [ "$boot" = true ]; then
+        # Creating 'efi', '/boot' and '/' partitions
+        sgdisk --new "15:$start:+1M" --typecode=15:ef02 \
+            --new "1::+512M" --typecode=1:8300 \
+            --new "2::$end" --typecode=2:8300 "$target" ||
+            { error "failed to gpt partition $target"; return 1; }
+    else
+        # Creating 'efi' and '/' partitions
+        sgdisk --new "15:$start:+1M" --typecode=15:ef02 \
+            --new "1::$end" --typecode=1:8300 "$target" ||
+            { error "failed to gpt partition $target"; return 1; }
+    fi
+
+    if $isblk; then
+        local expected="1 15"
+        [ "$boot" = "true" ] && expected="$expected 2"
+        blockdev --rereadpt "$target"
+        udevadm settle
+        assert_partitions "$target" $expected ||
+            { error "$target missing partitions: $_RET"; return 1; }
+        wipe_partitions "$target" $expected ||
+            { error "$target: failed to wipe partitions"; return 1; }
+    fi
+}
+
+assert_partitions() {
+    local dev="$1" missing="" part=""
+    shift
+    for part in "$@"; do
+        find_partno "$dev" $part || missing="${missing} ${part}"
+    done
+    _RET="${missing# }"
+    [ -z "$missing" ]
+}
+
+pt_uefi() {
+    local target="$1" end=${2:-""} size="" s512=""
+    local start="2048" rootsize="" maxend=""
+    local isblk=false
+    getsize "$target" ||
+        { error "failed to get size of $target"; return 1; }
+    size="$_RET"
+    if [ -z "$end" ]; then
+        end=$(($size/512))
+    else
+        end=$(($end/512))
+    fi
+
+    maxend=$((($size/512)-$start))
+    [ "$end" -gt "$maxend" ] && end="$maxend"
+    debug 1 "maxend=$maxend end=$end size=$size"
+
+    [ -b "$target" ] && isblk=true
+
+    # Creating 'UEFI' and '/' partitions
+    sgdisk --new "15:2048:+512M" --typecode=15:ef00 \
+           --new "1::$end" --typecode=1:8300 "$target" ||
+        { error "failed to sgdisk for uefi to $target"; return 1; }
+
+    if $isblk; then
+        blockdev --rereadpt "$target"
+        udevadm settle
+        assert_partitions "$target" 1 15 ||
+            { error "$target missing partitions: $_RET"; return 1; }
+        wipe_partitions "$target" 1 15 ||
+            { error "$target: failed to wipe partitions"; return 1; }
+    fi
+
+    local pt15
+    find_partno "$target" 15 && pt15="$_RET" ||
+        { error "failed to find partition 15 for $target"; return 1; }
+    mkfs -t vfat -F 32 -n uefi-boot "$pt15" ||
+        { error "failed to partition :$pt15' for UEFI vfat"; return 1; }
+}
+
+
+pt_mbr() {
+    local target="$1" end=${2:-""} boot="$3" size="" s512="" ptype="L"
+    local start="2048" rootsize="" maxsize="4294967296"
+    local maxend="" isblk=false def_bootsize="1048576" bootsize=0
+    local isblk=false
+    getsize "$target" ||
+        { error "failed to get size of $target"; return 1; }
+    size="$_RET"
+
+    if $boot; then
+        bootsize=$def_bootsize
+    fi
+
+    s512=$(($size/512))
+    if [ $s512 -ge $maxsize ]; then
+        debug 1 "disk is larger than max for mbr (2TB)"
+        s512=$maxsize
+    fi
+
+    # allow 33 sectors for the secondary gpt header in the case that
+    # the user wants to later 'sgdisk --mbrtogpt'
+    local gpt2hsize="33"
+    if [ -n "$end" ]; then
+        rootsize=$(((end/512)-start-bootsize))
+    else
+        rootsize=$((s512-start-bootsize-$gpt2hsize))
+    fi
+
+    [ -b "$target" ] && isblk=true
+
+    # interact with sfdisk in units of 512 bytes (--unit S)
+    # we start all partitions at 2048 of those (1M)
+    local sfdisk_out="" sfdisk_in="" sfdisk_cmd="" t="" expected=""
+    if "$boot"; then
+        t="$start,$bootsize,$ptype,-${CR}"
+        t="$t$(($start+$bootsize)),$rootsize,$ptype,*"
+        sfdisk_in="$t"
+        expected="1 2"
+    else
+        sfdisk_in="$start,$rootsize,$ptype,*"
+        expected=1
+    fi
+    sfdisk_cmd=( sfdisk --no-reread --force --Linux --unit S "$target" )
+    debug 1 "sfdisking with: echo '$sfdisk_in' | ${sfdisk_cmd[*]}"
+    sfdisk_out=$(echo "$sfdisk_in" | "${sfdisk_cmd[@]}" 2>&1)
+    ret=$?
+    [ $ret -eq 0 ] || {
+        error "failed to partition $target [${sfdisk_out}]";
+        return 1;
+    }
+    if $isblk; then
+        blockdev --rereadpt "$target"
+        udevadm settle
+        assert_partitions "$target" ${expected} ||
+            { error "$target missing partitions: $_RET"; return 1; }
+
+        wipe_partitions "$target" ${expected} ||
+            { error "failed to wipe partition 1 on $target"; return 1; }
+    fi
+
+}
+
+pt_prep() {
+    local target="$1" end=${2:-""}
+    local cmd="" isblk=false
+    [ -b "$target" ] && isblk=true
+
+    local pprep="1" proot="2"
+    wipedev "$target" ||
+        { error "failed to clear $target"; return 1; }
+
+    cmd=(
+        sgdisk
+           --new "${pprep}::+8M"  "--typecode=${pprep}:4100"
+           --new "${proot}::$end" "--typecode=${proot}:8300"
+           "$target"
+    )
+    debug 1 "partitioning '$target' with ${cmd[*]}"
+    "${cmd[@]}" ||
+        fail "Failed to create GPT partitions (${cmd[*]})"
+
+    udevadm trigger
+    udevadm settle
+
+    if $isblk; then
+        blockdev --rereadpt "$target"
+        udevadm settle
+        assert_partitions "$target" "${proot}" "${pprep}"  ||
+            { error "$target missing partitions: $_RET"; return 1; }
+        # wipe the full prep partition
+        wipe_partitions --full "$target" "${pprep}" ||
+            { error "$target: failed to wipe full PReP partition"; return 1;}
+        wipe_partitions "$target" "${proot}" ||
+            { error "$target: failed to wipe partition ${proot}"; return 1;}
+    fi
+
+    return 0
+}
+
+partition_main() {
+    local short_opts="hE:f:bv"
+    local long_opts="help,end:,format:,boot,verbose"
+    local getopt_out=$(getopt --name "${0##*/}" \
+        --options "${short_opts}" --long "${long_opts}" -- "$@") &&
+        eval set -- "${getopt_out}" ||
+        { partition_main_usage 1>&2; return 1; }
+
+    local cur="" next=""
+    local format="mbr" boot=false target="" end="" ret=0
+
+    while [ $# -ne 0 ]; do
+        cur="$1"; next="$2";
+        case "$cur" in
+            -h|--help) partition_main_usage ; exit 0;;
+            -E|--end) end=$next; shift;;
+            -f|--format) format=$next; shift;;
+            -b|--boot) boot=true;;
+            -v|--verbose) VERBOSITY=$((${VERBOSITY}+1));;
+            --) shift; break;;
+        esac
+        shift;
+    done
+
+    [ $# -gt 1 ] && { partition_main_usage "got $# args, expected 1" 1>&2; return 1; }
+    [ $# -eq 0 ] && { partition_main_usage "must provide target-dev" 1>&2; return 1; }
+    target="$1"
+    if [ -n "$end" ]; then
+        human2bytes "$end" ||
+            { error "failed to convert '$end' to bytes"; return 1; }
+        end="$_RET"
+    fi
+
+    [ "$format" = "gpt" -o "$format" = "mbr" ] ||
+        [ "$format" = "uefi" -o "$format" = "prep" ] ||
+        { partition_main_usage "invalid format: $format" 1>&2; return 1; }
+
+    TEMP_D=$(mktemp -d "${TMPDIR:-/tmp}/${0##*/}.XXXXXX") ||
+        fail "failed to make tempdir"
+    trap cleanup EXIT
+
+    [ -e "$target" ] || { error "$target does not exist"; return 1; }
+    [ -f "$target" -o -b "$target" ] ||
+        { error "$target not a block device"; return 1; }
+
+    wipedev "$target" ||
+        { error "wiping $target failed"; return 1; }
+
+    if [ "$format" = "mbr" ]; then
+        pt_mbr "$target" "$end" "$boot"
+    elif [ "$format" = "gpt" ]; then
+        pt_gpt "$target" "$end" "$boot"
+    elif [ "$format" = "uefi" ]; then
+        pt_uefi "$target" "$end"
+    elif [ "$format" = "prep" ]; then
+        pt_prep "$target" "$end"
+    fi
+    ret=$?
+
+    return $ret
+}
+
+human2bytes() {
+    # converts size suitable for input to resize2fs to bytes
+    # s:512 byte sectors, K:kilobytes, M:megabytes, G:gigabytes
+    # none: block size of the image
+    local input=${1} defunit=${2:-1024}
+    local unit count;
+    case "$input" in
+        *s) count=${input%s}; unit=512;;
+        *K) count=${input%K}; unit=1024;;
+        *M) count=${input%M}; unit=$((1024*1024));;
+        *G) count=${input%G}; unit=$((1024*1024*1024));;
+        *)  count=${input}  ; unit=${defunit};;
+    esac
+   _RET=$((${count}*${unit}))
+}
+
+getsize() {
+    # return size of target in bytes
+    local target="$1"
+    if [ -b "$target" ]; then
+        _RET=$(blockdev --getsize64 "$target")
+    elif [ -f "$target" ]; then
+        _RET=$(stat "--format=%s" "$target")
+    else
+        return 1;
+    fi
+}
+
+# vi: ts=4 expandtab syntax=sh

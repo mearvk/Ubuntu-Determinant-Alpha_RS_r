@@ -1,0 +1,94 @@
+Origin: upstream, https://github.com/cyrusimap/cyrus-sasl/commit/145ef0787def146a6b945340e18ff5cfb93823d1
+From: Orivej Desh <orivej@gmx.fr>
+Date: Thu, 14 Mar 2019 01:30:07 +0000
+Subject: Fix build with --disable-shared --enable-static
+
+1. Rename SASL_STATIC_LIBS to SASL_STATIC_LIB to free up SASL_STATIC_LIBS for
+the list of additional libraries needed by static libsasl due to the plugins
+that are included in libsasl only in the static build.
+2. Add LIB_DES to SASL_STATIC_LIBS for the digestmd5 plugin.
+3. Add SASL_DB_LIB to the list of libraries needed by libsasldb.
+
+The second point fixes linking utils/dbconverter-2 which fails with:
+ld: ../lib/.libs/libsasl2.a(digestmd5.o): in function `init_3des':
+lib/digestmd5.c:968: undefined reference to `DES_key_sched'
+
+The third point fixes linking sample/client which fails with:
+ld: ../lib/.libs/libsasl2.a(db_berkeley.o): in function `berkeleydb_open':
+lib/db_berkeley.c:103: undefined reference to `db_create'
+
+Signed-off-by: Orivej Desh <orivej@gmx.fr>
+---
+ configure.ac       | 7 +++++--
+ lib/Makefile.am    | 5 +++--
+ sasldb/Makefile.am | 2 +-
+ 3 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 118e458b..b5eeb53a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -126,10 +126,12 @@ AC_PROG_LIBTOOL
+ target=$save_target
+ 
+ if test "$enable_static" = yes; then
+-	SASL_STATIC_LIBS=libsasl2.a
++	SASL_STATIC_LIB=libsasl2.a
+ else
+-	SASL_STATIC_LIBS=
++	SASL_STATIC_LIB=
+ fi
++AC_SUBST(SASL_STATIC_LIB)
++SASL_STATIC_LIBS=
+ 
+ AC_ARG_ENABLE(staticdlopen, [  --enable-staticdlopen   try dynamic plugins when we are a static libsasl [[no]] ],
+                 enable_staticdlopen=$enableval,
+@@ -369,6 +371,7 @@ if test "$digest" != no; then
+   if test "$enable_static" = yes; then
+     SASL_STATIC_SRCS="$SASL_STATIC_SRCS \$(top_srcdir)/plugins/digestmd5.c"
+     SASL_STATIC_OBJS="$SASL_STATIC_OBJS digestmd5.o"
++    SASL_STATIC_LIBS="$SASL_STATIC_LIBS $LIB_DES"
+     AC_DEFINE(STATIC_DIGESTMD5, [], [Link DIGEST-MD5 Statically])
+   fi
+ else
+diff --git a/lib/Makefile.am b/lib/Makefile.am
+index 72ada6d4..9a43ae0d 100644
+--- a/lib/Makefile.am
++++ b/lib/Makefile.am
+@@ -51,7 +51,7 @@ PLUGIN_COMMON_OBJS = $(top_builddir)/common/libplugin_common.la
+ 
+ EXTRA_DIST = windlopen.c dlopen.c staticopen.h NTMakefile
+ EXTRA_LIBRARIES = libsasl2.a
+-noinst_LIBRARIES = @SASL_STATIC_LIBS@
++noinst_LIBRARIES = @SASL_STATIC_LIB@
+ libsasl2_a_SOURCES=
+ 
+ BUILT_SOURCES = $(SASL_STATIC_SRCS)
+@@ -67,6 +67,7 @@ common_sources = auxprop.c canonusr.c checkpw.c client.c common.c config.c exter
+ 
+ LTLIBOBJS = @LTLIBOBJS@
+ LIB_DOOR= @LIB_DOOR@
++SASL_STATIC_LIBS = @SASL_STATIC_LIBS@
+ 
+ lib_LTLIBRARIES = libsasl2.la
+ if BUILD_LIBOBJ
+@@ -81,7 +82,7 @@ libobj_la_LIBADD = $(LTLIBOBJS)
+ libsasl2_la_SOURCES = $(common_sources) $(common_headers)
+ libsasl2_la_LDFLAGS = -version-info $(sasl_version) -no-undefined
+ 
+-libsasl2_la_LIBADD = $(SASL_DL_LIB) $(LIB_SOCKET) $(LIB_DOOR) $(PLUGIN_COMMON_OBJS)
++libsasl2_la_LIBADD = $(SASL_DL_LIB) $(SASL_STATIC_LIBS) $(LIB_SOCKET) $(LIB_DOOR) $(PLUGIN_COMMON_OBJS)
+ if BUILD_LIBOBJ
+ libsasl2_la_LIBADD += libobj.la
+ endif
+diff --git a/sasldb/Makefile.am b/sasldb/Makefile.am
+index 497ee251..13489451 100644
+--- a/sasldb/Makefile.am
++++ b/sasldb/Makefile.am
+@@ -55,5 +55,5 @@ noinst_LTLIBRARIES = libsasldb.la
+ libsasldb_la_SOURCES = allockey.c sasldb.h
+ EXTRA_libsasldb_la_SOURCES = $(extra_common_sources)
+ libsasldb_la_DEPENDENCIES = $(SASL_DB_BACKEND)
+-libsasldb_la_LIBADD = $(SASL_DB_BACKEND)
++libsasldb_la_LIBADD = $(SASL_DB_BACKEND) $(SASL_DB_LIB)
+ libsasldb_la_LDFLAGS = -no-undefined

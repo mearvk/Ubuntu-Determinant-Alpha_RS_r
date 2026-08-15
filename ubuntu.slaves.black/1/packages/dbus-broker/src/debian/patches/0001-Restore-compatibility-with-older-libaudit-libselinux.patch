@@ -1,0 +1,61 @@
+Author: Luca Boccassi <bluca@debian.org>
+Description: restore compatibility with older libaudit/libselinux
+Forwarded: yes, https://github.com/bus1/dbus-broker/pull/273
+--- a/meson.build
++++ b/meson.build
+@@ -46,7 +46,7 @@
+ 
+ use_audit = get_option('audit')
+ if use_audit
+-        dep_libaudit = dependency('audit', version: '>=3.0')
++        dep_libaudit = dependency('audit', version: '>=2.7')
+         dep_libcapng = dependency('libcap-ng', version: '>=0.6')
+ endif
+ 
+@@ -90,7 +90,7 @@
+ 
+ use_selinux = get_option('selinux')
+ if use_selinux
+-        dep_libselinux = dependency('libselinux', version: '>=3.2')
++        dep_libselinux = dependency('libselinux', version: '>=2.5')
+ endif
+ 
+ #
+--- a/src/util/audit.c
++++ b/src/util/audit.c
+@@ -108,12 +108,16 @@
+         case UTIL_AUDIT_TYPE_AVC:
+                 audit_type = AUDIT_USER_AVC;
+                 break;
++#if defined AUDIT_USER_MAC_POLICY_LOAD && defined SELINUX_POLICYLOAD
+         case UTIL_AUDIT_TYPE_POLICYLOAD:
+                 audit_type = AUDIT_USER_MAC_POLICY_LOAD;
+                 break;
++#endif
++#if defined AUDIT_USER_MAC_STATUS && defined SELINUX_SETENFORCE
+         case UTIL_AUDIT_TYPE_MAC_STATUS:
+                 audit_type = AUDIT_USER_MAC_STATUS;
+                 break;
++#endif
+         case UTIL_AUDIT_TYPE_NOAUDIT:
+         default:
+                 audit_type = 0;
+--- a/src/util/selinux.c
++++ b/src/util/selinux.c
+@@ -300,12 +300,16 @@
+         case SELINUX_AVC:
+                 audit_type = UTIL_AUDIT_TYPE_AVC;
+                 break;
++#if defined AUDIT_USER_MAC_POLICY_LOAD && defined SELINUX_POLICYLOAD
+         case SELINUX_POLICYLOAD:
+                 audit_type = UTIL_AUDIT_TYPE_POLICYLOAD;
+                 break;
++#endif
++#if defined AUDIT_USER_MAC_STATUS && defined SELINUX_SETENFORCE
+         case SELINUX_SETENFORCE:
+                 audit_type = UTIL_AUDIT_TYPE_MAC_STATUS;
+                 break;
++#endif
+         default:
+                 /* not an auditable message. */
+                 audit_type = UTIL_AUDIT_TYPE_NOAUDIT;

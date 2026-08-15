@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+# output every command that modifies files on the build system.
+#DH_VERBOSE = 1
+
+DEB_BUILD_MAINT_OPTIONS =hardening=+all
+
+include /usr/share/dpkg/architecture.mk
+
+ifeq ($(DEB_HOST_ARCH_OS),hurd)
+DEB_CPPFLAGS_MAINT_APPEND = -DPATH_MAX=4096
+endif
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+ifneq (,$(findstring diet,$(DEB_BUILD_OPTIONS)))
+  CC =diet -v -Os gcc
+  CFLAGS =-nostdinc -Wall
+  CPPFLAGS =
+  LDFLAGS =
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-fnmatch \
+		--disable-lineno \
+		--disable-glob
+
+override_dh_auto_build: po-templates
+	dh_auto_build
+
+po-templates:
+	po2debconf debian/dash.templates.in >debian/dash.templates
+
+.PHONY: po-templates  \
+	  override_dh_auto_configure override_dh_auto_build

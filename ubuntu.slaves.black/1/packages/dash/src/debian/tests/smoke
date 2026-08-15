@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Cwd qw(getcwd realpath);
+use File::Temp qw();
+use Test::More;
+
+my $srcdir = getcwd;
+
+ok(-x '/bin/sh', '/bin/sh must be executable');
+ok(-x '/bin/dash', '/bin/dash must be executable');
+ok(-x '/bin/bash', '/bin/bash must be executable');
+diag(qx(ls -l /bin/sh));
+diag(qx(ls -l /bin/sh.distrib));
+diag(qx(ls -l /bin/dash));
+diag(qx(ls -l /bin/bash));
+
+like(qx(dpkg -L dash),
+     qr{^/bin/sh$}m,
+     'dash must contain a /bin/sh symlink, for debootstrap');
+
+is(qx(echo hello), "hello\n");
+
+my $diverter = qx(dpkg-divert --listpackage /bin/sh);
+
+if ($diverter eq "dash\n") {
+    like(realpath('/bin/sh'), qr{^(?:/usr)?/bin/dash},
+         '/bin/sh diverted by dash');
+}
+elsif ($diverter eq "bash\n") {
+    like(realpath('/bin/sh'), qr{^(?:/usr)?/bin/dash},
+         '/bin/sh diverted by dash pretending to be bash');
+}
+else {
+    is($diverter, "LOCAL\n", '/bin/sh diverted locally');
+}
+
+my $tmpdir = File::Temp->newdir();
+chdir $tmpdir;
+is(system("apt-get download dash"), 0);
+is(system("dpkg-deb -X *.deb ."), 0);
+diag(qx(find . -ls));
+chdir $srcdir;
+like(readlink("$tmpdir/bin/sh"), qr{^(?:/bin/)?[bd]ash$},
+     'dash_*.deb must contain a /bin/sh symlink for debootstrap');
+
+done_testing;

@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim: set sts=4 expandtab:
+
+import sys, os, re, string, getopt
+
+progname = "msgtranslated"
+version = "1.2.1"
+cmdname = os.path.basename(sys.argv[0])
+
+USAGE = """
+%s - extract only translated PO contents
+
+Copyright (C) 2011 Osamu Aoki, GPL2+, version: %s
+
+Usage: %s [options] <FOO.xx.po >FOO-out.xx.po
+ Supported options:
+   -h      Display this help message.
+
+This works better on a PO file processed with:
+ $ msgcat --no-wrap FOO.xx.po | sponge FOO.xx.po 
+"""%(cmdname, version, cmdname)
+
+
+def main():
+    global verbosemode
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "h")
+    except getopt.GetoptError, err:
+        print >>sys.stderr, "Wrong option ..."
+        print >>sys.stderr, USAGE
+        sys.exit(1)
+    for o, a in opts:
+        if o == "-h":
+            print >>sys.stderr, USAGE
+            sys.exit(0)
+        else:
+            assert False, "unhandled option"
+    process_po()
+
+def process_po():
+    i = 0 # line index
+    ii = i # line index updated for each PO set
+    mode = 0
+    # mode = 0 for pre
+    # mode = 1 for id
+    # mode = 2 for str
+    buff = ['', '', '']
+    for l in sys.stdin.readlines():
+        i += 1
+        if mode == 0:
+            if l[0:-1] == '':
+                pass
+            elif l[0:1] == '#':
+                buff[mode] += l
+            elif l[0:5] == 'msgid':
+                # start msgid mode
+                mode = 1
+                buff[mode] = l
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        elif mode == 1:
+            if l[0:1] == '"':
+                buff[mode] = buff[mode][:-2] + l[1:]
+            elif l[0:6] == 'msgstr':
+                # start msgstr mode
+                mode = 2
+                buff[mode] = l
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        elif mode == 2:
+            if l[0:1] == '"':
+                buff[mode] = buff[mode][:-2] + l[1:]
+            elif l[0:-1] == '':
+                # end msgstr mode
+                # now ready to process a set of PO data
+                po_write(ii, buff)
+                # start again
+                buff = ['', '', '']
+                mode = 0
+                ii = i
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        else:
+            assert False, "E: %i, mode %i"%(ii, mode)
+    # output at EOF
+    po_write(ii, buff)
+
+def po_write(ii, buff):
+    # msgid != msgstr
+    if buff[1][5:] != buff[2][6:]:
+        sys.stdout.write(buff[0])
+        sys.stdout.write(buff[1])
+        sys.stdout.write(buff[2])
+        print
+    elif buff[1][7:8] == "$" or buff[1][7:8] == " ":
+        # huristics: msgid "$..." or msgid " ..."
+        sys.stdout.write(buff[0])
+        sys.stdout.write(buff[1])
+        sys.stdout.write(buff[2])
+        print
+    else:
+        sys.stdout.write(buff[0])
+        sys.stdout.write(buff[1])
+        sys.stdout.write("msgstr \"\"\n")
+        print
+
+if __name__ == '__main__':
+    main()
+

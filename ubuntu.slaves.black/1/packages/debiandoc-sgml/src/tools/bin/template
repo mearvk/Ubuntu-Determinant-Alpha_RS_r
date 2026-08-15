@@ -1,0 +1,994 @@
+@@@start-active@@@
+=========================================================================
+# This is the template file to create all debiandoc2${format} files with
+# execution of "mkconversions ${perldir} ${helperdir}".
+#
+# The lines just with @@@start-...-active@@@ are used to mark the start of
+# ${format} specific section while the ones just with @@@end-...-active@@@
+# are used to mark the start of it.  For example, this text here will not
+# be included in any command since it lacks ${format} at all.  No nesting
+# are allowed with this.
+#
+# There will be few automatic text substitutions performed:
+#  EXpressions used                  => typical results
+#  s:@@@perldir@@@:${perldir}:g;     => /usr/share/perl5/DebianDoc_SGML/Format/
+#  s:@@@helperdir@@@:${helperdir}:g; => /usr/share/debiandoc-sgml
+#  s:@@@format@@@:${format}:g;       => tail end of the command name
+#  s:@@@ext@@@:${ext}:g;             => ${format} dependent file extension
+#
+# Some format calls other debiandoc2* script:
+#  latexdvi, latexps, latexpdf ==(calls)==> latex
+#  info                        ==(calls)==> texinfo
+#
+# If you are confused, do "make diff" and see the difference from 
+# installed version of debiandoc2* commands.
+#
+# Since this section sandwtched between lines with "start-active" and
+# "end-active" will not be copied to final scripts, this and similar sections
+# are pure comments applicable only to the source file.
+=========================================================================
+@@@end-active@@@
+@@@start-active@@@
+=========================================================================
+# This section is common start section.
+=========================================================================
+@@@end-active@@@
+#!/bin/bash
+## ----------------------------------------------------------------------
+
+## ----------------------------------------------------------------------
+## exit on erroneous subcommand
+set -e
+
+## ----------------------------------------------------------------------
+## get script name
+script=$(basename ${0})
+
+## ----------------------------------------------------------------------
+## print version and usage message
+function usage_message
+{
+    cat >&2 <<'END'
+debiandoc2@@@format@@@ version 1.1
+
+Copyright (C) 2005-2008 Osamu Aoki
+Copyright (C) 1998-2004 Ardo van Rangelrooij
+Copyright (C) 1996 Ian Jackson
+
+This is free software; see the GNU General Public Licence
+version 2 or later for copying conditions.  There is NO warranty.
+
+usage: debiandoc2@@@format@@@ [options] <filename>.sgml
+options: -h               print this help message
+@@@start-html-active@@@
+         -L               do not add <link> tags
+@@@end-html-active@@@
+@@@start-active@@@
+         -P               add extra <p> tags before <list>, <enumlist>, 
+	                  <taglist>, <example> ...
+@@@end-active@@@
+@@@start-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+         -O               send output to stdout instead of <filename>.@@@ext@@@
+@@@end-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+         -b <basename>    basename to be used
+         -c               use content-negotiation (w/  encoding suffix)
+         -C               use content-negotiation (w/o encoding suffix)
+	 -d <declaration> SGML declaration to be used
+         -e <extension>   extension to be used
+         -k               keep intermediate files
+         -l <locale>      locale to be used
+@@@start-latexdvi-latexps-latexpdf-active@@@
+         -s <script>      apply script on intermediate latex source
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+         -s <script>      apply script on generated file
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-info-active@@@
+         -s <script>      apply script on intermediate texinfo source
+@@@end-info-active@@@
+@@@start-html-dbk-text-wiki-textov-active@@@
+	 -m               put comments in output
+@@@end-html-dbk-text-wiki-textov-active@@@
+         -n <options>     onsgmls options to be passed on
+@@@start-html-dbk-active@@@
+         -t <topname>     topname to be used
+         -1               generate one page
+@@@end-html-dbk-active@@@
+@@@start-dbk-active@@@
+         -S               use <sect1>, <sect2>, <sect3> instead of <section>
+@@@end-dbk-active@@@
+@@@start--latexps-active@@@
+         -1               1 page per page (deprecated, default)
+@@@end-latexps-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+         -p <papersize>   paper size to be used
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+         -v               be verbose
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-active@@@
+         -x               produce XHTML codes (always compact <ol>)
+@@@end-html-active@@@
+         -X <custom_dir>  switch locale dependent format data tree
+END
+    exit 0;
+}
+
+## ----------------------------------------------------------------------
+## print error message
+function usage_error
+{
+    echo >&2 "${script}: ${@}";
+    exit 2;
+}
+
+@@@start-info-active@@@
+## ----------------------------------------------------------------------
+## check for presence of makeinfo
+if ! which makeinfo >/dev/null 2>&1
+then
+    echo >&2 "${script}: Texinfo documentation system not found"
+    echo >&2 "${script}: please install the package 'texinfo'"
+    exit 2
+fi
+
+@@@end-info-active@@@
+@@@start-latexdvi-latexps-active@@@
+## ----------------------------------------------------------------------
+## check for presence of latex
+if ! which latex >/dev/null 2>&1
+then
+    echo >&2 "${script}: LaTeX typesetting system not found"
+    echo >&2 "${script}: please install the package 'texlive-latex-base'"
+    exit 2
+fi
+
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## check for presence of pdflatex
+if ! which pdflatex >/dev/null 2>&1
+then
+    echo >&2 "${script}: LaTeX typesetting system not found"
+    echo >&2 "${script}: please install the package 'texlive-latex-base'"
+    exit 2
+fi
+
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used latex styles
+if ! kpsewhich -progname latex \
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used pdflatex styles
+if ! kpsewhich -progname pdflatex \
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+    fancyhdr.sty \
+    helvet.sty \
+    hyperref.sty \
+    palatino.sty \
+    pifont.sty \
+    times.sty \
+    url.sty \
+    >/dev/null 2>&1
+then
+    echo >&2 "${script}: one or more used LaTeX typesetting styles not found"
+    echo >&2 "${script}: please install the package 'texlive-latex-base'"
+    exit 2
+fi
+
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexdvi-latexps-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used latex styles
+if ! kpsewhich -progname latex \
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used pdflatex styles
+if ! kpsewhich -progname pdflatex \
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+    footmisc.sty \
+    paralist.sty \
+    vmargin.sty \
+    >/dev/null 2>&1
+then
+    echo >&2 "${script}: one or more used LaTeX typesetting styles not found"
+    echo >&2 "${script}: please install the package 'texlive-latex-extra'"
+    exit 2
+fi
+
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexdvi-latexps-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used latex styles
+if ! kpsewhich -progname latex \
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## check for presence of used pdflatex styles
+if ! kpsewhich -progname pdflatex \
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+    wasysym.sty \
+    >/dev/null 2>&1
+then
+    echo >&2 "${script}: one or more used LaTeX typesetting styles not found"
+    echo >&2 "${script}: please install the package 'texlive-fonts-recommended'"
+    exit 2
+fi
+
+@@@end-latexdvi-latexps-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## set default values
+basename=''
+@@@start-html-dbk-text-wiki-textov-active@@@
+comment=''
+@@@end-html-dbk-text-wiki-textov-active@@@
+content=''
+contentx=''
+@@@start-latex-latexdvi-latexps-latexpdf-active@@@
+postprocessing='@@@helperdir@@@/fixlatex'
+@@@end-latex-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-dbk-text-wiki-textov-texinfo-info-active@@@
+postprocessing=''
+@@@end-html-dbk-text-wiki-textov-texinfo-info-active@@@
+declaration='-d /usr/share/sgml/debiandoc/dtd/sgml/1.0/debiandoc.dcl'
+extension=''
+keep=false
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+keepopt=''
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-active@@@
+links=''
+@@@end-html-active@@@
+@@@start-html-active@@@
+xhtml=''
+@@@end-html-active@@@
+@@@start-active@@@
+para=''
+@@@end-active@@@
+locale=''
+onsgmls=''
+@@@start-latexps-active@@@
+paperopt=''
+@@@end-latexps-active@@@
+stdout=false
+@@@start-html-dbk-active@@@
+topname=''
+@@@end-html-dbk-active@@@
+@@@start-dbk-active@@@
+dbksection=''
+@@@end-dbk-active@@@
+@@@start-html-dbk-active@@@
+single=''
+@@@end-html-dbk-active@@@
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+verbose=false
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+custom_dir=''
+
+## ----------------------------------------------------------------------
+## get command line options
+options=':'
+options="${options}h"
+@@@start-html-active@@@
+options="${options}L"
+@@@end-html-active@@@
+@@@start-active@@@
+options="${options}P"
+@@@end-active@@@
+@@@start-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+options="${options}O"
+@@@end-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+options="${options}b:"
+options="${options}c"
+options="${options}C"
+@@@start-latex-latexdvi-latexps-latexpdf-html-dbk-text-wiki-textov-texinfo-info-active@@@
+options="${options}s:"
+@@@end-latex-latexdvi-latexps-latexpdf-html-dbk-text-wiki-textov-texinfo-info-active@@@
+options="${options}d:"
+options="${options}e:"
+options="${options}k"
+options="${options}l:"
+@@@start-html-dbk-text-wiki-textov-active@@@
+options="${options}m"
+@@@end-html-dbk-text-wiki-textov-active@@@
+options="${options}n:"
+@@@start-html-dbk-active@@@
+options="${options}t:"
+options="${options}1"
+@@@end-html-dbk-active@@@
+@@@start-dbk-active@@@
+options="${options}S"
+@@@end-dbk-active@@@
+@@@start-latexps-active@@@
+options="${options}1"
+@@@end-latexps-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+options="${options}p:"
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+options="${options}v"
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-active@@@
+options="${options}x"
+@@@end-html-active@@@
+options="${options}X:"
+while getopts ${options} opt
+do
+    case ${opt}
+    in
+	h  ) usage_message
+	     ;;
+@@@start-html-active@@@
+	L  ) links="-${opt}"
+	     ;;
+@@@end-html-active@@@
+@@@start-dbk-active@@@
+	S  ) dbksection="-${opt}"
+	     ;;
+@@@end-dbk-active@@@
+@@@start-active@@@
+	P  ) para="-${opt}"
+	     ;;
+@@@end-active@@@
+@@@start-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+	O  ) stdout=true
+	     ;;
+@@@end-latex-texinfo-text-wiki-textov-latexdvi-latexps-latexpdf-active@@@
+	b  ) basename="-${opt} ${OPTARG}"
+	     ;;
+	c  ) content="-${opt}"
+	     ;;
+	C  ) contentx="-${opt}"
+	     ;;
+	s  ) postprocessing="${OPTARG}"
+	     ;;
+	d  ) declaration="-${opt} ${OPTARG}"
+	     ;;
+	e  ) extension="-${opt} ${OPTARG}"
+	     ;;
+	k  ) keep=true
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+	     keepopt="-${opt}"
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+	     ;;
+	l  ) locale="-${opt} ${OPTARG}"
+	     ;;
+@@@start-html-dbk-text-wiki-textov-active@@@
+	m  ) comment="-${opt}"
+	     ;;
+@@@end-html-dbk-text-wiki-textov-active@@@
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+	n  ) onsgmls="${onsgmls} -${opt} ${OPTARG}"
+	     ;;
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-dbk-texinfo-latex-text-wiki-textov-active@@@
+	n  ) onsgmls="${onsgmls} ${OPTARG}"
+	     ;;
+@@@end-html-dbk-texinfo-latex-text-wiki-textov-active@@@
+@@@start-html-dbk-active@@@
+	t  ) topname="-${opt} ${OPTARG}"
+	     ;;
+	1  ) single="-${opt}"
+	     ;;
+@@@end-html-dbk-active@@@
+@@@start-latexdvi-latexpdf-active@@@
+	p  ) PAPERSIZE=${OPTARG}
+	     export PAPERSIZE
+	     ;;
+@@@end-latexdvi-latexpdf-active@@@
+@@@start-latexps-active@@@
+	p  ) PAPERSIZE=${OPTARG}
+	     export PAPERSIZE
+	     paperopt="-t ${PAPERSIZE}"
+	     ;;
+	1  ) echo >&2 "${script}: the -1 option is deprecated and may be removed in the future. It is activated by default now."
+	     ;;
+@@@end-latexps-active@@@
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+	v  ) verbose=true
+	     ;;
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-active@@@
+	x  ) xhtml="-${opt}"
+	     ;;
+@@@end-html-active@@@
+	X  ) custom_dir="${OPTARG}"
+	     ;;
+	\? ) usage_error "unknown option \`${OPTARG}'"
+	     ;;
+    esac
+done
+shift $((${OPTIND} - 1))
+
+## ----------------------------------------------------------------------
+## check remaining command line options
+if [ ${#} -ne 1 ]
+then
+    usage_error "need exactly one input filename: $*"
+fi
+
+@@@start-active@@@
+# Next section for basename needs review and merge with other portion
+# For now I just copy old ones for each format
+@@@end-active@@@
+@@@start-html-dbk-active@@@
+## ----------------------------------------------------------------------
+## get input file name
+case "${1}"
+in
+    -   ) onsgmlsi="-"
+	  if ${keep}
+	  then
+	      usage_error "-k not possible with input from stdin"
+	  fi
+	  if ! ${stdout}
+	  then
+	      usage_error "stdin not allowed with debiandoc2html"
+	  fi
+	  ;;
+    -?* ) onsgmlsi="./${1}"
+	  ;;
+    *   ) onsgmlsi="${1}"
+	  ;;
+esac
+
+## ----------------------------------------------------------------------
+## get basename
+if [ -n "${basename}" ]
+then
+    bsn="$(echo ${basename} | cut -d' ' -f2- | cut -d'/' -f-1)"
+else
+    if [ "${onsgmlsi}" != "-" ]
+    then
+	bsn="$(basename ${1} .sgml)"
+	basename="-b ${bsn}"
+    fi
+fi
+case "${bsn}"
+in
+    -* ) bsn="./${bsn}" 
+	 ;;
+esac
+
+## ----------------------------------------------------------------------
+## get content-negotiation
+cnt=''
+if [ -n "${content}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2-)"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+if [ -n "${contentx}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2- | sed -e 's/[@\.].*$//')"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+
+@@@end-html-dbk-active@@@
+@@@start-html-dbk-active@@@
+## ----------------------------------------------------------------------
+## get extension
+if [ -n "${extension}" ]
+then
+    ext="$(echo ${extension} | cut -d' ' -f2- )"
+else
+    ext='@@@ext@@@'
+    extension="-e ${ext}"
+fi
+ext=".${ext}"
+
+@@@end-html-dbk-active@@@
+@@@start-active@@@
+## ----------------------------------------------------------------------
+## get extension
+if [ -n "${extension}" ]
+then
+    ext="$(echo ${extension} | cut -d' ' -f2-)"
+else
+    ext='new.@@@ext@@@' # avoid collision with .sgml
+    extension="-e ${ext}"
+fi
+ext=".${ext}"
+
+@@@end-active@@@
+@@@start-info-active@@@
+## ----------------------------------------------------------------------
+## get basename
+if [ -n "${basename}" ]
+then
+    bsn="$(echo ${basename} | cut -d' ' -f2- | cut -d'/' -f-1)"
+else
+    bsn="$(basename ${1} .sgml)"
+fi
+case "${bsn}"
+in
+    -* ) bsn="./${bsn}"
+	 ;;
+esac
+
+## ----------------------------------------------------------------------
+## get content-negotiation
+cnt=''
+if [ -n "${content}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2-)"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+if [ -n "${contentx}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2- |  sed -e 's/[@\.].*$//')"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+
+## ----------------------------------------------------------------------
+## get extension
+if [ -n "${extension}" ]
+then
+    ext="$(echo ${extension} | cut -d' ' -f2-)"
+else
+    ext='@@@ext@@@'
+fi
+ext=".${ext}"
+
+@@@end-info-active@@@
+@@@start-latex-texinfo-text-wiki-textov-active@@@
+## ----------------------------------------------------------------------
+## get input file name
+case "${1}"
+in
+    -   ) onsgmlsi="-"
+	  if ${keep}
+	  then
+	      usage_error "-k not possible with input from stdin"
+	  fi
+	  stdout=true
+	  ;;
+    -?* ) onsgmlsi="./${1}"
+	  ;;
+    *   ) onsgmlsi="${1}"
+	  ;;
+esac
+
+## ----------------------------------------------------------------------
+## get basename
+if [ -n "${basename}" ]
+then
+    bsn="$(echo ${basename} | cut -d' ' -f2- | cut -d'/' -f-1)"
+else
+    if [ "${onsgmlsi}" != "-" ]
+    then
+	bsn="$(basename ${1} .sgml)"
+	basename="-b ${bsn}"
+    fi
+fi
+case "${bsn}"
+in
+    -* ) bsn="./${bsn}" 
+	 ;;
+esac
+
+## ----------------------------------------------------------------------
+## get content-negotiation
+cnt=''
+if [ -n "${content}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2-)"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+if [ -n "${contentx}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2- | sed -e 's/[@\.].*$//')"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+
+## ----------------------------------------------------------------------
+## get extension
+if [ -n "${extension}" ]
+then
+    ext="$(echo ${extension} | cut -d' ' -f2-)"
+else
+    ext='@@@ext@@@'
+    extension="-e ${ext}"
+fi
+ext=".${ext}"
+
+@@@end-latex-texinfo-text-wiki-textov-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## get basename
+if [ -n "${basename}" ]
+then
+    bsn="$(echo ${basename} | cut -d' ' -f2- | cut -d'/' -f-1)"
+else
+    bsn="$(basename ${1} .sgml)"
+fi
+case "${bsn}"
+in
+    -* ) bsn="./${bsn}"
+	 ;;
+esac
+
+## ----------------------------------------------------------------------
+## get content-negotiation
+cnt=''
+if [ -n "${content}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2-)"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+if [ -n "${contentx}" ]
+then
+    if [ -n "${locale}" ]
+    then
+	cnt="$(echo ${locale} | cut -d' ' -f2- | sed -e 's/[@\.].*$//')"
+    else
+	cnt='en'
+    fi
+    cnt=".${cnt}"
+fi
+
+## ----------------------------------------------------------------------
+## get extension
+if [ -n "${extension}" ]
+then
+    ext="$(echo ${extension} | cut -d' ' -f2-)"
+else
+    ext='@@@ext@@@'
+fi
+ext=".${ext}"
+
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+## ----------------------------------------------------------------------
+## get declaration
+if [ -n "${declaration}" ]
+then
+    declaration="$(echo ${declaration} | cut -d' ' -f2-)"
+    if [ "$(basename ${declaration})" = "${declaration}" ]
+    then
+	declaration="declaration/${declaration}"
+    fi
+fi
+
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+## ----------------------------------------------------------------------
+## construct temporary file names
+tf1="${bsn}.sasp"
+tf2="${bsn}.sasp-@@@format@@@"
+
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+## ----------------------------------------------------------------------
+## what needs to be passed on to the backend
+passing_on=''
+passing_on="${passing_on} ${basename}"
+@@@start-info-latexdvi-latexps-latexpdf-active@@@
+passing_on="${passing_on} ${declaration}"
+passing_on="${passing_on} ${keepopt}"
+passing_on="${passing_on} ${locale}"
+passing_on="${passing_on} ${onsgmls}"
+@@@end-info-latexdvi-latexps-latexpdf-active@@@
+@@@start-html-dbk-text-wiki-textov-active@@@
+passing_on="${passing_on} ${comment}"
+@@@end-html-dbk-text-wiki-textov-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+passing_on="${passing_on} ${content}"
+passing_on="${passing_on} ${contentx}"
+passing_on="${passing_on} ${extension}"
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-html-active@@@
+passing_on="${passing_on} ${links}"
+@@@end-html-active@@@
+@@@start-active@@@
+passing_on="${passing_on} ${para}"
+@@@end-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+passing_on="${passing_on} ${locale}"
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-html-dbk-active@@@
+passing_on="${passing_on} ${topname}"
+passing_on="${passing_on} ${single}"
+@@@end-html-dbk-active@@@
+@@@start-html-active@@@
+passing_on="${passing_on} ${xhtml}"
+@@@end-html-active@@@
+@@@start-dbk-active@@@
+passing_on="${passing_on} ${dbksection}"
+@@@end-dbk-active@@@
+@@@start-latexdvi-latexps-latexpdf-info-active@@@
+if [ -n "${postprocessing}" ]; then
+  passing_on="${passing_on} -s ${postprocessing}"
+fi
+@@@end-latexdvi-latexps-latexpdf-info-active@@@
+if [ -n "${custom_dir}" ]; then
+  passing_on="${passing_on} -X ${custom_dir}"
+fi
+@@@start-active@@@
+=========================================================================
+# This section normalizes ${bsn} if ${cnt} is defined.
+=========================================================================
+@@@end-active@@@
+if [ -n "${cnt}" ]; then
+  # Remove Largest Suffix Pattern if -C or -c is used.
+  bsn="${bsn%%.*}"
+fi
+@@@start-active@@@
+=========================================================================
+# This section is for html, dbk, text, textov, latex, and texinfo.
+# Just diect conversions
+=========================================================================
+@@@end-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+## ----------------------------------------------------------------------
+## do the actual work
+onsgmls -oline ${onsgmls} ${declaration} ${onsgmlsi} >${tf1}
+@@@helperdir@@@/saspconvert <${tf1} >${tf2}
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-latex-texinfo-text-wiki-textov-active@@@
+if ! ${stdout}
+then
+    exec >${bsn}${cnt}${ext}
+fi
+@@@end-latex-texinfo-text-wiki-textov-active@@@
+@@@start-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+sgmlspl @@@perldir@@@/Driver.pm -f @@@format@@@ ${passing_on} <${tf2}
+if [ -n "${postprocessing}" ]
+then
+    mv ${bsn}${cnt}${ext} ${bsn}${cnt}${ext}-in
+    "${postprocessing}" ${locale} ${bsn}${cnt}${ext}-in ${bsn}${cnt}${ext}
+fi
+
+## ----------------------------------------------------------------------
+## remove temporary files
+if ! ${keep}
+then
+    rm -f ${tf1} ${tf2} ${bsn}${cnt}${ext}-in
+fi
+
+@@@end-html-dbk-text-wiki-textov-latex-texinfo-active@@@
+@@@start-active@@@
+=========================================================================
+# This second section is for latexdvi, latexps, and latexpdf.
+=========================================================================
+@@@end-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## do the actual work
+if [ -e ${bsn}.tex ]
+then
+    echo >&2 "${script}: WARNING: overwriting ${bsn}.tex"
+fi
+if ! debiandoc2latex ${passing_on} ${1}
+then
+    echo >&2 "${script}: ERROR: ${bsn}.tex could not be generated properly"
+    exit 1
+fi
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexdvi-latexps-active@@@
+if [ -e ${bsn}.dvi ] && ( [ -n "${content}" ] || [ -n "${contentx}" ] || [ -n "${extension}" ] )
+then
+    echo >&2 "${script}: WARNING: overwriting ${bsn}.dvi"
+fi
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+if [ -e ${bsn}.pdf ] && ( [ -n "${content}" ] || [ -n "${contentx}" ] || [ -n "${extension}" ] )
+then
+    echo >&2 "${script}: WARNING: overwriting ${bsn}.pdf"
+fi
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+touch prior.aux pprior.aux
+MAX_LEVEL=9
+LEVEL=1
+while [ ${LEVEL} -lt ${MAX_LEVEL} ]
+do
+    if ! ( ${verbose} || exec >/dev/null;
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexdvi-latexps-active@@@
+	   latex -interaction=nonstopmode ${bsn}.tex )
+    then
+        echo >&2 "${script}: ERROR: ${bsn}.dvi could not be generated properly"
+@@@end-latexdvi-latexps-active@@@
+@@@start-latexpdf-active@@@
+	   pdflatex -interaction=nonstopmode ${bsn}.tex )
+    then
+        echo >&2 "${script}: ERROR: ${bsn}.pdf could not be generated properly"
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+        if ! ${verbose}
+        then
+	    echo >&2 "${script}: rerun with the -v option to find out why"
+	    echo >&2 "${script}: or check the log file ${bsn}.log"
+        fi
+	rm -f prior.aux pprior.aux
+        exit 1
+    fi
+    if    ( ! cmp ${bsn}.aux prior.aux >/dev/null 2>&1 ) \
+       && ( ! cmp ${bsn}.aux pprior.aux >/dev/null 2>&1 )
+    then
+        cp -pf prior.aux pprior.aux
+	cp -pf ${bsn}.aux prior.aux
+	let LEVEL=LEVEL+1
+    else
+        let LEVEL=MAX_LEVEL+1
+    fi
+done
+rm -f prior.aux pprior.aux
+if [ ${LEVEL} -eq ${MAX_LEVEL} ]
+then
+    echo >&2 "${script}: ERROR: reached maximum rebuilding level (= ${MAX_LEVEL})"
+    if ! ${verbose}
+    then
+	echo >&2 "${script}: rerun with the -v option to find out why"
+	echo >&2 "${script}: or check the log file ${bsn}.log"
+    fi
+    exit 1
+fi
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexps-active@@@
+if ! ( ${verbose} || exec >/dev/null 2>&1;
+       dvips -z ${paperopt} -o ${bsn}.@@@ext@@@ ${bsn} || dvips ${paperopt} -o ${bsn}.@@@ext@@@ ${bsn} )
+then
+    echo -n >&2 "${script}: ERROR: "
+    if ${stdout}
+    then
+	echo -n >&2 "output"
+    else
+	echo -n >&2 "${bsn}${cnt}${ext}"
+    fi
+    echo >&2 " could not be generated properly"
+    if ! ${verbose}
+    then
+	echo >&2 "${script}: rerun with the -v option to find out why"
+    fi
+    exit 1
+fi
+@@@end-latexps-active@@@
+@@@start-latexpdf-active@@@
+if ! ( ${verbose} || exec >/dev/null; thumbpdf ${bsn}.pdf )
+then
+    echo >&2 "${script}: ERROR: thumbnail images could not be generated properly"
+    if ! ${verbose}
+    then
+	echo >&2 "${script}: rerun with the -v option to find out why"
+	echo >&2 "${script}: or check the log file ${bsn}.log"
+    fi
+fi
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-latexps-latexpdf-active@@@
+if ${stdout}
+then
+    cat ${bsn}.@@@ext@@@
+    if ! ${keep}
+    then
+	rm -f ${bsn}.@@@ext@@@
+    fi
+else
+    if [ -n "${content}" ] || [ -n "${contentx}" ] || [ -n "${extension}" ]
+    then
+	mv -f ${bsn}.@@@ext@@@ ${bsn}${cnt}${ext}
+    fi
+fi
+
+@@@end-latexdvi-latexps-latexpdf-active@@@
+@@@start-latexps-active@@@
+## ----------------------------------------------------------------------
+## remove temporary files
+if ! ${keep}
+then
+    rm -f ${bsn}.dvi ${bsn}.tex ${bsn}.aux ${bsn}.log ${bsn}.toc ${bsn}.tex-in
+fi
+
+@@@end-latexps-active@@@
+@@@start-latexpdf-active@@@
+## ----------------------------------------------------------------------
+## remove temporary files
+if ! ${keep}
+then
+    rm -f ${bsn}.tex ${bsn}.aux ${bsn}.log ${bsn}.out ${bsn}.toc ${bsn}.tex-in
+fi
+
+@@@end-latexpdf-active@@@
+@@@start-latexdvi-active@@@
+## ----------------------------------------------------------------------
+## remove temporary files
+if ! ${keep}
+then
+    rm -f ${bsn}.tex ${bsn}.aux ${bsn}.log ${bsn}.toc ${bsn}.tex-in
+fi
+
+@@@end-latexdvi-active@@@
+@@@start-active@@@
+=========================================================================
+# This third section is for info.
+=========================================================================
+@@@end-active@@@
+@@@start-info-active@@@
+## ----------------------------------------------------------------------
+## do the actual work
+if [ -e ${bsn}.texinfo ]
+then
+    echo >&2 "${script}: WARNING: overwriting ${bsn}.texinfo"
+fi
+if ! debiandoc2texinfo ${passing_on} ${1}
+then
+    echo >&2 "${script}: ERROR: ${bsn}.texinfo could not be generated properly"
+    exit 1
+fi
+if ! ( ${verbose} || exec >/dev/null 2>&1;
+@@@end-info-active@@@
+@@@start-info-active@@@
+       makeinfo --no-validate -v -o ${bsn}${cnt}${ext} ${bsn}.texinfo )
+@@@end-info-active@@@
+@@@start-active@@@
+       makeinfo --no-validate --docbook -v -o ${bsn}${cnt}${ext} ${bsn}.texinfo )
+@@@end-active@@@
+@@@start-info-active@@@
+then
+    echo >&2 "${script}: ERROR: ${bsn}${cnt}${ext} could not be generated properly"
+    if ! ${verbose}
+    then
+	echo >&2 "${script}: rerun with the -v option to find out why"
+    fi
+    exit 1
+fi
+
+## ----------------------------------------------------------------------
+## remove temporary files
+if ! ${keep}
+then
+    rm -f ${bsn}.texinfo-in ${bsn}.texinfo
+fi
+
+@@@end-info-active@@@
+@@@start-active@@@
+=========================================================================
+# This section is common end section.
+=========================================================================
+@@@end-active@@@
+## ----------------------------------------------------------------------
+exit 0
+
+## ----------------------------------------------------------------------

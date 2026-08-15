@@ -1,0 +1,105 @@
+#!/usr/bin/python3
+#  which-pkg-broke: help find offending packages when something breaks
+#  Placed in the public domain by Bill Gribble <grib@billgribble.com>
+
+import sys
+import os
+import subprocess
+import time
+from string import *
+from stat import *
+
+def force_posix_locale():
+    os.environ['LC_ALL'] = 'C'
+
+def pkgdeps(pkgs):
+    apt_cache = subprocess.Popen(
+        ['apt-cache', 'depends', *pkgs],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        universal_newlines=True,
+        preexec_fn=force_posix_locale,
+    )
+    deps = []
+    for myline in apt_cache.stdout:
+        elts = list(s.strip() for s in myline.split(':'))
+        if len(elts) == 2:
+            how, pkg = elts
+            how = how.replace('|', '')
+            if how in ('Depends', 'PreDepends'):
+                deps.append(pkg)
+    apt_cache.wait()
+    return deps
+
+def alldeps(pkg):
+    seen = set()
+    todo = set([pkg])
+    while todo:
+        new = pkgdeps(todo)
+        seen |= todo
+        todo = set(new) - seen
+    return seen
+
+def localarchitectures():
+    architectures = []
+    dpkg_arch = subprocess.Popen(
+        ['dpkg', '--print-architecture'],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        universal_newlines=True,
+        preexec_fn=force_posix_locale,
+    )
+    for arch in dpkg_arch.stdout.readlines():
+        architectures.append(arch.rstrip())
+
+    try:
+        dpkg_archs = subprocess.Popen(
+            ['dpkg', '--print-foreign-architecture'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            preexec_fn=force_posix_locale,
+            )
+        for arch in dpkg_archs.stdout.readlines():
+            architectures.append(arch.rstrip())
+
+    except OSError:
+        pass # non-multiarchy dpkg, which is ok
+
+    return architectures
+
+def pkginstalltime(pkg, architectures):
+    times = []
+    for arch in architectures:
+        listfile = '/var/lib/dpkg/info/' + pkg + ':' + arch + '.list'
+        try:
+            times.append([pkg + ':' + arch, os.stat(listfile)[ST_MTIME]])
+        except OSError:
+            pass
+
+    if not times:
+        listfile = '/var/lib/dpkg/info/' + pkg + '.list'
+        try:
+            times.append([pkg, os.stat(listfile)[ST_MTIME]])
+        except OSError:
+            print("Package", pkg, "has no install time info")
+
+    return times
+
+def what_broke(pname):
+    pkgs = alldeps(pname)
+
+    architectures = localarchitectures()
+
+    itimes = []
+    for p in pkgs:
+        itimes.extend(pkginstalltime(p, architectures))
+    itimes.sort(key=lambda k: k[1])
+    for i in itimes:
+        p, t = i
+        if t is not None:
+            print(p.ljust(54), time.asctime(time.localtime(float(t))))
+
+if (len(sys.argv) != 2 or sys.argv[1][0] == '-'):
+    print("Usage: which-pkg-broke <pkg-name>")
+    sys.exit(-1)
+else:
+    what_broke(sys.argv[1])
+    sys.exit(0)

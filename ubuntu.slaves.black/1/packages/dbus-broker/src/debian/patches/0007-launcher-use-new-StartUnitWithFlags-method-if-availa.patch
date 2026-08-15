@@ -1,0 +1,77 @@
+Author: Luca Boccassi <bluca@debian.org>
+Description: docs: launcher: use new StartUnitWithFlags method if available
+ Check if the new method from systemd is available via Introspect(),
+ and if so use it.
+ This allows us to receive 'skipped' as the result when the service we
+ are trying to activate does not run because of a failed Condition
+ check, which would return a false 'done' with the older
+ StartUnit method, resulting in us just waiting for a unit to
+ show up that will never arrive.
+Forwarded: yes, https://github.com/bus1/dbus-broker/pull/278
+Bug: https://github.com/bus1/dbus-broker/issues/276
+--- a/src/launch/launcher.c
++++ b/src/launch/launcher.c
+@@ -18,6 +18,7 @@
+ #include "catalog/catalog-ids.h"
+ #include "dbus/protocol.h"
+ #include "launch/config.h"
++#include "launch/introspect.h"
+ #include "launch/launcher.h"
+ #include "launch/nss-cache.h"
+ #include "launch/policy.h"
+@@ -1434,6 +1435,21 @@
+                         return error_fold(r);
+         }
+ 
++        /*
++         * When a Condition*= setting fails, the JobRemoved signal normally returns
++         * 'done' which we interpret as a success, but it means we will wait in vain
++         * for the service to start. It cannot be changed without breaking backward
++         * compatibility, so a new StartUnitWithFlags was added to change it on-demand.
++         * Let's use it if it is available, and fallback to the old StartUnit otherwise.
++         */
++        r = object_supports_interface(launcher,
++                                      "org.freedesktop.systemd1",
++                                      "/org/freedesktop/systemd1",
++                                      "StartUnitWithFlags");
++        if (r < 0)
++                return error_fold(r);
++        launcher->systemd_supports_start_with_flags = !!r;
++
+         r = log_commitf(&launcher->log, "Ready\n");
+         if (r)
+                 return error_fold(r);
+--- a/src/launch/launcher.h
++++ b/src/launch/launcher.h
+@@ -42,6 +42,7 @@
+         uint64_t max_fds;
+         uint64_t max_matches;
+         bool at_console;
++        bool systemd_supports_start_with_flags;
+ };
+ 
+ int launcher_new(Launcher **launcherp, int listen_fd, bool audit, const char *configfile, bool user_scope);
+--- a/src/launch/service.c
++++ b/src/launch/service.c
+@@ -558,7 +558,7 @@
+                                            "org.freedesktop.systemd1",
+                                            "/org/freedesktop/systemd1",
+                                            "org.freedesktop.systemd1.Manager",
+-                                           "StartUnit");
++                                           launcher->systemd_supports_start_with_flags ? "StartUnitWithFlags" : "StartUnit");
+         if (r < 0)
+                 return error_origin(r);
+ 
+@@ -566,6 +566,12 @@
+         if (r < 0)
+                 return error_origin(r);
+ 
++        if (launcher->systemd_supports_start_with_flags) {
++                r = sd_bus_message_append(method_call, "t", 0);
++                if (r < 0)
++                        return error_origin(r);
++        }
++
+         r = sd_bus_call_async(launcher->bus_regular, &service->slot_start_unit, method_call, service_start_unit_handler, service, -1);
+         if (r < 0)
+                 return error_origin(r);

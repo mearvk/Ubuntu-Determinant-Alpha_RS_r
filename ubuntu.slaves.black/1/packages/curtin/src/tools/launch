@@ -1,0 +1,892 @@
+#!/bin/bash
+# This file is part of curtin. See LICENSE file for copyright and license info.
+
+VERBOSITY=0
+TEMP_D=""
+HTTP_PID=""
+XKVM_PID=""
+MY_D=$(dirname "$0")
+DEFAULT_ROOT_ARG="root=/dev/disk/by-id/virtio-boot-disk"
+
+error() { echo "$@" 1>&2; }
+
+Usage() {
+    cat <<EOF
+Usage: ${0##*/} [ options ] curtin install [args]
+
+   boot a system with based on 
+     --boot-image / --kernel / --initrd / --append 
+   so that it will run
+      curtin install [args]
+   after booting. 'curtin install [args]' can be any command'
+
+   options:
+           --add  F[:T] add file 'F' to the curtin archive at T
+      -a | --append     append args to kernel cmdline (--kernel)
+      -A | --arch   A   assume guest kernel architecture A
+         --boot-image F attach disk 'F' as boot image.  It will
+                        be given a serial 'boot-disk'
+      -d | --disk   D   add a disk 'D' format
+                        (path[:size][:driver][:bsize][:devopts])
+                        driver can be specified without size using path::driver
+                        driver defaults to virtio-blk
+                        bsize <logical>[,<physical>][,<min_io_size>]
+                        bsize defaults to 512b sector size
+                        opts is a comma delimitted list of property=value
+                        elements. Examine qemu-kvm -device scsi-hd,? for
+                        details.
+           --vnc D      use -vnc D (mutually exclusive with --silent)
+      -h | --help       show this message
+      -i | --initrd F   use initramfs F
+      -k | --kernel F   use kernel K
+           --mem    K   memory in Kb
+      -n | --netdev     netdev can be 'user' or a bridge
+      -p | --publish F  make file 'F' available in web server
+           --silent     use -nographic
+      -s | --smp S      use smp S for number of guest cpus (defaults to 2)
+           --vnc D      use -vnc D (mutually exclusive with --silent)
+                        directly through to qemu-system.
+                        Note, qemu adds 5900 to port numbers. (:0 = port 5900)
+           --serial-log F  : log to F (default 'serial.log')
+           --root-arg X pass 'X' through as the root= param when booting a
+                        kernel.  default: $DEFAULT_ROOT_PARAM
+           --no-reboot  Pass '-no-reboot' through to QEMU
+      -v | --verbose    be more verbose
+           --no-install-deps  do not install insert '--install-deps'
+                              on curtin command invocations
+
+    the following are passed through to xkvm:
+        --uefi-nvram
+        --bios
+
+   use of --kernel/--initrd will seed cloud-init via cmdline
+   rather than the local datasource
+
+   --boot-image or --kernel is required.
+
+   Example:
+    * boot myboot.img, and install my-root.tar.gz
+      ${0##*/} --boot-image=myboot.img --publish my-root.tar.gz curtin \\
+         install PUBURL/my-root.tar.gz
+
+EOF
+}
+
+bad_Usage() { Usage 1>&2; [ $# -eq 0 ] || error "$@"; exit 1; }
+cleanup() {
+    local msg="" pid=""
+    [ ! -d "$TEMP_D" ] || msg="${msg:+$msg }remove temp dir ${TEMP_D}."
+    [ -z "$HTTP_PID" ] || msg="${msg:+$msg }kill http pid ${HTTP_PID}."
+    [ -z "$XKVM_PID" ] || msg="${msg:+$msg }kill xkvm pid ${XKVM_PID}."
+    debug 1 "cleaning up [${SECONDS}s].${msg:+ $msg}"
+    [ -z "${TEMP_D}" -o ! -d "${TEMP_D}" ] || rm -Rf "${TEMP_D}"
+    for pid in ${XKVM_PID} ${HTTP_PID}; do
+        kill $pid
+    done
+}
+sighandle() {
+    debug 1 "recieved $1"
+    exit ${2:-1}
+}
+
+register_signal_handlers() {
+    local cur
+    for cur in TERM INT; do
+        trap "sighandle $cur" "SIG$cur"
+    done
+}
+
+debug() {
+    local level=${1}; shift;
+    [ "${level}" -gt "${VERBOSITY}" ] && return
+    error "${@}"
+}
+
+get_my_ip() {
+    [ -z "$IP_ADDR" ] || { _RET="${IP_ADDR}"; return 0; }
+    local Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT
+    local iface ipaddr="" tmpf=""
+    # work around LP: #1483440
+    cp "/proc/net/route" "${TEMP_D}/current-route"
+    while read Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT; do
+        [ "$Mask" = "00000000" ] && break
+    done < "${TEMP_D}/current-route"
+    iface="$Iface"
+    ipaddr=$(LC_ALL=C /sbin/ip -4 addr list dev "$iface" scope global) || return
+    ipaddr=${ipaddr#* inet }
+    ipaddr=${ipaddr%%/*}
+    _RET="$ipaddr"
+}
+
+write_metadata() {
+    cat <<EOF
+instance-id: 'inst-${RANDOM}'
+EOF
+}
+
+write_proxy_config() {
+    # write_proxy_config(file)
+    # write curtin proxy config settings to file
+    local out="$1" n=""
+    {
+    echo "proxy:"
+    for n in http_proxy https_proxy no_proxy; do
+        echo "  ${n}: \"${!n}\""
+    done
+    } > "${out}"
+}
+
+write_pstate_config() {
+    local pstate="$1" config1="$2" config2="$3"
+    cat > "$config1" <<EOF
+#cloud-config
+power_state:
+  mode: "$pstate"
+EOF
+    sed -e "s,PSTATE,$pstate," > "$config2" <<"EOF"
+#upstart-job
+# precise does not do cloud-config poweroff
+description "power-state for precise"
+start on stopped cloud-final
+console output
+task
+script
+  [ "$(lsb_release -sc)" = "precise" ] || exit 0
+  target="PSTATE"
+  msg="precise-powerstate: $target"
+  case "$target" in
+     on) exit 0;;
+     off|poweroff) shutdown -P now "$msg";;
+     reboot) shutdown -r now "$msg";;
+     *) echo "$msg : unknown target"; exit 1;;
+  esac
+  echo "$msg"
+  exit 0
+end script
+EOF
+}
+
+write_userdata() {
+    local x
+    cat <<EOF
+#cloud-config-archive
+- type: text/cloud-config
+  content: |
+   password: passw0rd
+   chpasswd: { expire: False }
+   output: {all: '| tee -a /var/log/cloud-init-output.log'}
+EOF
+    for x in "$@"; do
+        printf "%s\n" "- |" && sed 's,^,  ,' "$x" || return
+    done
+}
+
+xkvm_check() {
+    command -v xkvm >/dev/null 2>&1 && return
+    [ -x "$MY_D/xkvm" ] && PATH="$MY_D:$PATH" && return
+    cat 1>&2 <<EOF
+Unable to find 'xkvm' in PATH, should be in curtin's tools/ dir
+EOF
+    return 1
+}
+
+_start_http() {
+    local pubdir="$1" ip="$2" port_in="$3"
+    local statfile="_datesum" contents="" burl=""
+    local found="" hpid="" ret="" address="" log="$pubdir/ws.log"
+    contents="$$:$(date +%s.%N)"
+    echo "$contents" > "$pubdir/$statfile"
+    "${TOOLS_D}/webserv" "${port_in}" "$pubdir" >"$log" 2>&1 &
+    hpid=$!
+    HTTP_PID=$hpid  # set so cleanup cleans up during wget
+    local i=""
+    for((i=0;i<600;i++)); do
+        if [ ! -d "/proc/$hpid" ]; then 
+            debug 1 "child webservice process '$hpid' died."
+            break
+        fi
+        if [ -s "$log" ]; then
+            read address port < "$log"
+            if [ -n "$port" ] && test "$port" -eq "$port" 2>/dev/null; then
+                debug 1 "read address=$address port=$port from $log on try $i"
+                break
+            else
+                debug 1 "port '$port' was not a number on try $i"
+            fi
+        else
+            debug 2 "$log did not exist or was empty. on try $i"
+        fi
+        sleep .1
+    done
+    [ -n "$port" ] || {
+        debug 1 "failed to read port after $i tries";
+        kill $hpid && HTTP_PID=""
+        return 1;
+    }
+    burl="http://$ip:$port"
+    debug 3 "checking web service [pid=$hpid] on $burl"
+    found=$(env -u http_proxy wget -q --waitretry=0.4 --retry-connrefused \
+        --tries=10 "$burl/$statfile" --timeout=4 -O - 2>/dev/null) &&
+        [ "$found" = "$contents" ] && {
+            _RET=$hpid
+            return 0
+        }
+    ret=$?
+    kill $hpid && HTTP_PID=""
+    return $ret
+}
+
+start_http() {
+    # start_http(pubdir, ip, port="", tries=5)
+    # starts a web service at 'port' that serves files in 'pubdir'
+    # waits until it is verified to be lisenting at ip
+    # if port is not provided, '$tries' random ports are tried.
+    #
+    # sets HTTP_PID and returns in _RET the port selected.
+    local pubdir="$1" ip="$2" port="$3" tries="${4:-5}" i=""
+    [ -z "$ip" ] && ip="localhost"
+    local ret="" tried=""
+    local ptries=""
+    ptries=( )
+    if [ -n "$port" -a "$port" != "0" ]; then
+        ptries=( $port )
+    else
+        for((i=0;i<$tries;i++)); do
+            ptries[$i]="0"
+        done
+    fi
+    for port in "${ptries[@]}"; do
+        debug 2 "trying http server $ip:$port"
+        _start_http "$pubdir" "$ip" "$port" &&
+            HTTP_PID="$_RET" && _RET="$port" &&
+            debug 1 "serving $pubdir at http://$ip:$port/ in pid $HTTP_PID" &&
+            return 0
+        ret=$?
+        tried="$tried $port"
+    done
+    error "failed to start http on service on $ip tried ports: ${tried# }"
+    return $ret
+}
+
+find_apt_proxy() {
+    # pick an apt proxy for the guest
+    local out=""
+
+    # (This stanza is duplicated for each supported environment variable
+    # because handling the "unset" case generically is too complex.)
+    if [ -n ${CURTIN_VMTEST_APT_PROXY+x} ]; then
+         # if user set uncommon 'CURTIN_VMTEST_APT_PROXY', then trust it
+         [ -n "$CURTIN_VMTEST_APT_PROXY" ] && echo "$CURTIN_VMTEST_APT_PROXY" && return 0
+
+         # 'CURTIN_VMTEST_APT_PROXY' is set but empty; do not setup any proxy
+         return 1
+    fi
+
+    if [ -n ${apt_proxy+x} ]; then
+         # if user set uncommon 'apt_proxy', then trust it
+         [ -n "$apt_proxy" ] && echo "$apt_proxy" && return 0
+
+         # 'apt_proxy' is set but empty; do not setup any proxy
+         return 1
+    fi
+
+    # see if the host has an apt proxy configured, and use it
+    if command -v apt-config >/dev/null 2>&1; then
+        out=$(apt-config shell x Acquire::HTTP::Proxy) &&
+        out=$(sh -c 'eval $1 && echo $x' -- "$out") && [ -n "$out" ] &&
+        echo "$out" && return
+    fi
+
+    return 1
+}
+
+get_tgt_tid() {
+    # retry until we successfully register a tid in tgtadm, return it.
+    local target="$1" src="$2" out="" tid="" lun="1" ret=""
+    while true; do
+        # use next target ID
+        # this is racy, potentially, but we iterate until it works
+        out=$(tgtadm --lld=iscsi --mode=target --op=show) ||
+            { error "Failed to show iscsi devices"; return 1; }
+
+        # are we re-using a target?
+        tid=$(echo "$out" |
+            awk -F' ' "/^Target.*$target/ {gsub(\":\",\"\",\$2); print \$2; exit;} ")
+
+        [ -n "${tid}" ] && {
+            _RET="$tid"
+            return 0
+        }
+
+        tid=$(echo "$out" |
+            awk -F' ' '/^Target/ {tid=$2} END{gsub(":","",tid); print tid+1}')
+
+        tgtadm --lld=iscsi --mode=target --op=new "--tid=$tid" \
+            "--targetname=$target" || {
+            ret=$?
+            debug 1 "failed [$ret] in attempt to register tid=$tid " \
+                "targetname=$target"
+            sleep 0.1
+            continue
+        }
+
+        # assume LUN 1?
+        tgtadm --lld=iscsi --mode=logicalunit --op=new "--tid=$tid" \
+            "--backing-store=$src" --device-type=disk "--lun=$lun" || {
+            error "Unable to create TGT LUN $lun backed by '$src'. tid=$tid."
+            error "Does a prior config need to be cleaned up?"
+            return 1
+        }
+
+        # set all initiators to be able to authenticate
+        tgtadm --lld=iscsi --mode=target --op=bind "--tid=$tid" -I ALL || {
+            error "Unable to set TGT target ${tid} ACL to ALL."
+            error "Does a prior config need to be cleaned up?"
+            return 1
+        }
+
+        _RET="$tid"
+        return 0
+    done
+}
+
+configure_tgt_auth() {
+    # update a tgt target with authentication if specified
+    local tid="$1" user="$2" password="$3" iuser="$4" ipassword="$5"
+
+    if [ -n "$user" ]; then
+        tgtadm --lld=iscsi --mode=account --op=show | grep -q "${user}"
+        if [ $? != 0 ]; then
+            tgtadm --lld=iscsi --mode=account --op=new "--user=${user}" \
+                "--password=${password}" || {
+                RC=$?
+                error "Unable to create TGT user (${user}:${password}): ${RC}"
+                error "Does a prior config need to be cleaned up?"
+                return 1
+            }
+        fi 
+        tgtadm --lld=iscsi --mode=account --op=bind "--tid=$tid" \
+            "--user=${user}" || {
+            RC=$?
+            error "Unable to set TGT target ${tid} target auth " \
+                  "user to ${user}: ${RC}."
+            error "Does a prior config need to be cleaned up?"
+            return 1
+        }
+    fi
+
+    if [ -n "$iuser" ]; then
+        tgtadm --lld=iscsi --mode=account --op=show | grep -q "${iuser}"
+        if [ $? != 0 ]; then
+            tgtadm --lld=iscsi --mode=account --op=new "--user=${iuser}" \
+                "--password=${ipassword}" || {
+                RC=$?
+                error "Unable to create TGT user (${iuser}:${ipassword}): ${RC}"
+                error "Does a prior config need to be cleaned up?"
+                return 1
+            }
+        fi 
+        tgtadm --lld=iscsi --mode=account --op=bind "--tid=$tid" \
+            "--user=${iuser}" --outgoing || {
+            RC=$?
+            error "Unable to set TGT target ${tid} initiator user " \
+                  "to ${iuser}: ${RC}."
+            error "Does a prior config need to be cleaned up?"
+            return 1
+        }
+    fi
+
+    return 0
+}
+
+get_img_fmt() {
+    local out="" src="$1"
+    out=$(LANG=C qemu-img info "$src") &&
+    fmt=$(echo "$out" | awk '$0 ~ /^file format:/ { print $3 }') ||
+    { error "failed to determine format of $src"; return 1; }
+    echo "$fmt"
+}
+
+main() {
+    local short_opts="a:A:d:h:i:k:n:p:s:v"
+    long_opts="add:,append:,arch:,bios:,boot-image:,disk:,dowait,help,initrd:,kernel:,mem:,netdev:,no-dowait,no-proxy-config,no-reboot,power:,publish:,root-arg:,silent,serial-log:,smp:,uefi-nvram:,verbose,vnc:"
+    local getopt_out=""
+    getopt_out=$(getopt --name "${0##*/}" \
+        --options "${short_opts}" --long "${long_opts}" -- "$@") &&
+        eval set -- "${getopt_out}" ||
+        { bad_Usage; return 1; }
+
+    local seed=""
+    local bootimg="" bootimg_dist="none" target="" mem="1024" smp="2"
+    local udata="" ip="" http_port="${HTTP_PORT}" burl=""
+    local tmp="" top_d
+    local initrd="" kernel="" uappend="" iargs="" disk_args=""
+    local pubs="" disks="" pstate="null"
+    local bsize="512"
+    local netdevs="" install_deps="--install-deps"
+    local arch_hint=""
+    local video="-curses -vga std" serial_log="serial.log"
+    local root_arg="$DEFAULT_ROOT_ARG"
+    local proxy_config=true curtin_extra=""
+    # dowait: run xkvm with a '&' and then 'wait' on the pid.
+    #  the reason to do this or not do this has to do with interactivity
+    #  if detached with &, then user input will not go to xkvm.
+    #  if *not* detached, then signal handling is blocked until
+    #  the foreground subprocess returns. which means we can't handle
+    #  a sigterm and kill xkvm.
+    #  We default to dowait=false if input and output are a terminal
+    local dowait=""
+    [ -t 0 -a -t 1 ] && dowait=false || dowait=true
+    pubs=( )
+    disks=( )
+    addfiles=( )
+    netdevs=( )
+    pt=( )
+
+    # if output is to a terminal, then set dowait default to false
+    [ -t 0 ] && dowait=false || dowait=true
+    while [ $# -ne 0 ]; do
+        cur=${1}; next=${2};
+        case "$cur" in
+               --add) addfiles[${#addfiles[@]}]="$next"; shift;;
+            -a|--append) uappend="$uappend $next"; shift;;
+            -A|--arch) arch_hint="$next"; shift;;
+               --boot-image) bootimg_dist="$next"; shift;;
+            -d|--disk) disks[${#disks[@]}]="$next"; shift;;
+               --dowait) pt[${#pt[@]}]="$cur"; dowait=true;;
+            -h|--help) Usage ; exit 0;;
+            -i|--initrd) initrd="$next"; shift;;
+            -k|--kernel) kernel="$next"; shift;;
+               --mem) mem="$next"; shift;;
+            -n|--netdev) netdevs[${#netdevs[@]}]="$next"; shift;;
+               --no-dowait) pt[${#pt[@]}]="$cur"; dowait=false;;
+               --no-install-deps) install_deps="";;
+               --no-proxy-config) proxy_config=false;;
+               --no-reboot) pt[${#pt[@]}]="--no-reboot";;
+               --power)
+                case "$next" in
+                    off) pstate="poweroff";;
+                    on|none)  pstate="null";;
+                    reboot) pstate="$next";;
+                    *) error "Invalid power state, must be: off, on, reboot";;
+                esac
+                shift;;
+            -p|--publish) pubs[${#pubs[@]}]="$next"; shift;;
+               --root-arg) root_arg="$next";;
+               --serial-log) serial_log="$next"; shift;;
+               --silent) video="-nographic";;
+            -s|--smp) smp="$next"; shift;;
+            --uefi-nvram|--bios)
+                # handle all --opt=* pass through here.
+                pt[${#pt[@]}]="$cur=$next";;
+            -v|--verbose) VERBOSITY=$((${VERBOSITY}+1));;
+               --vnc)
+                    video="-vnc $next"
+                    debug 1 "VNC requested - $next"
+                    shift;;
+            --) shift; break;;
+        esac
+        shift;
+    done
+
+    # handle passing through '-v' if given
+    local t=""
+    for((i=0;i<${VERBOSITY};i++)); do t="${t}v"; done
+    [ -n "$t" ] && pt[${#pt[@]}]="-$t"
+
+    if [ "$bootimg_dist" = "none" -a -z "$kernel" ]; then
+        bad_Usage "must provide boot-image or --kernel";
+        return 1;
+    fi
+    cmdargs=( "$@" )
+    curtin_extra=( ${install_deps} )
+
+    xkvm_check || return
+    TEMP_D=$(mktemp -d "${TMPDIR:-/tmp}/${0##*/}.XXXXXX") ||
+        { error "failed to make tempdir"; return 1; }
+
+    trap cleanup EXIT
+    register_signal_handlers
+
+    if [ "${#disks[@]}" -eq 0 ]; then
+        disks=( "${TEMP_D}/disk1.img" )
+    fi
+
+    if [ "$bootimg_dist" != "none" ]; then
+        bootimg_dist=$(readlink -f "$bootimg_dist") ||
+            { error "bad bootimg $bootimg_dist"; return 1; }
+        bootimg="${TEMP_D}/boot.img"
+            qemu-img create -f qcow2 -b "${bootimg_dist}" "$bootimg" ||
+            { error "failed create from ${bootimg_dist}"; return 1; }
+    fi
+ 
+    [ -z "$initrd" -o -f "$initrd" ] ||
+        { error "initrd not a file: $initrd"; return 1; }
+    [ -z "$kernel" -o -f "$kernel" ] ||
+        { error "kernel not a file: $kernel"; return 1; }
+
+    tmp=$(dirname "$0") && top_d=$(cd "$tmp" && cd .. && pwd) ||
+        { error "failed to get dir for $0"; return 1; }
+
+    TOOLS_D=$(dirname "$0")
+
+    local disk="" src="" size="" fmt="" out="" id="" driver="" if=""
+    local split_input="" serial=""
+    disk_args=( )
+    id=1
+    for disk in "${disks[@]}"; do
+        ((id++))
+        # 1=src
+        # 2=src:size
+        # 3=src:size:driver
+        # 4=src:size:driver:bsize
+        # 5=src:size:driver:bsize:devopts
+        # 6=src:size:iscsi:bsize:target
+        # 7=src:size:iscsi:bsize:target:user:password:iuser:ipassword
+        src=$(echo $disk | awk -F: '{print $1}')
+        size=$(echo $disk | awk -F: '{print $2}')
+        driver=$(echo $disk | awk -F: '{print $3}')
+        bsize=$(echo $disk | awk -F: '{print $4}')
+        devopts=$(echo $disk | awk -F: '{print $5}')
+
+        if [ -z "${src}" ]; then
+            error "Failed to provide disk source"
+            exit 1
+        fi
+
+        if [ -z "${size}" ]; then
+            size=5G
+        fi
+
+        if [ -z "${driver}" ]; then
+            driver="virtio-blk"
+        fi
+
+        if [ -z "${bsize}" ]; then
+            bsize="512"
+        fi
+
+        if [ ! -e "$src" ]; then
+            qemu-img create -f raw "${src}" "$size" ||
+                { error "failed create $src of size $size"; return 1; }
+            fmt="raw"
+        else
+            fmt=$(get_img_fmt "$src") ||
+                { error "failed to determine format of $src"; return 1; }
+        fi
+
+        # We do not pass iSCSI disks down to qemu, as that will use
+        # qemu's iSCSI target layer and not the host tgt
+        if [ "${driver}" == "iscsi" ]; then
+            local target="" tid="" user="" password=""
+            local iuser="" ipassword=""
+            target=$(echo "$disk" | awk -F: '{print $5}') &&
+                [ -n "$target" ] || {
+                error "empty target for iSCSI disk '$disk'"
+                return 1
+            }
+            user=$(echo "$disk" | awk -F: '{print $6}')
+            password=$(echo "$disk" | awk -F: '{print $7}')
+            [ -n "$user" -a -n "$password" ] || \
+                [ -z "$user" -a -z "$password" ] || {
+                error "both target user ($user) and password ($password) " \
+                      "must be specified for iSCSI disk '$disk'"
+                return 1
+            }
+            iuser=$(echo "$disk" | awk -F: '{print $8}')
+            ipassword=$(echo "$disk" | awk -F: '{print $9}')
+            [ -n "$iuser" -a -n "$ipassword" ] || \
+                [ -z "$iuser" -a -z "$ipassword" ] || {
+                error "both initiator user ($iuser) and password ($ipassword) " \
+                      "must be specified for iSCSI disk '$disk'"
+                return 1
+            }
+            get_tgt_tid "$target" "$src" || return
+            tid="$_RET"
+            configure_tgt_auth "$tid" "$user" "$password" \
+                "$iuser" "$ipassword" || return
+            debug 1 "registered $disk to tgt tid=$tid"
+            continue
+        fi
+
+        # prepend comma if passing devopts
+        if [ -n "${devopts}" ]; then
+            devopts=",${devopts}"
+        fi
+
+        # set logical/physical size blocksz is logical:phys
+        local logbs=$(round_up ${bsize%%:*})
+        local phybs=$(round_up ${bsize##*:})
+        local bs_args="logical_block_size=$logbs"
+              bs_args="${bs_args},physical_block_size=$phybs"
+              bs_args="${bs_args},min_io_size=$logbs"
+
+        t="file=${src},if=none,cache=unsafe,format=$fmt,"
+        t="${t}id=drv${id},index=$id,"
+        t="${t}driver=${driver},${bs_args}${devopts}"
+        disk_args[${#disk_args[@]}]="--disk=$t"
+
+    done
+
+    get_my_ip || { error "failed to get your ip. set IP_ADDR"; return 1; }
+    ip=${_RET}
+
+    # put ip into no_proxy which will get into curtin proxy config
+    case ",${no_proxy:-}," in
+        ,,) export no_proxy="$ip"
+            debug 1 "exported no_proxy to $no_proxy";;
+        *,${ip},*)
+            debug 1 "no_proxy already contained ip $ip (${no_proxy})";;
+        *)  no_proxy="${no_proxy},${ip}"
+            debug 1 "added $ip to existing no_proxy (${no_proxy})";;
+    esac
+
+    start_http "${TEMP_D}" "$ip" "$http_port" "${HTTP_TRIES}" </dev/null ||
+        { error "failed to start http service"; return 1; }
+    http_port=$_RET
+    burl="http://$ip:${http_port}"
+
+    local tok tok_split src pub fpath rdir
+    # tok in pubs looks like file[:pubname]
+    # link them into the temp dir for publishing
+    for tok in "${pubs[@]}"; do
+        tok_split=( ${tok//:/ } )
+        src=${tok_split[0]}
+        pub=${tok_split[1]}
+        fpath=$(readlink -f "$src") ||
+            { error "'$src': failed to get path"; return 1; }
+        if [ -n "$pub" ]; then
+            rdir=$(dirname "$pub")
+            [ -d "${TEMP_D}/$rdir" ] || mkdir -p "${TEMP_D}/$rdir" || {
+                error "Failed to make <pubdir>/$rdir for publish of $pub";
+                return 1;
+            }
+        else
+            pub="${src##*/}"
+        fi
+        ln -sf "$fpath" "${TEMP_D}/${pub}" ||
+            { error "failed to link $fpath to <pubdir>/$pub"; return 1; }
+        debug 1 "publishing: $fpath to $burl/${pub}"
+    done
+
+    local addargs="" f=""
+    addargs=( )
+    for f in "${addfiles[@]}"; do
+        if [ "${f#*:}" != "$f" ]; then
+            addargs[${#addargs[@]}]="--add=$f"
+        else
+            addargs[${#addargs[@]}]="--add=$f:${f##*/}"
+        fi
+    done
+
+    if ${proxy_config}; then
+        f="${TEMP_D}/launch-curtin-proxy.cfg"
+        write_proxy_config "$f" ||
+            { error "Failed to write proxy config to $f"; return 1; }
+        curtin_extra[${#curtin_extra[@]}]="--config=$f"
+        debug 1 "proxy config has:"
+        debug 1 "$(cat $f)"
+    fi
+
+    if [ "${cmdargs[0]}" = "curtin" ]; then
+        # if this is a 'curtin' command, then insert any curtin_extra args.
+        debug 1 "adding to curtin command: " "${curtin_extra[@]}"
+        cmdargs=( curtin "${curtin_extra[@]}" "${cmdargs[@]:1}" )
+    elif [ "${#curtin_extra[@]}" -ne 0 ]; then
+        debug 1 "command '${cmdargs[0]}' is not 'curtin'." \
+            "Not adding additional curtin flags:" "${curtin_extra[@]}"
+    fi
+
+    # We now pack up --config= options for the user
+    # potentially should check to make sure they've not already done this
+    # as this updating could then be destructive / annoying
+    # specifically, it could be annoying if you had a config inside
+    # the image that you were meaning to reference, and we copied (or tried)
+    # the file from the host.
+    for((i=1;i<${#cmdargs[@]};i++)); do
+        cur=${cmdargs[$i]}
+        next=${cmdargs[$i+1]}
+        stuffed_cfg=""
+        fpath=""
+        case "$cur" in
+            --config|-c)
+                fpath=$next;
+                cmdargs[$i+1]="config/${fpath##*/}"
+                ;;
+            --config=*)
+                fpath=${cur#--config=}
+                cmdargs[$i]="--config=config/${fpath##*/}"
+                ;;
+            *) continue;;
+        esac
+        addargs[${#addargs[@]}]="--add=config/${fpath##*/}:$fpath"
+    done
+
+    # now replace PUBURL anywhere in cmdargs
+    for((i=0;i<${#cmdargs[@]};i++)); do
+        cmdargs[$i]=${cmdargs[$i]//PUBURL/$burl}
+    done
+
+    local curtin_exe="${CURTIN_VMTEST_CURTIN_EXE:-${top_d}/bin/curtin}"
+    debug 1 "pack command: ${curtin_exe} pack" "${addargs[@]}" -- \
+        "${cmdargs[@]}"
+    ${curtin_exe} pack "${addargs[@]}" -- \
+        "${cmdargs[@]}" > "${TEMP_D}/install-cmd" ||
+        { error "failed to pack"; return 1; }
+
+    udata="${TEMP_D}/user-data"
+    mdata="${TEMP_D}/meta-data"
+
+    local ccfiles=""
+    ccfiles=( )
+    if [ -n "${pstate}" ]; then
+        write_pstate_config "$pstate" "${TEMP_D}/pstate.1" "${TEMP_D}/pstate.2"
+        ccfiles[${#ccfiles[@]}]="${TEMP_D}/pstate.1"
+        ccfiles[${#ccfiles[@]}]="${TEMP_D}/pstate.2"
+    fi
+
+    if tmp=$(find_apt_proxy); then
+        debug 1 "using $tmp for proxy"
+        printf '#cloud-config\napt_proxy: "%s"\n' "$tmp" > "${TEMP_D}/cc-proxy"
+        ccfiles[${#ccfiles[@]}]="${TEMP_D}/cc-proxy"
+    fi
+
+    if command -v ssh-keys-list >/dev/null 2>&1; then
+        ssh-keys-list cloud-config > "${TEMP_D}/cc-ssh-keys" &&
+            ccfiles[${#ccfiles[@]}]="${TEMP_D}/cc-ssh-keys" ||
+            { error "failed to get users ssh keys."; return 1; }
+    fi
+
+    write_metadata > "$mdata" || { error "failed to write meta-data"; return 1; }
+    write_userdata "${TEMP_D}/install-cmd" "${ccfiles[@]}" > "$udata"  ||
+        { error "failed to write user-data"; return 1; }
+
+    local seedargs=""
+    seedargs=()
+    if [ -n "$kernel" ]; then
+        local append="" root=""
+        # Note: root_arg is by default done by serial.  This assumes
+        # the root device is not multipath
+        if [ -z "$root_arg" ]; then
+            debug 1 "WARN: root_arg is empty with kernel."
+        fi
+        root_arg="${root_arg//PUBURL/$burl}"
+        # Note: cloud-init requires seedfrom= to have a trailing-slash
+        append="${root_arg:+${root_arg} }ds=nocloud-net;seedfrom=${burl}/"
+
+        local console_name=""
+        case "${arch_hint}" in
+            s390x) console_name="";;
+            ppc64*) console_name="hvc0";;
+            *) console_name="ttyS0";;
+        esac
+        if [ -n "$console_name" ]; then
+            append="${append} console=${console_name}"
+        fi
+        append="${append} $uappend"
+        seedargs=( "${seedargs[@]}" -kernel "$kernel" )
+        [ -n "$initrd" ] && seedargs=( "${seedargs[@]}" -initrd "$initrd" )
+        seedargs=( "${seedargs[@]}" -append "$append" )
+    else
+        seed="${TEMP_D}/seed.img"
+        cloud-localds "$seed" "$udata" "$mdata" ||
+            { error "failed cloud-localds"; return 1; }
+        seedargs=( "--disk=file=${seed},if=virtio,media=cdrom" )
+    fi
+
+    local netargs
+    netargs=( )
+    for dev in "${netdevs[@]}"; do
+        netargs=( "${netargs[@]}" "--netdev=${dev}" )
+    done
+
+    local cmd serial_args="" chardev_arg=""
+    [ "${serial_log}" = "none" ] && serial_log=""
+    if [ -n "${serial_log}" ]; then
+        if [ "${arch_hint}" = "s390x" ]; then
+            if [ "${serial_log}" = "stdio" ]; then
+                chardev_arg="stdio"
+            else
+                chardev_arg="file,path=${serial_log}"
+            fi
+                serial_args="-nodefaults -chardev ${chardev_arg},id=charconsole0 -device sclpconsole,chardev=charconsole0,id=console0"
+        else
+            serial_args="-serial file:${serial_log}"
+            #debug mode serial_args="-serial ${serial_log} -monitor stdio"
+        fi
+    fi
+    cmd=(
+        xkvm
+        ${bootimg:+"--disk=$bootimg,if=virtio,serial=boot-disk"}
+        "${pt[@]}" "${netargs[@]}" 
+        "${disk_args[@]}"
+        --
+        -smp ${smp}
+        -m ${mem} ${serial_args} ${video}
+        "${seedargs[@]}"
+        )
+
+    debug 1 "running with dowait=$dowait: ${cmd[*]}"
+    local sstart=$SECONDS
+    if $dowait; then
+        "${cmd[@]}" &
+        XKVM_PID=$!
+        debug 1 "xkvm pid: $XKVM_PID. launch pid: $$"
+        wait "${XKVM_PID}"
+        ret=$?
+        XKVM_PID=""
+    else
+        "${cmd[@]}"
+        ret=$?
+    fi
+    debug 1 "xkvm returned $ret took $(($SECONDS-$sstart))"
+
+    return $ret
+}
+
+random_wwn() {
+    # wwn must be a int64, less than (1 << 63) - 1
+    # we achieve this by combining 4 (1 << 15) ints
+    printf "0x%04x%04x%04x%04x" $RANDOM $RANDOM $RANDOM $RANDOM
+}
+
+round_up() {
+    local size="${1}"
+    local multiple="${2:-512}"
+    local max_size=$((32 * 1024)) # 32k max
+
+    size=$(( (($size + $multiple - 1) / $multiple) * $multiple))
+    if [ $size -gt $max_size ]; then
+        echo $max_size
+        return
+    elif [ $size -lt $multiple ]; then
+        echo $multiple
+        return
+    fi
+    echo $size
+}
+
+test_start_http() {
+    # run this like:
+    #  HTTP_PORT_MIN=59000 HTTP_PORT_MAX=63001 ./tools/launch \
+    #     /tmp/smfoo localhost
+    TOOLS_D=${TOOLS_D:-${0%/*}}
+    VERBOSITY=3
+    trap cleanup EXIT
+    register_signal_handlers
+    echo "mypid: $$"
+    start_http "$@" || { ret=$?; echo "returned $ret"; return $ret; }
+    ret=$?
+    port=$_RET
+    echo "pid $HTTP_PID is serving on $port"
+    sleep ${SLEEPTIME:-3} &
+    XKVM_PID=$!
+    wait $XKVM_PID
+    ret=$?
+    XKVM_PID=""
+    return $ret
+}
+
+main "$@"
+
+# vi: ts=4 expandtab syntax=sh

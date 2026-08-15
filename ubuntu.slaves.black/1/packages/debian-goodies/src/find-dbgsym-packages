@@ -1,0 +1,508 @@
+#!/usr/bin/perl
+
+# Get list of debug symbol packages relevant for a core file or ELF
+# program/library.
+#
+# Copyright (C) 2017      Stefan Fritsch <sf@debian.org>
+# Copyright (C) 2017      Paul Wise <pabs@debian.org>
+# Copyright (C) 2017-2020 Axel Beckert <abe@debian.org>
+# Copyright (C) 2018      Jakub Wilk <jwilk@jwilk.net>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+use strict;
+use warnings FATAL => 'all';
+use autodie qw(:all);
+use v5.14;
+use IPC::System::Simple qw(capturex $EXITVAL);
+use File::Which;
+use File::Temp qw(tempdir);
+use File::Slurper qw(read_text write_text);
+use POSIX qw(strftime);
+use File::Copy qw(move);
+use File::Basename qw(fileparse);
+
+$ENV{LC_ALL} = 'C';
+
+if (scalar @ARGV == 0 or $ARGV[0] eq '--help' or $ARGV[0] eq '-h') {
+    usage();
+}
+
+my $vdso_regexp = qr/^linux-(gate|vdso\d*)[.]so[.]/;
+my $call_apt = 0;
+my $use_ssh = 0;
+my $show_all = 0;
+my $gen_deb = 0;
+
+my %pkgs;
+my @programs = ();
+my @out_of_date_files;
+foreach my $arg (@ARGV) {
+    if ($arg eq '--install') {
+        $call_apt = 1;
+        next;
+    }
+    if ($arg eq '--deb') {
+        die "Package equivs needs to be installed to use the option '--deb'.\n"
+            unless which('equivs-build');
+        $gen_deb = 1;
+        next;
+    }
+    if ($arg eq '--ssh') {
+        die "Package openssh-client needs to be installed to use the option '--ssh'.\n"
+            unless which('ssh');
+        $use_ssh = 1;
+        next;
+    }
+    if ($arg eq '--all') {
+        $show_all = 1;
+        next;
+    }
+
+    my %build_ids;
+    if ($arg =~ /^\d+$/) {
+        %build_ids = get_build_ids_from_pid($arg);
+
+        # Document which file was looked for
+        push(@programs, readlink("/proc/$arg/exe"));
+    } else {
+        %build_ids = get_build_ids_from_file($arg);
+    }
+
+    my %debs_from_id = get_debs_from_ids(keys %build_ids);
+    foreach my $id (keys %build_ids) {
+        my ($path, $name) = @{$build_ids{$id}};
+
+        next if $name =~ $vdso_regexp;
+
+        my @p = @{$debs_from_id{$id} // []};
+        if (scalar @p == 0) {
+            @p = get_debs_from_path($path);
+            if (scalar @p == 0) {
+                warn "W: Cannot find debug package for $name ($id)\n";
+            }
+        } elsif (scalar @p > 1) {
+            warn "W: Multiple packages for $name ($id): @p\n";
+        }
+        foreach my $p (@p) {
+            $pkgs{$p} = 1;
+        }
+    }
+}
+
+if (@out_of_date_files) {
+    warn
+        "W: The following files were reported by eu-unstrip as \"deleted\":\n".
+        "W:    ".join("\nW:    ", @out_of_date_files)."\n".
+        "W: If $0 reports already installed dbgsym packages as necessary,\n".
+        "W: they are not at the expected (usually older) package version.\n";
+}
+
+my @pkgs = sort keys %pkgs;
+
+# Is anything to do anyway?
+if (@pkgs) {
+
+    # Shall we install the needed packages directly?
+    if ($call_apt) {
+        my @cmd = (qw(apt install --no-install-recommends), @pkgs);
+
+        # Shall we generate a metapackage and install that one?
+        if ($gen_deb) {
+            my $pkg = gen_pkg(@pkgs);
+            @cmd = (qw(apt install), $pkg);
+        }
+
+        # Are we root?
+        unless ($> == 0) {
+
+            # Shall we use ssh to obtain root privileges?
+            if ($use_ssh) {
+                @cmd = (qw(ssh root@localhost -t), @cmd);
+            } else {
+
+                # Is sudo installed? If so, use it.
+                if (which('sudo')) {
+                    unshift(@cmd, 'sudo');
+
+                # Else use plain old su.
+                } else {
+                    @cmd = (qw(su - -c), join(' ', @cmd));
+                }
+            }
+        }
+
+        # Print the command that is being executed so
+        # that it is clear what password is needed
+        say("\$ @cmd");
+
+        # Finally execute the command constructed above
+        exec(@cmd);
+
+    # Shall we just generate a .deb, but not install it?
+    } elsif ($gen_deb) {
+        my $pkg = gen_pkg(@pkgs);
+        my $target = $ENV{TMPDIR} // '/tmp';
+        move($pkg, $target);
+        my $filename = $target.'/'.fileparse($pkg);
+        say "Metapackage has been generated at $filename.";
+        say "Install it like this with root privileges:";
+        say "";
+        say "apt install $filename";
+
+    # No options, so just display the list of still needed packages.
+    } else {
+        say join(" ", @pkgs);
+    }
+
+# If not, tell the user on STDERR.
+} else {
+    warn "I: All needed dbgsym packages are already installed.\n";
+}
+
+exit 0;
+
+#### sub routines ####
+
+sub parse_eu_unstrip
+{
+    my ($output) = @_;
+
+    my %ids;
+
+    foreach my $line (split(/\n/, $output)) {
+        # 0x7fa9b8017000+0x39e9a0 79450f6e36287865d093ea209b85a222209925ff@0x7fa9b8017280 /lib/x86_64-linux-gnu/libc.so.6 /usr/lib/debug/.build-id/79/450f6e36287865d093ea209b85a222209925ff.debug libc.so.6
+        # 0x7f7f7235e000+0x17000 - /usr/share/locale/de/LC_MESSAGES/bash.mo - /usr/share/locale/de/LC_MESSAGES/bash.mo
+        # 0x7ffd4098a000+0x2000 de7dac2df9f596f46fa94a387858ef25170603ec@0x7ffd4098a7d0 . - [vdso: 1740]
+        # 0x7f37090fb000+0x2a000 dc5cb16f5e644116cac64a4c3f5da4d081b81a4f@0x7f37090fb248 - - /lib/x86_64-linux-gnu/ld-2.27.so (deleted)
+        # 0x562f3d01b000+0xa725000 9b43003ffd70d8db@0x562f3d01b34c /usr/lib/chromium/chromium /usr/lib/debug/.build-id/9b/43003ffd70d8db.debug /usr/lib/chromium/chromium
+        if ($line =~ m{
+                      ^(?: 0 | 0x[[:xdigit:]]+ )
+                      [+]
+                      0x[[:xdigit:]]+
+                      \s+
+                      ( [[:xdigit:]]+ [@] 0x[[:xdigit:]]+ | - )
+                      \s+
+                      ( \S+ )
+                      \s+
+                      ( \S+ )
+                      \s+
+                      (?: ( \S+ ) | ( \[vdso: \s+ \d+\] ) )?
+                      ( \s+ \(deleted\) )?
+                      $
+                      }ix) {
+            my $id = $1;
+            my $path = $2;
+            my $debug = $3;
+            my $name = $4 // $path;
+            my $vdso = $5;
+            my $deleted = $6;
+            if ($debug ne '-' and not $show_all) {
+                next;
+            }
+            if (defined $vdso) {
+                next;
+            }
+            if ($id eq '-') {
+                warn "W: No build-ID for $name\n";
+                next;
+            } elsif ($id =~ /^([[:xdigit:]]+)[@]/) {
+                $id = $1;
+            } else {
+                die "BUG: id='$id'";
+            }
+            if ($path eq '-' || $path eq '.') {
+                $path = $name;
+                $path =~ s{ \(deleted\)$}{};
+            }
+            if (defined $deleted) {
+                push(@out_of_date_files, $path);
+            }
+            $ids{$id} = [$path, $name];
+        } else {
+            warn "W: Cannot parse eu-unstrip output: '$line'\n";
+        }
+    }
+    return (%ids);
+}
+
+sub get_files_from_elf
+{
+    my ($filename) = @_;
+    my @libs = ($filename);
+    my $output = capturex(qw(ldd --), $filename);
+
+    foreach my $line (split(/\n/, $output)) {
+        chomp $line;
+        my ($name, $path);
+        if ($line =~ /^\t.+ => (.+) \(0x[0-9a-f]+\)$/) {
+            push @libs, $1;
+        } elsif ($line =~ /^\t(.+) \(0x[0-9a-f]+\)$/) {
+            push @libs, $1;
+        } else {
+            warn "W: Cannot parse ldd output: '$line'\n";
+        }
+    }
+
+    return @libs;
+}
+
+sub get_build_ids_from_file
+{
+    my ($filename) = @_;
+    if ($filename !~ m(/) and not -f $filename) {
+        my $oldfilename = $filename;
+        $filename = which($filename);
+        if (defined($filename)) {
+            warn "I: ./$oldfilename not found, using $filename instead\n";
+        } else {
+            warn "W: ./$oldfilename not found ".
+                "and no '$oldfilename' found in path either, skipping\n";
+            return qw();
+        }
+    }
+
+    unless (-f $filename) {
+            warn "W: $filename not found, skipping\n";
+            return qw();
+    }
+
+    if (is_core_file($filename)) {
+        return get_build_ids_from_core($filename);
+    } else {
+        # Document which file was looked for
+        push(@programs, $filename);
+
+        my @filenames = get_files_from_elf($filename);
+        my %build_ids;
+        foreach my $filename (@filenames) {
+            next if $filename =~ $vdso_regexp;
+            %build_ids = (%build_ids, get_build_ids_from_elf($filename));
+        }
+        return %build_ids;
+    }
+}
+
+sub get_build_ids_from_elf
+{
+    my ($filename) = @_;
+    my $output = capturex(qw(eu-unstrip --list-only --executable), $filename);
+
+    return parse_eu_unstrip($output);
+}
+
+sub get_build_ids_from_core
+{
+    my ($filename) = @_;
+    my $output = capturex(qw(eu-unstrip --list-only --core), $filename);
+
+    # Document which file was looked for (fifth field in first line)
+    my $program = (split(' ', (split(/\n/, $output))[0]))[4];
+    push(@programs, $program);
+
+    return parse_eu_unstrip($output);
+}
+
+sub get_build_ids_from_pid
+{
+    my ($pid) = @_;
+    my $output = capturex(qw(eu-unstrip --list-only --pid), $pid);
+    chomp $output;
+
+    return parse_eu_unstrip($output);
+}
+
+sub get_debs_from_ids
+{
+    my $id_regexp = join('|', @_);
+    my %map;
+    my $output;
+    $output = capturex([0, 1], qw(grep-aptavail --no-field-names --show-field Package --show-field Build-IDs --field Build-IDs --eregex --pattern), $id_regexp);
+    while ($output =~ /\G(\S+)\n(\S+(?: \S+)*)\n\n/gc) {
+        my $pkg = $1;
+        my $ids = $2;
+        while ($ids =~ m/\b($id_regexp)\b/g) {
+            push @{$map{$1}}, $pkg;
+        }
+    }
+    if (length $output != (pos $output // 0)) {
+        die "Cannot parse grep-aptavail output";
+    }
+    return %map;
+}
+
+sub get_debs_from_path
+{
+    my ($path) = @_;
+
+    my $output;
+    eval {
+        ($output, undef) = capturex(qw(dpkg-query --search --), $path);
+    };
+    if ($@) {
+        return;
+    }
+
+    my %pkgs = ();
+    foreach my $line (split(/\n/, $output)) {
+        if ($line =~ /^(.*): /) {
+            $pkgs{$1} = 1;
+        } else {
+            warn "W: Cannot parse dpkg-query output: '$line'\n";
+        }
+    }
+    my @pkgs = sort keys %pkgs;
+    my @strip_pkgs = map { s{:.*}{}; s{\d.*$}{}r } @pkgs;
+
+    eval {
+        ($output, undef) = capturex(qw(dpkg-query --showformat ${source:Package}\n --show --), @pkgs);
+    };
+    if ($@) {
+        return;
+    }
+
+    my %dbg_pkgs = ();
+    foreach my $src_pkg (split(/\n/, $output)) {
+        my $output;
+        $output = capturex([0, 1], qw(grep-aptavail --no-field-names --show-field Package --field Package --pattern -dbg --and --whole-pkg --field Source:Package --pattern), $src_pkg);
+        if ($EXITVAL) {
+            warn "W: No dbg package for source '$src_pkg'\n";
+            next;
+        }
+        my %src_dbg_pkgs = map { $_ => 1 } split(/\n/, $output);
+        my @src_dbg_pkgs = keys %src_dbg_pkgs;
+        my @src_strip_pkgs = map { my $pkg = $_; grep { /^$pkg-dbg/ } @src_dbg_pkgs } @pkgs;
+        @src_strip_pkgs = map { my $pkg = $_; grep { /^$pkg.*-dbg/ } @src_dbg_pkgs } @pkgs unless @src_strip_pkgs;
+        @src_strip_pkgs = map { my $pkg = $_; grep { /^$pkg-dbg/ } @src_dbg_pkgs } @strip_pkgs unless @src_strip_pkgs;
+        @src_strip_pkgs = map { my $pkg = $_; grep { /^$pkg.*-dbg/ } @src_dbg_pkgs } @strip_pkgs unless @src_strip_pkgs;
+        @src_dbg_pkgs = @src_strip_pkgs if @src_strip_pkgs;
+        map { $dbg_pkgs{$_} = 1; } @src_dbg_pkgs;
+    };
+
+    return sort keys %dbg_pkgs;
+}
+
+sub is_core_file
+{
+    my ($filename) = (@_);
+    my $output = capturex(qw(eu-readelf --file-header --), $filename);
+    if ($output =~ /^\s*Type:\s*CORE/m) {
+        return 1;
+    }
+    return;
+}
+
+sub gen_pkg {
+    my @pkgs = @_;
+    my $tempdir = tempdir( ( $ENV{TMPDIR} ? $ENV{TMPDIR} : '/tmp' ).
+                           '/find-dbgsym-packages-equivs_XXXXX',
+                           CLEANUP => 1 );
+
+    # Generating the necessary strings for generating the metapackage
+    my %replacements = ();
+
+    $replacements{CALL} = "$0 ".join(' ', @ARGV);
+    $replacements{DATE} = strftime('%a, %d %b %Y %T %z', localtime());
+    $replacements{DEPENDS} = join(', ', @pkgs);
+    $replacements{USER} = getlogin();
+    $replacements{HOST} = `hostname`;
+    $replacements{AOM} = $show_all ? 'all' : 'currently missing';
+
+    chomp($replacements{USER});
+    chomp($replacements{HOST});
+
+    my $dg_version = `dpkg-query -f '\${Version}' -W debian-goodies`;
+    $replacements{DGVERSION} = $dg_version;
+
+    my @now = localtime;
+    my $pkg_version = strftime(
+        '%Y.%m.%dT%H.%M.%S+dg'.$dg_version,
+        localtime()
+        );
+    $replacements{PKGVERSION} = $pkg_version;
+
+    my %programs = map { $_ => 1 } @programs;
+    $replacements{PROGRAMS} = '  * ' .
+        join("\n  * ", sort keys %programs);
+
+    $replacements{PACKAGE} = 'dbgsym-pkgs-for-' .
+        join('-',
+             map {
+                 s(^.*/)();
+                 s/\W//g;
+                 s/[-_]//g;
+                 lc($_);
+             }
+             sort keys %programs
+        );
+
+    # Replace placeholders with actual data
+    foreach my $file (qw(changelog control readme)) {
+        gen_file_from_template(
+            ( -d './find-dbgsym-packages-templates/' ?
+              './find-dbgsym-packages-templates/' :
+              '/usr/share/debian-goodies/find-dbgsym-packages-templates/' )
+            . $file,
+            "$tempdir/$file",
+            \%replacements
+            );
+    }
+
+    # Generate the .deb
+    chdir($tempdir);
+    #system("head -100 *");
+    # Instruct equivs-build to use the current directory
+    my $tmpdir = $ENV{TMPDIR};
+    delete $ENV{TMPDIR};
+    my $pkgbuild = capturex(qw(equivs-build control));
+    $ENV{TMPDIR} = $tmpdir;
+    #system("dpkg-deb --info *.deb");
+
+    my @debs = glob('*.deb');
+    # Sanity check
+    die "$0: BUG: Not exactly one .deb file generated" unless $#debs == 0;
+
+    return $tempdir.'/'.$debs[0];
+}
+
+sub gen_file_from_template {
+    my ($input, $output, $replacements) = @_;
+
+    my $text = read_text($input);
+
+    foreach my $key (%$replacements) {
+        $text =~ s/__${key}__/$replacements->{$key}/g;
+    }
+
+    write_text($output, $text);
+}
+
+sub usage
+{
+    print << "EOF";
+usage:
+  $0 [--install] [--ssh] [--deb] [--all] \
+    <core file or PID or program> [ ... ]
+
+  You must already have the correct debug lines in your sources.list and have
+  executed 'apt update'.
+
+  $0 requires the elfutils and dctrl-tools packages to be installed.
+EOF
+
+    exit 1;
+}
+
+# vim: syntax=perl sw=4 sts=4 sr et

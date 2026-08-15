@@ -1,0 +1,139 @@
+#!/bin/sh
+set -e
+
+###############################################################################
+# This is the Ubuntu manpage repository generator and interface.
+# 
+# Copyright (C) 2008 Canonical Ltd.
+# 
+# This code was originally written by Dustin Kirkland <kirkland@ubuntu.com>,
+# based on a framework by Kees Cook <kees@ubuntu.com>.
+#
+# It was later modified for Debian, for use in the debian-goodies package,
+# by Antoine Beaupré <anarcat@debian.org>, Axel Beckert <abe@deuxchevaux.org>
+# and Javier Fernández-Sanguino <jfs@debian.org>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# 
+# On Debian-based systems, the complete text of the GNU General Public
+# License can be found in /usr/share/common-licenses/GPL-3
+###############################################################################
+
+
+if [ -r /etc/lsb-release ] ; then
+    . /etc/lsb-release
+else
+    DISTRIB_CODENAME=$(lsb_release -c -s 2>/dev/null)
+fi
+# default to stable if LSB fails or is absent
+DISTRIB_CODENAME=${DISTRIB_CODENAME:-stable}
+
+usage()
+{
+        echo "Usage: $0 [ --release suite ] man-page <man-arguments>"
+}
+
+download_man(){
+    url=$1
+    file=$2
+    curl $CURLOPTS "$url" >"$file" 2>/dev/null
+    if  ! [ -s "$file" ]  || 
+        egrep -q "<title>403.*Forbidden</title>" "$file" ||
+        egrep -q "<h1>Manpage not found</h1>" "$file"  ; then
+            return 1
+    fi
+    return 0
+}
+    
+
+# Process command line options
+while true; do
+	case "$1" in
+		--release)
+			DISTRIB_CODENAME="$2"
+			shift 2
+			;;
+		--help)
+                        usage
+                        exit 0
+                        ;;
+		*)
+			break
+			;;
+	esac
+done
+PAGE=`echo "$@" | awk '{print $NF}'`
+MAN_ARGS=`echo "$@" | sed "s/\$PAGE$//"`
+
+
+
+# Sanity checks
+if [ ! -x "`which curl`" ] ; then
+    echo "ERROR: $0 - cannot find curl - exiting"
+    exit 1
+fi
+if [ -z "$PAGE" ] ; then
+    echo "ERROR: No manpage provided - exiting"
+    usage
+    exit 1
+fi
+
+# PROGRAM OPTIONS
+CURLOPTS="-s -L" # -s for silent, -L to follow redirects
+
+# Mirror support of man's languages
+if [ ! -z "$LANG" ]; then
+	LOCALE=$(echo $LANG | sed 's/_.*$//')
+	LOCDOT=".$LOCALE"
+fi
+if [ ! -z "$LC_MESSAGES" ]; then
+	LOCALE="$LC_MESSAGES"
+	LOCDOT=".$LOCALE"
+fi
+if echo $LOCALE | grep -E -q "^(C|en)"; then
+	LOCALE=""
+	LOCDOT=".en"
+fi
+
+BASE_URL="https://dyn.manpages.debian.org"
+
+mandir=`mktemp --tmpdir="${TMPDIR:-/tmp}" -d dman.XXXXXX`
+trap "rm -rf $mandir" EXIT HUP INT QUIT TERM
+man="$mandir/$PAGE"
+
+TESTED_URLS=""
+# be careful not to add too many entries in this loop, as each hit can
+# take some time for the round-trip
+for URL in "$BASE_URL/$DISTRIB_CODENAME/$PAGE$LOCDOT.gz" \
+               "$BASE_URL/$DISTRIB_CODENAME/$PAGE.en.gz" \
+               "$BASE_URL/$DISTRIB_CODENAME/$PAGE.gz" \
+               "$BASE_URL/$PAGE$LOCDOT.gz" \
+               "$BASE_URL/$PAGE.en.gz" \
+               "$BASE_URL/$PAGE.gz" \
+
+do
+    if download_man $URL $man; then
+        man $MAN_ARGS -l "$man" || true
+        exit 0
+    fi
+    # Continue in case of failure, take note of tested URL
+    if [ -z "$TESTED_URLS" ] ; then
+        TESTED_URLS="$URL" 
+    else 
+        TESTED_URLS="$TESTED_URLS, $URL"
+    fi
+done
+
+echo "$0: not found. Tried: $TESTED_URLS" 1>&1
+exit 1

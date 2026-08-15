@@ -1,0 +1,59 @@
+From c4c57d85c589d7e78bccdc67d705cdcdf85a2b02 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Fri, 26 Jun 2020 11:23:55 -0400
+Subject: [PATCH] Be more conformant to RFC4752
+
+Although we need to be able to completly suppress Integrity and
+Confidentiality flags in GSS-SPNEGO, we also need to be more conformant
+to RFC4752 for the GSSAPI mechanism.
+
+The RFC reuires to always set Integrity for SASL/GSSAPI, it also
+requires MUTUAL/SEQUENCE flags to only be set if any Security Layer is
+requested.
+
+Finally Confidentiality should be set only when requested so change the
+code that suppresses MIT krb5 setting CI flags not only in the SSF == 0
+case but also when SSF == 1, the integrity flag in that case will be
+explicitly set by our code and the NO_CI_FLAGS option will unset just
+the CONF flag.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+---
+ plugins/gssapi.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+Origin: upstream, https://github.com/cyrusimap/cyrus-sasl/commit/c4c57d85c589d7e78bccdc67d705cdcdf85a2b02
+Bug: https://github.com/cyrusimap/cyrus-sasl/pull/603
+Bug-Fedora: https://bugzilla.redhat.com/show_bug.cgi?id=1822133
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/openldap/+bug/1912256
+Last-Update: 2022-07-21
+
+--- a/plugins/gssapi.c
++++ b/plugins/gssapi.c
+@@ -1778,9 +1778,15 @@
+ 
+ 	/* Setup req_flags properly */
+ 	req_flags = GSS_C_MUTUAL_FLAG | GSS_C_SEQUENCE_FLAG;
+-	if (params->props.max_ssf > params->external_ssf) {
+-	    /* We are requesting a security layer */
++        if (text->mech_type == NULL) {
++            /* in SASL/GSSAPI RFC4752 requires the INTEG flag MUST be set to
++             * TRUE in all cases */
+ 	    req_flags |= GSS_C_INTEG_FLAG;
++        }
++	/* We are requesting a security layer */
++	if (params->props.max_ssf > params->external_ssf) {
++            /* Add integrity if explicity requested */
++            req_flags |= GSS_C_INTEG_FLAG;
+ 	    /* Any SSF bigger than 1 is confidentiality. */
+ 	    /* Let's check if the client of the API requires confidentiality,
+ 	       and it wasn't already provided by an external layer */
+@@ -1797,7 +1803,7 @@
+          * two layers (say TLS and GSSAPI) to both provide these services.
+          * So if we do not suppress these flags a SASL/GSS-SPNEGO negotiation
+          * over, say, LDAPS will fail against Windows Servers */
+-	} else if (params->props.max_ssf == 0) {
++	} else if (params->props.max_ssf <= 1) {
+             gss_buffer_desc empty_buffer = GSS_C_EMPTY_BUFFER;
+             if (client_creds == GSS_C_NO_CREDENTIAL) {
+                 gss_OID_set_desc mechs = { 0 };

@@ -1,0 +1,59 @@
+#!/bin/sh
+
+# debget - Fetch a .deb for a package in APT's database
+
+# Copyright (C) 2001,2002 Matt Zimmerman <mdz@debian.org>
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+#
+
+
+# Set the locale so we can control apt-get errors properly
+LC_ALL=C
+
+usage()
+{
+    echo "Usage: `basename $0` [--help] package"
+}
+
+if [ $# -eq 0 ] ; then
+	usage
+	exit 1
+fi
+
+case $1 in
+    "-h")     usage; exit 0;;
+    "--help") usage; exit 0;;
+    -*) echo "Unknown option $1"; usage; exit 1;;
+esac
+
+# First check if apt-get is sane enough before proceeding
+if ! ls /var/lib/apt/lists/ |grep Release >/dev/null; then
+    echo "ERROR: Your apt lists are empty. Update your package database"
+    echo "using 'apt update'"
+fi
+
+error=0
+for pkgspec in $*; do
+   apt-get download "$pkgspec"
+   if [ $? -ne 0 ] ; then
+        echo "If you believe the package exists then consider updating your"
+        echo "package database using 'apt update'."
+        error=1
+	continue
+   fi
+done
+exit $error

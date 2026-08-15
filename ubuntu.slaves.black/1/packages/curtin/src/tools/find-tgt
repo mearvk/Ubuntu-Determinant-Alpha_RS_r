@@ -1,0 +1,151 @@
+#!/bin/bash
+# This file is part of curtin. See LICENSE file for copyright and license info.
+
+TGT_PID=""
+fail() { [ $# -eq 0 ] || error "$@"; exit 1; }
+error() { echo "$@" 1>&2; }
+cleanup() {
+   [ -z "$TGT_PID" ] || kill -9 "$TGT_PID"
+}
+
+Usage() {
+    cat <<EOF
+Usage: ${0##*/} out_dir [ipv4addr]
+
+   Start a tgt server on a random port, listening on address ipv4addr.
+   If ipv4addr not provided, use the address of the interface
+   with the default route.
+
+   if out_d does not exist it will be created.
+
+   Writes the following files in out_d:
+     pid: pidfile for the started tgt
+     tgt.log: log file
+     socket: the socket used for TGT_IPC_SOCKET
+     info: bash snippet to export TGT_IPC_SOCKET and other info.
+EOF
+}
+
+find_ipv4addr() {
+    # tgtd/tgtadmin end up using a suffix from here of the control port
+    local dev="" addr=""
+    dev=$(route -n | awk '$1 == "0.0.0.0" { print $8 }')
+    [ -n "$dev" ] || { error "failed to find ipv4 device"; return 1; }
+    addr=$(ip addr show dev "$dev" |
+        awk '$1 == "inet" {gsub(/\/.*/,"", $2); print $2; exit}')
+    case "$addr" in
+        *.*.*.*) :;;
+        *) error "failed to get ipv4addr on dev '$dev'. got '$addr'"
+           return 1;;
+    esac
+    _RET=$addr
+}
+
+wait_for_tgtd() {
+    local pid="$1" portal="$2"
+    local tries=10 naplen=1 try=1
+    local out="" pidstgt="" name="tgtd"
+    while :; do
+        # did we succesfully attach to the correct port?
+        out=$(netstat --program --all --numeric 2>/dev/null) ||
+            fail "failed to netstat --program --all --numeric"
+        pidstgt=$(echo "$out" |
+            awk '$4 == portal { print $7; exit(0); }' "portal=$portal")
+        if [ "$pidstgt" = "$pid/$name" ]; then
+            error "expected pid $pid is listening on $portal on try $try."
+            return 0
+        elif [ -n "$pidstgt" ]; then
+            # something else listening.
+            error "pid/process '$pidstgt' was listening on $portal." \
+                "expected '$pid/$name'."
+            return 1
+        else
+            # nothing listening. retry.
+            :
+        fi
+        [ $try -le $tries ] || break
+        try=$(($try+1))
+        sleep $naplen
+    done
+    error "nothing listening on $portal after $tries tries"
+    return 2
+}
+
+if [ "$1" = "--help" -o "$1" = "-h" ]; then
+    Usage;
+    exit 0;
+elif [ $# -eq 0 ]; then
+    Usage 1>&2;
+    fail "Must provide a directory"
+fi
+
+trap cleanup EXIT
+out_d="$1"
+ipv4addr=${2}
+
+[ -d "$out_d" ] || mkdir -p "$out_d" ||
+    fail "'$out_d' not a directory, and could not create"
+out_d=$(cd "$out_d" && pwd)
+log="${out_d}/tgt.log"
+info="${out_d}/info"
+socket="${out_d}/socket"
+pidfile="${out_d}/pid"
+
+command -v tgtd >/dev/null 2>&1 || fail "no tgtd command"
+
+if [ -z "$ipv4addr" ]; then
+    find_ipv4addr || fail
+    ipv4addr="$_RET"
+fi
+
+if [ -e "$pidfile" ] && read oldpid < "$pidfile" &&
+    [ -e "/proc/$oldpid" ]; then
+    echo "killing old pid $oldpid"
+    kill -9 $oldpid
+fi
+rm -f "$socket" "$pidfile" "$info" "$log"
+: > "$log" || fail "failed to write to $log"
+
+# Racily try for a port. Annoyingly, tgtd doesn't fail when it's
+# unable to use the requested portal, it just happily uses the default
+tries=1
+tried_ports=""
+while [ $tries -le 100 ]; do
+    # pick a port > 1024, and I think tgt needs one < 2^15 (32768)
+    port=$((($RANDOM%(32767-1024))+1024+1))
+
+    portal="$ipv4addr:$port"
+    tried_ports="${tried_ports:+${tried_ports} }${port}"
+    error "going for $portal"
+    TGT_IPC_SOCKET="$socket" \
+        tgtd --foreground --iscsi "portal=$portal" >"$log" 2>&1 &
+    TGT_PID=$!
+    pid=$TGT_PID
+
+    if wait_for_tgtd $pid $portal; then
+        error "grabbed $port in $pid on try $tries"
+        cat >"$info" <<EOF
+export TGT_PID=$pid
+export TGT_IPC_SOCKET=$socket
+export TGT_PORTAL=$portal
+export CURTIN_VMTEST_ISCSI_PORTAL=\${TGT_PORTAL}
+echo "To list targets on this tgt: " 1>&2
+echo "  TGT_IPC_SOCKET=\${TGT_IPC_SOCKET} tgtadm --lld=iscsi --mode=target --op=show" 1>&2
+echo "For a client view of visible disks:" 1>&2
+echo "  iscsiadm --mode=discovery --type=sendtargets --portal=\${TGT_PORTAL}" 1>&2
+echo "  iscsiadm --mode=node --portal=\${TGT_PORTAL} --op=show" 1>&2
+EOF
+        # unset to avoid cleanup
+        TGT_PID=""
+        exit
+    fi
+    kill -9 $pid >/dev/null 2>&1
+    TGT_PID=""
+    wait $pid
+    tries=$(($tries+1))
+done
+error "gave up.  tried $tries times."
+error "ports tried: ${tried_ports}"
+exit 1
+
+# vi: ts=4 expandtab syntax=sh

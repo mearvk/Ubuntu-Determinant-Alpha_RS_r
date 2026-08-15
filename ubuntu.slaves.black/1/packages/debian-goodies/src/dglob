@@ -1,0 +1,97 @@
+#!/bin/sh
+set -e
+
+# dglob - Expand package names matching a pattern and conditions
+
+# Copyright (C) 2001 Matt Zimmerman <mdz@debian.org>
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+#
+
+ARGS=$(getopt -o af0reinXvA -n dglob -- "$@")
+eval set -- "$ARGS"
+
+
+filter="grep-dctrl -FStatus installed"
+archfilter="cat"
+expand="cat"
+grep_dctrl_options=""
+all="no"
+
+dglob_not() {
+# List packages that are available but not installed
+    { dglob $* ; dglob -a $* ; } | sort | uniq -u ;
+}
+
+while true; do
+    case "$1" in
+        -n) shift; ARGS=$(echo $@ | sed -e 's/--/ /'); dglob_not $ARGS; exit 0;;
+        -a) filter="cat" ; all="yes" ; shift ;;
+        -0) SEP=0 ; shift ;;
+        -r|-e|-i|-X|-v) grep_dctrl_options="$grep_dctrl_options $1"; shift ;;
+        -A) expand="awk -F: '{print \$1}'"; shift ;;
+        -f) expand="xargs dpkg --listfiles | perl -nl${SEP}e 'print if -f'"
+            if [ "$all" = "yes" ] ; then
+                if [ -n "$(which apt-file)" ]   ; then
+# if we have apt-file use it instead
+                    expand="while read pack; do apt-file show \$pack; done | perl -ple 's/^.*?: //'"
+                else
+                    echo "WARN: You requested information on files of all packages," >&2
+                    echo "WARN: however, since the 'apt-file' package is not available, this" >&2
+                    echo "WARN: information can only be provided for those packages currently installed." >&2
+                fi
+            fi
+            shift
+            ;;
+
+        --) shift ; break ;;
+    esac
+done
+
+pattern="$1"
+if echo "$pattern" | fgrep -q ":"; then
+    package=$(echo "$pattern" | awk -F: '{print $1}')
+    arch=$(echo "$pattern" | awk -F: '{print $2}')
+    archfilter="grep-dctrl -FArchitecture $arch"
+    if [ -z "$arch" ]; then
+        echo "Empty architecture (but colon) not allowed" 1>&2
+        exit 2
+    fi
+else
+    package="$pattern"
+fi
+
+
+packages=$(
+    if [ "$all" = "no" ] ; then
+        $filter /var/lib/dpkg/status
+    else
+        # Use grep-available as the status file does not include all available
+        # packages
+        apt-cache dumpavail
+    fi | \
+        $archfilter | \
+        grep-dctrl -PnsPackage,Architecture $grep_dctrl_options "$package" | \
+        sed -ze 's/\n/:/g;s/::/\n/g' | \
+        grep -v ^$
+        )
+
+# Does a package exist which matches the query?
+if [ -z "$packages" ] ; then
+    exit 1
+fi
+
+echo "$packages" | (eval $expand)

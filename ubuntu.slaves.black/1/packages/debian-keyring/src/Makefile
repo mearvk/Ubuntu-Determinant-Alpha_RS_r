@@ -1,0 +1,35 @@
+all: output/keyrings/debian-keyring.gpg output/keyrings/debian-maintainers.gpg output/keyrings/debian-nonupload.gpg output/keyrings/debian-role-keys.gpg output/keyrings/emeritus-keyring.gpg output/sha512sums.txt output/README output/changelog
+
+output/keyrings/debian-keyring.gpg: debian-keyring-gpg debian-keyring-gpg/0x*
+	cat debian-keyring-gpg/0x* > output/keyrings/debian-keyring.gpg
+
+output/keyrings/debian-maintainers.gpg: debian-maintainers-gpg debian-maintainers-gpg/0x*
+	cat debian-maintainers-gpg/0x* > output/keyrings/debian-maintainers.gpg
+
+output/keyrings/debian-nonupload.gpg: debian-nonupload-gpg debian-nonupload-gpg/0x*
+	cat debian-nonupload-gpg/0x* > output/keyrings/debian-nonupload.gpg
+
+output/keyrings/debian-role-keys.gpg: debian-role-keys-gpg debian-role-keys-gpg/0x*
+	cat debian-role-keys-gpg/0x* > output/keyrings/debian-role-keys.gpg
+
+output/keyrings/emeritus-keyring.gpg: emeritus-keyring-gpg emeritus-keyring-gpg/0x*
+	cat emeritus-keyring-gpg/0x* > output/keyrings/emeritus-keyring.gpg
+
+output/sha512sums.txt: output/keyrings/debian-keyring.gpg output/keyrings/debian-maintainers.gpg output/keyrings/debian-nonupload.gpg output/keyrings/debian-role-keys.gpg output/keyrings/emeritus-keyring.gpg
+	cd output; sha512sum keyrings/* > sha512sums.txt
+
+output/README: README
+	cp README output/
+
+output/changelog: debian/changelog
+	cp debian/changelog output/
+
+output/openpgpkey: output/keyrings/debian-keyring.gpg output/keyrings/debian-keyring.gpg output/keyrings/debian-nonupload.gpg output/keyrings/debian-role-keys.gpg
+	cd output && ../scripts/update-keyrings build-wkd debian.org keyrings/debian-keyring.gpg keyrings/debian-nonupload.gpg keyrings/debian-role-keys.gpg
+
+test: all
+	./runtests
+
+clean:
+	rm -f output/keyrings/*.gpg output/sha512sums.txt output/README output/changelog output/keyrings/*~
+	rm -rf gpghome output/openpgpkey

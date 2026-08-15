@@ -1,0 +1,20 @@
+Author: Luca Boccassi <bluca@debian.org>
+Description: docs: launcher: do not consider a skipped activation job as successful
+ systemd jobs are currently skipped if the unit is not startable, in the sense
+ that it doesn't have a concept of 'starting', such as a device unit.
+ While it makes sense for generic interfaces like systemctl to avoid considering
+ this a hard failure, in the case of service activation via D-Bus this is less
+ sensible as only service units can be used like this, and they are all startable.
+Forwarded: yes, https://github.com/bus1/dbus-broker/pull/278
+Bug: https://github.com/bus1/dbus-broker/issues/269
+--- a/src/launch/service.c
++++ b/src/launch/service.c
+@@ -243,7 +243,7 @@
+         if (!service->job || strcmp(path, service->job))
+                 return 0;
+ 
+-        if (!strcmp(result, "done") || !strcmp(result, "skipped")) {
++        if (!strcmp(result, "done")) {
+                 /*
+                  * Our job completed successfully. Make sure to stop watching
+                  * it so the `ActiveState` handling will take effect.

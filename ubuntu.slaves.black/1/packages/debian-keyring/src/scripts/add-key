@@ -1,0 +1,144 @@
+#!/bin/bash
+
+# Copyright (c) 2008 Jonathan McDowell <noodles@earth.li>
+# GNU GPL; v2 or later
+# Adds a new key to a keyring directory
+
+set -e
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+	echo "Usage: add-key keyfile dir" >&2
+	echo "Or:    add-key fingerprint dir" >&2
+	exit 1
+fi
+
+# avoid gnupg touching ~/.gnupg
+GNUPGHOME=$(mktemp -d -t jetring.XXXXXXXX)
+export GNUPGHOME
+trap cleanup exit
+cleanup () {
+	rm -rf "$GNUPGHOME"
+}
+
+if echo -n "$1" | egrep -q '^[[:xdigit:]]{40}$'; then
+    fpr=$1
+    keyserver=${KEYSERVER:=pool.sks-keyservers.net}
+    keyfile=$(mktemp -p $GNUPGHOME newkyXXXXXX)
+    echo "Retrieving key $fpr from keyserver $keyserver"
+    gpg --keyserver $keyserver --recv-key "$fpr"
+    gpg --export "$fpr" > $keyfile
+else
+    keyfile=$(readlink -f "$1") # gpg works better with absolute keyring paths
+fi
+keydir="$2"
+
+basename=$(basename "$keyfile")
+date=`date -R`
+
+if [ -f $keyfile ]; then
+	keyid=$(gpg --with-colons --keyid long --options /dev/null --no-auto-check-trustdb < $keyfile | grep '^pub' | cut -d : -f 5)
+else
+	keyid=${1: -16:16}
+fi
+
+for keyring in *-pgp/ *-gpg/; do
+	if [ -e $keyring/0x$keyid ]; then
+		echo "0x$keyid already exists in $keyring - existing key or error."
+		exit 1
+	fi
+done
+
+# Check we have our keyrings available for checking the signatures
+if [ ! -e output/keyrings/debian-keyring.gpg ]; then
+	make
+fi
+
+if [ -f $keyfile ]; then
+	gpg --quiet --import $keyfile
+else
+	gpg --quiet --keyserver the.earth.li --recv-key $1 || true
+	gpg --quiet --keyserver pgp.mit.edu --recv-key $1 || true
+	gpg --quiet --keyserver keyserver.ubuntu.com --recv-key $1 || true
+	gpg --quiet --keyserver the.earth.li --send-key $1
+fi
+gpg --keyring output/keyrings/debian-keyring.gpg \
+        --keyring output/keyrings/debian-nonupload.gpg --check-sigs \
+        --with-fingerprint --keyid-format 0xlong 0x$keyid | \
+sensible-pager
+
+echo "We want signatures from at least two other DDs."
+echo "If this is a key transition, we also want a signature from the DD's old key."
+echo "Are you sure you want to update this key? (y/n)"
+read n
+
+if ( echo $keydir | egrep -q '^(\./)?debian-keyring-gpg/?$' ); then
+    dest=DD
+elif ( echo $keydir | egrep -q '^(\./)?debian-nonupload-gpg/?$' ); then
+    dest=DN
+elif ( echo $keydir | egrep -q '^(\./)?debian-maintainers-gpg/?$' ); then
+    dest=DM
+fi
+
+if [ "x$n" = "xy" -o "x$n" = "xY" ]; then
+	gpg --no-auto-check-trustdb --options /dev/null \
+		--keyring output/keyrings/debian-keyring.gpg \
+		--keyring output/keyrings/debian-nonupload.gpg \
+		--keyring output/keyrings/debian-maintainers.gpg \
+		--export-options export-clean,no-export-attributes \
+		--export $keyid > $keydir/0x$keyid
+	git add $keydir/0x$keyid
+	echo -n "Enter full name of new key: "
+	read name
+	echo -n 'RT issue ID this change closes, if any: '
+	read rtid
+	if [ "$dest" = DD -o "$dest" = DN ]; then
+		echo -n "Enter Debian login of new key: "
+		read login
+		echo "0x$keyid $name <$login>" >> keyids
+		sort keyids > keyids.$$ && mv keyids.$$ keyids
+		git add keyids
+	fi
+
+	log="Add new $dest key 0x${fpr:24:16} ($name) (RT #$rtid)"
+	VERSION=$(head -1 debian/changelog | awk '{print $2}' | sed 's/[\(\)]//g')
+	RELEASE=$(head -1 debian/changelog | awk '{print $3}' | sed 's/;$//')
+	case $RELEASE in
+            UNRELEASED)
+		dch  --multimaint-merge -D UNRELEASED -a "$log"
+		;;
+            unstable)
+		NEWVER=$(date +%Y.%m.xx)
+		if [ "$VERSION" = "$NEWVER" ]
+		then
+                    echo '* Warning: New version and previous released version are'
+                    echo "  the same: $VERSION. This should not be so!"
+                    echo '  Check debian/changelog'
+		fi
+		dch -D UNRELEASED -v $NEWVER "$log"
+		;;
+            *)
+		echo "Last release $VERSION for unknown distribution «$RELEASE»."
+		echo "Not calling dch, do it manually."
+		;;
+	esac
+	git add debian/changelog
+
+	cat > git-commit-template <<EOF
+$log
+
+Action: add
+Subject: $name
+Username: $login
+Role: $dest
+Key: $fpr
+Key-type: 
+RT-Ticket: $rtid
+Request-signed-by: 
+Key-certified-by: 
+Details: 
+EOF
+
+else
+	echo "Not adding key."
+        exit 1
+fi

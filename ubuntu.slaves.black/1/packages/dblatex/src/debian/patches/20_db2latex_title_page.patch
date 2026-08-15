@@ -1,0 +1,36 @@
+Author: Andreas Hoenen <andreas@hoenen-terstappen.de>
+Description: Hotfix for BTS report #584670:
+Avoid duplication of title and author on title page for articles in db2latex
+style.
+--- a/latex/contrib/db2latex/db2latex.sty
++++ b/latex/contrib/db2latex/db2latex.sty
+@@ -138,8 +138,10 @@
+ \def\maketitle{
+   \stdmaketitle
+   \noindent
+-  \textbf{\DBKtitle \\}
+-  \ifx\DBKauthor\empty\else{by \DBKauthor \\}\fi
++  \ifthenelse{\boolean{DBKIsBook}}{
++    \textbf{\DBKtitle \\}
++    \ifx\DBKauthor\empty\else{by \DBKauthor \\}\fi
++  }{}
+   \hspace{0pt}\\
+   \ifthenelse{\equal{\DBKedition}{}}{}{Edition \DBKedition \\}
+   \ifthenelse{\equal{\DBKpubdate}{}}{}{Published \DBKpubdate \\}
+--- a/xsl/preamble.xsl
++++ b/xsl/preamble.xsl
+@@ -52,6 +52,14 @@
+     </xsl:otherwise>
+   </xsl:choose>
+   <xsl:text>}&#10;</xsl:text>
++  <xsl:text>\usepackage{ifthen}&#10;</xsl:text>
++  <xsl:text>\newboolean{DBKIsBook}&#10;</xsl:text>
++  <xsl:text>\setboolean{DBKIsBook}{</xsl:text>
++  <xsl:choose>
++    <xsl:when test="self::book">true</xsl:when>
++    <xsl:otherwise>false</xsl:otherwise>
++  </xsl:choose>
++  <xsl:text>}&#10;</xsl:text>
+ 
+   <xsl:variable name="external.docs">
+     <xsl:call-template name="make.external.docs"/>

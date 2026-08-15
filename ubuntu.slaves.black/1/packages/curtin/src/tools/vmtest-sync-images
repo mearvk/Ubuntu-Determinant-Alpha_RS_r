@@ -1,0 +1,79 @@
+#!/usr/bin/python3
+# This file is part of curtin. See LICENSE file for copyright and license info.
+
+# This tool keeps a local copy of the maas images used by vmtests.
+# It keeps only the latest copy of the available images.
+import fcntl
+import os
+import shutil
+import sys
+
+# Fix path so we can import ImageStore class.
+sys.path.insert(1, os.path.realpath(os.path.join(
+                                    os.path.dirname(__file__), '..')))
+
+from tests.vmtests import (
+    IMAGE_DIR, IMAGE_SRC_URL, sync_images)  # noqa: E402
+from tests.vmtests.image_sync import ITEM_NAME_FILTERS  # noqa: E402
+from tests.vmtests.helpers import (
+    find_arches, find_releases_by_distro)  # noqa: E402
+
+
+def _fmt_list_filter(filter_name, matches):
+    return '~'.join((filter_name, '|'.join(matches)))
+
+
+if __name__ == '__main__':
+    # Acquire an exclusive lock on IMAGE_DIR. This will prevent jenkins-runner
+    # from running while vmtest-sync-images is working.
+    print("Acquiring an exclusive lock on %s..." % IMAGE_DIR)
+    image_dir_fd = os.open(IMAGE_DIR, os.O_RDONLY)
+    fcntl.flock(image_dir_fd, fcntl.LOCK_EX)
+
+    # Acquire an exclusive lock on vmtest-images.lock. The jenkins-runner
+    # script sets a shared lock on it, meaning that vmtest-sync-images will
+    # wait for all the running jenkins-runner to finish before actually
+    # touching the image files.
+    lockfile = IMAGE_DIR + "/vmtest-images.lock"
+    print("Acquiring an exclusive lock on %s..." % lockfile)
+    lockfd = open(lockfile, 'w')
+    fcntl.flock(lockfd, fcntl.LOCK_EX)
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--clean":
+        print("cleaning image dir %s" % IMAGE_DIR)
+        for subd in (".vmtest-data", "streams"):
+            fp = os.path.join(IMAGE_DIR, subd)
+            if os.path.exists(fp):
+                print(" removing %s" % subd)
+                shutil.rmtree(fp)
+        if os.path.exists(IMAGE_DIR):
+            for dirpath, dirnames, filenames in os.walk(IMAGE_DIR):
+                for f in filenames:
+                    if f.startswith("vmtest"):
+                        fpath = os.path.join(dirpath, f)
+                        print(" removing vmtest file %s" % fpath)
+                        os.unlink(fpath)
+
+    arg_releases = [r for r in sys.argv[1:] if r != "--clean"]
+    arch_filters = [_fmt_list_filter('arch', find_arches())]
+    filter_sets = []
+    if len(arg_releases):
+        filter_sets.append([_fmt_list_filter('release', arg_releases),
+                            _fmt_list_filter('krel', arg_releases)])
+    else:
+        for distname, distro in find_releases_by_distro().items():
+            f = ['os={}'.format(distname),
+                 _fmt_list_filter('release', distro.get('releases'))]
+            # ensure we fetch release=x krel=x items
+            krels = distro.get('krels')
+            if krels:
+                krels = set(krels).union(set(distro.get('releases')))
+                f.append(_fmt_list_filter('krel', krels))
+            filter_sets.extend([f])
+
+    # Sync images.
+    for filter_set in filter_sets:
+        sync_images(IMAGE_SRC_URL, IMAGE_DIR, verbosity=2,
+                    filters=filter_set + ITEM_NAME_FILTERS + arch_filters)
+
+# vi: ts=4 expandtab syntax=python

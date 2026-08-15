@@ -1,0 +1,178 @@
+#!/bin/sh
+# vim: set sts=4:
+#
+# convert DebianDoc SGML and its PO files to DoCBook XML and its PO files
+#
+# Copyright (C) 2011 Osamu Aoki, GPL2+
+#
+# $1 base name of SGML file (English): * part of *.en.sgml
+# $2 lunguge code of translated PO files : ?? part of *.??.po
+#
+# Requited Debian packages:
+#   docbook-xsl
+#   moreutils
+#   libxml2-utils
+# 
+# Syntax:
+#    debiandoc2dbkpo manual-name xx yy zz ...
+# Source:
+#    manual-name.en.sgml manual-name.xx.po
+#
+# This is just a template script.
+# Please customize this to it to particular source.
+#
+BUILD_HTML="FALSE"
+PUBLISHDIR="."
+#
+case "$1" in
+    --docbook|-D)
+	shift
+	DOCBOOK="TRUE"
+	BUILD_HTML="TRUE"
+	;;
+    --html-dbk)
+	shift
+	BUILD_HTML_DBK="TRUE"
+	;;
+    --html-po|-H)
+	shift
+	BUILD_HTML_PO="TRUE"
+	;;
+    --publishdir|-P)
+	shift
+	PUBLISHDIR="$1"
+	shift
+esac
+#
+MANUAL="$1"
+shift
+LANGS="$@"
+
+#
+# If there is no ".en" source, but one without encoding, that that is
+# probably an English one and we make a symlink.
+#
+if [ ! -r "${MANUAL}.en.sgml" ] ; then
+    if [ -r "${MANUAL}.sgml" ]; then
+	echo "Warning: No '${MANUAL}.en.sgml' found, but a '${MANUAL}.sgml'."
+	echo "         Creating a symlink."
+	echo "         Beware: Your project may have mor complicated building instructions."
+	ln -sf "${MANUAL}.sgml" "${MANUAL}.en.sgml"
+    else
+	echo "Error: Neither '${MANUAL}.en.sgml' nor '${MANUAL}.sgml' found." >&2
+	exit 1
+    fi
+fi
+
+#
+# get translated SGML files from English SGML and localized PO files
+# Format English SGML better by po4a-translate
+#po4a-translate  -v -M UTF-8 -f sgml --keep 0 -L UTF-8 -m $MANUAL.en.sgml -l $MANUAL.en.lint.sgml -p /dev/null
+#mv -f $MANUAL.en.lint.sgml $MANUAL.en.sgml
+#
+
+for LNG in $LANGS; do
+    echo "### process $MANUAL.$LNG.po ###" >&2
+    po4a-updatepo --previous -M UTF-8 -f sgml -m $MANUAL.en.sgml -p $MANUAL.$LNG.po
+    msgcat --no-wrap $MANUAL.$LNG.po | sponge $MANUAL.$LNG.po
+    ./debiandoc-lint4po -v <$MANUAL.$LNG.po >$MANUAL.$LNG.lint.po 2>>$MANUAL.log
+    ./debiandoc-lint4po -v -u <$MANUAL.$LNG.po >$MANUAL.$LNG.unlint.po 2>>$MANUAL.log
+    po4a-translate  -v -M UTF-8 -f sgml --keep 0 -L UTF-8 -m $MANUAL.en.sgml -l $MANUAL.$LNG.sgml -p $MANUAL.$LNG.lint.po
+done
+
+#
+# make DocBook XML (dbk) files with nice formatting
+#
+debiandoc2dbk -1 $MANUAL.en.sgml
+xmllint --encode UTF-8 $MANUAL.en.dbk |sponge $MANUAL.en.dbk
+for LNG in $LANGS; do
+    debiandoc2dbk -1 $MANUAL.$LNG.sgml
+    xmllint --encode UTF-8 $MANUAL.$LNG.dbk |sponge $MANUAL.$LNG.dbk
+done
+#
+# Test build HTML files to verify proper conversion from SGML to XML
+#
+if [ "$BUILD_HTML_DBK" = "TRUE" ]; then
+    mkdir -p "$PUBLISHDIR"
+    cat - >$PUBLISHDIR/$MANUAL.css <<EOF
+/* Cascading stylesheet for the Debian Installer Installation Guide */
+
+/* Use grey background for examples */
+pre.screen {
+  background-color : #E0E0E0;
+}
+EOF
+    #
+    for LNG in en $LANGS; do
+        rm -rf $MANUAL.$LNG.html
+        xsltproc --nonet --novalid --xinclude \
+    	--stringparam root.filename $MANUAL \
+    	--stringparam base.dir "$PUBLISHDIR/" \
+    	--stringparam html.ext .$LNG.html \
+    	--stringparam admon.graphics 0 \
+    	--stringparam callout.graphics 0 \
+    	--stringparam navig.graphics 0 \
+    	--stringparam html.stylesheet $MANUAL.css \
+    	/usr/share/sgml/docbook/stylesheet/xsl/docbook-xsl/html/onechunk.xsl \
+    	$MANUAL.$LNG.dbk
+    done
+# stop here
+exit 0
+fi
+
+#
+# make po files (dbk.po) for non-English DocBook XML (dbk) files
+# entities fixed
+#
+for LNG in $LANGS; do
+    po4a-gettextize -M UTF-8 -f docbook -L UTF-8 -m $MANUAL.en.dbk -p $MANUAL.$LNG.dbk.po -l $MANUAL.$LNG.dbk &&
+    msgattrib --clear-fuzzy $MANUAL.$LNG.dbk.po |sponge $MANUAL.$LNG.dbk.po &&
+    msgcat --no-wrap $MANUAL.$LNG.dbk.po | sponge $MANUAL.$LNG.dbk.po ||
+	echo "ERROR: while creating PO for DocBook XML for $MANUAL.$LNG.dbk"
+    sed -i -e 's/@@@\[/\&/g' -e 's/\]@@@/;/g' maint-guide.$LNG.dbk.po
+    ./msgtranslated <maint-guide.$LNG.dbk.po > maint-guide.$LNG.dbk.pox
+done
+if [ -r $MANUAL.en.dbk.new ]; then
+sed -e 's/@@@\[/\&/g' -e 's/\]@@@/;/g' $MANUAL.en.dbk >$MANUAL.en.dbk.new
+echo "### Edit $MANUAL.en.dbk.new to include entity reference and type ENTER. ###" >&2
+read X
+else
+echo "### $MANUAL.en.dbk.new already exist ! Use it. ###" >&2
+fi
+
+#
+# make dbk files from English DocBook XML (dbk) file and po files (dbk.po).
+#
+for LNG in $LANGS; do
+    po4a-translate  -v -M UTF-8 -f docbook --keep 0 -L UTF-8 -m $MANUAL.en.dbk.new -l $MANUAL.$LNG.dbk.new -p $MANUAL.$LNG.dbk.pox
+done
+
+#
+# Test build HTML files to verify proper conversion from SGML to XML
+#
+if [ "$BUILD_HTML_PO" = "TRUE" ]; then
+    mkdir -p "$PUBLISHDIR"
+    cat - >$PUBLISHDIR/$MANUAL.css <<EOF
+/* Cascading stylesheet for the Debian Installer Installation Guide */
+
+/* Use grey background for examples */
+pre.screen {
+  background-color : #E0E0E0;
+}
+EOF
+    #
+    for LNG in en $LANGS; do
+        rm -rf $MANUAL.$LNG.html
+        xsltproc --nonet --novalid --xinclude \
+    	--stringparam root.filename $MANUAL \
+    	--stringparam base.dir "$PUBLISHDIR/" \
+    	--stringparam html.ext .$LNG.html \
+    	--stringparam admon.graphics 0 \
+    	--stringparam callout.graphics 0 \
+    	--stringparam navig.graphics 0 \
+    	--stringparam html.stylesheet $MANUAL.css \
+    	/usr/share/sgml/docbook/stylesheet/xsl/docbook-xsl/html/onechunk.xsl \
+    	$MANUAL.$LNG.dbk.new
+    done
+fi
+

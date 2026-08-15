@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+PODDOC=debget dglob dgrep dpigs find-dbgsym-packages
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	for prog in $(PODDOC); do pod2man -c "Debian-goodies documentation" $$prog.pod > $$prog.1; done
+	help2man -n "show enhancement packages" \
+	         -m "Debian-goodies documentation" \
+	         -N ./check-enhancements | \
+	    sed -e 's/DESCRIPTION/SYNOPSIS/' > check-enhancements.1
+
+override_dh_auto_install:
+	dh_auto_install
+	dh_bash-completion
+
+override_dh_auto_clean:
+	for prog in $(PODDOC); do rm -f $$prog.1; done

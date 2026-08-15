@@ -1,0 +1,268 @@
+#!/usr/bin/perl
+## ----------------------------------------------------------------------
+## bin/saspconvert : 
+## ----------------------------------------------------------------------
+## Copyright (C) 1998-2004 Ardo van Rangelrooij
+## Copyright (C) 1996 Ian Jackson
+##
+## This is free software; see the GNU General Public Licence
+## version 2 or later for copying conditions.  There is NO warranty.
+## ----------------------------------------------------------------------
+
+## ----------------------------------------------------------------------
+@data = <>;
+$toclocation = -1;
+$cifile = '';
+$ciline = 0;
+
+## ----------------------------------------------------------------------
+for ( $i = 0; $i <= $#data; $i++ )
+{
+
+    ## ------------------------------------------------------------------
+    $_ = $data[$i];
+
+    ## ------------------------------------------------------------------
+    if ( m/^L(\d+)$/ )
+    {
+        $ciline = $1;
+        $cilinefile = "L$ciline $cifile\n" if $cifile ne '';
+    }
+    elsif ( m/^L(\d+) (.*)\n$/ )
+    {
+        $ciline = $1;
+        $cifile = $2;
+        $cilinefile = $_;
+    }
+
+    ## ------------------------------------------------------------------
+    $srclinefile[$i] = "$cifile:$ciline" if $ciline > 0;
+
+    ## ------------------------------------------------------------------
+    if ( m/^A(\S+) (.*)\n$/ )
+    {
+        $attribcollect{$1} = $2;
+    }
+    elsif ( m/^\(/ )
+    {
+        %attrib = %attribcollect;
+        undef %attribcollect;
+    }
+
+    ## ------------------------------------------------------------------
+    if ( m/^\(CHAPT$/ )
+    {
+        $level = 'CHAPT';
+        $num{'CHAPT'}++;
+        $num{'SECT0'} = 0;
+        $sectionstring = '';
+        &getid('ch');
+        $chaptsysrefid = $sysrefid;
+        $chaptsectattribs = ( "ASRID CDATA $sysrefid\n"
+			      . "ACHAPT CDATA $num{'CHAPT'}\n"
+			      . "ACSRID CDATA $chaptsysrefid\n"
+			      . "ASECT IMPLIED\n"
+			      . "AHNAME CDATA chapter $num{'CHAPT'}\n" );
+        $insert[$i] .= $chaptsectattribs;
+    }
+    elsif ( m/^\(APPENDIX$/ )
+    {
+        $level = 'CHAPT';
+	( $num{'CHAPT'} =~ m/[0-9]$/ ) ? $num{'CHAPT'} = 'A' : $num{'CHAPT'}++;
+        $num{'SECT0'} = 0;
+        $sectionstring = '';
+        &getid('ap');
+        $chaptsysrefid = $sysrefid;
+        $chaptsectattribs = ( "ASRID CDATA $sysrefid\n"
+			      . "ACHAPT CDATA $num{'CHAPT'}\n"
+			      . "ACSRID CDATA $chaptsysrefid\n"
+			      . "ASECT IMPLIED\n"
+			      . "AHNAME CDATA appendix $num{'CHAPT'}\n" );
+        $insert[$i] .= $chaptsectattribs;
+    }
+    elsif ( m/^\((SECT(\d*))$/ )
+    {
+        $level = $1;
+	$sl = $2 + 0;
+        $num{"SECT$sl"}++;
+        $num{"SECT". ( $sl + 1 )} = 0;
+        $sectionstring = '';
+        grep( $sectionstring .= '.' . $num{"SECT$_"}, 0..$sl );
+        &getid( 's' );
+        $chaptsectattribs = ( "ASRID CDATA $sysrefid\n"
+			      . "ACHAPT CDATA $num{'CHAPT'}\n"
+			      . "ACSRID CDATA $chaptsysrefid\n"
+			      . "ASECT CDATA $sectionstring\n"
+			      . "AHNAME CDATA "
+			      . ( $sl < 3
+				  ? ( 'sub' x $sl ) . 'section'
+				  : 'sub' x ( $sl - 3 ) . 'paragraph' )
+			      . " $num{'CHAPT'}$sectionstring\n" );
+        $insert[$i] .= $chaptsectattribs;
+    }
+    elsif ( m/^\(HEADING$/ )
+    {
+        $thisheadattribs = ( "ALEVEL CDATA $level\n"
+			     . $chaptsectattribs );
+        $thisheaddata = $cilinefile;
+        $inheading = 1;
+        $insert[$i] .= $chaptsectattribs;
+    }
+    elsif ( m/^\)HEADING$/ )
+    {
+        $tocdata .= ( $thisheadattribs
+		      . "(TOCENTRY\n"
+		      . $thisheaddata
+		      . ")TOCENTRY\n" );
+        if ( length( $userrefid ) )
+	{
+            $urid2attribs{$userrefid} = $thisheadattribs;
+            $urid2data{$userrefid} = $thisheaddata;
+        }
+        $inheading = 0;
+    }
+    elsif ( m/^\(TOC$/ )
+    {
+        $toclocation = $i;
+    }
+    elsif ( m/^\)TOC$/ )
+    {
+        $append[$i] .= $cilinefile;
+    }
+    elsif ( m/^\)TITLEPAG$/ )
+    {
+        $append[$i] .= $cilinefile;
+    }
+    elsif ( m/^\(REF$/ )
+    {
+        $attrib{'ID'} =~ m/^CDATA / || &error( $i, "no CDATA for ID REF" );
+        $refline2urid{$i} = $';
+    }
+    elsif ( m/^\(QREF$/ )
+    {
+        $attrib{'ID'} =~ m/^CDATA / || &error( $i, "no CDATA for ID REF" );
+        $qrefline2urid{$i} = $';
+    }
+    elsif ( m/^\(ABSTRACT$/ )
+    {
+	$append[$i] .= "(P\n";
+    }
+    elsif ( m/^\)ABSTRACT$/ )
+    {
+	$insert[$i] .= ")P\n";
+    }
+    elsif ( m/^\(TAG$/ )
+    {
+	$has_tag = 1;
+    }
+    elsif ( m/^\(ITEM$/ )
+    {
+	if ( ! $has_tag )
+	{
+	    $insert[$i] .= "(TAG\n)TAG\n";
+	}
+	$has_tag = 0;
+    }
+    elsif ( $inheading )
+    {
+        $thisheaddata .= $data[$i];
+    }
+
+}
+
+## ----------------------------------------------------------------------
+for $i ( keys %refline2urid )
+{
+    $userrefid = $refline2urid{$i};
+    defined( $urid2attribs{$userrefid} )
+	|| &error( "identifier \`$userrefid' is undefined", $i );
+    $insert[$i] .= $urid2attribs{$userrefid};
+    $append[$i] .= $urid2data{$userrefid};
+}
+
+## ----------------------------------------------------------------------
+for $i ( keys %qrefline2urid )
+{
+    $userrefid = $qrefline2urid{$i};
+    defined( $urid2attribs{$userrefid} )
+	|| &error( "identifier \`$userrefid' is undefined", $i );
+    $insert[$i] .= $urid2attribs{$userrefid};
+}
+
+## ----------------------------------------------------------------------
+$append[$toclocation] .= $tocdata if $toclocation >= 0;
+
+## ----------------------------------------------------------------------
+for ( $i = 0; $i <= $#data; $i++ )
+{
+    print( $insert[$i], $data[$i], $append[$i] ) || die $!;
+}
+
+## ----------------------------------------------------------------------
+close( STDOUT ) || die $!;
+
+## ----------------------------------------------------------------------
+exit( $errors ? 1 : 0 );
+
+## ----------------------------------------------------------------------
+sub usage
+{
+
+    ## ------------------------------------------------------------------
+    print STDERR "$_[0]\n\n" if length( $_[0] );
+    print STDERR "usage: saspconvert [<inputfile> ...]";
+    exit( 3 );
+
+} ## usage
+
+## ----------------------------------------------------------------------
+sub error
+{
+
+    ## ------------------------------------------------------------------
+    my ( $m,$l ) = @_;
+
+    ## ------------------------------------------------------------------
+    my $emsg = "saspconvert: ";
+    $emsg .= "$srclinefile[$l] " if length( $srclinefile[$l] );
+    $emsg .= "(input line $l): $m";
+    print( STDERR "$emsg\n" ) || die $!;
+    $errors++;
+    if ( $errors >= 20 )
+    {
+        print( STDERR "saspconvert: too many errors, stopping\n" );
+        exit( 2 );
+    }
+
+} ## error
+
+## ----------------------------------------------------------------------
+sub getid
+{
+
+    ## ------------------------------------------------------------------
+    if ( $attrib{'ID'} =~ m/^CDATA / )
+    {
+        $userrefid = "$'";
+        $sysrefid = $_[0] . '-' . $userrefid;
+        if ( defined( $defpos{$userrefid} ) )
+	{
+            &error( "indentifier $userrefid is defined more than once", $i );
+            &error( "indentifier $userrefid originally defined here",
+		    $defpos{$userrefid} ) if length( $defpos{$userrefid} );
+            $defpos{$userrefid} = '';
+        }
+	else
+	{
+            $defpos{$userrefid} = $i;
+	}
+    }
+    else
+    {
+        $userrefid = '';
+        $sysrefid = $_[0] . $num{'CHAPT'} . $sectionstring;
+    }
+
+} ## getid
+
+## ----------------------------------------------------------------------

@@ -1,0 +1,151 @@
+#!/bin/sh
+
+set -e
+
+sasluser="user$$"
+saslpass="pass$$"
+ldap_admin_pw="ldapadminpw$$"
+ldap_domain="example.fake"
+ldap_suffix="dc=example,dc=fake"
+ldap_admin_dn="cn=admin,${ldap_suffix}"
+MECHS="sasldb pam ldap"
+
+cleanup() {
+    if [ -n "${sasluser}" ]; then
+        saslpasswd2 -d "${sasluser}" > /dev/null 2>&1 || :
+        userdel -r "${sasluser}" > /dev/null 2>&1 || :
+    fi
+    systemctl stop saslauthd || :
+    sed -r -i '/^START=/d' /etc/default/saslauthd || :
+    rm -f /etc/saslauthd.conf || :
+}
+
+die() {
+    echo "FAIL"
+    echo "exit status: ${result}"
+    echo "output:"
+    echo "${output}"
+    exit 1
+}
+
+
+trap cleanup EXIT
+
+_configure_saslauthd() {
+    sed -r -i "s,^MECHANISMS=.*,MECHANISMS=\"${1}\"," /etc/default/saslauthd
+    if ! grep -q ^START /etc/default/saslauthd; then
+        echo "START=\"yes\"" >> /etc/default/saslauthd
+    else
+        sed -r -i 's,^START=.*,START="yes",' /etc/default/saslauthd
+    fi
+    if [ "${1}" = "ldap" ]; then
+        cat > /etc/saslauthd.conf <<EOF
+ldap_servers: ldap://127.0.0.1
+ldap_auth_method: bind
+ldap_search_base: ${ldap_suffix}
+EOF
+    fi
+}
+
+_populate_ldap_tree() {
+    {
+        cat <<EOF
+dn: ou=People,${ldap_suffix}
+ou: People
+objectClass: organizationalUnit
+
+EOF
+    } | ldapadd -x -D "${ldap_admin_dn}" -w "${ldap_admin_pw}"
+
+}
+
+_add_ldap_user() {
+    {
+        cat <<EOF
+dn: uid=${sasluser},ou=People,${ldap_suffix}
+uid: ${sasluser}
+objectClass: inetOrgPerson
+objectClass: posixAccount
+cn: ${sasluser}
+sn: ${sasluser}
+givenName: ${sasluser}
+mail: ${sasluser}@${ldap_domain}
+userPassword: $(slappasswd -s ${saslpass})
+uidNumber: 10001
+gidNumber: 10001
+loginShell: /bin/bash
+homeDirectory: /home/${sasluser}
+
+EOF
+    } | ldapadd -x -D "${ldap_admin_dn}" -w "${ldap_admin_pw}"
+}
+
+_setup_slapd() {
+    # MUST use REAL TABS as delimiters below!
+    debconf-set-selections << EOF
+slapd	slapd/domain	string	${ldap_domain}
+slapd	shared/organization	string	${ldap_domain}
+slapd	slapd/password1	password	${ldap_admin_pw}
+slapd	slapd/password2	password	${ldap_admin_pw}
+EOF
+    rm -rf /var/backups/*slapd* /var/backups/unknown*ldapdb
+    dpkg-reconfigure -fnoninteractive -pcritical slapd 2>&1
+    systemctl restart slapd # http://bugs.debian.org/1010678
+    _populate_ldap_tree
+}
+
+_setup_saslauthd_sasldb() {
+    _configure_saslauthd "${1}"
+    echo "${saslpass}" | saslpasswd2 -p -c "${sasluser}"
+}
+
+_setup_saslauthd_pam() {
+    _configure_saslauthd "${1}"
+    useradd "${sasluser}"
+    echo "${sasluser}:${saslpass}" | chpasswd
+}
+
+_setup_saslauthd_ldap() {
+    _configure_saslauthd "${1}"
+    _setup_slapd
+    _add_ldap_user
+}
+
+setup_saslauthd() {
+    if echo "${MECHS}" | grep -qw "${1}"; then
+        "_setup_saslauthd_${1}" "${1}"
+    else
+        echo "setup(): invalid mechanism \"${1}\""
+        exit 1
+    fi
+    systemctl restart saslauthd
+}
+
+for mech in ${MECHS}; do
+    echo "Setting up saslauthd with mecanism ${mech}"
+    setup_saslauthd ${mech}
+
+    # test correct credentials
+    echo -n "Authentication of user ${sasluser} with correct password should succeed... "
+    result=0
+    output=$(testsaslauthd -u "${sasluser}" -p "${saslpass}" 2>&1) || result=$?
+    [ ${result} -ne 0 ] && die
+    [ "${output}" != '0: OK "Success."' ] && die
+    echo "OK"
+
+    # test incorrect credentials
+    echo -n "Authentication of unknown user ${sasluser}notexist should fail... "
+    result=0
+    output=$(testsaslauthd -u "${sasluser}"notexist -p "${saslpass}" 2>&1) || result=$?
+    [ ${result} = 0 ] && die
+    [ "${output}" != '0: NO "authentication failed"' ] && die
+    echo "OK"
+
+    echo -n "Authentication of user ${sasluser} with incorrect password should fail... "
+    result=0
+    output=$(testsaslauthd -u "${sasluser}" -p "${saslpass}"incorrect 2>&1) || result=$?
+    [ ${result} = 0 ] && die
+    [ "${output}" != '0: NO "authentication failed"' ] && die
+    echo "OK"
+    echo
+done

@@ -1,0 +1,63 @@
+Using dbus-broker
+-----------------
+
+'dbus-broker' provides replacements for both the System and User D-Bus
+buses as implemented by the 'dbus-daemon' shipped in the 'dbus'
+package. The 'dbus' package is however still required as it also
+provides tools used by many applications and the 'dbus.socket' unit
+file as well as the default bus policy.
+
+The 'dbus-broker' packages ships 'dbus-broker.service' systemd units
+for the user and the system instance of systemd which are suitable as
+drop-in replacements for 'dbus.service' as provided by the D-Bus
+reference implementation. Both units are enabled creating at install
+time the '/etc/systemd/system/dbus.service' symlink pointing to the
+system unit and the '/etc/systemd/user/dbus.service' symlink pointing
+to the user unit. Those take precedence over the unit files installed
+by the 'dbus' and 'dbus-user-session' packages respectively.
+
+Replacing 'dbus-daemon' as System bus or upgrading to a newer
+'dbus-broker' release requires rebooting the system. Replacing
+'dbus-daemon' as User bus only requires to restart the user session.
+
+
+Compatibility
+-------------
+
+While 'dbus-broker' aims to keep perfect compatibility to existing
+D-Bus implementations, the D-Bus specification, as well as the
+reference implementation, there are several occasions where it
+deviates. The reason behind those deviations is to mitigate possible
+attacks or to improve performance. The complete list of known
+deviations is available here:
+
+  https://github.com/bus1/dbus-broker/wiki/Deviations
+
+
+D-Bus activated services
+------------------------
+
+In the D-Bus reference implementation all activated services are
+forked and executed by 'dbus-daemon'. With the introduction of
+systemd, activated service can opt-in to be run executed by systemd as
+a systemd service instead. 'dbus-broker' does not support direct
+activation: all activation requests are forwarded to systemd. In case
+no systemd service has been configured, a transient unit is generated
+and used instead.
+
+'dbus-daemon' tolerates the 'Exec=' directive for a D-Bus activated
+service to point to a command that will forks and exit. On the other
+hand 'dbus-broker' delegates to a systemd transient unit the execution
+of the service and thus all child processes are killed as soon as the
+main process terminates.
+
+Specifying a command that forks and exit as part of the 'Exec='
+directive is inadvisable behaviour also with 'dbus-daemon' because the
+daemon cannot tell whether the service subsequently fails and
+correctly react to the error condition and it is consider to be a bug
+in the service. Unfortunately this problem cannot be detected
+statically and not all packages installing D-Bus activated services
+have been audited. Please report any bug you may encounter.
+
+
+ -- Daniele Nicolodi <daniele@grinta.net>, Sat, 28 Apr 2018 17:48:25 -0600

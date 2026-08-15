@@ -1,0 +1,174 @@
+#!/usr/bin/python3
+
+# popbugs - Find RC bugs in packages you commonly use
+# Copyright (C) 2001-2004 Matt Zimmerman <mdz@debian.org>
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+# 02111-1307, USA.
+#
+
+
+import sys
+import re
+import os
+import urllib.request, urllib.error, urllib.parse
+import tempfile
+import getopt
+
+usage = '''Usage: popbugs [-d|--debug] [{-o|--output=} {outputfile|-}] [popularity-contest log]\n'''
+
+popconfile = '/var/log/popularity-contest'
+bugurl = 'https://bugs.debian.org/release-critical/other/all.html'
+# For testing purposes:
+#bugurl = 'file:///tmp/all.html'
+outputfile = None
+
+debug = False
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "dho:",
+                               ["debug", "help","output="])
+except getopt.GetoptError:
+    sys.stderr.write(usage)
+    sys.exit(2)
+for o, a in opts:
+    if o in ("-h", "--help"):
+        sys.stdout.write(usage)
+        sys.exit()
+    elif o in ("-o", "--output"):
+        outputfile = a
+    elif o in ("-d", "--debug"):
+        debug = True
+
+if len(args) >= 1:
+    popconfile = args[0]
+    if not os.path.exists(popconfile):
+            sys.stderr.write('''
+I cannot find the popularity-contest data you pointed me to.
+This program requires the data collected from popularity-contest
+in order to work.
+
+''')
+            sys.exit(1)
+else:
+    if not os.path.exists(popconfile):
+        if not os.path.exists('/usr/sbin/popularity-contest'):
+            sys.stderr.write('''
+The popularity-contest package does not appear to be installed.
+This program requires the data collected from popularity-contest
+in order to work.
+
+''')
+            sys.exit(1)
+
+        sys.stderr.write('''
+There is no popularity-contest data present on your system.  This
+probably means that popularity-contest has not yet run since it
+was installed.  Try waiting for /etc/cron.daily/popularity-contest to
+to collect some data or manually run (as root user):
+
+    /usr/sbin/popularity-contest >/var/log/popularity-contest
+
+''')
+        sys.exit(1)
+
+if outputfile == None:
+    fd, outputfile = tempfile.mkstemp(prefix='popbugs-', suffix='.html')
+    output = os.fdopen(fd, 'w')
+    view = True
+elif outputfile == '-':
+    output = sys.stdout
+    view = False
+else:
+    output = open(outputfile, 'w')
+    view = False
+
+class Package:
+    def __init__(self, name, atime):
+        self.name = name
+        self.atime = int(atime)
+
+packages = {}
+pkglist = []
+popcon = open(popconfile,'r')
+for line in popcon.readlines():
+    if len(line) == 0 or line.find(':') != -1:
+        continue
+
+    fields = line.split()
+    if len(fields) != 4:
+        continue
+    if (fields[0] == 'POPULARITY-CONTEST-0' or
+        fields[0] == 'END-POPULARITY-CONTEST-0'):
+        continue
+
+    (atime, ctime, package, pathname) = fields
+#    if pathname == '<NOFILES>' or pathname == '<RECENT-CTIME>':
+#        continue
+
+    if debug:
+        print("POPCON: Adding package " + package)
+    packages[package] = Package(package,atime)
+    pkglist.append(packages[package])
+
+popcon.close()
+
+page = urllib.request.urlopen(bugurl).readlines()
+
+while page:
+    line = page.pop(0).decode('utf-8')
+    if line.startswith('<div'):
+        break
+    output.write(line)
+
+packagere = re.compile('.*<a name="([^"]+)"><strong>Package:.*')
+while page:
+    m = packagere.match(page[0].decode('utf-8'))
+    if m:
+        html = ''
+        while page:
+            line = page.pop(0).decode('utf-8')
+            html += line
+
+            if line == '\n' or (page and packagere.match(page[0])):
+                # another paragraph started with no newline
+                break
+
+        pkgname = m.group(1)
+        if debug:
+           print("REGEX: Parsing package " + pkgname)
+
+        if pkgname in packages:
+            if debug:
+                print("REGEX: Package " + pkgname + "is in packages")
+            packages[pkgname].html = html
+    else:
+        if page[0].startswith(bytes('<hr>', 'ascii')):
+            break
+        page.pop(0)
+
+pkglist.sort(key=lambda k: -k.atime)
+for package in pkglist:
+    if hasattr(package,'html'):
+        output.write(package.html)
+        output.write('\n')
+
+while page:
+    line = page.pop(0).decode('utf-8')
+    output.write(line)
+
+output.flush()
+
+if view:
+    os.system('sensible-browser file://' + outputfile)

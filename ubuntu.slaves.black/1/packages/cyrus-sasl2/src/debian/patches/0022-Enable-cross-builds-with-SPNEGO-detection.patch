@@ -1,0 +1,60 @@
+Origin: upstream, https://github.com/cyrusimap/cyrus-sasl/commit/6fa9efaa08555d12bf82dea39ef8f1ce533f3ef6
+From: Bastian Germann <bage@debian.org>
+Date: Sun, 14 Nov 2021 13:36:40 +0100
+Subject: Enable cross builds with SPNEGO detection
+
+A cross build fails detecting whether GSSAPI supports SPNEGO.
+Others ran into this problem already.
+
+While the OE folks produced a patch, they didn't make it upstreamable. I
+think we can do better. The attached proposes using AC_CACHE_CHECK
+(which is good practise for any AC_TRY_RUN)
+
+Helmut Grohne provided this patch with the explicit intention to upstream it.
+
+Link: http://lists.openembedded.org/pipermail/openembedded-devel/2013-June/091202.html
+Link: https://lists.andrew.cmu.edu/pipermail/cyrus-sasl/2016-October/002906.html
+Link: https://bugs.debian.org/928512
+Reported-by: Helmut Grohne <helmut@subdivi.de>
+Signed-off-by: Bastian Germann <bage@debian.org>
+---
+ m4/sasl2.m4 | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/m4/sasl2.m4 b/m4/sasl2.m4
+index 60306943..098c853a 100644
+--- a/m4/sasl2.m4
++++ b/m4/sasl2.m4
+@@ -326,10 +326,10 @@ if test "$gssapi" != no; then
+   fi
+   LIBS="$cmu_save_LIBS"
+ 
+-  cmu_save_LIBS="$LIBS"
+-  LIBS="$LIBS $GSSAPIBASE_LIBS"
+-  AC_MSG_CHECKING([for SPNEGO support in GSSAPI libraries])
+-  AC_TRY_RUN([
++  AC_CACHE_CHECK([for SPNEGO support in GSSAPI libraries],[ac_cv_gssapi_supports_spnego],[
++    cmu_save_LIBS="$LIBS"
++    LIBS="$LIBS $GSSAPIBASE_LIBS"
++    AC_TRY_RUN([
+ #ifdef HAVE_GSSAPI_H
+ #include <gssapi.h>
+ #else
+@@ -350,11 +350,12 @@ int main(void)
+ 
+     return (!have_spnego);  // 0 = success, 1 = failure
+ }
+-],	
+-	[ AC_DEFINE(HAVE_GSS_SPNEGO,,[Define if your GSSAPI implementation supports SPNEGO])
+-	AC_MSG_RESULT(yes) ],
+-	AC_MSG_RESULT(no))
+-  LIBS="$cmu_save_LIBS"
++],[ac_cv_gssapi_supports_spnego=yes],[ac_cv_gssapi_supports_spnego=no])
++    LIBS="$cmu_save_LIBS"
++  ])
++  AS_IF([test "$ac_cv_gssapi_supports_spnego" = yes],[
++    AC_DEFINE(HAVE_GSS_SPNEGO,,[Define if your GSSAPI implementation supports SPNEGO])
++  ])
+ 
+ else
+   AC_MSG_RESULT([disabled])

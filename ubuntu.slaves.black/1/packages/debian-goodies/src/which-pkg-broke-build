@@ -1,0 +1,43 @@
+#!/bin/sh
+# Copyright (C) 2016 by Axel Beckert <abe@debian.org> under GPL-2+
+
+if [ -z "$1" ]; then
+   srcdir=.
+fi
+
+if [ -d "$1" ]; then
+   srcdir="$1"
+fi
+
+if [ -z "$srcdir" ]; then
+   pkg="$1"
+fi
+
+# For now we ignore that some dependencies might be
+# architecture-specific
+bd=$(
+    echo -n "build-essential "
+    if [ -n "$pkg" ]; then
+        apt-cache showsrc "$pkg"
+    elif [ -n "$srcdir" ]; then
+        cat debian/control | sed ':a;N;$!ba;s/\(Build-Depends[^ ]*:[^\n:]*\)\n/\1 /g'
+    fi | \
+        fgrep Build-Depends | \
+        tr '|,' '  ' | \
+        sed -e 's/^Build-Depends[^ ]*://; s/([^()]*)//g; s/<[^<>]*>//g; s/\[[^]]*\]//g;'
+    )
+
+# Schwartzian transform in bourne shell
+for pkg in $bd; do
+    which-pkg-broke $pkg
+done | \
+    fgrep -v "has no install time info" | \
+    while read pkg date; do
+        echo `date +%s -d "$date"` $pkg
+    done | \
+    sort -n | \
+    uniq | \
+    while read date pkg; do
+        echo $pkg `date +"%x %X" -d "@$date"`
+    done | \
+    column -t

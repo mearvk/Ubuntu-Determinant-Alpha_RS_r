@@ -1,0 +1,229 @@
+#!/bin/bash
+# This file is part of curtin. See LICENSE file for copyright and license info.
+
+topdir="${CURTIN_VMTEST_TOPDIR:-${WORKSPACE:-$PWD}/output}"
+pkeep=${CURTIN_VMTEST_KEEP_DATA_PASS:-logs,collect}
+fkeep=${CURTIN_VMTEST_KEEP_DATA_FAIL:-logs,collect}
+reuse=${CURTIN_VMTEST_REUSE_TOPDIR:-0}
+shuffle=${CURTIN_VMTEST_SHUFFLE_TESTS:-1}
+declare -i ltimeout=${CURTIN_VMTEST_IMAGE_LOCK_TIMEOUT:-"-1"}
+export CURTIN_VMTEST_TAR_DISKS=${CURTIN_VMTEST_TAR_DISKS:-0}
+export CURTIN_VMTEST_REUSE_TOPDIR=$reuse
+export CURTIN_VMTEST_IMAGE_SYNC=${CURTIN_VMTEST_IMAGE_SYNC:-0}
+export CURTIN_VMTEST_KEEP_DATA_PASS=$pkeep
+export CURTIN_VMTEST_KEEP_DATA_FAIL=$fkeep
+export CURTIN_VMTEST_TOPDIR="$topdir"
+export CURTIN_VMTEST_LOG="${CURTIN_VMTEST_LOG:-$topdir/debug.log}"
+export CURTIN_VMTEST_PARALLEL=${CURTIN_VMTEST_PARALLEL:-0}
+export CURTIN_VMTEST_SHUFFLE_TESTS=$shuffle
+export IMAGE_DIR=${IMAGE_DIR:-/srv/images}
+
+# empty TGT_* variables in current env to avoid killing a pid we didn't start.
+TGT_PID=""
+TGT_LOG_D=""
+
+error() { echo "$@" 1>&2; }
+fail() { [ $# -eq 0 ] || error "$@"; exit 1; }
+cleanup() {
+    local ret=$?
+    local keep_rules
+    [ "$ret" -eq 0 ] && keep_rules="$pkeep" || keep_rules="$fkeep"
+    # kill a tgtd pid that was started here.
+    if [ -n "$TGT_PID" ]; then
+        kill -9 ${TGT_PID};
+        if [ -n "${TGT_IPC_SOCKET}" ]; then
+            # var is <path>/socket but the actual socket is <path>/socket.0
+            rm -f "${TGT_IPC_SOCKET}" "${TGT_IPC_SOCKET}".* ||
+                error "WARN: failed removal of $TGT_IPC_SOCKET"
+        fi
+    fi
+    if [ -n "$TGT_LOG_D" ]; then
+        case ",${keep_rules}," in
+            *,logs,*|*,all,*) :;;
+            *) rm -Rf "${TGT_LOG_D}";;
+        esac
+    fi
+}
+
+if [ "$reuse" != "1" ]; then
+    if [ -d "$topdir" ]; then
+        fail "topdir '$topdir' existed."
+    fi
+    mkdir -p "$topdir" || fail "failed mkdir $topdir"
+fi
+
+# Use 'shuf' to randomize test case execution order
+if [ "$shuffle" == "1" ]; then
+    SHUFFLE="shuf"
+else
+    # when disabled just repeat the input to output
+    SHUFFLE="tee"
+fi
+
+
+start_s=$(date +%s)
+parallel=${CURTIN_VMTEST_PARALLEL}
+ntfilters=( )
+ntargs=( )
+ntdefargs=( "-vv" "--nologcapture" )
+tests=( )
+skip_images_dirlock=0
+while [ $# -ne 0 ]; do
+    case "$1" in
+        # allow setting these environment variables on cmdline.
+        CURTIN_VMTEST_*=*) export "$1";;
+        --filter=*) ntfilters[${#ntfilters[@]}]="${1#--filter=}";;
+        --filter) ntfilters[${#ntfilters[@]}]="$2"; shift;;
+        -p|--parallel) parallel="$2"; shift;;
+        --parallel=*) parallel=${1#*=};;
+        --skip-images-dirlock) skip_images_dirlock=1;;
+        -p[0-9]|-p-1|-p[0-9][0-9]) parallel=${1#-p};;
+        --)
+            shift
+            break
+            ;;
+        tests/vmtest*) tests[${#tests[@]}]="$1";;
+        *) ntargs[${#ntargs[@]}]="$1"
+           ntdefargs="";;
+    esac
+    shift;
+done
+
+if [ "${#tests[@]}" -ne 0 -a "${#ntfilters[@]}" -ne 0 ]; then
+    error "Passing test tests and --filter are incompatible."
+    error "test arguments provided were: ${#tests[*]}"
+    fail
+elif [ "${#tests[@]}" -eq 0 -a "${#ntfilters[@]}" -eq 0 ]; then
+    # run filter without args to enumerate all tests and maybe shuffle
+    tests=( $(./tools/vmtest-filter | ${SHUFFLE}) )
+elif [ "${#ntfilters[@]}" -ne 0 ]; then
+    tests=( $(./tools/vmtest-filter "${ntfilters[@]}" | ${SHUFFLE}) )
+    if [ "${#tests[@]}" -eq 0 ]; then
+        error "Failed to find any tests with filter(s): \"${ntfilters[*]}\""
+        fail "Try testing filters with: ./tools/vmtest-filter ${ntfilters[*]}"
+    fi
+fi
+
+CURTIN_VMTEST_PARALLEL=$parallel
+
+if [ ${#ntargs[@]} -eq 0 ]; then
+    set -- "${ntdefargs[@]}" "${tests[@]}"
+else
+    set -- "${tests[@]}"
+fi
+
+trap cleanup EXIT
+
+ntargs=( "${ntargs[@]}" "$@" )
+
+pargs=( )
+if [ -n "$parallel" -a "$parallel" != "0" -a "$parallel" != "1" ]; then
+    pargs=( --process-timeout=86400 "--processes=$parallel" )
+fi
+
+curtexe="${CURTIN_VMTEST_CURTIN_EXE:-./bin/curtin}"
+CURTIN_VMTEST_CURTIN_EXE_VERSION=$($curtexe version) ||
+    fail "failed to get version from '$curtexe version'"
+if [ "$curtexe" = "./bin/curtin" ]; then
+    CURTIN_VMTEST_CURTIN_VERSION="$CURTIN_VMTEST_CURTIN_EXE_VERSION"
+else
+    CURTIN_VMTEST_CURTIN_VERSION="$(./bin/curtin version)" ||
+        fail "failed to get version from ./bin/curtin version"
+fi
+
+if [ -n "$TGT_IPC_SOCKET" ]; then
+    error "existing TGT_IPC_SOCKET=${TGT_IPC_SOCKET}"
+elif command -v tgtd >/dev/null 2>&1; then
+    tgtdir="$topdir/tgt.d"
+    mkdir -p "$tgtdir" || fail "failed to create $tgtdir"
+    rm -f "$tgtdir/info" || fail "failed to remove $tgtdir/info"
+    ./tools/find-tgt "$tgtdir" >"${tgtdir}/find-tgt.log" 2>&1 || {
+        cat "${tgtdir}/find-tgt.log" 1>&2
+        fail "could not start a tgt service"
+    }
+    TGT_LOG_D="$tgtdir"
+    . "$tgtdir/info" >"$tgtdir/source-output.txt" 2>&1
+    [ -n "$TGT_PID" ] || fail "find-tgt did not write TGT_PID"
+    [ -d "/proc/${TGT_PID}" ] || fail "no tgtd process in /proc/${TGT_PID}"
+else
+    error "no tgtd command, iscsi tests will be skipped"
+fi
+
+# dump CURTIN_* and TGT_* and proxy variables just for info
+for v in ${!CURTIN_*} ${!TGT_*} http_proxy https_proxy no_proxy; do
+   echo "$v=${!v}"
+done
+
+# avoid LOG info by running python3 tests/vmtests/image_sync.py
+# rather than python3 -m tests.vmtests.image_sync (LP: #1594465)
+echo "Quering synced ephemeral images/kernels in $IMAGE_DIR"
+printf "%.s=" {1..86}; echo
+printf " %6s %8s %-12s %-5s/%-14s  %s\n" "Release" "Codename" "ImageDate" "Arch" "SubArch" "Path"
+printf "%.s-" {1..86}; echo
+fmt="  %(version)6s %(release)8s %(version_name)-12s %(arch)-5s/%(subarch)-14s %(path)s"
+PYTHONPATH="$PWD" python3 tests/vmtests/image_sync.py query \
+    --output-format="$fmt" "$IMAGE_DIR" "kflavor=generic" "ftype~(root-image.gz|squashfs|root-tgz)" ||
+    { ret=$?; echo "FATAL: error querying images in $IMAGE_DIR" 1>&2;
+      exit $ret; }
+printf "%.s-" {1..86}; echo
+PYTHONPATH="$PWD" python3 tests/vmtests/image_sync.py query \
+    --output-format="$fmt" "$IMAGE_DIR" "subarch=generic" "ftype~(root-image.gz|squashfs|root-tgz)" ||
+    { ret=$?; echo "FATAL: error querying images in $IMAGE_DIR" 1>&2;
+      exit $ret; }
+printf "%.s=" {1..86}; printf "\n\n"
+
+# Make sure IMAGE_DIR is not (exclusivly) locked. If it's locked it means that
+# the vmtest-sync-images script is running or waiting to run. In this case just
+# wait for it to finish.
+#
+# The skip_images_dirlock setting gives more priority to jenkins-runner, not
+# pausing it if vmtest-sync-images put a lock on IMAGE_DIR. The lockfile
+# (below) is a "writer" lock set by vmtest-sync-images when it's actually
+# updating the images. This setting is meant to be used by the autolander,
+# which uses jenkins-runner to execute TestBasic for landing a commit. We'd
+# like to allow these jobs to not wait behind a pending sync-images; but rather
+# allow it to contend directly with sync-images on the vmtest-images.lock, not
+# running if sync images is active.
+declare -a flock_timeout_opts
+ltimeout_msg="no timeout"
+if ((ltimeout >= 0)); then
+    flock_timeout_opts=(--verbose "--timeout=$ltimeout")
+    ltimeout_msg="timeout: ${ltimeout}s"
+fi
+
+if [ $skip_images_dirlock = 0 ]; then
+    exec {dirlockfd}< "$IMAGE_DIR"
+    if ! flock --nonblock --shared $dirlockfd; then
+        # Be more verbose if the lock wasn't acquired immediately
+        tlock=$(date +%s)
+        error "Acquiring directory lock on $IMAGE_DIR ($ltimeout_msg)..."
+        flock --shared "${flock_timeout_opts[@]}" $dirlockfd > /dev/null || fail "Failed to acquire the lock."
+        tlock=$(($(date +%s) - tlock))
+        error "Lock on $IMAGE_DIR acquired after ${tlock}s."
+    fi
+fi
+
+# Acquire a shared ("read") lock on a lockfile. This will allow multiple
+# jenkins-runner processes to run in parallel, but prevent vmtest-sync-images
+# from touching the images at the same time, as it needs an exclusive lock.
+lockfile="$IMAGE_DIR/vmtest-images.lock"
+exec {lockfd}> "$lockfile"
+if ! flock --nonblock --shared $lockfd; then
+    tlock=$(date +%s)
+    error "Acquiring lock on $lockfile ($ltimeout_msg)..."
+    flock --shared "${flock_timeout_opts[@]}" $lockfd > /dev/null || fail "Failed to acquire the lock."
+    tlock=$(($(date +%s) - tlock))
+    error "Lock on $lockfile acquired after ${tlock}s."
+fi
+
+# Close the directory file descriptor (releases the lock too)
+[ $skip_images_dirlock != 0 ] || exec {dirlockfd}>&- || fail "Failed to release lock on $IMAGE_DIR"
+
+echo "$(date -R): vmtest start: nosetests3 ${pargs[*]} ${ntargs[*]}"
+nosetests3 "${pargs[@]}" "${ntargs[@]}"
+ret=$?
+end_s=$(date +%s)
+echo "$(date -R): vmtest end [$ret] in $(($end_s-$start_s))s"
+exit $ret
+
+# vi: ts=4 expandtab syntax=sh

@@ -1,0 +1,186 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim: set sts=4 expandtab:
+
+import sys, os, re, string, getopt
+
+progname = "debiandoc-lint4po"
+version = "1.2.1"
+safemode = True
+manglemode = True
+verbosemode = False
+cmdname = os.path.basename(sys.argv[0])
+
+USAGE = """
+%s - proof read the DebianDoc SGML PO file
+
+Copyright (C) 2011 Osamu Aoki, GPL2+, version: %s
+
+Usage: %s [options] <FOO.xx.po >FOO-out.xx.po
+ Supported options:
+   -h      Display this help message.
+   -n      No mangling of <footnote> in translation
+   -u      Output only unsafe PO contents.
+   -v      Vebose output
+
+This works better on a PO file processed with:
+ $ msgcat --no-wrap FOO.xx.po | sponge FOO.xx.po 
+"""%(cmdname, version, cmdname)
+
+# global patterns
+p_tags = re.compile(r'<.+?[ >]')
+p_footnote = re.compile(r'<footnote>')
+p_footnotes = re.compile(r'<footnote>.*?</footnote>')
+p_manglesingle = re.compile(r'<([^ <>]+?) +([^<>]+?)>')
+p_mangleopen = re.compile(r'<([^ <>/]+?)>')
+p_mangleclose = re.compile(r'</([^ <>]+?)>')
+
+def main():
+    global manglemode
+    global safemode
+    global verbosemode
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hnuv")
+    except getopt.GetoptError, err:
+        print >>sys.stderr, "Wrong option ..."
+        print >>sys.stderr, USAGE
+        sys.exit(1)
+    for o, a in opts:
+        if o == "-h":
+            print >>sys.stderr, USAGE
+            sys.exit(0)
+        elif o == "-n":
+            manglemode = False
+        elif o == "-u":
+            safemode = False
+        elif o == "-v":
+            verbosemode = True
+        else:
+            assert False, "unhandled option"
+    process_po()
+
+def process_po():
+    i = 0 # line index
+    ii = i # line index updated for each PO set
+    mode = 0
+    # mode = 0 for pre
+    # mode = 1 for id
+    # mode = 2 for str
+    buff = ['', '', '']
+    for l in sys.stdin.readlines():
+        i += 1
+        if mode == 0:
+            if l[0:-1] == '':
+                pass
+            elif l[0:1] == '#':
+                buff[mode] += l
+            elif l[0:5] == 'msgid':
+                # start msgid mode
+                mode = 1
+                buff[mode] = l
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        elif mode == 1:
+            if l[0:1] == '"':
+                buff[mode] = buff[mode][:-2] + l[1:]
+            elif l[0:6] == 'msgstr':
+                # start msgstr mode
+                mode = 2
+                buff[mode] = l
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        elif mode == 2:
+            if l[0:1] == '"':
+                buff[mode] = buff[mode][:-2] + l[1:]
+            elif l[0:-1] == '':
+                # end msgstr mode
+                # now ready to process a set of PO data
+                po_write(ii, buff)
+                # start again
+                buff = ['', '', '']
+                mode = 0
+                ii = i
+            else:
+                assert False, "E: %i, mode %i"%(ii, mode)
+        else:
+            assert False, "E: %i, mode %i"%(ii, mode)
+    # output at EOF
+    po_write(ii, buff)
+
+def po_write(ii, buff):
+    global manglemode
+    global safemode
+    global verbosemode
+    warned = False
+    if buff[1] == "msgid \"\"\n":
+        # if PO header
+        sys.stdout.write(buff[0])
+        sys.stdout.write(buff[1])
+        sys.stdout.write(buff[2])
+        print
+    else:
+        # if not PO header ...
+        if manglemode and p_footnote.search(buff[1]) == None:
+            b = ''
+            p = 0
+            for m in p_footnotes.finditer(buff[2]):
+                b += buff[2][p:m.start()] + \
+                    p_mangleopen.sub(r'@@@[tagopen_\1]@@@', \
+                    p_mangleclose.sub(r'@@@[tagclose_\1]@@@', \
+                    p_manglesingle.sub(r'XXX_FIXME_\1_XXX \2 XXX_XXX', \
+                    buff[2][m.start():m.end()])))
+                p = m.end()
+            buff[2] = b + buff[2][p:]
+        # extract tags and sort them as list
+        tags1 = sorted(p_tags.findall(buff[1]))
+        tags2 = sorted(p_tags.findall(buff[2]))
+        if tags1 != tags2:
+            warned = True
+            txt = "W %i: unmatched tags: msgid # = %i, msgstr # = %i"%(ii, len(tags1), len(tags2))
+            warn(txt, buff)
+            if warned:
+                print "# " + txt
+        # remove single SGML open tags
+        tags1 = filter(lambda x: x == '<ref ', tags1)
+        tags1 = filter(lambda x: x == '<manref ', tags1)
+        tags1 = filter(lambda x: x == '<url ', tags1)    
+        # check tags are sane for buff[1]
+        opentags = filter(lambda x: x[1] != '/', tags1)
+        closetags = filter(lambda x: x[1] == '/', tags1)
+        for x in set(opentags):
+            y = '</' + x[1:]
+            if opentags.count(x) != closetags.count(y):
+                warned = True
+                txt = "# W %i: unmatched tags within msgid: open = %i, close = %i"%(ii, opentags.count(x), closetags.count(y))
+                warn(txt, buff)
+                if warned:
+                    print "# " + txt
+    if safemode:
+        # only safe content
+        sys.stdout.write(buff[0])
+        sys.stdout.write(buff[1])
+        if warned:
+            print "msgstr \"\""
+        else:
+            sys.stdout.write(buff[2])
+        print
+    else:
+        if warned:
+            # only unsafe content
+            sys.stdout.write(buff[0])
+            sys.stdout.write(buff[1])
+            sys.stdout.write(buff[2])
+            print
+
+def warn(txt, buff):
+    print >>sys.stderr, txt
+    if verbosemode:
+        print >>sys.stderr, ""
+        print >>sys.stderr, buff[0]
+        print >>sys.stderr, buff[1]
+        print >>sys.stderr, buff[2]
+        print >>sys.stderr, "--------------------------------"
+
+if __name__ == '__main__':
+    main()
+

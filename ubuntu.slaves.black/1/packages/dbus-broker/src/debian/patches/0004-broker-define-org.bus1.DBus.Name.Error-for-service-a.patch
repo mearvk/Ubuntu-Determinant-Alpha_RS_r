@@ -1,0 +1,341 @@
+Author: Luca Boccassi <bluca@debian.org>
+Description: docs:  broker: define org.bus1.DBus.Name.Error for service activation errors
+Forwarded: yes, https://github.com/bus1/dbus-broker/pull/277
+Bug: https://github.com/bus1/dbus-broker/issues/269
+--- a/docs/dbus-broker.rst
++++ b/docs/dbus-broker.rst
+@@ -193,7 +193,26 @@
+ |         # passed along. This must be the serial number received by the last
+ |         # activation event on this name. Calls for other serial numbers are
+ |         # silently ignored and considered stale.
+-|         **method** Reset(**t** *serial*) -> ()
++|         # A org.bus1.DBus.Name.Error string is also passed, giving a hint
++|         # about the reason the activation was reset. The list is defined below.
++|         **method** Reset(**t** *serial*, **s** *error*) -> ()
++|
++|         # Activation request failed: a concurrent deactivation request is already in progress
++|         **error** *org.bus1.DBus.Name.Error.DestructiveTransaction*
++|         # Activation request failed: unknown unit
++|         **error** *org.bus1.DBus.Name.Error.UnknownUnit*
++|         # Activation request failed: unit is masked
++|         **error** *org.bus1.DBus.Name.Error.MaskedUnit*
++|         # Activation request failed: unit is invalid
++|         **error** *org.bus1.DBus.Name.Error.InvalidUnit*
++|         # Unit activation job succeeded, but the unit failed afterwards
++|         **error** *org.bus1.DBus.Name.Error.UnitFailure*
++|         # The startup job was valid, but it failed during activation
++|         **error** *org.bus1.DBus.Name.Error.StartupFailure*
++|         # The startup job was valid, but it was skipped during activation
++|         **error** *org.bus1.DBus.Name.Error.StartupSkipped*
++|         # Activation request cancelled: bus name was released
++|         **error** *org.bus1.DBus.Name.Error.NameReleased*
+ |
+ |         # This signal is sent whenever a client requests activation of this
+ |         # name. Note that multiple activation requests are coalesced by the
+--- a/src/broker/controller-dbus.c
++++ b/src/broker/controller-dbus.c
+@@ -56,8 +56,9 @@
+ 
+ static const CDVarType controller_type_in_t[] = {
+         C_DVAR_T_INIT(
+-                C_DVAR_T_TUPLE1(
+-                        C_DVAR_T_t
++                C_DVAR_T_TUPLE2(
++                        C_DVAR_T_t,
++                        C_DVAR_T_s
+                 )
+         )
+ };
+@@ -311,7 +312,7 @@
+         if (!name)
+                 return CONTROLLER_E_NAME_NOT_FOUND;
+ 
+-        r = controller_name_reset(name, name->activation.pending);
++        r = controller_name_reset(name, name->activation.pending, BUS1_ERROR_NAME_RELEASED);
+         if (r)
+                 return error_trace(r);
+ 
+@@ -359,10 +360,11 @@
+ 
+ static int controller_method_name_reset(Controller *controller, const char *path, CDVar *in_v, FDList *fds, CDVar *out_v) {
+         ControllerName *name;
++        const char *reason;
+         uint64_t serial;
+-        int r;
++        int r, bus1_error;
+ 
+-        c_dvar_read(in_v, "(t)", &serial);
++        c_dvar_read(in_v, "(ts)", &serial, &reason);
+ 
+         r = controller_end_read(in_v);
+         if (r)
+@@ -372,7 +374,11 @@
+         if (!name)
+                 return CONTROLLER_E_NAME_NOT_FOUND;
+ 
+-        r = controller_name_reset(name, serial);
++        bus1_error = bus1_error_from_string(reason);
++        if (bus1_error < 0)
++                return CONTROLLER_E_INVALID_MESSAGE;
++
++        r = controller_name_reset(name, serial, bus1_error);
+         if (r)
+                 return error_trace(r);
+ 
+--- a/src/broker/controller.c
++++ b/src/broker/controller.c
+@@ -66,10 +66,10 @@
+ /**
+  * controller_name_reset() - XXX
+  */
+-int controller_name_reset(ControllerName *name, uint64_t serial) {
++int controller_name_reset(ControllerName *name, uint64_t serial, int bus1_error) {
+         int r;
+ 
+-        r = driver_name_activation_failed(&name->controller->broker->bus, &name->activation, serial);
++        r = driver_name_activation_failed(&name->controller->broker->bus, &name->activation, serial, bus1_error);
+         if (r)
+                 return error_fold(r);
+ 
+--- a/src/broker/controller.h
++++ b/src/broker/controller.h
+@@ -53,6 +53,40 @@
+         CONTROLLER_E_NAME_NOT_FOUND,
+ };
+ 
++enum {
++    BUS1_ERROR_DESTRUCTIVE_TRANSACTION = 0,
++    BUS1_ERROR_UNKNOWN_UNIT            = 1,
++    BUS1_ERROR_MASKED_UNIT             = 2,
++    BUS1_ERROR_INVALID_UNIT            = 3,
++    BUS1_ERROR_UNIT_FAILURE            = 4,
++    BUS1_ERROR_STARTUP_FAILURE         = 5,
++    BUS1_ERROR_STARTUP_SKIPPED         = 6,
++    BUS1_ERROR_NAME_RELEASED           = 7,
++    _BUS1_ERROR_N,
++};
++
++static const char* const bus1_error_table[_BUS1_ERROR_N] = {
++    [BUS1_ERROR_DESTRUCTIVE_TRANSACTION] = "org.bus1.DBus.Name.Error.DestructiveTransaction",
++    [BUS1_ERROR_UNKNOWN_UNIT]            = "org.bus1.DBus.Name.Error.UnknownUnit",
++    [BUS1_ERROR_MASKED_UNIT]             = "org.bus1.DBus.Name.Error.MaskedUnit",
++    [BUS1_ERROR_INVALID_UNIT]            = "org.bus1.DBus.Name.Error.InvalidUnit",
++    [BUS1_ERROR_UNIT_FAILURE]            = "org.bus1.DBus.Name.Error.UnitFailure",
++    [BUS1_ERROR_STARTUP_FAILURE]         = "org.bus1.DBus.Name.Error.StartupFailure",
++    [BUS1_ERROR_STARTUP_SKIPPED]         = "org.bus1.DBus.Name.Error.StartupSkipped",
++    [BUS1_ERROR_NAME_RELEASED]           = "org.bus1.DBus.Name.Error.NameReleased",
++};
++
++static const char* const bus1_error_table_human_readable[_BUS1_ERROR_N] = {
++    [BUS1_ERROR_DESTRUCTIVE_TRANSACTION] = "activation request failed: a concurrent deactivation request is already in progress",
++    [BUS1_ERROR_UNKNOWN_UNIT]            = "activation request failed: unknown unit",
++    [BUS1_ERROR_MASKED_UNIT]             = "activation request failed: unit is masked",
++    [BUS1_ERROR_INVALID_UNIT]            = "activation request failed: unit is invalid",
++    [BUS1_ERROR_UNIT_FAILURE]            = "unit failed",
++    [BUS1_ERROR_STARTUP_FAILURE]         = "startup job failed",
++    [BUS1_ERROR_STARTUP_SKIPPED]         = "startup job skipped (hint: a Condition*= might not have been met)",
++    [BUS1_ERROR_NAME_RELEASED]           = "activation request cancelled: bus name was released",
++};
++
+ struct ControllerName {
+         Controller *controller;
+         CRBNode controller_node;
+@@ -101,7 +135,7 @@
+ /* names */
+ 
+ ControllerName *controller_name_free(ControllerName *name);
+-int controller_name_reset(ControllerName *name, uint64_t serial);
++int controller_name_reset(ControllerName *name, uint64_t serial, int bus1_error);
+ int controller_name_activate(ControllerName *name, uint64_t serial);
+ 
+ C_DEFINE_CLEANUP(ControllerName *, controller_name_free);
+@@ -166,3 +200,29 @@
+          */
+         return c_container_of(activation, ControllerName, activation);
+ }
++
++/*
++ * The first two converters take input only from our own code, so assert
++ * on unknown errors. The last one receives it from the bus (even though it's
++ * P2P), so return an error in that case and let the caller handle it.
++ */
++
++static inline const char *bus1_error_to_string(int error) {
++    c_assert(error >= 0 && error < _BUS1_ERROR_N);
++
++    return bus1_error_table[error];
++}
++
++static inline const char *bus1_error_to_human_readable(int error) {
++    c_assert(error >= 0 && error < _BUS1_ERROR_N);
++
++    return bus1_error_table_human_readable[error];
++}
++
++static inline int bus1_error_from_string(const char *bus1_error) {
++    for (int i = 0; i < _BUS1_ERROR_N; i++)
++        if (strcmp(bus1_error, bus1_error_table[i]) == 0)
++            return i;
++
++    return -1;
++}
+--- a/src/bus/driver.c
++++ b/src/bus/driver.c
+@@ -721,9 +721,10 @@
+         return 0;
+ }
+ 
+-int driver_name_activation_failed(Bus *bus, Activation *activation, uint64_t serial) {
++int driver_name_activation_failed(Bus *bus, Activation *activation, uint64_t serial, int bus1_error) {
+         ActivationRequest *request, *request_safe;
+         ActivationMessage *message, *message_safe;
++        _c_cleanup_(c_freep) char *error = NULL;
+         int r;
+ 
+         /*
+@@ -733,6 +734,10 @@
+         if (!activation->pending || serial != activation->pending)
+                 return 0;
+ 
++        r = asprintf(&error, "Could not activate remote peer: %s.", bus1_error_to_human_readable(bus1_error));
++        if (r < 0)
++                return error_origin(-errno);
++
+         activation->pending = 0;
+ 
+         c_list_for_each_entry_safe(request, request_safe, &activation->activation_requests, link) {
+@@ -740,7 +745,7 @@
+ 
+                 sender = peer_registry_find_peer(&bus->peers, request->sender_id);
+                 if (sender) {
+-                        r = driver_send_error(sender, request->serial, "org.freedesktop.DBus.Error.ServiceUnknown", "Could not activate remote peer.");
++                        r = driver_send_error(sender, request->serial, "org.freedesktop.DBus.Error.ServiceUnknown", error);
+                         if (r)
+                                 return error_trace(r);
+                 }
+@@ -753,7 +758,7 @@
+ 
+                 sender = peer_registry_find_peer(&bus->peers, message->message->metadata.sender_id);
+                 if (sender) {
+-                        r = driver_send_error(sender, message_read_serial(message->message), "org.freedesktop.DBus.Error.NameHasNoOwner", "Could not activate remote peer.");
++                        r = driver_send_error(sender, message_read_serial(message->message), "org.freedesktop.DBus.Error.NameHasNoOwner", error);
+                         if (r)
+                                 return error_trace(r);
+                 }
+--- a/src/bus/driver.h
++++ b/src/bus/driver.h
+@@ -63,7 +63,7 @@
+         _DRIVER_E_MAX,
+ };
+ 
+-int driver_name_activation_failed(Bus *bus, Activation *activation, uint64_t serial);
++int driver_name_activation_failed(Bus *bus, Activation *activation, uint64_t serial, int bus1_error);
+ int driver_reload_config_completed(Bus *bus, uint64_t sender_id, uint32_t reply_serial);
+ int driver_reload_config_invalid(Bus *bus, uint64_t sender_id, uint32_t reply_serial);
+ 
+--- a/src/launch/service.c
++++ b/src/launch/service.c
+@@ -17,6 +17,7 @@
+ #include <c-stdaux.h>
+ #include <stdlib.h>
+ #include <systemd/sd-bus.h>
++#include "broker/controller.h"
+ #include "catalog/catalog-ids.h"
+ #include "launch/service.h"
+ #include "util/error.h"
+@@ -188,7 +189,7 @@
+         service->slot_watch_jobs = sd_bus_slot_unref(service->slot_watch_jobs);
+ }
+ 
+-static int service_reset_activation(Service *service) {
++static int service_reset_activation(Service *service, int bus1_error) {
+         _c_cleanup_(c_freep) char *object_path = NULL;
+         int r;
+ 
+@@ -198,13 +199,6 @@
+         if (r < 0)
+                 return error_origin(-errno);
+ 
+-        /*
+-         * XXX: Ideally, we would include more detailed error information as
+-         *      payload. This would allow the broker to forward this in the
+-         *      dbus error to each pending transaction.
+-         *      So far, we did not define such errors, so this is left for the
+-         *      future.
+-         */
+         r = sd_bus_call_method(service->launcher->bus_controller,
+                                NULL,
+                                object_path,
+@@ -212,8 +206,9 @@
+                                "Reset",
+                                NULL,
+                                NULL,
+-                               "t",
+-                               service->last_serial);
++                               "ts",
++                               service->last_serial,
++                               bus1_error_to_string(bus1_error));
+         if (r < 0)
+                 return error_origin(r);
+ 
+@@ -260,7 +255,7 @@
+                  * Our job failed. Forward this information to the broker so it
+                  * can fail pending activations.
+                  */
+-                r = service_reset_activation(service);
++                r = service_reset_activation(service, !strcmp(result, "skipped") ? BUS1_ERROR_STARTUP_SKIPPED : BUS1_ERROR_STARTUP_FAILURE);
+                 if (r)
+                         return error_trace(r);
+         }
+@@ -390,7 +385,7 @@
+          * anything to explicitly fail if they want to reset the activation.
+          */
+         if (value && !strcmp(value, "failed")) {
+-                r = service_reset_activation(service);
++                r = service_reset_activation(service, BUS1_ERROR_UNIT_FAILURE);
+                 if (r)
+                         return error_trace(r);
+         }
+@@ -434,7 +429,7 @@
+         Launcher *launcher = service->launcher;
+         const sd_bus_error *error;
+         const char *job;
+-        int r;
++        int r, bus1_error = -1;
+ 
+         service->slot_start_unit = sd_bus_slot_unref(service->slot_start_unit);
+ 
+@@ -506,6 +501,8 @@
+                                 if (r)
+                                         return error_fold(r);
+                         }
++
++                        bus1_error = BUS1_ERROR_UNKNOWN_UNIT;
+                 } else if (strcmp(error->name, "org.freedesktop.systemd1.UnitMasked") == 0) {
+                         if (!service->n_masked_unit++) {
+                                 log_append_here(&launcher->log, LOG_NOTICE, 0, DBUS_BROKER_CATALOG_ACTIVATE_MASKED_UNIT);
+@@ -519,6 +516,8 @@
+                                 if (r)
+                                         return error_fold(r);
+                         }
++
++                        bus1_error = BUS1_ERROR_MASKED_UNIT;
+                 } else {
+                         log_append_here(&launcher->log, LOG_ERR, 0, NULL);
+                         log_append_bus_error(&launcher->log, error);
+@@ -529,10 +528,13 @@
+                                         service->name);
+                         if (r)
+                                 return error_fold(r);
++
++                        bus1_error = BUS1_ERROR_INVALID_UNIT;
+                 }
+-        }
++        } else
++                bus1_error = BUS1_ERROR_DESTRUCTIVE_TRANSACTION;
+ 
+-        r = service_reset_activation(service);
++        r = service_reset_activation(service, bus1_error);
+         if (r)
+                 return error_trace(r);
+ 

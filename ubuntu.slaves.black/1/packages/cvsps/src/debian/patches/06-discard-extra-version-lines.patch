@@ -1,0 +1,27 @@
+Subject: Discard extra "M" lines in response to "version"
+From: Richard Hansen <ubuntu-a7x@scientician.org>
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1413084
+Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=775883
+
+Some CVS servers print more than one "M" line in response to a
+"version" command.  For example:
+
+Client: version
+Server: M Concurrent Versions System (CVS) 1.12.13 (client/server)
+Server: M with CVSACL Patch 1.2.5 (cvsacl.sourceforge.net)
+Server: ok
+
+This patch causes cvsps to consume all such lines rather than fail.
+
+--- a/cvs_direct.c
++++ b/cvs_direct.c
+@@ -916,7 +916,8 @@
+     else
+ 	debug(DEBUG_APPERROR, "cvs_direct: didn't read version: %s", lbuff);
+     
+-    read_line(ctx, lbuff);
++    while (strncmp(lbuff, "M ", 2) == 0)
++	read_line(ctx, lbuff);
+     if (strcmp(lbuff, "ok") != 0)
+ 	debug(DEBUG_APPERROR, "cvs_direct: protocol error reading version");
+ 

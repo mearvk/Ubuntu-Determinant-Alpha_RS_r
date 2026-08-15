@@ -1,0 +1,32 @@
+Origin: upstream, https://github.com/cyrusimap/cyrus-sasl/commit/ca6c587cc9da51235b125a97e841fa786aaad7ff
+Bug-Debian: https://bugs.debian.org/722611
+From: Simo Sorce <simo@redhat.com>
+Date: Tue, 16 Apr 2019 10:18:43 -0400
+Subject: Prevent double free of RC4 context
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+---
+ plugins/digestmd5.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/plugins/digestmd5.c b/plugins/digestmd5.c
+index f184c164..df35093d 100644
+--- a/plugins/digestmd5.c
++++ b/plugins/digestmd5.c
+@@ -1224,8 +1224,14 @@ static void free_rc4(context_t *text)
+ {
+     /* free rc4 context structures */
+ 
+-    if(text->cipher_enc_context) text->utils->free(text->cipher_enc_context);
+-    if(text->cipher_dec_context) text->utils->free(text->cipher_dec_context);
++    if (text->cipher_enc_context) {
++        text->utils->free(text->cipher_enc_context);
++        text->cipher_enc_context = NULL;
++    }
++    if (text->cipher_dec_context) {
++        text->utils->free(text->cipher_dec_context);
++        text->cipher_dec_context = NULL;
++    }
+ }
+ 
+ static int init_rc4(context_t *text, 

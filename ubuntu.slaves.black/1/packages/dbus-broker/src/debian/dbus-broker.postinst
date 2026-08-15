@@ -1,0 +1,47 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = triggered ] && systemctl --quiet is-active dbus-broker.service; then
+    systemctl reload dbus-broker || true
+    exit 0
+fi
+
+if [ "$1" = configure ]; then
+    # Restarting the system bus is not supported yet. On upgrades do
+    # not restart the broker but recomment a reboot if the service is
+    # running. Replacing dbus-deamon also requires a reboot.
+
+    # dbus-daemon depends on systemd but if we are replacing
+    # dbus-broker systemd may not be running yet. Thus check in
+    # dbus-daemon is running in an init agnostic way.
+    if [ -z "$2" ] && pidof -c /bin/dbus-daemon /usr/bin/dbus-daemon >/dev/null; then
+        echo "Replacing the running dbus-daemon with dbus-broker requires a reboot:" >&2
+        echo "please reboot the system when convenient." >&2
+
+        # Trigger an update notification that recommends a reboot.
+        touch /var/run/reboot-required || true
+
+        if ! grep -Fqsx dbus-broker /run/reboot-required.pkgs; then
+            echo dbus-broker >> /run/reboot-required.pkgs || true
+        fi
+    fi
+
+    # dbus-broker depends on systemd thus we can use its functionality
+    if [ -n "$2" ] && systemctl --quiet is-active dbus-broker.service; then
+	echo "Upgrading to a newer dbus-broker version requires a reboot:" >&2
+	echo "please reboot the system when convenient." >&2
+
+	# Trigger an update notification that recommends a reboot.
+        touch /var/run/reboot-required || true
+
+        if ! grep -Fqsx dbus-broker /run/reboot-required.pkgs; then
+            echo dbus-broker >> /run/reboot-required.pkgs || true
+        fi
+
+        # In case we got new configuration files
+        systemctl reload dbus-broker || true
+    fi
+fi
+
+#DEBHELPER#

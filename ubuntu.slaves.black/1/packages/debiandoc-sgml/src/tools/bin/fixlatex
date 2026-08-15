@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Perform some obscure postprocessing to obtain valid LaTeX code.
+# If you know a better way (such as using babel or integration into
+# Driver.pm or LaTeX.pm) let it me know.
+# Maybe the subroutine _cdata in LaTeX.pm is a good place, but we don't
+# want to call bg5conv for each little string, right?
+#
+# Further customization of LaTeX code in the compound conversion commands 
+# such as debiandoc2latexpdf can be accomplished with "-s script" option.
+#
+#  Called as "fixlatex -l <lang> <infile> <outfile>" for the modification.
+#
+#  Jens Seidel / Osamu Aoki
+
+locale=en
+
+while getopts ":l:" opt
+do
+        case ${opt}
+        in 
+           l) locale=${OPTARG};;
+           \? ) echo "unknown option \`${OPTARG}'"; exit 1;;
+        esac
+done
+shift $((${OPTIND} - 1))
+
+case "$locale"
+in
+("zh_TW")
+	perl -p \
+-e 's/([\x80-\xff])\\textbackslash\{\}/$1\\/g;' \
+-e 's/([\x80-\xff])\\textasciitilde\{\}/$1\~/g;' \
+-e 's/([\x80-\xff])\\textasciicircum\{\}/$1\^/g;' \
+-e 's/([\x80-\xff])\\\}/$1\}/g;' \
+-e 's/([\x80-\xff])\\\{/$1\{/g;' \
+-e 's/([\x80-\xff])\\\_/$1_/g;' <$1 |
+        bg5conv >$2
+	;;
+(*)
+	cp $1 $2
+esac
+

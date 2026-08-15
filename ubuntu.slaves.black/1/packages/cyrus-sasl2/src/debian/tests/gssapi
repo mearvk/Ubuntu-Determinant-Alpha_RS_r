@@ -1,0 +1,151 @@
+#!/bin/sh
+
+set -e
+
+sasluser="user$$"
+saslpass="pass$$"
+ldap_admin_pw="ldapadminpw$$"
+mydomain="example.fake"
+myrealm="EXAMPLE.FAKE"
+myhostname="server.${mydomain}"
+ldap_suffix="dc=example,dc=fake"
+ldap_admin_dn="cn=admin,${ldap_suffix}"
+service_principal="ldap/${myhostname}"
+mechs_to_test="GSSAPI GSS-SPNEGO"
+
+cleanup() {
+    /bin/true
+}
+
+
+trap cleanup EXIT
+
+setup_slapd() {
+    local domain="$1"
+    local password="$2"
+    # MUST use REAL TABS as delimiters below!
+    debconf-set-selections << EOF
+slapd	slapd/domain	string	${domain}
+slapd	shared/organization	string	${domain}
+slapd	slapd/password1	password	${password}
+slapd	slapd/password2	password	${password}
+EOF
+    rm -rf /var/backups/*slapd* /var/backups/unknown*ldapdb
+    dpkg-reconfigure -fnoninteractive -pcritical slapd 2>&1
+    systemctl restart slapd # http://bugs.debian.org/1010678
+}
+
+adjust_hostname() {
+    local myhostname="$1"
+
+    echo "${myhostname}" > /etc/hostname
+    hostname "${myhostname}"
+    if ! grep -qE "${myhostname}" /etc/hosts; then
+        # just so it's resolvable
+        echo "127.0.1.10 ${myhostname}" >> /etc/hosts
+    fi
+}
+
+create_realm() {
+    local realm_name="$1"
+    local kerberos_server="$2"
+
+    # start fresh
+    rm -rf /var/lib/krb5kdc/*
+    rm -rf /etc/krb5kdc/*
+    rm -f /etc/krb5.keytab
+
+    # setup some defaults
+    cat > /etc/krb5kdc/kdc.conf <<EOF
+[kdcdefaults]
+    kdc_ports = 750,88
+[realms]
+    ${realm_name} = {
+	    database_name = /var/lib/krb5kdc/principal
+	    admin_keytab = FILE:/etc/krb5kdc/kadm5.keytab
+	    acl_file = /etc/krb5kdc/kadm5.acl
+	    key_stash_file = /etc/krb5kdc/stash
+	    kdc_ports = 750,88
+	    max_life = 10h 0m 0s
+	    max_renewable_life = 7d 0h 0m 0s
+	    #master_key_type = des3-hmac-sha1
+	    #supported_enctypes = aes256-cts:normal aes128-cts:normal
+	    default_principal_flags = +preauth
+    }
+EOF
+
+    cat > /etc/krb5.conf <<EOF
+[libdefaults]
+    default_realm = ${realm_name}
+    kdc_timesync = 1
+    ccache_type = 4
+    forwardable = true
+    proxiable = true
+    fcc-mit-ticketflags = true
+[realms]
+	${realm_name} = {
+		kdc = ${kerberos_server}
+		admin_server = ${kerberos_server}
+	}
+EOF
+    echo "# */admin *" > /etc/krb5kdc/kadm5.acl
+
+    # create the realm
+    kdb5_util create -s -P secretpassword
+
+    # restart services
+    systemctl restart krb5-kdc.service krb5-admin-server.service
+}
+
+create_krb_principal() {
+    local principal="$1"
+    local password="$2"
+
+    if [ -n "${password}" ]; then
+        kadmin.local -q "addprinc -pw ${password} ${principal}" 2>&1
+    else
+        kadmin.local -q "addprinc -randkey ${principal}" 2>&1
+    fi
+}
+
+extract_keytab() {
+    local principal="$1"
+
+    kadmin.local -q "ktadd ${principal}"
+}
+
+adjust_hostname "${myhostname}"
+echo "Setting up slapd"
+setup_slapd "${mydomain}" "${ldap_admin_pw}"
+echo
+
+echo "Creating Kerberos realm and principals"
+create_realm "${myrealm}" "${myhostname}"
+create_krb_principal "${sasluser}" "${saslpass}"
+create_krb_principal "${service_principal}"
+echo
+
+echo "Extracting keytab"
+extract_keytab "${service_principal}"
+chmod 0640 /etc/krb5.keytab
+chgrp openldap /etc/krb5.keytab
+
+echo
+echo "Obtaining kerberos ticket for ${sasluser}"
+echo "${saslpass}" | kinit "${sasluser}"
+
+echo
+echo "Using ticket to authenticate with OpenLDAP"
+for mech in ${mechs_to_test}; do
+    echo "Testing mechanism ${mech}"
+    ldapwhoami -Y ${mech} 2>&1
+    echo
+done
+
+echo
+echo "Full list of tickets"
+klist
+
+echo
+echo "Verifying we have a service ticket for ldap"
+klist | grep "${service_principal}"

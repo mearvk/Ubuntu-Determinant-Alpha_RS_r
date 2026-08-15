@@ -1,0 +1,94 @@
+bucket:
+  - &run_if_systemd |
+    #!/bin/sh
+    command -v systemctl && systemctl mask media-root\\x2dro.mount
+    exit 0
+  - &swapon |
+    #!/bin/sh
+    # enable any swap device or partition if present
+    devices=""
+    for device in /dev/[hsv]d[a-z][0-9]*; do
+        if ! [ -b "$device" ]; then
+            continue
+        fi
+        MOFF=$((`getconf PAGESIZE` - 10))
+        magic=$(dd if="$device" bs=1 skip=$MOFF count=10 2>/dev/null) || continue
+        if [ "$magic" = "SWAPSPACE2" -o "$magic" = "SWAP-SPACE" ]; then
+            devices="$devices $device"
+        fi
+    done
+    for device in $devices; do
+        swapon $device || true
+    done
+    swapon --show
+    exit 0
+  - &multipath_on |
+      #!/bin/sh
+      if command -v multipath; then
+          multipath -ll
+          multipath -r
+          multipath -ll
+      fi
+  - &zpool_export |
+      #!/bin/sh
+      # disable any rpools to trigger disks with zfs_member label but inactive
+      # pools
+      zpool export rpool ||:
+  - &lvm_stop |
+      #!/bin/sh
+      # This function disables any existing lvm logical volumes that
+      # have been created during the early storage config stage
+      # and simulates the effect of booting into a system with existing
+      # (but inactive) lvm configuration.
+      for vg in `pvdisplay -C --separator = -o vg_name --noheadings`; do
+         vgchange -an $vg ||:
+      done
+      # disable the automatic pvscan, we want to test that curtin
+      # can find/enable logical volumes without this service
+      command -v systemctl && systemctl mask lvm2-pvscan\@.service
+      # remove any existing metadata written from early disk config
+      rm -rf /etc/lvm/archive /etc/lvm/backup
+  - &mdadm_stop  |
+      #!/bin/sh
+      # This function disables any existing raid devices which may
+      # have been created during the early storage config stage
+      # and simulates the effect of booting into a system with existing
+      # but inactive mdadm configuration.
+      for md in /dev/md*; do
+          mdadm --stop $md ||:
+      done
+      # remove any existing metadata written from early disk config
+      rm -f /etc/mdadm/mdadm.conf
+  - &naptime  |
+      #!/bin/sh
+      # This function attempts to settle and flush IO to devices
+      # in some scenarios vmtest devices have had lots of IO
+      # sent to them and they've yet to consume it all. Give it a
+      # chance to flush themselves
+      echo "VMTEST: io flush nap time, 12 second cleanse"
+      sleep 3
+      sync; sync; sync;
+      sleep 3
+      echo 3 > /proc/sys/vm/drop_caches
+      sleep 3
+      sync; sync; sync;
+      sleep 3
+      echo "VMTEST: io flush nap time complete;"
+
+
+early_commands:
+  # running block-meta custom from the install environment
+  # inherits the CONFIG environment, so this works to actually prepare
+  # the disks exactly as in this config before the rest of the install
+  # will just blow it all away.  We have clean out other environment
+  # that could unintentionally mess things up.
+  01-blockmeta: [env, OUTPUT_FSTAB=/tmp/my.bdir/state/fstab,
+              TARGET_MOUNT_POINT=/tmp/my.bdir/target,
+              WORKING_DIR=/tmp/my.bdir/work.d,
+              curtin, --showtrace, -v, block-meta, --umount, custom]
+  02-enable_swaps: [sh, -c, *swapon]
+  02-multipath_on: [sh, -c, *multipath_on]
+  03-disable_rpool: [sh, -c, *zpool_export]
+  04-lvm_stop: [sh, -c, *lvm_stop]
+  05-mdadm_stop: [sh, -c, *mdadm_stop]
+  06-naptime: [sh, -c, *naptime]

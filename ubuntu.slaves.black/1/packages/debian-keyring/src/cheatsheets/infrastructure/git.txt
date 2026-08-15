@@ -1,0 +1,107 @@
+Git working tree
+----------------
+
+Keyring work is coordinated in the Git tree living in
+/srv/keyring.debian.org/master-keyring.git/ at keyring.debian.org
+(which is an alias to kaufmann.debian.org). You need to have an
+account on kaufmann to get access to the working tree. The URL for the
+Git repository is:
+
+  ssh://kaufmann.debian.org/srv/keyring.debian.org/master-keyring.git/
+
+Note that, before March 2014, we used to work on a Bazaar tree. When
+the tree was imported over to Git, the only bit of lost information
+were the commit signatures. The Bazaar tree up to that point (left at
+commit #1297) is still available in Kaufmann, at
+/srv/keyring.debian.org/master-keyring/ (probably we should replace it
+to avoid confusions!).
+
+Public tree copy
+----------------
+
+There is a public copy of the tree we push to whenever we push the
+updates; it is available at Debian's Git server:
+
+  https://salsa.debian.org/debian-keyring/keyring.git
+
+This tree can also be browsed online at:
+
+  http://salsa.debian.org/debian-keyring/keyring
+
+So, when you push a new revision, do:
+
+  $ git push git@salsa.debian.org:debian-keyring/keyring.git master
+
+Signing commits
+---------------
+
+All commits should be GPG-signed. To do so, specify your signing key
+to Git, like:
+
+  $ git config user.signingkey 0x0000DEAD0000BEEF
+
+And remember to always specify the '-S' switch when committing!
+
+Note that if you use debcommit, you can ask it to always sign commits
+by either setting its DEBCOMMIT_SIGN_COMMITS configuration variable or
+by specifying --sign-commit in the command line.
+
+** Note: A nice Git hook can be of use here to remind us if we're
+   missing -S
+
+Parsing the Git changelog
+-------------------------
+
+When pushing a new keyring revision, you can use
+./script/parse-git-changelog to automate several steps. Pipe it the
+changelog since the last uploaded revision (remember to tag it!):
+
+$ git log 2014.11.19.. | scripts/parse-git-changelog
+
+It will create three files: rt-update, ldap-update and dak-update. For
+the two first ones, look in the respective cheatsheets; for the
+dak-update; refer to Ansgar Burchardt's message (Message-ID:
+<87tx2uvcti.fsf@deep-thought.43-1.org>):
+
+    Hi,
+
+    as DM permissions are bound to specific keys they need to be updated if
+    a DM changes his key. Currently I do so from time to time (usually when
+    somebody has problems uploading packages), but it would be nice if you
+    could tell dak that keys changed.
+    
+    To do so, please wait until the new keys have been installed and then
+    upload a <user>-<YYYYMMDD>-<HHMM>.dak-commands via ftp to ftp-master. It
+    should look like the following:
+    
+    +-----------------------------------------------------------------------
+    | Archive: ftp.debian.org
+    | Uploader: Ansgar Burchardt <ansgar@debian.org>     *optional*
+    | Cc: keyring-maint@debian.org                       *optional*
+    |
+    | Action: dm-migrate
+    | From: 3C0B6EB0AB2729E8CE2255A7385AE490868EFA66
+    | To: 5691 873A A9B1 C18E 3CEE  82E6 0F8C E0BF 4E85 E61B
+    | Reason: Replace 0x385AE490868EFA66 with 0x0F8CE0BF4E85E61B (Stefan Völkel) (RT #5318)
+    |
+    | Action: dm-migrate
+    | From: B86CB5487CC4B58F0CA3856E7EE852DEE6B78725
+    | To: FBF3 EEAF A780 7802 B56B  27A9 70A8 FEE0 74B3 ED3A
+    | Reason: Replace 0x7EE852DEE6B78725 with 0x70A8FEE074B3ED3A (Yauheni Kaliuta) (RT #5251)
+    |
+    | Action: dm-remove
+    | Fingerprint: ~bla~
+    | Reason: ~blubb~
+    +-----------------------------------------------------------------------
+    
+    Plus a GPG cleartext signature around everything.
+    
+    The Uploader and Cc fields are optional; if Uploader is not given email
+    replies are sent to the primary UID of the key that was used to sign the
+    file. Whitespace in fields with fingerprints is ignored to make life
+    easier. The Reason field is optional and just for informational use.
+    
+    Would it be possible for you to do this?
+    
+    Ansgar
+    
