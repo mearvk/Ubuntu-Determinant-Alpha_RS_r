@@ -1,0 +1,62 @@
+#!/bin/sh
+
+set -eu
+
+cat << EOF > "$DATADIR/foo.yarn"
+    SCENARIO foo
+    GIVEN foo
+    WHEN foo
+    THEN foo
+
+    SCENARIO bar
+    GIVEN bar
+    WHEN bar
+    THEN bar
+
+    IMPLEMENTS GIVEN (.*)
+    touch "\$DATADIR/\$MATCH_1.given"
+
+    IMPLEMENTS WHEN (.*)
+    touch "\$DATADIR/\$MATCH_1.when"
+
+    IMPLEMENTS THEN (.*)
+    touch "\$DATADIR/\$MATCH_1.then"
+EOF
+
+./run-yarn --snapshot --tempdir "$DATADIR/tmp" "$DATADIR/foo.yarn"
+
+test -e "$DATADIR/tmp/bar"
+test -e "$DATADIR/tmp/bar/datadir"
+test -e "$DATADIR/tmp/bar/datadir/bar.given"
+test -e "$DATADIR/tmp/bar/datadir/bar.when"
+test -e "$DATADIR/tmp/bar/datadir/bar.then"
+
+test -e "$DATADIR/tmp/bar/001-GIVEN-bar"
+test -e "$DATADIR/tmp/bar/001-GIVEN-bar/bar.given"
+! test -e "$DATADIR/tmp/bar/001-GIVEN-bar/bar.when"
+! test -e "$DATADIR/tmp/bar/001-GIVEN-bar/bar.then"
+
+test -e "$DATADIR/tmp/bar/002-WHEN-bar"
+test -e "$DATADIR/tmp/bar/002-WHEN-bar/bar.given"
+test -e "$DATADIR/tmp/bar/002-WHEN-bar/bar.when"
+! test -e "$DATADIR/tmp/bar/002-WHEN-bar/bar.then"
+
+test -e "$DATADIR/tmp/bar/003-THEN-bar"
+test -e "$DATADIR/tmp/bar/003-THEN-bar/bar.given"
+test -e "$DATADIR/tmp/bar/003-THEN-bar/bar.when"
+test -e "$DATADIR/tmp/bar/003-THEN-bar/bar.then"
+
+test -e "$DATADIR/tmp/foo/001-GIVEN-foo"
+test -e "$DATADIR/tmp/foo/001-GIVEN-foo/foo.given"
+! test -e "$DATADIR/tmp/foo/001-GIVEN-foo/foo.when"
+! test -e "$DATADIR/tmp/foo/001-GIVEN-foo/foo.then"
+
+test -e "$DATADIR/tmp/foo/002-WHEN-foo"
+test -e "$DATADIR/tmp/foo/002-WHEN-foo/foo.given"
+test -e "$DATADIR/tmp/foo/002-WHEN-foo/foo.when"
+! test -e "$DATADIR/tmp/foo/002-WHEN-foo/foo.then"
+
+test -e "$DATADIR/tmp/foo/003-THEN-foo"
+test -e "$DATADIR/tmp/foo/003-THEN-foo/foo.given"
+test -e "$DATADIR/tmp/foo/003-THEN-foo/foo.when"
+test -e "$DATADIR/tmp/foo/003-THEN-foo/foo.then"

@@ -1,0 +1,332 @@
+#!/usr/bin/perl
+
+#    Copyright (c) 2009.2012-2013 Dominique Dumont.
+#
+#    This library is free software; you can redistribute it and/or
+#    modify it under the terms of the GNU Lesser General Public License as
+#    published by the Free Software Foundation; either version 2.1 of
+#    the License, or (at your option) any later version.
+#
+#    Config-Model is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#    Lesser General Public License for more details.
+#
+#    You should have received a copy of the GNU Lesser General Public License
+#    along with Config-Model; if not, write to the Free Software
+#    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+#    02110-1301 USA
+
+# dh_cme_upgrade file provided by cme package
+
+# See /usr/share/doc/debhelper/PROGRAMMING for debhelper details
+
+use warnings;
+use strict;
+use File::Find;
+
+use Debian::Debhelper::Dh_Lib;
+
+my $prefix = '/usr';
+
+init();
+
+# See debhelper(7)
+if ( $dh{NO_ACT} ) {
+    exit;
+}
+
+if ( defined $ENV{DEB_BUILD_OPTIONS} and $ENV{DEB_BUILD_OPTIONS} =~ /noconfigmodel/ ) {
+    warn "dh_cme_upgrade: DEB_BUILD_OPTIONS specifies 'noconfigmodel',  exiting ...\n";
+    exit;
+}
+
+my @do_packages = @{ $dh{DOPACKAGES} };
+
+unless (@do_packages) {
+    @do_packages = map { m!debian/(.*)\.config-model!; $1; } glob("debian/*.config-model");
+}
+
+my @mandatory  = qw/cme-app-name cme-model-package/;
+my @legal_list = ( @mandatory, qw/cme-model-version cme-options cme-purge cme-command/ );
+my %legal      = map { ( $_ => 1 ) } @legal_list;
+
+# debian/config file: foo.config-model
+foreach my $package (@do_packages) {
+
+    verbose_print("dh_cme_upgrade: package $package");
+
+    my $metaconf = "debian/$package.config-model";
+
+    next unless -e $metaconf;
+
+    my %cm_config;
+
+    # declare model name to load ($model below)
+    # declare which package provides the model (optional)
+    open my $meta_fh, $metaconf || die "Can't open $metaconf:$!";
+    my @meta = <$meta_fh> ;
+    close $meta_fh;
+    while ($_ = shift @meta) {
+        chomp;
+        s/#.*//;
+        next unless /\w/;
+        my ( $k, $v ) = split /\s*?[:= ]\s*/,$_,2;
+        if ( not $legal{$k} ) {
+            die "Error: Unexpected option $k in $metaconf, expected @legal_list\n";
+        }
+        $cm_config{$k} = $v;
+    }
+
+    foreach my $k (@mandatory) {
+        die "Error: Missing $k parameter in $metaconf\n" unless $cm_config{$k };
+    }
+
+    # add dependency
+    addsubstvar( $package, 'misc:Depends', 'cme' );
+
+    # add dependency in misc:Depends control file
+    my $dep = $cm_config{'cme-model-package'};
+    $dep .= '(>= ' . $cm_config{'cme-model-version'}.')' if $cm_config{'cme-model-version'};
+
+    addsubstvar( $package, 'misc:Depends', $dep );
+
+    my $purge = $cm_config{'cme-purge'};
+    my $command = $cm_config{'cme-command'} || 'migrate' ;
+    my $conf_target = $cm_config{'cme-conf-target'} || '/etc' ;
+    my $munge_sub = sub {
+        s/%APPNAME%/$cm_config{'cme-app-name'}/g;
+        s/%PACKAGE%/$package/g;
+        s/%COMMAND%/$command/g;
+        s/%CONF_TARGET%/$conf_target/g;
+        no warnings 'uninitialized';
+        s/%OPTION%/$cm_config{'cme-options'}/g;
+        s/%PURGE%/$purge/g;
+    };
+
+    # calls autoscript to update pkg.postinst with cme command
+    # see /usr/share/doc/debhelper/PROGRAMMING.gz
+    autoscript( $package, postinst  => 'postinst-cme',      $munge_sub );
+    autoscript( $package, config    => 'config-script-cme', $munge_sub );
+
+    if ($purge) {
+        my @purge_paths = split /\s+/, $purge ;
+        my @ok = grep { m!^/etc/\w+! } @purge_paths ;
+        die "Error: cme-purge is not safe ('$purge'). Expected all paths to be something like /etc/foo"
+            if @ok < @purge_paths ;
+        autoscript( $package, postrm  => 'postrm-cme', $munge_sub );
+
+    }
+
+    autotemplate( $package, 'template-cme',      $munge_sub );
+
+}
+
+# modified from autoscript
+sub autotemplate {
+    my $package  = shift;
+    my $filename = shift;
+    my $sub      = shift || "";
+
+    # This is the file we will modify.
+    my $outfile = "debian/" . pkgext($package) . 'templates';
+
+    # Figure out what shell script snippet to use.
+    my $infile;
+    if ( defined( $ENV{DH_AUTOSCRIPTDIR} )
+        && -e "$ENV{DH_AUTOSCRIPTDIR}/$filename" )
+    {
+        $infile = "$ENV{DH_AUTOSCRIPTDIR}/$filename";
+    }
+    else {
+        if ( -e "$prefix/share/debhelper/autoscripts/$filename" ) {
+            $infile = "$prefix/share/debhelper/autoscripts/$filename";
+        }
+        else {
+            error("$prefix/share/debhelper/autoscripts/$filename does not exist");
+        }
+    }
+
+    open(IN, $infile) or die "$infile: $!";
+    open(OUT, ">$outfile") or die "$outfile: $!";
+    while (<IN>) { $sub->(); print OUT }    
+    close(OUT) or die "$outfile: $!";
+    close(IN) or die "$infile: $!";
+}
+
+
+__END__
+
+=encoding UTF-8
+
+=head1 NAME
+
+dh_cme_upgrade - add cme based configuration merge
+
+=head1 SYNOPSIS
+
+ dh_cme_upgrade [ debhelper options ] [ -p pkg ]
+
+=head1 DESCRIPTION
+
+B<dh_cme_upgrade is experimental>
+
+dh_cme_upgrade is a debhelper that will modify the package script to
+merge configuration on package upgrade. This merge is based on L<cme>
+from L<Config::Model> and will merge user's customisations with
+maintainer's configuration updates. This provides another way to
+preserve users modifications during upgrades.
+
+Configuration information used by L<cme> for upgrade are specified in
+a configuration file (see below)
+
+Configuration information is specified in a configuration model. It
+must be provided by another package like
+C<libconfig-model-lcdproc-perl>
+
+=head1 REQUIREMENTS
+
+For this program to work, package maintainer must make sure that:
+
+=over
+
+=item *
+
+C<*.postinst>, C<*.postrm> and C<*.config> have a C<#DEBHELPER#>  line (if these files exist)
+
+=item *
+
+C<control> file has a dependency on C<${misc:Depends}>
+
+=item *
+
+Configuration files upgraded by C<cme> must not be conffiles. Any
+default configuration file provided by upstream must not be installed
+directly in C</etc>. They should be installed in C</usr/share/doc/> for
+reference. C<cme> will create a default configuration file during package
+installation.
+
+=back
+
+=head1 OPTIONS
+
+This program accepts all debhelper options, including the C<-p>
+option to specify which package(s) to act on.
+
+=head1 Usage
+
+C<dh_cme_upgrade> is designed be called in the rules file via
+the dh command:
+
+ %:
+   dh --with cme_upgrade
+
+No options can be passed to C<dh_cme_upgrade>. Its
+configuration must be specified in C<debian/*.config_model> file. This
+file contains several lines, each in the form of "key: value".
+
+Here are the possible keys:
+
+=over
+
+=item cme-app-name
+
+Specifies the application or model name (à la C<Config::Model>) that will be used to
+perform the upgrade. (mandatory)
+
+=item cme-model-package
+
+Specifies the debian package that provide the model specified by
+C<cme-app-name>. (mandatory)
+
+=item cme-model-version
+
+Specifies the minimal version of the package that provides the model.
+(optional)
+
+=item cme-command
+
+Specify the command passed to L<cme>. Defaults to C<migrate>. Another useful value is C<fix> which
+will migrate and fix the configuration file.
+
+=item cme-options
+
+Specify a list of options or command that will be passed verbatim to
+L<cme> during upgrade. (optional)
+
+=item cme-purge
+
+Specify the configuration files or directory to be removed when purging the package. E.g
+C</etc/LCDd.conf*> or C</etc/java/>. Several files or directory can be purged by using a shell glob.
+If this option is empty, configuration files handled by cme will be left as-is after a purge.
+
+=item cme-conf-target
+
+Specifies where the target configuration files is expected. Defaults to
+C</etc>. This parameter is used to create a message to inform user who
+don't want automatic upgrade where to find the original configuration
+file (in C</usr/share/doc/package_name>) and where to copy it (in
+C</cme-conf-target>).
+
+=back
+
+Alternatively, since cme/1.030-1 you can just build depend on
+B<dh-sequence-cme-upgrade> and omit the C<--with cme_upgrade> part.
+
+=head1 Examples
+
+Here's a possible configuration for openssh server:
+
+ $ cat debian/openssh-server.config-model
+ cme-app-name: sshd
+ cme-model-package: lib-config-model-openssh-perl
+ cme-model-version: 1.206
+
+For lcdproc:
+
+ $ cat debian/lcdproc.config-model
+ cme-app-name: lcdproc
+ cme-package: libconfig-model-lcdproc-perl
+ cme-model-version: 2.040
+ # required to upgrade LCDd.conf from upstream configuration
+ cme-options: -force
+ cme-purge: /etc/LCDd.conf*
+
+For Popcon:
+
+ $ cat debian/popcon.config-model
+ cme-app-name: popcon
+ cme-model-package: libconfig-model-perl
+
+=head1 debian files setup
+
+C<dh_cme_upgrade> will work only if:
+
+=over 4
+
+=item *
+
+C<control> file contains a C<${misc:Depends}> variable in C<Depends> line
+
+=item *
+
+If present, C<postinst> script contains a C<#DEBHELPER#> line to insert generated postinst snippet
+
+=back
+
+=head1 ENVIRONMENT
+
+This program will exit(0) if C<DH_NO_ACT> is set or if C<DEB_BUILD_OPTIONS>
+contains C<noconfigmodel>.
+
+=head1 SEE ALSO
+
+L<debhelper>
+
+This program is an addendum to debhelper (part of libconfig-model-perl).
+
+=head1 AUTHOR
+
+Dominique Dumont <dod@debian.org>
+
+=cut

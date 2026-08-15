@@ -1,0 +1,71 @@
+The aim of dh_cme_upgrade is to provide an easy way for a
+Debian developer to add better configuration upgrade to the packages
+they maintain.
+
+Let's assume that Joe, Debian developer, had seen too many questions
+from users regarding configuration upgrades during package
+upgrades. Users complains that their settings are lost or that ucf's
+questions are too cryptic. So Joe has had enough and wants to add
+smooth upgrade capability to his foobar package.
+
+What will the end user see?
+----------------------------
+
+Hopefully, just a message during upgrade indicating that Config::Model
+is taking care of the upgrade.
+
+What does Joe, Debian developer, have to do?
+--------------------------------------------
+
+- ensure that a proper configuration model for the application
+  contained in foobar exists. Either:
+  - find the package containing the relevant model in Debian
+    (something like libconfig-model-foobar-perl)
+  - find the package in CPAN and ask debian-perl team to package it
+  - write the model. In this case, you may want to subscribe to
+    config-model users list (see below)
+- ensure that foobar.postinst has a #DEBHELPER# line (if this file
+  exists)
+- ensure that foobar.control has a dependency on ${misc:Depends}
+- ensure that call dh_cme_upgrade during package build.
+  Either:
+  - run "dh --with cme_upgrade" (**)
+  - directly call dh_cme_upgrade. (*)
+
+Note to developer for embedded system: dh_cme_upgrade will do
+nothing is DH_NO_ACT is set or if DEB_BUILD_OPTIONS contains
+'noconfigmodel'
+
+CDBS users should add a line like this in rules (*):
+
+build/foo::
+  dh_cme_upgrade --model Foo
+
+(**) Alternatively, since cme/1.030-1 you can just build depend on
+dh-sequence-cme-upgrade and omit the "--with cme_upgrade" part.
+
+(*) See dh_cme_upgrade man page for more details on usage and
+options
+
+
+How does this work?
+--------------------
+
+When called, dh_cme_upgrade will setup foobar package to
+upgrade the configuration with Config::Model.
+
+In more details, dh_cme_upgrade will:
+- add a dependency on libconfig-model-perl in foobar control file
+- add or update foobar.postinst file so that the configuration is
+  upgraded. In case of upgrade issue, a message is displayed inviting the
+  user to re-run the upgrade command in force and interactive mode.
+
+All these operations are handled by dh_cme_upgrade.
+
+For more information, see http://wiki.debian.org/PackageConfigUpgrade
+
+Config::Model home page is http://config-model.wiki.sourceforge.net/
+User mailing list: http://sourceforge.net/mail/?group_id=155650
+
+Feel free to contact the package maintainer (domi dot dumont at free dot fr)
+if more explanations are needed.

@@ -1,0 +1,193 @@
+.\" Copyright 2011 Lars Wirzenius <liw@liw.fi>
+.\" 
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\" 
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\" 
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.TH CMDTEST 1
+.SH NAME
+cmdtest \- blackbox testing of Unix command line tools
+.SH SYNOPSIS
+.SH DESCRIPTION
+.B cmdtest 
+black box tests Unix command line tools.
+Given some test scripts, their inputs, and expected outputs,
+it verifies that the command line produces the expected output.
+If not, it reports problems, and shows the differences.
+.PP
+Each test case
+.I foo
+consists of the following files:
+.TP
+.I foo.script
+a script to run the test (this is required)
+.TP
+.I foo.stdin
+the file fed to standard input
+.TP
+.I foo.stdout
+the expected output to the standard output
+.TP
+.I foo.stderr
+the expected output to the standard error
+.TP
+.I foo.exit
+the expected exit code
+.TP
+.I foo.setup
+a shell script to run before the test
+.TP
+.I foo.teardown
+a shell script to run after test
+.PP
+Usually, a single test is not enough. All tests are put into the
+same directory, and they may share some setup and teardown code:
+.TP
+.I setup-once
+a shell script to run once, before any tests
+.TP
+.I setup
+a shell script to run before each test
+.TP
+.I teardown
+a shell script to run after each test
+.TP
+.I teardown-once
+a shell script to run once, after all tests
+.PP
+.B cmdtest
+is given the name of the directory with all the tests,
+or several such directories, and it does the following:
+.PP
+.na
+.nh
+\(bu execute
+.I setup-once
+.PP
+\(bu for each test case (unique prefix 
+.IR foo ):
+.RS
+.HP 2
+\(em execute
+.I setup
+.HP 2
+\(em execute 
+.I foo.setup
+.HP 2
+\(em execute the command, by running 
+.IR foo.script ,
+and redirecting standard input to come from 
+.IR foo.stdin ,
+and capturing standard output and error and exit codes
+.HP 2
+\(em execute
+.I foo.teardown
+.HP 2
+\(em execute 
+.I teardown
+.HP 2
+\(em report result of test: does exit code match
+.IR foo.exit , 
+standard output match 
+.IR foo.stdout , 
+and standard error match 
+.IR foo.stderr ?
+.RE
+.fi
+.hy
+.PP
+\(bu execute 
+.I teardown-once
+.PP
+Except for
+.IR foo.script , 
+all of these files are optional. 
+If a setup or teardown script is missing, it is simply not executed. 
+If one of the standard input, output, or error files is missing, 
+it is treated as if it were empty. 
+If the exit code file is missing, it is treated as if it specified an exit
+code of zero.
+.PP
+The shell scripts may use the following environment variables:
+.TP
+.B DATADIR
+a temporary directory where files may be created by the test
+.TP
+.B TESTNAME
+name of the current test (will be empty for 
+.B setup-once
+and
+.BR teardown-once )
+.TP
+.B SRCDIR
+directory from which
+.B cmdtest
+was launched
+.SH OPTIONS
+.SH EXAMPLE
+To test that the
+.BR echo (1)
+command outputs the expected string,
+create a file called
+.I echo-tests/hello.script
+containing the following content:
+.IP
+.nf
+#!/bin/sh
+echo hello, world
+.fi
+.PP
+Also create the file
+.I echo-tests/hello.stdout
+containing:
+.IP
+hello, world
+.PP
+Then you can run the tests:
+.IP
+.nf
+$ cmdtest echo-tests
+test 1/1
+1/1 tests OK, 0 failures
+.fi
+.PP
+If you change the stdout file to be something else,
+.B cmdtest
+will report the differences:
+.IP
+.nf
+$ cmdtest echo-tests
+FAIL: hello: stdout diff:
+--- echo-tests/hello.stdout	2011-09-11 19:14:47 +0100
++++ echo-tests/hello.stdout-actual	2011-09-11 19:14:49 +0100
+@@ -1 +1 @@
+-something else
++hello, world
+
+test 1/1
+0/1 tests OK, 1 failures
+.fi
+.PP
+Furthermore, the 
+.I echo-tests
+directory will contain the actual output files,
+and diffs from the expected files.
+If one of the actual output files is actually correct,
+you can actually rename it to be the expected file.
+Actually,
+that's a very convenient way of creating the expected output files:
+you run the test,
+fixing things,
+until you've manually checked the actual output is correct,
+then you rename the file.
+.SH "SEE ALSO"
+.BR cliapp (5).

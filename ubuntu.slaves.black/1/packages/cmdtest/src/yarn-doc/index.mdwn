@@ -1,0 +1,284 @@
+% Yarn manual
+
+Yarn
+====
+
+FIXME: This will become a manual for writing test suites in yarn. It
+is currently not yet written.
+
+Mission
+-------
+This manual will provide all the information needed by Yarn users to enable
+them to use Yarn effectively in their development projects.
+
+The information will be
+
+* easy to find
+* easy to navigate
+* easy to use
+
+The information will include details of
+
+* how to perform certain tasks
+* why things are done in particular ways
+
+Document Status
+---------------
+
+### What's Done
+
+* Outline
+* Mission
+* this Document Status section
+
+### What's New
+
+* Writing Scenarios
+    * Test Language Specification
+* Introduction
+    * Skeleton
+    * What is `yarn`?
+
+
+### What's Next
+
+* Introduction
+    * Remaining sections
+* `yarn`'s command line
+*  How to embed `yarn` in Markdown
+
+Introduction
+------------
+
+### What is `yarn`?
+
+`yarn` is a scenario testing tool: you write a scenario describing how a
+user uses your software and what should happen, and express, using
+very lightweight syntax, the scenario in such a way that it can be tested
+automatically. The scenario has a simple, but strict structure:
+
+    SCENARIO name of scenario
+    GIVEN some setup for the test
+    WHEN thing that is to be tested happens
+    THEN the post-conditions must be true
+
+As an example, consider a very short test scenario for verifying that
+a backup program works, at least for one simple case.
+
+    SCENARIO basic backup and restore
+    GIVEN some live data in a directory
+    AND an empty backup repository
+    WHEN a backup is made
+    THEN the data can be restored
+
+(Note the addition of AND: you can have multiple GIVEN, WHEN, and
+THEN statements. The AND keyword makes the text be more readable.)
+
+
+### Who is `yarn` for?
+
+### Who are the test suites written in `yarn` for?
+
+### What kinds of testing is `yarn` for?
+
+### Why `yarn` instead of other tools?
+
+### Why not cmdtest?
+
+Writing Scenarios
+-----------------
+
+Scenarios are meant to be written in mostly human readable language.
+However, they are not free form text. In addition to the GIVEN/WHEN/THEN
+structure, the text for each of the steps needs a computer-executable
+implementation. This is done by using IMPLEMENTS. The backup scenario
+from above might be implemented as follows:
+
+    IMPLEMENTS GIVEN some live data in a directory
+    rm -rf "$DATADIR/data"
+    mkdir "$DATADIR/data"
+    echo foo > "$DATADIR/data/foo"
+
+    IMPLEMENTS GIVEN an empty backup repository
+    rm -rf "$DATADIR/repo"
+    mkdir "$DATADIR/repo"
+
+    IMPLEMENTS WHEN a backup is made
+    backup-program -r "$DATADIR/repo" "$DATADIR/data"
+
+    IMPLEMENTS THEN the data can be restored
+    mkdir "$DATADIR/restored"
+    restore-program -r "$DATADIR/repo" "$DATADIR/restored"
+    diff -rq "$DATADIR/data" "$DATADIR/restored"
+
+Each "IMPLEMENT GIVEN" (or WHEN, THEN) is followed by a regular
+expression on the same line, and then a shell script that gets executed
+to implement any step that matches the regular expression.  The
+implementation can extract data from the match as well: for example,
+the regular expression might allow a file size to be specified.
+
+The above example seems a bit silly, of course: why go to the effort
+to obfuscate the various steps? The answer is that the various steps,
+implemented using IMPLEMENTS, can be combined in many ways, to test
+different aspects of the program being tested. In effect, the IMPLEMENTS
+sections provide a vocabulary which the scenario writer can use to
+express a variety of usefully different scenarios, which together
+test all the aspects of the software that need to be tested.
+
+Moreover, by making the step descriptions be human language
+text, matched by regular expressions, most of the test can
+hopefully be written, and understood, by non-programmers. Someone
+who understands what a program should do, could write tests
+to verify its behaviour. The implementations of the various
+steps need to be implemented by a programmer, but given a
+well-designed set of steps, with enough flexibility in their
+implementation, that quite a good test suite can be written.
+
+### Test Language Specification
+
+A test document is written in [Markdown][markdown], with block
+quoted code blocks being interpreted specially. Each block
+must follow the syntax defined here.
+
+* Every step in a scenario is one line, and starts with a keyword.
+
+* Each implementation (IMPLEMENTS) starts as a new block, and
+  continues until there is a block that starts with another
+  keyword.
+
+The following keywords are defined.
+
+* **SCENARIO** starts a new scenario. The rest of the line is the name of
+  the scenario. The name is used for documentation and reporting
+  purposes only and has no semantic meaning. SCENARIO MUST be the
+  first keyword in a scenario, with the exception of IMPLEMENTS.
+  The set of documents passed in a test run may define any number of
+  scenarios between them, but there must be at least one or it is a
+  test failure. The IMPLEMENTS sections are shared between the
+  documents and scenarios.
+
+* **ASSUMING** defines a condition for the scenario. The rest of the
+  line is "matched text", which gets implemented by an
+  IMPLEMENTS section. If the code executed by the implementation
+  fails, the scenario is skipped.
+
+* **GIVEN** prepares the world for the test to run. If
+  the implementation fails, the scenario fails.
+
+* **WHEN** makes the change to the world that is to be tested.
+  If the code fails, the scenario fails.
+
+* **THEN** verifies that the changes made by the GIVEN steps
+  did the right thing. If the code fails, the scenario fails.
+
+* **FINALLY** specifies how to clean up after a scenario. If the code
+  fails, the scenario fails. All FINALLY blocks get run either when
+  encountered in the scenario flow, or at the end of the scenario,
+  regardless of whether the scenario is failing or not.
+
+* **AND** acts as ASSUMING, GIVEN, WHEN, THEN, or FINALLY: whichever
+  was used last. It must not be used unless the previous step was
+  one of those, or another AND.
+
+* **IMPLEMENTS** is followed by one of ASSUMING, GIVEN, WHEN, or THEN,
+  and a PCRE regular expression, all on one line, and then further
+  lines of shell commands until the end of the block quoted code
+  block. Markdown is unclear whether an empty line (no characters,
+  not even whitespace) between two block quoted code blocks starts a
+  new one or not, so we resolve the ambiguity by specifiying that a
+  code block directly following a code block is a continuation unless
+  it starts with one of the scenario testing keywords.
+
+  The shell commands get parenthesised parts of the match of the
+  regular expression as environment variables (`$MATCH_1` etc). For
+  example, if the regexp is "a (\d+) byte file", then `$MATCH_1` gets
+  set to the number matched by `\d+`.
+
+  The test runner creates a temporary directory, whose name is
+  given to the shell code in the `DATADIR` environment variable.
+
+  The test runner sets the `SRCDIR` environment variable to the
+  path to the directory it was invoked from (by convention, the
+  root of the source tree of the project).
+
+  The test runner removes all other environment variables, except
+  `TERM`, `USER`, `USERNAME`, `LOGNAME`, `HOME`, and `PATH`. It also
+  forces `SHELL` set to `/bin/sh`, and `LC_ALL` set to `C`, in order
+  to have as clean an environment as possible for tests to run in.
+
+  The shell commands get invoked with `/bin/sh -eu`, and need to
+  be written accordingly. Be careful about commands that return a
+  non-zero exit code. There will eventually be a library of shell
+  functions supplied which allow handling the testing of non-zero
+  exit codes cleanly. In addition functions for handling stdout and
+  stderr will be provided.
+
+  The code block of an IMPLEMENTS block fails if the shell
+  invocation exits with a non-zero exit code. Output to stderr is
+  not an indication of failure. Any output to stdout or stderr may
+  or may not be shown to the user.
+
+Semantics:
+
+* The name of each scenario (given with SCENARIO) must be unique.
+* All names of scenarios and steps will be normalised before use
+  (whitespace collapse, leading and trailing whitespace
+* Every ASSUMING, GIVEN, WHEN, THEN, FINALLY must be matched by
+  exactly one IMPLEMENTS. The test runner checks this before running
+  any code.
+* Every IMPLEMENTS may match any number of ASSUMING, GIVEN, WHEN,
+  THEN, or FINALLY. The test runner may warn if an IMPLEMENTS is unused.
+* If ASSUMING fails, that scenario is skipped, and any FINALLY steps
+  are not run.
+
+
+
+Outline
+-------
+
+* Introduction
+    - what is yarn?
+    - who is yarn for?
+    - who are the test suites written in yarn for?
+    - what kinds of testing is yarn for?
+    - why yarn instead of other tools?
+        - why not cmdtest?
+    - NOT installation instructions
+* Examples
+    - a test suite for "hello world"
+        - make the files available so people can try things for themselves
+    - a few simple scenarios
+* The yarn testing language
+    - Markdown with blockquotes for the executable code
+    - SCENARIO + the step-wise keywords
+    - IMPLEMENTS sections
+* Running yarn
+    - command line syntax
+    - examples of various ways to run yarn in different scenarios:
+        - how to run just one scenario
+        - how to run yarn under cron or jenkins
+    - formatting a test suite in yarn with pandoc
+* Best practices
+    - this chapter will describe best practices for writing test suites
+      with yarn
+    - how to structure the files: what to put in each *.yarn file, e.g.,
+      where should IMPLEMENTS go
+    - how to write test suites that make it easy to debug things when a
+      test case fails
+    - good phrasing guidelines for yarn scenario names and step names
+    - what things are good to keep visible to the reader, what are
+      better hidden inside impementations of steps, with examples from
+      real projects using yarn
+    - guidelines for well-defined steps that are easy to understand and
+      easy to implement
+    - anti-patterns: things that are good to avoid
+    - make tests fast
+    - make test code be obviously correct; make test code be the best
+      code
+    - when is it OK to skip scenarios?
+* Case studies
+    - this chapter will discuss ways to use yarn in things that are not
+      just "run this program and examine the output"
+    - start a daemon in the background, kill it at the end of a scenario
+    - how to use a really heavy-weight thing in test suites (e.g., start
+      a database server for all scenarios to share)

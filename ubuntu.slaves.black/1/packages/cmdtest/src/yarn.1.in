@@ -1,0 +1,156 @@
+.\" Copyright 2013 Lars Wirzenius <liw@liw.fi>
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.TH YARN 1
+.SH NAME
+yarn \- scenario testing of Unix command line tools
+.SH SYNOPSIS
+.SH DESCRIPTION
+.B yarn
+is a scenario testing tool:
+you write a scenario describing how a user uses your software
+and what should happen,
+and express,
+using very lightweight syntax,
+the scenario in such a way that it can be tested automatically.
+The scenario has a simple, but strict structure:
+.IP
+.nf
+GIVEN some setup for the test
+WHEN thing that is to be tested happens
+THEN the post-conditions must be true
+.fi
+.PP
+As an example, consider a very short test scenario for verifying that
+a backup program works, at least for one simple case.
+.IP
+.nf
+SCENARIO backups can be restored
+GIVEN some live data in a directory
+AND an empty backup repository
+WHEN a backup is made
+THEN the data case be restored
+FINALLY cleanup
+.fi
+.PP
+Note the addition of AND: you can have multiple GIVEN, WHEN, and
+THEN statements. The AND keyword makes the text be more readable.
+SCENARIO is also necessary, and gives the title.
+.PP
+FINALLY is for cleanups.
+The FINALLY steps will be run regardless of whether the scenario succeeds
+or not.
+.PP
+Scenarios are meant to be written in somewhat human readable language.
+However, they are not free form text.
+In addition to the GIVEN/WHEN/THEN structure,
+the text for each of the steps needs a computer-executable implementation.
+This is done by using IMPLEMENTS.
+The backup scenario from above might be implemented as follows:
+.IP
+.nf
+IMPLEMENTS GIVEN some live data in a directory
+rm -rf "$DATADIR/data"
+mkdir "$DATADIR/data"
+echo foo > "$DATADIR/data/foo"
+.IP
+IMPLEMENTS GIVEN an empty backup repository
+rm -rf "$DATADIR/repo"
+mkdir "$DATADIR/repo"
+.IP
+IMPLEMENTS WHEN a backup is made
+backup-program -r "$DATADIR/repo" "$DATADIR/data"
+.IP
+IMPLEMENTS THEN the data can be restored
+mkdir "$DATADIR/restored"
+restore-program -r "$DATADIR/repo" "$DATADIR/restored"
+diff -rq "$DATADIR/data" "$DATADIR/restored"
+.IP
+IMPLEMENTS FINALLY cleanup
+echo nothing to do, actually
+.fi
+.PP
+Each "IMPLEMENTS GIVEN" (or WHEN, THEN, FINALLY) is followed by a regular
+expression on the same line,
+and then a shell script that gets executed to implement any step
+that matches the regular expression.
+The implementation can extract data from the match as well:
+for example, the regular expression might allow a file size to be specified.
+.PP
+The above example is a bit silly, of course:
+why go to the effort to obfuscate the various steps?
+The answer is that the various steps,
+implemented using IMPLEMENTS,
+can be combined in many ways,
+to test different aspects of the program being tested.
+.PP
+Moreover,
+by making the step descriptions be human language text,
+matched by regular expressions,
+most of the test can hopefully be written,
+and understood,
+by non-programmers.
+Someone who understands what a program should do,
+could write tests to verify its behaviour.
+The implementations of the various steps need to be implemented
+by a programmer,
+but given a well-designed set of steps,
+with enough flexibility in their implementation,
+that quite a good test suite can be written.
+.PP
+The shell commands in an IMPLEMENTS section are run in the directory
+in which the user ran
+.BR yarn .
+The environment variable
+.B SRCDIR
+is set to the fully qualified path to that directory.
+.SH OPTIONS
+.SH ENVIRONMENT
+.TP
+.B DATADIR
+Fully qualified pathname to a temporary directory,
+in which the tests can use files.
+The temporary directory is removed at the end of the test execution,
+unless the user specifies otherwise with \-\-snapshot.
+.TP
+.B SRCDIR
+Fully qualitifed pathname to the directory in which the user ran
+.BR yarn .
+This is useful when the tests want to change the directory.
+.SH EXAMPLE
+To run
+.B yarn
+on all the scenarios in your current directory:
+.IP
+.nf
+yarn *.scenario
+.fi
+.PP
+All the files will be treated together as if they had been one file.
+.PP
+To add a shell library to be included when running any IMPLEMENTS section:
+.IP
+.nf
+yarn \-\-shell\-library mylib.sh *.scenario
+.fi
+.PP
+You can repeat
+.B \-\-shell\-library
+as many times as necessary.
+.SH "SEE ALSO"
+.BR cmdtest (1),
+.BR cliapp (5).
+.PP
+The README.yarn file has more details on the scenario testing language.
