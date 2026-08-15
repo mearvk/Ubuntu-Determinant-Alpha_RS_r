@@ -1,0 +1,100 @@
+Description: Add an option to ncal to use oldstyle output.
+Author: Michael Meskes <meskes@debian.org>
+
+--- bsdmainutils/usr.bin/ncal.orig/ncal.1	2020-08-04 13:07:46.876872210 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.1	2020-08-04 13:08:57.513167901 +0200
+@@ -47,7 +47,7 @@
+ .Fl m Ar month
+ .Op Ar year
+ .Nm ncal
+-.Op Fl 3hjJpwySM
++.Op Fl 3bhjJpwySM
+ .Op Fl A Ar number
+ .Op Fl B Ar number
+ .Op Fl W Ar number
+@@ -155,6 +155,8 @@
+ First week of the year has at least
+ .Ar number
+ days.
++.It Fl b
++Use oldstyle format for ncal output.
+ .El
+ .Pp
+ A single parameter specifies the year (1\(en9999) to be displayed;
+--- bsdmainutils/usr.bin/ncal.orig/ncal.c	2020-08-04 13:07:46.876872210 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.c		2020-08-04 13:07:46.876872210 +0200
+@@ -200,6 +200,7 @@
+ 	int     m = 0;			/* month */
+ 	int	y = 0;			/* year */
+ 	int     flag_backward = 0;	/* user called cal--backward compat. */
++	int	ncal_backward = 0;	/* make output of ncal backward compat. */
+ 	int     flag_wholeyear = 0;	/* user wants the whole year */
+ 	int	flag_julian_cal = 0;	/* user wants Julian Calendar */
+ 	int     flag_julian_day = 0;	/* user wants the Julian day numbers */
+@@ -257,11 +258,18 @@
+ 	/* Set the switch date to United Kingdom if backwards compatible */
+ 	if (flag_backward)
+ 		nswitchb = ndaysj(&ukswitch);
++	else
++		nswitchb = nswitch; /* needed if flag_backward is set later */
+ 
+ 	before = after = -1;
+ 
+-	while ((ch = getopt(argc, argv, "3A:B:Cd:eH:hjJm:Nops:wySMW:")) != -1)
++	while ((ch = getopt(argc, argv, "3A:B:Cd:eH:hjJm:Nops:wySMW:b")) != -1)
+ 		switch (ch) {
++		case 'b':
++			if (flag_backward)
++				usage();
++			ncal_backward = 1;
++			break;
+ 		case '3':
+ 			flag_3months = 1;
+ 			break;
+@@ -434,6 +442,12 @@
+ 		days_first_week = 3;
+ #endif
+ 
++	if (ncal_backward) 
++	{
++		flag_backward = 1;
++		weekstart++;
++	}
++
+ 	if (flag_month != NULL) {
+ 		if (parsemonth(flag_month, &m, &y)) {
+ 			errx(EX_USAGE,
+@@ -554,7 +568,7 @@
+ 	fputs(
+ "Usage: cal [general options] [-hjy] [[month] year]\n"
+ "       cal [general options] [-hj] [-m month] [year]\n"
+-"       ncal [general options] [-hJjpwySM] [-s country_code] [-W number of days] [[month] year]\n"
++"       ncal [general options] [-bhJjpwySM] [-s country_code] [-W number of days] [[month] year]\n"
+ "       ncal [general options] [-hJeo] [year]\n"
+ "General options: [-NC3] [-A months] [-B months]\n"
+ "For debug the highlighting: [-H yyyy-mm-dd] [-d yyyy-mm]\n",
+@@ -906,7 +920,7 @@
+ 	date    dt;		/* handy date */
+ 	int     dw;		/* width of numbers */
+ 	int     first;		/* first day of month */
+-	int     firsts;		/* sunday of first week of month */
++	int     firsts;		/* first day of first week of month */
+ 	int     i, j, k, l;	/* just indices */
+ 	int     jan1 = 0;	/* the first day of this year */
+ 	int     last;		/* the first day of next month */
+@@ -957,10 +971,13 @@
+ 	}
+ 
+ 	/*
+-	 * Set firsts to the day number of sunday of the first week of
++	 * Set firsts to the day number of the day starting the first week of
+ 	 * this month. (This might be in the last month)
+ 	 */
+-	firsts = first - (weekday(first)+1) % 7;
++	if (weekstart == 1)
++		firsts = first - (weekday(first)+1) % 7;
++	else
++		firsts = first - weekday(first);
+ 
+ 	/*
+ 	 * Fill the lines with day of month or day of year (Julian day)

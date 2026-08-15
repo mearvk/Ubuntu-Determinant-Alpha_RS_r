@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+SHELL+= -e
+#export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+CFLAGS = `dpkg-buildflags --get CFLAGS`
+CFLAGS += `dpkg-buildflags --get CPPFLAGS`
+LDFLAGS = `dpkg-buildflags --get LDFLAGS`
+export CFLAGS
+export LDFLAGS
+
+ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+	CROSS += "CC=$(DEB_HOST_GNU_TYPE)-gcc"
+else
+	CROSS +=
+endif
+
+%:
+	dh ${@} --with quilt
+
+override_dh_auto_build:
+	dh_auto_build
+	currentyear=$(shell date --date="`dpkg-parsechangelog -S Date`" +%Y); \
+	cd $(CURDIR)/debian/calendars; \
+	[ -L calendar.judaic ] || ln -s calendar.judaic.$$currentyear calendar.judaic;
+
+override_dh_clean:
+	-rm -f $(CURDIR)/debian/calendars/calendar.judaic
+	dh_clean

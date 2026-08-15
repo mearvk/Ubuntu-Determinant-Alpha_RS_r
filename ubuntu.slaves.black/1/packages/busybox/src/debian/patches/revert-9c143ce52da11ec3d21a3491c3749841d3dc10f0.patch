@@ -1,0 +1,46 @@
+From: Cyril Brulebois <kibi@debian.org>
+Date: Fri, 29 Mar 2019 17:42:23 +0100
+Subject: Revert 9c143ce52da11ec3d21a3491c3749841d3dc10f0 just to make sure the next patch can be applied
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -11149,17 +11149,9 @@ showvars(const char *sep_prefix, int on,
+ 		const char *p;
+ 		const char *q;
+ 
+-		p = endofname(*ep);
+-/* Used to have simple "p = strchrnul(*ep, '=')" here instead, but this
+- * makes "export -p" to have output not suitable for "eval":
+- * import os
+- * os.environ["test-test"]="test"
+- * if os.fork() == 0:
+- *   os.execv("ash", [ 'ash', '-c', 'eval $(export -p); echo OK' ])  # fixes this
+- * os.execv("ash", [ 'ash', '-c', 'env | grep test-test' ])
+- */
++		p = strchrnul(*ep, '=');
+ 		q = nullstr;
+-		if (*p == '=')
++		if (*p)
+ 			q = single_quote(++p);
+ 		out1fmt("%s%s%.*s%s\n", sep_prefix, sep, (int)(p - *ep), *ep, q);
+ 	}
+@@ -13965,18 +13957,8 @@ init(void)
+ 
+ 		initvar();
+ 		for (envp = environ; envp && *envp; envp++) {
+-/* Used to have
+- *			p = endofname(*envp);
+- *			if (p != *envp && *p == '=') {
+- * here to weed out badly-named variables, but this breaks
+- * scenarios where people do want them passed to children:
+- * import os
+- * os.environ["test-test"]="test"
+- * if os.fork() == 0:
+- *   os.execv("ash", [ 'ash', '-c', 'eval $(export -p); echo OK' ])  # fixes this
+- * os.execv("ash", [ 'ash', '-c', 'env | grep test-test' ])  # breaks this
+- */
+-			if (strchr(*envp, '=')) {
++			p = endofname(*envp);
++			if (p != *envp && *p == '=') {
+ 				setvareq(*envp, VEXPORT|VTEXTFIXED);
+ 			}
+ 		}

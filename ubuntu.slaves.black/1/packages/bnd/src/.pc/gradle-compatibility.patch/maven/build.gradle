@@ -1,0 +1,107 @@
+/*
+ * maven Gradle build script
+ */
+
+def localrepo = System.getProperty('maven.repo.local')
+if (localrepo) {
+  localrepo = relativePath(uri(gradle.startParameter.currentDir).resolve(localrepo))
+}
+def dist = parent.project(bnd_build)
+
+def deploy = tasks.register('deploy', Exec.class) {
+  def releaserepo = uri(bnd('releaserepo', dist.file('bundles'))) /* Release repository. */
+  dependsOn dist.tasks.named('releaseDependencies')
+  if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+    executable 'cmd'
+    args '/c', rootProject.file('mvnw.cmd')
+  } else {
+    executable rootProject.file('mvnw')
+  }
+  args '--batch-mode'
+  args '--no-transfer-progress'
+  if (logger.isDebugEnabled()) {
+    args '--debug'
+  }
+  args '-Pdist'
+  args "-Dreleaserepo=${releaserepo}"
+  if (localrepo) {
+    args "-Dmaven.repo.local=${localrepo}"
+  }
+  args 'deploy'
+}
+
+def deployOSSRH = tasks.register('deployOSSRH', Exec.class) {
+  enabled !bnd('-releaserepo.ossrh', '').empty
+  onlyIf {
+    def state = deploy.get().state
+    state.didWork && (state.failure == null)
+  }
+  dependsOn deploy
+  if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+    executable 'cmd'
+    args '/c', rootProject.file('mvnw.cmd')
+  } else {
+    executable rootProject.file('mvnw')
+  }
+  args '--batch-mode'
+  args '--no-transfer-progress'
+  if (logger.isDebugEnabled()) {
+    args '--debug'
+  }
+  args '-Possrh'
+  args "--settings=${parent.project('cnf').file('ext/ossrh-settings.xml')}"
+  if (localrepo) {
+    args "-Dmaven.repo.local=${localrepo}"
+  }
+  args 'deploy'
+}
+
+deploy.configure {
+  finalizedBy deployOSSRH
+}
+
+def deployJFrog = tasks.register('deployJFrog', Exec.class) {
+  enabled !bnd('-releaserepo.jfrog', '').empty
+  onlyIf {
+    def state = deploy.get().state
+    state.didWork && (state.failure == null)
+  }
+  dependsOn deploy
+  if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+    executable 'cmd'
+    args '/c', rootProject.file('mvnw.cmd')
+  } else {
+    executable rootProject.file('mvnw')
+  }
+  args '--batch-mode'
+  args '--no-transfer-progress'
+  if (logger.isDebugEnabled()) {
+    args '--debug'
+  }
+  args '-Pjfrog'
+  args "--settings=${parent.project('cnf').file('ext/jfrog-settings.xml')}"
+  if (localrepo) {
+    args "-Dmaven.repo.local=${localrepo}"
+  }
+  args 'deploy'
+}
+
+deploy.configure {
+  finalizedBy deployJFrog
+}
+
+tasks.named('clean') {
+  doFirst {
+    exec {
+      if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        executable 'cmd'
+        args '/c', rootProject.file('mvnw.cmd')
+      } else {
+        executable rootProject.file('mvnw')
+      }
+      args '--batch-mode'
+      args '--no-transfer-progress'
+      args 'clean'
+    }.assertNormalExitValue()
+  }
+}

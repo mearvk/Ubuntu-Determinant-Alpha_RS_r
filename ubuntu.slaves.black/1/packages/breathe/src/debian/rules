@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+PY3DEF=$(shell py3versions -vd)
+SPHINXBUILD="/usr/share/sphinx/scripts/python{version.major}/sphinx-build"
+
+# Build documentation for readthedocs
+export READTHEDOCS=True
+# Do not build for Travis
+export TRAVIS_CI=False
+
+%:
+	dh $@ --with=python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_clean:
+	dh_auto_clean
+	$(MAKE) distclean
+	rm -rf html
+
+override_dh_auto_build:
+	dh_auto_build
+	# Link mathjax in _static
+	ln -s /usr/share/javascript/mathjax \
+		documentation/source/_static/mathjax
+	pybuild --system=custom -p $(PY3DEF) --build \
+		--build-args="env PYTHONPATH={build_dir} BREATHE_GIT_TAG=v$(DEB_VERSION_UPSTREAM) $(MAKE) SPHINXBUILD=$(SPHINXBUILD) DOXYGEN=/usr/bin/doxygen"
+	mv documentation/build/html html
+	# Hotfix for build path in documentation
+	sed -i -e 's@$(CURDIR)/@@g' html/*.html
+
+override_dh_auto_test:
+	# We test breathe by building the documention. The documentation has already
+	# been built for the default Python 3 version, so we do not need to do this
+	# again.
+
+override_dh_installdocs:
+	# Do not copy mathjax to the binary package
+	dh_installdocs -X_static/mathjax
+
+override_dh_sphinxdoc:
+	# dh_link creates the link for mathjax after dh_sphinxdoc, so ignore
+	# MathJax.js
+	dh_sphinxdoc -XMathJax.js

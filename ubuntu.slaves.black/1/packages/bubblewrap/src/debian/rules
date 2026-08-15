@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+pie,+bindnow
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+PKGDIR=$(CURDIR)/debian/bubblewrap
+
+%:
+	dh $@ --buildsystem=meson+ninja --without=autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure \
+		-- \
+		-Dzsh_completion_dir=/usr/share/zsh/vendor-completions \
+		${NULL}
+.PHONY: override_dh_auto_configure
+
+override_dh_auto_test:
+	# Remove LD_PRELOAD so we don't run with faketime. It uses
+	# sem_open(), but bubblewrap runs in an environment where that
+	# can't work.
+	env -u LD_PRELOAD dh_auto_test
+
+.PHONY: override_dh_auto_test

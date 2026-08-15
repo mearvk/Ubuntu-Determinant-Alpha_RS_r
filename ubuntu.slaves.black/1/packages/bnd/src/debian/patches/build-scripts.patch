@@ -1,0 +1,183 @@
+Description: Make the Build Scripts Buildable
+ This project does not use the standard Gradle plugins to resolve dependencies so we have to make
+ it behave without the help of "gradle-debian-helper". Changes include:
+ .
+ * Replace the versions specified to dependencies to "latest": Avoid hardcoded versions.
+ * Remove some remote repositories in "repositories.bnd": Or it attempts to access internet.
+ * Remove test dependencies
+Author: Kai-Chung Yan (殷啟聰) <seamlikok@gmail.com>
+Forwarded: not-needed
+Last-Update: 2018-03-03
+--- a/biz.aQute.bnd.gradle/build.gradle
++++ b/biz.aQute.bnd.gradle/build.gradle
+@@ -7,10 +7,6 @@
+ dependencies {
+     compileOnly localGroovy()
+     compileOnly gradleApi()
+-    testImplementation gradleTestKit()
+-    testImplementation('org.spockframework:spock-core:1.1-groovy-2.4')  {
+-        exclude module: 'groovy-all'
+-    }
+ }
+ 
+ if (JavaVersion.current().isJava9Compatible()) {
+--- a/biz.aQute.resolve/bnd.bnd
++++ b/biz.aQute.resolve/bnd.bnd
+@@ -20,7 +20,6 @@
+ 
+ -testpath: \
+ 	${junit},\
+-	${mockito},\
+ 	slf4j.simple;version=latest
+ 
+ Export-Package:  \
+--- a/cnf/ext/repositories.bnd
++++ b/cnf/ext/repositories.bnd
+@@ -1,5 +1,5 @@
+ releaserepo:            ${workspace}/dist/bundles
+-mavencentral:           https://repo.maven.apache.org/maven2
++mavencentral:           file:/usr/share/maven-repo
+ 
+ -plugin.0.Main:\
+     aQute.bnd.repository.maven.provider.MavenBndRepository;\
+--- a/biz.aQute.repository/bnd.bnd
++++ b/biz.aQute.repository/bnd.bnd
+@@ -19,7 +19,6 @@
+ 
+ -testpath: \
+ 	${junit},\
+-	${mockito},\
+ 	biz.aQute.http.testservers;version=latest,\
+ 	slf4j.simple;version=latest
+ 
+--- a/biz.aQute.bnd/bnd.bnd
++++ b/biz.aQute.bnd/bnd.bnd
+@@ -74,7 +74,7 @@
+ 	biz.aQute.bnd.exporters;version=latest,\
+  	biz.aQute.bnd.reporter;version=latest,\
+ 	biz.aQute.bnd.annotation;version=project,\
+-	org.apache.ant:ant;version=latest,\
++	ant;version=latest,\
+ 	biz.aQute.remote.api;version=latest,\
+ 	org.yaml.snakeyaml;version=latest,\
+ 	slf4j.api;version=latest,\
+--- a/biz.aQute.remote/bnd.bnd
++++ b/biz.aQute.remote/bnd.bnd
+@@ -18,7 +18,6 @@
+     slf4j.simple,\
+     org.apache.felix.framework;version=latest;packages=*, \
+     biz.aQute.repository, \
+-    org.awaitility, \
+     biz.aQute.launchpad
+     
+     
+--- a/biz.aQute.launchpad/bnd.bnd
++++ b/biz.aQute.launchpad/bnd.bnd
+@@ -30,17 +30,16 @@
+ -buildpath: \
+     osgi.annotation;version=latest,\
+     osgi.core;version=latest,\
+-    org.osgi.service.component;version='[1.4,1.5)',\
++    org.osgi.service.component;version='latest',\
+     aQute.libg;version=latest,\
+-    org.osgi.service.component.annotations;version='[1.3,1.4)',\
++    org.osgi.service.component.annotations;version='latest',\
+     biz.aQute.bndlib;version=latest;packages=*,\
+-    org.eclipse.jdt.annotation;version=@2,\
++    org.eclipse.jdt.annotation;version=latest,\
+     ${junit},\
+     org.osgi.service.configurator,\
+     org.osgi.namespace.extender
+ 
+ -testpath: \
+-    ${mockito}, \
+     biz.aQute.repository, \
+     slf4j.simple;version=latest, \
+     slf4j.api
+@@ -57,4 +56,4 @@
+ # For testing purpose, see BundleBuilderTest.java
+ Project                 true
+ LaunchPadInheritTest    Project
+--privatepackage: aQute.launchpad.internal
+\ No newline at end of file
++-privatepackage: aQute.launchpad.internal
+--- a/aQute.libg/bnd.bnd
++++ b/aQute.libg/bnd.bnd
+@@ -9,7 +9,6 @@
+ 	osgi.core;version=latest
+ 
+ -testpath: \
+-	${junit},\
+ 	slf4j.simple;version=latest
+ 
+ -exportcontents: *
+--- a/cnf/ext/junit.bnd
++++ b/cnf/ext/junit.bnd
+@@ -1,13 +1,4 @@
+-junit: org.junit.platform:junit-platform-commons;version=latest,\
+-	org.junit.platform:junit-platform-engine;version=latest,\
+-	org.assertj.core;version="[3,4)",\
+-	org.opentest4j:opentest4j;version=latest,\
+-	org.apiguardian:apiguardian-api;version=latest,\
+-	org.junit.jupiter:junit-jupiter-api;version=latest,\
+-	org.junit.jupiter:junit-jupiter-engine;version=latest,\
+-	org.junit.jupiter:junit-jupiter-params;version=latest,\
+-	org.apache.servicemix.bundles.junit;version="[4.11,5)",\
+-	org.junit.vintage:junit-vintage-engine;version=latest
++junit:	org.apache.servicemix.bundles.junit;version="latest"
+ 
+ mockito: org.mockito.mockito-core;version="[2,3)",\
+ 	net.bytebuddy.byte-buddy;version="[1,2)",\
+--- a/biz.aQute.bndlib/bnd.bnd
++++ b/biz.aQute.bndlib/bnd.bnd
+@@ -77,8 +77,7 @@
+ 	slf4j.api;version=latest;maven-scope=compile
+ 
+ -testpath: \
+-    ${junit},\
+-    ${mockito}
++    ${junit}
+ 
+ -builderignore: testresources
+ 
+--- a/biz.aQute.junit/bnd.bnd
++++ b/biz.aQute.junit/bnd.bnd
+@@ -8,8 +8,7 @@
+ 	osgi.core;version=latest,\
+ 	aQute.libg;version=project,\
+ 	biz.aQute.bndlib;version=latest,\
+-    org.apache.servicemix.bundles.junit;version=latest,\
+-    org.assertj.core;version=latest
++    org.apache.servicemix.bundles.junit;version=latest
+ 
+ -includepackage: \
+ 	aQute.junit.*, \
+--- a/bndtools.test/tester/test/bnd.bnd
++++ b/bndtools.test/tester/test/bnd.bnd
+@@ -3,10 +3,7 @@
+ Bundle-Name: Test Bundle
+ 
+ -buildpath: \
+-	org.junit.jupiter.api,\
+-	org.assertj.core,\
+-	org.apache.servicemix.bundles.junit,\
+-	org.junit.jupiter.params
++	org.apache.servicemix.bundles.junit
+ -runrequires: \
+ 	bnd.identity;id='org.junit.jupiter.engine',\
+ 	bnd.identity;id='test',\
+--- a/biz.aQute.tester.junit-platform/bnd.bnd
++++ b/biz.aQute.tester.junit-platform/bnd.bnd
+@@ -33,11 +33,6 @@
+ 	osgi.core;version=latest,\
+ 	biz.aQute.bndlib;version=snapshot,\
+ 	biz.aQute.junit;version=snapshot;packages=aQute.junit.constants,\
+-	org.apache.servicemix.bundles.junit;version=latest,\
+-	org.junit.platform.launcher,\
+-	org.junit.platform.engine,\
+-	org.junit.platform.commons,\
+-	org.opentest4j,\
+-	org.apiguardian
++	org.apache.servicemix.bundles.junit;version=latest
+ 
+ -baseline: *

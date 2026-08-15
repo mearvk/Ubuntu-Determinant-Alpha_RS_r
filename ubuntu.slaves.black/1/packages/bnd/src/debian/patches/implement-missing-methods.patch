@@ -1,0 +1,94 @@
+Description: This patch prevents a FTBFS because of missing implemented methods. This patch
+ can be dropped when a future release of bnd incorporates the changes from OSGi R6.
+Author: Markus Koschany <apo@debian.org>
+Forwarded: not-needed
+--- a/biz.aQute.launcher/src/aQute/launcher/minifw/Context.java
++++ b/biz.aQute.launcher/src/aQute/launcher/minifw/Context.java
+@@ -393,16 +393,20 @@
+ 	}
+ 
+ 	@Override
+-	public ServiceRegistration registerService(String[] clazzes, Object service, Dictionary properties) {
++	public ServiceRegistration<?> registerService(String[] clazzes, Object service, Dictionary<String,?> properties) {
+ 		return null;
+ 	}
+ 
+ 	@Override
+-	public ServiceRegistration registerService(String clazz, Object service, Dictionary properties) {
++	public ServiceRegistration<?> registerService(String clazz, Object service, Dictionary<String,?> properties) {
+ 		return null;
+ 	}
+ 
+-	public ServiceRegistration registerService(Class<?> clazz, Object service, Dictionary<String, ?> properties) {
++	public <S> ServiceRegistration<S> registerService(Class<S> clazz, S service, Dictionary<String, ?> properties) {
++		return null;
++	}
++
++	public <S> ServiceRegistration<S> registerService(Class<S> clazz, org.osgi.framework.ServiceFactory<S> factory, Dictionary<String, ? > properties) {
+ 		return null;
+ 	}
+ 
+@@ -410,7 +414,7 @@
+ 		return null;
+ 	}
+ 
+-	public <S> Collection<ServiceReference> getServiceReferences(Class<S> clazz, String filter)
++	public <S> Collection<ServiceReference<S>> getServiceReferences(Class<S> clazz, String filter)
+ 		throws InvalidSyntaxException {
+ 		return null;
+ 	}
+@@ -432,4 +436,8 @@
+ 	public <A> A adapt(Class<A> type) {
+ 		return null;
+ 	}
++
++    public <S> org.osgi.framework.ServiceObjects<S> getServiceObjects(ServiceReference<S> reference) {
++        return null;
++    }
+ }
+--- a/biz.aQute.launcher/src/aQute/launcher/minifw/MiniFramework.java
++++ b/biz.aQute.launcher/src/aQute/launcher/minifw/MiniFramework.java
+@@ -52,6 +52,11 @@
+ 	}
+ 
+ 	@Override
++	public void init(FrameworkListener... listeners) throws BundleException {
++		init();
++	}
++
++	@Override
+ 	public FrameworkEvent waitForStop(long timeout) throws InterruptedException {
+ 		long deadline = System.currentTimeMillis() + timeout;
+ 
+@@ -353,7 +358,12 @@
+ 		return null;
+ 	}
+ 
+-	public <S> ServiceRegistration registerService(Class<S> clazz, S service, Dictionary<String, ?> properties) {
++	public <S> ServiceRegistration<S> registerService(Class<S> clazz, S service, Dictionary<String, ?> properties) {
++		return null;
++	}
++
++	@Override
++	public <S> ServiceRegistration<S> registerService(Class<S> clazz, org.osgi.framework.ServiceFactory<S> factory, Dictionary<String, ? > properties) {
+ 		return null;
+ 	}
+ 
+@@ -361,7 +371,7 @@
+ 		return null;
+ 	}
+ 
+-	public <S> Collection<ServiceReference> getServiceReferences(Class<S> clazz, String filter)
++	public <S> Collection<ServiceReference<S>> getServiceReferences(Class<S> clazz, String filter)
+ 		throws InvalidSyntaxException {
+ 		return null;
+ 	}
+@@ -383,4 +393,8 @@
+ 	public <A> A adapt(Class<A> type) {
+ 		return null;
+ 	}
++
++	public <S> org.osgi.framework.ServiceObjects<S> getServiceObjects(ServiceReference<S> reference) {
++		return null;
++	}
+ }

@@ -1,0 +1,30 @@
+Description: Don't choke on ip addr add [...] valid_lft [...] preferred_lft
+ isc-dhcp-dclient 4.4.1 has started passing valid_lft, preferred_lft to
+ ip addr add but busybox ip doesn't support these options.  Handle these
+ gracefully, making them no-ops for now.
+Author: Steve Langasek <steve.langasek@ubuntu.com>
+Bug-Debian: https://bugs.debian.org/924442
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1819747
+Forwarded: no
+Last-Update: 2019-03-12
+
+--- a/networking/libiproute/ipaddress.c
++++ b/networking/libiproute/ipaddress.c
+@@ -598,7 +598,8 @@
+ 	/* If you add stuff here, update ipaddr_full_usage */
+ 	static const char option[] ALIGN1 =
+ 		"peer\0""remote\0""broadcast\0""brd\0"
+-		"anycast\0""scope\0""dev\0""label\0""local\0";
++		"anycast\0""scope\0""dev\0""label\0"
++		"valid_lft\0""preferred_lft\0""local\0";
+ #define option_peer      option
+ #define option_broadcast (option           + sizeof("peer") + sizeof("remote"))
+ #define option_anycast   (option_broadcast + sizeof("broadcast") + sizeof("brd"))
+@@ -681,6 +682,7 @@
+ 		} else if (arg == 7) { /* label */
+ 			l = *argv;
+ 			addattr_l(&req.n, sizeof(req), IFA_LABEL, l, strlen(l) + 1);
++		} else if (arg <= 9) { /* valid_lft, preferred_lft */
+ 		} else {
+ 			/* local (specified or assumed) */
+ 			if (local_len) {

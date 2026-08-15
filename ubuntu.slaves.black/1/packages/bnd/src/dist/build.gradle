@@ -1,0 +1,32 @@
+/*
+ * dist Gradle build script
+ */
+
+def buildProject = project
+
+/* Configure the workspace project */
+configure(parent) {
+  layout.buildDirectory.set(buildProject.layout.buildDirectory)
+
+  task build {
+    dependsOn "${buildProject.path}:jarDependencies"
+    dependsOn "${buildProject.path}:checkDependencies"
+    dependsOn "${buildProject.path}:releaseNeeded"
+    description "Assembles, tests and releases the ${buildProject.name} project."
+    group 'build'
+  }
+  defaultTasks = [absoluteProjectPath(build.name)]
+}
+
+checkDependencies {
+  mustRunAfter 'jarDependencies'
+}
+
+releaseDependencies {
+  mustRunAfter 'jarDependencies', 'checkDependencies'
+}
+
+clean {
+  File releaserepo = file(bnd('releaserepo', 'bundles')) /* Release repository. */
+  delete releaserepo
+}

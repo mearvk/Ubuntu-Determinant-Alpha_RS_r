@@ -1,0 +1,454 @@
+Description: Cleanup usage of conflicting options.
+Author: <selinger@mathstat.dal.ca>, Michael Meskes <meskes@łdebian.org>
+
+--- bsdmainutils/usr.bin/ncal.orig/ncal.c	2020-08-04 13:16:47.523112729 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.c		2020-08-04 13:26:27.306710566 +0200	
+@@ -201,17 +201,18 @@
+ 	int	y = 0;			/* year */
+ 	int     flag_backward = 0;	/* user called cal--backward compat. */
+ 	int	ncal_backward = 0;	/* make output of ncal backward compat. */
++	int	no_backward = 0;	/* to make sure conflicting options really conflict */
+ 	int     flag_wholeyear = 0;	/* user wants the whole year */
+ 	int	flag_julian_cal = 0;	/* user wants Julian Calendar */
+ 	int     flag_julian_day = 0;	/* user wants the Julian day numbers */
+ 	int	flag_orthodox = 0;	/* user wants Orthodox easter */
+ 	int	flag_easter = 0;	/* user wants easter date */
+ 	int	flag_3months = 0;	/* user wants 3 month display (-3) */
++	int	flag_1month = 0;	/* user wants 1 month display (-1) */
+ 	int	flag_after = 0;		/* user wants to see months after */
+ 	int	flag_before = 0;	/* user wants to see months before */
+-	int	flag_specifiedmonth = 0;/* user wants to see this month (-m) */
+-	int	flag_givenmonth = 0;	/* user has specified month [n] */
+-	int	flag_givenyear = 0;	/* user has specified year [n] */
++	int	flag_givenmonth = 0;	/* user has specified month */
++	int	flag_givenyear = 0;	/* user has specified year */
+ 	char	*cp;			/* character pointer */
+ 	char	*flag_today = NULL;	/* debug: use date as being today */
+ 	char	*flag_month = NULL;	/* requested month as string */
+@@ -263,75 +264,87 @@
+ 
+ 	before = after = -1;
+ 
+-	while ((ch = getopt(argc, argv, "3A:B:Cd:eH:hjJm:Nops:wySMW:b")) != -1)
++	while ((ch = getopt(argc, argv, "31A:B:Cd:eH:hjJm:ops:wySMW:b")) != -1)
+ 		switch (ch) {
+ 		case 'b':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			ncal_backward = 1;
+ 			break;
+ 		case '3':
++			flag_1month = 0;
+ 			flag_3months = 1;
++			flag_wholeyear = 0;
++			break;
++		case '1':
++			flag_1month = 1;
++			flag_3months = 0;
++			flag_wholeyear = 0;
+ 			break;
+ 		case 'A':
+-			if (flag_after > 0)
+-				errx(EX_USAGE, "Double -A specified");
+ 			flag_after = strtol(optarg, NULL, 10);
+-			if (flag_after <= 0)
+-				errx(EX_USAGE,
+-				    "Argument to -A must be positive");
+ 			break;
+ 		case 'B':
+-			if (flag_before > 0)
+-				errx(EX_USAGE, "Double -A specified");
+ 			flag_before = strtol(optarg, NULL, 10);
+-			if (flag_before <= 0)
+-				errx(EX_USAGE,
+-				    "Argument to -B must be positive");
+ 			break;
+ 		case 'W':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			days_first_week = strtol(optarg, NULL, 10);
+ 			break;
+ 		case 'J':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			nswitch = ndaysj(&never);
+ 			flag_julian_cal = 1;
+ 			break;
+ 		case 'C':
++			if (no_backward == 1)
++				usage();
+ 			flag_backward = 1;
+ 			break;
+-		case 'N':
+-			flag_backward = 0;
+-			break;
+ 		case 'd':
+ 			flag_today = optarg;
+ 			break;
+ 		case 'H':
++			if (flag_backward)
++				usage();
++			else
++				no_backward = 1;
+ 			flag_highlightdate = optarg;
+ 			break;
+ 		case 'h':
++			if (flag_backward)
++				usage();
++			else
++				no_backward = 1;
+ 			flag_nohighlight = 1;
+ 			break;
+ 		case 'e':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			flag_easter = 1;
+ 			break;
+ 		case 'j':
+ 			flag_julian_day = 1;
+ 			break;
+ 		case 'm':
+-			if (flag_specifiedmonth)
+-				errx(EX_USAGE, "Double -m specified");
+ 			flag_month = optarg;
+-			flag_specifiedmonth = 1;
++			flag_givenmonth = 1;
+ 			break;
+ 		case 'o':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			flag_orthodox = 1;
+ 			flag_easter = 1;
+ 			break;
+@@ -344,6 +357,8 @@
+ 		case 's':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			q = switches +
+ 			    sizeof(switches) / sizeof(struct djswitch);
+ 			for (p = switches;
+@@ -357,19 +372,27 @@
+ 		case 'w':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			flag_weeks = 1;
+ 			break;
+ 		case 'y':
++			flag_1month = 0;
+ 			flag_wholeyear = 1;
++			flag_3months = 0;
+ 			break;
+ 		case 'S':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			weekstart = 0;
+ 			break;
+ 		case 'M':
+ 			if (flag_backward)
+ 				usage();
++			else
++				no_backward = 1;
+ 			weekstart = 1;
+ 			break;
+ 		default:
+@@ -456,82 +479,90 @@
+ 		}
+ 	}
+ 
+-	/*
+-	 * What is not supported:
+-	 * -3 with -A or -B
+-	 *	-3 displays 3 months, -A and -B change that behaviour.
+-	 * -3 with -y
+-	 *	-3 displays 3 months, -y says display a whole year.
+-	 * -3 with a given year but no given month or without -m
+-	 *	-3 displays 3 months, no month specified doesn't make clear
+-	 *      which three months.
+-	 * -m with a given month
+-	 *	conflicting arguments, both specify the same field.
+-	 * -y with -m
+-	 *	-y displays the whole year, -m displays a single month.
+-	 * -y with a given month
+-	 *	-y displays the whole year, the given month displays a single
+-	 *	month.
+-	 * -y with -A or -B
+-	 *	-y displays the whole year, -A and -B display extra months.
+-	 */
++	/* The base month and/or year can be specified by any of the
++	   following:
+ 
+-	/* -3 together with -A or -B. */
+-	if (flag_3months && (flag_after || flag_before))
+-		errx(EX_USAGE, "-3 together with -A and -B is not supported.");
+-	/* -3 together with -y. */
+-	if (flag_3months && flag_wholeyear)
+-		errx(EX_USAGE, "-3 together with -y is not supported.");
+-	/* -3 together with givenyear but no givenmonth. */
+-	if (flag_3months && flag_givenyear &&
+-	    !(flag_givenmonth || flag_specifiedmonth))
++	   month year
++	   year
++	   -m month
++	   <nothing>
++
++	   In case of multiple specification of the same item (month
++	   or year), the later one should override the earlier one.
++	   (However, arguments are always evaluated after options). In
++	   case neither month nor year is specified, use the current
++	   month in the current year.
++
++	   The range of months to display can be specified by one of
++	   the following three options:
++
++	   -y  (display a calendar for the specified year - disregard month)
++	   -3  (display 3 months - not possible if only year specified)
++	   -1  (display 1 month - not possible if only year specified)
++
++	   The default is -1, unless a year and no month is specified,
++	   in which case -y is implied.
++
++	   The options -1, -3, and -y methods are mutually exclusive;
++           if multiple ones are specified, the last one is used. 
++
++	   In addition, the range of months can be modified with the
++	   following options:
++
++	   -B n 
++	   -A m
++
++	   This modifies the range of months specified by the other
++	   options, by adding n additional months at the beginning and
++	   m additional months at the end. Negative numbers *are*
++	   allowed, as long as the total number of months displayed is
++	   at least 1.
++	*/
++
++	/* if givenyear, but not givenmonth, then imply -y */
++
++	if (flag_givenyear && !flag_givenmonth) {
++	  flag_wholeyear = 1;
++	  if (flag_3months) {
+ 		errx(EX_USAGE,
+ 		    "-3 together with a given year but no given month is "
+ 		    "not supported.");
+-	/* -m together with xx xxxx. */
+-	if (flag_specifiedmonth && flag_givenmonth)
++	  }
++	  if (flag_1month) {
+ 		errx(EX_USAGE,
+-		    "-m together with a given month is not supported.");
+-	/* -y together with -m. */
+-	if (flag_wholeyear && flag_specifiedmonth)
+-		errx(EX_USAGE, "-y together with -m is not supported.");
+-	/* -y together with xx xxxx. */
+-	if (flag_wholeyear && flag_givenmonth)
+-		errx(EX_USAGE, "-y together a given month is not supported.");
+-	/* -y together with -A or -B. */
+-	if (flag_wholeyear && (flag_before > 0 || flag_after > 0))
+-		errx(EX_USAGE, "-y together a -A or -B is not supported.");
+-	/* The rest should be fine. */
++		    "-1 together with a given year but no given month is "
++		    "not supported.");
++	  }
++	}
++
++	/* otherwise, default to -1 */
++	if (!flag_wholeyear && !flag_3months) {
++	  flag_1month = 1;
++	}
+ 
+ 	/* Select the period to display, in order of increasing priority .*/
+-	if (flag_wholeyear ||
+-	    (flag_givenyear && !(flag_givenmonth || flag_specifiedmonth))) {
++	if (flag_wholeyear) {
+ 		m = 1;
+ 		before = 0;
+ 		after = 11;
++	} else if (flag_3months) {
++	  before = 1;
++	  after = 1;
++	} else if (flag_1month) {
++	  before = 0;
++	  after = 0;
+ 	}
+-	if (flag_givenyear && flag_givenmonth) {
+-		before = 0;
+-		after = 0;
+-	}
+-	if (flag_specifiedmonth) {
+-		before = 0;
+-		after = 0;
+-	}
++	/* now add additional "before" and "after" values */
+ 	if (flag_before) {
+-		before = flag_before;
++		before += flag_before;
+ 	}
+ 	if (flag_after) {
+-		after = flag_after;
++		after += flag_after;
++	}
++	/* don't allow a period of 0 or less months */
++	if (before + after < 0) {
++	  before = after = 0;
+ 	}
+-	if (flag_3months) {
+-		before = 1;
+-		after = 1;
+-	}
+-	if (after == -1)
+-		after = 0;
+-	if (before == -1)
+-		before = 0;
+ 
+ 	/* Highlight a specified day or today .*/
+ 	if (flag_highlightdate != NULL) {
+@@ -566,12 +597,13 @@
+ {
+ 
+ 	fputs(
+-"Usage: cal [general options] [-hjy] [[month] year]\n"
+-"       cal [general options] [-hj] [-m month] [year]\n"
+-"       ncal [general options] [-bhJjpwySM] [-s country_code] [-W number of days] [[month] year]\n"
+-"       ncal [general options] [-hJeo] [year]\n"
+-"General options: [-NC3] [-A months] [-B months]\n"
+-"For debug the highlighting: [-H yyyy-mm-dd] [-d yyyy-mm]\n",
++"Usage: cal [general options] [-jy] [[month] year]\n"
++"       cal [general options] [-j] [-m month] [year]\n"
++"       ncal -C [general options] [-jy] [[month] year]\n"
++"       ncal -C [general options] [-j] [-m month] [year]\n"
++"       ncal [general options] [-bhJjpwySM] [-H yyyy-mm-dd] [-s country_code] [-W number of days] [[month] year]\n"
++"       ncal [general options] [-Jeo] [year]\n"
++"General options: [-31] [-A months] [-B months] [-d yyyy-mm]\n",
+ 	    stderr);
+ 	exit(EX_USAGE);
+ }
+@@ -658,11 +690,16 @@
+ 	mw = jd_flag ? MONTH_WIDTH_B_J : MONTH_WIDTH_B;
+ 	wdss = (mpl == 2) ? " " : "";
+ 
+-	while (before != 0) {
++	while (before > 0) {
+ 		DECREASEMONTH(m, y);
+ 		before--;
+ 		after++;
+ 	}
++	while (before < 0) {
++		INCREASEMONTH(m, y);
++		before++;
++		after--;
++	}
+ 	m1 = y * 12 + m - 1;
+ 	m2 = m1 + after;
+ 
+@@ -745,11 +782,16 @@
+ 	mpl = jd_flag ? 3 : 4;
+ 	mw = jd_flag ? MONTH_WIDTH_R_J : MONTH_WIDTH_R;
+ 
+-	while (before != 0) {
++	while (before > 0) {
+ 		DECREASEMONTH(m, y);
+ 		before--;
+ 		after++;
+ 	}
++	while (before < 0) {
++		INCREASEMONTH(m, y);
++		before++;
++		after--;
++	}
+ 	m1 = y * 12 + m - 1;
+ 	m2 = m1 + after;
+ 
+--- bsdmainutils/usr.bin/ncal.orig/ncal.1	2020-08-04 13:16:47.523112729 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.1		2020-08-04 13:16:54.131139871 +0200
+@@ -120,25 +120,41 @@
+ .It Fl w
+ Print the number of the week below each week column.
+ .It Fl y
+-Display a calendar for the specified year.
++Display a calendar for the specified year. This option is implied when
++a year but no month are specified on the command line.
+ .It Fl 3
+ Display the previous, current and next month surrounding today.
++.It Fl 1
++Display only the current month. This is the default. 
+ .It Fl A Ar number
+-Display the
+-.Ar number
+-of months after the current month.
++Months to add after. The specified number of months is added to the
++end of the display. This is in addition to any date range selected by the
++.Fl y ,
++.Fl 3 ,
++or
++.Fl 1
++options. For example,
++.Dq Li cal -y -B2 -A2
++shows everything from November of the previous year to
++February of the following year. Negative numbers are allowed, in which
++case the specified number of months is subtracted. For example, 
++.Dq Li cal -y -B-6 
++shows July to December. And 
++.Dq Li cal -A11
++simply shows the next 12 months.
+ .It Fl B Ar number
+-Display the
+-.Ar number
+-of months before the current month.
++Months to add before. The specified number of months is added to the 
++beginning of the display. See
++.Fl A
++for examples.
+ .It Fl C
+-Switch to
++Completely switch to
++.Nm cal
++mode. For
+ .Nm cal
+-mode.
+-.It Fl N
+-Switch to
+-.Nm ncal
+-mode.
++like output only, use
++.Fl b
++instead.
+ .It Fl d Ar yyyy-mm
+ Use
+ .Ar yyyy-mm
+@@ -175,13 +191,12 @@
+ year).
+ .Pp
+ Not all options can be used together.
+-For example
+-.Dq Li -3 -A 2 -B 3 -y -m 7
+-would mean:
+-show me the three months around the seventh month, three before
+-that, two after that and the whole year.
+-.Nm ncal
+-will warn about these combinations.
++For example the options 
++.Fl y , 3 , 
++and 
++.Fl 1 
++are mutually exclusive. If inconsistent options are given, the later
++ones take precedence over the earlier ones.
+ .Pp
+ A year starts on January 1.
+ .Pp

@@ -1,0 +1,28 @@
+#!/bin/sh
+set -C -e -f -u
+cd "$AUTOPKGTEST_TMP"
+
+export LANG=C
+
+# compare a compressed file against the original file
+printf "aaaa" > a
+bzip2 --keep a
+bzdiff a.bz2
+
+# compare two identical files
+cp a a2
+bzip2 --keep a2
+bzdiff a.bz2 a2.bz2
+
+# compare two different compressed files
+printf "bbbb" > b
+bzip2 --keep b
+
+expected=$(diff a b || true)
+
+r=$(bzdiff a.bz2 b.bz2 || true)
+if [ "$r" != "$expected" ] ; then
+    false
+fi
+
+

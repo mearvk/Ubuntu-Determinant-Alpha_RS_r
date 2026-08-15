@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+versions=$(apt-cache search jre-headless | awk '{print $1}')
+for version in ${versions}
+do
+# WHEN openjdk-jre-headless package is installed from scratch
+
+    # Java 18 is EOL 09.2022 but is present in Lunar so that we could do clean
+    # builds. Ignore it in certificate tests
+    if [[ ${version} == "openjdk-18-jre-headless" ]];
+    then
+        continue
+    fi
+    # Java 19 is EOL, but it is present in archive so that we could do clean
+    # builds. Ignore it in certificate tests
+    if [[ ${version} == "openjdk-19-jre-headless" ]];
+    then
+        continue
+    fi
+    # Java 13 is EOL, but it is present in archive so that we could do clean
+    # builds. Ignore it in certificate tests
+    if [[ ${version} == "openjdk-13-jre-headless" ]];
+    then
+        continue
+    fi
+    # Java 16 is EOL, but it is present in archive so that we could do clean
+    # builds. Ignore it in certificate tests
+    if [[ ${version} == "openjdk-16-jre-headless" ]];
+    then
+        continue
+    fi
+
+
+    output=`mktemp`
+    echo "installing ${version}"
+    apt-get install -y ${version} | tee ${output}
+# THEN installation is successfull
+# AND certificates are updated
+    if [[ $(grep -L "Adding debian:Amazon_Root_CA_1.pem" ${output}) ]]; then
+        echo "Certificates were not imported !!!"
+        exit 255
+    fi
+    rm $output
+    # purge in order to remove keytstore
+    apt-get purge -y ca-certificates-java ${version}
+done

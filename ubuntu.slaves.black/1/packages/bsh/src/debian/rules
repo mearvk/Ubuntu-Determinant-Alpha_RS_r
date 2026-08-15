@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export CLASSPATH=/usr/share/java/bsf.jar:/usr/share/java/servlet-api-3.1.jar:/usr/share/java/javacc.jar
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	dh_auto_build -- javadoc jarall -Dcompile.debug=true
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	dh_auto_build -- test
+endif
+
+override_dh_auto_install:
+	mh_installpoms -plibbsh-java
+	mh_installjar -plibbsh-java -l debian/pom.xml dist/bsh-$(DEB_VERSION_UPSTREAM).jar
+	install -m 755 debian/_bsh debian/bsh/usr/bin/bsh
+	install -m 755 debian/xbsh debian/bsh/usr/bin/
+
+	mkdir -p debian/bsh-src/usr/src/bsh-src
+	tar --exclude debian --exclude classes --exclude dist --exclude api \
+	    --clamp-mtime --mtime="@$(SOURCE_DATE_EPOCH)" \
+	    --mode='u+rw,g+rw,a+X' \
+	    -zcf debian/bsh-src/usr/src/bsh-src/bsh.tar.gz *
+
+get-orig-source:
+	-uscan --download-current-version --force-download --rename --repack
+
+get-orig-pom:
+	wget -O debian/pom.xml http://repository.sonatype.org/service/local/repositories/central/content/org/beanshell/bsh/$(DEB_VERSION_UPSTREAM)/bsh-$(DEB_VERSION_UPSTREAM).pom

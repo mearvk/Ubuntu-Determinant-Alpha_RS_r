@@ -1,0 +1,255 @@
+Description: Preserves the compatibility with JDKs older than the one used to build the package
+Author: Emmanuel Bourg
+Forwarded: no
+--- a/aQute.libg/src/aQute/lib/utf8properties/UTF8Properties.java
++++ b/aQute.libg/src/aQute/lib/utf8properties/UTF8Properties.java
+@@ -120,7 +120,7 @@
+ 			}
+ 			decoder.reset();
+ 			if (success) {
+-				return cb.flip()
++				return ((java.nio.Buffer) cb).flip()
+ 					.toString();
+ 			}
+ 			bb.rewind();
+--- a/aQute.libg/src/aQute/lib/io/IO.java
++++ b/aQute.libg/src/aQute/lib/io/IO.java
+@@ -211,11 +211,11 @@
+ 		try {
+ 			ByteBuffer bb = ByteBuffer.allocateDirect(BUFFER_SIZE);
+ 			while (in.read(bb) > 0) {
+-				bb.flip();
++				((java.nio.Buffer) bb).flip();
+ 				out.write(bb);
+ 				bb.compact();
+ 			}
+-			for (bb.flip(); bb.hasRemaining();) {
++			for (((java.nio.Buffer) bb).flip(); bb.hasRemaining();) {
+ 				out.write(bb);
+ 			}
+ 			return out;
+@@ -231,7 +231,7 @@
+ 				int offset = bb.arrayOffset();
+ 				for (int size, position; bb.hasRemaining()
+ 					&& (size = in.read(buffer, offset + (position = bb.position()), bb.remaining())) > 0;) {
+-					bb.position(position + size);
++					((java.nio.Buffer) bb).position(position + size);
+ 				}
+ 			} else {
+ 				int length = Math.min(bb.remaining(), BUFFER_SIZE);
+@@ -268,7 +268,7 @@
+ 			bbout.write(bb);
+ 		} else if (bb.hasArray()) {
+ 			out.write(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+-			bb.position(bb.limit());
++			((java.nio.Buffer) bb).position(bb.limit());
+ 		} else {
+ 			int length = Math.min(bb.remaining(), BUFFER_SIZE);
+ 			byte[] buffer = new byte[length];
+@@ -332,11 +332,11 @@
+ 		try {
+ 			ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
+ 			while (in.read(bb) > 0) {
+-				bb.flip();
++				((java.nio.Buffer) bb).flip();
+ 				md.update(bb);
+ 				bb.compact();
+ 			}
+-			for (bb.flip(); bb.hasRemaining();) {
++			for (((java.nio.Buffer) bb).flip(); bb.hasRemaining();) {
+ 				md.update(bb);
+ 			}
+ 			return md;
+@@ -465,12 +465,12 @@
+ 			ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
+ 			byte[] buffer = bb.array();
+ 			for (int size, position; (size = in.read(buffer, position = bb.position(), bb.remaining())) > 0;) {
+-				bb.position(position + size);
+-				bb.flip();
++				((java.nio.Buffer) bb).position(position + size);
++				((java.nio.Buffer) bb).flip();
+ 				out.write(bb);
+ 				bb.compact();
+ 			}
+-			for (bb.flip(); bb.hasRemaining();) {
++			for (((java.nio.Buffer) bb).flip(); bb.hasRemaining();) {
+ 				out.write(bb);
+ 			}
+ 			return out;
+@@ -483,7 +483,7 @@
+ 		try {
+ 			ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
+ 			byte[] buffer = bb.array();
+-			for (; in.read(bb) > 0; bb.clear()) {
++			for (; in.read(bb) > 0; ((java.nio.Buffer) bb).clear()) {
+ 				out.write(buffer, 0, bb.position());
+ 			}
+ 			return out;
+@@ -508,7 +508,7 @@
+ 			}
+ 			ByteBuffer bb = ByteBuffer.allocate((int) size);
+ 			while (in.read(bb) > 0) {}
+-			bb.flip();
++			((java.nio.Buffer) bb).flip();
+ 			return bb;
+ 		}
+ 	}
+--- a/biz.aQute.bndlib/src/aQute/bnd/osgi/ZipResource.java
++++ b/biz.aQute.bndlib/src/aQute/bnd/osgi/ZipResource.java
+@@ -64,7 +64,7 @@
+ 			return buffer = ByteBuffer.wrap(IO.read(zip.getInputStream(entry)));
+ 		}
+ 		ByteBuffer bb = IO.copy(zip.getInputStream(entry), ByteBuffer.allocate((int) size));
+-		bb.flip();
++		((java.nio.Buffer) bb).flip();
+ 		return buffer = bb;
+ 	}
+ 
+--- a/aQute.libg/src/aQute/lib/io/ByteBufferInputStream.java
++++ b/aQute.libg/src/aQute/lib/io/ByteBufferInputStream.java
+@@ -7,7 +7,7 @@
+ 	private final ByteBuffer bb;
+ 
+ 	public ByteBufferInputStream(ByteBuffer buffer) {
+-		buffer.mark();
++		((java.nio.Buffer) buffer).mark();
+ 		bb = buffer;
+ 	}
+ 
+@@ -44,7 +44,7 @@
+ 			return 0L;
+ 		}
+ 		int skipped = Math.min((int) n, bb.remaining());
+-		bb.position(bb.position() + skipped);
++		((java.nio.Buffer) bb).position(bb.position() + skipped);
+ 		return skipped;
+ 	}
+ 
+@@ -55,17 +55,17 @@
+ 
+ 	@Override
+ 	public void close() {
+-		bb.position(bb.limit());
++		((java.nio.Buffer) bb).position(bb.limit());
+ 	}
+ 
+ 	@Override
+ 	public void mark(int readlimit) {
+-		bb.mark();
++		((java.nio.Buffer) bb).mark();
+ 	}
+ 
+ 	@Override
+ 	public void reset() {
+-		bb.reset();
++		((java.nio.Buffer) bb).reset();
+ 	}
+ 
+ 	@Override
+--- a/biz.aQute.bndlib/src/aQute/bnd/osgi/URLResource.java
++++ b/biz.aQute.bndlib/src/aQute/bnd/osgi/URLResource.java
+@@ -48,7 +48,7 @@
+ 			return buffer = ByteBuffer.wrap(IO.read(in));
+ 		}
+ 		ByteBuffer bb = IO.copy(in, ByteBuffer.allocate(size));
+-		bb.flip();
++		((java.nio.Buffer) bb).flip();
+ 		return buffer = bb;
+ 	}
+ 
+--- a/biz.aQute.bndlib/src/aQute/bnd/osgi/Clazz.java
++++ b/biz.aQute.bndlib/src/aQute/bnd/osgi/Clazz.java
+@@ -1249,7 +1249,7 @@
+ 				}
+ 				case OpCodes.wide : {
+ 					int opcode = Byte.toUnsignedInt(code.get());
+-					code.position(code.position() + (opcode == OpCodes.iinc ? 4 : 2));
++					((java.nio.Buffer) code).position(code.position() + (opcode == OpCodes.iinc ? 4 : 2));
+ 					lastReference = -1;
+ 					break;
+ 				}
+@@ -1262,7 +1262,7 @@
+ 					int deflt = code.getInt();
+ 					int low = code.getInt();
+ 					int high = code.getInt();
+-					code.position(code.position() + (high - low + 1) * 4);
++					((java.nio.Buffer) code).position(code.position() + (high - low + 1) * 4);
+ 					lastReference = -1;
+ 					break;
+ 				}
+@@ -1274,12 +1274,12 @@
+ 					}
+ 					int deflt = code.getInt();
+ 					int npairs = code.getInt();
+-					code.position(code.position() + npairs * 8);
++					((java.nio.Buffer) code).position(code.position() + npairs * 8);
+ 					lastReference = -1;
+ 					break;
+ 				}
+ 				default : {
+-					code.position(code.position() + OpCodes.OFFSETS[instruction]);
++					((java.nio.Buffer) code).position(code.position() + OpCodes.OFFSETS[instruction]);
+ 					lastReference = -1;
+ 					break;
+ 				}
+@@ -1310,7 +1310,7 @@
+ 				case OpCodes.invokeinterface : {
+ 					int method_ref_index = Short.toUnsignedInt(code.getShort());
+ 					visitReferenceMethod(cd, method_ref_index);
+-					code.position(code.position() + 2);
++					((java.nio.Buffer) code).position(code.position() + 2);
+ 					break;
+ 				}
+ 				case OpCodes.invokestatic : {
+@@ -1320,34 +1320,34 @@
+ 				}
+ 				case OpCodes.wide : {
+ 					int opcode = Byte.toUnsignedInt(code.get());
+-					code.position(code.position() + (opcode == OpCodes.iinc ? 4 : 2));
++					((java.nio.Buffer) code).position(code.position() + (opcode == OpCodes.iinc ? 4 : 2));
+ 					break;
+ 				}
+ 				case OpCodes.tableswitch : {
+ 					// Skip to place divisible by 4
+ 					int rem = code.position() % 4;
+ 					if (rem != 0) {
+-						code.position(code.position() + 4 - rem);
++						((java.nio.Buffer) code).position(code.position() + 4 - rem);
+ 					}
+ 					int deflt = code.getInt();
+ 					int low = code.getInt();
+ 					int high = code.getInt();
+-					code.position(code.position() + (high - low + 1) * 4);
++					((java.nio.Buffer) code).position(code.position() + (high - low + 1) * 4);
+ 					break;
+ 				}
+ 				case OpCodes.lookupswitch : {
+ 					// Skip to place divisible by 4
+ 					int rem = code.position() % 4;
+ 					if (rem != 0) {
+-						code.position(code.position() + 4 - rem);
++						((java.nio.Buffer) code).position(code.position() + 4 - rem);
+ 					}
+ 					int deflt = code.getInt();
+ 					int npairs = code.getInt();
+-					code.position(code.position() + npairs * 8);
++					((java.nio.Buffer) code).position(code.position() + npairs * 8);
+ 					break;
+ 				}
+ 				default : {
+-					code.position(code.position() + OpCodes.OFFSETS[instruction]);
++					((java.nio.Buffer) code).position(code.position() + OpCodes.OFFSETS[instruction]);
+ 					break;
+ 				}
+ 			}
+--- a/aQute.libg/src/aQute/lib/io/ByteBufferDataInput.java
++++ b/aQute.libg/src/aQute/lib/io/ByteBufferDataInput.java
+@@ -52,7 +52,7 @@
+ 	@Override
+ 	public int skipBytes(int n) {
+ 		int skipped = ranged(n);
+-		bb.position(bb.position() + skipped);
++		((java.nio.Buffer) bb).position(bb.position() + skipped);
+ 		return skipped;
+ 	}
+ 

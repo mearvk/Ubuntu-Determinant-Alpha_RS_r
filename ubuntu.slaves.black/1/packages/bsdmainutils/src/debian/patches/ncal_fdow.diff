@@ -1,0 +1,205 @@
+Description: Handle first day of week and first week of year through locale
+             or command line setting.
+Author: Michael Meskes <meskes@debian.org>
+
+--- bsdmainutils/usr.bin/ncal.orig/calendar.c	2020-08-04 12:47:50.871367494 +0200
++++ bsdmainutils/usr.bin/ncal/calendar.c	2020-08-04 12:53:04.700970762 +0200
+@@ -27,9 +27,11 @@
+  */
+ 
+ #include <sys/cdefs.h>
++#include <langinfo.h>
+ __FBSDID("$FreeBSD: head/lib/libcalendar/calendar.c 326219 2017-11-26 02:00:33Z pfg $");
+ 
+ #include "calendar.h"
++extern int weekstart, days_first_week;
+ 
+ #ifndef NULL
+ #define NULL 0
+@@ -260,11 +262,12 @@
+ 	nd = ndaysgi(&idt);
+ 	/*
+ 	 * If more than 3 days of this week are in the preceding year, the
+-	 * next week is week 1 (and the next monday is the answer),
+-	 * otherwise this week is week 1 and the last monday is the
++	 * next week is week 1 (and the next sunday/monday is the answer),
++	 * otherwise this week is week 1 and the last sunday/monday is the
+ 	 * answer.
+ 	 */
+-	if ((wd = weekday(nd)) > 3)
++	/* 3 may or may not be correct, better use locale information */
++	if (7 - (wd = (weekday(nd) + 1 - weekstart) % 7) < days_first_week)
+ 		return (nd - wd + 7);
+ 	else
+ 		return (nd - wd);
+--- bsdmainutils/usr.bin/ncal.orig/ncal.1	2020-08-04 12:57:15.238138533 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.1	2020-08-04 12:56:23.557903370 +0200
+@@ -47,9 +47,10 @@
+ .Fl m Ar month
+ .Op Ar year
+ .Nm ncal
+-.Op Fl 3hjJpwy
++.Op Fl 3hjJpwySM
+ .Op Fl A Ar number
+ .Op Fl B Ar number
++.Op Fl W Ar number
+ .Op Fl s Ar country_code
+ .Oo
+ .Op Ar month
+@@ -147,6 +148,14 @@
+ Use
+ .Ar yyyy-mm-dd
+ as the current date (for debugging of highlighting).
++.It Fl M
++Weeks start on Monday.
++.It Fl S
++Weeks start on Sunday.
++.It Fl W Ar number
++First week of the year has at least
++.Ar number
++days.
+ .El
+ .Pp
+ A single parameter specifies the year (1\(en9999) to be displayed;
+--- bsdmainutils/usr.bin/ncal/ncal.c	2020-08-04 12:47:45.879340188 +0200
++++ bsdmainutils/usr.bin/ncal/ncal.c	2020-08-04 12:51:53.544623913 +0200
+@@ -164,6 +164,8 @@
+ static int nswitch;		/* user defined switch date */
+ static int nswitchb;		/* switch date for backward compatibility */
+ static int highlightdate;
++int weekstart = -1;		/* day the week starts on (Sun [0] - Sat [6]) */
++int days_first_week = -1;       /* minimal length of the first week in year */
+ 
+ static char	*center(char *s, char *t, int w);
+ static wchar_t *wcenter(wchar_t *s, wchar_t *t, int w);
+@@ -258,7 +260,7 @@
+ 
+ 	before = after = -1;
+ 
+-	while ((ch = getopt(argc, argv, "3A:B:Cd:eH:hjJm:Nops:wy")) != -1)
++	while ((ch = getopt(argc, argv, "3A:B:Cd:eH:hjJm:Nops:wySMW:")) != -1)
+ 		switch (ch) {
+ 		case '3':
+ 			flag_3months = 1;
+@@ -279,6 +281,11 @@
+ 				errx(EX_USAGE,
+ 				    "Argument to -B must be positive");
+ 			break;
++		case 'W':
++			if (flag_backward)
++				usage();
++			days_first_week = strtol(optarg, NULL, 10);
++			break;
+ 		case 'J':
+ 			if (flag_backward)
+ 				usage();
+@@ -347,6 +354,16 @@
+ 		case 'y':
+ 			flag_wholeyear = 1;
+ 			break;
++		case 'S':
++			if (flag_backward)
++				usage();
++			weekstart = 0;
++			break;
++		case 'M':
++			if (flag_backward)
++				usage();
++			weekstart = 1;
++			break;
+ 		default:
+ 			usage();
+ 		}
+@@ -387,6 +404,34 @@
+ 		usage();
+ 	}
+ 
++	/* Technically not correct, but removes the need to add 1 later on */
++	if (flag_backward) 
++		weekstart = (weekstart == -1) ? 1 : weekstart + 1;
++	/* Determine on what day the week starts. */
++#ifdef __GLIBC__
++	else if (weekstart == -1)
++	{
++		int first_week_i;
++		date first_week_d;
++		date sunday = { .y = 1997, .m = 11, .d = 30 };
++
++		first_week_i = (intptr_t) nl_langinfo(_NL_TIME_WEEK_1STDAY);
++		first_week_d.d = first_week_i % 100;
++		first_week_i /= 100;
++		first_week_d.m = first_week_i % 100;
++		first_week_i /= 100;
++		first_week_d.y = first_week_i;
++		weekstart = *nl_langinfo(_NL_TIME_FIRST_WEEKDAY) + (ndaysj(&first_week_d) - ndaysj(&sunday)) % 7 - 1;
++	}
++#endif
++
++	if (days_first_week == -1)
++#ifdef __GLIBC__
++		days_first_week = *nl_langinfo(_NL_TIME_WEEK_1STWEEK);
++#else
++		days_first_week = 4;
++#endif
++
+ 	if (flag_month != NULL) {
+ 		if (parsemonth(flag_month, &m, &y)) {
+ 			errx(EX_USAGE,
+@@ -507,7 +552,7 @@
+ 	fputs(
+ "Usage: cal [general options] [-hjy] [[month] year]\n"
+ "       cal [general options] [-hj] [-m month] [year]\n"
+-"       ncal [general options] [-hJjpwy] [-s country_code] [[month] year]\n"
++"       ncal [general options] [-hJjpwySM] [-s country_code] [-W number of days] [[month] year]\n"
+ "       ncal [general options] [-hJeo] [year]\n"
+ "General options: [-NC3] [-A months] [-B months]\n"
+ "For debug the highlighting: [-H yyyy-mm-dd] [-d yyyy-mm]\n",
+@@ -543,14 +588,6 @@
+ 	date    dt;
+ 	struct tm tm;
+ 	char    buf[MAX_WIDTH];
+-#ifndef D_MD_ORDER
+-	static int d_first = 1; /* XXX */
+-#else
+-	static int d_first = -1;
+-
+-	if (d_first < 0)
+-		d_first = (*nl_langinfo(D_MD_ORDER) == 'd');
+-#endif
+ 	/* force orthodox easter for years before 1583 */
+ 	if (y < 1583)
+ 		orthodox = 1;
+@@ -567,7 +604,7 @@
+ 	tm.tm_year = dt.y - 1900;
+ 	tm.tm_mon  = dt.m - 1;
+ 	tm.tm_mday = dt.d;
+-	strftime(buf, sizeof(buf), d_first ? "%e %B %Y" : "%B %e %Y",  &tm);
++	strftime(buf, sizeof(buf), "%x",  &tm);
+ 	wprintf(L"%s\n", buf);
+ }
+ 
+@@ -802,10 +839,13 @@
+ 		jan1 = firstday(y, 1);
+ 
+ 	/*
+-	 * Set firstm to the day number of monday of the first week of
++	 * Set firstm to the day number of the day starting the first week of
+ 	 * this month. (This might be in the last month)
+ 	 */
+-	firstm = first - weekday(first);
++	if (weekstart == 0)
++		firstm = first - (weekday(first) + 1) % 7;
++	else
++		firstm = first - weekday(first);
+ 
+ 	/* Set ds (daystring) and dw (daywidth) according to the jd_flag. */
+ 	if (jd_flag) {
+@@ -962,7 +1002,7 @@
+ 	memset(&tm, 0, sizeof(tm));
+ 
+ 	for (i = 0; i != 7; i++) {
+-		tm.tm_wday = (i+1) % 7;
++		tm.tm_wday = (i+weekstart) % 7;
+ 		wcsftime(buf, sizeof(buf)/sizeof(buf[0]), L"%a", &tm);
+ 		for (len = 2; len > 0; --len) {
+ 			if ((width = wcswidth(buf, len)) <= 2)

@@ -1,0 +1,66 @@
+/*
+ *
+ */
+
+import aQute.bnd.gradle.Bundle
+
+plugins {
+    id 'biz.aQute.bnd.builder'
+}
+
+ext.projectprop = 'prop.project'
+group = 'test.bnd.gradle'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'commons-codec:commons-codec:1.5'
+    implementation 'commons-lang:commons-lang:2.6'
+    testImplementation 'junit:junit:4.9'
+}
+
+jar {
+  ext.taskprop = 'prop.task'
+  manifest {
+    attributes('Implementation-Title': project.archivesBaseName,
+               'Implementation-Version': project.version,
+               '-includeresource': '{${.}/bar.txt}',
+               '-include': '${.}/other.bnd',
+               'Override': 'This should be overridden by the bnd file'
+              )
+  }
+  bnd = ['Override': 'This will be ignored since there is a bnd file for this task']
+}
+
+task bundle(type: Bundle) {
+   description 'Bundle'
+   group 'build'
+   from sourceSets.test.output
+   archiveBaseName = "${project.archivesBaseName}_bundle"
+   bnd = '''
+-exportcontents: doubler.impl
+-sources: true
+My-Header: my-value
+text: TEXT
+Bundle-Name: ${project.group}:${task.archiveBaseName}
+Project-Name: ${project.name}
+Project-Dir: ${project.dir}
+Project-Output: ${project.output}
+Project-Sourcepath: ${project.sourcepath}
+Project-Buildpath: ${project.buildpath}
+'''
+   bnd 'Here: ${.}'
+   bnd '-includeresource.lib': 'commons-lang-2.6.jar;lib:=true'
+   sourceSet = sourceSets.test
+   classpath = configurations.compileClasspath
+   classpath jar
+   version = '1.1.0'
+}
+
+artifacts {
+  runtimeOnly bundle
+  archives bundle
+}

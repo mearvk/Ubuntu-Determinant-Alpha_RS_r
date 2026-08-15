@@ -1,0 +1,23 @@
+#!/bin/sh
+set -C -e -f -u
+eval $(dpkg-architecture -s)
+PKG_CONFIG=$DEB_HOST_GNU_TYPE-pkg-config
+CC=$DEB_HOST_GNU_TYPE-gcc
+
+cd "$AUTOPKGTEST_TMP"
+cat > hello.c <<EOF
+#include <stdlib.h>
+#include <bzlib.h>
+int main () {
+  char dst [500];
+  char src [10];
+  unsigned int dstLen = sizeof (dst);
+  if (BZ2_bzBuffToBuffCompress (dst, &dstLen, src, sizeof (src), 1, 0, 0) == BZ_OK)
+    exit (EXIT_SUCCESS);
+  else
+    exit (EXIT_FAILURE);
+}
+EOF
+
+$CC hello.c -lbz2 -o hello
+./hello

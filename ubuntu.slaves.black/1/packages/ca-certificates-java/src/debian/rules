@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	mkdir target
+	jh_build --no-javadoc --javacopts="-source 1.7 -target 1.7" \
+	         target/ca-certificates-java.jar \
+	         src/main/java \
+	         --main=org.debian.security.UpdateCertificates
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	# Build the tests
+	jh_build --no-javadoc --javacopts="-source 1.7 -target 1.7 -cp target/ca-certificates-java.jar:/usr/share/java/junit4.jar" \
+	         target/ca-certificates-java-tests.jar \
+	         src/test/java
+
+	# Copy the test resources
+	mkdir target/test-classes
+	cp -R src/test/resources/* target/test-classes
+
+	# Run the tests
+	java -cp /usr/share/java/junit4.jar:target/ca-certificates-java.jar:target/ca-certificates-java-tests.jar \
+	      org.junit.runner.JUnitCore \
+	      org.debian.security.UpdateCertificatesTest org.debian.security.KeyStoreHandlerTest
+endif
+
+override_dh_auto_install:
+	install -m755 debian/jks-keystore.hook debian/ca-certificates-java/etc/ca-certificates/update.d/jks-keystore
+	install -m600 debian/default           debian/ca-certificates-java/etc/default/cacerts
+
+	dh_install target/ca-certificates-java.jar /usr/share/ca-certificates-java/
+
+override_dh_link:
+	dh_link
+	rm debian/ca-certificates-java/etc/default/ca-certificates-java

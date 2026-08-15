@@ -1,0 +1,104 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+bindnow
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/pkg-info.mk
+
+# Get the default Python version
+PY3VERSION = $(shell py3versions -d -v)
+
+export PYBUILD_NAME=breezy
+
+%:
+	dh $@ --with python3,sphinxdoc,bash_completion  --buildsystem=pybuild
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+CONCURRENCY = BRZ_CONCURRENCY=$(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+endif
+
+override_dh_auto_test:
+	[ -d debian/brzhome ] || mkdir debian/brzhome
+	$(CONCURRENCY) \
+	BRZ_HOME=debian/brzhome \
+	BRZ_PLUGIN_PATH=-site:-user \
+	LC_ALL=C.UTF-8 \
+	PYTHONPATH=$(CURDIR)/.pybuild/cpython3_$(PY3VERSION)_breezy/build \
+	$(shell py3versions -d) ./brz -Derror selftest -v \
+	-Oselftest.timeout=6000 -x bash_completion \
+	-x breezy.tests.test_transport.TestSSHConnections.test_bzr_connect_to_bzr_ssh -x test_export_pot \
+	-x breezy.tests.blackbox.test_branch.TestRemoteBranch.test_branch_local_remote \
+	-x breezy.tests.blackbox.test_branch.TestRemoteBranch.test_branch_remote_remote
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf debian/brzhome
+	rm -f brzlib/*_pyx.c
+	# It also doesn't really clean every thing...
+	ls doc/en/user-reference/*txt | grep -v readme.txt | xargs rm -rf
+	rm -rf doc/developers/make.bat \
+		doc/developers/Makefile \
+		doc/*/_build/ \
+		doc/en/release-notes/index.txt
+
+override_dh_install:
+	dh_install
+	for py in $(shell py3versions -r); do \
+		mkdir -p debian/python3-breezy.tests/usr/lib/$$py/dist-packages/breezy; \
+		mv debian/python3-breezy/usr/lib/$$py/dist-packages/breezy/tests \
+			debian/python3-breezy.tests/usr/lib/$$py/dist-packages/breezy/tests; \
+	done
+	# Install the documentation; since html and txt and intermixed
+	# under doc/, this is handier than trying to do it from brz-doc.install.
+	( cd doc && find -name "*.txt" -not -wholename "*/_build/*" -print0 ) | \
+		xargs -r0 -i'{}' -n1 install -D -m 644 'doc/{}' \
+		"debian/brz-doc/usr/share/doc/brz/txt/{}"
+	rm debian/python3-breezy/usr/man/man1/brz.1 \
+		debian/python3-breezy/usr/man/man1/git-remote-bzr.1 \
+		debian/python3-breezy/usr/bin/bzr-receive-pack \
+		debian/python3-breezy/usr/bin/brz \
+		debian/python3-breezy/usr/bin/bzr-upload-pack \
+		debian/python3-breezy/usr/bin/git-remote-bzr
+	rmdir debian/python3-breezy/usr/man/man1 \
+		  debian/python3-breezy/usr/man
+	rm debian/python3-breezy-dbg/usr/man/man1/brz.1 \
+		debian/python3-breezy-dbg/usr/man/man1/git-remote-bzr.1 \
+		debian/python3-breezy-dbg/usr/bin/bzr-receive-pack \
+		debian/python3-breezy-dbg/usr/bin/brz \
+		debian/python3-breezy-dbg/usr/bin/bzr-upload-pack \
+		debian/python3-breezy-dbg/usr/bin/git-remote-bzr
+	rmdir debian/python3-breezy-dbg/usr/man/man1 \
+		  debian/python3-breezy-dbg/usr/man
+
+override_dh_auto_missing:
+	dh_missing
+
+override_dh_auto_build:
+	dh_auto_build
+	PYTHONHASHSEED=0 $(MAKE) docs-sphinx
+
+override_dh_compress:
+	dh_compress -X.xvg -X.pdf
+
+override_dh_strip:
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+	dh_strip -ppython3-breezy
+endif
+
+override_dh_link:
+	# symlink identical resources.
+	( cd debian/brz-doc/usr/share/doc && fdupes -o name -r1q . | while read s; do \
+	      set -- $$(echo $$s | tr ' ' '\n' | sort); \
+	      f=$$1; shift; \
+	      for d; do \
+		  ln -sf /usr/share/doc/"$$d" "$$f"; \
+	      done; \
+	done )
+	dh_link
+
+override_dh_sphinxdoc:
+ifneq "$(shell dh_listpackages | grep -- -doc)" ""
+	dh_sphinxdoc -X searchtools.js
+endif
+	# dh_sphinxdoc chokes if we delete the extra licence files before it runs.
+	find debian/brz-doc/usr/share/doc/brz -name "licence.txt" -print | xargs rm -f

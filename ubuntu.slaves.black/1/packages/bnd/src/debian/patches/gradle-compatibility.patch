@@ -1,0 +1,1540 @@
+Description: Fixes the compatibility with the version of Gradle in Debian
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/TestOSGi.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/TestOSGi.groovy
+@@ -44,7 +44,7 @@
+ import org.gradle.api.tasks.Input
+ import org.gradle.api.tasks.OutputDirectory
+ import org.gradle.api.tasks.Optional
+-import org.gradle.api.tasks.options.Option
++import org.gradle.api.internal.tasks.options.Option
+ 
+ public class TestOSGi extends Bndrun {
+   private List<String> tests
+--- a/build.gradle
++++ b/build.gradle
+@@ -35,10 +35,10 @@
+   if (plugins.hasPlugin('biz.aQute.bnd')) {
+     group bnd('-groupid')
+     version bnd('base.version')
+-    tasks.withType(JavaCompile).configureEach {
++    tasks.withType(JavaCompile) {
+       options.compilerArgs.add('-Xlint:unchecked')
+     }
+-    tasks.named('javadoc') {
++    javadoc {
+       options.tags = [
+         'Immutable:t:',
+         'ThreadSafe:t:',
+@@ -46,8 +46,7 @@
+         'GuardedBy:mf:"Guarded By:"'
+       ]
+     }
+-    tasks.named('test') {
+-      useJUnitPlatform()
++    test {
+       testLogging {
+         exceptionFormat 'full'
+       }
+@@ -105,11 +104,11 @@
+   }
+ }
+ 
+-tasks.named('wrapper') {
++wrapper {
+   jarFile = rootProject.file('.gradle-wrapper/gradle-wrapper.jar')
+ }
+ 
+-tasks.register('buildscriptDependencies') {
++task buildscriptDependencies {
+   doLast {
+     println "bnd_plugin: ${bnd_plugin}"
+     println "bnd_repourl: ${bnd_repourl}"
+--- a/biz.aQute.bndlib.tests/build.gradle
++++ b/biz.aQute.bndlib.tests/build.gradle
+@@ -1,11 +1,11 @@
+-tasks.named('compileTestJava') {
++compileTestJava {
+   options.compilerArgs.add '-parameters'
+ }
+ 
+-tasks.named('test') {
++test {
+   // set heap size for the test JVM(s)
+   minHeapSize = "1024m"
+   maxHeapSize = "2048m"
+   // Some test's depend upon `-dependson` which are `jar` task dependencies.
+-  inputs.files tasks.named('jar')
++  inputs.files tasks.getByName('jar')
+ }
+--- a/dist/build.gradle
++++ b/dist/build.gradle
+@@ -8,25 +8,25 @@
+ configure(parent) {
+   layout.buildDirectory.set(buildProject.layout.buildDirectory)
+ 
+-  def build = tasks.register(bnd_defaultTask) {
+-    dependsOn buildProject.absoluteProjectPath('jarDependencies')
+-    dependsOn buildProject.absoluteProjectPath('checkDependencies')
+-    dependsOn buildProject.absoluteProjectPath('releaseNeeded')
++  task build {
++    dependsOn "${buildProject.path}:jarDependencies"
++    dependsOn "${buildProject.path}:checkDependencies"
++    dependsOn "${buildProject.path}:releaseNeeded"
+     description "Assembles, tests and releases the ${buildProject.name} project."
+     group 'build'
+   }
+   defaultTasks = [absoluteProjectPath(build.name)]
+ }
+ 
+-tasks.named('checkDependencies') {
++checkDependencies {
+   mustRunAfter 'jarDependencies'
+ }
+ 
+-tasks.named('releaseDependencies') {
++releaseDependencies {
+   mustRunAfter 'jarDependencies', 'checkDependencies'
+ }
+ 
+-tasks.named('clean') {
++clean {
+   File releaserepo = file(bnd('releaserepo', 'bundles')) /* Release repository. */
+   delete releaserepo
+ }
+--- a/maven/build.gradle
++++ b/maven/build.gradle
+@@ -8,9 +8,9 @@
+ }
+ def dist = parent.project(bnd_build)
+ 
+-def deploy = tasks.register('deploy', Exec.class) {
++def deploy = task deploy(type:Exec) {
+   def releaserepo = uri(bnd('releaserepo', dist.file('bundles'))) /* Release repository. */
+-  dependsOn dist.tasks.named('releaseDependencies')
++  dependsOn dist.releaseDependencies
+   if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+     executable 'cmd'
+     args '/c', rootProject.file('mvnw.cmd')
+@@ -30,7 +30,7 @@
+   args 'deploy'
+ }
+ 
+-def deployOSSRH = tasks.register('deployOSSRH', Exec.class) {
++def deployOSSRH = task deployOSSRH(type:Exec) {
+   enabled !bnd('-releaserepo.ossrh', '').empty
+   onlyIf {
+     def state = deploy.get().state
+@@ -60,7 +60,7 @@
+   finalizedBy deployOSSRH
+ }
+ 
+-def deployJFrog = tasks.register('deployJFrog', Exec.class) {
++def deployJFrog = task deployJFrog(type:Exec) {
+   enabled !bnd('-releaserepo.jfrog', '').empty
+   onlyIf {
+     def state = deploy.get().state
+@@ -90,7 +90,7 @@
+   finalizedBy deployJFrog
+ }
+ 
+-tasks.named('clean') {
++clean {
+   doFirst {
+     exec {
+       if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+--- a/org.bndtools.p2/build.gradle
++++ b/org.bndtools.p2/build.gradle
+@@ -11,13 +11,13 @@
+                           bnd('timestamp'),
+                           bnd('Git-SHA'))
+ 
+-def p2Plugins = tasks.register('p2Plugins', Sync.class) {
++def p2Plugins = task p2Plugins(type:Sync) {
+   dependsOn 'jarDependencies'
+   from    bnd('plugins').tokenize(',')
+   into    project.layout.buildDirectory.dir('plugins')
+ }
+ 
+-def p2FeatureProperties = tasks.register('p2FeatureProperties', WriteProperties.class) {
++def p2FeatureProperties = task p2FeatureProperties(type:WriteProperties) {
+   inputs.files p2Plugins
+   outputFile = project.layout.buildDirectory.file('feature.properties')
+   doFirst {
+@@ -30,10 +30,10 @@
+   }
+ }
+ 
+-def p2FeatureMain = tasks.register('p2FeatureMain', Zip.class) {
++def p2FeatureMain = task p2FeatureMain(type:Zip) {
+   inputs.files p2FeatureProperties
+-  destinationDirectory = project.layout.buildDirectory.dir('features')
+-  archiveFileName = 'bndtools.main.feature.jar'
++  destinationDir = file("${buildDir}/features")
++  archiveName = 'bndtools.main.feature.jar'
+   from             'features/bndtools.main'
+   include          'feature.xml'
+   doFirst {
+@@ -46,10 +46,10 @@
+   }
+ }
+ 
+-def p2FeatureM2e = tasks.register('p2FeatureM2e', Zip.class) {
++def p2FeatureM2e = task p2FeatureM2e(type:Zip) {
+   inputs.files p2FeatureProperties
+-  destinationDirectory = project.layout.buildDirectory.dir('features')
+-  archiveFileName    = 'bndtools.m2e.feature.jar'
++  destinationDir = file("${buildDir}/features")
++  archiveName    = 'bndtools.m2e.feature.jar'
+   from             'features/bndtools.m2e'
+   include          'feature.xml'
+   doFirst {
+@@ -62,10 +62,10 @@
+   }
+ }
+ 
+-def p2FeaturePde = tasks.register('p2FeaturePde', Zip.class) {
++def p2FeaturePde = task p2FeaturePde(type:Zip) {
+   inputs.files p2FeatureProperties
+-  destinationDirectory = project.layout.buildDirectory.dir('features')
+-  archiveFileName    = 'bndtools.pde.feature.jar'
++  destinationDir = file("${buildDir}/features")
++  archiveName    = 'bndtools.pde.feature.jar'
+   from             'features/bndtools.pde'
+   include          'feature.xml'
+   doFirst {
+@@ -78,13 +78,13 @@
+   }
+ }
+ 
+-def p2 = tasks.register('p2') {
++def p2 = task p2 {
+   description 'Publish the p2 repositories.'
+   group       'release'
+   enabled JavaVersion.current().isJava8()
+   inputs.files p2Plugins, p2FeatureMain, p2FeatureM2e, p2FeaturePde, 'p2.xml', 'features/category.xml'
+-  ext.destinationDirectory = project.layout.buildDirectory.dir('p2')
+-  outputs.dir destinationDirectory
++  ext.destinationDir = file("${buildDir}/p2")
++  outputs.dir destinationDir
+   doLast {
+     def eclipseDir = file('eclipse-3.5.2')
+     javaexec {
+@@ -118,7 +118,7 @@
+       args '-data'
+       args file(project.layout.buildDirectory)
+       args '-metadataRepository'
+-      args uri(destinationDirectory)
++      args uri(destinationDir)
+       args '-categoryDefinition'
+       args uri('features/category.xml')
+       args '-compress'
+@@ -132,11 +132,11 @@
+   }
+ }
+ 
+-tasks.named('jar') {
++jar {
+   inputs.files p2
+ }
+ 
+-tasks.named('release') {
++release {
+   onlyIf {
+     JavaVersion.current().isJava8()
+   }
+--- a/biz.aQute.bnd.gradle/build.gradle
++++ b/biz.aQute.bnd.gradle/build.gradle
+@@ -10,13 +10,13 @@
+ }
+ 
+ if (JavaVersion.current().isJava9Compatible()) {
+-    tasks.withType(GroovyCompile.class).configureEach {
++    tasks.withType(GroovyCompile) {
+         groovyOptions.fork 'jvmArgs': jpmsOptions
+     }
+ }
+ 
+-tasks.named('test') {
+-    inputs.files tasks.named('jar')
++test {
++    dependsOn 'jar'
+     systemProperty 'bnd_version', bnd('bnd_version')
+     def source = project.file('testresources')
+     def target = project.layout.buildDirectory.dir('testresources')
+@@ -29,7 +29,7 @@
+     }
+ }
+ 
+-tasks.named('testClasses') {
++testClasses {
+     def pluginClasspath = { project.files(configurations.runtimeClasspath.allArtifacts.files, 
+        configurations.runtimeClasspath.resolvedConfiguration.files) }
+     inputs.files(pluginClasspath).withPropertyName('pluginClasspath')
+@@ -44,6 +44,6 @@
+     }
+ }
+ 
+-tasks.named('release') {
++release {
+   dependsOn 'groovydoc'
+ }
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Baseline.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Baseline.groovy
+@@ -8,19 +8,17 @@
+  * Here is an example of using the Baseline task type:
+  * <pre>
+  * import aQute.bnd.gradle.Baseline
++ * apply plugin: 'java'
+  * configurations {
+  *   baseline
+  * }
+  * dependencies {
+- *     baseline('group': group, 'name': jar.archiveBaseName) {
+- *       version {
+- *         strictly "(0,${jar.archiveVersion.get()}["
+- *       }
++ *     baseline('group': group, 'name': jar.baseName, 'version': "(,${jar.version})") {
+  *       transitive false
+  *     }
+  *   }
+  * }
+- * tasks.register('baseline', Baseline) {
++ * task baseline(type: Baseline) {
+  *   bundle jar
+  *   baseline configurations.baseline
+  * }
+@@ -64,26 +62,17 @@
+ import org.gradle.api.Task
+ import org.gradle.api.artifacts.Configuration
+ import org.gradle.api.file.ConfigurableFileCollection
+-import org.gradle.api.file.DirectoryProperty
+-import org.gradle.api.file.RegularFile
+-import org.gradle.api.model.ReplacedBy
+-import org.gradle.api.provider.ListProperty
+-import org.gradle.api.provider.Provider
+ import org.gradle.api.tasks.Input
+ import org.gradle.api.tasks.InputFile
+-import org.gradle.api.tasks.Internal
++import org.gradle.api.tasks.Optional
+ import org.gradle.api.tasks.OutputFile
+ import org.gradle.api.tasks.TaskAction
+-import org.gradle.api.tasks.TaskProvider
+ 
+ public class Baseline extends DefaultTask {
+   private ConfigurableFileCollection bundleCollection
+   private ConfigurableFileCollection baselineCollection
+-  private final ListProperty<String> diffignore
+-  private final ListProperty<String> diffpackages
+-  private final DirectoryProperty baselineReportDirectory
+-  private final Provider<RegularFile> reportFile
+-  private String baselineReportDirName
++  private List<String> diffignore = []
++  private List<String> diffpackages = []
+ 
+   /**
+    * Whether baseline failures should be ignored.
+@@ -94,7 +83,17 @@
+    * <code>false</code>.
+    */
+   @Input
+-  boolean ignoreFailures = false
++  boolean ignoreFailures
++
++  /**
++   * The name of the baseline reports directory.
++   *
++   * <p>
++   * Can be a name or a path relative to <code>ReportingExtension.getBaseDir()</code>.
++   * The default name is 'baseline'.
++   */
++  @Input
++  String baselineReportDirName
+ 
+   /**
+    * Create a Baseline task.
+@@ -102,15 +101,8 @@
+    */
+   public Baseline() {
+     super()
++    ignoreFailures = false
+     baselineReportDirName = 'baseline'
+-    baselineReportDirectory = project.objects.directoryProperty().convention(project.reporting.baseDirectory.dir(baselineReportDirName))
+-    reportFile = baselineReportDirectory.file(project.provider({ ->
+-      String bundlename = project.file(getBundle()).name
+-      bundlename = bundlename[0..Math.max(-1, bundlename.lastIndexOf('.') - 1)]
+-      return "${name}/${bundlename}.txt"
+-    }))
+-    diffignore = project.objects.listProperty(String.class).empty()
+-    diffpackages = project.objects.listProperty(String.class).empty()
+     bundleCollection = project.files()
+     baselineCollection = project.files()
+     dependsOn {
+@@ -119,20 +111,6 @@
+   }
+ 
+   /**
+-   * Return the bundle File to be baselined.
+-   *
+-   * <p>
+-   * An exception will be thrown if the set bundle does
+-   * not result in exactly one file.
+-   */
+-  @InputFile
+-  public Provider<RegularFile> getBundle() {
+-    return project.layout.file(project.provider({ ->
+-      return bundleCollection.singleFile
+-    }))
+-  }
+-
+-  /**
+    * Set the bundle to be baselined.
+    *
+    * <p>
+@@ -145,17 +123,15 @@
+   }
+ 
+   /**
+-   * Get the baseline bundle File.
++   * Return the bundle File to be baselined.
+    *
+    * <p>
+-   * An exception will be thrown if the baseline argument does
++   * An exception will be thrown if the set bundle does
+    * not result in exactly one file.
+    */
+   @InputFile
+-  public Provider<RegularFile> getBaseline() {
+-    return project.layout.file(project.provider({ ->
+-      return baselineCollection.singleFile
+-    }))
++  public File getBundle() {
++    return bundleCollection.singleFile
+   }
+ 
+   /**
+@@ -170,11 +146,23 @@
+   }
+ 
+   /**
+-   * Return the diffignore values.
++   * Get the baseline bundle File.
++   *
++   * <p>
++   * An exception will be thrown if the baseline argument does
++   * not result in exactly one file.
+    */
+-  @Input
+-  public ListProperty<String> getDiffignore() {
+-    return this.diffignore
++  @InputFile
++  public File getBaseline() {
++    return baselineCollection.singleFile
++  }
++
++  /**
++   * Returns a file pointing to the baseline reporting directory.
++   */
++  public File getBaselineReportDir() {
++    File dir = new File(baselineReportDirName)
++    return dir.absolute ? dir : project.reporting.file(dir.path)
+   }
+ 
+   /**
+@@ -187,16 +175,17 @@
+   /**
+    * Set the diffignore values.
+    */
+-  public void setDiffignore(Iterable<String> diffignore) {
+-    this.diffignore.set(diffignore)
++  public void setDiffignore(List<String> diffignore) {
++    this.diffignore = diffignore
+   }
+ 
+   /**
+-   * Return the diffpackages values.
++   * Return the diffignore values.
+    */
+   @Input
+-  public ListProperty<String> getDiffpackages() {
+-    return this.diffpackages
++  @Optional
++  public List<String> getDiffignore() {
++    return diffignore
+   }
+ 
+   /**
+@@ -209,64 +198,36 @@
+   /**
+    * Set the diffpackages values.
+    */
+-  public void setDiffpackages(Iterable<String> diffpackages) {
+-    this.diffpackages.set(diffpackages)
++  public void setDiffpackages(List<String> diffpackages) {
++    this.diffpackages = diffpackages
++  }
++
++  /**
++   * Return the diffpackages values.
++   */
++  @Input
++  @Optional
++  public List<String> getDiffpackages() {
++    return diffpackages
+   }
+ 
+-  @Internal('Used by baseline configuration')
+   Task getBundleTask() {
+     return bundleCollection.getBuiltBy().flatten().findResult { t ->
+-      if (t instanceof TaskProvider) {
+-        t = t.get()
+-      }
+       t instanceof Task && t.convention.findPlugin(BundleTaskConvention.class) ? t : null
+     }
+   }
+-
+-  @Internal('Used internally')
+   ConfigurableFileCollection getBundleCollection() {
+     return bundleCollection
+   }
+-
+-  @Internal('Used internally')
+   ConfigurableFileCollection getBaselineCollection() {
+     return baselineCollection
+   }
+ 
+-  /**
+-   * The baseline reports directory.
+-   */
+-  @Internal('Represented by reportFile')
+-  public DirectoryProperty getBaselineReportDirectory() {
+-    return baselineReportDirectory
+-  }
+-
+-  /**
+-   * The name of the baseline reports directory.
+-   *
+-   * <p>
+-   * Can be a name or a path relative to <code>ReportingExtension.getBaseDirectory()</code>.
+-   * The default name is 'baseline'.
+-   */
+-  @Internal('Represented by reportFile')
+-  public String getBaselineReportDirName() {
+-    return baselineReportDirName
+-  }
+-
+-  public void setBaselineReportDirName(String baselineReportDirName) {
+-    this.baselineReportDirName = baselineReportDirName
+-    baselineReportDirectory.set(project.reporting.baseDirectory.dir(baselineReportDirName))
+-  }
+-
+   @OutputFile
+-  public Provider<RegularFile> getReportFile() {
+-    return reportFile
+-  }
+-
+-  @Deprecated
+-  @ReplacedBy('reportFile')
+   public File getDestination() {
+-    return project.file(getReportFile())
++    String bundlename = bundle.name
++    bundlename = bundlename[0..Math.max(-1, bundlename.lastIndexOf('.') - 1)]
++    return new File(baselineReportDir, "${name}/${bundlename}.txt")
+   }
+ 
+   /**
+@@ -275,9 +236,7 @@
+    */
+   @TaskAction
+   void baselineBundle() {
+-    File bundle = project.file(getBundle())
+-    File baseline = project.file(getBaseline())
+-    File report = project.file(getReportFile())
++    File report = destination
+     project.mkdir(report.parent)
+     boolean failure = false
+     new Processor().withCloseable { Processor processor ->
+@@ -288,9 +247,9 @@
+       logger.debug 'Baseline bundle {} against baseline {}', bundle, baseline
+ 
+       def differ = new DiffPluginImpl()
+-      differ.setIgnore(new Parameters(getDiffignore().get().join(','), processor))
++      differ.setIgnore(new Parameters(diffignore.join(','), processor))
+       def baseliner = new aQute.bnd.differ.Baseline(processor, differ)
+-      def infos = baseliner.baseline(newer, older, new Instructions(new Parameters(getDiffpackages().get().join(','), processor))).sort {it.packageName}
++      def infos = baseliner.baseline(newer, older, new Instructions(new Parameters(diffpackages.join(','), processor))).sort {it.packageName}
+       def bundleInfo = baseliner.getBundleInfo()
+       new Formatter(report, 'UTF-8', Locale.US).withCloseable { Formatter f ->
+         f.format '===============================================================%n'
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndUtils.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndUtils.groovy
+@@ -9,11 +9,9 @@
+ import org.gradle.api.Buildable
+ import org.gradle.api.Project
+ import org.gradle.api.Task
+-import org.gradle.api.attributes.LibraryElements
+ import org.gradle.api.file.ConfigurableFileCollection
+ import org.gradle.api.file.FileSystemLocation
+ import org.gradle.api.provider.Provider
+-import org.gradle.api.tasks.TaskProvider
+ import org.gradle.api.logging.Logger
+ import org.gradle.util.GradleVersion
+ 
+@@ -48,7 +46,7 @@
+   @CompileStatic
+   public static ConfigurableFileCollection builtBy(ConfigurableFileCollection collection, Object... paths) {
+     return collection.builtBy(paths.findAll { path ->
+-      path instanceof Task || path instanceof TaskProvider || path instanceof Buildable
++      path instanceof Task || path instanceof Buildable
+     })
+   }
+ 
+@@ -64,16 +62,5 @@
+   }
+ 
+   public static void jarLibraryElements(Project project, String configurationName) {
+-    if (IS_GRADLE_COMPATIBLE_5_6) {
+-      def attributes = project.configurations[configurationName].attributes
+-      if (attributes.getAttribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE)?.name != LibraryElements.JAR) {
+-        try {
+-          attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, project.objects.named(LibraryElements.class, LibraryElements.JAR))
+-          project.logger.info 'Set {}:{} configuration attribute {} to {}', project.path, configurationName, LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, attributes.getAttribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE)
+-        } catch (IllegalArgumentException e) {
+-          project.logger.info 'Unable to set {}:{} configuration attribute {} to {}', project.path, configurationName, LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, LibraryElements.JAR, e
+-        }
+-      }
+-    }
+   }
+ }
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Bndrun.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Bndrun.groovy
+@@ -45,7 +45,6 @@
+ import org.gradle.api.file.DirectoryProperty
+ import org.gradle.api.file.RegularFile
+ import org.gradle.api.file.RegularFileProperty
+-import org.gradle.api.model.ReplacedBy
+ import org.gradle.api.provider.Provider
+ import org.gradle.api.tasks.Input
+ import org.gradle.api.tasks.InputFile
+@@ -64,8 +63,8 @@
+   @Input
+   boolean ignoreFailures = false
+ 
+-  private final RegularFileProperty bndrunProperty
+-  private final DirectoryProperty workingDirectory
++  private File workingDir
++  private File bndrun
+   private final def bndWorkspace
+ 
+   /**
+@@ -74,10 +73,6 @@
+    */
+   public Bndrun() {
+     super()
+-    bndrunProperty = project.objects.fileProperty()
+-    DirectoryProperty temporaryDirProperty = project.objects.directoryProperty()
+-    temporaryDirProperty.set(temporaryDir)
+-    workingDirectory = project.objects.directoryProperty().convention(temporaryDirProperty)
+     bndWorkspace = project.findProperty('bndWorkspace')
+     if (bndWorkspace == null) {
+       convention.plugins.bundles = new FileSetRepositoryConvention(this)
+@@ -89,8 +84,8 @@
+    *
+    */
+   @InputFile
+-  public Provider<RegularFile> getBndrun() {
+-    return bndrunProperty
++  public File getBndrun() {
++    return bndrun
+   }
+ 
+   /**
+@@ -101,29 +96,17 @@
+    * Project.file().
+    */
+   public void setBndrun(Object file) {
+-    bndrunProperty.set(project.layout.file(project.provider({ ->
+-      return project.file(file)
+-    })))
+-  }
+-
+-  /**
+-   * The working directory for the execution.
+-   *
+-   */
+-  @Internal
+-  public DirectoryProperty getWorkingDirectory() {
+-    return workingDirectory
++    bndrun = project.file(file)
+   }
+ 
+   @Deprecated
+-  @ReplacedBy('workingDirectory')
+   public File getWorkingDir() {
+-    return project.file(getWorkingDirectory())
++    return workingDir ?: temporaryDir
+   }
+ 
+   @Deprecated
+   public void setWorkingDir(Object dir) {
+-    getWorkingDirectory().set(project.file(dir))
++    workingDir = project.file(dir)
+   }
+ 
+   /**
+@@ -132,22 +115,20 @@
+   @TaskAction
+   void bndrun() {
+     def workspace = bndWorkspace
+-    File bndrunFile = project.file(getBndrun())
+-    File workingDirFile = project.file(getWorkingDirectory())
+-    if ((workspace != null) && project.plugins.hasPlugin(BndPlugin.PLUGINID) && (bndrunFile == project.bnd.project.getPropertiesFile())) {
++    if ((workspace != null) && project.plugins.hasPlugin(BndPlugin.PLUGINID) && (bndrun == project.bnd.project.getPropertiesFile())) {
+       worker(project.bnd.project)
+       return
+     }
+-    createRun(workspace, bndrunFile).withCloseable { run ->
++    createRun(workspace, bndrun).withCloseable { run ->
+       def runWorkspace = run.getWorkspace()
+-      project.mkdir(workingDirFile)
++      project.mkdir(workingDir)
+       if (workspace == null) {
+         Properties gradleProperties = new PropertiesWrapper(runWorkspace.getProperties())
+         gradleProperties.put('task', this)
+         gradleProperties.put('project', project)
+         run.setParent(new Processor(runWorkspace, gradleProperties, false))
+       }
+-      run.setBase(workingDirFile)
++      run.setBase(workingDir)
+       if (run.isStandalone()) {
+         runWorkspace.setOffline(workspace != null ? workspace.isOffline() : project.gradle.startParameter.offline)
+         File cnf = new File(workingDirFile, Workspace.CNFDIR)
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Export.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Export.groovy
+@@ -8,11 +8,11 @@
+  * Here is examples of using the Export task type:
+  * <pre>
+  * import aQute.bnd.gradle.Export
+- * tasks.register('exportExecutable', Export) {
++ * task exportExecutable(type: Export) {
+  *   bndrun file('my.bndrun')
+  *   exporter = 'bnd.executablejar'
+  * }
+- * tasks.register('exportRunbundles', Export) {
++ * task exportRunbundles(type: Export) {
+  *   bndrun file('my.bndrun')
+  *   exporter = 'bnd.runbundles'
+  * }
+@@ -29,13 +29,13 @@
+  * -runbundles files. The default is 'bnd.executablejar'.</li>
+  * <li>bndrun - This is the bndrun file to be exported.
+  * This property must be set.</li>
+- * <li>destinationDirectory - This is the directory for the output.
+- * The default for destinationDirectory is project.distsDirectory.dir('executable')
+- * if the exporter is 'bnd.executablejar', project.distsDirectory.dir('runbundles'/bndrun)
+- * if the exporter is 'bnd.runbundles', and project.distsDirectory.dir(task.name)
++ * <li>destinationDir - This is the directory for the output.
++ * The default for destinationDir is project.distsDir/'executable'
++ * if the exporter is 'bnd.executablejar', project.distsDir/'runbundles'/bndrun
++ * if the exporter is 'bnd.runbundles', and project.distsDir/task.name
+  * for all other exporters.</li>
+- * <li>workingDirectory - This is the directory for the export operation.
+- * The default for workingDirectory is temporaryDir.</li>
++ * <li>workingDir - This is the directory for the export operation.
++ * The default for workingDir is temporaryDir.</li>
+  * <li>bundles - This is the collection of files to use for locating
+  * bundles during the bndrun execution. The default is
+  * 'sourceSets.main.runtimeClasspath' plus
+@@ -52,12 +52,8 @@
+ import aQute.lib.io.IO
+ 
+ import org.gradle.api.GradleException
+-import org.gradle.api.file.Directory
+-import org.gradle.api.file.DirectoryProperty
+-import org.gradle.api.model.ReplacedBy
+-import org.gradle.api.provider.Property
+-import org.gradle.api.provider.Provider
+ import org.gradle.api.tasks.Input
++import org.gradle.api.tasks.Optional
+ import org.gradle.api.tasks.OutputDirectory
+ 
+ public class Export extends Bndrun {
+@@ -74,8 +70,8 @@
+   @Input
+   boolean bundlesOnly = false
+ 
+-  private final DirectoryProperty destinationDirectory
+-  private final Property<String> exporterProperty
++  private File destinationDir
++  private String exporter
+ 
+   /**
+    * Create a Export task.
+@@ -83,51 +79,43 @@
+    */
+   public Export() {
+     super()
+-    exporterProperty = project.objects.property(String.class).convention(project.provider({ ->
+-      return bundlesOnly ? RUNBUNDLES : EXECUTABLE_JAR
+-    }))
+-    Provider<Directory> distsDirectory = project.hasProperty('distsDirectory') ? project.distsDirectory : // Gradle 6.0
+-      project.layout.buildDirectory.dir(project.provider({ ->
+-        return project.distsDirName
+-      }))
+-    destinationDirectory = project.objects.directoryProperty().convention(distsDirectory.flatMap({ distsDir ->
+-      return distsDir.dir(getExporter().map({ exporterName ->
+-        if (exporterName == EXECUTABLE_JAR) {
+-          return 'executable'
+-        }
+-        if (exporterName == RUNBUNDLES) {
+-          File bndrunFile = project.file(getBndrun())
+-          String bndrunName = bndrunFile.name - '.bndrun'
+-          return "runbundles/${bndrunName}"
+-        }
+-        return exporterName
+-      }))
+-    }))
+   }
+ 
+   /**
+    * Return the destination directory for the export.
+    *
+    * <p>
+-   * The default for destinationDirectory is project.distsDirectory.dir('executable')
+-   * if the exporter is 'bnd.executablejar', project.distsDirectory.dir('runbundles'/bndrun)
+-   * if the exporter is 'bnd.runbundles', and project.distsDirectory.dir(task.name)
++   * The default for destinationDir is project.distsDir/'executable'
++   * if the exporter is 'bnd.executablejar', project.distsDir/'runbundles'/bndrun
++   * if the exporter is 'bnd.runbundles', and project.distsDir/exporter
+    * for all other exporters.
+    */
+   @OutputDirectory
+-  public DirectoryProperty getDestinationDirectory() {
+-    return destinationDirectory
+-  }
+-
+-  @Deprecated
+-  @ReplacedBy('destinationDirectory')
+   public File getDestinationDir() {
+-    return project.file(getDestinationDirectory())
++    if (destinationDir != null) {
++      return destinationDir
++    }
++    String exporterName = getExporter()
++    if (exporterName == RUNBUNDLES) {
++      String bndrunName = bndrun.name - '.bndrun'
++      destinationDir = new File(project.distsDir, "runbundles/${bndrunName}")
++    } else if (exporterName == EXECUTABLE_JAR) {
++      destinationDir = new File(project.distsDir, 'executable')
++    } else {
++      destinationDir = new File(project.distsDir, exporterName)
++    }
++    return destinationDir
+   }
+ 
+-  @Deprecated
++  /**
++   * Set the destination directory for the export.
++   *
++   * <p>
++   * The argument will be handled using
++   * Project.file().
++   */
+   public void setDestinationDir(Object dir) {
+-    getDestinationDirectory().set(project.file(dir))
++    destinationDir = project.file(dir)
+   }
+ 
+   /**
+@@ -140,8 +128,12 @@
+    * bundlesOnly is false when the default is 'bnd.runbundles'.
+    */
+   @Input
+-  public Property<String> getExporter() {
+-    return exporterProperty
++  @Optional
++  public String getExporter() {
++    if (exporter == null) {
++      exporter = bundlesOnly ? RUNBUNDLES : EXECUTABLE_JAR
++    }
++    return exporter
+   }
+ 
+   /**
+@@ -156,7 +148,7 @@
+    * installed exporter plugin.
+    */
+   public void setExporter(String exporter) {
+-    exporterProperty.convention(exporter).set(exporter)
++    this.exporter = exporter
+   }
+ 
+   /**
+@@ -164,18 +156,16 @@
+    */
+   @Override
+   protected void worker(def run) {
+-    String exporterName = getExporter().get()
+-    File destinationDirFile = project.file(getDestinationDirectory())
+-    logger.info 'Exporting {} to {} with exporter {}', run.getPropertiesFile(), destinationDirFile, exporterName
++    logger.info 'Exporting {} to {} with exporter {}', run.getPropertiesFile(), destinationDir, exporter
+     try {
+-      def export = run.export(exporterName, [:])
+-      if (exporterName == RUNBUNDLES) {
++      def export = run.export(exporter, [:])
++      if (exporter == RUNBUNDLES) {
+         export?.value.withCloseable { jr ->
+-          jr.getJar().writeFolder(destinationDirFile)
++          jr.getJar().writeFolder(destinationDir)
+         }
+       } else {
+         export?.value.withCloseable { r ->
+-          File exported = IO.getBasedFile(destinationDirFile, export.key)
++          File exported = IO.getBasedFile(destinationDir, export.key)
+           exported.withOutputStream { out ->
+             r.write(out)
+           }
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Index.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/Index.groovy
+@@ -54,7 +54,6 @@
+ import org.gradle.api.file.ConfigurableFileCollection
+ import org.gradle.api.file.DirectoryProperty
+ import org.gradle.api.file.RegularFile
+-import org.gradle.api.model.ReplacedBy
+ import org.gradle.api.provider.Property
+ import org.gradle.api.provider.Provider
+ import org.gradle.api.tasks.Input
+@@ -155,7 +154,6 @@
+   }
+ 
+   @Deprecated
+-  @ReplacedBy('destinationDirectory')
+   public File getDestinationDir() {
+     return project.file(getDestinationDirectory())
+   }
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndWorkspacePlugin.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndWorkspacePlugin.groovy
+@@ -177,7 +177,7 @@
+       Project cnfProject = findProject(bnd_cnf)
+       if (cnfProject != null) {
+         ext.cnf = cnfProject
+-        cnfProject.tasks.register('cleanCache', Delete.class) { t ->
++        cnfProject.getTasks().create('cleanCache', Delete.class) { t ->
+           t.description 'Clean the cache folder.'
+           t.group 'build'
+           t.delete 'cache'
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndPlugin.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndPlugin.groovy
+@@ -105,7 +105,7 @@
+           resources.srcDirs = srcDirs
+           java.outputDir = destinationDir
+           output.resourcesDir = destinationDir
+-          tasks.named(compileJavaTaskName) { t ->
++          tasks.getByName(compileJavaTaskName) { t ->
+             t.destinationDir = destinationDir
+           }
+           output.dir(destinationDir, builtBy: compileJavaTaskName)
+@@ -118,7 +118,7 @@
+           resources.srcDirs = srcDirs
+           java.outputDir = destinationDir
+           output.resourcesDir = destinationDir
+-          tasks.named(compileJavaTaskName) { t ->
++          tasks.getByName(compileJavaTaskName) { t ->
+             t.destinationDir = destinationDir
+           }
+           output.dir(destinationDir, builtBy: compileJavaTaskName)
+@@ -135,7 +135,7 @@
+                 File destinationDir = java.outputDir
+                 String compileTaskName = getCompileTaskName(lang)
+                 try {
+-                  tasks.named(compileTaskName) { t ->
++                  tasks.getByName(compileTaskName) { t ->
+                     t.destinationDir = destinationDir
+                   }
+                   sourceDirSet.srcDirs = java.srcDirs
+@@ -154,7 +154,7 @@
+                 File destinationDir = java.outputDir
+                 String compileTaskName = getCompileTaskName(lang)
+                 try {
+-                  tasks.named(compileTaskName) { t ->
++                  tasks.getByName(compileTaskName) { t ->
+                     t.destinationDir = destinationDir
+                   }
+                   sourceDirSet.srcDirs = java.srcDirs
+@@ -191,7 +191,7 @@
+       boolean javacDebug = bndis('javac.debug')
+       boolean javacDeprecation = isTrue(bnd('javac.deprecation', 'true'))
+       String javacEncoding = bnd('javac.encoding', 'UTF-8')
+-      tasks.withType(JavaCompile.class).configureEach { t ->
++      tasks.withType(JavaCompile) { t ->
+         configure(t.options) {
+           if (javacDebug) {
+             debugOptions.debugLevel = 'source,lines,vars'
+@@ -234,12 +234,12 @@
+         }
+       }
+ 
+-      def jar = tasks.named('jar') { t ->
++      def jar = tasks.getByName('jar') { t ->
+         t.description 'Jar this project\'s bundles.'
+         t.actions.clear() /* Replace the standard task actions */
+         t.enabled !bndProject.isNoBundles()
+         project.configurations.archives.artifacts.files.find {
+-          t.archiveFileName = it.name /* use first artifact as archiveFileName */
++          t.archiveName = it.name /* use first artifact as archiveFileName */
+         }
+         /* Additional excludes for projectDir inputs */
+         t.ext.projectDirInputsExcludes = Strings.split(bndMerge(Constants.BUILDERIGNORE)).collect { it.concat('/') }
+@@ -287,27 +287,27 @@
+         }
+       }
+ 
+-      def jarDependencies = tasks.register('jarDependencies') { t ->
++      def jarDependencies = tasks.create('jarDependencies') { t ->
+         t.description 'Jar all projects this project depends on.'
+         t.dependsOn getBuildDependencies('jar')
+         t.group 'build'
+       }
+ 
+-      def buildDependencies = tasks.register('buildDependencies') { t ->
++      def buildDependencies = tasks.create('buildDependencies') { t ->
+         t.description 'Assembles and tests all projects this project depends on.'
+         t.dependsOn getTestDependencies('buildNeeded')
+         t.group 'build'
+       }
+ 
+-      def buildNeeded = tasks.named('buildNeeded') { t ->
++      def buildNeeded = tasks.getByName('buildNeeded') { t ->
+         t.dependsOn buildDependencies
+       }
+ 
+-      def buildDependents = tasks.named('buildDependents') { t ->
++      def buildDependents = tasks.getByName('buildDependents') { t ->
+         t.dependsOn getDependents('buildDependents')
+       }
+ 
+-      def release = tasks.register('release') { t ->
++      def release = tasks.create('release') { t ->
+         t.description 'Release this project to the release repository.'
+         t.group 'release'
+         t.enabled !bndProject.isNoBundles() && !bnd(Constants.RELEASEREPO, 'unset').empty
+@@ -322,26 +322,26 @@
+         }
+       }
+ 
+-      def releaseDependencies = tasks.register('releaseDependencies') { t ->
++      def releaseDependencies = tasks.create('releaseDependencies') { t ->
+         t.description 'Release all projects this project depends on.'
+         t.dependsOn getBuildDependencies('releaseNeeded')
+         t.group 'release'
+       }
+ 
+-      def releaseNeeded = tasks.register('releaseNeeded') { t ->
++      def releaseNeeded = tasks.create('releaseNeeded') { t ->
+         t.description 'Release this project and all projects it depends on.'
+         t.dependsOn releaseDependencies, release
+         t.group 'release'
+       }
+ 
+-      def test = tasks.named('test') { t ->
++      def test = tasks.getByName('test') { t ->
+         t.enabled !bndis(Constants.NOJUNIT) && !bndis('no.junit')
+         t.doFirst {
+           checkErrors(t.logger, t.ignoreFailures)
+         }
+       }
+ 
+-      def testOSGi = tasks.register('testOSGi', TestOSGi.class) { t ->
++      def testOSGi = tasks.create('testOSGi', TestOSGi.class) { t ->
+         t.description 'Runs the OSGi JUnit tests by launching a framework and running the tests in the launched framework.'
+         t.group 'verification'
+         t.enabled !bndis(Constants.NOJUNITOSGI) && !bndUnprocessed(Constants.TESTCASES, '').empty
+@@ -349,34 +349,34 @@
+         t.bndrun = bndProject.getPropertiesFile()
+       }
+ 
+-      def check = tasks.named('check') { t ->
++      def check = tasks.getByName('check') { t ->
+         t.dependsOn testOSGi
+       }
+ 
+-      def checkDependencies = tasks.register('checkDependencies') { t ->
++      def checkDependencies = tasks.create('checkDependencies') { t ->
+         t.description 'Runs all checks on all projects this project depends on.'
+         t.dependsOn getTestDependencies('checkNeeded')
+         t.group 'verification'
+       }
+ 
+-      def checkNeeded = tasks.register('checkNeeded') { t ->
++      def checkNeeded = tasks.create('checkNeeded') { t ->
+         t.description 'Runs all checks on this project and all projects it depends on.'
+         t.dependsOn checkDependencies, check
+         t.group 'verification'
+       }
+ 
+-      def clean = tasks.named('clean') { t ->
++      def clean = tasks.getByName('clean') { t ->
+         t.description 'Cleans the build and compiler output directories of this project.'
+         t.delete project.layout.buildDirectory, project.sourceSets.main.output, project.sourceSets.test.output
+       }
+ 
+-      def cleanDependencies = tasks.register('cleanDependencies') { t ->
++      def cleanDependencies = tasks.create('cleanDependencies') { t ->
+         t.description 'Cleans all projects this project depends on.'
+         t.dependsOn getTestDependencies('cleanNeeded')
+         t.group 'build'
+       }
+ 
+-      def cleanNeeded = tasks.register('cleanNeeded') { t ->
++      def cleanNeeded = tasks.create('cleanNeeded') { t ->
+         t.description 'Cleans this project and all projects it depends on.'
+         t.dependsOn cleanDependencies, clean
+         t.group 'build'
+@@ -386,61 +386,61 @@
+           include '*.bndrun'
+       }
+ 
+-      def export = tasks.register('export') { t ->
++      def export = tasks.create('export') { t ->
+         t.description 'Export all the bndrun files.'
+         t.group 'export'
+       }
+ 
+       bndruns.forEach { runFile ->
+-        def subtask = tasks.register("export.${runFile.name - '.bndrun'}", Export.class) { t ->
++        def subtask = tasks.create("export.${runFile.name - '.bndrun'}", Export.class) { t ->
+           t.description "Export the ${runFile.name} file."
+           t.dependsOn 'assemble'
+           t.group 'export'
+           t.bndrun = runFile
+           t.exporter = EXECUTABLE_JAR
+         }
+-        tasks.named('export') { t ->
++        tasks.getByName('export') { t ->
+           t.dependsOn subtask
+         }
+       }
+ 
+-      def runbundles = tasks.register('runbundles') { t ->
++      def runbundles = tasks.create('runbundles') { t ->
+         t.description 'Create a distribution of the runbundles in each of the bndrun files.'
+         t.group 'export'
+       }
+ 
+       bndruns.forEach { runFile ->
+-        def subtask = tasks.register("runbundles.${runFile.name - '.bndrun'}", Export.class) { t ->
++        def subtask = tasks.create("runbundles.${runFile.name - '.bndrun'}", Export.class) { t ->
+           t.description "Create a distribution of the runbundles in the ${runFile.name} file."
+           t.dependsOn 'assemble'
+           t.group 'export'
+           t.bndrun = runFile
+           t.exporter = RUNBUNDLES
+         }
+-        tasks.named('runbundles') { t ->
++        tasks.getByName('runbundles') { t ->
+           t.dependsOn subtask
+         }
+       }
+ 
+-      def resolve = tasks.register('resolve') { t ->
++      def resolve = tasks.create('resolve') { t ->
+         t.description 'Resolve the runbundles required for each of the bndrun files.'
+         t.group 'export'
+       }
+ 
+       bndruns.forEach { runFile ->
+-        def subtask = tasks.register("resolve.${runFile.name - '.bndrun'}", Resolve.class) { t ->
++        def subtask = tasks.create("resolve.${runFile.name - '.bndrun'}", Resolve.class) { t ->
+           t.description "Resolve the runbundles required for ${runFile.name} file."
+           t.dependsOn 'assemble'
+           t.group 'export'
+           t.bndrun = runFile
+         }
+-        tasks.named('resolve') { t ->
++        tasks.getByName('resolve') { t ->
+           t.dependsOn subtask
+         }
+       }
+ 
+       bndruns.forEach { runFile ->
+-        tasks.register("run.${runFile.name - '.bndrun'}", Bndrun.class) { t ->
++        tasks.create("run.${runFile.name - '.bndrun'}", Bndrun.class) { t ->
+           t.description "Run the bndrun file ${runFile.name}."
+           t.dependsOn 'assemble'
+           t.group 'export'
+@@ -449,7 +449,7 @@
+       }
+ 
+       bndruns.forEach { runFile ->
+-        tasks.register("testrun.${runFile.name - '.bndrun'}", TestOSGi.class) { t ->
++        tasks.create("testrun.${runFile.name - '.bndrun'}", TestOSGi.class) { t ->
+           t.description "Runs the OSGi JUnit tests in the bndrun file ${runFile.name}."
+           t.dependsOn 'assemble'
+           t.group 'verification'
+@@ -457,7 +457,7 @@
+         }
+       }
+ 
+-      def echo = tasks.register('echo') { t ->
++      def echo = tasks.create('echo') { t ->
+         t.description 'Displays the bnd project information.'
+         t.group 'help'
+         def compileJava = tasks.getByName('compileJava')
+@@ -491,7 +491,7 @@
+         }
+       }
+ 
+-      def bndproperties = tasks.register('bndproperties') { t ->
++      def bndproperties = tasks.create('bndproperties') { t ->
+         t.description 'Displays the bnd properties.'
+         t.group 'help'
+         t.doLast {
+@@ -523,7 +523,7 @@
+   private Closure getBuildDependencies(String taskName) {
+     return {
+       bndProject.getBuildDependencies().collect { dependency ->
+-        project.parent.project(dependency.getName()).tasks.named(taskName)
++        project.parent.project(dependency.getName()).tasks.getByName(taskName)
+       }
+     }
+   }
+@@ -531,7 +531,7 @@
+   private Closure getTestDependencies(String taskName) {
+     return {
+       bndProject.getTestDependencies().collect { dependency ->
+-        project.parent.project(dependency.getName()).tasks.named(taskName)
++        project.parent.project(dependency.getName()).tasks.getByName(taskName)
+       }
+     }
+   }
+@@ -539,7 +539,7 @@
+   private Closure getDependents(String taskName) {
+     return {
+       bndProject.getDependents().collect { dependent ->
+-        project.parent.project(dependent.getName()).tasks.named(taskName)
++        project.parent.project(dependent.getName()).tasks.getByName(taskName)
+       }
+     }
+   }
+--- a/biz.aQute.bnd.runtime/build.gradle
++++ b/biz.aQute.bnd.runtime/build.gradle
+@@ -1,4 +1,4 @@
+-tasks.named('test') {
++test {
+   // Depend upon output dir to avoid parallel test execution
+   // This effectively claims the resource and prevents
+   // other test tasks claiming the same resource from
+--- a/biz.aQute.bndall.tests/build.gradle
++++ b/biz.aQute.bndall.tests/build.gradle
+@@ -1,4 +1,4 @@
+-tasks.named('test') {
++test {
+   // Depend upon output dir to avoid parallel test execution
+   // This effectively claims the resource and prevents
+   // other test tasks claiming the same resource from
+--- a/biz.aQute.launchpad/build.gradle
++++ b/biz.aQute.launchpad/build.gradle
+@@ -1,4 +1,4 @@
+-tasks.named('test') {
++test {
+   // Depend upon output dir to avoid parallel test execution
+   // This effectively claims the resource and prevents
+   // other test tasks claiming the same resource from
+--- a/biz.aQute.tester.test/build.gradle
++++ b/biz.aQute.tester.test/build.gradle
+@@ -1,4 +1,4 @@
+-tasks.named('test') {
++test {
+   // Depend upon output dir to avoid parallel test execution
+   // This effectively claims the resource and prevents
+   // other test tasks claiming the same resource from
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndBuilderPlugin.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BndBuilderPlugin.groovy
+@@ -48,7 +48,7 @@
+       }
+       plugins.apply 'java'
+ 
+-      def jar = tasks.named('jar') { t ->
++      def jar = tasks.getByName('jar') { t ->
+         t.description 'Assembles a bundle containing the main classes.'
+         t.convention.plugins.bundle = new BundleTaskConvention(t)
+         RegularFile defaultBndfile = project.layout.projectDirectory.file('bnd.bnd')
+@@ -74,7 +74,7 @@
+         }
+       }
+ 
+-      tasks.register('baseline', Baseline.class) { t ->
++      tasks.create('baseline', Baseline.class) { t ->
+         t.description 'Baseline the project bundle.'
+         t.group 'release'
+         t.bundle jar
+@@ -85,8 +85,8 @@
+         Task baselineTask = tasks.getByName('baseline')
+         Task bundleTask = baselineTask.getBundleTask()
+         if (bundleTask) {
+-          String archiveBaseName = unwrap(bundleTask.archiveBaseName)
+-          String archiveVersion = unwrap(bundleTask.archiveVersion)
++          String archiveBaseName = unwrap(bundleTask.baseName)
++          String archiveVersion = unwrap(bundleTask.version)
+           logger.debug 'Searching for default baseline {}:{}:(0,{}[', group, archiveBaseName, archiveVersion
+           Dependency baselineDep = dependencies.create('group': group, 'name': archiveBaseName) {
+             version {
+--- a/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BundleTaskConvention.groovy
++++ b/biz.aQute.bnd.gradle/src/aQute/bnd/gradle/BundleTaskConvention.groovy
+@@ -23,10 +23,8 @@
+ 
+ package aQute.bnd.gradle
+ 
+-import static aQute.bnd.gradle.BndUtils.builtBy
+-import static aQute.bnd.gradle.BndUtils.jarLibraryElements
+ import static aQute.bnd.gradle.BndUtils.logReport
+-import static aQute.bnd.gradle.BndUtils.unwrap
++import static aQute.bnd.gradle.BndUtils.builtBy
+ 
+ import java.util.Properties
+ import java.util.jar.Manifest
+@@ -41,13 +39,10 @@
+ import aQute.bnd.version.MavenVersion
+ import aQute.lib.utf8properties.UTF8Properties
+ import org.gradle.api.GradleException
+-import org.gradle.api.Project
+-import org.gradle.api.Task
+ import org.gradle.api.file.ConfigurableFileCollection
+-import org.gradle.api.file.RegularFileProperty
+ import org.gradle.api.logging.Logger
+-import org.gradle.api.provider.ListProperty
+-import org.gradle.api.provider.Provider
++import org.gradle.api.Project
++import org.gradle.api.Task
+ import org.gradle.api.tasks.Input
+ import org.gradle.api.tasks.InputFile
+ import org.gradle.api.tasks.InputFiles
+@@ -57,9 +52,8 @@
+ class BundleTaskConvention {
+   private final Task task
+   private final Project project
+-  private final RegularFileProperty bndfile
+-  private final ListProperty<CharSequence> instructions
+-  private final Provider<String> bndbnd
++  private File bndfile
++  private final StringBuilder instructions
+   private final ConfigurableFileCollection classpathCollection
+   private boolean classpathModified
+   private SourceSet sourceSet
+@@ -74,18 +68,14 @@
+   BundleTaskConvention(org.gradle.api.tasks.bundling.Jar task) {
+     this.task = task
+     this.project = task.project
+-    bndfile = project.objects.fileProperty()
+-    instructions = project.objects.listProperty(CharSequence.class).empty()
+-    bndbnd = instructions.map({ list ->
+-      return list.join('\n')
+-    })
++    instructions = new StringBuilder()
+     classpathCollection = project.files()
+     setSourceSet(project.sourceSets.main)
+     classpathModified = false
+     // need to programmatically add to inputs since @InputFiles in a convention is not processed
+     task.inputs.files(classpathCollection).withPropertyName('classpath')
+-    task.inputs.file(getBndfile()).optional().withPropertyName('bndfile')
+-    task.inputs.property('bnd', getBnd())
++    task.inputs.file({ getBndfile() }).optional().withPropertyName('bndfile')
++    task.inputs.property('bnd', { getBnd() })
+   }
+ 
+   /**
+@@ -95,7 +85,7 @@
+    */
+   @InputFile
+   @Optional
+-  public RegularFileProperty getBndfile() {
++  public File getBndfile() {
+     return bndfile
+   }
+   /**
+@@ -106,9 +96,7 @@
+    * Project.file().
+    */
+   public void setBndfile(Object file) {
+-    bndfile.set(project.layout.file(project.provider({ ->
+-      return project.file(file)
+-    })))
++    bndfile = project.file(file)
+   }
+ 
+   /**
+@@ -119,15 +107,15 @@
+    */
+   @Input
+   @Optional
+-  public Provider<String> getBnd() {
+-    return bndbnd
++  public String getBnd() {
++    return instructions.toString()
+   }
+ 
+   /**
+    * Set the bnd property from a multi-line string.
+    */
+   public void setBnd(CharSequence line) {
+-     instructions.empty()
++     instructions.length = 0
+      bnd(line)
+   }
+ 
+@@ -135,14 +123,16 @@
+    * Add instuctions to the bnd property from a list of multi-line strings.
+    */
+   public void bnd(CharSequence... lines) {
+-    instructions.addAll(lines)
++    lines.each { line ->
++      instructions.append(line).append('\n')
++    }
+   }
+ 
+   /**
+    * Set the bnd property from a map.
+    */
+   public void setBnd(Map<String, ?> map) {
+-     instructions.empty()
++     instructions.length = 0
+      bnd(map)
+   }
+ 
+@@ -150,9 +140,9 @@
+    * Add instuctions to the bnd property from a map.
+    */
+   public void bnd(Map<String, ?> map) {
+-    map.each({ key, value ->
+-      instructions.add("${key}=${value}")
+-    })
++    map.each { key, value ->
++      instructions.append(key).append('=').append(value).append('\n')
++    }
+   }
+ 
+   /**
+@@ -194,7 +184,6 @@
+    */
+   public void setSourceSet(SourceSet sourceSet) {
+     this.sourceSet = sourceSet
+-    jarLibraryElements(project, sourceSet.compileClasspathConfigurationName)
+     if (!classpathModified) {
+       setClasspath(sourceSet.compileClasspath)
+       classpathModified = false
+@@ -220,16 +209,12 @@
+           }.replaceHere(project.projectDir).store(writer, null)
+ 
+           // if the bnd file exists, add its contents to the tmp bnd file
+-          File bndfile = getBndfile().getOrNull()?.getAsFile()
+           if (bndfile?.isFile()) {
+             builder.loadProperties(bndfile).store(writer, null)
+-          } else {
+-            String bnd = getBnd().get()
+-            if (!bnd.empty) {
+-              UTF8Properties props = new UTF8Properties()
+-              props.load(bnd, project.buildFile, builder)
+-              props.replaceHere(project.projectDir).store(writer, null)
+-            }
++          } else if (!bnd.empty) {
++            UTF8Properties props = new UTF8Properties()
++            props.load(bnd, project.buildFile, builder)
++            props.replaceHere(project.projectDir).store(writer, null)
+           }
+         }
+         builder.setProperties(temporaryBndFile, project.projectDir) // this will cause project.dir property to be set
+@@ -245,18 +230,18 @@
+           throw new GradleException('Sub-bundles are not supported by this task')
+         }
+ 
+-        File archiveFile = unwrap(task.archiveFile)
+-        String archiveFileName = unwrap(task.archiveFileName)
+-        String archiveBaseName = unwrap(task.archiveBaseName)
+-        String archiveVersion = unwrap(task.archiveVersion)
++        // Gradle 5.1 deprecates Jar task properties
++        File archivePath = task.hasProperty('archiveFile') ? task.archiveFile.get().asFile : task.archivePath
++        String archiveName = task.hasProperty('archiveFileName') ? task.archiveFileName.get() : task.archiveName
++        String version = task.hasProperty('archiveVersion') ? task.archiveVersion.get() : task.version
+ 
+         // Include entire contents of Jar task generated jar (except the manifest)
+         project.copy {
+-          from archiveFile
++          from archivePath
+           into temporaryDir
+         }
+-        File archiveCopyFile = new File(temporaryDir, archiveFileName)
+-        Jar bundleJar = new Jar(archiveFileName, archiveCopyFile)
++        File archiveCopyFile = new File(temporaryDir, archiveName)
++        Jar bundleJar = new Jar(archiveName, archiveCopyFile)
+         String reproducible = builder.getProperty(Constants.REPRODUCIBLE)
+         bundleJar.setReproducible((reproducible != null) ? Processor.isTrue(reproducible) : !task.preserveFileTimestamps)
+         bundleJar.updateModified(archiveCopyFile.lastModified(), 'time of Jar task generated jar')
+@@ -264,7 +249,7 @@
+         builder.setJar(bundleJar)
+ 
+         // set builder classpath
+-        ConfigurableFileCollection buildpath = project.files(getClasspath().files.findAll { File file ->
++        ConfigurableFileCollection buildpath = project.files(classpath.files.findAll { File file ->
+           if (!file.exists()) {
+             return false
+           }
+@@ -285,22 +270,22 @@
+         logger.debug 'builder classpath: {}', builder.getClasspath()*.getSource()
+ 
+         // set builder sourcepath
+-        ConfigurableFileCollection sourcepath = project.files(getSourceSet().allSource.srcDirs.findAll{it.exists()})
++        ConfigurableFileCollection sourcepath = project.files(sourceSet.allSource.srcDirs.findAll{it.exists()})
+         builder.setProperty('project.sourcepath', sourcepath.asPath)
+         builder.setSourcepath(sourcepath.files as File[])
+         logger.debug 'builder sourcepath: {}', builder.getSourcePath()
+ 
+ 
+-        // set bundle symbolic name from tasks's archiveBaseName property if necessary
++        // set bundle symbolic name from tasks's baseName property if necessary
+         String bundleSymbolicName = builder.getProperty(Constants.BUNDLE_SYMBOLICNAME)
+         if (isEmpty(bundleSymbolicName)) {
+-          builder.setProperty(Constants.BUNDLE_SYMBOLICNAME, archiveBaseName)
++          builder.setProperty(Constants.BUNDLE_SYMBOLICNAME, baseName)
+         }
+ 
+-        // set bundle version from task's archiveVersion if necessary
++        // set bundle version from task's version if necessary
+         String bundleVersion = builder.getProperty(Constants.BUNDLE_VERSION)
+         if (isEmpty(bundleVersion)) {
+-          builder.setProperty(Constants.BUNDLE_VERSION, MavenVersion.parseMavenString(archiveVersion).getOSGiVersion().toString())
++          builder.setProperty(Constants.BUNDLE_VERSION, MavenVersion.parseMavenString(version?.toString()).getOSGiVersion().toString())
+         }
+ 
+         logger.debug 'builder properties: {}', builder.getProperties()
+@@ -310,24 +295,24 @@
+         if (!builder.isOk()) {
+           // if we already have an error; fail now
+           logReport(builder, logger)
+-          failTask("Bundle ${archiveFileName} has errors", archiveFile)
++          failBuild("Bundle ${archiveName} has errors", archivePath)
+         }
+ 
+         // Write out the bundle
+-        builtJar.write(archiveFile)
++        builtJar.write(archivePath)
+         long now = System.currentTimeMillis()
+-        archiveFile.setLastModified(now)
++        archivePath.setLastModified(now)
+ 
+         logReport(builder, logger)
+         if (!builder.isOk()) {
+-          failTask("Bundle ${archiveFileName} has errors", archiveFile)
++          failBuild("Bundle ${archiveName} has errors", archivePath)
+         }
+       }
+     }
+   }
+ 
+-  private void failTask(String msg, File archiveFile) {
+-    project.delete(archiveFile)
++  private void failBuild(String msg, File archivePath) {
++    project.delete(archivePath)
+     throw new GradleException(msg)
+   }
+ 
