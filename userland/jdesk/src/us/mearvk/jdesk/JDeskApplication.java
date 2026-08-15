@@ -160,11 +160,13 @@ public class JDeskApplication extends Application {
             {"Settings",  "settings"},
             {"Terminal",  "terminal"},
             {"IDE",       "ide"},
+            {"VSCodium",  "vscodium"},
             {"Browser",   "browser"},
             {"Writer",    "writer"},
             {"Files",     "files"},
             {"Software",  "software"},
             {"Launcher",  "launcher"},
+            {"Kali",      "kali"},
         };
 
         int col = 0, row = 0;
@@ -172,7 +174,7 @@ public class JDeskApplication extends Application {
             VBox cell = createIconCell(entry[0], entry[1], jdeskIcon);
             grid.add(cell, col, row);
             col++;
-            if (col >= 4) { col = 0; row++; }
+            if (col >= 5) { col = 0; row++; }
         }
 
         // Enable drag-to-reorder on the grid

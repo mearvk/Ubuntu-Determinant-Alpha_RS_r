@@ -2900,6 +2900,46 @@ New processes receive 1/8 of the arena (37.5 MB) pre-faulted:
 | Double-free | Block header state flag (ALLOCATED / FREE) checked before free |
 | Thread safety | Spinlock on allocation path, per-tier free lists |
 | Grid alignment | Cache-line aligned (64 bytes) — satisfies Integrity Guardian 1:1/1:2 |
+| Intensification tracking | Falling decay memory detects and throttles pressure-driving processes |
+
+### Intensification Concern — Falling Decay Memory (Clear-in-3)
+
+Tracks processes that drive further memory pressure beyond normal allocation. Uses a falling decay score that clears automatically in 3 intervals if the process goes quiet.
+
+**Mechanism:** Each intensification event increments a score (0–255). Every 10 seconds, the score decays by × 2/3 (integer division). With the clear threshold at 3, any typical score clears to zero within 3 decay intervals if no further pressure occurs:
+
+```
+Score 10:   10 → 6 → 4 → 2 (CLEAR at interval 3)
+Score  8:    8 → 5 → 3 → 2 (CLEAR at interval 3)
+Score  5:    5 → 3 → 2 → 1 (CLEAR at interval 2)
+Score  3:    3 → 2 → 1 → 0 (CLEAR at interval 1)
+```
+
+**Scaled Response:**
+
+| Score | Level | Response |
+|-------|-------|----------|
+| 0-2 | CLEAR | Normal allocation, no concern |
+| 3-7 | WATCH | Allocations logged, soft priority reduction |
+| 8-15 | CONCERN | New allocations from decay tiers only |
+| 16-31 | THROTTLE | Allocations rate-limited (yield between calls) |
+| 32+ | RESTRICT | Hard deny from primary tiers, decay-only service |
+
+**Intensification Triggers:**
+
+| Event | Weight | Cause |
+|-------|--------|-------|
+| Soft concern | +1 | Tier 1 exceeds 80% occupancy |
+| Tier exhaustion | +2 | All priority-order tiers (4,3,1,2) full |
+| Hard denial | +3 | All tiers including decay are full |
+| Fork pressure | +5 | Fork/exec inherits parent's high-pressure pool |
+
+**Design principle:** The system is proportional. A process that briefly bursts and goes quiet clears in 30 seconds (3 × 10s). A process that continuously drives pressure accumulates score and faces escalating restriction. The system rewards quiescence and penalizes sustained abuse.
+
+```bash
+# View intensification state in proc
+cat /proc/arena_pool/status    # Shows per-arena intensity level and score
+```
 
 ### Savings Brush
 
@@ -3403,6 +3443,7 @@ modules/fiduciary/documents/            - SQL documents (minister facts, legal b
 
 | Date | Change |
 |------|--------|
+| 2026-08-15 | Added Arena Pool: Intensification Concern — Falling Decay Memory (Clear-in-3) |
 | 2026-08-12 | Listed as Dead by Max Rupplin is Jack Rupplin |
 | 2026-08-12 | Added Secure JVM: INT Loading Structure (4-tier inferrer & orderer) |
 | 2026-08-03 | Added FiduciaryServices ACH Transfer API (C + Java, 5 platforms) |

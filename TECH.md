@@ -222,7 +222,155 @@ Startup order:   1/8 upfront → (2, 3, 1, 2) → decay tiers
 
 ---
 
-### 10. Constants
+### 10. Intensification Concern — Falling Decay Memory (Clear-in-3)
+
+A proportional, time-decaying response to processes that drive sustained memory pressure beyond normal allocation patterns.
+
+#### The Problem
+
+Without intensification tracking, a badly-behaved process can:
+- Repeatedly exhaust primary tiers, forcing compaction on every allocation
+- Drive other processes into decay tiers unnecessarily
+- Fork-bomb its way to arena extension, consuming USB-backed virtual memory
+- Cause system-wide pressure through sustained churn
+
+The solution must be **proportional** (brief bursts forgiven, sustained abuse restricted) and **self-healing** (clears automatically when the process goes quiet).
+
+#### Mechanism
+
+Each arena carries an `intensity` struct with a score (0–255). Events that indicate memory pressure increment the score by their weight. Every 10 seconds, a decay timer multiplies the score by 2/3 (integer division, floors toward zero).
+
+**Clear-in-3 Property:**
+
+For any score N ≤ 10, the integer decay reaches zero within 3 intervals:
+
+```
+Interval 0:  score = N
+Interval 1:  score = ⌊N × 2/3⌋
+Interval 2:  score = ⌊⌊N × 2/3⌋ × 2/3⌋
+Interval 3:  score = ⌊⌊⌊N × 2/3⌋ × 2/3⌋ × 2/3⌋  →  < 3 (threshold)  →  CLEAR
+```
+
+Worked examples:
+```
+N=10:  10 → 6 → 4 → 2  (clear at interval 3)
+N= 8:   8 → 5 → 3 → 2  (clear at interval 3)
+N= 5:   5 → 3 → 2 → 1  (clear at interval 2-3)
+N= 3:   3 → 2 → 1 → 0  (clear at interval 1-2)
+N=32:  32 → 21 → 14 → 9 → 6 → 4 → 2  (clear at interval 6)
+```
+
+Higher scores (sustained abuse) take proportionally longer to clear. This is by design — the system remembers persistent offenders longer.
+
+#### Event Weights
+
+| Event | Weight | Triggered When |
+|-------|--------|----------------|
+| `ARENA_INTENSITY_SOFT_CONCERN` | +1 | Tier 1 occupancy exceeds 80% |
+| `ARENA_INTENSITY_TIER_EXHAUST` | +2 | All priority-order tiers (4,3,1,2) full |
+| `ARENA_INTENSITY_HARD_DENY` | +3 | All tiers including decay are exhausted |
+| `ARENA_INTENSITY_FORK_PRESSURE` | +5 | Fork/exec inherits parent's high-pressure arena |
+
+#### Response Levels
+
+| Score Range | Level | Allocation Response |
+|-------------|-------|---------------------|
+| 0–2 | CLEAR | Normal service via priority order (4,3,1,2) |
+| 3–7 | WATCH | Normal service + allocation logged |
+| 8–15 | CONCERN | Skip primary tiers; serve from decay tiers only |
+| 16–31 | THROTTLE | Yield (cpu_relax) before each allocation; decay tiers only |
+| 32–255 | RESTRICT | Hard deny from primary tiers; decay-only if available |
+
+#### Integration into arena_malloc()
+
+```c
+void *arena_malloc(struct arena_pool *pool, size_t size)
+{
+    int gate = arena_intensity_check_alloc(pool, size);
+
+    if (gate == 2) {
+        /* THROTTLE: yield before proceeding */
+        cpu_relax();
+    }
+
+    if (gate <= 0 && gate != -1) {
+        /* Normal path: try (4, 3, 1, 2) */
+        for (...)
+            if ((ptr = try_alloc_tier(pool, tier, size)))
+                return ptr;
+        /* Exhausted — record intensification */
+        arena_intensity_event(pool, ARENA_INTENSITY_TIER_EXHAUST);
+    }
+
+    /* Concern/Throttle/Restrict: decay tiers only */
+    for (tier = 5; tier < num_tiers; tier++)
+        if ((ptr = try_alloc_tier(pool, tier, size)))
+            return ptr;
+
+    /* Total failure */
+    arena_intensity_event(pool, ARENA_INTENSITY_HARD_DENY);
+    return NULL;
+}
+```
+
+#### Decay Timer
+
+The `arena_intensity_decay()` function is called every `ARENA_INTENSITY_INTERVAL_S` (10s) by a kernel timer or monitoring thread:
+
+```c
+void arena_intensity_decay(struct arena_pool *pool)
+{
+    pool->intensity.score = pool->intensity.score * 2 / 3;
+
+    if (pool->intensity.score < ARENA_INTENSITY_CLEAR_THRESHOLD) {
+        pool->intensity.score = 0;
+        pool->intensity.level = ARENA_LEVEL_CLEAR;
+        pool->flags &= ~(ARENA_F_INTENSIFIED | ARENA_F_THROTTLED);
+    }
+}
+```
+
+#### Procfs Visibility
+
+```bash
+cat /proc/arena_pool/status
+```
+
+Output includes per-arena intensification state:
+```
+  Arena [0] PID 1234
+    Intensity:   score=4  level=WATCH  peak=12
+    Events:      17 total (6 soft, 8 exhaust, 3 deny)
+    Decay:       14 passes since last event
+    Cleared:     3 times (lifetime)
+    Throttled:   0 allocations delayed
+    Restricted:  0 allocations denied
+```
+
+#### Design Philosophy
+
+The intensification system is a **memory for misbehavior** that heals itself. It is:
+
+- **Proportional:** Small burst → forgiven in 30s. Sustained abuse → longer restriction.
+- **Self-healing:** No admin intervention needed. Clear-in-3 is automatic.
+- **Non-destructive:** Never kills a process. Only restricts allocation paths.
+- **Observable:** Full telemetry via `/proc/arena_pool/status`.
+- **Integrated:** Wired directly into `arena_malloc()` — zero overhead at CLEAR level.
+
+#### Mathematical Summary
+
+```
+decay(score) = ⌊score × 2/3⌋           (applied every 10s)
+clear_threshold = 3                      (score < 3 → CLEAR)
+clear_time(N) ≈ ⌈log₃/₂(N/3)⌉ × 10s   (time to clear from score N)
+clear_time(10) = 3 intervals = 30s
+clear_time(32) = 6 intervals = 60s
+clear_time(255) = 14 intervals = 140s   (worst case: sustained max abuse)
+```
+
+---
+
+### 11. Constants
 
 ```c
 #define ARENA_SIZE_MB        300
@@ -235,20 +383,34 @@ Startup order:   1/8 upfront → (2, 3, 1, 2) → decay tiers
 #define CANARY_WORD          0xDEADC0DEBEEFCAFE
 #define MAX_TIERS            16
 #define SOFT_CONCERN_THRESH  0.80                       //  80% occupancy
+
+// Intensification (Falling Decay Memory)
+#define INTENSITY_DECAY_NUM  2                          //  × 2/3 per interval
+#define INTENSITY_DECAY_DEN  3
+#define INTENSITY_INTERVAL_S 10                         //  10 seconds per decay pass
+#define INTENSITY_CLEAR      3                          //  below 3 = cleared
+#define INTENSITY_WATCH      3                          //  3-7:  watch
+#define INTENSITY_CONCERN    8                          //  8-15: concern
+#define INTENSITY_THROTTLE   16                         //  16-31: throttle
+#define INTENSITY_RESTRICT   32                         //  32+: restrict
+#define INTENSITY_MAX        255                        //  saturating ceiling
 ```
 
 ---
 
-### 11. Future Exploration
+### 12. Future Exploration
 
 - **Adaptive arena sizing:** Measure first 10 seconds of allocation behavior, resize arena dynamically
 - **NUMA-aware tiering:** Pin tiers to specific NUMA nodes on multi-socket systems
 - **Compression tiers:** Decay tiers 7+ use zswap-style compression before USB spill
 - **Formal verification:** Prove convergence and bounds via Coq/Lean theorem prover
 - **Dave prediction:** ML model predicts tier exhaustion 30s ahead, pre-extends
+- **Intensification correlation:** Cross-reference intensity scores with process ancestry to detect fork-bomb pressure chains
+- **Adaptive decay rate:** Adjust 2/3 factor based on system-wide memory pressure (faster decay under low load, slower under high)
 
 ---
 
-*Document version: 1.0 — 2026-08-15*
+*Document version: 1.1 — 2026-08-15*
 *Authority: Installer Tech 9 architectural document*
 *System: Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98*
+*Change: Added Section 10 — Intensification Concern (Falling Decay Memory, Clear-in-3)*
