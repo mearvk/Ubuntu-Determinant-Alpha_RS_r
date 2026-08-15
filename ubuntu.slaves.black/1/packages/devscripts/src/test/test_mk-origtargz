@@ -1,0 +1,750 @@
+#!/bin/bash
+
+# Copyright 2014, Rafael Laboissiere <rafael@laboissiere.net>
+# Copyright 2015, James McCoy <jamessan@debian.org>
+
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+# Public License for more details.
+#
+# On Debian systems, the complete text of the GNU General Public License
+# version 3 can be found in the /usr/share/common-licenses/GPL-3 file.
+
+set -u
+
+# Load GPG
+TESTTYPE=MkOrigTarGz
+. ./lib_test_uscan
+
+if test "${1:-}" = --installed; then
+    MK_ORIGTARGZ="mk-origtargz"
+    shift
+else
+    top_srcdir=$(readlink -f "${0%/*}/..")
+    make -C "$top_srcdir/scripts" mk-origtargz
+    MK_ORIGTARGZ="perl -I $top_srcdir/lib $top_srcdir/scripts/mk-origtargz"
+    PATH="$top_srcdir/scripts:$PATH"
+    export PATH
+    PERL5LIB="$top_srcdir/lib"
+    export PERL5LIB
+fi
+PROGNAME="mk-origtargz"
+
+LC_ALL=C
+export LC_ALL
+
+setUp () {
+	TMPDIR=$(mktemp -d -p "$SHUNIT_TMPDIR" test_mk-origtargz.XXXX)
+}
+
+
+makeSubDir () {
+	dir=$1
+	shift
+
+	mkdir -p "$TMPDIR/foo-0.1/$dir"
+	touch    "$TMPDIR/foo-0.1/$dir/a-file"
+	mkdir    "$TMPDIR/foo-0.1/$dir/a-subdir"
+	touch    "$TMPDIR/foo-0.1/$dir/a-subdir/a-file"
+}
+
+
+makeUpstreamFiles () {
+	mkdir -p "$TMPDIR/foo-0.1"
+	touch "$TMPDIR/foo-0.1/include-this-file"
+	touch "$TMPDIR/foo-0.1/exclude-this-file"
+	touch "$TMPDIR/foo-0.1/.include-this-hidden-file"
+	touch "$TMPDIR/foo-0.1/.exclude-this-hidden-file"
+
+	makeSubDir "include-this-dir"
+	makeSubDir "exclude-this-dir"
+	makeSubDir "exclude-dir1"
+	makeSubDir "exclude-dir2"
+	makeSubDir ".include-this-hidden-dir"
+	makeSubDir ".exclude-this-hidden-dir"
+	makeSubDir "a-dir/include-this-subdir"
+	# Expected not to be removed since exclusion is anchored to top-level
+	makeSubDir "a-dir/exclude-this-subdir"
+
+	touch "$TMPDIR/foo-0.1/; echo strange-file; #"
+
+}
+
+makeGolangLikeVendorFiles() {
+    makeSubDir "vendor"
+
+    mkdir -p "$TMPDIR/foo-0.1/vendor/includeme"
+    touch "$TMPDIR/foo-0.1/vendor/includeme/important.go"
+}
+
+makeTarBall () {
+	comp="$1"
+	mkgpg="${2:-none}"
+	makeUpstreamFiles
+	COMP="--auto-compress"
+	if [ "$comp" = "zst" ]; then
+		COMP=--zstd
+	fi
+	tar --create $COMP --file "$TMPDIR/foo-0.1.tar.$comp" --directory "$TMPDIR" foo-0.1
+	local gpgopts=(
+		chronic_sh $GPG
+		--homedir "$GPGHOME"
+		--no-options -q --batch --no-default-keyring
+		--secret-keyring "$PRIVATE_KEYRING"
+		--default-key 72544FAF
+		--detach-sign
+	)
+	case "$mkgpg" in
+		sig)
+			"${gpgopts[@]}" "$TMPDIR/foo-0.1.tar.$comp"
+			;;
+		asc)
+			"${gpgopts[@]}" --armor "$TMPDIR/foo-0.1.tar.$comp"
+			;;
+		none)
+			;;
+		*)
+			fail "unknown parameter in makeTarBall()"
+			;;
+	esac
+	rm -rf "$TMPDIR/foo-0.1"
+}
+makeSimpleTar () {
+       makeUpstreamFiles
+       tar --create --file "$TMPDIR/foo-0.1.tar" --directory "$TMPDIR" foo-0.1
+       rm -rf "$TMPDIR/foo-0.1"
+}
+makeBrokenTarBall () {
+	echo foo > foo.txt
+	tar cf - foo.txt | sed -e 's/^/foo/' | gzip > "$TMPDIR/foo-0.1.tar.gz"
+	rm -f foo.txt
+}
+
+makeZipFile () {
+	makeUpstreamFiles
+	(cd $TMPDIR >/dev/null; zip -q -r "foo-0.1.zip" foo-0.1 )
+	rm -rf "$TMPDIR/foo-0.1"
+}
+
+makeJarFile () {
+	makeUpstreamFiles
+	cat > "$TMPDIR/MANIFEST.MF" <<END
+Manifest-Version: 1.0
+Main-Class: foo.bar
+END
+	(cd $TMPDIR >/dev/null; jar cf "foo-0.1.jar" MANIFEST.MF foo-0.1 )
+	rm -rf "$TMPDIR/foo-0.1" "$TMPDIR/MANIFEST.MF"
+}
+
+makeDebianChangelog() {
+	mkdir -p $TMPDIR/foo/debian
+	cat <<END > $TMPDIR/foo/debian/changelog
+foo (0.1-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+}
+
+makeDebianOldDir() {
+	makeDebianChangelog
+}
+
+makeDebianDir() {
+	makeDebianChangelog
+	mkdir -p $TMPDIR/foo/debian/source
+	echo -n "3.0 (quilt)" > $TMPDIR/foo/debian/source/format
+}
+
+makeDebianCopyright() {
+    cat <<'END' > $TMPDIR/foo/debian/copyright
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files-Excluded: exclude-this*
+ .exclude-this*
+ exclude-dir1
+ exclude-dir2/
+ ;?echo?strange-file;?#
+END
+
+}
+
+makeWrongDebianCopyright() {
+    cat <<'END' > $TMPDIR/foo/debian/copyright
+Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=174
+Files-Excluded: exclude-this*
+ .exclude-this*
+ exclude-dir1
+ exclude-dir2/
+ ;?echo?strange-file;?#
+END
+
+}
+
+makeUnmatchedExcludeCopyright() {
+	cat <<'END' > $TMPDIR/foo/debian/copyright
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files-Excluded: exclude-this*
+ .exclude-this*
+ exclude-dir1
+ exclude-dir2
+ ;?echo?strange-file;?#
+ nomatch
+END
+}
+
+
+makeDuplicatePatternCopyright() {
+	cat <<'END' > $TMPDIR/foo/debian/copyright
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files-Excluded: exclude-this*
+ .exclude-this*
+ exclude-dir1
+ exclude-dir*
+ ;?echo?strange-file;?#
+END
+}
+
+expected_stderr_after_removal="mk-origtargz warn: Files-Excluded pattern (exclude-dir2/) should not have a trailing /"
+
+expected_files_after_removal=$(LC_ALL=C sort <<END
+foo-0.1/
+foo-0.1/a-dir/
+foo-0.1/a-dir/exclude-this-subdir/
+foo-0.1/a-dir/exclude-this-subdir/a-file
+foo-0.1/a-dir/exclude-this-subdir/a-subdir/
+foo-0.1/a-dir/exclude-this-subdir/a-subdir/a-file
+foo-0.1/a-dir/include-this-subdir/
+foo-0.1/a-dir/include-this-subdir/a-file
+foo-0.1/a-dir/include-this-subdir/a-subdir/
+foo-0.1/a-dir/include-this-subdir/a-subdir/a-file
+foo-0.1/include-this-dir/
+foo-0.1/include-this-dir/a-file
+foo-0.1/include-this-dir/a-subdir/
+foo-0.1/include-this-dir/a-subdir/a-file
+foo-0.1/include-this-file
+foo-0.1/.include-this-hidden-dir/
+foo-0.1/.include-this-hidden-dir/a-file
+foo-0.1/.include-this-hidden-dir/a-subdir/
+foo-0.1/.include-this-hidden-dir/a-subdir/a-file
+foo-0.1/.include-this-hidden-file
+END
+)
+
+run_mk_origtargz() {
+	local dir="$1"
+	local exp_stderr="$2"
+	local exp_stdout="$3"
+	local stderrF="${SHUNIT_TMPDIR}/stderr"
+	shift
+	shift
+	shift
+	output="$( cd $TMPDIR/$dir >/dev/null; LC_ALL=C $MK_ORIGTARGZ "$@" 2> $stderrF )"
+	stderr="$(cat $stderrF)"
+	retval=$?
+	assertEquals "standard output of mk-origtargz $*\n" "$exp_stdout" "$output"
+	assertEquals "error output of mk-origtargz $*\n" "$exp_stderr" "$stderr"
+	assertEquals "return valueof mk-origtargz $*\n" "0" "$retval"
+}
+
+assertType () {
+	mime="$1"
+	file="$2"
+	actual="$(file --brief --mime-type "$file" | sed -e 's,/x-,/,')"
+	assertEquals "filetype for $(basename "$file")" "$mime" "$actual"
+}
+
+
+testSymlink() {
+	makeTarBall gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully symlinked ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		../foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertEquals "final symlink" foo-0.1.tar.gz "$(readlink $TMPDIR/foo_0.1.orig.tar.gz)"
+}
+
+testSymlinkWithConvertedSig() {
+	makeTarBall gz sig
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully symlinked ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		--signature 1 --signature-file=../foo-0.1.tar.gz.sig \
+		../foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertEquals "final symlink" foo-0.1.tar.gz "$(readlink $TMPDIR/foo_0.1.orig.tar.gz)"
+	assertTrue "signature isn't valid" "$GPG --homedir '$GPGHOME' --verify $TMPDIR/foo_0.1.orig.tar.gz.asc"
+}
+
+testSymlinkWithArmoredSig() {
+	# MR for https://lists.debian.org/debian-devel/2019/04/msg00459.html
+	makeTarBall gz asc
+	# an armored signature, but with the wrong extension.
+	mv $TMPDIR/foo-0.1.tar.gz.asc $TMPDIR/foo-0.1.tar.gz.sig
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully symlinked ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		--signature 1 --signature-file=../foo-0.1.tar.gz.sig \
+		../foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertEquals "final symlink" foo-0.1.tar.gz "$(readlink $TMPDIR/foo_0.1.orig.tar.gz)"
+	assertTrue "signature isn't valid" "$GPG --homedir '$GPGHOME' --verify $TMPDIR/foo_0.1.orig.tar.gz.asc"
+}
+
+testCopy() {
+	makeTarBall gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully copied ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		--copy ../foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testRename() {
+	makeTarBall gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully renamed ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		--rename ../foo-0.1.tar.gz
+	assertFalse "original tarball does exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSymlinkExplicit() {
+	makeTarBall gz
+	run_mk_origtargz "" "" \
+		"Successfully symlinked foo-0.1.tar.gz to foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertEquals "final symlink" foo-0.1.tar.gz "$(readlink $TMPDIR/foo_0.1.orig.tar.gz)"
+}
+
+testCopyExplicit() {
+	makeTarBall gz
+	run_mk_origtargz "" "" \
+		"Successfully copied foo-0.1.tar.gz to foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testRenameExplicit() {
+	makeTarBall gz
+	run_mk_origtargz "" "" \
+		"Successfully renamed foo-0.1.tar.gz to foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --rename foo-0.1.tar.gz
+	assertFalse "original tarball does exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSymlinkExplicitSubdir() {
+	makeTarBall gz
+	mkdir -p $TMPDIR/destdir
+	run_mk_origtargz "" "" \
+		"Successfully symlinked foo-0.1.tar.gz to destdir/foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 -C destdir foo-0.1.tar.gz
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/destdir/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/destdir/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/destdir/foo_0.1.orig.tar.gz ]"
+	assertEquals "final symlink" ../foo-0.1.tar.gz "$(readlink $TMPDIR/destdir/foo_0.1.orig.tar.gz)"
+}
+
+testRepackGZ2GZ() {
+	makeTarBall gz
+	run_mk_origtargz "" "" \
+		"Successfully copied foo-0.1.tar.gz to foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.gz --repack --compression gzip
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+}
+
+testForceRepackGZ2XZ() {
+	makeTarBall gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.gz." \
+		--force-repack ../foo-0.1.tar.gz --compression gzip
+	assertTrue "original tarball does not exist" "[ -e $TMPDIR/foo-0.1.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not a file" "[ -f $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result is not readable" "[ -r $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testRepackGZ2XZ() {
+	makeTarBall gz
+	run_mk_origtargz "" ""\
+		"Successfully repacked foo-0.1.tar.gz as foo_0.1.orig.tar.xz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.gz --repack
+	assertFalse "wrong result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+
+testRepackXZ2GZ() {
+	makeTarBall xz
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.tar.xz as foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.xz --repack --compression gzip
+	assertFalse "wrong result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+}
+
+testRepackZST2XZRepackOpt() {
+	makeTarBall zst
+	run_mk_origtargz "" ""\
+		"Successfully repacked foo-0.1.tar.zst as foo_0.1.orig.tar.xz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.zst --repack
+	assertFalse "wrong result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.zst ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+
+testRepackZST2XZNoRepackOpt() {
+	makeTarBall zst
+	run_mk_origtargz "" ""\
+		"Successfully repacked foo-0.1.tar.zst as foo_0.1.orig.tar.xz." \
+		--package foo --version 0.1 --copy foo-0.1.tar.zst
+	assertFalse "wrong result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.zst ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+
+testRepackZST2ZSTFail() {
+	makeTarBall zst
+	run_mk_origtargz "" "mk-origtargz error: Bad value for compression: Unknown compression scheme zst"\
+		"" \
+		--package foo --version 0.1 --copy foo-0.1.tar.zst --compression zst
+	assertFalse "wrong result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.zst ]"
+	assertFalse "result does exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+}
+
+testRepackZip2GZ() {
+	makeZipFile
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.zip as foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --copy foo-0.1.zip --compression gzip
+	assertTrue "original zip file does not exist" "[ -e $TMPDIR/foo-0.1.zip ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+}
+
+testRepackJar2GZ() {
+	if ! command -v jar >/dev/null
+	then
+          # skip to avoid dependency on java-jdk
+	  return
+	fi
+	makeJarFile
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.jar as foo_0.1.orig.tar.gz." \
+		--package foo --version 0.1 --copy foo-0.1.jar --compression gzip
+	assertTrue "original zip file does not exist" "[ -e $TMPDIR/foo-0.1.jar ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+}
+
+testRepackZip2GZRename() {
+	makeZipFile
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.zip as foo_0.1.orig.tar.gz, and removed the original file." \
+		--package foo --version 0.1 --rename foo-0.1.zip --compression gzip
+	assertFalse "original zip file does exist" "[ -e $TMPDIR/foo-0.1.zip ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+}
+
+testRepackZip2XZ() {
+	makeZipFile
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.zip as foo_0.1.orig.tar.xz." \
+		--package foo --version 0.1 foo-0.1.zip
+	assertTrue "original zip file does not exist" "[ -e $TMPDIR/foo-0.1.zip ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+
+testRepackXpi2XZ() {
+	makeZipFile
+	mv $TMPDIR/foo-0.1.zip $TMPDIR/foo-0.1.xpi
+	run_mk_origtargz "" "" \
+		"Successfully repacked foo-0.1.xpi as foo_0.1.orig.tar.xz." \
+		--package foo --version 0.1 foo-0.1.xpi
+	assertTrue "original xpi file does not exist" "[ -e $TMPDIR/foo-0.1.xpi ]"
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+
+testRepackTAR2XZ() {
+       makeSimpleTar
+       run_mk_origtargz "" "" \
+               "Successfully repacked foo-0.1.tar as foo_0.1.orig.tar.xz." \
+               --package foo --version 0.1 --copy foo-0.1.tar --repack
+       assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+       assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+}
+testOldFormat() {
+	makeTarBall xz
+	makeDebianOldDir
+	makeDebianCopyright
+	run_mk_origtargz foo "mk-origtargz warn: Missing debian/source/format, switch compression to gzip
+$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.xz as ../foo_0.1.orig.tar.gz, deleting 19 files from it." \
+		 ../foo-0.1.tar.xz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertType application/gzip $TMPDIR/foo_0.1.orig.tar.gz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.gz | sort)"
+}
+
+testExclude() {
+	makeTarBall gz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testGoVendorIncludeIgnore () {
+    makeGolangLikeVendorFiles
+    makeTarBall gz
+    makeDebianDir
+    makeDebianCopyright
+
+    # adjust existing test cases slightly
+    cat <<'END' >> $TMPDIR/foo/debian/copyright
+ vendor
+Files-Included:
+ vendor/includeme
+END
+
+    expected_files=$(LC_ALL=C sort <<END
+$expected_files_after_removal
+foo-0.1/vendor/
+foo-0.1/vendor/a-subdir/
+foo-0.1/vendor/includeme/
+foo-0.1/vendor/includeme/important.go
+END
+)
+
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 21 files from it." \
+		 ../foo-0.1.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testExcludeXZ() {
+	makeTarBall xz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.xz as ../foo_0.1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.xz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testExcludeZip() {
+	makeZipFile
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.zip as ../foo_0.1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.zip
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testSuffix() {
+	makeTarBall gz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1+dfsg1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.gz --repack-suffix +dfsg1
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1+dfsg1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1+dfsg1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1+dfsg1.orig.tar.xz | sort)"
+}
+
+testSuffixXZ() {
+	makeTarBall xz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.tar.xz as ../foo_0.1+dfsg1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.xz --repack-suffix +dfsg1
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1+dfsg1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1+dfsg1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1+dfsg1.orig.tar.xz | sort)"
+}
+
+testSuffixZip() {
+	makeZipFile
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Successfully repacked ../foo-0.1.zip as ../foo_0.1+dfsg1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.zip --repack-suffix +dfsg1
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1+dfsg1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1+dfsg1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1+dfsg1.orig.tar.xz | sort)"
+}
+
+testSuffixNoExclusions() {
+	makeTarBall gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Successfully renamed ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		 ../foo-0.1.tar.gz --rename --repack-suffix +dfsg1
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSameNameSymlink() {
+	makeTarBall gz
+	mv $TMPDIR/foo-0.1.tar.gz $TMPDIR/foo_0.1.orig.tar.gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Leaving ../foo_0.1.orig.tar.gz where it is." \
+		 --symlink ../foo_0.1.orig.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSameNameCopy() {
+	makeTarBall gz
+	mv $TMPDIR/foo-0.1.tar.gz $TMPDIR/foo_0.1.orig.tar.gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Leaving ../foo_0.1.orig.tar.gz where it is." \
+		 --copy ../foo_0.1.orig.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSameNameRename() {
+	makeTarBall gz
+	mv $TMPDIR/foo-0.1.tar.gz $TMPDIR/foo_0.1.orig.tar.gz
+	makeDebianDir
+	run_mk_origtargz foo "" \
+		"Leaving ../foo_0.1.orig.tar.gz where it is." \
+		 --rename ../foo_0.1.orig.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+}
+
+testSameNameExclude() {
+	makeTarBall gz
+	mv $TMPDIR/foo-0.1.tar.gz $TMPDIR/foo_0.1.orig.tar.gz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Leaving ../foo_0.1.orig.tar.gz where it is, deleting 19 files from it." \
+		 ../foo_0.1.orig.tar.gz --compression=gzip
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertFalse "result is a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.gz ]"
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.gz | sort)"
+}
+
+testSameNameExcludeSymlink() {
+	makeTarBall xz
+	ln -s foo-0.1.tar.xz $TMPDIR/foo_0.1.orig.tar.xz
+	makeDebianDir
+	makeDebianCopyright
+	run_mk_origtargz foo "$expected_stderr_after_removal" \
+		"Leaving ../foo_0.1.orig.tar.xz where it is, deleting 19 files from it." \
+		 ../foo_0.1.orig.tar.xz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertTrue "result is not a symlink" "[ -L $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testCopyrightFormatWarning() {
+	makeTarBall gz
+	makeDebianDir
+	makeWrongDebianCopyright
+	run_mk_origtargz foo \
+		"mk-origtargz warn: The file debian/copyright mentions Files-Excluded, but its format is not recognized. Specify Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/ in order to remove files from the tarball with mk-origtargz." \
+		"Successfully symlinked ../foo-0.1.tar.gz to ../foo_0.1.orig.tar.gz." \
+		 ../foo-0.1.tar.gz
+
+}
+
+testBrokenTarWarning() {
+	makeBrokenTarBall
+	makeDebianDir
+	if dpkg --compare-versions $(dpkg-query -W -f='${Version}' libdpkg-perl) lt 1.19.0~; then
+		local SUBPROCESS_ERROR="gave error exit status 2"
+	else
+		local SUBPROCESS_ERROR="subprocess returned exit status 2"
+	fi
+	run_mk_origtargz foo \
+		"tar: This does not look like a tar archive
+tar: Skipping to next header
+tar: Exiting with failure status due to previous errors
+$PROGNAME: error: tar --list --auto-compress --file ../foo_0.1.orig.tar.xz $SUBPROCESS_ERROR" \
+		"" \
+		 ../foo-0.1.tar.gz --repack
+}
+
+testUnmatchedExclusion() {
+	makeTarBall gz
+	makeDebianDir
+	makeUnmatchedExcludeCopyright
+	run_mk_origtargz foo "mk-origtargz warn: No files matched excluded pattern as the last matching glob: nomatch" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+testDuplicatePattern() {
+	makeTarBall gz
+	makeDebianDir
+	makeDuplicatePatternCopyright
+	run_mk_origtargz foo "mk-origtargz warn: No files matched excluded pattern as the last matching glob: exclude-dir1" \
+		"Successfully repacked ../foo-0.1.tar.gz as ../foo_0.1.orig.tar.xz, deleting 19 files from it." \
+		 ../foo-0.1.tar.gz
+	assertTrue "result does not exist" "[ -e $TMPDIR/foo_0.1.orig.tar.xz ]"
+	assertType application/xz $TMPDIR/foo_0.1.orig.tar.xz
+	assertEquals "file contents" "$expected_files_after_removal" "$(tar taf $TMPDIR/foo_0.1.orig.tar.xz | sort)"
+}
+
+. shunit2

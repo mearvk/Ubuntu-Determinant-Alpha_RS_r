@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+
+# Copyright © 2012 Enrico Tassi <gareuselesinge@debian.org>
+# Heavily based on dh_linktree, 
+#   Copyright © 2011-2012 Raphaël Hertzog <hertzog@debian.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This package is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+=head1 NAME
+
+dh_lua - postprocess a lua package
+
+=cut
+
+use strict;
+use File::Find::Rule;
+use File::Compare;
+use Debian::Debhelper::Dh_Lib;
+use Dpkg::IPC;
+
+=head1 SYNOPSIS
+
+B<dh_lua> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_lua> is a debhelper program that postprocesses the package build
+directories. It performs the following actions:
+
+=over 4
+
+=item deduplication
+
+Files in /usr/share/lua/5.Y/ that are copies of files in /usr/share/lua/5.X/,
+where X is the lowest Lua interpreter version the package supports and Y>X,
+are replaced by symlinks.
+
+=back
+
+=cut
+
+init();
+
+
+sub mklfn {
+  my ($base, $version, $path) = @_;
+  return "$base/usr/share/lua/$version/$path";
+}
+
+sub mklrel {
+  my ($base,$version, $path) = @_;
+  $path=~s:^$base/usr/share/lua/$version/::;
+  return $path;
+}
+
+sub mklorig {
+  my ($path, $ver) = @_;
+  my @pieces=split(m:/+:,$path);
+  my $res="../";
+  for (1..$#pieces) {
+    $res.="../";
+  }
+  $res.="5.$ver/$path";
+  return $res;
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+  my $tmp=tmpdir($package);
+
+  my $minver=0;
+  my @srclinks=();
+  foreach my $ver (1..9) {
+    if (-d mklfn($tmp,"5.$ver","")) {
+      @srclinks = File::Find::Rule->name('*.lua')->in(mklfn($tmp,"5.$ver",""));
+      $minver = $ver;
+      last;
+    }
+  }
+
+  while (@srclinks) {
+    my $src=shift @srclinks;
+    my $what=mklrel($tmp,"5.$minver",$src);
+    foreach my $ver (($minver+1)..9) {
+      my $dest=mklfn($tmp,"5.$ver",$what);
+      if (compare($src, $dest) == 0) {
+	print "deduplicating $what\n";
+	doit("ln","-sf", mklorig($what,$minver), $dest);
+      }
+    }
+  }
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of debhelper.
+
+=head1 AUTHOR
+
+Enrico Tassi <gareuselesinge@debian.org>
+
+=cut

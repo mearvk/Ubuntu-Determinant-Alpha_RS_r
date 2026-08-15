@@ -1,0 +1,24 @@
+#!/bin/sh -e
+
+if [ "$1" = "configure" ]; then
+    if ! getent group designate > /dev/null 2>&1; then
+        addgroup --system designate >/dev/null
+    fi
+
+    if ! getent passwd designate > /dev/null 2>&1; then
+        adduser --system --home /var/lib/designate --ingroup designate --no-create-home --shell /bin/false designate
+    fi
+
+    chown designate:adm /var/log/designate
+    chmod 0750 /var/log/designate
+
+    find /etc/designate -exec chown root:designate "{}" +
+    find /etc/designate -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+
+    find /etc/designate/rootwrap.d -exec chown root:root "{}" +
+    find /etc/designate/rootwrap.d -type f -exec chmod 0644 "{}" + -o -type d -exec chmod 0755 "{}" +
+
+    find /var/lib/designate -exec chown designate:designate "{}" +
+    find /var/lib/designate -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+fi
+#DEBHELPER#

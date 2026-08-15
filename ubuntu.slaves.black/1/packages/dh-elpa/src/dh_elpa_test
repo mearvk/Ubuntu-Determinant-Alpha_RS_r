@@ -1,0 +1,372 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+dh_elpa_test - run ELPA package testsuites
+
+=cut
+
+use strict;
+use warnings;
+no warnings "experimental::smartmatch";
+
+=head1 SYNOPSIS
+
+B<dh_elpa_test> [S<I<debhelper options>>] [S<I<--autopkgtest>>] [S<I<pkg-file>>]
+
+=head1 DESCRIPTION
+
+B<dh_elpa_test> is a debhelper program that is responsible for running
+the testsuites of ELPA packages, when those test suites use ERT or
+buttercup(1).  dh_auto_test(1) is rarely suitable.
+
+Testing with buttercup(1) will be activated if the package
+build-depends on elpa-buttercup.  Testing with ERT will be activated
+if ERT test files can be found.  Neither kind of test will be
+activated unless the debhelper compat level is 10 or higher.
+
+B<dh_elpa_test> overrides dh_auto_test(1).  If you need to switch back
+to use dh_auto_test(1), use the B<disable> configuration key, below.
+
+=head1 FILES
+
+=over 4
+
+=item debian/elpa-test
+
+Configuration for running the package's test suite.  Each line is of
+the form I<key> = I<value>, with I<key> drawn from the list of
+configuration options below.
+
+Note that you should not surround values with double quotation marks.
+This is convenient for including lisp.  Configuration values cannot
+cover more than one line.  Lines preceded with a # are ignored as
+comments.
+
+This configuration file is optional; in many cases, B<dh_elpa_test>
+can figure out how to run the test suite itself.
+
+=back
+
+=head1 CONFIGURATION KEYS
+
+=over 4
+
+=item B<disable>
+
+If this key is set to any value, dh_elpa(1) will not invoke
+B<dh_elpa_test>.
+
+=item B<buttercup_load_path>
+
+A comma-separated list of directories to add to the load-path when
+buttercup(1) invokes Emacs.  Will be passed to buttercup(1) with its
+B<-L> command line argument.
+
+=item B<buttercup_patterns>
+
+A comma-separated list of Emacs regular expressions jointly matching
+all and only the files containing Buttercup tests that you wish to
+run.  If this key is not defined, all tests that can be found
+will be run.  Will be passed to buttercup(1) with its B<-p> command
+line argument.
+
+=item B<ert_exclude>
+
+A comma-separated list of file globs matching files containing ERT
+tests that should not be run.
+
+The '*' character in globs in this configuration key does NOT match
+'/' directory separators.
+
+=item B<ert_helper>
+
+The name of a *.el file containing Emacs Lisp code that will run the
+ERT test suite.  When this key is not defined, B<dh_elpa_test>
+calls the function B<(ert-run-tests-batch-and-exit)>.
+
+Your helper code should ensure that Emacs exits nonzero if there were
+any test failures, or exits zero if the test suite passed.
+
+Note that this is not the way to load test helpers that do needed work
+but don't actually run the tests.  For that, you can use something like
+
+=over 4
+
+    ert_eval = (load-file "test-helper.el")
+
+=back
+
+=item B<ert_eval>
+
+Emacs Lisp code to be run prior to running ERT tests by the Emacs
+instance spawned by B<dh_elpa_test> to run those tests.
+
+=item B<ert_load_path>
+
+A comma-separated list of directories to add to the load-path when
+B<dh_elpa_test> invokes Emacs to run ERT tests.
+
+=item B<autopkgtest_keep>
+
+A comma-separated list of file globs matching files that should not be
+moved out of the source tree before running DEP8 tests (see the
+B<--autopkgtest> option below).
+
+The '*' character in globs in this configuration key matches '/'
+directory separators.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--autopkgtest>
+
+Operate in autopkgtest mode.  B<dh_elpa_test> will rename non-test *.el
+files so that Emacs will not load them.  This ensures that the test
+test the installed binary package rather than the unpacked source
+package.
+
+To exclude files from this removal, specify them in the
+B<autopkgtest_keep> configuration option (see above).
+
+=back
+
+=head1 ENVIRONMENT VARIABLES
+
+Older versions of B<dh_elpa_test> were configured using environment
+variables corresponding to some of the above configuration keys.  For
+example, the B<ert_eval> configuration key replaced environment
+variable B<DH_ELPA_TEST_ERT_EVAL>.  Their use is now deprecated.  If
+the debian/elpa-test file exists, they will be ignored.
+
+=cut
+
+use File::Find::Rule;
+use Array::Utils qw{ array_minus };
+use Text::Glob qw{ glob_to_regex };
+use Config::Tiny;
+
+use Debian::Debhelper::Dh_Lib;
+use Debian::Control;
+
+# ---- Subroutines
+
+# like Find::File::Rule::name, but matches the whole path of the file
+# (relative to cwd when search was started) against the glob, rather
+# than just the basename (also, unlike Find::File::Rule::name, accepts
+# a single glob and no regexps since that's all we need here)
+sub long_name {
+    my $glob = shift;
+
+    return sub {
+        ( undef, undef, my $fullname ) = @_;
+
+        if ( $fullname =~ glob_to_regex($glob) ) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+}
+
+# ---- Script setup
+
+# check command line opts for autopkgtest mode
+my $autopkgtest = ( "--autopkgtest" ~~ @ARGV );
+
+# This checks whether the debhelper compat is 10 or above.  With
+# debhelper compat below 9, dh_elpa_test will get run more in more
+# than one sequence, including inside fakeroot, which can cause tests
+# to fail
+if ( get_buildoption("nocheck") || compat(9) ) {
+	exit 0;
+}
+
+# note that we don't need package.elpa-test since we are testing all
+# lisp we can find in the *source* package
+my $options = Config::Tiny->new;
+if ( -f "debian/elpa-test") {
+    verbose_print("I: Ignoring DH_ELPA_TEST_* envvars since debian/elpa-test exists");
+    $options = Config::Tiny->read( "debian/elpa-test" );
+} else {
+    my @envvars = ("DH_ELPA_TEST_DISABLE",
+                   "DH_ELPA_TEST_BUTTERCUP_LOAD_PATH",
+                   "DH_ELPA_TEST_BUTTERCUP_PATTERNS",
+                   "DH_ELPA_TEST_ERT_EXCLUDE",
+                   "DH_ELPA_TEST_ERT_HELPER",
+                   "DH_ELPA_TEST_ERT_EVAL",
+                   "DH_ELPA_TEST_ERT_LOAD_PATH"
+                  );
+    foreach my $envvar ( @envvars ) {
+        if (defined $ENV{$envvar}) {
+            my $short = lc(substr($envvar, 13));
+            print "W: environment variable $envvar is deprecated; see dh_elpa_test(1)\n";
+            $options->{_}->{$short} = $ENV{$envvar};
+        }
+    }
+}
+
+my @non_test_files;
+if ($autopkgtest) {
+    # Since we were not invoked by the dh sequencer, we need to check
+    # here whether tests have been disabled.  Note that we can't
+    # replace the test in elpa.pm with this one because we can't
+    # (cleanly) disable dh_auto_test from within dh_elpa_test
+    if ( defined $options->{_}->{ "disable" } ) {
+        exit 0;
+    }
+
+    my $rule = File::Find::Rule->new;
+    $rule
+      ->or(File::Find::Rule
+           ->name('.pc', 'debian', '.git')
+           ->directory->prune->discard,
+           File::Find::Rule->new);
+    $rule
+      ->file()
+      ->name( '*.el' )
+      ->none(File::Find::Rule->grep( "ert-deftest" ), # ERT
+             File::Find::Rule->grep( "\\(describe \"" ) # Buttercup
+            );
+
+    if ( defined $options->{_}->{'autopkgtest_keep'} ) {
+        foreach my $glob (split(',', $options->{_}->{'autopkgtest_keep'} )) {
+            # We want the user to be able to say
+            #     autopkgtest_keep = test/resources/*
+            # and have that affect all subdirs of resources
+            $Text::Glob::strict_wildcard_slash = 0;
+            # TODO should we do this for ert_exclude too?
+            $rule->not_exec( long_name($glob) );
+        }
+    }
+
+    @non_test_files = $rule->in('.');
+
+    foreach my $old ( @non_test_files ) {
+        my $new = $old =~ s|\.el$|.disabled|r;
+        rename $old, $new or die "Failed to rename: $!\n";
+    }
+}
+
+# these are from dh_elpa
+# TODO have dh_elpa export them so we can import them, instead of copy/paste
+my $dhelpadir="/usr/share/emacs/site-lisp/elpa";
+my $elpadir="/usr/share/emacs/site-lisp/elpa-src";
+
+my $control = Debian::Control->new();
+$control->read("debian/control");
+
+if ($autopkgtest) {
+    # save stderr handle for restoration
+    {
+        no warnings 'once';
+        open(OLDERR, ">&", \*STDERR);
+    }
+
+    # redirect stderr to stdout while we run our tests
+
+    # emacs --batch and ERT itself both produce a lot of output on
+    # stderr even when there has been no error, and adt-run interprets
+    # this as a test failure
+
+    # Recent autopkgtest has a 'allow-stderr' restriction prevents
+    # that interpretation.  However, relying on that would require
+    # 'allow-stderr' to be specified in the d/tests/control file for
+    # every package using dh_elpa_test.  It's cleaner just to redirect
+    # here.
+
+    open(STDERR, ">&STDOUT");
+    # unbuffer them to ensure lines appear in the right order
+    select STDERR; $| = 1;
+    select STDOUT; $| = 1;
+}
+
+# ---- Buttercup
+
+if ($control->source->Build_Depends->has( "elpa-buttercup" )) {
+    my @args = qw{ buttercup -L . };
+    if (defined $options->{_}->{'buttercup_load_path'}) {
+        foreach my $dir (split(',', $options->{_}->{'buttercup_load_path'})) {
+            push @args, ('-L', "$dir");
+        }
+    }
+    if (defined $options->{_}->{'buttercup_patterns'}) {
+        foreach my $pattern (split(',', $options->{_}->{'buttercup_patterns'})) {
+            push @args, ('-p', "$pattern");
+        }
+    }
+    print_and_doit(@args);
+}
+
+# ---- ERT
+
+my $rule = File::Find::Rule->new;
+$rule
+  ->or(File::Find::Rule
+       ->name('.pc', 'debian', '.git')
+       ->directory->prune->discard,
+       File::Find::Rule->new);
+$rule
+  ->file()
+  ->name( '*.el' )
+  ->grep( "ert-deftest" );
+if (defined $options->{_}->{'ert_exclude'}) {
+    foreach my $glob (split(',', $options->{_}->{'ert_exclude'})) {
+        $rule->not_exec( long_name($glob) );
+    }
+}
+my @ert_files = $rule->in('.');
+
+if (@ert_files) {
+    my @args = qw{ emacs -batch -Q -l package };
+    push @args, ("--eval", "(add-to-list 'package-directory-list \"$dhelpadir\")");
+    push @args, ("--eval", "(add-to-list 'package-directory-list \"$elpadir\")");
+    push @args, ("-f", "package-initialize");
+
+    # add the user's load-path entries
+    if (defined $options->{_}->{'ert_load_path'}) {
+        foreach my $dir (split(',', $options->{_}->{'ert_load_path'})) {
+            push @args, ('-L', "$dir");
+        }
+    }
+
+    # make some guesses about where stuff that needs to be in
+    # load-path will be
+    push @args, ("-L", ".");
+    push @args, ("-L", "test") if ( -d "test" );
+    push @args, ("-L", "tests") if ( -d "tests" );
+    # TODO maybe we should just add all dirs containing files in @ert_files?
+
+    # now finish adding the user's stuff
+    push @args, ("--eval", $options->{_}->{'ert_eval'})
+      if (defined $options->{_}->{'ert_eval'});
+    foreach my $ert_file (@ert_files) {
+        push @args, ("-l", "$ert_file");
+    }
+    if (defined $options->{_}->{'ert_helper'}) {
+        push @args, ("-l", $options->{_}->{'ert_helper'});
+    } else {
+        push @args, ("--eval", "(ert-run-tests-batch-and-exit)");
+    }
+
+    print_and_doit(@args);
+}
+
+# ---- Cleanup
+
+END {
+    if ($autopkgtest) {
+        # restore stderr now we've finished running tests
+        open(STDERR, ">&OLDERR");
+
+        # Restore files that we renamed so that we comply with DEP8
+        # rw-build-tree
+        foreach my $new ( @non_test_files ) {
+            my $old = $new =~ s|\.el$|.disabled|r;
+            rename $old, $new or die "Failed to rename: $!\n";
+        }
+    }
+}

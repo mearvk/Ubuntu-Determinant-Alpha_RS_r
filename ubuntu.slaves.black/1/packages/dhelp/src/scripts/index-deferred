@@ -1,0 +1,58 @@
+#!/bin/sh
+# Perform deffered indexing of dhelp registered documents.
+# Copyright (C) 2011,2012 Georgios M. Zarkadas <gz@member.fsf.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the Free
+# Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA  02111-1307  USA.
+
+TODAY=$(date '+%F')
+LOGDIR=/var/lib/dhelp/tmp
+
+IDXCMD='/usr/sbin/dhelp_parse -i'
+BINCMD='/usr/sbin/dhelp_parse'
+
+case ${1} in
+-f|--full)
+    IDXCMD='/etc/cron.weekly/dhelp'
+    BINCMD=${IDXCMD}
+    ;;
+*)
+    ;;
+esac
+
+if [ ! -d ${LOGDIR} ]; then
+    >&2 echo "Error: ${LOGDIR} is missing or is not a directory"
+    exit 1
+fi
+
+if [ ! -x ${BINCMD} ]; then
+    >&2 echo "Error: ${BINCMD} is missing or is not executable"
+    exit 1
+fi
+
+if DHLOG=$(mktemp --tmpdir=${LOGDIR} ${TODAY}.index-log.XXXXXXXX 2>/dev/null)
+then
+    :
+else
+    >&2 echo "Error: unable to create temporary log file in ${LOGDIR}"
+    exit 2
+fi
+
+# Indexing may last a large amount of time, which may be (depending
+# on how we were called) larger than the timespan of the controlling
+# process/terminal. Use nohup to account for this possibility.
+
+</dev/null >${DHLOG} 2>${DHLOG} nohup nice -n10 ${IDXCMD} &
+

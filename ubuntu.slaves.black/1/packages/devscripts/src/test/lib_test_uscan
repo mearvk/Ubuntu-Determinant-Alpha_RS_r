@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# Copyright (C) 2018, Xavier <yadd@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+# Public License for more details.
+#
+# On Debian systems, the complete text of the GNU General Public License
+# version 3 can be found in the /usr/share/common-licenses/GPL-3 file.
+
+echo '======================================================================='
+echo "*** uscan $TESTTYPE test ***"
+echo '======================================================================='
+
+test_dir=$(readlink -f "${0%/*}")
+
+# Operation mode
+if test "${1:-}" = --installed; then
+    shift
+else
+    top_srcdir=$(readlink -f "${0%/*}/..")
+    make -C "$top_srcdir/scripts" uscan mk-origtargz uupdate debchange
+    PATH="$top_srcdir/scripts:$PATH"
+    export PATH
+    PERL5LIB="$top_srcdir/lib"
+    export PERL5LIB
+fi
+
+GPGHOME=$(mktemp -d -t gpg.XXXXX)
+
+GPG=gpg
+if ! command -v $GPG >/dev/null 2>&1; then
+    echo "$GPG missing"
+    GPG=gpg2
+    if ! command -v $GPG >/dev/null 2>&1; then
+        echo "$GPG missing"
+        exit 1
+    fi
+fi
+
+PRIVATE_KEY=$test_dir/uscan/PRIVATE_KEY.asc
+PUBLIC_KEY=$test_dir/uscan/PUBLIC_KEY.asc
+PRIVATE_KEYRING=$GPGHOME/secring.gpg
+PUBLIC_KEYRING=$GPGHOME/pubring.gpg
+
+# magic function that pipes stdout and stderr into a pipe, and prints it only
+# on command failure.
+# This uses a pipe, so it has limited capacity.  Do not use it with stuff
+# outputting too much data.
+chronic_sh (){
+    local pipe pipe_q
+    pipe=$(mktemp -p "$SHUNIT_TMPDIR" devscripts_chronic_sh.XXXXXXXXXX)
+    printf -v pipe_q '%q' "$pipe"
+    trap 'rm -fv '"$pipe_q" RETURN
+    # one can't open a reading fd and a writing fd without blocking, because
+    # they want to already have something on the other side of the pipe.
+    # the temporary fd 5 will be that something.
+    exec 5<>"$pipe" # hack
+    exec 3>"$pipe"  # writing fd
+    exec 4<"$pipe"  # reading fd
+    exec 5>&-       # end hack
+    rm "$pipe"
+
+    local ret=0
+    "$@" >&3 2>&3 || ret=$?
+    if [ "$ret" -ne 0 ] ; then
+        exec 3>&-
+        cat <&4-
+        return $ret
+    fi
+}
+
+oneTimeSetUp () {
+    chronic_sh $GPG -v --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+        --output "$PRIVATE_KEYRING" --dearmor "$PRIVATE_KEY"
+
+    chronic_sh $GPG -v --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+        --output "$PUBLIC_KEYRING" --dearmor "$PUBLIC_KEY"
+
+    echo "Using test gpg key:"
+    $GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+        --secret-keyring "$PRIVATE_KEYRING" --default-key \
+        CF218F0E7EABF584B7E20402C77E2D6872543FAF \
+        --list-keys --verbose
+
+    export GNUPGHOME=$GPGHOME
+}
+
+oneTimeTearDown () {
+    gpgconf --homedir "$GPGHOME" --verbose --kill gpg-agent
+    rm -rf "$GPGHOME"
+}
+
+spawnHttpServer () {
+    unset http_proxy
+    local pid
+    [ -n "$TEMP_PKG_DIR" ] || fail "unexpected testsuite error"
+    (
+        mkdir -p "$TEMP_PKG_DIR"/repo
+        cd "$TEMP_PKG_DIR"/repo || exit 1
+        python3 "$test_dir/uscan/httpserver.py" 2>log &
+        pid=$!
+        echo "$pid" > pid
+        while ! [ -s port ]; do
+            sleep 2s
+            if ! kill -0 "$pid" 2> /dev/null ; then
+                echo "The HTTP server returned an error:"
+                cat log
+                exit 1
+            fi
+        done
+    )
+}
+
+killHttpServer () {
+    if [ -n "${TEMP_PKG_DIR:-}" ] && [ -f "$TEMP_PKG_DIR/repo/pid" ]; then
+        local pid
+        pid=$(< "$TEMP_PKG_DIR/repo/pid")
+        kill -9 "$pid"
+        rm -rf "$TEMP_PKG_DIR"
+        unset TEMP_PKG_DIR
+    fi
+}

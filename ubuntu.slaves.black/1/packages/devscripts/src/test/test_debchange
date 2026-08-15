@@ -1,0 +1,252 @@
+#!/bin/bash
+
+# Copyright (C) 2012, Benjamin Drung <bdrung@debian.org>
+#            ©  2017  Mattia Rizzolo <mattia@debian.org>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+set -u
+
+if test "${1:-}" = --installed; then
+    COMMAND="dch --no-conf"
+    shift
+else
+    COMMAND="perl -I ${0%/*}/../lib ${0%/*}/../scripts/debchange.pl --no-conf"
+fi
+
+. "${0%/*}/shunit2-helper-functions.sh"
+
+setUp() {
+    CHANGELOG="${SHUNIT_TMPDIR}/changelog"
+    DEBFULLNAME="Raphaël Hertzog"
+    DEBEMAIL="hertzog@debian.org"
+    export DEBFULLNAME DEBEMAIL
+}
+
+tearDown() {
+    unset CHANGELOG DEBFULLNAME DEBEMAIL
+}
+
+runCommand2() {
+    local param="$1"
+    local exp_stdout="$2"
+    local exp_stderr="$3"
+    local exp_retval=$4
+    local stdoutF="${SHUNIT_TMPDIR}/stdout"
+    local stderrF="${SHUNIT_TMPDIR}/stderr"
+    eval "${COMMAND} $param" > ${stdoutF} 2> ${stderrF}
+    # Strip distribution data outdated warnings (caused by outdate distro-info-data).
+    cat $stderrF | \
+        grep -v "^Distribution data outdated. Please check for an update for distro-info-data. See /usr/share/doc/distro-info-data/README.Debian for details." | \
+        grep -v '^debchange[^ ]* warning: Unable to determine the current Ubuntu development release. Using UNRELEASED instead.$' > ${stderrF}.tmp
+    mv ${stderrF}.tmp ${stderrF}
+    retval=$?
+    assertEquals "standard output of ${COMMAND} $param\n" "$exp_stdout" "$(cat ${stdoutF})"
+    assertEquals "error output of ${COMMAND} $param\n" "$exp_stderr" "$(cat ${stderrF})"
+    assertEquals "return value of ${COMMAND} $param\n" $exp_retval $retval
+}
+
+success() {
+    runCommand2 "-c \"$CHANGELOG\" $1" "" "" 0
+}
+
+checkUbuntuDevelAvailable() {
+    if ubuntu-distro-info --devel 2>/dev/null >&2; then
+        # distro-info-data knows of the current devel release
+        true
+    else
+        # distro-info-data doesn't know of the current devel release
+        false
+    fi
+}
+
+checkVersion() {
+    local start_param="$1"
+    local param="$2"
+    local start_version="$3"
+    local expected_version="$4"
+    rm -f "$CHANGELOG"
+    success "--create $start_param --package test-package -v $start_version \"Devscripts Test Suite.\""
+    success "$param \"Version test.\""
+    local version=$(dpkg-parsechangelog -l"$CHANGELOG" -SVersion)
+    assertEquals "\"dch $param\" from version $start_version" "$expected_version" "$version"
+}
+
+checkDebianDistribution() {
+    checkVersion "--vendor Debian -D unstable" "--vendor Debian -i -D $1" "1.0-1" "1.0-2"
+}
+
+checkDebianVersion() {
+    checkVersion "--vendor Debian -D unstable" "--vendor Debian $1" "$2" "$3"
+}
+
+checkUbuntuVersion() {
+    checkVersion "--vendor Debian -D unstable" "--vendor Ubuntu $1" "$2" "$3"
+}
+
+testDebianDistributions() {
+    checkDebianDistribution "bullseye"
+    checkDebianDistribution "bullseye-security"
+    checkDebianDistribution "buster"
+    checkDebianDistribution "buster-security"
+    checkDebianDistribution "stretch"
+    checkDebianDistribution "stretch-security"
+    checkDebianDistribution "jessie"
+    checkDebianDistribution "jessie-proposed-updates"
+    checkDebianDistribution "jessie-security"
+    checkDebianDistribution "wheezy-security"
+    checkDebianDistribution "experimental"
+    checkDebianDistribution "oldstable"
+    checkDebianDistribution "oldstable-proposed-updates"
+    checkDebianDistribution "oldoldstable"
+    checkDebianDistribution "oldoldstable-proposed-updates"
+    checkDebianDistribution "proposed-updates"
+    checkDebianDistribution "stable"
+    checkDebianDistribution "stable-proposed-updates"
+    checkDebianDistribution "testing"
+    checkDebianDistribution "testing-proposed-updates"
+    checkDebianDistribution "UNRELEASED"
+}
+
+testDebianIncrement() {
+    checkDebianVersion "-i" "1.0-1" "1.0-2"
+    checkDebianVersion "-i" "12" "13"
+}
+
+testUbuntuIncrement() {
+    if ! checkUbuntuDevelAvailable; then
+        echo "No known Ubuntu devel release known, skipping related tests"
+        startSkipping
+    fi
+    checkUbuntuVersion "-i" "12" "12ubuntu1"
+    checkUbuntuVersion "-i" "3.4" "3.4ubuntu1"
+    checkUbuntuVersion "-i" "3.4.5" "3.4.5ubuntu1"
+    checkUbuntuVersion "-i" "5.6-7" "5.6-7ubuntu1"
+    checkUbuntuVersion "-i" "5.6-7.1" "5.6-7.1ubuntu1"
+    checkUbuntuVersion "-i" "5.6-7.1.8" "5.6-7.1.8ubuntu1"
+    checkUbuntuVersion "-i" "2.13-14build5" "2.13-14ubuntu1"
+    checkUbuntuVersion "-i" "0.45-2ubuntu3" "0.45-2ubuntu4"
+    checkUbuntuVersion "-i" "0.45-2ubuntu3.1" "0.45-2ubuntu3.2"
+    checkUbuntuVersion "-i" "0.45-2ubuntu3.1.0" "0.45-2ubuntu3.1.1"
+}
+
+testUbuntuRebuild() {
+    if ! checkUbuntuDevelAvailable; then
+        echo "No known Ubuntu devel release known, skipping related tests"
+        startSkipping
+    fi
+    checkUbuntuVersion "-R" "3.4" "3.4build1"
+    checkUbuntuVersion "-R" "2.0-4" "2.0-4build1"
+    checkUbuntuVersion "-R" "1.42-4ubuntu5" "1.42-4ubuntu6"
+    checkUbuntuVersion "-R" "0.1-2build3" "0.1-2build4"
+}
+
+verifyMaintainer() {
+    local maintainer="$(dpkg-parsechangelog -l"$CHANGELOG" -SMaintainer)"
+    assertEquals "\"$1\"" "$DEBFULLNAME <$DEBEMAIL>" "$maintainer"
+}
+
+testEncoding() {
+    rm -f "$CHANGELOG"
+    success "--create -D unstable --package test-package -v 1.0-1 \"First upload\""
+    verifyMaintainer "dch --create"
+
+    success "-a \"Some change\""
+    verifyMaintainer "dch -a"
+
+    success "-i \"Second upload\""
+    verifyMaintainer "dch -i"
+
+    success "-e \"Another change\""
+    verifyMaintainer "dch -e"
+
+    success "-n NMU"
+    verifyMaintainer "dch -n"
+
+    success "-v 1.1-1 \"New upstream\""
+    verifyMaintainer "dch -v"
+
+    success "--bin-nmu \"Rebuild against libfoo\""
+    verifyMaintainer "dch --bin-nmu"
+
+    success "-q \"QA upload\""
+    verifyMaintainer "dch -q"
+
+    success "-s \"Security upload\""
+    verifyMaintainer "dch -s"
+
+    success "-s \"LTS Security upload\""
+    verifyMaintainer "dch --lts"
+
+    success "--bpo \"Backports upload\""
+    verifyMaintainer "dch --bpo"
+
+    success "--stable \"Stable upload\""
+    verifyMaintainer "dch --stable"
+}
+
+verifyEntryLines() {
+    success "--vendor Debian $1"
+    local changes="$(dpkg-parsechangelog -l"$CHANGELOG" -SChanges | grep -F '*')"
+    assertEquals "\"$changes\"" 1 "$(echo "$changes" | wc -l)"
+}
+
+# Any options which automatically add their own entry to the changelog should
+# elide an empty entry if the user passes an empty string as the entry.
+testEmptyMessage() {
+    rm -f "$CHANGELOG"
+    success "--create -D unstable --package test-package -v 1.0-1 'First upload'"
+
+    verifyEntryLines "--nmu ''"
+
+    verifyEntryLines "--bin-nmu ''"
+
+    verifyEntryLines "--qa ''"
+
+    verifyEntryLines "--security ''"
+
+    verifyEntryLines "--bpo ''"
+
+    verifyEntryLines "--team ''"
+}
+
+verifyGuessedDistribution() {
+    # $1 → initial suite
+    # $2 → action
+    # $3 → expected suite after the action
+    rm -f "$CHANGELOG"
+    vdeb="--vendor Debian"
+    success "$vdeb --create -D $1 --package test-package -v 1.0-1 'First upload'"
+    success "$vdeb $2 'Second Upload'"
+    success "$vdeb -r ''"
+    local dist="$(dpkg-parsechangelog -l"$CHANGELOG" -SDistribution)"
+    assertEquals "$3" "$dist"
+}
+
+testGuessedDistribution() {
+    verifyGuessedDistribution unstable -i unstable
+    verifyGuessedDistribution experimental -i experimental
+    verifyGuessedDistribution buster-backports -i buster-backports
+    verifyGuessedDistribution stretch -i stretch
+    verifyGuessedDistribution unstable --bpo bullseye-backports
+    verifyGuessedDistribution unstable --stable bullseye
+}
+
+testSpecialCharacterMaintainer() {
+    rm -f "$CHANGELOG"
+    export DEBFULLNAME='\k'
+    success "--create -D unstable --package test-package -v 1.0-1 \"First upload\""
+    success "-a \"Some change\""
+}
+
+. shunit2

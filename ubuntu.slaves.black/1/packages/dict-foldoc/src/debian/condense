@@ -1,0 +1,120 @@
+#!/usr/bin/perl
+
+# condense -- condense cross-reference only foldoc entries
+#
+# Takes as sole argument a raw foldoc Dictionary data file.
+#
+# Prints to stdout the file with cross-reference only entries
+# removed and their headword appended with $separator onto their
+# cross-referenced entry headword.
+#
+# Assumes that headwords are unindented.
+
+# Changelog:
+$version = 0.1; # Thu Aug 28 09:39:18 EDT 2003
+$version = 0.2; # Thu Aug 28 09:57:07 EDT 2003
+#  Added a $separator variable.
+
+$separator = "%%%";
+
+# verbosity level controls report to strerr:
+#  0  no report
+#  1  counts reported
+#  2  quirks also listed
+#  3  condensed headwords also listed
+
+$verbose = 1;
+die "Usage: $0 data_file\n" unless @ARGV == 1;
+
+open DATA, $ARGV[0] or die "Can't open file $ARGV[0]\n";
+
+# prime $new_headword
+while($_=<DATA> and ! /^\S/) {}
+chomp($new_headword = $_);
+
+# scan the dictionary
+while (defined $new_headword) {
+    $hw = $new_headword;
+    undef $new_headword;
+    $entry = "";
+    ++$headword{$hw};
+    while($_=<DATA> and ! /^\S/) { $entry .= $_; }
+    chomp($new_headword = $_);
+    if($entry =~ /^\s*\{\s*(.*\S)\s*\}\s*$/) {
+        $xref{$hw} = $1;
+        push @ordered_keys, $hw;
+    }
+}
+
+# shorten chains and analyze for errors
+for $hw (@ordered_keys) {
+    if ( $headword{$hw} > 1 ) {
+        push @duplicate, $hw unless $duplicate{$hw};
+        ++$duplicate{$hw};
+        next;
+    }
+    $target = $xref{$hw};
+    if (! $headword{$target}) {
+        push @missing, $hw;
+        next;
+    }
+    %chain = undef;
+    ++$chain{$target};
+    while (defined $xref{$target} and $headword{$xref{$target}}
+           and $chain{$target} == 1) {
+        $target = $xref{$target};
+        ++$chain{$target};
+    }
+    if ($chain{$target} > 1) {
+        push @loop, $hw;
+        next;
+    }
+    ++$remove{$hw};
+    push @ordered_remove, $hw;
+    $headword_expansion{$target} .=  $separator . $hw;
+}
+
+# report
+if ($verbose > 0) {
+    warn scalar @ordered_remove, " condensable cross-references\n";
+}
+if ($verbose > 2 ) {
+    for(sort @ordered_remove) { warn"  $_\n"; }
+}
+if ($verbose > 0) {
+    warn scalar @missing, " entries with dangling cross-reference\n";
+}
+if ($verbose > 1 ) {
+    for(sort @missing) { warn"  $_\n"; }
+}
+if ($verbose > 0) {
+    warn scalar @duplicate, " duplicate entries with cross-reference\n";
+}
+if ($verbose > 1 ) {
+    for(sort @duplicate) { warn"  $_\n"; }
+}
+if ($verbose > 0) {
+    warn scalar @loop, " looped chains of cross-references\n";
+}
+if ($verbose > 1 ) {
+    for(sort @loop) { warn"  $_\n"; }
+}
+
+# starting over, prime $new_headword
+seek DATA, 0, 0;
+while($_=<DATA> and ! /^\S/) {print}
+chomp($new_headword = $_);
+
+# and write the condensed dictionary
+while (defined $new_headword) {
+    $headword = $new_headword;
+    undef $new_headword;
+    if ($remove{$headword}) {
+        while($_=<DATA> and ! /^\S/) { }
+        chomp($new_headword = $_);
+    } else {
+        print $headword, $headword_expansion{$headword}, "\n";
+        while($_=<DATA> and ! /^\S/) { print; }
+        chomp($new_headword = $_);
+    }
+}

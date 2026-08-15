@@ -1,0 +1,209 @@
+#!/usr/bin/perl -w
+
+# (c) 2003,2006 Yann Dirson <dirson@debian.org>
+# Covered by the GNU GPL, version 2.
+
+# When given command-line arguments, only generates pages for the
+# given packages.  When run without arguments, generates pages for all
+# packages in database, and regenerates the index.
+
+use strict;
+use IO::Handle;
+
+my $htmlroot = "/home/dirson/public_html/buildinfo";
+
+my $npkg = current_stat('stats/buildinfo');
+my $nfiles = current_stat('stats/buildinfo-nb-files');
+
+chdir "data/buildinfo";
+
+my %categs = ('arch' => 'Architecture-dependant build-deps',
+	      'arch-closure' => 'Architecture-dependant closure',
+	      'indep' => 'Architecture-independant build-deps',
+	      'indep-closure' => 'Architecture-independant build-deps closure',
+	      'b-ess' => 'Build-essential packages',
+	      'b-ess-closure' => 'Build-essential closure',
+	      'ess' => 'Essential packages',
+	      'ess-closure' => 'Essential closure');
+
+if (@ARGV) {
+  ## for each package on command-line
+  foreach my $package (@ARGV) {
+    handle_package($package);
+  }
+} else {
+  mkdir $htmlroot unless -d $htmlroot;
+  open (SUMMARY, ">$htmlroot/index.html");
+  SUMMARY->autoflush(1);
+
+  print SUMMARY <<EOH
+<html>
+<head>
+<title>Build informations</title>
+</head>
+
+<body>
+<h1>Build informations</h1>
+
+<p>Build informations are currently generated using the
+<tt>dh_buildinfo</tt> script from the <a
+href="http://packages.debian.org/dh-buildinfo">dh-buildinfo</a>
+package.  This is a temporary measure, as doing so for the whole
+archive would add much too much size to it.  The best known idea till
+now would be to have them uploaded together with .changes file, and
+archived on buildd.debian.org.
+
+<p>dh_buildinfo also has a <a
+href="http://ydirson.free.fr/en/software/buildinfo.html" >homepage</a>.
+
+<h2>some graphs</h2>
+
+<ul>
+<li>$npkg <a href="npkg.eps" >packages in the database</a>
+<li>$nfiles <a href="nfiles.eps" >buildinfo files in the database</a>
+</ul>
+
+<p>Note that there were a number of bugs in the fetching script, which
+caused a number of buildinfo files to be missed, and that those
+bugfixes are reflected in the graphs.
+
+<h2>extracted data</h2>
+
+<ul>
+EOH
+    ;
+
+
+  ## for each package in the database (we have chdir'd into data/buildinfo)
+  foreach my $package (<*>) {
+    handle_package($package);
+  }
+
+  print SUMMARY "</ul>\n";
+  close SUMMARY;
+}
+
+## extract last count from a stat file
+sub current_stat {
+  my $file=shift;
+  open FILE, $file;
+
+  my @v;
+  while (<FILE>) { @v = split(/\s/, $_); };
+  close FILE;
+  return $v[1];
+}
+
+## the main stuff
+
+sub handle_package {
+  my $package=shift;
+  my $packagedir="$htmlroot/$package";
+
+  ## read data for every version of the package
+
+  my %data = ();
+  foreach my $datafile (<$package/*>) {
+    $datafile =~ m|^\Q$package/${package}\E_(.*)_(.*)$| or next;
+    my ($vers,$arch) = ($1,$2);
+    $data{$vers} = { archs => {} } unless defined $data{$vers};
+    $data{$vers}->{archs}->{$arch} = {};
+
+    open DATA, $datafile;
+    my $categ = 'ess';
+    foreach my $dataline (<DATA>) {
+      if ($dataline =~ '^ Essential packages closure:') { $categ = 'ess-closure'; next; }
+      if ($dataline =~ '^ Build-Essential packages:') { $categ = 'b-ess'; next; }
+      if ($dataline =~ '^ Build-Essential closure:') { $categ = 'b-ess-closure'; next; }
+      if ($dataline =~ '^ Declared Arch-indep Build-Dependencies:') { $categ = 'indep'; next; }
+      if ($dataline =~ '^ Arch-indep Build-Dependencies closure:') { $categ = 'indep-closure'; next; }
+      if ($dataline =~ '^ Declared Arch-dependent Build-Dependencies:') { $categ = 'arch'; next; }
+      if ($dataline =~ '^ Arch-dependent Build-Dependencies closure:') { $categ = 'arch-closure'; next; }
+      next if $dataline =~ /^ /;
+      my ($deppkg,$depvers) = split (/\s+/, $dataline);
+      $data{$vers}->{archs}->{$arch}->{$deppkg} = $depvers;
+
+      push (@{$data{$vers}->{packages}->{$categ}}, $deppkg)
+	unless grep { $_ eq $deppkg } @{$data{$vers}->{packages}->{$categ}};
+    }
+    close DATA;
+  }
+
+  ## present the data
+
+  my $datasize = keys %data;
+  if ($datasize == 0) {
+    unless (@ARGV) {
+      print SUMMARY "<li>$package";
+      if (-r "$package/ERROR") {
+	open (ERROR, "<$package/ERROR");
+	print SUMMARY ' (', <ERROR>, ')';
+	close ERROR;
+      }
+      print SUMMARY "\n";
+    }
+  } else {
+    unless (@ARGV) {
+      print SUMMARY "<li><a href=\"$package/\">$package</a> ($datasize)";
+
+      if (-r "$package/WARNING") {
+	open (WARNING, "<$package/WARNING");
+	print SUMMARY ' (<span style="color:red">', <WARNING>, '</span>)';
+	close WARNING;
+      }
+    }
+
+    mkdir $packagedir unless -d $packagedir;
+    unlink "$packagedir/data";
+    symlink "../../../data/buildinfo/$package", "$packagedir/data";
+    open (PKGSUMMARY, ">$packagedir/index.html");
+
+    print PKGSUMMARY <<EOH
+<html>
+<head>
+<title>Build informations for $package</title>
+</head>
+
+<body>
+<h1>Build informations for $package</h1>
+<ul>
+EOH
+  ;
+
+    ## print out an index of all available versions
+
+    print PKGSUMMARY "<h2>", scalar keys %data, " versions:</h2>\n<ul>\n";
+    foreach my $vers (sort keys %data) {
+      print PKGSUMMARY "<li><a href=\"#$vers\">$vers</a></li>\n";
+    }
+    print PKGSUMMARY "</ul>\n";
+
+    ## format details for every version
+
+    foreach my $vers (sort keys %data) {
+      print PKGSUMMARY "<h1><a name=\"$vers\" href=\"data/\">$package $vers</a></h1>\n";
+      # list is hardcoded to force ordering
+      foreach my $categ ('arch', 'arch-closure', 'indep', 'indep-closure',
+			 'b-ess', 'b-ess-closure', 'ess', 'ess-closure') {
+	print PKGSUMMARY '<h2>', $categs{$categ}, "</h2>\n";
+	print PKGSUMMARY "<table border>\n<tr><th>";
+	foreach my $deppkg (@{$data{$vers}->{packages}->{$categ}}) {
+	  print PKGSUMMARY "<th>$deppkg";
+	}
+	print PKGSUMMARY "</tr>\n";
+	foreach my $arch (keys %{$data{$vers}->{archs}}) {
+	  print PKGSUMMARY "<tr><th>$arch";
+	  foreach my $deppkg (@{$data{$vers}->{packages}->{$categ}}) {
+	    if (defined $data{$vers}->{archs}->{$arch}->{$deppkg}) {
+	      print PKGSUMMARY "<td>$data{$vers}->{archs}->{$arch}->{$deppkg}";
+	    } else {
+	      print PKGSUMMARY "<td>N/A";
+	    }
+	  }
+	  print PKGSUMMARY "</tr>\n";
+	}
+	print PKGSUMMARY "</table>\n";
+      }
+    }
+  }
+}

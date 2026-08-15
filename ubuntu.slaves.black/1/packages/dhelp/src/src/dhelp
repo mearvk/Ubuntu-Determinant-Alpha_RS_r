@@ -1,0 +1,189 @@
+#!/usr/bin/perl -w
+#
+# Copyright 2002 by Stefan Hornburg (Racke) <racke@linuxia.de>
+#
+# Based on a sample implementation of Chris Tillman
+# <tillman@azstarnet.com>.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the Free
+# Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA  02111-1307  USA.
+
+use strict;
+use warnings;
+
+use File::Spec;
+use File::Temp qw(tempfile);
+use IO::Socket;
+use Getopt::Long;
+use Pod::Usage;
+use URI::Escape;
+
+# version (replaced on packaging time)
+my $version = '__VERSION__';
+
+sub fatal_error {
+    chomp(my $msg = shift );
+    print STDERR $msg, "\n";
+    sleep 3;
+    exit 1;
+}
+
+# check if there is a CGI capable WWW server running on the localhost, and
+# return some identification string for it if any found. Return '' otherwise
+sub detected_local_webserver {
+    my $testdoc = "/doc/HTML/index.html";
+    my $eol = "\015\012";
+    my $blank = $eol x 2;
+    my $sock = IO::Socket::INET->new('127.0.0.1:80');
+    my $httpd_running = '';
+
+    if ($sock) {
+        $sock->autoflush(1);
+        print $sock "HEAD $testdoc HTTP/1.0$eol";
+        print $sock "Host: localhost" . $blank;
+
+        while (my $line = <$sock>) {
+            if ($line =~ s/^Server: //) {
+                $httpd_running = $line;
+                $httpd_running =~ s/\r?\n?//go;
+            }
+        }
+        close $sock;
+
+        if ($httpd_running =~ /dhttpd/) {
+            # this server is not CGI capable
+            $httpd_running = '';
+        }
+    }
+
+    return $httpd_running;
+}
+
+# process commandline options
+my %opts;
+my $whandler = $SIG{__WARN__};
+$SIG{__WARN__} = sub {print STDERR "$0: @_";};
+unless (GetOptions(\%opts,
+                   'file|f',
+                   'help|h',
+                   'version')) {
+    fatal_error(pod2usage(1));
+}
+
+if ($opts{help}) {
+    pod2usage(1);
+    exit 0;
+} elsif ($opts{version}) {
+    print "dhelp version $version\n";
+    exit 0;
+}
+
+my $searchterm = join(" ", @ARGV);
+
+# home directory of the current user
+my $homedir;
+
+if (exists $ENV{'HOME'} && -d $ENV{'HOME'}) {
+    $homedir = $ENV{'HOME'};
+} else {
+    $homedir = (getpwent()) [7];
+}
+
+# always use sensible-browser
+my $browser = "/usr/bin/sensible-browser";
+
+my $online_mode = ! $opts{file};
+my $httpd_running = detected_local_webserver;
+
+my $document;
+
+if ($online_mode && $httpd_running) {
+    # we can query the web server directly
+    if ($searchterm) {
+        my $searchterm_uri = uri_escape($searchterm);
+        $searchterm_uri =~ s/'/'\\''/go;
+        $document = "http://localhost/cgi-bin/dsearch?search=$searchterm_uri";
+    } else {
+        $document = "http://localhost/doc/HTML/index.html";
+    }
+    print "Starting browser (using HTTP $httpd_running) ...\n";
+} else {
+    if ($searchterm) {
+        my ($basedir) = File::Spec->tmpdir();
+        my ($fh, $tmpfile) = tempfile('dhelp' . 'X' x 6,
+                                      DIR    => $basedir,
+                                      SUFFIX => '.html',
+                                      UNLINK => 1);
+        print "Starting dsearch for $searchterm\n";
+        $searchterm =~ s/'/'\\''/go;
+        # call dsearch
+        open (DSEARCH, "/usr/lib/cgi-bin/dsearch file=1 search='$searchterm'|");
+        while (<DSEARCH>) {
+            print $fh $_;
+        }
+        close (DSEARCH) || fatal_error "$0: dsearch failed\n";
+        system ( "$browser $tmpfile" ) and fatal_error( "${browser}: Failed to open $tmpfile: $!\n" );
+        exit 0;
+    } else {
+        $document = "/usr/share/doc/HTML/index.html";
+        print "Starting browser (using local filesystem) ...\n";
+    }
+}
+
+system("$browser '$document'") and fatal_error("${browser}: Failed to open $document: $!\n");
+
+__END__
+
+
+=head1 NAME
+
+dhelp - Accessing Debian Online Help System
+
+=head1 SYNOPSIS
+
+   dhelp [ -h | -v | search-term ]
+   dhelp -f
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-f, --file>
+
+Direct the browser to use the local file system instead of
+contacting the local WWW server.
+
+=item B<-h, --help>
+
+Show a brief help message and exit.
+
+=item B<-v, --version>
+
+Show the program version number and exit.
+
+=back
+
+=head1 DESCRIPTION
+
+B<dhelp> presents a list of installed html documentation. The
+list can be browsed directly with Lynx, or if a web server
+is installed then any web browser can be used.
+
+In addition, you can search for terms indexed in the documentation
+using B<dhelp search-term> .
+
+=cut
+
+

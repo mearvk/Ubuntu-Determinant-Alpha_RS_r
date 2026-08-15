@@ -1,0 +1,47 @@
+#!/bin/sh
+#!/bin/sh
+# invoke as /usr/lib/dh-elpa/helper/remove flavor elpa_package elpa_version
+
+set -e
+
+# safe values for important variables
+
+unset HOME
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# grab parameters
+
+FLAVOR=$1
+ELPA_PACKAGE=$2
+ELPA_VERSION=$3
+
+ELPA_DIR=${ELPA_PACKAGE}-${ELPA_VERSION}
+
+elpa_root="/usr/share/${FLAVOR}/site-lisp/elpa"
+elc_dir="${elpa_root}/${ELPA_DIR}"
+
+FLAVOR=$1
+case $FLAVOR in
+    emacs2[01234]*)
+        echo remove/${ELPA_DIR}: Skipping obsolete emacs ${FLAVOR}
+        exit 0
+        ;;
+    xemacs*)
+        echo remove/${ELPA_DIR}: Skipping unsupported emacs ${FLAVOR}
+	exit 0
+        ;;
+    *)
+        echo remove/${ELPA_DIR}: Handling removal of emacsen flavor ${FLAVOR}
+esac
+
+echo dh-elpa: purging flavor specific files for ${FLAVOR}
+rm -f ${elc_dir}/*.elc
+[ -d ${elc_dir} ] && find ${elc_dir} -type l -delete
+rm -f ${elc_dir}/Install.log*
+if test -e "${elc_dir}"
+then
+    rmdir --ignore-fail-on-non-empty "${elc_dir}"
+    rmdir --ignore-fail-on-non-empty "${elpa_root}"
+fi
+
+exit 0;

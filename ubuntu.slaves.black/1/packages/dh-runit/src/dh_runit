@@ -1,0 +1,160 @@
+#!/usr/bin/perl -w
+
+1;
+
+# PROMISE: DH NOOP WITHOUT runit
+
+=head1 NAME
+
+dh_runit - install/enable runit runscripts
+
+=head1 SYNOPSIS
+
+B<dh_runit> [S<I<debhelper options>>] [I<path> I<options>] ...
+
+=head1 DESCRIPTION
+
+B<dh_runit> is a debhelper program that is responsible for
+installing and enabling I<runit> runscripts. If a file named
+F<debian/I<package>.runit> exists, then it ensures appropriate actions
+are performed based on its content.
+
+For runit, each unit of supervision (or, simply speaking, program) is
+represented by a directory under F</etc/sv>, containing at least a F<run>
+executable file. Each enabled unit of supervision is represented by a
+symbolic link under F</etc/services> (which itself is a symbolic link to
+F</etc/runit/runsvdir/default>) pointing to some directory under
+F</etc/sv>.
+
+B<dh_runit> reads arguments from the command line and
+F<debian/I<package>.runit> in pairs, with the first item being the
+path to a file or directory and the second being a set of options.
+If the first argument names a file, it is treated as a 'run' script
+to be installed at F</etc/sv/*/run> as an executable file. If the first
+argument names a directory, that directory is copied as a whole to
+F</etc/sv>.
+
+Options are comma separated, like mount options. Unrecognized options
+are errors. The following options are recognized:
+
+=over
+
+=item I<disable>
+
+Install the runscript but do not enable it by default.
+This means that the corresponding service will not be started.
+The service can be enabled manually by the system administrator or
+automatically using update-service(8).
+
+=item I<name>=preferred-name
+
+By default, the name of the directory under F</etc/sv> for a given
+runscript is the basename of the path argument naming it. This
+option allows overriding that default with an explicitly chosen
+directory name.
+
+=item I<logscript>
+
+Install a standard F<log/run> script that invokes svlogd(8) with
+the rights of the dedicated user. Specifying this option produces
+an error if the path argument names a directory that already
+contains a F</log/run> script.
+
+=item I<onupgrade>=string
+
+This option controls what to do during the upgrade of a service
+when runit is PID 1; 
+it takes one of the following strings as argument:
+
+F<restart>
+ restart the service in postinstall, after all files of the package are
+ unpacked and the upgrade is complete. This is the same as dh_installinit
+ or dh_installsystemd ' --restart-after-upgrade '.
+ This is the implicit default if the 'onupgrade' option is not set.
+
+F<stop>
+ stop the service in prerm and start again in postinst. This option is useful
+ if the daemon get confused by the package being upgraded while it's still
+ running. This is the same as dh_installinit or dh_installsystemd
+ '--no-restart-after-upgrade'.
+
+F<nostop>
+ do not stop service on upgrade. This has the side-effect of not restarting the
+ service as a part of the upgrade. Use this option when the service does not 
+ support being restarted while it's running. Display managers (xdm, slim, ...) 
+ are example of non-restartible services.
+ When this option is set the B<invoke-run> interpreter, provided by I<runit>
+ package, will refrain from automatically replace the sysvinit-managed 
+ instance of the service with a runit-managed instance (replacement requires manual
+ intervention or a system restart).
+ This is the same as dh_installinit or dh_installsystemd '--no-stop-on-upgrade'.
+
+F<reload>
+ similar to nostop, but the service configuration is reloaded (HUP) during the upgrade. 
+ This might be useful in cases  (like dbus) where the service does not support restarting
+ on upgrade and where reloading the config instead of restarting makes sense.
+ When this option is set the B<invoke-run> interpreter, provided by I<runit>
+ package, will refrain to automatically replace the sysvinit-managed 
+ instance of the service with a runit-managed instance (replacement requires manual
+ intervention or a system restart).
+ 
+Please note that F<onupgrade> does not control whether the service will be started
+after the first install of the package; by default the service is always started
+if it's enabled (and stopped before removal). To not start the service after the
+first install you should use the 'disable' option.
+
+=item I<since>
+
+Since dh-runit 2.8.15 this option is no longer needed and is deprecated.
+It's retained only for backward compatibility with packages that still
+use it. See #942323
+
+=item I<noreplace>
+
+Since dh-runit 2.9.0 this option is deprecated and it's retained only for backward
+compatibility.
+You can use onupgrade=nostop instead.
+
+=item I<presubj>
+
+Include presubj file for reportbug into generate package. This file contains
+note that suggest including runit maintainers into copy of bug reports, related
+to runit integration. If the package already include it's own presubj file, that file
+takes precedence over runit presubj file.
+
+This may make life of package maintainer who uses another init system easier.
+
+=item I<defaults>
+
+If you don't need other options, specify this one.
+
+=back
+
+=head1 SUBSTITUTION VARIABLES
+
+Packages using B<dh_runit> do not depend on B<runit> but should include the
+I<runit:Breaks> variable in their I<Breaks> field in I<debian/control>
+to ensure that no breakages are caused by a too-old version of B<runit> package.
+
+=head1 EXAMPLES
+
+This section contains several example F<I<package>.runit> snippets.
+
+  # In this case, a file is installed as a 'run' script. The directory
+  # name under /etc/sv is derived from the file's basename (/etc/sv/script).
+  path/to/file/to/be/installed/as/run/script defaults
+
+  # Similar, but installs a directory as a whole. It is the package's
+  # responsibility to ensure this directory contains everything required.
+  path/to/directory defaults
+
+  # Similar, but without creating a symlink under /etc/service.
+  path/to/directory disable
+
+  # Explicitly specifying a name to use for the directory under /etc/sv.
+  # A standard log/run script will be created.
+  path/to/directory name=my-preferred-name,logscript
+
+=cut
+
+# vim: et:sw=4

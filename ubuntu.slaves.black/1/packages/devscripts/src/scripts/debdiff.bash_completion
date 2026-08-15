@@ -1,0 +1,154 @@
+# /usr/share/bash-completion/completions/debdiff
+# Bash command completion for ‘debdiff(1)’.
+# Documentation: ‘bash(1)’, section “Programmable Completion”.
+
+# This is free software, and you are welcome to redistribute it under
+# certain conditions; see the end of this file for copyright
+# information, grant of license, and disclaimer of warranty.
+
+_have debdiff &&
+_debdiff () {
+    local cur prev words cword
+    _init_completion || return
+
+    local i
+    local command_name=debdiff
+    local options=(
+        -h --help -v --version
+        -q --quiet
+        -d --dirs --nodirs
+        -w --ignore-space
+        --diffstat --no-diffstat
+        --auto-ver-sort --no-auto-ver-sort
+        --unpack-tarballs --no-unpack-tarballs
+        --apply-patches --no-apply-patches
+        --control --nocontrol --controlfiles
+        --wdiff-source-control --no-wdiff-source-control --wp --wl --wt
+        --show-moved --noshow-moved --renamed
+        --debs-dir
+        --from
+        --move --move-regex
+        --exclude
+    )
+
+    local file_list_mode=normal
+    local -i move_from=-1
+    local -i move_to=-1
+
+    unset COMPREPLY
+
+    case "$prev" in
+        "$command_name")
+            options+=( --noconf --no-conf )
+            ;;
+
+        --debs-dir)
+            COMPREPLY=( $( compgen -A directory -- "$cur" ) )
+            ;;
+
+    esac
+
+    if [[ -v COMPREPLY ]] ; then
+        return 0
+    fi
+
+    for (( i=1; i<${#words[@]}; i++ )); do
+        if [[ $file_list_mode == @(deb|dsc|changes) ]]; then
+            if (( i == ${#words[@]}-1 )); then
+                break
+            else
+                COMPREPLY=()
+                return 0
+            fi
+        fi
+        if (( ${move_from} == -1  && ${move_to} == -1 )); then
+            file_list_mode=normal
+        elif (( ${move_from} >= 0 && ${move_to} == -1 )); then
+            file_list_mode=from
+        elif (( ${move_from} >= 0 && ${move_to} >= 0 && ${move_to} < ${move_from} )); then
+            file_list_mode=to
+        else
+            COMPREPLY=()
+            return 0
+        fi
+        if [[ $file_list_mode == normal && ${words[i]} == --from ]]; then
+            move_from=0
+            file_list_mode=from
+        elif [[ $file_list_mode == normal && ${words[i]} == *.deb ]]; then
+            file_list_mode=deb
+        elif [[ $file_list_mode == normal && ${words[i]} == *.udeb ]]; then
+            file_list_mode=deb
+        elif [[ $file_list_mode == normal && ${words[i]} == *.dsc ]]; then
+            file_list_mode=dsc
+        elif [[ $file_list_mode == normal && ${words[i]} == *.changes ]]; then
+            file_list_mode=changes
+        elif [[ $file_list_mode == from && ${words[i]} == *.deb ]]; then
+            (( ++move_from ))
+        elif [[ $file_list_mode == from && ${words[i]} == *.udeb ]]; then
+            (( ++move_from ))
+        elif [[ $file_list_mode == from && ${words[i]} == --to ]]; then
+            move_to=0
+            file_list_mode=to
+        elif [[ $file_list_mode = to && ${words[i]} == *.deb ]]; then
+            (( ++move_to ))
+        elif [[ $file_list_mode = to && ${words[i]} == *.udeb ]]; then
+            (( ++move_to ))
+        fi
+    done
+
+    case $file_list_mode in
+        normal)
+            if [[ $prev == --debs-dir ]]; then
+                COMPREPLY=( $( compgen -G "${cur}*" ) )
+                compopt -o dirnames
+            elif [[ $cur == -* ]]; then
+                COMPREPLY=( $( compgen -W "${options[*]}" -- "$cur" ) )
+            else
+                COMPREPLY=( $( compgen -G "${cur}*.@(deb|udeb|dsc|changes)" ) )
+                compopt -o filenames
+                compopt -o plusdirs
+            fi
+            ;;
+        deb|from|to)
+            COMPREPLY=( $( compgen -G "${cur}*.deb" "${cur}*.udeb" ) )
+            if (( $move_from > 0 && $move_to < 0 )) ; then
+                COMPREPLY+=( $( compgen -W "--to" -- "$cur" ) )
+            fi
+            compopt -o filenames
+            compopt -o plusdirs
+            ;;
+        dsc)
+            COMPREPLY=( $( compgen -G "${cur}*.dsc" ) )
+            compopt -o filenames
+            compopt -o plusdirs
+            ;;
+        changes)
+            COMPREPLY=( $( compgen -G "${cur}*.changes" ) )
+            compopt -o filenames
+            compopt -o plusdirs
+            ;;
+        *)
+            COMPREPLY=( $( compgen -W "${options[*]}" -- "$cur" ) )
+            ;;
+    esac
+
+    return 0
+
+} &&
+complete -F _debdiff debdiff
+
+
+# Copyright © 2016–2017 Ben Finney <ben+debian@benfinney.id.au>
+# Copyright © 2015 Nicholas Bamber <nicholas@periapt.co.uk>
+#
+# This is free software: you may copy, modify, and/or distribute this work
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; version 2 of that license or any later version.
+# No warranty expressed or implied. See the file ‘LICENSE.GPL-2’ for details.
+
+# Local variables:
+# coding: utf-8
+# mode: shell-script
+# indent-tabs-mode: nil
+# End:
+# vim: fileencoding=utf-8 filetype=sh expandtab shiftwidth=4 :

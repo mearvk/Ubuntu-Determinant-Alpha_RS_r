@@ -1,0 +1,81 @@
+#!/bin/sh
+# You can call this script from inside your debian/ dir and redirect
+# the output to README.Debian.
+#
+# This script helps to create README.source for R packages
+# featuring large amounts of binary data files
+
+cat <<EOT
+Explanation for binary files inside source package according to
+  https://lists.debian.org/debian-devel/2013/09/msg00332.html
+
+EOT
+
+GuessDocName () {
+  if [ -e $1.Rd ] ; then
+    echo $1.Rd
+  else
+    rdoc=`echo $1 | sed 's/\.[RDArdat]\+$/.Rd/'`
+    if [ -e $rdoc ] ; then
+      echo $rdoc
+    else
+      if [ -e "${rdoc}.rd"  ] ; then
+        echo ${rdoc}.rd
+      else
+        find ../man -iname $(basename $1).rd
+      fi
+    fi
+  fi
+}
+
+for rda in `find .. -iname "*.rda" -o -iname "*.rdata" | sort` ; do
+  if echo $rda | grep -q -e "^\.\./data" -e "^\.\./.*/extdata" ; then
+    rdoc=`GuessDocName "../man/$(basename $rda .rda)"`
+    if [ ! -e "$rdoc"  ] ; then
+      # try lower case doc name if nothing else was found
+      rdoc=`GuessDocName "../man/"$(basename $rda .rda | tr 'A-Z' 'a-z')`
+    fi
+    if [ ! -e "$rdoc"  ] ; then
+      # Pick a doc file that is featuring the full name of the binary
+      rdanoext=`basename $rda .rda | sed 's/\.RData$//'`
+      rdoc=`grep -l -w $rdanoext ../man/* | head -n1`
+    fi
+    rdaname=$(echo $rda | sed 's#^\.\./##')
+    if [ ! -e "$rdoc"  ] ; then
+      >&2 echo "Verify documentation for $rda manually"
+    else
+        echo "Files: $rdaname"
+        echo $rdoc | sed 's#^\.\./#Documented: #'
+        TITLE=$(grep '\\title' $rdoc | sed -e 's/^\\title{/  /' -e 's/ *} *$//')
+        DESCRIPTION=$(grep -A 3 '\\description' $rdoc  | sed -e 's/^\\description{/  /' -e 's/ *} *$//' -e '/}/,$d' -e '/^[[:space:]]*$/d' -e 's/^ \+//')
+        if ! echo $TITLE | grep -q ' ' ; then
+            if [ "$DESCRIPTION" != "" ] ; then
+                TITLE=$DESCRIPTION
+            fi
+        fi
+        if echo $TITLE | grep -q '^[[:space:]]*$' ; then
+            sed -e '0,/^\\title{/d' -e '/^}/,$d' -e 's/^\\description{//' -e 's/^\([^ ]\)/  \1/' $rdoc
+        else
+            echo $TITLE | sed -e 's/}[[:space:]]*$//' -e 's/^ */  /'
+        fi
+        echo ""
+    fi
+  else
+    echo $rda | sed 's#^\.\./#Files: #'
+    if echo $rda | grep -q "^\.\./tests" ; then
+      echo "Documentation: Test data for comparison in unit test"
+    else
+      if echo $rda | grep -q "sysdata.rda" ; then
+        echo "Documentation: dump of system data of R run."
+      else
+        echo "FIXME: Needs documentation"
+      fi
+    fi
+    echo ""
+  fi
+done
+
+cat <<EOT
+ -- `echo ${DEBFULLNAME}` <`echo ${DEBEMAIL}`>  `date -R`
+EOT
+

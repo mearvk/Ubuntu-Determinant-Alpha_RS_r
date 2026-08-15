@@ -1,0 +1,237 @@
+#!/usr/bin/perl
+
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright © 2018 James McCoy <jamessan@debian.org>
+
+=head1 NAME
+
+dh_vim-addon - debhelper addon to help package Vim/Neovim addons
+
+=cut
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+use File::Spec;
+
+our $VERSION = '0.4';
+
+=head1 SYNOPSIS
+
+B<dh_vim-addon> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_vim-addon> is a debhelper program that is responsible for installing
+addons for Vim/Neovim and generating the help tags file for any documentation.
+The addons are installed into directories following Vim's native "package"
+hierarchy.
+
+There are two types of addons which are supported.
+
+=over 4
+
+=item automatic
+
+Automatic addons are immediately enabled for users when installed.  The addons
+should provide a standard mechansim to let the user disable the addon.  This is
+typically done by short-circuiting loading of the addon when the user adds
+C<let g:loaded_E<lt>addonE<gt> = 1> in their vimrc.
+
+=item optional
+
+Optional addons are only enabled for users if the explicitly opt-in to the
+addon.  The user can do so by adding C<packadd! E<lt>addonE<gt>> to their vimrc.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item debian/I<package>.vim-addon
+
+=item debian/I<package>.neovim-addon
+
+List of installed directories to be setup as an automatic addon in I<package>.
+The format is a set of lines, where each line lists the base directory of an
+addon, relative to the package build directory and, optionally, the addon name.
+
+=over 4
+
+    B<path/to/addon/basedir>  I<optional-addon-name>
+
+=back
+
+There should typically only be a single addon, and therefore line, per
+package.  If an addon name is not supplied, the last component of the base
+directory will be used as the addon name.
+
+If the C<basedir> does not match the addon's name (e.g., because it matches the
+Debian package's name), then it is recommended to supply the addon name.  This
+ensures that common conventions, like C<packadd addon-name> and C<let
+g:loaded_addon = 1> work as the user expects.
+
+The C<${vim-addon:Depends}> substvar will be set with any required dependencies.
+
+=item debian/I<package>.vim-opt-addon
+
+=item debian/I<package>.neovim-opt-addon
+
+This file follows the same format as F<vim-addon>, however the directories will
+be installed as optional addons in I<package>.
+
+The C<${vim-addon:Depends}> substvar will be set with any required dependencies.
+
+=back
+
+=head1 EXAMPLES
+
+=head2 Single addon, dh-style
+
+Here is an example of a simple dh(1) style package with a single addon,
+compatible with Vim and Neovim.  The F<debian/rules> is:
+
+=over 4
+
+    #!/usr/bin/make -f
+    %:
+        dh $@ --with vim_addon
+
+=back
+
+The Vim addon is installed under F</usr/share/vim-simple>, but the addon name
+is I<simple> (i.e., C<let g:loaded_simple = 1> is the expected way for a user
+to disable loading of the addon).  The F<vim-addon> file is:
+
+=over 4
+
+    usr/share/vim-simple simple
+
+=back
+
+F<debian/vim-simple.neovim-addon> is a symlink to
+F<debian/vim-simple.vim-addon>.
+
+=head2 Multiple addons, debhelper
+
+Here is an example of a debhelper style package, providing multiple addons,
+some of which aren't compatible with Neovim.  The F<debian/rules> contains:
+
+=over 4
+
+    #!/usr/bin/make -f
+    ...
+        # Install the files to the package build directory
+        dh_install
+        # Setup the (neo)vim addons
+        dh_vim-addon
+
+=back
+
+The addons are installed under F</usr/share/vim-multi-addons>.  Unlike the
+single addon example, these addons are all installed into a directory matching
+the addon name, so only the base directory is needed in the F<vim-addon> file:
+
+=over 4
+
+    usr/share/vim-multi-addons/addon1
+    usr/share/vim-multi-addons/addon2
+
+=back
+
+while the F<neovim-addon> is:
+
+=over 4
+
+    usr/share/vim-multi-addon/addon1
+    usr/share/vim-multi-addon/addon3
+
+=back
+
+=head1 SEE ALSO
+
+nvim(1), vim(1)
+
+=head1 AUTHOR
+
+James McCoy <jamessan@debian.org>
+
+=cut
+
+init();
+
+# PROMISE: DH NOOP WITHOUT pkgfile-logged(vim-addon) pkgfile-logged(vim-opt-addon) pkgfile-logged(neovim-addon) pkgfile-logged(neovim-opt-addon)
+
+my %pkgfiledir = (
+	'vim-addon' => '/usr/share/vim/vimfiles/pack/dist-bundle/start',
+	'vim-opt-addon' => '/usr/share/vim/vimfiles/pack/dist-bundle/opt',
+	'neovim-addon' => '/usr/share/nvim/site/pack/dist-bundle/start',
+	'neovim-opt-addon' => '/usr/share/nvim/site/pack/dist-bundle/opt',
+);
+
+my @packages = getpackages();
+on_items_in_parallel(\@packages, sub {
+	my %tagdirs;
+	foreach my $package (@_) {
+		my $tmp = tmpdir($package);
+
+		my %substvar;
+		foreach my $pkgfilebase (sort keys %pkgfiledir) {
+			my $pkgfile = pkgfile($package, $pkgfilebase);
+			my $skip_process = process_pkg($package) ? 0 : 1;
+
+			next if $skip_process;
+
+			my @paths;
+			@paths = filedoublearray($pkgfile) if $pkgfile;
+
+			# Verify all the specified directories can be found
+			my @dirs = grep { -d File::Spec->join($tmp, $_->[0]) } @paths;
+			my @unknown = map { $_->[0] }
+			              grep { ! -d File::Spec->join($tmp, $_->[0]) } @paths;
+			error("No directories found matching: @unknown\n") if @unknown;
+
+			my $dest = $pkgfiledir{$pkgfilebase};
+			foreach my $pair (@dirs) {
+				my ($basedir, $addon_name) = @$pair;
+				# Can either be [/path/to/addon  addonname] or [/path/to/addon]
+				$addon_name = basename($basedir) unless $addon_name;
+				my $destpath = File::Spec->join($dest, $addon_name);
+				make_symlink($destpath, $basedir, $tmp);
+
+				my $docdir = File::Spec->join($tmp, $basedir, 'doc');
+				if (-d $docdir) {
+					verbose_print("$addon_name doc directory: $docdir");
+					$tagdirs{$docdir} = 1;
+				} else {
+					verbose_print("No doc directory for $addon_name");
+				}
+			}
+
+			if ($pkgfilebase =~ m/neovim/) {
+				# First version with good "packages" support
+				$substvar{neovim} = '0.2.2-1~';
+			} else {
+				# First version with $VIM/vimfiles as a directory instead of a symlink to /etc/vim
+				$substvar{vim} = '2:8.1.0693-2~';
+			}
+		}
+
+		if (%substvar) {
+			my $depinfo = join '|', map { "$_ (>= $substvar{$_})" }
+			              # Put vim first when both vim/neovim are supported
+			              reverse sort keys %substvar;
+			addsubstvar($package, 'vim-addon:Depends', $depinfo);
+		}
+
+		# Record that the package was handled, even though it only
+		# generates new content, rather than installing anything from
+		# the source
+		log_installed_files($package);
+	}
+
+	if (scalar(%tagdirs)) {
+		doit('helpztags', sort keys %tagdirs);
+	}
+});

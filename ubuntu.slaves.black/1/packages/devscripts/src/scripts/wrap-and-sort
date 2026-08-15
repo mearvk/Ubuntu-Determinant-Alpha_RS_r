@@ -1,0 +1,318 @@
+#!/usr/bin/python3
+#
+# Copyright (C) 2010-2018, Benjamin Drung <bdrung@debian.org>
+#               2010, Stefano Rivera <stefanor@ubuntu.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+import argparse
+import glob
+import operator
+import os
+import re
+import sys
+
+from devscripts.control import Control
+
+CONTROL_LIST_FIELDS = (
+    "Breaks",
+    "Build-Conflicts",
+    "Build-Conflicts-Arch",
+    "Build-Conflicts-Indep",
+    "Build-Depends",
+    "Build-Depends-Arch",
+    "Build-Depends-Indep",
+    "Built-Using",
+    "Conflicts",
+    "Depends",
+    "Enhances",
+    "Pre-Depends",
+    "Provides",
+    "Recommends",
+    "Replaces",
+    "Suggests",
+    "Xb-Npp-MimeType",
+)
+
+SUPPORTED_FILES = (
+    "clean",
+    "control",
+    "control*.in",
+    "copyright",
+    "copyright.in",
+    "dirs",
+    "*.dirs",
+    "docs",
+    "*.docs",
+    "examples",
+    "*.examples",
+    "info",
+    "*.info",
+    "install",
+    "*.install",
+    "links",
+    "*.links",
+    "mainscript",
+    "*.maintscript",
+    "manpages",
+    "*.manpages",
+    "tests/control",
+)
+
+
+def erase_and_write(file_ob, data):
+    """When a file is opened via r+ mode, replaces its content with data"""
+    file_ob.seek(0)
+    file_ob.write(data)
+    file_ob.truncate()
+
+
+class WrapAndSortControl(Control):
+    def __init__(self, filename, args):
+        super().__init__(filename)
+        self.args = args
+
+    def wrap_and_sort(self):
+        for paragraph in self.paragraphs:
+            for field in CONTROL_LIST_FIELDS:
+                if field in paragraph:
+                    self._wrap_field(paragraph, field, True)
+            if "Uploaders" in paragraph:
+                self._wrap_field(paragraph, "Uploaders", False)
+            if "Architecture" in paragraph:
+                archs = set(paragraph["Architecture"].split())
+                # Sort, with wildcard entries (such as linux-any) first:
+                archs = sorted(archs, key=lambda x: ("any" not in x, x))
+                paragraph["Architecture"] = " ".join(archs)
+
+        if self.args.sort_binary_packages:
+            if self.filename.endswith('tests/control'):
+                return
+            first = self.paragraphs[:1 + int(self.args.keep_first)]
+            sortable = self.paragraphs[1 + int(self.args.keep_first):]
+            sort_key = operator.itemgetter("Package")
+            self.paragraphs = first + sorted(sortable, key=sort_key)
+
+    def _wrap_field(self, control, entry, sort):
+        # An empty element is not explicitly disallowed by Policy but known to
+        # break QA tools, so remove any
+        packages = [x.strip() for x in control[entry].split(",") if x.strip()]
+
+        # Sanitize alternative packages. E.g. "a|b  |c" -> "a | b | c"
+        packages = [" | ".join([x.strip() for x in p.split("|")])
+                    for p in packages]
+
+        if sort:
+            # Remove duplicate entries
+            packages = set(packages)
+            packages = sort_list(packages)
+
+        length = len(entry) + sum([2 + len(package) for package in packages])
+        if self.args.wrap_always or length > self.args.max_line_length:
+            indentation = " "
+            if not self.args.short_indent:
+                indentation *= len(entry) + len(": ")
+            packages_with_indention = [indentation + x for x in packages]
+            packages_with_indention = ",\n".join(packages_with_indention)
+            if self.args.trailing_comma:
+                packages_with_indention += ','
+            if self.args.short_indent:
+                control[entry] = "\n" + packages_with_indention
+            else:
+                control[entry] = packages_with_indention.strip()
+        else:
+            control[entry] = ", ".join(packages)
+
+    def check_changed(self):
+        """Checks if the content has changed in the control file"""
+        content = "\n".join([x.dump() for x in self.paragraphs])
+        with open(self.filename, "r", encoding="utf8") as control_file:
+            if content != control_file.read():
+                return True
+        return False
+
+
+class Install:
+    def __init__(self, filename, args):
+        self.content = None
+        self.filename = None
+        self.args = args
+        self.open(filename)
+
+    def open(self, filename):
+        assert os.path.isfile(filename), "%s does not exist." % (filename)
+        self.filename = filename
+        with open(filename, encoding="utf8") as f:
+            lines = f.readlines()
+        self.content = [line.strip() for line in lines if line.strip()]
+
+    def save(self):
+        to_write = "\n".join(self.content) + "\n"
+
+        with open(self.filename, "r+", encoding="utf8") as install_file:
+            content = install_file.read()
+            if to_write != content:
+                if not self.args.dry_run:
+                    erase_and_write(install_file, to_write)
+                return True
+        return False
+
+    def sort(self):
+        self.content = sorted(self.content)
+
+
+def remove_trailing_whitespaces(filename, args):
+    assert os.path.isfile(filename), "%s does not exist." % (filename)
+    with open(filename, "br+") as file_object:
+        content = file_object.read()
+        if not content:
+            return True
+        new_content = content.strip() + b"\n"
+        new_content = b"\n".join(
+            [
+                line.rstrip()
+                for line in new_content.split(b'\n')
+            ],
+        )
+        if new_content != content:
+            if not args.dry_run:
+                erase_and_write(file_object, new_content)
+            return True
+    return False
+
+
+def sort_list(unsorted_list):
+    packages = [x for x in unsorted_list if re.match("[a-z0-9]", x)]
+    special = [x for x in unsorted_list if not re.match("[a-z0-9]", x)]
+    return sorted(packages) + sorted(special)
+
+
+def wrap_and_sort(args):
+    modified_files = []
+    control_files = [f for f in args.files if re.search("/control[^/]*$", f)]
+    for control_file in control_files:
+        if args.verbose:
+            print(control_file)
+        control = WrapAndSortControl(control_file, args)
+        if args.cleanup:
+            control.strip_trailing_spaces()
+        control.wrap_and_sort()
+        if control.check_changed():
+            if not args.dry_run:
+                control.save()
+            modified_files.append(control_file)
+
+    copyright_files = [f for f in args.files
+                       if re.search("/copyright[^/]*$", f)]
+    for copyright_file in copyright_files:
+        if args.verbose:
+            print(copyright_file)
+        if remove_trailing_whitespaces(copyright_file, args):
+            modified_files.append(copyright_file)
+
+    pattern = "(dirs|docs|examples|info|install|links|maintscript|manpages)$"
+    install_files = [f for f in args.files if re.search(pattern, f)]
+    for install_file in sorted(install_files):
+        if args.verbose:
+            print(install_file)
+        install = Install(install_file, args)
+        install.sort()
+        if install.save():
+            modified_files.append(install_file)
+
+    return modified_files
+
+
+def get_files(debian_directory):
+    """Returns a list of files that should be wrapped and sorted."""
+    files = []
+    for supported_files in SUPPORTED_FILES:
+        file_pattern = os.path.join(debian_directory, supported_files)
+        files.extend(file_name for file_name in glob.glob(file_pattern)
+                     if not os.access(file_name, os.X_OK))
+    return files
+
+
+def main():
+    script_name = os.path.basename(sys.argv[0])
+    epilog = "See %s(1) for more info." % (script_name)
+    parser = argparse.ArgumentParser(epilog=epilog)
+
+    # Remember to keep doc/wrap-and-sort.1 updated!
+    parser.add_argument("-a", "--wrap-always", action="store_true", default=False,
+                        help="wrap lists even if they do not exceed the line length limit")
+    parser.add_argument("-s", "--short-indent", dest="short_indent",
+                        help="only indent wrapped lines by one space (default is "
+                             "in-line with the field name)",
+                        action="store_true", default=False)
+    parser.add_argument("-b", "--sort-binary-packages",
+                        help="Sort binary package paragraphs by name",
+                        dest="sort_binary_packages", action="store_true",
+                        default=False)
+    parser.add_argument("-k", "--keep-first",
+                        help="When sorting binary package paragraphs, leave the "
+                             "first one at the top. Unqualified debhelper "
+                             "configuration files are applied to the first "
+                             "package.",
+                        dest="keep_first", action="store_true", default=False)
+    parser.add_argument("-n", "--no-cleanup", help="do not remove trailing whitespaces",
+                        dest="cleanup", action="store_false", default=True)
+    parser.add_argument("-t", "--trailing-comma", help="add trailing comma",
+                        dest="trailing_comma", action="store_true",
+                        default=False)
+    parser.add_argument("-d", "--debian-directory", dest="debian_directory",
+                        help="location of the 'debian' directory (default: ./debian)",
+                        metavar="PATH", default="debian")
+    parser.add_argument("-f", "--file", metavar="FILE",
+                        dest="files", action="append", default=[],
+                        help="Wrap and sort only the specified file.")
+    parser.add_argument("-v", "--verbose",
+                        help="print all files that are touched",
+                        dest="verbose", action="store_true", default=False)
+    parser.add_argument("--max-line-length", type=int, default=79,
+                        help="set maximum allowed line length before wrapping "
+                             "(default: %(default)i)")
+    parser.add_argument("-N", "--dry-run", dest="dry_run", action="store_true",
+                        default=False,
+                        help="do not modify any file, instead only "
+                             "print the files that would be modified")
+
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.debian_directory):
+        parser.error('Debian directory not found, expecting "%s".' %
+                     args.debian_directory)
+
+    not_found = [f for f in args.files if not os.path.isfile(f)]
+    if not_found:
+        parser.error('Specified files not found: %s' % ", ".join(not_found))
+
+    if not args.files:
+        args.files = get_files(args.debian_directory)
+
+    modified_files = wrap_and_sort(args)
+
+    # Only report at the end, to avoid potential clash with --verbose
+    if modified_files and (args.verbose or args.dry_run):
+        if args.dry_run:
+            header = "--- Dry run, these files would be modified ---"
+        else:
+            header = "--- Modified files ---"
+        print(header)
+        print("\n".join(modified_files))
+    elif args.verbose:
+        print("--- No file needs modification ---")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,569 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>Build-information collecting engine</title>
+  </head>
+
+  <body>
+    <h1 align="center">Build-information collecting engine</h1>
+
+    <p style="font-weight:bold" align="center">Improving tracability of Debian packages
+
+    <p style="font-weight:bold" align="center">A mechanism to register
+    build-time informations inside a Debian package.  Mostly, that
+    means keeping a list of the versions of all packages used for the
+    package build.
+
+    <p>You may be looking for <a
+    href="http://people.debian.org/~dirson/buildinfo/" >available
+    build informations</a>.
+    
+    <p>Note: the latest version of this document can be found at <a
+    href="http://ydirson.free.fr/en/software/buildinfo.html"
+    >http://ydirson.free.fr/en/software/buildinfo.html</a>.
+
+    <p>Note: this is currently a work-in-progress thing.  It needs to
+    be used by a couple of people willing to send feedback, before
+    thinking about promoting it to a standard Debian tool.
+
+    <h2>How is it useful ?</h2>
+
+    <p>When I talk about this tool to encourage people to give me
+    feedback, I often get "I don't understand its usefulness" as
+    answer.  Here is a try to clarify why I think it's useful.
+    Please, do tell me if you feel these explanations do not convince
+    you :)
+
+    <dl>
+      <dt>Finding out that a package needs rebuild
+	
+      <dd>What makes a binary package is a combination of the source
+      package <em>AND</em> build-dependencies.  Since library APIs are
+      subject to change and bugs get fixed (in compilers, libs, etc),
+      a package which used to build may start to
+      FTBFS at any time because of a new version of a
+      build-dependency, as recently demonstrated by the transition
+      from gcc 3.2 to gcc 3.3.
+
+	<p>It also sometimes occur that bugs in build-deps cause
+	subtle problems in packages built with it.  Debhelper comes to
+	mind, as it eveolves quickly and is used by many packages.
+	Being able to locate packages built with a known-broken
+	version of a package will greatly help to improve the quality
+	of Debian.
+	
+      <p>The current way of distributing binary packages of GPL'd
+      software may even be read as a violation of the spirit of the
+      GPL, in that it may not be possible to rebuild the binary
+      package from stuff available from Debian.
+      
+      <p>This information can be used to provide a mechanism that will
+      check whether a build-dep requires a package to be rebuilt.
+      This probably requires that:
+	<ul>
+	  <li>packages declare whether a new version possibly requires
+	    depending packages to be rebuilt
+	  <li>packages may declare that some (build-)essential
+	    packages are to be ignored in this calculation
+	</ul>
+      </dd>
+
+      <dt>Blame a build-dep/build-essential/essential package for a
+      buildd failure
+	
+      <dd>When a package fails to autobuild, the only version
+      information we get is that of packages that were not already
+      installed on the build daemon.  This excludes the toolchain,
+      although recent buildd versions now print this particular set of
+      version numbers, and other stuff.  And the information in the
+      buildd logs is not systematically parsable, it is mostly meant
+      for the human eye.
+
+      <p>An idea from Rene Engelhard is to have dh_buildinfo invoked
+      from the very beginning of the build process (before
+      <tt>./configure</tt> or any other thing that could possibly
+      fail), and to cat the output so that the information is
+      available from the buildd logs in case of build failure.  This
+      could surely be improved by adding knowledge of the buildinfo to
+      buildd itself.  For now you can achieve this by calling
+      <tt>dh_buildinfo generate cat</tt> before <tt>./configure</tt>
+      is run, and then <tt>dh_buildinfo install</tt> to install the
+      already-generated <tt>debian/buildinfo</tt> into your packages.
+
+      <dt>Quick summaries
+	
+      <dd>This info can be used to generate nifty graphs.  Everyone
+      likes nifty graphs.  And tables too :)
+      <ul>
+	<li>For each package, a table showing for each arch the
+	version of a build-dep, and the current version thereof.
+	Maybe with some colors to better visualize outdated stuff.
+	
+	<li>For each package, a graph of the number of packages built
+	using each version thereof.  With some history to visualize
+	transitions.  And take all archs into account.
+      </ul>
+    </dl>
+
+    <h2>What currently exists</h2>
+
+    <p>See package <a href="http://packages.debian.org/dh-buildinfo"
+    >dh-buildinfo</a> in sarge and later.  It contains:
+
+    <ul>
+      <li>A dh_buildinfo
+      script, which generates a <tt>buildinfo</tt> file, which
+      currently ends up being installed into each package's doc
+      directory.  These info currently contain the versions of all
+      packages on which the package build-depends, as well as
+      build-essential and essential packages.  It is at least
+      limited in that:
+	<ul>
+	  <li>Virtual packages are not 100% correctly listed I think
+	  <li>Build-Depends-Indep is not handled correctly
+	</ul>
+
+      <li>The BuildDeps perl module which abstracts the core
+      functionality of <tt>dpkg-checkbuilddeps</tt>.
+
+    </ul>
+    
+    <h2>How to use this info</h2>
+
+    <p>Running <tt>grep '^[^ ]'</tt> on a buildinfo file will extract
+    all lines with a package and its version.  All lines starting with
+    a space can be considered as "human use only".
+
+    <h2>Bugs/plans/ideas for the future</h2>
+
+    <ul>
+      <li>See if we can improve the structure of the buildinfo file,
+      to make it more easily parsable.
+
+      <li>We could get rid of the runtime-dependency on
+      <tt>build-essential</tt>
+      
+      <li>See where the generated information should be
+      per-binary-package or per-set-of-binary-packages, where it
+      should be located (in the filesystem (in
+      <tt>/usr/share/doc/<em>package</em>/buildinfo</tt>, or
+      <tt>/usr/share/buildinfo/<em>package</em></tt>, or whatever),
+      but that will cause diskpace problems, as an additional
+      file to be uploaded (to register in <tt>debian/files</tt>), in
+      the deb at the same level as data.tar.gz (eg. added with <tt>ar
+      q foo.deb buildinfo</tt>), just registered on buildd.d.o (<a
+      href="http://lists.debian.org/debian-devel/2001/debian-devel-200110/msg01997.html"
+      >suggested by aj</a>), etc.)
+      
+      <li>Better handling of alternatives and virtual packages:
+      <ul>
+	<li>See example below
+	<li>Correctly handle virtual packages when computing closure
+	<li>Warn for virtual packages multiply provided
+	<li>Maybe query alternatives on multiply provided packages (eg. awk)
+      </ul>
+
+      <li>Better handling of arch-indep packages and build-deps:
+      <ul>
+	<li>Correctly handle <tt>Build-Depends-Indep</tt>
+	<li>Omit packages which we know have no influence on an
+	arch-indep package ?  Or is it too much of an hypothesis
+	(think of an arch-indep package with data produced by a
+	program compiled at build-time) ?
+      </ul>
+      
+      <li>Write an efficient pool-traversal lib (or check whether
+      there is already one), to extract the buildinfo from binary
+      packages.
+
+      <li>Have this mechanism accepted and used
+
+      <li>World domination
+    </ul>
+
+    <h2>Sample output</h2>
+
+    <p>This is a buildinfo file for gcompris 3.2-3 [2003/08/07]
+
+    <p>You will notice the 2 available alternatives for the "awk"
+    virtual package (not nice, eh...)
+
+<pre>
+ *** Build information ***
+
+ Essential packages:
+
+base-files                               3.0.9
+base-passwd                              3.5.4
+bash                                     2.05b-8.1
+bsdutils                                 1:2.11z-4
+coreutils                                5.0-5
+debianutils                              2.5.4
+diff                                     2.8.1-2
+dpkg                                     1.10.10
+e2fsprogs                                1.33+1.34-WIP-2003.05.21-2
+findutils                                4.1.20-1
+grep                                     2.5.1-5
+gzip                                     1.3.5-7
+hostname                                 2.10
+login                                    1:4.0.3-8
+mount                                    2.11z-4
+ncurses-base                             5.3.20030719-1
+ncurses-bin                              5.3.20030719-1
+perl-base                                5.8.0-18
+sed                                      4.0.7-1
+sysvinit                                 2.85-7
+tar                                      1.13.25-5
+util-linux                               2.11z-4
+
+
+ Essential packages closure:
+
+libpam-runtime                           0.76-13
+  pulled by: libpam0g
+libcap1                                  1:1.10-12
+  pulled by: libpam-modules
+gcc-3.3-base                             1:3.3.1-0rc1
+  pulled by: libstdc++5
+sysv-rc                                  2.85-7
+  pulled by: sysvinit
+libpam0g                                 0.76-13
+  pulled by: libpam-modules
+libdb1-compat                            2.1.3-7
+  pulled by: libc6
+libblkid1                                1.33+1.34-WIP-2003.05.21-2
+  pulled by: e2fsprogs
+libncurses5                              5.3.20030719-1
+  pulled by: dselect, ncurses-bin, util-linux
+libc6                                    2.3.1-17
+  pulled by: base-passwd, libdb1-compat, bsdutils, coreutils, debianutils, diff, dpkg, dselect, libgcc1, libncurses5, libstdc++5, e2fsprogs, libblkid1, findutils, grep, hostname, libpam-modules, libcap1, libdb3, libpam0g, mount, ncurses-bin, perl-base, sed, tar, util-linux, slang1
+dselect                                  1.10.10
+  pulled by: dpkg
+libstdc++5                               1:3.3.1-0rc1
+  pulled by: dselect
+libdb3                                   3.2.9-19
+  pulled by: libpam-modules
+slang1                                   1.4.5-2.1
+  pulled by: util-linux
+gawk                                     1:3.1.3-1
+  provides: awk
+  pulled by: base-files
+mawk                                     1.3.3-11
+  provides: awk
+  pulled by: base-files
+libgcc1                                  1:3.3.1-0rc1
+  pulled by: dselect, libstdc++5
+libpam-modules                           0.76-13
+  pulled by: login
+
+
+ Build-Essential packages:
+
+libc6-dev                                2.3.1-17
+libc6-dev                                2.3.1-17
+  provides: libc-dev
+gcc                                      3:3.3-2
+g++                                      3:3.3-2
+make                                     3.80-2
+dpkg-dev                                 1.10.10
+
+
+ Build-Essential closure:
+
+debconf                                  1.3.4
+  pulled by: binutils, debconf-english
+libdb4.0                                 4.0.14-1.2
+  pulled by: perl
+perl-modules                             5.8.0-18
+  pulled by: dpkg-dev, perl
+debconf-english                          1.3.4
+  pulled by: debconf
+perl                                     5.8.0-18
+  pulled by: perl-modules
+gcc-3.3                                  1:3.3.1-0rc1
+  pulled by: gcc, g++, g++-3.3, g++-3.3
+cpp                                      3:3.3-2
+  pulled by: gcc, g++
+cpp-3.3                                  1:3.3.1-0rc1
+  pulled by: gcc, cpp, gcc-3.3, gcc-3.3
+binutils                                 2.14.90.0.4-0.1
+  pulled by: gcc-3.3, dpkg-dev
+g++-3.3                                  1:3.3.1-0rc1
+  pulled by: g++, libstdc++5-3.3-dev
+patch                                    2.5.9-1
+  pulled by: dpkg-dev
+perl                                     5.8.0-18
+  provides: perl5
+  pulled by: dpkg-dev
+libstdc++5-3.3-dev                       1:3.3.1-0rc1
+  pulled by: g++-3.3
+libgdbm3                                 1.8.3-1
+  pulled by: perl
+cpio                                     2.5-1
+  pulled by: dpkg-dev
+
+
+ Declared Arch-indep Build-Dependencies:
+
+
+
+ Arch-indep Build-Dependencies closure:
+
+
+
+ Declared Arch-dependent Build-Dependencies:
+
+libgnomeui-dev                           2.2.2-1
+debhelper                                4.1.55
+libxml2-dev                              2.5.7-1
+libao-dev                                0.8.3-1.1
+libvorbis-dev                            1.0.0-3
+gnuchess                                 5.06-1
+texinfo                                  4.6-1
+texi2html                                1.66-1
+dh-buildinfo                             0.5
+
+
+ Arch-dependent Build-Dependencies closure:
+
+esound-common                            0.2.29-1
+  pulled by: libesd0, libesd0-dev
+libgnome2-0                              2.2.3-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, libgnome2-dev
+defoma                                   0.11.3
+  pulled by: libpango1.0-common
+libxslt1                                 1.0.30-3
+  pulled by: libgnome2-0
+libgnomevfs2-common                      2.2.5-3
+  pulled by: libgnomeui-0, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, libgnomevfs2-dev
+libgconf2-dev                            2.2.1-1
+  pulled by: libgnomeui-dev, libgnome2-dev, libgnomevfs2-dev
+gettext                                  0.12.1-3
+  pulled by: po-debconf, intltool-debian
+file                                     4.02-4
+  pulled by: defoma, debhelper
+libgnomecanvas2-0                        2.2.1-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, libgnomecanvas2-dev
+zlib1g-dev                               1:1.1.4-14
+  pulled by: libfreetype6-dev, libxft2-dev, libgnutls7-dev
+libesd0                                  0.2.29-1
+  pulled by: libgnomeui-0, libgnome2-0, libesd0-dev
+dialog                                   0.9b-20030720-1
+  pulled by: defoma
+zlib1g-dev                               1:1.1.4-14
+  provides: libz-dev
+  pulled by: libfreetype6-dev, libxft2-dev, libxml2-dev
+libbonobo2-dev                           2.2.3-1
+  pulled by: libgnome2-dev, libbonoboui2-dev
+fontconfig                               2.2.1-1
+  pulled by: libfontconfig1, libpango1.0-common, libfontconfig1-dev
+zlib1g                                   1:1.1.4-14
+  pulled by: libgnomeui-0, bonobo-activation, libbonoboui2-0, libbonoboui2-common, gconf2, libglade2-0, libgnome2-0, libxslt1, libgnomecanvas2-0, libgnomevfs2-0, libgnutls7, libopencdk4, libgnomevfs2-common, libgnutls5, libgtk2.0-0, libgtk2.0-common, libfontconfig1, fontconfig, libfreetype6, libpng12-0, libtiff3g, libxft2, libpango1.0-0, libpango1.0-common, file, libmagic1, libxml2, zlib1g-dev, python2.2
+libgcrypt1                               1.1.12-3
+  pulled by: libgnomeui-0, libgnome2-0, libgnutls7, libopencdk4, libgnutls5, libgcrypt-dev
+libgnomecanvas2-dev                      2.2.1-1
+  pulled by: libgnomeui-dev, libbonoboui2-dev
+debconf-utils                            1.3.4
+  pulled by: debhelper
+libgnutls7-dev                           0.8.9-2
+  pulled by: libgnomevfs2-dev
+libvorbis0a                              1.0.0-3
+  pulled by: libvorbis-dev
+libcdparanoia0                           3a9.8-9
+  pulled by: libgnomevfs2-common
+liborbit2                                1:2.6.2-1
+  pulled by: libgnomeui-0, bonobo-activation, libbonobo-activation4, libbonobo2-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgconf2-4, gconf2, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, liborbit2-dev
+libvorbisenc2                            1.0.0-3
+  pulled by: libvorbis-dev
+libreadline4                             4.3-5
+  pulled by: python2.2, gnuchess
+indent                                   2.2.8-4
+  pulled by: liborbit2-dev
+libpopt0                                 1.7-2
+  pulled by: libgnomeui-0, bonobo-activation, libbonobo-activation4, libbonobo2-common, gconf2, libgnome2-0, libgnutls7, libopencdk4, libgnutls5, liborbit2, liborbit2-dev, libpopt-dev
+libgnomeui-0                             2.2.2-1
+  pulled by: libgnomeui-dev
+libfreetype6                             2.1.4-4
+  pulled by: libgtk2.0-0, libgtk2.0-common, libfontconfig1, fontconfig, libxft2, libpango1.0-0, libpango1.0-common, xlibs, libfreetype6-dev
+libjpeg62                                6b-8
+  pulled by: libgnomeui-0, libgtk2.0-0, libtiff3g, libjpeg62-dev
+libbonoboui2-common                      2.2.2-1
+  pulled by: libbonoboui2-0
+libbonobo2-common                        2.2.3-1
+  pulled by: libbonobo2-0, libbonobo2-dev
+libvorbisfile3                           1.0.0-3
+  pulled by: libvorbis-dev
+libatk1.0-0                              1.2.4-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, gconf2, libglade2-0, libgnomecanvas2-0, libgtk2.0-0, libgtk2.0-common, libatk1.0-dev
+libfreetype6-dev                         2.1.4-4
+  pulled by: libpango1.0-dev, libxft2-dev, libfontconfig1-dev
+xlibs                                    4.2.1-9
+  pulled by: libgnomeui-0, libgtk2.0-0, libgtk2.0-0, libgtk2.0-common, libgtk2.0-common, libxft2, libpango1.0-0, libpango1.0-0, libpango1.0-common, libpango1.0-common, xlibs-dev
+liblinc1                                 2:1.0.3-2
+  pulled by: libgnomeui-0, bonobo-activation, libbonobo-activation4, libbonobo2-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgconf2-4, gconf2, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, liborbit2, liblinc-dev
+libgtk2.0-0                              2.2.2-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, gconf2, libglade2-0, libgnomecanvas2-0, libgtk2.0-common, libgtk2.0-dev
+libgnutls7                               0.8.9-2
+  pulled by: libgnomevfs2-0, libgnutls7-dev
+libidl0                                  0.8.2-1
+  pulled by: liborbit2, liborbit2-dev
+libdb4.1                                 4.1.25-4
+  pulled by: python2.2
+libopencdk4                              1:0.4.2-3
+  pulled by: libgnutls7, libgnutls5, libopencdk-dev
+libopencdk-dev                           1:0.4.2-3
+  pulled by: libgnutls7-dev
+libart-2.0-dev                           2.3.13-1
+  pulled by: libgnomeui-dev, libgnomecanvas2-dev
+libgcrypt-dev                            1.1.12-3
+  pulled by: libgnutls7-dev, libopencdk-dev
+html2text                                1.3.1-2
+  pulled by: debhelper
+libjpeg62-dev                            6b-8
+  pulled by: libgnomeui-dev
+build-essential                          9.4
+  pulled by: dh-buildinfo
+libglade2-0                              2.0.1-3
+  pulled by: libgnomeui-0, libbonoboui2-common, libgnomecanvas2-0, libglade2-dev
+libfontconfig1                           2.2.1-1
+  pulled by: libgtk2.0-0, libgtk2.0-common, fontconfig, libxft2, libpango1.0-0, libpango1.0-common
+libfam0c102                              2.6.10-1
+  pulled by: libgnomevfs2-common
+libgnomecanvas2-common                   2.2.1-1
+  pulled by: libgnomecanvas2-0
+python                                   2.2.3-3
+  pulled by: python-xmlbase, python-xmlbase, python2.2
+libmagic1                                4.02-4
+  pulled by: file
+libart-2.0-2                             2.3.13-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, libgnomecanvas2-0, libart-2.0-dev
+libexpat1                                1.95.6-4
+  pulled by: libfontconfig1, fontconfig, python2.2-xmlbase
+gnome-mime-data                          2.3.0-1
+  pulled by: libgnomevfs2-common
+libbonoboui2-dev                         2.2.2-1
+  pulled by: libgnomeui-dev
+libpango1.0-dev                          1.2.3-1
+  pulled by: libgtk2.0-dev
+libglade2-dev                            2.0.1-3
+  pulled by: libbonoboui2-dev
+python-xmlbase                           2.2.3-3
+  pulled by: libglade2-dev
+libgconf2-4                              2.2.1-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, gconf2, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, libgconf2-dev
+python2.2                                2.2.3-3
+  pulled by: python, python2.2-xmlbase
+libxft2-dev                              2.1.1-2
+  pulled by: libpango1.0-dev
+libglib2.0-0                             2.2.2-1
+  pulled by: libgnomeui-0, bonobo-activation, libatk1.0-0, libbonobo-activation4, libbonobo2-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgconf2-4, gconf2, libglade2-0, libgnome2-0, libgnomecanvas2-0, libgnomevfs2-0, libgnomevfs2-common, libgtk2.0-0, libgtk2.0-common, liblinc1, liborbit2, libidl0, libpango1.0-0, libpango1.0-common, liborbit2-dev, pkg-config, libglib2.0-dev
+libao2                                   0.8.3-1.1
+  pulled by: libao-dev
+liblzo1                                  1.08-1
+  pulled by: libgnutls7, libgnutls5
+libpango1.0-common                       1.2.3-1
+  pulled by: libpango1.0-0
+libogg0                                  1.0.0-1
+  pulled by: libogg-dev, libvorbis0a, libvorbisenc2, libvorbisfile3
+libaudiofile0                            0.2.3-4
+  pulled by: libgnomeui-0, libesd0, libgnome2-0, libaudiofile-dev
+libbonobo-activation-dev                 1:2.2.2-1
+  pulled by: libbonobo2-dev, libgnomevfs2-dev
+libgnome2-common                         2.2.3-1
+  pulled by: libgnome2-0
+libgtk2.0-dev                            2.2.2-1
+  pulled by: libgnomeui-dev, libgnomecanvas2-dev, libglade2-dev
+po-debconf                               0.7.1
+  pulled by: debhelper
+libglib2.0-dev                           2.2.2-1
+  pulled by: libgnome2-dev, liborbit2-dev, liblinc-dev, libbonobo-activation-dev, libgtk2.0-dev, libpango1.0-dev, libatk1.0-dev, libgconf2-dev
+libatk1.0-dev                            1.2.4-1
+  pulled by: libgtk2.0-dev
+gconf2                                   2.2.1-1
+  pulled by: libgconf2-4, libgnome2-common, libgconf2-dev
+libxml2                                  2.5.7-1
+  pulled by: libgnomeui-0, bonobo-activation, libbonoboui2-0, libbonoboui2-common, gconf2, libglade2-0, libgnome2-0, libxslt1, libgnomecanvas2-0, libgnomevfs2-0, libgnomevfs2-common, libxml2-dev
+pkg-config                               0.15.0-2
+  pulled by: liborbit2-dev, libglib2.0-dev, libgtk2.0-dev, libpango1.0-dev, libxft2-dev, libfontconfig1-dev, libatk1.0-dev, libart-2.0-dev
+libpng12-0                               1.2.5.0-4
+  pulled by: libgtk2.0-0
+intltool-debian                          0.26+20030525
+  pulled by: po-debconf
+libjpeg62-dev                            6b-8
+  provides: libjpeg-dev
+  pulled by: libgnomeui-dev
+libbonoboui2-0                           2.2.2-1
+  pulled by: libgnomeui-0, libbonoboui2-common, libbonoboui2-dev
+libfontconfig1-dev                       2.2.1-1
+  pulled by: libpango1.0-dev, libxft2-dev
+liborbit2-dev                            1:2.6.2-1
+  pulled by: libgnome2-dev, libbonobo-activation-dev, libgconf2-dev
+libtiff3g                                3.5.7-2
+  pulled by: libgtk2.0-0
+coreutils                                5.0-5
+  provides: fileutils
+  pulled by: debhelper
+fileutils                                5.0-5
+  pulled by: debhelper
+libpango1.0-0                            1.2.3-1
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, gconf2, libglade2-0, libgnomecanvas2-0, libgtk2.0-0, libgtk2.0-common, libpango1.0-common, libpango1.0-dev
+libaudiofile-dev                         0.2.3-4
+  pulled by: libesd0-dev
+libssl0.9.7                              0.9.7b-2
+  pulled by: python2.2
+libgnomevfs2-dev                         2.2.5-3
+  pulled by: libgnomeui-dev, libgnome2-dev
+libgnomeui-common                        2.2.2-1
+  pulled by: libgnomeui-0
+libgtk2.0-common                         2.2.2-1
+  pulled by: libgtk2.0-0
+libogg-dev                               1.0.0-1
+  pulled by: libvorbis-dev
+gettext-base                             0.12.1-3
+  pulled by: gettext
+libbonobo-activation4                    1:2.2.2-1
+  pulled by: libgnomeui-0, bonobo-activation, libbonobo2-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, libbonobo-activation-dev
+bonobo-activation                        1:2.2.2-1
+  pulled by: libgnomeui-0, libbonobo-activation4, libbonobo2-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgnome2-0, libgnomevfs2-0, libgnomevfs2-common, libbonobo-activation-dev
+libgnutls5                               0.8.8-2
+  pulled by: libgnomeui-0, libgnome2-0
+liblinc-dev                              2:1.0.3-2
+  pulled by: liborbit2-dev
+libtasn1-0                               0.1.2-1
+  pulled by: libgnomeui-0, libgnome2-0, libgnutls7, libgnutls5, libtasn1-dev
+xlibs-dev                                4.2.1-9
+  pulled by: libgtk2.0-dev, libpango1.0-dev, libxft2-dev
+xfree86-common                           4.2.1-9
+  pulled by: xlibs
+libgnome2-dev                            2.2.3-1
+  pulled by: libgnomeui-dev, libbonoboui2-dev
+python2.2-xmlbase                        2.2.3-3
+  pulled by: python-xmlbase
+libpopt-dev                              1.7-2
+  pulled by: liborbit2-dev, libbonobo-activation-dev, libgconf2-dev, libopencdk-dev
+libgnomevfs2-0                           2.2.5-3
+  pulled by: libgnomeui-0, libbonoboui2-0, libbonoboui2-common, libgnome2-0, libgnomevfs2-common, libgnomevfs2-common, libgnomevfs2-dev
+libxft2                                  2.1.1-2
+  pulled by: libgtk2.0-0, libgtk2.0-common, libpango1.0-0, libpango1.0-common, libxft2-dev
+libbz2-1.0                               1.0.2-1
+  pulled by: libgnome2-0, libgnomevfs2-common
+libtasn1-dev                             0.1.2-1
+  pulled by: libgnutls7-dev
+libbonobo2-0                             2.2.3-1
+  pulled by: libgnomeui-0, libbonobo2-common, libbonoboui2-0, libbonoboui2-common, libgnome2-0, libgnomevfs2-common, libbonobo2-dev
+libesd0-dev                              0.2.29-1
+  pulled by: libgnome2-dev, libbonoboui2-dev
+</pre>
+
+    <h2>Other information</h2>
+
+    <p>The <a
+    href="http://lists.debian.org/debian-devel/2001/debian-devel-200110/thrd2.html#00632"
+    >first thread</a> about this software, in october 2001.
+
+    <hr>
+    <address><a href="mailto:ydirson@altern.org">Yann Dirson</a></address>
+<!-- Created: Wed Oct 10 00:52:27 CEST 2001 -->
+<!-- hhmts start -->Last modified: Tue Sep 16 21:50:35 CEST 2003 <!-- hhmts end -->
+  </body>
+</html>

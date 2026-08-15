@@ -1,0 +1,42 @@
+# /usr/share/bash-completion/completions/debsign
+# Bash command completion for ‘debsign(1)’.
+# Documentation: ‘bash(1)’, section “Programmable Completion”.
+
+_debsign()
+{
+    local cur prev options
+
+    COMPREPLY=()
+    cur=${COMP_WORDS[COMP_CWORD]}
+    prev=${COMP_WORDS[COMP_CWORD-1]}
+    options='-r -p -m -e -k -S -a -t --multi -h --help -version \
+             --re-sign --no-re-sign --debs-dir --no-conf --noconf'
+
+    case $prev in
+        -k)
+            keyid_options=$(gpg --fixed-list-mode --with-colons --fingerprint -K | awk -F: '/^sec/{print $5}')
+            COMPREPLY=( $( compgen -W "$keyid_options" | grep "^${cur:-.}" ) )
+            ;;
+        *)
+            COMPREPLY=( $(
+                    compgen -f -X "!*.changes"   -- "$cur"
+                    compgen -f -X "!*.buildinfo" -- "$cur"
+                    compgen -f -X "!*.dsc"       -- "$cur"
+                    compgen -f -X "!*.commands"  -- "$cur"
+                    compgen -W "$options" | grep "^$cur"
+                ) )
+            ;;
+    esac
+
+    return 0
+
+}
+complete -F _debsign -o filenames debsign
+
+
+# Local variables:
+# coding: utf-8
+# mode: shell-script
+# indent-tabs-mode: nil
+# End:
+# vim: fileencoding=utf-8 filetype=sh expandtab shiftwidth=4 :

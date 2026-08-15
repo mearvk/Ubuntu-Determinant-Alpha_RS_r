@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# This should run in a VM where we can start dictd
+
+set -e
+
+# This file should already be installed by the dict package...
+test -f /etc/dictd/dict.conf
+
+# But we overwrite it with only localhost.
+echo 'server localhost' > /etc/dictd/dict.conf
+
+# And not per-user files exist.
+rm -f ~/.dictrc
+
+# Setup done, start testing.
+
+echo test: the foldoc dictionary is available.
+dict -D|grep foldoc
+
+echo test: the definition from 'debian' exists in foldoc.
+dict debian|grep -q 'From The Free On-line Dictionary of Computing'
+
+echo test: uninstalling foldoc does not find the definition anymore.
+apt-get remove -yy --purge -q dict-foldoc
+dict debian 2>&1 | grep 'No definitions found for "debian"'
+
+echo test: installing the package finds the definition again.
+DEBIAN_FRONTEND=noninteractive apt-get install -yy -q dict-foldoc
+dict debian|grep -q 'From The Free On-line Dictionary of Computing'

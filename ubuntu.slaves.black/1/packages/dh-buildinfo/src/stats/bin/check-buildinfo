@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# (c) 2003 Yann Dirson <dirson@debian.org>
+# Covered by the GNU GPL, version 2.
+
+# This script is intended to be run as a daily cron job.  It expects
+# to find the Sources.gz files in a fixed place, and the gnuplot
+# script in ~/lib/.
+
+# It registers the number of packages with build-time dep on dh-buildinfo
+# It is used to generate http://people.debian.org/~dirson/buildinfo-npkg.eps
+
+# It also fetches buildinfo files from debs in the archive, and produces
+# http://people.debian.org/~dirson/buildinfo.html
+
+## output files
+
+usersfile=stats/buildinfo-users
+outfile=stats/buildinfo
+
+## processing
+
+date=$(date --iso)
+
+zcat /org/ftp.debian.org/ftp/dists/sid/*/source/Sources.gz |
+    grep-dctrl --field=Build-depends,Build-depends-indep \
+	--show-field=Package --no-field-names \
+	dh-buildinfo > ${usersfile}
+
+# store and graph number of packages using dh-buildinfo
+echo $date $(cat ${usersfile} | wc -l) >> ${outfile}
+gnuplot lib/buildinfo-nb.gnuplot
+
+
+## fetch buildinfo files
+(cd /org/ftp.debian.org/ftp && /home/dirson/bin/fetch-buildinfo dists/sid/*/source/Sources.gz)
+
+## generate summary tables
+./bin/buildinfo-packagetable
+
+## store and graph number of buildinfo files
+echo $date $(find data/buildinfo -type f -not -name ERROR -not -name WARNING | wc -l) >>stats/buildinfo-nb-files
+gnuplot lib/buildinfo-nb-files.gnuplot

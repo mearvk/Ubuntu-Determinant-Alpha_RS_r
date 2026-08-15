@@ -1,0 +1,65 @@
+#!/bin/sh
+# Copyright: © 2012 Enrico Tassi <gareuselesinge@debian.org>
+# License: MIT
+
+echo
+echo '******************************************************************'
+echo You should consider using lua-create-gitbuildpackage-layout instead
+echo '******************************************************************'
+echo
+sleep 2
+
+if [ -z "$1" -o "$1" = "-h" -o "$1" = "--help" ]; then
+	echo Give as a unique argument the name of the source package
+	echo that will be the name of the root directory of the package.
+	echo Be sure to start this script from your packages/ directory.
+	exit 1
+fi
+
+PKG=$1
+
+SVN=
+if [ -x /usr/bin/svn ]; then
+	SVN=/usr/bin/svn
+else
+	echo warning: No /usr/bin/svn found
+	echo warning: The directory structure will be created, but no items
+	echo warning: will be added to the svn repository nor svn properties
+	echo warning: will be set.
+fi
+
+$SVN mkdir $PKG
+$SVN mkdir $PKG/trunk
+$SVN mkdir $PKG/tags
+$SVN mkdir $PKG/build-area
+$SVN mkdir $PKG/tarballs
+$SVN mkdir $PKG/trunk/debian
+$SVN mkdir $PKG/trunk/debian/patches
+$SVN mkdir $PKG/trunk/debian/source
+
+cat > $PKG/trunk/debian/watch <<EOT
+# test this watch file using:
+# uscan --watchfile debian/watch --upstream-version 0.0.1 --package $PKG
+#
+version=3
+http://...  /.../$PKG-([\d\.]*).tar.gz
+EOT
+echo '3.0 (quilt)' > $PKG/trunk/debian/source/format
+touch $PKG/trunk/debian/patches/series
+cp /usr/share/dh-lua/template/dh-lua.conf $PKG/trunk/debian/
+cp /usr/share/dh-lua/template/rules $PKG/trunk/debian/
+cp /usr/share/dh-lua/template/copyright $PKG/trunk/debian/
+cp /usr/share/dh-lua/template/control $PKG/trunk/debian/
+chmod a+x $PKG/trunk/debian/rules
+
+if [ ! -z "$SVN" ]; then
+	$SVN propset svn:ignore '*' $PKG/build-area
+	$SVN propset mergeWithUpstream 1 $PKG/trunk/debian
+	$SVN add $PKG/trunk/debian/patches/series
+	$SVN add $PKG/trunk/debian/watch
+	$SVN add $PKG/trunk/debian/dh-lua.conf
+	$SVN add $PKG/trunk/debian/rules
+	$SVN add $PKG/trunk/debian/copyright
+	$SVN add $PKG/trunk/debian/control
+	$SVN add $PKG/trunk/debian/source/format
+fi

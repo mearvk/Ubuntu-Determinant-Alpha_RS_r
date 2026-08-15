@@ -1,0 +1,32 @@
+#!/bin/sh
+# Create HTML document index locally (use system's dhelp document pool)
+
+set -e
+
+mkdir --mode=711 build  2>/dev/null || true
+mkdir --mode=711 build/doc 2>/dev/null || true
+mkdir --mode=711 build/doc/dhelp 2>/dev/null || true
+mkdir --mode=711 build/doc/dhelp/css 2>/dev/null || true
+cp -a doc/css/* build/doc/dhelp/css/
+
+RUBYLIB=lib:devtools ruby1.8 -w -e '
+
+PREFIX = "/usr"
+DEFAUL_INDEX_ROOT = "#{PREFIX}/share/doc/HTML"
+
+require "dhelp"
+require "dhelp/exporter/html"
+include Dhelp
+
+pool = Dhelp::DhelpDocumentPool.new
+ex = Dhelp::Exporter::Html.new(
+  pool, {
+    :dir => "'$(pwd)'/build/doc/HTML",
+    :templates => "'$(pwd)'/templates"
+  })
+ex.export()
+'
+
+find build/doc -type d -execdir chmod 711 '{}' ';'
+find build/doc -type f -execdir chmod 644 '{}' ';'
+

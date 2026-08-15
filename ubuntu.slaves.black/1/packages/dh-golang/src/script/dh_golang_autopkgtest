@@ -1,0 +1,139 @@
+#!/bin/bash
+
+set -e -u
+
+TARGETS=
+
+error() {
+    echo "[error] $@" >&2
+    exit 2
+}
+
+msg() {
+    echo "[info] $@"
+}
+
+debug_enabled() {
+    test ${AUTOPKGTEST_DEBUG:-0} = 1
+}
+
+debug() {
+    if debug_enabled; then
+        echo "[debug] $@"
+    fi
+}
+
+prepare() {
+    if debug_enabled; then
+        export DH_VERBOSE=1
+    fi
+    eval $(dpkg-architecture --print-set)
+    if [ -z "${AUTOPKGTEST_TMP:-}" -o ! -d "${AUTOPKGTEST_TMP:-}" -o \
+        ! -x debian/rules ]; then
+        error "This script is to be called by autopkgtest."
+    fi
+
+    # Copy source dir to temporary location.
+    cp -ap . "$AUTOPKGTEST_TMP"
+    cd "$AUTOPKGTEST_TMP"
+
+    # Detect defined targets.
+    TARGETS=$(make -pRrq -f debian/rules : 2>/dev/null |
+        awk -F: '/^# File/,/^# Finished Make data base/ {
+            if ($1 !~ "^[#.]") {print $1}
+            }' | egrep -v -e '^[^[:alnum:]]' | egrep .)
+    debug "Defined targets in debian/rules:" $TARGETS
+
+    # Add magic var-printing target.
+    cat >> debian/rules <<'END'
+
+apt-print-%:
+	@echo '$($*)'
+END
+}
+
+call_rules() {
+    make -f debian/rules "$@"
+}
+
+get_import_path() {
+    # Find package's main import path from debian/rules or debian/control.
+    pkgs=$(call_rules apt-print-DH_GOPKG)
+
+    if [ -z "$pkgs" ]; then
+        # DH_GOPKG not set, find it in control file.
+        pkgs=$(perl -w -MDpkg::Control::Info -e '
+            my $s = Dpkg::Control::Info->new()->get_source();
+            print $s->{"XS-Go-Import-Path"} || "";')
+    fi
+
+    if [ -z "$pkgs" ]; then
+        error "Can't find import paths."
+    fi
+
+    # Transform into a single comma-separated line.
+    # Then, replace commas by spaces.
+    # Place the result into an array.
+    pkgs=($(echo $pkgs | tr -d " \n" | tr "," " "))
+
+    # Only return the first import path.
+    echo "${pkgs[0]}"
+}
+
+add_configure_override() {
+    # Override dh_auto_configure to use installed source files (as opposed to
+    # the ones in the source directory).
+
+    # Copy instead of symlink as `go list` can't deal with symlinks.
+    cat >> debian/rules <<'END'
+
+APT_BDIR := $(shell perl -w -MDebian::Debhelper::Dh_Buildsystems -e \
+    'buildsystems_init(); print load_buildsystem("golang")->get_builddir()')
+
+override_dh_auto_configure:
+	mkdir -p "${APT_BDIR}"
+	cp -a /usr/share/gocode/src "${APT_BDIR}"
+END
+}
+
+prepare
+
+IMP_PATH=$(get_import_path)
+msg "Testing $IMP_PATH..."
+
+if [ -e "/usr/share/gocode/src/$IMP_PATH" ]; then
+    msg "Source code installed by binary package, overriding" \
+        "dh_auto_configure..."
+    if echo "$TARGETS" | egrep -q '(^| )override_dh_auto_configure($| )';
+    then
+        msg "Disabling existing override_dh_auto_configure..."
+        sed -i 's/^override_dh_auto_configure:/_&/' debian/rules
+    fi
+    # Add dh_auto_configure override.
+    add_configure_override
+else
+    libpkgs=$(perl -w -MDpkg::Control::Info -e '
+        foreach (Dpkg::Control::Info->new()->get_packages()) {
+            my $pkg = $_->{"Package"};
+            print $pkg if($pkg =~ /^golang-.*-dev$/);
+        }')
+    if [ -n "$libpkgs" ]; then
+        error "Source code not found, even with dev packages installed" \
+            "($libpkgs)"
+    fi
+    msg "Source code not installed by binary packages, using source" \
+        "package..."
+fi
+
+debug "Contents of debian/rules:"
+if debug_enabled; then
+    cat debian/rules
+fi
+debug "-------------------------"
+
+# Re-build the package and run tests.
+call_rules build
+
+if echo "$TARGETS" | egrep -q '(^| )autopkgtest($| )'; then
+    call_rules autopkgtest
+fi

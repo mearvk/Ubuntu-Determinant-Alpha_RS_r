@@ -1,0 +1,74 @@
+#!/usr/bin/make -f
+#-*- makefile -*-
+# Made with the aid of dh_make, by Craig Small
+# Sample debian/rules that uses debhelper. GNU copyright 1997 by Joey Hess.
+# Some lines taken from debmake, by Christoph Lameter.
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+PACKAGE=$(shell dh_listpackages)
+
+ifndef PERL
+PERL = /usr/bin/perl
+endif
+
+ifndef DESTDIR
+DESTDIR=..
+endif
+TMP     =`pwd`/debian/$(PACKAGE)
+
+build build-indep: build-stamp
+build-stamp:
+	dh_testdir
+
+	$(PERL) Makefile.PL INSTALLDIRS=vendor
+	$(MAKE) OPTIMIZE="-O2 -g -Wall"
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+
+	[ ! -f Makefile ] || $(MAKE) realclean
+
+	dh_clean
+
+install: install-indep
+install-indep: build-indep
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	$(MAKE) install DESTDIR=$(TMP)
+	mkdir -p $(TMP)/usr/share/perl5/Debian/Debhelper/Sequence
+	mv $(TMP)/usr/share/perl5/buildinfo.pm $(TMP)/usr/share/perl5/Debian/Debhelper/Sequence/
+	# not the tip of elegance but I don't know how to install this properly with Module::Build
+
+
+# Build architecture-independent files here.
+binary-indep: install-indep
+	dh_testdir
+	dh_testroot
+	dh_installdocs buildinfo.html
+	./dh_buildinfo
+	dh_installcron
+	dh_installman
+	dh_installchangelogs 
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_perl 
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb --destdir=$(DESTDIR)
+
+source diff:                                                                  
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+binary: binary-indep binary-arch
+# binary-arch, install-arch and build-arch are no-ops.
+.PHONY: build clean binary-indep binary-arch binary build-arch install-arch

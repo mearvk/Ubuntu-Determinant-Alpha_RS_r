@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# This scripts enables shebang lines like
+#
+#   #!/usr/bin/env lua-any
+#   -- Lua-Versions: 5.1 5.2
+#   -- Lua-Root: /usr/bin/lua
+#   -- Lua-Args: -l foo
+#
+# That will pick the first installed interpreter among /usr/bin/lua5.1 and
+# /usr/bin/lua5.2 and pass to if '-l foo' as well ass the name of the script
+# containing the shebang and the extra arguments
+# 
+# License: MIT/X
+# Copyright: 2015 Enrico Tassi <gareuselesinge@debian.org>
+
+#set -x
+set -e
+
+FILE="$1"
+
+if [ -z "$FILE" ]; then
+	echo "Error: lua-any needs at least one argument"
+	exit 1
+fi
+
+VERSIONS="`head "$FILE" | grep -i '^--[[:space:]]*Lua-Versions[[:space:]]*:' \
+	| cut -d : -f 2- \
+	| sed 's/^[[:space:]]*//' \
+	| sed 's/[[:space:]]*$//' `"
+ROOT="`head "$FILE" | grep -i '^--[[:space:]]*Lua-Root[[:space:]]*:' \
+	| cut -d : -f 2- \
+	| sed 's/^[[:space:]]*//' \
+	| sed 's/[[:space:]]*$//' `"
+ARGS="`head "$FILE" | grep -i '^--[[:space:]]*Lua-Args[[:space:]]*:' \
+	| cut -d : -f 2- \
+	| sed 's/^[[:space:]]*//' \
+	| sed 's/[[:space:]]*$//' `"
+
+if [ -z "$ROOT" ]; then ROOT=/usr/bin/lua; fi
+
+for v in $VERSIONS; do
+	if [ -x "$ROOT$v" ]; then
+		exec $ROOT$v $ARGS "$@"
+	fi
+done
+
+echo "Error: no suitable Lua interpreter found"
+echo "Error: supported versions are: $VERSIONS"
+exit 1

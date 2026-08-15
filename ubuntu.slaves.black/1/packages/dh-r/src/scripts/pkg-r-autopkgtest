@@ -1,0 +1,54 @@
+#!/bin/sh -e
+
+export LC_ALL=C.UTF-8
+
+# R DESCRIPTION files use the debian control file format
+# (see R package manual 1.1.1)
+pkgname=$(grep-dctrl -s Package -n '' DESCRIPTION)
+bioc=$(grep-dctrl -s biocViews -n '' DESCRIPTION)
+
+# Try to load package
+echo "Test: Try to load the R library ${pkgname}"
+R --no-save -e "library('${pkgname}')"
+
+##########
+echo "Other tests are currently unsupported!"
+echo "They will be progressively added."
+exit 0
+##########
+
+# Create temp environment for testing
+if [ "$AUTOPKGTEST_TMP" = "" ] ; then
+  AUTOPKGTEST_TMP=`mktemp -d /tmp/${pkgname}-test.XXXXXX`
+  trap "rm -rf $AUTOPKGTEST_TMP" 0 INT QUIT ABRT PIPE TERM
+fi
+
+# install Suggests since these are usually needed for testing
+apt-get install -y `grep R:Suggests debian/*.substvars | sed -e 's/^R:Suggests=//' -e 's/([^)]\+)//g' -e 's/,//g'`
+# install additional Test-Depends that can be specifed in debian/tests/control
+if [ -d debian/tests ] ; then
+  if [ -e debian/tests/control ] ; then
+    apt-get install -y `grep Depends debian/tests/control | sed -e 's/^Depends://' -e 's/@builddeps@//' -e 's/@//g' -e 's/,//g'`
+  fi
+fi
+
+cp -a * $AUTOPKGTEST_TMP
+cd $AUTOPKGTEST_TMP
+
+if [ -d debian/tests ] ; then
+  if [ -e debian/tests/autopkgtest-pkg-r.hook ] ; then
+    . debian/tests/autopkgtest-pkg-r.hook
+  fi
+fi
+
+NBTEST=`find tests -type f -name "*.R" | wc -l`
+if [ "$NBTEST" -gt "0" ] ; then
+  echo "Test: Run tests for ${pkgname}"
+  cd tests
+  for testfile in *.R; do
+    echo "Start: ${testfile}"
+    R --no-save < ${testfile}
+  done
+  exit 0
+fi
+

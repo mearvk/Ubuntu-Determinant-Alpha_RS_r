@@ -1,0 +1,67 @@
+#! /usr/bin/perl -w
+
+# Get buildinfo files from deb archives of all packages declaring a
+# builddep on dh-buildinfo.
+
+# FIXME: we only get the buildinfo from a .deb of the same name as the
+# source package.  1) we should look at the "Binary" field instead.
+# 2) this doesn't work when this package has a symlink as docdir, we
+# could cycle through values of the "Binary" field.
+
+use strict;
+
+# Usage: (cd /org/ftp.debian.org/ftp && /home/dirson/bin/fetch-buildinfo dists/sid/*/source/Sources.gz)
+
+my $buildinfodir = '/home/dirson/data/buildinfo';
+
+sub error {
+  my ($pkg, $msg, $file) = @_;
+  $file = 'ERROR' unless defined $file;
+  mkdir "$buildinfodir/$pkg" unless -d "$buildinfodir/$pkg";
+  open (ERROR, ">$buildinfodir/$pkg/$file") or die "cannot create $buildinfodir/$pkg/$file: $!"; 
+  print ERROR "$msg\n"; 
+  close ERROR; 
+}
+
+for my $sourcesfile (@ARGV) {
+  open SOURCES, "zcat $sourcesfile | grep-dctrl -FBuild-depends,Build-depends-indep -sPackage,Binary,Version,Directory dh-buildinfo |";
+  local $/ = "\n\n";
+ PACKAGE:
+  while (<SOURCES>) {
+    m/Package: (.+)\nBinary: (.+)\nVersion: ((.+:)?(.+))\nDirectory: (.+)/m;
+    my ($pkg, $binaries, $fullvers, undef, $vers, $dir) = ($1, $2, $3, $4, $5, $6);
+    my @binaries = split /,\s*/, $binaries;
+    # print "$pkg $vers $dir\n";
+
+    my $found;
+  BINARY:
+    foreach my $binary (@binaries) {
+    FILE:
+      foreach my $archfile (<$dir/${binary}_${vers}_*.deb>) {
+	$archfile =~ m|\Q$dir/${binary}_${vers}\E_(.*)\.deb|;
+	my $arch = $1;
+	my $resultfile = "$buildinfodir/${pkg}/${pkg}_${vers}_$arch";
+
+	mkdir "$buildinfodir/${pkg}";
+	system ("dpkg --fsys-tarfile $archfile | tar Oxf - ./usr/share/doc/*/buildinfo.gz 2>/dev/null | gzip -dc 2>/dev/null > $resultfile");
+
+	# don't read debs for other archs if the 1st one fails
+	if (-z $resultfile) {
+	  system ("dpkg --fsys-tarfile $archfile | tar Oxf - ./usr/share/doc/*/buildinfo 2>/dev/null > $resultfile");
+
+	  if (-z $resultfile) {
+	    unlink $resultfile;
+	    next BINARY;
+	  } else {
+	    error ($pkg, "buildinfo not compressed", 'WARNING');
+	    $found = 1;
+	  }
+	} else {
+	  $found = 1;
+	}
+      }
+      last BINARY if $found;
+    }
+    error ($pkg, "no buildinfo in any binary packages") unless $found;
+  }
+}

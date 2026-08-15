@@ -1,0 +1,386 @@
+#!/bin/bash
+
+# Copyright (C) 2015, Nicholas Bamber <nicholas@periapt.co.uk>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+set -u
+
+WORKDIR=$(readlink -f "${0%/*}")
+_ARCH=$(dpkg-architecture -qDEB_BUILD_ARCH)
+declare -r _ARCH
+if dpkg --compare-versions "$(dpkg-query -W -f='${Version}' dpkg-dev )" lt "1.19.1~"; then
+    echo "This test requires dpkg-dev >= 1.19.1." >&2
+    exit 1
+fi
+if dpkg --compare-versions "$(dpkg-query -W -f='${Version}' dpkg-dev )" lt "1.21.0~"; then
+    _dpkg_genchanges="dpkg-genchanges  >"
+elif dpkg --compare-versions "$(dpkg-query -W -f='${Version}' dpkg-dev )" eq "1.21.0"; then
+    echo "This version of dpkg produces incorrect output, not supported" >&2
+    exit 1
+else
+    _dpkg_genchanges="dpkg-genchanges -O"
+fi
+declare -r _dpkg_genchanges
+
+if test "${1:-}" = --installed; then
+    shift
+else
+    PATH=${WORKDIR}/../scripts:${PATH}
+	PERL5LIB=${WORKDIR}/../lib:${PERL5LIB:-}
+	export PATH PERL5LIB
+fi
+
+. "${0%/*}/shunit2-helper-functions.sh"
+
+GPGHOME=$(mktemp -d -p /tmp gpg.XXXXX)
+
+oneTimeSetUp () {
+	GPG=gpg
+	if ! command -v $GPG >/dev/null 2>&1;then
+		echo "$GPG missing"
+		GPG=gpg2
+		if ! command -v $GPG >/dev/null 2>&1;then
+		echo "$GPG missing"
+		exit 1
+		fi
+	fi
+
+	PRIVATE_KEY=${WORKDIR}/uscan/PRIVATE_KEY.asc
+	PUBLIC_KEY=${WORKDIR}/uscan/PUBLIC_KEY.asc
+
+	PRIVATE_KEYRING=$GPGHOME/secring.gpg
+	PUBLIC_KEYRING=$GPGHOME/pubring.gpg
+
+	$GPG -v --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+		--output $PRIVATE_KEYRING --dearmor $PRIVATE_KEY
+
+	$GPG -v --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+	    --output $PUBLIC_KEYRING --dearmor $PUBLIC_KEY
+
+	$GPG --homedir "$GPGHOME" --no-options -q --batch --no-default-keyring \
+	    --secret-keyring $PRIVATE_KEYRING --default-key 72543FAF \
+	    --list-keys --verbose
+
+	mkdir -p ${WORKDIR}/package_lifecycle/test/debian/source
+	cat > ${WORKDIR}/package_lifecycle/test/debian/control <<-EOS
+	Source: test
+	Section: devel
+	Priority: optional
+	Maintainer: Devscripts Devel Team <devscripts-devel@lists.alioth.debian.org>
+	Uploaders: Testophilus Testownik <tester@testity.org>
+	Standards-Version: 4.5.0
+	Rules-Requires-Root: no
+	
+	Package: test
+	Architecture: all
+	Description: Short description
+	 Longer description
+EOS
+	printf '#!/usr/bin/make -f\n%%:\n\tdh $@' > ${WORKDIR}/package_lifecycle/test/debian/rules
+	chmod +x ${WORKDIR}/package_lifecycle/test/debian/rules
+	_DATE=$(LC_ALL=C date '+%a, %d %b %Y %T +0000')
+	cat > ${WORKDIR}/package_lifecycle/test/debian/changelog <<-EOS
+	test (1.0-1) unstable; urgency=low
+	
+	  * Initial packaging
+	
+	 -- Testophilus Testownik <tester@testity.org>  ${_DATE}
+EOS
+	echo 12 > ${WORKDIR}/package_lifecycle/test/debian/compat
+	echo '3.0 (quilt)' > ${WORKDIR}/package_lifecycle/test/debian/source/format
+	touch ${WORKDIR}/package_lifecycle/test/CONTENTS
+	cd ${WORKDIR}/package_lifecycle/ && tar cvf test_1.0.orig.tar --exclude debian -- test/CONTENTS 2>&1 > /dev/null && xz -f test_1.0.orig.tar
+	cd ${WORKDIR}
+}
+
+runCommandOutCmpFile() {
+    local param="$1"
+    local exp_stdoutfile="$2"
+    local exp_stderr="$3"
+    local exp_retval=$4
+    local stdoutF="${SHUNIT_TMPDIR}/stdout"
+    local stderrF="${SHUNIT_TMPDIR}/stderr"
+    eval "${COMMAND} $param"  2> ${stderrF} | \
+	grep -v File::FcntlLock | \
+	grep -v '^  *dh_' | \
+	grep -v '^dh_gencontrol debug symbol wrapper:' | \
+	grep -v '^  *create-stamp debian/debhelper' | \
+	sed -e "s/\`/'/g" | \
+	sed -e "s/^dpkg-buildpackage: info: /dpkg-buildpackage: /g" | \
+	sed -e "s/^dpkg-genchanges: info: /dpkg-genchanges: /g" | \
+	sed -e "/^ dpkg-genbuildinfo/d" | \
+	sed -e "/^gpg: /d" | \
+	sed -e's!^ -- Testophilus Testownik <tester@testity.org>.*! -- Testophilus Testownik <tester@testity.org>!' > ${stdoutF}
+    retval=$?
+	eval "cmp ${stdoutF} ${exp_stdoutfile}" 3>&1 >/dev/null
+	local diffretval=$?
+    assertEquals "standard output of ${COMMAND} $param matches ${exp_stdoutfile}\n" "0" "$diffretval" || diff ${stdoutF} ${exp_stdoutfile}
+    assertEquals "error output of ${COMMAND} $param\n" "$exp_stderr" "$(cat ${stderrF})"
+    assertEquals "return value of ${COMMAND} $param\n" $exp_retval $retval
+}
+
+
+test_debuild() {
+  export GNUPGHOME=$GPGHOME
+  cd ${WORKDIR}/package_lifecycle/test
+  COMMAND='LC_ALL=C debuild --no-conf --no-lintian --preserve-envvar=PATH --preserve-envvar=PERL5LIB --preserve-envvar=DEBFULLNAME --preserve-envvar=DEBEMAIL --preserve-envvar=GNUPGHOME --set-envvar=NO_PKG_MANGLE=1'
+  cat > ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 dpkg-buildpackage -us -uc -ui
+	dpkg-buildpackage: source package test
+	dpkg-buildpackage: source version 1.0-1
+	dpkg-buildpackage: source distribution unstable
+	dpkg-buildpackage: source changed by Testophilus Testownik <tester@testity.org>
+	 dpkg-source --before-build .
+	dpkg-buildpackage: host architecture ${_ARCH}
+	 debian/rules clean
+	dh clean
+	 dpkg-source -b .
+	dpkg-source: info: using source format '3.0 (quilt)'
+	dpkg-source: info: building test using existing ./test_1.0.orig.tar.xz
+	dpkg-source: info: building test in test_1.0-1.debian.tar.xz
+	dpkg-source: info: building test in test_1.0-1.dsc
+	 debian/rules binary
+	dh binary
+	dpkg-deb: building package 'test' in '../test_1.0-1_all.deb'.
+	 ${_dpkg_genchanges}../test_1.0-1_${_ARCH}.changes
+	dpkg-genchanges: including full source code in upload
+	 dpkg-source --after-build .
+	dpkg-buildpackage: full upload (original source is included)
+	Now signing changes and any dsc files...
+EOS
+  if command -v dpkg-genbuildinfo >/dev/null; then
+    cat >> ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 signfile dsc test_1.0-1.dsc uscan test key (no secret) <none@debian.org>
+	
+	 fixup_buildinfo test_1.0-1.dsc test_1.0-1_${_ARCH}.buildinfo
+	 signfile buildinfo test_1.0-1_${_ARCH}.buildinfo uscan test key (no secret) <none@debian.org>
+	
+	 fixup_changes dsc test_1.0-1.dsc test_1.0-1_${_ARCH}.changes
+	 fixup_changes buildinfo test_1.0-1_${_ARCH}.buildinfo test_1.0-1_${_ARCH}.changes
+	 signfile changes test_1.0-1_${_ARCH}.changes uscan test key (no secret) <none@debian.org>
+	
+	Successfully signed dsc, buildinfo, changes files
+EOS
+  else
+    cat >> ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 signfile dsc test_1.0-1.dsc uscan test key (no secret) <none@debian.org>
+	
+	 fixup_changes dsc test_1.0-1.dsc test_1.0-1_${_ARCH}.changes
+	 signfile changes test_1.0-1_${_ARCH}.changes uscan test key (no secret) <none@debian.org>
+	
+	Successfully signed dsc, changes files
+EOS
+  fi
+  runCommandOutCmpFile "-k'uscan test key (no secret) <none@debian.org>'" "${WORKDIR}/package_lifecycle/debuild.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_dscverify () {
+  cd ${WORKDIR}/package_lifecycle
+  COMMAND='dscverify --no-conf --keyring $GPGHOME/pubring.gpg'
+  cat > ${WORKDIR}/package_lifecycle/dscverify.txt <<-EOS
+	${WORKDIR}/package_lifecycle/test_1.0-1.dsc:
+	      Good signature found
+	   validating test_1.0.orig.tar.xz
+	   validating test_1.0-1.debian.tar.xz
+	All files validated successfully.
+EOS
+  runCommandOutCmpFile "${WORKDIR}/package_lifecycle/test_1.0-1.dsc" "${WORKDIR}/package_lifecycle/dscverify.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_dscextractControl () {
+  cd ${WORKDIR}/package_lifecycle
+  COMMAND='dscextract'
+  cat > ${WORKDIR}/package_lifecycle/dscextractControl.txt <<-EOS
+	Source: test
+	Section: devel
+	Priority: optional
+	Maintainer: Devscripts Devel Team <devscripts-devel@lists.alioth.debian.org>
+	Uploaders: Testophilus Testownik <tester@testity.org>
+	Standards-Version: 4.5.0
+	Rules-Requires-Root: no
+	
+	Package: test
+	Architecture: all
+	Description: Short description
+	 Longer description
+EOS
+  runCommandOutCmpFile "test_1.0-1.dsc debian/control" "dscextractControl.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_dscextractChangelog () {
+  cd ${WORKDIR}/package_lifecycle
+  COMMAND='dscextract'
+  cat > ${WORKDIR}/package_lifecycle/dscextractChangelog.txt <<-EOS
+	test (1.0-1) unstable; urgency=low
+	
+	  * Initial packaging
+	
+	 -- Testophilus Testownik <tester@testity.org>
+EOS
+  runCommandOutCmpFile "test_1.0-1.dsc debian/changelog" "dscextractChangelog.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_debchange () {
+  cd ${WORKDIR}/package_lifecycle/test
+  COMMAND='debchange'
+  export DEBFULLNAME='Testophilus Testownik'
+  export DEBEMAIL='tester@testity.org'
+  cat > ${WORKDIR}/package_lifecycle/debchange.txt <<-EOS
+	test (1.0-2) UNRELEASED; urgency=medium
+	
+	  * new killer app functionality
+	
+	 -- Testophilus Testownik <tester@testity.org>
+	
+	test (1.0-1) unstable; urgency=low
+	
+	  * Initial packaging
+	
+	 -- Testophilus Testownik <tester@testity.org>
+EOS
+  runCommand "-iU 'new killer app functionality'" "" "" 0
+  COMMAND=cat
+  runCommandOutCmpFile "debian/changelog" "../debchange.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_list_unreleased () {
+  cd ${WORKDIR}/package_lifecycle/test
+  COMMAND='list-unreleased'
+  cat > ${WORKDIR}/package_lifecycle/list-unreleased.txt <<-EOS
+	test (1.0-2) UNRELEASED; urgency=medium
+	
+	  * new killer app functionality
+	
+	 -- Testophilus Testownik <tester@testity.org>
+EOS
+  runCommandOutCmpFile "-c -R" "../list-unreleased.txt" "" 0
+  cd ${WORKDIR}
+}
+
+
+test_debuild2() {
+  export GNUPGHOME=$GPGHOME
+  cd ${WORKDIR}/package_lifecycle/test
+  COMMAND='LC_ALL=C debuild --no-conf --no-lintian --preserve-envvar=PATH --preserve-envvar=PERL5LIB --preserve-envvar=DEBFULLNAME --preserve-envvar=DEBEMAIL --preserve-envvar=GNUPGHOME --set-envvar=NO_PKG_MANGLE=1'
+  cat > ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 dpkg-buildpackage -us -uc -ui
+	dpkg-buildpackage: source package test
+	dpkg-buildpackage: source version 1.0-2
+	dpkg-buildpackage: source distribution UNRELEASED
+	dpkg-buildpackage: source changed by Testophilus Testownik <tester@testity.org>
+	 dpkg-source --before-build .
+	dpkg-buildpackage: host architecture ${_ARCH}
+	 debian/rules clean
+	dh clean
+	 dpkg-source -b .
+	dpkg-source: info: using source format '3.0 (quilt)'
+	dpkg-source: info: building test using existing ./test_1.0.orig.tar.xz
+	dpkg-source: info: building test in test_1.0-2.debian.tar.xz
+	dpkg-source: info: building test in test_1.0-2.dsc
+	 debian/rules binary
+	dh binary
+	dpkg-deb: building package 'test' in '../test_1.0-2_all.deb'.
+	 ${_dpkg_genchanges}../test_1.0-2_${_ARCH}.changes
+	dpkg-genchanges: not including original source code in upload
+	 dpkg-source --after-build .
+	dpkg-buildpackage: binary and diff upload (original source NOT included)
+EOS
+  runCommandOutCmpFile "-k'uscan test key (no secret) <none@debian.org>'" "${WORKDIR}/package_lifecycle/debuild.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_debuild_forcesign() {
+  export GNUPGHOME=$GPGHOME
+  cd ${WORKDIR}/package_lifecycle/test
+  COMMAND='LC_ALL=C debuild --no-conf --no-lintian --preserve-envvar=PATH --preserve-envvar=PERL5LIB --preserve-envvar=DEBFULLNAME --preserve-envvar=DEBEMAIL --preserve-envvar=GNUPGHOME --set-envvar=NO_PKG_MANGLE=1 --force-sign'
+  cat > ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 dpkg-buildpackage -us -uc -ui
+	dpkg-buildpackage: source package test
+	dpkg-buildpackage: source version 1.0-2
+	dpkg-buildpackage: source distribution UNRELEASED
+	dpkg-buildpackage: source changed by Testophilus Testownik <tester@testity.org>
+	 dpkg-source --before-build .
+	dpkg-buildpackage: host architecture ${_ARCH}
+	 debian/rules clean
+	dh clean
+	 dpkg-source -b .
+	dpkg-source: info: using source format '3.0 (quilt)'
+	dpkg-source: info: building test using existing ./test_1.0.orig.tar.xz
+	dpkg-source: info: building test in test_1.0-2.debian.tar.xz
+	dpkg-source: info: building test in test_1.0-2.dsc
+	 debian/rules binary
+	dh binary
+	dpkg-deb: building package 'test' in '../test_1.0-2_all.deb'.
+	 ${_dpkg_genchanges}../test_1.0-2_${_ARCH}.changes
+	dpkg-genchanges: not including original source code in upload
+	 dpkg-source --after-build .
+	dpkg-buildpackage: binary and diff upload (original source NOT included)
+	Now signing changes and any dsc files...
+EOS
+  if command -v dpkg-genbuildinfo >/dev/null; then
+    cat >> ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 signfile dsc test_1.0-2.dsc uscan test key (no secret) <none@debian.org>
+	
+	 fixup_buildinfo test_1.0-2.dsc test_1.0-2_${_ARCH}.buildinfo
+	 signfile buildinfo test_1.0-2_${_ARCH}.buildinfo uscan test key (no secret) <none@debian.org>
+	
+	 fixup_changes dsc test_1.0-2.dsc test_1.0-2_${_ARCH}.changes
+	 fixup_changes buildinfo test_1.0-2_${_ARCH}.buildinfo test_1.0-2_${_ARCH}.changes
+	 signfile changes test_1.0-2_${_ARCH}.changes uscan test key (no secret) <none@debian.org>
+	
+	Successfully signed dsc, buildinfo, changes files
+EOS
+  else
+    cat >> ${WORKDIR}/package_lifecycle/debuild.txt <<-EOS
+	 signfile dsc test_1.0-2.dsc uscan test key (no secret) <none@debian.org>
+	
+	 fixup_changes dsc test_1.0-2.dsc test_1.0-2_${_ARCH}.changes
+	 signfile changes test_1.0-2_${_ARCH}.changes uscan test key (no secret) <none@debian.org>
+	
+	Successfully signed dsc, changes files
+EOS
+  fi
+  runCommandOutCmpFile "-k'uscan test key (no secret) <none@debian.org>'" "${WORKDIR}/package_lifecycle/debuild.txt" "" 0
+  cd ${WORKDIR}
+}
+
+test_debdiff () {
+  cd ${WORKDIR}/package_lifecycle
+  COMMAND='debdiff --no-conf'
+  cat > ${WORKDIR}/package_lifecycle/debdiff.txt <<-EOS
+	File lists identical (after any substitutions)
+	
+	Control files: lines which differ (wdiff format)
+	------------------------------------------------
+	Version: [-1.0-1-] {+1.0-2+}
+EOS
+  runCommandOutCmpFile "test_1.0-1_${_ARCH}.changes test_1.0-2_${_ARCH}.changes" "debdiff.txt" "" 0
+  cd ${WORKDIR}
+}
+
+oneTimeTearDown () {
+	rm -rf ${WORKDIR}/package_lifecycle
+	gpgconf --homedir "$GPGHOME" --kill gpg-agent
+	rm -rf "$GPGHOME"
+}
+
+cd ${WORKDIR}
+. shunit2
+

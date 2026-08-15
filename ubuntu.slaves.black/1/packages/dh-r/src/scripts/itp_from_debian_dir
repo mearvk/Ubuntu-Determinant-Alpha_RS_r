@@ -1,0 +1,96 @@
+#!/bin/sh
+
+package=$(dpkg-parsechangelog | awk '/^Source:/ {print $2}')
+
+if apt-cache show $package > /dev/null 2>/dev/null ; then
+  # apt-cache show gives an output, but this may be because the package
+  # is referenced and thus created as a virtual package
+  if apt-cache pkgnames| egrep "^$package$"; then
+    echo "Package '$package' already exists in Debian"
+    exit 1
+  fi
+fi
+isitp=$(wnpp-check $package | grep " $package$")
+if [ "" != "$isitp" ] ; then
+  echo "Package ITPed previously: $isitp"
+  exit 1
+fi
+
+shortdesc=$(grep ^Description: debian/control | head -n1 | sed 's/^Description: \+//')
+version=$(dpkg-parsechangelog | awk '/^Version/ { print $2 }' | cut -d- -f1 | sed 's/+dfsg//')
+author=$(grep ^Copyright: debian/copyright | head -n1 | sed 's/^Copyright: \+[-0-9 ]\+//'   )
+if echo $author | grep -q '<upstream>' ; then
+  echo "Copyright contains template '<upstream>' - please fix"
+  exit 1
+fi
+homepage=$(grep ^Homepage: debian/control | head -n1 | sed 's/^Homepage: \+//')
+license=$(grep ^License: debian/copyright | head -n1 | sed 's/^License: \+\([^ ]\+\) *.*/\1/')
+if echo $license | grep -q '<license>' ; then
+  echo "License contains template '<license>' - please fix"
+  exit 1
+fi
+section=$(grep ^Section: debian/control | head -n1 | sed 's/^Section: \+//')
+
+case "$section" in
+    gnu-r)
+           lang="GNU R"
+           ;;
+    java)
+           lang="Java"
+           ;;
+    perl)
+           lang="Perl"
+           ;;
+    python)
+           lang="Python"
+           ;;
+    *)
+	   if [ "$(find . -iname "*.c" -o -iname "*.h" | wc -l)" -gt 0 ] ; then
+               lang="C"
+           elif [ "$(find . -iname "*.c++" -o -iname "*.h++" -o -iname "*.cpp" -o -iname "*.hpp"| wc -l)" -gt 0 ] ; then
+               lang="C++"
+           elif [ "$(find . -iname "*.py" | wc -l)" -gt 0 ] ; then
+               lang="Python"
+           elif [ "$(find . -iname "*.java" | wc -l)" -gt 0 ] ; then
+               lang="Java"
+           elif [ "$(find . -iname "*.jar" | wc -l)" -gt 0 ] ; then
+               lang="Java"
+           else
+               lang="(C, C++, C#, Perl, Python, etc.)"
+           fi;
+           ;;
+esac
+
+description=$(sed '0,/^Description: /d' debian/control | sed '/^$/,$d')
+maintainer=$(grep ^Maintainer: debian/control | head -n1 | sed -e 's/^Maintainer: \+\([^<]\+\) *<.*/\1/' -e 's/ *$//')
+maintainer_full=$(grep ^Maintainer: debian/control | head -n1 | sed -e 's/^Maintainer: //')
+vcsbrowser=$(grep ^Vcs-Browser: debian/control | head -n1 | sed 's/^Vcs-Browser: \+//')
+body=$(mktemp)
+cat << EOT > "${body}"
+Subject: ITP: $package -- $shortdesc
+Package: wnpp
+Owner: $DEBFULLNAME <$DEBEMAIL>
+Severity: wishlist
+
+* Package name    : $package
+  Version         : $version
+  Upstream Author : $author
+* URL             : $homepage
+* License         : $license
+  Programming Lang: $lang
+  Description     : $shortdesc
+$description
+
+Remark: This package is maintained by $maintainer at
+   $vcsbrowser
+
+EOT
+
+if [ "$1" != "" ] ; then
+  echo "$1" >> "${body}"
+fi
+
+reportbug --body-file="${body}" --no-query-bts --no-check-available --no-debconf \
+	--email="${DEBEMAIL}" --subject="ITP: $package -- $shortdesc" \
+	--severity=wishlist --header="X-Debbugs-CC: ${maintainer_full}" wnpp
+rm "${body}"

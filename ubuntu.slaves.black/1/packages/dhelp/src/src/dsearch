@@ -1,0 +1,360 @@
+#! /usr/bin/perl -T
+#
+# Copyright 2001,2004 by Stefan Hornburg (Racke) <racke@linuxia.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the Free
+# Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA  02111-1307  USA.
+
+$ENV{'PATH'} = '/bin:/usr/bin';
+# Avoid taint problems when any of these environment variables are defined.
+# See perlsec(1) manpage 
+delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+
+use strict;
+use warnings;
+use CGI qw/:standard/;
+use Template;
+use AnyDBM_File;
+use File::Basename;
+use HTML::Entities;
+use File::Temp qw(tempfile);
+use Locale::gettext;
+use POSIX;
+use Data::Page;
+use URI::Escape;
+use Encode;
+
+use constant DOCBASEDB            => '/var/lib/dhelp/doc-base_dirs';
+use constant DOCSINDEX            => '/var/lib/dhelp/documents.index';
+use constant TEMPLATES_DIR        => '/usr/share/dhelp/templates';
+use constant RESULTS_PER_PAGE     => 20;
+use constant RESULTS_OFFLINE_MODE => 100;
+
+sub word_regex {
+    my ($words) = @_;
+    return qr/\b/ . join("|", @$words) . qr/\b/;
+}
+
+sub highlight_fragment {
+    my ($text, $words) = @_;
+
+    my $regex = word_regex($words);
+    $text = encode_entities($text);
+    $text =~ s/$regex/<span class="matched-fragment">$&<\/span>/gi;
+    return $text;
+}
+
+sub get_highlighted_fragments {
+    my ($text, $words) = @_;
+
+    # Only look for results in the first 100K
+    $text = substr($text, 0, 100000)."..." if length $text > 100000;
+
+    my $regex = word_regex($words);
+    my $max_fragments = 5;
+    my @fragment_list = ();
+    while ($text =~ /(.{0,31})($regex)(.{0,31})/isg) {
+        my ($pre, $word, $post) = ($1, $2, $3);
+        if (length $pre > 30) {
+            $pre = "...".substr($pre, 1);
+        }
+        if (length $post > 30) {
+            $post = substr($post, 0, 29)."...";
+        }
+        push @fragment_list, highlight_fragment($pre.$word.$post, $words);
+        last if --$max_fragments < 1;
+    }
+    # Just in case: if we don't match anything, just show the first 60
+    # characters
+    if (scalar @fragment_list) {
+        return @fragment_list;
+    }
+    else {
+        return length $text > 100 ? substr($text, 0, 99)."..." : $text;
+    }
+}
+
+sub file_to_text {
+    my ($cmd, $file_type, $package) = @_;
+
+    $cmd =~ /^(\S+)/;
+    my $binary = $1;
+    if (-x $binary) {
+        return `$cmd`;
+    }
+    else {
+        return "[Cannot show $file_type file preview. Please install package $package]";
+    }
+}
+
+sub get_text {
+    my ($file) = @_;
+
+    # Remove any weird character
+    $file =~ s/[^a-z0-9_.\/+-]//gio;
+    $file =~ s/\.\.//go;
+    $file =~ /(.*)/;
+    $file = $1;
+
+    my $basename = basename($file);
+    $basename =~ s/\.(\w+)$//go;
+    my $ext = $1;
+
+    my $text = undef;
+    if ($ext =~ /html?/) {
+        # Try to fetch a text version of the HTML
+        if (-x '/usr/bin/lynx') {
+            $text = `/usr/bin/lynx -dump -nolist "$file"`;
+        }
+        elsif (-x '/usr/bin/links') {
+            $text = `/usr/bin/links -dump -no-references "$file"`;
+        }
+        elsif (-x '/usr/bin/w3m') {
+            $text = `/usr/bin/w3m -dump "$file"`;
+        }
+        elsif (-x '/usr/bin/html2text') {
+            $text = `/usr/bin/html2text -nobs "$file"`;
+        }
+        else {
+            # Fallback to retarded HTML stripper
+            open F, $file;
+            $text = join("", <F>);
+            close F;
+            $text =~ s/<.*?>//go;
+        }
+    }
+    elsif ($ext =~ /gz/) {
+        my ($fh, $tmp_path) = tempfile("dsearch-XXXXXX",
+                                       DIR    => '/tmp',
+                                       SUFFIX => "$basename");
+        print $fh `gunzip -c "$file"`;
+        close $fh;
+        $text = get_text($tmp_path);
+    }
+    elsif ($ext =~ /pdf/) {
+        if (-x '/usr/bin/pdftotext') {
+            $text = `/usr/bin/pdftotext "$file" -`;
+        }
+        else {
+            # ghostscript is a dependency, so ps2txt should never fail, but we
+            # recommend the user to install xpdf-utils instead, to get
+            # pdftotext (better extraction quality and much faster)
+            $text = file_to_text("/usr/bin/ps2txt '$file'", "PDF", "xpdf-utils");
+        }
+    }
+    elsif ($ext =~ /dvi/) {
+        $text = file_to_text("/usr/bin/catdvi '$file'", "DVI", "catdvi");
+    }
+    elsif ($ext =~ /ps/) {
+        $text = file_to_text("/usr/bin/ps2txt '$file'", "Postscript", "ghostscript");
+    }
+    else {
+        open F, $file;
+        $text = join("", <F>);
+        close F;
+    }
+
+    return $text;
+}
+
+sub get_extract {
+    my ($file, $search) = @_;
+
+    my $text = get_text($file);
+    my @words = split(/\s/, $search);
+    return join(" / ", get_highlighted_fragments($text, \@words));
+}
+
+sub error {
+    my ($msg, $vars) = @_;
+
+    $msg =~ s/\n/<br>\n/go;
+    $vars->{error} = $msg;
+
+    my $tt = Template->new({INCLUDE_PATH => TEMPLATES_DIR});
+    $tt->process('search_error.tmpl', $vars);
+    exit 0;
+}
+
+sub get_doc_base_info {
+    my ($info_hash, $file) = @_;
+
+    my $packed_dirname = pack("Z100", dirname($file));
+    my $value = $info_hash->{$packed_dirname};
+    defined $value || return;
+    unpack("Z50 Z1000", $value);
+}
+
+# Selects the best matching language between two lists (the available languages
+# list, in normal locale format, and the acceptable languages list, in
+# HTTP_ACCEPT_LANGUAGE format).
+sub select_matching_language {
+    my ($available_list, $accept_list) = @_;
+
+    foreach my $accept (@$accept_list) {
+        return $accept if grep { $accept eq $_ } @$available_list;
+        my $stripped_accept = $accept;
+        $stripped_accept =~ s/-.*//go;
+        $stripped_accept =~ s/;.*//go;
+        foreach my $available (@$available_list) {
+            my $stripped_available = $available;
+            $stripped_available =~ s/_.*//go;
+            $stripped_available =~ s/\..*//go;
+            return $available if $stripped_accept eq $stripped_available;
+        }
+    }
+}
+
+
+
+my $online = !param('file');
+print header(-charset=>'utf-8') if $online;
+
+my $gettext = Locale::gettext->domain_raw("dhelp");
+$gettext->codeset('UTF-8'); # Always UTF-8, specified in the HTML templates
+my @available_languages = map { chomp; $_ } split(/\n/, `/usr/bin/locale -a`);
+my @accept_languages = split(",", $ENV{HTTP_ACCEPT_LANGUAGE} || "");
+setlocale(LC_MESSAGES, select_matching_language(\@available_languages,
+                                                \@accept_languages));
+my $vars = {
+    online   => $online,
+    base_url => $online ? '' : 'file:/usr/share',
+    results  => [],
+    gettext  => $gettext,
+};
+
+sub _ {
+    $gettext->get($_[0]);
+}
+
+unless (-f DOCSINDEX) {
+    error(_("No search database found.\nPlease run /etc/cron.weekly/dhelp as superuser to create it."), $vars);
+}
+
+# Fetch, decode, untaint and check search parameter
+my $search = param('search');
+# This script may be called from command-line too, so the string might be just
+# a bunch of octets. Assume UTF-8 in that case.
+unless (Encode::is_utf8($search)) {
+    $search = decode('utf-8', $search);
+}
+$search =~ m/(.+)/;                 # Is there anything we shouldn't allow?
+$search = $1;
+$vars->{search_terms} = encode('utf8', $search);
+
+if ($search !~ /\S/) {
+    error(_("Please specify a search term."), $vars);
+}
+
+
+# Pass parameters to Swish++ search program
+(param('page') || "") =~ /(\d+)/;
+my $current_page = defined($1) ? $1 : 1;
+my $skipped_results = ($current_page - 1) * RESULTS_PER_PAGE;
+# search++ seems to support only Latin-1. Everything else makes it die with
+# "malformed query"
+my $encoded_search = encode('latin1', $search);
+open (SEARCH, '-|')
+    or exec '/usr/bin/search++', '-i', DOCSINDEX,
+                                 '-r', $skipped_results,
+                                 '-m', RESULTS_PER_PAGE,
+                                       $encoded_search;
+
+# Open the doc-base info database, and tie to %docs_info
+my %docs_info;
+tie %docs_info, 'AnyDBM_File', DOCBASEDB, O_RDONLY, 0644 or die "Cannot tie ".DOCBASEDB.": $!";
+
+##
+# Read the search results back and store somewhere, so we can calculate the
+# pages.
+##
+my ($n_results, $ignored);
+my @results;
+while ( <SEARCH> ) {
+    if ( /^\# ignored: / ) {
+        ##
+        # Get the ignored words so we can report them to the user.
+        ##
+        $ignored = $';
+        $ignored =~ s/\s+$//;
+        next;
+    }
+    if ( /^\# results: (\d+)/) {
+        $n_results = $1;
+        if ($n_results == 0) {
+            if ($ignored) {
+                $vars->{msg} = sprintf(_("No results (ignored words: %s). Search terms must be at least 4 characters long, and must not be \"stop words\". The command \"<tt>index++ -S</tt>\" gives the stop word list."), $ignored);
+            } else {
+                $vars->{msg} = _("No results.");
+            }
+            last;
+        }
+    }
+    ##
+    # Future releases of SWISH++ may emit other comments: ignore ones we
+    # don't know about.
+    ##
+    next if /^\#/;
+
+    my( $rank, $file, $size, $title ) = split(/ /, $_, 4);
+    my $extract = get_extract($file, $search);
+
+    $size = int( $size / 1024 );
+    if ( $size ) {
+        $size .= 'K';
+    } else {
+        $size = '&lt;1K';
+    }
+    my $file_url = $file;
+    if ($online) {
+        my $file_url_encoded = uri_escape($file_url);
+        $file_url = "/cgi-bin/dhelp_fetcher?file=$file_url_encoded";
+    } else {
+        $file_url = "file:$file";
+    }
+    # Calculate the real title
+    my ($doc_id, $doc_base_title) = get_doc_base_info(\%docs_info, $file);
+    $title .= " ($doc_base_title)" if $doc_base_title;
+    push @{$vars->{results}}, {rank    => $rank,
+                               file    => $file_url,
+                               title   => $title,
+                               size    => $size,
+                               extract => $extract};
+}
+
+if (!$online && $n_results > RESULTS_OFFLINE_MODE) {
+    $vars->{msg} .= " ".sprintf(_("Showing only %s out of %s results in offline mode."), RESULTS_OFFLINE_MODE, $n_results);
+}
+
+close (SEARCH);
+
+# We are already fetching just the data page we want, but Data::Page is
+# useful to calculate information about _other_ pages of data
+my $pager = Data::Page->new($n_results,
+                            RESULTS_PER_PAGE,
+                            $current_page);
+
+# Include paging information
+$vars->{current_page}  = $pager->current_page;
+$vars->{previous_page} = $pager->previous_page;
+$vars->{next_page}     = $pager->next_page;
+$vars->{last_page}     = $pager->last_page;
+
+my $tt = Template->new({INCLUDE_PATH => TEMPLATES_DIR});
+$tt->process('search_results.tmpl', $vars) or die $tt->error;
+
+__END__
+
+

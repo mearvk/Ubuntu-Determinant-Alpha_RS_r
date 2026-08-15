@@ -1,0 +1,421 @@
+#!/usr/bin/perl -w
+
+=encoding utf8
+
+=head1 NAME
+
+dh_fortran_mod - Install Fortran 90 .mod files and add dependency information.
+
+=cut
+
+use strict;
+use File::Find;
+use Debian::Debhelper::Dh_Lib;
+use IO::Uncompress::Gunzip qw( $GunzipError );
+use File::LibMagic;
+
+our $VERSION = '@VERSION@';
+
+=head1 SYNOPSIS
+
+B<dh_fortran_mod>   [B<--sourcedir=>I<dir>] [$<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_fortran_mod> is a debhelper program that finds Fortran module and submodule files and
+adds dependencies to B<gfortran-$version> as required to the package using
+via the variable B<${misc:Depends}>.
+
+B<dh_fortran_mod> is expected to be automatically added using the debhelper "addon" B<fortran_mod>
+ie. using the debian/rules line:
+
+    dh $@ --with fortran_mod
+
+
+B<dh_fortran_mod>Searches the debian/ directory for files B<debian/pkg.fortran-mod>$ which list
+module files to include, with the same syntax as debhelper install files.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--sourcedir=>I<dir>
+
+Look in the specified directory for files to be installed.
+
+Typically Fortran module files are included in library development packages.
+
+=back
+
+=head1 TODO
+
+=over 4
+
+B<dh_fortran_mod> will be expanded to find mod files automatically from the I<debian/tmp> directory.
+It will enable the installation of mod files in parallel for multiple compilers.
+It will install .smod files for Fortran 2018.
+
+The fortran-mod file syntax follows dh_install: pairs of sources and optional target directories.
+The default directory will be $fmoddir ( /usr/lib/$multiarch/fortran/$compiler_mod_directory/)
+If the target directory is absolute (starts with a  '/'), this directory is used in the target package.
+If the target  does not absolute, it will be treated as a subdirectory of $fmoddir.
+
+$compiler_mod_directory is based on the compiler module version: currently gfortran-mod-15 for
+gfortran-11, and flang-mod-34 for flang-7. These will be updated for incompatible compiler versions.
+There is a symlink in $libdir/fortran/ for the 'canonical' compiler name, linking to this, e.g.
+  /usr/lib/$multiarch/fortran/x86_64-linux-gnu-gfortran-9 -> gfortran-mod-15
+This enables makefile fragments to construct $fmoddir as required from :
+
+  FC:=$(shell basename $(shell readlink -f /usr/bin/gfortran))
+  FMODDIR:=/usr/lib/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)/fortran/$(FC)
+
+Its not clear what happens on module version changes in Flang/F18. While the version number signifies
+format changes, it appears the design is currently to be backward compatible and read previous versions.
+Hence symlinks for flang handling may be required; however a new f18 front-end is being developed,
+so this may change.
+
+=cut
+
+
+# Default
+
+our %modversions = ();
+
+init(options => {
+    "sourcedir=s" => \$dh{SOURCEDIR},
+});
+
+my $srcdir = '.';
+$srcdir = $dh{SOURCEDIR} if defined $dh{SOURCEDIR};
+
+
+my $multiarch = dpkg_architecture_value("DEB_HOST_MULTIARCH");
+
+# TODO: Use this to scan for modules / submodules
+sub ScanDirectory{
+    my ($workdir) = shift;
+    chdir($workdir) or die "Unable to enter dir $workdir:$!\n";
+    opendir(DIR, ".") or die "Unable to open $workdir:$!\n";
+    my @names = readdir(DIR) or die "Unable to read $workdir:$!\n";
+    closedir(DIR);
+
+    foreach my $name (@names){
+        next if ($name eq ".");
+        next if ($name eq "..");
+
+        if (-d $name){                  # is this a directory?
+            #Whatever you want to do goes here.
+        }
+    }
+}
+
+
+## Determine the compiler and module version number as necessary
+## takes: filename (module/submodule file), returns (compiler, module-version)
+sub determine_mod_version {
+    my $modfile = shift;
+    my $magic = File::LibMagic->new();
+
+    if ( ! (-r $modfile) ) {
+	warning("Can't open $modfile");
+	return ('none', -1);
+    }
+    my ($mime) = split(/;/, $magic->checktype_filename($modfile));
+
+    if ($mime eq "text/plain") {
+        if ( ! (open(MODFILE, "<", $modfile))) {
+	    warning($!);
+	    return ('none', -1);
+	}
+        $_ = <MODFILE>;
+        close(MODFILE);
+    } elsif ($mime eq "application/gzip") {
+        my $z = new IO::Uncompress::Gunzip $modfile or error("gunzip failed: $GunzipError\n");
+        $_ = <$z>;
+        $z->close();
+    } else {
+        print("wrong MIME type $mime for $modfile; ignoring");
+	return ('none', -1);
+    }
+
+    if (/^GFORTRAN module version '([0-9]+)'/) {
+        return ('gfortran', $1);
+    } elsif  (/^V([0-9]+)/) {
+	# could also be PGI, but we don't ship PGI on Debian ...
+	return ('flang', $1);
+    } else {
+        # error("$modfile is not a gfortran mod file.");
+	return ('none', -1);
+    }
+
+}
+
+# Determine which compiler pkg(s) created a given mod/smod file
+sub which_compiler {
+    my $modfile = shift;
+
+    my ($compiler, $modversion) = determine_mod_version($modfile);
+    my $compiler_version = '';
+    next if $compiler eq 'none';
+
+    if (!exists($modversions{$modversion})) {
+	if ($compiler eq 'gfortran') {
+	    if ($modversion eq 14) {
+		$compiler_version = 'gfortran-7';
+		$modversions{'gfortran-7'} = "${compiler}-mod-${modversion}";
+	    }
+	    if ($modversion eq 15) {
+		$compiler_version = 'gfortran-11';
+		$modversions{'gfortran-8'} = "${compiler}-mod-${modversion}";
+		$modversions{'gfortran-9'} = "${compiler}-mod-${modversion}";
+		$modversions{'gfortran-10'} = "${compiler}-mod-${modversion}";
+		$modversions{'gfortran-11'} = "${compiler}-mod-${modversion}";
+
+	    }
+	}
+	if ($compiler eq 'flang') {
+	    if ($modversion le 34) {
+		$compiler_version = 'flang-7';
+		$modversions{'flang-7'} = "${compiler}-mod-${modversion}";
+	    }
+	}
+    }
+    verbose_print ("Fortran modfile $modfile created by $compiler modversion $modversion");
+    return $compiler_version;
+}
+
+# Create a built_using list  for substitution
+sub create_built_using {
+    my %compiler_pkgs  = @_;
+    my $built_using = '';
+    my  $mp='';
+    foreach my $compiler_pkg  (keys(%compiler_pkgs)) {
+	$mp = "$compiler_pkg | $modversions{$compiler_pkg}";
+	if ( $built_using eq '') {
+	    $built_using = $mp;
+	} else {
+	    $built_using = "${built_using}, ${mp}";
+	}
+    }
+    return $built_using;
+}
+
+sub compute_dest {
+	my ($source_dir, $modfile, $target_dest) = @_;
+
+	my $cmplr = which_compiler( $modfile);
+	my $fmoddir = "/usr/lib/${multiarch}/fortran/$modversions{${cmplr}}";
+
+	if (defined $target_dest) {
+
+	    if ($target_dest =~ /^\//) {
+		return $target_dest;
+	    } else {
+		return "$fmoddir/$target_dest";
+	    }
+	} else {
+	    return $fmoddir;
+	}
+}
+
+# Support for -X flag.
+my $exclude = '';
+if ($dh{EXCLUDE_FIND}) {
+	$exclude = '! \( '.$dh{EXCLUDE_FIND}.' \)';
+}
+
+foreach my $package (getpackages()) {
+    next if is_udeb($package);
+
+    my (@installed, %dest2sources);
+    my $default_source_dir = default_sourcedir($package);
+    my @search_dirs = ($srcdir);
+    push(@search_dirs, $default_source_dir);
+
+
+    # Look at the install files for all packages to handle
+    # list-missing/fail-missing, but skip really installing for
+    # packages that are not being acted on.
+    my $skip_install = process_pkg($package) ? 0 : 1;
+
+    my $tmp = tmpdir($package);
+    my $config = pkgfile($package, "fortran-mod");
+    my @install;
+    my $pkg_built_using = '';
+    my %compiler_pkgs;
+
+    # try parsing a list of files
+    if ($config) {
+	@install = filedoublearray($config);
+    }
+
+    # Copy dh_install behaviour.
+    #
+    # Bug backwards compatibility (#867866).  The new "glob_expand"
+    # interface is smart enough to not split on spaces, but dh_install
+    # used to do that... *except* for the "DEST" since it was never
+    # passed to the glob function.
+    my @a = @ARGV;
+    my $dest = pop(@a) if @a > 1;
+    my @srcs = map { split } @a;
+    push(@srcs, $dest) if defined($dest);
+    push(@install, \@srcs);
+
+    my $glob_error_handler = sub {
+	# Do not require a match for packages that not acted on
+	# (directly).  After all, the files might not have been
+	# generated/compiled.
+	return if $skip_install;
+	goto \&glob_expand_error_handler_warn_and_discard;
+    };
+
+    foreach my $set (@install) {
+
+	my ($dest, @filelist, @patterns);
+
+	if (@$set > 1) {
+	    $dest=pop @$set;
+	}
+
+	my @tmp = @$set;
+
+	# Skip excluded patterns.  We will need two exclude checks per pattern;
+	# 1) exclude the entire pattern as people expect this to work (#814856)
+	# 2) exclude files matched by the pattern as people could have just
+	#    excluded a single file of a "dir/*"-pattern.
+	# This line below filters entire patterns
+	@patterns = grep { not excludefile($_) } @{$set};
+	next if not @patterns;
+	foreach my $glob (@patterns) {
+	    my @found = glob_expand(\@search_dirs, $glob_error_handler, $glob);
+	    push(@filelist, map { tr{/}{/}s; $_ } @found);
+	}
+
+	if (! @filelist  && !$skip_install ) {
+	    warning("$package missing files: @$set");
+	    next;
+	}
+
+	# Do a quick bulk handling of excluded files and update @installed.
+	# - this is for filtering files matched by the pattern
+	@filelist = grep { not excludefile($_) } @filelist if $exclude;
+	push(@installed, @filelist);
+
+	# ... because then we can short-curcit here.
+        next if $skip_install;
+
+	if (not $exclude) {
+	    my @unoptimized;
+	    for my $src (@filelist) {
+		my $d = compute_dest($default_source_dir, $src, $dest);
+		my $cmplr = which_compiler($src);
+	        $compiler_pkgs{$cmplr} = 1 ;
+		my $basename = basename($src);
+		if (exists($dest2sources{$d}{$basename})) {
+		    # If there is a clash, silently undo the optimizations.
+		    # See #866405 and #868169.
+		    my $replaced = delete($dest2sources{$d}{$basename});
+		    # Associate the $replaced the destination
+		    # directory.  We cannot be sure that compute_dest will
+		    # get it right nor can we blindly set $dest.
+		    #
+		    # It is technically unnecessary for $src, but we
+		    # might as well do it to possibly save a
+		    # compute_dest call.
+		    push(@unoptimized, [$replaced, $d], [$src, $d]);
+		    next;
+		}
+		$dest2sources{$d}{$basename} = $src;
+	    }
+	    next if not @unoptimized;
+	    @filelist = @unoptimized;
+	}
+
+	foreach my $src (@filelist) {
+
+	    my $target_dest;
+
+	    my $compiler_pkg = which_compiler($src);
+	    $compiler_pkgs{$compiler_pkg} = 1 ;
+
+	    if (ref($src)) {
+		# On a failed optimization, we will have the
+		# destination directory.
+		($src, $target_dest) = @{$src};
+	    } else {
+		$target_dest = $dest;
+		if (! defined $target_dest) {
+		    # Guess at destination directory.
+		    $target_dest = compute_dest($default_source_dir, $src, undef);
+		}
+	    }
+
+	    # Make sure the destination directory exists.
+	    install_dir("$tmp/$target_dest");
+
+	    if (-d $src && $exclude) {
+		my $basename = basename($src);
+		my $dir = ($basename eq '.') ? $src : "$src/..";
+		my $pwd=`pwd`;
+		chomp $pwd;
+		complex_doit("cd '$dir' && " .
+			     "find '$basename' $exclude \\( -type f -or -type l \\) -print0 | LC_ALL=C sort -z | " .
+			     "xargs -0 -I {} cp --reflink=auto --parents -dp {} $pwd/$tmp/$target_dest/");
+		# cp is annoying so I need a separate pass
+		# just for empty directories
+		complex_doit("cd '$dir' && " .
+			     "find '$basename' $exclude \\( -type d -and -empty \\) -print0 | LC_ALL=C sort -z | " .
+			     "xargs -0 -I {} cp --reflink=auto --parents -a {} $pwd/$tmp/$target_dest/");
+	    }
+	    else {
+		doit("cp", '--reflink=auto', "-a", $src, "$tmp/$target_dest/");
+	    }
+	    doit("chmod","644","$tmp/$target_dest/*.mod");
+	}
+    }
+
+    for my $dest (sort(keys(%dest2sources))) {
+	my @srcs = sort(values(%{$dest2sources{$dest}}));
+	# Make sure the destination directory exists.
+	install_dir("$tmp/$dest");
+
+	for my $src (@srcs) {
+	    xargs(\@srcs, "cp", '--reflink=auto', "-a", XARGS_INSERT_PARAMS_HERE, "$tmp/$dest/");
+	}
+	log_installed_files($package, @installed);
+    }
+    $pkg_built_using = create_built_using ( %compiler_pkgs);
+    addsubstvar($package, "misc:Depends", $pkg_built_using);
+    keys %modversions;
+
+    if ($config) { # config file defined, so create scripts
+	foreach my $compiler (sort keys %modversions) {
+	    my $lnk=`readlink -f /usr/bin/$compiler`;
+	    my $canoncomp=`basename $lnk`;
+	    chomp $canoncomp;
+	    autoscript($package, 'preinst', 'preinst-fortran-mod', { 'MULTIARCH' => $multiarch,
+									 'FCOMPILERMOD' => $modversions{$compiler},
+									 'FCOMPILER' => $compiler,
+									 'FCANONICAL' => $canoncomp});
+	    autoscript($package, 'postrm', 'postrm-fortran-mod', { 'MULTIARCH' => $multiarch,
+								       'FCOMPILERMOD' => $modversions{$compiler},
+								       'FCOMPILER' => $compiler,
+								       'FCANONICAL' => $canoncomp });
+	}
+    }
+}
+
+
+=back
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+=head1 AUTHORS
+
+Sébastien Villemot <sebastien@debian.org>
+Alastair McKinstry <mckinstry@debian.org>
+
+Lots of code stolen shamelessly from dh_install (Joey Hess <joeyh@debian.org>).
+=cut

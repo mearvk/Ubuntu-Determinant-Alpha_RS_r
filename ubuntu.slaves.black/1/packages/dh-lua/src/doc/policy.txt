@@ -1,0 +1,484 @@
+Debian Lua policy (v@@V@@)
+===============================
+
+Index
+-----
+
+* [Conventions](#ch-conventions)
+* [Rationale](#ch-rationale)
+* [Packages Contents](#ch-pkgcontents)
+  * [Run time package: `lua-{PKG_NAME}` ](#sec-runtime)
+  * [Development package: `lua-{PKG_NAME}-dev` ](#sec-devel)
+  * [Packages Contents (an example)](#sec-pkgconsample)
+* [Creating a package in a quick and clean way](#ch-quickandclean)
+  * [The `dh-lua` package](#sec-pkgpolicydev)
+  * [Writing a `debian/dh-lua.conf` file](#sec-makefileconf)
+  * [The `rules` file](#sec-rules)
+  * [No `.install` files](#sec-install)
+  * [The control file](#sec-control)
+  * [Multiple packages from the same source](#sec-multipkg)
+  * [Automatically testing your package](#sec-autotest)
+* [Notes on undefined symbols and packages dependencies](#ch-notesundef)
+* [Notes on source package names](#ch-notessource)
+* [Notes on multi-version Lua scripts in PATH](#ch-lua-any)
+
+  
+Conventions <a id="ch-conventions"></a>
+-----------
+
+In the following we shall write `{VARIABLE}` to mean a schema of file names.
+The following ones are the most relevant:
+
+  - `{LUA_VERSION}` The Lua major version, like `5.1`, `5.2`, `5.3`, or `5.4`
+  - `{PKG_NAME}` The name of the library, like `expat`, `lpeg` and `sql`
+  - `{LUA_MODNAME}` The string used to `require` the module, like `lxp`
+
+Rationale <a id="ch-rationale"></a>
+---------
+
+For every library two packages will be available, one containing only the
+minimum needed to run `require "{LUA_MODNAME}"` and one with all the other
+stuff (documentation or headers and library files to link standalone
+applications).  The former package will be named `lua-{PKG_NAME}` while the
+latter will be named  `lua-{PKG_NAME}-dev` even if it contains only
+documentation (like pure lua libraries).  The motivation is that it may be
+modified in the future to include some C parts (and this would imply a
+renaming).
+
+The headers files `.h` are intended to declare the simple
+`luaopen_{LUA_MODNAME}` function.
+
+To avoid bloating the Debian archive with minuscule packages, a `-doc` package
+should be provided only if documentation is very large.  Including a short
+documentation in the `-dev` package does not hurt. 
+
+If the same source package is able to provide more than one couple of deb
+packages (like luasql, that provides various backends) only one copy of the
+source package should be added to the archive and let that package generate all
+the needed debs.  All packages should be named with a common prefix, like
+`lua-{PKG_NAME}-` that in the case of luasql will produce the
+following debs: `lua-sql-mysql`, `lua-sql-mysql-dev`, `lua-sql-sqlite` and
+`lua-sql-sqlite-dev`.
+
+If the package is made of a common part the best would be to put it in a
+package whose name ends with the `-common` suffix. All debs should then depend
+on it. This avoids playing with diversions. The same also applies to
+documentation, that (if common to all debs) should not be replicated on all
+`-dev` packages, but put in a `-doc` package.
+
+Packages Contents <a id="ch-pkgcontents"></a>
+-----------------
+
+Here a listing of the contents of the two packages will follow.
+
+### Run time package: `lua-{PKG_NAME}` <a id="sec-runtime"></a>
+
+  - `/usr/lib/liblua{LUA_VERSION}-{PKG_NAME}.so.{ABI}`
+  - `/usr/lib/liblua{LUA_VERSION}-{PKG_NAME}.so.{CABI} -> 
+       liblua{LUA_VERSION}-{PKG_NAME}.so.{ABI}`
+  - `/usr/lib/lua/{LUA_VERSION}/{LUA_MODNAME}.so -> 
+       ../../liblua{LUA_VERSION}-{PKG_NAME}.so.{ABI}`
+  - `/usr/share/lua/{LUA_VERSION}/*.lua`
+
+### Development package: `lua-{PKG_NAME}-dev` <a id="sec-devel"></a>
+
+  - `/usr/include/lua{LUA_VERSION}/*.h`
+  - `/usr/lib/liblua{LUA_VERSION}-{PKG_NAME}.a`
+  - `/usr/lib/liblua{LUA_VERSION}-{PKG_NAME}.so -> 
+       liblua{LUA_VERSION}-{PKG_NAME}.so.{ABI}`
+  - `/usr/share/doc/liblua{LUA_VERSION}-{PKG_NAME}-dev/*`
+  - `/usr/lib/pkgconfig/lua{LUA_VERSION}-{PKG_NAME}.pc`
+
+Should a `-doc` package exist, only the following files will be contained
+in the package:
+
+  - `/usr/share/doc/lua-{PKG_NAME}-doc/*`
+
+### Packages Contents (an example) <a id="sec-pkgconsample"></a>
+
+*`lua-expat`*
+
+  - `/usr/lib/liblua5.1-expat.so.0.0.0`
+  - `/usr/lib/liblua5.1-expat.so.0 -> liblua5.1-expat.so.0.0.0`
+  - `/usr/lib/lua/5.1/lxp.so -> ../../liblua5.1-expat.so.0.0.0`
+  - `/usr/share/lua/5.1/lxp/lom.lua`
+
+*`lua-expat-dev`*
+
+  - `/usr/include/lua5.1/lxplib.h`
+  - `/usr/lib/liblua5.1-expat.a`
+  - `/usr/lib/liblua5.1-expat.so -> liblua5.1-expat.so.0.0.0`
+  - `/usr/share/doc/lua-expat-dev/us/*html`
+  - `/usr/lib/pkgconfig/lua5.1-expat.pc`
+
+Creating a package in a quick and clean way <a id="ch-quickandclean"></a>
+-------------------------------------------
+
+Since all lua libraries look almost the same, we provide a common set of
+templates to help building packages conforming the policy and allowing
+single-place modification all over these packages.
+
+### The `dh-lua` package <a id="sec-pkgpolicydev"></a>
+
+The following files are contained in the package:
+
+  - `dh-lua.conf` is a configuration file sourced by make.
+    
+  - `app.c` and `app.c.conf.in` are automatically handled by `dh-lua`
+    and they implement an interpreter that calls `luaopen_{LUA_MODNAME}` and
+    runs the file taken as parameter. `dh-lua` test links twice
+    this interpreter (one time dynamically and one statically, i.e. including
+    the library) and runs it on the test file.
+
+  - `pkg-config.pc.in` is automatically handled by `dh-lua` that
+    will create for you a policy-conforming `.pc` file.
+
+Since these files are needed at compile time, you should put `dh-lua` in your
+`Build-Depends` field. In addition to these files it provides the following
+utility:
+
+  - `lua-create-gitbuildpackage-layout` should be used to create the 
+    git repository of the debian packages. It builds a git-buildpackage ready 
+    layout, adding the standard `debian/rules` file, a `debian/watch` template
+    and a `debian/dh-lua.conf` template.
+
+Then it is necessary to edit `debian/dh-lua.conf`, create a
+changelog file with `dch --create`, write down the `debian/control`
+and `debian/copyright` files.
+
+### Writing a `debian/dh-lua.conf` file <a id="sec-makefileconf"></a>
+
+You will find a template file called `dh-lua.conf` in the
+`dh-lua` package (see `/usr/share/dh-lua/template/`).
+
+Note that if you used the `lua-create-svnbuildpackage-layout`
+utility to create the package svn repository, you will find a template
+in `debian/`.
+
+The `LUA_VERSION` field is *mandatory*, unless you name the `dh-lua`
+configuration file in a special way (see [Multiple packages](#sec-multipkg))
+
+  - `LUA_VERSION=5.1`
+
+The `PKG_NAME` field is *mandatory*, the usual name of the library should be
+used (like `curl` or `logging` for luacurl and lualogging).
+
+  - `PKG_NAME=curl`
+
+The next part is for the C part of the library (if any).
+
+  - `CLIB_CFLAGS= -I src/`
+  - `CLIB_LDFLAGS= $(shell pkg-config libcurl --libs)`
+  - `CLIB_LDFLAGS_STATIC= $(shell pkg-config libcurl --libs --static)`
+  - `CLIB_OBJS= src/lxplib.lo`
+  - `VERSION_INFO=0:0:0`
+
+Remember that all `.c` files have to produce a `.lo` files (in libtool
+tradition).  List them in the `CLIB_OBJS` field. `CLIB_CFLAGS` and
+`CLIB_LDFLAGS` have the standard meaning (see the [make manual][5]), while
+the `CLIB_LDFLAGS_STATIC` variant is used when building the statically linked
+test application (if `LUA_TEST` is not empty).
+
+`VERSION_INFO` is libtool specific (read libtool documentation if in doubt).
+It should be avoided in packages created using `dh-lua`, it is there for
+retrocompatibility with the `lua5.1-policy-dev` helper.
+
+The next part is for the lua part of the library (if any).
+
+  - `LUA_HEADER=src/lxplib.h`
+  - `LUA_SOURCES=$(wildcard src/lxp/*.lua)`
+  - `LUA_SOURCES_MANGLER=sed s?^src/??`
+  - `LUA_MODNAME=lxp`
+  - `LUA_TEST=tests/test.lua`
+  - `LUA_MODNAME_CPART=lxp`
+
+`LUA_MODNAME` will be the module name used inside lua (with `require`), if
+empty `PKG_NAME` will be used.
+`LUA_HEADER` points to the file (if any) that declares the
+`luaopen_LUA_MODNAME_CPART` C function (if the library has a C part), if omitted
+(and if the library has a C part) a trivial `.h` file will be automatically
+generated.
+`LUA_SOURCES` point to the `.lua` files. `LUA_SOURCES_MANGLER` is a program
+that takes in standard input one item in `LUA_SOURCES` and mangles it.  The
+default value is `cat` that makes no change.  Note that the escape
+character `\` has to be doubled, for example `\(a\|b\)` becomes `\\(a\\|b\\)`
+and `\1` becomes `\\1`.  Single quotes `'` should be avoided in favour of
+double quotes `"`.
+`LUA_SOURCES_ARCHDEP` can be used to specify sources that needs to be installed
+in architecture specific paths, like
+`/usr/lib/x86_64-linux-gnu/lua/{PLUA_VERSION}`.  This is useful for `.lua`
+files specific using `luajit` facilities to access `C` data structures. 
+`LUA_TEST` points to the test file that will be run once the library is
+compiled.  `LUA_MODNAME_CPART` is the suffix of the C function to load the
+module (if empty `LUA_MODNAME` is used). 
+
+The next part is for pkg-config (if the library has a C part).
+
+  - `PKG_VERSION=`
+  - `PKG_LIBS_PRIVATE=`
+  - `PKG_URL=`
+  - `PKG_REQUIRES=`
+  - `PKG_CONFLICTS=`
+
+All these fields are explained in the manpage of pkg-config.
+If `PKG_VERSION` is unspecified, the following one liner is run
+to compute a value starting from `debian/changelog`:
+
+<pre>
+dpkg-parsechangelog | grep ^Ver | cut -d ' ' -f 2 | cut -d '-' -f 1
+</pre>
+
+### The `rules` file <a id="sec-rules"></a>
+
+If you used the `lua-create-svnbuildpackage-layout` a standard
+file is placed in `debian/` for you. If not, you can use this one:
+
+<pre>
+#!/usr/bin/make -f
+
+%:
+        dh $@ --buildsystem=lua --with lua
+</pre>
+
+Note that there are various targets one can hook to in order to
+fix things. The following example illustrates how to add extra
+stuff to the configuration phase, the testing phase and how
+to clean up the mess at the end:
+
+<pre>
+override_dh_auto_configure:
+	echo "do some extra stuff before"
+	dh_auto_configure
+	echo "and some more after"
+
+override_dh_auto_test:
+	echo "prepare the test phase"
+	dh_auto_test
+
+override_dh_auto_clean:
+	dh_auto_clean
+	echo "remove the mess!"
+</pre>
+
+### No `.install` files <a id="sec-install"></a>
+
+All `.install` files are provided by two templates part of dh-lua.
+The template `lib.install.in` generates the following
+`lua-{PKG_NAME}.install` file:
+
+<pre>
+/usr/share/lua/{LUA_VERSION}/*
+/usr/lib/*.so.*
+/usr/lib/lua/{LUA_VERSION}/{LUA_MODNAME_UNDERSCORE}.so
+</pre>
+
+Where `{LUA_MODNAME_UNDERSCORE}` is `{LUA_MODNAME}` where `.` is replaced
+by `_`.  Also, a line is generated only if it is relevant.  In the example
+above the package in question has both a C and a Lua part.
+
+The template `dev.install.in` generates the following
+`lua-{PKG_NAME}-dev.install` file:
+
+<pre>
+/usr/lib/pkgconfig/*
+/usr/include/lua{LUA_VERSION}/*
+/usr/lib/*.so
+/usr/lib/*.a
+</pre>
+
+If you need to ship more files, you may add a `.install.in` file.  This file
+can contain a line like the following one to reuse the text of the template
+file:
+
+<pre>
+include @@TEMPLATE@@/lib.install.in
+</pre>
+
+Moreover, to ship your files to the right path, take into account that
+`@@LUA_VERSION@@` string is substituted with the`{LUA_VERSION}` value,
+`@@DEB_HOST_MULTIARCH@@` with the corresponding `dpkg-architecture
+-qDEB_HOST_MULTIARCH` value.
+
+To install documentation, please use a `.docs` file.
+
+### The control file <a id="sec-control"></a>
+
+Two variables will be automatically substituted by `dh-lua` in
+the control file.
+
+  - `${lua:Versions}` is substituted in the control file of
+    any package that has in its binary stanza the field `XB-Lua-Versions`.
+    The value is going to be something like `5.1 5.2`, or `5.1`, depending
+    on how many versions of the module exist (see also the following section).
+
+  - `${lua:Provides}` should be used in the `Provides` field.
+    Its value is the list of (versioned) virtual packages.
+    For example the package `lua-lpeg` that compiles for both 
+    Lua 5.1 and 5.2 will provide `lua5.1-lpeg` and `lua5.2-lpeg`.
+
+In this way `apt-cache search 5.2 lpeg` finds the `lua-lpeg` package.
+Moreover a software can just declare a dependency over `lua5.2-lpeg` if 
+sufficient.
+
+### Multiple packages from the same source <a id="sec-multipkg"></a>
+
+It is possible that the same source package provides more (and distinct)
+modules. This is the case for `luasql` that provides various backends.
+`dh-lua` is able to cope with this situation if it finds a set of
+files (and not a single file) that match the pattern
+`debian/*dh-lua.conf`.
+
+The variables `{PKG_NAME}` and `{LUA_MODNAME}` can be set using the `.` symbol
+to separate modules.  In `luasql` the file `debian/mysql.dh-lua.conf`
+defines:
+
+  - `PKG_NAME=sql.mysql`
+  - `LUA_MODNAME=luasql.mysql`
+
+The latter is the one expected since it is the same string used with `require`,
+while the former is used to infer the deb package name, substituting `.` with
+`-` when needed.
+
+A special case is when the the configuration file name starts with
+`lua${LUA_VERSION}`.  In that case the `LUA_VERSION` variable can be omitted
+and it is automatically set to the value extracted from the file name.
+Supported values are `5.4`, `5.3`, `5.2` and `5.1`.
+This makes it possible to use one single
+conf file to build the library for many Lua version.  It is sufficient to
+name the file like `debian/lua5.1.lpeg.dh-lua.conf` and add a symlink to it
+named like `debian/lua5.2.lpeg.dh-lua.conf`. Of course this trick can be used
+only if the library is agnostic and works out of the box with both versions of
+Lua with no modifications.
+
+### Automatically testing your package <a id="sec-autotest"></a>
+
+If you specify the `LUA_TEST` variable in the `dh-lua.conf` file, three
+tests will be performed after compilation and before building the package.
+
+* `lua-dynamic-test` calls the lua standard interpreter in the following way:
+  `lua{LUA_VERSION} -l LUA_MODNAME LUA_TEST` (note that if you set `LUA_TEST` to 
+  something like `tests/test.lua arg1 arg2` the arguments will be passed to 
+  the test). The lua interpreter should found the `.lua` and eventual `.so` 
+  files in the current working directory. For that purpose `LUA_MODNAME` is
+  used to make a symbolic link pointing to the real `.so` file during build
+  phase. If you need a different setting, set an hook for
+  `pre-lua-dynamic-test-hook`
+* `app-dynamic-test` builds a minimal application that is linked (at compile 
+  time) with the C par of the library (if any). This means that the lua
+  interpreter should load the C part of the library calling a function that
+  is already linked with the binary, and not use dlopen as in the previous
+  test.  This minimal application is `app.c` that includes a minimal
+  configuration file that is tuned using the variables defined in
+  `Makefile.Debian.conf` (see the [code snippet](#snippet-appconf) at the end
+  of this section).
+  The variables between `@@` will be replaced with their values (the
+  `_UNDERSCORE` is simply the result of replacing `.` by `_`). This code means 
+  that when a `require` is issued for `LUA_MODNAME_CPART` the corresponding
+  C function `luaopen_LUA_MODNAME_CPART_UNDERSCORE` is called
+* `app-static-test` behaves exactly as `app-dynamic-test`, but libtool is run
+  to statically link the C code of the library into the `app` executable
+
+<pre id="snippet-appconf">
+  &#x0023;include "@@LUA_HEADER@@"
+  static void app_open(lua_State* L){
+    lua_getglobal(L,"package");
+    lua_getfield(L,-1,"preload");
+    lua_pushcfunction(L,luaopen_@@LUA_MODNAME_CPART_UNDERSCORE@@);
+    lua_setfield(L,-2,"@@LUA_MODNAME_CPART@@");
+  }
+</pre>
+
+Multiple tests can be separated by a `;`, like in
+`LUA_TEST=test1.lua; test2.lua`. Moreover one can give a context for the test
+like in `LUA_TEST=cd test/ && @@LUA@@ test.lua`. `@@LUA@@` will be substituted
+with the something like `LUA_INIT=... lua5.1 -l${LUA_MODNAME}`.
+Of course you cannot use `;`.
+
+To run a custom command, for example to avoid `-l${LUA_MODNAME}`, the
+`LUA_TEST_CUSTOM` variable can be used instead.  There `;` can be used,
+`@@LUA@@` is substituted for something like `LUA_INIT=... lua5.1`.
+Shell expansions are not reliable anyway.  To code `for X in a b; do echo $X;
+done` one has to write `$(foreach X,a b,echo $(X);)`, using make syntax.
+
+### Debugging
+
+`dh-lua` understands `DH_VERBOSE`. For example tp get verbose output for the
+test phase, you can put the following lines in `debian/rules`:
+
+<pre>
+override_dh_auto_test: 
+	DH_VERBOSE=1 dh_auto_test
+</pre>
+
+### Fine tuning `dh-lua` while developing
+
+The `DH_LUA_OPTS` variable can be set to a space separated list of
+the following values:
+
+* verbose
+* skip-test-lua-dynamic
+* skip-test-app-dynamic
+* skip-test-app-static
+
+Notes on undefined symbols and packages dependencies <a id="ch-notesundef"></a>
+----------------------------------------------------
+
+All lua libraries are not linked against `liblua5.1.so`, so all `lua_` and
+`luaL_` prefixed symbols will appear as undefined (i.e. using `objdump -T` to
+inspect them and look for symbols marked with `*UND*`). This is a *feature*
+since:
+
+  - The interpreter is statically linked with that library and exports all the
+    needed symbols.  This means that it is able to dlopen the library with any
+    troubles.
+
+  - Any application linked against `liblua5.1.so` has these symbols defined,
+    thus can load the library safely.
+
+  - If libraries are linked against `liblua5.1.so` you would see `liblua5.1.so`
+    resident in memory loading them from the lua interpreter (try `cat
+    /proc/PID/maps`).  But the interpreter already had that code loaded.
+
+As a side effect, all lua libraries do not depend on the `liblua5.1` package
+(and must not declare it in the `Depends` field). 
+
+All dependencies among other lua libraries must be declared. A `-dev` package
+must depend on the `-dev` packages corresponding to the other lua libraries
+that it uses, while the runtime package (non `-dev` package) must depend only
+on the runtime package relative to the other lua libraries that it uses.
+
+Notes on source package names <a id="ch-notessource"></a>
+-----------------------------
+
+All source packages should be named `lua-{PKG_NAME}` for consistency.  
+
+Notes on multi-version Lua scripts in PATH <a id="ch-lua-any"></a>
+-----------------------------
+
+If you have a Lua scripts meant to be executed (installed in the PATH)
+that works with many Lua versions (but not all of them).  The `lua-any`
+wrapper may come handy.
+
+Example of shebang line:
+
+<pre>
+#!/usr/bin/env lua-any
+-- Lua-Versions: 5.1 5.2
+</pre>
+
+Example of control file:
+
+<pre>
+Depends: lua-any, lua5.1 | lua5.2
+</pre>
+
+For more details, refer to the `lua-any` man page.
+
+-------------------------------------------------------------------------------
+This file follows the markdown syntax. See [Markdown][1] and [lua markdown][2].
+
+[1]: http://daringfireball.net/projects/markdown/ "Markdown Homepage"
+[2]: http://luaforge.net/projects/markdown/ "Lua implementation of markdown"
+[3]: http://www.gnu.org/software/libtool/ "GNU Libtool"
+[4]: http://pkgconfig.freedesktop.org/wiki/ "pkg-config tool"
+[5]: http://www.gnu.org/software/make/manual/make.html "GNU Make"

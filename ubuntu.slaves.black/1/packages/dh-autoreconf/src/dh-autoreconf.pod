@@ -1,0 +1,83 @@
+=head1 NAME
+
+dh-autoreconf - debhelper add-on to run autoreconf during build
+
+=head1 DESCRIPTION
+
+The dh-autoreconf package provides a sequence addon for debhelper 7 and is
+enabled by default since compatibility level 10. For earlier compatibility
+levels it can be enabled in the following way:
+
+    #!/usr/bin/make -f
+    %:
+        dh $@ --with autoreconf
+
+This will call dh_autoreconf prior to dh_auto_configure and will call
+dh_autoreconf_clean before dh_clean.
+
+For more information on how to control the autoreconf process or how to
+other possible options, read the L<dh_autoreconf(1)> and
+L<dh_autoreconf_clean(1)> manual pages.
+
+=head1 CDBS INTEGRATION
+
+This package also provides F</usr/share/cdbs/1/rules/autoreconf.mk> for
+packages using B<CDBS>. The variable C<DEB_DH_AUTORECONF_ARGS> can be used
+to pass extra arguments to dh_autoreconf, and the variable
+C<DEB_DH_AUTORECONF_CLEAN_ARGS> to pass arguments to dh_autoreconf_clean. See
+their manual pages for information on available arguments.
+
+=head1 TIPS AND EXAMPLES
+
+=head2 PATCHING LTMAIN.SH FOR AS-NEEDED LINKER FLAGS
+
+You can add support for -Wl,--as-needed to ltmain.sh (at least for those
+ltmain.sh scripts changed during autoreconf) by passing the argument
+B<--as-needed> to dh_autoreconf, as demonstrated in the following example:
+
+    override_dh_autoreconf:
+        dh_autoreconf --as-needed
+
+and for CDBS, by adding it to the correct variable such as:
+
+    DEB_DH_AUTORECONF_ARGS = --as-needed
+
+For more information about this feature, see L<dh_autoreconf(1)>
+
+=head2 RUNNING MULTIPLE COMMANDS WITH DH_AUTORECONF
+
+Please note that you may run dh_autoreconf only once. If you need to run
+multiple commands, you can put the commands into a script or your debian/rules
+file and then pass the name of your script to dh_autoreconf. For example, if
+your script is called debian/autogen.sh, you can put the following into your
+debian/rules if you use dh:
+
+    override_dh_autoreconf:
+        dh_autoreconf debian/autogen.sh
+
+Or, if you use CDBS:
+
+    DEB_DH_AUTORECONF_ARGS += debian/autogen.sh
+
+=head1 CAVEATS
+
+dh_autoreconf is mostly a superset of the dh_update_autotools_config debhelper
+command included in debhelper since version 9.20160115. When using the dh
+sequencer, dh_update_autotools_config is run before dh_autoreconf and updates
+the config.guess and config.sub files. This is required in cases where
+autoreconf does not update config.guess and config.sub itself.
+
+From time to time, there might be a short breakage for those using
+automatic ltmain.sh patching, when the patch no longer applies to
+the ltmain.sh.
+
+You can only run dh_autoreconf once. Future versions may be able to
+be run multiple times, but this requires slightly more planning.
+
+=head1 SEE ALSO
+
+L<debhelper(7)>, L<dh(1)>, L<dh_autoreconf(1)>, L<dh_autoreconf_clean(1)>
+
+=head1 AUTHOR
+
+Julian Andres Klode <jak@debian.org>

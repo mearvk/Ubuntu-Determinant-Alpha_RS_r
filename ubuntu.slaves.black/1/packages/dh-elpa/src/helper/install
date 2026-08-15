@@ -1,0 +1,65 @@
+#!/bin/sh
+# invoke as /usr/lib/dh-elpa/helper/install flavor elpa_package elpa_version elpa_load_path
+
+set -e
+
+# safe values for important variables
+
+unset HOME
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# grab parameters
+
+FLAVOR=$1
+ELPA_PACKAGE=$2
+ELPA_VERSION=$3
+ELPA_LOAD_PATH=$4
+
+ELPA_DIR=${ELPA_PACKAGE}-${ELPA_VERSION}
+
+case $FLAVOR in
+    emacs2[01234]*)
+        echo install/${ELPA_DIR}: Skipping obsolete emacs ${FLAVOR}
+        exit 0
+        ;;
+    xemacs*)
+        echo install/${ELPA_DIR}: Skipping unsupported emacs ${FLAVOR}
+        exit 0
+        ;;
+    *)
+        echo install/${ELPA_DIR}: Handling install of emacsen flavor ${FLAVOR}
+esac
+
+src_dir=/usr/share/emacs/site-lisp/elpa-src
+el_dir=$src_dir/${ELPA_DIR}/
+elc_dir=/usr/share/${FLAVOR}/site-lisp/elpa/${ELPA_DIR}/
+
+export EMACSLOADPATH
+EMACSLOADPATH=${ELPA_LOAD_PATH}
+
+echo install/${ELPA_DIR}: byte-compiling for ${FLAVOR}
+
+[ -d ${elc_dir} ] || mkdir -p ${elc_dir}
+
+# Create symlinks to the .el files (see section 6E in debian-emacs
+# policy).  This makes complation easy, and also allows find-function
+# and find-library to work properly.  Also link all other top level
+# files and directories into the flavor directory
+(cd ${elc_dir} && ln -sf ${el_dir}/* .)
+
+# Byte compile them
+(cd ${elc_dir}
+ set +e
+ ${FLAVOR} --quick --batch -l package \
+           --eval "(setq package-user-dir \"/nonexistent\")" \
+           --eval "(add-to-list 'package-directory-list \"$src_dir\")" \
+           -f package-initialize -f batch-byte-compile *.el > Install.log 2>&1
+ if test $? -ne 0
+ then
+   cat Install.log
+   exit 1
+ fi
+ set -e
+ gzip -9f Install.log)
+
+exit 0;

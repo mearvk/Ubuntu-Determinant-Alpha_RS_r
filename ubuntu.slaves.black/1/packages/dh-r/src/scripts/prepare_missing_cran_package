@@ -1,0 +1,248 @@
+#!/bin/sh -e
+
+show_usage () {
+  echo "Usage: `basename $0` <package_name>"
+  echo
+  echo "`basename $0` searches the CRAN and BioConductor repositories for package with the exact name given as a single argument. It will download, unpack, and prepare all the Debian packaging for the requested packages and all those dependencies that are not yet shipping with Debian."
+}
+
+if [ $# -ne 1 ] ; then
+  show_usage
+  exit 1
+fi
+
+if [ "$1" = "-h" -o "$1" = "--help" ] ; then
+  show_usage
+  exit 1
+fi
+
+if [ "$1" = "splines" ] ; then
+  echo "I: Package $1 already ships with r-base-core."
+  exit 0
+fi
+
+if [ "$1" = "stats4" ] ; then
+  echo "I: Package $1 already ships with r-base-core."
+  exit 0
+fi
+
+if ! (which $(basename $0) > /dev/null 2>&1); then
+  echo "E: Extending PATH for $(dirname $0)"
+  PATH=$PATH:$(dirname "$0")
+fi
+
+for tool in cme dh-make-R git
+do
+  p=$(which $tool||true)
+  if [ "" = "$p" ]; then
+    echo "E: Missing tool '$tool'"
+    exit 1
+  fi
+done
+
+do_wnpp_check () {
+  retval=""
+  wnpp=`wnpp-check $wnppname | sed 's/^(.* - #\([0-9]\+\)) http.*/\1/'`
+  if [ "$wnpp" != "" ] ; then
+    newversion=`PGPASSWORD="udd-mirror" psql --port=5432 --host=udd-mirror.debian.net --username=udd-mirror -t udd -c "select version from new_packages where package = '$wnppname' ;"`
+    if [ "$newversion" != "" ] ; then
+      >&2 echo "W: Package $wnppname is just in Debian new queue waiting for processing"
+      retval="new"
+    else
+      >&2 echo "W: Package $wnppname was ITPed in bug #$wnpp.  Please check http://bugs.debian.org/$wnpp"
+      retval="$wnpp"
+    fi
+  fi
+  echo $retval
+}
+
+cranname=$1
+pkgname=""
+workdir=`pwd`
+for repository in bioc cran
+do
+  pkgname=r-${repository}-`echo $cranname | tr '[A-Z]' '[a-z]'`
+
+  a=$(apt-cache show $pkgname|wc -l)
+  if [ 0 -lt $a ]; then
+    echo "$a"
+    echo "I: Package $pkgname is already known - see 'apt-cache show $pkgname'."
+    exit 0
+  fi
+
+  if apt-cache policy $pkgname | grep -v "(none)" | grep -q "Installed:" ; then
+    echo "I: Package $pkgname is available. Try 'apt-cache policy $pkgname' to find its author."
+    exit 0
+  fi
+
+  wnppname=$pkgname
+  wnppcheck=$( do_wnpp_check )
+  if [ "$wnppcheck" = "new" ] ; then
+    echo "I: No point to deal with a package which is in new - exitting"
+    exit 0
+  else
+    # If wnpp_check did not found r-cran-NAME try r-bioc
+    if [ "$wnppcheck" = "" ] ; then
+      wnppname="r-bioc-`echo $cranname | tr '[A-Z]' '[a-z]'`"
+      wnppcheck=$( do_wnpp_check )
+      if [ "$wnppcheck" = "new" ] ; then
+        echo "I: No point to deal with a package which is in new - exitting"
+        exit 0
+      fi
+    fi
+  fi
+done
+
+if echo $workdir | grep -q CRAN_prospective ; then
+  basedir=`echo $workdir | sed 's#\(CRAN_prospective\).*#\1#'`
+else
+  basedir=`dirname $workdir`/CRAN_prospective
+fi
+targetdir="$basedir/$pkgname"
+
+for p in "`dirname ${targetdir}`/${cranname}/debian" "$targetdir"
+do
+  if [ -d "$p" ]; then
+    echo "E: Previous packaging attempt for package $cranname exists in '$p'."
+    exit 1
+  fi
+done
+
+createdDirs=""
+if [ ! -d "$targetdir" ]; then
+  mkdir -p "$targetdir"/debian
+  createdDirs="$targetdir"
+elif [ ! -d "$targetdir"/debian ]; then
+  mkdir $targetdir/debian
+  createdDirs="$targetdir/debian"
+fi
+cd $targetdir
+
+if [ "$DEBFULLNAME" != "" -a "$DEBEMAIL" != "" ] ; then
+  AUTHOR="$DEBFULLNAME <${DEBEMAIL}>"
+else
+  AUTHOR="FIXME: DEBFULLNAME <DEBEMAIL> (you should set these variables in your environment)"
+fi
+
+cat > debian/changelog <<EOT
+$pkgname (0.0-1) UNRELEASED; urgency=medium
+
+  * Initial release
+
+ -- $AUTHOR  `date -R`
+EOT
+
+cat > debian/watch <<EOT
+version=4
+https://cloud.r-project.org/src/contrib/${cranname}@ANY_VERSION@@ARCHIVE_EXT@
+EOT
+
+echo "I: Checking CRAN repository for ${cranname}"
+tarball=`uscan --verbose 2>/dev/null | grep ".orig.tar.[gx]z" | sed 's#^.* \(\.\./.*\.orig\.tar\.[gx]z\).*#\1#'`
+#echo "I: - testing for '$tarball'"
+
+BIOCDATA=""
+if [ "$tarball" = "" ] ; then
+  # if nothing was found on CRAN try BioConductor
+  echo "I: Checking BioConductor release repository"
+  sed -i 's/^r-cran-/r-bioc-/' debian/changelog
+  cat > debian/watch <<EOT
+version=4
+opts=downloadurlmangle=s?^(.*)\.\.?https://bioconductor.org/packages/release/bioc? \
+ https://www.bioconductor.org/packages/release/bioc/html/${cranname}.html .*/${cranname}@ANY_VERSION@@ARCHIVE_EXT@
+EOT
+  tarball=`uscan --verbose 2>/dev/null | grep ".orig.tar.[gx]z" | sed 's#^.* \(\.\./.*\.orig\.tar\.[gx]z\).*#\1#'`
+  if [ "$tarball" = "" ] ; then
+    echo "I: Checking BioConductor experiment data repository"
+    # There is a last resort chance to find the package in BioConductor data area
+    cat > debian/watch <<EOT
+version=4
+opts=downloadurlmangle=s?^(.*)\.\.?https://bioconductor.org/packages/release/data/experiment? https://www.bioconductor.org/packages/release/data/experiment/html/${cranname}.html .*/${cranname}@ANY_VERSION@@ARCHIVE_EXT@
+EOT
+    tarball=`uscan --verbose 2>/dev/null | grep ".orig.tar.[gx]z" | sed 's#^.* \(\.\./.*\.orig\.tar\.[gx]z\).*#\1#'`
+    if [ "$tarball" = "" ] ; then
+      echo "I: Checking BioConductor annotation data repository"
+      # There is a last resort chance to find the package in BioConductor annotation data area
+      cat > debian/watch <<EOT
+version=4
+opts=downloadurlmangle=s?^(.*)\.\.?https://bioconductor.org/packages/release/data/annotation? https://www.bioconductor.org/packages/release/data/annotation/html/${cranname}.html .*/${cranname}@ANY_VERSION@@ARCHIVE_EXT@
+EOT
+      tarball=`uscan --verbose 2>/dev/null | grep ".orig.tar.[gx]z" | sed 's#^.* \(\.\./.*\.orig\.tar\.[gx]z\).*#\1#'`
+      if [ "$tarball" = "" ] ; then
+        echo "E: $cranname was neither found on CRAN nor part of the BioConductor release nor BioConductor annotation/experiment data"
+        if [ "" != "$createdDirs" ]; then
+          echo "   Please remove directory '$createdDirs'"
+        fi
+        exit 1
+      fi
+    fi
+    # If this line was reached, then the package was found somewhere in BioConductor
+    BIOCDATA="true"
+    pkgname=r-bioc-`echo $cranname | tr '[A-Z]' '[a-z]'`
+    cp -a debian/watch /tmp/watch_$pkgname
+  fi
+  pkgname=r-bioc-`echo $cranname | tr '[A-Z]' '[a-z]'`
+fi
+
+echo "I: Preparing package '$pkgname'"
+
+cd ..
+rm -rf r-cran-`echo $cranname | tr '[A-Z]' '[a-z]'`
+tarball=`echo $tarball | sed 's#^\.\./##'`
+if [ ! -r "$tarball" ]; then
+  echo "I: Something went wrong - expected file '$tarball' in $(pwd)"
+  exit 1
+fi
+echo "I: Untaring '$tarball' in $(pwd)"
+tar xaf $tarball
+cd $cranname
+if [ `find . -iname "test*" | wc -l` -gt 0 ] ; then
+  dh-make-R --test run-unit-test 2>/dev/null >/dev/null
+else
+  dh-make-R 2>/dev/null >/dev/null
+fi
+
+echo "I: Preparing debian/control"
+
+# FIXME: dh-r does not know BioC data location yet.
+#        This hack restores working watch file and hacks in proper Homepage
+# FIXME FIXME: Handling annoation packages still needs to be addressed
+if [ "$BIOCDATA" = "true" -a -e /tmp/watch_$pkgname ] ; then
+  mv /tmp/watch_$pkgname debian/watch
+  # Fix Homepage
+  sed -i 's+^\(Homepage.*.org/packages/\)+&data/experiment/+' debian/control
+fi
+
+# Hack to get cme formatted d/control
+sed -i 's/^Standards-Version: .*/Standards-Version: 4.0.0/' debian/control
+cme fix dpkg-control 2>/dev/null >/dev/null || true
+
+if [ `find . -iname "*.rda" -o -iname "*.rdata" | wc -l` -gt 0 ] ; then
+  cd debian
+  /usr/share/dh-r/create_README.source > README.source
+  cd ..
+fi
+
+echo "I: Preparing local git repository"
+cd ..
+gitdir="$basedir/$pkgname"
+mkdir $gitdir
+cd $gitdir
+git init
+#newversion=`echo ../$tarball | sed 's/^.*_\([0-9].*\)\.orig\.tar\..*/\1/'`
+#gbp import-orig --pristine-tar --upstream-version=$newversion ../$tarball
+gbp import-orig --pristine-tar --no-interactive ../$tarball
+mv ../$cranname/debian .
+git add debian
+git commit -a -m"Initial packaging by `basename $0`"
+echo "I: Cleaning up"
+rm -f ../`readlink ../$tarball`
+rm -f ../$tarball
+rm -rf ../$cranname
+
+if [ "$wnppcheck" != "" ] ; then
+  echo "Please make sure you contact reporter of ITP bug $wnppcheck to sort out the status if the package"
+  sed -i "/Initial release/s/xxxxxx/$wnppcheck/" debian/changelog
+fi
+
+echo "You can find a packaging repository for $cranname in `pwd`"

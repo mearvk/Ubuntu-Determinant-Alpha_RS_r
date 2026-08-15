@@ -1,0 +1,127 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+dh_golang - Generates Built-Using substvar
+
+=cut
+
+use strict;
+use warnings;
+use Cwd qw(realpath);
+use Debian::Debhelper::Dh_Lib; # not in core
+use Debian::Debhelper::Dh_Buildsystems; # not in core
+
+=head1 SYNOPSIS
+
+B<dh_golang> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<dh_golang> is a debhelper program which adds the misc:Built-Using substvar
+based on the dependencies of the package being built. It uses go list to
+determine the packages imported and dpkg-query to find the source package and
+version that provided that package.
+
+=head1 NOTES
+
+The best way to invoke B<dh_golang> is by adding B<dh-sequence-golang> to the
+package build dependencies and using B<dh> or by using B<dh --with=golang>.
+
+=cut
+
+sub uniq {
+    my %list = map { $_ => 1 } @_;
+
+    return sort keys %list;
+}
+
+sub exec_single {
+    my ($cmd, @args) = @_;
+
+    verbose_print(escape_shell(@_));
+
+    my @output = qx($cmd @args);
+    error_exitcode($cmd) if $? != 0;
+    chomp(@output);
+
+    return @output;
+}
+
+# Amount of chunking we are going to use for dpkg commands, which should speed
+# up the execution by avoiding too many database loads.
+use constant CHUNKSIZE => 200;
+
+sub exec_chunked {
+    my ($cmd, @list) = @_;
+
+    my @result;
+    while (@list) {
+        push @result, exec_single($cmd, splice(@list, 0, CHUNKSIZE));
+    }
+
+    return @result;
+}
+
+############################################################################
+# Generate misc:Built-Using substvar.
+############################################################################
+
+buildsystems_init();
+my $bs = load_buildsystem("golang");
+
+$bs->set_go_env();
+
+my @targets = $bs->get_targets();
+
+my $tmpl = '{{ range .Deps }}{{.}}
+{{ end }}';
+my @godeps = exec_single(qq{go list -f '$tmpl'}, @targets);
+
+my $gofiletmpl = '\
+{{ .Dir }}/{{ index (or .GoFiles .CgoFiles .TestGoFiles .XTestGoFiles .IgnoredGoFiles) 0 }}';
+
+# gccgo can't find files for standard libraries, see #907263
+if (grep /gccgo/, exec_single(q{go version})) {
+    $gofiletmpl = '{{if not .Standard}}' . $gofiletmpl . '{{end}}';
+}
+
+my @gofiles = exec_chunked(qq{go list -f '$gofiletmpl'}, uniq(@godeps));
+
+my @realpath;
+foreach my $pathname (@gofiles) {
+    my $realpath = realpath($pathname);
+    # gofiles will include packages being built, so exclude those.
+    if ($realpath !~ /^\Q$bs->{cwd}\E/) {
+        push @realpath, $realpath;
+    }
+}
+
+my @searchoutput = exec_chunked('dpkg-query --search', @realpath);
+my @gopkgs = split /, */, join ', ', map { s/: .+$//r } @searchoutput;
+
+my @srcdeps = exec_chunked(q{dpkg-query -f='${source:Package} (= ${source:Version})\n' -W}, uniq(@gopkgs));
+my $built_using = join ', ', uniq(@srcdeps);
+
+# If there is an easier way to have a universal misc:Built-Using on all binary
+# packages, I am happy to merge your patch :).
+foreach my $package (@{$dh{DOPACKAGES}}) {
+    # Skip adding the misc:Built-Using substvar if the package is
+    # architecture independent, as those should not end up embeddeding
+    # other Go modules.
+    next if package_arch($package) eq 'all';
+
+    addsubstvar($package, "misc:Built-Using", $built_using);
+}
+
+=head1 SEE ALSO
+
+dh(1), Debian::Debhelper::Buildsystem::golang(1).
+
+=head1 AUTHORS
+
+Michael Stapelberg <stapelberg@debian.org>
+
+=cut
+
+# vim:ts=4:sw=4:et

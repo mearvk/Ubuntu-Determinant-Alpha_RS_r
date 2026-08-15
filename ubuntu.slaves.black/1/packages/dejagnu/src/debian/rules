@@ -1,0 +1,74 @@
+#!/usr/bin/make -f
+
+DEB_BUILDDIR := $(shell pwd)/objdir
+
+# This implements the .deb package creation using debhelper.
+include /usr/share/cdbs/1/rules/debhelper.mk
+
+# This implements building using a configure script and Makefile.
+include /usr/share/cdbs/1/class/autotools.mk
+
+# Quilt-based patches in debian/patches.
+include /usr/share/cdbs/1/rules/patchsys-quilt.mk
+
+# Rather paranoid than sorry. Make the shell exit with an error if an
+# untested command fails.
+SHELL += -e
+
+ifeq (,$(findstring stage1,$(DEB_BUILD_PROFILES)))
+DEB_MAKE_BUILD_TARGET = all html pdf ps
+else
+DEB_MAKE_BUILD_TARGET = all
+
+common-build-indep::
+	touch objdir/dejagnu.pdf objdir/dejagnu.ps objdir/dejagnu.rtf objdir/html
+endif
+
+# Do not run tests.  Building with pbuilder puts a pipe on standard input,
+# and building in the build daemons puts nothing there.  If we do not force
+# a TTY manually, something goes wrong (timing related?) in expect, and
+# host_execute ends up closing standard output instead of the unit test,
+# and the testsuite blows up.  But on a build daemon, there's no TTY to
+# be had.
+# DEB_MAKE_CHECK_TARGET = check < /dev/tty
+
+binary-install/dejagnu::
+	install -d debian/dejagnu/etc/dejagnu
+	install -m 644 debian/site.exp debian/dejagnu/etc/dejagnu/
+	ln -s /etc/dejagnu/site.exp debian/dejagnu/usr/share/dejagnu/site.exp
+
+	chmod -R a-x debian/dejagnu/usr/share/dejagnu
+	chmod -R a+X debian/dejagnu/usr/share/dejagnu
+	chmod a+x debian/dejagnu/usr/share/dejagnu/libexec/config.guess
+
+	# Since 1.5 release there are no examples
+	#install -m 755 install-sh \
+	#	debian/dejagnu/usr/share/doc/dejagnu/examples/calc/install-sh
+
+	# Make install already installs this, but redo it to get the right
+	# postinst bits.
+	dh_installinfo doc/dejagnu.info
+	-rm -f debian/dejagnu/usr/share/info/dir	# Closes: #546551
+
+post-patches::
+	# Nothing in Debian is quite capable of regenerating this (neither
+	# docbook-utils nor docbook2x) so the small diffs necessary were
+	# made by hand.
+	touch doc/dejagnu.texi
+
+	# TCL's "file exists" strips out .. components, which lets runtest.exp
+	# decide that dejagnu/../config.guess exists if only ./config.guess
+	# exists.  For the sake of running the dejagnu testsuite from the build
+	# directory, create a symlink.
+	if ! test -e dejagnu; then \
+		ln -s . dejagnu; \
+	fi
+
+clean::
+	# DejaGNU fails to remove all sorts of things.
+	rm -rf $(DEB_BUILDDIR)
+
+	# Automake likes to create this in srcdir.
+	rm -f doc/dejagnu.info
+
+	rm -f dejagnu

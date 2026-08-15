@@ -1,0 +1,525 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+dh_elpa - install emacs lisp packages into package build directories
+
+=cut
+
+use strict;
+use Cwd qw{ getcwd };
+use File::Temp qw{tempfile};
+use IO::Handle;
+use File::Path;
+
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_elpa> [S<I<debhelper options>>]  [S<I<pkg-file>>]
+
+=head1 DESCRIPTION
+
+B<dh_elpa> is a debhelper program that is responsible for installing
+elpa style emacs lisp packages into package build directories.
+
+B<dh_elpa> will attempt to run ERT and Buttercup test suites using
+dh_elpa_test(1) if the debhelper compat level is 10 or higher.  To
+disable this behaviour, or tweak it if it is failing to run the tests
+as they should be run, set environment variables in debian/rules as
+detailed in dh_elpa_test(1).
+
+=head1 FILES
+
+=over 4
+
+=item debian/I<package>.elpa
+
+=item debian/elpa
+
+List of files to be installed into I<package> (respectively into the
+first binary package) as an elpa package.  The format is a set of
+lines, where each line is either (i) a single filename or glob, or
+(ii) a space-separated list of one or more filenames or globs,
+followed by the name of a destination subdirectory (which should not
+begin with a slash).
+
+For lines with a single file or glob, B<dh_elpa> will install matching
+file(s) into the top level elpa package directory.
+
+For lines which include a destination subdirectory, B<dh_elpa> will
+install matching file(s) into the named subdirectory.
+
+Only elisp files in the top level elpa package directory will be
+automatically byte-compiled.
+
+=item I<elpa-package>-pkg.el
+
+This file contains packaging metadata for a multi-file package -- see
+the Emacs manual on the subject of "Packaging" for full details.
+
+This file is often part of the upstream source, but when it is not,
+dh_elpa will try to create it at package build time.  If it cannot,
+and you need to create one manually, you can add it to the upstream
+source, or create the file in C<debian/> and list it in
+debian/I<package>.elpa.
+
+=item I<elpa-package>-autoloads.el
+
+This file is used by the Emacs packaging system to collect autoloads
+from the Emacs Lisp sources.  It is usually generated at package build
+time, and should not usually exist in the upstream source.
+
+=back
+
+=cut
+
+init(options => {
+        "emacs-loadpath=s" => \$dh{EMACS_LOADPATH},
+	"byte-compile!" => \$dh{BYTECOMPILE},
+	"fix-autoload-date!" => \$dh{FIXAUTOLOADDATE},
+});
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--byte-compile>, B<--no-byte-compile>
+
+Enable (default) or disable byte compilation of installed emacs lisp
+files.  Disabling byte compilation changes the destination directory
+to one that is found by the emacs package system.
+
+=back
+
+=over 4
+
+=item B<--emacs-loadpath> I<path>
+
+A colon separated list of directories to add to the Emacs load path
+for byte compilation (e.g. for a non elpa-* dependency).
+
+=back
+
+=over 4
+
+=item B<--fix-autoload-date>, B<--no--fix-autoload-date>
+
+Enable (default) or disable munging the dates in Emacs generated
+autoload files to match debian/changelog.
+
+=back
+
+=cut
+
+sub doit_quietly {
+  my ($handle,$tmpfile) = tempfile(UNLINK=>1);
+  my $exitcode;
+
+  verbose_print(escape_shell(@_));
+  open (CPERR,">&STDERR") or error "$!";
+  open (CPOUT,">&STDOUT") or error "$!";
+  STDOUT->fdopen($handle,'w');
+  STDERR->fdopen($handle,'w');
+  my $ret=doit_noerror(@_);
+  STDOUT->fdopen(\*CPOUT,'w');
+  STDERR->fdopen(\*CPERR,'w');
+
+  if (!$ret){
+    $exitcode=$?;
+    seek $handle, 0, 0 or error "$!";
+    print while (<$handle>);
+    my $command=join(" ",@_);
+    error("$command returned exit code ".($exitcode >> 8));
+  }
+
+}
+
+# simplified version of private sub autoscript_sed in Dh_Lib
+sub sed_file {
+  my ($sed, $infile, $outfile) = @_;
+
+  open(IN, $infile) or die "$infile: $!";
+  open(OUT, ">>$outfile") or die "$outfile: $!";
+  while (<IN>) { $sed->(); print OUT }
+  close(OUT) or die "$outfile: $!";
+  close(IN) or die "$infile: $!";
+}
+
+sub read_package_desc {
+  my ($descdir, $package) = @_;
+  my %desc = ();
+
+  my $descfile="${descdir}/${package}.desc";
+
+  my $fh;
+
+  open $fh,'<', $descfile or
+    error "failed to open $descfile";
+
+  while (<$fh>) {
+    if (m/([^:]+):\s*(.*)\s*$/) {
+      $desc{$1} = $2;
+    }
+  }
+  return \%desc;
+}
+
+my $templatedir = "/usr/share/debhelper/dh_elpa/emacsen-common";
+
+sub maybe_install_helper{
+  my ($package,$piece, $mode, $desc, $emacs_loadpath)=@_;
+  my $file=pkgfile($package,"emacsen-$piece");
+
+  my $tmp=tmpdir($package);
+  my $ecdest="$tmp/usr/lib/emacsen-common/packages";
+  my $target="$ecdest/$piece/$package";
+  # if there is file, leave it for dh_installemacsen
+  if ($file eq '') {
+    if (! -d "$ecdest/$piece") {
+      doit("install","-d","$ecdest/$piece");
+    }
+    unlink $target; # ignore errors
+
+    my $elpapackage = $desc->{'ELPA-Name'} or
+      error "elpa package name not found";
+
+    my $elpaversion = $desc->{'ELPA-Version'};
+    error "elpa version not found" if (!defined($elpaversion));
+
+    sed_file (sub {s/#ELPAPACKAGE#/$elpapackage/;
+                   s/#ELPAVERSION#/$elpaversion/;
+                   s/#EMACSLOADPATH#/$emacs_loadpath/; },
+              "$templatedir/$piece", $target);
+    chmod oct($mode), $target;
+  }
+}
+
+$dh{BYTECOMPILE} = 1 unless defined($dh{BYTECOMPILE});
+$dh{FIXAUTOLOADDATE} = 1 unless defined($dh{FIXAUTOLOADDATE});
+
+my $elpadir;
+
+my $dhelpadir="/usr/share/emacs/site-lisp/elpa";
+
+# TODO: do we really need a seperate elpa-src hierarchy?
+if ($dh{BYTECOMPILE}) {
+  $elpadir="/usr/share/emacs/site-lisp/elpa-src";
+} else {
+  $elpadir=$dhelpadir;
+}
+
+PACKAGE:
+foreach my $package (getpackages()) {
+
+  my $tmp=tmpdir($package);
+  my $file=pkgfile($package,"elpa");
+  my $skip_install = process_pkg($package) ? 0 : 1;
+
+  my $varname="ELPA_NAME_${package}";
+  my $elpapkg = $ENV{$varname} || $ENV{ELPA_NAME};
+  if (!defined($elpapkg)) {
+    verbose_print("Guessing elpa package name from package name $package");
+
+    $elpapkg = $package;
+    $elpapkg =~ s/^elpa-//;
+  }
+  verbose_print("Using elpa package name $elpapkg");
+
+  my @lines;
+  my @actions;
+  my $is_single_file;
+  my $has_package_file = 0;
+
+  # Call isnative because it sets $dh{VERSION}
+  # as a side effect.
+  isnative($package);
+  if ($file) {
+    # Read in the contents of the elpa control file into an array of
+    # arrays. Don't glob yet, we need to count the words first.
+    @lines=filedoublearray($file);
+
+    foreach my $line (@lines) {
+      my $action = {};
+      # On lines with more than one word, the last word is the
+      # destination (sub)directory
+      if (@$line >1) {
+        $action->{dest} = pop(@$line);
+      }
+
+      # Glob expand every word in the current line
+      $action->{src} = [ map { glob_expand(["."], \&glob_expand_error_handler_warn_and_discard, $_)  } @$line ];
+
+      # Check for an multi-file elpa package control file
+      $has_package_file ||= (grep m/\b${elpapkg}-pkg.el$/, @{$action->{src}});
+
+      push @actions, $action;
+    }
+
+    $is_single_file = (scalar(@actions) == 1 && scalar(@{$actions[0]->{src}}) == 1);
+
+    warning "missing ${elpapkg}-pkg.el; will try to generate it"
+      unless ($is_single_file || $has_package_file);
+  }
+  if (($package eq $dh{FIRSTPACKAGE} || $dh{PARAMS_ALL})
+      && @ARGV) {
+    push @actions, map { {"src" => $_} } @ARGV;
+  }
+
+  log_installed_files($package, map { @{$_->{src}} } @actions);
+
+  next PACKAGE if ($skip_install or (scalar(@actions) == 0));
+
+  my $pkg_file;
+  my $cwd = getcwd();
+  my $tempdir = "${cwd}/debian/.debhelper/elpa";
+
+  my @extra_args = ( $tempdir );
+  my $emacs_loadpath = "";
+
+  if (defined $dh{EMACS_LOADPATH}) {
+    $emacs_loadpath = $dh{EMACS_LOADPATH} . ':'
+  }
+
+  if ($dh{FIXAUTOLOADDATE}) {
+    push @extra_args, get_source_date_epoch();
+  }
+
+  File::Path::rmtree $tempdir ||
+      error "cleaning $tempdir";
+
+  File::Path::make_path $tempdir ||
+	  error "creating $tempdir";
+
+  if ($is_single_file) {
+      my $pkg_file=${$actions[0]->{src}}[0];
+
+      doit_quietly(qw{emacs -batch -Q -l package},
+		   '--eval',"(add-to-list 'package-directory-list \"$dhelpadir\")",
+		   '--eval',"(add-to-list 'package-directory-list \"$elpadir\")",
+		   qw{-f package-initialize -l dh-elpa.el},
+		   qw{-f dhelpa-batch-install-file}, "$tmp/$elpadir", $pkg_file, @extra_args);
+  } else {
+    my $stagedir = "$tempdir/$elpapkg";
+    foreach my $action (@actions) {
+      my $targetdir = $stagedir;
+
+      if (defined ($action->{dest})) {
+        $targetdir = $stagedir . "/" . $action->{dest};
+      }
+
+      File::Path::make_path $targetdir ||
+          error "creating $targetdir";
+
+      foreach my $file (@{$action->{src}}) {
+        doit("cp", "-a", $file, "$targetdir");
+      }
+    }
+
+    doit_quietly(qw{emacs -batch -Q -l package},
+		 '--eval',"(add-to-list 'package-directory-list \"$dhelpadir\")",
+		 '--eval',"(add-to-list 'package-directory-list \"$elpadir\")",
+		 qw{-f package-initialize -l dh-elpa.el},
+		 qw{-f dhelpa-batch-install-directory},
+		 "$tmp/$elpadir", $stagedir, @extra_args);
+
+  }
+
+  my $desc = read_package_desc ($tempdir,$elpapkg);
+  my $deps = $desc->{'ELPA-Requires'};
+
+  # TODO: addsubstvar fails to add a variable if its blank.  So if the
+  # package has no ELPA dependencies, we should tell the user not to
+  # use this substvar in debian/control
+  addsubstvar($package, 'elpa:Depends', $deps);
+
+  if ($dh{BYTECOMPILE}) {
+    addsubstvar($package, 'misc:Depends', 'emacsen-common');
+    addsubstvar($package, 'misc:Depends', 'dh-elpa-helper');
+    maybe_install_helper($package, 'compat', '0644', $desc, $emacs_loadpath);
+    maybe_install_helper($package, 'install', '0755', $desc, $emacs_loadpath);
+    maybe_install_helper($package, 'remove', '0755', $desc, $emacs_loadpath);
+
+    if (! $dh{NOSCRIPTS}) {
+      autoscript($package,"postinst","postinst-emacsen",
+                 "s/#PACKAGE#/$package/");
+      autoscript($package,"prerm","prerm-emacsen",
+                 "s/#PACKAGE#/$package/");
+    }
+  }
+
+}
+
+=head1 SUBSTVARS
+
+dh_elpa currently defines three substvars (cf. deb-substvars(5)) that
+can be used in debian/control
+
+=over 4
+
+=item ${misc:Depends}
+
+These are dependencies needed by every dh_elpa based package.
+
+=item ${elpa:Depends}
+
+These are dependencies on other ELPA packages as given in the
+Package-Requires: line of the package's main Emacs Lisp file.
+
+Note that Emacs Lisp dependencies packaged outside the elpa-* dpkg
+namespace must be specified manually.  For example, the s.el library
+was once provided by the binary package s-el, and at that time packages
+depending on it required an explicit dependency on s-el.  A dependency
+on s.el is now fulfilled automatically by elpa-s via ${elpa:Depends}.
+
+If dh_elpa adds dependency elpa-x where x is an Emacs Lisp binary
+package outside the elpa-* namespace, please file a bug against
+dh_elpa to have an exclusion added.
+
+=back
+
+=head1 EXAMPLES
+
+Here is an example of using the helper in a dh(1) style debian/rules
+
+=over 4
+
+    #!/usr/bin/make -f
+    %:
+        dh $@ --with elpa
+
+=back
+
+Here is a more complex dh(1) style debian/rules, where the package
+needs some non-dh-elpa emacs addon I<fubar-el>
+
+=over 4
+
+    #!/usr/bin/make -f
+    %:
+        dh $@ --with elpa
+
+    override_dh_elpa:
+        dh_elpa --emacs-loadpath="/usr/share/emacs/site-lisp/fubar-el"
+
+=back
+
+Here is an example of a binary package stanza using dh_elpa generated
+substvars
+
+=over 4
+
+    Package: elpa-hello
+    Architecture: all
+    Depends: ${misc:Depends}, ${elpa:Depends}
+    Description: Emacs addon to say hello
+     The Emacs editor addon likes to wave and say hello.
+
+=back
+
+=head1 HINTS
+
+=head2 Specifying the package version
+
+If dh_elpa can't determine the package version by looking at *.el
+files (usually because upstream has failed to include the proper
+headers or *-pkg.el file), it will fallback to the
+DEB_UPSTREAM_VERSION and DEB_VERSION_UPSTREAM environment variables.
+An easy way to set one of these based on your latest Debian changelog
+entry is just to prepend the following to your rules file:
+
+=over 4
+
+    include /usr/share/dpkg/pkg-info.mk
+    export DEB_VERSION_UPSTREAM
+
+=back
+
+Certain Debian upstream version strings cannot be translated into
+version strings Emacs will accept (see the docstring for the Emacs
+function `version-to-list' for details).  dh_elpa will error out if
+the version cannot be translated.  You should resort to patching in a
+Package-Version header or adding a *-pkg.el file.
+
+=head2 Specifying the Emacs package name
+
+Every Emacs package has a name (e.g. C<magit>, C<circe>, or
+C<tetris>).  For a simple package this is the filename without the
+'.el' extension; for a multi-file package, it is given in the
+C<*-pkg.el> file.  The Emacs package name is often distinct from the
+name of the upstream repository or the name of the Debian source
+package.
+
+B<dh_elpa> needs to know what the Emacs package name is, but it does
+not examine the upstream source code to find it.  Instead, by default,
+it assumes that the Emacs package name is the name of the binary
+package, stripped of any 'elpa-' prefix (which will be present for
+packages compliant with the Debian Emacsen Team addons policy
+(L<https://wiki.debian.org/EmacsenTeam>).
+
+To override that assumption, you can export the B<ELPA_NAME>
+environment variable in debian/rules:
+
+=over 4
+
+    ELPA_NAME=tpp-mode
+    export ELPA_NAME
+
+=back
+
+You can also specify the name on a per binary package basis with
+C<ELPA_NAME_binary-package-name>=tpp-mode.
+
+=head2 Debian-specific Lisp customizations
+
+With B<dh_elpa>, the file C<debian/emacsen-startup> is no longer
+required to ensure that C<load-path> is properly set.  This means that
+most packages do not require a C<debian/emacsen-startup> file at all.
+
+If you do need other configuration to be executed, add the special
+I<autoload cookie> in front of a form, and it will be run at package
+initialization time.  This is better than using
+C<debian/emacsen-startup> because the forms are then added to
+I<elpa-package>-autoloads.el, rather than a file in C</etc/>, as the
+contents of C<debian/emacsen-startup> was.  This simplifies package
+maintenance.
+
+These cookies can either annotate upstream source, or be added (along
+with the relevant forms) to a file in C<debian/>, by convention
+C<debian/debian-autoloads.el>.  That file must then be listed in
+debian/I<package>.elpa.
+
+=over 4
+
+=item Autoload a function
+
+In general definitions of which functions to autoload belong in the
+upstream source beside the function definition.
+
+    ;;;###autoload
+    (defun hello ()
+    "wave in a friendly manner"
+    (interactive)
+    ...)
+
+One option is to patch in the autoload cookie (if needed) and send
+those patches upstream. If that is not possible, you can manually
+create the autoload form and add it to C<debian-autoloads.el>.
+
+    ;;;###autoload
+    (autoload 'hello "goodbye.el" "wave in a friendly manner" t)
+
+=item Other customizations
+
+Other customizations (e.g. key bindings or setting variables) can be
+handled similarly to autoloading functions.
+
+    ;;;###autoload
+    (setq the-package-setting 42)
+
+The Emacs package system will copy an arbitrary (non-defun) form to
+the package autoloads file.  Changing the behaviour of the package (as
+opposed to making it work) should in most cases happen in upstreamed
+patches.
+
+=back

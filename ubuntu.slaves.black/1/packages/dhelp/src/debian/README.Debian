@@ -1,0 +1,227 @@
+1. Debian Online Help fetures
+==============================================
+
+Debian Online Help builds an index of all documentation in your system that
+is registered with doc-base (and updates it when new packages are installed).
+You can view this index with any web browser in two possible modes:
+
+1. Offline, using the file:// protocol. Just use the command:
+
+    <your-browser> file:///usr/share/doc/HTML/index.html
+
+2. Online, by installing a web server of your choice and opening the URL:
+
+    http://localhost/doc/HTML/index.html
+
+You can start Debian Online Help using the command `dhelp'. It will detect
+if you are using a web server and start in online mode, else it will start
+in offline mode. 
+
+You can search for documentation relating to a particular query string using
+the command `dhelp <query-string>', or use the search form if you have a web
+server installed.
+
+Debian Online Help tries hard to not carry with it excessive dependencies
+in order to allow you to accommodate any software setup without bringing in
+unneeded components. All optional components will be used if found, but the
+core functionality will still be provided if they are missing. If they get
+installed in the future, they will be available at the next index update.
+
+The list below summarizes the available functionality in any possible setup.
+Note that browsing offline through the file:/// protocol, as well as using
+search through the `dhelp <query-string>' command remain functional in _all_
+cases. 
+
+-- No web server installed:
+
+   Only offline mode works. Online mode and CGI scripts do not.
+   If you do not wish to install even a web browser, you can still use the
+   `html2text' package to view the text of the index pages from the console.
+
+-- A web server that does not support CGI is installed:
+
+   Offline and online modes work (web server may need manual configuration,
+   cf. section 1 below). CGI scripts do not work (ie the links to man and
+   info pages, the online mode's links to the documentation and the search
+   web form).
+
+-- A web server that supports CGI is installed, but man2html/info2www aren't
+
+   Offline and online modes work, as well as the online mode's links to the
+   documentation and the search web form. The links to man/info pages are
+   inactive.
+
+-- A web server that supports CGI as well as man2html/info2www are installed
+
+   The full functionality of Debian Online Help is available.
+
+
+2. Configuring dhelp to work with a web server
+==============================================
+
+Debian Online Help comes pre-configured for quite a few web servers that
+support aliases. If this is your case, then no further actions are needed
+(you may have to issue the command `dpkg-reconfigure dhelp' in case you 
+are installing the web server _after_ dhelp has been installed).
+
+For some web servers though that support aliases and for all web servers
+that do not support them, it is required to do a few actions by hand in
+order to finish dhelp configuration.
+
+The following tables summarize the situation and gives instructions for
+dhelp configuration with each web server:
+
+Table #1: Web servers that _do not_ require manual configuration
+------------------------------------------------------------------------------
+boa         : The default boa configuration has the /doc alias enabled.
+------------------------------------------------------------------------------
+lighttpd    : A configuration snippet is installed during dhelp installation.
+------------------------------------------------------------------------------
+mathopd     : The default mathopd configuration has the /doc alias enabled.
+------------------------------------------------------------------------------
+
+Table #2: Web servers that _may_ require manual configuration
+------------------------------------------------------------------------------
+apache2     : A configuration snippet is installed during dhelp installation.
+
+              For newer versions of the package (squeeze: >=2.2.16-6+squeeze7,
+              wheezy: >=2.2.22-4, all: >=2.4.1) you will have to enable the
+              /doc alias manually due to CVE-2012-0216.
+
+    Action  : Uncomment the `Alias /doc/ ...' line inside the installed dhelp
+              configuration snippet for apache2. Its path depends on apache2
+              version.
+              <  2.4 : /etc/apache2/conf.d/dhelp.conf
+              >= 2.4 : /etc/apache2/conf-available/dhelp.conf
+------------------------------------------------------------------------------
+
+Table #3: Web servers that _do_ require manual configuration
+------------------------------------------------------------------------------
+bozohttpd   : Does not support aliases. Action : cf. [1] below.
+------------------------------------------------------------------------------
+micro-httpd : Does not support aliases. Action : cf. [1] below.
+------------------------------------------------------------------------------
+mini-httpd  : Does not support aliases. Action : cf. [1] below.
+------------------------------------------------------------------------------
+monkey      : Does not support aliases.
+
+ [1] Action : Create a symlink named `doc' to `/usr/share/doc', inside
+              the web server's document root (Debian default is /var/www).
+              The command to create it is:
+
+                  ln -s /usr/share/doc  /var/www/doc
+------------------------------------------------------------------------------
+nginx       : The default nginx configuration has the /doc alias enabled, but
+              the server does not support CGI scripts by default.
+
+    Action  : Install the `fcgiwrap' package and copy the following line to
+              the `server {...}' block of the default virtual site (its path
+              is: /etc/nginx/sites-available/default):
+
+                  include /usr/share/doc/fcgiwrap/examples/nginx.conf
+------------------------------------------------------------------------------
+yaws        : An example configuration file for dhelp is provided at
+              `/usr/share/dhelp/config/yaws-dhelp.conf', but is not installed
+              in `/etc/yaws/conf.avail' because yaws does not allow overlayed
+              <server> directives.
+              In addition, the cgi scripts coming with dhelp cannot work as is
+              because they lack the `.cgi' extension.
+
+    Action  : Use the supplied dhelp configuration snippet to manually edit
+              your configuration. To support the dhelp cgi scripts you need
+              to create a wrapper erlang appmode and edit the configuration
+              to load it.
+------------------------------------------------------------------------------
+
+Any web server not listed in the tables above will most probably require
+manual configuration. The recipy in [1], above, will work with any web
+server, so this is the first thing to try.
+
+The dhelp configuration snippets provided at /usr/share/dhelp/config, as
+`<webserver>-dhelp.conf' for each web server, list additional information
+in case you would like to create a custom dhelp configuration. 
+
+
+3. Notes about indexing in dhelp
+================================
+
+3.1 How the indexer is run
+==========================
+
+The scheduling of the indexer process was completely redesigned in version
+0.6.20, in order to solve the problem that the policy of index-when-installing-
+packages creates (namely long delays in the overall installation of packages
+when the size of installed documentation grows).
+
+Now dhelp indexes even during installation, but in a deferred way.  That is,
+registration of new documents or even the pool-rebuild (issued by the commands
+
+    dhelp_parse -a <document-list>
+
+and
+
+    dhelp_parse -r
+
+respectively) does not start the indexer but instead writes the filenames of
+the documents to be indexed in a cache list.  This list is later reopened
+(by a Dpkg post-install trigger) and fed to the indexer through a background
+running process.
+
+Note that the indexing during install is incremental by default, in order to
+finish the indexing quicker.  This does not hurt overall searching capabilities
+since the index will be fully rebuilt anyway by the weekly cron job.
+
+If for any reason the indexer does not run and you are left with a non-empty
+cache file (it is located in /var/lib/dhelp/pending.list) you can start the
+indexer manually, issuing the command:
+
+    sudo dhelp_parse -i
+
+To force reindexing of all the currently installed documentation you can
+either issue the sequence of commands:
+
+    sudo dhelp_parse -r
+    sudo dhelp_parse -i
+
+or call the weekly cron job directly:
+
+    sudo /etc/cron.weekly/dhelp
+
+To force (incremental) reindexing of certain packages you can use the utility
+provided in the examples/ directory. You should use it like this:
+
+    sudo ruby /usr/share/doc/dhelp/examples/index_package_doc.rb <package> ...
+
+
+3.2 Error reporting
+===================
+
+Up to version 0.6.19 error messages generated during indexing by the format
+conversion tools where copied verbatim to the indexers error report.  That
+resulted in lengthy and hard to understand messages from the weekly cron job
+in the cases where a package had registered a document that could not be 
+converted.
+
+From version 0.6.20 and later, raw conversion error messages are hidden from
+the indexer's error report; instead the full filename of the offending file is
+printed, so that the source of the error can easily identified.  You can then
+manually try to convert the file in order to see the exact errors generated.
+ 
+
+3.3 Log files
+=============
+
+From version 0.6.20 and above, the Dpkg post-install trigger as well as the
+weekly cron job generate a log file with the output from the indexer process
+inside directory /var/lib/dhelp/tmp.
+
+The log filename contains the date that the process started as its first
+component.  If something does not work as expected, you can search for logs
+with non-zero file size and view their content.
+
+A monthly cron job deletes all but the five last logs, in order to keep under
+control the size they occupy.
+
+
+-- Esteban Manchado Velázquez <zoso@debian.org>
+-- Georgios M. Zarkadas <gz@member.fsf.org>

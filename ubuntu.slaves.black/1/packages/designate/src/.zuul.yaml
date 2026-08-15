@@ -1,0 +1,208 @@
+- job:
+    name: designate-base
+    parent: devstack-tempest
+    vars: &base_vars
+      devstack_localrc:
+        DESIGNATE_SERVICE_PORT_DNS: 5322
+        TEMPEST_PLUGINS: /opt/stack/designate-tempest-plugin
+        USE_PYTHON3: true
+        API_WORKERS: 4
+      devstack_plugins:
+        designate: https://opendev.org/openstack/designate
+      devstack_services:
+        designate: true
+        s-account: false
+        s-container: false
+        s-object: false
+        s-proxy: false
+        c-bak: false
+      tox_envlist: all
+      tempest_test_regex: |
+        designate_tempest_plugin.*
+    required-projects: &base_required_projects
+      - openstack/designate
+      - openstack/designate-dashboard
+      - openstack/designate-tempest-plugin
+      - openstack/python-designateclient
+    timeout: 4200
+    irrelevant-files: &base_irrelevant_files
+      - ^.*\.rst$
+      - ^api-ref/.*$
+      - ^doc/.*$
+      - ^etc/.*$
+      - ^releasenotes/.*$
+
+- job:
+    name: designate-base-ipv6-only
+    parent: devstack-tempest-ipv6
+    description: |
+      Designate devstack-tempest base job for IPv6-only deployment
+    irrelevant-files: *base_irrelevant_files
+    required-projects: *base_required_projects
+    vars: *base_vars
+
+- job:
+    name: designate-bind9
+    post-run: playbooks/designate-bind9/post.yaml
+    parent: designate-base
+
+- job:
+    name: designate-bind9-centos9stream-fips
+    parent: designate-bind9
+    nodeset: devstack-single-node-centos-9-stream
+    description: |
+      Functional testing for a FIPS enabled Centos 9 stream system
+    pre-run: playbooks/enable-fips.yaml
+    vars:
+      nslookup_target: 'opendev.org'
+
+- job:
+    name: designate-bind9-scoped-tokens
+    post-run: playbooks/designate-bind9/post.yaml
+    parent: designate-base
+    vars:
+      devstack_local_conf:
+        post-config:
+          $DESIGNATE_CONF:
+            oslo_policy:
+              enforce_scope: True
+              enforce_new_defaults: True
+        test-config:
+          "$TEMPEST_CONFIG":
+            enforce_scope:
+              designate: True
+            dns_feature_enabled:
+              enforce_new_defaults: True
+
+- job:
+    name: designate-bind9-centos-9-stream
+    parent: designate-bind9
+    nodeset: devstack-single-node-centos-9-stream
+
+- job:
+    name: designate-pdns4
+    post-run: playbooks/designate-pdns4/post.yaml
+    parent: designate-base
+    vars:
+      devstack_localrc:
+        DESIGNATE_BACKEND_DRIVER: pdns4
+
+- job:
+    name: designate-pdns4-postgres
+    parent: designate-pdns4
+    vars:
+      devstack_services:
+        mysql: False
+        postgresql: True
+    voting: false
+
+- job:
+    name: designate-ipv6-only-bind9
+    post-run: playbooks/designate-bind9/post.yaml
+    parent: designate-base-ipv6-only
+
+- job:
+    name: designate-ipv6-only-pdns4
+    post-run: playbooks/designate-pdns4/post.yaml
+    parent: designate-base-ipv6-only
+    vars:
+      devstack_localrc:
+        DESIGNATE_BACKEND_DRIVER: pdns4
+
+- job:
+    name: designate-grenade-pdns4
+    parent: grenade
+    required-projects:
+      - opendev.org/openstack/horizon
+      - opendev.org/openstack/designate
+      - opendev.org/openstack/designate-dashboard
+      - opendev.org/openstack/designate-tempest-plugin
+      - opendev.org/openstack/python-designateclient
+    post-run: playbooks/designate-pdns4/post.yaml
+    vars:
+      devstack_plugins:
+        designate: https://opendev.org/openstack/designate
+      devstack_services:
+        designate: true
+        designate-api: true
+        designate-central: true
+        designate-producer: true
+        designate-worker: true
+        designate-mdns: true
+        designate-agent: true
+        designate-sink: true
+        horizon: true
+        s-account: false
+        s-container: false
+        s-object: false
+        s-proxy: false
+        c-bak: false
+      grenade_devstack_localrc:
+        shared:
+          DESIGNATE_BACKEND_DRIVER: pdns4
+          DESIGNATE_SERVICE_PORT_DNS: 5322
+      grenade_localrc:
+        BASE_RUN_SMOKE: False
+      tox_envlist: all
+      tempest_plugins:
+        - designate-tempest-plugin
+      tempest_test_regex: designate_tempest_plugin(?!\.tests.api.v1).*
+    irrelevant-files:
+      - ^.*\.rst$
+      - ^api-ref/.*$
+      - ^doc/.*$
+      - ^etc/.*$
+      - ^releasenotes/.*$
+
+- job:
+    name: designate-tox-dnspython-latest
+    parent: openstack-tox
+    description: |
+      Run the Designate unit tests with the latest release of dnspython.
+    vars:
+      tox_envlist: dnspython-latest
+
+- project-template:
+    name: designate-devstack-jobs
+    queue: designate
+    check:
+      jobs:
+        - designate-bind9
+        - designate-bind9-centos9stream-fips:
+            voting: false
+        - designate-bind9-centos-9-stream:
+            voting: false
+        - designate-bind9-scoped-tokens
+        - designate-pdns4
+        - designate-grenade-pdns4
+        - designate-ipv6-only-pdns4
+        - designate-ipv6-only-bind9
+    gate:
+      jobs:
+        - designate-bind9
+        - designate-bind9-scoped-tokens
+        - designate-pdns4
+        - designate-grenade-pdns4
+        - designate-ipv6-only-pdns4
+        - designate-ipv6-only-bind9
+
+- project:
+    templates:
+      - designate-devstack-jobs
+      - openstack-cover-jobs
+      - openstack-python3-yoga-jobs
+      - publish-openstack-docs-pti
+      - periodic-stable-jobs
+      - check-requirements
+      - release-notes-jobs-python3
+    check:
+      jobs:
+        - neutron-tempest-plugin-designate-scenario
+        - designate-tox-dnspython-latest:
+            voting: false
+    gate:
+      jobs:
+        - neutron-tempest-plugin-designate-scenario
+    experimental:
+      jobs:
+        - designate-pdns4-postgres

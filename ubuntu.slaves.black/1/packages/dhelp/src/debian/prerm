@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# Copyright (C) 2001,2002 Stefan Hornburg (Racke) <racke@linuxia.de>
+# Copyright (C) 2011,2012 Georgios M. Zarkadas <gz@member.fsf.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the Free
+# Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA  02111-1307  USA.
+
+set -e
+
+#DEBHELPER#
+
+#### Globals ####
+
+line_feed="
+"
+
+#### Import Library ####
+
+# If old version's prerm fails, our files (and thus the script library)
+# will not be available. Thus, we need to treat this case specially.
+
+case $1 in
+failed-upgrade)
+    ;;
+*)
+    for DHELP_LIBFILE in /usr/share/dhelp/maint-scripts/*.sh; do 
+        if [ -f ${DHELP_LIBFILE} ]; then
+            . ${DHELP_LIBFILE}
+        else
+            >&2 echo "Dhelp error: file ${DHELP_LIBFILE} was not found."
+            >&2 echo "Please file a bug report at bugs.debian.org" \
+                "against the dhelp package."
+        fi
+    done
+    unset DHELP_LIBFILE || true
+    ;;
+esac
+
+#### Functions ####
+
+# Cleanup the files installed by the postinst.
+#
+do_removal_cleanup_actions ()
+{
+    # The directories themselves will be removed by dpkg;
+    # cf. our debian/dirs entries.
+
+    # Remove html document index directory contents.
+
+    if [ -e /var/lib/dhelp/exported.list ]; then
+        local old_ifs="$IFS"
+        IFS="${line_feed}"
+        for entry in $(tac /var/lib/dhelp/exported.list); do
+            case "${entry}" in
+            */)
+                rmdir "${entry}" || true
+                ;;
+            *)
+                rm --force "${entry}"
+                ;;
+            esac
+        done
+        IFS="${old_ifs}"
+    fi
+
+    # Remove all cache data inside /var/lib/dhelp/tmp
+
+    if [ -d /var/lib/dhelp/tmp ]; then
+        rm --force /var/lib/dhelp/tmp/* || true
+    fi
+
+    # Remove all cache data inside /var/lib/dhelp
+    # Hide the "rm: cannot remove `/var/lib/dhelp/tmp': Is a directory" error.
+
+    if [ -d /var/lib/dhelp ]; then
+        rm --force /var/lib/dhelp/* 2>&1 \
+            | grep --invert-match '/var/lib/dhelp/tmp' || true
+    fi
+}
+
+#### Main script body ####
+
+case $1 in
+failed-upgrade)
+    # Library is not available; confine ourselves to the bare essentials.
+
+    do_removal_cleanup_actions
+    ;;
+*)
+    # Disable our web server configuration snippets.
+
+    try_chconf_apache2  "$1" disable dhelp || true
+    try_chconf_lighttpd "$1" disable dhelp || true
+
+    # Cleanup the files installed by the postinst.
+
+    do_removal_cleanup_actions
+    ;;
+esac
+

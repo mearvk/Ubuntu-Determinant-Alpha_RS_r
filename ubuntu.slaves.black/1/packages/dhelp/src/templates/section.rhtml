@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+ "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<%
+    cgimap = Dhelp::Exporter::CgiMap.new()
+%>
+<head>
+    <title><%= @section_title %></title>
+    <link rev="made" href="mailto:dhelp@packages.debian.org">
+    <link rel="stylesheet" href="<%= @doc_path_prefix %>dhelp/css/dhelp.css">
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <script type="text/javascript">
+        function fetch_document(path) {
+            var online = location.href.match(/^http/)
+            if (online) {
+                location.href = '/cgi-bin/dhelp_fetcher?file='+encodeURIComponent(path);
+                return false;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="top-bar">
+        <h1><a href="<%= @doc_path_prefix %>HTML/"><span 
+        id="logo"><img src="<%= @doc_path_prefix %>dhelp/css/swirl.png" alt=""><img
+        src="<%= @doc_path_prefix %>dhelp/css/debian.png" alt="Debian"></span>
+            <%= _("Online Help") %></a></h1>
+
+        <div id="navigation-bar">
+            <%= cgimap.info2www_link() %> |
+            <%= cgimap.man2html_link() %> |
+            <a href="<%= @doc_path_prefix %>"
+            ><%= _("documentation folder") %></a> |
+
+            <form id="search-form" action="/cgi-bin/dsearch">
+                <div id="search-form-contents">
+                    <input type="text" name="search">
+                    <input type="submit" value="<%= _("Search") %>">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="content">
+        <h2><%= @section_title %></h2>
+
+        <div id="item-list"><div class="spacer">
+            <dl>
+            <!-- Items in this section -->
+<%
+    @item_list.each do |item|
+        doc_supported_formats = item.formats.find_all { |f|
+            @supported_formats.include? f.format.downcase
+        }
+        unless doc_supported_formats.empty?
+%>
+                    <dt><img src="<%= @doc_path_prefix %>dhelp/css/text.png"
+                        alt=""> <span class="doc_name"><%= item.title %></span>
+<%
+            doc_supported_formats.each do |format|
+                format_index = format.index
+                if format_index
+%>
+                        <a onclick="return fetch_document('<%= format.index %>')"
+                        href="<%= resource_url(format_index) %>"
+                        ><%= format_name(format.format) %></a>
+<%
+                else
+                    $stderr.puts "Invalid format #{format.format} for " + \
+                        "#{item.document} (#{item.title})"
+                end
+            end
+%>
+                    </dt>
+                    <dd class="doc_description"><%= item.abstract %></dd>
+<%
+        end
+    end
+%>
+            </dl>
+        </div></div>
+
+        <div id="dir-panel">
+            <!-- Directory list -->
+<%
+    curbranch = @section_title.split('/')
+
+    @section_tree.keys.sort.each do |entry|
+        active_section = false
+        if Dhelp.capitalize_section(entry) == curbranch[0]
+            active_section = true
+        end
+%>
+                <div class="dir-panel-entry">
+                    <img src="<%= @doc_path_prefix %>dhelp/css/<%= active_section ? "book-open.png" : "book.png" %>" alt="">
+                        <a href="<%= @doc_path_prefix %>HTML/<%= entry %>/index.html"><%= entry %></a>
+<%
+        if active_section
+            @section_tree[entry][:subsections].keys.sort.each do |ss|
+                active_subsection = false
+                if curbranch.size > 1 && Dhelp.capitalize_section(ss) == curbranch[1]
+                    active_subsection = true
+                end
+%>
+                        <div class="dir-panel-entry-subsection">
+                            <img src="<%= @doc_path_prefix %>dhelp/css/<%= active_subsection ? "book-open.png" : "book.png" %>" alt="">
+                                <a href="<%= @doc_path_prefix %>HTML/<%= entry %>/<%= ss %>/index.html"><%= ss %></a>
+                        </div>
+<%
+            end
+%>
+                </div>
+<%
+        end
+    end
+%>
+        </div>
+    </div>
+</body>
+</html>

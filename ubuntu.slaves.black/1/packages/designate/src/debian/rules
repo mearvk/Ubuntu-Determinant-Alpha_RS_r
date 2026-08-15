@@ -1,0 +1,54 @@
+#!/usr/bin/make -f
+
+# Verbose mode
+#export DH_VERBOSE=1
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/~/./g')
+export OSLO_PACKAGE_VERSION=$(VERSION)
+export PBR_VERSION=$(VERSION)
+
+
+UPSTREAM_GIT = git://github.com/openstack/designate.git
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --buildsystem=pybuild --with python3,sphinxdoc
+
+override_dh_auto_install:
+	pkgos-dh_auto_install --no-py2
+	install -D -m 0664 $(CURDIR)/etc/designate/rootwrap.conf.sample $(CURDIR)/debian/designate-common/etc/designate/rootwrap.conf
+	rm -rf $(CURDIR)/debian/python*/usr/etc
+
+override_dh_auto_clean:
+	dh_auto_clean -O--buildsystem=pybuild
+	rm -rf doc/build build debian/doctrees
+	rm -f debian/*.init debian/*.upstart debian/*.service
+	rm -rf .eggs
+	rm -f etc/designate/policy.json.sample etc/designate/designate.conf
+
+override_dh_install:
+	dh_install -O--buildsystem=pybuild -Xusr/etc
+	dh_missing -O--buildsystem=pybuild --fail-missing -Xusr/etc
+
+override_dh_auto_build:
+	PYTHONPATH=$(CURDIR) oslopolicy-sample-generator \
+		--config-file=$(CURDIR)/etc/designate/designate-policy-generator.conf \
+		--output-file=$(CURDIR)/etc/designate/policy.json.sample
+	PYTHONPATH=$(CURDIR) oslo-config-generator \
+		--config-file=$(CURDIR)/etc/designate/designate-config-generator.conf \
+		--output-file=$(CURDIR)/etc/designate/designate.conf
+	dh_auto_build -O--buildsystem=pybuild
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	pkgos-dh_auto_test --no-py2
+endif
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=. sphinx-build -b html doc/source -d debian/doctrees $(CURDIR)/debian/designate-doc/usr/share/doc/designate-doc/html
+endif
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

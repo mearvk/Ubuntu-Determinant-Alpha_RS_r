@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE = 1
+
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=-all optimize=-lto
+
+%:
+	dh $@
+
+override_dh_auto_test:
+	: # -ffile-prefix-map= isn't expected ...
+	if [ ! -f tests/atlocal.orig ]; then \
+	  cp -p tests/atlocal tests/atlocal.orig; \
+	  sed -i 's/^\(C\|LD\)FLAGS=.*/\1FLAGS=""/' tests/atlocal; \
+	fi
+	$(if $(filter $(DEB_HOST_ARCH),mips64el),-)\
+	if dh_auto_test; then \
+	  : ; \
+	else \
+	  cat tests/testsuite.log; \
+	  exit 1; \
+	fi

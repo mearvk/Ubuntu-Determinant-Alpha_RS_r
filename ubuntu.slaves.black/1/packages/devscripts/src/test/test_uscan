@@ -1,0 +1,540 @@
+#!/bin/bash
+
+# Copyright (C) 2013, Rafael Laboissiere <rafael@laboissiere.net>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+# Public License for more details.
+#
+# On Debian systems, the complete text of the GNU General Public License
+# version 3 can be found in the /usr/share/common-licenses/GPL-3 file.
+
+set -u
+
+TESTTYPE=base
+test_dir=$(readlink -f "${0%/*}")
+. "$test_dir/lib_test_uscan"
+
+SUFFIX="1"
+if command -v dpkg-vendor >/dev/null; then
+    VENDER="$(dpkg-vendor --query Vendor 2>/dev/null|tr 'A-Z' 'a-z')"
+    case "$VENDER" in
+        debian) SUFFIX="1" ;;
+        *) SUFFIX="0${VENDER}1" ;;
+    esac
+fi
+
+if test "${1:-}" = --installed; then
+    COMMAND="uscan --no-conf --compression=xz"
+    shift
+else
+    top_srcdir=$(readlink -f "${0%/*}/..")
+    make -C "$top_srcdir/scripts" uscan mk-origtargz uupdate debchange
+    PATH="$top_srcdir/scripts:$PATH"
+    export PATH
+    PERL5LIB="$top_srcdir/lib"
+    export PERL5LIB
+    COMMAND="uscan --no-conf --compression=xz"
+fi
+
+COMMANDDEHS="$COMMAND --dehs"
+
+# comment out for debug
+#COMMAND="$COMMAND --debug"
+
+tearDown(){
+    killHttpServer
+    echo
+}
+
+trap tearDown EXIT
+
+containsName(){
+  echo "$1" | grep -qF "$2"
+  echo $?
+}
+
+. "$test_dir/shunit2-helper-functions.sh"
+
+# The following tests do the following: (1) create a minimal Debian package
+# directory, containing minimal files debian/{changelog,watch,copyright},
+# (2) create a minimal repository, containing a tarball (built on the fly),
+# (3) start an HTTP server that works offline, using the SimpleHTTPServer
+# module of Python, and (4) run uscan inside that minimal universe.
+
+
+# The following function tests the --repack feature
+helperTestRepack() {
+    from_ext="$1"
+    to_comp="$2"
+    file_output="$3"
+
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/source
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=3
+http://localhost:$PORT/$PKG-(\d).$from_ext
+END
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    echo -n '3.0 (quilt)' > "$TEMP_PKG_DIR"/$PKG/debian/source/format
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    if [ "$from_ext" = "tar.zstd" ]
+    then
+        ( cd "$TEMP_PKG_DIR"/repo ;
+          tar --zstd -cf $PKG-1.$from_ext $PKG/* )
+    else
+        ( cd "$TEMP_PKG_DIR"/repo ;
+          tar -caf $PKG-1.$from_ext $PKG/* )
+    fi
+
+    OUTPUT=$( cd "$TEMP_PKG_DIR"/$PKG ; $COMMANDDEHS --repack --compression=$to_comp )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1.orig.tar.$to_comp
+    if [ "$from_ext" != "tar.$to_comp" ]
+    then
+        assertFalse 'unrepacked tarball still present' "[ -f "$TEMP_PKG_DIR"/${PKG}_1.orig.$from_ext ]"
+    fi
+    assertTrue 'pristine tarball is not created' "[ -f "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertNotNull "pristine tarball is not $to_comp-compressed" \
+                  "$( file -L "$TEMP_PKG_DIR"/$TARBALL | grep "$file_output" )"
+    CONTENTS="$(tar atf "$TEMP_PKG_DIR"/$TARBALL)"
+    assertTrue 'file contents missing'        \
+                $(containsName "$CONTENTS" content)
+    assertTrue "malfored target in dehs output: $OUTPUT" \
+               $(containsName "$OUTPUT" "<target>$TARBALL</target>")
+
+}
+
+testRepackGZ_XZ() { helperTestRepack "tar.gz" "xz" "XZ compressed data" ; }
+testRepackGZ_BZ2() { helperTestRepack "tar.gz" "bz2" "bzip2 compressed data" ; }
+testRepackBZ2_GZ() { helperTestRepack "tar.bz2" "gz" "gzip compressed data" ; }
+testRepackGZ_GZ() { helperTestRepack "tar.gz" "gz" "gzip compressed data" ; }
+testRepackXZ_XZ() { helperTestRepack "tar.xz" "xz" "XZ compressed data" ; }
+testRepackTGZ_XZ() { helperTestRepack "tgz" "xz" "XZ compressed data" ; }
+testRepackTGZ_XZ() { helperTestRepack "tgz" "xz" "XZ compressed data" ; }
+testRepackLZ_XZ() { helperTestRepack "tar.lzma" "xz" "XZ compressed data" ; }
+testRepackZST_XZ() { helperTestRepack "tar.zst" "xz" "XZ compressed data" ; }
+testRepackZSTD_XZ() { helperTestRepack "tar.zstd" "xz" "XZ compressed data" ; }
+
+# The following function tests the --repack feature, with a zip file
+testRepackZip_XZ() {
+    to_comp=xz
+    file_output="XZ compressed data"
+
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/source
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=3
+http://localhost:$PORT/$PKG-(\d).zip
+END
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+    echo -n '3.0 (quilt)' > "$TEMP_PKG_DIR"/$PKG/debian/source/format
+
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    ( cd "$TEMP_PKG_DIR"/repo ;
+      zip -q -r $PKG-1.zip * )
+
+    OUTPUT=$( (cd "$TEMP_PKG_DIR"/$PKG ; $COMMANDDEHS --repack --compression=$to_comp) )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1.orig.tar.$to_comp
+    assertTrue 'unrepacked zipfile present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.zip ]"
+    assertTrue 'pristine tarball is not created' "[ -f "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertNotNull "pristine tarball is not $to_comp-compressed" \
+                  "$( file -L "$TEMP_PKG_DIR"/$TARBALL | grep "$file_output" )"
+    CONTENTS="$(tar atf "$TEMP_PKG_DIR"/$TARBALL)"
+    assertTrue 'file contents missing'        \
+                $(containsName "$CONTENTS" content)
+    assertTrue "malfored target in dehs output: $OUTPUT" \
+               $(containsName "$OUTPUT" "<target>$TARBALL</target>")
+
+}
+
+
+
+# The following function tests the Files-Excluded feature of uscan, which
+# allows the selective exclusion of files from the upstream tarball before
+# repacking it.
+
+helperCreateRepo () {
+    mkdir -p $PKG/debian
+
+    cat <<END > $PKG/debian/watch
+version=3
+${OPTS:-}http://localhost:$PORT/$PKG-(\d).tar.gz debian ${SCRIPT:-}
+END
+
+    cat <<END > $PKG/debian/changelog
+$PKG (0+dfsg1-$SUFFIX) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    cat <<'END' > $PKG/debian/copyright
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files-Excluded: exclude-this
+ exclude-dir
+ .*
+ */js/jquery.js
+ ;?echo?baz;?#
+END
+    if [ -n "${SRCFORMAT:-}" ]; then
+        mkdir -p $PKG/debian/source
+        echo "$SRCFORMAT" > $PKG/debian/source/format
+    fi
+
+    mkdir -p repo
+    touch repo/include-this
+    touch repo/exclude-this
+    touch repo/.hidden
+    mkdir -p "repo/; echo baz; #/"
+    mkdir -p repo/exclude-dir
+    touch repo/exclude-dir/file
+    mkdir -p repo/exclude-dir/subdir
+    touch repo/exclude-dir/subdir/file2
+    mkdir -p repo/docs/html/js/
+    touch repo/docs/html/js/jquery.js
+
+}
+
+helperTestContent() {
+    assertTrue 'file that must be present is excluded in the tarball'        \
+                $(containsName "$CONTENTS" include-this)
+    assertFalse 'file that must be excluded is present in the tarball'        \
+                $(containsName "$CONTENTS" exclude-this)
+    assertFalse "dir that must be excluded is present in the tarball"        \
+                $(containsName "$CONTENTS" exclude-dir)
+    assertFalse "subdir that must be excluded is present in the tarball"        \
+                $(containsName "$CONTENTS" subdir)
+    assertFalse "non-root-file that must be excluded is present in the tarball"        \
+                $(containsName "$CONTENTS" jquery.js)
+    assertFalse "hidden file that must be excluded is present in the zip file"        \
+                $(containsName "$CONTENTS" .hidden)
+    assertFalse "path with whitespace that must be excluded is present"        \
+                $(containsName "$CONTENTS" "; echo baz; #/")
+}
+
+testFileExclusion() {
+
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    (
+      cd "$TEMP_PKG_DIR"
+      OPTS="opts=repacksuffix=+dfsg1,dversionmangle=s/@DEB_EXT@// "
+      SCRIPT="uupdate"
+      SRCFORMAT="3.0 (quilt)"
+      helperCreateRepo
+      cd repo
+      tar cfz $PKG-1.tar.gz * .hidden )
+
+    (cd "$TEMP_PKG_DIR"/$PKG ; $COMMAND)
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1+dfsg1.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.tar.gz ]"
+    assertTrue 'pristine tarball is not created' "[ -f "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertFalse 'pristine tarball is a symlink (nothing repacked?)' "[ -L "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertNotNull 'pristine tarball is not XZ-compressed' \
+                  "$( file "$TEMP_PKG_DIR"/$TARBALL | grep -i 'XZ compressed data' )"
+    CONTENTS="$(tar atf "$TEMP_PKG_DIR"/$TARBALL)"
+
+    helperTestContent
+
+    # check uupdate
+    assertTrue 'pristine tarball is not extracted' "[ -f "$TEMP_PKG_DIR"/${PKG}-1+dfsg1/debian/changelog ]"
+    DVERSION=`dpkg-parsechangelog -l"$TEMP_PKG_DIR"/${PKG}-1+dfsg1/debian/changelog -SVersion`
+    assertEquals "uscan: Version should be 1+dfsg1-$SUFFIX but $DVERSION" "$DVERSION" "1+dfsg1-$SUFFIX"
+
+}
+
+# the same, but run from a separate directory (no way for uupdate, just download)
+testFileExclusionSeparateDir() {
+
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    (
+      cd "$TEMP_PKG_DIR"
+      SCRIPT=""
+      OPTS="opts=repacksuffix=+dfsg1,dversionmangle=auto "
+      helperCreateRepo
+      cd repo
+      tar cfz $PKG-1.tar.gz * .hidden )
+
+    mkdir "$TEMP_PKG_DIR"/otherdir
+    (
+        cd "$TEMP_PKG_DIR"/otherdir; 
+        $COMMAND --package $PKG --force-download --upstream-version 1 \
+                --watchfile ../$PKG/debian/watch --copyright-file ../$PKG/debian/copyright
+    )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1+dfsg1.orig.tar.xz
+    assertTrue 'downloaded tarfile not present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.tar.gz ]"
+    assertTrue 'pristine tarball is not created' "[ -f "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertFalse 'pristine tarball is a symlink (nothing repacked?)' "[ -L "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertNotNull 'pristine tarball is not XZ-compressed' \
+                  "$( file "$TEMP_PKG_DIR"/$TARBALL | grep -i 'XZ compressed data' )"
+    CONTENTS="$(tar atf "$TEMP_PKG_DIR"/$TARBALL)"
+
+    helperTestContent
+
+}
+
+# The same, for a zip file that is being repacked
+
+testFileExclusionZipToTar() {
+
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    (
+      cd "$TEMP_PKG_DIR"
+      SRCFORMAT="3.0 (quilt)"
+      helperCreateRepo
+      cat <<END > $PKG/debian/watch
+version=3
+opts=repacksuffix=+dfsg1,dversionmangle=s/@DEB_EXT@// http://localhost:$PORT/$PKG-(\d).zip debian uupdate
+END
+
+      cd repo
+      zip -q -r $PKG-1.zip * .hidden )
+
+    (cd "$TEMP_PKG_DIR"/$PKG ; $COMMAND --repack)
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1+dfsg1.orig.tar.xz
+    assertTrue 'unrepacked zipfile not present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.zip ]"
+    assertTrue 'pristine tarball is not created' "[ -f "$TEMP_PKG_DIR"/$TARBALL ]"
+    assertNotNull 'pristine tarball is not xz-compressed' \
+                  "$( file "$TEMP_PKG_DIR"/$TARBALL | grep 'XZ compressed data' )"
+    CONTENTS="$(tar atf "$TEMP_PKG_DIR"/$TARBALL)"
+    helperTestContent
+
+    # check uupdate
+    assertTrue 'pristine tarball is not extracted' "[ -f "$TEMP_PKG_DIR"/${PKG}-1+dfsg1/debian/changelog ]"
+    DVERSION=`dpkg-parsechangelog -l"$TEMP_PKG_DIR"/${PKG}-1+dfsg1/debian/changelog -SVersion`
+    assertEquals "uscan: Version should be 1+dfsg1-$SUFFIX but $DVERSION" "$DVERSION" "1+dfsg1-$SUFFIX"
+
+}
+
+testPlainMode() {
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=4
+opts="searchmode=plain" \
+http://localhost:$PORT/src.json http://localhost:$PORT/foo-(\d).zip
+END
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    ( cd "$TEMP_PKG_DIR"/repo ;
+      zip -q -r $PKG-1.zip *;
+      cat > src.json <<END
+{"1.0":{"tarball":"http://localhost:$PORT/foo-1.zip"}}
+END
+      )
+
+    OUTPUT=$( (cd "$TEMP_PKG_DIR"/$PKG ; $COMMANDDEHS) )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+
+    TARBALL=${PKG}_1.orig.tar.$to_comp
+    assertTrue 'unrepacked zipfile present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.zip ]"
+
+}
+
+testLinksWithRelativeBase() {
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+    to_comp=xz
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=4
+http://localhost:$PORT/foo/index.html foo-([\d\.]+).zip
+END
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    for href in foo-1.zip /foo/foo-1.zip //localhost:$PORT/foo/foo-1.zip ../foo/foo-1.zip x/../../foo/foo-1.zip; do
+        ( cd "$TEMP_PKG_DIR"/repo/foo ;
+          zip -q -r $PKG-1.zip *;
+          zip -q -r $PKG-0.9.zip *;
+          cat > index.html <<END
+<html><body>
+<base href="/foo/" />
+<a href="$href">foo-1.zip</a>
+</body></html>
+END
+        )
+
+        (cd "$TEMP_PKG_DIR"/$PKG ; $COMMAND)
+        assertEquals "uscan: exit_code!=0 but exit_code=0 with $href" "$?" "0"
+    done
+
+    assertTrue 'unrepacked zipfile present' "[ -f "$TEMP_PKG_DIR"/${PKG}-1.zip ]"
+
+}
+
+testComponentDehsOutput() {
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=4
+http://localhost:$PORT/$PKG-(\d).zip debian
+
+opts="searchmode=plain,component=baz" \
+http://localhost:$PORT/src.json http://localhost:$PORT/foo-(\d).zip
+END
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    ( cd "$TEMP_PKG_DIR"/repo ;
+      zip -q -r $PKG-1.zip *;
+      cat > src.json <<END
+{"1.0":{"tarball":"http://localhost:$PORT/foo-1.zip"}}
+END
+      )
+
+    OUTPUT=$( (cd "$TEMP_PKG_DIR"/$PKG ; $COMMANDDEHS --report --dehs) )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+    assertTrue "malfored target in dehs output: $OUTPUT" \
+               $(containsName "$OUTPUT" '<component id="baz">')
+    assertTrue "malfored target in dehs output: $OUTPUT" \
+               $(containsName "$OUTPUT" "<component-upstream-version>1</component-upstream-version>")
+}
+
+testSimpleHeader() {
+    PKG=foo
+    TEMP_PKG_DIR=$(mktemp -d -p "$SHUNIT_TMPDIR")
+    spawnHttpServer
+    PORT=$(cat "$TEMP_PKG_DIR"/repo/port)
+
+    mkdir -p "$TEMP_PKG_DIR"/$PKG/debian/source
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/watch
+version=4
+http://localhost:$PORT/$PKG-(\d).zip debian
+
+opts="searchmode=plain,component=baz,filenamemangle=s/.*-(@ANY_VERSION@@ARCHIVE_EXT@)/baz-\$1/" \
+http://localhost:$PORT/src.json http://localhost:$PORT/foo-(\d).zip
+END
+
+    echo -n '3.0 (quilt)' > "$TEMP_PKG_DIR"/$PKG/debian/source/format
+
+    cat <<END > "$TEMP_PKG_DIR"/$PKG/debian/changelog
+$PKG (0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Joe Developer <jd@debian.org>  Mon, 02 Nov 2013 22:21:31 -0100
+END
+
+    mkdir -p "$TEMP_PKG_DIR"/repo/foo
+    touch "$TEMP_PKG_DIR"/repo/foo/content
+
+    ( cd "$TEMP_PKG_DIR"/repo ;
+      zip -q -r $PKG-1.zip *;
+      cat > src.json <<END
+{"1.0":{"tarball":"http://localhost:$PORT/foo-1.zip"}}
+END
+      )
+
+    OUTPUT=$( (cd "$TEMP_PKG_DIR"/$PKG ; $COMMAND -v \
+        --http-header http://localhost:$PORT@Simple-Token=localtoken \
+        --http-header http://another.com@Ext-Token=exttoken \
+    ) )
+    assertEquals "uscan: exit_code!=0 but exit_code=0" "$?" "0"
+    assertTrue "per-host header not exported: $OUTPUT" \
+               $(containsName "$OUTPUT" "Set per-host custom header Simple-Token for http://localhost:$PORT/foo")
+    assertFalse "ext per-host header is exported: $OUTPUT" \
+               $(containsName "$OUTPUT" "Set per-host custom header Ext-Token")
+}
+
+. shunit2

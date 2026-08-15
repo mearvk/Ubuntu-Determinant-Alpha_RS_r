@@ -1,0 +1,382 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_buildinfo - register the versions of build-dependencies used to build a package
+
+=cut
+
+# TODO:
+# - use cleaner APIs
+# - list "also used by" packages after "pulled by" ?
+
+use Data::Dumper;
+
+BEGIN {
+  my ($mydir,$me) = $0=~m:(.*)/(.+):;
+  push @INC, $mydir;
+}
+use strict;
+use Debian::Debhelper::Dh_Lib;
+use BuildDeps;
+
+my $hostarch = Debian::Debhelper::Dh_Lib::hostarch();
+
+=head1 SYNOPSIS
+
+B<dh_buildinfo> [S<I<debhelper options>>] [S<I<generate>>] [S<I<cat>>] [S<I<install>>]
+
+=head1 DESCRIPTION
+
+dh_buildinfo is a debhelper program that registers in a file the list
+of packages declared as build-time dependencies, as well as
+build-essential packages, together with their versions, as installed
+in the build machine.
+
+This will hopefully help to track packages (auto-)built with package
+versions which are known to be buggy, and, more generally, to find out
+whether a package needs to be rebuilt because of a significant change
+in a package it has a build-time dependency on.
+
+You will usually just run this in your package's binary rule. If you
+need extra control over the operation, you can specify the actions to
+be taken. The default actions are I<generate> I<install>.
+
+=head1 OPTIONS
+
+=over 4
+
+=item I<generate>
+
+Generate the list of versions of the build dependencies in use.
+
+=item I<cat>
+
+Output the list of versions to I<stdout>.
+
+=item I<install>
+
+Installs the compressed list of versions to the package's build directory, in
+/usr/share/doc/package/buildinfo.gz
+
+=back
+
+=cut
+
+# This part could be replaced. Silly little status file parser.
+# thanks to Matt Zimmerman. Returns two hash references that
+# are exactly what the other functions need...
+sub parse_status {
+	my $status=shift || "/var/lib/dpkg/status";
+	
+	my %providers;
+	my %depends;
+	my %version;
+	local $/ = '';
+	open(STATUS, "<$status") || die "$status: $!\n";
+	while (<STATUS>) {
+		next unless /^Status: .*ok installed$/m;
+
+                # do not include foreign archs
+                next unless /^Architecture: ($hostarch|all)$/m;
+
+		my ($package) = /^Package: (.*)$/m;
+		push @{$providers{$package}}, $package;
+		($version{$package}) = /^Version: (.*)$/m;
+	
+		if (/^Provides: (.*)$/m) {
+			foreach (split(/,\s*/, $1)) {
+				push @{$providers{$_}}, $package;
+			}
+		}
+	
+		if (/^(?:Pre-)?Depends: (.*)$/m) {
+			foreach (split(/,\s*/, $1)) {
+				push @{$depends{$package}}, $_;
+			}
+		}
+	}
+	close STATUS;
+
+	return \%version, \%providers, \%depends;
+}
+
+# for each package, the packages which cause it to be listed
+my %causes;
+
+# Compute the closure in the depends graph of a
+# list of packages
+#
+# $1: arayref - list of packages to process
+# $2: hashref to %depends
+# $3: hashref for packages to exclude from the list
+#     (presumably already listed)
+# $4: internal hashref for recursion
+#     (should be undef on external calls)
+sub deps_closure {
+  my @pkgs = @{shift()};
+  my %depends = %{shift()};
+  my $excludes = shift;
+  $excludes = {} unless defined $excludes;
+  my $closure = shift;
+  my $firstiteration;
+  if (defined $closure) {
+    $firstiteration = 0;
+  } else {
+    $firstiteration = 1;
+    $closure = {};
+  }
+  my @unseen;
+
+  foreach my $pkg (@pkgs) {
+    # we don't want the initial packages in the final listing
+    $excludes->{$pkg} = 1 if $firstiteration;
+    #
+    if ($firstiteration or
+	(! defined $closure->{$pkg} and ! defined $excludes->{$pkg})) {
+      push @unseen, $pkg;
+    }
+    $closure->{$pkg} = 1 unless $firstiteration or defined $excludes->{$pkg};
+  }
+  foreach my $unseen (@unseen) {
+    my @unseendeps = defined $depends{$unseen} ? @{$depends{$unseen}} : ();
+    my @cleanunseendeps;
+    foreach my $unseendep (@unseendeps) {
+      my @split = split /\s*\|\s*/, $unseendep;
+      foreach my $split (@split) {
+	$split =~ s/\s*\(.*//;
+	push @cleanunseendeps, $split;
+	# record cause
+	$causes{$split}->{$unseen} = 1;
+      }
+    }
+    deps_closure (\@cleanunseendeps, \%depends, $excludes, $closure);
+  }
+
+  return keys %{$closure};
+}
+
+sub add_to_closure {
+  my ($pkgs, $closurehash) = @_;
+
+  foreach my $pkg (@{$pkgs}) {
+    $closurehash->{$pkg} = 1;
+  }
+}
+
+sub pkgformat {
+  my $pkgs = shift;
+  my $listcauses = shift;
+  my @vers = BuildDeps::pkginfo($pkgs, @_);
+  my $str = '';
+
+  foreach my $ver (@vers) {
+    $str .= sprintf "%-40s %s\n", $ver->[0], $ver->[1];
+    $str .= sprintf ("  provides: %s\n", $ver->[2]) if $#$ver >= 2;
+    if ($listcauses) {
+      my $pkg;
+      if ($#$ver >= 2) {
+	$pkg = $ver->[2];
+      } else {
+	$pkg = $ver->[0];
+      }
+      $str .= sprintf "  pulled by: %s\n", join (', ', sort keys %{$causes{$pkg}})
+	if defined $causes{$pkg};
+    }
+  }
+  return $str;
+}
+
+my $buildinfo;
+
+sub compute_buildinfo {
+  my @status=parse_status();
+  my %depends=%{pop @status};
+  push (@status,
+	1,			# $dump_met
+       );
+  my $excludes={};
+
+  $buildinfo =
+    " *** Build information ***";
+
+  #
+  # get list of essential files
+  #
+
+  # parse list file
+  open (RAWFILE, '/usr/share/build-essential/essential-packages-list')
+    or error("cannot read /usr/share/build-essential/essential-packages-list: $!\n");
+  my @essentials = <RAWFILE>;
+  close RAWFILE;
+  chomp @essentials;
+  while (shift @essentials ne '') {
+  }
+  ;
+  @essentials = sort @essentials;
+
+  # get output in the same format as build-essential and explicit build-deps
+  #@essentials = BuildDeps::depends(join (', ', @essentials), @status);
+
+  # closure
+  my @essentialsclosure = deps_closure(\@essentials, \%depends, $excludes);
+  @essentialsclosure = sort @essentialsclosure;
+  add_to_closure(\@essentialsclosure, $excludes);
+
+  # record
+  $buildinfo .=
+    "\n\n Essential packages:\n\n" .
+      pkgformat (\@essentials, 0, @status) .
+	"\n\n Essential packages closure:\n\n" .
+	  pkgformat (\@essentialsclosure, 1, @status);
+
+
+  #
+  # get list of build-essential files
+  #
+
+  # get a build-dep like expression from list file
+  open (RAWFILE, "/usr/share/build-essential/list")
+    or error("cannot read /usr/share/build-essential/list: $!\n");
+  my $started = 0;
+  my $bestring;
+  while (<RAWFILE>) {
+    chomp;
+    last if $_ eq 'END LIST OF PACKAGES';
+    next if /^\s/ or $_ eq '';
+
+    if ($started) {
+      $bestring .= ', ' if defined $bestring;
+      $bestring .= $_;
+    }
+
+    $started = 1 if $_ eq 'BEGIN LIST OF PACKAGES';
+  }
+
+  # have the expression parsed
+  my @buildessentials = BuildDeps::depends($bestring, @status);
+  @buildessentials = sort @buildessentials;
+
+  # closure
+  my @buildessentialsclosure = deps_closure(\@buildessentials, \%depends, $excludes);
+  @buildessentialsclosure = sort @buildessentialsclosure;
+  add_to_closure (\@buildessentialsclosure, $excludes);
+
+  # record
+  $buildinfo .=
+    "\n\n Build-Essential packages:\n\n" .
+      pkgformat (\@buildessentials, 0, @status) .
+	"\n\n Build-Essential closure:\n\n" .
+	  pkgformat (\@buildessentialsclosure, 1, @status);
+
+
+  #
+  # get explicit arch-indep build-dependencies
+  #
+
+  my @builddepsindep;
+  my %fields = BuildDeps::parse_control ('debian/control');
+  if (defined $fields{'Build-Depends-Indep'}) {
+    @builddepsindep = BuildDeps::depends($fields{'Build-Depends-Indep'}, @status);
+    @builddepsindep = sort @builddepsindep;
+  }
+
+  # closure
+  my @builddepsindepclosure = deps_closure(\@builddepsindep, \%depends, $excludes);
+  @builddepsindepclosure = sort @builddepsindepclosure;
+  add_to_closure (\@builddepsindepclosure, $excludes);
+
+  # record
+  $buildinfo .=
+    "\n\n Declared Arch-indep Build-Dependencies:\n\n" .
+      pkgformat (\@builddepsindep, 0, @status) .
+	"\n\n Arch-indep Build-Dependencies closure:\n\n" .
+	  pkgformat (\@builddepsindepclosure, 1, @status);
+
+
+  #
+  # get explicit build-dependencies
+  #
+
+  my @builddeps;
+  %fields = BuildDeps::parse_control ('debian/control');
+  if (defined $fields{'Build-Depends'}) {
+    @builddeps = BuildDeps::depends($fields{'Build-Depends'}, @status);
+    @builddeps = sort @builddeps;
+  }
+
+  # closure
+  my @builddepsclosure = deps_closure(\@builddeps, \%depends, $excludes);
+  @builddepsclosure = sort @builddepsclosure;
+  #add_to_closure (\@builddepsclosure, $excludes);
+
+  # record
+  $buildinfo .=
+    "\n\n Declared Arch-dependent Build-Dependencies:\n\n" .
+      pkgformat (\@builddeps, 0, @status) .
+	"\n\n Arch-dependent Build-Dependencies closure:\n\n" .
+	  pkgformat (\@builddepsclosure, 1, @status);
+}
+
+sub generate_buildinfo {
+  open BUILDINFO, ">debian/buildinfo";
+  print BUILDINFO $buildinfo;
+  close BUILDINFO;
+}
+
+sub install_buildinfo {
+  complex_doit("gzip -9nf debian/buildinfo >debian/buildinfo.gz");
+  foreach my $package (@{$dh{DOPACKAGES}}) {
+    # policy forbids doc files in udebs, comply even if we're not
+    # really a docfile
+    next if is_udeb($package);
+
+    my $tmp=tmpdir($package);
+    my $arch=package_arch($package);
+
+    # If this is a symlink, leave it alone.
+    if ( ! -d "$tmp/usr/share/doc/$package" &&
+	 ! -l "$tmp/usr/share/doc/$package") {
+      install_dir("$tmp/usr/share/doc/$package");
+    }
+
+    if ( ! -l "$tmp/usr/share/doc/$package") {
+      install_file("debian/buildinfo.gz","$tmp/usr/share/doc/$package/buildinfo_$arch.gz");
+    }
+
+  }
+  doit("rm","debian/buildinfo.gz");
+}
+
+my @commands;
+
+sub ensure_buildinfo {
+  if (!-r 'debian/buildinfo' and ! grep { $_ eq 'generate' } @commands) {
+    compute_buildinfo();
+    generate_buildinfo();
+  }
+}
+
+#
+# The real work
+#
+
+init();				# debhelper stuff
+
+@commands = @ARGV;
+@commands = ('generate', 'install') unless scalar @commands;
+
+if (grep { $_ eq 'generate' } @commands) {
+  compute_buildinfo();
+  generate_buildinfo();
+}
+
+if (grep { $_ eq 'cat' } @commands) {
+  ensure_buildinfo;
+  doit ("cat","debian/buildinfo");
+}
+
+if (grep { $_ eq 'install' } @commands) {
+  ensure_buildinfo;
+  install_buildinfo();
+}

@@ -1,0 +1,194 @@
+#!/bin/sh
+#
+# Copyright (C) 2001,2002 Stefan Hornburg (Racke) <racke@linuxia.de>
+# Copyright (C) 2007 Esteban Manchado Velázquez <zoso@debian.org>
+# Copyright (C) 2011,2012 Georgios M. Zarkadas <gz@member.fsf.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the Free
+# Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+# MA  02111-1307  USA.
+
+set -e
+
+#DEBHELPER#
+
+#### Globals ####
+
+DHELP_INDEXER=/usr/share/dhelp/scripts/index-deferred
+DHELP_APTHOOK=/etc/apt/apt.conf.d/35dhelp
+DHELP_POSTCMD='Dpkg::Post-Invoke {
+    "if test -x '${DHELP_INDEXER}'; then '${DHELP_INDEXER}'; fi";
+};'
+DHELP_OKINDEX="false"
+
+#### Import Library ####
+
+for DHELP_LIBFILE in /usr/share/dhelp/maint-scripts/*.sh; do 
+    if [ -f ${DHELP_LIBFILE} ]; then
+        . ${DHELP_LIBFILE}
+    else
+        >&2 echo "Dhelp error: file ${DHELP_LIBFILE} was not found."
+        >&2 echo "Please file a bug report at bugs.debian.org" \
+            "against the dhelp package."
+    fi
+done
+
+#### Functions ####
+
+# cleanup artifacts of previous versions
+#
+do_upgrade_cleanup_actions ()
+{
+    # remove /usr/doc/HTML, /usr/doc/HTML2 and /usr/doc/dhelp
+    # if upgrading from old dhelp package
+
+    if [ -h /usr/doc/HTML ]; then
+        rm --force /usr/doc/HTML
+    elif [ -d /usr/doc/HTML ]; then
+        rm --force --recursive /usr/doc/HTML
+    fi
+
+    if [ -d /usr/doc/HTML2 ]; then
+        rm --force --recursive /usr/doc/HTML2
+    fi
+
+    if [ -h /usr/doc/dhelp ]; then
+        rm --force /usr/doc/dhelp
+    fi
+
+    # remove old /var/lib/dhelp/swish++.index (versions older than 0.6)
+
+    if [ ! -d /var/lib/dhelp/swish++.index ]; then
+        rm --force /var/lib/dhelp/swish++.index
+    fi
+}
+
+# create and register with ucf our dpkg post-invoke hook
+#
+register_dpkg_postinvoke_hook ()
+{
+    local dhelp_tmp_apthook=$(mktemp)
+
+    chmod 644 ${dhelp_tmp_apthook}
+    echo "${DHELP_POSTCMD}" > ${dhelp_tmp_apthook}
+
+    mv_ucfregister_file dhelp ${dhelp_tmp_apthook} ${DHELP_APTHOOK}
+}
+
+# build the set of html files inside /usr/share/doc/HTML 
+#
+build_document_index ()
+{
+    local ret=0
+
+    # 'dhelp_parse -r', among other actions, produces the pending list.
+    echo -n "Building HTML tree..."
+
+    dhelp_parse -r && ret=$? || ret=$?
+
+    if [ ${ret} -eq 0 ]; then
+        echo " done."
+    fi
+    return ${ret}
+}
+
+# create the full text search index file in the background
+#
+delaybuild_search_index ()
+{
+    local ret=0
+
+    # since the pending list is created by dhelp_parse -r, if index file
+    # does not exist, it suffices to do incremental indexing.
+
+    if [ -f /var/lib/dhelp/documents.index ]; then
+        return 0
+    else
+        echo "Reindexing documentation in the background"
+
+        if [ -x ${DHELP_INDEXER} ]; then
+            ${DHELP_INDEXER} && ret=$? || ret=$?
+            return ${ret}
+        else
+            install_msg dhelp err \
+                "Error: ${DHELP_INDEXER} does not exist or is not executable"
+            return 1
+        fi
+    fi
+}
+
+#### Main script body ####
+
+# NOTE: do not fail package installation if "cache data" that can be
+# recreated anytime cannot for any reason be created during install.
+
+case $1 in
+configure|abort-upgrade)
+
+    # cleanup artifacts of previous versions
+
+    do_upgrade_cleanup_actions
+
+    # Create and register with ucf our dpkg post-invoke hook.
+
+    register_dpkg_postinvoke_hook
+
+    # Hack to tell if the package is configured, so that third party 
+    # packages that call dhelp don't barf (from scrollkeeper package).
+    # It is also checked by dhelp_parse, hence this line must come
+    # _before_ the build_document_index call.
+
+    touch /var/lib/dhelp/configured
+
+    # Create the html document index before registering configuration
+    # snippets with installed web servers.
+
+    if build_document_index; then
+        DHELP_OKINDEX="true"
+    else
+        install_msg dhelp err \
+            "Error: building of the HTML tree failed;" \
+            "check mount options and disk space for '/usr/share/doc/HTML'" \
+            "and run 'dhelp_parse -r' to retry the build process."
+    fi
+
+    # Try to enable web server configs (at most one is expected to succeed)
+
+    try_chconf_apache2  "$1" enable dhelp || true
+    try_chconf_lighttpd "$1" enable dhelp || true
+
+    # Create the full text search index at the end of postinst.
+
+    if [ "${DHELP_OKINDEX}" = "true" ]; then
+        if delaybuild_search_index; then
+            :
+        else
+            install_msg dhelp err \
+                "Error: delayed indexing failed;" \
+                "run the weekly cron job to recreate the index."
+        fi
+    else
+        install_msg dhelp warning \
+            "Not reindexing documentation due to HTML tree" \
+            "build error; correct the above and run the weekly" \
+            "cron job to recreate the index."
+    fi
+    ;;
+*)
+    ;;
+esac
+
+unset DHELP_INDEXER DHELP_POSTCMD DHELP_APTHOOK || true
+unset DHELP_LIBFILE DHELP_OKINDEX || true
+

@@ -1,0 +1,613 @@
+dh-golang (1.53) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * Add reference to Debian::Debhelper::Buildsystem::golang(1) to SEE ALSO.
+    Most of the machinery documentation is provided in the build system
+    module, and it's non-obvious when checking the dh_golang(1) man page.
+
+  [ Anthony Fok ]
+  * Debian::Debhelper::Buildsystem::golang: Fix logic in
+    "no non-test Go files" path removal.
+    According to https://perldoc.perl.org/perlsyn#Foreach-Loops:
+        If any part of LIST is an array, foreach will get very confused
+        if you add or remove elements within the loop body, for example
+        with splice. So don't do that.
+    Well, I was ignorant and did just that to @targets (removing elements
+    with grep) in get_targets, causing some elements to be skipped, and
+    this bug finally manifests itself with golang-google-api/0.61.0-1
+    where there are two consecutive paths with no non-test Go files.
+
+ -- Anthony Fok <foka@debian.org>  Thu, 16 Dec 2021 14:17:48 -0700
+
+dh-golang (1.52) unstable; urgency=medium
+
+  * Team upload.
+  * Debhelper::Buildsystem::golang: Use qw instead of quotes.
+  * Enable warnings in perl code.
+  * Use modern parent instead of base module.
+  * example: Comment DH_VERBOSE by default.
+  * Update documentation and example about the sequencer usage.
+  * Debhelper::Buildsystem::golang: Add auto-detection support.
+  * Debhelper::Buildsystem::golang: Auto-detect using more dependency manager
+    files.
+  * Add gitignore files.
+  * Debhelper::Buildsystem::golang: Change default build directory to _build.
+  * Debhelper::Buildsystem::golang: Do not try to parse missing
+    XS-Go-Import-Path.
+  * Debhelper::Buildsystem::golang, example: Update dh usage documentation.
+  * Debian::Debhelper::Buildsystem::golang: Ignore '.' in find() on configure.
+  * Bump Standards-Version to 4.6.0 (no changes needed).
+
+ -- Guillem Jover <gjover@sipwise.com>  Wed, 24 Nov 2021 14:48:20 +0100
+
+dh-golang (1.51) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Guillem Jover ]
+  * Provide a dh-sequence-golang virtual package.
+    This will simplify the golang packaging by not needing to duplicate
+    the same information in both the Build-Depends and debian/rules files.
+
+ -- Shengjing Zhu <zhsj@debian.org>  Tue, 26 Jan 2021 00:26:48 +0800
+
+dh-golang (1.50) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Arnaud Rebillout ]
+  * Typo in comment: godoc -> gocode.
+
+  [ Shengjing Zhu ]
+  * Don't skip directory with .go suffix when symlink (Closes: #966139)
+  * Bump debhelper-compat to 13
+  * Update Standards-Version to 4.5.1 (no changes)
+
+  [ Guillem Jover ]
+  * Debhelper::Buildsystem::golang: Fix main calling get_targets method.
+    When the get get_targets method gets called from the main package, the
+    subroutine item will be undefined. This happens when dh_golang itself
+    calls the method. If the subroutine is undefined set it to '(main)'
+    following the patters used internally by the caller builtin.
+    (Closes: #960887)
+
+ -- Shengjing Zhu <zhsj@debian.org>  Sun, 24 Jan 2021 23:23:50 +0800
+
+dh-golang (1.49) unstable; urgency=medium
+
+  * Team upload.
+  * Since make-4.3, there is no longer an empty line before '# Files', making
+    the awk-expression in dh_golang_autopkgtest not find the '/# File' pattern
+    due to the empty record separator. This results in TARGETS being empty and
+    autopkgtests failing. To fix, do not set the RS variable to empty, but
+    append a "grep ." to the end of the pipe in order to clean up the empty
+    lines. (Closes: 961755)
+
+ -- Michael Banck <michael.banck@credativ.de>  Fri, 29 May 2020 12:07:20 +0200
+
+dh-golang (1.48) unstable; urgency=medium
+
+  * Prevent "no non-test Go files" error during build
+    in case a target path contains only *_test.go files,
+    e.g. golang.org/x/crypto/internal/wycheproof
+
+ -- Anthony Fok <foka@debian.org>  Wed, 26 Feb 2020 13:28:21 -0700
+
+dh-golang (1.47) unstable; urgency=medium
+
+  [ Shengjing Zhu ]
+  * Skip empty pattern when check target lists (Closes: #952173)
+    If the PATTERN evaluates to the empty string, the last
+    successfully matched regular expression is used instead
+    Thanks @lilydjwg
+
+  [ Anthony Fok ]
+  * Replace / / with ' ' as pattern in Perl split() calls,
+    emulating awk’s behaviour such that leading whitespace and
+    consecutive spaces do not become empty strings in the resulting list.
+    This was the case with golang-gopkg-gorethink-gorethink.v3 when its
+    DH_GOLANG_EXCLUDES created empty string patterns, such that
+    "grep { !/$pattern/ } @targets" stripped the list empty and
+    caused e.g. "go test" call to fail.  That FTBFS did not happen
+    before dh-golang 1.46 as it was hidden by Perl 5’s peculiar feature:
+    “If the PATTERN evaluates to the empty string,
+    the last successfully matched regular expression is used instead.”
+    See https://metacpan.org/pod/perlop#The-empty-pattern and
+    https://github.com/Perl/perl5/issues/17577 for more. (Closes: #952173)
+  * Warn in case an empty pattern is detected even if split(' ', ...)
+    should have prevented it in the first place.  For future-proofing.
+
+ -- Anthony Fok <foka@debian.org>  Mon, 24 Feb 2020 12:27:16 -0700
+
+dh-golang (1.46) unstable; urgency=medium
+
+  [ Shengjing Zhu ]
+  * Move all env setup to sub new
+  * Move comparison of go minor version to subroutine
+  * Set default CGO FLAGS to values from dpkg buildflags.
+    This changes CGO FLAGS to:
+    CGO_CFLAGS="-g -O2 -fdebug-prefix-map=/<<PKGBUILDDIR>>=. \
+        -fstack-protector-strong -Wformat -Werror=format-security"
+    CGO_CPPFLAGS="-Wdate-time -D_FORTIFY_SOURCE=2"
+    CGO_CXXFLAGS="-g -O2 -fdebug-prefix-map=/<<PKGBUILDDIR>>=. \
+        -fstack-protector-strong -Wformat -Werror=format-security"
+    CGO_FFLAGS="-g -O2 -fdebug-prefix-map=/<<PKGBUILDDIR>>=. \
+        -fstack-protector-strong"
+    CGO_LDFLAGS="-Wl,-z,relro"
+    This makes the CGO FLAGS more consistent to the default one
+    in Debian. (Closes: #951262)
+
+  [ Anthony Fok ]
+  * Allow user-defined GOPROXY="" to override GOPROXY=off
+    so as to tell Go 1.13 to set GOPROXY to its default non-empty value.
+  * Bump Standards-Version to 4.5.0 (no change)
+
+ -- Anthony Fok <foka@debian.org>  Sun, 16 Feb 2020 18:58:28 -0700
+
+dh-golang (1.45) unstable; urgency=medium
+
+  * Team upload.
+  * Pass different trimpath arg for different go version (Closes: #948163)
+
+ -- Shengjing Zhu <zhsj@debian.org>  Sun, 05 Jan 2020 04:25:18 +0800
+
+dh-golang (1.44) unstable; urgency=medium
+
+  * Team upload.
+  * Also export PKG_CONFIG for cross compiling. (Closes: #945479)
+    Thanks Helmut Grohne
+  * Fix reproducible build in go1.13, using -trimpath
+    https://github.com/golang/go/issues/16860
+
+ -- Shengjing Zhu <zhsj@debian.org>  Sat, 04 Jan 2020 21:29:47 +0800
+
+dh-golang (1.43) unstable; urgency=medium
+
+  [ Helmut Grohne ]
+  * Make dh-golang work with cross compiling. (Closes: #930176)
+    + Set up cross environment variables GOOS, GOARCH and GOARM.
+    + Set up a C compiler in CC.
+    + Always use cgo (enabled by default for native builds).
+    + Cross go install installs to GOPATH/bin/GOOS_GOARCH.
+    + Mark dh-golang Multi-Arch: foreign.
+
+  [ Anthony Fok ]
+  * Correct Martina's name
+  * Bump Standards-Version to 4.4.1 (no change)
+  * Add debian/gbp.conf and switch master to debian/sid
+    to conform with DEP-14
+
+ -- Anthony Fok <foka@debian.org>  Fri, 22 Nov 2019 15:14:21 -0700
+
+dh-golang (1.42) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * Properly handle Go-Import-Path being a multi-line field.
+    A multi-line field can start with a blank line after the field, we
+    should cope with that. Such as in:
+      Go-Import-Path:
+       some-import-path,
+       other-import-path,
+  * Recommend building object files under _build/
+    By default the build directory is arch-qualified, which means that we
+    cannot easily ignore them in places like .gitignore. Use a well-known
+    pathname for this.
+  * Use Uploaders instead of Maintainers in debian/control example file
+  * Wrap, sort, and add trailing commas to multi-line fields.
+    Format fields in a way that minimizes diff output and that makes it
+    easier to copy & paste or move lines around between fields:
+     - Adding a trailing comma on the last entry makes appending new
+       entries not affect the last one.
+     - Sorting makes the contents easier to find and easier to avoid
+       adding duplicates.
+  * Switch to Standards-Version 4.4.0 in example/control
+  * Switch to debhelper-compat (= 12) in example/control.
+    This matches the main packaging, and gets rid of the requirement for
+    the debian/compat file, which was not present in the example directory
+    anyway.
+  * Set Rules-Requires-Root to no
+  * Remove boilerplate comment from debian/rules
+
+  [ Dr. Tobias Quathamer ]
+  * Add myself as uploader
+  * Correct Martína's name
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Sat, 07 Sep 2019 18:10:27 +0200
+
+dh-golang (1.41) unstable; urgency=medium
+
+  * Add "go clean -modcache" call before rmdir_builddir()
+    to remove the unwritable directories under $GOPATH/pkg/mod
+
+ -- Anthony Fok <foka@debian.org>  Sat, 03 Aug 2019 23:47:20 -0600
+
+dh-golang (1.40) unstable; urgency=medium
+
+  * Set GOCACHE to a safely writable directory because the build cache is
+    now required as of Go 1.12
+  * Set GOPROXY=off to disallow network access
+  * Apply "cme fix dpkg" fixes:
+    - Update debhelper dependency to "Build-Depends: debhelper-compat (= 12)"
+    - Bump Standards-Version to 4.4.0 (no change)
+    - Remove unnecessary greater-than versioned dependency: dpkg (>= 1.16.2)
+  * Add myself to the list of Uploaders
+
+ -- Anthony Fok <foka@debian.org>  Sat, 03 Aug 2019 06:06:39 -0600
+
+dh-golang (1.39) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Michael Stapelberg ]
+  * Update example to match dh-make-golang github.com/Debian/dcs output
+
+  [ Anthony Fok ]
+  * Fix indentation in elsif block for installation of testdata/ content
+  * Set GO111MODULE to off (unless explicitly specified)
+    to operate in "GOPATH mode" by default for "minimal module compatibility",
+    otherwise Go >= 1.11 would attempt to check module information on-line,
+    leading to build failure.  See https://github.com/golang/go/wiki/Modules
+  * Install go.mod and go.sum by default for v2+ module support
+  * Set GOCACHE and GO111MODULE to off in dh_golang too
+  * Bump Standards-Version to 4.3.0 (no change)
+
+ -- Anthony Fok <foka@debian.org>  Sat, 29 Dec 2018 18:00:34 -0700
+
+dh-golang (1.38) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Félix Sipma ]
+  * Build with '-{gc,asm}flags=all=-trimpath=' for reproducibility.
+    Thanks, Alexander Neumann.
+    see https://github.com/restic/restic/issues/2061
+
+ -- Shengjing Zhu <zhsj@debian.org>  Tue, 30 Oct 2018 11:23:16 +0800
+
+dh-golang (1.37) unstable; urgency=medium
+
+  * Team upload.
+  * Use "cp" instead of "copy" so permissions are preserved (Closes: #910125)
+
+  [ Shengjing Zhu ]
+  * Fix exec_chunked not iterating over all elements. (Closes: #909787)
+
+  [ Hilko Bengen ]
+  * Copy files with .cpp, .hpp suffixes by default. (Closes: #908679)
+
+ -- Stephen Gelman <ssgelm@debian.org>  Thu, 04 Oct 2018 20:24:11 -0500
+
+dh-golang (1.36) unstable; urgency=medium
+
+  [ Clément Hermann ]
+  * Add DH_GOLANG_EXCLUDES_ALL to exclude files from installation
+    as well as build process. Default to true starting from compat
+    level 12. (Closes: #904261)
+
+ -- Martín Ferrari <tincho@debian.org>  Fri, 14 Sep 2018 15:40:15 +0000
+
+dh-golang (1.35) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Alexandre Viau ]
+  * Point Vcs-* urls to salsa.debian.org.
+
+  [ Arnaud Rebillout ]
+  * Mention that DH_GOPKG is not set in debian/rules.
+
+  [ Shengjing Zhu ]
+  * Update Standards-Version to 4.2.1. (no changes)
+  * Update team mail address to tracker.debian.org.
+  * Fix index out of range when using gccgo. (Closes: #907263)
+
+ -- Shengjing Zhu <i@zhsj.me>  Tue, 28 Aug 2018 22:03:23 +0800
+
+dh-golang (1.34) unstable; urgency=medium
+
+  * Bugfix: ensure destination directory exists (Closes: #891359)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sun, 25 Feb 2018 23:47:46 +0100
+
+dh-golang (1.33) unstable; urgency=medium
+
+  * Set GOCACHE to off (unless explicitly specified) to suppress errors
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sat, 17 Feb 2018 12:50:12 +0100
+
+dh-golang (1.32) unstable; urgency=medium
+
+  * Specify -vet=off for Go ≥ 1.10
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sat, 17 Feb 2018 12:40:07 +0100
+
+dh-golang (1.31) unstable; urgency=medium
+
+  * Install testdata/ contents by default
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Fri, 16 Feb 2018 09:11:32 +0100
+
+dh-golang (1.30) unstable; urgency=medium
+
+  [ aviau ]
+  * dh_golang_autopkgtest support for several import paths
+    (Closes: #887475)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 18 Jan 2018 22:34:39 +0100
+
+dh-golang (1.29) unstable; urgency=medium
+
+  * Team upload.
+  * golang.pm: improve DH_GOPKG documentation by mentionning new
+    XS-Go-Import-Path format.
+
+ -- Alexandre Viau <aviau@debian.org>  Wed, 17 Jan 2018 01:07:21 -0500
+
+dh-golang (1.28) unstable; urgency=medium
+
+  [ Alexandre Viau ]
+  * support comma-separated paths in Go-Import-Path (Closes: #885780)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Wed, 03 Jan 2018 09:29:30 +0100
+
+dh-golang (1.27) unstable; urgency=medium
+
+  * Team upload.
+  * Remove slash from Vcs-Browser URL
+  * Update to Standards-Version 4.1.3, no changes needed
+  * Avoid "Use of uninitialized value $args[192] in join or string" warnings.
+    Thanks to Chris Lamb <lamby@debian.org> (Closes: #885696)
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Fri, 29 Dec 2017 17:26:46 +0100
+
+dh-golang (1.26) unstable; urgency=medium
+
+  * Team upload.
+  * Fix use of uninitialized value $ENV{"DH_GOLANG_EXCLUDES"}
+  * Use debhelper v10
+  * Update Standards-Version to 4.1.1
+    - Use Priority optional
+    - Use HTTPS URL for d/copyright
+  * Update years in d/copyright
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Fri, 27 Oct 2017 22:31:24 +0200
+
+dh-golang (1.25) unstable; urgency=medium
+
+  * Fix examples (again!)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sat, 21 Oct 2017 13:53:51 +0200
+
+dh-golang (1.24) unstable; urgency=medium
+
+  * Fix build system documentation regarding --no-source/--no-binaries
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Fri, 20 Oct 2017 19:42:14 +0200
+
+dh-golang (1.23) unstable; urgency=medium
+
+  * Document Debian::Debhelper::Buildsystem::golang (Closes: #839108)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Wed, 11 Oct 2017 09:19:22 +0200
+
+dh-golang (1.22) unstable; urgency=medium
+
+  [ Guillem Jover ]
+  * Do not emit misc:Built-Using substvars for arch:all packages
+
+  [ Michael Stapelberg ]
+  * Build with -gcflags="-trimpath=$GOPATH/src" for reproducibility
+  * Also specify -trimpath in -asmflags
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sat, 29 Jul 2017 11:06:53 +0200
+
+dh-golang (1.21.1) unstable; urgency=medium
+
+  * Actually install the new script introduced in 1.21.
+
+ -- Martín Ferrari <tincho@debian.org>  Mon, 29 May 2017 06:04:15 +0100
+
+dh-golang (1.21) unstable; urgency=medium
+
+  * Add a new script to be used by autopkgtest/autodep8 to automatically run
+    package tests on installed packages.
+  * Add myself as Uploader.
+
+ -- Martín Ferrari <tincho@debian.org>  Sun, 28 May 2017 20:50:00 +0000
+
+dh-golang (1.20) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Martín Ferrari ]
+  * Stop forcing the compression to xz, and that has been the default for some
+    time now, even Debian stable has that. Thanks to Guillem Jover for the
+    patch. Closes: #840821.
+  * Rewrite of dh_golang for a more robust and idiomatic perl. Patch by
+    Guillem Jover. Closes: #841145.
+
+  [ Tim Potter ]
+  * Add .cc and .hh to whitelisted extensions when copying source to build
+    dir. Closes: #844284
+
+ -- Tim Potter <tpot@hpe.com>  Tue, 31 Jan 2017 16:44:26 +1100
+
+dh-golang (1.19) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Paul Tagliamonte ]
+  * Use a secure transport for the Vcs-Git and Vcs-Browser URL
+
+  [ Dmitry Smirnov ]
+  * Perlcritic corrections for "Glob written as <...>".
+  * Avoid linking pre-installed DH_GOPKG package to itself (Closes: #827226).
+  * Respect "--parallel" and "--max-parallel" options (Closes: #829302).
+
+ -- Dmitry Smirnov <onlyjob@debian.org>  Thu, 14 Jul 2016 15:07:49 +1000
+
+dh-golang (1.18) unstable; urgency=medium
+
+  * Team upload.
+  * Yet another corner case in dh_golang, this one only shows up with gccgo.
+    (Closes: 823136)
+  * Pass a go file, not a directory, to dpkg-search in dh_golang so that only
+    one package is returned. (Closes: 827219)
+
+ -- Michael Hudson-Doyle <michael.hudson@ubuntu.com>  Wed, 15 Jun 2016 18:56:39 +1000
+
+dh-golang (1.17) unstable; urgency=medium
+
+  * Team upload.
+  * Move dh-golang to the pkg-go team repository.
+    - Update Maintainer and Uploaders.
+    - Update Vcs-* fields.
+  * Update Standards-Version with no changes.
+  * Export DH_GOLANG_INSTALL_EXTRA with a list of space-separated paths to
+    copy to the build dir, for tests and other files not automatically
+    installed.
+  * Add --no-source and --no-binaries options to install target.
+  * Display a debug message when copying files to the build tree.
+
+ -- Martín Ferrari <tincho@debian.org>  Mon, 16 May 2016 01:08:06 +0100
+
+dh-golang (1.16) unstable; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Make dh_golang more robust:
+    - Initialize the buildsystem more correctly, so --builddirectory=_build
+      works (Closes: 821350)
+    - Exit with an error if any of the 'go list' or 'dpkg-search' commands
+      fail.
+    - Quote the current working directory in the regexp used to filter out
+      files from the build directory.
+    - Store package / directory lists in files and use xargs to avoid
+      constructing over-long command lines.
+  * Also trim dh_golang's use statements.
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 21 Apr 2016 09:38:34 +0200
+
+dh-golang (1.15) unstable; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Restore setting of GOPATH during build removed by mistake in 1.14.
+    (Closes: #821000)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Fri, 15 Apr 2016 08:50:49 +0200
+
+dh-golang (1.14) unstable; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Compute Built-Using with go list, not Build-Depends (Closes: #819473)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 14 Apr 2016 09:11:54 +0200
+
+dh-golang (1.13) unstable; urgency=medium
+
+  [ Stephen Gelman ]
+  * Set build_dep to 1 to support the “native” architecture (Closes: #819596)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 14 Apr 2016 08:51:20 +0200
+
+dh-golang (1.12) unstable; urgency=medium
+
+  [ Hilko Bengen ]
+  * Make dh-golang work with older dpkg versions (Closes: #794956)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Mon, 10 Aug 2015 19:46:17 +0200
+
+dh-golang (1.11) unstable; urgency=medium
+
+  * Only call go generate if DH_GOLANG_GO_GENERATE == 1 (Closes: #794815)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Fri, 07 Aug 2015 09:47:50 +0200
+
+dh-golang (1.10) unstable; urgency=medium
+
+  * If DH_GOPKG is not set in debian/rules, use XS-Go-Import-Path from
+    debian/control. If this works out well, this will become the encouraged
+    mechanism. The advantage is that it is easier to parse this field for
+    other automation that deals with Go packaging.
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 06 Aug 2015 22:26:55 +0200
+
+dh-golang (1.9) unstable; urgency=medium
+
+  * Also install .{c,h,proto,s} files by default.
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Mon, 03 Aug 2015 21:44:51 +0200
+
+dh-golang (1.8) unstable; urgency=medium
+
+  * Correctly parse Build-Depends when they contain an OR.
+  * Relicense under GPL-2+ due to having copied a large chunk of GPL-2+ code
+    into dh_golang(1).
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sun, 26 Jul 2015 19:25:48 +0200
+
+dh-golang (1.7) unstable; urgency=medium
+
+  * Call go generate (introduced with Go 1.4) when building packages.
+  * Bump Standards-Version to 3.9.6 (no changes necessary)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sat, 25 Jul 2015 12:41:44 +0200
+
+dh-golang (1.6) unstable; urgency=low
+
+  [ Michael Stapelberg ]
+  * In debian/rules, export DH_GOLANG_BUILDPKG to overwrite "${DH_GOPKG}/..."
+    in the go install and go test commands. This can be used to avoid
+    recursing into subpackages or to specify just one specific part of the
+    package that should be built and installed.
+  * In debian/rules, export DH_GOLANG_EXCLUDES (containing a space-separated
+    list of perl regular expressions) to filter targets, e.g.:
+    export DH_GOLANG_EXCLUDES := github.com/coreos/etcd/third_party
+    (Closes: #721496)
+
+  [ Alessandro Ghedini ]
+  * Enable debian/control comment stripping (Closes: #734785)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Tue, 29 Jul 2014 09:59:18 +0200
+
+dh-golang (1.5) unstable; urgency=low
+
+  * Fix a bug introduce in 1.4 which lead to .go files not being installed
+    without DH_GOLANG_INSTALL_ALL=1 (Closes: #731991)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 12 Dec 2013 10:46:36 +0100
+
+dh-golang (1.4) unstable; urgency=low
+
+  * in debian/rules, export DH_GOLANG_INSTALL_ALL=1 to install all files into
+    the builddir, not just .go files. This may be necessary to include golden
+    files for testcases, but then you need to manually delete extra LICENSE
+    files and such.
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Mon, 02 Dec 2013 21:54:11 +0100
+
+dh-golang (1.3) unstable; urgency=low
+
+  * Skip quilt’s .pc directories when copying the source code into the
+    builddir
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Tue, 24 Sep 2013 22:47:47 +0200
+
+dh-golang (1.2) unstable; urgency=low
+
+  * Only copy bin/ if there actually are any binaries
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Thu, 05 Sep 2013 09:20:34 +0200
+
+dh-golang (1.1) unstable; urgency=low
+
+  * Add dependency on dpkg >= 1.16.2 for the source: fields
+  * Install files into /usr/share/gocode/src/${DH_GOPKG} and /usr/bin/ by
+    default
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Tue, 30 Jul 2013 17:41:29 +0200
+
+dh-golang (1.0) unstable; urgency=low
+
+  * Initial release (Closes: #718183)
+
+ -- Michael Stapelberg <stapelberg@debian.org>  Sun, 28 Jul 2013 16:02:04 +0200

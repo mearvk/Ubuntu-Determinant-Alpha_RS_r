@@ -1,0 +1,58 @@
+#!/bin/sh
+# Copyright: © 2012 Enrico Tassi <gareuselesinge@debian.org>
+# License: MIT
+
+if [ -z "$1" -o "$1" = "-h" -o "$1" = "--help" ]; then
+	echo Give as a unique argument the name of the source package
+	echo that will be the name of the root directory of the package.
+	exit 1
+fi
+
+PKG=$1
+
+mkdir $PKG/
+cd $PKG
+git init
+git remote add origin ssh://git.debian.org/git/pkg-lua/$PKG.git
+[ ! -z "$DEBFULLNAME" ] && git config user.name "$DEBFULLNAME"
+[ ! -z "$DEBEMAIL" ] && git config user.email "<$DEBEMAIL>"
+cd ..
+mkdir $PKG/debian
+mkdir $PKG/debian/patches
+mkdir $PKG/debian/source
+mkdir $PKG/debian/tests
+
+cat > $PKG//debian/watch <<EOT
+# test this watch file using:
+# uscan --watchfile debian/watch --upstream-version 0.0.1 --package $PKG
+#
+version=3
+http://...  /.../$PKG-([\d\.]*).tar.gz
+EOT
+echo '3.0 (quilt)' > $PKG/debian/source/format
+touch $PKG/debian/patches/series
+cp /usr/share/dh-lua/template/dh-lua.conf $PKG/debian/
+cp /usr/share/dh-lua/template/rules $PKG/debian/
+cp /usr/share/dh-lua/template/copyright $PKG/debian/
+cp /usr/share/dh-lua/template/control $PKG/debian/
+cp /usr/share/dh-lua/template/compat $PKG/debian/
+cp /usr/share/dh-lua/template/tests.control $PKG/debian/tests/control
+cp /usr/share/dh-lua/template/tests.dh-lua-tests $PKG/debian/tests/dh-lua-tests
+chmod a+x $PKG/debian/rules
+cd $PKG
+git add debian/
+cd ..
+
+cat > init-repo-$PKG.sh <<EOT
+cd /git/pkg-lua/
+umask 002
+mkdir $PKG.git
+cd $PKG.git
+git --bare init --shared
+echo "Repository for the $PKG package" > description
+mv hooks/post-update.sample hooks/post-update
+chmod a+x hooks/post-update
+EOT
+
+echo "Now run: scp init-repo-$PKG.sh git.debian.org: && ssh git.debian.org sh init-repo-$PKG.sh"
+

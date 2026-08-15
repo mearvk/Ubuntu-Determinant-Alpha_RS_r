@@ -1,0 +1,148 @@
+#! /usr/bin/perl -w
+# GPL copyright 2001 by Joey Hess <joeyh@debian.org>
+# Parts copyright 2001 by Yann Dirson <dirson@debian.org>
+
+my $me;
+BEGIN {
+  my $mydir;
+  ($mydir,$me) = $0=~m:(.*)/(.+):;
+  push @INC, $mydir;
+}
+use strict;
+use Getopt::Long;
+use BuildDeps;
+
+sub usage {
+	print STDERR <<EOF;
+Usage: dpkg-checkbuild [-B] [-m] [-d builddeps] [-c conflictdeps] [control-file]
+	-B		binary-only, ignore -Indep
+	-m		output met dependencies on stdout, instead of
+			unmet dependencies on stderr
+	-V		also print versions of met dependencies
+	-d BuildDepStr	use given string for build-depends instead of
+			getting it from control file
+	-c BldConflStr	use given string for build-conflicts instead of
+			getting it from control file
+	control-file	control file to process [Default: debian/control]
+EOF
+}
+
+my $binary_only=0;
+my $want_help=0;
+my $dump_met=0;
+my $dependsexpr;
+my $conflictsexpr;
+my $printversions;
+if (! GetOptions('-B' => \$binary_only,
+		 '-m' => \$dump_met,
+		 '-V' => \$printversions,
+		 '-d=s' => \$dependsexpr,
+		 '-c=s' => \$conflictsexpr,
+		 '-h' => \$want_help)) {
+	usage();
+	exit(2);
+}
+if ($want_help) {
+	usage();
+	exit(0);
+}
+
+my (@met, @unmet, @conflicts);
+my @status=parse_status();
+push @status, $dump_met, $printversions;
+
+if (defined $dependsexpr or defined $conflictsexpr) {
+	if ($dump_met) {
+		if (defined $dependsexpr) {
+			push @met, BuildDeps::depends($dependsexpr, @status);
+		}
+		foreach my $met (@met) {
+		  printf "%-40s ", $met->[0]; # pkg name
+		  print $met->[1] if $#{$met} >= 1;	# version
+		  print ' (', $met->[2], ')' if $#{$met} > 1;	# virtual pkg provided
+		  print "\n";
+		}
+	} else {
+		if (defined $dependsexpr) {
+			push @unmet, BuildDeps::depends($dependsexpr, @status);
+		}
+		if (defined $dependsexpr) {
+			push @unmet, BuildDeps::conflicts($conflictsexpr, @status);
+		}
+
+		if (@unmet) {
+			print STDERR "$me: Unmet build dependencies: ";
+			print STDERR join(", ", @unmet), "\n";
+		}
+		if (@conflicts) {
+			print STDERR "$me: Build conflicts: ";
+			print STDERR join(", ", @conflicts), "\n";
+		}
+		exit 1 if @unmet || @conflicts;
+	}
+} else {
+	my $control=shift || "debian/control";
+	my %fields = BuildDeps::parse_control ($control);
+
+	if ($dump_met) {
+		if (defined $fields{'Build-Depends'}) {
+			push @met, BuildDeps::depends($fields{'Build-Depends'}, @status);
+		}
+		if (! $binary_only && defined $fields{'Build-Depends-Indep'}) {
+			push @met, BuildDeps::depends($fields{'Build-Depends-Indep'}, @status);
+		}
+		print join("\n", @met), "\n";
+	} else {
+		if (defined $fields{'Build-Depends'}) {
+			push @unmet, BuildDeps::depends($fields{'Build-Depends'}, @status);
+		}
+		if (defined $fields{'Build-Conflicts'}) {
+			push @conflicts, BuildDeps::conflicts($fields{'Build-Conflicts'}, @status);
+		}
+		if (! $binary_only && defined $fields{'Build-Depends-Indep'}) {
+			push @unmet, BuildDeps::depends($fields{'Build-Depends-Indep'}, @status);
+		}
+		if (! $binary_only && defined $fields{'Build-Conflicts-Indep'}) {
+			push @conflicts, BuildDeps::conflicts($fields{'Build-Conflicts-Indep'}, @status);
+		}
+
+		if (@unmet) {
+			print STDERR "$me: Unmet build dependencies: ";
+			print STDERR join(", ", @unmet), "\n";
+		}
+		if (@conflicts) {
+			print STDERR "$me: Build conflicts: ";
+			print STDERR join(", ", @conflicts), "\n";
+		}
+		exit 1 if @unmet || @conflicts;
+	}
+}
+
+# This part could be replaced. Silly little status file parser.
+# thanks to Matt Zimmerman. Returns two hash references that
+# are exactly what the other functions need...
+sub parse_status {
+	my $status=shift || "/var/lib/dpkg/status";
+	
+	my %providers;
+	my %version;
+	local $/ = '';
+	open(STATUS, "<$status") || die "$status: $!\n";
+	while (<STATUS>) {
+		next unless /^Status: .*ok installed$/m;
+	
+		my ($package) = /^Package: (.*)$/m;
+		push @{$providers{$package}}, $package;
+		($version{$package}) = /^Version: (.*)$/m;
+	
+		if (/^Provides: (.*)$/m) {
+			foreach (split(/,\s*/, $1)) {
+				push @{$providers{$_}}, $package;
+			}
+		}
+	}
+	close STATUS;
+
+	return \%version, \%providers;
+}
+

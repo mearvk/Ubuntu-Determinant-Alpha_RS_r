@@ -1,0 +1,529 @@
+# Copyright: © 2012 Enrico Tassi <gareuselesinge@debian.org>
+# License: MIT/X
+# vim: foldmethod=marker:ft=make
+
+# override for more verbose output
+ifeq "$(DH_VERBOSE)-$(findstring verbose,$(DH_LUA_OPTS))" "-"
+H=@
+else
+H=
+endif
+
+include $(CONFIGURATION_FILE)
+
+### {{{gnu make haks
+empty:=
+space:=$(empty) $(empty)
+### }}}
+
+### {{{ a bunch of definitions (standard at least for debian)
+### you should not need to change this
+
+# LUA_VERSION
+ifeq "$(LUA_VERSION)" ""
+LUA_VERSION:=$(if $(shell echo $(CONFIGURATION_FILE) | grep ^debian/lua5\.4),5.4)
+endif
+ifeq "$(LUA_VERSION)" ""
+LUA_VERSION:=$(if $(shell echo $(CONFIGURATION_FILE) | grep ^debian/lua5\.3),5.3)
+endif
+ifeq "$(LUA_VERSION)" ""
+LUA_VERSION:=$(if $(shell echo $(CONFIGURATION_FILE) | grep ^debian/lua5\.2),5.2)
+endif
+ifeq "$(LUA_VERSION)" ""
+LUA_VERSION:=$(if $(shell echo $(CONFIGURATION_FILE) | grep ^debian/lua5\.1),5.1)
+endif
+ifeq "$(LUA_VERSION)" ""
+LUA_VERSION:=$(if $(shell echo $(CONFIGURATION_FILE) | grep ^debian/luajit),jit)
+endif
+
+# UID for the LUA_VERSION
+UID=$(shell pwd)/$(LUA_VERSION)-$(PKG_NAME)
+
+# misc
+DH_LUA_SUPPORT_FILES=/usr/share/dh-lua/
+LUA=lua$(LUA_VERSION)
+C_TEST_FILE=$(DH_LUA_SUPPORT_FILES)test/$(LUA_VERSION)/app.c
+PREFIX=$(DESTDIR)/usr/
+LBTL=libtool --tag=CC
+ifeq "$(LUA_SOURCES_MANGLER)" ""
+	LUA_SOURCES_MANGLER:=cat
+endif
+
+# .pc
+PKG_CONF_NAME=$(LUA)-$(PKG_NAME_DASH).pc
+DEB_PKGCONFIG_TEMPL=$(DH_LUA_SUPPORT_FILES)/template/pkg-config.pc.in
+PKGCONF=pkg-config $(LUA) --define-variable=prefix=$(PREFIX)
+ifeq "$(PKG_VERSION)" ""
+PKG_VERSION=$(shell dpkg-parsechangelog|grep ^Ver|cut -d ' ' -f 2|cut -d '-' -f 1)
+endif
+
+# sanity check
+ifneq "$(shell pkg-config $(LUA) --exists; echo $$?)" "0"
+$(error "pkg-config file for $(LUA) not found") 
+endif
+
+# CFLAGS
+LUA_CFLAGS := $(shell $(PKGCONF) --cflags)
+CFLAGS := $(shell dpkg-buildflags --get CFLAGS)
+CFLAGS += $(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS += $(LUA_CFLAGS) $(CLIB_CFLAGS) -Wall -Wextra
+STD_LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+LDFLAGS_STATIC = $(STD_LDFLAGS) $(CLIB_LDFLAGS_STATIC)
+LDFLAGS        = $(STD_LDFLAGS) $(CLIB_LDFLAGS)
+
+# liblua5.1-foo.so.0.0.0
+VERSION_INFO ?= 0:0:0
+LIBNAME=lib$(LUA)-$(PKG_NAME_DASH)
+REALSO=$(LIBNAME).so.$(subst :,.,$(VERSION_INFO))
+
+# /usr/lib/liblua5.1.la
+LUA_LBTL_S := $(shell $(PKGCONF) --libs --static)
+LUA_LBTL_D := $(shell $(PKGCONF) --libs)
+
+# /usr/lib/, /usr/lib/lua/5.1, /usr/share/lua/5.1/
+LUA_CPATH:=$(shell $(PKGCONF) --define-variable=abiver=$(LUA_VERSION) --variable=INSTALL_CMOD)
+LUA_SPATH:=$(shell $(PKGCONF) --define-variable=abiver=$(LUA_VERSION) --variable=INSTALL_LMOD)
+DEB_HOST_MULTIARCH:=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+LUA_LPATH=$(PREFIX)/lib/$(DEB_HOST_MULTIARCH)
+
+# /usr/include/lua5.1
+LUA_HPATH:=$(shell $(PKGCONF) --variable=includedir)/$(LUA)
+
+# debian packages name and derivates
+PKG_NAME_DASH=$(subst .,-,$(PKG_NAME))
+DEB_PKG_LIB=lua-$(PKG_NAME_DASH)
+DEB_PKG_DEV=$(DEB_PKG_LIB)-dev
+
+# .h
+ifeq "$(LUA_HEADER)" ""
+  LUA_HEADER=$(UID)/lua-$(PKG_NAME_DASH).h
+endif
+DEB_HEADER_TEMPL=$(DH_LUA_SUPPORT_FILES)template/header.h.in
+
+# names for require and for luaopen
+ifeq "$(LUA_MODNAME)" ""
+  LUA_MODNAME=$(PKG_NAME)
+endif
+ifeq "$(LUA_MODNAME_CPART)" ""
+  LUA_MODNAME_CPART=$(LUA_MODNAME)
+endif
+
+# luasql.mysql -> /usr/lib/lua/5.1/sql/mysql
+LUA_MODNAME_PATH=$(subst .,/,$(LUA_MODNAME_CPART))
+
+# luaopen_luasql_mysql(lua_State* L)
+ifeq "$(LUA_MODNAME_CPART_UNDERSCORE)" ""
+  LUA_MODNAME_CPART_UNDERSCORE=$(subst .,_,$(LUA_MODNAME_CPART))
+endif
+
+
+# depending on the nesting, a '../' for every level
+LUA_MODNAME_DOTS=$(shell echo $(LUA_MODNAME_CPART) | sed 's/[^\.]//g' | sed 's/\./..\//g')
+
+# .install
+DEB_INST_LIB=debian/$(DEB_PKG_LIB).install
+DEB_INST_LIB_TEMPL=$(DH_LUA_SUPPORT_FILES)template/lib.install.in
+DEB_INST_DEV=debian/$(DEB_PKG_DEV).install
+DEB_INST_DEV_TEMPL=$(DH_LUA_SUPPORT_FILES)template/dev.install.in
+
+# where to find stuff
+LUA_INIT=' package.path="$(UID)/?.lua;$(UID)/?/init.lua;"..package.path; package.cpath="$(UID)/?.so;"..package.cpath; '
+
+# to help crosscompiling
+DEB_BUILD_ARCH:=$(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_ARCH:=$(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+# lua5.2 specific
+ifeq "$(LUA_VERSION)" "5.2"
+	LUA_TEST := $(subst /usr/bin/shake,,$(LUA_TEST))
+endif
+
+# test
+LUA_TEST_KIND:=fake
+ifneq "$(LUA_TEST)" ""
+	LUA_TEST_KIND:=real
+endif
+ifneq "$(LUA_TEST_CUSTOM)" ""
+	LUA_TEST_KIND:=real-custom
+endif
+
+
+### }}}
+
+.PHONY: build clean test install configure sanity
+
+# ---------------------- Here starts the Makefile ------------------------------
+
+# {{{ entrypoints 
+ifeq "$(CLIB_OBJS)" ""
+build: sanity
+test: sanity test-config test-lua-dynamic 
+install: sanity installcommon
+else
+ifeq "$(LUA_VERSION)" "jit"
+build: sanity
+test: sanity test-config test-lua-dynamic 
+install: sanity installcommon
+else
+build: sanity $(UID)/$(LIBNAME).la 
+test: sanity test-config test-lua-dynamic test-config-app test-app-dynamic test-app-static
+install: sanity installcommon installso
+endif
+endif
+clean: sanity
+	$(H)$(RM) -rf $(UID)/
+	$(H)$(call empty_trash)
+	# fix for leftovers of dh-lua < 14
+	$(H)$(RM) -f debian/backup
+autopkgtest: sanity test-lua-dynamic-apkgt-$(LUA_TEST_KIND)
+
+sanity:
+	$(H)if [ -z "$(LUA_VERSION)" ]; then\
+		echo;\
+		echo ERROR: LUA_VERSION is not set;\
+		echo;\
+		exit 1;\
+	fi
+
+# }}}
+
+# {{{ helper macros
+define trash
+	echo $(1) >> debian/trash
+endef
+
+define empty_trash
+	if [ -e debian/trash ]; then \
+		$(RM) -f `cat debian/trash` debian/trash; fi
+endef
+
+define subst_vars
+	sed \
+	 -e 's@@TEMPLATE@@$(DH_LUA_SUPPORT_FILES)templateg' \
+	 -e 's^include \(.\)cat \1g' \
+	 -e '/^cat ./e' \
+	 -e 's@@PKG_VERSION@@$(PKG_VERSION)g' \
+	 -e 's@@PKG_NAME@@$(PKG_NAME_DASH)g' \
+	 -e 's@@PKG_LUA@@$(LUA)g' \
+	 -e 's@@PKG_LIBS_PRIVATE@@$(PKG_LIBS_PRIVATE)g' \
+	 -e 's@@PKG_URL@@$(PKG_URL)g' \
+	 -e 's@@PKG_REQUIRES@@$(PKG_REQUIRES)g' \
+	 -e 's@@PKG_CONFLICTS@@$(PKG_CONFLICTS)g' \
+	 -e 's@@LIBNAME@@$(LIBNAME)g' \
+	 -e 's@@DEB_HOST_MULTIARCH@@$(DEB_HOST_MULTIARCH)g' \
+	 -e 's@@LUA@@$(LUA)g' \
+	 -e 's@@LUA_VERSION@@$(LUA_VERSION)g' \
+	 -e 's@@LUA_MODNAME_CPART_UNDERSCORE@@$(LUA_MODNAME_CPART_UNDERSCORE)g' \
+	 -e 's@@LUA_MODNAME_CPART@@$(LUA_MODNAME_CPART)g' \
+	 -e 's@@LUA_MODNAME_PATH@@$(LUA_MODNAME_PATH)g' \
+	 -e 's@@LUA_HEADER@@$(notdir $(LUA_HEADER))g' \
+	 -e 's@@LUA_SOURCES@@$(LUA_SOURCES)g' \
+	 -e 's@@LUA_SOURCES_ARCHDEP@@$(LUA_SOURCES_ARCHDEP)g' \
+	 -e 's@@LUA_SOURCES_MANGLER@@$(LUA_SOURCES_MANGLER)g' \
+	 -e 's@@CLIB_OBJS@@$(CLIB_OBJS)g' \
+	 -e 's@@[A-Z_]*@@g' \
+	 -e '/^test ./e'
+endef
+
+define merge_with
+	(while read line; do\
+		[ -e $(1) ] || touch $(1);\
+		if grep -q -F "$$line" $(1); then\
+			if [ ! -z "$$line" ]; then\
+				echo "Skipping already existing line: $$line";\
+			fi\
+		else\
+			echo "Adding new line: $$line";\
+			echo "$$line" >> $(1);\
+		fi;\
+	done)
+endef
+
+define assert
+	if [ "$(1)" != "$(2)" ]; then\
+		echo;\
+		echo "ERROR:" $(3);\
+		echo;\
+		exit 1;\
+	fi
+endef
+
+define all_packages_with_luaVersions
+	grep-dctrl -s Package -F XB-Lua-Versions lua:Versions debian/control | \
+			cut -d : -f 2
+endef
+
+define all_packages_with_luaProvides
+	grep-dctrl -s Package -F Provides lua:Provides debian/control | \
+			cut -d : -f 2
+endef
+
+define subst_lua
+	$(if $(findstring @@LUA@@,$(1)),($(subst @@LUA@@,$(2),$(1))),$(2) $(1))
+endef
+
+define export_env
+	HOME=$(shell pwd)/debian LUA_INIT=$(LUA_INIT) \
+	SEGFAULT_SIGNALS=all PATH="$(UID)/:$$PATH" $(1)
+endef
+
+define export_env_apkgt
+	HOME="$(ADTTMP)" \
+	SEGFAULT_SIGNALS=all PATH="$(UID)/:$$PATH" $(1)
+endef
+
+define run_multiple_tests
+	$(foreach test,$(subst ;,$(space),$(subst $(space),_space_,$(1))),\
+		echo "Test: $(subst _space_,$(space),$(test))" && \
+		cd $(shell pwd) && \
+		$(call subst_lua,\
+			$(subst _space_,$(space),$(test)),\
+			$(call export_env$(3),$(2))) &&) true
+endef
+
+define run_custom_test
+	cd $(shell pwd) && $(call subst_lua,$(1),$(call export_env$(3),$(2)))
+endef
+
+# }}}
+
+# ---------------------------- Testing -----------------------------------------
+
+# {{{ test the module, from lua and from a dynamically/statically linked C app
+test-lua-dynamic-fake:
+	@echo "********************** lua dynamic ($(LUA_VERSION)) *********"
+	@echo SKIPPED!
+	@echo "**************************************************"
+
+test-app-static-fake: $(UID)/app-static 
+	@echo "*********************** app static ($(LUA_VERSION)) *********"
+	@echo SKIPPED!
+	@echo "**************************************************"
+
+test-app-dynamic-fake:  $(UID)/app-dynamic
+	@echo "********************** app dynamic ($(LUA_VERSION)) *********"
+	@echo SKIPPED!
+	@echo "**************************************************"
+
+test-lua-dynamic-real:
+	@echo "********************** lua dynamic ($(LUA_VERSION)) *********"
+	$(H)$(call run_multiple_tests,$(LUA_TEST),catchsegv $(LUA) -l$(LUA_MODNAME))
+	@echo "**************************************************"
+
+test-lua-dynamic-real-custom:
+	@echo "****************** lua dynamic custom ($(LUA_VERSION)) ******"
+	$(H)$(call run_custom_test,$(LUA_TEST_CUSTOM),catchsegv $(LUA))
+	@echo "*************************************************"
+
+test-lua-dynamic-apkgt-real:
+	@echo "************ lua dynamic ($(LUA_VERSION), autopkgtest) *********"
+	$(H)$(call run_multiple_tests,\
+			$(LUA_TEST),catchsegv $(LUA) -l$(LUA_MODNAME),_apkgt)
+	@echo "**************************************************"
+
+test-lua-dynamic-apkgt-real-custom:
+	@echo "********* lua dynamic custom ($(LUA_VERSION), autopkgtest) ******"
+	$(H)$(call run_custom_test,$(LUA_TEST_CUSTOM),catchsegv $(LUA),_apkgt)
+	@echo "*************************************************"
+
+test-app-static-real: $(UID)/app-static
+	@echo "*********************** app static ($(LUA_VERSION)) *********"
+	$(H)$(call run_multiple_tests,$(LUA_TEST),catchsegv $(UID)/app-static)
+	@echo "**************************************************"
+
+test-app-dynamic-real: $(UID)/app-dynamic
+	@echo "********************** app dynamic ($(LUA_VERSION)) *********"
+	$(H)$(call run_multiple_tests,$(LUA_TEST),\
+			$(LBTL) --mode=execute -dlopen $(UID)/$(LIBNAME).la \
+			catchsegv $(UID)/app-dynamic)
+	@echo "**************************************************"
+
+ifneq "$(DEB_HOST_ARCH)" "$(DEB_BUILD_ARCH)"
+ifeq "$(CLIB_OBJS)" ""
+test-lua-dynamic: test-lua-dynamic-$(LUA_TEST_KIND)
+else
+test-lua-dynamic: test-lua-dynamic-fake
+endif
+test-app-static: test-app-static-fake
+test-app-dynamic: test-app-dynamic-fake
+else
+ifneq "$(findstring skip-test-lua-dynamic,$(DH_LUA_OPTS))" ""
+test-lua-dynamic: test-lua-dynamic-fake
+else
+test-lua-dynamic: test-lua-dynamic-$(LUA_TEST_KIND)
+endif
+ifneq "$(findstring skip-test-app-static,$(DH_LUA_OPTS))" ""
+test-app-static: test-app-static-fake
+else
+test-app-static: test-app-static-$(LUA_TEST_KIND)
+endif
+ifneq "$(findstring skip-test-app-dynamic,$(DH_LUA_OPTS))" ""
+test-app-dynamic: test-app-dynamic-fake
+else
+test-app-dynamic: test-app-dynamic-$(LUA_TEST_KIND)
+endif
+endif
+# }}}
+
+# ------------------------- Installation ---------------------------------------
+  
+# {{{ install static and dynamic libraries for module to global location
+installso: $(UID)/$(LIBNAME).la $(UID)/$(PKG_CONF_NAME) $(LUA_HEADER)
+	# .so
+	$(H)echo Installing $(LIBNAME)
+	$(H)mkdir -p $(LUA_CPATH)
+	$(H)mkdir -p $(LUA_LPATH)
+	$(H)$(LBTL) --mode=install install \
+		$(UID)/$(LIBNAME).la \
+		$(shell pwd)/$(LUA_LPATH)/$(LIBNAME).la
+	$(LBTL) --finish $(LUA_LPATH)
+	$(H)cd $(LUA_CPATH); \
+		echo Creating symlink $(LUA_MODNAME_PATH).so;\
+		mkdir -p $(dir $(LUA_MODNAME_PATH));\
+		ln -s $(LUA_MODNAME_DOTS)../../$(REALSO) $(LUA_MODNAME_PATH).so
+	# .pc
+	$(H)echo Installing $(PKG_CONF_NAME)
+	$(H)mkdir -p $(LUA_LPATH)/pkgconfig/
+	$(H)$(LBTL) --mode=install install -m 0644 \
+		$(UID)/$(PKG_CONF_NAME) \
+		$(shell pwd)/$(LUA_LPATH)/pkgconfig/
+	# .h
+	$(H)if [ ! -z "$(CLIB_OBJS)" ]; then\
+		echo Installing $(LUA_HEADER);\
+		mkdir -p $(LUA_HPATH);\
+		$(LBTL) --mode=install install -m 0644 \
+			$(LUA_HEADER) $(shell pwd)/$(LUA_HPATH)/;\
+	fi
+
+installcommon:
+	# .lua
+	$(H)mkdir -p $(LUA_SPATH)
+	$(H)if [ ! -z "$(LUA_SOURCES)" ]; then\
+		echo Installing $(LUA_SOURCES) in $(LUA_SPATH); \
+		for X in $(LUA_SOURCES); do\
+		  mkdir -p `dirname $(LUA_SPATH)/$$(echo $$X|$(LUA_SOURCES_MANGLER))`;\
+	   	  cp $$X $(LUA_SPATH)/`echo $$X|$(LUA_SOURCES_MANGLER)`;\
+	   	  chmod 644 $(LUA_SPATH)/`echo $$X|$(LUA_SOURCES_MANGLER)`;\
+		done;\
+	fi
+	$(H)if [ ! -z "$(LUA_SOURCES_ARCHDEP)" ]; then\
+		echo Installing $(LUA_SOURCES_ARCHDEP) in $(LUA_CPATH); \
+		for X in $(LUA_SOURCES_ARCHDEP); do\
+		  mkdir -p `dirname $(LUA_CPATH)/$$(echo $$X|$(LUA_SOURCES_MANGLER))`;\
+	   	  cp $$X $(LUA_CPATH)/`echo $$X|$(LUA_SOURCES_MANGLER)`;\
+	   	  chmod 644 $(LUA_CPATH)/`echo $$X|$(LUA_SOURCES_MANGLER)`;\
+		done;\
+	fi
+	# debian/substvars
+	$(H)for P in $(shell $(call all_packages_with_luaVersions)); do \
+		echo Filling in debian/$$P.substvars; \
+		echo lua:Versions=`LC_ALL=C sort debian/lua_versions` | \
+			$(call merge_with, debian/$$P.substvars);\
+	done
+	$(H)for P in $(shell $(call all_packages_with_luaProvides)); do \
+		ACC=""; \
+		for V in `LC_ALL=C sort debian/lua_versions`; do \
+			PV=`echo $$P | sed "s/^lua-/lua$$V-/"`; \
+			ACC="$$PV, $$ACC"; \
+		done; \
+		echo Filling in debian/$$P.substvars; \
+		echo lua:Provides=$$ACC | $(call merge_with, debian/$$P.substvars);\
+	done
+
+# }}}
+
+# ------------------------- C compilation --------------------------------------
+
+# {{{ compilation rules: .lo .la app
+$(UID)/%.lo: %.c
+	$(LBTL) --mode=compile $(CC) -c $(CFLAGS) -o $@ $< 
+
+$(UID)/$(LIBNAME).la $(UID)/$(LUA_MODNAME_PATH).so: $(addprefix $(UID)/,$(CLIB_OBJS))
+	$(LBTL) --mode=link $(CC) \
+	    -rpath $(LUA_LPATH) -version-info $(VERSION_INFO) -Wl,--no-add-needed \
+		-o $(UID)/$(LIBNAME).la \
+	    $(patsubst %,$(UID)/%,$(CLIB_OBJS)) \
+		$(LDFLAGS)
+	$(H)mkdir -p $(UID)/$(dir $(LUA_MODNAME_PATH))
+	$(H)ln -sf $(LUA_MODNAME_DOTS)./.libs/$(REALSO) \
+		$(UID)/$(LUA_MODNAME_PATH).so
+	ldd $(UID)/$(LUA_MODNAME_PATH).so
+
+$(UID)/app-static: $(UID)/$(LIBNAME).la
+	$(LBTL) --mode=link $(CC) $(CFLAGS) -Wl,--no-add-needed \
+		-static -o $@ -I . -I $(UID)/ \
+		$(C_TEST_FILE) $(UID)/$(LIBNAME).la \
+		$(LDFLAGS_STATIC) $(LUA_LBTL_S)
+	ldd $(UID)/app-static
+
+$(UID)/app-dynamic: $(UID)/$(LIBNAME).la
+	$(LBTL) --mode=link $(CC) $(CFLAGS) -Wl,--no-add-needed \
+		-o $@ -I . -I $(UID)/ \
+		$(C_TEST_FILE) $(UID)/$(LIBNAME).la \
+		$(LDFLAGS) $(LUA_LBTL_D)
+	$(LBTL) --mode=execute -dlopen $(UID)/$(LIBNAME).la \
+			ldd $(UID)/app-dynamic
+
+# }}}
+
+# ------------------------- configuration --------------------------------------
+
+# {{{ pkgconfig, .install and (evental) .h generation
+$(UID):
+	$(H)mkdir -p $(UID)/
+
+$(LUA_HEADER):
+	$(H)if [ ! -e $@ ]; then \
+		cat $(DEB_HEADER_TEMPL) | $(call subst_vars) > $@; \
+	fi
+
+$(UID)/$(PKG_CONF_NAME): $(UID)
+	$(H)cat $(DEB_PKGCONFIG_TEMPL) | $(call subst_vars) > $@
+
+$(UID)/app.c.conf: $(UID)
+	$(H)cat $(C_TEST_FILE).conf.in | $(call subst_vars) > $@ 
+
+configure: sanity $(UID) $(LUA_HEADER) $(UID)/$(PKG_CONF_NAME)
+	# .install
+	$(H)$(call trash, $(DEB_INST_LIB))
+	$(H)if [ -e $(DEB_INST_LIB).in ]; then\
+		echo "Filling in $(DEB_INST_LIB) using $(DEB_INST_LIB).in";\
+		cat $(DEB_INST_LIB).in | $(call subst_vars) | \
+			$(call merge_with, $(DEB_INST_LIB));\
+	else\
+		echo "Filling in $(DEB_INST_LIB) using $(DEB_INST_LIB_TEMPL)";\
+		cat $(DEB_INST_LIB_TEMPL) | $(call subst_vars) | \
+			$(call merge_with, $(DEB_INST_LIB));\
+	fi
+	$(H)$(call trash, $(DEB_INST_DEV))
+	$(H)if [ -e $(DEB_INST_DEV).in ]; then\
+		echo "Filling in $(DEB_INST_DEV) using $(DEB_INST_DEV).in";\
+		cat $(DEB_INST_DEV).in | $(call subst_vars) | \
+			$(call merge_with, $(DEB_INST_DEV));\
+	else\
+		echo "Filling in $(DEB_INST_DEV) using $(DEB_INST_DEV_TEMPL)";\
+		cat $(DEB_INST_DEV_TEMPL) | $(call subst_vars) | \
+			$(call merge_with, $(DEB_INST_DEV));\
+	fi
+	# lua_versions
+	$(H)$(call trash, debian/lua_versions)
+	$(H)echo Filling in debian/lua_versions
+	$(H)echo $(LUA_VERSION) | $(call merge_with, debian/lua_versions)
+
+test-config:
+	# tests
+	$(H)ln -sf `which $(LUA)` $(UID)/lua
+	$(H)if [ ! -z "$(LUA_SOURCES)" ]; then\
+		echo Copying $(LUA_SOURCES) in $(UID) for test; \
+		for X in $(LUA_SOURCES); do\
+			mkdir -p `dirname $(UID)/$$(echo $$X|$(LUA_SOURCES_MANGLER))`;\
+	   		cp $$X $(UID)/`echo $$X|$(LUA_SOURCES_MANGLER)`;\
+		done;\
+	fi
+
+test-config-app:  $(UID)/app.c.conf
+
+# }}}
+
+# vim:set ts=4:
+# eof

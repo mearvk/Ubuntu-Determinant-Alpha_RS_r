@@ -1,0 +1,73 @@
+#! /usr/bin/make -f
+
+FILES_TO_CLEAN  = foldoc.* newdict
+
+include /usr/share/dpkg/pkg-info.mk
+
+get-orig-source:
+	set -ex; tempdir=$$(mktemp -d); \
+	udate=$$(curl -s -I https://foldoc.org/Dictionary| \
+	sed -n 's/^[Ll]ast-[Mm]odified: //p'); \
+	uver=$$(date -u -d "$$udate" +"%Y%m%d"); \
+	fdir="$$tempdir/dict-foldoc-$$uver"; \
+	mkdir "$$fdir"; \
+	curl -s -f -o $$fdir/Dictionary https://foldoc.org/Dictionary; \
+	tar czf dict-foldoc-$$uver.tar.gz -C $$tempdir .; \
+	rm -rf $$tempdir
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+
+build-stamp:
+	dh_testdir
+
+	cat Dictionary debian/Dictionary.debian > newdict
+	set -ex ; \
+	uver=$(DEB_VERSION_UPSTREAM) ; \
+	udate=$$(LC_ALL=C date -d "$$uver" +"%d %B %Y"); \
+	perl debian/condense newdict | \
+	  /usr/bin/dictfmt -f --headword-separator %%% --break-headwords \
+	  --allchars -u http://foldoc.org/Dictionary.gz \
+	  -s "The Free On-line Dictionary of Computing ($$udate)" \
+	  --utf8 --without-time foldoc
+	# Ensure deterministic mtime for dictzip to inherit
+	touch --date='@$(SOURCE_DATE_EPOCH)' foldoc.dict
+	/usr/bin/dictzip -v foldoc.dict
+
+	touch $@
+
+clean:
+# Undoes the effect of `$(MAKE) -f debian/rules build'.
+	dh_testdir
+	dh_testroot
+	rm -f $(FILES_TO_CLEAN)
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	dh_install
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir Dictionary
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-dependent files here.
+binary-arch: build install
+# We have nothing to do by default.
+
+binary: binary-indep binary-arch
+.PHONY: build build-arch build-indep clean \
+	binary-indep binary-arch binary install

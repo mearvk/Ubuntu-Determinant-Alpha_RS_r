@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# Copyright (C) 2012, James McCoy <jamessan@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+set -u
+
+WORKDIR="$(readlink -f "${0%/*}")"
+
+if test "${1:-}" = --installed; then
+    COMMAND=dd-list
+    shift
+else
+    COMMAND="$WORKDIR/../scripts/dd-list.pl"
+fi
+
+testBinariesFromSameSource() {
+  $COMMAND -s ${WORKDIR}/dd-list/sources vim-gtk vim-nox 2>&1 >/dev/null
+  rc=$?
+  assertEquals 'packages found' 0 $rc
+}
+
+testExtraSourceOnlyIgnored() {
+  $COMMAND -s ${WORKDIR}/dd-list/sources bzip2 >$SHUNIT_TMPDIR/extra-source.out
+
+  assertFalse 'Jorge listed as uploader' "grep -q Jorge $SHUNIT_TMPDIR/extra-source.out"
+}
+
+testUseOnlyLatestVersion() {
+  $COMMAND -s ${WORKDIR}/dd-list/sources subversion >$SHUNIT_TMPDIR/latest-version.out
+
+  assertFalse 'Troy Heber listed as uploader'  "grep -q Troy $SHUNIT_TMPDIR/latest-version.out"
+}
+
+. shunit2

@@ -1,0 +1,205 @@
+#!/usr/bin/perl
+
+use feature say;
+use strict;
+use Debian::Debhelper::Buildsystem::R qw(parse_deps);
+use Dpkg::Control;
+use Dpkg::Deps qw(deps_parse);
+use Getopt::Long;
+use Pod::Usage;
+use List::Util qw(first);
+
+my $opt_desc = 0;
+my $opt_help = 0;
+
+GetOptions('help|?' => \$opt_help, 'desc|d' => \$opt_desc);
+pod2usage(1) if $opt_help;
+
+( -d "debian") or die "No debian/ directory, this tool updates existing R packaging";
+( -e "DESCRIPTION") or die "No DESCRIPTION file, is this an R package?";
+
+my $desc = Dpkg::Control->new(type => Dpkg::Control::CTRL_UNKNOWN);
+$desc->load("DESCRIPTION");
+
+my $dctrl = Dpkg::Control::Info->new();
+$dctrl->load("debian/control");
+
+my $dsrc = $dctrl->get_source();
+my $dbin = $dctrl->get_pkg_by_idx(1);
+
+my @aptavail = qx/grep-aptavail -P -s Package -n -e ^r-/;
+my %apthash;
+@apthash{@aptavail} = ();
+my @global_dep_list = ();
+
+sub deps_concat {
+    # Dpkg::Deps::deps_concat generates "dep, , , " if some arguments are empty strings
+    my $field = @_[0];
+    shift @_ ;
+    my (@dep_list) = @_;
+    @dep_list = grep { /[a-z]/ } @dep_list;
+    my $dep ;
+    my @dedup_dep_list = () ;
+    foreach (@dep_list) {
+      $dep = $_ ;
+      s/ .*// ;
+      unless ($_ ~~ @global_dep_list ) {
+        push @global_dep_list, $_ ;
+        push @dedup_dep_list, $dep ;
+      } else {
+        say "Ignore duplicated dependency $dep" ;
+      }
+    }
+    my $empty = substr('                              ', 0, length($field)+1);
+    return join ",\n$empty", @dedup_dep_list;
+}
+
+my $dhrversion = "";
+
+sub unmanaged {
+    my $field = @_[0];
+    shift @_;
+    my $rawtext = shift;
+    # deps_parse errors on substvars like ${R:Depends}, so split it manually
+    my @deps = split(/\s*,\s*/m, $rawtext);
+    my @keep;
+    foreach my $d (@deps) {
+        if ($d !~ /^(r-|debhelper(?:-compat)?|dh-r|\$)/) {
+            say "I: keeping unmanaged dependency: $d";
+            push(@keep, $d);
+        } else {
+            if ( @keep && $d =~ /^r-/ ) {
+              say "I: keep also $d since it is specified behind other unmanaged depencency";
+              push(@keep, $d);
+            }
+        }
+        if ($d =~ /^dh-r\s+\(\s*>=\s*\d+\s*\)\s*$/ ) {
+            $d =~ s/^dh-r\s+/ / ;
+            $dhrversion = $d;
+            say "I: Keep versioned Build-Depends: dh-r$dhrversion";
+        }
+    }
+    return deps_concat($field, @keep);
+}
+
+say "I: Updating Build-Depends";
+my $unmanaged_builddeps = unmanaged("Build-Depends", $dsrc->{'Build-Depends'});
+if ( ! $desc->{Depends} ) { $desc->{Depends} = ""; }
+if ( ! $desc->{Imports} ) { $desc->{Imports} = ""; }
+if ( ! $desc->{LinkingTo} ) { $desc->{LinkingTo} = ""; }
+if ( ! $desc->{SystemRequirements} ) { $desc->{SystemRequirements} = ""; }
+my $rdepends = deps_concat("Build-Depends", Debian::Debhelper::Buildsystem::R::parse_depends("Depends", $desc->{Depends}, \%apthash));
+my $rimports = deps_concat("Build-Depends", Debian::Debhelper::Buildsystem::R::parse_depends("Imports", $desc->{Imports}, \%apthash));
+my $rlinkingto = deps_concat("Build-Depends", Debian::Debhelper::Buildsystem::R::parse_depends("LinkingTo", $desc->{LinkingTo}, \%apthash));
+my $rsystemrequirements = "";
+if ( $desc->{SystemRequirements} =~ /^gsl$/ ) {
+  $rsystemrequirements = deps_concat("Build-Depends", 'libgsl-dev');
+}
+my $compiled = "no";
+if ( $desc->{NeedsCompilation} ) {
+  $compiled = lc $desc->{NeedsCompilation} eq "yes";
+} else {
+  say "W: NeedsCompilation field is missing in DESCRIPTION" ;
+  # some DESCRIPTION files (for instance r-cran-deal) are lacking NeedsCompilation field
+  # try to find other means for the decision whether compilation is needed
+  # for the moment simply check whether src/ dir exists
+  if (-e 'src' and -d 'src') {
+    say "W: Directory src exists despite NeedsCompilation field is missing in DESCRIPTION" ;
+    my @files = glob("src/*.[cf]");
+    if ( @files ) {
+      $compiled = "yes";
+      say "I: Set Architecture=any since there are *.c or *.f files." ;
+    }
+  }
+}
+# reset global dep list before final concatenation
+@global_dep_list = ();
+
+my $debhelper_dep = "";
+my $new_compat = first { /^debhelper-compat/ } split(/\s*,\s*/m, $dsrc->{'Build-Depends'});
+if (-e 'debian/compat') {
+  open my $file, '<', "debian/compat";
+  my $DhVersion = <$file>;
+  $DhVersion =~ s/^\s+|\s+$//g;
+  $debhelper_dep = "debhelper (>= $DhVersion~)";
+  close $file;
+  say "I: Using debhelper compat from d/compat: $debhelper_dep";
+} elsif (defined $new_compat) {
+  $debhelper_dep = $new_compat;
+  say "I: Using debhelper compat from build-depends: $debhelper_dep";
+} else {
+  die "could not determine debhelper version";
+}
+
+$dsrc->{'Build-Depends'} = deps_concat("Build-Depends", $debhelper_dep, "dh-r".$dhrversion, "r-base-dev", $rdepends, $rimports, $rlinkingto, $unmanaged_builddeps, $rsystemrequirements);
+if ( $dsrc->{'Maintainer'} =~ ".*\@lists.alioth.debian.org>\$" ) {
+  $dsrc->{'Maintainer'} = "Debian R Packages Maintainers <r-pkg-team\@alioth-lists.debian.net>" ;
+}
+if ( $dsrc->{'Maintainer'} =~ ".*lists.*\.debian\..*" ) {
+  $dsrc->{'Vcs-Browser'} = "https://salsa.debian.org/r-pkg-team/".$dsrc->{'Source'};
+  $dsrc->{'Vcs-Git'} = $dsrc->{'Vcs-Browser'}.".git";
+}
+
+# this will contain all build dependencies, but we don't want to remove
+# binary dependencies which are also build dependencies
+@global_dep_list = ();
+
+say "I: Updating binary Depends, Recommends, Suggests";
+my $unmanaged_depends = unmanaged("Depends", $dbin->{Depends});
+my $unmanaged_recommends = unmanaged("Recommends", $dbin->{Recommends});
+my $unmanaged_suggests = unmanaged("Suggests", $dbin->{Suggests});
+
+# because unmanaged() calls deps_concat(), global_dep_list will already be populated
+# and then dependencies will get de-duplicated when called again
+@global_dep_list = ();
+
+$dbin->{Depends} = deps_concat("Depends", "\${R:Depends}", $compiled ? "\${shlibs:Depends}" : "", "\${misc:Depends}", $unmanaged_depends);
+$dbin->{Recommends} = deps_concat("Recommends", "\${R:Recommends}", $unmanaged_recommends);
+$dbin->{Suggests} = deps_concat("Suggests", "\${R:Suggests}", $unmanaged_suggests);
+
+if ( ! -e 'debian/tests/control' & ! exists $dsrc->{Testsuite} ) {
+    say "W: No debian/tests/control and no Testsuite field, adding Testsuite: autopkgtest-pkg-r";
+    $dsrc->{Testsuite} = "autopkgtest-pkg-r";
+}
+
+if ($opt_desc) {
+    say "I: Updating package description";
+    my $longdesc = $desc->{Description};
+    $longdesc =~ s/^\s*//gm;
+    $dbin->{Description} = "$desc->{Title}\n$longdesc";
+}
+
+open(my $fh, ">", "debian/control") or die "Can't write to debian/control";
+$dctrl->output($fh);
+close($fh);
+
+__END__
+
+=head1 NAME
+
+dh-update-R - Updates d/control for a debian R package
+
+=head1 SYNOPSIS
+
+dh-update-R [options]
+
+ Options:
+    --help
+    --desc Update the package description
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help>
+
+Print this help message.
+
+=back
+
+=head1 DESCRIPTION
+
+B<dh-update-R> should be run from the root of an unpacked R tarball (ie, the
+directory containing DESCRIPTION), where there is already a debian/ directory.
+This tools attempts to update files in debian/ after a new upstream version has
+been imported.
