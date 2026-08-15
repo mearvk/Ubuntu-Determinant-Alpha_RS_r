@@ -1,0 +1,700 @@
+/*
+ * Copyright IBM Corp. and others 2009
+ *
+ * This program and the accompanying materials are made available under
+ * the terms of the Eclipse Public License 2.0 which accompanies this
+ * distribution and is available at https://www.eclipse.org/legal/epl-2.0/
+ * or the Apache License, Version 2.0 which accompanies this distribution and
+ * is available at https://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * This Source Code may also be made available under the following
+ * Secondary Licenses when the conditions for such availability set
+ * forth in the Eclipse Public License, v. 2.0 are satisfied: GNU
+ * General Public License, version 2 with the GNU Classpath
+ * Exception [1] and GNU General Public License, version 2 with the
+ * OpenJDK Assembly Exception [2].
+ *
+ * [1] https://www.gnu.org/software/classpath/license.html
+ * [2] https://openjdk.org/legal/assembly-exception.html
+ *
+ * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 OR GPL-2.0-only WITH OpenJDK-assembly-exception-1.0
+ */
+
+package com.ibm.tools.attach.attacher;
+
+import static com.ibm.oti.util.Msg.getString;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.List;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import openj9.internal.tools.attach.target.AttachHandler;
+import openj9.internal.tools.attach.target.AttachmentConnection;
+import openj9.internal.tools.attach.target.Command;
+import openj9.internal.tools.attach.target.CommonDirectory;
+import openj9.internal.tools.attach.target.DiagnosticProperties;
+import openj9.internal.tools.attach.target.DiagnosticUtils;
+import openj9.internal.tools.attach.target.FileLock;
+import openj9.internal.tools.attach.target.IPC;
+import openj9.internal.tools.attach.target.Reply;
+import openj9.internal.tools.attach.target.Response;
+import openj9.internal.tools.attach.target.TargetDirectory;
+import com.sun.tools.attach.AgentInitializationException;
+import com.sun.tools.attach.AgentLoadException;
+import com.sun.tools.attach.AttachNotSupportedException;
+import com.sun.tools.attach.AttachOperationFailedException;
+import com.sun.tools.attach.VirtualMachine;
+import com.sun.tools.attach.VirtualMachineDescriptor;
+import com.sun.tools.attach.spi.AttachProvider;
+
+/**
+ * Handles the initiator end of an attachment to a target VM
+ *
+ */
+public final class OpenJ9VirtualMachine extends VirtualMachine implements Response {
+
+	/*
+	 * The expected string is "ATTACH_CONNECTED <32 bit hexadecimal key>".
+	 * If the target replies with an error, we may expect a longer string.
+	 * Allow enough for ~100 40-character lines.
+	 */
+	private static final int ATTACH_CONNECTED_MESSAGE_LENGTH_LIMIT = 4000;
+	/* The units for timeouts are milliseconds, Set to 0 for no timeout. */
+	private static final int DEFAULT_ATTACH_TIMEOUT = 120000;	/* should be ~2* the TCP timeout, i.e. /proc/sys/net/ipv4/tcp_fin_timeout on Linux */
+	private static final int DEFAULT_COMMAND_TIMEOUT = 0;
+
+	private static int MAXIMUM_ATTACH_TIMEOUT;
+	private static int COMMAND_TIMEOUT;
+
+	private static final String INSTRUMENT_LIBRARY = "instrument"; //$NON-NLS-1$
+	private OutputStream commandStream;
+	private final OpenJ9VirtualMachineDescriptor descriptor;
+	private final OpenJ9AttachProvider myProvider;
+	private Integer portNumber;
+	private InputStream responseStream;
+	private boolean targetAttached;
+	private String targetId;
+	private FileLock[] targetLocks;
+	private ServerSocket targetServer;
+	private Socket targetSocket;
+
+	static {
+		PrivilegedAction<Object> action = () -> {
+			MAXIMUM_ATTACH_TIMEOUT = Integer.getInteger("com.ibm.tools.attach.timeout", DEFAULT_ATTACH_TIMEOUT).intValue(); //$NON-NLS-1$
+			COMMAND_TIMEOUT = Integer.getInteger("com.ibm.tools.attach.command_timeout", DEFAULT_COMMAND_TIMEOUT).intValue(); //$NON-NLS-1$
+			return null;
+		};
+		AccessController.doPrivileged(action);
+	}
+
+	/**
+	 * @param provider
+	 *            AttachProvider which created this VirtualMachine
+	 * @param id
+	 *            identifier for the VM
+	 */
+	OpenJ9VirtualMachine(AttachProvider provider, String id)
+			throws NullPointerException {
+		super(provider, id);
+		if ((null == id) || (null == provider)) {
+			// K0554 = Virtual machine ID or display name is null
+			throw new NullPointerException(getString("K0554")); //$NON-NLS-1$
+		}
+		this.targetId = id;
+		this.myProvider = (OpenJ9AttachProvider) provider;
+		this.descriptor = (OpenJ9VirtualMachineDescriptor) myProvider.getDescriptor(id);
+	}
+
+	/**
+	 * @throws IOException
+	 *             if cannot open the communication files
+	 * @throws AttachNotSupportedException
+	 *             if the descriptor is null the target does not respond.
+	 */
+	void attachTarget() throws IOException, AttachNotSupportedException {
+		PrivilegedExceptionAction<Object> action = () -> {attachTargetImpl(); return null;};
+		try {
+			AccessController.doPrivileged(action);
+		} catch (PrivilegedActionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof AttachNotSupportedException) {
+				throw (AttachNotSupportedException) cause;
+			} else if (cause instanceof IOException) {
+				throw (IOException) cause;
+			} else if (cause instanceof RuntimeException) {
+				throw (RuntimeException) cause;
+			} else if (cause instanceof Error) {
+				throw (Error) cause;
+			} else {
+				throw new RuntimeException(cause);
+			}
+		}
+	}
+
+	private void attachTargetImpl() throws AttachNotSupportedException, IOException {
+		if (null == descriptor) {
+			// K0531 = target {0} not found
+			throw new AttachNotSupportedException(getString("K0531", targetId)); //$NON-NLS-1$
+		}
+		AttachNotSupportedException lastException = null;
+		int timeout = 100; /* start small in case there is a rogue process which is eating semaphores, grow big in case of system load. */
+		while (timeout < MAXIMUM_ATTACH_TIMEOUT) {
+			lastException = null;
+			try {
+				tryAttachTarget(timeout);
+			} catch (AttachNotSupportedException e) {
+				IPC.logMessage("attachTarget " + targetId + " timeout after " + timeout+" ms"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+				lastException = e;
+				timeout = (timeout * 3)/2;
+			}
+			if (null == lastException) {
+				break;
+			}
+			try {
+				// give another attacher a chance to run
+				Thread.sleep(timeout);
+			} catch (InterruptedException e) {
+				// ignore
+			}
+		}
+		if (null != lastException) {
+			throw lastException;
+		} else {
+			IPC.logMessage("OpenJ9VirtualMachine.attachTargetImpl() finished"); //$NON-NLS-1$
+		}
+	}
+
+	private static String createLoadAgent(String agentName, String options) {
+		String optString = (null == options) ? "" : //$NON-NLS-1$
+				options;
+		String cmdFrame = Command.LOADAGENT + '(' + INSTRUMENT_LIBRARY + ','
+				+ agentName + '=' + optString + ')';
+		return cmdFrame;
+	}
+
+	private static String createLoadAgentLibrary(String agentName, String options,
+			boolean agentPath) {
+		String cmd = (agentPath ? Command.LOADAGENTPATH
+				: Command.LOADAGENTLIBRARY);
+		String optString = ""; //$NON-NLS-1$
+		if ((null != options) && !(options.equals(""))) { //$NON-NLS-1$
+			optString = ',' + options;
+		}
+		String cmdFrame = cmd + '(' + agentName + optString + ')';
+		return cmdFrame;
+	}
+
+	/**
+	 * Detach a virtual machine by sending a detach command to the connected VM
+	 * via the IPC channel.
+	 */
+	@Override
+	public synchronized void detach() throws IOException {
+		AttachmentConnection.streamSend(commandStream, Command.DETACH);
+		try {
+			AttachmentConnection.streamReceiveString(responseStream);
+		} finally {
+			IPC.logMessage("VirtualMachine.detach"); //$NON-NLS-1$
+			if (null != commandStream) {
+				commandStream.close();
+				commandStream = null;
+			}
+			if (null != targetSocket) {
+				targetSocket.close();
+				targetSocket = null;
+			}
+			if (null != targetServer) {
+				targetServer.close();
+				targetServer = null;
+			}
+		}
+		targetAttached = false;
+	}
+
+	@Override
+	public Properties getAgentProperties() throws IOException {
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		Properties props = getTargetProperties(false);
+
+		return props;
+	}
+
+	@Override
+	public Properties getSystemProperties() throws IOException {
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		Properties props = getTargetProperties(true);
+		return props;
+	}
+
+	/**
+	 * Synchronized because multiple threads may use this object
+	 * @param systemProperties flag to indicate if we want system properties (true) or agent properties (false)
+	 * @return Properties object
+	 * @throws IOException
+	 */
+	private synchronized Properties getTargetProperties(boolean systemProperties)
+			throws IOException {
+		AttachmentConnection.streamSend(commandStream,
+				systemProperties ? Command.GET_SYSTEM_PROPERTIES
+						: Command.GET_AGENT_PROPERTIES);
+		return IPC.receiveProperties(responseStream, true);
+	}
+
+	@Override
+	public synchronized void loadAgent(String agent, String options)
+			throws AgentLoadException, AgentInitializationException,
+			IOException {
+
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		AttachmentConnection.streamSend(commandStream, (createLoadAgent(agent, options)));
+		String response = AttachmentConnection.streamReceiveString(responseStream);
+		parseResponse(response);
+	}
+
+	@Override
+	public synchronized void loadAgentLibrary(String agentLibrary,
+			String options) throws AgentLoadException,
+			AgentInitializationException, IOException {
+
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		AttachmentConnection.streamSend(commandStream, createLoadAgentLibrary(
+				agentLibrary, options, false));
+		String response = AttachmentConnection.streamReceiveString(responseStream);
+		parseResponse(response);
+	}
+
+	@Override
+	public synchronized void loadAgentPath(String agentPath, String options)
+			throws AgentLoadException, AgentInitializationException,
+			IOException {
+		if (null == agentPath) {
+			// K0577 = loadAgentPath: null agent path
+			throw new AgentLoadException(getString("K0577")); //$NON-NLS-1$
+		}
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		AttachmentConnection.streamSend(commandStream, createLoadAgentLibrary(agentPath,
+				options, true));
+		String response = AttachmentConnection.streamReceiveString(responseStream);
+		parseResponse(response);
+	}
+
+	/**
+	 * Execute a diagnostic command on a target VM.
+	 *
+	 * @param diagnosticCommand name of command to execute
+	 * @return properties object containing serialized result
+	 * @throws IOException in case of a communication error
+	 */
+	public Properties executeDiagnosticCommand(String diagnosticCommand) throws IOException {
+		IPC.logMessage("OpenJ9VirtualMachine enter executeDiagnosticCommand ", diagnosticCommand); //$NON-NLS-1$
+		AttachmentConnection.streamSend(commandStream, Command.ATTACH_DIAGNOSTICS_PREFIX + diagnosticCommand);
+		return IPC.receiveProperties(responseStream, true);
+	}
+
+	private void lockAllAttachNotificationSyncFiles(
+			List<VirtualMachineDescriptor> vmds) {
+
+		int vmdIndex = 0;
+		targetLocks = new FileLock[vmds.size()];
+		for  (VirtualMachineDescriptor i : vmds) {
+			OpenJ9VirtualMachineDescriptor vmd;
+			try {
+				vmd = (OpenJ9VirtualMachineDescriptor) i;
+			} catch (ClassCastException e) {
+				continue;
+			}
+			if (!vmd.id().equalsIgnoreCase(AttachHandler.getVmId())) { /*
+																		 * avoid
+																		 * overlapping
+																		 * locks
+																		 */
+				String attachSyncFile = vmd.getAttachSyncFileValue();
+				if (null != attachSyncFile) { /*
+				 * in case of a malformed advert
+				 * file
+				 */
+					IPC.logMessage("lockAllAttachNotificationSyncFiles locking targetLocks[", vmdIndex, "] ", attachSyncFile); //$NON-NLS-1$ //$NON-NLS-2$
+					targetLocks[vmdIndex] = new FileLock(attachSyncFile, TargetDirectory.SYNC_FILE_PERMISSIONS);
+					try {
+						/* use FileLockWatchdogTask for non-CommonControlFile */
+						targetLocks[vmdIndex].lockFile(true, "OpenJ9VirtualMachine.lockAllAttachNotificationSyncFiles", true); //$NON-NLS-1$
+					} catch (IOException e) {
+						targetLocks[vmdIndex] = null;
+						IPC.logMessage("lockAllAttachNotificationSyncFiles locking targetLocks[", vmdIndex, "] ", "already locked"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+					}
+				}
+			} else {
+				targetLocks[vmdIndex] = null;
+			}
+			++vmdIndex;
+		}
+	}
+
+	private static boolean parseResponse(String response) throws IOException,
+			AgentInitializationException, AgentLoadException, IllegalArgumentException
+			, AttachOperationFailedException
+	{
+		if (response.startsWith(ERROR)) {
+			int responseLength = response.indexOf('\0');
+			String trimmedResponse;
+			if (-1 == responseLength) {
+				trimmedResponse = response;
+			} else {
+				trimmedResponse = response.substring(0, responseLength);
+			}
+			if (response.contains(EXCEPTION_IOEXCEPTION)) {
+				// K0576 = IOException from target: {0}
+				throw new IOException(getString("K0576", trimmedResponse)); //$NON-NLS-1$
+			} else if (response.contains(EXCEPTION_AGENT_INITIALIZATION_EXCEPTION)) {
+				Integer status = getStatusValue(trimmedResponse);
+				if (null == status) {
+					throw new AgentInitializationException(trimmedResponse);
+				} else {
+					throw new AgentInitializationException(trimmedResponse, status.intValue());
+				}
+			} else if (response.contains(EXCEPTION_AGENT_LOAD_EXCEPTION)) {
+				throw new AgentLoadException(trimmedResponse);
+			} else 	if (response.contains(EXCEPTION_IOEXCEPTION)) {
+				// K0576 = IOException from target: {0}
+				throw new IOException(getString("K0576", trimmedResponse)); //$NON-NLS-1$
+			} else if (response.contains(EXCEPTION_ILLEGAL_ARGUMENT_EXCEPTION)) {
+				// K05de = IllegalArgumentException from target: {0}
+				throw new IllegalArgumentException(getString("K05de", trimmedResponse)); //$NON-NLS-1$
+			} else if (response.contains(EXCEPTION_ATTACH_OPERATION_FAILED_EXCEPTION)) {
+				// k05dc = AttachOperationFailedException from target: {0}
+				throw new AttachOperationFailedException(getString("k05dc", trimmedResponse)); //$NON-NLS-1$
+			}
+			return false;
+		} else	if (response.startsWith(ACK) || response.startsWith(ATTACH_RESULT)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * parse the status value from the end of the response string: this will be a
+	 * numeric string at the end of the string.
+	 *
+	 * @param response
+	 * @return Integer value of status, or null if the string does not end in a
+	 *         number
+	 */
+	private static Integer getStatusValue(String response) {
+		Pattern rvPattern = Pattern.compile("(-?\\d+)\\s*$"); //$NON-NLS-1$
+		Matcher rvMatcher = rvPattern.matcher(response);
+		Integer ret = null;
+		if (rvMatcher.find()) {
+			String status = rvMatcher.group(1);
+			try {
+				ret = Integer.valueOf(status);
+			} catch (NumberFormatException e) {
+				IPC.logMessage("Error parsing response", response); //$NON-NLS-1$
+			}
+		}
+		return ret;
+	}
+
+	private void tryAttachTarget(int timeout) throws IOException,
+			AttachNotSupportedException {
+		Reply replyFile = null;
+		AttachHandler.waitForAttachApiInitialization(); /* ignore result: we can still attach to another target if API is disabled */
+		IPC.logMessage("VirtualMachineImpl.tryAttachtarget"); //$NON-NLS-1$
+		Object myIn = AttachHandler.getMainHandler().getIgnoreNotification();
+
+		synchronized (myIn) {
+			int numberOfTargets = 0;
+			try {
+				CommonDirectory.obtainAttachLock("OpenJ9VirtualMachine.tryAttachTarget(" + timeout + ")"); //$NON-NLS-1$ //$NON-NLS-2$
+				IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() before listVirtualMachines"); //$NON-NLS-1$
+				List<VirtualMachineDescriptor> vmds = myProvider.listVirtualMachines();
+				if (null == vmds) {
+					IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() myProvider.listVirtualMachines() returns null"); //$NON-NLS-1$
+					return;
+				} else {
+					IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() myProvider.listVirtualMachines() returns"); //$NON-NLS-1$
+				}
+
+				targetServer = new ServerSocket(0); /* select a free port */
+				int thePort = targetServer.getLocalPort();
+				if (thePort < 0) {
+					IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() ServerSocket is not bound yet, port: ", thePort); //$NON-NLS-1$
+					return;
+				}
+				portNumber = Integer.valueOf(thePort);
+				String key = IPC.getRandomString();
+				replyFile = new Reply(portNumber, key, TargetDirectory.getTargetDirectoryPath(descriptor.id()), descriptor.getUid());
+				try {
+					IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() before replyFile.writeReply()"); //$NON-NLS-1$
+					replyFile.writeReply();
+				} catch (IOException e) { /*
+										 * target shut down while we were trying
+										 * to attach
+										 */
+					// K0457 = Target no longer available
+					AttachNotSupportedException exc = new AttachNotSupportedException(getString("K0457")); //$NON-NLS-1$
+					exc.initCause(e);
+					IPC.logMessage("OpenJ9VirtualMachine.tryAttachTarget() Target no longer available."); //$NON-NLS-1$
+					throw exc;
+				}
+
+				if (descriptor.id().equals(AttachHandler.getVmId())) {
+					if (!AttachHandler.selfAttachAllowed) {
+						// K0646 = Late attach connection to self disabled. Set jdk.attach.allowAttachSelf=true
+						throw new IOException(getString("K0646")); //$NON-NLS-1$
+					}
+					/* I am connecting to myself: bypass the notification and launch the attachment thread directly */
+					if (AttachHandler.isAttachApiInitialized()) {
+						AttachHandler.getMainHandler().attachSelf(thePort, key);
+					} else {
+						// K0558 = Attach API initialization failed
+						throw new AttachNotSupportedException(getString("K0558")); //$NON-NLS-1$
+					}
+				} else {
+					lockAllAttachNotificationSyncFiles(vmds);
+					numberOfTargets = CommonDirectory.countTargetDirectories();
+					int status = CommonDirectory.notifyVm(numberOfTargets, descriptor.isGlobalSemaphore(), "OpenJ9VirtualMachine.tryAttachTarget"); //$NON-NLS-1$
+					// K0532 = status={0}
+					if ((IPC.JNI_OK != status)
+							&& (CommonDirectory.J9PORT_INFO_SHSEM_OPENED_STALE != status)) {
+						throw new AttachNotSupportedException(getString("K0532", status)); //$NON-NLS-1$
+					}
+				}
+
+				try {
+					IPC.logMessage("attachTarget " + targetId + " on port " + portNumber); //$NON-NLS-1$ //$NON-NLS-2$
+					targetServer.setSoTimeout(timeout);
+					targetSocket = targetServer.accept();
+				} catch (SocketTimeoutException e) {
+					targetServer.close();
+					IPC.logMessage("attachTarget SocketTimeoutException on " + portNumber + " to " + targetId); //$NON-NLS-1$ //$NON-NLS-2$
+					// K0539 = acknowledgement timeout from {0} on port {1}
+					AttachNotSupportedException exc = new AttachNotSupportedException(getString("K0539", targetId, portNumber)); //$NON-NLS-1$
+					exc.initCause(e);
+					throw exc;
+				}
+				commandStream = targetSocket.getOutputStream();
+				targetSocket.setSoTimeout(COMMAND_TIMEOUT);
+				responseStream = targetSocket.getInputStream();
+
+				/*
+				 * Limit data until the target is verified.
+				 */
+				String response = AttachmentConnection.streamReceiveString(responseStream, ATTACH_CONNECTED_MESSAGE_LENGTH_LIMIT);
+				// K0533 = key error: {0}
+				if (!response.contains(' ' + key + ' ')) {
+					throw new AttachNotSupportedException(getString("K0533", response)); //$NON-NLS-1$
+				}
+				IPC.logMessage("attachTarget connected on ", portNumber.toString()); //$NON-NLS-1$
+				targetAttached = true;
+			} finally {
+				if (null != replyFile) {
+					replyFile.deleteReply();
+				}
+				if (numberOfTargets > 0) { /*[PR 48044] if number of targets is 0, then the VM is attaching to itself  and the semaphore was not involved */
+					unlockAllAttachNotificationSyncFiles();
+					CommonDirectory.cancelNotify(numberOfTargets, descriptor.isGlobalSemaphore());
+
+					if (numberOfTargets > 2) {
+						try {
+							int delayTime = 50 * ((numberOfTargets > 10) ? 10
+									: numberOfTargets);
+							IPC.logMessage("attachTarget sleep for ", delayTime); //$NON-NLS-1$
+							Thread.sleep(delayTime);
+						} catch (InterruptedException e) {
+							IPC.logMessage("attachTarget sleep interrupted"); //$NON-NLS-1$
+						}
+					}
+				}
+				CommonDirectory.releaseAttachLock("OpenJ9VirtualMachine.tryAttachTarget(" + timeout + ")"); //$NON-NLS-1$ //$NON-NLS-2$
+			}
+		}
+	}
+
+	private void unlockAllAttachNotificationSyncFiles() {
+
+		if (null != targetLocks) {
+			for (int i = 0; i < targetLocks.length; ++i) {
+				IPC.logMessage("unlockAllAttachNotificationSyncFiles unlocking targetLocks[", i, "]"); //$NON-NLS-1$ //$NON-NLS-2$
+				if (null != targetLocks[i]) {
+					targetLocks[i].unlockFile("OpenJ9VirtualMachine.unlockAllAttachNotificationSyncFiles"); //$NON-NLS-1$
+				}
+			}
+		}
+	}
+
+	/**
+	 * request that the local VM start its JMX agent
+	 * @param agentProperties Configuration information for the agent
+	 * @throws IOException, IllegalArgumentException, AttachOperationFailedException
+	 */
+	@Override
+	public void startManagementAgent(Properties agentProperties)
+			throws IOException, IllegalArgumentException, AttachOperationFailedException {
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		} else if (null == agentProperties) {
+			throw new NullPointerException();
+		}
+		AttachmentConnection.streamSend(commandStream, Command.START_MANAGEMENT_AGENT);
+		IPC.sendProperties(agentProperties, commandStream);
+		String response = AttachmentConnection.streamReceiveString(responseStream);
+		try {
+			parseResponse(response);
+		} catch (AgentInitializationException|AgentLoadException e) {
+			IPC.logMessage("Unexpected exception " + e + " in startManagementAgent");  //$NON-NLS-1$//$NON-NLS-2$
+		}
+	}
+
+	/**
+	 * request that the local VM start its JMX agent
+	 * @return Service address of local connector
+	 * @throws IOException if error communicating with target
+	 */
+	@Override
+	public String startLocalManagementAgent() throws IOException {
+		if (!targetAttached) {
+			// K0544 = Target not attached
+			throw new IOException(getString("K0544")); //$NON-NLS-1$
+		}
+		AttachmentConnection.streamSend(commandStream, Command.START_LOCAL_MANAGEMENT_AGENT);
+		String response = AttachmentConnection.streamReceiveString(responseStream);
+		String result = "";  //$NON-NLS-1$
+
+		try {
+			if (!parseResponse(response)) {
+				// k05dd = unrecognized response: {0}
+				throw new IOException(getString("k05dd", response)); //$NON-NLS-1$
+			} else if (response.startsWith(ACK)) { /* this came from a legacy VM with dummy start*Agent()s */
+				result = response.substring(ACK.length());
+			} else if (response.startsWith(ATTACH_RESULT)) {
+				result = response.substring(ATTACH_RESULT.length());
+			} else {
+				// k05dd = unrecognized response: {0}
+				throw new IOException(getString("k05dd", response)); //$NON-NLS-1$
+			}
+		} catch (AgentLoadException | IllegalArgumentException | AgentInitializationException e) {
+			IPC.logMessage("Unexpected exception " + e + " in startLocalManagementAgent");  //$NON-NLS-1$//$NON-NLS-2$
+		}
+		return result;
+
+	}
+
+	/**
+	 * Generate a text description of a target JVM's heap, including the number and
+	 * sizes of instances of each class.
+	 *
+	 * @param opts
+	 *            String options: "-live" for live object only, or "-all" for all
+	 *            objects. Default is "live".
+	 * @return byte stream containing the UTF-8 text of the formatted output
+	 */
+	public InputStream heapHisto(Object... opts) {
+		PrivilegedExceptionAction<InputStream> action = () -> heapHistoImpl(opts);
+		try {
+			return AccessController.doPrivileged(action);
+		} catch (PrivilegedActionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof RuntimeException) {
+				throw (RuntimeException) cause;
+			} else if (cause instanceof Error) {
+				throw (Error) cause;
+			} else {
+				throw new RuntimeException(cause);
+			}
+		}
+	}
+
+	private InputStream heapHistoImpl(Object... opts) {
+		String responseString = null;
+		IPC.logMessage("heapHisto called"); //$NON-NLS-1$
+		boolean live = true;
+		for (Object opt : opts) {
+			IPC.logMessage("heapHisto option: ", opt.toString()); //$NON-NLS-1$
+			if ("-live".equals(opt)) { //$NON-NLS-1$
+				live = true;
+			} else if ("-all".equals(opt)) { //$NON-NLS-1$
+				live = false;
+			} else {
+				responseString = "unrecognized option: " + opt.toString(); //$NON-NLS-1$
+			}
+		}
+		if (null == responseString) {
+			String cmd = DiagnosticUtils.makeHeapHistoCommand(live);
+			try {
+				DiagnosticProperties props = new DiagnosticProperties(executeDiagnosticCommand(cmd));
+				responseString = props.printStringResult();
+			} catch (IOException e) {
+				responseString = "Error executing heapHisto command: " + e.toString(); //$NON-NLS-1$
+			}
+		}
+		IPC.logMessage("heapHisto result: ", responseString); //$NON-NLS-1$
+		return new ByteArrayInputStream(responseString.getBytes(StandardCharsets.UTF_8));
+	}
+
+	/**
+	 *
+	 * @note Public API, signature compatible with
+	 *       com.sun.tools.attach.spi.AttachProvider.
+	 */
+	@Override
+	public boolean equals(Object comparand) {
+
+		if (!(comparand instanceof VirtualMachine)) {
+			return false;
+		}
+
+		VirtualMachine otherVM = (VirtualMachine) comparand;
+		return id().equals(otherVM.id());
+	}
+
+	/**
+	 *
+	 * @note Public API, signature compatible with
+	 *       com.sun.tools.attach.spi.AttachProvider.
+	 */
+	@Override
+	public int hashCode() {
+		return provider().hashCode() + id().hashCode();
+	}
+
+	/**
+	 *
+	 * @note Public API, signature compatible with
+	 *       com.sun.tools.attach.spi.AttachProvider.
+	 */
+	@Override
+	public String toString() {
+		return getClass().getName() + "@" + //$NON-NLS-1$
+				hashCode() + ";" + id(); //$NON-NLS-1$
+	}
+}
