@@ -1,0 +1,147 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+#
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+#
+# Modified to make a template file for a multi-binary package with separated
+# build-arch and build-indep targets  by Bill Allombert 2001
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+# Make sure build is always done in a reproducible and working
+# language environment
+LC_ALL = C
+export LC_ALL
+
+APKG            = aspell-eu
+AVAR            = /var/lib/aspell
+ALIB            = /usr/lib/aspell
+ASHARE          = /usr/share/aspell
+# -- hunspell stuff ----
+HPKG            = hunspell-eu
+HDICTSDIR       = /usr/share/myspell/dicts
+# -- aspell official dict builddir
+ASPELL6BASENAME = aspell6-eu
+ASPELL6DIR      = $(CURDIR)/debian/$(ASPELL6BASENAME)
+ASPELLPROC      = /usr/share/aspell-lang/proc    # Location of proc script
+# -----------------------------------------------------
+
+DOCS = xuxenedbl.txt xuxenedbl-en.txt xuxenedbl-es.txt
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+        # Add here commands to configure the package.
+
+	touch configure-stamp
+
+
+#Architecture
+#build: build-arch build-indep
+build: build-indep
+
+build-arch: build-arch-stamp
+build-arch-stamp: configure-stamp
+
+        # Add here commands to compile the arch part of the package.
+        #$(MAKE)
+	touch $@
+
+build-indep: build-indep-stamp
+build-indep-stamp: configure-stamp
+#	sed '1d' eu-ES.dic | LANG=C sort -u | prezip | gzip -c > eu.cwl.gz
+#	sed '1d' eu-ES.dic | grep -v '[\._][^\/$]' | LANG=C sort -u | prezip | gzip -c > eu.cwl.gz
+	sed '1d' myspell/eu-ES.dic | grep -v -e '[\._]' -e '^katen\-' | prezip -s | gzip -9n -c > eu.cwl.gz
+	installdeb-hunspell -phunspell-eu
+	installdeb-aspell   -paspell-eu
+	touch $@
+
+aspelltgz: clean build
+	mkdir -p $(ASPELL6DIR)/doc
+	install -m 0644 debian/aspell/Copyright $(ASPELL6DIR)
+	install -m 0644 debian/aspell/info $(ASPELL6DIR)
+	install -m 0644 /usr/share/common-licenses/GPL-2 $(ASPELL6DIR)/COPYING
+	install -m 0644 debian/aspell/eu.dat $(ASPELL6DIR)/eu.dat
+	install -m 0644 myspell/eu-ES.aff $(ASPELL6DIR)/eu_affix.dat
+	sed '1d' myspell/eu-ES.dic | grep -v -e '[\._]' -e '^katen\-' | LC_COLLATE=C sort -u | \
+		aspell --local-data-dir=$(ASPELL6DIR) --lang=eu  clean > $(ASPELL6DIR)/eu.wl
+	( cd $(ASPELL6DIR) && \
+		ln -sf $(ASPELLPROC) && \
+		perl proc && \
+		./configure && \
+		make dist )
+	mv $(ASPELL6DIR)/$(ASPELL6BASENAME)*.tar.bz2 ..
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-arch-stamp build-indep-stamp configure-stamp
+
+	rm -f eu.cwl.gz
+
+	rm -rf $(ASPELL6DIR)
+
+	rm -f hunspell/eu.aff
+	rm -f hunspell/eu.dic
+
+	dh_clean
+
+#install: install-indep install-arch
+install: install-common install-indep
+
+install-common:
+	dh_testdir
+	dh_testroot
+	dh_prep
+
+install-indep: build-indep
+	dh_installdirs -i
+# -------------
+	install -m 644 myspell/eu-ES.aff debian/$(APKG)/$(ALIB)/eu_affix.dat
+	install -m 644 eu.cwl.gz debian/$(APKG)/$(ASHARE)
+	install -m 644 debian/aspell/eu* debian/$(APKG)/$(ALIB)
+# -------------
+	ln -s eu-ES.aff hunspell/eu.aff
+	ln -s eu-ES.dic hunspell/eu.dic
+	installdeb-myspell -phunspell-eu --srcdir=hunspell
+
+install-arch: build-arch
+
+# Must not depend on anything. This is to be called by
+# binary-arch/binary-indep
+# in another 'make' thread.
+binary-common:
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs -A $(DOCS)
+	dh_installexamples
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_makeshlibs
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+# Build architecture independant packages using the common target.
+binary-indep: build-indep install-indep
+	$(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
+
+# Build architecture dependant packages using the common target.
+binary-arch: build-arch install-arch
+
+#binary: binary-arch binary-indep
+binary: binary-indep
+.PHONY: build clean binary-indep binary-arch binary install install-indep install-arch configure

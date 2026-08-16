@@ -1,0 +1,305 @@
+#!/bin/bash -e
+
+CONFFILE=${PKGBINARYMANGLER_CONF_DIR:-/etc/pkgbinarymangler}/stripfiles.conf
+
+. ${PKGBINARYMANGLER_COMMON_PATH:-/usr/share/pkgbinarymangler}/common
+
+#
+# Remove buildinfo files and upstream changelogs; take care to keep native changelogs
+#
+clean_upstream_changelogs()
+{
+    # skip if we have symlinked dirs (e. g. Perl, see LP#923430)
+    if [ -L usr/share/doc -o -L usr/share/doc/$PKGNAME ]; then
+	return
+    fi
+
+    dch=usr/share/doc/$PKGNAME/changelog.Debian.gz
+    if [ ! -e "$dch" ] && [ ! -h "$dch" ]; then
+	dch=usr/share/doc/$PKGNAME/changelog.gz
+    fi
+
+    if [ -d usr/share/doc ]; then
+	(find usr/share/doc -type f \( -name buildinfo_*.gz -o -iname 'changelog.*' -o -iname changes -o -iname changes.gz -o -iname '*.changes.gz' \) -a ! -name `basename $dch` ) | while read f; do
+	    echo ".. removing $f"
+	    rm "$f"
+	    [ ! -f DEBIAN/md5sums ] || sed -i "\& $f$&d" DEBIAN/md5sums
+	done
+    fi
+}
+
+#
+# Only keep the topmost ten entries in Debian changelogs. If we truncate, add a
+# pointer to apt-get changelog.
+#
+strip_debian_changelogs()
+{
+    record_sep="^[^ ]+ (.*) .*; urgency"
+    if [ -e "$dch" -a ! -L "$dch" ]; then
+	record_count=0
+	changelog=""
+	gzip -cd $dch | (while read; do
+	    if [[ "$REPLY" =~ $record_sep ]]; then
+		((++record_count))
+		if [ "$record_count" -eq 11 ]; then
+		    echo "pkgstripfiles: Truncating $dch to topmost ten records"
+		    echo -e "${changelog}# For older changelog entries, run 'apt-get changelog $PKGNAME'" | gzip -9n > $dch
+		    if [ -f DEBIAN/md5sums ]; then
+			MD5=`md5sum "$dch"`
+			sed -i "s%^.*  $dch\$%$MD5%" DEBIAN/md5sums
+		    fi
+		    break
+		fi
+	    fi
+	    changelog="$changelog$REPLY\n"
+	done)
+    fi
+}
+
+#
+# Optimize PNGs
+#
+optimize_pngs()
+{
+    # skip PNG modification for games; they often rely on their particular image
+    # format
+    if [ "${SECTION%games}" != "$SECTION" ]; then
+	echo "pkgstripfiles: Skipping PNG optimization for package in games section."
+	return
+    fi
+
+    # skip -doc packages; optimizing them takes a long build time and is not so
+    # important as these are not on the CDs
+    if [ "${PKGNAME%-doc}" != "$PKGNAME" ]; then
+	echo "pkgstripfiles: Disabled PNG optimization for -doc package $PKGNAME (to save build time)"
+	return
+    fi
+
+    # also skip when disabling explicitly
+    if [ -n "$NO_PNG_PKG_MANGLE" ]; then
+	echo "pkgstripfiles: Disabled PNG optimization for package $PKGNAME."
+	return
+    fi
+
+    time_start=`date +%s`
+
+    use_cpus=$(echo ${DEB_BUILD_OPTIONS_ORIG:-$DEB_BUILD_OPTIONS} | sed -n 's/.*parallel=\([0-9][0-9]*\).*/\1/p')
+    [ -n "$use_cpus" ] || use_cpus=1
+    echo "pkgstripfiles: Running PNG optimization (using $use_cpus cpus) for package $PKGNAME ..."
+
+    # optipng/advancecomp
+    files=$(mktemp -q)
+    find -type f -name '*.png' -print0 > $files
+    if [ ! -s $files ]; then
+	echo "pkgstripfiles: No PNG files."
+	rm -f $files
+	return
+    fi
+    cat $files | xargs -0 -L 1 -P $use_cpus -I{} /bin/sh -c '
+	f='\''{}'\''
+	f=${f#./}
+	orig_perms=`stat -c %a "$f"`
+	orig_MD5=`md5sum "$f"`
+	if ! optipng -o4 -preserve "$f" 2>/dev/null; then
+	    echo "WARNING: optipng failed on $f, ignoring" >&2
+	fi
+	if ! advpng -q -z4 "$f"; then
+	    echo "WARNING: advpng failed on $f, ignoring" >&2
+	fi
+
+	# advpng does not keep permissions
+	chmod "$orig_perms" "$f"
+
+	MD5=`md5sum "$f"`
+	if [ "$orig_MD5" = "$MD5" ]; then
+	    echo -n '.'
+	else
+	    echo "/^$(echo "$orig_MD5" | sed '\''s,/,\\/,g'\'')/s%^${orig_MD5%  $f} %${MD5%  $f} %" > "$f.sedscript"
+	    echo -n 'o'
+	fi
+	'
+    echo ''
+    sedscript=$(mktemp -q)
+    find -name '*.png.sedscript' -print0 | xargs -0 -r cat > $sedscript
+    find -name '*.png.sedscript' -print0 | xargs -0 -r rm -f
+    
+    # update md5sums
+    if [ -f DEBIAN/md5sums -a -s $sedscript ]; then
+	sed -i -f $sedscript DEBIAN/md5sums
+    fi
+    
+    time_end=`date +%s`
+    duration=$(($time_end-$time_start))
+    n_all=$(wc -l $files | cut -d ' ' -f 1)
+    n_opt=$(wc -l $sedscript | cut -d ' ' -f 1)
+    echo "pkgstripfiles: PNG optimization ($n_opt/$n_all) for package $PKGNAME took $duration s" >&2
+    rm -f $files $sedscript
+}
+
+#
+# Symlink identical documentation to depending packages
+#
+symlink_doc()
+{
+    if [ -n "$CDBS_NO_DOC_SYMLINKING" -o -n "$NO_DOC_PKG_MANGLE" ]; then
+	echo "pkgstripfiles: documentation symlinking disabled"
+	return
+    fi
+
+    # skip if doc dirs are already symlinks
+    if [ ! -d usr/share/doc -o -h usr/share/doc -o -h usr/share/doc/$PKGNAME ];
+    then
+	return
+    fi
+
+    # iterate over all dependencies
+    for dep in `perl -ne 'if (/^(Pre-)?Depends:/) {s/^\w+://; foreach (split /,/) { @f=split; print($f[0], "\n"); } }' DEBIAN/control`; do
+	[ -d ../$dep/usr/share/doc ] || continue
+	# don't replace docs with symlinks to matching files in dependent
+	# packages when the dependent package is arch: all and the depending
+	# package isn't; ensures consistency between packages built with -b vs.
+	# -B, required by multiarch.
+	if ! [ -e ../$dep/DEBIAN/control ]; then
+	    # This can happen when building arch: any without arch: all
+	    echo "Skipping $dep because it is not to be built"
+	    continue
+	fi
+	readctrl ../$dep/DEBIAN/control Architecture
+	DEPARCH=$RET
+	if [ "$ARCHITECTURE" != "$DEPARCH" ] && [ "$DEPARCH" = "all" ];
+	then
+	    echo "Skipping arch: any to arch: all dependency to $dep"
+	    continue
+	fi
+	echo "Searching for duplicated docs in dependency $dep..."
+	(
+	    r=`pwd`
+	    cd usr/share/doc/$PKGNAME
+	    find -type f ! -name copyright | while read f; do
+		f=${f#./}
+		thisfile="$r/usr/share/doc/$PKGNAME/$f"
+		depfile="$r/../$dep/usr/share/doc/$dep/$f"
+		if [ -L $depfile ]; then
+		    dep=$(basename $(dirname $(readlink "$depfile")))
+		    depfile="$r/../$dep/usr/share/doc/$dep/$f"
+		fi
+
+		[ "$dep" != "$PKGNAME" ] || continue
+		[ -f "$depfile" ] || continue
+
+		# special-case Debian changelog: as we truncate them they may
+		# differ, so only compare the topmost lines
+		if [ "$f" = "`basename $dch`" ]; then
+		    if ! cmp <(zcat $thisfile | head -n 20) <(zcat $depfile | head -n 20); then
+			continue
+		    fi
+		elif ! zcmp "$thisfile" "$depfile" >/dev/null; then
+		    continue
+		fi
+
+		# files are identical, symlink
+		echo "  symlinking $f in $PKGNAME to file in $dep"
+		rm "$thisfile"
+		prefix="../"
+		slashes="${f//[^\/]}"
+		slashcount=${#slashes}
+		while [ $slashcount -gt 0 ]; do
+			prefix="../$prefix"
+			slashcount=$((slashcount - 1))
+		done
+		ln -s "${prefix}${dep}/$f" "$thisfile";
+		[ ! -f $r/DEBIAN/md5sums ] || sed -i "\& usr/share/doc/$PKGNAME/$f$&d" $r/DEBIAN/md5sums
+	    done
+	)
+    done
+}
+
+lock_debug()
+{
+    :
+    # echo "DEBUG: $1 $PKGNAME $(grep -s -xn $PKGNAME $PKGBINARYMANGLER_LOCKFILE || echo '<none>')"
+}
+
+wait_for_lock()
+{
+    # the lock file lists the packages in the order to build
+    if [ -z "$PKGBINARYMANGLER_LOCKFILE" ]; then
+	echo >&2 "WARNING: pkgstripfiles: no lock file name available ($PKGNAME)"
+	return
+    fi
+    if [ ! -f "$PKGBINARYMANGLER_LOCKFILE" ]; then
+	echo >&2 "WARNING: pkgstripfiles: lock file does not exist ($PKGNAME)"
+	return
+    fi
+    lock_debug "wait"
+    pkg=$(head -1 $PKGBINARYMANGLER_LOCKFILE)
+    while [ "$pkg" != "$PKGNAME" ]; do
+	echo "INFO: pkgstripfiles: waiting for lock ($PKGNAME) ..."
+	sleep 1
+	if [ ! -f "$PKGBINARYMANGLER_LOCKFILE" ]; then
+	    echo >&2 "WARNING: pkgstripfiles: lock file does not exist ($PKGNAME)"
+	    return
+	fi
+	lock_debug "loop"
+	pkg=$(head -1 $PKGBINARYMANGLER_LOCKFILE)
+    done
+}
+
+clear_lock()
+{
+    if [ -z "$PKGBINARYMANGLER_LOCKFILE" ]; then
+	echo >&2 "WARNING: pkgstripfiles: no lock file name available ($PKGNAME)"
+	return
+    fi
+    if [ ! -f "$PKGBINARYMANGLER_LOCKFILE" ]; then
+	echo >&2 "WARNING: pkgstripfiles: lock file does not exist ($PKGNAME)"
+	return
+    fi
+    lock_debug "clear"
+    sed -i -e '1d' $PKGBINARYMANGLER_LOCKFILE
+    lock_debug "done"
+}
+
+#
+# main
+#
+
+# don't do anything for PPA builds
+if [ -f "$BUILDINFO" ]; then
+    if grep -qs '^Purpose: PPA' "$BUILDINFO"; then
+	if grep -q '/oem-archive' ${PKGBINARYMANGLER_APT_CONF_DIR:-/etc/apt}/sources.list; then
+	    echo "INFO: Running pkgstripfiles for OEM PPA build"
+	else
+	    echo "INFO: Disabling pkgstripfiles for PPA build"
+	    exit 0
+	fi
+    fi
+fi
+
+readctrl $PKGCTL Package
+PKGNAME=$RET
+readctrl $PKGCTL Section
+SECTION=$RET
+readctrl $PKGCTL Architecture
+ARCHITECTURE=$RET
+PKGDIR=$(dirname $(dirname $PKGCTL))
+echo "pkgstripfiles: processing control file: $PKGCTL, package $PKGNAME, directory $PKGDIR"
+
+cd "$PKGDIR"
+
+clean_upstream_changelogs
+
+# symlink_doc can't be run in parallel mode, see LP: #893826
+case "$PKGNAME" in
+*-dbgsym) ;;
+*)
+trap clear_lock 1 2 3 7 10 13 15
+wait_for_lock
+
+symlink_doc
+strip_debian_changelogs
+optimize_pngs
+
+clear_lock
+trap - 1 2 3 7 10 13 15
+esac

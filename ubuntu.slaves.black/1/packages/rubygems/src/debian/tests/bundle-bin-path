@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -euf
+
+if [ -z "${AUTOPKGTEST_TMP:-}" ]; then
+  AUTOPKGTEST_TMP=$(mktemp -d)
+  cleanup() {
+    rm -rf "$AUTOPKGTEST_TMP"
+  }
+  trap cleanup INT TERM EXIT
+fi
+
+check() {
+  exp="$1"
+  exe="$2"
+  echo "${exp} = ${exe}:"
+  if [ -x "$exe" ]; then
+    echo "OK"
+  else
+    echo "FAIL: ${exe} is not a valid executable"
+    return 1
+  fi
+}
+
+cd $AUTOPKGTEST_TMP
+mkdir test
+cd test
+echo 'gem "rake"' > Gemfile
+
+rc=0
+check 'BUNDLE_BIN_PATH' "$(bundle exec sh -c 'echo $BUNDLE_BIN_PATH')" || rc=$((rc + $?))
+check 'Gem.bin_path("bundler", "bundle")' "$(ruby -e 'puts Gem.bin_path("bundler", "bundle")')" || rc=$((rc + $?))
+exit "$rc"

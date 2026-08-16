@@ -1,0 +1,201 @@
+From: Jakub Wilk <jwilk@debian.org>
+Date: Thu, 8 Oct 2015 11:57:09 -0700
+Subject: Allow all data files to be moved to /usr/share/docutils/.
+
+Forwarded: not-needed
+Last-Update: 2016-12-10
+---
+ docutils/__init__.py                                      | 15 +++++++++++++++
+ docutils/parsers/rst/directives/misc.py                   |  3 ++-
+ docutils/writers/html4css1/__init__.py                    |  9 +++++----
+ docutils/writers/html5_polyglot/__init__.py               |  4 ++--
+ docutils/writers/latex2e/__init__.py                      |  4 ++--
+ docutils/writers/odf_odt/__init__.py                      |  4 ++--
+ docutils/writers/pep_html/__init__.py                     |  4 ++--
+ docutils/writers/s5_html/__init__.py                      |  2 +-
+ .../test_parsers/test_rst/test_directives/test_include.py |  3 ++-
+ 9 files changed, 33 insertions(+), 15 deletions(-)
+
+diff --git a/docutils/__init__.py b/docutils/__init__.py
+index 92a577c..f71920d 100644
+--- a/docutils/__init__.py
++++ b/docutils/__init__.py
+@@ -270,3 +270,18 @@ class Component(SettingsSpec, TransformSpec):
+         a certain input context or output format.
+         """
+         return format in self.supported
++
++import os
++
++_debian_package = 0
++
++if _debian_package:
++    def _datadir(path):
++        dirname = os.path.dirname(path)
++        prefix = os.path.join(os.path.dirname(__file__), '') # _datadir
++        assert path.startswith(prefix), "%r doesn't start with %r" % (path, prefix)
++        suffix = dirname[len(prefix):]
++        return os.path.join('/usr/share/docutils/', suffix)
++else:
++    def _datadir(path):
++        return os.path.dirname(path)
+diff --git a/docutils/parsers/rst/directives/misc.py b/docutils/parsers/rst/directives/misc.py
+index 4d55913..10d9c26 100644
+--- a/docutils/parsers/rst/directives/misc.py
++++ b/docutils/parsers/rst/directives/misc.py
+@@ -10,6 +10,7 @@ import sys
+ import os.path
+ import re
+ import time
++import docutils
+ from docutils import io, nodes, statemachine, utils
+ from docutils.utils.error_reporting import SafeString, ErrorString
+ from docutils.utils.error_reporting import locale_encoding
+@@ -48,7 +49,7 @@ class Include(Directive):
+                    'class': directives.class_option,
+                    'name': directives.unchanged}
+ 
+-    standard_include_path = os.path.join(os.path.dirname(states.__file__),
++    standard_include_path = os.path.join(docutils._datadir(states.__file__),
+                                          'include')
+ 
+     def run(self):
+diff --git a/docutils/writers/html4css1/__init__.py b/docutils/writers/html4css1/__init__.py
+index a0df06f..0cdb564 100644
+--- a/docutils/writers/html4css1/__init__.py
++++ b/docutils/writers/html4css1/__init__.py
+@@ -30,15 +30,16 @@ class Writer(writers._html_base.Writer):
+ 
+     default_stylesheets = ['html4css1.css']
+     default_stylesheet_dirs = ['.',
+-        os.path.abspath(os.path.dirname(__file__)),
++        docutils._datadir(os.path.abspath(__file__)),
+         # for math.css
+-        os.path.abspath(os.path.join(
+-            os.path.dirname(os.path.dirname(__file__)), 'html5_polyglot'))
++        os.path.join(
++            docutils._datadir(os.path.dirname(os.path.abspath(__file__))),
++            'html5_polyglot')
+        ]
+ 
+     default_template = 'template.txt'
+     default_template_path = os.path.join(
+-        os.path.dirname(os.path.abspath(__file__)), default_template)
++        docutils._datadir(os.path.abspath(__file__)), default_template)
+ 
+     settings_spec = (
+         'HTML-Specific Options',
+diff --git a/docutils/writers/html5_polyglot/__init__.py b/docutils/writers/html5_polyglot/__init__.py
+index 140aa44..5b8969a 100644
+--- a/docutils/writers/html5_polyglot/__init__.py
++++ b/docutils/writers/html5_polyglot/__init__.py
+@@ -42,11 +42,11 @@ class Writer(writers._html_base.Writer):
+     """Formats this writer supports."""
+ 
+     default_stylesheets = ['minimal.css', 'plain.css']
+-    default_stylesheet_dirs = ['.', os.path.abspath(os.path.dirname(__file__))]
++    default_stylesheet_dirs = ['.', docutils._datadir(os.path.abspath(__file__))]
+ 
+     default_template = 'template.txt'
+     default_template_path = os.path.join(
+-        os.path.dirname(os.path.abspath(__file__)), default_template)
++        docutils._datadir(os.path.abspath(__file__)), default_template)
+ 
+     settings_spec = (
+         'HTML-Specific Options',
+diff --git a/docutils/writers/latex2e/__init__.py b/docutils/writers/latex2e/__init__.py
+index 475a908..7c1163a 100644
+--- a/docutils/writers/latex2e/__init__.py
++++ b/docutils/writers/latex2e/__init__.py
+@@ -45,7 +45,7 @@ class Writer(writers.Writer):
+     """Formats this writer supports."""
+ 
+     default_template = 'default.tex'
+-    default_template_path = os.path.dirname(os.path.abspath(__file__))
++    default_template_path = docutils._datadir(os.path.abspath(__file__))
+     default_preamble = '\n'.join([r'% PDF Standard Fonts',
+                                   r'\usepackage{mathptmx} % Times',
+                                   r'\usepackage[scaled=.90]{helvet}',
+@@ -572,7 +572,7 @@ def _read_block(fp):
+         block.append(line)
+     return ''.join(block).rstrip()
+ 
+-_du_sty = os.path.join(os.path.dirname(os.path.abspath(__file__)),
++_du_sty = os.path.join(docutils._datadir(os.path.abspath(__file__)),
+                       'docutils.sty')
+ with open(_du_sty, encoding='utf8') as fp:
+     for line in fp:
+diff --git a/docutils/writers/odf_odt/__init__.py b/docutils/writers/odf_odt/__init__.py
+index ef54017..c9dcabc 100644
+--- a/docutils/writers/odf_odt/__init__.py
++++ b/docutils/writers/odf_odt/__init__.py
+@@ -398,13 +398,13 @@ class Writer(writers.Writer):
+ 
+     default_stylesheet_path = utils.relative_path(
+         os.path.join(os.getcwd(), 'dummy'),
+-        os.path.join(os.path.dirname(__file__), default_stylesheet))
++        os.path.join(docutils._datadir(__file__), default_stylesheet))
+ 
+     default_template = 'template.txt'
+ 
+     default_template_path = utils.relative_path(
+         os.path.join(os.getcwd(), 'dummy'),
+-        os.path.join(os.path.dirname(__file__), default_template))
++        os.path.join(docutils._datadir(__file__), default_template))
+ 
+     settings_spec = (
+         'ODF-Specific Options',
+diff --git a/docutils/writers/pep_html/__init__.py b/docutils/writers/pep_html/__init__.py
+index 3adc316..bb2fcfb 100644
+--- a/docutils/writers/pep_html/__init__.py
++++ b/docutils/writers/pep_html/__init__.py
+@@ -24,13 +24,13 @@ class Writer(html4css1.Writer):
+ 
+     default_stylesheet_path = utils.relative_path(
+         os.path.join(os.getcwd(), 'dummy'),
+-        os.path.join(os.path.dirname(__file__), default_stylesheet))
++        os.path.join(docutils._datadir(__file__), default_stylesheet))
+ 
+     default_template = 'template.txt'
+ 
+     default_template_path = utils.relative_path(
+         os.path.join(os.getcwd(), 'dummy'),
+-        os.path.join(os.path.dirname(__file__), default_template))
++        os.path.join(docutils._datadir(__file__), default_template))
+ 
+     settings_spec = html4css1.Writer.settings_spec + (
+         'PEP/HTML-Specific Options',
+diff --git a/docutils/writers/s5_html/__init__.py b/docutils/writers/s5_html/__init__.py
+index 7f6686c..d0d026b 100644
+--- a/docutils/writers/s5_html/__init__.py
++++ b/docutils/writers/s5_html/__init__.py
+@@ -20,7 +20,7 @@ from docutils.parsers.rst import directives
+ 
+ themes_dir_path = utils.relative_path(
+     os.path.join(os.getcwd(), 'dummy'),
+-    os.path.join(os.path.dirname(__file__), 'themes'))
++    os.path.join(docutils._datadir(__file__), 'themes'))
+ 
+ def find_theme(name):
+     # Where else to look for a theme?
+diff --git a/test/test_parsers/test_rst/test_directives/test_include.py b/test/test_parsers/test_rst/test_directives/test_include.py
+index 1a1fa2e..112230c 100755
+--- a/test/test_parsers/test_rst/test_directives/test_include.py
++++ b/test/test_parsers/test_rst/test_directives/test_include.py
+@@ -14,6 +14,7 @@ import sys
+ if __name__ == '__main__':
+     import __init__
+ from test_parsers import DocutilsTestSupport
++import docutils
+ from docutils.parsers.rst import states
+ from docutils.parsers import recommonmark_wrapper
+ from docutils.utils.code_analyzer import with_pygments
+@@ -57,7 +58,7 @@ if sys.version_info < (3, 0):
+     utf_16_error_str = ("UnicodeError: Unable to decode input data.  "
+                         "Tried the following encodings: 'ascii'.\n"
+                         "            (%s)" % utf_16_error_str)
+-nonexistent = os.path.join(os.path.dirname(states.__file__),
++nonexistent = os.path.join(docutils._datadir(states.__file__),
+                            'include', 'nonexistent')
+ nonexistent_rel = DocutilsTestSupport.utils.relative_path(
+     os.path.join(DocutilsTestSupport.testroot, 'dummy'), nonexistent)

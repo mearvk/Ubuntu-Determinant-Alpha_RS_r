@@ -1,0 +1,40 @@
+#!/bin/sh
+# autopkgtest check: Builds a small application against libcairo2-dev, checking
+# if it compiles, links and runs successfully.
+# Author: Rafał Cieślak <rafalcieslak256@ubuntu.com> 
+
+set -e
+set -u
+
+WORKDIR=$(mktemp -d)
+cleanup () {
+    rm -fr "$WORKDIR"
+}
+trap cleanup 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > build_test.c
+
+#include <pango/pango.h>
+int main (int argc, char *argv[])
+{
+	PangoFontDescription* pfd = pango_font_description_new();
+	if(!pfd) return 1;
+	pango_font_description_set_size(pfd,12);
+	return 0;
+}
+EOF
+
+# Deliberately word-splitting, that's how pkg-config works:
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -o build_test build_test.c $("${CROSS_COMPILE}pkg-config" --cflags --libs pango)
+echo "build: OK"
+[ -x build_test ]
+./build_test
+echo "run: OK"

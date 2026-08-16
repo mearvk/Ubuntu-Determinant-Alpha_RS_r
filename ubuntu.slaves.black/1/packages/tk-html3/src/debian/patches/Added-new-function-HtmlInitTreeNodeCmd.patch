@@ -1,0 +1,103 @@
+From: Stefan Ziegler <fuh-gpl@fuh-e.de>
+Date: Fri, 26 Apr 2013 18:26:09 +0200
+Subject: Added new function HtmlInitTreeNodeCmd
+
+And deleted/avoid some asserts to make tkhtml a little bit more stable for us.
+---
+ src/html.h     |  1 +
+ src/htmltcl.c  | 26 +++++++++++++++++---------
+ src/htmltree.c | 15 ++++++++++++++-
+ 3 files changed, 32 insertions(+), 10 deletions(-)
+
+diff --git a/src/html.h b/src/html.h
+index c8e82bc..1f25905 100644
+--- a/src/html.h
++++ b/src/html.h
+@@ -913,6 +913,7 @@ void HtmlTreeAddText(HtmlTree *, HtmlTextNode *, int);
+ void HtmlTreeAddClosingTag(HtmlTree *, int, const char *, int);
+ 
+ void HtmlInitTree(HtmlTree *);
++void HtmlInitTreeNodeCmd(HtmlTree *);
+ 
+ void HtmlHashInit(void *, int);
+ HtmlTokenMap * HtmlHashLookup(void *, const char *zType);
+diff --git a/src/htmltcl.c b/src/htmltcl.c
+index 055213e..a30e86b 100644
+--- a/src/htmltcl.c
++++ b/src/htmltcl.c
+@@ -498,6 +498,11 @@ INSTRUMENTED(callbackHandler, HTML_INSTRUMENT_CALLBACK)
+         HtmlNodeComputedValues(pTree->pRoot) ||
+         pTree->cb.pRestyle==pTree->pRoot
+     );
++
++    while( pTree->cb.inProgress ) {
++	usleep( 2000 );
++    }
++
+     HtmlCheckRestylePoint(pTree);
+ 
+     HtmlLog(pTree, "CALLBACK", 
+@@ -668,14 +673,17 @@ HtmlCallbackForce(pTree)
+         (!pTree->cb.inProgress) 
+     ) {
+         ClientData clientData = (ClientData)pTree;
+-        assert(!pTree->cb.isForce);
+-        pTree->cb.isForce++;
+-        callbackHandler(clientData);
+-        pTree->cb.isForce--;
+-        assert(pTree->cb.isForce >= 0);
+-        if (pTree->cb.flags == 0) {
+-            Tcl_CancelIdleCall(callbackHandler, clientData);
+-        }
++	if( !pTree->cb.isForce )
++	{
++	    pTree->cb.isForce++;
++            callbackHandler(clientData);
++            pTree->cb.isForce--;
++            assert(pTree->cb.isForce >= 0);
++
++    	    if (pTree->cb.flags == 0) {
++    	        Tcl_CancelIdleCall(callbackHandler, clientData);
++        	}
++	};
+     }
+ }
+ 
+@@ -2430,7 +2438,7 @@ nodeCmd(clientData, interp, objc, objv)
+     int objc;                          /* Number of arguments. */
+     Tcl_Obj *CONST objv[];             /* Argument strings. */
+ {
+-    HtmlInitTree((HtmlTree *)clientData);
++    HtmlInitTreeNodeCmd((HtmlTree *)clientData);
+     return HtmlLayoutNode(clientData, interp, objc, objv);
+ }
+ static int 
+diff --git a/src/htmltree.c b/src/htmltree.c
+index 079fd58..cc47c19 100644
+--- a/src/htmltree.c
++++ b/src/htmltree.c
+@@ -997,10 +997,23 @@ HtmlInitTree(pTree)
+          * document is the current node. 
+          */
+         pTree->state.pCurrent = HtmlNodeChild(pTree->pRoot, 1);
+-        assert(HtmlNodeTagType(pTree->state.pCurrent) == Html_BODY);
+     }
+ }
+ 
++void
++HtmlInitTreeNodeCmd(pTree)
++    HtmlTree *pTree;
++{
++    if (pTree->pRoot
++     && !pTree->state.pCurrent) {
++        /* If there is no current node, then the <body> node of the
++         * document is the current node.
++         */
++        pTree->state.pCurrent = HtmlNodeChild(pTree->pRoot, 1);
++    }
++}
++
++
+ static HtmlNode *
+ findFosterParent(pTree, ppTable)
+     HtmlTree *pTree;

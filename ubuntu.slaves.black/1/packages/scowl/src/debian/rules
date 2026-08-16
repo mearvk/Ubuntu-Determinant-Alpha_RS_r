@@ -1,0 +1,113 @@
+#!/usr/bin/make -f
+# -*- Makefile -*- $Id: rules,v 1.18 2005/10/15 03:03:48 david Exp $
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+# Customized 27 Oct 1999 by David Coe for wenglish, later moved to scowl
+# This version is for packages that are architecture independent.
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+# In addition to the scowl binary package, we create wamerican-small, wamerican, wamerican-large, wamerican-huge, and the
+# corresponding packages for wbritish and wcanadian.
+# The medium size packages have no -size part in their names
+# These are the scowl extensions (complexity numbers?) that contribute to each word list (i.e. each size);
+# the -size parts "-small", "", "-large", and "-huge" correspond to the end of the binary package name:
+empty:=
+SIZES=small "" large huge insane
+SIZE_OPTIONS_small:=-v2 35
+SIZE_OPTIONS:=-v2 50
+SIZE_OPTIONS_large:=-v2 70
+SIZE_OPTIONS_huge:=-v2 80
+SIZE_OPTIONS_insane:=-v3 95
+export SIZE_OPTIONS_small
+export SIZE_OPTIONS
+export SIZE_OPTIONS_large
+export SIZE_OPTIONS_huge
+export SIZE_OPTIONS_insane
+
+SPELLINGS:= american british canadian
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	set -ex; \
+	mkdir -p final_utf8;\
+	for file in final/*.[0-9][0-9]; do\
+		iconv -f 'iso8859-1' -t 'utf-8' < $${file} > final_utf8/$$(basename $${file}); \
+	done;
+	set -ex;\
+	for SPELLING in $(SPELLINGS); do\
+	  for SIZE in $(SIZES); do\
+	    if [ -n "$$SIZE" ]; then SIZE_NAME="_$$SIZE"; SIZE="-$$SIZE"; else SIZE_NAME=""; SIZE=""; fi; \
+	    echo "The following SCOWL word lists were concatenated and sorted (with duplicates" > w$$SPELLING$$SIZE.scowl-word-lists-used;\
+	    echo "removed) to create this word list (see README.Debian for more details):" >> w$$SPELLING$$SIZE.scowl-word-lists-used;\
+		ARGS=`eval echo "\$$""SIZE_OPTIONS$$SIZE_NAME"`; \
+		for word_list in `./mk-list -f $${SPELLING} $${ARGS}`; do \
+			if [ -f final/"$${word_list}" ]; then\
+				cat final/$${word_list} >> $$SPELLING-english$$SIZE.unsorted; \
+				echo "  $${word_list}" >> w$$SPELLING$$SIZE.scowl-word-lists-used;\
+			fi;\
+		done; \
+	  cat $$SPELLING-english$$SIZE.unsorted | LC_ALL=C sort -d | uniq | iconv -f 'iso8859-1' -t 'utf-8' > $$SPELLING-english$$SIZE; rm $$SPELLING-english$$SIZE.unsorted;\
+	  done;\
+	done
+	cd speller && $(MAKE) hunspell
+
+override_dh_auto_clean:
+	rm -rf final_utf8;
+	set -e;\
+	for SIZE in $(SIZES); do\
+	  if [ -n "$$SIZE" ]; then SIZE="-$$SIZE"; fi; \
+	  for SPELLING in $(SPELLINGS); do\
+	    rm -f $$SPELLING-english$$SIZE.unsorted $$SPELLING-english$$SIZE $$SPELLING-english$$SIZE.5 w$$SPELLING$$SIZE.scowl-word-lists-used;\
+	  done;\
+	done
+	cd speller && $(MAKE) clean
+
+INSTALL_WORDLISTS=$(patsubst %-"",%,$(foreach spelling,$(SPELLINGS),$(foreach size,$(SIZES),install-w$(spelling)-$(size))))
+
+override_dh_auto_install: install-scowl install-hunspell $(INSTALL_WORDLISTS)
+	installdeb-wordlist -pwamerican --noscripts
+	installdeb-wordlist --no-package=wamerican --no-package=scowl --no-package=hunspell-en-us --no-package=hunspell-en-au --no-package=hunspell-en-ca
+	installdeb-hunspell -phunspell-en-ca -phunspell-en-au -phunspell-en-us
+
+install-scowl:
+	dh_installdirs --package=scowl
+
+	dh_install --package=scowl final_utf8/*.[0-9][0-9] usr/share/dict/scowl
+	dh_installdocs --package=scowl README debian/README.Debian
+
+install-hunspell:
+	dh_install --package=hunspell-en-us
+	dh_install --package=hunspell-en-au
+	dh_install --package=hunspell-en-ca
+
+override_dh_auto_test:
+	echo "doing nothing";
+
+override_dh_gencontrol:
+	dh_gencontrol -Nhunspell-en-us -Nhunspell-en-au -Nhunspell-en-ca
+	dh_gencontrol -phunspell-en-us -phunspell-en-au -phunspell-en-ca -- -v1:$(DEB_VERSION)
+
+
+WORDLIST=$(shell echo $(*)|sed -re 's/^w([a-z]*)(-*[a-z]*)/\1-english\2/')
+$(INSTALL_WORDLISTS): install-%: install-scowl
+	dh_testdir
+	dh_testroot
+	dh_installdirs --package=$(*) usr/share/dict
+	dh_install --package=$(*) $(shell echo $(*)|sed -re	\
+'s/^w([a-z]*)(-*[a-z]*)/\1-english\2/') usr/share/dict
+	dh_installdocs --package=$(*) $(*).scowl-word-lists-used debian/README.Debian
+	sed "s/WORDLIST/$(WORDLIST)/g" < debian/wordlist_manpage_template > $(WORDLIST).5
+	dh_installman --package=$(*) $(WORDLIST).5
+
+# this is the install-w$(SPELLING)-$(VARIANT) rule
+.PHONY: $(foreach spelling,$(SPELLINGS),$(foreach size,$(SIZES),install-w$(spelling)-$(size)))
+

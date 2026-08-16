@@ -1,0 +1,38 @@
+#! /usr/bin/make -f
+
+# export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+pkg-dte  := $(shell grep '@set RELEASE' vera.texi | cut -f3,4 -d' ')
+
+%:
+	dh $@
+
+override_dh_auto_build-indep:
+	makeinfo --no-split vera.texi
+	sed -f debian/sedfile vera.? >> vera
+	/usr/bin/dictfmt -f -u http://home.snafu.de/ohei --without-time \
+	    -s "V.E.R.A. -- Virtual Entity of Relevant Acronyms ($(pkg-dte))" \
+	   vera < vera
+	# Ensure deterministic mtime for dictzip to inherit
+	touch --date='@$(SOURCE_DATE_EPOCH)' vera.dict
+	/usr/bin/dictzip -v vera.dict
+	rm -f vera.tmp vera
+
+debian/changes: build-indep
+	info ./vera.info History | \
+	    sed -n '1d;/^File: vera.info, .*/d;/^\*Installation as Info file\*$$/q;p' > $@
+
+override_dh_installchangelogs: debian/changes
+	dh_installchangelogs $<
+
+override_dh_gencontrol:
+	dh_gencontrol -pvera
+	# dict-vera was previously its own source package, give its version a 1:
+	# prefix
+	dh_gencontrol -pdict-vera -- -v1:$(DEB_VERSION)
+
+override_dh_auto_clean:
+	rm -f debian/changes
+	dh_auto_clean

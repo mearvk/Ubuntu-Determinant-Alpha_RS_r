@@ -1,0 +1,185 @@
+#!/usr/bin/perl
+
+#
+# Copyright 2014 Andrew Ayer
+# Copyright 2016-2017, 2019 Chris Lamb <lamby@debian.org>
+#
+# This file is part of strip-nondeterminism.
+#
+# strip-nondeterminism is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# strip-nondeterminism is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with strip-nondeterminism.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+use warnings;
+
+use File::StripNondeterminism;
+use Getopt::Long;
+Getopt::Long::Configure(qw(no_ignore_case permute bundling));
+
+my $cmd = $0;
+$cmd =~ s/.*\///;
+my $usage
+  = "Usage: $cmd [-v|--verbose] [-t|--type FILETYPE] [-T|--timestamp SECONDS] [--clamp-timestamp] [--normalizers <+NORMALIZER,-NORMALIZER,+all,-all,...>] FILENAME\n";
+
+my ($filetype, $timestamp, $clamp_timestamp, $normalizers, $want_help, $verbose, $want_version);
+my $getopt = Getopt::Long::Parser->new;
+$getopt->configure(qw(no_ignore_case permute bundling));
+$getopt->getoptions(
+	'type|t=s', \$filetype,
+	'timestamp|T=i', \$timestamp,
+	'clamp-timestamp!', \$clamp_timestamp,
+	'normalizers=s', \$normalizers,
+	'help|h', \$want_help,
+	'verbose|v', \$verbose,
+	'version|V', \$want_version
+) or die $usage;
+
+if ($want_help) {
+	print $usage;
+	exit 0;
+}
+
+if ($want_version) {
+	print "$cmd version $File::StripNondeterminism::VERSION\n";
+	exit 0;
+}
+
+File::StripNondeterminism::init();
+
+for (split(/,/, $normalizers // '')) {
+	my ($fn, $action);
+
+	m/^([+-])(\w+)$/ or die "$0: invalid --normalizer spec: $_";
+
+	if ($1 eq '+') {
+		$fn = \&File::StripNondeterminism::enable_normalizer;
+		$action = 'Enabling';
+	} else {
+		$fn = \&File::StripNondeterminism::disable_normalizer;
+		$action = 'Disabling';
+	}
+	my $name = $2;
+
+	if ($name eq 'all') {
+		print "$0: $action all normalizers\n" if $verbose;
+		for (File::StripNondeterminism::all_normalizers) {
+			&$fn($_);
+		}
+		next;
+	}
+
+	print "$0: $action normalizer $name\n" if $verbose;
+	&$fn($name);
+}
+
+$File::StripNondeterminism::canonical_time = $timestamp;
+$File::StripNondeterminism::clamp_time = $clamp_timestamp;
+$File::StripNondeterminism::verbose = $verbose;
+
+die $usage if @ARGV == 0;
+
+my $normalizer;
+if (defined $filetype) {
+	$normalizer
+	  = File::StripNondeterminism::get_normalizer_by_name($filetype);
+	die "$filetype: Unknown file type\n" unless $normalizer;
+}
+print "$cmd: Not using a canonical time\n"
+  if not defined $timestamp and $verbose;
+print "$cmd: Using normalizers: "
+  . join(" ", File::StripNondeterminism::enabled_normalizers) . "\n"
+  if not defined $timestamp and $verbose;
+for my $filename (@ARGV) {
+	die "$filename: Does not exist\n" unless -e $filename;
+
+	if (!defined $filetype) {
+		$normalizer
+		  = File::StripNondeterminism::get_normalizer_for_file($filename);
+		next unless defined $normalizer;
+		if (!$normalizer) {
+			print "Not normalizing $filename (normalizer disabled)\n" if $verbose;
+			next;
+		}
+	}
+
+	print "Normalizing $filename\n" if $verbose;
+	eval { $normalizer->($filename); 1 }
+	  or die "strip-nondeterminism: $filename: $@";
+}
+
+__END__
+
+=head1 NAME
+
+strip-nondeterminism - strip nondeterministic information from files
+
+=head1 SYNOPSIS
+
+ strip-nondeterminism [-t filetype] filename ...
+
+=head1 DESCRIPTION
+
+B<strip-nondeterminism> is a tool to strip bits of nondeterministic
+information, such as timestamps, from files.  It can be used as
+a post-processing step to make a build reproducible, when the build
+process itself cannot be made deterministic.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-t> I<filetype>, B<--type> I<filetype>
+
+Use the normalizer for the given file type (ar, gzip, jar, zip).  If this
+option is not specified, the file type is detected automatically based on
+the file name extension.
+
+=item B<-T> I<seconds>, B<--timestamp> I<seconds>
+
+Instead of stripping timestamps from files, set them to the given number
+of seconds since January 1, 1970.
+
+=item B<--clamp-timestamp>
+
+Only replace timestamps if they are later than the time specified to
+B<--timestamp>.  You can use this option to ensure that only timestamps
+introduced as part of the build process are replaced.  NOT YET IMPLEMENTED
+FOR ALL FILE FORMATS.
+
+=item B<--normalizers> I<SPEC>
+
+Enable or disable specific normalizers separated by a comma (eg. B<+foo,-bar>.
+The magic values B<+all> and B<-all> will enable and disable all normalizers.
+
+=item B<-h>, B<--help>
+
+Display this help message.
+
+=item B<-V>, B<--version>
+
+Print only the version string and then quit.
+
+=back
+
+=head1 AUTHORS
+
+Andrew Ayer
+Chris Lamb
+
+=head1 COPYRIGHT
+
+strip-nondeterminism is free software.  You can redistribute it and/or
+modify it under the terms of the GNU General Public License, version 3.
+
+=cut

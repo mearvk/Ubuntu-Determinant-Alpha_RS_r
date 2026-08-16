@@ -1,0 +1,138 @@
+From: Ole Streicher <olebole@debian.org>
+Date: Tue, 21 Feb 2012 15:07:26 +0100
+Subject: Install the manpages in the proper section.
+
+Fix trivial manpage spelling.
+---
+ Makefile.in    | 12 +++++++-----
+ doc/html.man   |  6 +++---
+ doc/hv3.man    |  8 ++++----
+ doc/macros.tcl |  5 +++--
+ 4 files changed, 17 insertions(+), 14 deletions(-)
+
+diff --git a/Makefile.in b/Makefile.in
+index 553510f..4e915d3 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -208,7 +208,9 @@ libraries: $(HV3_LIB)
+ #========================================================================
+ 
+ doc:
+-	$(TCLSH) $(srcdir)/doc/macros.tcl -nroff $(srcdir)/doc/html.man>tkhtml.n
++	$(TCLSH) $(srcdir)/doc/macros.tcl -nroff $(srcdir)/doc/html.man > tkhtml.3tcl
++	$(TCLSH) $(srcdir)/doc/macros.tcl -nroff $(srcdir)/doc/hv3.man > hv3.3tcl
++	$(TCLSH) $(srcdir)/doc/macros.tcl -nroff $(srcdir)/doc/browser.man> hv3browser.3tcl
+ 
+ install: all install-binaries install-libraries install-doc
+ 
+@@ -235,12 +237,12 @@ install-libraries: libraries
+ #========================================================================
+ 
+ install-doc: doc
+-	@mkdir -p $(DESTDIR)$(mandir)/mann
++	@mkdir -p $(DESTDIR)$(mandir)/man3
+ 	@echo "Installing documentation in $(DESTDIR)$(mandir)"
+-	@list='*.n'; for i in $$list; do \
++	@list='*.3tcl'; for i in $$list; do \
+ 	    echo "Installing $$i"; \
+-	    rm -f $(DESTDIR)$(mandir)/mann/`basename $$i`; \
+-	    $(INSTALL_DATA) $$i $(DESTDIR)$(mandir)/mann ; \
++	    rm -f $(DESTDIR)$(mandir)/man3/`basename $$i`; \
++	    $(INSTALL_DATA) $$i $(DESTDIR)$(mandir)/man3 ; \
+ 	done
+ 
+ test: binaries libraries
+diff --git a/doc/html.man b/doc/html.man
+index 6a77240..ce27655 100644
+--- a/doc/html.man
++++ b/doc/html.man
+@@ -36,7 +36,7 @@
+ 		The Tkhtml package adds the [SQ ::tkhtml::htmlstyle] command to
+ 		the interpreter it is loaded into. Invoking this command
+ 		returns a CSS document suitable for use with Tkhml as a default
+-		stylesheet for HTML documents. If the "-quirks" option is
++		stylesheet for HTML documents. If the -quirks option is
+ 		passed to [SQ ::tkhtml::htmlstyle] then the returned document
+ 		includes some extra rules used when rendering legacy documents.
+ 
+@@ -103,7 +103,7 @@
+ 		As well as for replacing entire document nodes (i.e. <img>),
+ 		images are used in several other contexts in CSS formatted
+ 		documents, for example as list markers or backgrounds. If the
+-		-imagecmd option is not set to an empty string (the default),
++		 -imagecmd option is not set to an empty string (the default),
+ 		then each time an image URI is encountered in the document, it
+ 		is appended to the -imagecmd script and the resulting list
+ 		evaluated.
+@@ -539,7 +539,7 @@
+ 
+ 		The [SQ pathName text text] command returns a string 
+ 		containing the raw, unformatted text of the displayed document.
+-		Each block box is seperated from the next by a newline
++		Each block box is separated from the next by a newline
+ 		character. Each block of whitespace is collapsed to a
+ 		single space, except within blocks with the CSS 'white-space'
+ 		property set to "pre".
+diff --git a/doc/hv3.man b/doc/hv3.man
+index fdc7513..3a5ac48 100644
+--- a/doc/hv3.man
++++ b/doc/hv3.man
+@@ -58,7 +58,7 @@
+ }]
+ 
+ 	The two most important interfaces are the [SQ goto] method and the
+-	_-requestcmd_ option. The [SQ goto] method tells the widget to
++	 _-requestcmd_ option. The [SQ goto] method tells the widget to
+ 	load the document identified by the specified absolute or relative
+ 	URI.
+ 
+@@ -67,7 +67,7 @@
+ 	users responsibility to retrieve the document and pass it back to
+ 	the widget. If the document contains links to external resources
+ 	(images or CSS stylesheets), then the widget invokes the 
+-	_-requestcmd_ script to request these. The _-requestcmd_ callback may
++	 _-requestcmd_ script to request these. The _-requestcmd_ callback may
+ 	choose to implement handling for one or more of http:// URIs, 
+ 	file:// URIs or any other existing or invented URI scheme. See
+ 	the "Example Usage" section below for an example.
+@@ -350,7 +350,7 @@
+ 	to display ready in a Tcl variable (or variables). The solution 
+ 	here is to invent a custom URI scheme to use within the 
+ 	application. For example, the following example demonstrates a
+-	_-requestcmd_ script that implements the "tclvar:", URI scheme
++	 _-requestcmd_ script that implements the "tclvar:", URI scheme
+ 	for refering to global Tcl variables.
+ 	
+ 	[Code {
+@@ -397,7 +397,7 @@
+ 	found at the start of each URI passed to [SQ tclvar_requestcmd]. This
+ 	is because Hv3 resolves and escapes all URIs against the base URI 
+ 	of the currently loaded document before passing them to the 
+-	_-requestcmd_. This means you need to be careful with special
++	 _-requestcmd_. This means you need to be careful with special
+ 	characters. If the name of the variable storing the stylesheet
+ 	document in the above example were _::css::my_stylesheet_, then
+ 	markup like this:
+diff --git a/doc/macros.tcl b/doc/macros.tcl
+index d2932f7..3dd9af1 100644
+--- a/doc/macros.tcl
++++ b/doc/macros.tcl
+@@ -71,6 +71,8 @@ proc process_text {input {nocommands 0}} {
+     regsub -all {_([^ \n]*)_} $output {\1}
+   ]
+ 
++  set output [string map { " -" " \\-" "\t-" "\t\\-"
++                           "\t." "\t ." "'" "\""} $output ]
+   set output [string trim [strip_leading_tabs $output]]
+   set output [regsub -all {[\n]*REMOVELINEBREAK\n} $output \n]
+ 
+@@ -78,8 +80,7 @@ proc process_text {input {nocommands 0}} {
+ }
+ 
+ proc TH {name section} {
+-  set date [clock format [clock seconds]]
+-  return "\n.TH \"$name\" \"$section\" \"$date\"\n"
++  return "\n.TH \"$name\" \"3tcl\" \"Sat Feb 25 2006\"\n"
+ }
+ 
+ proc Section {args} {

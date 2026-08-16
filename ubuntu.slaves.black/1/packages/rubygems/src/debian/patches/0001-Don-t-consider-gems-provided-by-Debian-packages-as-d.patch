@@ -1,0 +1,31 @@
+From: Antonio Terceiro <terceiro@debian.org>
+Date: Fri, 28 Jan 2022 11:04:22 -0300
+Subject: Don't consider gems provided by Debian packages as deleted
+
+In Debian, old-style packages provide a gemspec but the actual library files
+are shipped in /usr/lib/ruby/vendor_ruby/. We are converting all packages to
+the Rubygems layout, but we are not finished yet.
+
+This fixed a regression introduced in Debian by
+8950631f02498195794096a8e7c28b7feac56382 ("Fix `bundle install` to force
+reinstallation of deleted gems").
+
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1004195
+Forwarded: https://github.com/rubygems/rubygems/pull/5319
+---
+ bundler/lib/bundler/rubygems_ext.rb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bundler/lib/bundler/rubygems_ext.rb b/bundler/lib/bundler/rubygems_ext.rb
+index 5d572aa..164705f 100644
+--- a/bundler/lib/bundler/rubygems_ext.rb
++++ b/bundler/lib/bundler/rubygems_ext.rb
+@@ -86,7 +86,7 @@ def nondevelopment_dependencies
+     end
+ 
+     def deleted_gem?
+-      !default_gem? && !File.directory?(full_gem_path)
++      !default_gem? && !File.directory?(full_gem_path) && (full_gem_path !~ %r{/rubygems-integration/})
+     end
+ 
+     private

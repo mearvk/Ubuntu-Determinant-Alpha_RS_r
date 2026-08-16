@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+%:
+	dh $@ --with autoreconf
+
+
+# Enable build hardening
+#
+override_dh_auto_configure:
+	dh_auto_configure -- $(shell dpkg-buildflags --export=configure)
+
+# Ensure dbus python build is cleaned out
+#
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf apps/dbus/build
+
+# Override needed to:
+# - fix embedded-javascript-library lintian warning
+#
+override_dh_auto_install:	
+	dh_auto_install
+	set -e; if test -f debian/tmp/usr/share/presage/html/jquery.js; \
+	then \
+		rm -f debian/tmp/usr/share/presage/html/jquery.js; \
+		ln -s /usr/share/javascript/jquery/jquery.js debian/tmp/usr/share/presage/html/jquery.js; \
+	fi
+
+# Override needed to create debug packages
+#
+override_dh_strip:
+	dh_strip -plibpresage1v5 --dbg-package=libpresage1-dbg
+	dh_strip -ppresage --dbg-package=presage-dbg
+	dh_strip -pgprompter --dbg-package=gprompter-dbg

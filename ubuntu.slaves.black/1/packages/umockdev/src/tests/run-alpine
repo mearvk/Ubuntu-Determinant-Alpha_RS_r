@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+
+# keep container around if $DEBUG is set
+[ -n "${DEBUG:-}" ] || OPTS="--rm"
+
+if type podman >/dev/null 2>&1; then
+    RUNC=podman
+else
+    RUNC="sudo docker"
+fi
+
+$RUNC run --interactive ${OPTS:-} --volume `pwd`:/source:ro ${1:-docker.io/alpine} /bin/sh <<EOF
+# avoid meson exit code 125; https://github.com/containers/podman/issues/11540
+trap '[ \$? -eq 0 ] || exit 1' EXIT
+
+# install build dependencies
+apk add --no-cache meson gcc musl-dev glib-dev eudev-dev libpcap-dev make vala linux-headers xz usbutils ${EXTRA_PACKAGES:-}
+
+# run build as user
+su -s /bin/sh - guest << EOG
+set -ex
+export BRITTLE_TESTS="${BRITTLE_TESTS:-}"
+cd /source
+meson setup /tmp/dbg --buildtype debug --werror
+meson test -C /tmp/dbg -v --num-processes=1
+DESTDIR=/tmp/inst meson install -C /tmp/dbg
+echo "===== tests done; install tree: ===="
+ls -lR /tmp/inst
+EOG
+
+EOF

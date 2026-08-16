@@ -1,0 +1,49 @@
+From: jemptymethod <jempty...@gmail.com>
+Date: Fri, 17 Jun 2011 01:53:48 -0700
+Subject: Fixed table-columns are resized
+
+If I have a html-table like ... <TD width=120px> ...
+ all the columns are resized if the widget ist smaller then it should be.
+
+Origin: http://groups.google.com/group/tkhtml3/browse_thread/thread/ff9221f6ea2ba16d
+---
+ src/htmltable.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/src/htmltable.c b/src/htmltable.c
+index 1520de6..7d5784e 100644
+--- a/src/htmltable.c
++++ b/src/htmltable.c
+@@ -1480,14 +1480,12 @@ tableCalculateCellWidths(pData, availablewidth, isAuto)
+     logWidthStage(2, pStageLog, pData->nCol, aWidth);
+ 
+     /* Allocate pixels to explicit width columns */
+-    if (iRemaining > 0) {
+-        for (ii = 0; ii < pData->nCol; ii++) {
+-            if (aReqWidth[ii].eType == CELL_WIDTH_PIXELS) {
+-                int iReq = MAX(0, aReqWidth[ii].x.iVal - aWidth[ii]);
+-                aWidth[ii] += iReq;
+-                iRemaining -= iReq;
+-            }
+-        }
++    for (ii = 0; ii < pData->nCol; ii++) {
++	if (aReqWidth[ii].eType == CELL_WIDTH_PIXELS) {
++	    int iReq = MAX(0, aReqWidth[ii].x.iVal - aWidth[ii]);
++	    aWidth[ii] += iReq;
++	    iRemaining -= iReq;
++	}
+     }
+     logWidthStage(3, pStageLog, pData->nCol, aWidth);
+ 
+@@ -1560,6 +1558,11 @@ tableCalculateCellWidths(pData, availablewidth, isAuto)
+     assert(CELL_WIDTH_PERCENT == 2);
+     for (jj = 0; iRemaining < 0 && jj < 3; jj++) {
+         
++        /* Only reduce columns with CELL_WIDTH_AUTO or CELL_WIDTH_PERCENT */
++        if (jj != CELL_WIDTH_AUTO || jj != CELL_WIDTH_PERCENT )	{
++            continue;
++        };
++
+         /* Total allocated, less the total min-content-width, for the cols */
+         int iAllocLessMin = 0;
+ 

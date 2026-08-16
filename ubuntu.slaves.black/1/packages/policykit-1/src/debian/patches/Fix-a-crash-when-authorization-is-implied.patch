@@ -1,0 +1,34 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Wed, 23 Feb 2022 19:17:45 +0000
+Subject: Fix a crash when authorization is implied
+
+If authorization for one action is implied by authorization for another
+action, the previous code unreffed result_details but did not set it to
+null, and then jumped to "out" which tries to unref it again. This will
+often be a use-after-free that leads to a crash.
+
+This would often not be noticeable in practice, because polkitd gets
+restarted automatically by D-Bus activation.
+
+Commit 3b7868b3 "Make it possible for JS code to change details" deleted
+this code as part of a larger refactor in newer upstream versions,
+but we are 9 years behind upstream as a result of it not being clear
+how best to handle the JavaScript dependency in newer versions.
+
+Forwarded: not-needed, part of a larger commit upstream
+---
+ src/polkitbackend/polkitbackendinteractiveauthority.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/src/polkitbackend/polkitbackendinteractiveauthority.c b/src/polkitbackend/polkitbackendinteractiveauthority.c
+index 1e17dfd..3185214 100644
+--- a/src/polkitbackend/polkitbackendinteractiveauthority.c
++++ b/src/polkitbackend/polkitbackendinteractiveauthority.c
+@@ -1232,7 +1232,6 @@ check_authorization_sync (PolkitBackendAuthority         *authority,
+                               g_debug (" is authorized (implied by %s)", imply_action_id);
+                               result = implied_result;
+                               /* cleanup */
+-                              g_object_unref (result_details);
+                               g_strfreev (tokens);
+                               goto out;
+                             }

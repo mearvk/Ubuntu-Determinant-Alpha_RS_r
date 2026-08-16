@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+LIBC_DEV := $(shell grep-status -F Provides libc-dev -n -sPackage)
+ifeq (linux,$(DEB_HOST_ARCH_OS))
+LIBSELINUX_DEV := libselinux1-dev
+endif
+BUILT_USING := $(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W libelf-dev $(LIBSELINUX_DEV) $(LIBC_DEV))
+
+%:
+	dh $@ --with=autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-shared --disable-libtool-lock
+
+override_dh_auto_install:
+	dh_auto_install
+	mv debian/tmp/usr/sbin/prelink debian/tmp/usr/sbin/prelink.bin
+	install debian/prelink.sh debian/tmp/usr/sbin/prelink
+
+override_dh_auto_test:
+	# pass
+	
+override_dh_installchangelogs:
+	sed -e '1,/^%changelog$$/d' < debian/prelink.spec > debian/tmp/changelog
+	dh_installchangelogs debian/tmp/changelog
+
+override_dh_gencontrol:
+	dh_gencontrol -- -V"built-using=$(BUILT_USING)"

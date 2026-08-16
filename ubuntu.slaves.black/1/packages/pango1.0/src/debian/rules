@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+
+built_binaries := $(shell dh_listpackages)
+
+ifneq ($(filter libpango1.0-doc,$(built_binaries)),)
+with_docs = true
+else
+with_docs = false
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dauto_features=enabled \
+		-Dgtk_doc=$(with_docs) \
+		-Dinstall-tests=true \
+		$(NULL)
+
+override_dh_auto_test-arch:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	debian/tests/run-with-locales \
+		--generate en_US.utf8 \
+		-- \
+	env \
+		LC_ALL=en_US.utf8 \
+	dh_auto_test
+endif
+
+# Skip build-time tests if all we are building is documentation; running
+# them once per architecture is plenty
+override_dh_auto_test-indep:
+	@:
+
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+override_dh_fixperms:
+	dh_fixperms -Xusr/libexec/installed-tests
+ifneq ($(filter %-tests,$(binaries)),)
+	chmod --recursive --changes a+rX,u+w,og-w debian/*-tests/usr/libexec/installed-tests
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs --add-udeb=libpango1.0-udeb -- -c4

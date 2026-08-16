@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+
+import sys
+import os.path
+import unittest
+import subprocess
+
+import gi
+gi.require_version('UMockdev', '1.0')
+from gi.repository import UMockdev
+
+srcdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+testsdir = os.path.join(srcdir, 'tests')
+sys.path.append(testsdir)
+
+def program_out(argv):
+    '''Return (exitcode, out, err) from a program call.'''
+
+    prog = subprocess.Popen(argv, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, universal_newlines=True)
+    (out, err) = prog.communicate()
+    return (prog.returncode, out, err)
+
+def program_out_success(argv, self):
+    '''Return out from a successful program call.'''
+
+    (code, out, err) = program_out(argv)
+    self.assertEqual(err, '')
+    self.assertEqual(code, 0)
+    return out
+
+class TestSystem(unittest.TestCase):
+    '''Run ubuntu-drivers on the current system.
+
+    We cannot assume anything about the output here, we just ensure that the
+    program is found and works.
+    '''
+    def test_list(self):
+        '''ubuntu-drivers list succeeds'''
+
+        program_out_success(['ubuntu-drivers', 'list'], self)
+
+    def test_debug(self):
+        '''ubuntu-drivers debug succeeds'''
+
+        o = program_out_success(['ubuntu-drivers', 'debug'], self)
+
+        # let's assume we have at least one pci device
+        self.assertTrue('\npci:' in o)
+
+        # finds detection plugins
+        self.assertTrue('Loading custom detection plugin' in o, o)
+        self.assertTrue('sl-modem' in o, o)
+        self.assertTrue('=== matching driver packages ===' in o, o)
+
+# run ourselves through umockdev-wrapper
+if 'umockdev' not in os.environ.get('LD_PRELOAD', ''):
+    os.execvp('umockdev-wrapper', ['umockdev-wrapper'] + sys.argv)
+
+# avoid debconf errors
+os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
+
+# for autopkgtest we must write to stdout, not stderr, and have an appropriate
+# exit code
+unittest.main(testRunner=unittest.TextTestRunner(stream=sys.stdout, verbosity=2))

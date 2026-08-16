@@ -1,0 +1,105 @@
+#!/usr/bin/make -f
+
+export PYTHONWARNINGS=d
+export PYTHONHASHSEED=random
+
+export PYBUILD_TEST_ARGS={interpreter} test/alltests.py --verbose && {interpreter} $(CURDIR)/tools/test/test_buildhtml.py --verbose
+
+scripts = \
+	rst-buildhtml \
+	rst2html \
+	rst2html4 \
+	rst2html5 \
+	rst2latex \
+	rst2man \
+	rst2odt \
+	rst2odt_prepstyles \
+	rst2pseudoxml \
+	rst2s5 \
+	rst2xetex \
+	rst2xml \
+	rstpep2html \
+
+pre_localize_css = 's,href="(([.][.]/)*)docutils/.*/([^/]+[.]css)",href="$$1css/$$3",g;'
+pre_strip_images1 = 's,<img src="http://[^"]+" alt="([^"]*)"[^>]*>,$$1,g;'
+pre_strip_images2 = 's,<img alt="([^"]*)"[^>]*\bsrc="http://[^"]+"[^>]*>,$$1,g;'
+pre_strip_images = $(pre_strip_images1)$(pre_strip_images2)
+
+%:
+	dh $@ --with python3,xml_core --buildsystem=pybuild
+
+override_dh_auto_build:
+	# Remove convenience copy of the roman module
+	rm -f docutils/utils/roman.py
+	# Check if move-data-to-usr-share.diff is up-to-date
+	if grep -r __file__ --include='*.py' docutils/ | grep -vw _datadir; then \
+		echo "Error: Some uses of __file__ are not guarded by _datadir()." \
+			"Is move-data-to-usr-share.diff up-to-date?"; \
+		exit 1; \
+	fi
+	dh_auto_build
+	# Build documentation:
+	PYTHONPATH=. LC_ALL=C.UTF-8 python3 tools/buildhtml.py \
+		--local --link-stylesheet --traceback \
+		.
+	PYTHONPATH=. LC_ALL=C.UTF-8 python3 tools/buildhtml.py \
+		--link-stylesheet --traceback \
+		docs
+	( ls *.html && find docs/ -name '*.html' ) \
+	| xargs perl -0777 -p -i -e $(pre_localize_css)$(pre_strip_images)
+
+override_dh_auto_test:
+	dh_auto_test -- --system custom
+
+override_dh_auto_clean:
+	dh_auto_clean
+	find docs -name '*.html' -not -name 'quickref.html' -delete
+
+override_dh_auto_install:
+	dh_auto_install
+	# Move data files outside dist-packages:
+	mkdir -p debian/tmp/usr/share/
+	cp -rlf debian/tmp/usr/lib/python3*/dist-packages/docutils debian/tmp/usr/share/
+	find debian/tmp/usr/lib/python3*/dist-packages/docutils/ -type f '!' -name '*.py' -delete
+	find debian/tmp/usr/share/docutils/ \( -name '*.py' -o -name '*.py[co]' \) -delete
+	find debian/tmp/ -type d -empty -delete
+	sed -i -e 's/^\(_debian_package\) = /\1 = 1/' debian/tmp/usr/lib/python3*/dist-packages/docutils/__init__.py
+	# Give scripts canonical names
+	set -ex && for exe in $(filter-out rst-buildhtml,$(scripts)); do \
+		mv debian/tmp/usr/bin/$$exe.py debian/tmp/usr/bin/$$exe; \
+	done
+	install tools/buildhtml.py debian/tmp/usr/bin/rst-buildhtml
+	sed -i -e "1 s,^#!.*,#!/usr/bin/python3," debian/tmp/usr/bin/rst-buildhtml
+	: # Make the man pages (we want to do this *after* renaming all the
+	: # tools, because their executable name goes into the --help output)
+	mkdir -p debian/tmp/man/
+	set -ex && for exe in $(filter-out rst2odt_prepstyles,$(scripts)); do \
+		export PYTHONPATH=debian/tmp/usr/lib/$(shell py3versions -d)/dist-packages; \
+		cp debian/$$exe.txt debian/tmp/man/$$exe.txt; \
+		python3 debian/tmp/usr/bin/$$exe --help | \
+			sed \
+				-e '1 s/^Usage$$/Synopsis/' \
+				-e 's/^=/====/' \
+				-e '3 s/^  //' \
+				-e '4 a Description' \
+				-e '4 a ===========' \
+			>> debian/tmp/man/$$exe.txt;\
+		python3 tools/rst2man.py debian/tmp/man/$$exe.txt \
+			debian/tmp/man/$$exe.1; \
+		rm debian/tmp/man/$$exe.txt; \
+	done
+	PYTHONPATH=. LC_ALL=C.UTF-8 python3 tools/rst2man.py debian/rst2odt_prepstyles.txt \
+		debian/tmp/man/rst2odt_prepstyles.1
+	sed -i -e 's,"\(docutils/writers/\),"/usr/share/\1,g' debian/tmp/man/*
+
+override_dh_installdocs:
+	dh_installdocs -XCOPYING
+	mkdir -p debian/docutils-doc/usr/share/doc/python3-docutils/
+	cd debian/docutils-doc/usr/share/doc/python3-docutils/ && ln -sf ../docutils-doc/*.html .
+
+override_dh_installchangelogs:
+	dh_installchangelogs -XHISTORY
+
+override_dh_compress:
+	dh_compress -p docutils-doc -X.dtd -X.txt
+	dh_compress --remaining-packages

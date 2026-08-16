@@ -1,0 +1,2499 @@
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.4) jammy; urgency=medium
+
+  * ubuntu-drivers:
+    - Fix --no-oem option stored in wrong config variable (LP: #1966413).
+
+ -- Olivier Gayot <olivier.gayot@canonical.com>  Fri, 16 Jun 2023 11:49:53 +0200
+
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.3) jammy; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Fix "882:5 local variable 'with_nvidia_kms' is assigned to
+      but never used" FTBFS (triggered by tests/test_static.py).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 08 Mar 2023 16:03:28 +0000
+
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.2) jammy; urgency=medium
+
+  [ Alberto Milone ]
+  * debian/rules:
+    - Limit the tests to the selected architectures (amd64, arm64).
+      This prevents armhf builds from failing.
+  * UbuntuDrivers/detect.py:
+    - Make sure all -open drivers have a lower priority, regardless
+      of whether the --server parameter is passed in or not.
+    - Update regex and unify package name parsing in the following
+      functions by using the new NvidiaPkgNameInfo class:
+      nvidia_desktop_pre_installation_hook,
+      _get_headless_no_dkms_metapackage,
+      nvidia_desktop_pre_installation_hook,
+      get_linux_modules_metapackage,
+      This prevents ubuntu-drivers from crashing when dealing with
+      the -open NVIDIA drivers (LP: #1993019).
+  * tests/test_ubuntu_drivers.py:
+    - Add tests so we make sure to keep preferring non-open NVIDIA
+      modules over the -open ones, at least until the open modules catch up
+      feature wise and performance wise.
+
+  [ gongzhengyang ]
+  * UbuntuDrivers/detect.py:
+    - Fix local variable 'version' being referenced before assignment
+      when catching ValueError (LP: #1993019).
+
+  [ Jeff Lane ]
+  * detect-plugins/sl-modem.py:
+    - Add some error trapping when aplay is not installed (on servers)
+      (LP: #1935070).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 16 Feb 2023 14:50:33 +0000
+
+ubuntu-drivers-common (1:0.9.6.2~0.22.04.1) jammy; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Make sure -open drivers have a lower priority (LP: #1988836).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Sep 2022 11:39:41 +0000
+
+ubuntu-drivers-common (1:0.9.6.1) jammy; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Handle Production branches (PB) (LP: #1964747).
+    - Always prefer PB and LTSB, and pick the highest of the two
+      whenever possible.
+  * tests/test_ubuntu_drivers.py:
+    - Add test_system_driver_packages_chroot_support_branch_pb and
+      test_system_driver_packages_chroot_support_branch_pb_1, to
+      keep track of our policy on PB and LTSB releases.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Mar 2022 15:59:19 +0100
+
+ubuntu-drivers-common (1:0.9.6) jammy; urgency=medium
+
+  * Drop apt in favour of the apt_pkg bindings (LP: #1963712).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 14 Mar 2022 12:15:38 +0100
+
+ubuntu-drivers-common (1:0.9.5.1) jammy; urgency=medium
+
+  * Change maximum open file descriptors limit for the process in
+    the test suite. This should fix the FTBFS.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 07 Mar 2022 17:16:26 +0100
+
+ubuntu-drivers-common (1:0.9.5) jammy; urgency=medium
+
+  [ Jeremy Szu ]
+  * 71-u-d-c-gpu-detection.rules,
+    gpu-manager.c:
+    - Wait for the nvidia-drm module to be loaded. This works around
+      a race condition, where nvidia-drm is loaded after gdm, and
+      this causes gdm to hang (LP: #1958488).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 24 Feb 2022 12:32:44 +0100
+
+ubuntu-drivers-common (1:0.9.4) jammy; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * UbuntuDrivers/detect.py:
+    - Optimize packages_for_modalias by compiling all the Modaliases
+      into one big regexp that can be used to quickly reject most
+      devices.
+
+  [ Alberto Milone ]
+  * UbuntuDrivers/kerneldetection.py:
+    - Improve performance of _get_linux_metapackage.
+  * gpu-manager.c:
+    - Fall back from on-demand to on if nvidia < 450.
+
+  [ Jeremy Szu ]
+  * ubiquity/target-config/31ubuntu_driver_packages:
+    - Install nvidia-prime in eariler stage.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 12 Jan 2022 09:37:18 +0000
+
+ubuntu-drivers-common (1:0.9.3) jammy; urgency=medium
+
+  * UbuntuDrivers/detect.py,
+    ubuntu-drivers:
+    - Provide helper functions for NVIDIA on the desktop:
+      o get_desktop_package_list()
+      o nvidia_desktop_pre_installation_hook()
+      o nvidia_desktop_post_installation_hook()
+      The new functions, which are now used by ubuntu-drivers
+      (only for the desktop i.e. "ubuntu-drivers install"),
+      allow reusing the hardware detection and the customisations
+      from ubuntu-drivers in other applications such as the
+      Software Properties UIsi (LP: #1942208).
+    - Add the "--recommended" option to the "list" command
+      (LP: #1952147).
+      This allows to show only the packages that will be
+      installed using auto-detection i.e. one specific
+      driver and its kernel module, instead of all the
+      compatible drivers.
+      This works with and without --gpgpu, yielding different
+      results.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Nov 2021 18:05:53 +0100
+
+ubuntu-drivers-common (1:0.9.2.2) impish; urgency=medium
+
+  * ubuntu-drivers:
+    - Enable KMS Wayland if nvidia >= 470. This only affects
+      the UDA drivers. This is more effective than checking
+      if Wayland is running, since the live image uses X11.
+  * UbuntuDrivers/detect.py:
+    - Add newline when setting kms.
+  * ubiquity/target-config/31ubuntu_driver_packages:
+    - Install nvidia-prime, so that we can handle hybrid
+      systems, and pick up the NVIDIA driver configuration
+      (LP: #1943816).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 Oct 2021 15:40:04 +0200
+
+ubuntu-drivers-common (1:0.9.2.1) impish; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Fix E302 expected 2 blank lines, found 1.
+    - Fix E711 comparison to None should be "if cond is not None".
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 21 Sep 2021 11:46:07 +0200
+
+ubuntu-drivers-common (1:0.9.2) impish; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Do not complain about Legacy not being a valid support level.
+  * gpu-manager.c:
+    - Enable RTD3 only on laptops (LP: #1942788).
+  * ubuntu-drivers, UbuntuDrivers/detect.py:
+    - Enable KMS for NVIDIA when running on Wayland.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 15 Sep 2021 15:25:13 +0200
+
+ubuntu-drivers-common (1:0.9.1.2) impish; urgency=medium
+
+  * tests/test_ubuntu_drivers.py:
+    - Fix pycodestyle E265 block comment should start with "# ".
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Jul 2021 20:33:07 +0200
+
+ubuntu-drivers-common (1:0.9.1.1) impish; urgency=medium
+
+  * tests/test_ubuntu_drivers.py:
+    - Skip checking the error output for apt install. Just
+      make sure the process doesn't fail.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 15 Jul 2021 16:38:49 +0200
+
+ubuntu-drivers-common (1:0.9.1) impish; urgency=medium
+
+  * detect-plugins/sl-modem.py:
+    - Make the failure to find or user aplay a debugging error.
+      This will always fail on servers, and printing the whole exception
+      all the time is unnecessary.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 14 Jul 2021 13:34:52 +0200
+
+ubuntu-drivers-common (1:0.9.0~0.21.10.1) impish; urgency=medium
+
+  * gpu-manager.c:
+    - Make sure to also search the signed modules (LP: #1931514).
+      Credit goes to Bin Li for the first version of this patch.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 18 Jun 2021 16:55:54 +0200
+
+ubuntu-drivers-common (1:0.8.9.1) hirsute; urgency=medium
+
+  * debian/tests/control:
+    - Add dependency on alsa-utils, since the autopkgtest requires it
+      for the sl-modem detection plugin.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 13 Apr 2021 13:00:14 +0200
+
+ubuntu-drivers-common (1:0.8.9) hirsute; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Fix previous change: I removed alsa-utils from Build-Depends not Depends.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Apr 2021 13:15:57 +0200
+
+ubuntu-drivers-common (1:0.8.8) hirsute; urgency=medium
+
+  [ Michael Hudson-Doyle ]
+  * Drop dependency on alsa-utils as we want to start using ubuntu-drivers in
+    the server installer but do not want alsa-utils there. The code using
+    aplay to detect certain kinds of modem will fail to detect them if aplay
+    is not installed but will not crash. As alsa-utils is in the
+    desktop-common seed there should be no loss of functionality anywhere
+    ubuntu-drivers is used today.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Mar 2021 13:43:48 +0200
+
+ubuntu-drivers-common (1:0.8.7) hirsute; urgency=medium
+
+  * ubuntu-drivers:
+    - Do not install recommended dependencies when calling
+      "install --gpgpu" (LP: #1898601). The whole point of
+      having --gpgpu was to reduce the amount of the
+      installed dependencies.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 23 Mar 2021 16:14:36 +0100
+
+ubuntu-drivers-common (1:0.8.6.5) hirsute; urgency=medium
+
+  * tests/test_ubuntu_drivers.py:
+    - Add testcase for list-oem --package-list.
+  * UbuntuDrivers/detect.py:
+    - Fix the way we validate the nvidia modules metapackages
+      (LP: #1914374).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Feb 2021 19:13:21 +0100
+
+ubuntu-drivers-common (1:0.8.6.4) hirsute; urgency=medium
+
+  [ Alberto Milone ]
+  * ubuntu-drivers:
+    - Don't error out when failing to write to /run without
+      root privileges (LP: #1913651), since package
+      installation will fail later.
+    - Restore "--package-list" for list-oem, which was supported
+      but accidentally not exposed in the transition to click.
+      (LP: #1914051).
+
+  [ Dimitri John Ledkov ]
+  * debian/rules:
+    - Make tests on riscv64 non-fatal.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Feb 2021 18:43:34 +0100
+
+ubuntu-drivers-common (1:0.8.6.3) hirsute; urgency=medium
+
+  * UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Prefer LTSB releases over NFB ones for non gpgpu cases too.
+  * gpu-manager.c:
+    - Make it possible to force runtimepm by creating the
+      /etc/u-d-c-nvidia-runtimepm-override file.
+    - Make on-demand default on nvidia >= 450, when no
+      previous settings are available.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 18 Nov 2020 15:44:11 +0100
+
+ubuntu-drivers-common (1:0.8.6.2) groovy; urgency=medium
+
+  * ubuntu-drivers:
+    - Unify metapackage listing for --gpgpu and non --gpgpu mode.
+      This relies on the more robust metapackage listing of
+      the non --gpgpu mode (LP: #1900452).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Oct 2020 13:42:45 +0200
+
+ubuntu-drivers-common (1:0.8.6.1) groovy; urgency=medium
+
+  * UbuntuDrivers/detect.py:
+    - Assume the NVIDIA packages to be non-free (LP: #1899630).
+  * gpu-manager.{c|py}:
+    - Handle the xorg conf file in all supported PRIME
+      scenarios (LP: #1900137).
+  * tests/test_ubuntu_drivers.py,
+    tests/gpu-manager.py:
+    - Expect a xorg conf file to be created in on-demand
+      mode (11-nvidia-offload.conf) in the test suite.
+    - Fix test cases now that nvidia is marked as non-free.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 16 Oct 2020 16:51:44 +0200
+
+ubuntu-drivers-common (1:0.8.6) groovy; urgency=medium
+
+  [ Alberto Milone ]
+  * share/hybrid/json-parser, debian/copyright:
+    - Include json-parser (just C file and header).
+  * gpu-manager.c:
+    - Add json parsing code to detect support for runtimepm on NVIDIA
+      (LP: #1895855).
+    - Check that RTD3 is enabled, and write that to a file in /run.
+    - Make on-demand mode the default when no settings are available.
+    - Add support for AMD+NVIDIA hybrid systems.
+    - Add support for checking PME capabilities for runtimepm, so that,
+      if the GPU is not boot_vga, and it is not listed in the json
+      database, we can at least check whether d3hot is supported, and
+      enable runtimepm in the NVIDIA driver.
+  * gpu-manager.py:
+    - Adjust the test suite to match the changes in gpu-manager.c.
+  * UbuntuDrivers/detect.py, ubuntu-drivers:
+    - Catch apt exceptions.
+    - Catch failure when modinfo is not available.
+    - Introduce the concept of LTSB (long term support branch), NFB
+      (new feature branch), Legacy, and Beta, which the driver packages
+      can specify.
+    - Use package support to pick the nvidia driver:
+      o Desktop case: pick the latest non-server driver, when available
+        (this preserves the current behaviour).
+      o Server case: pick the LTSB -server driver, when available.
+  * NvidiaDetector/nvidiadetector.py:
+    - Use regex to parse package names (LP: #1891183).
+  * ubuntu-drivers:
+    - Select on-demand mode if runtimepm is supported.
+    - Check RTD3 support for NVIDIA, and enable it when available.
+    - Show the package support level, when available, when using
+      "ubuntu-drivers debug".
+  * debian/control:
+    - Replace build-dep on libpciaccess-dev with libpci-dev.
+  * debian/rules: make sure to call the clean target of the Makefile
+
+  [ Cyrus Lien ]
+  * gpu-manager.c:
+    - Fix segmentation fault in json_find_feature_in_array.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Oct 2020 16:00:18 +0200
+
+ubuntu-drivers-common (1:0.8.5.4) groovy; urgency=medium
+
+  * ubuntu-drivers:
+    - Do not assume that the metapackage tag is available.
+  * NvidiaDetector/nvidiadetector.py:
+    - Fix failure with the -server drivers.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 29 Jul 2020 17:24:08 +0200
+
+ubuntu-drivers-common (1:0.8.5.3) groovy; urgency=medium
+
+  * ubuntu-drivers:
+    - Fix failure when using the deprecated "autoinstall"
+      argument (LP: #1889181).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 28 Jul 2020 10:55:27 +0200
+
+ubuntu-drivers-common (1:0.8.5.2) groovy; urgency=medium
+
+  * gpu-manager.c:
+    - Use the full mutliarch path for the X11 libraries.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 27 Jul 2020 16:16:22 +0200
+
+ubuntu-drivers-common (1:0.8.5.1) groovy; urgency=medium
+
+  * UbuntuDrivers/detect.py,
+    detect-plugins/sl-modem.py:
+    - Avoid triggering test_static.py "E741 ambiguous variable name 'l'".
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Jun 2020 12:26:01 +0200
+
+ubuntu-drivers-common (1:0.8.5) groovy; urgency=medium
+
+  * ubuntu-drivers:
+    - Remove leftover code from argparse
+  * UbuntuDrivers/detect.py,
+    tests/test_ubuntu_drivers.py:
+    - Add test_legacy_nvidia_driver_packages_chroot1.
+    - Do not print an error when linux-modules cannot
+      be found. Use debugging lines instead.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 15 Jun 2020 18:04:40 +0200
+
+ubuntu-drivers-common (1:0.8.4) groovy; urgency=medium
+
+  * ubuntu-drivers:
+    - Rework the argument parser.
+  * debian/control:
+    - Depend on python3-click.
+    - Drop dependency on dpkg-dev (LP: #1880564).
+  * Add support for the "Support" field in packages.
+  * Add support for passing in driver and vendor for
+    the "install" case (LP: #1881586).
+  * gpu-manager.c:
+    - Add get_system_architecture().
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Jun 2020 12:08:39 +0200
+
+ubuntu-drivers-common (1:0.8.3) groovy; urgency=medium
+
+  * debian/control:
+    - Replace build dependency on lib32gcc1 with lib32gcc-s1.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 04 May 2020 16:21:39 +0200
+
+ubuntu-drivers-common (1:0.8.2) groovy; urgency=medium
+
+  * debian/control:
+    - Depend on dpkg-dev (LP: #1875339).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 04 May 2020 10:53:31 +0200
+
+ubuntu-drivers-common (1:0.8.1) focal; urgency=medium
+
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/test_ubuntu_drivers.py,
+    ubuntu-drivers:
+    - Add tests for the -generic-hwe-20.04 flavour and for
+      the -oem-20.04 linux flavour.
+    - Add detection logic to get the linux metapackage and
+      linux-modules for -hwe-20.04 (LP: #1873867).
+    - List the modules provider when it is either a dkms package
+      or a linux-modules package.
+    - Install linux-modules packages when available.
+      This makes the NVIDIA drivers work with Secure Boot.
+
+  [ Dimitri John Ledkov ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py:
+    - Use exact matching in find_reverse_deps() with both
+      installed and candidate.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 21 Apr 2020 21:14:15 +0200
+
+ubuntu-drivers-common (1:0.8) focal; urgency=medium
+
+  [ Iain Lane ]
+  * tests:
+    - Rename ubuntu_drivers.py to test_ubuntu_drivers.py.
+  * UbuntuDrivers/detect.py:
+    - Update oem-*-meta packages after we install them.
+    - Offer oem-*-meta for installation with "ubuntu-drivers install".
+    - Check for 'Modaliases' first when building modalias -> package map.
+  * ubuntu-drivers:
+    - Add a new 'list-oem' command.
+    - Add a --no-oem flag.
+    - Allow installing device specific metapackages (LP: #1866035).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 05 Mar 2020 17:06:28 +0100
+
+ubuntu-drivers-common (1:0.7.8.1) focal; urgency=medium
+
+  * tests/gpu-manager.py:
+    - Do not test against renamed intel modules.
+      We don't rename intel modules (such as i915-brw) any more.
+      This fixes a test failure now that we have switched to exact
+      module matching.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2020 11:31:12 +0100
+
+ubuntu-drivers-common (1:0.7.8) focal; urgency=medium
+
+  * 71-u-d-c-gpu-detection.rules:
+    - Look only for the actual nvidia module.
+  * gpu-manager.c:
+    - Stricter module name matching in is_module_loaded()
+      (LP: #1848326).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Feb 2020 13:35:12 +0100
+
+ubuntu-drivers-common (1:0.7.7) focal; urgency=medium
+
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/ubuntu_drivers.py:
+    - Rely on the linux-image metapackage to find the flavour and
+      linux-modules.
+      This is for cases such as linux-virtual, which depend on the
+      "-generic" flavour.
+    - Fix test case where the linux-modules for the ABI shouldn't have
+      been available.
+
+  [ Daniel Dadap ]
+  * gpu-manager.c:
+    - Add helper to remove /usr/share/X11/xorg.conf.d files.
+      remove_prime_outputclass() and remove_offload_serverlayout() are
+      basically the same function with different target filenames, so
+      add a helper function and make both call into the new helper.
+      Also give the new helper (and the original functions) a return
+      type and value to inform callers of whether removal was successful.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Feb 2020 12:03:24 +0100
+
+ubuntu-drivers-common (1:0.7.6.1) focal; urgency=medium
+
+  * Make sure that the PATH environment variable is set (LP: #1854472).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Nov 2019 11:06:12 +0100
+
+ubuntu-drivers-common (1:0.7.6) eoan; urgency=medium
+
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Drop prime_is_action_on() (now that it isn't on/off any more)
+      and update the description.
+  * UbuntuDrivers/detect.py,
+    UbuntuDrivers/kerneldetection.py,
+    tests/ubuntu_drivers.py,
+    ubuntu-drivers:
+    - Provide DKMS fallback for the "install --gpgpu" case
+      when no linux-modules-nvidia are available for the driver
+      and for a specific kernel (LP: #1843796).
+      We have new tests to cover this scenario now.
+    - Show provider of kernel modules in list --gpgpu
+    - Fix linux metapackage detection.
+      This was meant to be driven by the latest kernel version
+      But it was only partially implemented.
+      Complete the implementation and update the relevant tests.
+
+  [ Daniel Dadap ]
+  * gpu-manager.c:
+    - Enable power management in NVIDIA on-demand mode:
+      The NVIDIA driver can suspend the GPU when it's being used as a
+      PRIME render offload source and it isn't actively being used.
+      disable_power_management() sets the NVIDIA GPU's power/control
+      mode to "on", which prevents the GPU from suspending when it
+      might otherwise be possible to do so.
+    - Increase string storage on stack for path names. This fixes
+      the warnings that gcc emits when building up path names.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 13 Sep 2019 12:38:45 +0200
+
+ubuntu-drivers-common (1:0.7.5) eoan; urgency=medium
+
+  [ Philip Langdale ]
+  * gpu-manager.c:
+    - Turn on PRIME offload when in on-demand mode.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 21 Aug 2019 16:06:34 +0200
+
+ubuntu-drivers-common (1:0.7.4) eoan; urgency=medium
+
+  * tests/quirkreader-test.py:
+    - Fix indentation of comments.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 19:53:11 +0200
+
+ubuntu-drivers-common (1:0.7.3) eoan; urgency=medium
+
+  * UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py:
+    - Remove blank line, and add new line to make test_static.py happy.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 16:22:53 +0200
+
+ubuntu-drivers-common (1:0.7.2) eoan; urgency=medium
+
+  * ubuntu-drivers,
+    UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py:
+    - Make sure to install the linux-modules-nvidia package for the
+      kernel flavour in use, when passing the --gpgpu argument, so
+      that we can deliver a working NVIDIA installation, provided
+      that the EULA was accepted.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 20 Aug 2019 09:50:52 +0200
+
+ubuntu-drivers-common (1:0.7.1) eoan; urgency=medium
+
+  * debian/tests/system:
+    - Do not try installing dkms packages. We already have an
+      infrastructure in place to catch any such failures.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 Jul 2019 17:12:12 +0200
+
+ubuntu-drivers-common (1:0.7) eoan; urgency=medium
+
+  * gpu-manager.c:
+    - Add support for the on-demand mode for PRIME.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 09 Jul 2019 16:59:37 +0200
+
+ubuntu-drivers-common (1:0.6.3) disco; urgency=medium
+
+  [ Jean-Baptiste Lallement ]
+  * ubuntu-drivers,
+    UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py:
+    - Add a --free-only parameter, so as to allow installing only the
+     available free drivers (LP: #1819207).
+    - Add support for testing against a fake archive with free and
+      non-free components.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 18 Mar 2019 16:20:49 +0100
+
+ubuntu-drivers-common (1:0.6.2) disco; urgency=medium
+
+  * UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py,
+    ubuntu-drivers:
+    - Fix argument parsing when only one argument is passed to --gpgpu.
+    - Be more strict about the allowed arguments for --gpgpu (LP: #1818748).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Mar 2019 15:18:26 +0100
+
+ubuntu-drivers-common (1:0.6.1) disco; urgency=medium
+
+  * ubuntu-drivers,
+    UbuntuDrivers/detect.py:
+    - Use exit status 1 if the gpgpu driver is specified and not found,
+      0 if it's not specified and not found.
+    - Exclude the "autoinstall" argument from the help page, and
+      remove the deprecation warning.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 05 Mar 2019 18:39:13 +0100
+
+ubuntu-drivers-common (1:0.6) disco; urgency=medium
+
+  * ubuntu-drivers,
+    tests/ubuntu_drivers.py:
+    - Deprecate the "autoinstall" argument in favour of the "install" one.
+    - Use umockdev more, and test metapackages.
+    - Fix up tests to honour fake sys path.
+    - Allow passing --gpgpu to the list parameter. This will show the
+      available gpgpgu drivers.
+    - Show help screen if no mandatory argument is passed.
+    - Work around bug in argparse in python 3.5.5 in xenial.
+  * UbuntuDrivers/detect.py:
+    - Clean up the way we access the apt cache.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2019 13:05:30 +0100
+
+ubuntu-drivers-common (1:0.5.7) disco; urgency=medium
+
+  * share/hybrid/gpu-manager.service:
+    - Do not let the output through journald (LP: #1768637).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Jan 2019 17:10:36 +0100
+
+ubuntu-drivers-common (1:0.5.6) disco; urgency=medium
+
+  * nvidia-installer-hooks/alternate-install-available,
+    nvidia-installer-hooks/pre-install,
+    setup.py:
+    - Rather than failing with no explanation, let the
+      NVIDIA installer provide instructions on how to
+      install the driver from the Ubuntu archive.
+    - Stop making hooks executable, since they are only
+      plain text files now.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 05 Dec 2018 17:50:26 +0100
+
+ubuntu-drivers-common (1:0.5.5) cosmic; urgency=medium
+
+  *  gpu-manager.c:
+    - Improve pid detection, and restore the default pci
+      power control profile in performance mode (LP: #1778011).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 28 Sep 2018 11:19:26 +0200
+
+ubuntu-drivers-common (1:0.5.4) cosmic; urgency=medium
+
+  * debian/source/options:
+      - Ignore "__pycache__" dir.
+  * debian/rules:
+    - Make sure to remove all the "__pycache__" directories.
+  * gpu-manager.c:
+      - Fix potential issue introduced in commit
+        6770360ed3324358d9069c7468a3af80219157ef.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Sep 2018 14:38:12 +0200
+
+ubuntu-drivers-common (1:0.5.3) cosmic; urgency=medium
+
+  * gpu-manager.(c|py):
+    - Set automatic pci power management when the dGPU is disabled (LP: #1778011).
+    - Load the nvidia modules when switching to performance mode.
+    - Do not skip unbound devices.
+    - Make remove_prime_outputclass() void.
+    - Report failures in enable_power_management().
+    - Look for blacklisted modules in /lib/modprobe.d too.
+    - Report failure when the nvidia modules cannot be unloaded,
+      kill the main display session created by gdm3, and try
+      unloading the nvidia modules once again.
+  * gpu-manager.service:
+    - Start before oem-config.service.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 02 Aug 2018 15:45:42 +0200
+
+ubuntu-drivers-common (1:0.5.2) bionic; urgency=medium
+
+  * gpu-manager.c:
+    - Disable CRT connectors for PRIME, as we used to
+      do in 17.10. This solves a problem with phantom
+      connectors on hybrid systems (LP: #1762200).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 20 Apr 2018 17:07:28 +0200
+
+ubuntu-drivers-common (1:0.5.1) bionic; urgency=medium
+
+  * debian/control:
+    - Build depend on dh-python.
+    - Drop dh-systemd, and use debhelper (>= 9.20160709).
+  * tests/ubuntu_drivers.py:
+    - Raise time to 40.0 for i386 in
+      test_system_driver_packages_performance().
+  * NvidiaDetector/nvidiadetector.py:
+    - Fix crash with new name scheme of the NVIDIA
+      packages (LP: #1054458).
+  * gpu-manager.(c|py):
+    - Create a xorg.conf.d file for systems with PRIME.
+      This way we can drop the PrimaryGpu option from
+      the main NVIDIA configuration xorg.conf.d snippet,
+      and generate an additional custom snippet on demand
+      with that option, to avoid causing problems on systems
+      with multiple NVIDIA GPUs (LP: #1756226).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Apr 2018 16:35:07 +0200
+
+ubuntu-drivers-common (1:0.5) bionic; urgency=medium
+
+  * gpu-manager.{c|py}:
+    - Drop all the code to handle driver configuration, which
+      stopped working after we moved away from alternatives.
+      Only keep telling the system whether PRIME is supported
+      or not (LP: #1757180).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 22 Mar 2018 18:35:19 +0100
+
+ubuntu-drivers-common (1:0.4.27) bionic; urgency=medium
+
+  [ Chris Coulson ]
+  * detect-plugins/cpu-microcode.py, UbuntuDrivers/detect.py:
+    - Remove the cpu-microcode.py detection plugin (LP: #1738259).
+      Kernel metapackages are going to have a hard dependency on the
+      {intel,amd64}-microcode packages to ensure that all bare-metal installs
+      benefit from microcode updates. This means that microcode packages are
+      no longer "additional drivers" and since they won't be able to be removed
+      without uninstalling the kernel metapackages, there is no need for them
+      to be exposed by ubuntu-drivers.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 02 Feb 2018 09:38:35 +0100
+
+ubuntu-drivers-common (1:0.4.26) bionic; urgency=medium
+
+  * tests/gpu-manager.py:
+    - It is ok that quirks are still be detected, even though bbswitch
+      won't use them, as it's not being loaded. Fixes FTFS.
+    - Skip test_system_modaliases_system on s390x.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 01 Feb 2018 16:22:00 +0100
+
+ubuntu-drivers-common (1:0.4.25) bionic; urgency=medium
+
+  [ Alex Tu ]
+  * gpu-manager.c:
+    - Skip bbswitch, and make sure to unload the nvidia driver when
+      the force-dgpu-on option is enabled (LP: #1728547).
+
+  [ Bryan Quigley ]
+  * debian/rules,
+    debian/ubuntu-drivers-common.install,
+    setup.py,
+    share/hybrid/gpu-manager.conf:
+    - Remove the remaing upstart pieces.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Jan 2018 12:51:48 +0100
+
+ubuntu-drivers-common (1:0.4.24) bionic; urgency=medium
+
+  * gpu-manager.{c|py}:
+    - Add support for forcing the dGPU on on hybrid systems.
+      Creating an empty file named "force-dgpu-on"
+      in the /usr/share/gpu-manager.d directory will force the dGPU
+      on in power saving mode (LP: #1728547).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 Oct 2017 10:25:02 +0100
+
+ubuntu-drivers-common (1:0.4.23) artful; urgency=medium
+
+  [ Alberto Milone ]
+  * gpu-manager.{c|py}:
+    - Disable persistence mode before powering down the dGPU.
+      If persistence mode is not disabled, gpu-manager will not be
+      able to unload the nvidia module.
+    - Add support for using custom xorg.confs with the nvidia
+      driver (LP: #1667198).
+      Custom xorg files can be named "non-hybrid" (for non hybrid
+      systems), "hybrid-performance", and "hybrid-power-saving",
+      and will have to placed in the /usr/share/gpu-manager.d
+      directory.
+      The directory can be overridden by passing another directory
+      along with the "--custom-xorg-conf-path" parameter.
+    - Add tests for the custom xorg.confs code and for amdgpu-pro
+      hybrid support.
+  [ Kai-Heng Feng ]
+  * debian/control:
+    - Add build dependency on libkmod-dev.
+  * gpu-manager.c:
+    - Detect and handle switchable graphics with the amdgpu-pro driver.
+      AMDGPU-Pro has its own script to switch between powersaving and
+      performance mode.
+      Some machines allow enabling switchable graphics, or disabling
+      the iGPU completely, thus leaving only the dGPU on. This new code
+      simply detects the different profiles supported by AMD, and
+      enables powersaving mode when possible.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 11 May 2017 11:05:40 +0200
+
+ubuntu-drivers-common (1:0.4.22) yakkety; urgency=medium
+
+  * gpu-manager.c:
+    - Disable persistence mode before powering down the dGPU.
+      If persistence mode is not disabled, gpu-manager will not be able to
+      unload the nvidia module.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 18:09:25 +0200
+
+ubuntu-drivers-common (1:0.4.21) yakkety; urgency=medium
+
+  * gpu-manager.c:
+    - Make sure to load and unload the new nvidia-drm module.
+      This fixes a problem that prevents the dGPU from being powered off
+      in hybrid systems with recent nvidia drivers.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 31 Aug 2016 11:47:13 +0200
+
+ubuntu-drivers-common (1:0.4.20) yakkety; urgency=medium
+
+  * Remove PackageKit plugin. This stopped working with packagekit 1.0 as its
+    apt backend is gone and aptcc does not support plugins.
+  * debian/control: Drop obsolete XS-Testsuite:.
+  * Bump Standards-Version to 3.9.8.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 16 Aug 2016 11:46:36 +0200
+
+ubuntu-drivers-common (1:0.4.19) yakkety; urgency=medium
+
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Fix memory leak in get_alternatives(). Make sure to always free
+      alternatives->current_core and alternatives->current_egl.
+    - Partially drop the drm code, and get information about connectors
+      from sysf. This fixes a long standing performance issue (LP: #1586933).
+
+  [ Ying-Chun Liu (PaulLiu) ]
+  * Quirks/quirkinfo.py:
+    - Catch and ignore UnicodeDecodeErrors in dmi info, as some machines
+      may report board_name as ffffffffffff0a to mean empty, and this
+      causes an error in python 3 (LP: #1320868).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 30 May 2016 16:17:42 +0200
+
+ubuntu-drivers-common (1:0.4.18) yakkety; urgency=medium
+
+  * gpu-manager.c:
+    - Pass the arguments in the correct order when getting
+      the list of alternatives (LP: #1575960).
+      Thanks to Rafał Cieślak for the fix.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 29 Apr 2016 12:29:03 +0200
+
+ubuntu-drivers-common (1:0.4.17) xenial; urgency=medium
+
+  * tests/ubuntu_drivers.py: Allow test_system_driver_packages_performance()
+    90s on ARM, as 30s is not enough on slow buildds.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 12 Apr 2016 11:03:37 +0200
+
+ubuntu-drivers-common (1:0.4.16) xenial; urgency=medium
+
+  * debian/tests/system: Drop test_fglrx() as the fglrx driver is gone.
+    Test bcmwl instead.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 04 Mar 2016 11:07:02 +0100
+
+ubuntu-drivers-common (1:0.4.15) xenial; urgency=medium
+
+  * gpu-manager.{c|py}:
+    - Add support for managing EGL alternatives.
+    - Make sure to load and to unload the new nvidia-modeset module for
+      prime.
+  * 71-u-d-c-gpu-detection.rules, u-d-c-print-pci-ids:
+    - Fix fglrx detection.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 28 Jan 2016 17:29:27 +0100
+
+ubuntu-drivers-common (1:0.4.14) xenial; urgency=medium
+
+  * gpu-manager.{c|py}:
+    - Rely on udev for card detection. This helps detecting if a module
+      was unloaded or if a card was disabled on a hybrid system.
+      In addition to being more accurate (LP: #1485236), this should also
+      be much faster on boot (LP: #1307069).
+    - Restrict the search for built modules to the dkms directory. This
+      improves performance.
+  * debian/rules, setup.py, 71-u-d-c-gpu-detection.rules,
+    u-d-c-print-pci-ids:
+    - Provide a udev rule to detect cards and modules.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 13 Jan 2016 10:35:18 +0100
+
+ubuntu-drivers-common (1:0.4.13) xenial; urgency=medium
+
+  * Depend on liblocale-gettext-perl for autopkgtest, forcing it not to be
+    dropped during Perl transitions (thereby breaking the fglrx test) due to
+    pinning only necessary packages from -proposed.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Tue, 29 Dec 2015 05:22:18 +0000
+
+ubuntu-drivers-common (1:0.4.12) xenial; urgency=medium
+
+  [ Alberto Milone ]
+  * UbuntuDrivers/detect.py:
+    - Make modalias matching case insensitive (LP: #1500591).
+
+  [ Martin Pitt ]
+  * debian/tests/system: Explicitly require version 1.0 of UMockdev, to avoid
+    a warning on stderr.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 26 Oct 2015 11:03:09 +0100
+
+ubuntu-drivers-common (1:0.4.11) wily; urgency=medium
+
+  * gpu-manager.c:
+    - Rely on /var/log/syslog to get information about unloaded modules.
+      This should minimise the current slowdown on boot (LP: #1307069).
+    - Switch from intel to modesetting as the default driver on hybrid
+      intel/nvidia systems because of a regression in the intel driver
+      (LP: #1507676).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 19 Oct 2015 17:35:12 +0200
+
+ubuntu-drivers-common (1:0.4.10) wily; urgency=medium
+
+  * debian/tests/system: Drop the nvidia package tests; they are now tested
+    through autodep8 on every kernel and dkms change, so we don't have to rely
+    on this hard to maintain autopkgtest any more. Also drop most other driver
+    package tests for the same reason; just keep the "fglrx" test to get a
+    full end-to-end test with "ubuntu-drivers".
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 03 Sep 2015 11:27:33 +0200
+
+ubuntu-drivers-common (1:0.4.9) wily; urgency=medium
+
+  * tests/ubuntu_drivers.py: Reset the apt.Cache() cache between tests, as
+    this is unreliable with tests that keep switching apt's root directory.
+    (LP: #1487223)
+  * Bump Standards-Version to 3.9.6 (no changes necessary).
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 03 Sep 2015 07:47:21 +0200
+
+ubuntu-drivers-common (1:0.4.8) wily; urgency=medium
+
+  [ Alberto Milone ]
+  * share/hybrid/gpu-manager.c, tests/gpu-manager.py:
+    - Use SNA in powersaving mode for pxpress, and keep UXA
+      only for performance mode (where it's required). This
+      fixes a number of HWE issues (e.g. LP: #1472972).
+  * Quirks/quirkreader.py:
+    - Set the encoding when opening the file. This fixes a
+      crash in Wily.
+
+  [ Martin Pitt ]
+  * debian/rules: Ensure that $PATH includes /sbin:/usr/sbin, as the tests
+    require several programs from that (e. g. modinfo, aptd). Fixes FTBFS due
+    to test failures. (LP: #1487223)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 02 Sep 2015 16:59:42 +0200
+
+ubuntu-drivers-common (1:0.4.7) wily; urgency=medium
+
+  * gpu-manager.c:
+    - Check that we have write access to the log. If writing to
+      the log fails, we show a warning, and use stdout instead.
+      (LP: #1298693)
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Aug 2015 10:40:23 +0200
+
+ubuntu-drivers-common (1:0.4.6) wily; urgency=medium
+
+  * gpu-manager.c, gpu-manager.py:
+    - Use the amdconfig tool to configure multi-amd PXpress. This
+      fixes a problem where the AMD control panel won't show an
+      option to switch between power saving mode and performance
+      mode on AMD+AMD hybrid systems (LP: #1410801).
+    - The tests now reflect a more relaxed approach so that we
+      do not overwrite configurations that are not supported (such
+      as multiple xscreens set in the xorg.conf).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 May 2015 16:42:32 +0200
+
+ubuntu-drivers-common (1:0.4.5) vivid; urgency=medium
+
+  * Call dh_systemd_enable after installing gpu-manager.service, so that the
+    unit actually gets enabled. Also quiesce the confusing error messages
+    about nonexisting binary package directories. (LP: #1443364)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 13 Apr 2015 07:01:15 -0500
+
+ubuntu-drivers-common (1:0.4.4) vivid; urgency=medium
+
+  * debian/tests/system: Re-enable fglrx tests and update them for the
+    fglrx-core split.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 10 Apr 2015 12:47:48 +0200
+
+ubuntu-drivers-common (1:0.4.3) vivid; urgency=medium
+
+  * debian/tests/system: Don't use --auto-remove on purge, to avoid removing
+    our test dependencies.
+  * debian/tests/system: Set noninteractive debconf frontend, to avoid debconf
+    error messages.
+  * debian/tests/system: Mark fglrx tests as expected failures, the current
+    fglrx driver is known to be incompatible with current X.org.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 10 Apr 2015 11:44:45 +0200
+
+ubuntu-drivers-common (1:0.4.2) vivid; urgency=medium
+
+  * gpu-manager.c:
+    - Do not abort when dealing with sddm. This allows users to get
+      partial support for hybrid graphics when using sddm instead of
+      lightdm.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 09 Apr 2015 12:51:23 +0200
+
+ubuntu-drivers-common (1:0.4.1) vivid; urgency=medium
+
+  * debian/tests/system:
+    - Add test for nvidia-346 and change the ids for nvidia-340.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 12 Mar 2015 17:47:05 +0100
+
+ubuntu-drivers-common (1:0.4) vivid; urgency=medium
+
+  [ Dimitri John Ledkov ]
+  * Add cpu-microcode detect-plugin. (LP: #1386257)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 19 Feb 2015 14:52:28 +0100
+
+ubuntu-drivers-common (1:0.3) vivid; urgency=medium
+
+  * debian/tests/system: nvidia-331 is transitional now, so adjust tests to
+    use nvidia-340.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 16 Feb 2015 10:38:48 +0100
+
+ubuntu-drivers-common (1:0.2.98.9) vivid; urgency=medium
+
+  * gpu-manager.c:
+    - Ignore pci passthroughs (LP: #1397124).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 08 Dec 2014 10:56:17 +0100
+
+ubuntu-drivers-common (1:0.2.98.8) vivid; urgency=medium
+
+  * gpu-manager.service: Log into /var/log/gpu-manager.log so that we can pick
+    this up from apport.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 15:28:24 +0100
+
+ubuntu-drivers-common (1:0.2.98.7) vivid; urgency=medium
+
+  * Only install systemd unit on architectures where gpu-manager gets built.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 14:59:47 +0100
+
+ubuntu-drivers-common (1:0.2.98.6) vivid; urgency=medium
+
+  * setup.py: Drop unnecessary glob().
+  * tests/ubuntu_drivers.py: Set SYSTEMD_LOG_LEVEL to avoid failing on
+    unexpected udevadm debug spew if the kernel gets booted with "debug".
+    Fixes FTBFS on our arm64 builders.
+  * Add systemd unit for gpu-manager.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 03 Dec 2014 13:36:11 +0100
+
+ubuntu-drivers-common (1:0.2.98.5) vivid; urgency=medium
+
+  * gpu-manager.c:
+    - Refine checks for blacklisted modules, so that we don't end up
+      catching false positives (LP: 1376966).
+      Thanks to Pär Lindfors for the patch.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 30 Oct 2014 11:36:55 +0100
+
+ubuntu-drivers-common (1:0.2.98.4) utopic; urgency=medium
+
+  * debian/tests/system, tests/ubuntu_drivers.py,
+    UbuntuDrivers/detect.py:
+    - Revert the previous changes that made us switch from bcmwl to
+      the open driver, as the latter (in order to be a full replacement)
+      seems to require firmware that we cannot include in the Ubuntu
+      image because of licensing issues (LP: #1374126).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 09 Oct 2014 16:42:53 +0200
+
+ubuntu-drivers-common (1:0.2.98.3) utopic; urgency=medium
+
+  * gpu-manager.c:
+    - Add support for "gpumanager_uxa" and "gpumanager_modesetting"
+      boot parameters, so that there is an option to force NVIDIA
+      Optimus systems (that don't work well with Intel/SNA) to use
+      either Intel/UXA or modesetting (LP: #1365695).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 18 Sep 2014 12:15:34 +0200
+
+ubuntu-drivers-common (1:0.2.98.2) utopic; urgency=medium
+
+  * gpu-manager.c, gpu-manager.py:
+    - Be more tolerant with xorg.confs. This fixes the multi AMD
+      GPU use case where aticonfig insists on not setting the
+      PCI domain in the xorg.conf (LP: #1310489). Also add a test
+      with one of the xorg.confs from the bug report so that we
+      do not regress in the future.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sun, 07 Sep 2014 09:28:20 +0200
+
+ubuntu-drivers-common (1:0.2.98.1) utopic; urgency=medium
+
+  * gpu-manager.c, gpu-manager.py:
+    - Avoid false positives with blacklisted modules (LP: #1363675).
+    - Add regression test for the bug.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 01 Sep 2014 18:01:09 +0200
+
+ubuntu-drivers-common (1:0.2.98) utopic; urgency=medium
+
+  * gpu-manager.c, gpu-manager.py:
+    - Add support for testing core alternatives. This will be needed
+      by fglrx.
+    - Add the --backup-log parameter. This is only used for debugging
+      and disabled by default.
+    - Fix a regression that caused the gpu-manager to switch to mesa
+      after enabling fglrx on hybrid systems (LP: #1310489). Also
+      add a test case so that we don't regress in the future.
+    - Check that either fglrx or nvidia is set in xorg.conf when
+      xorg.conf is needed.
+    - Check if kernel modules are blacklisted before choosing the
+      driver (LP: #1310489).
+    - Enable only GPUs with open drivers that have connected outputs.
+      Attaching to GPUs that have no connected outputs would result
+      in a black screen.
+    - Allow RandR offloading even without bbswitch (LP: #1349282).
+    - Fall back to mesa when failing to enable prime.
+    - Do not try to enable prime if the nvidia driver is older than
+      331.
+    - Do not abort if the settings for prime cannot be found.
+      Try creating the file before failing.
+    - Avoid false positives of unloaded modules.
+    - Use the cleanup attribute.
+    - Always use snprintf instead of sprintf.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 27 Aug 2014 10:39:17 +0200
+
+ubuntu-drivers-common (1:0.2.97) utopic; urgency=medium
+
+  * tests/testarchive.py: Organize debs in pool/ structure, for better
+    reusability.
+  * tests/ubuntu_drivers.py: Drop expected failures, they've succeeded for a
+    long time. This needs to be fixed properly if there's a bug.
+  * sl-modem plugin: Keep environment for aplay, just ensure it's using the C
+    locale. (LP: #1296425)
+  * Disable linux-firmware-nonfree autopkgtest for now. bcma does not declare
+    any firmware dependencies and linux-firmware-nonfree does not declare
+    modaliases, so it either just works now, or the driver needs fixing first.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 18 Aug 2014 10:13:11 +0200
+
+ubuntu-drivers-common (1:0.2.96.1) utopic; urgency=medium
+
+  * gpu-manager.c:
+    - Make sure to unload nvidia-uvm or nvidia won't be
+      unloaded.
+    - Make sure to walk properly the /dev/dri dir. This
+      prevents the program from stopping when, for example
+      /dev/dri/card1 is available while /dev/dri/card0 is
+      not.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 11 Jun 2014 17:29:38 +0200
+
+ubuntu-drivers-common (1:0.2.96) utopic; urgency=medium
+
+  * gpu-manager.c:
+    - Try harder when loading bbswitch (LP: #1310023).
+      If loading bbswitch fails try with or without the
+      "skip_optimus_dsm=1" option.
+    - Switch to intel/SNA for optimus systems (LP: #1326257).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 04 Jun 2014 15:59:24 +0200
+
+ubuntu-drivers-common (1:0.2.95) utopic; urgency=medium
+
+  [ Tim Lunn ]
+  * gpu-manager.c, gpu-manager.conf:
+    - Use the gpu-manager with GDM too now that support for
+      it has landed in Utopic (LP: #1262068).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 30 May 2014 14:09:31 +0200
+
+ubuntu-drivers-common (1:0.2.94) utopic; urgency=medium
+
+  * gpu-manager.c, tests/gpu-manager.py:
+    - Trim dmi resources or matching will give false positives.
+      This should fix LP: #1310516 for good.
+    - Re-enable checking alternatives for pxpress.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 16 May 2014 13:28:31 +0200
+
+ubuntu-drivers-common (1:0.2.93) utopic; urgency=medium
+
+  * gpu-manager.c, tests/gpu-manager.py:
+    - Add support for matching dmi product name (LP: #1310516).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 May 2014 15:50:11 +0200
+
+ubuntu-drivers-common (1:0.2.92.2) utopic; urgency=medium
+
+  * gpu-manager.c:
+    - Revert switch to the intel driver from modesetting until
+      some issues are fixed.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Apr 2014 18:37:02 +0200
+
+ubuntu-drivers-common (1:0.2.92.1) utopic; urgency=medium
+
+  * debian/tests/system, tests/ubuntu_drivers.py:
+    - Fix the relevant tests now that linux-firmware-nonfree
+      has replaced bcmwl.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Apr 2014 18:03:45 +0200
+
+ubuntu-drivers-common (1:0.2.92) utopic; urgency=medium
+
+  [ Alberto Milone ]
+  * gpu-manager.c:
+    - Ignore CRT displays when using PRIME. This works around
+      systems whose BIOS provides a ghost output (LP: #1296020).
+    - Switch from modesetting to intel for PRIME.
+  * tests/gpu-manager.py:
+    - Check that we don't remove xorg.confs on 1st boot.
+  * UbuntuDrivers/detect.py:
+    - Do not autoinstall the broadcom driver. The open driver
+      should be a better solution now (LP: #1306928).
+    - Autoinstall linux-firmware-nonfree. This will help now
+      that we no longer autoinstall Broadcom's binary driver.
+
+  [ Mario Limonciello ]
+  * gpu-manager.c:
+    - During first boot, don't remove existing xorg.conf (LP: #1307546).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 28 Apr 2014 10:15:11 +0200
+
+ubuntu-drivers-common (1:0.2.91.4) trusty; urgency=medium
+
+  * Force removal of jockey on upgrades. It has been replaced with
+    ubuntu-drivers-common two cycles ago, removed from trusty, and now just
+    crashes due to API changes in aptdaemon. (LP: #1216193)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sun, 13 Apr 2014 13:31:11 +0200
+
+ubuntu-drivers-common (1:0.2.91.3) trusty; urgency=medium
+
+  * gpu-manager.c:
+    - Move away the xorg.conf if mesa is selected as a
+      fallback and binary drivers are still in use in the
+      xorg.conf. This will prevent X from failing when
+      users on hybrid systems uninstall a binary driver.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 09 Apr 2014 17:06:53 +0200
+
+ubuntu-drivers-common (1:0.2.91.2) trusty; urgency=medium
+
+  * gpu-manager.c:
+    - Always check that devices are bound to a driver.
+      This works better than blacklisting the 0380 class, and
+      should help systems such as the one in LP: #1301839.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 07 Apr 2014 17:52:29 +0200
+
+ubuntu-drivers-common (1:0.2.91.1) trusty; urgency=medium
+
+  * debian/control, debian/rules:
+    - Obsolete and replace fglrx-pxpress. The gpu-manager
+      already deals with AMD GPUs.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 21 Mar 2014 19:03:20 +0100
+
+ubuntu-drivers-common (1:0.2.91) trusty; urgency=medium
+
+  * debian/control:
+    - Add build dependency on libdrm-dev.
+  * debian/rules:
+    - Remove /etc/init/hybrid-gfx.conf.
+    - Also remove the current upstart job from the architectures
+      that don't ship gpu-manager.
+  * gpu-manager.c, tests/gpu-manager.py:
+    - Replace laptop specific hack to detect the need to offload
+      rendering to the discrete card with code that opens the
+      available drm devices and checks the connected outputs.
+      If any outputs are connected to the Intel card, then we
+      choose offloading. This also helps when the monitor is
+      still connected to Intel on desktop systems with Intel +
+      NVIDIA systems.
+    - Preliminary work to reduce code duplication in nvidia-prime.
+  * tests/ubuntu_drivers.py:
+    - Do not abort if test_auto_install_system fails.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Mar 2014 14:49:04 +0100
+
+ubuntu-drivers-common (1:0.2.90) trusty; urgency=low
+
+  * gpu-manager.c, gpu-manager.py:
+    - Match only PCI_CLASS_DISPLAY, except for PCI_CLASS_DISPLAY_OTHER.
+    - Re-enable outputs connected to NVIDIA discrete cards. This only
+      affects Optimus systems (LP: #1290711).
+    - Prevent possible buffer overflow when reading the configuration
+      from last boot.
+    - Clean up and make get_output() more robust (LP: #1290831).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 13 Mar 2014 10:15:06 +0100
+
+ubuntu-drivers-common (1:0.2.89.6) trusty; urgency=low
+
+  * gpu-manager.c:
+    - Take action if settings don't match the current bbswitch status
+      (LP: #1289420).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 17:07:28 +0100
+
+ubuntu-drivers-common (1:0.2.89.5) trusty; urgency=low
+
+  * tests/run:
+    - Skip gpu-manager.py on anything other than the x86 family.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Mar 2014 01:26:18 +0100
+
+ubuntu-drivers-common (1:0.2.89.4) trusty; urgency=medium
+
+  [ Martin Pitt ]
+  * Reenable tests.
+  * Mark the three failing tests as expected failure instead of skipping them
+    entirely, so that we can see what they do on the buildds.
+
+  [ Alberto Milone ]
+  * tests/gpu-manager.py:
+    - Refactor the test suite by reusing more code and reducing the
+      overall code.
+    - Add test case for zero length dmi product version.
+  * share/hybrid/gpu-manager.c:
+    - Do not try to match quirks if dmi product version has zero length
+      (LP: #1289298).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 07 Mar 2014 22:54:22 +0100
+
+ubuntu-drivers-common (1:0.2.89.3) trusty; urgency=low
+
+  * debian/rules:
+    - Temporarily disable all tests. We'll switch them back on as
+      soon as we find out the cause of these failures.
+  * tests/gpu-manager.py:
+    - Do not run on anything but x86 family.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 16:30:54 +0100
+
+ubuntu-drivers-common (1:0.2.89.2) trusty; urgency=low
+
+  * tests/gpu-manager.py:
+    - Fix FTBFS.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 11:45:29 +0100
+
+ubuntu-drivers-common (1:0.2.89.1) trusty; urgency=low
+
+  * tests/gpu-manager.py:
+    - Remove leftover print that caused tests to fail in -proposed.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 10:47:44 +0100
+
+ubuntu-drivers-common (1:0.2.89) trusty; urgency=low
+
+  * debian/control:
+    - Breaks: nvidia-prime (<< 0.6). We don't want the gpu-manager
+      to compete with the old nvidia-prime on hybrid systems.
+  * share/hybrid/gpu-manager.c:
+    - Fix memory leaks and complete the different test cases.
+  * tests/gpu-manager.py:
+    - Add test suite for gpu-manager to reproduce different
+      hardware/software scenarios.
+  * UbuntuDrivers/detect.py, tests/ubuntu_drivers.py:
+    - Enable installing graphics drivers on laptops with hybrid
+      graphics (LP: #1126234), and on desktop systems where the
+      BIOS doesn't disable the integrated GPU when a discrete
+      card is available (LP: #1126234). This is now possible
+      thanks to the gpu-manager (now enabled by default).
+  * Replace the deprecated hybrid-detect program with gpu-manager (now
+    enabled by default). In case of problems with the gpu-manager, it
+    can be disabled by passing "nogpumanager" as a boot parameter.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 06 Mar 2014 09:24:54 +0100
+
+ubuntu-drivers-common (1:0.2.88) trusty; urgency=medium
+
+  * debian/tests/control: Add missing linux-headers test dependency.
+  * Drop python3-aptdaemon.pkcompat recommends to a suggests, to avoid pulling
+    it into Kubuntu.
+  * share/hybrid/gpu-manager.c:
+    - Add the new gpu manager. This will replace hybrid-detect as soon as
+      test coverage is complete.
+  * tests/ubuntu_drivers.py:
+    - Skip test_list_system() and test_devices_system() for now. We need
+      to find a way to pass syspath without the whole APT_CONFIG env var,
+      or the tests will fail if system packages match real system hardware.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 20 Feb 2014 17:13:36 +0100
+
+ubuntu-drivers-common (1:0.2.87) trusty; urgency=low
+
+  * tests/ubuntu_drivers.py: Reduce the expected system modaliases from > 5 to
+    > 3, as our arm64 builders seem a bit hardware deprived. Fixes FTBFS on
+    arm64.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 10:20:08 +0100
+
+ubuntu-drivers-common (1:0.2.86) trusty; urgency=low
+
+  * debian/tests/system: nvidia-319 is now a transitional package, update
+    tests to check nvidia-331 instead.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 09:52:58 +0100
+
+ubuntu-drivers-common (1:0.2.85) trusty; urgency=low
+
+  * Depend on kmod | module-init-tools. Apparently some users manage to
+    uninstall it. (LP: #1087222)
+  * Bump Standards-Version to 3.9.5. No changes necessary.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 05 Dec 2013 07:55:48 +0100
+
+ubuntu-drivers-common (1:0.2.84) trusty; urgency=low
+
+  * debian/tests/system: Update check of modinfo error message to also work
+    with current kmod.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 04 Nov 2013 10:33:44 +0100
+
+ubuntu-drivers-common (1:0.2.83) saucy; urgency=low
+
+  * debian/tests/control: Install libgl1-mesa-glx for the tests, so that
+    the fglrx packages don't fail to install.
+  * debian/tests/system: nvidia-{310,313} are now transitional, drop tests and
+    test nvidia-319{,-updates} instead.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 05 Jul 2013 11:13:45 +0200
+
+ubuntu-drivers-common (1:0.2.82) saucy; urgency=low
+
+  * debian/tests/system: Accept stderr messages from the
+    TestUbuntuDrivers.test_bcmwl() test, as this spits out lots of libkmod
+    errors due to the rather thin umockdev environment.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 19 Jun 2013 07:30:38 +0200
+
+ubuntu-drivers-common (1:0.2.81) saucy; urgency=low
+
+  * debian/tests/system: Port to umockdev.
+  * share/fake-devices-wrapper: Fix fake bcmwl modalias.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 22:23:14 +0200
+
+ubuntu-drivers-common (1:0.2.80) saucy; urgency=low
+
+  * Make test failures non-fatal on powerpc.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 17:17:16 +0200
+
+ubuntu-drivers-common (1:0.2.79) saucy; urgency=low
+
+  * Skip test_system_driver_packages_bad_encoding() on powerpc. It's not
+    obvious why it fails there, and without a porter box there is little we
+    can do.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 14:48:01 +0200
+
+ubuntu-drivers-common (1:0.2.78) saucy; urgency=low
+
+  * debian/tests/system: Drop usage of fakesys.py, should not actually be
+    necessary.
+  * Drop tests/fakesysfs.py, not used any more and obsolete.
+  * Bump Standards-Version to 3.9.4 (no changes necessary).
+  * UbuntuDrivers/detect.py, system_aliases(): Tone down "Cannot read modalias
+    file" warning into a debug statement; this isn't particularly interesting
+    or an error the user could do something about, and it breaks tests on
+    powerpc.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 18 Jun 2013 13:43:05 +0200
+
+ubuntu-drivers-common (1:0.2.77) saucy; urgency=low
+
+  * detect.py, _get_db_name(): Call "udevadm hwdb" instead of the old
+    /lib/udev/*-db helpers; the latter don't exist any more. This brings back
+    vendor/product names. Bump udev dependency accordingly. (LP: #1186777)
+  * share/fake-devices-wrapper: Rewrite using umockdev, our fakesys.py does
+    not work any more with current libudev.
+  * Port test suite from fakesys.py to umockdev. Add umockdev build-dependency
+    for this (see MIR LP #1190926)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 14 Jun 2013 14:20:21 +0200
+
+ubuntu-drivers-common (1:0.2.76) raring; urgency=low
+
+  * debian/tests/system: nvidia-current is now a transitional package, so
+    change tests to test -304.
+  * debian/tests/system: Add tests for nvidia-310 and -313-updates.
+  * debian/tests/system: Drop sl-modem test case. We don't officially support
+    it, and it's broken at the moment. The package build test should move into
+    sl-modem itself if anyone is interested in keeping it alive.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 18 Mar 2013 13:12:14 +0100
+
+ubuntu-drivers-common (1:0.2.75) raring; urgency=low
+
+  * UbuntuDrivers/detect.py:
+    - Add get_linux() which returns the linux metapackage name.
+  * UbuntuDrivers/kerneldetection.py:
+    - Rely on the source name only for "-lts" packages (a special case).
+    - Add KernelDetection.get_linux_metapackage().
+  * tests/ubuntu_drivers.py:
+    - Add more tests with different kernel names.
+    - Extend test coverage to both get_linux() and get_linux_headers()
+      from UbuntuDrivers/detect.py.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 30 Jan 2013 12:08:59 +0100
+
+ubuntu-drivers-common (1:0.2.74) raring; urgency=low
+
+  [ Martin Pitt ]
+  * hybrid-detect.c: Fix detection of i386 architecture. Thanks Dennis
+    Baurichter! (LP: #1096354)
+
+  [ Alberto Milone ]
+  * NvidiaDetector/nvidiadetector.py: Exclude -current from the
+    recommended flavours. The -current flavour is now a transitional
+    package therefore we should not recommend it any more.
+  * UbuntuDrivers/kerneldetection.py, UbuntuDrivers/detect.py,
+    tests/ubuntu_drivers.py: Add support for checking and suggesting
+    the required linux headers.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 29 Jan 2013 13:30:50 +0100
+
+ubuntu-drivers-common (1:0.2.73) raring; urgency=low
+
+  * debian/tests/control: Add apport to test dependencies, so that the DKMS
+    hook can generate proper crash files which will help with debugging.
+  * debian/tests/system: In the Broadcom wifi test, use a proper device class
+    and subclass, as the current driver matches on those now.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 13 Dec 2012 16:02:42 +0100
+
+ubuntu-drivers-common (1:0.2.72) raring; urgency=low
+
+  [ Matthias Klose ]
+  * Build-depend on python3-all.
+
+  [ Dmitrijs Ledkovs ]
+  * Use /usr/bin/python3 shebang.
+
+  [ Martin Pitt ]
+  * debian/tests/system: Fix duplicate output of error message for test
+    failures.
+  * tests/ubuntu_drivers.py, test_devices_detect_plugins(): Fix failure if
+    special.py occurs first in the output. This bug was triggered by Python
+    3.3's new hash randomization behaviour. (LP: #1071997)
+  * UbuntuDrivers/detect.py: Fix UnicodeDecodeError crash when encountering a
+    package with invalid UTF-8 encoding. Just skip those packages instead. Add
+    test to tests/ubuntu_drivers.py.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 07 Nov 2012 15:47:19 +0100
+
+ubuntu-drivers-common (1:0.2.71.1) quantal-proposed; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - Make sure to never recommend experimental drivers (LP: #1070795).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 24 Oct 2012 16:42:19 +0200
+
+ubuntu-drivers-common (1:0.2.71) quantal; urgency=low
+
+  * tests/ubuntu_drivers.py: When calling PackageKit, retry up to 5 seconds on
+    o.f.d.Error.ServiceUnknown, so that this also works reliably on our slow
+    ARM builders. (LP: #1061748)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 05 Oct 2012 08:25:30 +0200
+
+ubuntu-drivers-common (1:0.2.70) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py: Never recommend a driver which has "experiment"
+    in the name, unless no other driver is available.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 04 Oct 2012 22:59:33 +0200
+
+ubuntu-drivers-common (1:0.2.69) quantal; urgency=low
+
+  * Drop share/last_gfx_boot, and stop installing it in setup.py. This file is
+    created and updated at runtime and should not be shipped in the package.
+    (LP: #1045629)
+  * setup.py: Only install the upstart job on platforms where we build
+    hybrid-detect. (LP: #1045193)
+  * debian/rules: On architectures which do not ship hybrid-detect, generate a 
+    .maintscript helper to clean up the /etc/init/hybrid-gfx.conf upstart job
+    conffile on upgrade.
+  * tests/ubuntu_drivers.py: Add test for a video driver which supports
+    multiple X.org video ABIs. Reproduces LP #1033222.
+  * UbuntuDrivers/detect.py, _check_video_abi_compat(): Do not only consider
+    the first xorg-video-abi-* dependency, but all of them. (LP: #1033222)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 06 Sep 2012 15:18:26 +0200
+
+ubuntu-drivers-common (1:0.2.68) quantal; urgency=low
+
+  * setup.py: Fix hybrid_detect installation. (LP: #1026787)
+
+ -- Jason Conti <jason.conti@gmail.com>  Fri, 20 Jul 2012 05:45:14 +0200
+
+ubuntu-drivers-common (1:0.2.67) quantal; urgency=low
+
+  * setup.py: Install hybrid-detect through data_files instead of scripts, as
+    the later stopped working with python 3.2.3-3 (see LP #1026016)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 10:23:05 +0200
+
+ubuntu-drivers-common (1:0.2.66) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py, system_device_drivers(): Add driver flag
+    "manual_installed" if none of the driver packages are installed, but the
+    corresponding kernel module is available. This usually means that the user
+    installed the driver manually from upstream. (LP: #1025632)
+  * share/fake-devices-wrapper: If $FAKE_INSTALLED_KMOD is set, run the
+    wrapped program with a "modinfo" wrapper in $PATH which claims that the
+    given kernel module name is available. This can be used to test the
+    "manually installed driver" case.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 18 Jul 2012 09:29:59 +0200
+
+ubuntu-drivers-common (1:0.2.65) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py, system_driver_packages(): Add 'recommended' flag
+    to the nvidia-* and fglrx-* packages, which usually provide more than one
+    package for a particular device. (LP: #1025315)
+  * UbuntuDrivers/detect.py, auto_install_filter(): Filter out non-recommended
+    packages, to avoid installing multiple versions of the NVidia or FGLRX
+    driver.
+  * UbuntuDrivers/detect.py: Change return value of detect_plugin_packages()
+    to a plugin_name → [package, ...] map, so that we retain the plugin names.
+  * UbuntuDrivers/detect.py: Add system_device_drivers() API to get a
+    by-device view of drivers, plus OS builtin free alternatives (such as
+    Nouveau). Add it to README as well. (LP: #1025323)
+  * ubuntu-drivers: Add "device" command to show by-device drivers as reported
+    by system_device_drivers().
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 17 Jul 2012 15:48:44 +0200
+
+ubuntu-drivers-common (1:0.2.64) quantal; urgency=low
+
+  * debian/control: Add pciutils and usbutilsl build/binary dependencies, so
+    that pci-db and usb-db actually have some data files to work with.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 11:08:02 +0200
+
+ubuntu-drivers-common (1:0.2.63) quantal; urgency=low
+
+  * debian/control: Add udev build/binary dependency, to ensure we have pci-db
+    and usb-db.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 10:52:46 +0200
+
+ubuntu-drivers-common (1:0.2.62) quantal; urgency=low
+
+  * debian/control: As the PackageKit apt backend is going away, drop the
+    Conflicts to packagekit-backend-aptcc. Instead, recommend
+    python3-aptdaemon.pkcompat and update the description to point out that
+    the PackageKit API does not work with the aptcc backend.
+    (LP: #1023953)
+  * UbuntuDrivers.detect.py, system_driver_packages(): Add 'vendor' and
+    'model' fields for the human readable names from pci/usb databases.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 13 Jul 2012 10:41:12 +0200
+
+ubuntu-drivers-common (1:0.2.61) quantal; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py: Fix crash if there is only one card.
+    (LP: #1021305)
+  * Add share/fake-devices-wrapper: Wrapper script to run a command under a
+    mock sysfs tree which pretends to have an NVidia and ATI graphics card,
+    and a Broadcom wifi card. This can be used for testing the new
+    software-properties or other driver management software.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 12 Jul 2012 16:49:08 +0200
+
+ubuntu-drivers-common (1:0.2.60) quantal; urgency=low
+
+  * libudev uses $SYSFS_PATH, not $SYSFS. Fix test suite accordingly.
+  * debian/tests/system: Raise a more specific exception if headers for
+    the running kernel are not installed. Thanks to Jean-Baptiste Lallement
+    for the intial patch! (LP: #1021386)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 06 Jul 2012 07:47:09 +0200
+
+ubuntu-drivers-common (1:0.2.59) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py: Fix crash on non-ASCII characters in Xorg log.
+    Adjust test case to reproduce this. (LP: #1020329).
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 03 Jul 2012 12:38:39 +0200
+
+ubuntu-drivers-common (1:0.2.58) quantal; urgency=low
+
+  * Add detect-plugins/arm-gles.py, thanks Oliver Grawert! (LP: #1016006)
+  * debian/tests/system: Add test for virtualbox-dkms.
+  * debian/tests/system: Add test for sl-modem-dkms.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 26 Jun 2012 07:55:43 +0200
+
+ubuntu-drivers-common (1:0.2.57) quantal; urgency=low
+
+  * debian/tests/control: Drop undefined "no-build-needed" feature.
+  * debian/tests/system: NVidia and FGLRX drivers produce some stderr output
+    when installing the packages. Don't fail on them, but do show the output
+    in the test suite.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 21 Jun 2012 08:32:59 +0200
+
+ubuntu-drivers-common (1:0.2.56) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py: Add nvidia-* for automatic installation after
+    discussion with Chris. The proprietary driver is still the better choice
+    (if you click "proprietary 3rd party drivers" in Ubiquity) until Nouveau
+    enables power management.
+  * tests/ubuntu_drivers.py: Update test_auto_install_chroot() for above
+    change, as nvidia now does get installed automatically.
+  * Quirks/quirkapplier.py: Update to current xkit API: Call write(), not
+    writeFile(). (LP: #1014728)
+  * UbuntuDrivers/detect.py: Change system_modaliases() to return an alias →
+    sysfs_path map, instead of just a list of aliases.
+  * UbuntuDrivers/detect.py: Change system_driver_packages() to return a
+    package → info map, instead of just a list of packages. UI can use the
+    info to show which device requested a driver, whether it is free or
+    proprietary, and whether it is a distro or third-party package.
+    (LP: #1013665)
+  * Fix fd leaks from subprocess in the test suite.
+  * Add debian/tests/system and debian/tests/control: Add autopkg test to
+    check that we can detect, install, and remove the nvidia, fglrx, and bcmwl
+    drivers. Due to their nature of being compiled on the client side and
+    depend on matching kernel headers/API, they are inherently a bit brittle
+    and thus we should spot regressions immediately.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Wed, 20 Jun 2012 16:54:23 +0200
+
+ubuntu-drivers-common (1:0.2.55) quantal; urgency=low
+
+  [ Martin Pitt ]
+  * UbuntuDrivers/detect.py: Auto-install virtualbox-guest-dkms.
+  * UbuntuDrivers/PackageKit.py: If packagekit.enums is not available, fall
+    back to aptdaemon.pkenums. This will allow us to move to Python3 without
+    waiting for PackageKit.
+  * Revert Dmitrijs' relative imports and move back to Python3 compatible
+    absolute imports.
+  * quirks-handler, setup.py: Move to Python 3 as well.
+
+  [ Dmitrijs Ledkovs ]
+  * NvidiaDetector/nvidiadetector.py: Use python3 compatible syntax.
+  * Convert package to python3 only.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 14 Jun 2012 08:05:47 +0200
+
+ubuntu-drivers-common (1:0.2.54) quantal; urgency=low
+
+  * debian/control: depend on python-xkit (>= 0.5.0).
+  * Quirks/quirkapplier.py, Quirks/quirkreader.py
+    tests/quirkreader-test.py:
+    - Add support for the new python-xkit API.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 08 Jun 2012 16:36:02 +0200
+
+ubuntu-drivers-common (1:0.2.53) quantal; urgency=low
+
+  * debian/control: Drop hard packagekit/aptdeamon dependencies, and move them
+    to Suggests/Enhances. We do not need them for the core code, just for the
+    PackageKit plugin.
+  * UbuntuDrivers/PackageKit.py: Drop system_driver_packages(), as it is
+    really not that useful: For UIs using the PackageKit API you cannot call
+    it, and for Ubuntu specific UIs you can use the faster
+    UbuntuDrivers.detect API. Instead, provide the functionality through the
+    WhatProvides(HARDWARE_DRIVER, "drivers_for_attached_hardware") call, which
+    is defined in PackageKit. Adjust tests accordingly.
+  * debian/control: Update description.
+  * debian/control: Drop obsolete XB-Python-Version.
+  * debian/control: Move packagekit-backend-aptcc from Breaks to Conflicts, as
+    it is unversioned.
+  * UbuntuDrivers/PackageKit.py: Add pkcon example for HARDWARE_DRIVERS to
+    header comment.
+  * UbuntuDrivers/detect.py, packages_for_modalias(): Avoid returning the same
+    package multiple times.
+  * Add README: Document purpose, interfaces, and detection logic.
+  * Add debian/ubuntu-drivers-common.apport: Apport hook to include the output
+    of "ubutu-drivers debug". Add dh-apport build dependency and enable in
+    debian/rules.
+  * Add dh-modaliases, moved from the obsolete Jockey package:
+    - Add debhelper/dh_modaliases: Debhelper program to produce a
+      ${modaliases} substvar from scanning .ko files or
+      debian/packagename.modaliases.
+    - Add debhelper/modaliases.pm: dh_auto sequencer for dh_modaliases.
+    - Add debian/dh-modaliases.install: Install above files.
+    - debian/control: Add dh-modaliases package.
+    - debian/rules: Create manpage from dh_modaliases POD.
+  * Add debhelper/test_dh_modaliases: Old test script for dh_modaliases from
+    Jockey. This is not integrated into "make check" and uses the
+    snd_hda_intel kernel module from the system; this needs to be run manually
+    for now.
+  * debian/rules: Respect "nocheck" in $DEB_BUILD_OPTIONS.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 31 May 2012 10:35:26 +0200
+
+ubuntu-drivers-common (1:0.2.52) quantal; urgency=low
+
+  * ubuntu-drivers: Add --package-list option to create a file with the list
+    of installed packages in "autoinstall" mode.
+  * Add ubiquity/target-config/31ubuntu_driver_packages: Ubiquity plugin to
+    install all packages that "ubuntu-drivers autoinstall" installed into the
+    live system. Install it in setup.py.
+  * ubuntu-drivers: Stop meddling with the debconf environment variables. It
+    is wrong (and too late anyway for Ubiquity) to do it here. The complete
+    environment setting is now done in Ubiquity's simple-plugins.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 16:00:21 +0200
+
+ubuntu-drivers-common (1:0.2.51) quantal; urgency=low
+
+  * detect-plugins/sl-modem.py: Do not log an exception when
+    /proc/asound/cards does not exist (such as in the buildds), as it causes
+    the test_plugin_errors test to fail.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 10:24:51 +0200
+
+ubuntu-drivers-common (1:0.2.50) quantal; urgency=low
+
+  * debian/control: Add alsa-utils build and binary dependency, so that the
+    sl-modem handler can call aplay.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 09:49:10 +0200
+
+ubuntu-drivers-common (1:0.2.49) quantal; urgency=low
+
+  * Fix exception, print, and assert syntax to be Python 3 compatible.
+  * Fix octal number and iteration syntax to be Python 3 compatible.
+  * Add .gitignore to ignore built stuff.
+  * tests/run: Clean up generated settings.py file on exit.
+  * Add detect-plugins/sl-modem.py: Custom detect plugin for the
+    sl-modem-daemon special case (formerly handled by Jockey's sl_modem.py
+    handler).
+  * debian/rules: Simplify running the tests.
+  * tests/ubuntu_drivers.py: Fix temporary log level changing.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Tue, 29 May 2012 08:36:29 +0200
+
+ubuntu-drivers-common (1:0.2.48) quantal; urgency=low
+
+  * ubuntu-drivers: Fix duplicate system modalias debug messages.
+  * UbuntuDrivers/detect.py: Disable two debug messages which cause excessive
+    debug log spew and are not very interesting.
+  * ubuntu-drivers autoinstall: Do not reinstall already installed drivers.
+  * Add detect-plugins/open-vm-dkms.py: Custom detect plugin for the
+    open-vm-dkms special case (formerly handled by Jockeys' vmware-client.py
+    handler).
+  * setup.py: Install detect-plugins/*.
+  * tests/ubuntu_drivers.py: Add PluginsTest to check that shipped plugins
+    work without errors or crashes.
+  * UbuntuDrivers/detect.py, _check_video_abi_compat(): Disable NVidia driver
+    if X.org's log shows that the Intel driver is loaded. This prevents
+    breaking hybrid systems as long as the NVidia driver and X.org do not work
+    on those.
+  * debian/ubuntu-drivers-common.templates: Drop trailing whitespace, to stop
+    lintian from complaining.
+  * debian/control: Add missing ${misc:Depends} to transitional package.
+  * debian/control: Add missing ${shlibs:Depends} for hybrid-detect.
+  * debian/control: Set priority of the nividia-common transitional package to
+    "extra" to quiesce lintian.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 25 May 2012 13:58:21 +0200
+
+ubuntu-drivers-common (1:0.2.47) quantal; urgency=low
+
+  * UbuntuDrivers/detect.py, system_modaliases(): Catch/log IOErrors when
+    trying to open "modalias" files in /sys. On powerpc we get a "No such
+    device" error on some files, causing test failures.
+  * tests/ubuntu_drivers.py, ToolTest: Explicitly set --log in the chroot's
+    DPKG::options::. The buildds seem to have a dpkg configuration which needs
+    that, otherwise it's trying to write into the system log file.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Fri, 25 May 2012 06:54:13 +0200
+
+ubuntu-drivers-common (1:0.2.46) quantal; urgency=low
+
+  * Rename to ubuntu-drivers-common, as this package is already necessary for
+    fglrx as well, and will soon get support for more drivers (replacing
+    Jockey). Update file references and names everywhere, and drop the
+    obsolete debian/README.Debian and debian/nvidia-common.preinst.
+  * debian/control: Fix for current python packaging policy (XS- → X-), and
+    drop obsolete debian/pycompat.
+  * debian/control: Add Vcs-* tags.
+  * setup.py: Move from distutils to setuptools, to get an egg info (needed to
+    provide PackageKit plugins). Add python-setuptools build dependency.
+  * Add tests/fakesysfs.py: Provide a fake sysfs directory for testing.
+    Adapted from upower's integration test suite.
+  * Add tests/testarchive.py: Class for building an apt archive with test
+    packages.
+  * Add UbuntuDrivers/detect.py, tests/ubuntu_drivers.py: Hardware/driver
+    detection functionality.  These are borrowed and streamlined from Jockey.
+  * Add aptdaemon/PackageKit (apt backend) plugin for what-provides MODALIAS:
+    - Add UbuntuDrivers/PackageKit.py: The actual plugin, which checks the
+      query against the patterns packages specify in their "Modaliases:"
+      header. Also provides a system_driver_packages() function to get all
+      driver packages applicable for the system.
+    - setup.py: Install the new UbuntuDrivers Python package and register the
+      plugin entry point.
+    - tests/ubuntu_drivers.py: Add tests cases for UbuntuDrivers.PackageKit,
+      using a test aptdaemon instance on a local session bus.
+    - debian/control: Add python-aptdaemon.pkcompat dependency. Also specify
+      packagekit as an alternative, but conflict to packagekit-backend-aptcc
+      for now, as this does not support the MODALIAS what-provides query, nor
+      plugins. This means that you cannot currently install this package
+      together with packagekit as long as the latter hard-depends on the aptcc
+      backend. Also add aptdaemon/dbus build dependencies to be able to run
+      the tests during build time.
+  * tests/run: Exit with a nonzero code if there are failures or errors.
+  * debian/rules: Ensure that our egg-info is built before running the tests,
+    and removed again on clean.
+  * debian/copyright: Rewrite using copyright 1.0 format.
+  * Add ubuntu-drivers: Command line tool to list available driver packages
+    for this system and auto-install them. This replaces the functionality of
+    "jockey-text --auto-install". This does not use any D-BUS communication,
+    so is safe to run in chroots.
+  * debian/control: Switch to Architecture: any, we are already building this
+    package anywhere but powerpc.
+  * setup.py: Remove commented code for updating .mo files. This package is
+    not supposed to show user-visible strings, and if we ever get them it
+    should rather use python-distutils-extra.
+  * setup.py: Only build hybrid-detect on x86 machines.
+  * debian/control: Bump Standards-Version to 3.9.3.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Thu, 24 May 2012 18:22:53 +0200
+
+nvidia-common (1:0.2.45) quantal; urgency=low
+
+  * Don't write to /usr/share for hybrid graphics
+    detection, use /var/lib instead (LP: #976779).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 15 May 2012 14:30:07 +0200
+
+nvidia-common (1:0.2.44) precise; urgency=low
+
+  [ Ricardo Salveti de Araujo ]
+  * Make it possible to use nvidia-common with arm/gles
+    drivers (LP: #977245).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 10 Apr 2012 11:33:06 +0200
+
+nvidia-common (1:0.2.43) precise; urgency=low
+
+  * Do not apply multiple quirks when facing multiple values
+    for a tag. This was causing nvidia-common to apply quirks
+    that are not specific to the hardware in use.
+  * Make sure never to add quirks without an id.
+  * Improve test 3 and 4 of the test suite:
+    - Add testcase for matching multiple products at the same
+      time.
+    - Make sure to parse config files in the quirks directory.
+    - Change the name of the handlers used in the tests so
+      that they don't conflict with the ones in the quirks
+      files.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 06 Apr 2012 18:22:23 +0200
+
+nvidia-common (1:0.2.42) precise; urgency=low
+
+  * Fix broken hybrid-gfx upstart job.
+
+ -- StÃ©phane Graber <stgraber@ubuntu.com>  Thu, 22 Mar 2012 16:38:16 -0400
+
+nvidia-common (1:0.2.41) precise; urgency=low
+
+  * Add a test suite and run it at build time with dh_auto_test.
+  * Work correctly when the pipe symbol is used in "Match" tags.
+    This symbol only worked when used in the "Handler" tag.
+    Both test cases are covered in the test suite.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 12 Mar 2012 12:30:52 +0100
+
+nvidia-common (1:0.2.40) precise; urgency=low
+
+  * Add quirks to get brightness keys to work on Lenovo T420s
+    (LP: #773710) and on Dell Latitude E6530 (LP: #914069)
+    when using NVIDIA's proprietary driver.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 08 Mar 2012 11:30:56 +0100
+
+nvidia-common (1:0.2.39) precise; urgency=low
+
+  * Re-enable support for Hybrid Graphics now that the driver
+    packages are fixed.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 18 Feb 2012 09:48:35 +0100
+
+nvidia-common (1:0.2.38) precise; urgency=low
+
+  * Add support for Hybrid graphics, disabled by default for now.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 15 Feb 2012 18:04:29 +0100
+
+nvidia-common (1:0.2.37) precise; urgency=low
+
+  * Quirks, quirks-handler:
+    - Add module and script to create quirks for graphics drivers.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 03 Feb 2012 13:57:10 +0100
+
+nvidia-common (1:0.2.36) precise; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Add optional ignore_pattern argument to get_alternative_by_name.
+      This argument allows ignoring a substring in the name. This is
+      required in the case of fglrx and fglrx-updates which share the
+      same master link name (LP: #873058).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 16 Nov 2011 17:04:21 +0100
+
+nvidia-common (1:0.2.35) oneiric; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Return the correct alternative when dealing with "updates"
+      driver flavours in get_alternative_by_name(). This allows
+      Jockey to correctly detect the alternatives provided by
+      different drivers (LP: #841462).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 07 Sep 2011 10:59:20 +0200
+
+nvidia-common (1:0.2.34) oneiric; urgency=low
+
+  * debian/nvidia-common.preinst:
+    - Use dpkg-maintscript-helper to remove conffiles.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 25 Aug 2011 12:36:19 +0200
+
+nvidia-common (1:0.2.33) oneiric; urgency=low
+
+  * debian/nvidia-common.preinst:
+    - Make sure to remove any leftover kernel hooks from nvidia-common.
+  * debian/nvidia-common.postinst:
+    - Disable the debconf interface.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 17 Aug 2011 16:59:06 +0200
+
+nvidia-common (1:0.2.32) oneiric; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Remove trailing whitespace.
+  * NvidiaDetector/nvidiadetector.py:
+    - Remove trailing whitespace.
+    - Ignore "-updates" flavours and recommend only stable flavours.
+      This fixes a crash in the nvidia detector.
+  * setup.py:
+    - Disable kernel hooks.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 12 Aug 2011 17:33:04 +0200
+
+nvidia-common (1:0.2.31) oneiric; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Replace __ with _ for private methods.
+    - Make Alternatives a new-style class.
+    - Add MultiArchUtils class so that Jockey can get the names of
+      multi-arch alternatives (LP: #798049).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 24 Jun 2011 18:11:31 +0200
+
+nvidia-common (1:0.2.30+1) oneiric; urgency=low
+
+  * Add epoch to override the sync. The packages in Debian and Ubuntu
+    have the same name but different code and scope (LP: #792576).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 04 Jun 2011 12:13:27 +0200
+
+nvidia-common (0.2.30) natty; urgency=low
+
+  * debian/control:
+    - Set the section to "admin" so that vrms doesn't complain about
+      the package even though it contains only free software (LP: #745904).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Apr 2011 17:15:51 +0200
+
+nvidia-common (0.2.29) natty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - Strip the architecture from the package name. This makes sure we
+      extract the driver flavour correctly (LP: #752101).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 06 Apr 2011 16:23:15 +0200
+
+nvidia-common (0.2.28) natty; urgency=low
+
+  * debian/control: Add conflicts/replaces to the old -modalias packages, to
+    clean them up. They are causing unwanted and nonworking driver offerings.
+    (LP: #717776)
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 07 Mar 2011 18:59:10 +0100
+
+nvidia-common (0.2.27) natty; urgency=low
+
+  * nvidia-detector:
+    - Initialise NvidiaDetection() with verbose=False. This should avoid
+      problems when dealing with debconf (LP: #698327). 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 18 Jan 2011 18:15:44 +0100
+
+nvidia-common (0.2.26) natty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py: Fix __get_value_from_name() to only
+    convert the string to an int if we don't have an explicit override.
+    (LP: #692022)
+  * debian/nvidia-common.postinst: When calling nvidia-detector, only consider
+    the last line, to ignore other messages before the "None". (LP: #692096)
+  * debian/control: Add missing ${misc:Depends}.
+  * debian/control, debian/rules, debian/compat: Move to "dh", compat level 7,
+    and build with dh_python2, which greatly simplifies the build system.
+  * debian/control: Set Maintainer to standard "ubuntu developers".
+  * debian/nvidia-common.config: Add missing set -e, thanks lintian.
+  * debian/nvidia-common.postinst: Drop obsolete upgrade handling.
+  * Use "3.0 (quilt)" source package format.
+  * debian/control: Bump Standards-Version to 3.9.1.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sun, 19 Dec 2010 11:29:51 +0100
+
+nvidia-common (0.2.25) natty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py: Drop code to read
+    /usr/share/jockey/modaliases, and scan for "Modaliases:" package headers
+    instead. Add dependency to python-apt.
+  * debian/control: Drop Vcs-Bzr:. That branch is ancient, and we should use
+    lp:ubuntu/nvidia-common now anyway.
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Sat, 18 Dec 2010 20:27:26 +0100
+
+nvidia-common (0.2.24build1) natty; urgency=low
+
+  * Rebuild with python 2.7 as the python default.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 08 Dec 2010 13:08:06 +0000
+
+nvidia-common (0.2.24) maverick; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Call "dpkg --configure -a" after using dpkg-trigger so
+      that the cache is regenerated (LP: #548751).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 23 Sep 2010 15:37:27 +0200
+
+nvidia-common (0.2.23) lucid; urgency=low
+
+  * Drop unnecessary dependency on fglrx-modaliases.  It will be pulled in
+    from jockey's recommends (and be removable then).
+
+ -- Mario Limonciello <superm1@ubuntu.com>  Fri, 02 Apr 2010 10:34:06 -0500
+
+nvidia-common (0.2.22) lucid; urgency=low
+
+  * debian/control:
+    - Add dependency on fglrx-modaliases.
+  * debian/nvidia-common.config:
+    - Put back the config script with only one line to source
+      debconf so that the template file is loaded when
+      nvidia-common is triggered by kernel hooks (LP: #533970).
+      Thanks to Colin Watson for the advice.
+  * NvidiaDetector/alternatives.py:
+    - Add the update_gmenu method and call it in set_alternative
+      so that the gnome menu is updated when we switch between
+      drivers (LP: #548751).
+    - Add the resolve_module_alias method so as to retrieve the
+      module name from the alias (relevant to #547066).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 15 Mar 2010 16:44:17 +0100
+
+nvidia-common (0.2.21) lucid; urgency=low
+
+  * Make sure that /etc/modprobe.d/lrm-video is removed
+    so that it doesn't interfere with nvidia (LP: #467490).
+  * debian/nvidia-common.postinst:
+    - Remove db_stop as suggested by Colin Watson, as it
+      can do more harm than good there.
+    - Move the debconf part into the postinst and get rid
+      of the config script (which was run before
+      nvidia-common was configured, with unpredictable
+      results). Thanks to Colin Watson for the advice.
+    - Don't test the existence of nvidia-detector.
+  * share/obsolete:
+    - Add nvidia-glx-{190|195} so as to take care of
+      packages from PPAs.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 03 Mar 2010 13:13:51 +0100
+
+nvidia-common (0.2.20) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Make sure that the PATH environment variable is set
+      so that subprocess knows where to find binaries in
+      /sbin (LP: #518879).
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 16 Feb 2010 16:35:35 +0100
+
+nvidia-common (0.2.19) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Call ldconfig after setting an alternative.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Thu, 04 Feb 2010 15:10:19 -0800
+
+nvidia-common (0.2.18) lucid; urgency=low
+
+  * NvidiaDetector/alternatives.py:
+    - Set self.__open_drivers_alternative to 'mesa/ld.so.conf' so as to
+      adapt to the fact that the alternative lives in mesa now.
+    - Do not pass arguments to the list_alternatives method.
+    - Use subprocess.check_call instead of .call so as to get the exit
+      status in addition to the return code. 
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 19 Jan 2010 17:18:45 +0100
+
+nvidia-common (0.2.17) lucid; urgency=low
+
+  * setup.py:
+    - Add pre-inst hook for the NVIDIA installer as
+      the latter may interact badly with the Ubuntu
+      packages(LP: #317703).
+  * NvidiaDetector/nvidiadetector.py:
+    - Handle driver flavours which have strings (instead
+      of integers in their name).
+  * NvidiaDetector/alternatives.py:
+    - Alternatives class to get the list of alternatives
+      and to get and set the alternative in use.
+  * nvidia-common:
+    - ${LATEST} should have quotation marks (LP: #505855).
+
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Mon, 11 Jan 2010 18:13:11 +0100
+
+nvidia-common (0.2.16) lucid; urgency=low
+
+  * debian/control::
+    - Depends on nvidia-current-modaliases since 185 is no longer used.
+
+ -- Mario Limonciello <superm1@ubuntu.com>  Sun, 10 Jan 2010 14:45:14 -0800
+
+nvidia-common (0.2.15.1) karmic-proposed; urgency=low
+
+  * debian/postinst:
+    - remove leftover /etc/modprobe.d/lrm-video (LP: #459829)
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Tue, 27 Oct 2009 17:09:34 +0100
+
+nvidia-common (0.2.15) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-180-modaliases.
+    - Add dependency on nvidia-185-modaliases.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Wed, 19 Aug 2009 19:25:51 +0200
+
+nvidia-common (0.2.14) karmic; urgency=low
+
+  * Revert previous change, -185 is still in NEW.
+
+ -- Steve Kowalik <stevenk@ubuntu.com>  Wed, 12 Aug 2009 15:37:12 +1000
+
+nvidia-common (0.2.13) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-180-modaliases.
+    - Add dependency on nvidia-185-modaliases.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Sat, 08 Aug 2009 19:23:16 +0200
+
+nvidia-common (0.2.12) karmic; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-71-modaliases.
+  * NvidiaDetector/nvidiadetector.py:
+    - Use a text file in /usr/share/nvidia-common/
+      instead of hardcoding the list of obsolete
+      packages in the program.
+    - Add "obsolete" optional argument to the ctor so
+      as to allow to change the default path to the
+      list of obsolete packages.
+    - Catch IOError if the path to the modalias files
+      does not exist.
+    - Flush stdout before printing (LP: #292606).
+  * nvidia-common:
+    - Prevent the script from failing when $LATEST is
+      null.
+  * setup.py:
+    - Install share/obsolete to /usr/share/nvidia-common.
+  * share/obsolete:
+    - Add nvidia-glx-71.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Fri, 24 Jul 2009 17:03:18 +0200
+
+nvidia-common (0.2.11) jaunty; urgency=low
+
+  * do not sys.exit(0) in NvidiaDetection.__init__()
+    but raise a exception instead (this code is imported
+    by update-manager and the exit(0) exits it)
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Mon, 20 Apr 2009 10:50:40 +0200
+
+nvidia-common (0.2.10) jaunty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - Exit without an error exit status in NvidiaDetection.__init__()
+      so as not to break dist-upgrades if the modaliases are not
+      installed (LP: #303825).
+  * debian/rules:
+    - Add "--install-layout=deb" to make sure that nvidia-detector
+      is installed in /usr/bin/ instead of /usr/local/bin.
+
+ -- Alberto Milone <alberto.milone@canonical.com>  Tue, 14 Apr 2009 15:54:28 +0200
+
+nvidia-common (0.2.9) jaunty; urgency=low
+
+  * Include the symlinks in the package.
+
+ -- Matthias Klose <doko@ubuntu.com>  Tue, 24 Feb 2009 22:41:02 +0100
+
+nvidia-common (0.2.8) jaunty; urgency=low
+
+  * debian/rules: add "export DH_PYCENTRAL=nomove" to avoid
+    problems with dist-upgrades.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Thu, 19 Feb 2009 14:39:36 +0100
+
+nvidia-common (0.2.7) jaunty; urgency=low
+
+  * NvidiaDetector/nvidiadetector.py:
+    - add nvidia-glx-177 to
+      the "oldPackages" list since 177 is no longer available
+      in Jaunty.
+    - make sure that drivers which have the modaliases and
+      are in oldPackages are ignored.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Wed, 04 Feb 2009 12:09:26 +0100
+
+nvidia-common (0.2.6) jaunty; urgency=low
+
+  * debian/control:
+    - Drop dependency on nvidia-177-modaliases since it's not 
+      compatible with Jaunty's X ABI.
+    - Add Vcs-Bzr
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Fri, 30 Jan 2009 18:14:19 +0100
+
+nvidia-common (0.2.5) jaunty; urgency=low
+
+  * debian/control:
+    - Now that the 180 series of drivers is stable, depend on the 180
+      modaliases.
+
+ -- Mario Limonciello <mario_limonciello@dell.com>  Thu, 08 Jan 2009 15:18:19 -0600
+
+nvidia-common (0.2.4) intrepid; urgency=low
+
+  * Do not raise an exception if self.drivers is empty (LP: #272196)
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Mon, 06 Oct 2008 14:51:17 +0200
+
+nvidia-common (0.2.3) intrepid; urgency=low
+
+  * Move the hard work in debian/rules to binary-arch now that we're
+    architecture-dependent.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 27 Aug 2008 15:37:20 +0100
+
+nvidia-common (0.2.2) intrepid; urgency=low
+
+  * Set Architecture to i386 amd64 in debian/control
+  * Move Build-Depends-Indep to Build-Depends in debian/control
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Wed, 27 Aug 2008 15:14:18 +0200
+
+nvidia-common (0.2.1) intrepid; urgency=low
+
+  * add missing depends on pciutils
+
+ -- Michael Vogt <michael.vogt@ubuntu.com>  Fri, 25 Jul 2008 11:12:47 +0200
+
+nvidia-common (0.2) intrepid; urgency=low
+
+  * Native version
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 22 Jul 2008 12:21:25 +0200
+
+nvidia-common (0.1-0ubuntu12) intrepid; urgency=low
+
+  * Bump for PPA
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 15 Jul 2008 15:11:51 +0200
+
+nvidia-common (0.1-0ubuntu11) intrepid; urgency=low
+
+  * Change the regex pattern so as to make use of the new pattern in the
+    modalias files
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Tue, 15 Jul 2008 11:48:03 +0200
+
+nvidia-common (0.1-0ubuntu10) intrepid; urgency=low
+
+  * Drop CDBS in favour of python-central due to a bug in CDBS
+  * Check the existence of /usr/share/jockey/modaliases
+  * See if the modaliases files contain something useful
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Mon, 14 Jul 2008 17:47:35 +0200
+
+nvidia-common (0.1-0ubuntu9) intrepid; urgency=low
+
+  * Switch to python-support
+  * nvdia-common and the config file should point to the executable file in
+    /usr/bin
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sun, 13 Jul 2008 13:54:20 +0200
+
+nvidia-common (0.1-0ubuntu8) intrepid; urgency=low
+
+  * Add dependency on the nvidia-VER-modaliases packages
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sun, 13 Jul 2008 12:29:53 +0200
+
+nvidia-common (0.1-0ubuntu7) intrepid; urgency=low
+
+  * Remove makefile
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 16:35:06 +0200
+
+nvidia-common (0.1-0ubuntu6) intrepid; urgency=low
+
+  * Correct DOMAIN in makefile
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 15:42:05 +0200
+
+nvidia-common (0.1-0ubuntu5) intrepid; urgency=low
+
+  * Add build dependency on python2.4
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 15:18:05 +0200
+
+nvidia-common (0.1-0ubuntu4) intrepid; urgency=low
+
+  * Add missing build dependency on the Python versions
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 13:46:14 +0200
+
+nvidia-common (0.1-0ubuntu3) intrepid; urgency=low
+
+  * Put nvidia-common also in /etc/kernel/postinst.d/ so that it's triggered
+    when a new kernel is installed too.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 13:21:08 +0200
+
+nvidia-common (0.1-0ubuntu2) hardy; urgency=low
+
+  * Switch to CDBS
+  * Make it possible for nvidiadetector to be imported by other Python
+    applications such as Update-Manager
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Sat, 12 Jul 2008 12:48:15 +0200
+
+nvidia-common (0.1-0ubuntu1) intrepid; urgency=low
+
+  * First release.
+
+ -- Alberto Milone (tseliot) <albertomilone@alice.it>  Thu, 10 Jul 2008 15:13:50 +0200

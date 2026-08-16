@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+if type podman >/dev/null 2>&1; then
+    RUNC=podman
+else
+    RUNC="sudo docker"
+fi
+
+# sandboxing requires privileged container; https://github.com/NixOS/docker#limitations
+$RUNC run --interactive ${DEBUG:+--tty} --privileged --volume `pwd`:/source:ro ${1:-docker.io/nixos/nix} /bin/sh <<EOF
+# avoid meson exit code 125; https://github.com/containers/podman/issues/11540
+trap '[ \$? -eq 0 ] || exit 1' EXIT
+
+set -eu
+
+CONF="\$(cat /etc/nix/nix.conf)"
+echo "\${CONF/sandbox = false/sandbox = true}" > /etc/nix/nix.conf
+
+cat <<EOG > /tmp/default.nix
+let pkgs = (import (builtins.fetchTarball { url = "https://github.com/NixOS/nixpkgs/archive/master.tar.gz"; }) {});
+
+in pkgs.umockdev.overrideAttrs (attrs: {
+  src = /source;
+  patches = [];
+  preCheck = "";
+  doCheck = true;
+  nativeBuildInputs = attrs.nativeBuildInputs ++ [ ${DEBUG:+pkgs.breakpointHook} ];
+  # libpcap is a new dependency, it can be removed again later
+  buildInputs = attrs.buildInputs ++ [ pkgs.libpcap ];
+})
+EOG
+
+[ -z "${DEBUG:-}" ] || nix-env -i cntr
+
+nix-build --keep-failed /tmp/default.nix
+EOF

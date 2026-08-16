@@ -1,0 +1,59 @@
+#!/bin/sh
+set -eu
+
+# keep container around if $DEBUG is set
+[ -n "${DEBUG:-}" ] || OPTS="--rm"
+
+if type podman >/dev/null 2>&1; then
+    RUNC=podman
+else
+    RUNC="sudo docker"
+fi
+
+$RUNC run --interactive ${RUNC_OPTIONS:-} ${OPTS:-} --volume `pwd`:/source:ro ${1:-registry.fedoraproject.org/fedora} /bin/sh << EOF
+set -eu
+
+# avoid meson exit code 125; https://github.com/containers/podman/issues/11540
+trap '[ \$? -eq 0 ] || exit 1' EXIT
+
+dnf -y update
+
+if grep -q ID=.*centos /etc/os-release; then
+    repos=--enablerepo=powertools
+    packages=""
+    coverage=false
+    # building gtk-doc does not yet work with meson 0.49.2
+    gtk_doc=false
+else
+    packages="gcovr"
+    coverage=true
+    gtk_doc=true
+fi
+
+# install build and test dependencies
+dnf -y \${repos:-} install meson git gcc clang glib2-devel gtk-doc libgudev1-devel libtool libudev-devel libpcap-devel make python3 python3-gobject-base usbutils vala xz systemd-udev evtest gphoto2 valgrind \$packages
+
+# run build as user
+useradd guest
+su -s /bin/sh - guest << EOG
+set -eux
+export BRITTLE_TESTS="${BRITTLE_TESTS:-}"
+cd /source
+
+CFLAGS="\$(grep -q rawhide /etc/os-release && echo -fanalyzer)" meson setup /tmp/dbg --buildtype debug --prefix /usr -Dgtk_doc=\${gtk_doc} -Db_coverage=\$coverage --werror
+cd /tmp/dbg
+DESTDIR=/tmp/inst meson install
+meson test -v --num-processes=1
+if [ "\$coverage" = true ]; then
+    ninja coverage-text
+    meson test -v --num-processes=1 --setup valgrind --no-suite fails-valgrind
+    cat meson-logs/coverage.txt
+fi
+
+# build with clang
+cd /source
+CC=clang meson setup /tmp/clang -Dgtk_doc=false --werror
+meson test -C /tmp/clang -v --num-processes=1
+EOG
+
+EOF

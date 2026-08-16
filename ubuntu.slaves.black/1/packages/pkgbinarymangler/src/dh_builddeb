@@ -1,0 +1,30 @@
+#! /usr/bin/perl
+# Wrapper around dh_builddeb to cope with parallel invocations of dpkg-deb,
+# ensuring that pkgstripfiles' symlink_doc isn't run in parallel.
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+use File::Spec;
+use File::Temp qw/ tempfile tempdir /;
+
+my @args = @ARGV;
+
+init(options => {
+        "filename=s" => \$dh{FILENAME},
+        "destdir=s" => \$dh{DESTDIR},
+});
+
+my @packages = grep (! /-dbgsym$/, @{$dh{DOPACKAGES}});
+
+# avoid using default TMPDIR because it might be used already by debian/rules
+# package file, and point to a wrong location
+my $dir = tempdir( DIR => '/tmp', CLEANUP => 1 );
+(my $fh, my $lockfile) = tempfile( DIR => $dir );
+foreach my $pkg (@packages) {
+    print $fh "$pkg\n";
+}
+$ENV{'PKGBINARYMANGLER_PACKAGES'} = join(' ', @packages);
+$ENV{'PKGBINARYMANGLER_LOCKFILE'} = $lockfile;
+
+system {"dh_builddeb.pkgbinarymangler"} ("dh_builddeb", @args);

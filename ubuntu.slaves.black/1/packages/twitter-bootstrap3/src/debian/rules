@@ -1,0 +1,107 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+ifeq ($(SOURCE_DATE_EPOCH),)
+year := $(shell date +%Y)
+else
+year := $(shell date --utc --date @$(SOURCE_DATE_EPOCH) +%Y)
+endif
+
+DOCS = README.html README.txt
+
+# resolve font version
+FONT_VERSION = $(shell otfinfo -i fonts/glyphicons-halflings-regular.ttf | grep -Po '^Unique ID:\s+\K[\d.]+')
+
+%:
+	dh $@ -XLICENSE
+
+%.html: %.md
+	pandoc --from gfm-raw_html --to html --standalone \
+		--metadata title:leaflet-headless \
+		--output $@ -- $<
+
+%.txt: %.md
+	pandoc --from gfm-raw_html --to plain \
+		--output $@ -- $<
+
+override_dh_auto_build: $(DOCS)
+	dh_auto_build
+	# Mimic concat from Gruntfile
+	echo '/*!' \
+		> dist/js/bootstrap.js
+	echo ' * Bootstrap v$(DEB_VERSION_UPSTREAM) (http://getbootstrap.com)' \
+		>> dist/js/bootstrap.js
+	echo ' * Copyright 2011-$(year) Twitter, Inc.' \
+		>> dist/js/bootstrap.js
+	echo ' * Licensed under the MIT license' \
+		>> dist/js/bootstrap.js
+	echo ' */' \
+		>> dist/js/bootstrap.js
+	echo '' >> dist/js/bootstrap.js
+	echo "if (typeof jQuery === 'undefined') {" \
+		>> dist/js/bootstrap.js
+	echo "  throw new Error('Bootstrap\'s JavaScript requires jQuery')" \
+		>> dist/js/bootstrap.js
+	echo "}" \
+		>> dist/js/bootstrap.js
+	echo '' >> dist/js/bootstrap.js
+	echo "+function ($$) {" \
+		>> dist/js/bootstrap.js
+	echo "  'use strict';" \
+		>> dist/js/bootstrap.js
+	echo "  var version = $$.fn.jquery.split(' ')[0].split('.')" \
+		>> dist/js/bootstrap.js
+	echo "  if ((version[0] < 2 && version[1] < 9) || (version[0] == 1 && version[1] == 9 && version[2] < 1) || (version[0] > 3)) {" \
+		>> dist/js/bootstrap.js
+	echo "    throw new Error('Bootstrap\'s JavaScript requires jQuery version 1.9.1 or higher, but lower than version 4')" \
+		>> dist/js/bootstrap.js
+	echo "  }" \
+		>> dist/js/bootstrap.js
+	echo "}(jQuery);" \
+		>> dist/js/bootstrap.js
+	for i in \
+		js/transition.js \
+		js/alert.js \
+		js/button.js \
+		js/carousel.js \
+		js/collapse.js \
+		js/dropdown.js \
+		js/modal.js \
+		js/tooltip.js \
+		js/popover.js \
+		js/scrollspy.js \
+		js/tab.js \
+		js/affix.js \
+		; do \
+			echo '' >> dist/js/bootstrap.js && \
+			cat $$i >> dist/js/bootstrap.js \
+		; done
+	# Mimic uglify from Gruntfile
+	uglifyjs -o dist/js/bootstrap.min.js dist/js/bootstrap.js
+	# Mimic copy from Gruntfile
+	cp fonts/* dist/fonts
+	# Mimic less from Gruntfile
+	lessc --strict-math=on \
+		--source-map-url=bootstrap.css.map \
+		--source-map=dist/css/bootstrap.css.map \
+		less/bootstrap.less dist/css/bootstrap.css
+	lessc --strict-math=on \
+		--source-map-url=bootstrap-theme.css.map \
+		--source-map=dist/css/bootstrap-theme.css.map \
+		less/theme.less dist/css/bootstrap-theme.css
+	# Mimic cssmin from Gruntfile
+	cssmin < dist/css/bootstrap.css > dist/css/bootstrap.min.css
+	cssmin < dist/css/bootstrap-theme.css > dist/css/bootstrap-theme.min.css
+
+override_dh_installdocs:
+	dh_installdocs -XREADME.md -- $(DOCS)
+
+override_dh_installchangelogs:
+	dh_installchangelogs $(CURDIR)/debian/upstream/changelog
+
+# append upstream version to font package
+override_dh_gencontrol:
+	dh_gencontrol -Nfonts-glyphicons-halflings
+	dh_gencontrol -pfonts-glyphicons-halflings \
+		-- -v"$(FONT_VERSION)~$(DEB_VERSION)"

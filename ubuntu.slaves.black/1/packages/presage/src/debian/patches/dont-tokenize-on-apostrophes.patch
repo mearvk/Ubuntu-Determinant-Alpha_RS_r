@@ -1,0 +1,54 @@
+Description: Allow words with apostrophes to be predicted
+ Stop the tokenizer from splitting based on apostrophes and allow for the
+ escaping of words containing apostrophes in the database connector.
+Author: Michael Sheldon <michael.sheldon@canonical.com>
+Forwarded: https://sourceforge.net/p/presage/patches/2/
+Bug-Ubuntu: https://launchpad.net/bugs/1384800
+Bug-Debian: https://bugs.debian.org/770831
+
+--- presage-0.9.orig/src/lib/core/charsets.h
++++ presage-0.9/src/lib/core/charsets.h
+@@ -180,7 +180,6 @@ const char DEFAULT_SEPARATOR_CHARS[]={
+     '$',
+     '%',
+     '&',
+-    '\'',
+     '(',
+     ')',
+     '*',
+--- presage-0.9.orig/src/lib/predictors/dbconnector/databaseConnector.cpp
++++ presage-0.9/src/lib/predictors/dbconnector/databaseConnector.cpp
+@@ -293,12 +293,16 @@ std::string DatabaseConnector::buildValu
+ 
+ std::string DatabaseConnector::sanitizeString(const std::string str) const
+ {
+-    // TODO
+-    // just return the string for the time being
+-    // REVISIT
+-    // TO BE DONE
+-    // TBD
+-    return str;
++    // Escape single quotes
++    std::size_t searchPos = 0;
++    std::size_t pos;
++    std::string result(str);
++    while((pos = result.find("'", searchPos)) != std::string::npos)
++    {
++          result.replace(pos, 1, "''");
++          searchPos = pos + 2;
++    }
++    return result;
+ }
+ 
+ int DatabaseConnector::extractFirstInteger(const NgramTable& table) const
+--- presage-0.9.orig/src/tools/text2ngram.cpp
++++ presage-0.9/src/tools/text2ngram.cpp
+@@ -174,7 +174,7 @@ int main(int argc, char* argv[])
+ 	std::ifstream infile(argv[i]);
+ 	ForwardTokenizer tokenizer(infile,
+ 				   " \f\n\r\t\v",
+-				   "`~!@#$%^&*()_-+=\\|]}[{'\";:/?.>,<");
++				   "`~!@#$%^&*()_-+=\\|]}[{\";:/?.>,<");
+ 	tokenizer.lowercaseMode(lowercase);
+ 
+ 	// take care of first N-1 tokens

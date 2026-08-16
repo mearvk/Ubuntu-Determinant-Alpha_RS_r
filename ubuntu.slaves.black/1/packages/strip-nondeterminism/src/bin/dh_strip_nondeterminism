@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_strip_nondeterminism - strip uninteresting, nondeterministic information from files
+
+=cut
+
+use strict;
+use warnings;
+use B;
+use File::Find;
+use Debian::Debhelper::Dh_Lib;
+use File::StripNondeterminism;
+
+=head1 SYNOPSIS
+
+B<dh_strip_nondeterminism> [S<I<debhelper options>>] [B<-X>I<item>]
+
+=head1 DESCRIPTION
+
+B<dh_strip_nondeterminism> is a debhelper program that is responsible
+for stripping uninteresting, nondeterministic information, such as
+timestamps, from compiled files so that the build is reproducible.
+
+This program examines your package build directories and works out what
+to strip on its own. It uses L<file(1)> and filenames to figure out what
+files should have nondeterminism stripped from them.  In general it
+seems to make very good guesses, and will do the right thing in almost
+all cases.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-X>I<item>, B<--exclude=>I<item>
+
+Exclude files that contain I<item> anywhere in their filename from being
+stripped. You may use this option multiple times to build up a list of
+things to exclude.
+
+=back
+
+=cut
+
+init();
+
+my (@nondeterministic_files, %seen);
+
+sub testfile {
+	return if -l $_ or -d $_; # Skip directories and symlinks always.
+
+	# See if we were asked to exclude this file.
+	# Note that we have to test on the full filename, including directory.
+	my $fn="$File::Find::dir/$_";
+	foreach my $f (@{$dh{EXCLUDE}}) {
+		return if ($fn=~m/\Q$f\E/);
+	}
+
+	# Deduplicate hardlinks to avoid issues under parallelism
+	my ($dev, $inode, undef, $nlink) = stat($_);
+	return if defined $nlink && $nlink > 1 && $seen{"$inode.$dev"};
+	$seen{"$inode.$dev"} = 1;
+
+	my $normalizer = File::StripNondeterminism::get_normalizer_for_file($_);
+	return unless $normalizer;
+
+	unless (-w $_) {
+		warning("Ignoring unwritable file: $_");
+		return;
+	}
+
+	push @nondeterministic_files, [$fn, $normalizer];
+}
+
+sub handler_name {
+	eval {
+		my $obj = B::svref_2object(shift());
+		return $obj->GV->STASH->NAME;
+	} || "unknown handler";
+}
+
+File::StripNondeterminism::init();
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+	my $tmp=tmpdir($package);
+
+	next if not -d $tmp;
+
+	@nondeterministic_files=();
+	find(\&testfile,$tmp);
+	next unless @nondeterministic_files;
+
+	# This has been introduced in debhelper/13.5.3 specifically for
+	# strip-nondeterminism.  See https://bugs.debian.org/999665 for the
+	# background of get_non_binnmu_date_epoch().
+	if (eval "get_non_binnmu_date_epoch()") {
+		$File::StripNondeterminism::canonical_time
+		  = get_non_binnmu_date_epoch();
+		$ENV{SOURCE_DATE_EPOCH} = get_non_binnmu_date_epoch()
+	} else {
+		$File::StripNondeterminism::canonical_time = get_source_date_epoch();
+	}
+
+	verbose_print("Using $File::StripNondeterminism::canonical_time as canonical time");
+
+	on_items_in_parallel(\@nondeterministic_files, sub {
+		foreach (@_) {
+			my ($path, $normalize) = @$_;
+			verbose_print("Normalizing $path using " . handler_name($normalize));
+			eval { $normalize->($path) or nonquiet_print("Normalized $path"); 1; }
+			  or error("$path: $@");
+		}
+	});
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of debhelper.
+
+=head1 AUTHORS
+
+Andrew Ayer <agwa@andrewayer.name>
+Chris Lamb <lamby@debian.org>
+
+=cut

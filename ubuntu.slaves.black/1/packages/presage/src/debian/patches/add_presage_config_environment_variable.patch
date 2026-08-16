@@ -1,0 +1,32 @@
+Description: Add PRESAGE_CONFIG environment variable
+ Provide an environment variable for setting the location that presage should
+ check for its system-wide configuration file. This allows for usage within
+ snap packages.
+Author: Michael Sheldon <michael.sheldon@canonical.com>
+Forwarded: no
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/presage/+bug/1639270
+Last-Update: 2016-12-07
+
+--- presage-0.9.1.orig/src/lib/core/profileManager.cpp
++++ presage-0.9.1/src/lib/core/profileManager.cpp
+@@ -121,10 +121,16 @@ void ProfileManager::init_profiles (cons
+     }
+ 
+ 
+-    // system etc directory
+-    profiles.push_back (get_system_etc_dir() + '/' + DefaultProfile::DEFAULT_PROFILE_FILENAME);
+-    // installation config directory
+-    profiles.push_back (static_cast<std::string>(sysconfdir) + '/' + DefaultProfile::DEFAULT_PROFILE_FILENAME);
++    // config specified by environment overrides system config
++    char *env_profile = getenv("PRESAGE_CONFIG");
++    if (env_profile != NULL) {
++        profiles.push_back(env_profile);
++    } else {
++        // system etc directory
++        profiles.push_back (get_system_etc_dir() + '/' + DefaultProfile::DEFAULT_PROFILE_FILENAME);
++        // installation config directory
++        profiles.push_back (static_cast<std::string>(sysconfdir) + '/' + DefaultProfile::DEFAULT_PROFILE_FILENAME);
++    }
+     // home dir dotfile
+     profiles.push_back (get_user_home_dir() + "/.presage/" + DefaultProfile::DEFAULT_PROFILE_FILENAME);
+     // user specified profile (if any)

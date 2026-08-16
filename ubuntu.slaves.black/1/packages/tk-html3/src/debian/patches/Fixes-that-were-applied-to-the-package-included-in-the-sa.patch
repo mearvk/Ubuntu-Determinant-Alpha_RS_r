@@ -1,0 +1,107 @@
+From: William Joye <wjoye@cfa.harvard.edu>
+Date: Fri, 2 Mar 2012 15:05:10 +0100
+Subject: Fixes that were applied to the package included in the saods9
+ source.
+
+Origin: http://hea-www.harvard.edu/saord/download/ds9/source/ds9.6.2.tar.gz
+---
+ src/htmlcmd.c    | 22 ++++++++++++++++++++++
+ src/htmlurl.c    |  3 +++
+ src/htmlwidget.c | 20 ++++++++++++++------
+ 3 files changed, 39 insertions(+), 6 deletions(-)
+
+diff --git a/src/htmlcmd.c b/src/htmlcmd.c
+index eb904a9..85eda04 100644
+--- a/src/htmlcmd.c
++++ b/src/htmlcmd.c
+@@ -453,6 +453,28 @@ HtmlYviewCmd(clientData, interp, argc, argv)
+         if (p)
+             HtmlVerticalScroll(htmlPtr, p->anchor.y);
+     }
++    else if( argc==4 && !strncmp(argv[2],"text",4)) {
++	HtmlElement *p;
++	int i;
++
++	HtmlLock(htmlPtr);
++	if( HtmlGetIndex(htmlPtr, argv[3], &p, &i)!=0 ){
++	    if( !HtmlUnlock(htmlPtr) ){
++		Tcl_AppendResult(interp,"malformed index: \"", argv[3], "\"", 0);
++	    }
++	    
++	    return TCL_ERROR;
++	}
++	if( !HtmlUnlock(htmlPtr) && p ){
++	    if( p->base.type==Html_Text ) {
++		int offset = p->text.y-20;
++		if (offset<0)
++		    offset = 0;
++		HtmlVerticalScroll(htmlPtr, offset);
++	    }
++	    
++	}
++    }
+     else {
+         int count;
+         double fraction;
+diff --git a/src/htmlurl.c b/src/htmlurl.c
+index d68c821..5b14b68 100644
+--- a/src/htmlurl.c
++++ b/src/htmlurl.c
+@@ -389,6 +389,9 @@ HtmlCallResolver(htmlPtr, azSeries)
+                             continue;
+                         }
+                     }
++		    /* look for /../ at begining */
++		    if (!strncmp(zBuf,"/../",4))
++			strcpy(zBuf,zBuf+3);
+                     HtmlFree(base->zPath);
+                     base->zPath = zBuf;
+                 }
+diff --git a/src/htmlwidget.c b/src/htmlwidget.c
+index 069e87f..4d65229 100644
+--- a/src/htmlwidget.c
++++ b/src/htmlwidget.c
+@@ -1638,6 +1638,13 @@ HtmlGetColorByName(htmlPtr, zColor, def)
+      * compatibility. 
+      */
+     n = strlen(zColor);
++
++    /* trucate any spaces on the end */
++    while (n>0 && zColor[n-1]==' ') {
++	zColor[n-1] = '\0';
++	n--;
++    }
++
+     if (n == 6 || n == 3 || n == 9 || n == 12) {
+         for (i = 0; i < n; i++) {
+             if (!isxdigit(zColor[i]))
+@@ -1809,22 +1816,23 @@ GetColorByValue(htmlPtr, pRef)
+     float dist;
+     float closestDist;
+     int closest;
+-    int r, g, b;
++    XColor* q;
++    q = Tk_GetColorByValue(htmlPtr->clipwin, pRef);
+ 
+     /*
+      * Search for an exact match 
+      */
+-    r = pRef->red &= COLOR_MASK;
+-    g = pRef->green &= COLOR_MASK;
+-    b = pRef->blue &= COLOR_MASK;
+     for (i = 0; i < N_COLOR; i++) {
+         XColor *p = htmlPtr->apColor[i];
+-        if (p && (p->red & COLOR_MASK) == r && (p->green & COLOR_MASK) == g
+-            && (p->blue & COLOR_MASK) == b) {
++	if (p && (q->red == p->red) 
++	    && (q->green == p->green) 
++	    && (q->blue == p->blue)) {
+             htmlPtr->colorUsed |= (1LL << i);
++	    Tk_FreeColor(q);
+             return i;
+         }
+     }
++    Tk_FreeColor(q);
+ 
+     /*
+      * No exact matches.  Look for a completely unused slot 

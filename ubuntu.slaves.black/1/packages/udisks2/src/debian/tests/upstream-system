@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+mkdir -p /var/run/udisks2
+mkdir -p /var/lib/udisks2
+# collect core dump in case of a crash
+ulimit -c unlimited
+RC=0
+# succeeding test must not write anything to stderr, as per DEP-8
+src/tests/integration-test 2>&1 || RC=$?
+if [ "$RC" -gt 128 ]; then
+    # give it some time to write the core file
+    sleep 10
+    if [ -e core ]; then
+        echo "test failed with code $RC and core dump, copying to artifacts"
+        cp core ${AUTOPKGTEST_ARTIFACTS:-$ADT_ARTIFACTS}
+    fi
+fi
+exit $RC

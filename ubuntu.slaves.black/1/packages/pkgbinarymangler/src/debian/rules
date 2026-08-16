@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/pkg-info.mk
+
+# do not mangle ourselves, in case the previous version caused FTBFS
+export NO_PKG_MANGLE=1
+
+%:
+	dh $*
+
+override_dh_install:
+	dh_install
+	sed -i 's/#VERSION#/$(DEB_VERSION)/' debian/pkgbinarymangler/usr/bin/pkgstriptranslations
+	mkdir -p debian/dh-translations/usr/share/man/man1/
+	pod2man -c Debhelper -r "$(DEB_VERSION)" dh_translations debian/dh-translations/usr/share/man/man1/dh_translations.1
+
+override_dh_auto_test:
+ifeq (, $(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	unset NO_PKG_MANGLE; test/run -v
+endif
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f dh_builddeb.pkgbinarymangler
+	rm -f dpkg-deb.pkgbinarymangler

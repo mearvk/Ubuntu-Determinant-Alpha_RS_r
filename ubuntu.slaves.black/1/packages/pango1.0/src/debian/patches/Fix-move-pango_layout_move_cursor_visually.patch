@@ -1,0 +1,54 @@
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Thu, 31 Mar 2022 02:19:45 -0400
+Subject: Fix move pango_layout_move_cursor_visually
+
+When moving the cursor off the paragraph end to
+the left in RTL text, we were moving to the previous
+line, and not to the next line, as expected.
+
+Test included.
+
+Fixes: #679
+(cherry picked from commit bc00edb9426ddb326b6d6d1cf725cad441b511f2)
+---
+ pango/pango-layout.c | 4 ++--
+ tests/test-bidi.c    | 3 ++-
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/pango/pango-layout.c b/pango/pango-layout.c
+index e45fb69..eb674b5 100644
+--- a/pango/pango-layout.c
++++ b/pango/pango-layout.c
+@@ -2184,9 +2184,9 @@ pango_layout_move_cursor_visually (PangoLayout *layout,
+   else
+     {
+       if (old_index == line->start_index + line->length && direction < 0)
+-        off_start = TRUE;
+-      if (old_index == line->start_index && direction > 0)
+         off_end = TRUE;
++      if (old_index == line->start_index && direction > 0)
++        off_start = TRUE;
+     }
+ 
+   if (off_start || off_end)
+diff --git a/tests/test-bidi.c b/tests/test-bidi.c
+index eb99abb..ba578ba 100644
+--- a/tests/test-bidi.c
++++ b/tests/test-bidi.c
+@@ -348,6 +348,7 @@ test_move_cursor_para (void)
+     { "line 1 line 2 line 3\nline 4\r\nline 5", -1 }, // various separators
+     { "some text, some more text,\n\n even more text", 60 },
+     { "long word", 40 },
++    { "זוהי השורה הראשונה" "\n" "זוהי השורה השנייה" "\n" "זוהי השורה השלישית" , 200 },
+   };
+   PangoLayout *layout;
+   PangoRectangle pos, old_pos;
+@@ -399,7 +400,7 @@ test_move_cursor_para (void)
+             break;
+ 
+           if (index >= strlen (tests[i].text) - 1)
+-            break;
++            continue;
+ 
+           pango_layout_get_cursor_pos (layout, index, &pos, NULL);
+ 

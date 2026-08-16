@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+export GEM2DEB_TEST_RUNNER = --check-dependencies
+export DH_RUBY = --gem-install
+
+RUBYGEMS_GEMSPEC=rubygems-update.gemspec
+RUBYGEMS_VERSION=$(shell debian/get-gem-version.rb ${RUBYGEMS_GEMSPEC})
+BUNDLER_GEMSPEC=bundler/bundler.gemspec
+BUNDLER_VERSION=$(shell debian/get-gem-version.rb ${BUNDLER_GEMSPEC})
+BUNDLER_VERSION := $(subst .rc,~rc,$(BUNDLER_VERSION))
+DEBIAN_REVISION=$(shell dpkg-parsechangelog --show-field Version | cut -d '-' -f 2)
+
+GEMS_DIR=usr/share/rubygems-integration/all/gems
+
+%:
+	dh $@ --buildsystem=ruby --with ruby
+
+override_dh_install:
+	dh_install -O--buildsystem=ruby
+
+	# Remove remaining bundler files from ruby-rubygems binary package
+	rm -rf debian/ruby-rubygems/${GEMS_DIR}/rubygems-update-${RUBYGEMS_VERSION}/bundler
+
+	# Mimick rubygems-update installation process. The files (other than
+	# the gemspec) should *not* be available in the gem directory, and only
+	# under the vendor_ruby.
+	########################################################################
+	# Move rubygems files to vendor_ruby
+	install -d -m 0755 $(CURDIR)/debian/ruby-rubygems/usr/lib/ruby/vendor_ruby
+	for f in rubygems rubygems.rb; do \
+		mv $(CURDIR)/debian/ruby-rubygems/${GEMS_DIR}/rubygems-update-${RUBYGEMS_VERSION}/lib/$$f \
+		$(CURDIR)/debian/ruby-rubygems/usr/lib/ruby/vendor_ruby/$$f; \
+	done
+	# Move gem binary to /usr/bin
+	install -d -m 0755 $(CURDIR)/debian/ruby-rubygems/usr/bin
+	mv $(CURDIR)/debian/ruby-rubygems/${GEMS_DIR}/rubygems-update-${RUBYGEMS_VERSION}/bin/gem \
+		$(CURDIR)/debian/ruby-rubygems/usr/bin/gem
+	# Delete the rest
+	$(RM) -rf $(CURDIR)/debian/ruby-rubygems/${GEMS_DIR}/rubygems-update-${RUBYGEMS_VERSION}
+
+override_dh_gencontrol:
+	# bundler binary package needs to know the bundler version to depend on
+	# the correct ruby-bundler version
+	echo "bundler:Version=${BUNDLER_VERSION}-${DEBIAN_REVISION}" >> debian/bundler.substvars
+
+	dh_gencontrol
+
+	# Bundler has a different version than rubygems at the moment
+	dh_gencontrol -pbundler -- -v${BUNDLER_VERSION}-${DEBIAN_REVISION}
+	dh_gencontrol -pruby-bundler -- -v${BUNDLER_VERSION}-${DEBIAN_REVISION}

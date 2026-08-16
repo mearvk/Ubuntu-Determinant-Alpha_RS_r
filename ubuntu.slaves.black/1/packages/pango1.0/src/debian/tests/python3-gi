@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+xvfb-run -a python3 <<EOF
+import gi
+gi.require_version('Pango', '1.0')
+from gi.repository import Pango
+
+fd = Pango.FontDescription()
+assert fd is not None
+fd.set_size(12)
+EOF
+
+xvfb-run -a python3 <<EOF
+import gi
+gi.require_version('PangoFT2', '1.0')
+from gi.repository import PangoFT2
+
+fm = PangoFT2.FontMap()
+assert fm is not None
+fm.set_resolution(96, 96)
+EOF
+
+xvfb-run -a python3 <<EOF
+import os, gi
+
+gi.require_version('PangoXft', '1.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk, PangoXft
+
+Gdk.set_allowed_backends('x11')
+display = Gdk.Display.open(os.getenv('DISPLAY'))
+xdisplay = display.get_xdisplay()
+fm = PangoXft.get_font_map(xdisplay, 0)
+assert fm is not None
+EOF
+

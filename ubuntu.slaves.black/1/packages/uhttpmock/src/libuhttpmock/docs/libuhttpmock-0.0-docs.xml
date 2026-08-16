@@ -1,0 +1,244 @@
+<?xml version="1.0"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN" "http://www.oasis-open.org/docbook/xml/4.3/docbookx.dtd" [
+	<!ENTITY % local.common.attrib "xmlns:xi  CDATA  #FIXED 'http://www.w3.org/2003/XInclude'">
+	<!ENTITY version SYSTEM "version.xml">
+]>
+<book id="index" xmlns:xi="http://www.w3.org/2003/XInclude">
+	<bookinfo>
+		<title>libuhttpmock Reference Manual</title>
+		<releaseinfo>for libuhttpmock &version;.<!-- The latest version of this documentation can be found online at
+			<ulink role="online-location" url="http://[SERVER]/libuhttpmock/index.html">http://[SERVER]/libuhttpmock/</ulink>.-->
+		</releaseinfo>
+	</bookinfo>
+
+	<part>
+		<title>Integrating libuhttpmock into new projects</title>
+		<chapter>
+			<title>Introduction</title>
+			<para>
+				libuhttpmock works by recording the Soup Session your application uses.
+				It traces the requests your application makes and the reply it receives
+				from the (online) server you query. After capturing an initial trace,
+				libuhttpmock will be able to reply to your application's requests
+				the same way the actual servers would and as such help you detect
+				unwanted changes in behaviour in your application.
+			</para>
+			<example>
+				<title>A sample implementation of a test with libuhttpmock</title>
+				<programlisting>
+/*
+ * Copyright (C) 2020 Rasmus Thomsen &lt;oss@cogitri.dev&gt;
+ */
+#include &lt;gio/gio.h&gt;
+#include &lt;glib.h&gt;
+#include &lt;libsoup/soup.h&gt;
+#include &lt;uhttpmock/uhm.h&gt;
+
+UhmServer* mock_server = NULL;
+
+void
+test_mock (void)
+{
+	g_autoptr(GError) error = NULL;
+	g_autoptr(SoupLogger) soup_logger = NULL;
+	g_autoptr(SoupMessage) soup_message = NULL;
+	g_autoptr(SoupMessageBody) soup_response_message_body = NULL;
+	g_autoptr(SoupSession) soup_session = NULL;
+	g_autofree gchar *server_url = NULL;
+	guint http_status_code = 0;
+
+	/*
+	 * Start recording the trace if in online mode, otherwise read trace to comapre
+	 * Replace "testname" with the name of the test. This needs to be unique among
+	 * your test suite!
+	 */
+	uhm_server_start_trace (mock_server, "testname", &amp;error);
+	g_assert (error == NULL);
+
+	soup_session = soup_session_new ();
+
+	/* Query actual server if online mode is activated */
+	if (uhm_server_get_enable_online (mock_server)) {
+		server_url = g_strdup ("https://jsonplaceholder.typicode.com/todos/1");
+
+		/*
+		 * Allow usage of the self-signed certificate we generate in
+		 * main (). Make sure this is _only_ set during testing!
+		 */
+		g_object_set (soup_session, "ssl-strict", FALSE, NULL);
+	} else {
+		const gchar *server_address = uhm_server_get_address (mock_server);
+		guint server_port = uhm_server_get_port (mock_server);
+		server_url = g_strdup_printf ("https://%s:%u", server_address, server_port);
+	}
+
+	/* Set uhttpmock as soup logger so it can capture the trace */
+	soup_logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, -1);
+	soup_logger_set_printer (soup_logger, uhm_server_received_message_chunk_from_soup, mock_server, NULL);
+	soup_session_add_feature (soup_session, SOUP_SESSION_FEATURE (soup_logger));
+
+	/*
+	 * Send the message - usually your application would process the
+	 * response from uhttpmock, do further requests, etc. afterwards
+	 */
+	soup_message = soup_message_new ("GET", server_url);
+	http_status_code = soup_session_send_message (soup_session, soup_message);
+	g_assert (http_status_code == 200);
+
+	/* End the trace - in online mode this will save the trace, otherwise it'd compare it. */
+	uhm_server_end_trace (mock_server);
+}
+
+int
+main (int argc, char **argv)
+{
+	g_autofree gchar *cert_path = NULL;
+	g_autofree gchar *key_path = NULL;
+	g_autofree gchar *trace_path = NULL;
+	g_autoptr(GError) error = NULL;
+	g_autoptr(GFile) trace_dir = NULL;
+	g_autoptr(GTlsCertificate) tls_cert = NULL;
+
+	g_test_init (&amp;argc, &amp;argv, NULL);
+
+	/*
+	 * Setup the mock server with the directory to write traces to.
+	 * replace "testsuitename" with the name of the testsuite. This must
+	 * be unique among your project!
+	 */
+	mock_server = uhm_server_new ();
+	trace_path = g_test_build_filename (G_TEST_DIST, "traces", "testsuitename", NULL);
+	trace_dir = g_file_new_for_path (trace_path);
+	uhm_server_set_trace_directory (mock_server, trace_dir);
+
+	/*
+	 * Set up self signed cert for HTTPS. The cert doesn't actually need to be
+	 * secret - it can be distributed with your program or be generated during
+	 * build time with:  openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -nodes
+	 */
+	cert_path = g_test_build_filename (G_TEST_DIST, "sslcertdir", "cert.pem", NULL);
+	key_path = g_test_build_filename (G_TEST_DIST, "sslcertdir", "key.pem", NULL);
+	tls_cert = g_tls_certificate_new_from_files (cert_path, key_path, &amp;error);
+	g_assert (error == NULL);
+	uhm_server_set_tls_certificate (mock_server, tls_cert);
+
+	/*
+	 * TRUE, TRUE => Logging mode, records what actual server replies
+	 * FALSE, TRUE => Comparing mode, checks actual server still replies as expected from trace
+	 * FALSE, FALSE => Testing mode, requests are answered by mock server as per trace
+	 *
+	 * As such, you usually want TRUE, TRUE for the initial recording or if you/the server changed
+	 * something (and as such expect a legitimate change in the trace) and then FALSE, FALSE
+	 * to actually engage the tests.
+	 */
+	uhm_server_set_enable_logging (mock_server, TRUE);
+	uhm_server_set_enable_online (mock_server, TRUE);
+
+	g_test_add_func ("/test/mock", test_mock);
+	return g_test_run ();
+}
+				</programlisting>
+			</example>
+
+			<para>
+				This example can be compiled using:
+			</para>
+			<informalexample>
+				<programlisting>
+gcc -o uhttpsample uhttpsample.c $(pkg-config --cflags --libs gio-2.0 glib-2.0 libsoup-2.4 libuhttpmock-0.0)
+				</programlisting>
+			</informalexample>
+			<para>
+				Afterwards, executing <code>./uhttpsample</code> will run the test suite. Initially it will
+				record a trace of the requests done by the test_mock function and the responses
+				it receives, because <code>uhm_server_set_enable_logging</code> and
+				<code>uhm_server_set_enable_online</code> are both set to <code>TRUE</code>. Upon setting
+				both of these to <code>FALSE</code>, libuhttpmock will read the trace it
+				created earlier and will fail the test (by returning an HTTP status code indicating failure
+				for the faulty query your application makes) in case something is different - e.g. because
+				your application queried a different URL than expected. Keep in mind that by default
+				libuhttpmock will only compare the URI and methods of messages, but no headers and
+				not the message bodies. To override this behaviour, you can connect to the
+				<code>compare-messages</code> signal on <code>UhmServer</code> to implement your own
+				custom handler for checking if messages are as expected.
+			</para>
+		</chapter>
+		<chapter>
+			<title>Testing Workflow</title>
+			<para>
+				Once you have integrated libuhttpmock into your tests, your workflow will consist out of the
+				following steps:
+			</para>
+			<itemizedlist>
+				<listitem>
+					<para>
+						<emphasis role="strong">Log</emphasis>: After doing changes in your application that
+						cause wanted changes in behavior (e.g. a different response after the API has changed),
+						you want to record a new trace. For this you enable both logging and online modes, as
+						described above.
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						<emphasis role="strong">Compare</emphasis>: If you want to make sure the server still
+						behaves as you expect (sends you the expected responses), you can disable logging and
+						enable the online mode. libuhttpmock will then query the actual online server, but wont
+						overwrite the trace file and will error out if any response from the server has changed.
+					</para>
+				</listitem>
+				<listitem>
+					<para>
+						<emphasis role="strong">Test</emphasis>: When running tests in CI or when releasing your
+						application for downstreams to package it (and run tests), you want both logging and
+						the online mode to be disabled. In this case libuhttpmock will mock the responses of the
+						actual online server. That way no internet access is required for your tests, API keys required
+						for testing don't have to be shipped and so on.
+					</para>
+				</listitem>
+			</itemizedlist>
+		</chapter>
+	</part>
+
+	<part>
+		<title>libuhttpmock Overview</title>
+		<chapter>
+			<title>Object Hierarchy</title>
+			<xi:include href="xml/tree_index.sgml"/>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Core API</title>
+		<chapter>
+			<title>Core API</title>
+			<xi:include href="xml/uhm-version.xml"/>
+			<xi:include href="xml/uhm-server.xml"/>
+			<xi:include href="xml/uhm-resolver.xml"/>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Appendices</title>
+		<index role="api-index-full">
+			<title>API Index</title>
+			<xi:include href="xml/api-index-full.xml"><xi:fallback/></xi:include>
+		</index>
+		<index role="api-index-deprecated">
+			<title>Index of deprecated symbols</title>
+			<xi:include href="xml/api-index-deprecated.xml"><xi:fallback/></xi:include>
+		</index>
+		<index role="0.1.0">
+			<title>Index of new symbols in 0.1.0</title>
+			<xi:include href="xml/api-index-0.1.0.xml"><xi:fallback/></xi:include>
+		</index>
+		<index role="0.3.0">
+			<title>Index of new symbols in 0.3.0</title>
+			<xi:include href="xml/api-index-0.3.0.xml"><xi:fallback/></xi:include>
+		</index>
+		<index role="0.5.0">
+			<title>Index of new symbols in 0.5.0</title>
+			<xi:include href="xml/api-index-0.5.0.xml"><xi:fallback/></xi:include>
+		</index>
+		<xi:include href="xml/annotation-glossary.xml"><xi:fallback /></xi:include>
+	</part>
+</book>

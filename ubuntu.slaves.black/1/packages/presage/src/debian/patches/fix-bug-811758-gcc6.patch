@@ -1,0 +1,63 @@
+Description: Fix FTBFS by g++-6
+Author: Kentaro Hayashi <hayashi@clear-code.com>
+Forwarded: No
+--- a/src/lib/core/charsets.h
++++ b/src/lib/core/charsets.h
+@@ -42,7 +42,7 @@
+ const char PAGE_DOWN   = 128;
+ 
+ 
+-const char DEFAULT_WORD_CHARS[]={
++const unsigned char DEFAULT_WORD_CHARS[]={
+     'A',
+     'B',
+     'C',
+--- a/src/lib/core/context_tracker/contextTracker.cpp
++++ b/src/lib/core/context_tracker/contextTracker.cpp
+@@ -37,11 +37,11 @@
+ ContextTracker::ContextTracker(Configuration* config,
+ 			       PredictorRegistry* registry,
+ 			       PresageCallback* callback,
+-			       const char wChars[],
++			       const unsigned char wChars[],
+ 			       const char tChars[],
+ 			       const char bChars[],
+ 			       const char cChars[])
+-    : wordChars      (wChars),
++    : wordChars      (reinterpret_cast<const char *>(wChars)),
+       separatorChars (tChars),
+       blankspaceChars(bChars),
+       controlChars   (cChars),
+--- a/src/lib/core/context_tracker/contextTracker.h
++++ b/src/lib/core/context_tracker/contextTracker.h
+@@ -157,7 +157,7 @@
+     ContextTracker(Configuration* config,
+ 		   PredictorRegistry* predictorRegistry,
+ 		   PresageCallback* callback,
+-		   const char[]=DEFAULT_WORD_CHARS,
++		   const unsigned char[]=DEFAULT_WORD_CHARS,
+                    const char[]=DEFAULT_SEPARATOR_CHARS,
+                    const char[]=DEFAULT_BLANKSPACE_CHARS,
+                    const char[]=DEFAULT_CONTROL_CHARS );
+--- a/test/lib/core/context_tracker/contextChangeDetectorTest.cpp
++++ b/test/lib/core/context_tracker/contextChangeDetectorTest.cpp
+@@ -30,7 +30,7 @@
+ 
+ void ContextChangeDetectorTest::setUp()
+ {
+-    detector = new ContextChangeDetector(DEFAULT_WORD_CHARS,
++    detector = new ContextChangeDetector(reinterpret_cast<const char *>(DEFAULT_WORD_CHARS),
+ 					 DEFAULT_SEPARATOR_CHARS,
+ 					 DEFAULT_BLANKSPACE_CHARS,
+ 					 DEFAULT_CONTROL_CHARS,
+--- a/test/lib/predictors/predictorsTestMockObjects.cpp
++++ b/test/lib/predictors/predictorsTestMockObjects.cpp
+@@ -31,7 +31,7 @@
+ ContextTracker::ContextTracker(Configuration* config,
+ 			       PredictorRegistry* predictorRegistry,
+ 			       PresageCallback* callback,
+-			       const char wc[],
++			       const unsigned char wc[],
+ 			       const char sc[],
+ 			       const char bc[],
+ 			       const char cc[])

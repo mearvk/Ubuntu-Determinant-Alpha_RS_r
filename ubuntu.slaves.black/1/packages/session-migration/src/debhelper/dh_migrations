@@ -1,0 +1,83 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+dh_migrations - install session migration files into package build directories
+
+=cut
+
+use strict;
+use File::Find;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<dh_migrations> [S<B<debhelper options>>] [B<-n>]
+
+=head1 DESCRIPTION
+
+B<dh_migrationis> is a debhelper program that is responsible for
+installing B<session migration> files used by session-migration helper
+into package build directories and add a dependency of the package on
+session-migration.
+
+This helper will add in ${misc:Depends} the session-migration tool as a dependency of the 
+targeted package.
+
+Use the --with migrations sequence for debhelper 8+.
+
+=head1 FILES
+
+=over 4
+
+=item debian/I<package>.migrations
+
+List the files and migration scripts to install into each package. The format is a set of lines,
+where each line lists a script file to install into into usr/share/session-migration/scripts
+in the package build directory.
+
+The name of the files (or directories) to install should be given relative to the current directory.
+
+=back
+
+=head1 OPTIONS
+
+=cut
+
+init();
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+	my $tmp=tmpdir($package);
+	my $file=pkgfile($package,"migrations");
+	my @scripts;
+
+	@scripts=filearray($file, ".") if $file;
+
+	if (($package eq $dh{FIRSTPACKAGE} || $dh{PARAMS_ALL}) && @ARGV) {
+		push @scripts, @ARGV;
+	}
+
+	foreach my $script (@scripts) {
+		if (! -d "$tmp/usr/share/session-migration/scripts") {
+			doit("install","-d","$tmp/usr/share/session-migration/scripts");
+		}
+		doit("install","-p","-m755",$script,"$tmp/usr/share/session-migration/scripts");		
+	}
+
+    if (@scripts) {
+		addsubstvar($package, "misc:Depends", "session-migration");
+	}
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+L<session-migration(1)>
+
+=head1 AUTHOR
+
+Didier Roche <didrocks@ubuntu.com>
+
+Copyright (C) 2012 Canonical Ltd., licensed under the GNU GPL v3 or later.
+
+=cut
