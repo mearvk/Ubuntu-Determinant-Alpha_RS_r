@@ -1,0 +1,47 @@
+#!/bin/sh
+# Copyright 2020 Collabora Ltd.
+# Copyright 2020 Simon McVittie
+# SPDX-License-Identifier: MIT
+
+set -eux
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cd "$AUTOPKGTEST_TMP"
+
+cat > trivial.c <<EOF
+#include <ft2build.h>
+#include <freetype/freetype.h>
+
+#include <assert.h>
+#include <stdio.h>
+
+int main(void)
+{
+    FT_Library library = NULL;
+    FT_Error error;
+    FT_Int x = 0, y = 0, z = 0;
+
+    error = FT_Init_FreeType(&library);
+    assert(error == FT_Err_Ok);
+    FT_Library_Version(library, &x, &y, &z);
+    printf("freetype %d.%d.%d\n", x, y, z);
+    assert(x >= 2);
+    error = FT_Done_FreeType(library);
+    assert(error == FT_Err_Ok);
+    return 0;
+}
+EOF
+
+# Deliberately word-splitting pkg-config's output:
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -Wall -o trivial trivial.c $("${CROSS_COMPILE}pkg-config" --cflags --libs freetype2)
+./trivial
+
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -Wall -static -o static trivial.c $("${CROSS_COMPILE}pkg-config" --static --cflags --libs freetype2)
+./static

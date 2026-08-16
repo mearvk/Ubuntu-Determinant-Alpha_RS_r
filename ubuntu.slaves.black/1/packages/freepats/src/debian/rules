@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# debian/rules for freepats, dh version
+# Copyright (c) 2020 by Henrique de Moraes Holschuh
+# Published under the GNU GPL license version 2 or any later versions
+
+# where dh_install will look for files by default
+PKGTMP:=$(CURDIR)/debian/tmp
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	mkdir -p $(PKGTMP)
+	tar -jxf upstream/freepats-*.tar.bz2 -C $(PKGTMP)
+	mkdir -p $(PKGTMP)/etc/timidity
+	(echo "dir /usr/share/midi/freepats" ; \
+	 echo ; \
+	 cat $(PKGTMP)/freepats/freepats.cfg ) \
+	 > $(PKGTMP)/etc/timidity/freepats.cfg
+	chmod 644 $(PKGTMP)/etc/timidity/freepats.cfg
+	cd $(PKGTMP)/freepats; patch -p1 < $(CURDIR)/freepat-crude-cfg.diff
+	dh_auto_install

@@ -1,0 +1,71 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+SHELL := sh -e
+
+ifeq (,$(filter noudeb, $(DEB_BUILD_PROFILES)))
+  with_udeb = yes
+endif
+
+DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
+
+%:
+	dh ${@}
+
+override_dh_autoreconf:
+	ln -s /usr/share/gettext/config.rpath $(CURDIR)
+	dh_autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- --bindir=/bin --libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_compress:
+	dh_compress -Xusr/share/doc/libfuse-dev/examples
+
+override_dh_fixperms:
+	dh_fixperms
+
+ifeq ($(DEB_BUILD_ARCH),linux)
+	chmod 0755 debian/fuse/bin/fusermount
+endif
+
+override_dh_install:
+	# remove unused files
+	rm -f  debian/tmp/etc/init.d/fuse
+	rm -rf debian/tmp/etc/udev/
+	rm -f  debian/tmp/usr/lib/*/*.la
+
+	dh_install --fail-missing
+
+	# adjusting /lib for multiarch
+	mkdir -p debian/libfuse2/lib/$(DEB_HOST_MULTIARCH)
+	mv debian/libfuse2/lib/*.so* debian/libfuse2/lib/$(DEB_HOST_MULTIARCH)
+ifeq ($(with_udeb),yes)
+	mkdir -p debian/libfuse2-udeb/lib/$(DEB_HOST_MULTIARCH)
+	mv debian/libfuse2-udeb/lib/*.so* debian/libfuse2-udeb/lib/$(DEB_HOST_MULTIARCH)
+endif
+
+	# adding initramfs-tools integration
+	install -D -m 0755 debian/local/fuse.hook debian/fuse/usr/share/initramfs-tools/hooks/fuse
+
+	# adding kmod integration
+#	install -D -m 0644 debian/local/fuse.kmod debian/fuse/lib/modules-load.d/fuse.conf
+
+override_dh_link:
+	# correcting symlink targets
+	for LIB in debian/tmp/usr/lib/*/*.so; \
+	do \
+		dh_link -plibfuse-dev lib/$(DEB_HOST_MULTIARCH)/$$(basename $$(readlink $${LIB})) usr/lib/$(DEB_HOST_MULTIARCH)/$$(basename $${LIB}); \
+	done
+
+	dh_link --remaining-packages
+
+.PHONY: override_dh_autoreconf override_dh_auto_configure \
+	override_dh_compress override_dh_fixperms \
+	override_dh_install override_dh_link

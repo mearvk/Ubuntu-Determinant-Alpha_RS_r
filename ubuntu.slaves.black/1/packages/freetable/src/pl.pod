@@ -1,0 +1,248 @@
+=encoding UTF-8
+
+=head1 NAME
+
+B<freetable> - program ułatwiający tworzenie HTML-owych tabeli
+
+=head1 WERSJA
+
+Ten dokument opisuje B<freetable> w wersji 2.3.
+
+Może być nie w pełni prawidłowy jeśli używasz innej wersji.
+
+=head1 SYNOPSIS
+
+B<freetable> I<[opcje]> I<nazwapliku>
+
+lub
+
+B<freetable> I<[opcje]>
+
+Dostępne opcje to :
+
+I<-h>, I<--help>    Program wydrukuje informację o sposobie użycia i skończy
+
+I<-V>, I<--version> Program wydrukuje numer wersji i skończy
+
+I<-c>, I<--comment> Program wstawi przed każdą komórką komentarz o jej pozycji
+
+I<-b>, I<--no-nbsp> Program nie wstawi I<&nbsp;> do pustych komórek celem
+wizualnego ich obniżenia na graficznych przeglądarkach
+
+I<-w>, I<--warning> Program wstawi ostrzeżenie że powinnaś raczej zmieniać
+źródło niż tabelę przed każdą tabelą, którą stworzy.
+
+I<-l>, I<--location> Program zamieni tagi lokacyjne I<E<lt>rowE<gt>> i
+I<E<lt>colE<gt>> wewnątrz tabeli na pozycję komórki, w której wystąpią.
+
+I<-m>, I<--macro> I<[program]>
+               Program przepuści tabelę przez makroprocesor (domyślnie: B<m4>)
+
+=head1 OSTRZEŻENIE
+
+ NIE UŻYWAJ MAKROPROCESORA NA NIEPEWNYM ŹRÓDLE
+ M4 MOŻE ZOSTAĆ UŻYTE DO NARUSZENIA TWEGO BEZPIECZEŃSTWA
+ WIĘCEJ INFORMACJI ZNAJDZIESZ URUCHAMIAJĄC :
+
+I<info m4 'UNIX commands' syscmd>
+
+=head1 DESCRIPTION
+
+Ten program jest wyzwolonym (wolnodostępnym) następcą B<wwwtable>.
+
+HTML to świetny język, ale ma straszną niedoróbę : tabele.
+Spędziłem wiele czasu wpatrując się w HTMLowy kod i próbując zgadnąć,
+która komórka kodu odpowiada której w przeglądarce.
+
+Jeśli również miałeś ten problem, to być może za chwilę zostanie rozwiązany.
+
+Program czyta z pliku lub ze I<stdin>. Szuka linii zaczynającej opis tabeli :
+
+    <wwwtable [opcje]>
+
+Analizuje ten opis, wstawia poprawną HTML-ową tabelę i szuka następnego opis, aż plik
+się skończy.
+
+=head1 SKŁADNIA TABELI
+
+Jest bardzo prosta :
+
+    wwwtable 
+    <wwwtable [opcje]>
+    [preambuła]
+    [komórka]
+    [komórka]
+    ...
+    </wwwtable>
+
+opcje będą przekazane do taga I<E<lt>tableE<gt>>.
+Preambuła to dowolny HTML-owy text. Będzie umieszczony bezpośrednio przed tabelą.
+
+komórka to albo normalna_komórka (tag I<E<lt>tdE<gt>>) albo
+nagłówkowa_komórka (tag I<E<lt>thE<gt>>).
+Tak przynajmniej było w starszych wersjach freetable.
+W następnej sekcji są opisane nowe metody adresowania komórek.
+
+    normalna_komórka :
+    (rząd,kolumna) opcje
+    zawartość
+
+    nagłówkowa_komórka :
+    ((rząd,kolumna)) opcje  
+    zawartość
+
+opcje będą przekazane do komórkowego taga. Atrybuty I<colspan> i I<rowspan>
+są uwzględniane podczas tworzenia tabeli.
+
+zawartość maże zawierać text, tagi a nawet osadzoną tabelę.
+
+Jeśli używasz opcji I<-m> (lub I<--macro>), zawartość będzie przerobiona przez m4(1),
+z <row> i <col> ustawionymi na adres aktualnej komórki
+
+rząd i kolumna mogą być zarówno liczbami, wyrażeniami względnymi, albo regex'ami.
+W przeciwieństwie do B<wwwtable>, z B<freetable> możesz używać regex'ów również
+dla komórek nagłówka.
+Możesz również używać I<*>, co znaczy dokładnie tyle co I<.*>.
+
+Wyrażenia względne to :
+
+I<=> albo pusta znaczy : tyle samo co w poprzedniej komórce
+
+I<+> albo I<+X> znaczy : o 1 lub X więcej niż w poprzedniej komórce
+
+I<-> albo I<-X> znaczy : o 1 lub X więcej niż w poprzedniej komórce
+
+Jeśli wiele definicji adresuje tą samą komórkę zarówno opcje jak i zawartość są doklejane
+w kolejności wystąpienia.
+
+Jeśli chcesz używać tylko regex'ów musisz powiedzieć programowi o adresie ostatniej komórki :
+
+    <wwwtable>
+    (*,1)
+    to są piewsze kolumny
+    (1,*)
+    to są piewsze rzędy
+    (4,4)
+    </wwwtable>
+
+=head1 ALTERNATYWNE ADRESY KOMÓREK
+
+Adresowanie komórek za pomocą wyrażeń regularnych jest
+bardzo niewygodne. Z tego powodu, w B<freetable> 2.0 zostały
+wprowadzone dwie nowe  metody.
+Obie mogą być użyte zarówno do komórek normalnych jak i nagłówkowych.
+
+Zachowana jest pełna wsteczna kompatybilność.
+W tym celu została wprowadzona nowa składnia.
+Niestety, nie możesz adresować rzędu i kolumny używając
+odmiennych metod.
+Żeby obejść ten problem, obie nowe metody są bardzo tolerancyjne
+i pozwalają na użycie I<=>, I<+>, I<->, I<+X> I<-X> oraz
+pustego łańcucha z tym samym znaczeniem, jakie mają one
+w starej metodzie.
+
+Nowe metody potrafią samodzielnie ustalić rozmiar tabeli.
+
+=head2 ZASIĘGI
+
+    (zasięg rzędów;zasięg kolumn) opcje
+    zawartość
+
+Składnia wygląda jak: 1-2,4-7,9,12.
+Zduplikowane adresy zostają wyeliminowane.
+Dla potrzeb adresowania relatywnego,
+użyty jest ostatni podany numer. A więc jeśli napiszesz
+
+    (1-100,32;1)
+    foo
+    (+,)
+    bar
+
+Komórka (33,1) będzie zawierać `foobar' a wszystkie pozostałe tylko `foo'.
+
+=head2 DOWOLNY KOD PERL
+
+    ({kod dla rzędów},{kod dla kolumn}) opcje
+    zawartość
+
+Możesz używać dowolnego kodu Perl o ile zmieści się w jednej linijce,
+pasuje do naszego wyrażenia regularnego i da w wyniku listę.
+Niestety, nie istnieje wyrażenie regularne pasujące do dowolnego
+kodu Perl, ale dopóki twój kod nie zawiera I<},{> ani I<})>,
+powinno działać.
+Przykład:
+
+    <wwwtable>
+    ({grep {$_%3 == 1} 1..100},{1..2,4})
+    foo
+    </wwwtable>
+
+Da tabele 100 rzędów x 4 kolumny z `foo' w każdej
+1wszej, 2giej i 4tej kolumnie każdego rzędu o numerze dającym reszte 1 w
+dzieleniu przez 3.
+
+Jeśli chcesz użyć "dowolnego kodu" w jednej częsci adresu a zasięgu w drugiej
+zastąp w definicji zasięgu I<-> przez I<..> i włóż zasięg między I<{> i I<}>.
+
+Jeśli chcesz użyć "dowolnego kodu" w jednej częsci adresu a wyrażenia
+regulernego w drugiej, musisz napisać I<{grep {/wyrażenie/} od..do}>.
+Niestety, w tym wypadku musisz podać rozmiar tablicy.
+
+=head1 NIEZGODNOŚCI Z WWWTABLE
+
+Jeśli poprzednio używałeś B<wwwtable>, a teraz chcesz się przesiąść,
+powinieneś przeczytać ten rozdział. Większość jest o regex'ach.
+Zauważ również, że B<wwwtable> nie mógł używać podstawiania tagów lokacyjnych ani
+makroprocesora.
+
+Opcja I<-w> ma przeciwne znaczenie. Domyślnie żadne ostrzeżenie nie jest drukowane,
+a I<-w> albo I<--warning> służą wymuszeniu takiego ostrzażenia.
+
+Komórki nagłówkowe mogą być zdefiniowane za pomocą regex'ów :
+
+    ((1,*))
+
+Nie było to możliwe z B<wwwtable>.
+
+Liczniki pozycji na osiach są 100%-owo niezależne. Wynika z tego że kod :
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,=)
+    Cośś
+
+umieści Cośś w 3ciej kolumnie. Jeśli chcesz, by było w 1wszej, napisz :
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,1)
+    Cośś
+
+albo
+
+    (*,) width=30
+    (*,+) width=35
+    (*,+) width=40
+    (=,1)
+    Cośś
+
+W B<freetable> 2.0 zostały wprowadzone dwie nowe metody adresowania
+komórek. Są całkowicie niezgodne z B<wwwtable>.
+
+=head1 BUGS
+
+Adres typu "Dowolny Kod Perl" może nie działać ze skomplikowanym kodem.
+
+=head1 ZOBACZ RÓWNIEŻ
+
+B<m4(1)>
+
+=head1 AUTOR
+
+Tomasz Wegrzanowski <taw@users.sourceforge.net>
+
+(zarówno angielska jak i polska wersja)
+
+=cut

@@ -1,0 +1,246 @@
+=head1 NAME
+
+B<freetable> - tool for making HTML tables generation easier
+
+=head1 VERSION
+
+This manpage describes version 2.3 of B<freetable>.
+
+It might be not 100% accurate if you use different version.
+
+=head1 SYNOPSIS
+
+B<freetable> I<[options]> I<filename>
+
+or
+
+B<freetable> I<[options]>
+
+Possible options are :
+
+I<-h>, I<--help>     Print usage info and exit
+
+I<-V>, I<--version>  Print version information and exit
+
+I<-c>, I<--comment>  Insert comment before every cell to point its location
+
+I<-b>, I<--no-nbsp>  Do not insert I<&nbsp;> to empty cells for lowered-3D apperance
+
+I<-w>, I<--warning>  Print a warning before each generated table
+that you should not change it. You should change its source.
+
+I<-l>, I<--location> Substitute I<E<lt>rowE<gt>> and I<E<lt>colE<gt>> flags
+inside table with correct cell's location
+
+I<-m>, I<--macro> I<[program]> 
+               Use macro procesor to proces cells content (default: B<m4>)
+
+=head1 WARNING
+
+ DO NOT USE MACRO PROCESSOR OVER UNSURE SOURCE
+ M4 MAY BE USED TO COMPROMISE YOUR SECURITY
+ FOR MORE INFORMATION ON THIS EXEC :
+
+I<info m4 'UNIX commands' syscmd>
+
+=head1 DESCRIPTION
+
+This is free replacement of B<wwwtable>
+
+HTML is great language, but have one horrible flaw :
+tables. I spent many hours looking at HTML source I just written
+and trying to guess which cell in source is which in browser.
+
+If this also describes you, then read this manpage and your
+pain will stop.
+
+Program read HTML source from either I<stdin> or file. Then it
+searches for line starting table:
+
+    <wwwtable [options]>
+
+Then it analyzes table, put correct HTML table in this place and
+continue searching for the next table.
+
+=head1 TABLE SYNTAX
+
+It is very easy:
+
+    wwwtable :
+    <wwwtable [wwwtable_options]>
+    [preamble]
+    [cell]
+    [cell]
+    ...
+    </wwwtable>
+
+wwwtable_options will be passed to I<E<lt>tableE<gt>> tags. There is
+no magic inside preamble. It can be any HTML text. It will be simply
+put in front of table.
+
+cell is either normal_cell (I<E<lt>tdE<gt>> tag) or
+header_cell (I<E<lt>thE<gt>> tag).
+At least it was this way in freetable 1.x.
+See the next section for alternative cell address syntax.
+
+    normal_cell :
+    (row,col) cell_options
+    cell_content
+
+    header_cell :
+    ((row,col)) cell_options  
+    cell_content
+
+cell_options will be passed to cell tag. There is magic inside
+I<colspan> and I<rowspan> keys are parsed to make correct table.
+
+cell_content can be anything. It may contain text, tags, and
+even nested wwwtables.
+
+If you use I<-m> (or I<--macro>) option, it will be passed thru m4(1),
+with <row> and <col> set to adress of curent cell
+
+row and col are either numbers locating cells, expressions relative to previous cell
+or regular expresions to match few of them. Unlike B<wwwtable>, B<freetable> can use regular
+expresions for header cells. Also I<*> can be used, and it mean I<.*> really.
+
+Relative expressions are :
+
+I<=> or empty means : the same as previous
+
+I<+> or I<+X> means : one and X more than previous
+
+I<-> or I<-X> means : one and X less than previous
+
+If many definisions adress the same cell all options and contents are
+concatenated in order of apperance.
+
+If you want to use only regular expresions you must tell
+program about the last cell :
+
+    <wwwtable>
+    (*,1)
+    these are colums 1
+    (1,*)
+    these are rows 1
+    (4,4)
+    </wwwtable>
+
+=head1 ALTERNATIVE CELL ADDRESS SYNTAX
+
+It is inconvenient to specify cell address as regular expression.
+So in B<freetable> 2.0 two new methods were introduced.
+Both can be used to either normal or header cells.
+
+Full bakward compatibility is preserved.
+To preserve it, new syntax had to be introduced.
+Unfortunatelly, you can't specify row
+address using one method, and column address using another.
+To come around this, both new methods are very liberal
+and allow you to use I<=>, I<+>, I<->, I<+X> I<-X> and null
+string with the same meaning as they have in old addressing
+method.
+
+Unlike regular expression method,
+new methods will find out the last cell automatically.
+
+=head2 EXPLICIT RANGES
+
+    (rowrange;colrange) cell_options
+    cell_content
+
+Syntax for both rowrange and colrange is like: 1-2,4-7,9,12.
+Duplicates will be eliminated. For purpose of relative addresses
+last given number is used. So if you write
+
+    (1-100,32;1)
+    foo
+    (+,)
+    bar
+
+Cell (33,1) will contain `foobar' and all others only `foo'.
+
+=head2 ARBITRARY PERL CODE
+
+    ({code for rows},{code for tables}) cell_options
+    cell_content
+
+You can use arbitrary Perl one-liner as long as it matches our
+not very intelligent regular expressions and evaluates to list.
+Unfortunatelly there isn't any regular expression for Perl code,
+but as long as it doesn't contain I<},{> and I<})> it should work.
+Example:
+
+    <wwwtable>
+    ({grep {$_%3 == 1} 1..100},{1..2,4})
+    foo
+    </wwwtable>
+
+Will evaluate to 100 rows x 4 columns table with `foo' in
+every 1st, 2nd and 4th column of every row with number equal 1 modulo 3.
+
+If you want to use "arbitrary code" in one part of address and
+explicit range in the other, change I<-> into I<..> in defenition of
+range, and put in between I<{> and I<}>.
+
+If you want to use "arbitrary code" in one part of address and
+regular expression in the other, you have to write
+I<{grep {/expression/} from..to}>.
+Unfortunatelly, in this case you have to specify size of the table explicitely.
+
+=head1 INCOMPATIBILITIES WITH WWWTABLE
+
+If you was formerly user of B<wwwtable> and want to change your tool, you
+should read this. Most of this is about regexps handling.
+Notice also that B<wwwtable> couldnt do location tags substitution nor macroprocesing.
+
+Option I<-w> has completely oposite meaning. We dont print warnings by default,
+and I<-w> or I<--warning> is used to force warnings.
+
+Table header fields can be specified by regexps ex :
+
+    ((1,*))
+
+It was impossible in B<wwwtable>.
+
+Axis counters are 100% orthogonal. This mean that code :
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,=)
+    Foo
+
+Foo will appear in 3rd column. If you wanted it to be in 1st
+you should write :
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,1)
+    Foo
+
+or
+
+    (*,) width=30
+    (*,+) width=35
+    (*,+) width=40
+    (=,1)
+    Foo
+
+In B<freetable> 2.0 two new methods o specifying cell address
+were introduced. They are completely incompatible with B<wwwtable>.
+
+=head1 BUGS
+
+"Arbitrary Perl Code" cell address will fail on very complex Perl code.
+
+=head1 SEE ALSO
+
+B<m4(1)>
+
+=head1 AUTHOR
+
+Tomasz Wegrzanowski <taw@users.sourceforge.net>
+
+=cut

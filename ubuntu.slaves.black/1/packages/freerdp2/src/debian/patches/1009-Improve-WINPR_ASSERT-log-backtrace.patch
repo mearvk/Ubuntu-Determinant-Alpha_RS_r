@@ -1,0 +1,44 @@
+From: Armin Novak <armin.novak@thincast.com>
+Date: Wed, 16 Jun 2021 13:11:07 +0200
+Subject: Improve WINPR_ASSERT, log backtrace
+
+(cherry picked from commit 9e94f1dace7295e506e01b9ece59d77f62343e3c)
+(cherry picked from commit 83dffd0009b4d8b7b241c621b6aff4efe12a0380)
+---
+ winpr/include/winpr/assert.h | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/winpr/include/winpr/assert.h b/winpr/include/winpr/assert.h
+index ae9deb2..03f2ff2 100644
+--- a/winpr/include/winpr/assert.h
++++ b/winpr/include/winpr/assert.h
+@@ -25,17 +25,19 @@
+ #include <winpr/winpr.h>
+ #include <winpr/wtypes.h>
+ #include <winpr/wlog.h>
++#include <winpr/debug.h>
+ 
+-#if WITH_VERBOSE_WINPR_ASSERT
+-#define WINPR_ASSERT(cond)                                                                   \
+-	do                                                                                       \
+-	{                                                                                        \
+-		if (!(cond))                                                                         \
+-		{                                                                                    \
+-			WLog_FATAL("com.freerdp.winpr.assert", "%s [%s:%s:%" PRIuz "]", #cond, __FILE__, \
+-			           __FUNCTION__, __LINE__);                                              \
+-			abort();                                                                         \
+-		}                                                                                    \
++#if defined(WITH_VERBOSE_WINPR_ASSERT) && (WITH_VERBOSE_WINPR_ASSERT != 0)
++#define WINPR_ASSERT(cond)                                                                     \
++	do                                                                                         \
++	{                                                                                          \
++		if (!(cond))                                                                           \
++		{                                                                                      \
++			const char* tag = "com.freerdp.winpr.assert";                                      \
++			WLog_FATAL(tag, "%s [%s:%s:%" PRIuz "]", #cond, __FILE__, __FUNCTION__, __LINE__); \
++			winpr_log_backtrace(tag, WLOG_FATAL, 20);                                          \
++			abort();                                                                           \
++		}                                                                                      \
+ 	} while (0)
+ #else
+ #define WINPR_ASSERT(cond) \

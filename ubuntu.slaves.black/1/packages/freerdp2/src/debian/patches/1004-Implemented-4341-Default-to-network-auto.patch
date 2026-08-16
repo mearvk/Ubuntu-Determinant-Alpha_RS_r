@@ -1,0 +1,76 @@
+From: Armin Novak <armin.novak@thincast.com>
+Date: Thu, 29 Jul 2021 13:26:05 +0200
+Subject: Implemented #4341: Default to /network:auto
+
+If no arguments are supplied, default to the behaviour of
+/network:auto. This ensures the default experience is using the
+best available graphics options.
+As soon as any /network, /bpp, /rfx, /gfx, ... argument is used
+only use these.
+
+(cherry picked from commit d3168a1436eefe6864727991b18e458c2d6c87b3)
+(cherry picked from commit baf35cece9ff369d27deae1fed23d56907d82c31)
+---
+ client/common/cmdline.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/client/common/cmdline.c b/client/common/cmdline.c
+index 15d4813..453a38c 100644
+--- a/client/common/cmdline.c
++++ b/client/common/cmdline.c
+@@ -27,6 +27,8 @@
+ #include <assert.h>
+ #include <errno.h>
+ 
++#include <assert.h>
++
+ #include <winpr/crt.h>
+ #include <winpr/wlog.h>
+ #include <winpr/path.h>
+@@ -46,6 +48,8 @@
+ #include "cmdline.h"
+ 
+ #include <freerdp/log.h>
++
++#define WINPR_ASSERT(x) assert(x)
+ #define TAG CLIENT_TAG("common.cmdline")
+ 
+ static BOOL freerdp_client_print_codepages(const char* arg)
+@@ -1567,6 +1571,28 @@ static BOOL parseSizeValue(const char* input, unsigned long* v1, unsigned long*
+ 	return TRUE;
+ }
+ 
++static BOOL prepare_default_settings(rdpSettings* settings, const COMMAND_LINE_ARGUMENT_A* args,
++                                     BOOL rdp_file)
++{
++	size_t x;
++	const char* arguments[] = { "network", "gfx", "rfx", "bpp" };
++	WINPR_ASSERT(settings);
++	WINPR_ASSERT(args);
++
++	if (rdp_file)
++		return FALSE;
++
++	for (x = 0; x < ARRAYSIZE(arguments); x++)
++	{
++		const char* arg = arguments[x];
++		COMMAND_LINE_ARGUMENT_A* p = CommandLineFindArgumentA(args, arg);
++		if (p && (p->Flags & COMMAND_LINE_ARGUMENT_PRESENT))
++			return FALSE;
++	}
++
++	return freerdp_set_connection_type(settings, CONNECTION_TYPE_AUTODETECT);
++}
++
+ int freerdp_client_settings_parse_command_line_arguments(rdpSettings* settings, int argc,
+                                                          char** argv, BOOL allowUnknown)
+ {
+@@ -1637,6 +1663,8 @@ int freerdp_client_settings_parse_command_line_arguments(rdpSettings* settings,
+ 
+ 		if (status < 0)
+ 			return status;
++
++		prepare_default_settings(settings, largs, ext);
+ 	}
+ 
+ 	CommandLineFindArgumentA(largs, "v");

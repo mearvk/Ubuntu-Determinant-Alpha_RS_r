@@ -1,0 +1,36 @@
+Description: Fixes buffer overflow with the handling of $HOME
+Bug-Debian: https://bugs.debian.org/430160
+Author: Sebastian Ramacher <s.ramacher@gmx.at>
+Reviewed-by: Anton Gladky <gladky.anton@gmail.com>
+Last-Update: 2012-11-19
+--- a/src/freeglut_joystick.c
++++ b/src/freeglut_joystick.c
+@@ -1339,7 +1339,8 @@
+     if( joy->os->is_analog )
+     {
+         FILE *joyfile;
+-        char joyfname[ 1024 ];
++        char* joyfname = NULL;
++        const char* home = NULL;
+         int noargs, in_no_axes;
+ 
+         float axes [ _JS_MAX_AXES ];
+@@ -1353,9 +1354,17 @@
+         if( joy->error )
+             return;
+ 
+-        snprintf( joyfname, sizeof(joyfname), "%s/.joy%drc", getenv( "HOME" ), joy->id );
++        home = getenv( "HOME" );
++        joy->error =( home == NULL );
++        if( joy->error )
++            return;
++
++        joy->error =( asprintf( &joyfname, "%s/.joy%drc", home, joy->id ) == -1 );
++        if( joy->error )
++            return
+ 
+         joyfile = fopen( joyfname, "r" );
++        free( joyfname );
+         joy->error =( joyfile == NULL );
+         if( joy->error )
+             return;

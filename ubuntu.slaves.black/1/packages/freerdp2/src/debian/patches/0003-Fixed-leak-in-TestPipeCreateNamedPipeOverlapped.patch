@@ -1,0 +1,47 @@
+From: Armin Novak <armin.novak@thincast.com>
+Date: Mon, 20 Sep 2021 08:57:08 +0200
+Subject: Fixed leak in TestPipeCreateNamedPipeOverlapped.
+
+(cherry picked from commit 1ee8370f28f1f3542d2559ae23ad670434b303b6)
+---
+ .../libwinpr/pipe/test/TestPipeCreateNamedPipeOverlapped.c  | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/winpr/libwinpr/pipe/test/TestPipeCreateNamedPipeOverlapped.c b/winpr/libwinpr/pipe/test/TestPipeCreateNamedPipeOverlapped.c
+index 6c8d3be..ba6d801 100644
+--- a/winpr/libwinpr/pipe/test/TestPipeCreateNamedPipeOverlapped.c
++++ b/winpr/libwinpr/pipe/test/TestPipeCreateNamedPipeOverlapped.c
+@@ -19,7 +19,7 @@ static BYTE CLIENT_MESSAGE[PIPE_BUFFER_SIZE];
+ static BOOL bClientSuccess = FALSE;
+ static BOOL bServerSuccess = FALSE;
+ 
+-static HANDLE serverReadyEvent;
++static HANDLE serverReadyEvent = NULL;
+ 
+ static LPTSTR lpszPipeName = _T("\\\\.\\pipe\\winpr_test_pipe_overlapped");
+ 
+@@ -332,8 +332,8 @@ finish:
+ 
+ int TestPipeCreateNamedPipeOverlapped(int argc, char* argv[])
+ {
+-	HANDLE ClientThread;
+-	HANDLE ServerThread;
++	HANDLE ClientThread = NULL;
++	HANDLE ServerThread = NULL;
+ 	int result = -1;
+ 
+ 	FillMemory(SERVER_MESSAGE, PIPE_BUFFER_SIZE, 0xAA);
+@@ -372,6 +372,13 @@ int TestPipeCreateNamedPipeOverlapped(int argc, char* argv[])
+ 
+ out:
+ 
++	if (ClientThread)
++		CloseHandle(ClientThread);
++	if (ServerThread)
++		CloseHandle(ServerThread);
++	if (serverReadyEvent)
++		CloseHandle(serverReadyEvent);
++
+ #ifndef _WIN32
+ 	if (result == 0)
+ 	{

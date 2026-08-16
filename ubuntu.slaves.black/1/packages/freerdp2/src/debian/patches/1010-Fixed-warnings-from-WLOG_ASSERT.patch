@@ -1,0 +1,44 @@
+From: Armin Novak <armin.novak@thincast.com>
+Date: Tue, 1 Feb 2022 08:17:43 +0100
+Subject: Fixed warnings from WLOG_ASSERT
+
+(cherry picked from commit 02896b0656de693a7014cc8ca6ff12de1d9ffabd)
+(cherry picked from commit e675ffcb35e3211b9424c8a067494057b803b935)
+---
+ winpr/include/winpr/assert.h | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/winpr/include/winpr/assert.h b/winpr/include/winpr/assert.h
+index 03f2ff2..b8530bf 100644
+--- a/winpr/include/winpr/assert.h
++++ b/winpr/include/winpr/assert.h
+@@ -28,16 +28,19 @@
+ #include <winpr/debug.h>
+ 
+ #if defined(WITH_VERBOSE_WINPR_ASSERT) && (WITH_VERBOSE_WINPR_ASSERT != 0)
+-#define WINPR_ASSERT(cond)                                                                     \
+-	do                                                                                         \
+-	{                                                                                          \
+-		if (!(cond))                                                                           \
+-		{                                                                                      \
+-			const char* tag = "com.freerdp.winpr.assert";                                      \
+-			WLog_FATAL(tag, "%s [%s:%s:%" PRIuz "]", #cond, __FILE__, __FUNCTION__, __LINE__); \
+-			winpr_log_backtrace(tag, WLOG_FATAL, 20);                                          \
+-			abort();                                                                           \
+-		}                                                                                      \
++#define WINPR_ASSERT(cond)                                                                    \
++	do                                                                                        \
++	{                                                                                         \
++		if (!(cond))                                                                          \
++		{                                                                                     \
++			static wLog* _log_cached_ptr = NULL;                                              \
++			if (!_log_cached_ptr)                                                             \
++				_log_cached_ptr = WLog_Get("com.freerdp.winpr.assert");                       \
++			WLog_Print(_log_cached_ptr, WLOG_FATAL, "%s [%s:%s:%" PRIuz "]", #cond, __FILE__, \
++			           __FUNCTION__, __LINE__);                                               \
++			winpr_log_backtrace_ex(_log_cached_ptr, WLOG_FATAL, 20);                          \
++			abort();                                                                          \
++		}                                                                                     \
+ 	} while (0)
+ #else
+ #define WINPR_ASSERT(cond) \

@@ -1,0 +1,115 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
+    export DH_VERBOSE = 1
+endif
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+
+CFLAGS   += $(CPPFLAGS)
+CXXFLAGS += $(CPPFLAGS)
+
+empty :=
+
+DEB_CMAKE_EXTRA_FLAGS = \
+    -DCMAKE_INSTALL_INCLUDEDIR=include/$(DEB_HOST_MULTIARCH) \
+    -DCMAKE_SKIP_RPATH=FALSE \
+    -DCMAKE_SKIP_INSTALL_RPATH=TRUE \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DWITH_DEBUG_ALL=OFF \
+    -DBUILD_TESTING=OFF \
+    -DWITH_CHANNELS=ON \
+    -DBUILTIN_CHANNELS=ON \
+    -DWITH_SERVER=ON \
+    -DWITH_PROXY=OFF \
+    -DWITH_CLIENT_INTERFACE=OFF \
+    -DWITH_PULSE=ON \
+    -DWITH_ICU=ON \
+    -DWITH_CUPS=ON \
+    -DWITH_PCSC=ON \
+    -DWITH_JPEG=ON \
+    $(empty)
+
+ifneq (,$(filter armel,$(DEB_HOST_ARCH)))
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DWITH_NEON=OFF \
+        $(empty)
+endif
+
+ifneq (,$(filter linux,$(DEB_HOST_ARCH_OS)))
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DCHANNEL_URBDRC=ON \
+        -DCHANNEL_URBDRC_CLIENT=ON \
+        $(empty)
+else
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DCHANNEL_URBDRC=OFF \
+        -DCHANNEL_URBDRC_CLIENT=OFF \
+        $(empty)
+
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DWITH_ALSA=OFF \
+        -DWITH_LIBSYSTEMD=OFF \
+        -DWITH_WAYLAND=OFF \
+        $(empty)
+endif
+
+# Ubuntu can't have ffmpeg in main
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes),yes)
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DWITH_FFMPEG=OFF \
+        -DWITH_GSM=OFF \
+        -DWITH_CAIRO=ON \
+        $(empty)
+else
+    DEB_CMAKE_EXTRA_FLAGS += \
+        -DWITH_GSM=ON \
+        -DWITH_SWSCALE=ON \
+        -DWITH_DSP_FFMPEG=ON \
+        -DSWScale_INCLUDE_DIRS=/usr/include/$(DEB_HOST_MULTIARCH) \
+        -DWITH_CAIRO=OFF \
+        $(empty)
+endif
+
+%:
+	dh $@
+
+# char 026 (0x16) is seemed to be safe separator for sed "s" command;
+# idea taken from Debian src:nginx/debian/dh_nginx.
+# (however, they're using 0x17)
+xSEDx :=$(shell printf '\026')
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(DEB_CMAKE_EXTRA_FLAGS)
+	# mangle CFLAGS value stored in buildflags.h.
+	# fixes build path leakage.
+	o='-f(debug|file)-prefix-map' ; \
+	sed -E -i \
+	    -e "s$(xSEDx)$${o}=[^=]+=\. $(xSEDx)$(xSEDx)g;" \
+	    -e "s$(xSEDx) $${o}=[^=]+=\.$(xSEDx)$(xSEDx)g;" \
+	obj-$(DEB_HOST_GNU_TYPE)/buildflags.h
+	# remove unused config define (not packaging freerdp-proxy so far).
+	# fixes build path leakage.
+	# NB: mangle that define to something like
+	#   /usr/lib/$(DEB_HOST_MULTIARCH)/freerdp/proxy-plugins
+	# if you consider to package freerdp-proxy.
+	sed -i \
+	    -e '/FREERDP_PROXY_PLUGINDIR/d' \
+	    obj-$(DEB_HOST_GNU_TYPE)/include/freerdp/build-config.h
+
+# NB debhelper 13+: convert to execute_before_dh_install
+override_dh_install: TMP_LIB = debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
+override_dh_install:
+	rm -rf $(TMP_LIB)/*.a
+	mkdir -p $(TMP_LIB)/freerdp/
+	dh_install
+
+# NB debhelper 13+: remove override
+override_dh_missing:
+	dh_missing --fail-missing
+
+get-orig-source:
+	uscan --noconf --force-download --rename --download-current-version --destdir=..

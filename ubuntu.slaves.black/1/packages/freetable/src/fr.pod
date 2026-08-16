@@ -1,0 +1,283 @@
+=encoding UTF-8
+
+=head1 NOM
+
+B<freetable> - outil de génération automatique de tableaux HTML
+
+=head1 VERSION
+
+Cette documentation décrit l'utilisation de B<freetable> version 2.3.
+
+Si vous utilisez une autre version, certaines différences peuvent
+apparaitre.
+
+=head1 SYNOPSIS
+
+B<freetable> I<[options]> F<fichier>
+ 
+ou
+
+B<freetable> I<[options]>
+
+Options:
+
+I<-h>, I<--help>        Affiche cette aide et stoppe
+
+I<-V>, I<--version>     Affiche seulement le numéro de version
+
+I<-c>, I<--comment>     Affiche un commentaire avant chaque
+                  cellule pour indiquer son emplacement
+
+I<-b>, I<--no-nbsp>     N'ajoute pas I<&nbsp;> dans les cellules
+                  vides pour modifier le rendu 3D
+
+I<-w>, I<--warning>     Affiche un commentaire avant chaque
+                  tableau, indiquant que le tableau est
+                  généré automatiquement et ne doit pas
+                  être édité
+
+I<-l>, I<--location>    Remplace les indicateurs C<E<lt>rowE<gt>> (ligne)
+                  et C<E<lt>colE<gt>> (colonne) à l'intérieur des
+                  tableaux par la position de la cellule
+                  courante.
+
+I<-m>, I<--macro> I<[program]>
+                  Avec cette option, le contenu des
+                  cellules est passé à un pré-processeur,
+                  qui est B<m4> par défaut
+
+=head1 AVERTISSEMENT SUR LA SÉCURITÉ
+
+ N'UTILISEZ PAS DE MACRO-PROCESSEUR SUR UN
+ FICHIER SOURCE DONT VOUS N'ÊTES PAS SÛR.
+ CELA POURRAIT COMPROMETTRE LA SÉCURITÉ DE
+ VOTRE SYSTÈME
+
+Plus d'informations dans la documentation de B<m4>,
+en particulier la commande I<syscmd>.
+
+=head1 DESCRIPTION
+
+Ce programme est un logiciel libre qui remplace B<wwwtable>.
+
+HTML est un langage agréable, mais avec un énorme défaut : les tableaux.
+J'ai passé de nombreuses heures à lire le code source que j'avais tout
+juste écrit pour essayer de comprendre quelle cellule dans le code
+source correspond à ce qui est affiché dans le navigateur.
+
+Si cela vous rappelle une expérience similaire, alors lisez cette
+documentation et votre peine ne sera plus qu'un mauvais souvenir.
+
+Le programme reçoit en entrée du code HTML provenant soit de l'entrée
+standard (I<stdin>), soit d'un fichier. Il recherche alors les
+caractères suivants, qui annoncent l'ouverture d'un tableau:
+
+   <wwwtable [options]>
+
+Il analyse le contenu jusqu'à détecter la fin du tableau, affiche le
+code HTML correspondant puis continue le traitement avec les tableaux
+suivants.
+
+=head1 SYNTAXE
+
+La syntaxe est très simple:
+
+    wwwtable:
+    <wwwtable [wwwtable_options]>
+    [preambule]
+    [cellule]
+    [cellule]
+    ...
+    </wwwtable>
+
+La chaîne optionnelle wwwtable_options est passée telle quelle comme
+attribut de la balise C<E<lt>tableE<gt>>. Le préambule n'est pas traité,
+il peux contenir n'importe quel code HTML, il sera inséré au début du
+tableau.
+
+Les cellules sont soit des cellules normales (balise C<E<lt>tdE<gt>>),
+soit des cellules d'en-tête (balise C<E<lt>thE<gt>>).
+Il en était ainsi jusqu'aux versions 1.x, voyez la prochaine section
+pour une autre méthode d'adressage des colonnes.
+
+    cellule normale:
+    (ligne,colonne) options_cellule
+    contenu_cellule
+
+    cellule en-tête:
+    ((ligne,colonne)) options_cellule  
+    contenu_cellule
+
+Le texte contenu dans options_cellule est passé comme attribut
+de la balise de la cellule. Les mots-clés I<colspan> et I<rowspan>
+sont interprétés pour générer des tableaux corrects.
+
+Le contenu des cellules (contenu_cellule) est quelconque, il peut même
+contenir d'autres wwwtables !
+
+Si vous utilisez l'option I<-m> (ou son synonyme I<--macro>), le contenu
+des cellules sera passé comme entrée standard de la commande B<m4>(1),
+après avoir remplacé les chaînes de caractères B<E<lt>rowE<gt>> (resp.
+B<E<lt>colE<gt>>) par le numéro de ligne (resp. colonne) de la cellule.
+
+Les indices de ligne et colonne sont soit des nombres, soit un adressage
+relatif, soit une expression régulière qui désigne un ensemble de
+cellules. À la différence de B<wwwtable>, B<freetable> peut aussi
+utiliser des expressions régulières dans les cellules d'en-tête. Un
+autre ajout est la possiblité d'utiliser I<*> à la place de I<.*>.
+
+L'adressage relatif est de la forme :
+
+I<=> ou vide : même indice que la cellule précédente
+
+I<+> ou I<+X> : incrémente l'indice de I<X> (défaut: 1)
+
+I<-> ou I<-X> : décrémente l'indice de I<X> (défaut: 1)
+
+Lorsqu'une cellule est désignée par plusieurs expressions, à la fois les
+options et le contenu de chaque cellule sont ajoutés.
+
+Si vous n'utilisez que des expressions régulières, il faut indiquer au
+programme la position de la dernière cellule.
+
+    <wwwtable>
+    (*,1)
+    cellules de la colonne 1
+    (1,*)
+    cellules de la ligne 1
+    (4,4)
+    </wwwtable>
+
+=head1 AUTRE SYNTAXE D'ADRESSAGE
+
+Il n'est pas très pratique de spécifier les numéros de cellules avec des
+expressions régulières. B<Freetable> 2.0 a introduit deux nouvelles
+méthodes d'adressage, qui peuvent être utilisées sur les cellules
+normales et les cellules d'en-tête.
+
+Une compatibilité totale avec les versions antérieures est assurée.
+Pour cette raison, il n'était pas question de modifier la syntaxe
+actuelle. Malheureusement, vous ne pouvez pas spécifier les lignes en
+utilisant une syntaxe d'adressage, et les colonnes avec une autre
+syntaxe. Pour remédier à ce problème, les deux méthodes sont très
+souples, si bien que vous ne devriez jamais avoir à les mélanger, et
+elles vous permettent d'utiliser I<=>, I<+>, I<->, I<+X>, I<-X> et la
+chaîne vide de la même façon qu'avec B<freetable> 1.x.
+
+De plus, ces nouvelles méthodes déterminent automatiquement la dernière
+cellule, contrairement à l'adressage par des expressions régulières.
+
+=head2 BORNES EXPLICITES
+
+    (bornes_ligne;bornes_colonne) options_cellule
+    contenu_cellule
+
+La syntaxe pour I<bornes_ligne> et I<bornes_colonne> est de la forme:
+1-2,4-7,9,12. Les doublons sont éliminés. Pour les besoins de
+l'adressage relatif, le dernier nombre est utilisée. Ainsi, quand vous
+écrivez
+
+    (1-100,32;1)
+    foo
+    (+,)
+    bar
+
+la cellule (33,1) contiendra « foo bar » et toutes les autres seulement
+« foo ».
+
+=head2 CODE PERL QUELCONQUE
+
+    ({code pour les lignes},{code pour les colonnes}) options_cellule
+    contenu_cellule
+
+Vous pouvez utiliser n'importe quel code Perl qui tient sur une seule
+ligne du moment qu'il est repéré oar notre expression régulière (pas
+très futée) et renvoie une liste. Il n'est malheureusement pas possible
+de détecter n'importe quel code de Perl grâce à une expression
+régulière, mais du moment qu'il ne contient pas les séquences I<},{> et
+I<})>, cela devrait marcher. Exemple :
+    <wwwtable>
+    ({grep {$_%3 == 1} 1..100},{1..2,4})
+    foo
+    </wwwtable>
+
+va créer un tableau de 100 lignes par 4 colonnes avec « foo » dans les
+premières, deuxième et quatrième colonnes de chaque ligne dont le numéro
+vaut 1 modulo 3.
+
+Si vous voulez mélanger cet adressage avec le précédent, il suffit de
+remplacer I<-> par I<..> dans la définition des bornes, et l'entourer
+par des accolades I<{> et I<}>.
+
+Si vous voulez mélanger cet adressage avec une expression régulière,
+vous pouvez remplacer cette dernière par I<{grep {/expression/} min..max}>.
+Il est malheureusement obligatoire de spécifier explicitement la
+dimension du tableau.
+
+=head1 INCOMPATIBILITÉS AVEC WWWTABLE
+
+Les utilisateurs de B<wwwtable> qui décident de passer à B<freetable>
+devraient lire cette section. La majorité des incompatibilités
+proviennent du traitement des expressions régulières. Il faut aussi
+noter que B<wwwtable> ne permettait ni le remplacement automatiques des
+numéros de lignes et de colonnes, ni l'utilisation d'un
+pré-processeur.
+
+L'option I<-w> a le comportement opposé. Nous n'écrivons aucun
+commentaire par défaut, et I<-w> ou I<--warning> est utilisée pour les
+ajouter.
+
+Les cellules d'en-tête peuvent être définies avec des expressions
+régulières, par exemple
+
+    ((1,*))
+    
+ce qui était impossible avec B<wwwtable>.
+
+Les indices des axes sont 100% orthogonaux, ce qui signifie qu'avec le code
+suivant
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,=)
+    Foo
+
+Foo va apparaitre en 3e colonne, et si vous vouliez qu'il soit en 1e
+position, il faut écrire
+
+    (*,1) width=30
+    (*,2) width=35
+    (*,3) width=40
+    (=,1)
+    Foo
+
+ou
+
+    (*,) width=30
+    (*,+) width=35
+    (*,+) width=40
+    (=,1)
+    Foo
+
+Avec B<freetable> 2.0, deux méthodes complètement nouvelles d'adressage
+des cellules ont été introduites. Elles sont totalement incompatibles
+avec B<wwwtable>.
+
+=head1 BUGS
+
+L'utilisation de « code Perl quelconque » échouera avec du code
+complexe.
+
+=head1 VOIR AUSSI
+
+B<m4(1)>
+
+=head1 AUTEUR
+
+Tomasz Wegrzanowski <taw@users.sourceforge.net>
+
+Traduction française de la documentation:
+Denis Barbier <barbier@debian.org>
+
+=cut

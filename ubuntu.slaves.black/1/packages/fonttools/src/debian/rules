@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+export LC_ALL=C.UTF-8
+
+binaries := $(shell dh_listpackages)
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+# skip doctest with afmLib and tfmLib due to file loading issue with
+# dh_auto_test
+# TOFIX(mwei): find a fix to this
+export PYBUILD_TEST_ARGS = -k "not afmLib and not tfmLib"
+
+override_dh_auto_build:
+	python3 MetaTools/buildUCD.py --ucd-path=/usr/share/unicode
+	PYTHONPATH="./Lib" python3 MetaTools/buildTableList.py
+	dh_auto_build
+
+ifneq ($(filter python-fonttools-doc,$(binaries)),)
+override_dh_sphinxdoc:
+	sphinx-build $(CURDIR)/Doc/source $(CURDIR)/debian/python-fonttools-doc/usr/share/doc/fonttools/html/
+	dh_sphinxdoc
+endif
