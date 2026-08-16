@@ -1,0 +1,80 @@
+--- a/gyptest.py
++++ b/gyptest.py
+@@ -8,6 +8,7 @@
+ from __future__ import print_function
+ 
+ import argparse
++import distro
+ import math
+ import os
+ import platform
+@@ -141,7 +142,7 @@ def print_configuration_info():
+     print('  MSVS %s' %
+           gyp.MSVSVersion.SelectVisualStudioVersion().Description())
+   elif sys.platform in ('linux', 'linux2'):
+-    print('  Linux %s' % ' '.join(platform.linux_distribution()))
++    print('  Linux', distro.name(pretty=True))
+   print('  Python %s' % platform.python_version())
+   print('  PYTHONPATH=%s' % os.environ['PYTHONPATH'])
+   print()
+--- a/pylib/gyp/common.py
++++ b/pylib/gyp/common.py
+@@ -4,7 +4,7 @@
+ 
+ from __future__ import with_statement
+ 
+-import collections
++from collections.abc import MutableSet
+ import errno
+ import filecmp
+ import os.path
+@@ -494,7 +494,7 @@ def uniquer(seq, idfun=None):
+ 
+ 
+ # Based on http://code.activestate.com/recipes/576694/.
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+   def __init__(self, iterable=None):
+     self.end = end = []
+     end += [None, end, end]         # sentinel node for doubly linked list
+--- a/test/lib/TestCmd.py
++++ b/test/lib/TestCmd.py
+@@ -882,7 +882,7 @@ class TestCmd(object):
+                 #self.diff_function = difflib.unified_diff
+         self._dirlist = []
+         self._preserve = {'pass_test': 0, 'fail_test': 0, 'no_result': 0}
+-        if 'PRESERVE' in os.environ and os.environ['PRESERVE'] is not '':
++        if 'PRESERVE' in os.environ and os.environ['PRESERVE'] != '':
+             self._preserve['pass_test'] = os.environ['PRESERVE']
+             self._preserve['fail_test'] = os.environ['PRESERVE']
+             self._preserve['no_result'] = os.environ['PRESERVE']
+@@ -1103,7 +1103,7 @@ class TestCmd(object):
+         the temporary working directories to be preserved for all
+         conditions.
+         """
+-        if conditions is ():
++        if conditions == ():
+             conditions = ('pass_test', 'fail_test', 'no_result')
+         for cond in conditions:
+             self._preserve[cond] = 1
+--- a/test/small/gyptest-small.py
++++ b/test/small/gyptest-small.py
+@@ -8,7 +8,7 @@
+ Runs small tests.
+ """
+ 
+-import imp
++import importlib.util
+ import os
+ import platform
+ import sys
+@@ -42,7 +42,8 @@ for filename in files_to_test:
+   # Find the complete module path.
+   full_filename = os.path.join(test._cwd, filename)
+   # Load the module.
+-  module = imp.load_source(name, full_filename)
++  spec = importlib.util.spec_from_file_location(name, full_filename)
++  module = importlib.util.module_from_spec(spec)
+   # Add it to the list of test suites.
+   suites.append(unittest.defaultTestLoader.loadTestsFromModule(module))
+ # Create combined suite.

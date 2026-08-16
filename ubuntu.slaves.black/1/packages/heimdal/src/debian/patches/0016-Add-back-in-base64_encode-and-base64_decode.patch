@@ -1,0 +1,69 @@
+From: Brian May <brian@linuxpenguins.xyz>
+Date: Wed, 26 Apr 2017 06:34:52 +1000
+Subject: Add back in base64_encode and base64_decode
+
+These functions were removed upstream. See
+https://github.com/heimdal/heimdal/issues/107
+
+Unfortunately the SONAME was not incremented for libroken.  This could
+cause breakage. This change reintroduces the old names until the SONAME
+can be incremented.
+---
+ lib/roken/base64.c           | 12 ++++++++++++
+ lib/roken/base64.h           |  6 ++++++
+ lib/roken/version-script.map |  2 ++
+ 3 files changed, 20 insertions(+)
+
+diff --git a/lib/roken/base64.c b/lib/roken/base64.c
+index 6ee4899..76364a5 100644
+--- a/lib/roken/base64.c
++++ b/lib/roken/base64.c
+@@ -51,6 +51,18 @@ pos(char c)
+     return -1;
+ }
+ 
++ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
++base64_encode(const void *data, int size, char **str)
++{
++    return rk_base64_encode(data, size, str);
++}
++
++ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
++base64_decode(const char *str, void *data)
++{
++    return rk_base64_decode(str, data);
++}
++
+ ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
+ rk_base64_encode(const void *data, int size, char **str)
+ {
+diff --git a/lib/roken/base64.h b/lib/roken/base64.h
+index 734a6b5..f5d094f 100644
+--- a/lib/roken/base64.h
++++ b/lib/roken/base64.h
+@@ -46,6 +46,12 @@
+ #endif
+ #endif
+ 
++ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
++base64_encode(const void *, int, char **);
++
++ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
++base64_decode(const char *, void *);
++
+ ROKEN_LIB_FUNCTION int ROKEN_LIB_CALL
+ rk_base64_encode(const void *, int, char **);
+ 
+diff --git a/lib/roken/version-script.map b/lib/roken/version-script.map
+index ccd5925..1929732 100644
+--- a/lib/roken/version-script.map
++++ b/lib/roken/version-script.map
+@@ -2,6 +2,8 @@ HEIMDAL_ROKEN_1.0 {
+ 	global:
+ 		arg_printusage;
+ 		arg_printusage_i18n;
++		base64_decode;
++		base64_encode;
+ 		cgetcap;
+ 		cgetclose;
+ 		cgetmatch;

@@ -1,0 +1,41 @@
+#! /usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+# Needed for testsuite
+export XDG_RUNTIME_DIR = $(CURDIR)/debian/tmp/tmp-xdgruntimedir
+
+ifeq ($(DEB_BUILD_ARCH_OS),linux)
+CONFFLAGS = -Dcontext_manager=linux
+else
+CONFFLAGS = -Dcontext_manager=system
+endif
+
+%:
+	dh $@
+
+execute_before_dh_clean:
+	rm -f doc/version.xml
+
+override_dh_auto_configure:
+	dh_auto_configure -- -Dgtk_doc=true $(CONFFLAGS)
+
+# Make the tests non-fatal on kfreebsd-* as multicast requires to explicitly
+# setup a route
+ifneq (,$(filter $(DEB_HOST_ARCH),kfreebsd-amd64 kfreebsd-i386 hurd-i386))
+override_dh_auto_test:
+	dh_auto_test || true
+endif
+
+override_dh_installman:
+	cp obj-$(DEB_HOST_GNU_TYPE)/doc/version.xml doc
+	xsltproc --novalid --nonet --xinclude -o debian/stripped-docs.xml debian/strip-manpages.xsl doc/gupnp-binding-tool.xml
+	xsltproc --novalid --nonet /usr/share/xml/docbook/stylesheet/docbook-xsl/manpages/docbook.xsl debian/stripped-docs.xml
+	rm -f debian/stripped-docs.xml
+	dh_installman -p libgupnp-1.2-dev gupnp-binding-tool-1.2.1
+	dh_installman --remaining-packages
+
+override_dh_compress:
+	dh_compress -Xexamples

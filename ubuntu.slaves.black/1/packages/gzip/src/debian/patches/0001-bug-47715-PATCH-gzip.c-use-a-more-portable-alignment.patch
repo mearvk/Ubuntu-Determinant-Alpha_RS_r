@@ -1,0 +1,37 @@
+From 23a870d14a49803c6d2579071886c1acf497c9d1 Mon Sep 17 00:00:00 2001
+From: "Dmitry V. Levin" <ldv@altlinux.org>
+Date: Sun, 11 Apr 2021 20:00:00 +0000
+Subject: [PATCH] bug#47715: [PATCH] gzip.c: use a more portable alignment
+
+The alignment of 8192 introduced by commit
+be0c5581e38332b2ffa8a4cf92076cfde02872b4 is not quite portable:
+eu-elflint --gnu-ld complains about the result gzip executable
+with the following diagnostics:
+section [25] '.bss' not fully contained in segment of program header entry 6
+
+* gzip.c [__alignas_is_defined] (BUFFER_ALIGNED): Decrease alignment
+from 8192 back to 4096.
+---
+ gzip.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gzip.c b/gzip.c
+index 8b8b0bb232..0123f8252f 100644
+--- a/gzip.c
++++ b/gzip.c
+@@ -132,10 +132,10 @@ static char const *const license_msg[] = {
+ /* With IBM_Z_DFLTCC, DEFLATE COMPRESSION works faster with
+    page-aligned input and output buffers, and requires page-aligned
+    windows; the alignment requirement is 4096.  On other platforms
+-   alignment doesn't hurt, and alignment up to 8192 is portable so
++   alignment doesn't hurt, and alignment up to 4096 is portable so
+    let's do that.  */
+ #ifdef __alignas_is_defined
+-# define BUFFER_ALIGNED alignas (8192)
++# define BUFFER_ALIGNED alignas (4096)
+ #else
+ # define BUFFER_ALIGNED /**/
+ #endif
+-- 
+2.34.1
+

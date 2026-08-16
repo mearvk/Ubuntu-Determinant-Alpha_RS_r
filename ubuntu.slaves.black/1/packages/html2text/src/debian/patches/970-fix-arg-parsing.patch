@@ -1,0 +1,36 @@
+Date: Tue, 09 Dec 2014 13:25:57 +0200
+From: Dmitry Borisyuk <q1werty@i.com.ua>
+To: 716064@bugs.debian.org
+Subject: Bug#716064: Patch
+Message-ID: <ngbbr9.jcj5xv@mail.i.com.ua>
+
+Control: retitle -1 "html2text -width" crashes with exit status 139
+Control: tags -1 patch
+
+Hi,
+
+this crash is because of improper parsing of input arguments in html2text.C
+It occurs when "-width" or "-rcfile" is the last command line argument.
+Of course, this is improper usage, but the segfault is still bad.
+The patch is:
+
+
+Index: html2text/html2text.C
+===================================================================
+--- html2text.orig/html2text.C
++++ html2text/html2text.C
+@@ -295,10 +295,10 @@ main(int argc, char **argv)
+     if (!strcmp(arg, "-check"        )) { mode = MyParser::SYNTAX_CHECK;                  } else
+     if (!strcmp(arg, "-debug-scanner")) { debug_scanner = true;                           } else
+     if (!strcmp(arg, "-debug-parser" )) { debug_parser = true;                            } else
+-    if (!strcmp(arg, "-rcfile"       )) { rcfile = argv[++i];                             } else
+-    if (!strcmp(arg, "-style"        )) { style = argv[++i];                              } else
+-    if (!strcmp(arg, "-width"        )) { if (atoi(argv[++i]) > 0) width = atoi(argv[i]); } else
+-    if (!strcmp(arg, "-o"            )) { output_file_name = argv[++i];                   } else
++    if (!strcmp(arg, "-rcfile"       )) { if (++i < argc) rcfile = argv[i];               } else
++    if (!strcmp(arg, "-style"        )) { if (++i < argc) style = argv[i];                } else
++    if (!strcmp(arg, "-width"        )) { if (++i < argc) if (atoi(argv[i]) > 0) width = atoi(argv[i]); } else
++    if (!strcmp(arg, "-o"            )) { if (++i < argc) output_file_name = argv[i];     } else
+     if (!strcmp(arg, "-nobs"         )) { use_backspaces = false;                         } else
+     if (!strcmp(arg, "-ascii"        )) { use_encoding = ASCII;                           } else
+     if (!strcmp(arg, "-utf8"         )) { use_encoding = UTF8;                            } else

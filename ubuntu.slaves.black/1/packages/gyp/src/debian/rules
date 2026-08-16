@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_build:
+	dh_auto_build
+	a2x -L --doctype manpage --format manpage $(CURDIR)/debian/gyp.txt > $(CURDIR)/debian/gyp.1
+
+override_dh_auto_test:
+	dh_auto_test -- --system custom --test-args "\
+		mkdir -p {build_dir}/bin; \
+		ln -s \$$(command -v {interpreter}) {build_dir}/bin/python; \
+		PATH={build_dir}/bin:\$$PATH; \
+		export PATH; \
+		printf '#!/bin/sh\nset -e\n{interpreter} {build_dir}/gyp_main.py \"\$$@\"\n' > {build_dir}/gyp.sh; \
+		chmod +x {build_dir}/gyp.sh; \
+		chmod +x {build_dir}/gyp_main.py; \
+		cd {build_dir}; \
+		: removing/skipping non-deterministic tests that rely on ordering in serialization of Python objects; \
+		rm -f test/variables/commands/gyptest-commands-ignore-env.py; \
+		rm -f test/variables/commands/gyptest-commands-repeated.py; \
+		rm -f test/variables/commands/gyptest-commands.py; \
+		rm -f test/variables/filelist/gyptest-filelist-golden.py; \
+		TESTCMD_VERBOSE=1 TESTGYP_GYP=gyp.sh PRESERVE_FAIL=1 {interpreter} gyptest.py --verbose --all; \
+		test 0 -eq \$$? && rm -rf bin out gyp.sh; \
+	"
+
+override_dh_auto_clean:
+	-dh_auto_clean
+	rm -rf build pylib/gyp.egg-info
+	rm -f debian/gyp.1

@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+SHELL := /bin/sh -e
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/+git.*//g' -e 's/~/./g')
+export PBR_VERSION=$(VERSION)
+
+export PYBUILD_NAME=heat-dashboard
+
+DEB_VERSION := $(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ')
+DEB_NOEPOCH_VERSION := $(shell echo $(DEB_VERSION) | cut -d: -f2-)
+DEB_UPSTREAM_VERSION := $(shell echo $(DEB_NOEPOCH_VERSION) | sed 's/-[^-]*$$//')
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=$(CURDIR) \
+		INTEGRATION_TESTS=0 \
+		NOSE_WITH_OPENSTACK=1 \
+		NOSE_OPENSTACK_COLOR=1 \
+		NOSE_OPENSTACK_RED=0.05 \
+		NOSE_OPENSTACK_YELLOW=0.025 \
+		NOSE_OPENSTACK_SHOW_ELAPSED=1 \
+		DJANGO_SETTINGS_MODULE=heat_dashboard.test.settings \
+		python3-coverage run --source=heat_dashboard \
+		$(CURDIR)/manage.py test heat_dashboard.test.tests --settings=heat_dashboard.test.settings
+endif
+
+override_dh_clean:
+	dh_clean
+	rm -rf .coverage*
+
+override_dh_auto_install:
+	pkgos-dh_auto_install --no-py2
+
+	# Activates the heat_dashboard plugin in Horizon - Python 3
+	mkdir -p $(CURDIR)/debian/python3-heat-dashboard/usr/lib/python3/dist-packages/openstack_dashboard/enabled ; \
+	cp $(CURDIR)/heat_dashboard/enabled/_16*.py $(CURDIR)/debian/python3-heat-dashboard/usr/lib/python3/dist-packages/openstack_dashboard/enabled ; \
+
+	# Install common files - Python 3
+	mkdir -p $(CURDIR)/debian/heat-dashboard-common/usr/lib/python3/dist-packages/openstack_dashboard/local/local_settings.d
+	cp $(CURDIR)/heat_dashboard/local_settings.d/_16*.py $(CURDIR)/debian/heat-dashboard-common/usr/lib/python3/dist-packages/openstack_dashboard/local/local_settings.d
+	mkdir -p $(CURDIR)/debian/heat-dashboard-common/usr/lib/python3/dist-packages/openstack_dashboard/conf/default_policies
+	cp $(CURDIR)/heat_dashboard/conf/*.yaml $(CURDIR)/debian/heat-dashboard-common/usr/lib/python3/dist-packages/openstack_dashboard/conf
+	cp $(CURDIR)/heat_dashboard/conf/default_policies/*.yaml $(CURDIR)/debian/heat-dashboard-common/usr/lib/python3/dist-packages/openstack_dashboard/conf/default_policies
+
+	# Install xstatic dependencies
+	cp -r xstatic $(CURDIR)/debian/python3-heat-dashboard/usr/lib/python3/dist-packages/heat_dashboard
+
+refresh-xstatic:
+	bash debian/bundle-xstatic.sh $(DEB_UPSTREAM_VERSION)

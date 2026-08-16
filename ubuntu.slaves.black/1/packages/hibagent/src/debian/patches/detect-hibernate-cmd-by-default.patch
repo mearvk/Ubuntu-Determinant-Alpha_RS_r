@@ -1,0 +1,44 @@
+Description: Detect hibernation method
+ Use systemctl hibernate with systemd and pm-hibernate otherwise
+ .
+Author: Balint Reczey <rbalint@ubuntu.com>
+Forwarded: no
+Last-Update: 2017-10-26
+
+--- a/agent/hibagent
++++ b/agent/hibagent
+@@ -369,6 +369,13 @@
+     os.dup2(nul.fileno(), sys.stderr.fileno())
+ 
+ 
++def detect_hibernate_cmd():
++    if os.path.exists("/run/systemd/system"):
++        return "/bin/systemctl hibernate"
++    else:
++        return "/usr/sbin/pm-hibernate"
++
++
+ class Config(object):
+     def __init__(self, config, args):
+         def get(section, name):
+@@ -413,7 +420,7 @@
+         self.swapfile = self.merge(get('swap', 'swapfile'), args.swapfile, '/swap')
+ 
+         self.hibernate = self.merge(
+-            get('pm-utils', 'hibernate-command'), args.hibernate, '/usr/sbin/pm-hibernate')
++            get('pm-utils', 'hibernate-command'), args.hibernate, detect_hibernate_cmd())
+         self.url = self.merge(
+             get('notification', 'monitored-url'), args.monitored_url,
+             'http://169.254.169.254/latest/meta-data/spot/instance-action')
+--- a/etc/hibagent-config.cfg
++++ b/etc/hibagent-config.cfg
+@@ -34,7 +34,8 @@
+ 
+ [pm-utils]
+ # The command used to initiate the hibernation
+-hibernate-command = /usr/sbin/pm-hibernate
++# By default is is autodetected
++# hibernate-command = /usr/sbin/pm-hibernate
+ 
+ [notification]
+ # The URL to monitor for the notification

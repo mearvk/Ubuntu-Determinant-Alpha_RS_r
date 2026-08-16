@@ -1,0 +1,99 @@
+From 7025bdda0a1823f229f016202ac1a297fde3a64e Mon Sep 17 00:00:00 2001
+From: Rob Browning <rlb@defaultvalue.org>
+Date: Tue, 20 Feb 2018 23:58:09 -0600
+Subject: Mark "preemption via sigprof" test as an expected failure for now
+
+Since this test fails intermittently in earlier versions (e.g. 3.0.4),
+and after discussion upstream, mark it as unresolved so that we'll still
+run it and can see the results, but won't be blocked by it.
+
+Bug: https://debbugs.gnu.org/46001
+Bug-Debian: https://bugs.debian.org/980498
+---
+ test-suite/tests/asyncs.test | 73 +++++++++++++++++++-----------------
+ 1 file changed, 38 insertions(+), 35 deletions(-)
+
+diff --git a/test-suite/tests/asyncs.test b/test-suite/tests/asyncs.test
+index 4ac9020c48..7932c9bcad 100644
+--- a/test-suite/tests/asyncs.test
++++ b/test-suite/tests/asyncs.test
+@@ -54,41 +54,44 @@
+ (when (and (defined? 'setitimer)
+            (provided? 'ITIMER_PROF))
+   (pass-if "preemption via sigprof"
+-    ;; Use an atomic box as a compiler barrier.
+-    (let* ((box (make-atomic-box 0))
+-           (preempt-tag (make-prompt-tag))
+-           (runqueue (make-q)))
+-      (define (run-cothreads)
+-        (unless (q-empty? runqueue)
+-          (let ((k (deq! runqueue)))
+-            (call-with-prompt preempt-tag
+-              k
+-              (lambda (k) (enq! runqueue k))))
+-          (run-cothreads)))
+-      (enq! runqueue (lambda ()
+-                       (let lp ()
+-                         (let ((x (atomic-box-ref box)))
+-                           (unless (= x 100)
+-                             (when (even? x)
+-                               (atomic-box-set! box (1+ x)))
+-                             (lp))))))
+-      (enq! runqueue (lambda ()
+-                       (let lp ()
+-                         (let ((x (atomic-box-ref box)))
+-                           (unless (= x 100)
+-                             (when (odd? x)
+-                               (atomic-box-set! box (1+ x)))
+-                             (lp))))))
+-      (with-sigprof-interrupts
+-       1000                             ; Hz
+-       (lambda ()
+-         ;; Could throw an exception if the prompt is
+-         ;; not active (i.e. interrupt happens
+-         ;; outside running a cothread).  Ignore in
+-         ;; that case.
+-         (false-if-exception (abort-to-prompt preempt-tag)))
+-       run-cothreads)
+-      (equal? (atomic-box-ref box) 100))))
++    (or
++     (false-if-exception
++      ;; Use an atomic box as a compiler barrier.
++      (let* ((box (make-atomic-box 0))
++             (preempt-tag (make-prompt-tag))
++             (runqueue (make-q)))
++        (define (run-cothreads)
++          (unless (q-empty? runqueue)
++            (let ((k (deq! runqueue)))
++              (call-with-prompt preempt-tag
++                k
++                (lambda (k) (enq! runqueue k))))
++            (run-cothreads)))
++        (enq! runqueue (lambda ()
++                         (let lp ()
++                           (let ((x (atomic-box-ref box)))
++                             (unless (= x 100)
++                               (when (even? x)
++                                 (atomic-box-set! box (1+ x)))
++                               (lp))))))
++        (enq! runqueue (lambda ()
++                         (let lp ()
++                           (let ((x (atomic-box-ref box)))
++                             (unless (= x 100)
++                               (when (odd? x)
++                                 (atomic-box-set! box (1+ x)))
++                               (lp))))))
++        (with-sigprof-interrupts
++         1000                             ; Hz
++         (lambda ()
++           ;; Could throw an exception if the prompt is
++           ;; not active (i.e. interrupt happens
++           ;; outside running a cothread).  Ignore in
++           ;; that case.
++           (false-if-exception (abort-to-prompt preempt-tag)))
++         run-cothreads)
++        (equal? (atomic-box-ref box) 100)))
++     (throw 'unresolved))))
+ 
+ (when (provided? 'threads)
+   (pass-if "preemption via external thread"

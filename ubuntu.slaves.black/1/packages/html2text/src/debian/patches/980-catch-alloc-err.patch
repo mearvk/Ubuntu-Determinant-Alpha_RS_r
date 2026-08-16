@@ -1,0 +1,32 @@
+Description: Catch ENOMEM in {m,re}alloc_array (prevent segfaults).
+Author: Dmitry Borisyuk <q1werty@i.com.ua>
+Index: html2text/Area.C
+===================================================================
+--- html2text.orig/Area.C
++++ html2text/Area.C
+@@ -30,7 +30,7 @@
+ 
+  /***************************************************************************/
+ 
+-
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <iostream>
+@@ -45,10 +45,14 @@ extern int use_encoding;
+ 
+ /* ------------------------------------------------------------------------- */
+ 
++static void* alloc_error() {
++  perror("html2text: error"); abort();
++}
++
+ #define malloc_array(type, size)\
+-((type *) malloc(sizeof(type) * (size)))
++((type *) (malloc(sizeof(type) * (size)) ? : alloc_error()))
+ #define realloc_array(array, type, size) \
+-((array) = (type *) realloc((array), sizeof(type) * (size)))
++((array) = (type *) (realloc((array), sizeof(type) * (size)) ? : alloc_error()))
+ #define copy_array(from, to, type, count) \
+ ((void) memcpy((to), (from), (count) * sizeof(type)))
+ 

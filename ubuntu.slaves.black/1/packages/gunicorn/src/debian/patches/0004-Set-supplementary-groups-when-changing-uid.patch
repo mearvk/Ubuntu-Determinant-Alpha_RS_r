@@ -1,0 +1,38 @@
+From: Chris Lamb <lamby@debian.org>
+Date: Fri, 7 Oct 2016 11:00:45 +0100
+Subject: Set supplementary groups when changing uid.
+
+Thanks to Filippos Giannakos <philipgian@grnet.gr>.
+
+Signed-off-by: Chris Lamb <lamby@debian.org>
+---
+ gunicorn/util.py | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/gunicorn/util.py b/gunicorn/util.py
+index d8571dd..d1d7774 100644
+--- a/gunicorn/util.py
++++ b/gunicorn/util.py
+@@ -153,6 +153,22 @@ def set_owner_process(uid, gid, initgroups=False):
+                 raise
+ 
+     if uid:
++        username = None
++        try:
++            username = pwd.getpwuid(uid)[0]
++        except KeyError:
++            pass
++
++        if username is not None:
++            if not gid:
++                gid = os.getgid()
++
++            try:
++                os.initgroups(username, gid)
++            except OSError as e:
++                if e.errno != errno.EPERM:
++                    raise
++
+         os.setuid(uid)
+ 
+ 

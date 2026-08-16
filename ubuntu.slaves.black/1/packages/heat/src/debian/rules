@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+export PYBUILD_NAME=heat
+
+SHELL := /bin/sh -e
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/~/./g')
+export PBR_VERSION=$(VERSION)
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	pkgos-dh_auto_test --no-py2 '^(?!heat_integrationtests)'
+endif
+
+override_dh_clean:
+	dh_clean
+	rm -rf doc/build
+	find . -iname '*.pyc' -delete
+	rm -f run_tests.err.log
+	rm -rf pbr*.egg
+	rm -f etc/heat/heat.conf
+	rm -f debian/*.init debian/*.service debian/*.upstart
+
+override_dh_install:
+	rm -rf $(CURDIR)/debian/python3-heat/usr/etc
+	PYTHONPATH=$(CURDIR)/debian/python3-heat/usr/lib/python3/dist-packages \
+		oslo-config-generator --config-file=config-generator.conf \
+		--output-file etc/heat/heat.conf
+	dh_install
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3
+
+#override_dh_installman:
+#	python setup.py build
+#	make -C doc man
+#	dh_installman

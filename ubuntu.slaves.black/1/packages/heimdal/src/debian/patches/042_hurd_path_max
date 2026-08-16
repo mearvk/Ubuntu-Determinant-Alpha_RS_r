@@ -1,0 +1,70 @@
+From: Brian May <bam@debian.org>
+Date: Wed, 26 Apr 2017 06:29:23 +1000
+Subject: hurd_path_max
+
+---
+ lib/sl/slc-gram.y | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
+
+diff --git a/lib/sl/slc-gram.y b/lib/sl/slc-gram.y
+index 31ec6bc..2b4139d 100644
+--- a/lib/sl/slc-gram.y
++++ b/lib/sl/slc-gram.y
+@@ -691,8 +691,8 @@ gen_wrapper(struct assignment *as)
+     cprint(0, "\n");
+ }
+ 
+-char cname[PATH_MAX];
+-char hname[PATH_MAX];
++char *cname = NULL;
++char *hname = NULL;
+ 
+ static void
+ gen(struct assignment *as)
+@@ -742,6 +742,8 @@ main(int argc, char **argv)
+ 
+     int optidx = 0;
+ 
++    size_t cname_len = 0;
++
+     setprogname(argv[0]);
+     if(getarg(args, num_args, argc, argv, &optidx))
+ 	usage(1);
+@@ -760,16 +762,22 @@ main(int argc, char **argv)
+     if(yyin == NULL)
+ 	err(1, "%s", filename);
+     p = strrchr(filename, '/');
+-    if(p)
+-	strlcpy(cname, p + 1, sizeof(cname));
+-    else
+-	strlcpy(cname, filename, sizeof(cname));
++    if(p) {
++	cname_len = strlen(p + 1) + 2 + 1;
++	cname = malloc(cname_len);
++	strlcpy(cname, p + 1, cname_len);
++    } else {
++	cname_len = strlen(filename) + 2 + 1;
++	cname = malloc(cname_len);
++	strlcpy(cname, filename, cname_len);
++    }
+     p = strrchr(cname, '.');
+     if(p)
+ 	*p = '\0';
+-    strlcpy(hname, cname, sizeof(hname));
+-    strlcat(cname, ".c", sizeof(cname));
+-    strlcat(hname, ".h", sizeof(hname));
++    hname = malloc(cname_len);
++    strlcpy(hname, cname, cname_len);
++    strlcat(cname, ".c", cname_len);
++    strlcat(hname, ".h", cname_len);
+     yyparse();
+     if(error_flag)
+ 	exit(1);
+@@ -785,5 +793,7 @@ main(int argc, char **argv)
+ 	fclose(hfile);
+     }
+     fclose(yyin);
++    free(cname);
++    free(hname);
+     return 0;
+ }

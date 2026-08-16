@@ -1,0 +1,202 @@
+- job:
+    name: heat-functional-base
+    parent: devstack
+    abstract: true
+    run: playbooks/devstack/functional/run.yaml
+    post-run: playbooks/devstack/functional/post.yaml
+    description: Base heat functional test job
+    timeout: 7800
+    roles:
+      - zuul: opendev.org/openstack/devstack
+      - zuul: opendev.org/openstack/tempest
+    required-projects:
+      - openstack/devstack-gate
+      - openstack/barbican
+      - openstack/heat
+      - openstack/heat-templates
+      - openstack/heat-tempest-plugin
+      - openstack/octavia
+      - openstack/neutron
+      - openstack/oslo.messaging
+      - openstack/python-barbicanclient
+      - openstack/python-heatclient
+      - openstack/heat-agents
+      - openstack/tempest
+    vars:
+      configure_swap_size: 8192
+      tempest_plugins:
+        - heat-tempest-plugin
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/heat-tempest-plugin'
+        HEAT_USE_MOD_WSGI: True
+        CEILOMETER_PIPELINE_INTERVAL: 60
+      devstack_services:
+        tls-proxy: false
+        s-account: false
+        s-container: false
+        s-object: false
+        s-proxy: false
+        tempest: true
+      devstack_plugins:
+        barbican: https://opendev.org/openstack/barbican
+        heat: https://opendev.org/openstack/heat
+        octavia: https://opendev.org/openstack/octavia
+      devstack_local_conf:
+        post-config:
+          $HEAT_CONF:
+            DEFAULT:
+              convergence_engine: true
+              stack_scheduler_hints: true
+              hidden_stack_tags: hidden
+              encrypt_parameters_and_properties: True
+              logging_exception_prefix: "%(asctime)s.%(msecs)03d %(process)d TRACE %(name)s %(instance)s"
+              enable_stack_adopt: true
+              enable_stack_abandon: true
+              max_stacks_per_tenant: 256
+            heat_api:
+              workers: 2
+            heat_api_cfn:
+              workers: 2
+            cache:
+              enabled: True
+            eventlet_opts:
+              client_socket_timeout: 120
+            oslo_messaging_notifications:
+              driver: messagingv2
+        test-config:
+          $TEMPEST_CONFIG:
+            service_available:
+              heat: True
+            heat_plugin:
+              convergence_engine_enabled: true
+              minimal_image_ref: ${DEFAULT_IMAGE_NAME:-cirros-0.3.6-x86_64-disk}
+              instance_type: m1.heat_int
+              minimal_instance_type: m1.heat_micro
+              image_ref: Fedora-Cloud-Base-36-1.5.x86_64
+              hidden_stack_tag: hidden
+              heat_config_notify_script: /opt/stack/heat-agents/heat-config/bin/heat-config-notify
+              boot_config_env: /opt/stack/heat-templates/hot/software-config/boot-config/test_image_env.yaml
+              credential_secret_id: $OS_CREDENTIAL_SECRET_ID
+            heat_features_enabled:
+              multi_cloud: True
+            # disable cinder backup feature
+            volume-feature-enabled:
+              backup: False
+      test_results_stage_name: test_results
+      zuul_copy_output:
+        '{{ devstack_base_dir }}/tempest/etc/tempest.conf': logs
+        '{{ devstack_base_dir }}/tempest/etc/accounts.yaml': logs
+        '{{ devstack_base_dir }}/tempest/tempest.log': logs
+        '{{ stage_dir }}/{{ test_results_stage_name }}.subunit': logs
+        '{{ stage_dir }}/{{ test_results_stage_name }}.html': logs
+        '{{ stage_dir }}/stackviz': logs
+      extensions_to_txt:
+        conf: true
+        log: true
+        yaml: true
+        yml: true
+    irrelevant-files:
+      - ^.*\.rst$
+      - ^api-ref/.*$
+      - ^doc/.*$
+      - ^heat/locale/.*$
+      - ^heat/tests/.*$
+      - ^releasenotes/.*$
+
+
+- job:
+    name: heat-functional
+    parent: heat-functional-base
+
+- job:
+    name: heat-functional-legacy
+    parent: heat-functional-base
+    vars:
+      devstack_local_conf:
+        post-config:
+          $HEAT_CONF:
+            DEFAULT:
+              convergence_engine: false
+        test-config:
+          $TEMPEST_CONFIG:
+            heat_plugin:
+              convergence_engine_enabled: false
+
+- job:
+    name: heat-functional-non-apache
+    parent: heat-functional-base
+    voting: false
+    vars:
+      devstack_localrc:
+        HEAT_USE_MOD_WSGI: False
+
+- job:
+    name: grenade-heat-multinode
+    parent: grenade-multinode
+    required-projects:
+      - opendev.org/openstack/heat
+      - opendev.org/openstack/heat-tempest-plugin
+      - opendev.org/openstack/python-heatclient
+    vars:
+      grenade_devstack_localrc:
+        shared:
+          HOST_TOPOLOGY: multinode
+          HOST_TOPOLOGY_ROLE: primary
+          HOST_TOPOLOGY_SUBNODES: "{{ hostvars['compute1']['nodepool']['public_ipv4'] }}"
+      configure_swap_size: 8192
+      devstack_services:
+        h-api: true
+        h-api-cfn: true
+        h-eng: true
+        heat: true
+      # We do run a list of tests after upgrade. This is just to bypass the req from parent.
+      tempest_test_regex: ^tempest\.api\.identity\.v3\.test_tokens
+      tox_envlist: all
+      devstack_plugins:
+        heat: https://opendev.org/openstack/heat
+      tempest_plugins:
+        - heat-tempest-plugin
+    group-vars:
+      subnode:
+        grenade_devstack_localrc:
+          shared:
+            HOST_TOPOLOGY: multinode
+            HOST_TOPOLOGY_ROLE: subnode
+            HOST_TOPOLOGY_SUBNODES: "{{ hostvars['compute1']['nodepool']['public_ipv4'] }}"
+        configure_swap_size: 8192
+        devstack_services:
+          h-api: true
+          h-api-cfn: true
+          h-eng: true
+          heat: true
+        # We do run a list of tests after upgrade. This is just to bypass the req from parent.
+        devstack_plugins:
+          heat: https://opendev.org/openstack/heat
+    irrelevant-files:
+      - ^.*\.rst$
+      - ^api-ref/.*$
+      - ^doc/.*$
+      - ^heat/locale/.*$
+      - ^heat/tests/.*$
+      - ^releasenotes/.*$
+
+- project:
+    queue: heat
+    templates:
+      - openstack-cover-jobs
+      - openstack-python3-yoga-jobs
+      - openstack-python3-yoga-jobs-arm64
+      - periodic-stable-jobs
+      - publish-openstack-docs-pti
+      - check-requirements
+      - release-notes-jobs-python3
+    check:
+      jobs:
+        - grenade-heat-multinode
+        - heat-functional
+        - heat-functional-legacy
+    gate:
+      jobs:
+        - grenade-heat-multinode
+        - heat-functional
+        - heat-functional-legacy

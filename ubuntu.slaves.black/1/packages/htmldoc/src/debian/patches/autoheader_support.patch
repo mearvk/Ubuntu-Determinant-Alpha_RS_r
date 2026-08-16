@@ -1,0 +1,65 @@
+From: Reiner Herrmann <reiner@reiner-h.de>
+Date: Sat, 21 Dec 2019 22:31:04 +0100
+Subject: move definitions from config.h.in to configure.ac
+
+Forwarded: https://github.com/michaelrsweet/htmldoc/pull/329
+
+Upstream does not properly support autoheader. So when autoreconfiguring
+and autoheader is called, upstream's config.h.in is overwritten, which
+contains some constants/macros.
+They are now redefined in configure.ac so that they will land in config.h(.in).
+---
+ configure.ac | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 1faab58..6dc856b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -110,7 +110,10 @@ dnl Checks for string functions.
+ AC_CHECK_FUNCS(strdup strcasecmp strncasecmp strlcat strlcpy snprintf vsnprintf)
+ 
+ dnl Check for random number functions...
+-AC_CHECK_FUNCS(random lrand48 arc4random)
++AC_CHECK_FUNC(arc4random, AC_DEFINE([HTMLDOC_RAND()], [arc4random()], [use arc4random]) AC_DEFINE([HTMLDOC_SRAND(v)], [srand for arc4random]),
++  AC_CHECK_FUNC(random, AC_DEFINE([HTMLDOC_RAND()], [random()], [use random]) AC_DEFINE([HTMLDOC_SRAND(v)], [srandom(v)], [srand for random]),
++    AC_CHECK_FUNC(lrand48, AC_DEFINE([HTMLDOC_RAND()], [lrand48()], [use lrand48]) AC_DEFINE([HTMLDOC_SRAND(v)], [srand48(v)], [srand for lrand48]),
++      AC_DEFINE([HTMLDOC_RAND()], [rand()], [fallback to rand]) AC_DEFINE([HTMLDOC_SRAND(v)], [srand(v)], [fallback to srand]))))
+ 
+ dnl See whether the tm structure has the tm_gmtoff member...
+ AC_MSG_CHECKING([for tm_gmtoff member in tm structure])
+@@ -173,9 +176,14 @@ AC_CACHE_CHECK([for long long int], ac_cv_c_long_long, [
+     ])
+ ])
+ 
+-AS_IF([test $ac_cv_c_long_long = yes], [
++if test $ac_cv_c_long_long = yes; then
+     AC_DEFINE([HAVE_LONG_LONG], [], [long long support])
+-])
++	AC_DEFINE([HTMLDOC_LLFMT], ["%lld"], [long long format])
++	AC_DEFINE([HTMLDOC_LLCAST], [(long long)], [long long cast])
++else
++	AC_DEFINE([HTMLDOC_LLFMT], ["%ld"], [long long format])
++	AC_DEFINE([HTMLDOC_LLCAST], [(long)], [long long cast])
++fi
+ 
+ AC_CHECK_FUNC(strtoll, AC_DEFINE([HAVE_STRTOLL], [], [strtoll support]))
+ 
+@@ -327,6 +335,17 @@ AS_IF([test "$datadir" = "\${prefix}/share"], [
+     datadir="$datarootdir"
+ ])
+ 
++AC_DEFINE([MAX_CHAPTERS], [1000], [max number of chapters or files])
++AC_DEFINE([MAX_COLUMNS], [200], [max number of columns in a table])
++AC_DEFINE([MAX_HF_IMAGES], [10], [max number of header/footer images])
++
++AC_DEFINE([ALLOC_FILES], [10], [temporary/image files])
++AC_DEFINE([ALLOC_HEADINGS], [50], [headings])
++AC_DEFINE([ALLOC_LINKS], [100], [web links])
++AC_DEFINE([ALLOC_OBJECTS], [100], [pdf objects])
++AC_DEFINE([ALLOC_PAGES], [10], [ps/pdf pages])
++AC_DEFINE([ALLOC_ROWS], [20], [table rows])
++
+ AC_DEFINE_UNQUOTED([DOCUMENTATION], ["$datadir/doc/htmldoc"], [documentation directory])
+ AC_DEFINE_UNQUOTED([HTML_DATA], ["$datadir/htmldoc"], [data directory])
+ 

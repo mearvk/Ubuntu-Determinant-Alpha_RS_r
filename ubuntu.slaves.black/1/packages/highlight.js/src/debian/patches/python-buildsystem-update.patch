@@ -1,0 +1,57 @@
+Description: Update old python buildsystem for 9.11.0
+Author: Ximin Luo <infinity0@debian.org>
+Bug: https://github.com/isagalaev/highlight.js/issues/1521
+
+--- a/src/highlight.js
++++ b/src/highlight.js
+@@ -13,7 +13,7 @@
+   // CommonJS.
+   // `nodeType` is checked to ensure that `exports` is not a HTML element.
+   if(typeof exports !== 'undefined' && !exports.nodeType) {
+-    factory(exports);
++    return factory(exports);
+   } else if(globalObject) {
+     // Export hljs globally even when using AMD for cases when this script
+     // is loaded with others that may still expect a global hljs.
+@@ -25,6 +25,8 @@
+         return globalObject.hljs;
+       });
+     }
++
++    return globalObject.hljs;
+   }
+ 
+ }(function(hljs) {
+--- a/tools/build.py
++++ b/tools/build.py
+@@ -134,7 +134,7 @@
+     if not match:
+         return
+     headers = match.group(1).split('\n')
+-    headers = dict(h.strip().split(': ') for h in headers if ': ' in h)
++    headers = dict(h.strip().split(': ', 1) for h in headers if ': ' in h)
+     return headers if 'Language' in headers else None
+ 
+ def language_filenames(src_path, languages):
+@@ -201,10 +201,10 @@
+     Glues files together for the browser build.
+     '''
+     if compressed:
+-        hljs = 'var hljs=new %s();' % strip_read(hljs_filename).rstrip(';')
++        hljs = 'var hljs=%s;' % strip_read(hljs_filename)
+         file_func = lambda f: utf8_open(f).read()
+     else:
+-        hljs = 'var hljs = new %s();\n' % strip_read(hljs_filename)
++        hljs = 'var hljs = %s;\n' % strip_read(hljs_filename)
+         file_func = strip_read
+     return ''.join([hljs] + [wrap_language(f, file_func(f), compressed) for f in language_filenames])
+ 
+@@ -260,7 +260,7 @@
+     utf8_open(os.path.join(build_path, 'lib', 'highlight.js'), 'w').write(core)
+ 
+     print('Registering languages with the library...')
+-    hljs = "var Highlight = require('./highlight');\nvar hljs = new Highlight();"
++    hljs = "var hljs = require('./highlight');"
+     filenames = map(os.path.basename, filenames)
+     for filename in filenames:
+         hljs += '\nhljs.registerLanguage(\'%s\', require(\'./languages/%s\'));' % (lang_name(filename), filename)

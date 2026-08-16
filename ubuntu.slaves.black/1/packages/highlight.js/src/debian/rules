@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+export DH_VERBOSE=1
+
+js-compressor := $(or $(notdir $(shell which uglifyjs)),yui-compressor)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	python3 tools/build.py -n
+	python3 tools/build.py -tnode
+	$(js-compressor) -o build_browser/highlight.min.js build_browser/highlight.pack.js
+	mv build_browser/highlight.pack.js build_browser/highlight.js
+	$(MAKE) -C docs/ html
+	$(MAKE) -C docs/ latexpdf
+	mv build_node/lib .
+	mv build_node/styles .
+	mv package.json package.json.save
+	mv build_node/package.json .
+
+override_dh_auto_clean:
+	if [ -e package.json.save ]; then \
+		mv package.json.save package.json; \
+	fi
+	dh_auto_clean --buildsystem=nodejs

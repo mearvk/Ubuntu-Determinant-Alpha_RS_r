@@ -1,0 +1,98 @@
+Remove limited built-in http support.
+Index: html2text/html2text.C
+===================================================================
+--- html2text.orig/html2text.C
++++ html2text/html2text.C
+@@ -36,18 +36,20 @@
+ 
+ 
+ #include <iostream>
++#include <fstream>
+ #include <string.h>
+ #include <stdlib.h>
+ 
+ #include "html.h"
+ #include "HTMLControl.h"
+-#include "urlistream.h"
++//#include "urlistream.h"
+ #include "format.h"
+ 
+ #define stringify(x) stringify2(x)
+ #define stringify2(x) #x
+ 
+ /* ------------------------------------------------------------------------- */
++using std::ifstream;
+ 
+ class MyParser : public HTMLControl {
+ 
+@@ -55,7 +57,7 @@ public:
+   enum { PRINT_AS_ASCII, UNPARSE, SYNTAX_CHECK };
+ 
+   MyParser(
+-    urlistream &is_,
++    istream &is_,
+     bool       debug_scanner_,
+     bool       debug_parser_,
+     ostream    &os_,
+@@ -352,15 +354,14 @@ main(int argc, char **argv)
+     }
+ 
+     istream    *isp;
+-    urlistream uis;
++    ifstream     uis;
+ 
+     uis.open(input_url);
+     if (!uis.is_open()) {
+       std::cerr
+-        << "Opening input URL \""
++        << "Cannot open input file \""
+ 	<< input_url
+-        << "\": "
+-        << uis.open_error()
++        << "\"."
+         << std::endl;
+       exit(1);
+     }
+Index: html2text/HTMLControl.h
+===================================================================
+--- html2text.orig/HTMLControl.h
++++ html2text/HTMLControl.h
+@@ -38,7 +38,6 @@
+ /* ------------------------------------------------------------------------- */
+ 
+ #include "HTMLParser.h"
+-#include "urlistream.h"
+ #include <istream>
+ 
+ using std::istream;
+@@ -48,7 +47,7 @@ using std::istream;
+ class HTMLControl : public HTMLParser {
+ 
+ public:
+-  HTMLControl(urlistream &is_, bool debug_scanner_, bool debug_parser_) :
++  HTMLControl(istream &is_, bool debug_scanner_, bool debug_parser_) :
+     HTMLParser(),
+     current_line(1),
+     current_column(0),
+@@ -84,7 +83,7 @@ private:
+ 
+   bool debug_scanner;
+ 
+-  urlistream &is;
++  istream &is;
+   int     ungotten_chars[5];
+   int     number_of_ungotten_chars;
+ };
+Index: html2text/Makefile.in
+===================================================================
+--- html2text.orig/Makefile.in
++++ html2text/Makefile.in
+@@ -65,7 +65,7 @@ all : html2text
+ 	@echo '"/usr/local/bin", "/usr/local/man/man1" and "/usr/local/man/man5").';
+ 	@echo
+ 
+-OBJS = html2text.o html.o HTMLControl.o HTMLParser.o Area.o format.o sgml.o table.o urlistream.o Properties.o cmp_nocase.o
++OBJS = html2text.o html.o HTMLControl.o HTMLParser.o Area.o format.o sgml.o table.o Properties.o cmp_nocase.o
+ 
+ html2text : $(OBJS) $(LIBSTDCXX_LIBS)
+ 	$(CXX) $(LDFLAGS) $(OBJS) $(LOADLIBES) $(LDLIBS) -o $@

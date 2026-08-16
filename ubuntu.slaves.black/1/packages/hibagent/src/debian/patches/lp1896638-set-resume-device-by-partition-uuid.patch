@@ -1,0 +1,33 @@
+From: Tony Nie <zirann@amazon.com>
+Subject: Set resume device by PARTUUID instead of by device name
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/ec2-hibinit-agent/+bug/1896638
+Origin: upstream, https://github.com/aws/ec2-hibernate-linux-agent/commit/43636fcf
+---
+ agent/hibagent | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+Index: b/agent/hibagent
+===================================================================
+--- a/agent/hibagent	2023-03-24 13:12:50.192981414 +0100
++++ b/agent/hibagent	2023-03-24 13:17:13.151025129 +0100
+@@ -99,6 +99,11 @@ def get_swap_space():
+         return int(lines[0].split()[2]) * 1024
+ 
+ 
++def get_partuuid(device):
++    return check_output(
++        ['lsblk', '-dno', 'PARTUUID', device]).decode('ascii').strip()
++
++
+ def patch_grub_config(swap_device, offset, grub_file, grub2_dir):
+     log("Updating GRUB to use the device %s with offset %d for resume" % (swap_device, offset))
+     lines = []
+@@ -128,6 +133,8 @@ def patch_grub_config(swap_device, offse
+     # Do GRUB2 update as well
+     if grub2_dir and os.path.exists(grub2_dir):
+         offset_file = os.path.join(grub2_dir, '99-set-swap.cfg')
++        if swap_device.startswith("/dev"):
++            swap_device = "PARTUUID=%s" % get_partuuid(swap_device)
+         if not os.path.exists(offset_file):
+             with open(offset_file, 'w') as fl:
+                 fl.write('GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT no_console_suspend=1 '

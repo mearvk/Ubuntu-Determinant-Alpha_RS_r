@@ -1,0 +1,157 @@
+#!/usr/bin/make -f
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+# amd64 ends up without a dep on libroken breaking multiarch
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all optimize=-lto
+
+%:
+	dh $* --parallel
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_strip:
+	dh_strip --dbgsym-migration="heimdal-dbg (<< 7.5.0~)"
+
+override_dh_makeshlibs:
+	dh_makeshlibs -plibsl0-heimdal -- -c4
+	dh_makeshlibs -plibkafs0-heimdal -- -c4
+	dh_makeshlibs -plibgssapi3-heimdal -- -c4
+	dh_makeshlibs -plibotp0-heimdal -- -c4
+	dh_makeshlibs -plibkdc2-heimdal -V"libkdc2-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibasn1-8-heimdal -V"libasn1-8-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibheimbase1-heimdal -V"libheimbase1-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibhcrypto4-heimdal -V"libhcrypto4-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibhdb9-heimdal -V"libhdb9-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibhx509-5-heimdal -V"libhx509-5-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibkadm5srv8-heimdal -V"libkadm5srv8-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibkadm5clnt7-heimdal -V"libkadm5clnt7-heimdal (>= 1.6~rc2+dfsg)" -- -c4
+	dh_makeshlibs -plibkrb5-26-heimdal -V"libkrb5-26-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibheimntlm0-heimdal -V"libheimntlm0-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibroken18-heimdal -V"libroken18-heimdal (>= 1.4.0~git20110226.dfsg.2-1)" -- -c4
+	dh_makeshlibs -plibwind0-heimdal -V"libwind0-heimdal (>= 1.4.0~git20110226.dfsg.1-1)" -- -c4
+
+override_dh_auto_test:
+	# The testsuite fails when run with parallel jobs
+	dh_auto_test -- -j1
+
+override_dh_auto_configure:
+	./configure $(shell dpkg-buildflags --export=configure) \
+	  --libexecdir="\$${prefix}/sbin" \
+	  --enable-shared \
+	  --prefix=/usr \
+	  --includedir="\$${prefix}/include" \
+	  --with-openldap=/usr \
+	  --with-sqlite3=/usr \
+	  --with-libedit=/usr \
+	  --enable-kcm \
+	  --with-hdbdir=/var/lib/heimdal-kdc \
+	  --without-openssl \
+	  --infodir="\$${prefix}/share/info" \
+	  --datarootdir="\$${prefix}/share" \
+	  --libdir="\$${prefix}/lib/${DEB_HOST_MULTIARCH}" \
+	  --without-krb4
+
+DESTDIR = $(CURDIR)/debian/tmp
+
+overide_dh_fixperms:
+	dh_fixperms
+	# /var/lib/heimdal-kdc is 700
+	chmod 700 debian/heimdal-kdc/var/lib/heimdal-kdc
+
+override_dh_auto_clean::
+	[ ! -f Makefile ] || $(MAKE) clean
+
+override_dh_auto_install:
+	dh_auto_install
+	/bin/mkdir -p "$(DESTDIR)/usr/share/info"
+	# no translations for the moment
+	rm -rf $(DESTDIR)/usr/share/locale/sv_SE
+	rm -rf $(DESTDIR)/usr/share/man/cat*
+	/bin/mkdir -p debian/heimdal-kdc/usr/share/heimdal-kdc
+	cp debian/extras/kdc.conf debian/heimdal-kdc/usr/share/heimdal-kdc
+	cp debian/extras/kadmind.acl debian/heimdal-kdc/usr/share/heimdal-kdc
+	mkdir -p debian/heimdal-multidev/usr/lib/$(DEB_HOST_MULTIARCH)/heimdal
+	mv $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.a \
+		debian/heimdal-multidev/usr/lib/$(DEB_HOST_MULTIARCH)/heimdal
+	rm -f $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.la
+	mv $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.so \
+		debian/heimdal-multidev/usr/lib/$(DEB_HOST_MULTIARCH)/heimdal
+	# remove general purpose utilities
+	rm -f $(DESTDIR)/usr/bin/bsearch \
+		  $(DESTDIR)/usr/bin/idn-lookup \
+		  $(DESTDIR)/usr/share/man/man1/bsearch.1 \
+		  $(DESTDIR)/usr/share/man/man1/idn-lookup.1
+	# remove unwanted files
+	rm -f $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/windc.so*
+	rm -f $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/windc.a
+
+override_dh_install-indep:
+	dh_install --sourcedir=$(DESTDIR) --list-missing --fail-missing
+	if [ -d debian/heimdal-docs ]; then \
+	mv debian/heimdal-docs/usr/share/man/man5/krb5.conf.5 \
+	   debian/heimdal-docs/usr/share/man/man5/krb5.conf.5heimdal; \
+	rm -f debian/heimdal-docs/usr/share/info/dir; \
+	fi
+
+override_dh_install-arch:
+	dh_install --sourcedir=$(DESTDIR) --list-missing --fail-missing
+	# remove conflicting files
+	rm -rf debian/heimdal-multidev/usr/include/heimdal/ss
+	rm -f debian/heimdal-multidev/usr/include/heimdal/fnmatch.h
+	# rewrite symlinks to symlinks to point directly to file
+	for l in debian/heimdal-multidev/usr/lib/${DEB_HOST_MULTIARCH}/heimdal/*.so; do \
+		ln -s -f ../`readlink $$l` $$l ; \
+	done
+	mv debian/heimdal-multidev/usr/bin/krb5-config \
+	   debian/heimdal-multidev/usr/bin/krb5-config.heimdal
+	mv debian/heimdal-multidev/usr/share/man/man1/krb5-config.1 \
+	   debian/heimdal-multidev/usr/share/man/man1/krb5-config.heimdal.1
+	install -m644 debian/extras/default debian/heimdal-kdc/etc/default/heimdal-kdc
+	install -m644 lib/hdb/hdb.schema debian/heimdal-kdc/etc/ldap/schema/hdb.schema
+	mv debian/heimdal-clients/usr/bin/pagsh \
+	   debian/heimdal-clients/usr/bin/kpagsh
+	mv debian/heimdal-clients/usr/bin/su debian/heimdal-clients/usr/bin/ksu
+	mv debian/heimdal-clients/usr/share/man/man1/pagsh.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kpagsh.1
+	mv debian/heimdal-clients/usr/share/man/man1/su.1 \
+	   debian/heimdal-clients/usr/share/man/man1/ksu.1
+	mv debian/heimdal-clients/usr/bin/kadmin \
+	   debian/heimdal-clients/usr/bin/kadmin.heimdal
+	mv debian/heimdal-clients/usr/share/man/man1/kadmin.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kadmin.heimdal.1
+	mv debian/heimdal-clients/usr/bin/ktutil \
+	   debian/heimdal-clients/usr/bin/ktutil.heimdal
+	mv debian/heimdal-clients/usr/share/man/man1/ktutil.1 \
+	   debian/heimdal-clients/usr/share/man/man1/ktutil.heimdal.1
+	mv debian/heimdal-clients/usr/bin/kinit \
+	   debian/heimdal-clients/usr/bin/kinit.heimdal
+	mv debian/heimdal-clients/usr/bin/kswitch \
+	   debian/heimdal-clients/usr/bin/kswitch.heimdal
+	mv debian/heimdal-clients/usr/bin/kpasswd \
+	   debian/heimdal-clients/usr/bin/kpasswd.heimdal
+	mv debian/heimdal-clients/usr/bin/ksu \
+	   debian/heimdal-clients/usr/bin/ksu.heimdal
+	mv debian/heimdal-clients/usr/bin/kdestroy \
+	   debian/heimdal-clients/usr/bin/kdestroy.heimdal
+	mv debian/heimdal-clients/usr/bin/klist \
+	   debian/heimdal-clients/usr/bin/klist.heimdal
+	mv debian/heimdal-clients/usr/share/man/man1/kinit.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kinit.heimdal.1
+	mv debian/heimdal-clients/usr/share/man/man1/kdestroy.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kdestroy.heimdal.1
+	mv debian/heimdal-clients/usr/share/man/man1/kpasswd.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kpasswd.heimdal.1
+	mv debian/heimdal-clients/usr/share/man/man1/ksu.1 \
+	   debian/heimdal-clients/usr/share/man/man1/ksu.heimdal.1
+	mv debian/heimdal-clients/usr/share/man/man1/kswitch.1 \
+	   debian/heimdal-clients/usr/share/man/man1/kswitch.heimdal.1
+	mv debian/heimdal-clients/usr/share/man/man1/klist.1 \
+	   debian/heimdal-clients/usr/share/man/man1/klist.heimdal.1
+	# remove libtool recursive linking mess
+	sed -i "s/libdir=.*/libdir=\/usr\/lib\/${DEB_HOST_MULTIARCH}\/heimdal/" \
+		debian/heimdal-multidev/usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/*.pc \
+		debian/heimdal-dev/usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/*.pc
+	sed -i "s/includedir=.*/includedir=\/usr\/include\/heimdal/" \
+		debian/heimdal-multidev/usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/*.pc \
+		debian/heimdal-dev/usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/*.pc

@@ -1,0 +1,24 @@
+#!/bin/bash
+#---------------------
+# Testing heat-daemons
+#---------------------
+set -e
+DAEMONS=('heat-api' 'heat-api-cfn' 'heat-engine')
+
+for daemon in "${DAEMONS[@]}"; do
+    TIMEOUT=50
+    while [ "$TIMEOUT" -gt 0 ]; do
+        if pidof -x $daemon > /dev/null; then
+            echo "OK"
+            break
+        fi
+        TIMEOUT=$((TIMEOUT - 1))
+        sleep 0.5
+    done
+
+    if [ "$TIMEOUT" -le 0 ]; then
+        echo "ERROR: ${daemon} IS NOT RUNNING"
+        tail -n 100 /var/log/heat/*.log
+        exit 1
+    fi
+done

@@ -1,0 +1,281 @@
+#!/usr/bin/make -f
+
+# New stable upstream release TODO:
+#   s/A.B/C.D/go in debian/control.
+#   Adjust debian/changelog.
+#   Adjust "ver" variables below.
+#   Adjust debian/guile-libs.lintian.
+#   Adjust debian/.gitignore.
+#   Fix deb_alt_priority below.
+
+SHELL := /bin/bash
+
+pf := set -o pipefail
+
+# Mess to check the exit status of shell commands.  To use it, make sure
+# all shell invocations end with $(rc) to print $?, and then pass the
+# shell output through shout, which will strip off the exit status if
+# it's 0, or crash with diagnostic information if it's not.
+chop = $(wordlist 2,$(words $1),x $1)
+rc := echo " $$?"
+diesh = $(info $(call chop,$(1)))$(info exit: $(lastword $(1)))$(error ($2))
+shout = $(if $(lastword $(1)),$(if $(subst 0,,$(lastword $(1))),$(call diesh,$(1),$(2)),$(call chop,$(1))),$(call diesh,$(1),$(2)))
+
+# Make sure the build process doesn't touch the real HOME.
+export HOME := $(CURDIR)/debian/no-trespassing
+
+# Keep this in sync with guile-doc.install
+expected_info := guile.info $(foreach n,1 2 3 4 5 6 7 8 9 10,guile.info-$(n))
+
+joblimit := $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ifeq (,$(joblimit))
+  joblimit := 1
+endif
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE := 1
+
+# The version from the changelog (i.e. 2.0.3-1)
+deb_src_ver := $(shell dpkg-parsechangelog -S version; $(rc))
+deb_src_ver := $(call shout,$(deb_src_ver),dpkg-parsechangelog failed)
+
+# The Debian revision, everything after the last '-' (i.e. the 1 from 2.0.3-1)
+deb_src_rev := $(shell $(pf); echo $(deb_src_ver) | sed -e 's/.*-//'; $(rc))
+deb_src_rev := $(call shout,$(deb_src_rev),unable to get deb_src_rev)
+
+# Upstream version, everything before the last '-'.
+deb_src_ver := $(shell $(pf); echo $(deb_src_ver) | sed -e 's/-[^-]*//'; $(rc))
+deb_src_ver := $(call shout,$(deb_src_ver),unable to get deb_src_ver)
+
+deb_src_src_rev := \
+  $(shell $(pf); echo $(deb_src_ver) | sed -re 's/.*\+([0-9]+).*/\1/'; $(rc))
+deb_src_src_rev := $(call shout,$(deb_src_src_rev),unable to get deb_src_src_rev)
+
+upstream_ver := $(shell $(pf); echo $(deb_src_ver) | sed -e 's/\+.*//'; $(rc))
+upstream_ver := $(call shout,$(upstream_ver),unable to get upstream_ver)
+
+# Upstream components
+deb_src_maj_ver := $(shell $(pf); echo $(upstream_ver) | cut -d. -f 1; $(rc))
+deb_src_min_ver := $(shell $(pf); echo $(upstream_ver) | cut -d. -f 2; $(rc))
+deb_src_mic_ver := $(shell $(pf); echo $(upstream_ver) | cut -d. -f 3; $(rc))
+deb_src_maj_ver := $(call shout,$(deb_src_maj_ver),unable to get deb_src_maj_ver)
+deb_src_min_ver := $(call shout,$(deb_src_min_ver),unable to get deb_src_min_ver)
+deb_src_mic_ver := $(call shout,$(deb_src_mic_ver),unable to get deb_src_mic_ver)
+
+deb_src_eff_ver := $(deb_src_maj_ver).$(deb_src_min_ver)
+deb_pkg_basename := guile-$(deb_src_eff_ver)
+deb_guile_bin_path := /usr/bin/guile-$(deb_src_eff_ver)
+
+# this raises "invalid syntax in conditional", disable -- myon 2020-10-31
+#ifneq (ok,$(shell x='$(deb_src_min_ver)';  [ "$${#x}" -lt 4 ] && echo ok;))
+#  $(error ERROR: alternatives priority expects min version < 1000)
+#endif
+
+# Up to and including some releases of 2.0.11, this was (incorrectly)
+# majminmic (i.e. 2011 for 2.0.11), so stick with something compatible
+# until 3.0.  This approach assumes 2.0 will never reach 2.0.200, and
+# 2.2 will never have enough minor releases to overflow to 3000.
+deb_alt_priority := $(deb_src_maj_ver)$(shell echo $$(($(deb_src_min_ver) + 200)))
+
+# For 3.0, switch to this, i.e. 3.0 -> 3000, 3.1 -> 3001, 3.2 -> 3002, etc.
+#deb_alt_priority := $(deb_src_maj_ver)$(shell printf "%03d" $(deb_src_min_ver))
+
+multiarch := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH; $(rc))
+multiarch := $(call shout,$(multiarch),dpkg-architecture failed)
+ifneq ($(multiarch),)
+  march = $(multiarch)/
+else
+  march =
+endif
+
+export DEB_CFLAGS_MAINT_APPEND := \
+  -DPACKAGE_PACKAGER='"Debian"' \
+  -DPACKAGE_PACKAGER_VERSION='"$(upstream_ver)-deb+$(deb_src_src_rev)-$(deb_src_rev)"' \
+  -DPACKAGE_PACKAGER_BUG_REPORTS='"http://www.debian.org/Bugs/Reporting"'
+
+# https://debbugs.gnu.org/29464
+export DEB_CFLAGS_MAINT_APPEND += -fno-stack-protector
+
+define checkdir
+  dh_testdir debian/guile.postinst
+endef
+
+%:
+	dh $@ --parallel --with autoreconf
+
+.PHONY: check-vars
+check-vars:
+	@echo "    upstream_ver:" $(upstream_ver)
+	@echo "deb_pkg_basename:" $(deb_pkg_basename)
+	@echo "     deb_src_ver:" $(deb_src_ver)
+	@echo " deb_src_eff_ver:" $(deb_src_eff_ver)
+	@echo " deb_src_maj_ver:" $(deb_src_maj_ver)
+	@echo " deb_src_min_ver:" $(deb_src_min_ver)
+	@echo " deb_src_mic_ver:" $(deb_src_mic_ver)
+	@echo " deb_src_src_rev:" $(deb_src_src_rev)
+	@echo "     deb_src_rev:" $(deb_src_rev)
+	@echo "deb_alt_priority:" $(deb_alt_priority)
+
+# For now, assumes there are no "|" characters in the expansions.
+debian/autogen.sed: debian/rules debian/changelog
+	echo "s|@UPSTREAM_VER@|$(upstream_ver)|g" > "$@.tmp"
+	echo "s|@DEB_SRC_VER@|$(deb_src_ver)|g" >> "$@.tmp"
+	echo "s|@DEB_SRC_MAJ_VER@|$(deb_src_maj_ver)|g" >> "$@.tmp"
+	echo "s|@DEB_SRC_MIN_VER@|$(deb_src_min_ver)|g" >> "$@.tmp"
+	echo "s|@DEB_SRC_MIC_VER@|$(deb_src_mic_ver)|g" >> "$@.tmp"
+	echo "s|@DEB_SRC_EFF_VER@|$(deb_src_eff_ver)|g" >> "$@.tmp"
+	echo "s|@DEB_PKG_BASENAME@|$(deb_pkg_basename)|g" >> "$@.tmp"
+	echo "s|@DEB_ALT_PRIORITY@|$(deb_alt_priority)|g" >> "$@.tmp"
+	echo "s|@MARCH@|$(march)|g" >> "$@.tmp"
+	mv "$@.tmp" "$@"
+
+autogen_install_files := $(addprefix debian/, \
+  guile-$(deb_src_eff_ver).install \
+  guile-$(deb_src_eff_ver).links \
+  guile-$(deb_src_eff_ver).menu \
+  guile-$(deb_src_eff_ver).undocumented \
+  guile-$(deb_src_eff_ver)-dev.install \
+  guile-$(deb_src_eff_ver)-doc.README.Debian \
+  guile-$(deb_src_eff_ver)-doc.install \
+  guile-$(deb_src_eff_ver)-libs.install \
+  guile-$(deb_src_eff_ver)-libs.lintian-overrides)
+
+autogen_installdeb_files := $(addprefix debian/, \
+  guile-$(deb_src_eff_ver).postinst \
+  guile-$(deb_src_eff_ver).prerm \
+  guile-$(deb_src_eff_ver)-dev.postinst \
+  guile-$(deb_src_eff_ver)-dev.prerm \
+  guile-$(deb_src_eff_ver)-doc.postinst \
+  guile-$(deb_src_eff_ver)-doc.prerm \
+  guile-$(deb_src_eff_ver)-libs.postinst \
+  guile-$(deb_src_eff_ver)-libs.prerm \
+  guile-$(deb_src_eff_ver)-libs.triggers)
+
+debian/guile-$(deb_src_eff_ver).%: debian/guile.% debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
+debian/guile-$(deb_src_eff_ver)-dev.%: debian/guile-dev.% debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
+debian/guile-$(deb_src_eff_ver)-doc.%: debian/guile-doc.% debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
+debian/guile-$(deb_src_eff_ver)-libs.%: debian/guile-libs.% debian/autogen.sed
+	sed -f debian/autogen.sed "$<" > "$@.tmp"
+	mv "$@.tmp" "$@"
+
+debian/guile-$(deb_src_eff_ver)-doc.postinst:
+	DEB_PKG_BASENAME="$(deb_pkg_basename)" \
+	DEB_INFO_SUBDIR="$(deb_pkg_basename)" \
+	DEB_ALT_PRIORITY="$(deb_alt_priority)" \
+	  debian/guile-doc.postinst.gen $(addprefix doc/ref/,$(expected_info)) \
+	    > "$@".tmp
+	mv "$@.tmp" "$@"
+
+override_dh_testdir:
+	$(checkdir)
+
+override_dh_autoreconf:
+	echo '$(upstream_ver)' > .version
+	cp -a .version .tarball-version
+	dh_autoreconf ./autogen.sh
+
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-error-on-warning --disable-rpath \
+	  --program-suffix "-$(deb_src_eff_ver)"
+
+# Because some of the bootstrapping files compile for a very long time
+# with no output, the buildds don't have per-package limits, and we
+# don't want to raise the global limit that high for the slower
+# architectures.
+override_dh_auto_build:
+	timeout 10h bash \
+	  -c 'while true; do echo "still going" 1>&2; sleep 600; done' & \
+	trap "kill $$!" EXIT \
+	&& $(MAKE) -j "$(joblimit)"
+
+override_dh_auto_test:
+ifneq (,$(filter $(DEB_HOST_ARCH), armhf i386 hurd-i386 kfreebsd-amd64 kfreebsd-i386 powerpc ppc64el sparc64))
+	-dh_auto_test
+else
+	dh_auto_test
+endif
+
+override_dh_auto_clean:
+        # If Makefile doesn't exist GNUmakefile will abort on distclean.
+	if test -e Makefile; then make distclean; fi
+
+override_dh_clean:
+	-$(MAKE) -C prebuilt clean
+	dh_clean $(autogen_install_files) $(autogen_installdeb_files) \
+	  .tarball-version \
+	  .version \
+	  blarg-clean \
+	  bootstrap/ice-9/ \
+	  bootstrap/language/ \
+	  bootstrap/srfi/ \
+	  bootstrap/system/ \
+	  debian/autogen.sed \
+	  doc/r5rs/r5rs.info \
+	  doc/ref/autoconf-macros.texi \
+	  doc/ref/effective-version.texi \
+	  doc/ref/guile.info \
+	  doc/ref/guile.info-1 \
+	  doc/ref/guile.info-10 \
+	  doc/ref/guile.info-2 \
+	  doc/ref/guile.info-3 \
+	  doc/ref/guile.info-4 \
+	  doc/ref/guile.info-5 \
+	  doc/ref/guile.info-6 \
+	  doc/ref/guile.info-7 \
+	  doc/ref/guile.info-8 \
+	  doc/ref/guile.info-9 \
+	  doc/ref/stamp-vti \
+	  doc/ref/version.texi \
+	  filesys-test-link.tmp \
+	  guile-procedures.txt \
+	  libguile/c-tokenize.c \
+	  libguile/cpp-E.c \
+	  libguile/cpp-SIG.c \
+	  libguile/vm-operations.h
+
+# Info pages are installed to /usr/share/info/guile-X.Y/ via
+# guile-doc.install, and handled via update-alternatives.
+override_dh_installinfo:
+	true
+
+override_dh_auto_install: $(autogen_install_files)
+	make DESTDIR="$$(pwd)/debian/tmp" INSTALL='install -p' install
+	rm -f debian/tmp/usr/lib/$(march)libguile*.la
+
+gdb_ext := \
+  debian/$(deb_pkg_basename)-libs/usr/lib/$(march)libguile-$(deb_src_eff_ver).so*-gdb.scm
+gdb_ext_dir := debian/$(deb_pkg_basename)-dev/usr/share/gdb/auto-load
+
+override_dh_install-arch: $(autogen_install_files)
+	cd debian/tmp/usr/bin && mv -i guile-$(deb_src_eff_ver) guile
+	cd debian/tmp/usr/share/aclocal && mv -i guile.m4 guile-$(deb_src_eff_ver).m4
+	dh_install -a
+	dh_missing -a --fail-missing \
+	  -Xusr/lib/$(march)guile/$(deb_src_eff_ver)/extensions/guile-readline.a \
+	  -Xusr/lib/$(march)guile/$(deb_src_eff_ver)/extensions/guile-readline.la
+	test -e $(gdb_ext)
+	mkdir -p $(gdb_ext_dir)
+	mv $(gdb_ext) $(gdb_ext_dir)
+
+override_dh_install-indep: $(autogen_install_files)
+        # Glob should match the one in debian/guile-doc.install
+	test "$(sort $(expected_info))" = \
+	  "$(sort $(shell cd debian/tmp/usr/share/info && ls guile.info*))"
+	dh_install -i
+	dh_missing -i --fail-missing \
+	  -Xusr/bin/guile-$(deb_src_eff_ver) \
+	  -Xusr/share/info/dir \
+	  -Xusr/share/info/r5rs.info \
+	  -Xusr/lib/$(march)guile/$(deb_src_eff_ver)/extensions/guile-readline.a \
+	  -Xusr/lib/$(march)guile/$(deb_src_eff_ver)/extensions/guile-readline.la \
+	  -Xusr/share/aclocal/guile.m4
+	test ! -e debian/guile-$(deb_src_eff_ver)-doc/usr/share/info/dir
+
+override_dh_installdeb: $(autogen_installdeb_files)
+	dh_installdeb

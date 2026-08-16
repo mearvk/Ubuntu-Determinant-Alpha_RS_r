@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Expects the full list of uncompressed info files, including guile.info
+
+set -ueo pipefail
+
+
+
+if test $# -lt 1; then
+    echo "Usage: $(basename "$0"): primary [secondary ...]" 1>&2
+    exit 1
+fi
+
+primary="$(basename $1)"
+shift
+
+cat <<EOF
+#!/bin/sh
+
+set -e
+
+if [ "\$1" != upgrade ] ; then
+    update-alternatives \\
+EOF
+printf -- '        --install /usr/share/info/%q.gz \\\n' "$primary"
+printf -- '        %q.gz \\\n' "$primary"
+printf -- '        /usr/share/info/%q/guile.info.gz \\\n' "$DEB_INFO_SUBDIR"
+printf -- '        %q \\\n' "$DEB_ALT_PRIORITY"
+
+first=true
+for f in "$@"; do
+  if [[ $f =~ guile.info$ ]]; then
+      continue
+  fi
+  if test $first; then
+      first=''
+      echo -ne '        '
+  else
+    echo -ne ' \\\n        '
+  fi
+  name="$(basename "$f" .gz)"
+  printf -- '--slave /usr/share/info/%q.gz %q.gz \\\n' "$name" "$name"
+  echo -n "        "
+  printf -- '        /usr/share/info/%q/%q.gz' "$DEB_INFO_SUBDIR" "$name"
+done
+
+cat <<EOF
+
+fi
+
+#DEBHELPER#
+EOF

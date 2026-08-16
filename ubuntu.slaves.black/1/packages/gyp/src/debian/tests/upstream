@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+pyvers=$(py3versions -r 2>/dev/null)
+
+cp -a gyptest.py test "$AUTOPKGTEST_TMP"
+cd "$AUTOPKGTEST_TMP"
+
+: removing/skipping non-deterministic tests that rely on ordering in serialization of Python objects
+rm -f test/variables/commands/gyptest-commands-ignore-env.py
+rm -f test/variables/commands/gyptest-commands-repeated.py
+rm -f test/variables/commands/gyptest-commands.py
+rm -f test/variables/filelist/gyptest-filelist-golden.py
+
+PATH="$AUTOPKGTEST_TMP/bin:$PATH"
+export PATH
+
+for py in $pyvers; do
+    mkdir -p "$AUTOPKGTEST_TMP/bin"
+    ln -s "$(command -v $py)" "$AUTOPKGTEST_TMP/bin/python"
+    command -v python
+    printf '#!/bin/sh\nset -e\n%s /usr/bin/gyp "$@"\n' "$py" > "$AUTOPKGTEST_TMP/gyp.sh"
+    chmod +x "$AUTOPKGTEST_TMP/gyp.sh"
+    TESTCMD_VERBOSE=1 PRESERVE_FAIL=1 TESTGYP_GYP="$AUTOPKGTEST_TMP/gyp.sh" python gyptest.py --verbose --all
+    rm -rf bin out gyp.sh
+done

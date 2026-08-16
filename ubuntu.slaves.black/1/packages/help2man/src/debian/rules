@@ -1,0 +1,88 @@
+#!/usr/bin/make -f
+
+# Debian build rules for help2man.
+
+# Copyright (C) 2012, 2014, 2017, 2018, 2021 Free Software Foundation, Inc.
+
+# Copying and distribution of this file, with or without modification,
+# are permitted in any medium without royalty provided the copyright
+# notice and this notice are preserved.  This file is offered as-is,
+# without any warranty.
+
+# Written by Brendan O'Dea <bod@debian.org>
+
+SHELL = /bin/bash
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+execute_before_dh_clean: check-maint-prep  # maintainer sanity check
+
+override_dh_auto_configure:
+	dh_auto_configure -- --libdir=\$$\{prefix\}/lib  # omit arch from libdir
+
+execute_after_dh_auto_build:
+	$(MAKE) help2man.h2m  # for examples
+
+.PHONY: execute_before_dh_clean override_dh_auto_configure
+.PHONY: execute_after_dh_auto_build
+
+# Maintainer pre-release setup.  Intended to be run from a copy of the
+# contents of the git repository, excluding the .git subdir.  E.g. something
+# like this:
+#
+#  set -e
+#  version=$(./help2man.PL --version)
+#  mkdir ../help2man-$version
+#  find -name .git -prune -o -print | cpio -vdump ../help2man-$version
+#  cd ../help2man-$version
+#  debian/rules maint-prep
+#
+# should result in a directory which is ready to be archived for release.
+AM_DOC = COPYING INSTALL
+AM_AUX = install-sh missing mkinstalldirs
+AM_DIR = $(shell ls -d /usr/share/automake* 2>/dev/null | tail -1)
+PKG_VERSION = $(shell ./help2man.PL --version)
+include /usr/share/dpkg/pkg-info.mk  # DEB_VERSION
+maint-prep:
+	test -n $(AM_DIR)
+	test $(DEB_VERSION) = $(PKG_VERSION)  # mismatch b/w $$version in help2man.PL and changelog
+	cp $(addprefix $(AM_DIR)/,$(AM_DOC)) .
+	cp $(addprefix $(AM_DIR)/,$(AM_AUX)) build-aux
+	(eval `sed -n 's/^Vcs-\([^:]*\): /VCS_\U\1=/p' debian/control`; \
+	 echo "		README for GNU help2man version $(PKG_VERSION)"; \
+	 echo; \
+	 echo "help2man is a script to create simple man pages from the --help and"; \
+	 echo "--version output of programs."; \
+	 echo ""; \
+	 echo "Since most GNU documentation is now in info format, this provides a"; \
+	 echo "way to generate a placeholder man page pointing to that resource while"; \
+	 echo "still providing some useful information."; \
+	 echo ""; \
+	 echo "  Home page:    https://www.gnu.org/software/help2man/"; \
+	 echo "  Distribution: https://ftp.gnu.org/gnu/help2man/help2man-$(PKG_VERSION).tar.xz"; \
+	 echo "  Repository:   $$VCS_GIT"; \
+	 echo ""; \
+	 echo "-- "; \
+	 echo "Brendan O'Dea <bod@debian.org>") >README
+	ln -sf debian/changelog ChangeLog
+	autoconf
+	./configure
+	$(MAKE) update-po all distclean
+
+# Simple sanity check that the above rule has been run prior to release (run
+# as part of the "clean" rule, which is the first thing run when building a
+# debian package).
+check-maint-prep:
+	test -x configure  # autoconf has been run
+	[[ $(DEB_VERSION) = *+b[0-9]* ]] ||  # this is a bin-NMU, or... \
+	grep -qF 'help2man-$(DEB_VERSION).tar' README  # exists and up to date
+
+maint-clean: maint-prep
+	./configure
+	$(MAKE) maintainer-clean
+	rm -f README ChangeLog $(AM_DOC) $(addprefix build-aux/,$(AM_AUX))
+
+.PHONY: maint-prep check-maint-prep maint-clean

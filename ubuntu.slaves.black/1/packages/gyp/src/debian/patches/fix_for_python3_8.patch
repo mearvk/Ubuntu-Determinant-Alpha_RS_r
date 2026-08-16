@@ -1,0 +1,47 @@
+From: Mitsuya Shibata <mty.shibata@gmail.com>
+Date: Tue, 21 Sep 2021 10:19:08 +0000
+Subject: fix "is" with a literal warning
+
+Forwarded: not-needed
+Reviewed-By: Xavier Guimard <yadd@debian.org>
+Last-Update: 2020-11-07
+---
+ pylib/gyp/generator/cmake.py | 4 ++--
+ pylib/gyp/input.py           | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/pylib/gyp/generator/cmake.py b/pylib/gyp/generator/cmake.py
+index 4a2041c..1666d3e 100644
+--- a/pylib/gyp/generator/cmake.py
++++ b/pylib/gyp/generator/cmake.py
+@@ -41,7 +41,7 @@ import gyp.xcode_emulation
+ try:
+   # maketrans moved to str in python3.
+   _maketrans = string.maketrans
+-except NameError:
++except AttributeError:
+   _maketrans = str.maketrans
+ 
+ generator_default_variables = {
+@@ -987,7 +987,7 @@ def WriteTarget(namer, qualified_target, target_dicts, build_dir, config_to_use,
+ 
+     # XCode settings
+     xcode_settings = config.get('xcode_settings', {})
+-    for xcode_setting, xcode_value in xcode_settings.viewitems():
++    for xcode_setting, xcode_value in xcode_settings.items():
+       SetTargetProperty(output, cmake_target_name,
+                         "XCODE_ATTRIBUTE_%s" % xcode_setting, xcode_value,
+                         '' if isinstance(xcode_value, str) else ' ')
+diff --git a/pylib/gyp/input.py b/pylib/gyp/input.py
+index 4c12891..2bea334 100644
+--- a/pylib/gyp/input.py
++++ b/pylib/gyp/input.py
+@@ -1183,7 +1183,7 @@ def LoadVariablesFromVariablesDict(variables, the_dict, the_dict_key):
+       if variable_name in variables:
+         # If the variable is already set, don't set it.
+         continue
+-      if the_dict_key is 'variables' and variable_name in the_dict:
++      if the_dict_key == 'variables' and variable_name in the_dict:
+         # If the variable is set without a % in the_dict, and the_dict is a
+         # variables dict (making |variables| a varaibles sub-dict of a
+         # variables dict), use the_dict's definition.
