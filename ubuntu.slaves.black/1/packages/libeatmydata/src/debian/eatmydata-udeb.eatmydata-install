@@ -1,0 +1,67 @@
+#!/bin/sh
+# Speed up package installation by disabling all file system flushing
+# when dpkg is executed.  If something go wrong on first time
+# installation, try again.  This override is put in place
+# post-base-installer.d and pre-pkgsel.d and undone in
+# finish-install.d.  See also bug #613428 and #765527.
+
+set -e
+
+log() { logger -t eatmydata-udeb/eatmydata-install "$@"; }
+info() { log  "info: $@"; }
+warning() { log  "warning: $@"; }
+error() { log  "error: $@"; }
+
+at_exit() {
+    error "script $0 terminated unexpectedly."
+}
+disable_exception() { trap - INT TERM EXIT; }
+trap at_exit INT TERM EXIT
+
+enable_override() {
+    apt-install eatmydata || true
+    if [ -x /target/usr/bin/eatmydata ] ; then
+      if [ ! -f /target/etc/apt/apt.conf.d/95install-dpkg-eatmydata ]; then
+        info "Adding apt config to call dpkg via eatmydata"
+        printf "#!/bin/sh\nexec eatmydata dpkg \"\$@\"\n" \
+            > /target/var/tmp/dpkg-eatmydata-wrapper
+        chmod 755 /target/var/tmp/dpkg-eatmydata-wrapper
+        cat > /target/etc/apt/apt.conf.d/95install-dpkg-eatmydata <<EOF
+Dir::Bin::dpkg "/var/tmp/dpkg-eatmydata-wrapper";
+EOF
+      else
+	    info "apt redirect for eatmydata already in place"
+      fi
+    else
+        error "unable to find /usr/bin/eatmydata after installing the eatmydata package"
+    fi
+}
+
+disable_override() {
+    for override in \
+	/etc/apt/apt.conf.d/95install-dpkg-eatmydata \
+	/var/tmp/dpkg-eatmydata-wrapper ; do
+	info "Removing apt config to use eatmydata when running dpkg."
+	if [ -f /target$override ] ; then
+            rm -f /target$override
+	else
+            warning "missing /target$override"
+	fi
+    done
+    sync # Flush file buffers before continuing
+}
+
+case "$1" in
+    enable)
+        enable_override
+        ;;
+    disable)
+        disable_override
+        ;;
+    *)
+        error "invalid argument $1"
+        ;;
+
+esac
+
+disable_exception

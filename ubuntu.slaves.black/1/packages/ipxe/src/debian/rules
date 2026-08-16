@@ -1,0 +1,73 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/default.mk
+
+export ISOLINUX_BIN=/usr/lib/syslinux/
+
+VERSION := $(shell dpkg-parsechangelog | sed -ne 's,^Version: *\(.*\)$$,\1,p')
+
+%:
+	+dh $@
+
+override_dh_auto_configure:
+	cp debian/config/* src/config/local
+
+# qemu EFI roms shall be built with CONFIG=qemu
+# This will make it select src/config/qemu/* as config base
+# and set -DCONFIG=qemu -DLOCAL_CONFIG=qemu
+src/bin-i386-pcbios/%.rom src/bin-x86_64-efi/%.efirom: export CONFIG=qemu
+# qemu EFI roms are built without HTTPS, EFI does that on its own (and better)
+src/bin-x86_64-efi/%.efirom: export NOHTTPS=true
+
+# Note: d/rules Makefile logic can't differentiate src/bin-arm64-efi/ipxe.efi
+# from src/bin-x86_64-efi/ipxe.efi which makes these steps more complex and
+# ugly than they should be.
+src/bin-i386-pcbios/% src/bin-x86_64-efi/% src/bin-arm64-efi/%.efi:
+	# clean and reconfigure if either NOHTTPS or CONFIG=qemu switches
+	if [ "config:$(CONFIG)nohttps:$(NOHTTPS)" != "$(shell cat debian/last-used-config 2>/dev/null)" ]; then \
+	    if [ "$(NOHTTPS)" = "true" ]; then \
+	        cp -v debian/config/* src/config/local; \
+	    else \
+	        echo "#define DOWNLOAD_PROTO_HTTPS" >> src/config/local/general.h; \
+	    fi; \
+	   echo -n "config:$(CONFIG)" > debian/last-used-config; \
+	   echo -n "nohttps:$(NOHTTPS)" >> debian/last-used-config; \
+	fi; \
+	if [ "$@" = "src/bin-arm64-efi/ipxe-arm64.efi" ]; then \
+		export CROSS=aarch64-linux-gnu-; \
+		export CC=aarch64-linux-gnu-gcc; \
+		dh_auto_build --sourcedirectory=src -- V=1 NO_WERROR=1 VERSION="$(VERSION)" bin-arm64-efi/ipxe.efi; \
+		mv src/bin-arm64-efi/ipxe.efi src/bin-arm64-efi/ipxe-arm64.efi; \
+	else \
+		dh_auto_build --sourcedirectory=src -- V=1 NO_WERROR=1 VERSION="$(VERSION)" $(subst src/,,$@); \
+	fi; \
+
+src/bin-combined/%.efirom: src/bin-i386-pcbios/%.rom src/bin-x86_64-efi/%.efirom
+	@[ -d $(dir $@) ] || mkdir $(dir $@)
+	src/util/catrom.pl $^ > $@
+	# efi roms are >256k since Bionic due to https + natural growth
+	# stay at 256k-512k after disabling https in efi via padding
+	src/util/padimg.pl --blksize=524288 --byte=0xff --verbose $@
+
+src/bin-combined/%.iso: src/bin-i386-pcbios/%.lkrn src/bin-x86_64-efi/%.efi
+	@[ -d $(dir $@) ] || mkdir $(dir $@)
+	debian/util/geniso $@ $^
+
+override_dh_auto_build: $(shell grep -hoE 'src/bin(-[^/]*)?/\S+' debian/*.install)
+
+override_dh_install:
+	dh_install
+	debian/util/check-rom-sizes
+
+override_dh_auto_clean:
+	$(MAKE) -C src veryclean
+	rm -f debian/last-used-config
+	rm -fr src/bin*
+	rm -fr src/config/local/*
+
+.NOTPARALLEL:
+.SECONDARY:

@@ -1,0 +1,143 @@
+From: Ladi Prosek <lprosek@redhat.com>
+Subject: Strip 802.1Q VLAN 0 priority tags
+ iPXE was unable to receive priority tagged packets specified in
+ the 802.1Q standard and supported by all major networking stacks.
+
+ This commit adds a new function net_pull_tags which is called by
+ all consumers of incoming packets after stripping their link-layer
+ headers.
+
+ Update 2021:
+ Upstream made the vlan_find function that is used here static in
+  https://github.com/ipxe/ipxe/commit/fe680c8228563369804948010954128aacb7db74
+ We have to un-do this part of the change to be able to further use it from
+ where it is needed for this functionality.
+
+Origin: vendor, https://git.centos.org/blob/rpms!ipxe.git/c7/SOURCES!0009-Strip-802.1Q-VLAN-0-priority-tags.patch
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1805920
+Last-Update: 2021-05-03
+
+--- a/src/arch/x86/interface/pxe/pxe_undi.c
++++ b/src/arch/x86/interface/pxe/pxe_undi.c
+@@ -976,6 +976,12 @@ static PXENV_EXIT_t pxenv_undi_isr ( str
+ 		}
+ 		ll_hlen = ( len - iob_len ( iobuf ) );
+ 
++		/* Strip link-layer-independent headers */
++		if ( ( rc = net_pull_tags ( iobuf, pxe_netdev, &net_proto ) ) != 0 ) {
++			/* Assume unknown net_proto */
++			net_proto = 0;
++		}
++
+ 		/* Determine network-layer protocol */
+ 		switch ( net_proto ) {
+ 		case htons ( ETH_P_IP ):
+--- a/src/include/ipxe/netdevice.h
++++ b/src/include/ipxe/netdevice.h
+@@ -738,6 +738,8 @@ extern int net_tx ( struct io_buffer *io
+ extern int net_rx ( struct io_buffer *iobuf, struct net_device *netdev,
+ 		    uint16_t net_proto, const void *ll_dest,
+ 		    const void *ll_source, unsigned int flags );
++extern int net_pull_tags ( struct io_buffer *iobuf, struct net_device *netdev,
++			   uint16_t *net_proto );
+ extern void net_poll ( void );
+ extern struct net_device_configurator *
+ find_netdev_configurator ( const char *name );
+--- a/src/interface/efi/efi_snp.c
++++ b/src/interface/efi/efi_snp.c
+@@ -816,6 +816,13 @@ efi_snp_receive ( EFI_SIMPLE_NETWORK_PRO
+ 		goto out_bad_ll_header;
+ 	}
+ 
++	/* Strip link-layer-independent headers */
++	if ( ( rc = net_pull_tags ( iobuf, snpdev->netdev, &iob_net_proto ) ) ) {
++		DBGC ( snpdev, "SNPDEV %p could not parse tags: %s\n",
++			snpdev, strerror ( rc ) );
++		goto out_bad_ll_header;
++	}
++
+ 	/* Return link-layer header parameters to caller, if required */
+ 	if ( ll_header_len )
+ 		*ll_header_len = ll_protocol->ll_header_len;
+--- a/src/net/netdevice.c
++++ b/src/net/netdevice.c
+@@ -1099,6 +1099,44 @@ int net_rx ( struct io_buffer *iobuf, st
+ }
+ 
+ /**
++ * Strip extra link-layer-independent tags from a received packet
++ *
++ * @v iobuf        I/O buffer
++ * @v netdev        Network device
++ * @v net_proto        Network-layer protocol, in network-byte order
++ * @ret rc        Return status code
++ *
++ * This function should be called after stripping link-layer headers but
++ * before inspecting the network-layer protocol.
++ */
++int net_pull_tags ( struct io_buffer *iobuf, struct net_device *netdev,
++            uint16_t *net_proto ) {
++    struct vlan_header *vlanhdr;
++    uint16_t tag;
++
++    /* Strip 802.1Q VLAN 0 priority tags if present */
++    while ( *net_proto == htons ( ETH_P_8021Q ) ) {
++        if ( iob_len ( iobuf ) < sizeof ( *vlanhdr ) ) {
++            DBG ( "VLAN header too short at %zd bytes (min %zd bytes)\n",
++                  iob_len ( iobuf ), sizeof ( *vlanhdr ) );
++            return -EINVAL;
++        }
++        vlanhdr = ( struct vlan_header * ) iobuf->data;
++        tag = VLAN_TAG ( ntohs ( vlanhdr->tci ) );
++
++        if ( tag == 0 && ! vlan_find ( netdev, tag ) ) {
++            /* VLAN 0, strip and continue */
++            *net_proto = vlanhdr->net_proto;
++            iob_pull ( iobuf, sizeof ( *vlanhdr ) );
++        } else {
++            /* Real VLAN tag, leave it alone */
++            break;
++        }
++    }
++    return 0;
++}
++
++/**
+  * Poll the network stack
+  *
+  * This polls all interfaces for received packets, and processes
+@@ -1148,6 +1186,12 @@ void net_poll ( void ) {
+ 				free_iob ( iobuf );
+ 				continue;
+ 			}
++
++			/* Remove link-layer-independent headers */
++			if ( ( rc = net_pull_tags ( iobuf, netdev, &net_proto ) ) ) {
++				free_iob ( iobuf );
++				continue;
++			}
+ 
+ 			/* Hand packet to network layer */
+ 			if ( ( rc = net_rx ( iob_disown ( iobuf ), netdev,
+--- a/src/include/ipxe/vlan.h
++++ b/src/include/ipxe/vlan.h
+@@ -61,6 +61,8 @@ struct vlan_header {
+  */
+ #define VLAN_PRIORITY_IS_VALID( priority ) ( (priority) <= 7 )
+ 
++extern struct net_device * vlan_find ( struct net_device *trunk,
++                                      unsigned int tag );
+ extern unsigned int vlan_tag ( struct net_device *netdev );
+ extern int vlan_can_be_trunk ( struct net_device *trunk );
+ extern int vlan_create ( struct net_device *trunk, unsigned int tag,
+--- a/src/net/vlan.c
++++ b/src/net/vlan.c
+@@ -199,7 +199,7 @@ static void vlan_sync ( struct net_devic
+  * @v tag		VLAN tag
+  * @ret netdev		VLAN device, if any
+  */
+-static struct net_device * vlan_find ( struct net_device *trunk,
++struct net_device * vlan_find ( struct net_device *trunk,
+ 				       unsigned int tag ) {
+ 	struct net_device *netdev;
+ 	struct vlan_device *vlan;

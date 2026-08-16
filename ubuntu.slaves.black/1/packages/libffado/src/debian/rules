@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+export DEB_CFLAGS_MAINT_APPEND=-fPIC
+
+include /usr/share/dpkg/architecture.mk
+
+FLAGS= \
+			CUSTOM_ENV=True \
+			PREFIX=/usr \
+			DESTDIR=$(CURDIR)/debian/tmp \
+			LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) \
+			SHAREDIR=/usr/share/libffado2/ \
+			MANDIR=/usr/share/man/ \
+			PYPKGDIR=/usr/share/ffado-mixer-qt4/ \
+			PYTHON_INTERPRETER=/usr/bin/python3 \
+			WILL_DEAL_WITH_XDG_MYSELF=1 \
+			DETECT_USERSPACE_ENV=0 \
+			ENABLE_OPTIMIZATION=no \
+			DEBUG=0
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	scons $(FLAGS) $(patsubst parallel=%,-j%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+
+override_dh_auto_install:
+	scons $(FLAGS) install
+
+override_dh_auto_clean:
+	scons $(FLAGS) --clean
+	rm -rf cache
+	rm -f .sconsign.dblite
+	find . -name "*.pyc" -delete

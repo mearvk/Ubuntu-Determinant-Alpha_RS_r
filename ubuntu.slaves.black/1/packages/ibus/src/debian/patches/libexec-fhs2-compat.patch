@@ -1,0 +1,28 @@
+Description: compatibility with FHS 2.x built ibus engine packages
+ When an IBus engine setup command is not specified in its engine XML,
+ ibus-setup searches ${libexecdir}/ibus-setup-<COMPONENTNAME> as fallback. A
+ few ibus engine packages depend on this.
+ .
+ With this patch, ibus-setup first searches ${libexecdir}, and then it
+ searches /usr/lib/ibus/ the last fallback. So ibus doesn't break old FHS 2.x
+ built ibus engine packages which install their executables in /usr/lib/ibus.
+Author: Changwoo Ryu <cwryu@debian.org>
+Forwarded: not-needed
+Last-Update: 2020-03-18
+
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -439,6 +439,13 @@
+         if path.exists(setup_path):
+             args.append(setup_path)
+             args.append(path.basename(setup_path))
++        else:
++            # For compatibility while doing transition to FHS 3.0
++            setup_path = '/usr/lib/ibus/' + 'ibus-setup-' + name.split(':')[0]
++            if path.exists(setup_path):
++                print("Warning: Using old FHS 2.x path %s" % setup_path, file=sys.stderr)
++                args.append(setup_path)
++                args.append(path.basename(setup_path))
+         return args
+ 
+     def __treeview_notify_cb(self, treeview, prop):

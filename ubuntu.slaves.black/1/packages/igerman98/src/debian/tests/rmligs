@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Test rmligs
+#
+# (c) 2018 Roland Rosenfeld <roland@debian.org>
+
+TESTSDIR=$(dirname $0)
+
+if [ -z "$AUTOPKGTEST_TMP" ]; then
+    AUTOPKGTEST_TMP=$(mktemp -d)
+fi
+
+trap "rm -rf $AUTOPKGTEST_TMP" EXIT
+
+cd $AUTOPKGTEST_TMP
+
+cat <<EOF > pipefile
+Ablauf|folge
+auf|fahren
+Auf|fanglager
+auf|fräßet
+auf|flöge
+Wiederauf|führung
+übertarif|lich
+verkäuf|liche
+Affe
+EOF
+
+sed 's/|//g' < pipefile > input.tex
+sed 's/|/"|/g' < pipefile > soll.tex
+rmligs-german -f < input.tex > output.tex
+
+if diff soll.tex output.tex > diff.out
+then
+    exit 0
+else
+    echo "following words seem to be wrong after rmligs-german:"
+    grep -a '^>' diff.out
+    exit 1
+fi

@@ -1,0 +1,83 @@
+.TH eatmydata 1 "November 2014"
+.SH NAME
+eatmydata \- transparently disable fsync() and other data-to-disk synchronization calls
+.SH SYNOPSIS
+.B eatmydata
+[--] \fIcommand\fR [ \fIcommand arguments\fR ... ]
+.SH DESCRIPTION
+\fBeatmydata\fR runs a command in the environment where data-to-disk
+synchronization calls (like fsync(), fdatasync(), sync(), msync() and open()
+O_SYNC / O_DSYNC flags) have no effect. LD_PRELOAD library \fBlibeatmydata\fR
+overrides respective C library calls with custom functions that don't trigger
+synchronization but return success nevertheless.
+.P
+You may use \fBeatmydata\fR in two ways. In normal mode, just execute
+\fBeatmydata\fR directly and pass a command\-to\-be\-run and its arguments via
+command line. In order to use symlink mode, create a symlink to
+\fI/usr/bin/eatmydata\fR with the filename (a.k.a basename) of another program
+in the PATH and execute \fBeatmydata\fR via that symlink. Then \fBeatmydata\fR
+will find that program in the PATH and run it in the libeatmydata environment
+repassing all command line options.
+.SH OPTIONS
+.P
+Please note that \fBeatmydata\fR does not process any command line options in
+symlink mode. All command line options will be repassed to the underlying
+executable as-is.
+.TP
+.I command
+The command to execute. It may be either a full path or the name of the command
+in PATH. In case command cannot be found in PATH, \fBeatmydata\fR will fail.
+.TP
+.I command arguments
+Arbitrary number of arguments to pass to the command being executed.
+.TP
+--
+Optional command separator for compatibility with similar utilities. Ignored at
+the moment.
+.SH EXAMPLES
+.P
+Given PATH is /usr/bin and both /usr/bin/aptitude and /usr/bin/eatmydata are
+installed, the following:
+.P
+.nf
+    $ ln \-s /usr/bin/eatmydata ./aptitude
+    $ ./aptitude moo
+.fi
+.P
+is equivalent to:
+.P
+.nf
+    $ eatmydata \-\- aptitude moo
+.fi
+.P
+Therefore, you may use symlink mode to automatically run specific programs in
+the libeatmydata environment whenever you run them from PATH. For example,
+given standard PATH settings, just do:
+.P
+.nf
+    # ln \-s /usr/bin/eatmydata /usr/local/bin/aptitude
+.fi
+.P
+and enjoy sync\-free aptitude system-wide.
+.SH CAVEAT
+.P
+When using \fBeatmydata\fR with \fBsetarch\fR (including alias such as
+\fBlinux32\fR), or anyway with chroots with a different architectures than the
+host's, make sure to install the matching architecture of
+\fBlibeatmydata1\fR both in the \fBsetarch\fR environment and host's.
+.P
+Trying to load libeatmydata manually (without using the wrapper script) and
+using it through a chroot, especially if the eatmydata version differ between
+outside and inside, is probably going to fail do the different position of the
+library on the file system.
+.br
+The safest way to manually load libeatmydata is by setting the following two
+environment variables (shell syntax):
+.P
+.nf
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH:+"$LD_LIBRARY_PATH:"}/usr/lib/libeatmydata
+    LD_PRELOAD=${LD_PRELOAD:+"$LD_PRELOAD "}libeatmydata.so
+.fi
+.P
+These two variables accounts the case of a Debian Jessie host with a Debian
+Wheezy chroot, where the position of the library changed.

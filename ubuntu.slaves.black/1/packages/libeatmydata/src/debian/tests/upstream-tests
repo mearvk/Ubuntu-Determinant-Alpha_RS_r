@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# Copyright (c) 2015 Mattia Rizzolo <mattia@mapreri.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# .
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# .
+# On Debian systems, the full text of the GNU General Public License
+# version 3 can be found in file '/usr/share/common-licenses/GPL-3'.
+
+set -e
+
+cleanup() {
+    echo "Deleting $AUTOPKGTEST_TMP"
+    rm -r "$AUTOPKGTEST_TMP"
+}
+
+#set -x
+
+if [ -z "$AUTOPKGTEST_TMP" ] ; then
+    AUTOPKGTEST_TMP=$(mktemp -d)
+    trap cleanup EXIT
+fi
+
+
+echo
+echo "############### Autoconfiguring..."
+export DH_VERBOSE=1
+debian/rules clean 2>&1
+dh_update_autotools_config 2>&1
+dh_autoreconf 2>&1
+dh_auto_configure 2>&1
+
+echo
+echo "############### Coping the tests sources..."
+mkdir -pv "$AUTOPKGTEST_TMP"/libeatmydata
+cp -v config.h libeatmydata/test/* "$AUTOPKGTEST_TMP"/
+cp -v libeatmydata/portability.h "$AUTOPKGTEST_TMP"/libeatmydata/
+
+echo
+echo "############### Cleaning up the sources..."
+debian/rules clean 2>&1
+
+pushd "$AUTOPKGTEST_TMP"
+
+echo
+echo "############### Compiling..."
+while IFS= read -r -d '' file; do
+    printf "\t%s -> %s\n" "$file" "${file%.c}"
+    gcc -g -pthread -I. -o "${file%.c}" "$file" 2>&1
+done <   <(find . -type f ! -executable -name '*.c' -print0)
+
+echo
+echo "############### Running..."
+result=0
+while IFS= read -r -d '' file; do
+    printf "\t%s\n" "$file"
+    eatmydata strace -o "${file}.result" "$file"
+    if grep -q '^[a-z]*sync\|O_SYNC' "${file}.result" ; then
+        >&2 echo "test $file failed"
+        result=1
+    fi
+done < <(find . -type f -executable ! -name '*.c' -print0)
+
+popd
+
+echo
+echo
+echo
+echo "############### Test completed: exit: $result"
+echo
+
+exit "$result"
+

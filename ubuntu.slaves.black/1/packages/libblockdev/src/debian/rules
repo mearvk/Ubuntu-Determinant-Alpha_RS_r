@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-z,defs -Wl,--as-needed
+
+# Don't build nvdimm binary packages on these architectures.
+# We do it this way since we can't set excluded Architectures
+# for binary packages in debian/control but it's easier to keep track
+# of the architectures we don't want than all the arches we do want
+# The arch list comes from https://buildd.debian.org/status/package.php?p=ndctl
+ifneq (,$(filter ia64,$(DEB_HOST_ARCH)))
+CONF_FLAGS += --without-nvdimm
+BUILD_PACKAGES = -Nlibblockdev-nvdimm-dev -Nlibblockdev-nvdimm2
+endif
+
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes) $(DEB_HOST_ARCH), yes i386)
+   BUILD_PACKAGES += -Nlibblockdev-mpath-dev -Nlibblockdev-mpath2 -Nlibblockdev-plugins-all
+endif
+
+
+%:
+	dh $@ $(BUILD_PACKAGES)
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--disable-tests \
+		--without-s390 \
+		--without-python2 \
+		--without-tools \
+		--without-vdo \
+		$(CONF_FLAGS)
+
+override_dh_install:
+	find debian -name '*.la' -print -delete
+	dh_install
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4

@@ -1,0 +1,225 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Fri, 8 Apr 2022 20:12:04 +0200
+Subject: gtk-module: Handle display closing gracefully
+
+Modern desktop environments may have X running optionally, so the
+canberra module may be unloaded because of this reason.
+
+However we didn't handle it properly because of a long-standing issue
+due to missing quit signal on Gtk 3, also we it may happen that a
+widget gets destroyed because of that, but we were still trying to unref
+them again during the dispatch_queue() idle.
+
+To avoid this, let's track the "closed" display signal and let's monitor
+for disposed (same as using "destroy" signal) objects, removing them from
+the queue earlier.
+
+ #0  g_log_writer_default (log_level=<optimized out>, fields=0x7ffcf2f236c0,
+     n_fields=6, user_data=0x0) at ../../../glib/gmessages.c:557
+ #1  0x00007f355eb3cc93 in g_log_structured_array (n_fields=6,
+     fields=0x7ffcf2f236c0, log_level=G_LOG_LEVEL_ERROR)
+     at ../../../glib/gmessages.c:1973
+ #2  g_log_structured_array (log_level=G_LOG_LEVEL_ERROR,
+     fields=0x7ffcf2f236c0, n_fields=6) at ../../../glib/gmessages.c:1946
+ #3  0x00007f355eb3ce93 in g_log_structured_standard (
+     log_domain=log_domain@entry=0x7f355e6be063 "Gtk",
+     log_level=log_level@entry=G_LOG_LEVEL_ERROR,
+     file=file@entry=0x7f355e724138 "../../../../gtk/gtkstylecontext.c",
+     line=line@entry=0x7f355e6ddea4 "348",
+     func=func@entry=0x7f355e724c70 <__func__.70> "gtk_style_context_init",
+     message_format=message_format@entry=0x7f355e724458
+     "Can't create a GtkStyleContext without a display connection")
+     at ../../../glib/gmessages.c:2030
+ #4  0x00007f355e5b45cf in gtk_style_context_init (context=0x555ee32475d0)
+     at ../../../../gtk/gtkstylecontext.c:348
+ #5  0x00007f355ec57efa in g_type_create_instance (type=<optimized out>)
+     at ../../../gobject/gtype.c:1929
+ #6  0x00007f355ec3ef4d in g_object_new_internal (
+     class=class@entry=0x555ee2ec1c60, params=params@entry=0x0,
+     n_params=n_params@entry=0) at ../../../gobject/gobject.c:2011
+ #7  0x00007f355ec401ad in g_object_new_with_properties (
+     object_type=93866027507792, n_properties=0, names=names@entry=0x0,
+     values=values@entry=0x0) at ../../../gobject/gobject.c:2181
+ #8  0x00007f355ec40cb1 in g_object_new (object_type=<optimized out>,
+     first_property_name=<optimized out>) at ../../../gobject/gobject.c:1821
+ #9  0x00007f355e393f80 in _gtk_style_new_for_path (screen=0x0,
+     path=path@entry=0x555ee2ccd4b0)
+     at ../../../../gtk/deprecated/gtkstyle.c:854
+ #10 0x00007f355e3941f3 in gtk_style_new ()
+     at ../../../../gtk/deprecated/gtkstyle.c:888
+ #11 0x00007f355e398b71 in gtk_widget_get_default_style ()
+     at ../../../../gtk/deprecated/gtkstyle.c:4061
+ #12 gtk_widget_get_default_style ()
+     at ../../../../gtk/deprecated/gtkstyle.c:4050
+ #13 0x00007f355e65e8ee in gtk_widget_real_destroy (object=0x555ee3d54320)
+     at ../../../../gtk/gtkwidget.c:12356
+ #14 0x00007f355dec62a7 in ?? () from /lib/x86_64-linux-gnu/libmutter-10.so.0
+ #15 0x00007f355ec2ed2f in g_closure_invoke (closure=0x555ee10ccac0,
+     return_value=0x0, n_param_values=1, param_values=0x7ffcf2f24180,
+     invocation_hint=0x7ffcf2f24100) at ../../../gobject/gclosure.c:830
+ #16 0x00007f355ec4aae0 in signal_emit_unlocked_R (
+     node=node@entry=0x555ee0fcd450, detail=detail@entry=0,
+     instance=instance@entry=0x555ee3d54320,
+     emission_return=emission_return@entry=0x0,
+     instance_and_params=instance_and_params@entry=0x7ffcf2f24180)
+     at ../../../gobject/gsignal.c:3861
+ #17 0x00007f355ec4c554 in g_signal_emit_valist (instance=<optimized out>,
+     signal_id=<optimized out>, detail=<optimized out>,
+     var_args=var_args@entry=0x7ffcf2f24330)
+     at ../../../gobject/gsignal.c:3496
+ #18 0x00007f355ec4c7a3 in g_signal_emit (
+     instance=instance@entry=0x555ee3d54320, signal_id=<optimized out>,
+     detail=detail@entry=0) at ../../../gobject/gsignal.c:3553
+ #19 0x00007f355e65e600 in gtk_widget_dispose (object=0x555ee3d54320)
+     at ../../../../gtk/gtkwidget.c:12166
+ #20 0x00007f355e66e0ee in gtk_window_dispose (object=0x555ee3d54320)
+     at ../../../../gtk/gtkwindow.c:3168
+ #21 0x00007f355ec3cd31 in g_object_unref (_object=<optimized out>)
+     at ../../../gobject/gobject.c:3636
+ #22 g_object_unref (_object=0x555ee3d54320)
+     at ../../../gobject/gobject.c:3553
+ #23 0x00007f352d6f1bfe in free_sound_event (d=0x7f3544280870)
+     at /build/libcanberra-DU1C23/libcanberra-0.30/src/canberra-gtk-module.c:184
+ #24 dispatch_queue ()
+     at /build/libcanberra-DU1C23/libcanberra-0.30/src/canberra-gtk-module.c:840
+ #25 idle_cb (userdata=<optimized out>)
+     at /build/libcanberra-DU1C23/libcanberra-0.30/src/canberra-gtk-module.c:847
+ #26 0x00007f355da452ad in gdk_threads_dispatch (data=0x7f35080db680)
+     at ../../../../gdk/gdk.c:769
+ #27 0x00007f355eb35c24 in g_main_dispatch (context=0x555ee08d8bd0)
+     at ../../../glib/gmain.c:3417
+ #28 g_main_context_dispatch (context=0x555ee08d8bd0)
+     at ../../../glib/gmain.c:4135
+ #29 0x00007f355eb8a6f8 in g_main_context_iterate.constprop.0 (
+     context=0x555ee08d8bd0, block=block@entry=1, dispatch=dispatch@entry=1,
+     self=<optimized out>) at ../../../glib/gmain.c:4211
+ #30 0x00007f355eb35293 in g_main_loop_run (loop=0x555ee29a8f50)
+     at ../../../glib/gmain.c:4411
+ #31 0x00007f355dea6209 in meta_context_run_main_loop ()
+    from /lib/x86_64-linux-gnu/libmutter-10.so.0
+ #32 0x0000555edf819ed2 in ?? ()
+ #33 0x00007f355dbd7d90 in __libc_start_call_main (
+     main=main@entry=0x555edf819a30, argc=argc@entry=1,
+     argv=argv@entry=0x7ffcf2f24838)
+     at ../sysdeps/nptl/libc_start_call_main.h:58
+ #34 0x00007f355dbd7e40 in __libc_start_main_impl (main=0x555edf819a30,
+     argc=1, argv=0x7ffcf2f24838, init=<optimized out>, fini=<optimized out>,
+     rtld_fini=<optimized out>, stack_end=0x7ffcf2f24828)
+     at ../csu/libc-start.c:392
+ #35 0x0000555edf81a155 in ?? ()
+
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/gnome-shell/+bug/1949200
+---
+ src/canberra-gtk-module.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 52 insertions(+), 5 deletions(-)
+
+diff --git a/src/canberra-gtk-module.c b/src/canberra-gtk-module.c
+index c1532ab..dbeca5e 100644
+--- a/src/canberra-gtk-module.c
++++ b/src/canberra-gtk-module.c
+@@ -114,6 +114,8 @@ static GQuark
+  * exported function */
+ void gtk_module_init(gint *argc, gchar ***argv[]);
+ 
++static void on_object_disposed(gpointer data, GObject *object);
++
+ static const char *translate_message_tye(GtkMessageType mt) {
+         static const char *const message_type_table[] = {
+                 [GTK_MESSAGE_INFO] = "dialog-information",
+@@ -180,8 +182,10 @@ static GtkDialog* find_parent_dialog(GtkWidget *w) {
+ }
+ 
+ static void free_sound_event(SoundEventData *d) {
+-
+-        g_object_unref(d->object);
++        if (d->object) {
++                g_object_weak_unref(d->object, on_object_disposed, d);
++                g_clear_object(&d->object);
++        }
+ 
+         if (d->arg1_is_set)
+                 g_value_unset(&d->arg1);
+@@ -851,6 +855,34 @@ static gboolean idle_cb(void *userdata) {
+ 
+ static void connect_settings(void);
+ 
++static void on_object_disposed(gpointer data, GObject *object)
++{
++        /* Workaround missing handler for gtk_quit in gtk 3.0, but safe to use in 2.0.
++         * As we may try to remove disposed objects on idle, so let's avoid this
++         * by just removing the queued events, if an object gets disposed earlier than
++         * we expect.
++         * https://gitlab.gnome.org/GNOME/glib/-/issues/389
++         */
++        SoundEventData *d = data;
++
++        /* If the object is set here, it means that we're running this as per
++         * the object being disposed when the reference count has not dropped to
++         * 0 yet, as per a manual call of g_object_run_dispose (or
++         * gtk_widget_destroy), so it means that we can safely release the extra
++         * reference that had been added in emission_hook_cb()
++         */
++        g_assert(d->object == NULL || d->object->ref_count > 1);
++        g_clear_object(&d->object);
++
++        g_queue_remove(&sound_event_queue, d);
++        free_sound_event(d);
++
++        if (idle_id && !sound_event_queue.length) {
++                g_source_remove(idle_id);
++                idle_id = 0;
++        }
++}
++
+ static gboolean emission_hook_cb(GSignalInvocationHint *hint, guint n_param_values, const GValue *param_values, gpointer data) {
+         static SoundEventData *d = NULL;
+         GdkEvent *e;
+@@ -889,6 +921,7 @@ static gboolean emission_hook_cb(GSignalInvocationHint *hint, guint n_param_valu
+         d = g_slice_new0(SoundEventData);
+ 
+         d->object = g_object_ref(object);
++        g_object_weak_ref(object, on_object_disposed, d);
+ 
+         d->signal_id = hint->signal_id;
+ 
+@@ -956,8 +989,21 @@ static void connect_settings(void) {
+         connected = TRUE;
+ }
+ 
+-#if GTK_CHECK_VERSION(3,0,0)
+-#warning "We really need a quit handler in Gtk 3.0, https://bugzilla.gnome.org/show_bug.cgi?id=639770"
++#if GTK_CHECK_VERSION(3, 0, 0)
++/* Workaround missing quit_handler on gtk3
++ * https://gitlab.gnome.org/GNOME/glib/-/issues/389
++ */
++
++static void
++on_display_closed(GdkDisplay *display)
++{
++        if (idle_id) {
++                g_source_remove(idle_id);
++                idle_id = 0;
++        }
++
++        dispatch_queue();
++}
+ #else
+ static gboolean quit_handler(gpointer data) {
+         dispatch_queue();
+@@ -966,7 +1012,6 @@ static gboolean quit_handler(gpointer data) {
+ #endif
+ 
+ G_MODULE_EXPORT void gtk_module_init(gint *argc, gchar ***argv[]) {
+-
+         /* This is the same quark libgnomeui uses! */
+         disable_sound_quark = g_quark_from_string("gnome_disable_sound_events");
+         was_iconized_quark = g_quark_from_string("canberra_was_iconized");
+@@ -994,6 +1039,8 @@ G_MODULE_EXPORT void gtk_module_init(gint *argc, gchar ***argv[]) {
+ 
+ #if !GTK_CHECK_VERSION(3,0,0)
+         gtk_quit_add(1, quit_handler, NULL);
++#else
++        g_signal_connect(gdk_display_get_default (), "closed", G_CALLBACK (on_display_closed), NULL);
+ #endif
+ }
+ 

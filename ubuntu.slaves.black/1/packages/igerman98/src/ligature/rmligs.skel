@@ -1,0 +1,228 @@
+#!/usr/bin/perl
+#
+# rmligs 0.87 - ligature corrector for German LaTeX documents
+# Copyright (C) 1999-2012 Björn Jacke <bjoern@j3e.de>
+#
+# This program comes with ABSOLUTELY NO WARRANTY; it may be copied or modified
+# under the terms of the GNU General Public License version 2 or 3 as
+# published by the Free Software Foundation.
+#
+# Please send bug reports, missing words and suggestions to bjoern@j3e.de
+###############################################################################
+#
+# rmligs is a program for removing incorrectly used ligatures from
+# LaTeX documents. This version is intended for German language texts only.
+# The wordlist data is taken from the igerman98 dictionary available on
+# https://www.j3e.de/ispell/igerman98/ .
+# Up-to-date versions of rmligs can be found on CTAN
+#
+######################################################################
+#
+#  Usage:
+#       rmligs [options] FILE(s) ...
+#
+#  -f, --filter       filter mode for streaming
+#  -t, --test         test mode (read-only)
+#  -i, --interactive  prompt before applying changes
+#  -q, --quiet        be quite quiet
+#
+##############################################################
+
+use Getopt::Long;
+Getopt::Long::Configure ("bundling");
+
+$debug = 0;
+$outerr = STDERR;
+$outmesg = STDOUT;
+
+GetOptions('f'=>\$opt_f, 'filter'=>\$opt_f, '' => \$opt_f, 't'=>\$opt_t, 'test'=>\$opt_t, 'q'=>\$opt_q, 'quiet'=>\$opt_q, 'i'=>\$opt_i, 'interactive'=>\$opt_i) or printusage();
+if ((($opt_f) and ((@ARGV) or ($opt_t) or ($opt_i)))
+		or (($opt_t) and ($opt_q)) ) {
+	print $outerr "\nIllegal combination of options!\n";
+	exit 1;
+}
+
+if ($opt_q) {$outmesg = NUL;}
+
+
+if (@ARGV) {
+	printcopyright();
+	buildlighash();
+	
+	for (@ARGV) {
+		$oldfile = $_;
+		open(OLDFILE, "< $oldfile") or print $outerr "Can't open $oldfile: $!\n\n" and next;
+		$infile = OLDFILE;
+		unless ($opt_t) {
+			$newfile = "$_.tmp";
+			$bakfile = "$_.bak";
+			open(NEWFILE, "> $newfile") or die "Can't open $newfile: $!\n\n";
+			$outfile = NEWFILE;
+		}
+
+		$corrlines = $linenumber = $jobs = 0;
+		processfile();
+		print $outmesg " >>> $jobs corrections in $corrlines of $linenumber lines in $oldfile\n\n";
+		
+		close(OLDFILE) or print $outerr "Can't close $oldfile: $!\n\n";
+		
+		unless ($opt_t) {
+			unless ($jobs == 0) {
+				close(NEWFILE) or die "Can't close $newfile $!\n";
+				rename($oldfile,$bakfile) or die "Can't rename $oldfile to $bakfile: $!\n" and next;
+				rename($newfile,$oldfile) or die "Can't rename $newfile to $oldfile: $!\n" and next;
+			}
+			else {unlink($newfile);}
+		}
+		else {print $outmesg "NO file changes (running read-only mode)\n";}
+	}
+}
+elsif ($opt_f) {
+	buildlighash();
+	$outmesg = NUL;
+	$infile = STDIN;
+	$outfile = STDOUT;
+	processfile();
+}
+else { printusage(); }
+
+
+
+###########################
+
+
+sub printcopyright {
+	print $outmesg <<END;
+
+rmligs 0.87 - ligature corrector for German LaTeX documents
+Copyright (C) 1999-2012 Bjoern Jacke <bjoern\@j3e.de>
+
+This program comes with ABSOLUTELY NO WARRANTY; it may be copied or modified
+under the terms of the GNU General Public License version 2 or 3 as
+published by the Free Software Foundation.
+
+Please send bug reports, missing words and suggestions to bjoern\@j3e.de
+
+END
+}
+
+####
+sub printusage {
+	printcopyright();
+	print $outmesg <<END;
+USAGE:  rmligs [options] FILE(S) ...
+
+  -f, --filter       filter mode for streaming
+  -t, --test         test mode (read-only)
+  -i, --interactive  prompt before applying changes
+  -q, --quiet        be quite quiet
+
+END
+	exit 1
+}
+
+####
+sub buildlighash {
+	while (<DATA>) {
+		chomp;
+		s/ß/ss/g; # we store "ss" in spite of "ß" -- also good for Swiss language
+		s/ä/ae/g;
+		s/ö/oe/g;
+		s/ü/ue/g;
+		
+		my $key=$_;
+		$key =~ s/\|//g;
+		$lighash{$key} = $_;
+	}
+}
+
+####
+sub processfile {
+	while (<$infile>) {
+		++$linenumber;
+		$linecorrected = 0;
+		for $word (m/[\\]*[\"a-zäöüÄÖÜß\303\244\204\266\274\234\237]*f[fil][\"a-zäöüÄÖÜß\303\244\204\266\274\234\237]*/gi) {
+			getlig();    # get our ligword ... if existing
+			if (defined $ligword and &check_interactive) {
+				changeword();
+				s/([^a-zA-ZäöüÄÖÜ\303\244\204\266\274\234\237\\]|^)\Q$word/$1$newword/g;
+				print $outmesg "line $linenumber: $word => $newword\n";  # let's be verbose!
+				++$jobs;
+				$linecorrected = 1;
+			}
+		}
+		print $outfile $_ unless $opt_t;
+		$corrlines += $linecorrected;
+	}
+}
+
+####
+sub getlig {
+	print "XXX checking $word\n" if ($debug);
+	my $compword = $word;
+	$compword =~ s/^(\\\\)*//;  # \\ as newline is allowed; \bla is a command!
+	                            # We remove all 2*n \'s from beginning
+	$compword =~ s/(\303\244|\303\204)/ae/g;
+	$compword =~ s/(\303\266|\303\226)/oe/g;
+	$compword =~ s/(\303\274|\303\234)/ue/g;
+	$compword =~ s/(\303\237)/ss/g;
+	$compword =~ tr [A-ZÄÖÜ] [a-zäöü];
+	$compword =~ s/(\"a|ä)/ae/g;
+	$compword =~ s/(\"o|ö)/oe/g;
+	$compword =~ s/(\"u|ü)/ue/g;
+	$compword =~ s/(\"[sz]|ß)/ss/g;
+	$compword =~ s/\"$//;  # we want a trailing "' to be possible!
+	$ligword = $lighash{$compword};
+}
+
+####
+sub changeword {
+	my $pos = index($ligword,'|');
+	my $runs = 0;
+	my $cut_pos = 0;
+	$newword = $word;
+	# to make all characters as long as the ones of the lighash (2 - only chars count!):
+	$newword =~ s/ß/qq/g;    # "qq" as a placeholder for iso-8859-1/15 &szlig;
+	$newword =~ s/"/"z/g;    # umlauts encoded like "o need to be 2 chars long, too!
+	$newword =~ s/ä/\"ae/g;  #
+	$newword =~ s/Ä/\"AE/g;  #
+	$newword =~ s/ö/\"oe/g;  # "\"AE" etc. as placeholders für iso8859-1/15 umlauts
+	$newword =~ s/Ö/\"OE/g;  #
+	$newword =~ s/ü/\"ue/g;  #
+	$newword =~ s/Ü/\"UE/g;  #
+	# equivalent UTF-8 characters already are 2 bytes long ... nothing more to do.
+	print "XXX changeword: $newword\n" if ($debug);
+	do {
+		my $left = my $right = $newword;
+		  # delete all up to the first occurence of | in the ligword:
+		$cutpos = $pos - $runs++;
+		$right =~ s/^\\*([\|\"\ ]*[a-zäöüÄÖÜ\303\244\204\266\274\234\237]){$cutpos}//i;
+		  # remember the rest of the word (left side):
+		$left =~ s/($right)$//i;
+		  # glue left & right with "| :
+		$newword = "$left\"\|$right";
+		  # get the next(?) non-ligature:
+		$pos = index($ligword,'|',++$pos);
+	} until ($pos == -1);
+	$newword =~ s/qq/ß/g;    # to get back our "ß"
+	$newword =~ s/"z/"/g;    #
+	$newword =~ s/\"ae/ä/g;  #
+	$newword =~ s/\"AE/Ä/g;  #
+	$newword =~ s/\"oe/ö/g;  # ... and other umlauts
+	$newword =~ s/\"OE/Ö/g;  #
+	$newword =~ s/\"ue/ü/g;  #
+	$newword =~ s/\"UE/Ü/g;  #
+}
+
+sub check_interactive {
+	if (not $opt_i) { return 1; }
+	my $a="";
+	do {
+		print STDOUT "Correct $word (l. $linenumber)? [y/n]";
+		read STDIN, $a, 1;
+		print "\n";
+	} until ($a =~ m/[yn]/);
+	return 1 if ($a eq "y");
+}
+
+__END__

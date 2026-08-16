@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Executed using the post-base-installer hooks after the base system
+# is installed, and before most packages are installed.  APT is only
+# using packages on the CD / DVD / USB stick at this point.
+
+set -e
+
+. /usr/share/debconf/confmodule
+
+log() { logger -t eatmydata-udeb/post-base-installer "$@"; }
+info() { log "info: $*"; }
+error() { log "error: $*"; }
+
+at_exit() {
+    error "script $0 terminated unexpectedly."
+}
+disable_exception() { trap - INT TERM EXIT; }
+trap at_exit INT TERM EXIT
+
+# First try here, in case the eatmydata package is available on the
+# ISO or we are installing via PXE.  Next try is in the
+# pre-pkgsel step.
+eatmydata-install enable
+
+disable_exception
+exit 0

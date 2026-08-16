@@ -1,0 +1,136 @@
+#!/usr/bin/perl -w
+use IPC::Open2;
+#use bytes;
+$debug = 1;
+$hack = 1;
+$minwordlength = 2;
+$comp_recourse_limit = 0;
+my @tail_checked_fail;
+#my($rdrblack, $wtrblack);
+
+print "start\n";
+#open(BLACKPIPE, '|ispell -d german -a');
+#open(SPELLPIPE, '|ispell -d german -a');
+#open(COMPPIPE, '|ispell -d german -a');
+#open2($rdrblack, $wtrblack, 'ispell', '-dgerman', '-a');
+open2(\*RDRBLACK, \*WTRBLACK, 'ispell', '-dgermanbl', '-a','-Tlatin1');
+open2(\*RDRSPELL, \*WTRSPELL, 'ispell', '-dgerman', '-a','-Tlatin1');
+#open2(\*RDRSPELL, \*WTRSPELL, 'cspell');
+open2(\*RDRCOMP, \*WTRCOMP, 'ispell', '-dgermancomp', '-a','-Tlatin1');
+open(BLA,"</tmp/bla6.txt");
+for (qw(RDRBLACK RDRSPELL RDRCOMP)) {
+	$tmp = "";
+	while (($tmp ne "\n")) {
+		sysread($_,$tmp,1);
+	}
+}
+print "start2\n";
+#while (<STDIN>) {
+while (<BLA>) {
+	&abbruch if (m/^q$/);
+	s/\/.*//;
+	for $word (m/[\"a-zäöüÄÖÜßéÉ\303\244\204\266\274\234\237]+/gi) {
+		print "spellchecking $word.\n" if ($debug);
+		# the same word tail can be looked up multiple times in various incarnations of the spellcheck function, so we try to remember the number of tailing characters of missed main dictionary lookups in a global array. This is little overhead but may save lots of CPU cycles:
+		@tail_checked_fail = ();
+		$ret=&spellcheck($word,0) or $ret = "nix";
+		print "RESULT: $ret\n";
+		if ($hack) {
+			my $replword=$word;
+			$replword =~ s/$ret$//;
+			print WTRCOMP "$replword\n";
+			$bekannt=0;
+			while (<RDRCOMP>) {
+				$bekannt = 1 if (m/^[\+\*]/);
+				last if ($_ eq "\n");
+			}
+			next if ($bekannt);
+			print "insert $replword ? ";
+			my $a = <>;
+			&abbruch if ($a =~ m/^q$/);
+			if ($a =~ m/^y$/) {
+				print "nehme Wort auf!\n";
+				print WTRCOMP "*$replword\n";
+				sleep 0.3;
+			}
+		}
+	}
+}
+
+sub spellcheck {
+	my $word = shift;
+	my $rec_limit = shift;
+#	return "" if ($rec_limit >$comp_recourse_limit);
+	my $okay="0";
+	my $ret = "";
+	my $word_len = length($word);
+	print "spellcheck invoked with $word and $rec_limit\n";
+	if (not $tail_checked_fail[$word_len]) {
+		print WTRBLACK $word,"\n";
+		while (<RDRBLACK> and not $hack) {
+			print "OUT BLACK$rec_limit: $_";
+			$okay = 1 if (m/^[\+\*]/);
+			last if ($_ eq "\n");
+		}
+		print $okay,"\n";
+		if ($okay and not $hack) {
+			$ret = "blacklisted";
+			$tail_checked_fail[$word_len] = 1;
+		} else {
+			print WTRSPELL &myucfirst($word),"\n";
+			while (<RDRSPELL>) {
+				print "OUT SPELL$rec_limit: $_";
+				$okay = 1 if (m/^[\+\*]/);
+				last if ($_ eq "\n");
+			}
+			print $okay,"\n";
+			if ($okay) {
+				$ret = "korrekt";
+				if ($hack) {$ret=$word;}
+			}
+		}
+		
+	}
+	print "L: ",$word_len," > ",$minwordlength*2,"\n";
+	if ((not $ret) and ($word_len > ($minwordlength*2-1)) and not ($rec_limit > $comp_recourse_limit)) {
+		print "if... entered\n";
+		my $i=$minwordlength;
+		while ($i++ < ($word_len-$minwordlength)) {
+			if (not $hack) {
+				print WTRCOMP &myucfirst(substr($word,0,$i)),"\n";
+				$okay="0";
+				while (<RDRCOMP>) {
+					print "OUT COMP$rec_limit: $_";
+					$okay = 1 if (m/^[\+\*]/);
+					last if ($_ eq "\n");
+				}
+				print $okay,"\n";
+			}
+			if ($okay or $hack) {
+				print "OKAY in if reached...$rec_limit\n";
+				$ret = &spellcheck(substr($word,$i),$rec_limit+1);
+				print "ret=$ret\n";
+				last if ($ret =~ m/korrekt/ or ($hack and $ret));
+			}
+		}
+	}
+	return $ret;
+}
+
+sub abbruch {
+	close (RDRSPELL);
+	close (WTRSPELL);
+	close (RDRCOMP);
+	close (WTRCOMP);
+	close (RDRBLACK);
+	close (WTRBLACK);
+	exit 0;
+}
+sub myucfirst {
+	my $foo =  shift;
+	$foo =~ s/^é/É/;
+	$foo =~ s/^ä/Ä/;
+	$foo =~ s/^ö/Ö/;
+	$foo =~ s/^ü/Ü/;
+	return ucfirst($foo);
+}

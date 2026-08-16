@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Test hunspell dictionary with wrong UTF-8 de_AT words.
+#
+# (c) 2018 Roland Rosenfeld <roland@debian.org>
+
+TESTSDIR=$(dirname $0)
+
+if [ -z "$AUTOPKGTEST_TMP" ]; then
+    AUTOPKGTEST_TMP=$(mktemp -d)
+fi
+trap "rm -rf $AUTOPKGTEST_TMP" EXIT
+
+cat $TESTSDIR/typo.utf8.txt $TESTSDIR/helvetismen.utf8.txt \
+    > $AUTOPKGTEST_TMP/typo.utf8.txt
+hunspell -l -d de_AT < $AUTOPKGTEST_TMP/typo.utf8.txt \
+                     > $AUTOPKGTEST_TMP/hunspell.typo.out
+
+if diff $AUTOPKGTEST_TMP/hunspell.typo.out $AUTOPKGTEST_TMP/typo.utf8.txt > $AUTOPKGTEST_TMP/diff.typo.out
+then
+    exit 0
+else
+    echo "following words are wrongly accepted:"
+    grep '^>' $AUTOPKGTEST_TMP/diff.typo.out
+    exit 1
+fi

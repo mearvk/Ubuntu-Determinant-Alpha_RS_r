@@ -1,0 +1,41 @@
+#!/bin/sh
+LC_ALL=C
+# try setting LANG=de_DE and see how much glibc sucks here...
+LANG=C
+set -x
+
+INFILE=$1
+if test -z $INFILE ; then
+	echo "this script $0 needs a file and cannot work with stdin"
+	exit 1
+fi
+
+# --x flagged words are exceptions that should not be compounded
+#find dicts/ -name "*-de_all*.txt"  | grep -v -- "$REGEX" \
+	grep "^[A-ZÄÖÜÉ]" $INFILE \
+		| grep -v -- "--x" \
+		| ./bin/myspellfixprefix.pl \
+		| ./bin/lcfirst.pl \
+		| sed "s:$:/ozm: ; s:/\(.*\)/:/\1: ; s:--x::"
+	echo
+	grep "^[A-ZÄÖÜÉ]" $INFILE \
+		| grep -v -- "--x" \
+		| sed "s:$:/m: ; s:/\(.*\)/:/\1: ; s:--x::"
+	echo
+	# now add words which are no-compounds:
+	grep -v "^[A-ZÄÖÜÉ]" $INFILE \
+		| sed "s:--x::"
+	grep -- "--x" $INFILE | sed "s:--x::"
+	echo
+	exit 0
+#find dicts/ -name "*-de_all*.txt"  | grep -- "$REGEX" \
+
+#find dicts/ -name "*-de_all*.txt"  | grep -v -- "$REGEX" \
+#	| while read a; do \
+#		cat $a | sed "s:--x::" >> $OUTFILE ;\
+#		echo >> $OUTFILE ;\
+#	done 
+
+#cat dicts/*-de_all*.txt \
+#	| sed "s:--x::"		>> $@
+#echo >> $@

@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+use IPC::Open2;
+use Getopt::Long;
+GetOptions      ('l'=>\$opt_l,
+		'T=s'=>\$opt_T);
+$hack = 0;
+$minwordlength = 2;
+my @tail_checked_fail;
+#my($rdrblack, $wtrblack);
+$opt_T="plain" unless ($opt_T);
+
+print "@(#) International Ispell (really BSPELL) Version 3.2.06 08/01/01\n" unless ($opt_l);
+
+open2(\*RDRBLACK, \*WTRBLACK, 'ispell', '-dgermanbl', '-a','-T'.$opt_T);
+open2(\*RDRSPELL, \*WTRSPELL, 'ispell', '-dgerman', '-a','-T'.$opt_T);
+open2(\*RDRCOMP, \*WTRCOMP, 'ispell', '-dgermancomp', '-a','-T'.$opt_T);
+for (qw(RDRBLACK RDRSPELL RDRCOMP)) {
+	$tmp = "";
+	while (($tmp ne "\n")) {
+		sysread($_,$tmp,1);
+	}
+}
+while (<STDIN>) {
+	&abbruch if (m/^q$/);
+	for $word (m/[\"a-z‰ˆ¸ƒ÷‹ﬂÈ…\303\244\204\266\274\234\237]+/gi) {
+		# the same word tail can be looked up multiple times in various incarnations of the spellcheck function, so we try to remember the number of tailing characters of missed main dictionary lookups in a global array. This is little overhead but may save lots of CPU cycles:
+		@tail_checked_fail = ();
+		$ret=&spellcheck($word);
+		if ($ret) {
+			$ret=($opt_l) ? "":"* $word\n";
+		} else {
+			$ret=($opt_l) ? "$word\n":"# $word\n";
+		}
+		print "$ret";
+		print "\n" unless ($opt_l);
+	}
+}
+
+sub spellcheck {
+	my $word = shift;
+	my $okay="0";
+	my $ret = "";
+	my $word_len = length($word);
+	if (not $tail_checked_fail[$word_len]) {
+		print WTRBLACK $word,"\n";
+		while (<RDRBLACK>) {
+			$okay = 1 if (m/^[\+\*]/);
+			last if ($_ eq "\n");
+		}
+		if ($okay) {
+			$ret = "blacklisted";
+			$tail_checked_fail[$word_len] = 1;
+		} else {
+			print WTRSPELL &myucfirst($word),"\n";
+			while (<RDRSPELL>) {
+				$okay = 1 if (m/^[\+\*]/);
+				last if ($_ eq "\n");
+			}
+			if ($okay) {
+				$ret = "korrekt";
+			}
+		}
+		
+	}
+	if ((not $ret) and ($word_len > ($minwordlength*2-1))) {
+		my $i=$minwordlength;
+		while ($i++ < ($word_len-$minwordlength)) {
+			if (not $hack) {
+				print WTRCOMP &myucfirst(substr($word,0,$i)),"\n";
+				$okay="0";
+				while (<RDRCOMP>) {
+					$okay = 1 if (m/^[\+\*]/);
+					last if ($_ eq "\n");
+				}
+			}
+			if ($okay or $hack) {
+				$ret = &spellcheck(substr($word,$i));
+				if ($hack and ($ret =~ m/korrekt/)) {
+					print "\"",substr($word,0,$i),"\" aufnehmen? ";
+				}
+				last if ($ret =~ m/korrekt/);
+			}
+		}
+	}
+	return $ret;
+}
+
+sub abbruch {
+	close (RDRSPELL);
+	close (WTRSPELL);
+	close (RDRCOMP);
+	close (WTRCOMP);
+	close (RDRBLACK);
+	close (WTRBLACK);
+	exit 0;
+}
+#sub myucfirst {
+#	my $foo =  shift;
+#	$foo =~ s/^[a-z‰ˆ¸È]/[A-Zƒ÷‹…]/;
+#	return $foo;
+#}
+sub myucfirst {
+	my $foo =  shift;
+	$foo =~ s/^È/…/;
+	$foo =~ s/^‰/ƒ/;
+	$foo =~ s/^ˆ/÷/;
+	$foo =~ s/^¸/‹/;
+	$foo =~ s/^\303\251/\303\211/; # È->… 
+	$foo =~ s/^\303\244/\303\204/; # ‰≠>ƒ
+	$foo =~ s/^\303\266/\303\226/; # ˆ≠>÷
+	$foo =~ s/^\303\274/\303\234/; # ¸≠>‹
+	
+	return ucfirst($foo);
+}

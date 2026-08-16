@@ -1,0 +1,76 @@
+From: Roland Rosenfeld <roland@debian.org>
+Subject: Build aspell cwl files for de_DE, de_AT, de_CH and de-common.
+Date: Sun, 06 Dec 2009 21:19:36 +0100
+Forwarded: Bjoern Jacke <bjoern@j3e.de> on Sat, 8 Sep 2007 13:06:08 +0200
+
+--- a/Makefile
++++ b/Makefile
+@@ -92,6 +92,7 @@ UNSQ = unsq
+ #UNSQ = unsq.pl
+ 
+ ASPELL = aspell
++PREZIP = prezip
+ 
+ # if you don't have ispell around, you may change this to aspell:
+ AFFIX_EXPANDER = ispell
+@@ -208,6 +209,13 @@ aspell/$(1).rws: myspell/$(1).dic aspell
+ 	# the warnings about skipped words should be ignorable...
+ 	$(ASPELL) --lang=$(1) --dict-dir=./aspell/ --local-data-dir=./aspell/ create master $(1).rws < myspell/$(1).dic
+ 
++aspell/$(1)-special.wl: $$(WORDS_$(1)) aspell/$(1).multi aspell/$(1).alias
++	cat $$(WORDS_$(1)) \
++		| (test -e ./bin/conv_dict_$(1) && ./bin/conv_dict_$(1) || cat) \
++		| ./bin/myspell-generic-process.sh \
++		| $(SED) -f ./bin/dic2iso \
++		> $$@
++
+ myspell/$(1).dic: $$(WORDS_$(1)) $$(WORDS_de_all) dicts/abkuerzpunkt.txt
+ 	./bin/test-working-grep.sh
+ 	cat $$(WORDS_$(1)) $$(WORDS_de_all) dicts/abkuerzpunkt.txt \
+@@ -221,7 +229,40 @@ myspell/$(1).dic: $$(WORDS_$(1)) $$(WORD
+ endef
+ $(foreach langcode,$(LANGS) liglist,$(eval $(call LANG_myspell_template,$(langcode))))
+ 
++aspell/de-common-szlig.wl: $(WORDS_de_all)
++	cat $(WORDS_de_all) | ./bin/myspell-generic-process.sh \
++		| $(SED) -f ./bin/dic2iso \
++		| sort -u > $@
++
++aspell/szlig.wl: aspell/de-common-szlig.wl
++	grep ß $< > $@
++
++aspell/ss.wl: aspell/szlig.wl
++	$(SED) 's/ß/ss/g' < $< > $@
++
++aspell/de-common.wl: aspell/de-common-szlig.wl aspell/de.dat aspell/de_affix.dat aspell/de_phonet.dat
++	grep -v ß aspell/de-common-szlig.wl > $@
++
++aspell/de_DE-only.wl: aspell/szlig.wl aspell/de_DE-special.wl
++	sort -u $? > $@
++
++aspell/de_AT-only.wl: aspell/szlig.wl aspell/de_AT-special.wl
++	sort -u $? > $@
++
++aspell/de_CH-only.wl: aspell/ss.wl aspell/de_CH-special.wl
++	sort -u $? > $@
++
++aspell/de.dat: aspell/de_all.dat.in
++	$(SED) "s/LANG_REPLACE/de/g" < aspell/de_all.dat.in > $@
++
++aspell/de_affix.dat: myspell/de_DE.aff
++	$(CP) $< $@
++
++aspell/de_phonet.dat: aspell/de_all_phonet.dat.in
++	$(CP) $< $@
+ 
++%.cwl: %.wl
++	$(PREZIP) < $< > $@
+ 
+ define LANG_aff_template
+ 
+--- a/aspell/de_all.multi.in
++++ b/aspell/de_all.multi.in
+@@ -1 +1,2 @@
+-add de_DE.rws
++add de-common.rws
++add LANG_REPLACE-only.rws

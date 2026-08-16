@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+SHARED_PKG := libgtop-2.0-11
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs -Wl,--as-needed
+
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
+CPPFLAGS += $(shell pkg-config --cflags libbsd-overlay)
+endif
+
+%:
+	dh $@
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--libexecdir=\$${libdir}/$(SHARED_PKG)
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V '$(SHARED_PKG) (>= 2.32.0)' -- -c4
+
+override_dh_fixperms:
+	dh_fixperms -X libgtop_server2
+
+override_dh_install:
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
+	# The server is only necessary on kFreeBSD
+	dh_install --autodest -p$(SHARED_PKG) \
+		--ignore=debian/$(SHARED_PKG).install \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/$(SHARED_PKG)/libgtop_server2
+endif
+	find debian/tmp -name '*.la' -print -delete
+	dh_install
+
+override_dh_missing:
+	dh_missing --list-missing

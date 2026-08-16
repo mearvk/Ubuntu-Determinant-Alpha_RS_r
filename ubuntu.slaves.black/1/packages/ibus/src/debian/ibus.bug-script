@@ -1,0 +1,75 @@
+#!/bin/sh
+type ibus >&3
+type ibus-setup >&3
+
+if [ -x /usr/bin/im-config ]; then
+echo -n "im-config -l => " >&3
+/usr/bin/im-config -l >&3
+echo -n "im-config -m => " >&3
+/usr/bin/im-config -m|sed -e "s/^\(.*\)$/\\\'\1\\\' /"| xargs echo >&3
+else
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&3
+echo "!!! im-config is missing.  Please install it.                 !!!" >&3
+echo "!!! Please also read usr/share/doc/im-config/README.Debian.gz !!!" >&3
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&3
+fi
+echo >&3
+echo "XMODIFIERS=$XMODIFIERS" >&3
+echo "GTK_IM_MODULE=$GTK_IM_MODULE" >&3
+echo "QT_IM_MODULE=$QT_IM_MODULE" >&3
+echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" >&3
+echo "XDG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP" >&3
+echo "XDG_MENU_PREFIX=$XDG_MENU_PREFIX" >&3
+echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >&3
+echo "XDG_SEAT=$XDG_SEAT" >&3
+echo "XDG_SESSION_CLASS=$XDG_SESSION_CLASS" >&3
+echo "XDG_SESSION_DESKTOP=$XDG_SESSION_DESKTOP" >&3
+echo "XDG_SESSION_ID=$XDG_SESSION_ID" >&3
+echo "XDG_SESSION_TYPE=$XDG_SESSION_TYPE" >&3
+echo >&3
+
+echo "== ls -l /usr/lib/ibus/ibus-* /usr/libexec/ibus-* ==" >&3
+/bin/ls -l /usr/lib/ibus/ibus-* /usr/libexec/ibus-* >&3 2>&3
+echo >&3
+echo "== dpkg-query -l 'ibus*' ==" >&3
+/usr/bin/dpkg-query -l 'ibus*' >&3
+echo >&3
+
+if [ -x /usr/bin/gsettings ]; then
+    echo "=== gsettings ===" >&3
+    /usr/bin/gsettings list-recursively org.freedesktop.ibus.general >&3
+    /usr/bin/gsettings list-recursively org.freedesktop.ibus.panel >&3
+    case "$XDG_CURRENT_DESKTOP" in
+    *GNOME*|*Unity*)
+        # settings for GNOME input sources
+        /usr/bin/gsettings list-recursively org.gnome.desktop.input-sources >&3
+        ;;
+    esac
+    echo >&3
+else
+    echo "=== gsettings command is missing ===" >&3
+    echo >&3
+fi
+
+if [ -x /usr/bin/localectl ]; then
+    echo "=== localectl status ===" >&3
+    /usr/bin/localectl status >&3
+    echo >&3
+fi
+
+if [ x$XDG_SESSION_TYPE != xwayland ]; then
+    echo "=== /etc/X11/default-display-manager ===" >&3
+    /bin/cat /etc/X11/default-display-manager >&3
+    echo >&3
+
+    if [ -x /usr/bin/setxkbmap ]; then
+        echo "=== setxkbmap -print ===" >&3
+        /usr/bin/setxkbmap -print
+        echo >&3
+    fi
+    if [ -f $HOME/.Xmodmap ]; then
+        echo "=== ~/.Xmodmap ===" >&3
+        /bin/cat $HOME/.Xmodmap >&3
+        echo >&3
+    fi
+fi

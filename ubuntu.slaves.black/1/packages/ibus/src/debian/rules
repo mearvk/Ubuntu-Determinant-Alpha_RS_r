@@ -1,0 +1,118 @@
+#!/usr/bin/make -f
+#DH_VERBOSE = 1
+
+# See dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CFLAGS_MAINT_APPEND = -Wall -pedantic
+#export DEB_LDFLAGS_MAINT_APPEND =
+# See dpkg-gensymbols(1)
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+# Do not build ibus-tests on (compatibility-only) Ubuntu i386, as some of
+# ibus-tests depends are not in the compatibility layer
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes) $(DEB_HOST_ARCH),yes i386)
+   skip_packages = -Nibus-tests
+endif
+
+DH_FLAGS = --with gir,python3
+
+# Ubuntu language pack support (dh_translations)
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes),yes)
+DH_FLAGS += --with translations
+endif
+
+
+%:
+	dh $@ $(DH_FLAGS)
+
+CONFIGURE_FLAGS = \
+		--disable-python2 \
+		--disable-python-library \
+		--disable-silent-rules \
+		--disable-static \
+		--enable-appindicator \
+		--enable-emoji-dict \
+		--enable-gtk2 \
+		--enable-gtk3 \
+		--enable-gtk4 \
+		--enable-introspection \
+		--enable-surrounding-text \
+		--enable-xim \
+		--with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*,terminator' \
+		--with-python=/usr/bin/python3 \
+		--with-ucd-dir='/usr/share/unicode/' \
+		$(NULL)
+
+ifeq (,$(filter nodoc,$(DEB_BUILD_PROFILES)))
+CONFIGURE_FLAGS += --enable-gtk-doc
+else
+CONFIGURE_FLAGS += --disable-gtk-doc
+endif
+
+ifeq (,$(filter noinsttest,$(DEB_BUILD_PROFILES)))
+CONFIGURE_FLAGS += --enable-install-tests
+else
+CONFIGURE_FLAGS += --disable-install-tests
+endif
+
+# The --enable-memconf configure flag is not needed on nocheck or noinsttest
+# build profile. But these build profiles should not change package contents
+# (See https://wiki.debian.org/BuildProfileSpec). So always use this flag.
+CONFIGURE_FLAGS += --enable-memconf
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+CONFIGURE_FLAGS += --enable-wayland
+else
+CONFIGURE_FLAGS += --disable-wayland
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CONFIGURE_FLAGS)
+
+override_dh_auto_install:
+	dh_auto_install
+	desktop-file-install --delete-original \
+		--dir debian/tmp/usr/share/applications \
+		debian/tmp/usr/share/applications/*
+
+override_dh_auto_build:
+# Rebuild upstream shipped Vala-generated files in ui/gtk3, as the shipped
+# ui/gtk3/panelbinding.c causes FTBFS with --disable-wayland. No need to
+# upstream; the upstream doesn't want Vala to be needed by the default build
+# (https://github.com/ibus/ibus/issues/2082).
+	make -C ui/gtk3 maintainer-clean-generic
+	dh_auto_build
+
+override_dh_install:
+	dh_install -X.la -X.pyc -X.pyo -X__pycache__
+
+override_dh_missing:
+	dh_missing --fail-missing -X.la -X.pyc -X.pyo
+
+override_dh_auto_test:
+	# NOTE: Do not use debhelper 13 provided $HOME and XDG dirs. The
+	# provided $XDG_CACHE_HOME is too long so the ibus-daemon socket name
+	# length easily exceeds the limit (107 bytes in Linux).
+	mkdir -p -m700 $(CURDIR)/debian/tmp-home/run
+	env \
+	  GVFS_DISABLE_FUSE=1 \
+	  dbus-run-session -- \
+	  xvfb-run --auto-servernum -- \
+	  dh_auto_test -- \
+	  HOME=$(CURDIR)/debian/tmp-home \
+	  XDG_CACHE_HOME= \
+	  XDG_CONFIG_HOME= \
+	  XDG_DATA_HOME= \
+	  XDG_DATA_DIRS= \
+	  XDG_RUNTIME_DIR=$(CURDIR)/debian/tmp-home/run \
+	  DISABLE_DAEMONIZE_IN_TESTS=1 \
+	  DISABLE_GUI_TESTS="ibus-bus ibus-compose ibus-keypress test-stress"
+	rm -rf $(CURDIR)/debian/tmp-home
+
+override_dh_builddeb:
+	dh_builddeb $(skip_packages)
+
+override_dh_gencontrol:
+	dh_gencontrol $(skip_packages)

@@ -1,0 +1,50 @@
+From: Andrea Azzarone <azzaronea@gmail.com>
+Date: Thu, 19 Apr 2018 15:58:30 +0200
+Subject: mountlist: ignore snap squashfs
+
+Ignore squashfs mounted in snaps. This will make sure that snap fs
+are not listed in gnome-system-monitor.
+
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1749007
+Forwarded: not-needed
+---
+ sysdeps/linux/mountlist.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/sysdeps/linux/mountlist.c b/sysdeps/linux/mountlist.c
+index 7c376fd..f36fc29 100644
+--- a/sysdeps/linux/mountlist.c
++++ b/sysdeps/linux/mountlist.c
+@@ -84,7 +84,7 @@ ignore_list_has(IgnoreList* ig, const char* fs)
+ 
+ 
+ static gboolean
+-ignore_fs(const char *fstype, IgnoreList** ig)
++ignore_fs(const char* mntdir, const char *fstype, IgnoreList** ig)
+ {
+   if (!*ig) {
+     FILE* fs;
+@@ -106,10 +106,13 @@ ignore_fs(const char *fstype, IgnoreList** ig)
+     }
+   }
+ 
++  /* ignore snap squashfs */
++  if (!strcmp(fstype, "squashfs") && !strncmp(mntdir, "/snap/", 6))
++    return TRUE;
++
+   return ignore_list_has(*ig, fstype);
+ }
+ 
+-
+ glibtop_mountentry *
+ glibtop_get_mountlist_s(glibtop *server, glibtop_mountlist *buf, int all_fs)
+ {
+@@ -136,7 +139,7 @@ glibtop_get_mountlist_s(glibtop *server, glibtop_mountlist *buf, int all_fs)
+       const char *devopt;
+       gsize len;
+ 
+-      if (!all_fs && ignore_fs(mnt->mnt_type, &ig))
++      if (!all_fs && ignore_fs(mnt->mnt_dir, mnt->mnt_type, &ig))
+ 	continue;
+ 
+       len = entries->len;

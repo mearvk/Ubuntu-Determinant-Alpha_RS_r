@@ -1,0 +1,157 @@
+#!/usr/bin/make -f
+#
+# (C) 1999-2021 Roland Rosenfeld <roland@debian.org>, based on
+#
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+#export DH_OPTIONS=-v
+
+DROOT=`pwd`/debian
+ADIR=$(DROOT)/aspell-de
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	ln -s /bin/busybox bin/grep
+	$(MAKE) ispell/de_DE.aff all.words.de_DE.tmp
+#	$(MAKE) ispell/de_AT.aff all.words.de_AT.tmp
+	$(MAKE) ispell/de_CH.aff all.words.de_CH.tmp
+
+	$(MAKE) hunspell/de_DE.dic hunspell/de_DE.aff
+	$(MAKE) hunspell/de_AT.dic hunspell/de_AT.aff
+	$(MAKE) hunspell/de_CH.dic hunspell/de_CH.aff
+
+	$(MAKE) ligature/rmligs
+
+	$(MAKE) isowordlist-de_DE
+#	$(MAKE) isowordlist-de_AT
+	$(MAKE) isowordlist-de_CH
+
+	$(MAKE) aspell/de-common.cwl aspell/de_DE-only.cwl
+	$(MAKE) aspell/de_CH-only.cwl aspell/de_AT-only.cwl
+
+override_dh_clean:
+	rm -f bin/grep
+	dh_clean
+	$(MAKE) clean
+	rm -f debian/ingerman.config debian/ingerman.templates
+	rm -f debian/wngerman.config debian/wngerman.templates
+	rm -f debian/iswiss.config debian/iswiss.templates
+	rm -f debian/wswiss.config debian/wswiss.templates
+
+override_dh_install-indep:
+	dh_install
+
+#	ingerman (binary-indep):
+	iconv -f iso-8859-1 -t utf-8 < ispell/de_DE.aff \
+		> $(DROOT)/ingerman/usr/lib/ispell/ngerman.aff
+	gzip -9n < all.words.munch.de_DE.tmp \
+		> $(DROOT)/ingerman/usr/share/ispell/ngerman.mwl.gz
+	(cd $(DROOT)/ingerman/usr/lib/ispell; \
+		ln -s ngerman.aff ndeutsch.aff; \
+		ln -s ngerman.hash ndeutsch.hash;)
+
+#	iswiss (binary-indep):
+	iconv -f iso-8859-1 -t utf-8 < ispell/de_CH.aff \
+		> $(DROOT)/iswiss/usr/lib/ispell/swiss.aff
+	gzip -9n < all.words.munch.de_CH.tmp \
+		> $(DROOT)/iswiss/usr/share/ispell/swiss.mwl.gz
+	(cd $(DROOT)/iswiss/usr/lib/ispell; \
+		ln -s swiss.aff deutsch-schweiz.aff; \
+		ln -s swiss.hash deutsch-schweiz.hash;)
+
+#	wngerman (binary-indep):
+	iconv -f iso-8859-1 -t utf-8 < isowordlist-de_DE \
+		> $(DROOT)/wngerman/usr/share/dict/ngerman
+
+#	wswiss (binary-indep):
+	iconv -f iso-8859-1 -t utf-8 < isowordlist-de_CH \
+		> $(DROOT)/wswiss/usr/share/dict/swiss
+
+#	rmligs-german (binary-indep):
+	install -m755 ligature/rmligs \
+		$(DROOT)/rmligs-german/usr/bin/rmligs-german
+	sed -e 's/rmligs/rmligs-german/g;s/RMLIGS/RMLIGS-GERMAN/g' \
+	    -e 's%README%/usr/share/doc/rmligs-german/README.ligatures%g' \
+	    < ligature/rmligs.1 \
+	    > $(DROOT)/rmligs-german/usr/share/man/man1/rmligs-german.1
+
+#	hunspell-de-ch (binary-indep)
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_CH.aff \
+		| sed -e 's/^SET ISO8859-1/SET UTF-8/' \
+		> $(DROOT)/hunspell-de-ch/usr/share/hunspell/de_CH.aff
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_CH.dic \
+		> $(DROOT)/hunspell-de-ch/usr/share/hunspell/de_CH.dic
+	(cd $(DROOT)/hunspell-de-ch/usr/share/hunspell; \
+		ln -s de_CH.aff de_LI.aff; \
+		ln -s de_CH.dic de_LI.dic)
+
+#	hunspell-de-de (binary-indep)
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_DE.aff \
+		| sed -e 's/^SET ISO8859-1/SET UTF-8/' \
+		> $(DROOT)/hunspell-de-de/usr/share/hunspell/de_DE.aff
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_DE.dic \
+		> $(DROOT)/hunspell-de-de/usr/share/hunspell/de_DE.dic
+	(cd $(DROOT)/hunspell-de-de/usr/share/hunspell; \
+		ln -s de_DE.aff de_BE.aff; \
+		ln -s de_DE.dic de_BE.dic; \
+		ln -s de_DE.aff de_LU.aff; \
+		ln -s de_DE.dic de_LU.dic)
+
+#	hunspell-de-at (binary-indep)
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_AT.aff \
+		| sed -e 's/^SET ISO8859-1/SET UTF-8/' \
+		> $(DROOT)/hunspell-de-at/usr/share/hunspell/de_AT.aff
+	iconv -f iso-8859-1 -t utf-8 < hunspell/de_AT.dic \
+		 > $(DROOT)/hunspell-de-at/usr/share/hunspell/de_AT.dic
+
+#	aspell-de (binary-indep)
+	install -m644 aspell/de_DE.multi \
+		$(ADIR)/usr/lib/aspell/de-neu.multi
+	install -m644 aspell/de_DE.multi \
+		$(ADIR)/usr/lib/aspell/de_DE-neu.multi
+	install -m644 aspell/de_CH.multi \
+		$(ADIR)/usr/lib/aspell/de_CH-neu.multi
+	install -m644 aspell/de_AT.multi \
+		$(ADIR)/usr/lib/aspell/de_AT-neu.multi
+
+	install -m644 aspell/de_AT.alias \
+		$(ADIR)/usr/lib/aspell/
+	install -m644 aspell/de_CH.alias \
+		$(ADIR)/usr/lib/aspell/
+	install -m644 aspell/de_DE.alias \
+		$(ADIR)/usr/lib/aspell/
+	install -m644 aspell/de_DE.alias \
+		$(ADIR)/usr/lib/aspell/german.alias
+	install -m644 aspell/de_DE.alias \
+		$(ADIR)/usr/lib/aspell/deutsch.alias
+
+	install -m644 aspell/de.dat \
+		$(ADIR)/usr/lib/aspell/
+	install -m644 aspell/de_phonet.dat \
+		$(ADIR)/usr/lib/aspell/
+	install -m644 aspell/de_affix.dat \
+		$(ADIR)/usr/lib/aspell/
+
+	gzip -9cn < aspell/de-common.cwl \
+		> $(ADIR)/usr/share/aspell/de-common.cwl.gz
+	gzip -9cn < aspell/de_AT-only.cwl \
+		> $(ADIR)/usr/share/aspell/de_AT-only.cwl.gz
+	gzip -9cn < aspell/de_CH-only.cwl \
+		> $(ADIR)/usr/share/aspell/de_CH-only.cwl.gz
+	gzip -9cn < aspell/de_DE-only.cwl \
+		> $(ADIR)/usr/share/aspell/de_DE-only.cwl.gz
+
+	installdeb-wordlist -pwngerman # Internally calls dh_installdebconf
+	installdeb-wordlist -pwswiss   # Internally calls dh_installdebconf
+	installdeb-hunspell -phunspell-de-de
+	installdeb-hunspell -phunspell-de-at
+	rm -f $(DROOT)/hunspell-de-at/usr/share/hunspell/de-DE.*
+	installdeb-hunspell -phunspell-de-ch
+	installdeb-aspell -paspell-de
+	installdeb-ispell -pingerman # Internally calls dh_installdebconf
+	installdeb-ispell -piswiss   # Internally calls dh_installdebconf
+
+override_dh_installchangelogs:
+	dh_installchangelogs Documentation/Changes
