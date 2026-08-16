@@ -7,7 +7,7 @@
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Wno-unused-result -Wno-unused-function -O2 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-LDFLAGS = -lpthread -lcrypto
+LDFLAGS = -lpthread -lcrypto -lm
 PREFIX  = /usr/local
 BINDIR  = $(PREFIX)/sbin
 CONFDIR = /etc

@@ -387,25 +387,347 @@ static int compute_sha256(const char *path, char *out_hex) {
 }
 
 /* ============================================================================
- * Pattern Scanning Engine
+ * HEURISTIC ENGINE — Second Order Concern & Scopious Yield
  *
- * Scans file content against pattern tables. Works on both text and binary
- * content. For binary content, only matches printable substrings.
+ * The heuristic operates at TWO ORDERS of concern:
+ *
+ *   ORDER 1 (Pattern Presence + Frequency):
+ *     Does the content contain a known-dangerous pattern?
+ *     How MANY times? Density amplifies concern.
+ *
+ *   ORDER 2 (Correlation, Entropy, Structure, Flow):
+ *     How do patterns COMBINE? (co-occurrence correlations)
+ *     What does byte ENTROPY suggest? (obfuscation/packing)
+ *     What do ELF SECTIONS reveal? (structural anomalies)
+ *     What do SCRIPT FLOWS reveal? (staged attack anatomy)
+ *     What do SUPPLY CHAIN indicators show? (trojan/rootkit staging)
+ *
+ * SCOPIOUS: thorough, covering, exhaustive in examination.
+ * ============================================================================ */
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Pattern Frequency — Count occurrences, not just presence
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+static int count_pattern_occurrences(const char *buf, size_t len,
+                                      const char *pattern) {
+    size_t plen = strlen(pattern);
+    if (plen == 0 || plen > len) return 0;
+
+    int count = 0;
+    const char *p = buf;
+    size_t remaining = len;
+
+    while (remaining >= plen) {
+        const char *found = (const char *)memmem(p, remaining, pattern, plen);
+        if (!found) break;
+        count++;
+        size_t advance = (size_t)(found - p) + 1;
+        p = found + 1;
+        remaining -= advance;
+    }
+    return count;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Byte Entropy Analysis — Shannon entropy over sliding windows
+ *
+ * High entropy (> 7.2 bits/byte) suggests:
+ *   - Encrypted payload
+ *   - Packed/compressed executable (not normal for scripts)
+ *   - Obfuscated source code
+ *   - Embedded binary blob in text file
+ *
+ * Low entropy (< 1.5 bits/byte) in ELF suggests:
+ *   - NOP sled (exploitation technique)
+ *   - Padding for buffer overflow alignment
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+#include <math.h>
+
+#define ENTROPY_WINDOW 4096
+#define HIGH_ENTROPY_THRESHOLD 7.2
+#define LOW_ENTROPY_THRESHOLD 1.5
+
+static double compute_entropy(const unsigned char *data, size_t len) {
+    if (len == 0) return 0.0;
+
+    unsigned long freq[256] = {0};
+    for (size_t i = 0; i < len; i++) {
+        freq[data[i]]++;
+    }
+
+    double entropy = 0.0;
+    for (int i = 0; i < 256; i++) {
+        if (freq[i] == 0) continue;
+        double p = (double)freq[i] / (double)len;
+        entropy -= p * log2(p);
+    }
+    return entropy;
+}
+
+static int find_entropy_anomalies(const unsigned char *data, size_t len,
+                                   double *max_entropy, double *avg_entropy,
+                                   int *high_entropy_windows) {
+    *max_entropy = 0.0;
+    *avg_entropy = 0.0;
+    *high_entropy_windows = 0;
+
+    if (len < ENTROPY_WINDOW) {
+        *max_entropy = compute_entropy(data, len);
+        *avg_entropy = *max_entropy;
+        if (*max_entropy > HIGH_ENTROPY_THRESHOLD) *high_entropy_windows = 1;
+        return 1;
+    }
+
+    int windows = 0;
+    double sum = 0.0;
+    size_t step = ENTROPY_WINDOW / 2;  /* 50% overlap */
+
+    for (size_t offset = 0; offset + ENTROPY_WINDOW <= len; offset += step) {
+        double e = compute_entropy(data + offset, ENTROPY_WINDOW);
+        sum += e;
+        windows++;
+        if (e > *max_entropy) *max_entropy = e;
+        if (e > HIGH_ENTROPY_THRESHOLD) (*high_entropy_windows)++;
+    }
+
+    *avg_entropy = windows > 0 ? sum / windows : 0.0;
+    return windows;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * ELF Structural Analysis — Deep binary inspection
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    int is_elf;
+    int is_64bit;
+    int has_rwx_segment;
+    int has_suspicious_interp;
+    int packed_indicator;
+    int has_ptrace_import;
+    int has_dlopen_import;
+    char interp[256];
+} ElfAnalysis;
+
+static void analyze_elf(const unsigned char *data, size_t len, ElfAnalysis *elf) {
+    memset(elf, 0, sizeof(*elf));
+
+    if (len < 64) return;
+    if (data[0] != 0x7f || data[1] != 'E' || data[2] != 'L' || data[3] != 'F')
+        return;
+
+    elf->is_elf = 1;
+    elf->is_64bit = (data[4] == 2);
+
+    /* Packer signatures */
+    size_t check_len = len < 4096 ? len : 4096;
+    if (memmem(data, check_len, "UPX!", 4)) elf->packed_indicator = 1;
+    if (memmem(data, check_len, "MPRESS", 6)) elf->packed_indicator = 1;
+
+    /* 64-bit ELF header parsing */
+    if (elf->is_64bit && len >= 64) {
+        uint16_t phnum = *(uint16_t *)(data + 56);
+        uint64_t phoff = *(uint64_t *)(data + 32);
+
+        if (phoff > 0 && phnum > 0 && phnum < 64) {
+            size_t phsize = 56;
+            for (int i = 0; i < phnum && (phoff + (i+1) * phsize) <= len; i++) {
+                const unsigned char *ph = data + phoff + i * phsize;
+                uint32_t p_type = *(uint32_t *)(ph + 0);
+                uint32_t p_flags = *(uint32_t *)(ph + 4);
+
+                /* PT_LOAD=1, RWX = all bits set */
+                if (p_type == 1 && (p_flags & 0x7) == 0x7)
+                    elf->has_rwx_segment = 1;
+
+                /* PT_INTERP=3 */
+                if (p_type == 3) {
+                    uint64_t offset = *(uint64_t *)(ph + 8);
+                    uint64_t size = *(uint64_t *)(ph + 32);
+                    if (offset < len && size < 255 && offset + size <= len) {
+                        memcpy(elf->interp, data + offset, (size_t)size);
+                        if (strstr(elf->interp, "/ld-linux") == NULL &&
+                            strstr(elf->interp, "/ld-musl") == NULL &&
+                            elf->interp[0] != '\0')
+                            elf->has_suspicious_interp = 1;
+                    }
+                }
+            }
+        }
+
+        if (memmem(data, len, "ptrace", 6)) elf->has_ptrace_import = 1;
+        if (memmem(data, len, "dlopen", 6)) elf->has_dlopen_import = 1;
+    }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Script Flow Analysis — Multi-stage execution detection
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    int has_download;
+    int has_decode;
+    int has_execute;
+    int has_pipe_to_shell;
+    int has_exfiltration;
+    int has_persistence;
+    int has_anti_forensics;
+    int has_obfuscation;
+    int has_privilege_esc;
+    int chain_score;
+} ScriptFlowAnalysis;
+
+static void analyze_script_flow(const char *buf, size_t len,
+                                 ScriptFlowAnalysis *flow) {
+    memset(flow, 0, sizeof(*flow));
+
+    if (memmem(buf, len, "curl ", 5) || memmem(buf, len, "wget ", 5) ||
+        memmem(buf, len, "fetch ", 6) || memmem(buf, len, "aria2c", 6))
+        flow->has_download = 1;
+
+    if (memmem(buf, len, "base64 -d", 9) || memmem(buf, len, "base64 --decode", 15) ||
+        memmem(buf, len, "xxd -r", 6) || memmem(buf, len, "openssl enc", 11) ||
+        memmem(buf, len, "python -c", 9) || memmem(buf, len, "perl -e", 7))
+        flow->has_decode = 1;
+
+    if (memmem(buf, len, "eval ", 5) || memmem(buf, len, "sh -c", 5) ||
+        memmem(buf, len, "bash -c", 7) || memmem(buf, len, "source /tmp", 11))
+        flow->has_execute = 1;
+
+    if (memmem(buf, len, "| sh", 4) || memmem(buf, len, "| bash", 6) ||
+        memmem(buf, len, "|sh", 3) || memmem(buf, len, "| /bin/sh", 9))
+        flow->has_pipe_to_shell = 1;
+
+    if (memmem(buf, len, "/dev/tcp/", 9) || memmem(buf, len, "/dev/udp/", 9) ||
+        memmem(buf, len, "nc -e", 5) || memmem(buf, len, "curl -X POST", 12))
+        flow->has_exfiltration = 1;
+
+    if (memmem(buf, len, "crontab -", 9) || memmem(buf, len, "/etc/cron", 9) ||
+        memmem(buf, len, "systemctl enable", 16) || memmem(buf, len, ".bashrc", 7))
+        flow->has_persistence = 1;
+
+    if (memmem(buf, len, "history -c", 10) || memmem(buf, len, "unset HISTFILE", 14) ||
+        memmem(buf, len, "shred ", 6) || memmem(buf, len, "rm -f /var/log", 14))
+        flow->has_anti_forensics = 1;
+
+    if (memmem(buf, len, "| rev", 5) || memmem(buf, len, "printf '\\x", 10) ||
+        memmem(buf, len, "${!", 3) || memmem(buf, len, "IFS=", 4))
+        flow->has_obfuscation = 1;
+
+    if (memmem(buf, len, "sudo -n", 7) || memmem(buf, len, "pkexec", 6) ||
+        memmem(buf, len, "su -c", 5))
+        flow->has_privilege_esc = 1;
+
+    /* Chain scoring: compound patterns multiply concern */
+    int stages = flow->has_download + flow->has_decode + flow->has_execute +
+                 flow->has_pipe_to_shell;
+    int aggravators = flow->has_exfiltration + flow->has_persistence +
+                      flow->has_anti_forensics + flow->has_obfuscation +
+                      flow->has_privilege_esc;
+
+    if (stages >= 3 && aggravators >= 2)       flow->chain_score = 10;
+    else if (stages >= 3)                      flow->chain_score = 6;
+    else if (stages >= 2 && aggravators >= 1)  flow->chain_score = 5;
+    else if (stages >= 2)                      flow->chain_score = 3;
+    else if (stages == 1 && aggravators >= 2)  flow->chain_score = 3;
+    else                                       flow->chain_score = 1;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Co-Occurrence Correlation Matrix — Pattern combinations that escalate
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    const char *pattern_a;
+    const char *pattern_b;
+    ConcernAxis axis;
+    int         bonus;
+    const char *reason;
+} Correlation;
+
+static const Correlation correlations[] = {
+    { "ptrace(",     "PROT_EXEC",       AXIS_MEMORY,     80, "Process injection (ptrace + exec memory)" },
+    { "ptrace(",     "process_vm_writev", AXIS_MEMORY,   90, "Cross-process code injection" },
+    { "fork(",       "setuid(",         AXIS_BEHAVIORAL, 60, "Privilege escalation sequence" },
+    { "setuid(",     "execve(",         AXIS_BEHAVIORAL, 70, "Privilege exec chain" },
+    { "/dev/mem",    "iopl(",           AXIS_KERNEL,     90, "Hardware-level rootkit" },
+    { "/dev/mem",    "ioperm(",         AXIS_KERNEL,     90, "Direct hardware rootkit" },
+    { "insmod ",     "/dev/mem",        AXIS_KERNEL,     95, "Kernel module + phys memory (rootkit)" },
+    { "kexec_load",  "init_module",     AXIS_KERNEL,     95, "Kernel replacement + module (advanced)" },
+    { "dlopen(",     "execve(",         AXIS_BEHAVIORAL, 60, "Dynamic load + execute (loader)" },
+    { "shm_open(",   "mprotect(",       AXIS_MEMORY,     70, "Shared memory shellcode" },
+    { "memfd_create(", "PROT_EXEC",     AXIS_MEMORY,     80, "Fileless malware (anon exec)" },
+    { "LD_PRELOAD",  "dlopen(",         AXIS_BEHAVIORAL, 70, "Injection via preload + dload" },
+    { "base64",      "eval(",           AXIS_BEHAVIORAL, 70, "Obfuscated code execution" },
+    { "curl ",       "| sh",            AXIS_BEHAVIORAL, 80, "Remote code execution (curl|sh)" },
+    { "wget ",       "| sh",            AXIS_BEHAVIORAL, 80, "Remote code execution (wget|sh)" },
+    { "/etc/shadow", "setuid(",         AXIS_BEHAVIORAL, 80, "Password theft + privesc" },
+    { "CLONE_NEWUSER","CLONE_NEWNS",    AXIS_KERNEL,     60, "Namespace escape combination" },
+    { "/dev/shm/",   "chmod",          AXIS_MEMORY,     70, "Executable in shm (fileless)" },
+    { "crontab",     "curl ",           AXIS_BEHAVIORAL, 60, "Persistent C2 fetch" },
+    { "nc -e",       "/dev/tcp/",       AXIS_BEHAVIORAL, 90, "Reverse shell anatomy" },
+    { NULL, NULL, 0, 0, NULL }
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Supply Chain & Trojan Indicators
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+static const struct {
+    const char *pattern;
+    int         weight;
+    const char *reason;
+} supply_chain_patterns[] = {
+    /* Reverse shell */
+    { "/dev/tcp/",              70, "Bash reverse shell redirect" },
+    { "/dev/udp/",              70, "Bash reverse shell (UDP)" },
+    { "bash -i >& /dev/tcp",   90, "Interactive reverse shell" },
+    { "nc -e /bin/",           80, "Netcat reverse shell" },
+    { "socat exec:",           70, "Socat reverse shell" },
+    { "python -c 'import socket", 80, "Python reverse shell" },
+    { "mkfifo /tmp/",          50, "Named pipe (reverse shell component)" },
+    /* Cryptomining */
+    { "xmrig",                 80, "XMRig cryptominer" },
+    { "stratum+tcp://",        90, "Mining pool connection" },
+    { "stratum+ssl://",        90, "Mining pool (TLS)" },
+    { "randomx",               60, "RandomX mining algorithm" },
+    { "kdevtmpfsi",            90, "Known cryptominer process" },
+    /* Container escape */
+    { "docker.sock",           60, "Docker socket (escape vector)" },
+    { "/var/run/docker.sock",  70, "Docker socket path" },
+    { "nsenter ",              50, "Namespace entry (escape)" },
+    /* Rootkit staging */
+    { "hide_pid",              70, "PID hiding (rootkit)" },
+    { "hide_file",             70, "File hiding (rootkit)" },
+    { "hook_syscall",          90, "Syscall hooking (rootkit)" },
+    { "kallsyms_lookup_name",  80, "Kernel symbol resolve (rootkit)" },
+    /* C2 infrastructure */
+    { ".onion",                50, "Tor hidden service (C2)" },
+    { "dnscat",                80, "DNS tunneling (C2)" },
+    { "iodine",                60, "DNS tunnel" },
+    /* Fileless */
+    { "dd of=/proc/self/mem",  90, "Direct process memory overwrite" },
+    { "LD_PRELOAD=/tmp/",      80, "Preload from temp (injection)" },
+    { "LD_PRELOAD=/dev/shm/",  90, "Preload from shm (fileless)" },
+    { NULL, 0, NULL }
+};
+
+/* ============================================================================
+ * Pattern Scanning Engine — First Order (Enhanced with Frequency)
  * ============================================================================ */
 
 static int scan_buffer_for_pattern(const char *buf, size_t len,
                                     const char *pattern) {
     size_t plen = strlen(pattern);
     if (plen == 0 || plen > len) return 0;
-
-    /* Simple Boyer-Moore-like scan (memmem) */
     return memmem(buf, len, pattern, plen) != NULL;
 }
 
 static void scan_patterns(const char *buf, size_t len,
                           InspectionResult *result,
                           const void *table, ConcernAxis axis) {
-    /* Generic pattern scanner — works with all pattern tables */
     typedef struct {
         const char *pattern;
         int         weight;
@@ -415,17 +737,208 @@ static void scan_patterns(const char *buf, size_t len,
     const PatternEntry *entries = (const PatternEntry *)table;
 
     for (int i = 0; entries[i].pattern != NULL; i++) {
-        if (scan_buffer_for_pattern(buf, len, entries[i].pattern)) {
-            result->scores[axis] += entries[i].weight;
+        int count = count_pattern_occurrences(buf, len, entries[i].pattern);
+        if (count == 0) continue;
 
-            if (result->concern_count < MAX_CONCERNS && entries[i].weight > 0) {
-                Concern *c = &result->concerns[result->concern_count++];
-                c->axis = axis;
-                c->weight = entries[i].weight;
-                c->line = 0;  /* Could compute approximate offset */
+        /* Density amplification:
+         * 1×: base weight
+         * 2-5×: base × 1.5
+         * 6-20×: base × 2.0
+         * 20+×: base × 2.5 (saturation) */
+        int weight = entries[i].weight;
+        if (count >= 20)     weight = (int)(weight * 2.5);
+        else if (count >= 6) weight = weight * 2;
+        else if (count >= 2) weight = (int)(weight * 1.5);
+
+        result->scores[axis] += weight;
+
+        if (result->concern_count < MAX_CONCERNS && entries[i].weight > 0) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = axis;
+            c->weight = weight;
+            c->line = 0;
+            if (count > 1)
+                snprintf(c->detail, sizeof(c->detail), "%s: %s (x%d)",
+                         entries[i].reason, entries[i].pattern, count);
+            else
                 snprintf(c->detail, sizeof(c->detail), "%s: %s",
                          entries[i].reason, entries[i].pattern);
+        }
+    }
+}
+
+/* ============================================================================
+ * Second Order: Correlation Engine
+ * ============================================================================ */
+
+static void apply_correlations(const char *buf, size_t len,
+                                InspectionResult *result) {
+    for (int i = 0; correlations[i].pattern_a != NULL; i++) {
+        if (scan_buffer_for_pattern(buf, len, correlations[i].pattern_a) &&
+            scan_buffer_for_pattern(buf, len, correlations[i].pattern_b)) {
+
+            result->scores[correlations[i].axis] += correlations[i].bonus;
+
+            if (result->concern_count < MAX_CONCERNS) {
+                Concern *c = &result->concerns[result->concern_count++];
+                c->axis = correlations[i].axis;
+                c->weight = correlations[i].bonus;
+                c->line = 0;
+                snprintf(c->detail, sizeof(c->detail),
+                         "CORRELATION: %s", correlations[i].reason);
             }
+        }
+    }
+}
+
+/* ============================================================================
+ * Second Order: Entropy Scoring
+ * ============================================================================ */
+
+static void apply_entropy_scoring(const unsigned char *data, size_t len,
+                                   InspectionResult *result) {
+    double max_entropy, avg_entropy;
+    int high_windows;
+    find_entropy_anomalies(data, len, &max_entropy, &avg_entropy, &high_windows);
+
+    /* Skip if clearly compressed */
+    int is_compressed = (len >= 2 && (
+        (data[0] == 0x1f && data[1] == 0x8b) ||
+        (data[0] == 'B'  && data[1] == 'Z')  ||
+        (data[0] == 0xfd && data[1] == '7')   ||
+        (data[0] == 0x28 && data[1] == 0xb5)));
+
+    if (!is_compressed) {
+        if (high_windows > 10) {
+            result->scores[AXIS_STRUCTURAL] += 60;
+            if (result->concern_count < MAX_CONCERNS) {
+                Concern *c = &result->concerns[result->concern_count++];
+                c->axis = AXIS_STRUCTURAL;
+                c->weight = 60;
+                snprintf(c->detail, sizeof(c->detail),
+                         "ENTROPY: %d high-entropy windows (max %.2f bits/byte)",
+                         high_windows, max_entropy);
+            }
+        } else if (high_windows > 3) {
+            result->scores[AXIS_STRUCTURAL] += 30;
+            if (result->concern_count < MAX_CONCERNS) {
+                Concern *c = &result->concerns[result->concern_count++];
+                c->axis = AXIS_STRUCTURAL;
+                c->weight = 30;
+                snprintf(c->detail, sizeof(c->detail),
+                         "ENTROPY: %d high-entropy regions (embedded payload?)",
+                         high_windows);
+            }
+        }
+    }
+}
+
+/* ============================================================================
+ * Second Order: ELF Structural Scoring
+ * ============================================================================ */
+
+static void apply_elf_scoring(const unsigned char *data, size_t len,
+                               InspectionResult *result) {
+    ElfAnalysis elf;
+    analyze_elf(data, len, &elf);
+    if (!elf.is_elf) return;
+
+    if (elf.has_rwx_segment) {
+        result->scores[AXIS_MEMORY] += 70;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_MEMORY; c->weight = 70;
+            snprintf(c->detail, sizeof(c->detail),
+                     "ELF: RWX segment (code injection surface)");
+        }
+    }
+    if (elf.has_suspicious_interp) {
+        result->scores[AXIS_KERNEL] += 50;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_KERNEL; c->weight = 50;
+            snprintf(c->detail, sizeof(c->detail),
+                     "ELF: Non-standard interpreter: %s", elf.interp);
+        }
+    }
+    if (elf.packed_indicator) {
+        result->scores[AXIS_STRUCTURAL] += 50;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_STRUCTURAL; c->weight = 50;
+            snprintf(c->detail, sizeof(c->detail),
+                     "ELF: Packed binary (UPX/MPRESS) — hides true content");
+        }
+    }
+    if (elf.has_ptrace_import && elf.has_dlopen_import) {
+        result->scores[AXIS_BEHAVIORAL] += 60;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_BEHAVIORAL; c->weight = 60;
+            snprintf(c->detail, sizeof(c->detail),
+                     "ELF: ptrace + dlopen (reflective injection binary)");
+        }
+    }
+}
+
+/* ============================================================================
+ * Second Order: Script Flow Scoring
+ * ============================================================================ */
+
+static void apply_script_flow_scoring(const char *buf, size_t len,
+                                       InspectionResult *result) {
+    int is_script = (len >= 2 && buf[0] == '#' && buf[1] == '!');
+    if (!is_script) {
+        int shell_ind = 0;
+        if (memmem(buf, len, "#!/bin/", 7)) shell_ind++;
+        if (memmem(buf, len, "if [", 4)) shell_ind++;
+        if (memmem(buf, len, "then\n", 5)) shell_ind++;
+        if (memmem(buf, len, "echo ", 5)) shell_ind++;
+        if (shell_ind < 2) return;
+    }
+
+    ScriptFlowAnalysis flow;
+    analyze_script_flow(buf, len, &flow);
+
+    if (flow.chain_score > 1) {
+        int chain_weight = flow.chain_score * 20;
+        result->scores[AXIS_BEHAVIORAL] += chain_weight;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_BEHAVIORAL; c->weight = chain_weight;
+            const char *desc = flow.chain_score >= 10 ? "FULL APT ANATOMY" :
+                               flow.chain_score >= 6  ? "THREE-STAGE CHAIN" :
+                               flow.chain_score >= 5  ? "TWO-STAGE+AGGRAVATION" :
+                                                        "TWO-STAGE DROPPER";
+            snprintf(c->detail, sizeof(c->detail),
+                     "SCRIPT FLOW: %s (chain=%d)", desc, flow.chain_score);
+        }
+    }
+    if (flow.has_anti_forensics) {
+        result->scores[AXIS_BEHAVIORAL] += 40;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_BEHAVIORAL; c->weight = 40;
+            snprintf(c->detail, sizeof(c->detail),
+                     "SCRIPT FLOW: Anti-forensics (history/log deletion)");
+        }
+    }
+    if (flow.has_obfuscation) {
+        result->scores[AXIS_STRUCTURAL] += 40;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_STRUCTURAL; c->weight = 40;
+            snprintf(c->detail, sizeof(c->detail),
+                     "SCRIPT FLOW: Obfuscation (rev/tr/printf-hex/IFS)");
+        }
+    }
+    if (flow.has_exfiltration) {
+        result->scores[AXIS_BEHAVIORAL] += 50;
+        if (result->concern_count < MAX_CONCERNS) {
+            Concern *c = &result->concerns[result->concern_count++];
+            c->axis = AXIS_BEHAVIORAL; c->weight = 50;
+            snprintf(c->detail, sizeof(c->detail),
+                     "SCRIPT FLOW: Data exfiltration indicators");
         }
     }
 }
@@ -483,7 +996,7 @@ static int inspect_file(const char *path, InspectionStage stage,
     close(fd);
     buf[total_read] = '\0';
 
-    /* Run pattern scans across all axes */
+    /* ── First Order: Pattern scans across all axes ── */
     scan_patterns(buf, total_read, result,
                   kernel_patterns, AXIS_KERNEL);
     scan_patterns(buf, total_read, result,
@@ -492,6 +1005,14 @@ static int inspect_file(const char *path, InspectionStage stage,
                   behavioral_patterns, AXIS_BEHAVIORAL);
     scan_patterns(buf, total_read, result,
                   structural_patterns, AXIS_STRUCTURAL);
+    scan_patterns(buf, total_read, result,
+                  supply_chain_patterns, AXIS_BEHAVIORAL);
+
+    /* ── Second Order: Correlation, Entropy, ELF, Script Flow ── */
+    apply_correlations(buf, total_read, result);
+    apply_entropy_scoring((const unsigned char *)buf, total_read, result);
+    apply_elf_scoring((const unsigned char *)buf, total_read, result);
+    apply_script_flow_scoring(buf, total_read, result);
 
     free(buf);
 
