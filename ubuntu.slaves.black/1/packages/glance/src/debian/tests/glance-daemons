@@ -1,0 +1,52 @@
+#!/bin/bash
+#---------------------
+# Testing glance-daemons
+#---------------------
+set -e
+DAEMONS=('glance-api')
+
+for daemon in "${DAEMONS[@]}"; do
+    systemctl stop $daemon
+done
+
+mysql -u root << EOF
+CREATE DATABASE glance;
+CREATE USER 'glance'@'localhost' IDENTIFIED BY 'changeme';
+CREATE USER 'glance'@'%'         IDENTIFIED BY 'changeme';
+GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost';
+GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%';
+EOF
+
+crudini --set /etc/glance/glance-api.conf database connection "mysql+pymysql://glance:changeme@localhost/glance"
+glance-manage db_sync
+
+ret=0
+
+timeout_loop () {
+    TIMEOUT=100
+    while [ "$TIMEOUT" -gt 0 ]; do
+        if $1 > /dev/null 2>&1; then
+            echo "OK"
+            break
+        fi
+        TIMEOUT=$((TIMEOUT - 1))
+        sleep 0.1
+    done
+
+    if [ "$TIMEOUT" -le 0 ]; then
+        echo "ERROR: $1 FAILED"
+        ret=1
+    fi
+}
+
+for daemon in "${DAEMONS[@]}"; do
+    systemctl start $daemon
+    timeout_loop "systemctl is-active $daemon"
+done
+
+timeout_loop "curl --fail http://localhost:9292"
+if [ "$ret" -eq 1 ]; then
+    # Run curl one more time without --fail to ensure no silent failures
+    curl http://localhost:9292
+fi
+exit $ret

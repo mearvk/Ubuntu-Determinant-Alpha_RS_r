@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+DEB_VERSION = $(shell dpkg-parsechangelog | awk '/^Version/ {print $$2}')
+UPSTREAM_VERSION = $(shell echo $(DEB_VERSION) | sed 's/-.*//')
+GLIBC_GIT = https://sourceware.org/git/glibc.git
+GLIBC_TAG = glibc-$(UPSTREAM_VERSION)
+GLIBC_CHECKOUT = glibc-checkout
+DEB_DIR = glibc-doc-reference-$(UPSTREAM_VERSION)
+DEB_ORIG = ../glibc-doc-reference_$(UPSTREAM_VERSION).orig.tar.xz
+
+%:
+	dh $@
+
+override_dh_auto_build-indep:
+	mkdir -p $(CURDIR)/build
+	echo "MAKEINFO = makeinfo"                                           >  $(CURDIR)/build/config.make
+	echo "AWK = gawk"                                                    >> $(CURDIR)/build/config.make
+	echo "PERL = perl"                                                   >> $(CURDIR)/build/config.make
+	echo "PYTHON = python3"                                              >> $(CURDIR)/build/config.make
+	echo "PKGVERSION_TEXI = (Debian glibc-doc-reference $(DEB_VERSION))" >> $(CURDIR)/build/config.make
+	echo "REPORT_BUGS_TEXI = @uref{https://www.debian.org/Bugs/}"        >> $(CURDIR)/build/config.make
+	$(MAKE) -C manual objdir=$(CURDIR)/build info html pdf
+
+override_dh_auto_clean:
+	rm -fr $(CURDIR)/build
+	dh_auto_clean
+
+get-orig-source: $(DEB_ORIG)
+$(DEB_ORIG):
+	dh_testdir
+	git clone --bare $(GLIBC_GIT) $(GLIBC_CHECKOUT)
+	mkdir -p $(DEB_DIR)
+	(cd $(GLIBC_CHECKOUT) && git archive -v --format=tar $(GLIBC_TAG)) | tar -C $(DEB_DIR) -xf -
+	tar --mode=go=rX,u+rw,a-s --owner=root --group=root --numeric-owner -Jcf $(DEB_ORIG) \
+		$(DEB_DIR)/manual \
+		$(DEB_DIR)/math/gen-libm-test.py \
+		$(DEB_DIR)/scripts/mkinstalldirs \
+		$(DEB_DIR)/scripts/move-if-change \
+		`find $(DEB_DIR) -name "libm-test-ulps*"`
+	rm -rf $(DEB_DIR) $(GLIBC_CHECKOUT)

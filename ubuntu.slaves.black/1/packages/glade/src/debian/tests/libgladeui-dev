@@ -1,0 +1,43 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against this library, to
+# verify that the headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2020 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR=$(mktemp -d)
+export XDG_RUNTIME_DIR="$WORKDIR"
+cleanup () {
+    rm -fr "$WORKDIR"
+}
+trap cleanup 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > glade.c
+#include <gladeui/glade.h>
+#include <glib.h>
+
+int main(void)
+{
+  gchar *p = glade_util_canonical_path ("/dev/../dev/null");
+  g_assert_cmpstr (p, ==, "/dev/null");
+  g_free (p);
+  return 0;
+}
+EOF
+
+# Deliberately word-splitting, that's how pkg-config works:
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -o glade glade.c $("${CROSS_COMPILE}pkg-config" --cflags --libs gladeui-2.0)
+echo "build: OK"
+[ -x ./glade ]
+dbus-run-session -- xvfb-run -a ./glade
+echo "run: OK"

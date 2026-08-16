@@ -1,0 +1,250 @@
+    <chapter id="gbp.special">
+    <title>Special Use Cases</title>
+    <sect1 id="gbp.special.dfsgfree">
+    <title>Handling non-DFSG clean upstream sources</title>
+    <para>If you have to handle non-DFSG clean upstream sources, you can use a
+    different branch which you have to create once:
+    </para>
+<programlisting>
+  &gitcmd; branch dfsg_clean upstream
+</programlisting>
+    <para>
+    This creates the <emphasis>dfsg_clean</emphasis> branch from the tip of a
+    branch called <emphasis>upstream</emphasis>.  Then, when importing a new
+    upstream version, you import the new version on the
+    <option>upstream-branch</option> (by default named
+    <emphasis>upstream</emphasis>) as usual and just don't merge to the
+    <emphasis>debian-branch</emphasis>  (by default named
+    <emphasis>master</emphasis>):
+    </para>
+<programlisting>
+  &gbp-import-orig; --no-merge <filename>/path/to/nondfsg-clean-package_10.4.orig.tar.gz</filename>
+  &gitcmd; <option>tag</option> 10.4
+</programlisting>
+    <para>
+    After the import, you can switch to the <emphasis>dfsg_clean</emphasis>
+    branch and get the newly imported changes from the upstream branch:
+    </para>
+<programlisting>
+  &gitcmd; <option>checkout</option> dfsg_clean
+  &gitcmd; <option>pull</option> <filename>.</filename> upstream
+</programlisting>
+    <para>Now make this checkout dfsg clean (preferably by a cleanup script), commit
+    your changes and merge to your <option>debian-branch</option>:</para>
+<programlisting>
+  cleanup-script.sh
+  &gitcmd; commit -a -m "Make source dfsg clean"
+  &gitcmd; tag <replaceable>10.4.dfsg</replaceable>
+  &gitcmd; checkout <replaceable>master</replaceable>
+  &gitcmd; pull <replaceable>.</replaceable> <replaceable>dfsg_clean</replaceable>
+</programlisting>
+    </sect1>
+
+    <sect1 id="gbp.special.nmus">
+    <title>Importing NMUs</title>
+    <para>
+    First, create a branch that holds the NMUs from the tip of your
+    <option>debian-branch</option> (default is <emphasis>master</emphasis>) once:
+    </para>
+<programlisting>
+  &gitcmd; <option>branch</option> <replaceable>nmu</replaceable> <replaceable>master</replaceable>
+</programlisting>
+    <para>
+    To import an NMU, change into the git repository and use &gbp-import-dsc;:
+    </para>
+<programlisting>
+  &gitcmd; checkout <replaceable>master</replaceable>
+  &gbp-import-dsc; <option>--debian-branch</option>=<replaceable>nmu</replaceable> <filename>/path/to/package_1.0-1nmu0.dsc</filename>
+</programlisting>
+    <para>
+    This will import the NMU onto the branched named <emphasis>nmu</emphasis>
+    instead of the default <option>master</option>. This method can also
+    be used to import "old" releases into the &git; repository when migrating
+    to &git; from another VCS.
+    </para>
+    </sect1>
+
+    <sect1 id="gbp.special.pbuilder">
+    <title>Building with &cowbuilder;</title>
+    <para>
+      &cowbuilder; is nice tool to build Debian packages in a defined
+      environment.  It makes sure all build-dependencies are specified
+      correctly by building the package in a clean chroot. As its
+      cousin &pbuilder; it can be extended via hooks to (e.g. run
+      autopkg tests) but doesn't need a tarball unpacked but uses copy
+      on write tree to speed up the build.
+    </para>
+
+    <para>
+      Since &cowbuilder; uses different command line arguments than
+      &debuild; and &dpkg-buildpackage;, we can't simply pass the
+      options to run it on the command line. To simplifiy the
+      integration we use a separate helper named &git-pbuilder;.
+      &gbp; has it's own command line option for this:
+    </para>
+<programlisting>
+  &gbp-buildpackage; <option>--git-pbuilder</option>
+</programlisting>
+    <para>
+      This will set the build command to run &git-pbuilder; (which
+      invokes &cowbuilder; by default) and the clean command
+      to <command>/bin/true</command>. It also activates the parsing
+      of several &git-pbuilder; related options
+      like <option>--git-dist</option>, <option>--git-arch</option> and
+      <option>--git-pbuilder-options</option>.
+    </para>
+
+    <para>
+      We can make &git-pbuilder; usage the default by adding it to
+      <filename>~/.gbp.conf</filename>:
+    </para>
+<programlisting>
+cat &lt;&lt;EOF &gt; <filename>~/.gbp.conf</filename>
+[DEFAULT]
+# We invoke cowbuilder via git-pbuilder. Arguments passed to &gbp-buildpackage;
+# will be passed to dpkg-buildpackage in the chroot
+pbuilder = True
+EOF
+</programlisting>
+      <para>
+	<command>git-pbuilder</command> defaults to building a package for the
+	<envar>sid</envar> distribution. If you want to build for another
+	distribution, pass this in the <option>--git-dist</option> option:
+
+<programlisting>
+  &gbp-buildpackage; --git-pbuilder --git-dist=jessie
+</programlisting>
+
+	If you want to use <command>debuild</command> again (without
+	modifying <filename>~/.gbp.conf</filename>), you can use:
+      </para>
+<programlisting>
+  &gbp-buildpackage; --git-no-pbuilder
+</programlisting>
+      <para>
+	In order for all of the above to work you have to create a
+	base chroot first using &git-pbuilder;:
+      </para>
+<programlisting>
+  <command>git-pbuilder</command> create
+</programlisting>
+      <para>
+	This can later be updated using:
+      </para>
+<programlisting>
+  <command>git-pbuilder</command> update
+</programlisting>
+    </sect1>
+
+    <sect1 id="gbp.special.hacking">
+    <title>Working on random packages</title>
+    <para>
+    Whenever you need to work on an arbitrary &debian; package, you can check it
+    right into &git; with one command:
+<programlisting>
+  &gbp-import-dsc; apt:<filename>package</filename>
+  cd <filename>package</filename>
+  &gitcmd; branch debian
+</programlisting>
+    </para>
+    <para>
+    This uses <command>apt-get</command> to download the source package,
+    puts the orig tarball on the <option>upstream-branch</option> and the
+    &debian; changes on the <option>debian-branch</option> (by default
+    <emphasis>master</emphasis>). The second command
+    creates a branch called <emphasis>debian</emphasis>. Now you can easily
+    modify the package, revert changes you made, create other branches for
+    testing, see what changes you made, etc.  When finished, just do</para>
+<programlisting>
+  &gitcmd; commit -a
+  &gitcmd; diff debian --
+</programlisting>
+    <para>
+    to get a nice patch that can be submitted to the &debian; BTS. You can also
+    fetch the source package from a URL:
+
+<programlisting>
+  &gbp-import-dsc; <filename>http://mentors.debian.net/debian/pool/main/i/ipsec-tools/ipsec-tools_0.7.3-9.dsc</filename>
+</programlisting>
+
+   The import works incrementally; you can import new versions on top of
+   already imported ones for e.g. easy review of changes.
+    </para>
+
+    </sect1>
+    <sect1 id="gbp.special.sloppytarball">
+    <title>Sloppy tarball creation</title>
+    <para>
+      By default &gbp-buildpackage; uses <filename>debian/changelog</filename> to detect
+      the upstream version and build the corrsponding tarball either via &pristine-tar; or
+      by using <command>git archive</command> directly. This ensures that the tarball matches
+      what's in the Debian archive already.
+    </para>
+    <para>
+      But there might be cases where you don't want to follow these
+      packaging practice and create a fresh <emphasis>dirty</emphasis>
+      tarball that contains additional changes. Such tarballs are not
+      suitable for upload into the archive but might be helpful in local testing.
+    </para>
+    <para>
+      Especially when getting started and when you first want to get a
+      package built and dive into &gbp-dch;, &git-pbuilder; and the 3.0
+      (quilt) format later to find out what exactly
+<programlisting>
+dpkg-source: info: local changes detected, the modified files are:
+ hello-debhelper/configure
+dpkg-source: error: aborting due to unexpected upstream changes, see /tmp/hello-debhelper_2.8-1.diff.har2Xx
+dpkg-source: info: you can integrate the local changes with dpkg-source --commit
+</programlisting>
+means.
+    </para>
+    <para>
+      For that you can force &gbp-buildpackage; to create a tarball
+      from the <emphasis>debian-branch</emphasis> dropping
+      the <filename>debian/</filename> directory. This will give you a
+      tarball that is very close to your current working copy except
+      for the packaging.
+    </para>
+<programlisting>
+  &gbp-buildpackage; --git-ignore-new --git-force-create --git-upstream-tree=SLOPPY --git-no-pristine-tar
+</programlisting>
+    <para>
+      The important part is the <emphasis>SLOPPY</emphasis> above. The
+      other options are there to prevent &gbp-buildpackage; from using
+      &pristine-tar;, to force the creation of a new tarball and to
+      not abort if you have changes in your current working copy.
+
+      If you're still getting an error about <emphasis>unexpected
+      upstream changes</emphasis> make sure you have no uncommitted
+      changes in you workig copy (changes in
+      the <filename>debian/</filename> directory are o.k.) and no
+      files that are ignored by git
+      via <filename>.gitignore</filename>. A <command>git clean
+      -dfx</command> can help here.
+    </para>
+    <para>
+      Please don't use this tarball to upload to the Debian archive
+      since changes outside <filename>debian/</filename> need to be
+      represented by patches in <filename>debian/patches</filename>.
+      See the <command>dpkg-source</command> manpage for
+      details.
+   </para>
+    </sect1>
+
+    <sect1 id="gbp.special.pk4">
+      <title>Integrating with pk4</title>
+      <para>
+	&pk4; provides an easy way to fetch the sources of packages
+	currently installed on the system. In order to let pk4 provide
+	these packages as &git; repositories you can enable &gbp;'s
+	unpack hook:
+      </para>
+      <programlisting>
+mkdir -p ~/.config/pk4/hooks-enabled/unpack/
+ln -s /usr/share/pk4/hooks-available/unpack/gbp ~/.config/pk4/hooks-enabled/unpack/
+      </programlisting>
+      <para>
+	This will make sure packages are imported into a git respository after download.
+      </para>
+    </sect1>
+</chapter>

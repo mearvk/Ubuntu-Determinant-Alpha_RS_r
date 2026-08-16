@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -e
+set -x
+
+cleanup()
+{
+  [ -z "${GBP_TEMPDIR}" ] || rm -rf "${GBP_TEMPDIR}"
+}
+
+trap cleanup EXIT
+
+git init .
+git config user.email "you@example.com"
+git config user.name "Doesnot Matter"
+git add .
+git commit -m"Smoketest" -a
+
+gbp buildpackage-rpm --help
+
+# Build an RPM of ourselfes if build-deps are available
+if python3 -c "import setuptools"; then
+  GBP_TEMPDIR=$(mktemp -d)
+  gbp buildpackage-rpm --git-packaging-dir=packaging/ \
+                       --git-export-dir="$GBP_TEMPDIR" \
+                       -D'%__python3 /usr/bin/python3' \
+                       -D'%__python /usr/bin/python3' \
+                       -D'%python_sitelib %(%{__python3} -Ic "from distutils.sysconfig import get_python_lib; print(get_python_lib())")' \
+                       -D'%_arch noarch' \
+                       -bb --nodeps
+fi

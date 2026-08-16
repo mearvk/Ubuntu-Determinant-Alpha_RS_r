@@ -1,0 +1,91 @@
+From: Markus Lehtonen <markus.lehtonen@linux.intel.com>
+Date: Wed, 9 Jan 2013 14:19:47 +0200
+Subject: [PATCH] packaging: add alternative spec file and change patch path
+
+Add a second spec file for testing import-srpm spec guessing.
+
+Change one patch filename to be full url for testing import-srpm patch
+import functionality.
+
+Signed-off-by: Markus Lehtonen <markus.lehtonen@linux.intel.com>
+
+diff --git a/.gbp.conf b/.gbp.conf
+index 3d5f92d..6c8e847 100644
+--- a/.gbp.conf
++++ b/.gbp.conf
+@@ -7,4 +7,5 @@ upstream-tag = upstream/%(upstreamversion)s
+ packaging-tag-msg = %(vendor)s release %(version)s
+ packaging-dir = packaging
+ patch-ignore-path = ^(packaging/.*|\.gbp.conf)
++spec-file = packaging/gbp-test2.spec
+ 
+diff --git a/packaging/gbp-test2-alt.spec b/packaging/gbp-test2-alt.spec
+new file mode 100644
+index 0000000..54a8f0e
+--- /dev/null
++++ b/packaging/gbp-test2-alt.spec
+@@ -0,0 +1,48 @@
++Name:       gbp-test2-alt
++Summary:    Test package 2 alternative for git-buildpackage
++Epoch:      1
++Version:    2.0
++Release:    0
++Group:      Development/Libraries
++License:    GPLv2
++Source10:   ftp://ftp.host.com/%{name}-%{version}.tar.gz
++Source0:    foo.txt
++Source20:   bar.tar.gz
++# Gbp-Ignore-Patches: -1
++Patch0:     my.patch
++Patch10:    http://example.com/patches/my2.patch
++Patch20:    my3.patch
++Packager:   Markus Lehtonen <markus.lehtonen@linux.intel.com>
++
++%description
++Package for testing the RPM functionality of git-buildpackage.
++Version 2 which has packaging and development in the same
++git branch. Alternative spec file used.
++
++
++%prep
++%setup -T -n %{name}-%{version} -c -a 10
++
++%patch
++%patch -P 20 -p1
++
++echo "Do things"
++
++# Gbp-Patch-Macros
++
++%build
++make
++
++
++%install
++rm -rf %{buildroot}
++mkdir -p %{buildroot}/%{_datadir}/%{name}
++cp -R * %{buildroot}/%{_datadir}/%{name}
++install %{SOURCE0} %{buildroot}/%{_datadir}/%{name}
++
++
++
++%files
++%defattr(-,root,root,-)
++%dir %{_datadir}/%{name}
++%{_datadir}/%{name}
+diff --git a/packaging/gbp-test2.spec b/packaging/gbp-test2.spec
+index 5121f17..fa28beb 100644
+--- a/packaging/gbp-test2.spec
++++ b/packaging/gbp-test2.spec
+@@ -8,9 +8,10 @@ License:    GPLv2
+ Source10:   ftp://ftp.host.com/%{name}-%{version}.tar.gz
+ Source0:    foo.txt
+ Source20:   bar.tar.gz
++Source9999: gbp-test2-alt.spec
+ # Gbp-Ignore-Patches: -1
+ Patch0:     my.patch
+-Patch10:    my2.patch
++Patch10:    http://example.com/patches/my2.patch
+ Patch20:    my3.patch
+ Packager:   Markus Lehtonen <markus.lehtonen@linux.intel.com>
+ 

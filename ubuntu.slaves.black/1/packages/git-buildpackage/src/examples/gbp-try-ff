@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# Try to update a package to a new upstream version
+
+set -e
+
+DB=$(gbp config buildpackage.debian-branch | sed 's/\(.*debian-branch=\)\(.*\)/\2/')
+MAINTAINER=$(dpkg-parsechangelog -SMaintainer)
+SOURCE=$(dpkg-parsechangelog -SSource)
+OLD_VERSION=$(dpkg-parsechangelog -SVersion)
+
+git checkout "${DB}"
+gbp pq import --force
+git checkout "${DB}"
+
+set +e
+gbp import-orig --uscan --no-interactive --no-pristine-tar
+ret=$?
+set -e
+# no new version found
+if [ $ret = 4 ]; then
+    exit 0
+# all other errors
+elif [ $ret != 0 ]; then
+    exit $ret
+fi
+
+if ! gbp pq rebase; then
+    echo "Automatic rebase failed"
+    git rebase --abort
+    exit 1
+fi
+
+gbp pq export --commit
+gbp dch -S -a
+
+NEW_VERSION=$(dpkg-parsechangelog -SVersion)
+git commit -m"Snapshot build of ${SOURCE} $NEW_VERSION" debian/changelog
+
+gbp buildpackage --git-pbuilder \
+                 --git-no-pristine-tar \
+                 --git-postbuild='lintian $GBP_CHANGES_FILE' \
+                 -nc \
+                 ${GBP_BUILDPACKAGE_ARGS}
+
+MSG="Fast forward of ${SOURCE} from ${OLD_VERSION} to ${NEW_VERSION} successful"
+echo "${MSG}"
+MAILADDR=$(echo $MAINTAINER | sed -e 's/.*<\(.*\)>/\1/')
+echo "$MSG" | mail -s "Update of ${SOURCE} to ${NEW_VERSION}" "${MAILADDR}"

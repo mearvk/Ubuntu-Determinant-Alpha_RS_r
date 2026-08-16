@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+
+# Verbose mode
+#export DH_VERBOSE=1
+
+SHELL := /bin/sh -e
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/~/./g')
+export PBR_VERSION=$(VERSION)
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	echo "Do nothing..."
+
+override_dh_install:
+	pkgos-dh_auto_install --no-py2
+	rm -rf $(CURDIR)/debian/python3-glance/usr/etc
+	dh_install -Xrootwrap.conf
+	dh_missing --fail-missing -Xrootwrap.conf
+
+	crudini --merge $(CURDIR)/debian/glance-common/etc/glance/glance-api.conf \
+		< $(CURDIR)/debian/glance-api.conf.defaults
+
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	pkgos-dh_auto_test --no-py2 "^glance.tests.unit.*"
+endif
+
+override_dh_auto_build:
+	dh_auto_build
+	mkdir -p doc/build/man doc/build/html
+	sphinx-build -b man doc/source doc/build/man
+	sphinx-build -b html doc/source doc/build/html
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf doc/build glance.sqlite .testrepository
+	rm -f debian/*.init debian/*.service debian/*.upstart
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

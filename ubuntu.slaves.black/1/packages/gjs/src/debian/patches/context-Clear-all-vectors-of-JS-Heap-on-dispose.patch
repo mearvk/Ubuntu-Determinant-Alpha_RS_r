@@ -1,0 +1,32 @@
+From: Daniel van Vugt <daniel.van.vugt@canonical.com>
+Date: Wed, 5 Apr 2023 17:48:22 +0800
+Subject: context: Clear all vectors of JS::Heap on dispose
+
+Otherwise we might still have some `JS::Heap`s lingering after
+`JS_DestroyContext`, which will fail to destruct (crash) when their
+destructors are called later in `~GjsContextPrivate()`.
+
+Fixes: https://gitlab.gnome.org/GNOME/gjs/-/issues/472
+
+Bug-Ubuntu: https://launchpad.net/bugs/1974293
+Origin: backport, https://gitlab.gnome.org/GNOME/gjs/-/merge_requests/834
+Forwarded: yes
+Last-Update: 2023-04-11
+---
+ gjs/context.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/gjs/context.cpp b/gjs/context.cpp
+
+--- a/gjs/context.cpp
++++ b/gjs/context.cpp
+@@ -417,6 +417,9 @@
+ void GjsContextPrivate::dispose(void) {
+     if (m_cx) {
+         stop_draining_job_queue();
++        m_job_queue.clear();
++
++        m_object_init_list.clear();
+
+         gjs_debug(GJS_DEBUG_CONTEXT,
+                   "Notifying reference holders of GjsContext dispose");
