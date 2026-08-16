@@ -1,0 +1,2 @@
+PACKAGE = junicode
+VERSION = 1.002
