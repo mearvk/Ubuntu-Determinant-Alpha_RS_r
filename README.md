@@ -74,10 +74,11 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 **Intelligence**
 
 24. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+25. [Psych-ID — Network Intelligence & Web Analysis](#psych-id--network-intelligence--web-analysis)
 
 **Certificates & Ethics**
 
-25. [Certificates](#certificates)
+26. [Certificates](#certificates)
 
 **Secure JVM (OpenJDK 28)**
 
@@ -2070,6 +2071,193 @@ tools/ai/web/dave_ssl_schema.sql     - MySQL schema (SSL certs, site auth, key r
 tools/ai/web/dave_web_capabilities.json - Web interface specification
 tools/ai/library/                    - 75 books (.lib, public domain)
 ```
+
+---
+
+## Psych-ID — Network Intelligence & Web Analysis
+
+A network intelligence daemon that scans standard service ports for MOTD banner messages, builds a ~300 MB suspects database, and applies a two-stage analyzer engine: **suggestion lobotomy** (carry toward center reference with 3rd/4th dimensional maintenance, respecting law and science) and **insect trimming** (removal of impossible or dead-end varios). Prescribes search engine queries for further information hinting.
+
+### Scan Ports
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 20 | TCP | FTP Data |
+| 21 | TCP | FTP Control |
+| 22 | TCP | SSH |
+| 80 | TCP | HTTP |
+| 443 | TCP/TLS | HTTPS |
+| 8080 | TCP | HTTP Alternate |
+| 8443 | TCP/TLS | HTTPS Alternate |
+
+### Analyzer Engine
+
+**Suggestion Lobotomy** — 7-stage progressive analysis refinement:
+
+| Stage | Name | Action |
+|-------|------|--------|
+| 1 | Center | Carry toward center reference — normalize outliers toward verified median |
+| 2 | Dim3 | Maintain 3rd dimension — spatial/relational context (network topology, proximity) |
+| 3 | Dim4 | Maintain 4th dimension — temporal/causal context (when, how long, evolution) |
+| 4 | Law | Respect to law — verify legal bounds of analysis |
+| 5 | Law Again | Reinforced — double-check legal boundary (no suggestion leads to illegal action) |
+| 6 | Science | Maintenance of science — reproducibility and consistency verification |
+| 7 | Full | All stages applied — suggestion is centered, dimensional, lawful, scientific |
+
+**Insect Trimming** — prune dead branches from the analysis web:
+
+| Type | Name | Meaning |
+|------|------|---------|
+| 0 | Impossible | Path is logically impossible given known facts |
+| 1 | Dead End | Path terminates without yielding useful information |
+| 2 | Circular | Path loops back to already-known information |
+| 3 | Contradictory | Path contradicts established, verified facts |
+| 4 | Expired | Information is time-sensitive and window has closed |
+| 5 | Superceded | Newer/better information renders this path obsolete |
+
+### Feed Modes
+
+| Mode | Behavior | Cron Use |
+|------|----------|----------|
+| Daily | Auto-feed at configured hour (default 03:00) | Standard crontab or callback |
+| On Command | Feed only when explicitly invoked | Manual or triggered |
+| Feed+Update | Feed AND run full analysis + prescriptions | Callback with `expect` |
+| Reminder | Random interval 8–36 hours (naturally timed) | Daemon self-schedules |
+
+### Search Prescription Engine
+
+When a suspect reaches sufficient interest, the engine generates search queries:
+
+1. **Vulnerability advisory** — known CVEs for the service fingerprint
+2. **Hardening guide** — CIS benchmarks, vendor best practices
+3. **Direct CVE/NVD lookup** — site-specific searches for high-concern suspects
+
+Each prescription includes: query string, recommended engine, explanatory hint, priority, and originating lobotomy stage.
+
+### Usage
+
+```bash
+psych-id daemon                    # Start background daemon
+psych-id feed                      # Scan all targets (quick)
+psych-id feed-update               # Scan + full analysis + prescriptions
+psych-id scan 192.168.1.1          # Scan single host
+psych-id status                    # MOTD banner with stats
+psych-id prescriptions             # List pending search prescriptions
+psych-id suspects                  # List tracked suspects
+psych-id prune                     # Enforce 300 MB limit
+psych-id stop                      # Stop running daemon
+```
+
+### Cron Integration
+
+```crontab
+# Daily feed + analysis at 3am (cronie callback extension)
+0 3 * * * /usr/local/bin/psych-id feed-update @callback {
+    expect: "Feed + Update complete"
+    retry: 2
+    on_fail: escalate
+    notify: "chat:ops-team"
+    timeout: 300s
+}
+
+# Standard cron (no callback)
+0 3 * * * /usr/local/bin/psych-id feed-update >> /var/log/psych-id-cron.log 2>&1
+```
+
+### Signals
+
+| Signal | Action |
+|--------|--------|
+| `SIGUSR1` | Trigger immediate feed (scan only) |
+| `SIGUSR2` | Trigger feed + update (full analysis) |
+| `SIGTERM` | Graceful shutdown |
+
+### Database
+
+- **Engine:** SQLite (WAL mode, 256 MB mmap, 64 MB cache)
+- **Max Size:** 300 MB (auto-prune oldest records when exceeded)
+- **Tables:** banners, suspects, prescriptions, web_nodes, feed_log
+- **Location:** `/var/lib/psych-id/suspects.db`
+
+### Files
+
+```
+tools/psych-id/psych_id.c              - Daemon/CLI source (~900 lines)
+tools/psych-id/psych_id.h              - Header (structures, API, constants)
+tools/psych-id/congregation_sorter.c   - 3rd Order Congregation Sorter (~550 lines)
+tools/psych-id/congregation_sorter.h   - Sorter header (axes, ethical table, congruences)
+tools/psych-id/psych_id.conf           - Default configuration
+tools/psych-id/Makefile                - Build/install
+tools/psych-id/README.md               - Detailed documentation
+```
+
+### 3rd Order Congregation Sorter (Binding Reagent)
+
+A sorting engine bound into Psych-ID that congregates all information along three axes derived from two centricities:
+
+**Jewish Law (Halacha)** — data has sanctity of SOURCE. Who said it, was it witnessed, is there a chain of transmission? Provenance is half the truth.
+
+**Mormonism (Restoration)** — data has quality of RELEVANCE. Is it alive now? Does it serve the living? Revelation is ongoing — what it means today matters.
+
+### Quality of Ethical Individual & Entity Table
+
+Data is produced by entities. The ethical quality of the producing entity informs the SOURCE axis. This is not surveillance — it is discernment.
+
+- *Jewish Law:* "From whom did you hear this?" — the witness matters.
+- *Mormonism:* "By their fruits ye shall know them." — track record matters.
+
+| Dimension | Meaning | Range |
+|-----------|---------|-------|
+| Truthfulness | History of providing accurate data | 0–100 |
+| Consistency | Stability and non-contradiction over time | 0–100 |
+| Transparency | Openness about operations and intent | 0–100 |
+| Harmlessness | Absence of malicious or deceptive behavior | 0–100 |
+| Reliability | Availability, responsiveness, uptime | 0–100 |
+| **Composite** | Weighted average — the ethical standing | 0–100 |
+
+An entity that contradicts known facts loses Truthfulness. An entity that produces consistent results over time gains Consistency. The composite ethical score flows into the congregation record's `ethical_quality` field and influences source-quality assessment.
+
+### Three Sorting Axes
+
+| Axis | Centricity | Question | Levels |
+|------|------------|----------|--------|
+| **Source Quality** | Jewish Law | Who said it? Chain? Authority? | Unknown → Hearsay → Witnessed → Corroborated → Documented → Authoritative → Canonical |
+| **Relevance Quality** | Mormonism | Is it alive now? Living revelation? | Dead → Historical → Dormant → Peripheral → Active → Immediate → Revelation |
+| **System Congruence** | Speculative | Must it be central? | None → Peripheral → Supporting → Structural → Essential → Axiomatic |
+
+### What Must Be Central (Congruences)
+
+| Level | What Belongs Here | Why |
+|-------|-------------------|-----|
+| **Axiomatic** | System identity, ethical posture, security policy, chain of authority | Removal destroys coherence |
+| **Essential** | Active threats (concern > 5), fully-lobotomized facts, confirmed prescriptions | Cannot move without damage |
+| **Structural** | Network topology, temporal patterns, cross-references, source authority rankings | Part of coherence fabric |
+
+### What Falls On Categories
+
+| Category | What Settles Here Naturally |
+|----------|-----------------------------|
+| Record | Permanent institutional knowledge |
+| Warning | Active threat, requires attention |
+| Pattern | Trend, recurring behavior |
+| Identity | Attribution, fingerprint, who-is-this |
+| Law | Legal/compliance concern |
+| Science | Technical/verifiable fact |
+| Ethics | Right/wrong consideration |
+| Commerce | Economic implication |
+| Health | System/human wellness |
+| Heritage | Cultural/ancestral record |
+| Revelation | New understanding (rare, precious) |
+| **Nowhere** | Floats — does not settle — trim candidate |
+
+### What Are Congruences vs. Falls
+
+- **Congruences** = data that MUST be where it is for the system to hold together. Structural necessity. If you remove it, something breaks.
+- **Falls-on** = data that NATURALLY settles into a domain. Gravitational, not forced. If you move it, it drifts back.
+- **Congruences are about position** (central vs. peripheral).
+- **Falls are about domain** (law vs. science vs. warning vs. record).
+
+A piece of data can be both Essential (congruence: must be central) and fall on Law (domain: it's a legal concern). These are orthogonal axes.
 
 ---
 

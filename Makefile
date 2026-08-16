@@ -333,6 +333,8 @@ tools:
 		echo "  Building negamane..."; $(MAKE) -C $(TOOLS_DIR)/negamane; fi
 	@if [ -d "$(TOOLS_DIR)/accounts" ]; then \
 		echo "  Building accounts..."; $(MAKE) -C $(TOOLS_DIR)/accounts; fi
+	@if [ -d "$(TOOLS_DIR)/psych-id" ]; then \
+		echo "  Building psych-id..."; $(MAKE) -C $(TOOLS_DIR)/psych-id; fi
 
 tools-install:
 	@echo "=== Installing core tools to rootfs ==="
@@ -346,6 +348,8 @@ tools-install:
 		$(MAKE) -C $(TOOLS_DIR)/negamane install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
 	@if [ -d "$(TOOLS_DIR)/accounts" ]; then \
 		$(MAKE) -C $(TOOLS_DIR)/accounts install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
+	@if [ -d "$(TOOLS_DIR)/psych-id" ]; then \
+		$(MAKE) -C $(TOOLS_DIR)/psych-id install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
 
 # ==============================================================================
 # Tools - Extended (autotools/cmake-based, longer builds)
