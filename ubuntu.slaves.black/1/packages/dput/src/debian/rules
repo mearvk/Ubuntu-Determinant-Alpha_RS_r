@@ -1,0 +1,56 @@
+#! /usr/bin/make -f
+#
+# debian/rules
+# Part of Debian ‘dput’ package.
+#
+# This is free software, and you are welcome to redistribute it under
+# certain conditions; see the end of this file for copyright
+# information, grant of license, and disclaimer of warranty.
+
+PACKAGE_NAME = dput
+
+export LC_ALL := C.UTF-8
+export PYTHONIOENCODING := utf-8
+
+package_share_dir = /usr/share/${PACKAGE_NAME}
+export PYBUILD_INSTALL_ARGS ?= \
+	--install-lib=${package_share_dir}/ \
+	--install-scripts=${package_share_dir}/
+
+
+%:
+	dh $@ --with=bash-completion,python3 --buildsystem=pybuild
+
+
+override_dh_clean:
+	dh_clean
+	make clean
+
+override_dh_installman:
+	dh_installman --language=C
+
+override_dh_bash-completion: DH_BASH_COMPLETION_CONFIG_FILE := $(CURDIR)/debian/bash-completion
+override_dh_bash-completion:
+	mv ${DH_BASH_COMPLETION_CONFIG_FILE} ${DH_BASH_COMPLETION_CONFIG_FILE}.ORIG
+	# Work around Debhelper bug#919853:
+	# strip leading/trailing white space from input file.
+	sed --regexp-extended 's/^[[:space:]]+|[[:space:]]+$$//g' \
+		< ${DH_BASH_COMPLETION_CONFIG_FILE}.ORIG \
+		> ${DH_BASH_COMPLETION_CONFIG_FILE}
+	dh_bash-completion
+	mv ${DH_BASH_COMPLETION_CONFIG_FILE}.ORIG ${DH_BASH_COMPLETION_CONFIG_FILE}
+
+
+# Copyright © 2015–2021 Ben Finney <bignose@debian.org>
+#
+# This is free software: you may copy, modify, and/or distribute this work
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; version 3 of that license or any later version.
+# No warranty expressed or implied. See the file ‘LICENSE.GPL-3’ for details.
+
+
+# Local variables:
+# coding: utf-8
+# mode: makefile
+# End:
+# vim: fileencoding=utf-8 filetype=make :

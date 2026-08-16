@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --with-hunspell-dir=/usr/share/hunspell \
+                             --disable-zemberek
+
+override_dh_auto_build:
+	# Move the enchant.ordering to /usr/share/enchant-2 to be
+	# co-installable with enchant v1
+	dh_auto_build -- pkgdatadir=/usr/share/enchant-2
+
+override_dh_makeshlibs:
+	dh_makeshlibs -Xusr/lib/$(DEB_HOST_MULTIARCH)/enchant-2/
+
+execute_before_dh_install:
+	find debian/tmp -name '*.a' -print -delete
+	find debian/tmp -name '*.la' -print -delete
+
+override_dh_clean:
+	dh_clean -Xtests/test.pwl.orig
+
+# Tests don't work yet.
+# Skip test tests on i386 since Ubuntu doesn't have libunittest++-dev there
+override_dh_auto_test:
+ifeq (,$(filter $(DEB_HOST_ARCH),i386))
+	dh_auto_test || true
+endif

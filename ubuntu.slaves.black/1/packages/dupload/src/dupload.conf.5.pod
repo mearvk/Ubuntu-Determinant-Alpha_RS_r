@@ -1,0 +1,278 @@
+# Copyright © 1996 Heiko Schlittermann
+# Copyright © 1999 Stephane Bortzmeyer
+# Copyright © 2002, 2003 Josip Rodin <joy-packages@debian.org>
+# Copyright © 2011 Frank Lichtenheld <djpig@debian.org>
+# Copyright © 2017, 2019-2020 Guillem Jover <guillem@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+=head1 NAME
+
+dupload.conf - configuration file for dupload
+
+=head1 DESCRIPTION
+
+The configuration file is rather straight forward Perl code as it is
+included by the B<dupload> script via C<do $config>.  I<The config file
+is read as Perl code!>
+
+Any B<dupload.conf> must begin with C<package config;> because C<config> is
+the namespace expected by B<dupload>.
+
+For examples of the configuration please refer to the global configuration
+file F</etc/dupload.conf>.
+
+It contains associative arrays, each indexed by the nickname (see B<--to>
+option of B<dupload>), for the following items:
+
+=over 4
+
+=item B<fqdn> [required]
+
+The fully qualified domain name (FQDN) of the nickname.
+
+For the B<copy> method, this option is ignored and the local
+FQDN will be used instead.
+
+=item B<method> [optional]
+
+The transfer method. The available methods are: B<ftp>
+(which is the default), B<scp>, B<scpb>, B<rsync> (over SSH) and
+B<copy> (local filesystem).
+
+If you are using an upload queue, use B<ftp> because it is fast.
+If you are using an authenticated host, B<always> use B<scp> or B<rsync>
+via SSH, because B<ftp> transmits the password in clear text.
+
+For B<scp> and B<rsync> to work properly, you have to setup the remote
+and local host to establish a ssh/slogin connection using F<.shosts/.rhosts>
+or the files in F<~/.ssh/>. If you do not want or cannot do that,
+you may find the B<scpb> more convenient since it uploads in batch,
+reducing the number of password prompts.
+
+The only major caveat of the B<rsync> and B<scpb> options is that the files are
+processed in a batch mode, i.e. not separately, so in case of an error
+B<dupload> will not be able to detect which part of the transfer failed, and
+just delete the B<.upload> file completely.
+
+=item B<login> [optional]
+
+The account name used to log into the remote host.
+For B<ftp> the default is B<anonymous>, which should work with firewall
+logins too.
+For B<scp>, B<scpb> and B<rsync> the default is delegated to SSH and its
+own configuration.
+
+=item B<password> [optional]
+
+The FTP password for anonymous logins.
+
+=item B<filemode> [optional]
+
+The destination files mode, in octal. If the value is B<undef>, the mode
+will not be modified. The default is B<0644>.
+
+=item B<incoming> [required]
+
+Incoming directory, the directory we try to upload to.
+
+=item B<queuedir> [optional]
+
+The directory we move the uploaded files to (after successful upload to
+I<incoming>. Usually necessary only with some special upload queues.
+
+=item B<distallowlist> [optional] (since 2.9.6)
+
+The regex of the distributions allowed for this host. This check is done
+against the B<Distribution> field in the F<.changes> file.
+
+=item B<distwhitelist> [optional] (since 2.9.3)
+
+Deprecated alias for B<distallowlist>.
+
+=item B<distblocklist> [optional] (since 2.9.6)
+
+The regex of the distributions blocked for this host. This check is done
+against the B<Distribution> field in the F<.changes> file.
+
+=item B<distblacklist> [optional] (since 2.9.3)
+
+Deprecated alias for B<distblocklist>.
+
+=item B<mailto> [optional]
+
+Email address where the announcement about stable packages is sent.
+
+=item B<mailtx> [optional]
+
+Email address where the announcement about unstable and experimental
+packages is sent.
+
+=item B<cc> [optional]
+
+Email address where to send a copy address of the announcement.
+
+=item B<fullname> [optional]
+
+Your full name, one that should appear in the announcement;
+
+If you leave this setting empty, the default will depend on your mail
+system. Usually the full name will be copied from the GCOS field in
+F</etc/passwd>.
+
+=item B<visibleuser> [optional]
+
+Your username that should appear in the announcement. Defaults to
+C<getlogin()>.
+
+=item B<visiblename> [optional]
+
+The host/domain name that appears as the part to the right of the B<@>
+character in the I<from>-part of the announcement. Defaults to the value
+your local MTA likes.
+
+=item B<passive> [optional]
+
+Set the passive mode for FTP transfers. Since B<dupload> uses L<Net::FTP>,
+you can also use the environment variable B<FTP_PASSIVE>.
+
+=item B<options> [optional]
+
+String that will be added verbatim to the command line of any
+B<scp> or B<rsync> calls done.
+
+=item B<dinstall_runs> [optional]
+
+Tells B<dupload> that the remote host runs dinstall (or equivalent)
+so that B<dupload> will not send a duplicate announcement mail.
+The default is 0 (false), set it to 1 to enable it.
+
+=item B<archive> [optional]
+
+If set to 0 (false), adds a B<X-No-Archive: yes> header in the announcement.
+The default is 1 (true).
+
+=back
+
+The configuration files also contain the following global variables:
+
+=over 4
+
+=item B<default_host> [optional]
+
+The default host to upload to. The default value of this variable is set
+depending on the current vendor, but if there is no configuration for that
+vendor it will be left unset.
+
+=item B<no_parentheses_to_fullname> [optional]
+
+Prevents B<dupload> to add parentheses around the full name when making
+mail announcements. Default is 0 (false), set it to 1 to enable it.
+
+=back
+
+=head1 HOOKS
+
+Hooks are a powerful way to add actions which will be run before or
+after a dupload (like the preinst and postinst script of B<dpkg>).
+
+You have two sort of hooks: pre-upload and post-upload. Both are simple
+shell commands (executed by C<sh -c> so you can use any shell tricks).
+Pre-uploads are
+always run (even in dry mode) and stop B<dupload> if they fail
+(failure being measured by the hook's exit status). Post-uploads
+are only run when you are not in dry mode and only if the uploading succeeded.
+
+Both sorts of hooks are run for a given category: B<changes>, B<sourcepackage>,
+B<package>, B<file> or B<deb>.
+
+=over 4
+
+=item changes
+
+This hook is run once per F<changes> file (given as an argument to B<dupload>)
+with the filename as its parameter.
+
+=item sourcepackage
+
+This hook is run once per F<changes> file
+with the source package name and its version as its two parameters.
+
+=item package
+
+This hook is run once per binary package (a F<deb> file) with
+the package name and its version as its two parameters.
+
+=item file
+
+This hook is run once per uploaded file, with the file name as its parameter.
+
+=item deb
+
+This hook is run once per binary package (a F<deb> file) with
+the filename as its parameter.
+
+=back
+
+=head2 Syntax
+
+Hooks are defined in two Perl hashes, C<%preupload> and C<%postupload>, each
+indexed by category. In addition to the global hashes, each host entry has
+two fields with the same names, for the host-specific hooks.
+
+Hooks are defined as list reference with each item executed in sequence.
+Note: For backwards compatibility with old configurations they can be
+defined as a simple scalar, even though they will emit a warning, but
+this support will be dropped after the next major Debian release.
+
+The shell command will be substituted first: C<%1> will be replace by the first
+argument, etc.
+
+=head2 Per-host or global hooks
+
+Hooks can be global (for all the hosts) or can be for a specific host.
+Host specific hooks override the global ones for each category.
+
+=head2 Examples
+
+This one runs B<lintian> before uploading. It is global and guarantee
+that you will always upload lintian-clean packages (thanks to B<lintian>
+return status).
+
+     $preupload{'deb'} = [ 'lintian -v -i %1' ];
+
+This one just display the name and versions of successfully uploaded packages.
+
+     $postupload{'package'} = [ 'echo PACKAGE %1 %2 uploaded' ];
+
+Unlike the two others, this one is specific to one host, I<debian-ssh>, and
+overrides the default global hook in charge of checking the OpenPGP signatures:
+
+     $cfg{'debian-ssh'}{preupload}{'changes'} = [ 'echo Uploading %1' ];
+
+=head1 FILES
+
+The configuration is searched as following:
+
+	/etc/dupload.conf
+	~/.dupload.conf
+
+The latest entries override the former.
+
+=head1 ENVIRONMENT
+
+Those of L<Net::FTP> for the FTP method:
+
+ FTP_FIREWALL
+ FTP_PASSIVE

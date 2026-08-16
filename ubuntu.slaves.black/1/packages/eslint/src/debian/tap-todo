@@ -1,0 +1,119 @@
+#!/usr/bin/perl
+
+use v5.10;
+use utf8;
+use strict;
+use warnings;
+use re 'taint';
+
+use TAP::Parser;
+
+=head1 NAME
+
+tap-todo - TAP filter to tolerate select failures
+
+=head1 VERSION
+
+Version v0.2.3
+
+=cut
+
+our $VERSION = version->declare('v0.2.1');
+
+=head1 SYNOPSIS
+
+B<prove --lib> | B<tap-todo> "B<is a foo>" "B<does.* do bar::reason: baz.*>"
+
+=head1 DESCRIPTION
+
+B<tap-todo> filters the output of TAP tests
+and flags select (otherwise) failing tests as TODO.
+
+You feed the original TAP data via STDIN,
+and apply skip-patterns for failing tests that should be tolerated.
+
+Each skip-pattern is a regular expression matched against description,
+optionally followed by "::" and
+a regular expression for YAML data and other subsequent content.
+
+tap-todo fails with error code 1
+if TAP contains failing tests not caught by skip-patterns,
+and fails with error code 1
+if TAP contains no tests at all.
+
+=cut
+
+# split and compile regular expressions
+my @skip = map {
+	my ( $desc, $more ) = split /::/;
+	my $desc_re = qr/$desc/  || die;
+	my $more_re = qr/$more/s || die if ($more);
+	{ desc => $desc_re, more => $more_re }
+} @ARGV;
+
+open my $fh, "<&STDIN";
+my $parser = TAP::Parser->new( { source => $fh } );
+
+my ( $more, $seen, $todo );
+$todo = 0;
+while ( my $res = $parser->next ) {
+	if ( $res->is_test ) {
+		$more = undef;
+		$seen = 0;
+		unless ( $res->is_ok ) {
+			foreach ( grep { $res->description =~ $$_{desc} } @skip ) {
+				unless ( $more = $$_{more} ) {
+					$todo++;
+					print "# TODO: ";
+				}
+				last;
+			}
+		}
+	}
+	elsif ( $more and $res->as_string =~ $more ) {
+		$todo++ unless ($seen++);
+		print "# TODO: ";
+	}
+	say $res->as_string;
+}
+say "# skipped $todo";
+say "# skip-patterns ", 0 + @ARGV;
+
+unless ( $parser->tests_run ) {
+	print STDERR "ERROR: no tests run\n";
+	exit(2);
+}
+
+my $reallyfailed = $parser->tests_run - $parser->passed - $todo;
+if ($reallyfailed) {
+	print STDERR "ERROR: $reallyfailed non-TODO tests failed\n";
+	exit(!!$reallyfailed);
+}
+
+=head1 AUTHOR
+
+Jonas Smedegaard C<< <dr@jones.dk> >>
+
+=head1 COPYRIGHT AND LICENSE
+
+  Copyright © 2020 Jonas Smedegaard
+
+  Copyright © 2020 Purism SPC
+
+This program is free software:
+you can redistribute it and/or modify it
+under the terms of the GNU General Public License
+as published by the Free Software Foundation,
+either version 3, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY;
+without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU Affero General Public License for more details.
+
+You should have received a copy
+of the GNU General Public License along with this program.
+If not, see <https://www.gnu.org/licenses/>.
+
+=cut

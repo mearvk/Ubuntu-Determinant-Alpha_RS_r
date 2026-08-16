@@ -1,0 +1,28 @@
+Subject: dp.h: make format_guid() handle misaligned guid pointers safely.
+Author: Peter Jones <pjones@redhat.com>
+Bug: https://bugzilla.opensuse.org/show_bug.cgi?id=1120862
+Bug-Debian: https://bugs.debian.org/925672
+Origin: upstream, https://github.com/rhboot/efivar/commit/b98ba8921010d03f46704a476c69861515deb1ca
+Last-Update: 2019-01-07
+diff --git a/src/dp.h b/src/dp.h
+index aa4e390..20cb608 100644
+--- a/src/dp.h
++++ b/src/dp.h
+@@ -70,8 +70,15 @@
+ #define format_guid(buf, size, off, dp_type, guid) ({			\
+ 		int _rc;						\
+ 		char *_guidstr = NULL;					\
+-									\
+-		_rc = efi_guid_to_str(guid, &_guidstr);			\
++		efi_guid_t _guid;					\
++		const efi_guid_t * const _guid_p =			\
++			likely(__alignof__(guid) == sizeof(guid))	\
++				? guid					\
++				: &_guid;				\
++								        \
++		if (unlikely(__alignof__(guid) == sizeof(guid)))	\
++			memmove(&_guid, guid, sizeof(_guid));		\
++		_rc = efi_guid_to_str(_guid_p, &_guidstr);		\
+ 		if (_rc < 0) {						\
+ 			efi_error("could not build %s GUID DP string",	\
+ 				  dp_type);				\

@@ -1,0 +1,102 @@
+Description: Avoid use of node module cross-spawn
+ Use core nodejs function child_process.spawnSync() instead.
+Forwarded: no
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2020-04-21
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/init/npm-utils.js
++++ b/lib/init/npm-utils.js
+@@ -10,7 +10,7 @@
+ //------------------------------------------------------------------------------
+ 
+ const fs = require("fs"),
+-    spawn = require("cross-spawn"),
++    spawnSync = require("child_process").spawnSync,
+     path = require("path"),
+     log = require("../shared/logging");
+ 
+@@ -51,7 +51,7 @@
+  */
+ function installSyncSaveDev(packages) {
+     const packageList = Array.isArray(packages) ? packages : [packages];
+-    const npmProcess = spawn.sync("npm", ["i", "--save-dev"].concat(packageList),
++    const npmProcess = spawnSync("npm", ["i", "--save-dev"].concat(packageList),
+         { stdio: "inherit" });
+     const error = npmProcess.error;
+ 
+@@ -68,7 +68,7 @@
+  * @returns {Object} Gotten peerDependencies. Returns null if npm was not found.
+  */
+ function fetchPeerDependencies(packageName) {
+-    const npmProcess = spawn.sync(
++    const npmProcess = spawnSync(
+         "npm",
+         ["show", "--json", packageName, "peerDependencies"],
+         { encoding: "utf8" }
+--- a/package.json
++++ b/package.json
+@@ -45,7 +45,6 @@
+   "dependencies": {
+     "ajv": "^6.10.0",
+     "chalk": "^2.1.0",
+-    "cross-spawn": "^6.0.5",
+     "debug": "^4.0.1",
+     "doctrine": "^3.0.0",
+     "eslint-scope": "^5.0.0",
+--- a/tests/lib/init/npm-utils.js
++++ b/tests/lib/init/npm-utils.js
+@@ -10,7 +10,7 @@
+ 
+ const
+     assert = require("chai").assert,
+-    spawn = require("cross-spawn"),
++    spawnSync = require("child_process").spawnSync,
+     sinon = require("sinon"),
+     npmUtils = require("../../../lib/init/npm-utils"),
+     log = require("../../../lib/shared/logging"),
+@@ -172,7 +172,7 @@
+ 
+     describe("installSyncSaveDev()", () => {
+         it("should invoke npm to install a single desired package", () => {
+-            const stub = sinon.stub(spawn, "sync").returns({ stdout: "" });
++            const stub = sinon.stub(spawnSync).returns({ stdout: "" });
+ 
+             npmUtils.installSyncSaveDev("desired-package");
+             assert(stub.calledOnce);
+@@ -182,7 +182,7 @@
+         });
+ 
+         it("should accept an array of packages to install", () => {
+-            const stub = sinon.stub(spawn, "sync").returns({ stdout: "" });
++            const stub = sinon.stub(spawnSync).returns({ stdout: "" });
+ 
+             npmUtils.installSyncSaveDev(["first-package", "second-package"]);
+             assert(stub.calledOnce);
+@@ -193,7 +193,7 @@
+ 
+         it("should log an error message if npm throws ENOENT error", () => {
+             const logErrorStub = sinon.stub(log, "error");
+-            const npmUtilsStub = sinon.stub(spawn, "sync").returns({ error: { code: "ENOENT" } });
++            const npmUtilsStub = sinon.stub(spawnSync).returns({ error: { code: "ENOENT" } });
+ 
+             npmUtils.installSyncSaveDev("some-package");
+ 
+@@ -206,7 +206,7 @@
+ 
+     describe("fetchPeerDependencies()", () => {
+         it("should execute 'npm show --json <packageName> peerDependencies' command", () => {
+-            const stub = sinon.stub(spawn, "sync").returns({ stdout: "" });
++            const stub = sinon.stub(spawnSync).returns({ stdout: "" });
+ 
+             npmUtils.fetchPeerDependencies("desired-package");
+             assert(stub.calledOnce);
+@@ -216,7 +216,7 @@
+         });
+ 
+         it("should return null if npm throws ENOENT error", () => {
+-            const stub = sinon.stub(spawn, "sync").returns({ error: { code: "ENOENT" } });
++            const stub = sinon.stub(spawnSync).returns({ error: { code: "ENOENT" } });
+ 
+             const peerDependencies = npmUtils.fetchPeerDependencies("desired-package");
+ 

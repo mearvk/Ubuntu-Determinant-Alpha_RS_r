@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Eclipse bundle build script">
+
+  <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpath="/usr/share/java/ant-contrib.jar"/>
+
+  <macrodef name="make-bundle">
+    <attribute name="name"                      description="The name of the bundle (for example org.eclipse.foo.bar)"/>
+    <attribute name="shortname" default=""      description="The short name of the bundle (for example eclipse-foo-bar)"/>
+    <attribute name="depends" default=""        description="The comma separated list of local bundles used as dependencies"/>
+    <attribute name="basedir" default="bundles" description="The base directory holding all the bundles"/>
+    <attribute name="release" default="8"       description="The version of Java targeted"/>
+    <attribute name="encoding" default="UTF-8"  description="The source encoding"/>
+    <element name="bundle-classpath" optional="true" implicit="true" description="The classpath elements required to build the bundle"/>
+    <sequential>
+      <if>
+        <not><isset property="@{name}.done"/></not>
+        <then>
+
+          <property name="bundle.dir.@{name}" value="@{basedir}/@{name}"/>
+          <property file="${bundle.dir.@{name}}/build.properties"  prefix="@{name}"/>
+          <property file="${bundle.dir.@{name}}/plugin.properties" prefix="@{name}"/>
+
+          <!-- Extract and clean the bundle version from the manifest -->
+          <bundle-version name="@{name}" basedir="@{basedir}" property="bundle.version.@{name}"/>
+
+          <propertyregex property="bundle.desc.@{name}" input="${@{name}.Plugin.name}${@{name}.pluginName}${@{name}.bundleName}${@{name}.Bundle-Name}${@{name}.name}" regexp="\$\{[^\$]*\}" replace="" global="true" override="true"/>
+
+          <echo>Building bundle '${bundle.desc.@{name}}' (@{name}:${bundle.version.@{name}})</echo>
+
+          <!-- Prepare the dependencies classpath -->
+          <mkdir dir="${bundle.dir.@{name}}/target/classes"/>
+
+          <touch file="${bundle.dir.@{name}}/target/dependencies"/>
+          <concat destfile="${bundle.dir.@{name}}/target/dependencies" append="true">non/existent/path/${line.separator}</concat>
+          <for list="@{depends}" param="dependency">
+            <sequential>
+              <if>
+                <equals arg1="@{basedir}" arg2="." />
+                <then>
+                  <concat destfile="${bundle.dir.@{name}}/target/dependencies" append="true">@{dependency}/target/@{dependency}.jar${line.separator}</concat>
+                </then>
+                <else>
+                  <concat destfile="${bundle.dir.@{name}}/target/dependencies" append="true">@{basedir}/@{dependency}/target/@{dependency}.jar${line.separator}</concat>
+                </else>
+              </if>
+            </sequential>
+          </for>
+
+          <!-- Copy the source files to target/sources. Source directories are defined in build.properties -->
+          <var name="sourcedirs.@{name}" value=""/>
+          <for list="${@{name}.source..}" param="srcdir">
+            <sequential>
+              <var name="sourcedirs.@{name}" value="${sourcedirs.@{name}},${bundle.dir.@{name}}/@{srcdir}"/>
+            </sequential>
+          </for>
+          <propertyregex property="sourcedirs.@{name}" input="${sourcedirs.@{name}}" regexp="^,(.*)" replace="\1" override="true"/>
+
+          <mkdir dir="${bundle.dir.@{name}}/target/sources"/>
+          <copy todir="${bundle.dir.@{name}}/target/sources">
+            <multirootfileset basedirs="${sourcedirs.@{name}}" includes="**/*.java"/>
+          </copy>
+
+          <!-- Compile the source files to target/classes -->
+          <javac srcdir="${bundle.dir.@{name}}/target/sources" destdir="${bundle.dir.@{name}}/target/classes" debug="yes" release="@{release}" includeantruntime="false" encoding="@{encoding}">
+            <classpath>
+              <fileset dir="." includesfile="${bundle.dir.@{name}}/target/dependencies"/>
+              <bundle-classpath/>
+              <pathelement path="/usr/share/java/eclipse-osgi.jar"/>
+              <pathelement path="/usr/share/java/org.eclipse.osgi.jar"/>
+              <pathelement path="/usr/share/java/osgi.compendium.jar"/>
+            </classpath>
+          </javac>
+
+          <!-- Copy the resources to target/classes -->
+          <copy todir="${bundle.dir.@{name}}/target/classes" quiet="true">
+            <multirootfileset basedirs="${sourcedirs.@{name}}" excludes="**/*.java,**/package.html"/>
+            <fileset dir="${bundle.dir.@{name}}" includes="${@{name}.bin.includes}"/>
+          </copy>
+
+          <!-- Create the jar -->
+          <replace file="${bundle.dir.@{name}}/target/classes/META-INF/MANIFEST.MF" token="%pluginName"   value="${@{name}.pluginName}"/>
+          <replace file="${bundle.dir.@{name}}/target/classes/META-INF/MANIFEST.MF" token="%bundleName"   value="${@{name}.bundleName}"/>
+          <replace file="${bundle.dir.@{name}}/target/classes/META-INF/MANIFEST.MF" token="%providerName" value="${@{name}.providerName}"/>
+          <jar jarfile="${bundle.dir.@{name}}/target/@{name}.jar" manifest="${bundle.dir.@{name}}/target/classes/META-INF/MANIFEST.MF">
+            <fileset dir="${bundle.dir.@{name}}/target/classes"/>
+          </jar>
+
+          <!-- Append the bundle info to the properties file used by debian/rules -->
+          <var name="bundle.depends.@{name}" value=""/>
+          <for list="@{depends}" param="dependency">
+            <sequential>
+              <bundle2shortname bundle="@{dependency}" property="dependency.package.@{name}"/>
+              <var name="bundle.depends.@{name}" value="${bundle.depends.@{name}},lib${dependency.package.@{name}}-java"/>
+            </sequential>
+          </for>
+          <bundle2shortname bundle="@{name}" property="shortname.@{name}"/>
+          <if>
+            <not><equals arg1="@{shortname}" arg2="" /></not>
+            <then><var name="shortname.@{name}" value="@{shortname}"/></then>
+          </if>
+          <concat destfile="debian/bundles.properties" append="true">@{name}	${bundle.version.@{name}}	${shortname.@{name}}	lib${shortname.@{name}}-java	${bundle.depends.@{name}}	@{basedir}${line.separator}</concat>
+
+          <!-- Prepare the pom to be installed in the package -->
+          <if>
+            <resourceexists>
+              <file file="${bundle.dir.@{name}}/pom.xml"/>
+            </resourceexists>
+            <then>
+              <!-- bundle with a pom, adjust the version and the packaging type -->
+              <copy file="${bundle.dir.@{name}}/pom.xml" todir="${bundle.dir.@{name}}/target"/>
+              <replace file="${bundle.dir.@{name}}/target/pom.xml" token="-SNAPSHOT" value=""/>
+              <replace file="${bundle.dir.@{name}}/target/pom.xml" token="&lt;packaging&gt;eclipse-plugin&lt;/packaging&gt;" value="&lt;packaging&gt;jar&lt;/packaging&gt;"/>
+            </then>
+            <else>
+              <!-- pomless bundle, let's generate one -->
+              <propertyregex property="groupId.@{name}" input="@{name}" regexp="([^\.]+\.[^\.]+\.[^\.]+).*" select="\1" defaultValue="@{name}" global="true" override="true"/>
+              <property name="artifactId.@{name}" value="@{name}"/>
+              <echo>Generating pom.xml for @{name} (${groupId.@{name}}:${artifactId.@{name}})</echo>
+              <echoxml file="${bundle.dir.@{name}}/target/pom.xml">
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>${groupId.@{name}}</groupId>
+  <artifactId>${artifactId.@{name}}</artifactId>
+  <version>${bundle.version.@{name}}</version>
+  <packaging>jar</packaging>
+</project>
+              </echoxml>
+            </else>
+          </if>
+
+          <property name="@{name}.done" value="true"/>
+        </then>
+      </if>
+    </sequential>
+  </macrodef>
+
+  <!-- Macro turning a bundle name into a short name (org.eclipse.foo.bar -> eclipse-foo-bar) -->
+  <macrodef name="bundle2shortname">
+    <attribute name="bundle"/>
+    <attribute name="property"/>
+    <sequential>
+      <propertyregex property="@{property}" input="@{bundle}"      regexp="org\.eclipse\.(.*)"        replace="eclipse.\1" override="true"/>
+      <propertyregex property="@{property}" input="${@{property}}" regexp="\."                        replace="-"          override="true" global="true"/>
+      <propertyregex property="@{property}" input="${@{property}}" regexp="eclipse-equinox-(.*)"      replace="equinox-\1" override="true" global="true"/>
+    </sequential>
+  </macrodef>
+
+  <!-- Macro setting the version of the bundle to the specified property -->
+  <macrodef name="bundle-version">
+    <attribute name="name" description="The name of the bundle (for example org.eclipse.foo.bar)"/>
+    <attribute name="basedir" default="bundles"/>
+    <attribute name="property"/>
+    <sequential>
+      <property file="@{basedir}/@{name}/META-INF/MANIFEST.MF" prefix="manifest.@{name}"/>
+      <propertyregex property="@{property}" input="${manifest.@{name}.Bundle-Version}" regexp="(.*)\.qualifier" select="\1"/>
+    </sequential>
+  </macrodef>
+
+</project>

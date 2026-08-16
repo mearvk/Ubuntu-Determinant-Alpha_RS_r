@@ -1,0 +1,80 @@
+#!/bin/sh
+
+set -e
+
+#DEBHELPER#
+
+. /usr/share/debconf/confmodule
+
+db_get esmtp/overwriteconfig
+OverwriteConfig="$RET"
+
+if test -s /etc/esmtprc -a "$OverwriteConfig" = "false"
+then
+	exit 0
+fi
+
+db_get esmtp/hostname
+HostName="$RET"
+
+db_get esmtp/hostport
+HostPort="$RET"
+
+db_get esmtp/username
+UserName="$RET"
+
+db_get esmtp/password
+Password="$RET"
+
+db_get esmtp/starttls
+StartTLS="$RET"
+
+db_get esmtp/certificate_passphrase
+CertificatePassphrase="$RET"
+
+db_get esmtp/mda
+case "$RET" in
+	procmail)
+		MDA='/usr/bin/procmail -d %T'
+		;;
+	maildrop)
+		MDA='/usr/bin/maildrop'
+		;;
+esac
+
+exec 1>/etc/esmtprc
+
+if test "$OverwriteConfig" = "true"
+then
+	echo "###     This file is auto-generated using debconf on install.     ###"
+	echo "###     Any changes made will be overwritten on next upgrade.     ###"
+	echo "#"
+fi
+echo "# Config file for ESMTP sendmail"
+echo
+echo "# The SMTP host and service (port)"
+echo "hostname=$HostName:$HostPort"
+echo
+echo "# SECURITY WARNING: Do NOT set username and password in the system wide"
+echo "# configuration file unless you are the only user of this machine. See"
+echo "# esmtprc(5)."
+echo
+echo "# The user name"
+test -z "$UserName" && echo -n "#"
+echo "username=$UserName"
+echo
+echo "# The password"
+test -z "$UserName" && echo -n "#"
+echo "password=$Password"
+echo
+echo "# Whether to use Starttls"
+test "$StartTLS" = "disabled" && echo -n "#"
+echo "starttls=$StartTLS"
+echo
+echo "# The certificate passphrase"
+test -z "$CertificatePassphrase" && echo -n "#"
+echo "certificate_passphrase=$CertificatePassphrase"
+echo
+echo "# The Mail Delivery Agent"
+test -z "$MDA" && echo -n "#"
+echo "mda=\"$MDA\""

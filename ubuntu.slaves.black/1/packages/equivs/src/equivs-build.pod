@@ -1,0 +1,157 @@
+=head1 NAME
+
+equivs-build - make a Debian package to register local software
+
+=head1 SYNOPSIS
+
+B<equivs-build [--full|-f] [--source|-s] [--arch=foo|-a=foo] [--templates=bar|-t=bar] controlfile>
+
+=head1 DESCRIPTION
+
+B<equivs-build> is a program that creates Debian packages which can be 
+used to inform dpkg about locally installed packages and their 
+dependencies. Also empty packages that just require other packages
+can be created with equivs. These can be used as "profile" packages 
+which just mark other ones for installation.
+
+Please note that this is a crude hack and if thoughtlessly used,
+it might possibly do damage to your packaging system. And please
+note as well that using it is not the recommended way of dealing
+with broken dependencies. Better file a bug report instead.
+
+The control file has a structure like the control files in "real"
+Debian packages, but it doesn't have to define all keys, as default 
+values will be used if you omit one.
+
+There are several additional fields that can be used:
+
+=over 4
+
+=item Changelog: 
+
+File to be used as the changelog
+
+=item Version: 
+
+If you don't use a local changelog, equivs will create a
+dummy one. As the version of the package is defined in the
+changelog, equivs will assume the version 1.0. With this
+field, you can set an explicit version.
+
+=item Readme: 
+
+A file to be used as the F<README.Debian> file. You can use the
+strings B<@packagename@> and B<@depends@> to insert the package
+name and the dependency information used.
+
+=item Copyright: 
+
+The copyright file to by used. If omitted, the GPL 2 
+will be used.
+
+=item Preinst: Postinst: Prerm: Postrm:
+
+Maintainerscripts executed before/after installation/removal 
+of the package. See the Debian developers reference for a 
+description (package developers-reference).
+
+=item Multi-Arch:
+
+Field specifying multiarch dependency status. Used exactly as in 'real' packages.
+Foreign: Satisfies dependencies for all architectures
+Same: Satisfies dependencies only for the same architecture
+Allowed: Can act as either Foreign or Same, as specified in the dependency
+
+=item Extra-Files:
+
+A comma-separated list of files to copy to the 
+F</usr/share/doc/packagename> directory.
+
+=item Files:
+
+Files to be copied into some directory of the created package.  Each
+line contains a source filename and a destination directory,
+space-separated.  As with other multi-line headers, all lines but the
+first must be indented.  Example:
+
+  Files: foo-cron /etc/cron.d/
+   foo-cron-helper /usr/local/bin/
+
+=item Links:
+
+Links to be created in some directory of the created package. Each
+line contains two paths. The first is the path that the generated
+symlink points at; the second is the name of the symlink file (The
+same order as 'ln -s').  As with other multi-line headers, all lines
+but the first must be indented.  Example:
+
+  Links: /usr/aarch64-linux-gnu/lib/libfoo.so /usr/lib/aarch64-linux-gnu/libfoo.so
+   /file/to/symlink/to  /symlink/file/name
+
+=item File:
+
+Files to be copied into some directory of the created package,
+specified inline in the source control file. The field syntax is the
+name of the files to be created, followed by lines indented by 1
+space denoting file content; leading space will be trimmed.  An octal
+file mode may be specified after the filename; it defaults to 644, and
+will be normalised to 644 or 755.  Example:
+
+  File: /usr/local/bin/true 755
+   #!/bin/sh
+   exit 0
+
+=back
+
+See F</usr/share/doc/equivs/README.Debian> for more information.
+
+=head1 OPTIONS
+
+=over 4
+
+=item --full | -f
+
+Do a complete build. B<debuild> will be called, that is, a 
+full package will be built and signed, suitable for upload 
+to the Debian servers. 
+
+The ID used to signed is taken from, in that order, the user from 
+the last entry of a supplied changelog, the Maintainer: field in the 
+equivs control file, or the local username.
+
+=item --source | -s
+
+Do a source build. B<debuild> will be called, that is, a
+source package will be built and signed, suitable for upload
+to the Ubuntu PPA servers.
+
+The ID used to signed is taken from, in that order, the user from
+the last entry of a supplied changelog, the Maintainer: field in the
+equivs control file, or the local username.
+
+=item --arch | -a
+
+Build package for the specified architecture. Used
+e.g. for building packages for hurd under linux. B<equivs-build> uses
+B<dpkg-architecture> to provide this facility.
+
+=item --templates | -t
+
+Build package using alternative templates in the given directory. By default
+B<equivs-build> uses template files from B</usr/share/equivs/template>.
+
+Use with caution, this can break B<equivs-build>.
+
+=back
+
+=head1 DISTRIBUTION
+
+Distribution is subject to the GNU public licence version 2.
+
+=head1 AUTHOR
+
+Martin Bialasinski <martinb@debian.org>
+
+=head1 SEE ALSO
+
+equivs-control(1), /usr/share/doc/equivs/README.Debian

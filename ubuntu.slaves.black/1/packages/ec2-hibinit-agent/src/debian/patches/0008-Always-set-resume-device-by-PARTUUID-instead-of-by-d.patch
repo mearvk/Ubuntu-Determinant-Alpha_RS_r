@@ -1,0 +1,38 @@
+From: Balint Reczey <balint.reczey@canonical.com>
+Date: Thu, 28 Feb 2019 22:54:27 +0100
+Subject: Always set resume device by PARTUUID instead of by device name
+
+Based on patch by Francis Ginther.
+
+LP: #1818150
+LP: #1896638
+---
+ agent/hibinit-agent | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/agent/hibinit-agent b/agent/hibinit-agent
+index e2cbed1..9c8e295 100755
+--- a/agent/hibinit-agent
++++ b/agent/hibinit-agent
+@@ -87,6 +87,11 @@ def get_rootfs_size():
+     return math.ceil(float(stat.f_bsize * stat.f_blocks)/(1024*1024*1024))
+ 
+ 
++def get_partuuid(device):
++    return check_output(
++        ['lsblk', '-dno', 'PARTUUID', device]).decode('ascii').strip()
++
++
+ def patch_grub_config(swap_device, offset, grub2_dir):
+     log("Updating GRUB to use the device %s with offset %d for resume" % (swap_device, offset))
+     lines = []
+@@ -95,6 +100,9 @@ def patch_grub_config(swap_device, offset, grub2_dir):
+     if grub2_dir and os.path.exists(grub2_dir):
+         offset_file = os.path.join(grub2_dir, '99-set-swap.cfg')
+         if not os.path.exists(offset_file):
++            if swap_device.startswith("/dev"):
++                swap_device = "PARTUUID=%s" % get_partuuid(swap_device)
++                log("Updating GRUB referencing root device as %s" % (swap_device))
+             with open(offset_file, 'w') as fl:
+                 fl.write('GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT no_console_suspend=1 '
+                          'resume_offset=%d resume=%s"\n' % (offset, swap_device))

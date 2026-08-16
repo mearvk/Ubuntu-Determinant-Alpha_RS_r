@@ -1,0 +1,421 @@
+.ds command dput
+.ds COMMAND DPUT
+.\" ==========
+.TH "\*[COMMAND]" 1 "2016-12-31" "Debian"
+.
+.\" ==========
+.SH NAME
+.B \*[command]
+\- Debian package upload tool
+.
+.\" ==========
+.SH SYNOPSIS
+.
+.SY \*[command]
+.OP \-DPUVdflosu
+.OP \-c CONFIGFILE
+.OP \-e DAYS
+.RI [ HOSTNAME [:ARGUMENT] ]
+.I CHANGESFILE
+\f[R].\|.\|.\f[]
+.YS
+.
+.SY \*[command]
+.OP \-d
+.OP \-c CONFIGFILE
+.B \-H
+.YS
+.
+.SY \*[command]
+.OP \-d
+.OP \-c CONFIGFILE
+.B \-p
+.YS
+.
+.SY \*[command]
+.B \-h
+.YS
+.
+.SY \*[command]
+.B \-v
+.YS
+.
+.\" ==========
+.SH DESCRIPTION
+.
+.P
+Upload, to the Debian package upload queue, the files constituting the
+package specified in each \f[I]CHANGESFILE\f[].
+.
+.P
+A Debian package release comprises several files, specified in the
+\f[I]CHANGESFILE\f[] for that release. The Debian Package Upload Tool
+.RB ( \*[command] )
+performs several verification checks on the package, then (if the
+verifications succeed) uploads those files to the remote Debian
+package repository.
+.
+See \f[B]VERIFICATION CHECKS\f[], below, for a description of the checks
+.B \*[command]
+can perform on each package.
+.
+.P
+\f[I]HOSTNAME\f[] is a name matching a host section in the
+.BR dput.cf (5)
+configuration. If not specified, \f[I]HOSTNAME\f[] defaults to the
+value of the \f[B]default_host_main\f[] configuration parameter.
+.
+You also can
+pass an argument to the host by appending the hostname with a colon followed
+by the argument. For example, you can upload easily to different launchpad PPAs
+by passing the PPAs' id to the ppa host without having to modify dput.cf.
+.
+.P
+The file transfer method is determined by the \f[B]method\f[]
+configuration parameter for the specified host. See
+.BR dput.cf (5)
+for the set of supported \f[B]method\f[] values.
+.
+.P
+If the configuration specifies a \f[B]pre_upload_command\f[] for the
+remote host, execute a shell subprocess for that command before
+attempting to upload each package.
+.
+.P
+If the configuration specifies a \f[B]post_upload_command\f[] for the
+remote host, execute a shell subprocess for that command after each
+successful package upload.
+.
+.\" ==========
+.SH VERIFICATION CHECKS
+.
+.P
+Each package release, as specified by a \f[I]CHANGESFILE\f[], is
+checked to see whether it is suitable for upload. The following checks
+are available:
+.
+.TP
+Unique upload
+.
+The package should not already have been uploaded to the remote host
+\f[I]HOSTNAME\f[].
+.
+.IP ""
+Check for the log file created when
+.B \*[command]
+successfully uploads a package. If the corresponding log file already
+exists, abort the upload attempt.
+.
+This is unique only for the combination of local machine (where the
+upload log is recorded), the \f[I]CHANGESFILE\f[] name, and the remote
+\f[I]HOSTNAME\f[].
+.
+.IP ""
+This check is disabled if the \f[B]\-\-force\f[] option is specified.
+.
+.TP
+Required package files
+.
+The package should comprise the required files for the type of package.
+.
+.IP ""
+If this is a source package release, and the required source control
+file (\f[I]….dsc\f[]) is not part of the package, abort the upload
+attempt.
+.
+.IP ""
+If this is a source package release, and the version string implies
+that this is the first Debian release for this version, and the
+corresponding source tarball is not part of the package, abort the
+upload attempt.
+.
+.IP ""
+If the package contains the upstream source tarball, but this is not
+required for this release, emit a warning that the upload might be
+rejected by the remote host.
+.
+.IP ""
+If the package contains the Debian-native source tarball, but this is
+not required for this release, emit a warning that the upload might be
+rejected by the remote host.
+.
+.TP
+Successful local install
+.
+The package should be successfully installed on the local system.
+.
+.IP ""
+If this is a binary package release, and each binary package
+(\f[I]….deb\f[] file) is not successfully installed on the local
+system at the specified version, abort the upload.
+.
+.IP ""
+This check is disabled by default. It is enabled when the
+configuration parameter \f[B]check_version\f[] is true.
+.
+.TP
+Cryptographic signature
+.
+The GnuPG signature on the \f[I]CHANGESFILE\f[] should match that file's contents.
+.
+If this is a source package release, the GnuPG signature on the source
+control file (\f[I]….dsc\f[]) should match that file's contents.
+.
+.IP ""
+If GnuPG does not report a good signature for these files, abort the upload.
+.
+.IP ""
+This check is disabled when either the \f[B]allow_unsigned_uploads\f[]
+parameter is true, or the \f[B]\-\-check\-only\f[] option is
+specified.
+.
+.TP
+Package files content match
+.
+The computed size and hash values for each constituent file should
+match the values specified in \f[I]CHANGESFILE\f[].
+.
+.IP ""
+For each file size and hash value specified in \f[I]CHANGESFILE\f[],
+compute the size and hash using the corresponding named file's
+contents on the filesystem.
+.
+If any computed size or hash value does not match the corresponding
+value in \f[I]CHANGESFILE\f[], abort the upload.
+.
+.TP
+Distribution name is permitted for the remote host
+.
+The configuration for \f[I]HOSTNAME\f[] should permit the distribution
+name specified in the package.
+.
+.IP ""
+If the package release's target Debian distribution name is not one
+specified by the \f[B]distributions\f[] parameter for the
+\f[I]HOSTNAME\f[], abort the upload attempt.
+.
+See
+.BR dput.cf (5)
+for the \f[B]distributions\f[] parameter.
+.
+.TP
+Lintian success
+.
+The package should get a successful report from Lintian.
+.
+.IP ""
+Invoke the Lintian tool to check the package described by
+\f[I]CHANGESFILE\f[]. If the check is unsuccessful (exit status
+non-zero), abort the upload attempt.
+.
+.IP ""
+This check is disabled by default. It is enabled when the
+configuration parameter \f[B]run_lintian\f[] is true, or the
+\f[B]\-\-lintian\f[] option is specified.
+.
+.\" ==========
+.SH OPTIONS
+.
+.TP
+.BI \-c " CONFIGFILE"
+.TQ
+.BI \-\-config " CONFIGFILE"
+Use the file \f[I]CONFIGFILE\f[] for configuration.
+.
+See
+.BR dput.cf (5)
+for the specification of this file format.
+.
+.TP
+.B \-d
+.TQ
+.B \-\-debug
+Display debugging messages.
+.
+.TP
+.B \-D
+.TQ
+.B \-\-dinstall
+Request a dry run of
+.B dinstall
+on the remote host after the upload.
+.
+.TP
+.B \-f
+.TQ
+.B \-\-force
+Disable the check for a unique upload.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of this check.
+.
+.TP
+.B \-h
+.TQ
+.B \-\-help
+Display help information, then exit.
+.
+.TP
+.B \-H
+.TQ
+.B \-\-host\-list
+Display the lists of hosts known to the configuration, then exit.
+.
+See
+.BR dput.cf (5)
+for the specification of hosts.
+.
+.TP
+.B \-l
+.TQ
+.B \-\-lintian
+Enable the Lintian verification check, and exit if the check fails.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of this check.
+.
+.TP
+.B \-U
+.TQ
+.B \-\-no\-upload\-log
+Do not write a log file when uploading files.
+.
+.IP ""
+This omits the record used later for checking whether an upload is unique.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of this check.
+.
+.TP
+.BR \-o
+.TQ
+.B \-\-check\-only
+Do not upload the files, and disable the checks for unique upload and
+cryptographic signature.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of these checks.
+.
+.TP
+.B \-p
+.TQ
+.B \-\-print
+Display the configuration that \f[B]\*[command]\f[] is using, then exit.
+.
+See
+.BR dput.cf (5)
+for the configuration format.
+.
+.TP
+.B \-P
+.TQ
+.B \-\-passive
+Use passive mode for FTP.
+.
+If not specified, default for FTP is active mode.
+.
+.TP
+.B \-s
+.TQ
+.B \-\-simulate
+Do not actually upload to the remote host.
+.
+.TP
+.B \-u
+.TQ
+.B \-\-unchecked
+Disable the check for cryptographic signature.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of this check.
+.
+.TP
+.BI \-e " DAYS"
+.TQ
+.BI \-\-delayed " DAYS"
+Upload to a \f[B]DELAYED\f[] queue, rather than the usual
+\f[B]Incoming\f[].
+.
+This takes a \f[I]DAYS\f[] argument from 0 to 15. Note that a delay of
+0 is different from no delay at all.
+.
+.TP
+.B \-v
+.TQ
+.B \-\-version
+Display version information, then exit.
+.
+.TP
+.B \-V
+.TQ
+.B \-\-check\-version
+Enable the check for successful local install.
+.
+See
+.BR "VERIFICATION CHECKS" ,
+above, for a description of this check.
+.
+.\" ==========
+.SH ENVIRONMENT
+.
+.TP
+.B USER
+.
+If no username is specified for authenticating to the remote host, use
+the value of this variable.
+.
+.\" ==========
+.SH FILES
+.
+.TP
+Configuration
+.
+See
+.BR dput.cf (5)
+for the files to configure
+.B \*[command].
+.
+.TP
+.B \f[I]path\f[]/\f[I]basename\f[].\f[I]HOSTNAME\f[].upload
+The log file that contains a record of the successful upload to
+\f[I]HOSTNAME\f[].
+.
+.IP ""
+\f[I]path\f[] is the directory path of \f[I]CHANGESFILE\f[].
+.
+.IP ""
+\f[I]basename\f[] is derived from the \f[I]CHANGESFILE\f[] filename,
+by removing the directory path and the \f[B].changes\f[] suffix.
+.
+.\" ==========
+.SH SEE ALSO
+.
+.BR dput.cf (5),
+.BR dcut (1),
+.BR lintian (1)
+.
+.P
+.UR file:///usr/share/doc/dput/
+\[oq]dput\[cq] package documentation
+.UE ,
+.UR file:///usr/share/dput/
+\[oq]dput\[cq] program files
+.UE .
+.
+.\" Copyright © 2016–2021 Ben Finney <bignose@debian.org>
+.
+.\" This is free software: you may copy, modify, and/or distribute this work
+.\" under the terms of the GNU General Public License as published by the
+.\" Free Software Foundation; version 3 of that license or any later version.
+.\" No warranty expressed or implied. See the file ‘LICENSE.GPL-3’ for details.
+.
+.\" Local variables:
+.\" coding: utf-8
+.\" mode: nroff
+.\" End:
+.\" vim: fileencoding=utf-8 filetype=nroff :

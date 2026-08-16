@@ -1,0 +1,189 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Copyright 2006, Kurt Roeckx <kurt@roeckx.be>
+
+# Based on the sample file from dh-make:
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+DISTRO = $(shell lsb_release -is)
+
+# These are used for cross-compiling and for saving the configure script
+# from having to guess our platform (since we know it already)
+DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
+        confflags += --build=$(DEB_HOST_GNU_TYPE) --enable-maintainer-mode
+else
+        confflags += --build=$(DEB_BUILD_GNU_TYPE) --host=$(DEB_HOST_GNU_TYPE)
+endif
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+    NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+    USE_JOBS = -j$(NUMJOBS)
+endif
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+# https://sourceware.org/pipermail/elfutils-devel/2020q2/002733.html
+ifneq (,$(findstring -flto, $(CFLAGS)))
+  CFLAGS += -flto-partition=none -Wno-error=stack-usage=
+  CXXFLAGS += -flto-partition=none
+  LDFLAGS += -Wno-error=stack-usage=
+endif
+CFLAGS := $(patsubst -O%,-O3, $(CFLAGS))
+CXXFLAGS := $(patsubst -O%,-O3, $(CXXFLAGS))
+
+# Whether we have a debuginfod service available in the distro.
+DEBUGINFOD_SERVICE_AVAILABLE = FALSE
+
+# debuginfod configuration flags.
+ifneq (,$(filter pkg.elfutils.nodebuginfod,$(DEB_BUILD_PROFILES)))
+  conf_debuginfod = \
+	--disable-libdebuginfod \
+	--disable-debuginfod
+else
+  # A space-separated list of distributions that have a debuginfod
+  # service available.
+  DEBUGINFOD_SUPPORTED_DISTROS = Debian
+
+  conf_debuginfod = \
+	--enable-libdebuginfod \
+	--enable-debuginfod
+
+  ifneq (,$(filter $(DISTRO),$(DEBUGINFOD_SUPPORTED_DISTROS)))
+    DEBUGINFOD_SERVICE_AVAILABLE = TRUE
+
+    conf_debuginfod += \
+	--enable-debuginfod-urls="https://debuginfod.debian.net"
+  endif
+endif
+
+
+stamps/configure:
+	dh_testdir
+	dh_autoreconf
+	@mkdir -p stamps
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	./configure --enable-maintainer-mode \
+		--enable-libdebuginfod=dummy \
+		--disable-debuginfod
+	$(MAKE) $(USE_JOBS)
+	$(MAKE) clean
+endif
+	CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" \
+		./configure $(confflags) --prefix=/usr \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--program-prefix=eu- --disable-silent-rules \
+		$(conf_debuginfod)
+	touch $@
+
+build: stamps/build
+stamps/build: stamps/configure
+	dh_testdir
+
+	$(MAKE) $(USE_JOBS)
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	# Check that those files exist.
+	-ls -l /proc/$$$$/maps
+	-ls -l /proc/$$$$/auxv
+	-ls -l /proc/$$$$/
+	-LC_CTYPE=C $(MAKE) check $(USE_JOBS) || { cat tests/test-suite.log; exit 1; }
+	cat tests/test-suite.log
+endif
+
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -rf stamps
+	[ ! -f Makefile ] || $(MAKE) distclean
+	dh_autoreconf_clean
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	# Add here commands to install the package into debian/tmp
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	# We do not provide a libebl anymore, use libdw instead.
+	rm -f debian/tmp/usr/include/elfutils/libebl.h
+
+	# Don't install that yet
+	rm -f debian/tmp/usr/etc/debuginfod/elfutils.urls
+
+	dh_install --sourcedir=debian/tmp
+	rm -f debian/elfutils/usr/bin/debuginfod*
+	dh_missing --fail-missing --sourcedir=debian/tmp
+
+# Build architecture-independent files here.
+build-indep: build
+binary-indep: build-indep install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs -i ChangeLog
+	dh_installdocs -i
+
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdebconf -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+# We have nothing to do.
+
+# Build architecture-dependent files here.
+build-arch: build
+binary-arch: build-arch install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs -a ChangeLog
+	dh_installdocs -a ChangeLog
+
+	: # FIXME: package those ...
+#	find debian/tmp -name '*debuginfod*' | xargs -r rm -f
+#	rm -f debian/tmp/usr/share/man/man1/eu-elfclassify.1
+#	rm -f debian/tmp/usr/share/man/man1/eu-readelf.1
+#	rm -f debian/tmp/usr/share/man/man3/elf_*.3
+
+	dh_dwz -a
+	dh_strip -a
+	dh_strip_nondeterminism -a
+	dh_compress -a
+	dh_fixperms -a
+	dpkg-gensymbols -Pdebian/libdw1/ -plibdw1 -c4
+	dpkg-gensymbols -Pdebian/libasm1/ -plibasm1 -c4
+	dpkg-gensymbols -Pdebian/libelf1/ -plibelf1 -c4
+	dh_makeshlibs -plibelf1 -V "libelf1 (>= 0.132)"
+	dh_makeshlibs -plibasm1 -V "libasm1 (>= 0.132)"
+	dh_makeshlibs -plibdw1 -V "libdw1 (>= 0.138)"
+	dh_makeshlibs -plibdebuginfod1
+	dh_installdebconf -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-indep binary-arch
+
+maint-unpatch:
+	bash debian/unpatch.sh debian/patches
+
+.PHONY: build clean binary-indep binary-arch binary install maint-unpatch

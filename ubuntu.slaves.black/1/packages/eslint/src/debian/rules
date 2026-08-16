@@ -1,0 +1,163 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+# generate documentation unless nodoc requested
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+DOCS = README.html README.txt
+CHANGELOGS = CHANGELOG.html CHANGELOG.txt
+MANPAGES = debian-man/eslint.1
+endif
+
+ESLINT = bin/eslint.js
+MOCHA = mocha --no-timeout
+MOCHA_TAP := $(MOCHA) --reporter tap
+# normalize output with TAP where possible unless terse requested
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
+ESLINT += --format tap
+MOCHA += --reporter tap
+else
+ESLINT += --format unix
+MOCHA += --reporter dot --no-colors
+endif
+
+# Work around missing Node.js module eslump
+MOCHA_SKIP += tests/tools/eslint-fuzzer.js
+
+# Work around Syntax error in selector
+MOCHA_ISOLATE += \
+ tests/bin/eslint.js \
+
+# Work around misc. breakage
+MOCHA_ISOLATE += \
+ tests/lib/cli.js \
+ tests/lib/cli-engine/cli-engine.js \
+ tests/lib/cli-engine/file-enumerator.js \
+ tests/lib/cli-engine/ignored-paths.js \
+ tests/lib/init/npm-utils.js \
+ tests/lib/init/source-code-utils.js \
+ tests/lib/linter/linter.js \
+ tests/lib/linter/node-event-generator.js \
+ tests/lib/rules/camelcase.js \
+ tests/lib/rules/id-length.js \
+ tests/lib/rules/id-match.js \
+ tests/lib/rules/require-await.js \
+
+# generate manpage with help2man from --help option of Node.js script
+_mkman = NODE_PATH=lib \
+ help2man $(patsubst %,--name %,$3) --no-info --output $2 $1 \
+ || { NODE_PATH=lib $1 --help; false; }
+
+%:
+	dh $@
+
+%.html: %.md
+	pandoc --from gfm-raw_html --to html --standalone --output $@ $<
+
+%.txt: %.md
+	pandoc --from gfm-raw_html --to plain --output $@ $<
+
+# strip extension from executable
+debian-man/eslint:
+	mkdir --parents $(dir $@)
+	cp --force bin/eslint.js $@
+
+# build manpage
+debian-man/eslint.1: %.1: %
+	$(call _mkman, $<, $@, \
+		AST-based pattern checker and linting utility for JavaScript)
+
+override_dh_clean:
+	dh_clean -- $(DOCS) $(CHANGELOGS)
+
+override_dh_auto_build: $(DOCS) $(CHANGELOGS) $(MANPAGES)
+
+# TODO: drop symlink when possible
+override_dh_auto_test:
+	ln --force --symbolic --no-target-directory internal-rules \
+		tools/eslint-plugin-internal-rules
+#	NODE_PATH=packages:tools $(ESLINT) --report-unused-disable-directives Makefile.js
+#	find conf -type f -name '*.json' \
+#		-exec jsonlint {} +
+#	find docs -type f -name '*.md' \
+#		-exec lintMarkdown {} +
+	NODE_PATH=packages:tools $(ESLINT) --report-unused-disable-directives \
+		$(patsubst %,--ignore-pattern '%',$(ESLINT_SKIP)) \
+		lib conf bin tests/bin tests/lib tests/tools
+	NODE_PATH=packages:tools $(MOCHA) \
+		$(patsubst %,--exclude %,$(MOCHA_SKIP) $(MOCHA_ISOLATE)) \
+		'tests/{bin,lib,tools}/**/*.js'
+	NODE_PATH=packages:tools $(MOCHA_TAP) $(MOCHA_ISOLATE) | debian/tap-todo \
+		'^bin/eslint.js handling crashes prints the error message to stderr in the event of a crash$$' \
+		'^bin/eslint.js handling crashes prints the error message exactly once to stderr in the event of a crash$$' \
+		'^bin/eslint.js emitting a warning for ecmaFeatures does not emit a warning when it does not find an ecmaFeatures option$$' \
+		'^bin/eslint.js emitting a warning for ecmaFeatures emits a warning when it finds an ecmaFeatures option$$' \
+		'^cli execute\(\) should return no error when --ext \.js2 is specified$$' \
+		'^cli when given a config file should load the specified config file$$' \
+		'^cli when given a config file and a directory of files should load and execute without error$$' \
+		'^cli when given a config with environment set to browser should execute without any errors$$' \
+		'^cli when given a config with environment set to Node.js should execute without any errors$$' \
+		'^cli when given a config with environment set to Nashorn should execute without any errors$$' \
+		'^cli when given a config with environment set to WebExtensions should execute without any errors$$' \
+		'^cli when given a valid built-in formatter name should execute without any errors$$' \
+		'^cli when given a valid built-in formatter name that uses rules meta. should execute without any errors$$' \
+		'^cli when given an invalid built-in formatter name should execute with error$$' \
+		'^cli when given a valid formatter path should execute without any errors$$' \
+		'^cli when given an invalid formatter path should execute with error$$' \
+		'^cli when given a directory with eslint excluded files in the directory should throw an error and not process any files$$' \
+		'^cli when given a file in excluded files list should not process the file$$' \
+		'^cli when given a pattern to ignore should not process any files$$' \
+		'^cli when the quiet option is enabled should print nothing if there are no errors$$' \
+		'^cli when given the max-warnings flag should not change exit code if warning count under threshold$$' \
+		'^cli when given the max-warnings flag should exit with exit code 1 if warning count exceeds threshold$$' \
+		'^cli when given the max-warnings flag should not change exit code if warning count equals threshold$$' \
+		'^cli when given the max-warnings flag should not change exit code if flag is not specified and there are warnings$$' \
+		'^CLIEngine executeOnFiles\(\) should return one error message when given a config with rules with options and severity level set to error$$' \
+		'^CLIEngine executeOnFiles\(\) should throw an error when given a directory with all eslint excluded files in the directory$$' \
+		'^FileEnumerator .iterateFiles\(patterns\). method should iterate files and configs\. with .tests/fixtures/glob-utils. files listFilesToProcess\(\) should throw if only ignored files match a glob$$' \
+		'^FileEnumerator .iterateFiles\(patterns\). method should iterate files and configs\. with .tests/fixtures/glob-utils. files listFilesToProcess\(\) should return an ignored file, if ignore option is turned off$$' \
+		'^FileEnumerator .iterateFiles\(patterns\). method should iterate files and configs\. with .tests/fixtures/glob-utils. files listFilesToProcess\(\) should ignore a file from a glob if it matches a pattern in an ignore file$$' \
+		'^IgnoredPaths contains should return false for files outside of the cwd \(with no ignore file provided\)$$' \
+		'^npmUtils installSyncSaveDev\(\) should invoke npm to install a single desired package$$' \
+		'^npmUtils installSyncSaveDev\(\) should accept an array of packages to install$$' \
+		'^npmUtils installSyncSaveDev\(\) should log an error message if npm throws ENOENT error$$' \
+		'^npmUtils fetchPeerDependencies\(\) should execute .npm show --json <packageName> peerDependencies. command$$' \
+		'^npmUtils fetchPeerDependencies\(\) should return null if npm throws ENOENT error$$' \
+		'^SourceCodeUtil getSourceCodeOfFiles\(\) should accept a relative path to a file in a parent directory$$' \
+		'^Linter when evaluating code with comments which have colon in its value should not parse errors, should report a violation$$' \
+		'^NodeEventGenerator parsing an invalid selector throws a useful error$$' \
+		'^camelcase valid var \{ category_id = 1 \} = query;$$' \
+		'^camelcase invalid var \{ category_id = 1 \} = query;$$' \
+		'^camelcase invalid function foo\(\{ no_camelcased = .default value. \}\) \{\};$$' \
+		'^camelcase invalid const no_camelcased = 0; function foo\(\{ camelcased_value = no_camelcased\}\) \{\}$$' \
+		'^camelcase invalid const \{ no_camelcased = false \} = bar;$$' \
+		'^camelcase invalid const \{ no_camelcased = foo_bar \} = bar;$$' \
+		'^id-length invalid var \{ x\} = \{\};$$' \
+		'^id-match valid var \{ category_id = 1 \} = query;$$' \
+		'^id-match invalid var \{ category_id \} = query;$$' \
+		'^id-match invalid var \{ category_id = 1 \} = query;$$' \
+		'^id-match invalid function foo\(\{ no_camelcased \}\) \{\};$$' \
+		'^id-match invalid function foo\(\{ no_camelcased = .default value. \}\) \{\};$$' \
+		'^id-match invalid const no_camelcased = 0; function foo\(\{ camelcased_value = no_camelcased \}\) \{\}$$' \
+		'^id-match invalid const \{ no_camelcased = false \} = bar;$$' \
+		'^require-await valid async function foo\(\) \{ await async \(\) => \{ await doSomething\(\) \} \}$$' \
+		'^require-await invalid async function foo\(\) \{ await async \(\) => \{ doSomething\(\) \} \}$$' \
+
+# avoid installing stray config files
+override_dh_install:
+	dh_install -X.eslintrc.yml
+
+override_dh_installdocs:
+	dh_installdocs --all -- $(DOCS)
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- $(CHANGELOGS)
+
+# unset bogus executable bits
+execute_after_dh_fixperms:
+	chmod --recursive a-x,a+X -- debian/*/usr/share/nodejs
+	chmod --recursive a+x -- debian/*/usr/share/nodejs/eslint/bin/*
+
+override_dh_gencontrol:
+	dh_gencontrol -- -V"types:Version=$(shell jq --raw-output .version < Xtypes/package.json)~$(DEB_VERSION)" \
+			-V"config:Version=$(shell jq --raw-output .version < packages/eslint-config-eslint/package.json)~$(DEB_VERSION)"

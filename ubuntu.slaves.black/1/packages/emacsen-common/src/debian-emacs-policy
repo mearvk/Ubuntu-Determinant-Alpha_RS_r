@@ -1,0 +1,313 @@
+-*-indented-text-*-
+
+First, for the purposes of this policy, some terminology:
+
+  <flavor> - a particular flavor of Emacs, for example:
+
+    emacs
+    xemacs21
+
+  add-on package - any package which wishes to use the emacsen-common
+    infrastructure, usually in order to byte-compile itself for some
+    subset of the currently installed emacs flavors.
+
+  <package> - the name of an add-on package, for example:
+
+    auctex
+    bbdb
+    gnus
+
+1) Guarding use of emacsen-common infrastructure
+
+   Any use of the emacsen-common infrastructure must be guarded by a
+   test for the existence of the emacsen-common installed state
+   file. i.e.:
+
+     if test -e /var/lib/emacsen-common/state/package/installed/emacsen-common
+     then
+        emacs-package-install ...
+     fi
+
+   Of course this requirement does not apply for the maintainer
+   scripts of any package that depends on emacsen-common, which
+   includes all add-on packages and all emacsen main <flavor>
+   packages: emacs-lucid, xemacs21, etc.  So in practice, this guard
+   should rarely be necessary.
+
+2) Flavor indication
+
+   Each flavor's binary must set the variable debian-emacs-flavor to be
+   the same as the name of the debian-package.  For example, the
+   emacs-lucid package does this in startup.el:
+
+     (defconst debian-emacs-flavor 'emacs
+       "A symbol representing the particular debian flavor of emacs running.
+     Something like 'emacs, 'xemacs21, etc.")
+
+   For now, debian-emacs-flavor should be defined regardless of the
+   use of -q or --no-site-file.
+
+3) Emacs startup strategy
+
+  On startup each emacsen must call (debian-startup <flavor>).  During
+  debian-startup, the relevant flavor-specific site-start.d files will
+  be loaded via debian-run-directories, e.g:
+
+    emacs:        /etc/emacs/site-start.d
+    xemacs21:     /etc/xemacs21/site-start.d
+
+  The next question is, "Where should we run debian-startup?"  The
+  safest possibility, and the one I had originally intended was to
+  modify lisp/startup.el to do the right thing, and I had also
+  intended that --no-site-file would disable all of the Debian startup
+  bits, including calling Debian startup.  So here's what emacs-lucid
+  has in startup.el:
+
+    ;; Debian startup
+     (if site-run-file
+        (progn
+          ;; Load all the Debian package snippets.
+          ;; It's in here because we want -q to kill it too.
+          (if (load "debian-startup" t t nil)
+              (debian-startup debian-emacs-flavor))
+          ;; Now the normal site file...
+          (load site-run-file t t nil)))
+
+  This makes sure that Debian's bits are setup as early as possible,
+  and requires only minor modifications to the emacs source.
+
+  At a minimum debian-startup calls debian-run-directories which
+  collects the union of all the file base names (i.e. without any .el
+  or .elc extension, and without the directory component:
+  i.e. /etc/xemacs21/site-start.d/50foo.elc => 50foo), then
+  temporarily augments the emacs load path to include
+  /etc/<flavor>/site-start.d, and calls (load base-name) in
+  string< order.
+
+4) /usr/share/<flavor>/site-lisp/
+
+  This directory must be treated as part of the normal emacsen load
+  path, and add-on packages should place their files there (see
+  below), e.g.:
+
+    emacs:     /usr/share/emacs/site-lisp/
+    xemacs21:  /usr/share/xemacs21/site-lisp/
+
+5) Emacs add-on package support (examples below should make this much clearer)
+
+  A) Each add-on package must add a "Depends: emacsen-common (>=
+     2.0.8)" and include a file like this that indicates its
+     emacsen-common compatibility level:
+
+       /usr/lib/emacsen-common/packages/compat/<package>
+
+     This file should contain a single integer, which at the moment
+     should be 0.  (Currently, the file is just used to distinguish
+     between old-style packages and new-style packages.)
+
+  B) Each add-on package may place a file named the same as the
+     package in
+
+       /usr/lib/emacsen-common/packages/install/
+       /usr/lib/emacsen-common/packages/remove/
+
+     and the package must make these calls from the given maintainer
+     scripts:
+  
+     preinst:
+       /usr/lib/emacsen-common/emacs-package-install --preinst <package>
+
+     postinst:
+       /usr/lib/emacsen-common/emacs-package-install --postinst <package>
+
+     prerm:
+       /usr/lib/emacsen-common/emacs-package-remove --prerm <package>
+
+     The postinst call must not be made until the package is
+     completely configured and otherwise ready for use, and the prerm
+     call must be made before any changes that would make the package
+     not completely configured and ready for use.
+
+     These calls will ensure that the add-on package's emacsen-common
+     install and remove scripts are called at the appropriate times.
+     In particular the postinst call will trigger the install script
+     for every flavor of emacs that's already completely installed.
+     If flavors are being installed simultaneously, the install script
+     may be delayed until that flavor's postinst runs.
+
+     When the install or remove script is called, the add-on package
+     can assume that the flavor for which it is being invoked is
+     completely installed (i.e. past the significant parts of its
+     postinst).
+
+     The install and remove scripts will be invoked with a single
+     argument, the <flavor> being installed or removed.
+
+     So if emacs and xemacs21 flavors are fully installed, installing
+     add-on foo will result in calls to:
+
+       /usr/lib/emacsen-common/packages/install/foo emacs
+       /usr/lib/emacsen-common/packages/install/foo xemacs21
+
+     emacs-package remove does the symmetric thing.
+
+  C) Add-on packages need not declare a dependency on any emacs
+     flavors, but they must declare a dependency on emacsen-common
+     (see above, and (of course) must declare dependencies on any
+     other relevant packages, including relevant add-on packages, or
+     tools needed by the install/remove scripts.
+
+     The emacsen-common infrastructure will ensure that the
+     install/remove script invocations are ordered to respect
+     inter-add-on package dependencies.
+
+  D) Each add-on package has the right to place files into the
+     following directories:
+
+       /etc/<flavor>/site-start.d
+       /usr/share/<flavor>/site-lisp/<package-name>
+
+  E) If an add-on package compiles any of its Emacs Lisp sources
+     (which must be compiled to a subdirectory of
+     /usr/share/<flavor>/site-lisp/<package-name> -- see section 4
+     above), the corresponding .el file must be available in the same
+     directory as the corresponding .elc file, either directly, via
+     symlink, or hardlink.
+
+     For example, if add-on package foo produces
+     /usr/share/emacs/site-lisp/foo/bar.elc, then
+     /usr/share/emacs/site-lisp/foo/bar.el must refer to the
+     corresponding source file.  This ensures that Emacs will be able
+     to locate the source code for the add-on package when using M-x
+     find-function, etc.
+
+  F) Each emacsen main package (i.e. emacs-lucid, xemacs21, etc.) must
+     depend on emacsen-common (>= 3.0.0).
+
+  G) Each emacsen main package (i.e. emacs-lucid, emacs-nox, etc.)
+     must make these calls from the given maintainer scripts:
+
+     preinst:
+       /usr/lib/emacsen-common/emacs-install --preinst <flavor>
+
+     postinst:
+       /usr/lib/emacsen-common/emacs-install --postinst <flavor>
+
+     prerm:
+       /usr/lib/emacsen-common/emacs-remove --prerm <flavor>
+
+     The postinst call must not be made until the package is
+     completely configured and ready for use, and the prerm call must
+     be made before any changes that would make the package not
+     completely configured and ready for use.
+
+     These calls will ensure that all of the relevant add-on packages'
+     emacsen-common install and remove scripts are called at the
+     appropriate times.  In particular the postinst call may trigger
+     the install scripts and the prerm script may trigger the remove
+     scripts for any package that is ready.  If add-on packages are
+     being installed simultaneously, the add-on install scripts may be
+     delayed until their postinst scripts are run.
+
+6) Mandatory binary path
+
+   Each emacsen must be available as /usr/bin/<flavor> in addition to
+   any normal binary path so that when add-on package install/remove
+   scripts are called, they can just use /usr/bin/"$1" to get the
+   right binary for byte-compilation.
+
+7) Virtual package
+
+   Each emacsen main package must "Provides: emacsen", and packages
+   that just need to make sure some flavor of emacs is installed
+   should "Depends: emacsen".  If they depend on specific flavors of
+   emacs, then they should list those dependencies explicitly instead.
+
+8) Emacs lisp load path.
+
+   At a minimum, each emacs must have the following directories in this
+   relative order in their load path:
+
+     /usr/local/share/<flavor>/site-lisp
+     /usr/share/<flavor>/site-lisp
+
+   Emacs add-on packages may not modify load-path directly.  They must
+   use (debian-pkg-add-load-path-item <path>).  This function will
+   make sure that their additions end up in the right place -- before
+   the emacs system directories, but after the /usr/local/
+   directories.
+
+9) Usage of autoload instead of load in the site-start.d files.
+
+   It's been suggested, and is probably a good idea that maintainers
+   switch to using autoload rather than load when possible in their
+   site-start.d files.  For example, instead of (load "some-package"),
+   you should use autoloads for all the top level, user visible
+   functions.
+
+
+
+That's it.  Hopefully this gives the add-on package maintainers the
+flexibility they need to be able to DTRT, and the common case won't be
+all that difficult.
+
+Examples:
+
+1) xemacs21 and the add-on packages tm and auctex are already installed,
+   and now someone installs emacs23.
+
+   In its prerm, emacs23 would make this call:
+
+     /usr/lib/emacsen-common/emacs-install --postinst emacs23
+
+   which would result in calls to
+
+     /usr/lib/emacsen-common/packages/install/auctex emacs23
+     /usr/lib/emacsen-common/packages/emacs/install/tm emacs23
+    
+2) Now, given (1), assume that someone removes xemacs21.
+
+   In its prerm, xemacs21 would make this call:
+
+     /usr/lib/emacsen-common/emacs-remove --prerm xemacs21
+
+   which would result in calls to
+
+     /usr/lib/emacsen-common/packages/remove/auctex xemacs21
+     /usr/lib/emacsen-common/packages/remove/tm xemacs21
+
+3) Now assume emacs23 and xemacs21 are installed, and that someone removes
+   tm.
+
+   The call to emacsen-package-remove in tm's prerm will result in
+   the following calls:
+
+     /usr/lib/emacsen-common/packages/remove/tm emacs23
+     /usr/lib/emacsen-common/packages/remove/tm xemacs21
+
+   In the remove/tm file, tm is responsible for cleaning up any files
+   it put into its allowed locations:
+
+     /etc/<flavor>/site-start.d/
+     /usr/share/<flavor>/site-lisp/tm
+
+4) Now assume that emacs and auctex are not installed, and that
+   someone installs both at the same time.
+
+   At some point during the installation, after emacs and auctex are
+   fully configured, this command will be invoked:
+
+     /usr/lib/emacsen-common/packages/remove/auctex emacs
+
+   This call may happen from either emacs or auctex's postinst as a
+   result of their respective calls to emacs-install and
+   emacs-package-install.  Which package causes the invocation will
+   depend on the order in which dpkg decides to invoke their postint
+   scripts.  The emacsen-common infrastructure makes sure that the
+   last one wins.
+
+5) Finally, please see sample-package-install-foo and
+   sample-package-remove-foo in /usr/share/doc/emacsen-common/.  These
+   are sample install and remove scripts for a hypothetical package
+   "foo" that only needs to byte compile a list of files for each
+   flavor.

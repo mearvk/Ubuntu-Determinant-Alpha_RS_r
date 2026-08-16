@@ -1,0 +1,302 @@
+Description: Breaking: drop Node.js 8 support
+ Needed to use NodeJS module memfs
+ instead of metro-memory-fs not packaged in Debian.
+ .
+ Adapted (compared to upstream)
+ to simplify jsdoc comments for function readdirSafeSync()
+ in file lib/cli-engine/file-enumerator.js
+ (seemingly needed until eslint-plugin-jsdoc is used).
+Origin: upstream, https://github.com/eslint/eslint/commit/2c28fbb
+Bug: https://github.com/eslint/eslint/issues/12700
+Author: Toru Nagashima <public@mysticatea.dev>
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2022-01-30
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/.eslintignore
++++ b/.eslintignore
+@@ -8,6 +8,5 @@
+ /tests/performance/**
+ /tmp/**
+ /tools/internal-rules/node_modules/**
+-/lib/rules/utils/unicode/is-combining-character.js
+ test.js
+ !.eslintrc.js
+--- a/README.md
++++ b/README.md
+@@ -40,7 +40,7 @@
+ 
+ ## <a name="installation-and-usage"></a>Installation and Usage
+ 
+-Prerequisites: [Node.js](https://nodejs.org/) (`^8.10.0`, `^10.13.0`, or `>=11.10.1`), npm version 3+.
++Prerequisites: [Node.js](https://nodejs.org/) (`^10.12.0`, or `>=12.0.0`) built with SSL support. (If you are using an official Node.js distribution, SSL is always built in.)
+ 
+ You can install ESLint using npm:
+ 
+--- a/docs/user-guide/getting-started.md
++++ b/docs/user-guide/getting-started.md
+@@ -13,7 +13,7 @@
+ 
+ ## Installation and Usage
+ 
+-Prerequisites: [Node.js](https://nodejs.org/en/) (>=8.10), npm version 3+.
++Prerequisites: [Node.js](https://nodejs.org/en/) (`^10.12.0`, or `>=12.0.0`) built with SSL support. (If you are using an official Node.js distribution, SSL is always built in.)
+ 
+ You can install ESLint using npm:
+ 
+--- a/lib/cli-engine/file-enumerator.js
++++ b/lib/cli-engine/file-enumerator.js
+@@ -129,12 +129,12 @@
+ /**
+  * Get filenames in a given path to a directory.
+  * @param {string} directoryPath The path to target directory.
+- * @returns {string[]} The filenames.
++ * @returns {fs.Dirent[]} The filenames.
+  * @private
+  */
+ function readdirSafeSync(directoryPath) {
+     try {
+-        return fs.readdirSync(directoryPath);
++        return fs.readdirSync(directoryPath, { withFileTypes: true });
+     } catch (error) {
+         /* istanbul ignore next */
+         if (error.code !== "ENOENT") {
+@@ -390,12 +390,11 @@
+         let config = null;
+ 
+         // Enumerate the files of this directory.
+-        for (const filename of readdirSafeSync(directoryPath)) {
+-            const filePath = path.join(directoryPath, filename);
+-            const stat = statSafeSync(filePath); // TODO: Use `withFileTypes` in the future.
++        for (const entry of readdirSafeSync(directoryPath)) {
++            const filePath = path.join(directoryPath, entry.name);
+ 
+             // Check if the file is matched.
+-            if (stat && stat.isFile()) {
++            if (entry.isFile()) {
+                 if (!config) {
+                     config = configArrayFactory.getConfigArrayForFile(filePath);
+                 }
+@@ -410,14 +409,14 @@
+                     : extensionRegExp.test(filePath);
+ 
+                 if (matched) {
+-                    debug(`Yield: ${filename}${ignored ? " but ignored" : ""}`);
++                    debug(`Yield: ${entry.name}${ignored ? " but ignored" : ""}`);
+                     yield { config, filePath, flag };
+                 } else {
+-                    debug(`Didn't match: ${filename}`);
++                    debug(`Didn't match: ${entry.name}`);
+                 }
+ 
+             // Dive into the sub directory.
+-            } else if (options.recursive && stat && stat.isDirectory()) {
++            } else if (options.recursive && entry.isDirectory()) {
+                 yield* this._iterateFilesRecursive(filePath, options);
+             }
+         }
+--- a/lib/shared/relative-module-resolver.js
++++ b/lib/shared/relative-module-resolver.js
+@@ -6,35 +6,18 @@
+ "use strict";
+ 
+ const Module = require("module");
+-const path = require("path");
+ 
+-// Polyfill Node's `Module.createRequire` if not present. We only support the case where the argument is a filepath, not a URL.
+-const createRequire = (
+-
+-    // Added in v12.2.0
+-    Module.createRequire ||
+-
+-    // Added in v10.12.0, but deprecated in v12.2.0.
+-    Module.createRequireFromPath ||
+-
+-    // Polyfill - This is not executed on the tests on node@>=10.
+-    /* istanbul ignore next */
+-    (filename => {
+-        const mod = new Module(filename, null);
+-
+-        mod.filename = filename;
+-        mod.paths = Module._nodeModulePaths(path.dirname(filename)); // eslint-disable-line no-underscore-dangle
+-        mod._compile("module.exports = require;", filename); // eslint-disable-line no-underscore-dangle
+-        return mod.exports;
+-    })
+-);
++/*
++ * `Module.createRequire` is added in v12.2.0. It supports URL as well.
++ * We only support the case where the argument is a filepath, not a URL.
++ */
++const createRequire = Module.createRequire || Module.createRequireFromPath;
+ 
+ module.exports = {
+ 
+     /**
+      * Resolves a Node module relative to another module
+      * @param {string} moduleName The name of a Node module, or a path to a Node module.
+-     *
+      * @param {string} relativeToPath An absolute path indicating the module that `moduleName` should be resolved relative to. This must be
+      * a file rather than a directory, but the file need not actually exist.
+      * @returns {string} The absolute path that would result from calling `require.resolve(moduleName)` in a file located at `relativeToPath`
+@@ -43,6 +26,8 @@
+         try {
+             return createRequire(relativeToPath).resolve(moduleName);
+         } catch (error) {
++
++            // This `if` block is for older Node.js than 12.0.0. We can remove this block in the future.
+             if (
+                 typeof error === "object" &&
+                 error !== null &&
+--- a/package.json
++++ b/package.json
+@@ -112,7 +112,7 @@
+     "load-perf": "^0.2.0",
+     "markdownlint": "^0.15.0",
+     "markdownlint-cli": "^0.17.0",
+-    "metro-memory-fs": "^0.54.1",
++    "memfs": "^3.0.1",
+     "mocha": "^6.1.2",
+     "mocha-junit-reporter": "^1.23.0",
+     "npm-license": "^0.3.3",
+@@ -137,6 +137,6 @@
+   ],
+   "license": "MIT",
+   "engines": {
+-    "node": "^8.10.0 || ^10.13.0 || >=11.10.1"
++    "node": "^10.12.0 || >=12.0.0"
+   }
+ }
+--- a/tests/lib/_utils.js
++++ b/tests/lib/_utils.js
+@@ -6,7 +6,7 @@
+ "use strict";
+ 
+ const path = require("path");
+-const MemoryFs = require("metro-memory-fs");
++const { Volume, createFsFromVolume } = require("memfs");
+ 
+ /**
+  * Prevents leading spaces in a multiline template literal from appearing in the resulting string
+@@ -27,37 +27,6 @@
+ 
+ // eslint-disable-next-line valid-jsdoc
+ /**
+- * Add support of `recursive` option.
+- * @param {import("fs")} fs The in-memory file system.
+- * @param {() => string} cwd The current working directory.
+- * @returns {void}
+- */
+-function supportMkdirRecursiveOption(fs, cwd) {
+-    const { mkdirSync } = fs;
+-
+-    fs.mkdirSync = (filePath, options) => {
+-        if (typeof options === "object" && options !== null) {
+-            if (options.recursive) {
+-                const absolutePath = path.resolve(cwd(), filePath);
+-                const parentPath = path.dirname(absolutePath);
+-
+-                if (
+-                    parentPath &&
+-                    parentPath !== absolutePath &&
+-                    !fs.existsSync(parentPath)
+-                ) {
+-                    fs.mkdirSync(parentPath, options);
+-                }
+-            }
+-            mkdirSync(filePath, options.mode);
+-        } else {
+-            mkdirSync(filePath, options);
+-        }
+-    };
+-}
+-
+-// eslint-disable-next-line valid-jsdoc
+-/**
+  * Define in-memory file system.
+  * @param {Object} options The options.
+  * @param {() => string} [options.cwd] The current working directory.
+@@ -73,17 +42,8 @@
+      * The in-memory file system for this mock.
+      * @type {import("fs")}
+      */
+-    const fs = new MemoryFs({
+-        cwd,
+-        platform: process.platform === "win32" ? "win32" : "posix"
+-    });
+-
+-    // Support D: drive.
+-    if (process.platform === "win32") {
+-        fs._roots.set("D:", fs._makeDir(0o777)); // eslint-disable-line no-underscore-dangle
+-    }
++    const fs = createFsFromVolume(new Volume());
+ 
+-    supportMkdirRecursiveOption(fs, cwd);
+     fs.mkdirSync(cwd(), { recursive: true });
+ 
+     /*
+--- a/tools/update-unicode-utils.js
++++ /dev/null
+@@ -1,47 +0,0 @@
+-/**
+- * @author Toru Nagashima <https://github.com/mysticatea>
+- */
+-"use strict";
+-
+-const fs = require("fs");
+-const path = require("path");
+-
+-/**
+- * Render the content of `lib/rules/utils/unicode/is-combining-character.js`.
+- * @param {number[]} chars The character code list to render.
+- * @returns {void}
+- */
+-function renderIsCombiningCharacter(chars) {
+-    return `// THIS FILE WAS GENERATED BY 'tools/update-unicode-utils.js'
+-"use strict";
+-
+-const combiningChars = new Set(${JSON.stringify(chars)})
+-
+-/**
+- * Check whether a given character is a combining mark or not.
+- * @param {number} c The character code to check.
+- * @returns {boolean} \`true\` if the character belongs to the category, one of \`Mc\`, \`Me\`, and \`Mn\`.
+- */
+-module.exports = function isCombiningCharacter(c) {
+-    return combiningChars.has(c);
+-};
+-`;
+-}
+-
+-//------------------------------------------------------------------------------
+-// Main
+-//------------------------------------------------------------------------------
+-
+-const combiningChars = Array.from(function *() {
+-    for (let codePoint = 0; codePoint <= 0x10FFFF; ++codePoint) {
+-        // eslint-disable-next-line node/no-unsupported-features/es-syntax
+-        if (/^[\p{Mc}\p{Me}\p{Mn}]$/u.test(String.fromCodePoint(codePoint))) {
+-            yield codePoint;
+-        }
+-    }
+-}());
+-
+-fs.writeFileSync(
+-    path.resolve(__dirname, "../lib/rules/utils/unicode/is-combining-character.js"),
+-    renderIsCombiningCharacter(combiningChars)
+-);
+--- /dev/null
++++ b/lib/rules/utils/unicode/is-combining-character.js
+@@ -0,0 +1,13 @@
++/**
++ * @author Toru Nagashima <https://github.com/mysticatea>
++ */
++"use strict";
++
++/**
++ * Check whether a given character is a combining mark or not.
++ * @param {number} codePoint The character code to check.
++ * @returns {boolean} `true` if the character belongs to the category, any of `Mc`, `Me`, and `Mn`.
++ */
++module.exports = function isCombiningCharacter(codePoint) {
++    return /^[\p{Mc}\p{Me}\p{Mn}]$/u.test(String.fromCodePoint(codePoint));
++};

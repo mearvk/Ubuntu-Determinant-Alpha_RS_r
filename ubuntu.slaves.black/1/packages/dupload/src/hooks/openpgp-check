@@ -1,0 +1,32 @@
+#!/bin/sh
+# Verify that a changes has been OpenPGP signed and that the signatures are
+# good.
+
+FILE=$1
+# If no gpg is found just exit
+[ ! -x "$(command -v gpg)" ] && exit 0
+# If the file is not found just exit with error
+[ ! -r "$FILE" ] && exit 2
+
+echo -n Checking OpenPGP signatures before upload...
+
+# Use the exit status to determine if the signature is ok or not
+gpg --weak-digest SHA1 --weak-digest RIPEMD160 --verify "$FILE" >/dev/null 2>&1
+ret=$?
+if [ $ret -eq 1 ]; then
+	echo "OpenPGP verification of $FILE failed!"
+	exit 1
+elif [ $ret -eq 2 ]; then
+	if grep -- '-----BEGIN PGP' "$FILE" >/dev/null 2>&1; then
+		echo "OpenPGP signature cannot be checked, probably because of missing keys"
+		exit 0
+	else
+		echo "OpenPGP signature is missing"
+		exit 1
+	fi
+fi
+
+echo ...signatures are ok
+
+exit 0
+

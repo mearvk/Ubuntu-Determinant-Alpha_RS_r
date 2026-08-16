@@ -1,0 +1,60 @@
+Description: Use node module regenerate-unicode-properties
+Forwarded: no
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2019-10-14
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/rules/capitalized-comments.js
++++ b/lib/rules/capitalized-comments.js
+@@ -8,7 +8,9 @@
+ // Requirements
+ //------------------------------------------------------------------------------
+ 
+-const LETTER_PATTERN = require("./utils/patterns/letters");
++const letters = require("regenerate-unicode-properties/General_Category/Letter.js"),
++    lettersUppercase = require("regenerate-unicode-properties/General_Category/Uppercase_Letter.js"),
++    lettersLowercase = require("regenerate-unicode-properties/General_Category/Lowercase_Letter.js");
+ const astUtils = require("./utils/ast-utils");
+ 
+ //------------------------------------------------------------------------------
+@@ -241,18 +243,15 @@
+ 
+             const firstWordChar = commentWordCharsOnly[0];
+ 
+-            if (!LETTER_PATTERN.test(firstWordChar)) {
++            if (!letters.contains(firstWordChar)) {
+                 return true;
+             }
+ 
+             // 7. Check the case of the initial word character.
+-            const isUppercase = firstWordChar !== firstWordChar.toLocaleLowerCase(),
+-                isLowercase = firstWordChar !== firstWordChar.toLocaleUpperCase();
+-
+-            if (capitalize === "always" && isLowercase) {
++            if (capitalize === "always" && lettersLowercase.contains(firstWordChar)) {
+                 return false;
+             }
+-            if (capitalize === "never" && isUppercase) {
++            if (capitalize === "never" && lettersUppercase.contains(firstWordChar)) {
+                 return false;
+             }
+ 
+@@ -279,7 +278,7 @@
+                     loc: comment.loc,
+                     messageId,
+                     fix(fixer) {
+-                        const match = comment.value.match(LETTER_PATTERN);
++                        const match = comment.value.match(letters.toRegExp());
+ 
+                         return fixer.replaceTextRange(
+ 
+--- a/package.json
++++ b/package.json
+@@ -72,6 +72,7 @@
+     "natural-compare": "^1.4.0",
+     "optionator": "^0.8.2",
+     "progress": "^2.0.0",
++    "regenerate-unicode-properties": "^1.0.0",
+     "regexpp": "^2.0.1",
+     "semver": "^6.1.2",
+     "strip-ansi": "^5.2.0",

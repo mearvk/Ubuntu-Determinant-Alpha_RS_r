@@ -1,0 +1,54 @@
+From: Balint Reczey <balint.reczey@canonical.com>
+Date: Mon, 14 Jan 2019 19:09:46 +0700
+Subject: Update grub 2 without grubby
+
+The patch is from and older version of hibinit
+---
+ agent/hibinit-agent | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/agent/hibinit-agent b/agent/hibinit-agent
+index 5896e33..6e0dc61 100755
+--- a/agent/hibinit-agent
++++ b/agent/hibinit-agent
+@@ -34,6 +34,8 @@ try:
+ except:
+     from configparser import ConfigParser, NoSectionError, NoOptionError
+ 
++GRUB2_DIR = '/etc/default/grub.d'
++
+ #space reserved for swap headers
+ SWAP_RESERVED_SIZE = 16384
+ log_to_syslog = True
+@@ -85,11 +87,18 @@ def get_rootfs_size():
+     return math.ceil(float(stat.f_bsize * stat.f_blocks)/(1024*1024*1024))
+ 
+ 
+-def patch_grub_config(swap_device, offset):
++def patch_grub_config(swap_device, offset, grub2_dir):
+     log("Updating GRUB to use the device %s with offset %d for resume" % (swap_device, offset))
+-    cmd = "grubby --update-kernel=ALL --args='no_console_suspend resume_offset={offset} resume={swap_device}'"
+-    cmd = cmd.format(offset=offset, swap_device=swap_device)
+-    check_call(cmd, shell=True)
++    lines = []
++
++    # Do GRUB2 update as well
++    if grub2_dir and os.path.exists(grub2_dir):
++        offset_file = os.path.join(grub2_dir, '99-set-swap.cfg')
++        if not os.path.exists(offset_file):
++            with open(offset_file, 'w') as fl:
++                fl.write('GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT no_console_suspend=1 '
++                         'resume_offset=%d resume=%s"\n' % (offset, swap_device))
++            check_call('/usr/sbin/update-grub2')
+     log("GRUB configuration is updated")
+ 
+ 
+@@ -105,7 +114,7 @@ def update_kernel_swap_offset(swapon, swapoff, filename, grub_update):
+ 
+     if grub_update:
+         dev_str = find_device_for_file(filename)
+-        patch_grub_config(dev_str, offset)
++        patch_grub_config(dev_str, offset, GRUB2_DIR)
+     else:
+         log("Skipping GRUB configuration update")
+ 

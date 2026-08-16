@@ -1,0 +1,63 @@
+Author: Matthew Ruffell <matthew.ruffell@canonical.com>
+Date: Wed 13 Apr 2022 15:39:15 +1200
+Description: 
+
+    Swapon with maximum priority before hibernation
+    
+    Since Focal, on systems with additional or multiple swapfiles
+    configured, swapon on /swap-hibinit will be added with the next
+    lowest priority for the system.
+    
+    For example, if we have /swapfile configured with a default priority
+    of -2, swapon /swap-hibinit will be added with priority -3.
+    
+    $ sudo swapon /swapfile
+    $ swapon --show
+    NAME      TYPE SIZE USED PRIO
+    /swapfile file   4G   0B   -2
+    $ sudo swapon /swap-hibinit
+    $ swapon --show
+    NAME          TYPE SIZE USED PRIO
+    /swapfile     file   4G   0B   -2
+    /swap-hibinit file 3.9G   0B   -3
+    
+    This causes hibernation to fail, since hibernation targets the
+    highest priority swapfile, which is no longer /swap-hibinit, and the
+    kernel command line is specifically configured to resume from the
+    UUID and offset for /swap-hibinit.
+    
+    The result is that EC2 console says "Stopping" for 20 minutes before
+    the instance is force stopped.
+    
+    Fix this by setting /swap-hibinit to maximum possible priority,
+    32767, as we swapon right before hibernation takes place.
+
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1968805
+Forwarded: yes, https://github.com/aws/amazon-ec2-hibinit-agent/commit/a2303d269610a6e7415c5045766da605eaa7e30f
+Last-Update: 2022-04-13
+
+Index: ec2-hibinit-agent-1.0.0/acpid.sleep.sh
+===================================================================
+--- ec2-hibinit-agent-1.0.0.orig/acpid.sleep.sh	2022-04-13 16:19:21.400545149 +1200
++++ ec2-hibinit-agent-1.0.0/acpid.sleep.sh	2022-04-13 16:19:21.396545195 +1200
+@@ -2,6 +2,11 @@
+ 
+ #PATH=/sbin:/bin:/usr/bin
+ 
++# Hibernation selects the swapfile with highest priority. Since there may be
++# other swapfiles configured, ensure /swap-hibinit is selected as hibernation
++# target by setting to maximum priority. See LP#1968805.
++swap_priority=32767
++
+ do_hibernate() {
+     if [ -d /run/systemd/system ]; then
+         systemctl hibernate
+@@ -14,7 +19,7 @@
+ 
+ case "$2" in
+     SBTN)
+-        swapon /swap-hibinit && do_hibernate
++        swapon --priority=$swap_priority /swap-hibinit && do_hibernate
+         ;;
+     *)
+         logger "ACPI action undefined: $2" ;;

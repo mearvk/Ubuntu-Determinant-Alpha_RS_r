@@ -1,0 +1,467 @@
+.ds command dcut
+.ds COMMAND DCUT
+.\" ==========
+.TH "\*[COMMAND]" 1 "2017-01-09" "Debian"
+.
+.\" ==========
+.SH NAME
+.B \*[command]
+\- Debian command upload tool for the archive upload queue
+.
+.\" ==========
+.SH SYNOPSIS
+.
+.SY \*[command]
+.OP \-Pds
+.OP \-c CONFIGFILE
+.OP \-k KEYID
+.OP \-m MAINTAINER
+.OP \-O COMMANDFILE
+\f[R][\f[]
+.RB [ \-\-host ]
+.IR HOSTNAME ]
+.I COMMAND
+.RB [ ,
+.IR COMMAND ]
+\f[R].\|.\|.\f[]
+.YS
+.
+.SY \*[command]
+.OP \-Pds
+.OP \-c CONFIGFILE
+.OP \-k KEYID
+.OP \-m MAINTAINER
+.OP \-O COMMANDFILE
+\f[R][\f[]
+.RB [ \-\-host ]
+.IR HOSTNAME ]
+.B \-i
+.I CHANGESFILE
+.YS
+.
+.SY \*[command]
+.OP \-Pds
+.OP \-c CONFIGFILE
+\f[R][\f[]
+.RB [ \-\-host ]
+.IR HOSTNAME ]
+.B \-U
+.I COMMANDFILE
+.YS
+.
+.SY \*[command]
+.B \-h
+.YS
+.
+.SY \*[command]
+.B \-v
+.YS
+.
+.\" ==========
+.SH DESCRIPTION
+.
+.P
+.B \*[command]
+creates and / or uploads Debian queue commands files for a Debian
+repository upload queue.
+.
+It is a companion for
+.BR dput (1)
+and uses dput configuration files (see \f[B]FILES\f[], below).
+.
+.P
+The normal workflow is:
+.
+.IP \[bu]
+Determine the queue control commands.
+.
+.IP \[bu]
+Compose the batch of commands to upload.
+.
+.IP \[bu]
+Determine the hostname of the queue host.
+.
+.IP \[bu]
+Upload the commands to the queue host.
+.
+.SS Determine queue control commands
+.
+.P
+In the default command-line syntax, parse each command-line argument
+\f[I]COMMAND\f[], in the format needed by a Debian archive queue
+manager.
+.
+Multiple queue commands must be separated by a comma
+.RB ( , )
+as a separate word between each command.
+.
+.P
+See \f[B]COMMANDS\f[] below for valid queue commands.
+.
+.P
+When the \f[I]CHANGESFILE\f[] parameter is specified, instead parse
+that file and compose a \f[B]rm\f[] command for each file specified in
+\f[I]CHANGESFILE\f[].
+.
+.P
+If the
+.B \-\-upload
+.RB ( \-U )
+option is specified, instead read the queue control commands from the
+file \f[I]COMMANDFILE\f[].
+.
+.SS Compose the batch of commands
+.
+.P
+The \f[B]Uploader\f[] field in the batch is set to the package
+maintainer specification \f[I]MAINTAINER\f[].
+.
+If not specified, the value of \f[I]MAINTAINER\f[] is derived from
+environment variables (see \f[B]ENVIRONMENT\f[], below).
+.
+.P
+The \f[B]Commands\f[] field in the batch is set to the sequence of
+queue control commands determined.
+.
+.P
+If the
+.B \-\-output
+.RB ( \-O )
+option is specified, write the batch to the file named by its
+\f[I]COMMANDFILE\f[] argument.
+.
+Otherwise, write the batch to a temporary file and remove it after
+upload.
+.
+.P
+After writing the batch of commands to a file, sign the file with
+.BR debsign (1).
+.
+The \f[I]MAINTAINER\f[] and \f[I]KEYID\f[] parameters, if specified,
+are passed to the
+.B debsign
+command.
+.
+.P
+If the
+.B \-\-upload
+.RB ( \-U )
+option is specified, do not compose the batch of commands; instead use
+the content of its \f[I]COMMANDFILE\f[] argument as the name of the
+command file to upload to the queue host.
+.
+.SS Determine the queue host
+.
+The \f[I]HOSTNAME\f[] must match one of the named hosts in the
+configuration (see
+.BR dput.cf (5)).
+.
+The value is determined as follows:
+.
+.IP \[bu]
+If the \f[B]\-\-host\f[] option is specified, use that option's
+\f[I]HOSTNAME\f[] argument.
+.
+.IP \[bu]
+If the first non-option argument is not a valid queue command, that is
+interpreted as the \f[I]HOSTNAME\f[].
+.
+.IP \[bu]
+Otherwise, \f[I]HOSTNAME\f[] defaults to the value of the
+.B default_host_main
+configuration parameter.
+.
+.SS Upload queue commands
+.
+.P
+Upload the composed batch of queue commands to the queue host
+\f[I]HOSTNAME\f[], using the parameters in the
+.BR dput.cf (5)
+configuration for that host.
+.
+.P
+If the
+.B \-\-output
+.RB ( \-O )
+option is specified, do not upload the commands to the queue host.
+Instead, leave the composed file \f[I]COMMANDFILE\f[] on the
+filesystem.
+.
+.\" ==========
+.SH COMMANDS
+.
+.P
+Presently supported commands are:
+.
+.TP
+.B rm
+Remove files from the UploadQueue directories.
+.
+\f[B]\*[command]\f[] generates commands that search the subdirectories
+automatically, but you can also specify \f[B]\-\-nosearchdirs\f[] and
+then target individual UploadQueue directories, i.e. either filenames
+without path for regular incoming or
+\f[B]DELAYED/\f[]\f[I]DAYS\f[]\f[B]-day\f[]\f[B]/\f[]\f[I]filename\f[].
+.
+Wildcards are accepted.
+.
+.TP
+.BI reschedule " CHANGESFILE DAYS" -day
+Move an upload from any \f[B]DEFERRED\f[] queue to
+.IB DAYS -day
+(use \fB0-day\fR for immediate processing).
+.
+.TP
+.BI cancel " CHANGESFILE"
+Cancels an upload from \fBDEFERRED\fR.
+.
+.P
+Both \fBreschedule\fR and \fBcancel\fR take a complete basename
+of a changes file as argument and operate on the whole upload,
+they process the changes and all files mentioned by it.
+.
+.P
+The authoritative documentation for the commands interface
+can be found at
+.UR ftp://ftp.upload.debian.org/pub/UploadQueue/README
+.UE .
+.
+.\" ==========
+.SH OPTIONS
+.
+.TP
+.BI \-c " CONFIGFILE"
+.TQ
+.BI \-\-config " CONFIGFILE"
+Use the file \f[I]CONFIGFILE\f[] for configuration.
+.
+See
+.BR dput.cf (5)
+for the specification of this file format.
+.
+.TP
+.B \-d
+.TQ
+.B \-\-debug
+Display debugging messages.
+.
+.TP
+.B \-h
+.TQ
+.B \-\-help
+Display help information, then exit.
+.
+.TP
+.BI \-\-host " HOSTNAME"
+Specify the \f[I]HOSTNAME\f[] unambiguously.
+.
+This allows naming a host that may be ambiguous with a queue command.
+.
+.TP
+.BI \-m " MAINTAINER"
+.TQ
+.BI \-\-maintainer " MAINTAINER"
+Use \f[I]MAINTAINER\f[] for the \f[B]Uploader\f[] field and GnuPG key
+selection.
+.
+This has no effect when \f[B]\-\-upload\f[] is used.
+.
+.TP
+.BI \-k " KEYID"
+.TQ
+.BI \-\-keyid " KEYID"
+Specify the GnuPG key id \f[I]KEYID\f[] to pass to the
+.BR debsign (1)
+command.
+.
+This has no effect when \f[B]\-\-upload\f[] is used.
+.
+.TP
+.BI \-O " COMMANDFILE"
+.TQ
+.BI \-\-output " COMMANDFILE"
+Write commands file to \f[I]COMMANDFILE\f[] instead of uploading.
+.
+You should not specify a \f[I]HOSTNAME\f[] when using this option.
+.
+Also, this option should not be used with \f[B]\-\-upload\f[].
+.
+.TP
+.B \-P
+.TQ
+.B \-\-passive
+Use passive mode for FTP.
+.
+If not specified, default for FTP is active mode.
+.
+.TP
+.B \-s
+.TQ
+.B \-\-simulate
+Do not actually upload to the queue host.
+.
+.TP
+.BI \-U " COMMANDFILE"
+.TQ
+.BI \-\-upload " COMMANDFILE"
+Instead of composing a new queue command file, upload the existing
+file \f[I]COMMANDFILE\f[].
+.
+Note: No checks (syntax or presence/validity of signature) are
+currently performed.
+.
+.TP
+.BI \-i " CHANGESFILE"
+.TQ
+.BI \-\-input " CHANGESFILE"
+Do not parse queue commands from the command line. Instead, read the
+package changes file \f[I]CHANGESFILE\f[] and compose a \f[B]rm\f[]
+command for each file specified in \f[I]CHANGESFILE\f[].
+.
+This has no effect when \f[B]\-\-upload\f[] is used.
+.
+.TP
+.B \-v
+.TQ
+.B \-\-version
+Display version information, then exit.
+.
+.\" ==========
+.SH ENVIRONMENT
+.
+.TP
+.B DEBEMAIL
+.TQ
+.B EMAIL
+.
+If \f[I]MAINTAINER\f[] is not specified, use the first of these which
+has a value to determine the email address portion of
+\f[I]MAINTAINER\f[].
+.
+.TP
+.B DEBFULLNAME
+.
+If \f[I]MAINTAINER\f[] is not specified, use this value to determine
+the full name portion of \f[I]MAINTAINER\f[].
+.
+.TP
+.B USER
+.
+If no username is specified for authenticating to the remote host, use
+the value of this variable.
+.
+.\" ==========
+.SH FILES
+.
+.TP
+Configuration
+.
+See
+.BR dput.cf (5)
+for the files to configure
+.B \*[command].
+.
+.\" ==========
+.SH EXAMPLES
+.
+.P
+To upload a GPG signed commands file that removes dput_0.9.2.33_all.deb
+file from the queue, one would have to do:
+.
+.P
+.EX
+$ \*[command] rm dput_0.9.2.33_all.deb
+.EE
+.
+.P
+This creates and uploads a commands file that looks like the following:
+.
+.P
+.EX
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Uploader: Foo Bar <foo@bar.org>
+Commands:
+ rm dput_0.9.2.33_all.deb
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+
+iEYEARECAAYKAkisYx0ACgkQ4eu+pS04mIfwLQCg85XVpae/LHLrbvzywcQNt9PS
+ztsAoMgw6HjcI9flfmwjgMiapcu379Pu
+=fjp0
+-----END PGP SIGNATURE-----
+.EE
+.
+.P
+To upload a GPG signed commands file that removes files named in
+dput_0.9.4_i386.changes from the queue, one would have to do:
+.
+.P
+.EX
+$ \*[command] \-\-input dput_0.9.4_i386.changes
+.EE
+.
+.P
+This creates and uploads a commands file that looks like the following:
+.
+.P
+.EX
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Uploader: Foo Bar <foo@bar.org>
+Commands:
+ rm \-\-searchdirs dput_0.9.4.dsc
+ rm \-\-searchdirs dput_0.9.4.tar.gz
+ rm \-\-searchdirs dput_0.9.4_all.deb
+
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+
+iEYEARECAAYKAkisYx0ACgkQ4eu+pS04mIfwLQCg85XVpae/LHLrbvzywcQNt9PS
+ztsAoMgw6HjcI9flfmwjgMiapcu379Pu
+=fjp0
+-----END PGP SIGNATURE-----
+.EE
+.
+.P
+If you've uploaded packages with the \f[B]\-\-delayed\f[] option
+(uploaded to \f[B]DEFERRED\f[] queue), then use the \f[B]cancel\f[]
+command with a .changes file:
+.
+.P
+.EX
+$ \*[command] cancel dput_0.9.4_i386.changes
+.EE
+.
+.P
+This creates and uploads a commands file just like the other commands.
+.
+.\" ==========
+.SH SEE ALSO
+.
+.BR dput (1),
+.BR dput.cf (5),
+.BR debsign (1)
+.
+.P
+.UR ftp://ftp.upload.debian.org/pub/UploadQueue/README
+Read Me document for the Debian upload queue
+.UE .
+.
+.\" Copyright © 2016–2021 Ben Finney <bignose@debian.org>
+.
+.\" This is free software: you may copy, modify, and/or distribute this work
+.\" under the terms of the GNU General Public License as published by the
+.\" Free Software Foundation; version 3 of that license or any later version.
+.\" No warranty expressed or implied. See the file ‘LICENSE.GPL-3’ for details.
+.
+.\" Local variables:
+.\" coding: utf-8
+.\" mode: nroff
+.\" End:
+.\" vim: fileencoding=utf-8 filetype=nroff :

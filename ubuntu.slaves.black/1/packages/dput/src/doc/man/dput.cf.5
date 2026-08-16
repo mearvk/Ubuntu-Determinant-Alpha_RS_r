@@ -1,0 +1,386 @@
+.ds command dput
+.ds format dput.cf
+.ds FORMAT DPUT.CF
+.\" ==========
+.TH "\*[FORMAT]" 5 "2016-12-27" "Debian"
+.
+.\" ==========
+.SH NAME
+.B \*[format]
+\- Debian package upload tool configuration file
+.
+.\" ==========
+.SH DESCRIPTION
+This manpage gives a brief overview of \*[command]'s configuration file and the
+available options in it.
+\fB\*[command]\fP is a tool to upload Debian packages to the archive.
+.PP
+.
+.\" ==========
+.SH FORMAT
+.
+.P
+.B \*[format]
+consists of different groups of configuration options, one for each
+host where you want to be able to upload packages. Hosts are defined
+using an identifier header with a short name for the host, enclosed in
+square brackets.
+.
+For example, a section named
+.B foo.example.org
+is introduced with the header:
+.EX
+.B [foo.example.org]
+.EE
+.
+.P
+Note that if multiple section names in the configuration match the
+specified hostname, only the last matching section is considered. This
+is done to avoid confusion when overriding a global configuration file
+with a user-specific one.
+.
+.P
+A special section name,
+.BR DEFAULT ,
+holds default parameters for all the hosts. The defaults can be
+overridden by redefining them again in each host section.
+.
+.P
+The available parameters are listed below.
+.
+.TP
+.BI "fqdn = " "DOMAIN\f[R][\f[]\f[B]:\f[]\f[I]PORT\f[]\f[R]]\f[]"
+Connect to the remote host using the fully-qualified domain
+.IR DOMAIN ,
+connecting on port
+.IR PORT .
+.
+The port is only relevant for HTTP or FTP protocols.
+.
+.TP
+.BI "login = " USERNAME
+Authenticate to this host with the username
+.IR USERNAME .
+.
+If
+.I USERNAME
+is a single asterisk \fB*\fR, the
+.B scp
+and
+.B rsync
+methods will not supply a login name when invoking the
+.BR ssh ,
+.BR scp ,
+and
+.BR rsync
+commands.
+.
+.TP
+.BI "incoming = " PATH
+Upload files to the filesystem path
+.I PATH
+on this host.
+.
+.TP
+.BI "method = " METHOD
+Use the file transfer method
+.I METHOD
+for uploading files to this host.
+.
+Currently,
+.B \*[command]
+accepts the following values for
+.IR METHOD :
+.
+.RS
+.
+.TP
+.B ftp
+The package will be uploaded via FTP, either anonymously or using a
+login and password.
+.
+Note that FTP is unencrypted so you should not use password
+authentication with this.
+.
+.TP
+.B http
+.TQ
+.B https
+The package will be uploaded via HTTP or HTTPS using the PUT method
+as specified in WebDAV.
+.
+The upload method will prompt for a password if necessary.
+.
+.TP
+.B scp
+The package will be uploaded using SSH's
+.BR scp .
+.
+This transfers files using a secure SSH tunnel, and needs
+authentication credentials on the remote machine.
+.
+.TP
+.B sftp
+the package will be uploaded using ssh's sftp. This transfers files using a
+secure ssh tunnel, and needs sftp access on the upload machine.
+.TP
+.B rsync
+The package will be uploaded using
+.B rsync
+over the SSH protocol.
+.
+This is similar to
+.BR scp ,
+but can save some bandwidth if the destination file already exists on
+the remote server. It also needs authentication credentials for the
+remote machine as it uses SSH.
+.
+.TP
+.B local
+The package will be "uploaded" locally using
+.BR /usr/bin/install .
+.
+This transfers files to a local incoming directory, and needs
+appropriate permissions set on that directory.
+.
+.RE
+.
+.TP
+.BI "hash = " ALGORITHM
+Use the hash algorithm
+.I ALGORITHM
+to compute the checksum of all files before the upload. If any hash
+does not match the value specified in the
+.IR CHANGESFILE ,
+the upload does not happen.
+.
+Currently,
+.B \*[command]
+accepts the following values for
+.IR ALGORITHM :
+.
+.RS
+.
+.TP
+.B md5
+The MD5 algorithm.
+.
+.TP
+.B sha
+The SHA-1 algorithm.
+.
+.RE
+.
+.TP
+.BI "allow_unsigned_uploads = " FLAG
+If
+.I FLAG
+is true,
+.B \*[command]
+may upload files without a GnuPG signature.
+.
+.TP
+.BI "allow_dcut = " FLAG
+If
+.I FLAG
+is true,
+.B dcut
+may upload a queue commands file to remove or move files in the queue
+on this host.
+.
+.TP
+.BI "distributions = " NAMES
+If defined,
+.I NAMES
+is a comma-separated list of distributions that this host accepts.
+.
+This is used to guess the host to use when none is specified on the
+command line.
+.
+.TP
+.BI "allowed_distributions = " PATTERN
+If defined,
+.B \*[command]
+will refuse the upload if the distribution field does not match
+.I REGEX
+using Python's \f[B]re\f[] syntax.
+.
+.TP
+.BI "delayed = " DAYS
+An integer giving the “days” parameter for delayed uploads to this host.
+.
+If defined,
+.B \*[command]
+will upload to the queue named
+.BI DELAYED/ DAYS
+(i.e. uploads to this host will be delayed the specified number of
+days). Defaults to the empty string, meaning no delay.
+.
+This only works with hosts that support delayed uploads.
+.
+.TP
+.BI "run_lintian = " FLAG
+If
+.I FLAG
+is true,
+.B \*[command]
+will run
+.BR lintian (1)
+on the
+.I CHANGESFILE
+before uploading. If the package is not Lintian clean, the upload will
+not happen.
+.
+.TP
+.BI "run_dinstall = " FLAG
+If
+.I FLAG
+is true,
+.B \*[command]
+will run
+.B "dinstall \-n"
+after the package has been uploaded.
+.
+This is an easy way to test if your package would be installed into
+the archive or not.
+.
+.TP
+.BI "check_version = " FLAG
+This option defines if \*[command] should check if the user has
+installed the package in his system for testing it before putting it
+into the archive. If the user has not installed and tested it,
+\*[command] will reject the upload.
+.
+.TP
+.BI "passive_ftp = " FLAG
+This option defines if \*[command] should use passive ftp or active
+ftp for uploading a package to one of the upload queues.
+.
+By default, \*[command] uses passive ftp connections. If you need to
+use active ftp connections, set passive_ftp to 0.
+.
+.TP
+.BI "progress_indicator = " STYLE
+Display a progress indicator using style
+.I STYLE
+for uploads to this host.
+.
+(Currently implemented for \f[B]ftp\f[] method only.)
+.
+.IP ""
+Supported values for
+.IR STYLE :
+.
+.RS
+.
+.TP
+.B 0
+(default) No progress indicator.
+.
+.TP
+.B 1
+Rotating progress indicator.
+.
+.TP
+.B 2
+Kilobyte counter.
+.
+.RE
+.
+.TP
+.BI "scp_compress = " FLAG
+If
+.I FLAG
+is true and the
+.I METHOD
+is
+.BR scp ,
+enable SSH compression for uploads to this host.
+.
+This parameter has been found to decrease upload time for slow links,
+and increase upload times for faster links.
+.
+.TP
+.BI "ssh_config_options = " OPTIONS
+Specify the command-line options (text) to pass to all automatic
+invocations of
+.B ssh
+and
+.BR scp .
+.
+The
+.I OPTIONS
+should be SSH client configuration options, as documented in
+.BR ssh_config (5).
+.
+Note that you can define multiline (dput) configuration options by
+indenting the second line with whitespace (i.e. similar to RFC822
+header continuations).
+.
+.TP
+.BI "post_upload_command = " COMMAND
+If defined,
+.B \*[command]
+will invoke the command
+.I COMMAND
+after a successful upload.
+.
+.TP
+.BI "pre_upload_command = " COMMAND
+If defined,
+.B \*[command]
+will invoke the command
+.I COMMAND
+before attempting an upload.
+.
+.TP
+.BI "default_host_main = " HOSTNAME
+Specify to use the
+.B \*[format]
+section named
+.I HOSTNAME
+for packages that are allowed to be uploaded to the main archive.
+.
+This variable is used when guessing the host to upload to.
+.
+.\" ==========
+.SH HOST ARGUMENT
+.P
+If a user passes an argument to a host by appending the hostname with a colon,
+.B %(HOSTNAME)s
+will be replaced with the specified argument. Otherwise, it will be replaced
+with an empty string.
+.
+.\" ==========
+.SH FILES
+.
+.TP
+.B /etc/dput.cf
+Global configuration file.
+.
+.TP
+.B ~/.dput.cf
+Per-user configuration file.
+.
+.\" ==========
+.SH SEE ALSO
+.
+.BR dput (1)
+.
+.P
+.UR file:///usr/share/doc/dput/
+\[oq]dput\[cq] package documentation
+.UE .
+.
+.\" Copyright © 2016–2021 Ben Finney <bignose@debian.org>
+.
+.\" This is free software: you may copy, modify, and/or distribute this work
+.\" under the terms of the GNU General Public License as published by the
+.\" Free Software Foundation; version 3 of that license or any later version.
+.\" No warranty expressed or implied. See the file ‘LICENSE.GPL-3’ for details.
+.
+.\" Local variables:
+.\" coding: utf-8
+.\" mode: nroff
+.\" End:
+.\" vim: fileencoding=utf-8 filetype=nroff :

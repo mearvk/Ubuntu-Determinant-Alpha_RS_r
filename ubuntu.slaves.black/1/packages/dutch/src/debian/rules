@@ -1,0 +1,70 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+ITMPDIR:=$(CURDIR)/debian/idutch
+ATMPDIR:=$(CURDIR)/debian/aspell-nl
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp:
+	dh_testdir
+	mkdir -p wdutch
+	chmod +x convert
+	./convert
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+
+	-rm -f build-stamp
+
+	-[ -L debian/aspell-nl.info-aspell ] && rm -f debian/aspell-nl.info-aspell
+	-rm -f `find . -name "*~"` debian/files* debian/substvars core
+	-rm -rf ${ATMPDIR}
+
+	-rm aspell/nl.cwl.gz aspell/nl.cwl aspell/nl.wl
+	-rm wdutch/dutch ispell/dutch.mwl*
+	-rmdir wdutch
+
+	dh_clean
+
+# Build architecture-independent files here.
+# Pass -i to all debhelper commands in this target to reduce clutter.
+binary-indep: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_installdirs
+
+	# wdutch wordlist
+	installdeb-wordlist --package=wdutch
+	dh_install -i
+	-ln -s idutch.info-ispell debian/aspell-nl.info-aspell
+	touch ${ATMPDIR}/var/lib/aspell/nl.compat ${ATMPDIR}/var/lib/aspell/nl.rws
+	installdeb-aspell --package=aspell-nl
+	touch ${ITMPDIR}/var/lib/ispell/dutch.compat ${ITMPDIR}/var/lib/ispell/dutch.hash
+	installdeb-ispell --package=idutch
+	installdeb-myspell --package=hunspell-nl --srcdir=hunspell
+	# general stuff
+	dh_installdocs -i
+	dh_installman -pwdutch debian/dutch.5
+	dh_installchangelogs -i
+	dh_link -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i -Nhunspell-nl
+	dh_gencontrol -p hunspell-nl -- -v2:$(DEB_VERSION_UPSTREAM_REVISION)
+	dh_md5sums -i -Xvar/lib/aspell -Xvar/lib/ispell
+	dh_builddeb -i
+
+# Build architecture-dependent files here.
+# Pass -a to all debhelper commands in this target to reduce clutter.
+binary-arch: build
+	# Nothing to do
+
+binary: binary-indep binary-arch
+
+.PHONY: clean binary-indep binary-arch binary build build-arch build-indep

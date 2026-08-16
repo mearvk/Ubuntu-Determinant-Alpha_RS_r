@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Resume from hibernation on EC2 and apply workarounds for various issues
+#
+# Copyright (C) 2020 Canonical Ltd.
+#
+
+set -e
+
+# Starting hibinit resume actions
+echo "hibinit-resume: begin" >> /var/log/hibinit-resume.log
+
+# Give some time to make sure the system is fully up and running, see LP: #1864041
+sleep 2
+
+# Make sure the network is properly resumed
+echo "restarting network" >> /var/log/hibinit-resume.log
+if grep -q xen_netfront /proc/modules; then
+    # Xen netfront workaround LP: #1864041
+    modprobe -r xen_netfront
+    modprobe xen_netfront
+fi
+systemctl restart --no-block systemd-networkd
+
+# Temporarily set memory allocation policy to "always overcommit". With
+# the default overcommit policy some applications might experience
+# out-of-memory errors. Setting the policy to "always overcommit" seems
+# to be a safe way to prevent these errors.
+OVERCOMMIT_POLICY=$(cat /proc/sys/vm/overcommit_memory)
+echo 1 > /proc/sys/vm/overcommit_memory
+# Start swapoff and make sure swap file is gone
+while :; do
+    echo "starting swapoff" >> /var/log/hibinit-resume.log
+    swapoff /swap-hibinit
+    if grep -q swap-hibinit /proc/swaps; then
+        echo "swap still active" >> /var/log/hibinit-resume.log
+        sleep 10
+    else
+        break
+    fi
+done
+echo "swap disabled" >> /var/log/hibinit-resume.log
+cat /proc/swaps >> /var/log/hibinit-resume.log
+# Restore previou overcommit policy
+echo "$OVERCOMMIT_POLICY" > /proc/sys/vm/overcommit_memory
+
+# All done
+echo "hibinit-resume: completed " >> /var/log/hibinit-resume.log

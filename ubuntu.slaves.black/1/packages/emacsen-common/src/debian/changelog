@@ -1,0 +1,558 @@
+emacsen-common (3.0.4) unstable; urgency=medium
+
+  * Conflict with xemacs21-support (<< 21.4.24-6~).  Restore conflict with
+    xemacs21-support, but version it to exclude everything before the
+    emacsen-common 3.0 compatibility patches were applied.  Thanks to
+    Adrian Bunk for reporting the issue.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 15 Sep 2018 13:25:41 -0500
+
+emacsen-common (3.0.3) unstable; urgency=medium
+
+  * Don't conflict with xemacs21; it's now ready for 3.0.
+
+  * Rename emacsen-common.maintscripts to emacsen-common.maintscript.
+    Update rm version to 3.0.3~. (Closes: 908099, 908126)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 08 Sep 2018 14:20:34 -0500
+
+emacsen-common (3.0.2) unstable; urgency=medium
+
+  * Move from experimental to unstable.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 29 Jul 2018 19:25:02 -0500
+
+emacsen-common (3.0.1) experimental; urgency=medium
+
+  * Conflict with xemacs21 entirely until it's ready for 3.0.  Thanks to
+    David Bremner for reporting the problem. (Closes: 902208)
+
+  * emacsen-common.maintstripts: update rm_conffile versions.  Apparently
+    this wasn't right the first time around.  Thanks to Sean Whitton for
+    reporting the problem and providing the fix. (Closes: 901450)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 30 Jun 2018 13:23:49 -0500
+
+emacsen-common (3.0.0) experimental; urgency=medium
+
+  * Accommodate the unversioning of the Emacs packages, i.e. emacs25 is
+    becoming emacs.
+
+  * Improve sample packaging scripts (quoting, etc.).
+
+  * Remove 00debian-vars.el.  Rely on flavors to set the mail-host-address
+    and gnus-nntpserver-file values themselves, when appropriate.
+
+  * Adjust policy to reflect dissolution of shared emacs metaflavor.
+    There will no longer be a shared emacs metaflavor -- the emacs25
+    package is planning to "unversion" to become the concrete emacs
+    flavor.
+
+  * Update debian/compat to 10.
+
+  * Conflict with older emacsen flavors.  Given the dissolution of the
+    emacs metaflavor and the unversioning of the emacs25 package, conflict
+    with the core package in all previous emacsen flavors so that we can
+    manage the transition without having to carry around a lot of
+    duplicated compatibility code here, and/or in the various flavors.
+
+  * Clean up emacsen-common install and remove.
+
+  * Move debian-startup.el to share/emacsen-common.
+
+  * Drop /etc/emacs/site-start.el.
+
+  * Remove vestigial debian-emacs-flavor handling.
+
+  * Don't run emacs/site-start.d anymore.
+
+  * Drop /usr/local/emacs/site-lisp.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 19 May 2018 14:03:17 -0500
+
+emacsen-common (2.0.8) unstable; urgency=medium
+
+  * Require add-on packages to depend on emacsen-common >= 2.0.8.  This
+    should be simpler and safer, and emacsen-common is only ~140k, which
+    shouldn't be too big a burden.
+
+    One specific problem this solves is the handling of
+    /var/lib/emacsen-common when emacsen-common is purged -- in particular
+    /var/lib/emacsen-common/state/package/installed/*.  Without the
+    dependency, emacsen-common can't remove the tree without clobbering
+    the state for every add-on, but if emacsen-common can't remove it, who
+    can?
+
+    This release changes the following requirements for add-on packages
+    (see debian-emacs-policy for the details):
+
+      - They must now depend on emacsen-common >= 2.0.8.
+      - They don't need to conflict with emacsen-common anymore.
+      - They don't need to guard their calls to emacs-install-package.
+      - They don't need to guard their calls to emacs-remove-package.
+      - They should no longer manage their package/installed/ file directly.
+
+    In addition emacsen flavor packages should now depend on
+    emacsen-common >= 2.0.8.
+
+  * emacs-package-install: don't try to validate the package during the preinst.
+    The package files that we're looking for won't be available.
+    Thanks to Tatsuya Kinoshita <tats@vega.ocn.ne.jp> for the report.
+    (Closes: 736062)
+
+  * emacs-package-remove: remove unused context variable.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 21 May 2014 15:19:38 -0500
+
+emacsen-common (2.0.7) unstable; urgency=medium
+
+  * Fix typo; add missing "-m" to mkdir call in postinst and policy.
+    Thanks to Stefan Lippers-Hollmann <s.L-H@gmx.de> for the report.
+    (Closes: 735155)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 13 Jan 2014 11:00:10 -0600
+
+emacsen-common (2.0.6) unstable; urgency=low
+
+  * Don't use given/when syntax in emacs-install and
+    emacs-package-install.  It's experimental and produces warnings with
+    Perl 5.18.  Thanks to Guillem Jover <guillem@debian.org> for the
+    report.  (Closes: 723157)
+
+  * sample-package-remove-foo: don't fail if elc_dir is already gone.
+    Thanks to Kevin Ryde <user42@zip.com.au> for the suggestion.
+    (Closes: 711915)
+
+  * Complain loudly if an add-on package appears to be broken.  Add
+    validate_add_on_pkg() to verify that an add-on package's invocations
+    match its "style", and call it from emacs-package-install and
+    emacs-package-remove.
+
+  * Ensure there are no duplicates in get_installed_add_on_packages()
+    result.
+
+  * Check dpkg exit status when reading package status.
+
+  * emacs-install: mark emacsen flavor available before handling all the
+    add-ons.
+
+  * Check for unlink errors when handling emacsen flavor installed state
+    file.
+
+  * emacs-install/emacs-remove: stop messing with package installed state
+    files.  That was just wrong -- the installed state file only indicates
+    that a package is ready to go (i.e. it's safe to start calling the
+    install/remove scripts).  It has nothing to do with emacsen flavors.
+
+  * emacs-install/emacs-remove: treat each add-on as old/new case-by-case.
+    Whether or not an add-on package is old or new is a property of the
+    package itself.  The old or new status of the emacsen flavor is
+    irrelevant.
+
+  * Check for unlink errors when handling an add-on's installed state
+    file.
+
+  * Fix handling of add-on package installed state file.  Mark an add-on
+    package as ready (installed) sooner, and wait until after all of the
+    relevant removals before marking an add-on as unavailable.  Note that
+    the state file is only intended to indicate that the package is ready
+    for processing by emacsen-common.
+
+  * debian-emacs-policy: require add-on postinst/prerm to handle state
+    directly.  Add-on packages must now maintain their installed/<package>
+    file directly from their postinst/prerm scripts.  This should fix a
+    race whenever emacsen-common and an add-on package are being installed
+    at the same time (i.e. perhaps via "apt-get install add-on emacs24").
+    If the add-on's postinst goes first, its emacsen install script won't
+    be run.
+
+  * debian-emacs-policy: change conflicts requirement from "<" to "<<".
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 11 Jan 2014 20:22:23 -0600
+
+emacsen-common (2.0.5) unstable; urgency=low
+
+  * Don't ignore dependency install scripts in emacs-package-install.  The
+    previous code didn't actually update the script name properly in the
+    loop where it was trying to install all of an add-on package's
+    dependencies.  As a result, none of the dependencies' install scripts
+    were actually invoked. Thanks to Sébastien Villemot
+    <sebastien@debian.org> for tracking down the problem, and providing
+    the patch. (closes: #693472)
+
+  * Invoke each add-on install script correctly as new-style or old-style.
+    Previously, emacs-package-install would invoke all of the add-on
+    install scripts in a dependency chain as either old-style or
+    new-style, based solely on whether or not the package that triggered
+    the install was old-style or new-style.  Now it should invoke each
+    package's install script based on whether the package itself is
+    new-style or old-style, as determined by the presence or absence of
+    the policy-required /usr/lib/emacsen-common/packages/compat/PACKAGE
+    file.  Thanks to Sébastien Villemot <sebastien@debian.org> for the
+    report.  (closes: #693472)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 12 Dec 2012 20:15:05 -0600
+
+emacsen-common (2.0.4) unstable; urgency=low
+
+  * Don't use the obsolete calc package as a policy example.
+    Thanks to "A. N. Other" <a.n.other.debian@gmail.com> for the report.
+    (closes: #674181)
+
+  * Don't override /usr/local/* load-path entries in debian-run-directories.
+    Previously, debian-run-directories would prepend all of the add-on
+    package paths to load-path, which meant that (in violation of Debian
+    policy) /usr/local wouldn't preceed the other entries.
+    Thanks to Hendrik Tews <hendrik@askra.de> for the report and Kevin
+    Ryde <user42@zip.com.au> for an initial suggested patch -- posted to
+    #454778. (closes: #676424)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 02 Dec 2012 16:03:18 -0600
+
+emacsen-common (2.0.3) unstable; urgency=low
+
+  * Move #DEBHEPLER# up in the postinst to avoid an emacs complaint about
+    a missing /usr/local/emacs/site-lisp during the emacsen-common package
+    install script.
+
+  * Report something like "ERROR: install script from foo package failed"
+    to more clearly indicate the cause of an install/remove failure.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 22 May 2012 22:53:55 -0500
+
+emacsen-common (2.0.2) unstable; urgency=low
+
+  * Install usr/local/emacs/site-lisp in the right place so debhelper will
+    handle it.  Thanks to Vincent Lefevre <vincent@vinc17.net> for the
+    report. (Closes: #672878)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 14 May 2012 19:40:05 -0500
+
+emacsen-common (2.0.1) unstable; urgency=low
+
+  * Add debian-emacs-policy requirement that add-on packages conflict with
+    emacsen-common < 2.0.0.
+
+  * Put emacsen-commmon install/remove scripts in the correct location.
+    Thanks to Adam Borowski <kilobyte@angband.pl> and Ondřej Surý
+    <ondrej@debian.org> for the report. (Closes: #672874)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 14 May 2012 19:15:57 -0500
+
+emacsen-common (2.0.0) unstable; urgency=low
+
+  * Remove the requirement that add-on packages depend on emacsen or
+    emacsen-common.  This should eliminate the need for many of the
+    trivial Debian foo-el packages, but before the dependencies can be
+    removed, an add-on package must be changed to follow the updated
+    debian-emacs-policy.
+
+  * Treat the failure of any add-on package install or remove script as a
+    fatal error.  Otherwise inter-add-on package dependencies won't be
+    respected.
+
+  * Migrate to debhelper.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 13 May 2012 16:38:30 -0500
+
+emacsen-common (1.4.23) unstable; urgency=low
+
+  * Remove vestigal dependency on bsdmainutils.  Thanks to Sven Joachim
+    <svenjoac@gmx.de> for the report. (Closes: #480894)
+
+  * Require add-on packages to create .el symlinks alongside .elc files.
+    Update debian-emacs-policy to require add-on packages to install a .el
+    symlink alongside each compiled .elc file.  Thanks to "Karl
+    M. Hegbloom" <karlheg@microsharp.com> for the original
+    report. (Closes: #122444)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sat, 11 Feb 2012 15:55:07 -0600
+
+emacsen-common (1.4.22) unstable; urgency=medium
+
+  * Call mapc instead of mapcar in debian-startup.el since mapcar was only
+    being called for side-effects.  Thanks to "Trent W. Buck"
+    <trentbuck@gmail.com> for the report. (closes: 530961)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Wed, 01 Dec 2010 21:46:10 -0600
+
+emacsen-common (1.4.21) unstable; urgency=medium
+
+  * Don't print a message if /etc/mailname doesn't exist.  Thanks to Josh
+    Triplett <josh@joshtriplett.org> for the report. (closes: 427757)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 30 Nov 2010 17:57:47 -0600
+
+emacsen-common (1.4.20) unstable; urgency=medium
+
+  * Update debian-emacs-policy to correctly reflect current usage.
+
+  * Don't call install-info to remove old emacs entry in the postinst.
+    It's been many years since the last package created that entry.
+    Thanks to Marco Nenciarini <mnencia@debian.org> for the
+    report. (closes: 604164)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 29 Nov 2010 21:26:02 -0600
+
+emacsen-common (1.4.19) unstable; urgency=low
+
+  * Move the sample package install/remove scripts from
+    debian-emacs-policy to the files sample-package-install-foo and
+    sample-package-remove-foo in /usr/share/doc/emacsen-common.
+
+  * Fix some suspicious code in the sample package install/remove scripts.
+    Thanks to Kevin Ryde <user42@zip.com.au>. (closes: 424940)
+
+  * Update debian-file->string to use insert-file-contents-literally.
+    Change gnus-nntpserver-file defvar to setq.  Thanks to Jari Aalto
+    <jari.aalto@poboxes.com>. (closes: 269155)
+
+  * Always call debian-run-directories.  Previously a bug would prevent it
+    from running if debian-emacs-flavor wasn't set.  Thanks to Francesco
+    Potorti` <pot@gnu.org> and Andrew Kemp <ajwk@pell.uklinux.net>.
+    (closes: 222518, 136779)
+
+  * Thanks to Agustin Martin Domingo <agmartin@debian.org> for collecting
+    and incorporating many of the fixes in the previous release, this
+    release, and probably the next several releases into his git
+    repository.  That work is being used heavily as a reference during
+    these updates.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 17 May 2009 15:42:24 -0700
+
+emacsen-common (1.4.18) unstable; urgency=low
+
+  * Add --no-site-file and --no-init-file for the compilation of
+    emacsen-common's .elc files.  Those options should be fine for
+    emacsen-common itself right now.  Thanks to Peter S Galbraith
+    <psg@debian.org>.  (closes: 132355)
+
+  * Fix minor documentation bug.  Thanks to Roland Stigge
+    <stigge@antcom.de>. (closes: 208414)
+
+  * Print the error message when debian-run-directories encounters an
+    error while loading a file.  Thanks to Kevin Ryde <user42@zip.com.au>.
+    (closes: 329030)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Sun, 10 May 2009 20:52:52 -0700
+
+emacsen-common (1.4.17) unstable; urgency=low
+
+  * Remove "Conflicts: emacs".  If I recall correctly, this dates back to
+    a time when the Emacs binary package was just named "emacs"
+    (i.e. unversioned), and before the creation of emacsen-common and the
+    Debian Emacs Policy.  The Conflicts should be safe to remove now, and
+    the removal will allow us to create a new emacs-defaults source
+    package (a la gcc-defaults) that will produce an emacs package that
+    always depends on the current "standard" version of Emacs
+    (i.e. emacs21, emacs22, etc.).
+  * Update to Standards-Version to 3.6.2.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu,  5 Jan 2006 18:10:56 -0800
+
+emacsen-common (1.4.16) unstable; urgency=high
+
+  * Fix sarge RC bug.  Alter debian-pkg-add-load-path-item to handle nil
+    in load-path.  Thanks to Manoj Srivastava.  (closes: 270388)
+  * Include section and priorty in dpkg-gencontrol generated control file.
+    (closes: 288752)
+  * Don't create /usr/doc/ symlinks anymore.
+  * Remove pause in 00debian-vars.el when there is no /etc/mailname.  The
+    message will always be available in *Messages*.  The real fix for this
+    may involve bug 149924.  (closes: 115116)
+  * Ignore *~ when generating package list.  Eventually we may do
+    something more like run-parts, but this is at least an improvement.
+    (ref: #29494)
+  * Make the package description a bit more elaborate.  (closes: 209469)
+  * Fix debian-emacs-policy typo.  (closes: 175779)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Thu, 27 Jan 2005 12:27:09 -0600
+
+emacsen-common (1.4.15) unstable; urgency=low
+
+  * make /etc/emacs/site-start.d/00debian-vars.el a conffile as per Debian
+    policy. (closes: Bug#132842)
+  * don't use dolist (not defined everywhere by default).
+    (closes: Bug#132352)
+  * document debian-pkg-add-load-path-item better and fix to actually
+    modify load-path. (closes: Bug#134464)
+  * make debian-unique-strings iterative since elisp isn't as recursion
+    friendly as we might like. (closes: Bug#131803)
+  * for now, issue a descriptive error message if emacsen-common is used
+    before it's configured.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Mon, 18 Feb 2002 11:42:31 -0600
+
+emacsen-common (1.4.14) unstable; urgency=low
+
+  * policy(9): /usr/local/share/emacs/<flavor>/site-lisp should not exist.
+  * policy(9): /usr/share/emacs/<upstream>/site-lisp should not exist.
+  * policy(9): all emacsen must have
+    /usr/share/emacsen-common/mark-end-local in their load-path in the
+    right place.
+  * policy(9): add-on packages must use debian-pkg-add-load-path-item to
+    augment the load-path now. (closes: #122877)
+  * fix non-idempotentency in prerm. (closes: #96702)
+  * remove bogus directories from package. (closes: #121393)
+  * fix generate-install-list dependency list generation bug. (closes: #46948)
+  * patch example in debian-emacs-policy. (closes: #23424)
+  * debian-startup.el: don't call load-file. (closes: #116126)
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 29 Jan 2002 14:52:51 -0600
+
+emacsen-common (1.4.13) unstable; urgency=low
+
+  * Update my email address.
+  * Fix tmpfile usage. (closes: #26601, #45140)
+  * Move doc files to /usr/share/doc (closes: #91457, #72493)
+  * Remove execute permission from conffiles file. (closes: #61303)
+  * Updated policy concerning the long-standing problem with version
+    specific site-lisp dirs.  New policy, once adopted should eliminate
+    the cruft problem.
+
+ -- Rob Browning <rlb@defaultvalue.org>  Tue, 17 Jul 2001 11:07:08 -0500
+
+emacsen-common (1.4.12) unstable frozen; urgency=low
+
+  * Emergency changes to startup policy.  We're reverting for now to the
+    old behavior because the new way breaks too many things, and we need
+    to release.  Please see debian-emacs-policy's bits about
+    debian-emacs-flavor for details, and sorry for the short notice.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Tue, 20 Jun 2000 11:17:52 -0500
+
+emacsen-common (1.4.11) unstable frozen; urgency=low
+
+  * Upload to frozen to match emacs20 bugfix upload for frozen.  Without
+    this the frozen emacs20 is uninstallable. (Closes: Bug#64648)
+  * Hopefully accomodate bug in xemacs packages with strange hack.  This
+    will work around the current problem, but xemacs still needs some
+    fixing. (Closes: Bug#61161  Bug#61080 Bug#61110 Bug#61133 Bug#61157) 
+  * Update debian-emacs-policy to be stricter about startup behaviors and
+    to more clearly indicate what I really meant.  Since no one's
+    responded to my proposal on debian-emacsen, I guess there are no
+    objections :> Feel free to bring this up later if you have a
+    problem...
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Thu, 25 May 2000 09:54:12 -0500
+
+emacsen-common (1.4.10) unstable; urgency=low
+
+  * Moved debian-emacs-flavor here from emacs20.  Other emacsen
+    maintainers note, you should not declare this in your packages
+    anymore.  It is now set by debian-startup automatically from its
+    argument.  See debian-emacs-policy for details.
+  * Fix problem in args to install-info in postinst. (Closes: Bug#25196)
+  * Get /usr/local/... permissions right. (Closes: Bug#25913)
+  * Fix bashism in postrm. (Closes: Bug#41967 Bug#50674)
+  * Remove symlinks from package so I can put it under CVS.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Tue, 22 Feb 2000 16:11:33 -0600
+
+emacsen-common (1.4.9) frozen unstable; urgency=low
+
+  * silenced mkdir warnings in postinst.
+  * fixed important bug in dependency sorting (Closes: Bug#34095)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Mon,  8 Mar 1999 19:00:32 -0600
+
+emacsen-common (1.4.8) unstable; urgency=low
+
+  * Clean up old "emacs" info entry in postinst.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sun, 26 Jul 1998 17:03:05 -0500
+
+emacsen-common (1.4.7) unstable; urgency=low
+
+  * First implementation of dependency sorting mechanism
+    Sorting mechanism is dirt slow since I have to use N "dpkg --status calls"  
+  * Added bsdmainutils dependency (tsort used by dependency mechanism)
+  * Minor edits to debian-emacs-policy.  Bigger changes brewing...
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sat, 25 Jul 1998 13:26:55 -0500
+
+emacsen-common (1.4.6) frozen unstable; urgency=low
+
+  * debian-emacs-policy: add-on packages may not depend on emacsen-common.
+  * debian-emacs-policy: add-on packages must declare install/remove
+    script dependencies (i.e. make, etc.)
+  * fixed postinst to be cleaner about /usr/local/* (Closes: Bug#21524,
+    Bug#22737, Bug#22959)
+  * Made /etc/emacs/site-start.el a conffile (Closes: Bug#21934)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Mon, 29 Jun 1998 18:53:51 -0500
+
+emacsen-common (1.4.5) frozen unstable; urgency=low
+
+  * Fixed upload problem.  This should still go in frozen as it still
+    closes Bug#21089.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sat, 16 May 1998 21:18:10 -0500
+
+emacsen-common (1.4.4) frozen unstable; urgency=low
+
+  * Fix things so failure in add-on package install/remove script
+    won't kill an emacs flavor install, but will kill an independent
+    add-on package install.  (Closes: Bug#21089)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Fri, 15 May 1998 13:06:04 -0500
+
+emacsen-common (1.4.3) frozen unstable; urgency=low
+
+  * Fix problem in postinst /usr/local... creation (Closes: Bug#19935)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Thu, 19 Mar 1998 08:15:55 -0600
+
+emacsen-common (1.4.2) frozen unstable; urgency=low
+
+  * Upload to frozen and unstable (oops.)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Tue, 17 Mar 1998 13:10:20 -0600
+
+emacsen-common (1.4.1) unstable; urgency=low
+
+  * Fixed typos in debian-emacs-policy.
+  * Fixed handling of /usr/local dir.  (Closes: Bug#19301)
+  * Fixed load-path clobbering in debian-startup.el (Closes: Bug#19597)
+  * Switched to more reasonable version numbering (debian-only package).
+    Using Linux kernel scheme.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Fri, 13 Mar 1998 12:21:29 -0600
+
+emacsen-common (1.3-1) unstable; urgency=low
+
+  * Fixed debian-vars (Closes: Bug#17235)
+      - renamed functions to debian-*
+      - eliminated spurious message about mark.
+      - don't set user-mail-address (it's done for you by emacs later)
+      - clean up load messages
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sat, 14 Feb 1998 15:20:00 -0600
+
+emacsen-common (1.2-1) unstable; urgency=low
+
+  * Fixed disabled load line in debian-startup.el (Closes: Bug#18189)
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sat, 14 Feb 1998 13:03:20 -0600
+
+emacsen-common (1.1-2) unstable; urgency=low
+
+  * Updated postrm to remove /var/lib/emacsen-common on purge if it's
+    actually empty.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Mon,  9 Feb 1998 01:34:32 -0600
+
+emacsen-common (1.1-1) unstable; urgency=low
+
+  * Added debian-emacs-policy to /usr/doc/emacsen-common
+  * Updated debian-emacs-policy to reflect this.
+  * Changed to call add-on install/remove scripts for the common
+    "emacs" flavor only on package install.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Fri, 23 Jan 1998 20:49:35 -0600
+
+emacsen-common (1.0-1) unstable; urgency=low
+
+  * Initial creation.
+
+ -- Rob Browning <rlb@cs.utexas.edu>  Sun, 18 Jan 1998 13:35:05 -0600

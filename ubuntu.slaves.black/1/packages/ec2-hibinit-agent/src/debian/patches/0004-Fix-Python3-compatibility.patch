@@ -1,0 +1,90 @@
+From: Balint Reczey <balint.reczey@canonical.com>
+Date: Mon, 14 Jan 2019 23:26:15 +0700
+Subject: Fix Python3 compatibility
+
+---
+ agent/hibinit-agent | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/agent/hibinit-agent b/agent/hibinit-agent
+index 6e0dc61..9dc2f1d 100755
+--- a/agent/hibinit-agent
++++ b/agent/hibinit-agent
+@@ -53,8 +53,8 @@ def sigterm_handler(signal, frame):
+     #save the state here or do whatever you want
+     log('Process killed cleaning up!')
+     if os.path.isfile(SWAP_FILE) and os.access(SWAP_FILE, os.R_OK):
+-	os.remove(SWAP_FILE)
+-	exit(0)
++        os.remove(SWAP_FILE)
++        exit(0)
+ 
+ def fallocate(fl, size):
+     try:
+@@ -149,10 +149,10 @@ class SwapInitializer(object):
+         self.touch_swap = touch_swap
+ 
+     def do_allocate(self):
+-	log("Allocating %d bytes in %s" % (self.swap_size, self.filename))
++        log("Allocating %d bytes in %s" % (self.swap_size, self.filename))
+         with open(self.filename, 'w+') as fl:
+             fallocate(fl, self.swap_size)
+-	os.chmod(self.filename, 0o600)
++            os.chmod(self.filename, 0o600)
+ 
+     def init_swap(self):
+         """
+@@ -229,14 +229,14 @@ class BackgroundInitializerRunner(object):
+             if pid > 0:
+             # Exit parent process
+                 sys.exit(0)
+-        except OSError, e:
++        except OSError as e:
+             print >> sys.stderr, "fork failed: %d (%s)" % (e.errno, e.strerror)
+             sys.exit(1)
+ 
+         # Configure the child processes environment
+         os.chdir("/")
+         os.setsid()
+-        os.umask(0022)
++        os.umask(0o022)
+   
+     def do_async_init(self):
+         try:
+@@ -395,12 +395,12 @@ def main():
+         log("There's sufficient swap available (have %d, need %d)" %
+             (cur_swap, target_swap_size))
+         update_kernel_swap_offset(config.swapon, config.swapoff, SWAP_FILE, config.grub_update)
+-    	exit()
++        exit()
+     #validate if instance was launched from pre-created image and swap size>=total RAM, if not re-create the swap 
+     elif cur_swap > 0 and (cur_swap < target_swap_size - SWAP_RESERVED_SIZE):
+-	log("Swap already exists! (have %d, need %d), deleting existing swap file %s" %
++        log("Swap already exists! (have %d, need %d), deleting existing swap file %s" %
+ 		(cur_swap, target_swap_size, SWAP_FILE))
+-	os.remove(SWAP_FILE)
++        os.remove(SWAP_FILE)
+         
+     log("Create swap and initialize it")
+     # We need to create swap, but first validate that we have enough free space
+@@ -410,9 +410,9 @@ def main():
+     #rounding off to swap_size+10mb for swap headers
+     free_space_needed = target_swap_size + 10 * 1024 * 1024
+     if free_space_needed >= free_bytes:
+-	log("There's not enough space (%d present, %d needed) on the device: %s" % (
++        log("There's not enough space (%d present, %d needed) on the device: %s" % (
+ 		free_bytes, free_space_needed, swap_dev))
+-	exit(1)
++        exit(1)
+         log("There's enough space (%d present, %d needed) on the device: %s" % (
+             free_bytes, free_space_needed, swap_dev))
+ 
+@@ -422,7 +422,7 @@ def main():
+     signal.signal(signal.SIGTERM, sigterm_handler)
+ 
+     if bi:
+-	bi.start_init()
++        bi.start_init()
+         
+     log("kicking child process to initiate the setup")
+     bi.do_async_init()

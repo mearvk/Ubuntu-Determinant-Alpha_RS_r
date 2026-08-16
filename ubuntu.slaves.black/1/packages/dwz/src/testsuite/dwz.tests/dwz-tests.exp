@@ -1,0 +1,145 @@
+set tests [find $srcdir/$subdir *.sh]
+
+set pwd [pwd]
+
+set env(PATH) $srcdir/scripts:$::env(PATH)
+set env(execs) $pwd
+
+exec mkdir -p $pwd/testsuite/dwz.tests/execs
+exec $srcdir/scripts/xunzip-dir.sh \
+    $srcdir/dwz.tests/execs.xz \
+    $pwd/testsuite/dwz.tests/execs
+
+foreach test $tests {
+    global runtests
+
+    set basename [exec basename $test]
+
+    if ![runtest_file_p $runtests $basename] {
+	continue
+    }
+
+    set required_execs []
+    if { $basename == "pr24173.sh" } {
+	lappend required_execs "py-section-script"
+    }
+    if { $basename == "pr24341.sh" } {
+	if { [catch {exec readelf -wi min | grep DW_AT_name | grep -c / } matches] } {
+	    # Some error occurred in the supported test, f.i. DWARF in min
+	    # unsupported by readelf.
+	    unsupported "$test"
+	    continue
+	}
+	if { $matches != 2 } {
+	    # The exec min is used for the regression test for pr24341, but it
+	    # only functions as such if the DWARF only contains the CUs of the
+	    # test-case itself.
+	    unsupported "$test"
+	    continue
+	}
+    }
+    if { $basename == "pr24172.sh" } {
+	if { ![istarget x86_64-*-*] } {
+	    unsupported "$test"
+	    continue
+	}
+	lappend required_execs "dw2-skip-prologue"
+    }
+    if { $basename == "pr24170.sh" } {
+	lappend required_execs "implptr-64bit-d2o4a8r8t0"
+    }
+    if { $basename == "gold-gdb-index.sh" } {
+	lappend required_execs "hello-gold-gdb-index"
+    }
+    if { $basename == "pr24747.sh" } {
+	lappend required_execs "start-gold"
+    }
+    if { $basename == "pr24771.sh" } {
+	lappend required_execs "hello-gnu-pubnames"
+    }
+    if { $basename == "pr24823.sh" } {
+	lappend required_execs "varval"
+    }
+    if { ![istarget x86_64-*-*] } {
+	if { $basename == "pr24468.sh" } {
+	    unsupported "$test"
+	    continue
+	}
+	if { $basename == "ld-2.26.1-multifile.sh" } {
+	    unsupported "$test"
+	    continue
+	}
+    }
+    if { $basename == "gdb-add-index.sh" } {
+        if { [catch { exec which gdb-add-index } ] } {
+            unsupported "$test"
+            continue
+        }
+    }
+    if { [istarget mips*-*-*] } {
+	# elfutils don't have a MIPS backend (PR elfutils/24795), so eu-strip
+	# doesn't work as expected.
+	if { $basename == "eu-strip-unstrip.sh" || \
+		 $basename == "eu-strip-unstrip-multifile.sh" || \
+		 $basename == "pr24173.sh" } {
+	    unsupported "$test"
+	    continue
+	}
+    }
+    if { $basename == "pr25109.sh" } {
+	lappend required_execs no-multifile-prop
+    }
+    if { $basename == "pr27463.sh" } {
+	lappend required_execs unavailable-dwarf-piece
+    }
+
+    set unsupported 0
+    foreach required_exec $required_execs {
+	set exists [file exists $required_exec]
+	if { $exists == 0 } {
+	    set unsupported 1
+	    break
+	}
+	set size [file size $required_exec]
+	if { $size == 0 } {
+	    set unsupported 1
+	    break
+	}
+    }
+    if { $unsupported == 1 } {
+	unsupported "$test"
+	continue
+    }
+
+    set dir $pwd/tmp.$basename
+    exec rm -Rf $dir
+    exec mkdir $dir
+
+    cd $dir
+    if { [catch { exec sh -e $test } msg] } {
+	if { [lindex $::errorCode 0] == "CHILDSTATUS" && \
+		 [lindex $::errorCode 2] == 77 } {
+	    unsupported "$test"
+	    exec rm -Rf $dir
+	} else {
+	    puts "$msg"
+	    fail "$test"
+	}
+    } else {
+	if { [file exists dwz.info ] } {
+	    set info [exec cat dwz.info]
+	    verbose -log "$test:" 1
+	    verbose -log "$info" 1
+	    exec rm -f dwz.info
+	}
+	set file_list [glob -nocomplain "$dir/*"]
+	if {[llength $file_list] != 0} {
+	    puts "$dir is not empty"
+	    fail "$test"
+	} else {
+	    pass "$test"
+	    exec rm -Rf $dir
+	}
+    }
+    cd $pwd
+}

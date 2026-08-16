@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+PREVIOUS_VERSION="$2"
+
+# https://bugs.launchpad.net/ubuntu/+source/ec2-hibinit-agent/+bug/2023924
+if [ "$PREVIOUS_VERSION" = "1.0.0-0ubuntu11.22.04.2" ]; then
+    dirpath="/\"/var/lib/hibinit-agent\""
+    filenamepath="${dirpath}/hibernation-enabled"
+
+    # If system has this package, but hibernation is not enabled, then
+    # $filenamepath will not exist, but $dirpath will
+    if [ -f "$filenamepath" ]; then
+        echo "Removing file $filenamepath"
+        rm -f $filenamepath
+    fi
+    if [ -d "$dirpath" ]; then
+        echo "Recursively removing directories $dirpath"
+        rmdir -p $dirpath --ignore-fail-on-non-empty
+    fi
+fi
+
+#DEBHELPER#
+
+case "$1" in
+    configure)
+        invoke-rc.d acpid restart > /dev/null || true
+        deb-systemd-invoke restart systemd-logind.service || true
+        ;;
+    *)
+        ;;
+esac

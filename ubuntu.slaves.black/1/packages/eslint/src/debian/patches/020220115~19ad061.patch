@@ -1,0 +1,158 @@
+Description: fix no-restricted-imports support casing
+ Path matching in `.gitignore` can be case-sensitive,
+ and ignore@5.2.0 supports this
+ as well as maintains support for relative paths,
+ whose support was dropped after 4.0.6
+ but restored in 5.2.0
+ (this was a blocker for past upgrades).
+ .
+ By default, this rule remains case-insensitive
+ to maintain backwards compatibility with earlier versions.
+ Only by explicitly specifying it in a custom pattern object
+ can it be triggered.
+ .
+ * Set allowRelativePaths directly in files
+ .
+ Per member feedback,
+ the allowing of relative paths was not entirely intentional
+ for rules using the ignore library.
+ This commit also reverts the utility
+ for creating ignore instances.
+ .
+ * Update word in docs for allowRelativePaths
+ .
+ Per member feedback.
+Origin: upstream, https://github.com/eslint/eslint/commit/19ad061
+Bug: https://github.com/eslint/eslint/issues/15439
+Author: gfyoung <gfyoung17@gmail.com>
+Last-Update: 2022-01-30
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/docs/rules/no-restricted-imports.md
++++ b/docs/rules/no-restricted-imports.md
+@@ -164,6 +164,15 @@
+ import pick from 'lodash/pick';
+ ```
+ 
++```js
++/*eslint no-restricted-imports: ["error", { patterns: [{
++    group: ["foo[A-Z]*"],
++    caseSensitive: true
++}]}]*/
++
++import pick from 'fooBar';
++```
++
+ Examples of **correct** code for this rule:
+ 
+ ```js
+@@ -206,6 +215,15 @@
+ import lodash from 'lodash';
+ ```
+ 
++```js
++/*eslint no-restricted-imports: ["error", { patterns: [{
++    group: ["foo[A-Z]*"],
++    caseSensitive: true
++}]}]*/
++
++import pick from 'food';
++```
++
+ ## When Not To Use It
+ 
+ Don't use this rule or don't include a module in the list for this rule if you want to be able to import a module in your project without an ESLint error or warning.
+--- a/lib/rules/no-restricted-imports.js
++++ b/lib/rules/no-restricted-imports.js
+@@ -63,6 +63,9 @@
+                     message: {
+                         type: "string",
+                         minLength: 1
++                    },
++                    caseSensitive: {
++                        type: "boolean"
+                     }
+                 },
+                 additionalProperties: false,
+@@ -142,10 +145,18 @@
+         }, {});
+ 
+         // Handle patterns too, either as strings or groups
+-        const restrictedPatterns = (isPathAndPatternsObject ? options[0].patterns : []) || [];
+-        const restrictedPatternGroups = restrictedPatterns.length > 0 && typeof restrictedPatterns[0] === "string"
+-            ? [{ matcher: ignore().add(restrictedPatterns) }]
+-            : restrictedPatterns.map(({ group, message }) => ({ matcher: ignore().add(group), customMessage: message }));
++        let restrictedPatterns = (isPathAndPatternsObject ? options[0].patterns : []) || [];
++
++        // standardize to array of objects if we have an array of strings
++        if (restrictedPatterns.length > 0 && typeof restrictedPatterns[0] === "string") {
++            restrictedPatterns = [{ group: restrictedPatterns }];
++        }
++
++        // relative paths are supported for this rule
++        const restrictedPatternGroups = restrictedPatterns.map(({ group, message, caseSensitive }) => ({
++            matcher: ignore({ allowRelativePaths: true, ignorecase: !caseSensitive }).add(group),
++            customMessage: message
++        }));
+ 
+         // if no imports are restricted we don't need to check
+         if (Object.keys(restrictedPaths).length === 0 && restrictedPatternGroups.length === 0) {
+--- a/lib/rules/no-restricted-modules.js
++++ b/lib/rules/no-restricted-modules.js
+@@ -98,7 +98,8 @@
+             return {};
+         }
+ 
+-        const ig = ignore().add(restrictedPatterns);
++        // relative paths are supported for this rule
++        const ig = ignore({ allowRelativePaths: true }).add(restrictedPatterns);
+ 
+ 
+         /**
+--- a/package.json
++++ b/package.json
+@@ -58,7 +58,7 @@
+     "functional-red-black-tree": "^1.0.1",
+     "glob-parent": "^5.0.0",
+     "globals": "^11.7.0",
+-    "ignore": "^4.0.6",
++    "ignore": "^5.2.0",
+     "import-fresh": "^3.0.0",
+     "imurmurhash": "^0.1.4",
+     "inquirer": "^6.4.1",
+--- a/tests/lib/rules/no-restricted-imports.js
++++ b/tests/lib/rules/no-restricted-imports.js
+@@ -42,6 +42,16 @@
+             options: [{ patterns: [{ group: ["foo/*", "!foo/bar"], message: "foo is forbidden, use bar instead" }] }]
+         },
+         {
++            code: "import withPatternsCaseSensitive from 'foo';",
++            options: [{
++                patterns: [{
++                    group: ["FOO"],
++                    message: "foo is forbidden, use bar instead",
++                    caseSensitive: true
++                }]
++            }]
++        },
++        {
+             code: "import AllowedObject from \"foo\";",
+             options: [{
+                 paths: [{
+@@ -276,6 +286,16 @@
+             endColumn: 36
+         }]
+     }, {
++        code: "import withPatternsCaseInsensitive from 'foo';",
++        options: [{ patterns: [{ group: ["FOO"] }] }],
++        errors: [{
++            message: "'foo' import is restricted from being used by a pattern.",
++            type: "ImportDeclaration",
++            line: 1,
++            column: 1,
++            endColumn: 47
++        }]
++    }, {
+         code: "import withGitignores from \"foo/bar\";",
+         options: [{ patterns: ["foo/*", "!foo/baz"] }],
+         errors: [{

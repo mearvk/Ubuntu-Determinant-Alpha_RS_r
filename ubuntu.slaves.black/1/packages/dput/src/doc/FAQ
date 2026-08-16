@@ -1,0 +1,110 @@
+1. Why can't the option -D be used with FTP uploads?
+
+   Because the FTP upload method uses anonymous upload queues, which
+   don't know anything about the user or dinstall. They will just
+   accept every Debian package and later upload it to the incoming
+   directory of ftp.upload.debian.org.
+
+2. Why don't you change the suffix .cf to .conf for consistency purpose?
+
+   At the time, where I had to decide on a suffix for the
+   configuration file, I had the offer to user either "rc", ".cf" or
+   ".conf". If you look at the dot files in your homedir or the files
+   in /etc, you'll notice that there's no standard and that every of
+   these three extension is used. Since I wanted to have a short
+   suffix, I had to decide between "rc" or ".cf". I decided to use
+   ".cf" as suffix, because it's an obvious abbreviation for
+   configuration and also I noticed that Postfix uses it as extension.
+   Since this extension has now been used for quite some time, I'm not
+   planning to change it. Any change would need a lot of work or
+   introduce problems for the users.
+
+3. Why can't Dput act like Dupload and just use every file in the
+   directory?
+
+   Well, Dput was not written as a Dupload-in-Python, but as an
+   alternative tool for uploading Debian packages. Dput and Dupload
+   are completely different, especially since Dput supports modules.
+   I only took one or two ideas from Dupload, especially the hooks,
+   but won't implement any further options or features.
+
+4. Why should I switch to Dput since Dupload works for me?
+
+   Because Dput will make you rich and attractive.
+
+   Now, seriously, it's a matter of preferences. If you use Dupload
+   and like its behaviour, then continue to use it. But in every
+   case, I would suggest that you try Dput, since it will check the
+   GnuPG signature and the checksums before uploading and offer to run
+   dinstall in dry-run mode after the upload. It also offers the usage
+   of other upload methods via modules.
+
+5. Where are modules and what are they exactly used for?
+
+   Dput uses modules for the different upload methods that it offers.
+   All upload methods are implemented via seperate modules that will
+   be loaded at runtime. That way we can easily extend the number of
+   upload methods that Dput offers. So if you write or already wrote a
+   new upload method, then please inform the author of Dput, so that
+   it maybe can be added to Dput in the future.
+
+6. Can I just copy /etc/dput.cf into my homedir as .dput.cf?
+
+   No, this shouldn't be done, because .dput.cf is a configuration
+   file for the user. It should only contain configuration variables
+   which have a value different from the default and which the user
+   needs to define. This will reduce the risk of breaking Dput, if
+   either some default value in /etc/dput.cf is changed or a new
+   configuration variable is added.
+
+7. How can I set up my own local APT repository and use Dput for
+   installing?
+
+   There are many ways to maintain APT repositories. Using Colin
+   Walters' mini-dinstall-Package is perhaps the easiest way (if you run
+   sarge or later). If you want to have the repository on a remote
+   machine, see question 8. For a local repository you might use our
+
+   MICRO RECIPE FOR PERSONAL MINI-DINSTALL REPOSITORY
+   The following Dput and mini-dinstall configuration works for the
+   mainters of Dput. For your convenience we have included a "local"
+   Dput target in the stock debian dput.cf which can be used with the
+   mini-dinstall configuration below.
+   For simplicity, we do not use the daemon mode of mini-dinstall. As
+   mini-dinstall has rather flexible configuration options, you might
+   want to consider reading the documentation yourself, but the file
+   file below should work out of the box to implement most simple setup.
+   After copying the configuration file below into your home directory
+   do mkdir -p public_html/debian ; mini-dinstall --batch
+   in your home directory to setup your repository.
+
+   ~/.mini-dinstall.conf:
+   # Adapted Colin's mini-dinstall.conf
+   [DEFAULT]
+   architectures = all, i386
+   archivedir = ~/public_html/debian/
+   use_dnotify = 0
+   verify_sigs = 0
+   extra_keyrings = ~/.gnupg/pubring.gpg
+   mail_on_success = 0
+   archive_style = flat
+   poll_time = 10
+   mail_log_level = NONE
+   [stable]
+   [testing]
+   [unstable]
+
+8. How do I set up Dput to fill my remote APT repository?
+
+   Assuming you have remote SSH access, you can use the following
+   You can use the same mini-dinstall configuration file (and setup
+   command) as for a local repository on the remote machine.
+   As ~/.dput.cf you now can use
+
+   [myremote]
+   fqdn = remote.machine.net
+   login = usernameonremote
+   method = scp
+   incoming = ~/public_html/debian/mini-dinstall/incoming
+   run_dinstall = 0
+   post_upload_command = ssh usernameonremote@remote.machine.net /usr/bin/mini-dinstall --batch

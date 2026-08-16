@@ -1,0 +1,40 @@
+From: Balint Reczey <rbalint@ubuntu.com>
+Date: Mon, 14 Jan 2019 16:06:04 +0700
+Subject: Detect hibernation method
+
+Use systemctl hibernate with systemd and pm-hibernate otherwise
+
+Forwarded: no
+Last-Update: 2017-10-26
+---
+ acpid.sleep.sh | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/acpid.sleep.sh b/acpid.sleep.sh
+index 5b62e59..22b6e3b 100755
+--- a/acpid.sleep.sh
++++ b/acpid.sleep.sh
+@@ -1,10 +1,20 @@
+ #!/bin/sh
+ 
+-PATH=/sbin:/bin:/usr/bin
++#PATH=/sbin:/bin:/usr/bin
++
++do_hibernate() {
++    if [ -d /run/systemd/system ]; then
++        systemctl hibernate
++    else
++        pm-hibernate
++        swapoff /swap-hibinit
++    fi
++}
++
++
+ case "$2" in
+     SBTN)
+-        swapon /swap && /usr/sbin/pm-hibernate
+-        swapoff /swap
++        swapon /swap-hibinit && do_hibernate
+         ;;
+     *)
+         logger "ACPI action undefined: $2" ;;

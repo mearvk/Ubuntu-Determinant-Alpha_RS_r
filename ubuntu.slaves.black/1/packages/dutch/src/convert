@@ -1,0 +1,111 @@
+#!/bin/sh
+set -e
+
+export LC_ALL=C
+
+# Input files:
+UTF8FILES="wordlist/wordlist.txt"
+LATIN1FILES=""
+
+# aspell
+ASPELL_AFF=aspell/nl_affix.dat
+# ispell
+ISPELL_AFF=ispell/dutch.aff
+
+# Output files:
+# For a wordlist
+WORDLIST=wdutch/dutch
+# ispell
+LATIN1ISPELL=ispell/dutch.mwl
+# aspell
+ASPELL=aspell/nl
+
+
+# We need to work around shortcommings in various spelling software:
+# - ispell can not handle UTF-8, so we need to convert the list to latin1.
+#   aspell now supports UTF-8, but can't handle subscript.
+#   This currently means replacing the subscripts with normal numbers,
+#   and for ispell remove words with €.
+# - No spelling software can deal with words with a space or dash (-) in it.
+#   We also add the word splitted, which also means it will approve
+#   words that can never be used alone.
+# - The munchers can't deal with words with a / in it since they
+#   use that internally.
+# - Aspell can't deal with words which contain:
+#   - a space
+#   - a number
+#   - a .
+#   - a '
+#   - a +
+# - ispell can't handle the same as aspell, but it generates the warnings
+#   when building the package instead of when installing it.
+
+# Fur hunspell we don't generate anything anymore.  It's directly edited
+# upstream.
+
+# Temporary files:
+# Contains the full list of correct words.
+UTF8WORDLIST=wordlist.utf8.txt
+
+# Those have all the work arounds other than those for aspell
+UTF8FIXEDLIST=nl.utf8.txt
+LATIN1FIXEDLIST=nl.txt
+
+# Convert files to a plain utf-8 file.
+# Input files can have a BOM mark, be in latin1, and
+# have dos file encoding.
+rm -f $UTF8WORDLIST
+touch $UTF8WORDLIST
+for f in $UTF8FILES; \
+do \
+	sed -e '1s/\xEF\xBB\xBF//;s/\r//' $f >> $UTF8WORDLIST; \
+done
+
+for f in $LATIN1FILES; \
+do \
+	sed -e 's/\r//' $f | iconv -f latin1 -t utf8 >> \
+		$UTF8WORDLIST; \
+done
+
+# Generate word list.
+cp $UTF8WORDLIST $WORDLIST
+
+# Replace all ij's at the start of the line with IJ
+grep ^ij $UTF8WORDLIST | sed -e 's/^ij/IJ/' > tmp.txt
+# Add to the list
+cat $UTF8WORDLIST tmp.txt > $UTF8FIXEDLIST
+# Split words
+grep '[ -/]' $UTF8FIXEDLIST | sed -e 's/[- /]/\n/g' > tmp.txt
+# Add to the list
+cat tmp.txt >> $UTF8FIXEDLIST
+
+# Splitting the words generated some words ending in a -
+# like "kijk- en luistergeld" generates the word "kijk-".
+# It contains words that start with - like "-werk".
+# It contains words with ², ³, or starting with @ or &
+# It also generated empty lines.  Remove those words and empty lines.
+# Also remove words with a '/' in it, since they can't be munched.
+grep -v -E -- '-$|^$|/|^-|²|³|^@|^&' $UTF8FIXEDLIST > tmp.txt
+cp tmp.txt $UTF8FIXEDLIST
+
+# Replace the subscript 2 and 8 with normal numbers sort, remove duplicates
+sed -e 's/\xE2\x82\x82/2/g' -e 's/\xE2\x82\x88/8/g' $UTF8FIXEDLIST |sort |uniq > tmp.txt
+cp tmp.txt $UTF8FIXEDLIST
+
+# aspell
+grep -av "[0-9 \.'\+]" $UTF8FIXEDLIST > $ASPELL.wl
+prezip $ASPELL.wl
+gzip -9nf $ASPELL.cwl
+
+# ispell
+# Remove words with € and convert to latin1.
+grep -v "[0-9 \.'\+-\&€]" $UTF8FIXEDLIST | iconv -f utf-8 -t latin1 > $LATIN1FIXEDLIST
+munchlist -l $ISPELL_AFF -v -w "&'\`-_" $LATIN1FIXEDLIST > $LATIN1ISPELL
+gzip -9nf $LATIN1ISPELL
+
+# cleanup temp files
+rm tmp.txt
+rm $UTF8WORDLIST
+rm $UTF8FIXEDLIST
+rm $LATIN1FIXEDLIST
+

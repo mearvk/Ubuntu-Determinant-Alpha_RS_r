@@ -1,0 +1,108 @@
+Description: Upgrade: js-yaml to v4
+  * Upgrade: js-yaml to v4
+  * allow Python licenses
+ .
+ Patch extended (compared to upstream)
+ to also cover lib/cli-engine/config-array-factory.js
+Origin: upstream, https://github.com/eslint/eslint/commit/88db3f5
+Bug: https://github.com/eslint/eslint/issues/14890
+Author: Bryan Mishkin <698306+bmish@users.noreply.github.com>
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2022-01-30
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/Makefile.js
++++ b/Makefile.js
+@@ -44,7 +44,7 @@
+ const PERF_MULTIPLIER = 13e6;
+ 
+ const OPEN_SOURCE_LICENSES = [
+-    /MIT/u, /BSD/u, /Apache/u, /ISC/u, /WTF/u, /Public Domain/u, /LGPL/u
++    /MIT/u, /BSD/u, /Apache/u, /ISC/u, /WTF/u, /Public Domain/u, /LGPL/u, /Python/u
+ ];
+ 
+ //------------------------------------------------------------------------------
+@@ -210,7 +210,7 @@
+             }
+         });
+ 
+-    const output = yaml.safeDump(categoriesData, { sortKeys: true });
++    const output = yaml.dump(categoriesData, { sortKeys: true });
+ 
+     output.to(outputFile);
+ }
+@@ -386,7 +386,7 @@
+  * @private
+  */
+ function lintMarkdown(files) {
+-    const config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, "./.markdownlint.yml"), "utf8")),
++    const config = yaml.load(fs.readFileSync(path.join(__dirname, "./.markdownlint.yml"), "utf8")),
+         result = markdownlint.sync({
+             files,
+             config,
+--- a/lib/cli-engine/formatters/tap.js
++++ b/lib/cli-engine/formatters/tap.js
+@@ -31,7 +31,7 @@
+     const prefix = "  ";
+     let output = `${prefix}---\n`;
+ 
+-    output += prefix + yaml.safeDump(diagnostic).split("\n").join(`\n${prefix}`);
++    output += prefix + yaml.dump(diagnostic).split("\n").join(`\n${prefix}`);
+     output += "...\n";
+     return output;
+ }
+--- a/lib/init/config-file.js
++++ b/lib/init/config-file.js
+@@ -64,7 +64,7 @@
+     // lazy load YAML to improve performance when not used
+     const yaml = require("js-yaml");
+ 
+-    const content = yaml.safeDump(config, { sortKeys: true });
++    const content = yaml.dump(config, { sortKeys: true });
+ 
+     fs.writeFileSync(filePath, content, "utf8");
+ }
+--- a/package.json
++++ b/package.json
+@@ -63,7 +63,7 @@
+     "imurmurhash": "^0.1.4",
+     "inquirer": "^6.4.1",
+     "is-glob": "^4.0.0",
+-    "js-yaml": "^3.13.1",
++    "js-yaml": "^4.1.0",
+     "json-stable-stringify-without-jsonify": "^1.0.1",
+     "levn": "^0.3.0",
+     "lodash": "^4.17.14",
+--- a/tests/lib/init/config-file.js
++++ b/tests/lib/init/config-file.js
+@@ -62,8 +62,8 @@
+         leche.withData([
+             ["JavaScript", "foo.js", espree.parse],
+             ["JSON", "bar.json", JSON.parse],
+-            ["YAML", "foo.yaml", yaml.safeLoad],
+-            ["YML", "foo.yml", yaml.safeLoad]
++            ["YAML", "foo.yaml", yaml.load],
++            ["YML", "foo.yml", yaml.load]
+         ], (fileType, filename, validate) => {
+ 
+             it(`should write a file through fs when a ${fileType} path is passed`, () => {
+--- a/lib/cli-engine/config-array-factory.js
++++ b/lib/cli-engine/config-array-factory.js
+@@ -122,7 +122,7 @@
+     try {
+ 
+         // empty YAML file can be null, so always use
+-        return yaml.safeLoad(readFile(filePath)) || {};
++        return yaml.load(readFile(filePath)) || {};
+     } catch (e) {
+         debug(`Error reading YAML file: ${filePath}`);
+         e.message = `Cannot read config file: ${filePath}\nError: ${e.message}`;
+@@ -168,7 +168,7 @@
+     const yaml = require("js-yaml");
+ 
+     try {
+-        return yaml.safeLoad(stripComments(readFile(filePath))) || /* istanbul ignore next */ {};
++        return yaml.load(stripComments(readFile(filePath))) || /* istanbul ignore next */ {};
+     } catch (e) {
+         debug("Error reading YAML file: %s\n%o", filePath, e);
+         e.message = `Cannot read config file: ${filePath}\nError: ${e.message}`;

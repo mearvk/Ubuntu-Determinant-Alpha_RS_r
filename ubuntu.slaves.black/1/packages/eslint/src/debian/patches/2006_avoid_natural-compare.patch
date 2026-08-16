@@ -1,0 +1,119 @@
+Description: Avoid use of node module natural-compare
+ Instead embed the module inline.
+ .
+ Origin: <https://github.com/litejs/natural-compare-lite/blob/v1.4.0/index.js>
+Forwarded: no
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2019-10-19
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/rules/sort-keys.js
++++ b/lib/rules/sort-keys.js
+@@ -9,8 +9,7 @@
+ // Requirements
+ //------------------------------------------------------------------------------
+ 
+-const astUtils = require("./utils/ast-utils"),
+-    naturalCompare = require("natural-compare");
++const astUtils = require("./utils/ast-utils");
+ 
+ //------------------------------------------------------------------------------
+ // Helpers
+@@ -39,6 +38,97 @@
+ }
+ 
+ /**
++ * Function to do "natural sort"
++ *
++ * Origin: <https://github.com/litejs/natural-compare-lite/blob/v1.4.0/index.js>
++ *
++ * @version    1.4.0
++ * @date       2015-10-26
++ * @stability  3 - Stable
++ * @author     Lauri Rooden (https://github.com/litejs/natural-compare-lite)
++ * @license    MIT License
++ * @param {string} a - The first character to compare.
++ * @param {string} b - The second character to compare.
++ * @returns {string} The equality -1 | 0 | 1.
++ * @private
++ */
++function naturalCompare(a, b) {
++    let i, codeA,
++        codeB = 1,
++        posA = 0,
++        posB = 0;
++    const alphabet = String.alphabet;
++
++    /* eslint-disable no-param-reassign */
++    /* eslint-disable no-sequences */
++
++    /**
++     * @param {string} str - string.
++     * @param {string} pos - position.
++     * @param {string} code - character codes.
++     * @returns {string} new character codes.
++     * @private
++     */
++    function getCode(str, pos, code) {
++        if (code) {
++            for (i = pos; code = getCode(str, i), code < 76 && code > 65;) {
++                ++i;
++            }
++            return +str.slice(pos - 1, i);
++        }
++        code = alphabet && alphabet.indexOf(str.charAt(pos));
++
++        let newCode;
++
++        if (code > -1) {
++            newCode = code + 76;
++        } else if ((code = str.charCodeAt(pos) || 0), code < 45 || code > 127) {
++            newCode = code;
++        } else if (code < 46) {
++            newCode = 65; // -
++        } else if (code < 48) {
++            newCode = code - 1;
++        } else if (code < 58) {
++            newCode = code + 18; // 0-9
++        } else if (code < 65) {
++            newCode = code - 11;
++        } else if (code < 91) {
++            newCode = code + 11; // A-Z
++        } else if (code < 97) {
++            newCode = code - 37;
++        } else if (code < 123) {
++            newCode = code + 5; // a-z
++        } else {
++            newCode = code - 63;
++        }
++        return newCode;
++    }
++
++    /* eslint-enable no-sequences */
++
++    if ((a += "") !== (b += "")) {
++        for (;codeB;) {
++            codeA = getCode(a, posA++);
++            codeB = getCode(b, posB++);
++
++            if (codeA < 76 && codeB < 76 && codeA > 66 && codeB > 66) {
++                codeA = getCode(a, posA, posA);
++                codeB = getCode(b, posB, posA = i);
++                posB = i;
++            }
++
++            if (codeA !== codeB) {
++                return (codeA < codeB) ? -1 : 1;
++            }
++        }
++    }
++    return 0;
++
++    /* eslint-enable no-param-reassign */
++}
++
++
++/**
+  * Functions which check that the given 2 names are in specific order.
+  *
+  * Postfix `I` is meant insensitive.

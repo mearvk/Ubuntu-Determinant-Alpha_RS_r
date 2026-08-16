@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -e
+
+#DEBHELPER#
+
+case "$1" in
+    configure)
+        modified=1
+        # If there is nothing in the AuthorizedKeysCommand field of sshd_config
+        if ! grep -q '^[^#]*AuthorizedKeysCommand[[:blank:]]\+.*$' /etc/ssh/sshd_config ; then
+            if ! grep -q '^[^#]*AuthorizedKeysCommandUser[[:blank:]]\+.*$' /etc/ssh/sshd_config ; then
+                if ! grep -q '^[^#]*AuthorizedKeysCommandRunAs[[:blank:]]\+.*$' /etc/ssh/sshd_config ; then
+                    modified=0
+                fi
+            fi
+        fi
+
+        if [ $modified -eq 0 ] ; then
+            echo "sshd override added, restarting daemon" >&2
+            deb-systemd-invoke restart ssh.service
+        else
+            echo "ERROR: Not restarting ssh because /etc/ssh/sshd_config already sets" >&2
+            echo "ERROR: AuthorizedKeysCommand*, which is also set by" >&2
+            echo "ERROR: /lib/systemd/system/ssh.service.d/ec2-instance-connect.conf." >&2
+            echo "Please restart ssh manually if the configuration is correct." >&2
+        fi
+    ;;
+esac

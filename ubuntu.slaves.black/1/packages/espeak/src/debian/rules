@@ -1,0 +1,59 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+%:
+	dh $@
+
+soname=libespeak.so.1
+version=$(shell dpkg-parsechangelog|sed -n -e 's/^Version: //p'|cut -d- -f1|cut -d. -f1-2)
+
+include /usr/share/dpkg/architecture.mk
+ifeq ($(origin CXX),default)
+	CXX = $(DEB_HOST_GNU_TYPE)-g++
+endif
+ESPEAK_DATA=/usr/lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_auto_build:
+	cp src/portaudio19.h src/portaudio.h
+	dh_auto_build --sourcedirectory=src -- DATADIR=$(ESPEAK_DATA)/espeak-data libespeak.a
+	# Remove object files so we can rebuild them with
+	# AUDIO=runtime enabled
+	rm -f src/*.o
+	dh_auto_build --sourcedirectory=src -- DATADIR=$(ESPEAK_DATA)/espeak-data espeak AUDIO=runtime
+
+	# Build static speak binary
+	cd platforms/big_endian && CFLAGS="$(CFLAGS)" $(MAKE) CXX=$(CXX)
+	# Build voice metadata.
+	cp -a $(CURDIR)/espeak-data $(CURDIR)/espeak-data-local
+	$(CURDIR)/platforms/big_endian/espeak-phoneme-data $(CURDIR)/espeak-data-local $(CURDIR)/espeak-data-local $(CURDIR)/espeak-data-local/phondata-manifest
+
+override_dh_auto_clean:
+	dh_auto_clean
+
+	-cd src && $(MAKE) distclean
+	cp -f src/portaudio18.h src/portaudio.h
+	-cd platforms/big_endian && $(MAKE) clean
+
+override_dh_auto_install:
+	install -m 755 src/espeak $(CURDIR)/debian/espeak/usr/bin/espeak
+	install -d $(CURDIR)/debian/espeak-data$(ESPEAK_DATA)
+	cp -r espeak-data-local $(CURDIR)/debian/espeak-data$(ESPEAK_DATA)/espeak-data
+	find $(CURDIR)/debian/espeak-data/usr/lib -type f -exec chmod 644 {} \;
+	find $(CURDIR)/debian/espeak-data/usr/lib -type d -exec chmod 755 {} \;
+	cp -al $(CURDIR)/debian/espeak-data/usr $(CURDIR)/debian/espeak-data-udeb
+	rm -fr $(CURDIR)/debian/espeak-data-udeb$(ESPEAK_DATA)/espeak-data/mbrola* $(CURDIR)/debian/espeak-data-udeb$(ESPEAK_DATA)/espeak-data/voices/mb $(CURDIR)/debian/espeak-data-udeb$(ESPEAK_DATA)/espeak-data/voices/test
+	mkdir -p $(CURDIR)/debian/libespeak1$(ESPEAK_DATA)
+	mkdir -p $(CURDIR)/debian/libespeak-dev$(ESPEAK_DATA)
+	install -m 644 src/$(soname).$(version) $(CURDIR)/debian/libespeak1$(ESPEAK_DATA)/$(soname).$(version)
+	cd $(CURDIR)/debian/libespeak1$(ESPEAK_DATA) && ln -s $(soname).$(version) $(soname)
+	cd $(CURDIR)/debian/libespeak1$(ESPEAK_DATA) && ln -s $(soname).$(version) libespeak.so
+	mv $(CURDIR)/debian/libespeak1$(ESPEAK_DATA)/libespeak.so $(CURDIR)/debian/libespeak-dev$(ESPEAK_DATA)
+	install -m 644 src/libespeak.a $(CURDIR)/debian/libespeak-dev$(ESPEAK_DATA)
+	install -m 644 src/speak_lib.h $(CURDIR)/debian/libespeak-dev/usr/include/espeak
+
+override_dh_installdocs:
+	dh_installdocs
+	sed -i -e 's&<img src="http://sflogo.sourceforge.net[^>]*>&&' debian/espeak/usr/share/doc/espeak/docs/*.html
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V

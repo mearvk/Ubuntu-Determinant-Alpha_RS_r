@@ -1,0 +1,41 @@
+From 82f34324a4b9ff21c375ac5724e9d68bd051a00f Mon Sep 17 00:00:00 2001
+From: Jacob Meisler <meislerj@amazon.com>
+Date: Mon, 9 May 2022 16:22:17 -0400
+Subject: [PATCH] Fix parse authorized keys script to work with OpenSSL 3.0.2
+
+---
+ src/bin/eic_parse_authorized_keys     | 10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+Origin: upstream, https://github.com/aws/aws-ec2-instance-connect-config/pull/39/commits/82f34324a4b9ff21c375ac5724e9d68bd051a00f
+Bug: https://github.com/aws/aws-ec2-instance-connect-config/issues/38
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/ec2-instance-connect/+bug/1973114
+Applied-Upstream: https://github.com/aws/aws-ec2-instance-connect-config/pull/39/commits/82f34324a4b9ff21c375ac5724e9d68bd051a00f (v1.1.17)
+Last-Updated: 2022-05-12
+
+--- a/src/bin/eic_parse_authorized_keys
++++ b/src/bin/eic_parse_authorized_keys
+@@ -50,7 +50,7 @@
+ verifyocsp() {
+     # First check if this cert is already trusted
+     cname=$("${2}" x509 -noout -subject -in "${3}" 2>/dev/null | /bin/sed -n -e 's/^.*CN[[:blank:]]*=[[:blank:]]*//p')
+-    fingerprint=$("${2}" x509 -noout -fingerprint -sha1 -inform pem -in "${3}"  2>/dev/null | /bin/sed -n 's/SHA1 Fingerprint[[:space:]]*=[[:space:]]*\(.*\)/\1/p' | tr -d ':')
++    fingerprint=$("${2}" x509 -noout -fingerprint -sha1 -inform pem -in "${3}"  2>/dev/null | /bin/sed -n 's/SHA1 Fingerprint[[:space:]]*=[[:space:]]*\(.*\)/\1/pI' | tr -d ':')
+     ocsp_out=$("${2}" ocsp -no_nonce -issuer "${4}" -cert "${3}" -VAfile "${4}" -respin "${5}/${fingerprint}" 2>/dev/null)
+     ocsp_exit="${?}"
+     if [ "${ocsp_exit}" -ne 0 ] || ! startswith "${ocsp_out}" "${3}: good" ; then
+@@ -143,10 +143,10 @@
+ fi
+ 
+ # Build the intermediate trust chain
+-/bin/touch "${tmpdir}/ca-trust.pem"
+-for i in $(/usr/bin/seq 1 "${end}") ; do
+-  /bin/cat "${tmpdir}/cert${i}.pem" >> "${tmpdir}/ca-trust.pem"
+-done
++# We only need to verify the first intermediate certificate since it's signed by Amazon Root CA 1, which
++# is already trusted by the system (in /etc/ssl/certs).
++/usr/bin/cp "${tmpdir}/cert1.pem" "${tmpdir}/ca-trust.pem"
++
+ if [ -d "${ca_path}" ] ; then
+     subject=$("${OPENSSL}" x509 -noout -subject -in "${tmpdir}/cert${end}.pem" | /bin/sed -n -e 's/^.*CN[[:space:]]*=[[:space:]]*//p')
+     underscored=$(/bin/echo "${subject}" | /usr/bin/tr -s ' ' '_') 2>/dev/null
