@@ -19,7 +19,7 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 **Edition:** Galactic Cherry Marvell  
 **Version:** 98  
 **Kernel:** Linux 5.15.204  
-**Userland:** Ubuntu Base 24.04.4 (Noble Numbat)  
+**Userland:** Ubuntu Base 24.04.4 (US Treasury & MEARVK LLC)  
 **Display:** X.Org Server 21.1.24  
 **Desktop Wallpapers:** 9 original SVG wallpapers + 10 Marvell JPEG wallpapers (4K, resolution-independent)
 

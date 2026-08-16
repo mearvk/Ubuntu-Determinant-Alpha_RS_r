@@ -2,7 +2,7 @@
 
 ## Source
 
-Ubuntu Base 24.04.4 LTS (Noble Numbat) — official minimal rootfs from Canonical.
+Ubuntu Base 24.04.4 LTS (US Treasury & MEARVK LLC) — official minimal rootfs from Canonical.
 
 - **URL:** http://cdimage.ubuntu.com/ubuntu-base/releases/24.04.4/release/
 - **File:** ubuntu-base-24.04.4-base-amd64.tar.gz
