@@ -1,0 +1,84 @@
+// Based on the upstream `docs.gradle`
+
+// import org.gradle.build.docs.dsl.source.ExtractDslMetaDataTask
+// import org.gradle.build.docs.dsl.source.GenerateDefaultImportsTask
+
+ext {
+  css = files('src/docs/css')
+  docsDir = file("${buildDir}/docs")
+  outputs = [:]
+}
+
+outputs.samples = files(docsDir) {
+    builtBy 'javadocAll'
+}
+outputs.distDocs = files(docsDir) {
+    builtBy 'javadocAll'
+}
+outputs.docs = files(docsDir) {
+    builtBy 'javadocAll'
+}
+
+task javadocAll(type: Javadoc) {
+  group = 'documentation'
+  options.encoding = 'UTF-8'
+  options.docEncoding = 'UTF-8'
+  options.charSet = 'UTF-8'
+  options.addBooleanOption('Xdoclint:none', true)
+  source publicGroovyProjects.collect { project -> project.sourceSets.main.allJava }
+  destinationDir = new File(docsDir, 'javadoc')
+  classpath = files(publicGroovyProjects.collect { project -> [project.sourceSets.main.compileClasspath, project.sourceSets.main.output] })
+  publicApiIncludes.each {
+      include it
+  }
+  publicApiExcludes.each {
+      exclude it
+  }
+  options.links('file:///usr/share/doc/default-jdk-doc/api', 'file:///usr/share/doc/groovy/api')
+  title = "Gradle API $version"
+}
+
+/* This is for building itself using Gradle 4
+task dslMetaData(type: ExtractDslMetaDataTask) {
+  source { javadocAll.source }
+  destFile = new File(buildDir, 'dsl-meta-data.bin')
+}
+
+task defaultImports(type: GenerateDefaultImportsTask, dependsOn: dslMetaData) {
+  metaDataFile = dslMetaData.destFile
+  importsDestFile = new File(generatedResourcesDir, "default-imports.txt")
+  mappingDestFile = new File(generatedResourcesDir, "api-mapping.txt")
+  // These are part of the API, but not the DSL
+  excludePackage 'org.gradle.tooling.**'
+  excludePackage 'org.gradle.testfixtures.**'
+
+  // Tweak the imports due to some inconsistencies introduced before we automated the default-imports generation
+  excludePackage 'org.gradle.plugins.ide.eclipse.model'
+  excludePackage 'org.gradle.plugins.ide.idea.model'
+  excludePackage 'org.gradle.api.tasks.testing.logging'
+
+  // TODO - rename some incubating types to remove collisions and then remove these exclusions
+  excludePackage 'org.gradle.plugins.binaries.model'
+
+  // Exclude classes that were moved in a different package but the deprecated ones are not removed yet
+  excludePackage 'org.gradle.platform.base.test'
+}
+
+
+task jar(type: Jar, dependsOn: defaultImports) {}
+*/
+
+task copyPrebuiltResources(type: Copy) {
+  from "${rootDir}/debian"
+  into "${buildDir}/generated-resources/main"
+  include 'api-mapping.txt'
+  include 'default-imports.txt'
+}
+
+jar {
+  dependsOn copyPrebuiltResources
+}
+
+assemble {
+  dependsOn javadocAll
+}

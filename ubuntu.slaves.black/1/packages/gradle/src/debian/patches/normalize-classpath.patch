@@ -1,0 +1,93 @@
+From: Markus Koschany <apo@debian.org>
+From: Kai-Chung Yan
+Subject: Normalize the generated classpath in every JAR
+ Gradle uses its own class loading mechanism which uses a dedicated classpath
+ file stored in every JAR. The JAR names are really names, not paths, so they
+ need to be normalized so that Gradle can search `/usr/share/java` for them.
+ .
+ This patch also sorts the generated classpath to improve reproducibility.
+ .
+ One bug of this patch is that the Groovy version is hard-coded, but it seems
+ not to affect the actual result of running `gradle --version`.
+--- a/buildSrc/src/main/groovy/org/gradle/build/ClasspathManifest.groovy
++++ b/buildSrc/src/main/groovy/org/gradle/build/ClasspathManifest.groovy
+@@ -49,14 +49,14 @@
+     String getRuntime() {
+         return input.fileCollection {
+             (it instanceof ExternalDependency) || (it instanceof FileCollectionDependency)
+-        }.collect { it.name }.join(',')
++        }.collect { ClasspathManifest.normalizeRuntime(it.name) }.toSorted().minus('').join(',')
+     }
+ 
+     @Input
+     String getProjects() {
+         return (input.allDependencies.withType(ProjectDependency).collect {
+             it.dependencyProject.archivesBaseName
+-        } + additionalProjects*.archivesBaseName).join(',')
++        } + additionalProjects*.archivesBaseName).toSorted().join(',')
+     }
+ 
+     Properties createProperties() {
+@@ -73,4 +73,42 @@
+     def generate() {
+         ReproduciblePropertiesWriter.store(createProperties(), manifestFile)
+     }
++
++    private static String normalizeRuntime(final def name) {
++        if (name.startsWith('xml-apis-')) {
++            return ''
++        }
++        if (name.startsWith('org.eclipse.sisu.inject-')) {
++            return 'sisu-inject.jar'
++        }
++        if (name.startsWith('org.eclipse.sisu.plexus-')) {
++            return 'sisu-plexus.jar'
++        }
++        if (name.startsWith('biz.aQute.bndlib-')) {
++            return 'bndlib.jar'
++        }
++        if (name.startsWith('commons-collections-')) {
++            return 'commons-collections3.jar'
++        }
++        if (name.startsWith('groovy-all-')) {
++            return 'groovy-all.jar'
++        }
++        if (name.startsWith('junit-')) {
++            return 'junit4.jar'
++        }
++        if (name.startsWith('javax.inject-')) {
++            return 'atinject-jsr330-api.jar'
++        }
++        if (name.startsWith('geronimo-interceptor_3.0_spec-')) {
++            return 'geronimo-interceptor-3.0-spec.jar'
++        }
++        if (name.startsWith('maven-') && name.endsWith('-3.x.jar')) {
++            return name.replace('maven-', 'maven3-').replace('-3.x.jar', '.jar')
++        }
++        if (name.endsWith('-debian.jar')) {
++            return name.replace('-debian.jar', '.jar')
++        }
++        // Regex operations are costly so they are the last to do.
++        return name.replaceAll('-[\\d\\.]*x\\.jar\\z', '.jar')
++    }
+ }
+--- a/subprojects/plugins/src/main/java/org/gradle/api/internal/plugins/GroovyJarFile.java
++++ b/subprojects/plugins/src/main/java/org/gradle/api/internal/plugins/GroovyJarFile.java
+@@ -23,7 +23,7 @@
+ import java.util.regex.Pattern;
+ 
+ public class GroovyJarFile {
+-    private static final Pattern FILE_NAME_PATTERN = Pattern.compile("(groovy(?:-all)?)-(\\d.*?)(-indy)?.jar");
++    private static final Pattern FILE_NAME_PATTERN = Pattern.compile("(groovy(?:-all)?)-(debian|\\d.*?)(-indy)?.jar");
+ 
+     private final File file;
+     private final Matcher matcher;
+@@ -42,7 +42,7 @@
+     }
+ 
+     public VersionNumber getVersion() {
+-        return VersionNumber.parse(matcher.group(2));
++        return VersionNumber.parse("debian".equals(matcher.group(2)) ? "2.4.6" : matcher.group(2));
+     }
+ 
+     public boolean isGroovyAll() {

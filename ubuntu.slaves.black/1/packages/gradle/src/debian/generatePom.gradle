@@ -1,0 +1,51 @@
+apply plugin: 'maven'
+task debianMavenPom {
+  final def pomPath = "${buildDir}/pom.xml"
+  outputs.files pomPath
+  jar.dependsOn debianMavenPom
+  doFirst {
+    pom {
+      project { artifactId archivesBaseName }
+      whenConfigured {
+        // Some Gradle dependencies have a wrong artifactId, e.g. `toolingApi` instead of
+        // `gradle-tooling-api`.
+        dependencies.each {
+          if (it.groupId == 'org.gradle') {
+            final def normalizedName = it.artifactId.replaceAll("\\p{Upper}") {
+              "-${it.toLowerCase()}"
+            }
+            // Some artifacts are named gradle-* while some don't
+            it.artifactId = normalizedName.startsWith('gradle-') ? normalizedName : "gradle-$normalizedName"
+          }
+        }
+
+        // Sort dependencies
+        setDependencies(getDependencies().toSorted { a, b ->
+          if ((a.scope <=> b.scope) != 0) {
+            a.scope <=> b.scope
+            } else if ((a.groupId <=> b.groupId) != 0) {
+            a.groupId <=> b.groupId
+          } else if ((a.artifactId <=> b.artifactId) != 0) {
+            a.artifactId <=> b.artifactId
+          } else {
+            a.version <=> b.version
+          }
+        })
+      }
+      if (configurations.findByName('publishCompile') != null) {
+        scopeMappings.addMapping(
+          300,
+          configurations.publishCompile,
+          Conf2ScopeMappingContainer.COMPILE
+        )
+      }
+      if (configurations.findByName('publishRuntime') != null) {
+        scopeMappings.addMapping(
+          300,
+          configurations.publishCompile,
+          Conf2ScopeMappingContainer.RUNTIME
+        )
+      }
+    }.writeTo pomPath
+  }
+}
