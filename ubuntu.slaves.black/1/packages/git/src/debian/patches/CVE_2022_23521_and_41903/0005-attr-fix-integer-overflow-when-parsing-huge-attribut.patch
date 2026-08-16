@@ -1,0 +1,53 @@
+From 24557209500e6ed618f04a8795a111a0c491a29c Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:23 +0100
+Subject: [PATCH 05/25] attr: fix integer overflow when parsing huge attribute
+ names
+
+It is possible to trigger an integer overflow when parsing attribute
+names that are longer than 2^31 bytes because we assign the result of
+strlen(3P) to an `int` instead of to a `size_t`. This can lead to an
+abort in vsnprintf(3P) with the following reproducer:
+
+    blob=$(perl -e 'print "A " . "B"x2147483648 . "\n"' | git hash-object -w --stdin)
+    git update-index --add --cacheinfo 100644,$blob,.gitattributes
+    git check-attr --all path
+
+    BUG: strbuf.c:400: your vsnprintf is broken (returned -1)
+
+But furthermore, assuming that the attribute name is even longer than
+that, it can cause us to silently truncate the attribute and thus lead
+to wrong results.
+
+Fix this integer overflow by using a `size_t` instead. This fixes the
+silent truncation of attribute names, but it only partially fixes the
+BUG we hit: even though the initial BUG is fixed, we can still hit a BUG
+when parsing invalid attribute lines via `report_invalid_attr()`.
+
+This is due to an underlying design issue in vsnprintf(3P) which only
+knows to return an `int`, and thus it may always overflow with large
+inputs. This issue is benign though: the worst that can happen is that
+the error message is misreported to be either truncated or too long, but
+due to the buffer being NUL terminated we wouldn't ever do an
+out-of-bounds read here.
+
+Reported-by: Markus Vervier <markus.vervier@x41-dsec.de>
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -294,7 +294,7 @@ static const char *parse_attr(const char
+ 			      struct attr_state *e)
+ {
+ 	const char *ep, *equals;
+-	int len;
++	size_t len;
+ 
+ 	ep = cp + strcspn(cp, blank);
+ 	equals = strchr(cp, '=');

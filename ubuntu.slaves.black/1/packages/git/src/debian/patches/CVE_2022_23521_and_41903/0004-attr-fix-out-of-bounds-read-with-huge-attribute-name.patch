@@ -1,0 +1,65 @@
+From 8d0d48cf2157cfb914db1f53b3fe40785b86f3aa Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:19 +0100
+Subject: [PATCH 04/25] attr: fix out-of-bounds read with huge attribute names
+
+There is an out-of-bounds read possible when parsing gitattributes that
+have an attribute that is 2^31+1 bytes long. This is caused due to an
+integer overflow when we assign the result of strlen(3P) to an `int`,
+where we use the wrapped-around value in a subsequent call to
+memcpy(3P). The following code reproduces the issue:
+
+    blob=$(perl -e 'print "a" x 2147483649 . " attr"' | git hash-object -w --stdin)
+    git update-index --add --cacheinfo 100644,$blob,.gitattributes
+    git check-attr --all file
+
+    AddressSanitizer:DEADLYSIGNAL
+    =================================================================
+    ==8451==ERROR: AddressSanitizer: SEGV on unknown address 0x7f93efa00800 (pc 0x7f94f1f8f082 bp 0x7ffddb59b3a0 sp 0x7ffddb59ab28 T0)
+    ==8451==The signal is caused by a READ memory access.
+        #0 0x7f94f1f8f082  (/usr/lib/libc.so.6+0x176082)
+        #1 0x7f94f2047d9c in __interceptor_strspn /usr/src/debug/gcc/libsanitizer/sanitizer_common/sanitizer_common_interceptors.inc:752
+        #2 0x560e190f7f26 in parse_attr_line attr.c:375
+        #3 0x560e190f9663 in handle_attr_line attr.c:660
+        #4 0x560e190f9ddd in read_attr_from_index attr.c:769
+        #5 0x560e190f9f14 in read_attr attr.c:797
+        #6 0x560e190fa24e in bootstrap_attr_stack attr.c:867
+        #7 0x560e190fa4a5 in prepare_attr_stack attr.c:902
+        #8 0x560e190fb5dc in collect_some_attrs attr.c:1097
+        #9 0x560e190fb93f in git_all_attrs attr.c:1128
+        #10 0x560e18e6136e in check_attr builtin/check-attr.c:67
+        #11 0x560e18e61c12 in cmd_check_attr builtin/check-attr.c:183
+        #12 0x560e18e15993 in run_builtin git.c:466
+        #13 0x560e18e16397 in handle_builtin git.c:721
+        #14 0x560e18e16b2b in run_argv git.c:788
+        #15 0x560e18e17991 in cmd_main git.c:926
+        #16 0x560e190ae2bd in main common-main.c:57
+        #17 0x7f94f1e3c28f  (/usr/lib/libc.so.6+0x2328f)
+        #18 0x7f94f1e3c349 in __libc_start_main (/usr/lib/libc.so.6+0x23349)
+        #19 0x560e18e110e4 in _start ../sysdeps/x86_64/start.S:115
+
+    AddressSanitizer can not provide additional info.
+    SUMMARY: AddressSanitizer: SEGV (/usr/lib/libc.so.6+0x176082)
+    ==8451==ABORTING
+
+Fix this bug by converting the variable to a `size_t` instead.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -338,7 +338,7 @@ static const char *parse_attr(const char
+ static struct match_attr *parse_attr_line(const char *line, const char *src,
+ 					  int lineno, unsigned flags)
+ {
+-	int namelen;
++	size_t namelen;
+ 	int num_attr, i;
+ 	const char *cp, *name, *states;
+ 	struct match_attr *res = NULL;

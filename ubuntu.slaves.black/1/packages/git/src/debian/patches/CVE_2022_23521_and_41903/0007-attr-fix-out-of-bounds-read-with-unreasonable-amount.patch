@@ -1,0 +1,81 @@
+From 447ac906e189535e77dcb1f4bbe3f1bc917d4c12 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:31 +0100
+Subject: [PATCH 07/25] attr: fix out-of-bounds read with unreasonable amount
+ of patterns
+
+The `struct attr_stack` tracks the stack of all patterns together with
+their attributes. When parsing a gitattributes file that has more than
+2^31 such patterns though we may trigger multiple out-of-bounds reads on
+64 bit platforms. This is because while the `num_matches` variable is an
+unsigned integer, we always use a signed integer to iterate over them.
+
+I have not been able to reproduce this issue due to memory constraints
+on my systems. But despite the out-of-bounds reads, the worst thing that
+can seemingly happen is to call free(3P) with a garbage pointer when
+calling `attr_stack_free()`.
+
+Fix this bug by using unsigned integers to iterate over the array. While
+this makes the iteration somewhat awkward when iterating in reverse, it
+is at least better than knowingly running into an out-of-bounds read.
+While at it, convert the call to `ALLOC_GROW` to use `ALLOC_GROW_BY`
+instead.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -451,7 +451,7 @@ struct attr_stack {
+ 
+ static void attr_stack_free(struct attr_stack *e)
+ {
+-	int i;
++	unsigned i;
+ 	free(e->origin);
+ 	for (i = 0; i < e->num_matches; i++) {
+ 		struct match_attr *a = e->attrs[i];
+@@ -665,8 +665,8 @@ static void handle_attr_line(struct attr
+ 	a = parse_attr_line(line, src, lineno, flags);
+ 	if (!a)
+ 		return;
+-	ALLOC_GROW(res->attrs, res->num_matches + 1, res->alloc);
+-	res->attrs[res->num_matches++] = a;
++	ALLOC_GROW_BY(res->attrs, res->num_matches, 1, res->alloc);
++	res->attrs[res->num_matches - 1] = a;
+ }
+ 
+ static struct attr_stack *read_attr_from_array(const char **list)
+@@ -1056,11 +1056,11 @@ static int fill(const char *path, int pa
+ 		struct all_attrs_item *all_attrs, int rem)
+ {
+ 	for (; rem > 0 && stack; stack = stack->prev) {
+-		int i;
++		unsigned i;
+ 		const char *base = stack->origin ? stack->origin : "";
+ 
+-		for (i = stack->num_matches - 1; 0 < rem && 0 <= i; i--) {
+-			const struct match_attr *a = stack->attrs[i];
++		for (i = stack->num_matches; 0 < rem && 0 < i; i--) {
++			const struct match_attr *a = stack->attrs[i - 1];
+ 			if (a->is_macro)
+ 				continue;
+ 			if (path_matches(path, pathlen, basename_offset,
+@@ -1091,9 +1091,9 @@ static void determine_macros(struct all_
+ 			     const struct attr_stack *stack)
+ {
+ 	for (; stack; stack = stack->prev) {
+-		int i;
+-		for (i = stack->num_matches - 1; i >= 0; i--) {
+-			const struct match_attr *ma = stack->attrs[i];
++		unsigned i;
++		for (i = stack->num_matches; i > 0; i--) {
++			const struct match_attr *ma = stack->attrs[i - 1];
+ 			if (ma->is_macro) {
+ 				int n = ma->u.attr->attr_nr;
+ 				if (!all_attrs[n].macro) {

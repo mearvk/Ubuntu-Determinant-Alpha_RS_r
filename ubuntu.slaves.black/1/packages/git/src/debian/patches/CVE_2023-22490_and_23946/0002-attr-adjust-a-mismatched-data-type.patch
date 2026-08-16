@@ -1,0 +1,43 @@
+From 0227130244c007870c106fc613903d078730e45c Mon Sep 17 00:00:00 2001
+From: Johannes Schindelin <Johannes.Schindelin@gmx.de>
+Date: Thu, 12 Jan 2023 01:05:02 +0100
+Subject: [PATCH 2/7] attr: adjust a mismatched data type
+
+On platforms where `size_t` does not have the same width as `unsigned
+long`, passing a pointer to the former when a pointer to the latter is
+expected can lead to problems.
+
+Windows and 32-bit Linux are among the affected platforms.
+
+In this instance, we want to store the size of the blob that was read in
+that variable. However, `read_blob_data_from_index()` passes that
+pointer to `read_object_file()` which expects an `unsigned long *`.
+Which means that on affected platforms, the variable is not fully
+populated and part of its value is left uninitialized. (On Big-Endian
+platforms, this problem would be even worse.)
+
+The consequence is that depending on the uninitialized memory's
+contents, we may erroneously reject perfectly fine attributes.
+
+Let's address this by passing a pointer to a variable of the expected
+data type.
+
+Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -757,7 +757,7 @@ static struct attr_stack *read_attr_from
+ 	struct attr_stack *res;
+ 	char *buf, *sp;
+ 	int lineno = 0;
+-	size_t size;
++	unsigned long size;
+ 
+ 	if (!istate)
+ 		return NULL;

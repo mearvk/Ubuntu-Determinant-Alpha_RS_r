@@ -1,0 +1,42 @@
+From eb22e7dfa23da6bd9aed9bd1dad69e1e8e167d24 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:15 +0100
+Subject: [PATCH 03/25] attr: fix overflow when upserting attribute with overly
+ long name
+
+The function `git_attr_internal()` is called to upsert attributes into
+the global map. And while all callers pass a `size_t`, the function
+itself accepts an `int` as the attribute name's length. This can lead to
+an integer overflow in case the attribute name is longer than `INT_MAX`.
+
+Now this overflow seems harmless as the first thing we do is to call
+`attr_name_valid()`, and that function only succeeds in case all chars
+in the range of `namelen` match a certain small set of chars. We thus
+can't do an out-of-bounds read as NUL is not part of that set and all
+strings passed to this function are NUL-terminated. And furthermore, we
+wouldn't ever read past the current attribute name anyway due to the
+same reason. And if validation fails we will return early.
+
+On the other hand it feels fragile to rely on this behaviour, even more
+so given that we pass `namelen` to `FLEX_ALLOC_MEM()`. So let's instead
+just do the correct thing here and accept a `size_t` as line length.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -211,7 +211,7 @@ static void report_invalid_attr(const ch
+  * dictionary.  If no entry is found, create a new attribute and store it in
+  * the dictionary.
+  */
+-static const struct git_attr *git_attr_internal(const char *name, int namelen)
++static const struct git_attr *git_attr_internal(const char *name, size_t namelen)
+ {
+ 	struct git_attr *a;
+ 

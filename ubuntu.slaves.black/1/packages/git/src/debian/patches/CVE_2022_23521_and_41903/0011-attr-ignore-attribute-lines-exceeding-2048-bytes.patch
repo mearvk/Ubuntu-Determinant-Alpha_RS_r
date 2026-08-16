@@ -1,0 +1,117 @@
+From dfa6b32b5e599d97448337ed4fc18dd50c90758f Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:48 +0100
+Subject: [PATCH 11/25] attr: ignore attribute lines exceeding 2048 bytes
+
+There are two different code paths to read gitattributes: once via a
+file, and once via the index. These two paths used to behave differently
+because when reading attributes from a file, we used fgets(3P) with a
+buffer size of 2kB. Consequentially, we silently truncate line lengths
+when lines are longer than that and will then parse the remainder of the
+line as a new pattern. It goes without saying that this is entirely
+unexpected, but it's even worse that the behaviour depends on how the
+gitattributes are parsed.
+
+While this is simply wrong, the silent truncation saves us with the
+recently discovered vulnerabilities that can cause out-of-bound writes
+or reads with unreasonably long lines due to integer overflows. As the
+common path is to read gitattributes via the worktree file instead of
+via the index, we can assume that any gitattributes file that had lines
+longer than that is already broken anyway. So instead of lifting the
+limit here, we can double down on it to fix the vulnerabilities.
+
+Introduce an explicit line length limit of 2kB that is shared across all
+paths that read attributes and ignore any line that hits this limit
+while printing a warning.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c                |  5 +++++
+ attr.h                |  6 ++++++
+ t/t0003-attributes.sh | 25 +++++++++++++++++++++++--
+ 3 files changed, 34 insertions(+), 2 deletions(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -349,6 +349,11 @@ static struct match_attr *parse_attr_lin
+ 		return NULL;
+ 	name = cp;
+ 
++	if (strlen(line) >= ATTR_MAX_LINE_LENGTH) {
++		warning(_("ignoring overly long attributes line %d"), lineno);
++		return NULL;
++	}
++
+ 	if (*cp == '"' && !unquote_c_style(&pattern, name, &states)) {
+ 		name = pattern.buf;
+ 		namelen = pattern.len;
+Index: git-2.34.1/attr.h
+===================================================================
+--- git-2.34.1.orig/attr.h
++++ git-2.34.1/attr.h
+@@ -107,6 +107,12 @@
+  * - Free the `attr_check` struct by calling `attr_check_free()`.
+  */
+ 
++/**
++ * The maximum line length for a gitattributes file. If the line exceeds this
++ * length we will ignore it.
++ */
++#define ATTR_MAX_LINE_LENGTH 2048
++
+ struct index_state;
+ 
+ /**
+Index: git-2.34.1/t/t0003-attributes.sh
+===================================================================
+--- git-2.34.1.orig/t/t0003-attributes.sh
++++ git-2.34.1/t/t0003-attributes.sh
+@@ -370,6 +370,15 @@ test_expect_success SYMLINKS 'symlinks n
+ 	test_i18ngrep "unable to access.*gitattributes" err
+ '
+ 
++test_expect_success 'large attributes line ignored in tree' '
++	test_when_finished "rm .gitattributes" &&
++	printf "path %02043d" 1 >.gitattributes &&
++	git check-attr --all path >actual 2>err &&
++	echo "warning: ignoring overly long attributes line 1" >expect &&
++	test_cmp expect err &&
++	test_must_be_empty actual
++'
++
+ test_expect_success 'large attributes line ignores trailing content in tree' '
+ 	test_when_finished "rm .gitattributes" &&
+ 	# older versions of Git broke lines at 2048 bytes; the 2045 bytes
+@@ -378,7 +387,18 @@ test_expect_success 'large attributes li
+ 	# erroneously parsed.
+ 	printf "a %02045dtrailing attribute\n" 1 >.gitattributes &&
+ 	git check-attr --all trailing >actual 2>err &&
+-	test_must_be_empty err &&
++	echo "warning: ignoring overly long attributes line 1" >expect &&
++	test_cmp expect err &&
++	test_must_be_empty actual
++'
++
++test_expect_success 'large attributes line ignored in index' '
++	test_when_finished "git update-index --remove .gitattributes" &&
++	blob=$(printf "path %02043d" 1 | git hash-object -w --stdin) &&
++	git update-index --add --cacheinfo 100644,$blob,.gitattributes &&
++	git check-attr --cached --all path >actual 2>err &&
++	echo "warning: ignoring overly long attributes line 1" >expect &&
++	test_cmp expect err &&
+ 	test_must_be_empty actual
+ '
+ 
+@@ -387,7 +407,8 @@ test_expect_success 'large attributes li
+ 	blob=$(printf "a %02045dtrailing attribute\n" 1 | git hash-object -w --stdin) &&
+ 	git update-index --add --cacheinfo 100644,$blob,.gitattributes &&
+ 	git check-attr --cached --all trailing >actual 2>err &&
+-	test_must_be_empty err &&
++	echo "warning: ignoring overly long attributes line 1" >expect &&
++	test_cmp expect err &&
+ 	test_must_be_empty actual
+ '
+ 

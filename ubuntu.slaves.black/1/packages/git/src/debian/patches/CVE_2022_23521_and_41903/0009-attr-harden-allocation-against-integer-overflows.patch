@@ -1,0 +1,37 @@
+From a60a66e409c265b2944f18bf43581c146812586d Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:40 +0100
+Subject: [PATCH 09/25] attr: harden allocation against integer overflows
+
+When parsing an attributes line, we need to allocate an array that holds
+all attributes specified for the given file pattern. The calculation to
+determine the number of bytes that need to be allocated was prone to an
+overflow though when there was an unreasonable amount of attributes.
+
+Harden the allocation by instead using the `st_` helper functions that
+cause us to die when we hit an integer overflow.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+---
+ attr.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -385,10 +385,9 @@ static struct match_attr *parse_attr_lin
+ 			goto fail_return;
+ 	}
+ 
+-	res = xcalloc(1,
+-		      sizeof(*res) +
+-		      sizeof(struct attr_state) * num_attr +
+-		      (is_macro ? 0 : namelen + 1));
++	res = xcalloc(1, st_add3(sizeof(*res),
++				 st_mult(sizeof(struct attr_state), num_attr),
++				 is_macro ? 0 : namelen + 1));
+ 	if (is_macro) {
+ 		res->u.attr = git_attr_internal(name, namelen);
+ 	} else {

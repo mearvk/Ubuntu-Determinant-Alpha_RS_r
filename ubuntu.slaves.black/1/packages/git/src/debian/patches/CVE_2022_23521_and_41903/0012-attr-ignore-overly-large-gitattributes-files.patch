@@ -1,0 +1,138 @@
+From 3c50032ff5289cc45659f21949c8d09e52164579 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:53 +0100
+Subject: [PATCH 12/25] attr: ignore overly large gitattributes files
+
+Similar as with the preceding commit, start ignoring gitattributes files
+that are overly large to protect us against out-of-bounds reads and
+writes caused by integer overflows. Unfortunately, we cannot just define
+"overly large" in terms of any preexisting limits in the codebase.
+
+Instead, we choose a very conservative limit of 100MB. This is plenty of
+room for specifying gitattributes, and incidentally it is also the limit
+for blob sizes for GitHub. While we don't want GitHub to dictate limits
+here, it is still sensible to use this fact for an informed decision
+given that it is hosting a huge set of repositories. Furthermore, over
+at GitLab we scanned a subset of repositories for their root-level
+attribute files. We found that 80% of them have a gitattributes file
+smaller than 100kB, 99.99% have one smaller than 1MB, and only a single
+repository had one that was almost 3MB in size. So enforcing a limit of
+100MB seems to give us ample of headroom.
+
+With this limit in place we can be reasonably sure that there is no easy
+way to exploit the gitattributes file via integer overflows anymore.
+Furthermore, it protects us against resource exhaustion caused by
+allocating the in-memory data structures required to represent the
+parsed attributes.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -715,6 +715,7 @@ static struct attr_stack *read_attr_from
+ 	FILE *fp;
+ 	struct attr_stack *res;
+ 	int lineno = 0;
++	struct stat st;
+ 
+ 	if (flags & READ_ATTR_NOFOLLOW)
+ 		fd = open_nofollow(path, O_RDONLY);
+@@ -726,12 +727,22 @@ static struct attr_stack *read_attr_from
+ 		return NULL;
+ 	}
+ 	fp = xfdopen(fd, "r");
++	if (fstat(fd, &st)) {
++		warning_errno(_("cannot fstat gitattributes file '%s'"), path);
++		fclose(fp);
++		return NULL;
++	}
++	if (st.st_size >= ATTR_MAX_FILE_SIZE) {
++		warning(_("ignoring overly large gitattributes file '%s'"), path);
++		fclose(fp);
++		return NULL;
++	}
+ 
+ 	CALLOC_ARRAY(res, 1);
+ 	while (strbuf_getline(&buf, fp) != EOF) {
+ 		if (!lineno && starts_with(buf.buf, utf8_bom))
+ 			strbuf_remove(&buf, 0, strlen(utf8_bom));
+-		handle_attr_line(res, buf.buf, path, ++lineno, macro_ok);
++		handle_attr_line(res, buf.buf, path, ++lineno, flags);
+ 	}
+ 
+ 	fclose(fp);
+@@ -746,6 +757,7 @@ static struct attr_stack *read_attr_from
+ 	struct attr_stack *res;
+ 	char *buf, *sp;
+ 	int lineno = 0;
++	size_t size;
+ 
+ 	if (!istate)
+ 		return NULL;
+@@ -764,9 +776,13 @@ static struct attr_stack *read_attr_from
+ 	if (!path_in_cone_mode_sparse_checkout(path, istate))
+ 		return NULL;
+ 
+-	buf = read_blob_data_from_index(istate, path, NULL);
++	buf = read_blob_data_from_index(istate, path, &size);
+ 	if (!buf)
+ 		return NULL;
++	if (size >= ATTR_MAX_FILE_SIZE) {
++		warning(_("ignoring overly large gitattributes blob '%s'"), path);
++		return NULL;
++	}
+ 
+ 	CALLOC_ARRAY(res, 1);
+ 	for (sp = buf; *sp; ) {
+Index: git-2.34.1/attr.h
+===================================================================
+--- git-2.34.1.orig/attr.h
++++ git-2.34.1/attr.h
+@@ -113,6 +113,12 @@
+  */
+ #define ATTR_MAX_LINE_LENGTH 2048
+ 
++ /**
++  * The maximum size of the giattributes file. If the file exceeds this size we
++  * will ignore it.
++  */
++#define ATTR_MAX_FILE_SIZE (100 * 1024 * 1024)
++
+ struct index_state;
+ 
+ /**
+Index: git-2.34.1/t/t0003-attributes.sh
+===================================================================
+--- git-2.34.1.orig/t/t0003-attributes.sh
++++ git-2.34.1/t/t0003-attributes.sh
+@@ -392,6 +392,14 @@ test_expect_success 'large attributes li
+ 	test_must_be_empty actual
+ '
+ 
++test_expect_success EXPENSIVE 'large attributes file ignored in tree' '
++	test_when_finished "rm .gitattributes" &&
++	dd if=/dev/zero of=.gitattributes bs=101M count=1 2>/dev/null &&
++	git check-attr --all path >/dev/null 2>err &&
++	echo "warning: ignoring overly large gitattributes file ${SQ}.gitattributes${SQ}" >expect &&
++	test_cmp expect err
++'
++
+ test_expect_success 'large attributes line ignored in index' '
+ 	test_when_finished "git update-index --remove .gitattributes" &&
+ 	blob=$(printf "path %02043d" 1 | git hash-object -w --stdin) &&
+@@ -412,4 +420,13 @@ test_expect_success 'large attributes li
+ 	test_must_be_empty actual
+ '
+ 
++test_expect_success EXPENSIVE 'large attributes file ignored in index' '
++	test_when_finished "git update-index --remove .gitattributes" &&
++	blob=$(dd if=/dev/zero bs=101M count=1 2>/dev/null | git hash-object -w --stdin) &&
++	git update-index --add --cacheinfo 100644,$blob,.gitattributes &&
++	git check-attr --cached --all path >/dev/null 2>err &&
++	echo "warning: ignoring overly large gitattributes blob ${SQ}.gitattributes${SQ}" >expect &&
++	test_cmp expect err
++'
++
+ test_done

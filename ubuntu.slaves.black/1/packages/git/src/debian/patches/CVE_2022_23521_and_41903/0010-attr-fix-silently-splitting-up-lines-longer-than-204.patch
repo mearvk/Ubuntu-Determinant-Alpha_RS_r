@@ -1,0 +1,87 @@
+From d74b1fd54fdbc45966d12ea907dece11e072fb2b Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 1 Dec 2022 15:45:44 +0100
+Subject: [PATCH 10/25] attr: fix silently splitting up lines longer than 2048
+ bytes
+
+When reading attributes from a file we use fgets(3P) with a buffer size
+of 2048 bytes. This means that as soon as a line exceeds the buffer size
+we split it up into multiple parts and parse each of them as a separate
+pattern line. This is of course not what the user intended, and even
+worse the behaviour is inconsistent with how we read attributes from the
+index.
+
+Fix this bug by converting the code to use `strbuf_getline()` instead.
+This will indeed read in the whole line, which may theoretically lead to
+an out-of-memory situation when the gitattributes file is huge. We're
+about to reject any gitattributes files larger than 100MB in the next
+commit though, which makes this less of a concern.
+
+Signed-off-by: Patrick Steinhardt <ps@pks.im>
+Signed-off-by: Junio C Hamano <gitster@pobox.com>
+Index: git-2.34.1/attr.c
+===================================================================
+--- git-2.34.1.orig/attr.c
++++ git-2.34.1/attr.c
+@@ -705,10 +705,10 @@ void git_attr_set_direction(enum git_att
+ 
+ static struct attr_stack *read_attr_from_file(const char *path, unsigned flags)
+ {
++	struct strbuf buf = STRBUF_INIT;
+ 	int fd;
+ 	FILE *fp;
+ 	struct attr_stack *res;
+-	char buf[2048];
+ 	int lineno = 0;
+ 
+ 	if (flags & READ_ATTR_NOFOLLOW)
+@@ -723,13 +723,14 @@ static struct attr_stack *read_attr_from
+ 	fp = xfdopen(fd, "r");
+ 
+ 	CALLOC_ARRAY(res, 1);
+-	while (fgets(buf, sizeof(buf), fp)) {
+-		char *bufp = buf;
+-		if (!lineno)
+-			skip_utf8_bom(&bufp, strlen(bufp));
+-		handle_attr_line(res, bufp, path, ++lineno, flags);
++	while (strbuf_getline(&buf, fp) != EOF) {
++		if (!lineno && starts_with(buf.buf, utf8_bom))
++			strbuf_remove(&buf, 0, strlen(utf8_bom));
++		handle_attr_line(res, buf.buf, path, ++lineno, macro_ok);
+ 	}
++
+ 	fclose(fp);
++	strbuf_release(&buf);
+ 	return res;
+ }
+ 
+Index: git-2.34.1/t/t0003-attributes.sh
+===================================================================
+--- git-2.34.1.orig/t/t0003-attributes.sh
++++ git-2.34.1/t/t0003-attributes.sh
+@@ -370,4 +370,25 @@ test_expect_success SYMLINKS 'symlinks n
+ 	test_i18ngrep "unable to access.*gitattributes" err
+ '
+ 
++test_expect_success 'large attributes line ignores trailing content in tree' '
++	test_when_finished "rm .gitattributes" &&
++	# older versions of Git broke lines at 2048 bytes; the 2045 bytes
++	# of 0-padding here is accounting for the three bytes of "a 1", which
++	# would knock "trailing" to the "next" line, where it would be
++	# erroneously parsed.
++	printf "a %02045dtrailing attribute\n" 1 >.gitattributes &&
++	git check-attr --all trailing >actual 2>err &&
++	test_must_be_empty err &&
++	test_must_be_empty actual
++'
++
++test_expect_success 'large attributes line ignores trailing content in index' '
++	test_when_finished "git update-index --remove .gitattributes" &&
++	blob=$(printf "a %02045dtrailing attribute\n" 1 | git hash-object -w --stdin) &&
++	git update-index --add --cacheinfo 100644,$blob,.gitattributes &&
++	git check-attr --cached --all trailing >actual 2>err &&
++	test_must_be_empty err &&
++	test_must_be_empty actual
++'
++
+ test_done
