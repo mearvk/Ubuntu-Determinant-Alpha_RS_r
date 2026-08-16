@@ -1,0 +1,262 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>ProgressBar</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-misc-widgets.html" title="Chapter 7. Miscellaneous Widgets">
+<link rel="prev" href="sec-spinbutton.html" title="SpinButton">
+<link rel="next" href="sec-infobar.html" title="InfoBar">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">ProgressBar</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-spinbutton.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 7. Miscellaneous Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-infobar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-progressbar"></a>ProgressBar</h2></div></div></div>
+<p>
+Progress bars are used to show the status of an ongoing operation. For
+instance, a <code class="classname">ProgressBar</code> can show how much of a task has
+been completed.
+</p>
+<p>
+To change the value shown, use the <code class="methodname">set_fraction()</code> method,
+passing a <span class="type">double</span> between 0.0 and 1.0 to provide the new percentage.
+</p>
+<p>
+A <code class="classname">ProgressBar</code> is horizontal and left-to-right by default,
+but you can change it to a vertical progress bar by using the
+<code class="methodname">set_orientation()</code> method.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1ProgressBar.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="progressbar-activity-mode"></a>Activity Mode</h3></div></div></div>
+<p>
+Besides indicating the amount of progress that has occured, the
+progress bar can also be used to indicate that there is some activity;
+this is done by placing the progress bar in <span class="emphasis"><em>activity mode</em></span>. In
+this mode, the progress bar displays a small rectangle which moves
+back and forth. Activity mode is useful in situations where the
+progress of an operation cannot be calculated as a value range (e.g.,
+receiving a file of unknown length).
+</p>
+<p>
+To do this, you need to call the <code class="methodname">pulse()</code> method at regular
+intervals. You can also choose the step size, with the
+<code class="methodname">set_pulse_step()</code> method.
+</p>
+<p>
+The progress bar can also display a configurable text
+string within its trough, using the <code class="methodname">set_text()</code> method.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="progressbar-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-progressbar"></a><p class="title"><b>Figure 7.7. ProgressBar</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/progressbar.png" alt="ProgressBar"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/progressbar?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_checkbutton_text();
+  void on_checkbutton_activity();
+  void on_checkbutton_inverted();
+
+  bool on_timeout();
+  void on_button_close();
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::Grid m_Grid;
+  Gtk::ProgressBar m_ProgressBar;
+  Gtk::Separator m_Separator;
+  Gtk::CheckButton m_CheckButton_Text, m_CheckButton_Activity, m_CheckButton_Inverted;
+  Gtk::Button m_Button_Close;
+
+  sigc::connection m_connection_timeout;
+  bool m_bActivityMode;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL, 5),
+  m_CheckButton_Text("Show text"),
+  m_CheckButton_Activity("Activity mode"),
+  m_CheckButton_Inverted("Right to Left"),
+  m_Button_Close("Close"),
+  m_bActivityMode(false)
+{
+  set_resizable();
+  set_title("Gtk::ProgressBar");
+
+  m_VBox.set_border_width(10);
+  add(m_VBox);
+
+  m_VBox.pack_start(m_ProgressBar, Gtk::PACK_SHRINK, 5);
+  m_ProgressBar.set_halign(Gtk::ALIGN_CENTER);
+  m_ProgressBar.set_valign(Gtk::ALIGN_CENTER);
+  m_ProgressBar.set_text("some text");
+  m_ProgressBar.set_show_text(false);
+
+  //Add a timer callback to update the value of the progress bar:
+  m_connection_timeout = Glib::signal_timeout().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_timeout), 50 );
+
+  m_VBox.pack_start(m_Separator, Gtk::PACK_SHRINK);
+  m_VBox.pack_start(m_Grid);
+  m_Grid.set_row_homogeneous(true);
+
+  //Add a check button to select displaying of the trough text:
+  m_Grid.attach(m_CheckButton_Text, 0, 0, 1, 1);
+  m_CheckButton_Text.property_margin() = 5;
+  m_CheckButton_Text.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_checkbutton_text) );
+
+  //Add a check button to toggle activity mode:
+  m_Grid.attach(m_CheckButton_Activity, 0, 1, 1, 1);
+  m_CheckButton_Activity.property_margin() = 5;
+  m_CheckButton_Activity.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_checkbutton_activity) );
+
+  //Add a check button to select growth from left to right or from right to left:
+  m_Grid.attach(m_CheckButton_Inverted, 0, 2, 1, 1);
+  m_CheckButton_Inverted.property_margin() = 5;
+  m_CheckButton_Inverted.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_checkbutton_inverted) );
+
+  //Add a button to exit the program.
+  m_VBox.pack_start(m_Button_Close, Gtk::PACK_SHRINK);
+  m_Button_Close.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_close) );
+  m_Button_Close.set_can_default();
+  m_Button_Close.grab_default();
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_checkbutton_text()
+{
+  const bool show_text = m_CheckButton_Text.get_active();
+  m_ProgressBar.set_show_text(show_text);
+}
+
+void ExampleWindow::on_checkbutton_activity()
+{
+  m_bActivityMode = m_CheckButton_Activity.get_active();
+
+  if(m_bActivityMode)
+    m_ProgressBar.pulse();
+  else
+    m_ProgressBar.set_fraction(0.0);
+}
+
+void ExampleWindow::on_checkbutton_inverted()
+{
+  const bool inverted = m_CheckButton_Inverted.get_active();
+  m_ProgressBar.set_inverted(inverted);
+}
+
+void ExampleWindow::on_button_close()
+{
+  hide();
+}
+
+/* Update the value of the progress bar so that we get
+ * some movement */
+bool ExampleWindow::on_timeout()
+{
+  if(m_bActivityMode)
+    m_ProgressBar.pulse();
+  else
+  {
+    double new_val = m_ProgressBar.get_fraction() + 0.01;
+
+    if(new_val &gt; 1.0)
+      new_val = 0.0;
+
+    //Set the new value:
+    m_ProgressBar.set_fraction(new_val);
+  }
+
+  //As this is a timeout function, return true so that it
+  //continues to get called
+  return true;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-spinbutton.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-misc-widgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-infobar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">SpinButton </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> InfoBar</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

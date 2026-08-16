@@ -1,0 +1,1224 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Examples</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-treeview.html" title="Chapter 9. The TreeView widget">
+<link rel="prev" href="sec-treeview-contextmenu.html" title="Popup Context Menu">
+<link rel="next" href="chapter-combobox.html" title="Chapter 10. Combo Boxes">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Examples</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-treeview-contextmenu.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 9. The TreeView widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-combobox.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-treeview-examples"></a>Examples</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="liststore-example"></a>ListStore</h3></div></div></div>
+<p>
+This example has a <code class="classname">Gtk::TreeView</code> widget, with a
+<code class="classname">Gtk::ListStore</code> model.
+</p>
+<div class="figure">
+<a name="figure-treeview-liststore"></a><p class="title"><b>Figure 9.3. TreeView - ListStore</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_list.png" alt="TreeView - ListStore"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/treeview/list/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); add(m_col_number); add(m_col_percentage);}
+
+    Gtk::TreeModelColumn&lt;unsigned int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+    Gtk::TreeModelColumn&lt;short&gt; m_col_number;
+    Gtk::TreeModelColumn&lt;int&gt; m_col_percentage;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TreeView m_TreeView;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("Quit")
+{
+  set_title("Gtk::TreeView (ListStore) example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TreeView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  //Create the Tree model:
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  m_TreeView.set_model(m_refTreeModel);
+
+  //Fill the TreeView's model
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 1;
+  row[m_Columns.m_col_name] = "Billy Bob";
+  row[m_Columns.m_col_number] = 10;
+  row[m_Columns.m_col_percentage] = 15;
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 2;
+  row[m_Columns.m_col_name] = "Joey Jojo";
+  row[m_Columns.m_col_number] = 20;
+  row[m_Columns.m_col_percentage] = 40;
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 3;
+  row[m_Columns.m_col_name] = "Rob McRoberts";
+  row[m_Columns.m_col_number] = 30;
+  row[m_Columns.m_col_percentage] = 70;
+
+  //Add the TreeView's view columns:
+  //This number will be shown with the default numeric formatting.
+  m_TreeView.append_column("ID", m_Columns.m_col_id);
+  m_TreeView.append_column("Name", m_Columns.m_col_name);
+
+  m_TreeView.append_column_numeric("Formatted number", m_Columns.m_col_number,
+          "%010d" /* 10 digits, using leading zeroes. */);
+
+  //Display a progress bar instead of a decimal number:
+  auto cell = Gtk::make_managed&lt;Gtk::CellRendererProgress&gt;();
+  int cols_count = m_TreeView.append_column("Some percentage", *cell);
+  auto pColumn = m_TreeView.get_column(cols_count - 1);
+  if(pColumn)
+  {
+    pColumn-&gt;add_attribute(cell-&gt;property_value(), m_Columns.m_col_percentage);
+  }
+
+  //Make all the columns reorderable:
+  //This is not necessary, but it's nice to show the feature.
+  //You can use TreeView::set_column_drag_function() to more
+  //finely control column drag and drop.
+  for(guint i = 0; i &lt; 2; i++)
+  {
+    auto column = m_TreeView.get_column(i);
+    column-&gt;set_reorderable();
+  }
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treestore-example"></a>TreeStore</h3></div></div></div>
+<p>
+This example is very similar to the <code class="classname">ListStore</code> example,
+but uses a <code class="classname">Gtk::TreeStore</code> model instead, and adds
+children to the rows.
+</p>
+<div class="figure">
+<a name="figure-treeview-treestore"></a><p class="title"><b>Figure 9.4. TreeView - TreeStore</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_tree.png" alt="TreeView - TreeStore"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/treeview/tree/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+  void on_treeview_row_activated(const Gtk::TreeModel::Path&amp; path, Gtk::TreeViewColumn* column);
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); }
+
+    Gtk::TreeModelColumn&lt;int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TreeView m_TreeView;
+  Glib::RefPtr&lt;Gtk::TreeStore&gt; m_refTreeModel;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("Quit")
+{
+  set_title("Gtk::TreeView (TreeStore) example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TreeView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  //Create the Tree model:
+  m_refTreeModel = Gtk::TreeStore::create(m_Columns);
+  m_TreeView.set_model(m_refTreeModel);
+
+  //All the items to be reordered with drag-and-drop:
+  m_TreeView.set_reorderable();
+
+  //Fill the TreeView's model
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 1;
+  row[m_Columns.m_col_name] = "Billy Bob";
+
+  Gtk::TreeModel::Row childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 11;
+  childrow[m_Columns.m_col_name] = "Billy Bob Junior";
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 12;
+  childrow[m_Columns.m_col_name] = "Sue Bob";
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 2;
+  row[m_Columns.m_col_name] = "Joey Jojo";
+
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 3;
+  row[m_Columns.m_col_name] = "Rob McRoberts";
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 31;
+  childrow[m_Columns.m_col_name] = "Xavier McRoberts";
+
+  //Add the TreeView's view columns:
+  m_TreeView.append_column("ID", m_Columns.m_col_id);
+  m_TreeView.append_column("Name", m_Columns.m_col_name);
+
+  //Connect signal:
+  m_TreeView.signal_row_activated().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_treeview_row_activated) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void ExampleWindow::on_treeview_row_activated(const Gtk::TreeModel::Path&amp; path,
+        Gtk::TreeViewColumn* /* column */)
+{
+  Gtk::TreeModel::iterator iter = m_refTreeModel-&gt;get_iter(path);
+  if(iter)
+  {
+    Gtk::TreeModel::Row row = *iter;
+    std::cout &lt;&lt; "Row activated: ID=" &lt;&lt; row[m_Columns.m_col_id] &lt;&lt; ", Name="
+        &lt;&lt; row[m_Columns.m_col_name] &lt;&lt; std::endl;
+  }
+}
+
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-editable-cells-example"></a>Editable Cells</h3></div></div></div>
+<p>
+This example is identical to the <code class="classname">ListStore</code> example, but
+it uses <code class="methodname">TreeView::append_column_editable()</code> instead of
+<code class="methodname">TreeView::append_column()</code>.
+</p>
+<div class="figure">
+<a name="figure-treeview-editablecells"></a><p class="title"><b>Figure 9.5. TreeView - Editable Cells</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_editablecells.png" alt="TreeView - Editable Cells"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/treeview/editable_cells/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+  void treeviewcolumn_validated_on_cell_data(Gtk::CellRenderer* renderer, const Gtk::TreeModel::iterator&amp; iter);
+  void cellrenderer_validated_on_editing_started(Gtk::CellEditable* cell_editable, const Glib::ustring&amp; path);
+  void cellrenderer_validated_on_edited(const Glib::ustring&amp; path_string, const Glib::ustring&amp; new_text);
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); add(m_col_foo); add(m_col_number); add(m_col_number_validated); }
+
+    Gtk::TreeModelColumn&lt;unsigned int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+    Gtk::TreeModelColumn&lt;bool&gt; m_col_foo;
+    Gtk::TreeModelColumn&lt;int&gt; m_col_number;
+    Gtk::TreeModelColumn&lt;int&gt; m_col_number_validated;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TreeView m_TreeView;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+
+  //For the validated column:
+  //You could also use a CellRendererSpin or a CellRendererProgress:
+  Gtk::CellRendererText m_cellrenderer_validated;
+  Gtk::TreeView::Column m_treeviewcolumn_validated;
+  bool m_validate_retry;
+  Glib::ustring m_invalid_text_for_retry;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include &lt;cstdio&gt;
+#include &lt;cstdlib&gt;
+#include "examplewindow.h"
+
+using std::sprintf;
+using std::strtol;
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("Quit"),
+  m_validate_retry(false)
+{
+  set_title("Gtk::TreeView Editable Cells example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TreeView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  //Create the Tree model:
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  m_TreeView.set_model(m_refTreeModel);
+
+  //Fill the TreeView's model
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 1;
+  row[m_Columns.m_col_name] = "Billy Bob";
+  row[m_Columns.m_col_foo] = true;
+  row[m_Columns.m_col_number] = 10;
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 2;
+  row[m_Columns.m_col_name] = "Joey Jojo";
+  row[m_Columns.m_col_foo] = true;
+  row[m_Columns.m_col_number] = 20;
+
+  row = *(m_refTreeModel-&gt;append());
+
+  row[m_Columns.m_col_id] = 3;
+  row[m_Columns.m_col_name] = "Rob McRoberts";
+  row[m_Columns.m_col_foo] = false;
+  row[m_Columns.m_col_number] = 30;
+
+  //Add the TreeView's view columns:
+  //We use the *_editable convenience methods for most of these,
+  //because the default functionality is enough:
+  m_TreeView.append_column_editable("ID", m_Columns.m_col_id);
+  m_TreeView.append_column_editable("Name", m_Columns.m_col_name);
+  m_TreeView.append_column_editable("foo", m_Columns.m_col_foo);
+  m_TreeView.append_column_numeric_editable("foo", m_Columns.m_col_number,
+          "%010d");
+
+
+  //For this column, we create the CellRenderer ourselves, and connect our own
+  //signal handlers, so that we can validate the data that the user enters, and
+  //control how it is displayed.
+  m_treeviewcolumn_validated.set_title("validated (&lt;10)");
+  m_treeviewcolumn_validated.pack_start(m_cellrenderer_validated);
+  m_TreeView.append_column(m_treeviewcolumn_validated);
+
+  //Tell the view column how to render the model values:
+  m_treeviewcolumn_validated.set_cell_data_func(m_cellrenderer_validated,
+          sigc::mem_fun(*this,
+              &amp;ExampleWindow::treeviewcolumn_validated_on_cell_data) );
+
+  //Make the CellRenderer editable, and handle its editing signals:
+  m_cellrenderer_validated.property_editable() = true;
+
+  m_cellrenderer_validated.signal_editing_started().connect(
+          sigc::mem_fun(*this,
+        &amp;ExampleWindow::cellrenderer_validated_on_editing_started) );
+
+  m_cellrenderer_validated.signal_edited().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::cellrenderer_validated_on_edited) );
+
+  //If this was a CellRendererSpin then you would have to set the adjustment:
+  //m_cellrenderer_validated.property_adjustment() = m_spin_adjustment;
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void ExampleWindow::treeviewcolumn_validated_on_cell_data(
+        Gtk::CellRenderer* /* renderer */,
+        const Gtk::TreeModel::iterator&amp; iter)
+{
+  //Get the value from the model and show it appropriately in the view:
+  if(iter)
+  {
+    Gtk::TreeModel::Row row = *iter;
+    int model_value = row[m_Columns.m_col_number_validated];
+
+    //This is just an example.
+    //In this case, it would be easier to use append_column_editable() or
+    //append_column_numeric_editable()
+    char buffer[32];
+    sprintf(buffer, "%d", model_value);
+
+    Glib::ustring view_text = buffer;
+    m_cellrenderer_validated.property_text() = view_text;
+  }
+}
+
+void ExampleWindow::cellrenderer_validated_on_editing_started(
+        Gtk::CellEditable* cell_editable, const Glib::ustring&amp; /* path */)
+{
+  //Start editing with previously-entered (but invalid) text,
+  //if we are allowing the user to correct some invalid data.
+  if(m_validate_retry)
+  {
+    //This is the CellEditable inside the CellRenderer.
+    auto celleditable_validated = cell_editable;
+
+    //It's usually an Entry, at least for a CellRendererText:
+    auto pEntry = dynamic_cast&lt;Gtk::Entry*&gt;(celleditable_validated);
+    if(pEntry)
+    {
+      pEntry-&gt;set_text(m_invalid_text_for_retry);
+      m_validate_retry = false;
+      m_invalid_text_for_retry.clear();
+    }
+  }
+
+}
+
+void ExampleWindow::cellrenderer_validated_on_edited(
+        const Glib::ustring&amp; path_string,
+        const Glib::ustring&amp; new_text)
+{
+  Gtk::TreePath path(path_string);
+
+  //Convert the inputed text to an integer, as needed by our model column:
+  char* pchEnd = nullptr;
+  int new_value = strtol(new_text.c_str(), &amp;pchEnd, 10);
+
+  if(new_value &gt; 10)
+  {
+    //Prevent entry of numbers higher than 10.
+
+    //Tell the user:
+    Gtk::MessageDialog dialog(*this,
+            "The number must be less than 10. Please try again.",
+            false, Gtk::MESSAGE_ERROR);
+    dialog.run();
+
+    //Start editing again, with the bad text, so that the user can correct it.
+    //A real application should probably allow the user to revert to the
+    //previous text.
+
+    //Set the text to be used in the start_editing signal handler:
+    m_invalid_text_for_retry = new_text;
+    m_validate_retry = true;
+
+    //Start editing again:
+    m_TreeView.set_cursor(path, m_treeviewcolumn_validated,
+            m_cellrenderer_validated, true /* start_editing */);
+  }
+  else
+  {
+    //Get the row from the path:
+    Gtk::TreeModel::iterator iter = m_refTreeModel-&gt;get_iter(path);
+    if(iter)
+    {
+      Gtk::TreeModel::Row row = *iter;
+
+      //Put the new value in the model:
+      row[m_Columns.m_col_number_validated] = new_value;
+    }
+  }
+}
+
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-dnd-example"></a>Drag and Drop</h3></div></div></div>
+<p>
+This example is much like the <code class="classname">TreeStore</code> example, but has
+2 extra columns to indicate whether the row can be dragged, and whether it can
+receive drag-and-dropped rows. It uses a derived
+<code class="classname">Gtk::TreeStore</code> which overrides the virtual functions as
+described in the <a class="link" href="sec-treeview-draganddrop.html" title="Drag and Drop">TreeView Drag and
+    Drop</a> section.
+</p>
+<div class="figure">
+<a name="figure-treeview-draganddrop"></a><p class="title"><b>Figure 9.6. TreeView - Drag And Drop</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_draganddrop.png" alt="TreeView - Drag And Drop"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/treeview/drag_and_drop/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "treemodel_dnd.h"
+
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TreeView m_TreeView;
+  Glib::RefPtr&lt;TreeModel_Dnd&gt; m_refTreeModel;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">treemodel_dnd.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_TREEMODEL_DND_H
+#define GTKMM_EXAMPLE_TREEMODEL_DND_H
+
+#include &lt;gtkmm.h&gt;
+
+class TreeModel_Dnd : public Gtk::TreeStore
+{
+protected:
+  TreeModel_Dnd();
+
+public:
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); add(m_col_draggable); add(m_col_receivesdrags); }
+
+    Gtk::TreeModelColumn&lt;int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+    Gtk::TreeModelColumn&lt;bool&gt; m_col_draggable;
+    Gtk::TreeModelColumn&lt;bool&gt; m_col_receivesdrags;
+  };
+
+  ModelColumns m_Columns;
+
+  static Glib::RefPtr&lt;TreeModel_Dnd&gt; create();
+
+protected:
+  //Overridden virtual functions:
+  bool row_draggable_vfunc(const Gtk::TreeModel::Path&amp; path) const override;
+  bool row_drop_possible_vfunc(const Gtk::TreeModel::Path&amp; dest, const Gtk::SelectionData&amp; selection_data) const override;
+
+};
+
+#endif //GTKMM_EXAMPLE_TREEMODEL_DND_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">treemodel_dnd.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "treemodel_dnd.h"
+#include &lt;iostream&gt;
+
+TreeModel_Dnd::TreeModel_Dnd()
+{
+  //We can't just call Gtk::TreeModel(m_Columns) in the initializer list
+  //because m_Columns does not exist when the base class constructor runs.
+  //And we can't have a static m_Columns instance, because that would be
+  //instantiated before the gtkmm type system.
+  //So, we use this method, which should only be used just after creation:
+  set_column_types(m_Columns);
+}
+
+Glib::RefPtr&lt;TreeModel_Dnd&gt; TreeModel_Dnd::create()
+{
+  return Glib::RefPtr&lt;TreeModel_Dnd&gt;( new TreeModel_Dnd() );
+}
+
+bool
+TreeModel_Dnd::row_draggable_vfunc(const Gtk::TreeModel::Path&amp; path) const
+{
+  // Make the value of the "draggable" column determine whether this row can
+  // be dragged:
+
+  //TODO: Add a const version of get_iter to TreeModel:
+  auto unconstThis = const_cast&lt;TreeModel_Dnd*&gt;(this);
+  const_iterator iter = unconstThis-&gt;get_iter(path);
+  //const_iterator iter = get_iter(path);
+  if(iter)
+  {
+    Row row = *iter;
+    bool is_draggable = row[m_Columns.m_col_draggable];
+    return is_draggable;
+  }
+
+  return Gtk::TreeStore::row_draggable_vfunc(path);
+}
+
+bool
+TreeModel_Dnd::row_drop_possible_vfunc(const Gtk::TreeModel::Path&amp; dest,
+        const Gtk::SelectionData&amp; selection_data) const
+{
+  //Make the value of the "receives drags" column determine whether a row can be
+  //dragged into it:
+
+  //dest is the path that the row would have after it has been dropped:
+  //But in this case we are more interested in the parent row:
+  Gtk::TreeModel::Path dest_parent = dest;
+  bool dest_is_not_top_level = dest_parent.up();
+  if(!dest_is_not_top_level || dest_parent.empty())
+  {
+    //The user wants to move something to the top-level.
+    //Let's always allow that.
+  }
+  else
+  {
+    //Get an iterator for the row at this path:
+    //We must unconst this. This should not be necessary with a future version
+    //of gtkmm.
+    //TODO: Add a const version of get_iter to TreeModel:
+    auto unconstThis = const_cast&lt;TreeModel_Dnd*&gt;(this);
+    const_iterator iter_dest_parent = unconstThis-&gt;get_iter(dest_parent);
+    //const_iterator iter_dest_parent = get_iter(dest);
+    if(iter_dest_parent)
+    {
+      Row row = *iter_dest_parent;
+      bool receives_drags = row[m_Columns.m_col_receivesdrags];
+      return receives_drags;
+    }
+  }
+
+  //You could also examine the row being dragged (via selection_data)
+  //if you must look at both rows to see whether a drop should be allowed.
+  //You could use
+  //TODO: Add const version of get_from_selection_data(): Glib::RefPtr&lt;const
+  //Gtk::TreeModel&gt; refThis = Glib::RefPtr&lt;const Gtk::TreeModel&gt;(this);
+  //
+  //auto refThis =
+  //Glib::RefPtr&lt;Gtk::TreeModel&gt;(const_cast&lt;TreeModel_Dnd*&gt;(this));
+  //refThis-&gt;reference(); //, true /* take_copy */)
+  //Gtk::TreeModel::Path path_dragged_row;
+  //Gtk::TreeModel::Path::get_from_selection_data(selection_data, refThis,
+  //path_dragged_row);
+
+  return Gtk::TreeStore::row_drop_possible_vfunc(dest, selection_data);
+}
+
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("_Quit", true)
+{
+  set_title("Gtk::TreeView (Drag and Drop) example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TreeView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  //Create the Tree model:
+  //Use our derived model, which overrides some Gtk::TreeDragDest and
+  //Gtk::TreeDragSource virtual functions:
+  //The columns are declared in the overridden TreeModel.
+  m_refTreeModel = TreeModel_Dnd::create();
+  m_TreeView.set_model(m_refTreeModel);
+
+  //Enable Drag-and-Drop of TreeView rows:
+  //See also the derived TreeModel's *_vfunc overrides.
+  m_TreeView.enable_model_drag_source();
+  m_TreeView.enable_model_drag_dest();
+
+  //Fill the TreeView's model
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_refTreeModel-&gt;m_Columns.m_col_id] = 1;
+  row[m_refTreeModel-&gt;m_Columns.m_col_name] = "Billy Bob";
+  row[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  row[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  Gtk::TreeModel::Row childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_id] = 11;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_name] = "Billy Bob Junior";
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_id] = 12;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_name] = "Sue Bob";
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_refTreeModel-&gt;m_Columns.m_col_id] = 2;
+  row[m_refTreeModel-&gt;m_Columns.m_col_name] = "Joey Jojo";
+  row[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  row[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_refTreeModel-&gt;m_Columns.m_col_id] = 3;
+  row[m_refTreeModel-&gt;m_Columns.m_col_name] = "Rob McRoberts";
+  row[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  row[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_id] = 31;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_name] = "Xavier McRoberts";
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_draggable] = true;
+  childrow[m_refTreeModel-&gt;m_Columns.m_col_receivesdrags] = true;
+
+  //Add the TreeView's view columns:
+  m_TreeView.append_column("ID", m_refTreeModel-&gt;m_Columns.m_col_id);
+  m_TreeView.append_column("Name", m_refTreeModel-&gt;m_Columns.m_col_name);
+  m_TreeView.append_column_editable("Draggable",
+          m_refTreeModel-&gt;m_Columns.m_col_draggable);
+  m_TreeView.append_column_editable("Receives Drags",
+          m_refTreeModel-&gt;m_Columns.m_col_receivesdrags);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-popup-menu-example"></a>Popup Context Menu</h3></div></div></div>
+<p>
+This example is much like the <code class="classname">ListStore</code> example, but
+derives a custom <code class="classname">TreeView</code> in order to override the
+<code class="literal">button_press_event</code>, and also to encapsulate the tree model
+code in our derived class. See the <a class="link" href="sec-treeview-contextmenu.html" title="Popup Context Menu">TreeView Popup Context Menu</a>
+section.
+</p>
+<div class="figure">
+<a name="figure-treeview-popup"></a><p class="title"><b>Figure 9.7. TreeView - Popup Context Menu</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_popup.png" alt="TreeView - Popup Context Menu"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/treeview/popup/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "treeview_withpopup.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  TreeView_WithPopup m_TreeView;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">treeview_withpopup.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_TREEVIEW_WITHPOPUP_H
+#define GTKMM_EXAMPLE_TREEVIEW_WITHPOPUP_H
+
+#include &lt;gtkmm.h&gt;
+
+class TreeView_WithPopup : public Gtk::TreeView
+{
+public:
+  TreeView_WithPopup();
+  virtual ~TreeView_WithPopup();
+
+protected:
+  // Override Signal handler:
+  // Alternatively, use signal_button_press_event().connect_notify()
+  bool on_button_press_event(GdkEventButton* button_event) override;
+
+  //Signal handler for popup menu items:
+  void on_menu_file_popup_generic();
+
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); }
+
+    Gtk::TreeModelColumn&lt;unsigned int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+  };
+
+  ModelColumns m_Columns;
+
+  //The Tree model:
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+
+  Gtk::Menu m_Menu_Popup;
+};
+
+#endif //GTKMM_EXAMPLE_TREEVIEW_WITHPOPUP_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">treeview_withpopup.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "treeview_withpopup.h"
+#include &lt;iostream&gt;
+
+TreeView_WithPopup::TreeView_WithPopup()
+{
+  //Create the Tree model:
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  set_model(m_refTreeModel);
+
+  //Fill the TreeView's model
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 1;
+  row[m_Columns.m_col_name] = "right-click on this";
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 2;
+  row[m_Columns.m_col_name] = "or this";
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 3;
+  row[m_Columns.m_col_name] = "or this, for a popup context menu";
+
+  //Add the TreeView's view columns:
+  append_column("ID", m_Columns.m_col_id);
+  append_column("Name", m_Columns.m_col_name);
+
+  //Fill popup menu:
+  auto item = Gtk::make_managed&lt;Gtk::MenuItem&gt;("_Edit", true);
+  item-&gt;signal_activate().connect(
+    sigc::mem_fun(*this, &amp;TreeView_WithPopup::on_menu_file_popup_generic) );
+  m_Menu_Popup.append(*item);
+
+  item = Gtk::make_managed&lt;Gtk::MenuItem&gt;("_Process", true);
+  item-&gt;signal_activate().connect(
+    sigc::mem_fun(*this, &amp;TreeView_WithPopup::on_menu_file_popup_generic) );
+  m_Menu_Popup.append(*item);
+
+  item = Gtk::make_managed&lt;Gtk::MenuItem&gt;("_Remove", true);
+  item-&gt;signal_activate().connect(
+    sigc::mem_fun(*this, &amp;TreeView_WithPopup::on_menu_file_popup_generic) );
+  m_Menu_Popup.append(*item);
+
+  m_Menu_Popup.accelerate(*this);
+  m_Menu_Popup.show_all(); //Show all menu items when the menu pops up
+}
+
+TreeView_WithPopup::~TreeView_WithPopup()
+{
+}
+
+bool TreeView_WithPopup::on_button_press_event(GdkEventButton* button_event)
+{
+  bool return_value = false;
+
+  //Call base class, to allow normal handling,
+  //such as allowing the row to be selected by the right-click:
+  return_value = TreeView::on_button_press_event(button_event);
+
+  //Then do our custom stuff:
+  if( (button_event-&gt;type == GDK_BUTTON_PRESS) &amp;&amp; (button_event-&gt;button == 3) )
+  {
+    m_Menu_Popup.popup_at_pointer((GdkEvent*)button_event);
+
+    // Menu::popup_at_pointer() is new in gtkmm 3.22.
+    // If you have an older revision, try this:
+    //m_Menu_Popup.popup(button_event-&gt;button, button_event-&gt;time);
+  }
+
+  return return_value;
+}
+
+void TreeView_WithPopup::on_menu_file_popup_generic()
+{
+  std::cout &lt;&lt; "A popup menu item was selected." &lt;&lt; std::endl;
+
+  auto refSelection = get_selection();
+  if(refSelection)
+  {
+    Gtk::TreeModel::iterator iter = refSelection-&gt;get_selected();
+    if(iter)
+    {
+      int id = (*iter)[m_Columns.m_col_id];
+      std::cout &lt;&lt; "  Selected ID=" &lt;&lt; id &lt;&lt; std::endl;
+    }
+  }
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("Quit")
+{
+  set_title("Gtk::TreeView (ListStore) example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TreeView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-treeview-contextmenu.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-treeview.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-combobox.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Popup Context Menu </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 10. Combo Boxes</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

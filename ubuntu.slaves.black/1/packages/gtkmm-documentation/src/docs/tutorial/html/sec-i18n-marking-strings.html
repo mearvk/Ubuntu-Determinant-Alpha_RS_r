@@ -1,0 +1,195 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Marking strings for translation</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-internationalization.html" title="Chapter 27. Internationalization and Localization">
+<link rel="prev" href="chapter-internationalization.html" title="Chapter 27. Internationalization and Localization">
+<link rel="next" href="sec-i18n-expecting-utf8.html" title="Expecting UTF8">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Marking strings for translation</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-internationalization.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 27. Internationalization and Localization</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-i18n-expecting-utf8.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-i18n-marking-strings"></a>Marking strings for translation</h2></div></div></div>
+<p>
+    String literals should be typed in the source code in English, but
+    they should be surrounded by a call to the <code class="function">gettext()</code>
+    function. These strings will be extracted for translation and the
+    translations may be used at runtime instead of the original English
+    strings.
+  </p>
+<p>
+    The <span class="application">GNU gettext</span> package allows you to mark
+    strings in source code, extract those strings for translation, and use
+    the translated strings in your application.
+  </p>
+<p>
+    However, <span class="application">Glib</span> defines
+    <code class="function">gettext()</code>
+    support macros which are shorter wrappers in an easy-to-use form.
+    To use these macros, include <code class="literal">&lt;glibmm/i18n.h&gt;</code>,
+    and then, for example, substitute:
+    </p>
+<pre class="programlisting">display_message("Getting ready for i18n.");</pre>
+<p>
+    with:
+    </p>
+<pre class="programlisting">display_message(_("Getting ready for i18n."));</pre>
+<p>
+  </p>
+<p>
+    For reference, it is possible to generate a file which contains all
+    strings which appear in your code, even if they are not marked for translation,
+    together with file name and line
+    number references. To generate such a file named
+    <code class="literal">my-strings</code>, execute the following command,
+    within the source code directory:
+
+    </p>
+<pre class="programlisting">xgettext -a -o my-strings --omit-header *.cc *.h</pre>
+<p>
+  </p>
+<p>
+    Finally, to let your program use the translation for the current locale,
+    add this code to the beginning of your <code class="filename">main.cc</code> file, to initialize gettext.
+
+</p>
+<pre class="programlisting">bindtextdomain(GETTEXT_PACKAGE, PROGRAMNAME_LOCALEDIR);
+bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
+textdomain(GETTEXT_PACKAGE);</pre>
+<p>
+  </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-i18n-gettext"></a>How gettext works</h3></div></div></div>
+<p>
+      <span class="application">intltool</span> /
+      <span class="application">xgettext</span> script extracts the strings
+      and puts them in a <code class="filename">mypackage.pot</code> file.
+      The translators of your application create their translations by
+      first copying this <code class="filename">.pot</code> file to a
+      <code class="filename">localename.po</code> file. A locale identifies a
+      language and an encoding for that language, including date and numerical
+      formats. Later, when the text in your source code has changed, the
+      <code class="literal">msmerge</code> script is used to update the
+      <code class="filename">localename.po</code> files from the regenerated
+      <code class="filename">.pot</code> file.
+    </p>
+<p>
+      At install time, the <code class="filename">.po</code> files are converted to
+      a binary format (with the extension <code class="filename">.mo</code>) and
+      placed in a system-wide directory for locale files, for example
+      <code class="filename">/usr/share/locale/</code>.
+    </p>
+<p>
+      When the application runs, the <span class="application">gettext</span>
+      library checks the system-wide directory to see if there is a
+      <code class="filename">.mo</code> file for the user's locale environment
+      (you can set the locale with, for instance, "export LANG=de_DE.UTF-8"
+      from a bash console). Later, when the program reaches a
+      <code class="literal">gettext</code> call, it looks for a translation of a
+      particular string. If none is found, the original string is used.
+    </p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-i18n-testing"></a>Testing and adding translations</h3></div></div></div>
+<p>
+      To convince yourself that you've done well, you may wish to add a
+      translation for a new locale. In order to do that, go to the
+      <code class="filename">po</code> subdirectory of your project and
+      execute the following command:
+      </p>
+<pre class="programlisting">intltool-update --pot</pre>
+<p>
+    </p>
+<p>
+      That will create a file named <code class="filename">programname.pot</code>.
+      Now copy that file to <code class="filename">languagecode.po</code>, such as
+      <code class="filename">de.po</code> or <code class="filename">hu.po</code>. Also add
+      that language code to <code class="literal">LINGUAS</code>. The
+      <code class="filename">.po</code> file contains a header and a list of English strings,
+      with space for the translated strings to be entered. Make sure you set the
+      encoding of the <code class="filename">.po</code> file (specified in the header, but
+      also as content) to <code class="literal">UTF-8</code>.
+    </p>
+<div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="icons/note.png"></td>
+<th align="left">Note</th>
+</tr>
+<tr><td align="left" valign="top"><p>
+      It's possible that certain strings will be marked as
+      <code class="literal">fuzzy</code> in the <code class="filename">.po</code> file.
+      These translations will not substitute the original string. To make
+      them appear, simply remove the <code class="literal">fuzzy</code> tag.
+      </p></td></tr>
+</table></div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-i18n-resources"></a>Resources</h3></div></div></div>
+<p>
+      More information about what lies behind the internationalization and localization process
+      is presented and demonstrated in:
+
+      </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+            <a class="ulink" href="https://wiki.gnome.org/TranslationProject/DevGuidelines" target="_top">
+              L10N Guidelines for Developers</a>
+          </p></li>
+<li class="listitem"><p>
+            <a class="ulink" href="http://bazaar.launchpad.net/~intltool/intltool/trunk/view/head:/README" target="_top">Intltool README</a>
+          </p></li>
+<li class="listitem"><p>
+            <a class="ulink" href="https://wiki.gnome.org/TranslationProject/GitHowTo" target="_top">How to use Git for GNOME translators</a>
+          </p></li>
+<li class="listitem"><p>
+            <a class="ulink" href="http://www.gnu.org/software/gettext/manual/gettext.html" target="_top">gettext manual</a>
+          </p></li>
+<li class="listitem"><p>
+            <a class="ulink" href="http://ftp.gnome.org/pub/GNOME/sources/gtkmm_hello/" target="_top"><code class="literal">gtkmm_hello</code> example package</a>
+          </p></li>
+<li class="listitem"><p>
+            <a class="ulink" href="http://ftp.gnome.org/pub/GNOME/sources/gnomemm_hello/" target="_top"><code class="literal">gnomemm_hello</code> example package</a>
+          </p></li>
+</ul></div>
+<p>
+    </p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-internationalization.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-internationalization.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-i18n-expecting-utf8.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 27. Internationalization and Localization </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Expecting UTF8</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+#
+# (C) 1999-2015 Roland Rosenfeld <roland@debian.org>, based on
+#
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+#export DH_OPTIONS=-v
+
+debroot=`pwd`/debian/gsfonts-x11
+
+%:
+	dh $@
+
+override_dh_install-indep:
+	for f in `sed -e '1d;s/ .*//' < fonts.scale`; do \
+		ln -sf ../../type1/gsfonts/$$f \
+			$(debroot)/usr/share/fonts/X11/Type1/$$f; \
+	done
+
+	perl -e 'my $$lines=""; my $$count=0; '\
+'		 while (<>) { '\
+'		    next if /^\d+$$/; '\
+'		    $$lines.=$$_; $$count++; '\
+'	 	    if(/iso8859-1/) { '\
+'		       s/iso8859-1/iso8859-2/g; '\
+'		       $$lines.=$$_; $$count++; '\
+'		       s/iso8859-2/iso8859-15/g; '\
+'		       $$lines.=$$_; $$count++; '\
+'		    } '\
+'		 } '\
+'		 print "$$count\n$$lines";' \
+		 < fonts.scale \
+		 > $(debroot)/etc/X11/fonts/Type1/gsfonts-x11.scale
+
+	perl -ne 'print; '\
+'		  if (/iso8859-1/) { '\
+'		     s/iso8859-1/iso8859-2/g; '\
+'		     print; '\
+'		     s/iso8859-2/iso8859-15/g; '\
+'		     print; '\
+'		  }' \
+		  < fonts.alias \
+		  > $(debroot)/etc/X11/fonts/Type1/gsfonts-x11.alias

@@ -1,0 +1,150 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>The Selection</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-treeview.html" title="Chapter 9. The TreeView widget">
+<link rel="prev" href="sec-iterating-over-model-rows.html" title="Iterating over Model Rows">
+<link rel="next" href="sec-treeview-sort.html" title="Sorting">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">The Selection</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-iterating-over-model-rows.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 9. The TreeView widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-treeview-sort.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-treeview-selection"></a>The Selection</h2></div></div></div>
+<p>
+To find out what rows the user has selected, get the
+<code class="classname">Gtk::TreeView::Selection</code> object from the
+<code class="classname">TreeView</code>, like so:
+</p>
+<pre class="programlisting">Glib::RefPtr&lt;Gtk::TreeSelection&gt; refTreeSelection =
+    m_TreeView.get_selection();</pre>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-selection-mode"></a>Single or multiple selection</h3></div></div></div>
+<p>
+By default, only single rows can be selected, but you can allow
+multiple selection by setting the mode, like so:
+</p>
+<pre class="programlisting">refTreeSelection-&gt;set_mode(Gtk::SELECTION_MULTIPLE);</pre>
+<p>
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-selected-rows"></a>The selected rows</h3></div></div></div>
+<p>
+For single-selection, you can just call <code class="methodname">get_selected()</code>,
+like so:
+</p>
+<pre class="programlisting">TreeModel::iterator iter = refTreeSelection-&gt;get_selected();
+if(iter) //If anything is selected
+{
+  TreeModel::Row row = *iter;
+  //Do something with the row.
+}</pre>
+<p>
+For multiple-selection, you need to define a callback, and give it to
+<code class="methodname">selected_foreach()</code>,
+<code class="methodname">selected_foreach_path()</code>, or
+<code class="methodname">selected_foreach_iter()</code>, like so:
+</p>
+<pre class="programlisting">refTreeSelection-&gt;selected_foreach_iter(
+    sigc::mem_fun(*this, &amp;TheClass::selected_row_callback) );
+
+void TheClass::selected_row_callback(
+    const Gtk::TreeModel::iterator&amp; iter)
+{
+  TreeModel::Row row = *iter;
+  //Do something with the row.
+}</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-selection-changed-signal"></a>The "changed" signal</h3></div></div></div>
+<p>
+To respond to the user clicking on a row or range of rows, connect to the
+signal like so:
+</p>
+<pre class="programlisting">refTreeSelection-&gt;signal_changed().connect(
+    sigc::mem_fun(*this, &amp;Example_IconTheme::on_selection_changed)
+);</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-selection-preventing"></a>Preventing row selection</h3></div></div></div>
+<p>
+Maybe the user should not be able to select every item in your list or tree.
+For instance, in the gtk-demo, you can select a demo to see the source code,
+but it doesn't make any sense to select a demo category.
+</p>
+<p>
+To control which rows can be selected, use the
+<code class="methodname">set_select_function()</code> method, providing a
+<code class="classname">sigc::slot</code> callback. For instance:
+</p>
+<pre class="programlisting">m_refTreeSelection-&gt;set_select_function( sigc::mem_fun(*this,
+    &amp;DemoWindow::select_function) );</pre>
+<p>
+and then
+</p>
+<pre class="programlisting">bool DemoWindow::select_function(
+    const Glib::RefPtr&lt;Gtk::TreeModel&gt;&amp; model,
+    const Gtk::TreeModel::Path&amp; path, bool)
+{
+  const Gtk::TreeModel::iterator iter = model-&gt;get_iter(path);
+  return iter-&gt;children().empty(); // only allow leaf nodes to be selected
+}</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-selection-changing"></a>Changing the selection</h3></div></div></div>
+<p>
+To change the selection, specify a
+<code class="classname">Gtk::TreeModel::iterator</code> or
+<code class="classname">Gtk::TreeModel::Row</code>, like so:
+</p>
+<pre class="programlisting">Gtk::TreeModel::Row row = m_refModel-&gt;children()[5]; //The fifth row.
+if(row)
+  refTreeSelection-&gt;select(row);</pre>
+<p>
+or
+</p>
+<pre class="programlisting">Gtk::TreeModel::iterator iter = m_refModel-&gt;children().begin()
+if(iter)
+  refTreeSelection-&gt;select(iter);</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-iterating-over-model-rows.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-treeview.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-treeview-sort.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Iterating over Model Rows </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Sorting</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

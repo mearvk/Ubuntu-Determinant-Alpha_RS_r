@@ -1,0 +1,238 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 23. Keyboard Events</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-plugs-sockets-example.html" title="Plugs and Sockets Example">
+<link rel="next" href="sec-keyboardevents-propagation.html" title="Event Propagation">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 23. Keyboard Events</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-plugs-sockets-example.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-keyboardevents-propagation.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-keyboardevents"></a>Chapter 23. Keyboard Events</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-keyboardevents.html#sec-keyboardevents-overview">Overview</a></span></li>
+<li><span class="sect1"><a href="sec-keyboardevents-propagation.html">Event Propagation</a></span></li>
+</ul>
+</div>
+<p>
+    X events differ in some ways from other signals. These differences are described
+    in the <a class="link" href="sec-xeventsignals.html" title="X Event signals">X Event signals</a> section in
+    the appendix. Here we will use keyboard events to show how X events can be
+    used in a program.
+  </p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-keyboardevents-overview"></a>Overview</h2></div></div></div>
+<p>
+      Whenever you press or release a key, an event is emitted. You can connect
+      a signal handler to handle such events.
+    </p>
+<p>
+      To receive the keyboard events, you must first call the
+      <code class="methodname">Gtk::Widget::add_events()</code> function with a bit
+      mask of the events you're interested in. The event signal handler will
+      receive an argument that depends on the type of event. For keyboard
+      events it's a <span class="type">GdkEventKey*</span>. As discribed in the
+      <a class="link" href="sec-xeventsignals.html" title="X Event signals">appendix</a>, the event signal handler
+      returns a <span class="type">bool</span> value, to indicate that the signal is fully
+      handled (<code class="literal">true</code>) or allow event propagation
+      (<code class="literal">false</code>).
+    </p>
+<p>
+      To determine which key was pressed or released, you read the value of
+      <code class="varname">GdkEventKey::keyval</code> and compare it with a constant in the
+      <code class="filename">&lt;gdk/gdkkeysyms.h&gt;</code> header file. The states of
+      modifier keys (shift, ctrl, etc.) are available as bit-flags in
+      <code class="varname">GdkEventKey::state</code>.
+    </p>
+<p>
+      Here's a simple example:
+</p>
+<pre class="programlisting">
+bool on_key_press_or_release_event(GdkEventKey* event)
+{
+  if (event-&gt;type == GDK_KEY_PRESS &amp;&amp;
+    event-&gt;keyval == GDK_KEY_1 &amp;&amp;
+    (event-&gt;state &amp; (GDK_SHIFT_MASK | GDK_CONTROL_MASK | GDK_MOD1_MASK)) == GDK_MOD1_MASK)
+  {
+    handle_alt_1_press(); // GDK_MOD1_MASK is normally the Alt key
+    return true;
+  }
+  return false;
+}
+
+Gtk::Entry m_entry; // in a class definition
+
+// in the class constructor
+m_entry.signal_key_press_event().connect( sigc::ptr_fun(&amp;on_key_press_or_release_event) );
+m_entry.signal_key_release_event().connect( sigc::ptr_fun(&amp;on_key_press_or_release_event) );
+m_entry.add_events(Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK);
+</pre>
+<p>
+    </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="keyboardevents-simple-example"></a>Example</h3></div></div></div>
+<p>
+        In this example there are three keyboard shortcuts:
+        <span class="keycap"><strong>Alt</strong></span>+<span class="keycap"><strong>1</strong></span> selects the first radio button,
+        <span class="keycap"><strong>Alt</strong></span>+<span class="keycap"><strong>2</strong></span> selects the second one, and the
+        <span class="keycap"><strong>Esc</strong></span> key hides (closes) the window.
+        The default event signal handler is overridden, as described in the
+        <a class="link" href="sec-overriding-default-signal-handlers.html" title="Overriding default signal handlers">Overriding default signal handlers</a>
+        section in the appendix.
+      </p>
+<div class="figure">
+<a name="figure-keyboardevents-simple"></a><p class="title"><b>Figure 23.1. Keyboard Events - Simple</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/keyboardevents_simple.png" alt="Keyboard Events - Simple"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/keyboard_events/simple/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+private:
+  //Override default signal handler:
+  bool on_key_press_event(GdkEventKey* event) override;
+
+  Gtk::Grid m_container;
+  Gtk::RadioButton m_first;
+  Gtk::RadioButton m_second;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+{
+  set_title("Keyboard Events");
+  set_border_width(10);
+  add(m_container);
+
+  // Radio buttons:
+  m_first.set_label("First");
+  m_second.set_label("Second");
+
+  m_second.join_group(m_first);
+  m_first.set_active();
+
+  // Main Container:
+  m_container.add(m_first);
+  m_container.add(m_second);
+
+  // Events.
+  // We override the default event signal handler.
+  add_events(Gdk::KEY_PRESS_MASK);
+
+  show_all_children();
+}
+
+bool ExampleWindow::on_key_press_event(GdkEventKey* key_event)
+{
+  //GDK_MOD1_MASK -&gt; the 'alt' key(mask)
+  //GDK_KEY_1 -&gt; the '1' key
+  //GDK_KEY_2 -&gt; the '2' key
+
+  //select the first radio button, when we press alt + 1
+  if((key_event-&gt;keyval == GDK_KEY_1) &amp;&amp;
+    (key_event-&gt;state &amp;(GDK_SHIFT_MASK | GDK_CONTROL_MASK | GDK_MOD1_MASK)) == GDK_MOD1_MASK)
+  {
+    m_first.set_active();
+    //returning true, cancels the propagation of the event
+    return true;
+  }
+  else if((key_event-&gt;keyval == GDK_KEY_2) &amp;&amp;
+    (key_event-&gt;state &amp; (GDK_SHIFT_MASK | GDK_CONTROL_MASK | GDK_MOD1_MASK)) == GDK_MOD1_MASK)
+  {
+    //and the second radio button, when we press alt + 2
+    m_second.set_active();
+    return true;
+  }
+  else if(key_event-&gt;keyval == GDK_KEY_Escape)
+  {
+    //close the window, when the 'esc' key is pressed
+    hide();
+    return true;
+  }
+
+  //if the event has not been handled, call the base class
+  return Gtk::Window::on_key_press_event(key_event);
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+</pre>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-plugs-sockets-example.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-keyboardevents-propagation.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Plugs and Sockets Example </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Event Propagation</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

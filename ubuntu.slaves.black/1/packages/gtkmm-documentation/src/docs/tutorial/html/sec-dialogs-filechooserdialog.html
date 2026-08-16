@@ -1,0 +1,231 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>FileChooserDialog</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-dialogs.html" title="Chapter 16. Dialogs">
+<link rel="prev" href="chapter-dialogs.html" title="Chapter 16. Dialogs">
+<link rel="next" href="sec-color-selection-dialog.html" title="ColorChooserDialog">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">FileChooserDialog</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-dialogs.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 16. Dialogs</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-color-selection-dialog.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-dialogs-filechooserdialog"></a>FileChooserDialog</h2></div></div></div>
+<p>
+The <code class="classname">FileChooserDialog</code> is suitable for use with
+"Open" or "Save" menu items.
+</p>
+<p>
+Most of the useful member methods for this class are actually in the
+<code class="classname">Gtk::FileChooser</code> base class.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1FileChooserDialog.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="filechooserdialog-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-dialogs-filechooser"></a><p class="title"><b>Figure 16.2. FileChooser</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/dialogs_filechooser.png" alt="FileChooser"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/dialogs/filechooserdialog?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_file_clicked();
+  void on_button_folder_clicked();
+
+  //Child widgets:
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_File, m_Button_Folder;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+
+ExampleWindow::ExampleWindow()
+: m_ButtonBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_File("Choose File"),
+  m_Button_Folder("Choose Folder")
+{
+  set_title("Gtk::FileSelection example");
+
+  add(m_ButtonBox);
+
+  m_ButtonBox.pack_start(m_Button_File);
+  m_Button_File.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_file_clicked) );
+
+  m_ButtonBox.pack_start(m_Button_Folder);
+  m_Button_Folder.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_folder_clicked) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_folder_clicked()
+{
+  Gtk::FileChooserDialog dialog("Please choose a folder",
+          Gtk::FILE_CHOOSER_ACTION_SELECT_FOLDER);
+  dialog.set_transient_for(*this);
+
+  //Add response buttons the the dialog:
+  dialog.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+  dialog.add_button("Select", Gtk::RESPONSE_OK);
+
+  int result = dialog.run();
+
+  //Handle the response:
+  switch(result)
+  {
+    case(Gtk::RESPONSE_OK):
+    {
+      std::cout &lt;&lt; "Select clicked." &lt;&lt; std::endl;
+      std::cout &lt;&lt; "Folder selected: " &lt;&lt; dialog.get_filename()
+          &lt;&lt; std::endl;
+      break;
+    }
+    case(Gtk::RESPONSE_CANCEL):
+    {
+      std::cout &lt;&lt; "Cancel clicked." &lt;&lt; std::endl;
+      break;
+    }
+    default:
+    {
+      std::cout &lt;&lt; "Unexpected button clicked." &lt;&lt; std::endl;
+      break;
+    }
+  }
+}
+
+void ExampleWindow::on_button_file_clicked()
+{
+  Gtk::FileChooserDialog dialog("Please choose a file",
+          Gtk::FILE_CHOOSER_ACTION_OPEN);
+  dialog.set_transient_for(*this);
+
+  //Add response buttons the the dialog:
+  dialog.add_button("_Cancel", Gtk::RESPONSE_CANCEL);
+  dialog.add_button("_Open", Gtk::RESPONSE_OK);
+
+  //Add filters, so that only certain file types can be selected:
+
+  auto filter_text = Gtk::FileFilter::create();
+  filter_text-&gt;set_name("Text files");
+  filter_text-&gt;add_mime_type("text/plain");
+  dialog.add_filter(filter_text);
+
+  auto filter_cpp = Gtk::FileFilter::create();
+  filter_cpp-&gt;set_name("C/C++ files");
+  filter_cpp-&gt;add_mime_type("text/x-c");
+  filter_cpp-&gt;add_mime_type("text/x-c++");
+  filter_cpp-&gt;add_mime_type("text/x-c-header");
+  dialog.add_filter(filter_cpp);
+
+  auto filter_any = Gtk::FileFilter::create();
+  filter_any-&gt;set_name("Any files");
+  filter_any-&gt;add_pattern("*");
+  dialog.add_filter(filter_any);
+
+  //Show the dialog and wait for a user response:
+  int result = dialog.run();
+
+  //Handle the response:
+  switch(result)
+  {
+    case(Gtk::RESPONSE_OK):
+    {
+      std::cout &lt;&lt; "Open clicked." &lt;&lt; std::endl;
+
+      //Notice that this is a std::string, not a Glib::ustring.
+      std::string filename = dialog.get_filename();
+      std::cout &lt;&lt; "File selected: " &lt;&lt;  filename &lt;&lt; std::endl;
+      break;
+    }
+    case(Gtk::RESPONSE_CANCEL):
+    {
+      std::cout &lt;&lt; "Cancel clicked." &lt;&lt; std::endl;
+      break;
+    }
+    default:
+    {
+      std::cout &lt;&lt; "Unexpected button clicked." &lt;&lt; std::endl;
+      break;
+    }
+  }
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-dialogs.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-dialogs.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-color-selection-dialog.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 16. Dialogs </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> ColorChooserDialog</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,664 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>ToolPalette Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-toolpalette.html" title="Chapter 13. ToolPalette">
+<link rel="prev" href="chapter-toolpalette.html" title="Chapter 13. ToolPalette">
+<link rel="next" href="chapter-adjustment.html" title="Chapter 14. Adjustments">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">ToolPalette Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-toolpalette.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 13. ToolPalette</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-adjustment.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="toolpalette-example"></a>ToolPalette Example</h2></div></div></div>
+<p>This example adds a <code class="classname">ToolPalette</code> and a <code class="classname">DrawingArea</code> to a window and allows the user to drag icons from the tool palette to the drawing area. The tool palette contains several groups of items. The combo boxes allow the user to change the style and orientation of the tool palette.</p>
+<div class="figure">
+<a name="figure-toolpalette"></a><p class="title"><b>Figure 13.1. ToolPalette</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/toolpalette.png" alt="ToolPalette"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/toolpalette/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "canvas.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+private:
+
+  void load_icon_items();
+  void load_toggle_items();
+  void load_special_items();
+
+  //Signal handlers:
+  void on_combo_orientation_changed();
+  void on_combo_style_changed();
+
+  //Tree model columns:
+  class ModelColumnsOrientation : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumnsOrientation()
+    { add(m_col_value); add(m_col_name); }
+
+    Gtk::TreeModelColumn&lt;Gtk::Orientation&gt; m_col_value;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+  };
+
+  ModelColumnsOrientation m_ColumnsOrientation;
+
+  //Tree model columns:
+  class ModelColumnsStyle : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumnsStyle()
+    { add(m_col_value); add(m_col_name); }
+
+    Gtk::TreeModelColumn&lt;int&gt; m_col_value; //We use int to also allow -1
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+  };
+
+  ModelColumnsStyle m_ColumnsStyle;
+
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::Box m_HBox;
+  Gtk::ComboBox m_ComboOrientation;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModelOrientation;
+  Gtk::ComboBox m_ComboStyle;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModelStyle;
+  Gtk::ToolPalette m_ToolPalette;
+  Gtk::ScrolledWindow m_ScrolledWindowPalette;
+  Gtk::ScrolledWindow m_ScrolledWindowCanvas;
+  Canvas m_Canvas;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">canvas.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_CANVAS_H
+#define GTKMM_EXAMPLE_CANVAS_H
+
+#include &lt;gtkmm.h&gt;
+
+// This little canvas class is only here
+// because gtkmm does not have a canvas class yet.
+// Applications should probably use GooCanvas::Canvas (goocanvasmm) instead.
+class Canvas : public Gtk::DrawingArea
+{
+public:
+  Canvas();
+  virtual ~Canvas();
+
+private:
+
+  class CanvasItem
+  {
+  public:
+    CanvasItem(Gtk::Widget* canvas, Gtk::ToolButton* button, double x, double y)
+    {
+      Glib::ustring icon_name(button-&gt;get_icon_name());
+      if (icon_name.empty())
+        icon_name = button-&gt;get_label();
+
+      auto icon_theme = Gtk::IconTheme::get_for_screen(canvas-&gt;get_screen());
+      int width = 0;
+      int height = 0; //ignored
+      Gtk::IconSize::lookup(Gtk::ICON_SIZE_DIALOG, width, height);
+      this-&gt;m_pixbuf = icon_theme-&gt;load_icon(icon_name, width, Gtk::ICON_LOOKUP_GENERIC_FALLBACK);
+      this-&gt;m_x = x;
+      this-&gt;m_y = y;
+    }
+
+    Glib::RefPtr&lt;Gdk::Pixbuf&gt; m_pixbuf;
+    double m_x, m_y;
+  };
+
+  void item_draw(const CanvasItem *item,
+    const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr,
+    bool preview);
+
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+  void on_drag_data_received(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context,
+    int x, int y, const Gtk::SelectionData&amp; selection_data, guint info, guint time) override;
+  bool on_drag_motion(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, int x, int y, guint time) override;
+  bool on_drag_drop(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, int x, int y, guint time) override;
+  void on_drag_leave(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, guint time) override;
+
+  bool m_drag_data_requested_for_drop; //So we know what to do in on_drag_data_received().
+  CanvasItem* m_drop_item;
+
+  typedef std::vector&lt;CanvasItem*&gt; type_vec_items;
+  type_vec_items m_canvas_items;
+};
+
+#endif //GTKMM_EXAMPLE_CANVAS_H
+</pre>
+<p>File: <code class="filename">canvas.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "canvas.h"
+#include &lt;iostream&gt;
+
+Canvas::Canvas()
+: m_drag_data_requested_for_drop(false),
+  m_drop_item(nullptr)
+{
+  set_app_paintable();
+}
+
+Canvas::~Canvas()
+{
+  while(!m_canvas_items.empty())
+  {
+    auto iter = m_canvas_items.begin();
+    auto item = *iter;
+    delete item;
+    m_canvas_items.erase(iter);
+  }
+
+  delete m_drop_item;
+}
+
+void Canvas::item_draw(const CanvasItem *item,
+  const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr,
+  bool preview)
+{
+  if(!item || !item-&gt;m_pixbuf)
+    return;
+
+  const double cx = item-&gt;m_pixbuf-&gt;get_width();
+  const double cy = item-&gt;m_pixbuf-&gt;get_height();
+
+  Gdk::Cairo::set_source_pixbuf(cr,
+    item-&gt;m_pixbuf,
+    item-&gt;m_x - cx * 0.5, item-&gt;m_y - cy * 0.5);
+
+  if(preview)
+    cr-&gt;paint_with_alpha(0.6);
+  else
+    cr-&gt;paint();
+}
+
+bool Canvas::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  cr-&gt;set_source_rgb(1.0, 1.0, 1.0);
+  const Gtk::Allocation allocation = get_allocation();
+  cr-&gt;rectangle(0, 0, allocation.get_width(), allocation.get_height());
+  cr-&gt;fill();
+
+  for(type_vec_items::iterator iter = m_canvas_items.begin();
+    iter != m_canvas_items.end(); ++iter )
+  {
+    item_draw(*iter, cr, false);
+  }
+
+  if(m_drop_item)
+    item_draw (m_drop_item, cr, true);
+
+  return true;
+}
+
+
+bool Canvas::on_drag_motion(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context,
+  int x, int y, guint time)
+{
+  m_drag_data_requested_for_drop = false; //It's for drag-motion instead.
+
+  if(m_drop_item)
+  {
+    // We already have a drop indicator so just update its position.
+
+    m_drop_item-&gt;m_x = x;
+    m_drop_item-&gt;m_y = y;
+
+    queue_draw();
+    context-&gt;drag_status(Gdk::ACTION_COPY, time);
+  }
+  else
+  {
+    // Request DnD data for creating a drop indicator.
+    // This will cause on_drag_data_received() to be called.
+    const Glib::ustring target = drag_dest_find_target(context);
+
+    if (target.empty())
+      return false;
+
+    drag_get_data(context, target, time);
+  }
+
+  Gtk::DrawingArea::on_drag_motion(context, x, y, time);
+  return true;
+}
+
+
+void Canvas::on_drag_data_received(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context,
+  int x, int y, const Gtk::SelectionData&amp; selection_data, guint info, guint time)
+{
+  // Find the tool button which is the source of this DnD operation.
+  auto widget = drag_get_source_widget(context);
+
+  auto drag_palette = dynamic_cast&lt;Gtk::ToolPalette*&gt;(widget);
+  while(widget &amp;&amp; !drag_palette)
+  {
+    widget = widget-&gt;get_parent();
+    drag_palette = dynamic_cast&lt;Gtk::ToolPalette*&gt;(widget);
+  }
+
+  Gtk::ToolItem* drag_item = nullptr;
+  if(drag_palette)
+    drag_item = drag_palette-&gt;get_drag_item(selection_data);
+
+  // Create a drop indicator when a tool button was found:
+  auto button = dynamic_cast&lt;Gtk::ToolButton*&gt;(drag_item);
+  if(!button)
+    return;
+
+  delete m_drop_item;
+  m_drop_item = nullptr;
+
+  try
+  {
+    auto item = new CanvasItem(this, button, x, y);
+
+    if(m_drag_data_requested_for_drop)
+    {
+      m_canvas_items.push_back(item);
+
+      // Signal that the item was accepted and then redraw.
+      context-&gt;drag_finish(true /* success */, false /* del */, time);
+    }
+    else
+    {
+      m_drop_item = item;
+
+      // We are getting this data due to a request in drag_motion,
+      // rather than due to a request in drag_drop, so we are just
+      // supposed to call gdk_drag_status (), not actually paste in
+      // the data.
+      context-&gt;drag_status(Gdk::ACTION_COPY, time);
+    }
+
+    queue_draw();
+  }
+  catch (const Gtk::IconThemeError&amp; ex)
+  {
+    std::cerr &lt;&lt; "IconThemeError: " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+
+  Gtk::DrawingArea::on_drag_data_received(context, x, y, selection_data, info, time);
+}
+
+
+bool Canvas::on_drag_drop(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, int /* x */, int /* y */, guint time)
+{
+  // Request DnD data for creating a dopped item.
+  // This will cause on_drag_data_received() to be called.
+  const Glib::ustring target = drag_dest_find_target(context);
+
+  if (target.empty())
+    return false;
+
+  m_drag_data_requested_for_drop = true;
+  drag_get_data(context, target, time);
+
+  return true;
+}
+
+void Canvas::on_drag_leave(const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, guint time)
+{
+  //This signal is emitted to clean up the item used for drag-motion,
+  //either when the cursor moves out of the widget or when we drop.
+
+  if(!m_drop_item)
+    return;
+
+  delete m_drop_item;
+  m_drop_item = nullptr;
+
+  queue_draw();
+
+  Gtk::DrawingArea::on_drag_leave(context, time);
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+
+void ExampleWindow::load_icon_items()
+{
+  auto icon_theme = Gtk::IconTheme::get_for_screen(get_screen());
+
+  typedef std::vector&lt;Glib::ustring&gt; type_stringvec;
+  type_stringvec icon_names = icon_theme-&gt;list_icons();
+
+  // Obtain the names of all contexts, and the icon names per context.
+  type_stringvec contexts = icon_theme-&gt;list_contexts();
+  std::sort(contexts.begin(), contexts.end());
+
+  int requested_icon_size = 0;
+  int requested_icon_height = 0; //ignored
+  Gtk::IconSize::lookup(Gtk::ICON_SIZE_BUTTON, requested_icon_size, requested_icon_height);
+  const guint max_icons_per_group = 10;
+
+  for (type_stringvec::const_iterator iter = contexts.begin(); iter != contexts.end(); ++iter)
+  {
+    const Glib::ustring context_name = *iter;
+    auto group = Gtk::make_managed&lt;Gtk::ToolItemGroup&gt;(context_name);
+    m_ToolPalette.add(*group);
+
+    // Iterate through the icon names, populating the ToolItemGroup as appropriate.
+    type_stringvec icon_names_for_context = icon_theme-&gt;list_icons(context_name);
+    std::sort(icon_names_for_context.begin(), icon_names_for_context.end());
+    guint icons_count = 0;
+    for (type_stringvec::const_iterator iconiter = icon_names_for_context.begin(); iconiter != icon_names_for_context.end(); ++iconiter)
+    {
+      const Glib::ustring icon_name = *iconiter;
+      Glib::RefPtr&lt;Gdk::Pixbuf&gt; pixbuf;
+      try
+      {
+        pixbuf = icon_theme-&gt;load_icon(icon_name, requested_icon_size, Gtk::ICON_LOOKUP_GENERIC_FALLBACK);
+      }
+      catch (const Gtk::IconThemeError&amp; /* ex */)
+      {
+        // Gtk::IconTheme::list_icons() may return some names of icons
+        // that can't be loaded.
+        continue;
+      }
+
+      // Skip large icons, just to make the ToolPalette look better.
+      if (pixbuf-&gt;get_width() &gt; 2*requested_icon_size ||
+          pixbuf-&gt;get_height() &gt; 2*requested_icon_size)
+        continue;
+
+      auto image = Gtk::make_managed&lt;Gtk::Image&gt;(pixbuf);
+      auto button = Gtk::make_managed&lt;Gtk::ToolButton&gt;(*image, icon_name);
+      button-&gt;set_tooltip_text(icon_name);
+      button-&gt;set_is_important();
+      group-&gt;insert(*button);
+
+      // Prevent us having an insane number of icons:
+      ++icons_count;
+      if(icons_count &gt;= max_icons_per_group)
+        break;
+    }
+  }
+}
+
+
+void ExampleWindow::load_toggle_items()
+{
+  auto group = Gtk::make_managed&lt;Gtk::ToolItemGroup&gt;("Radio Item");
+  m_ToolPalette.add(*group);
+
+  Gtk::RadioToolButton::Group radio_group;
+
+  for(int i = 1; i &lt;= 10; ++i)
+  {
+    const Glib::ustring label = Glib::ustring::compose("#%1", i);
+    auto button = Gtk::make_managed&lt;Gtk::RadioToolButton&gt;();
+    button-&gt;set_group(radio_group);
+    button-&gt;set_label(label);
+
+    group-&gt;insert(*button);
+  }
+}
+
+
+static Gtk::ToolItem* create_entry_item(const Glib::ustring&amp; text)
+{
+  auto entry = Gtk::make_managed&lt;Gtk::Entry&gt;();
+  entry-&gt;set_text(text);
+  entry-&gt;set_width_chars(5);
+
+  auto item = Gtk::make_managed&lt;Gtk::ToolItem&gt;();
+  item-&gt;add(*entry);
+
+  return item;
+}
+
+void ExampleWindow::load_special_items()
+{
+  auto group = Gtk::make_managed&lt;Gtk::ToolItemGroup&gt;();
+
+  Gtk::Button *label_button = Gtk::make_managed&lt;Gtk::Button&gt;("Advanced Features");
+  label_button-&gt;show();
+  group-&gt;set_label_widget(*label_button);
+  m_ToolPalette.add(*group);
+
+  auto item = create_entry_item ("homogeneous=false");
+  group-&gt;insert(*item);
+  //TODO: Add Gtk::Container::set_child_property().
+  gtk_container_child_set (GTK_CONTAINER (group-&gt;gobj()), GTK_WIDGET (item-&gt;gobj()),
+                           "homogeneous", FALSE, NULL);
+
+  item = create_entry_item ("homogeneous=FALSE, expand=TRUE");
+  group-&gt;insert(*item);
+  gtk_container_child_set (GTK_CONTAINER (group-&gt;gobj()), GTK_WIDGET (item-&gt;gobj()),
+                           "homogeneous", FALSE, "expand", TRUE,
+                           NULL);
+
+  item = create_entry_item ("homogeneous=FALSE, expand=TRUE, fill=FALSE");
+  group-&gt;insert(*item);
+  gtk_container_child_set (GTK_CONTAINER (group-&gt;gobj()), GTK_WIDGET (item-&gt;gobj()),
+                           "homogeneous", FALSE, "expand", TRUE,
+                           "fill", FALSE, NULL);
+
+  item = create_entry_item ("homogeneous=FALSE, expand=TRUE, new-row=TRUE");
+  group-&gt;insert(*item);
+  gtk_container_child_set (GTK_CONTAINER (group-&gt;gobj()), GTK_WIDGET (item-&gt;gobj()),
+                           "homogeneous", FALSE, "expand", TRUE,
+                           "new-row", TRUE, NULL);
+
+  auto button = Gtk::make_managed&lt;Gtk::ToolButton&gt;();
+  button-&gt;set_icon_name("go-up");
+  button-&gt;set_tooltip_text("Show on vertical palettes only");
+  group-&gt;insert(*button);
+  button-&gt;set_visible_horizontal(false);
+
+  button = Gtk::make_managed&lt;Gtk::ToolButton&gt;();
+  button-&gt;set_icon_name("go-next");
+  button-&gt;set_tooltip_text("Show on horizontal palettes only");
+  group-&gt;insert(*button);
+  button-&gt;set_visible_vertical(false);
+
+  button = Gtk::make_managed&lt;Gtk::ToolButton&gt;();
+  button-&gt;set_icon_name("edit-delete");
+  button-&gt;set_tooltip_text("Do not show at all");
+  button-&gt;set_no_show_all();
+  group-&gt;insert(*button);
+  button-&gt;set_visible_vertical(false);
+
+  button = Gtk::make_managed&lt;Gtk::ToolButton&gt;();
+  button-&gt;set_icon_name("view-fullscreen");
+  button-&gt;set_tooltip_text("Expanded this item");
+  group-&gt;insert(*button);
+  gtk_container_child_set (GTK_CONTAINER (group-&gt;gobj()), GTK_WIDGET (button-&gt;gobj()),
+                           "homogeneous", FALSE,
+                           "expand", TRUE,
+                           NULL);
+
+  button = Gtk::make_managed&lt;Gtk::ToolButton&gt;();
+  button-&gt;set_icon_name("help-contents");
+  button-&gt;set_tooltip_text("A regular item");
+  group-&gt;insert(*button);
+}
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL, 6),
+  m_HBox(Gtk::ORIENTATION_HORIZONTAL, 6)
+{
+  set_title("Gtk::ToolPalette example");
+  set_size_request(600, 600);
+  set_border_width(6);
+
+  add(m_VBox);
+
+  //The Orientation ComboBox:
+  m_refTreeModelOrientation = Gtk::ListStore::create(m_ColumnsOrientation);
+  Gtk::TreeModel::Row row = *(m_refTreeModelOrientation-&gt;append());
+  row[m_ColumnsOrientation.m_col_value] = Gtk::ORIENTATION_HORIZONTAL;
+  row[m_ColumnsOrientation.m_col_name] = "Horizontal";\
+  row = *(m_refTreeModelOrientation-&gt;append());
+  row[m_ColumnsOrientation.m_col_value] = Gtk::ORIENTATION_VERTICAL;
+  row[m_ColumnsOrientation.m_col_name] = "Vertical";
+  m_ComboOrientation.set_model(m_refTreeModelOrientation);
+  m_VBox.pack_start(m_ComboOrientation, Gtk::PACK_SHRINK);
+  m_ComboOrientation.pack_start(m_ColumnsOrientation.m_col_name);
+  m_ComboOrientation.signal_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_combo_orientation_changed) );
+  m_ComboOrientation.set_active(row);
+
+  //The Style ComboBox:
+  m_refTreeModelStyle = Gtk::ListStore::create(m_ColumnsStyle);
+  row = *(m_refTreeModelStyle-&gt;append());
+  row[m_ColumnsStyle.m_col_value] = Gtk::TOOLBAR_TEXT;
+  row[m_ColumnsStyle.m_col_name] = "Text";\
+  row = *(m_refTreeModelStyle-&gt;append());
+  row[m_ColumnsStyle.m_col_value] = Gtk::TOOLBAR_BOTH;
+  row[m_ColumnsStyle.m_col_name] = "Both";
+  row = *(m_refTreeModelStyle-&gt;append());
+  row[m_ColumnsStyle.m_col_value] = Gtk::TOOLBAR_BOTH_HORIZ;
+  row[m_ColumnsStyle.m_col_name] = "Both: Horizontal";
+  row = *(m_refTreeModelStyle-&gt;append());
+  row[m_ColumnsStyle.m_col_value] = Gtk::TOOLBAR_ICONS;
+  row[m_ColumnsStyle.m_col_name] = "Icons";
+  row = *(m_refTreeModelStyle-&gt;append());
+  row[m_ColumnsStyle.m_col_value] = -1; // A custom meaning for this demo.
+  row[m_ColumnsStyle.m_col_name] = "Default";
+  m_ComboStyle.set_model(m_refTreeModelStyle);
+  m_VBox.pack_start(m_ComboStyle, Gtk::PACK_SHRINK);
+  m_ComboStyle.pack_start(m_ColumnsStyle.m_col_name);
+  m_ComboStyle.signal_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_combo_style_changed) );
+  m_ComboStyle.set_active(row);
+
+  //Add and fill the ToolPalette:
+  load_icon_items();
+  load_toggle_items();
+  load_special_items();
+
+  m_VBox.pack_start(m_HBox, Gtk::PACK_EXPAND_WIDGET);
+
+  m_ScrolledWindowPalette.set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+  m_ScrolledWindowPalette.set_border_width(6);
+  m_ScrolledWindowPalette.add(m_ToolPalette);
+  m_HBox.pack_start(m_ScrolledWindowPalette);
+
+  on_combo_orientation_changed();
+
+  m_ScrolledWindowCanvas.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_ALWAYS);
+  m_ScrolledWindowCanvas.set_border_width(6);
+  m_ScrolledWindowCanvas.add(m_Canvas);
+  m_ScrolledWindowCanvas.set_size_request(200, -1);
+  m_HBox.pack_start(m_ScrolledWindowCanvas);
+
+  m_ToolPalette.add_drag_dest(m_Canvas,
+    Gtk::DEST_DEFAULT_HIGHLIGHT, Gtk::TOOL_PALETTE_DRAG_ITEMS, Gdk::ACTION_COPY);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_combo_orientation_changed()
+{
+  Gtk::TreeModel::iterator iter = m_ComboOrientation.get_active();
+  if(!iter)
+    return;
+
+  Gtk::TreeModel::Row row = *iter;
+  const Gtk::Orientation value = row[m_ColumnsOrientation.m_col_value];
+
+  m_ToolPalette.set_orientation(value);
+
+  if(value == Gtk::ORIENTATION_HORIZONTAL)
+    m_ScrolledWindowPalette.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_NEVER);
+  else
+    m_ScrolledWindowPalette.set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+}
+
+void ExampleWindow::on_combo_style_changed()
+{
+  Gtk::TreeModel::iterator iter = m_ComboStyle.get_active();
+  if(!iter)
+    return;
+
+  Gtk::TreeModel::Row row = *iter;
+  const int value = row[m_ColumnsStyle.m_col_value];
+
+  if(value == -1)
+    m_ToolPalette.unset_style();
+  else
+    m_ToolPalette.set_style((Gtk::ToolbarStyle)value);
+}
+
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-toolpalette.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-toolpalette.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-adjustment.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 13. ToolPalette </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 14. Adjustments</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

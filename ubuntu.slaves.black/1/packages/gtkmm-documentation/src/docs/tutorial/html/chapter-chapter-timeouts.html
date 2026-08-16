@@ -1,0 +1,287 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 24. Timeouts, I/O and Idle Functions</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-keyboardevents-propagation.html" title="Event Propagation">
+<link rel="next" href="sec-monitoring-io.html" title="Monitoring I/O">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 24. Timeouts, I/O and Idle Functions </th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-keyboardevents-propagation.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-monitoring-io.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-chapter-timeouts"></a>Chapter 24. Timeouts, I/O and Idle Functions </h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-chapter-timeouts.html#sec-timeouts">Timeouts</a></span></li>
+<li><span class="sect1"><a href="sec-monitoring-io.html">Monitoring I/O</a></span></li>
+<li><span class="sect1"><a href="sec-idle-functions.html">Idle Functions</a></span></li>
+</ul>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-timeouts"></a>Timeouts</h2></div></div></div>
+<p>
+You may be wondering how to make <span class="application">gtkmm</span> do useful work while it's idling along. Happily,
+you have several options. Using the following methods you can create a timeout
+method that will be called every few milliseconds.
+</p>
+<p>
+</p>
+<pre class="programlisting">
+sigc::connection Glib::SignalTimeout::connect(const sigc::slot&lt;bool&gt;&amp; slot,
+                                      unsigned int interval, int priority = Glib::PRIORITY_DEFAULT);
+</pre>
+<p>
+</p>
+<p>
+The first argument is a <code class="classname">slot</code> you wish to have called
+when the timeout occurs. The second argument is the number of milliseconds
+between calls to that method. You receive a
+<code class="classname">sigc::connection</code> object that can be used to deactivate
+the connection using its <code class="methodname">disconnect()</code> method:
+</p>
+<p>
+
+</p>
+<pre class="programlisting">
+my_connection.disconnect();
+</pre>
+<p>
+</p>
+<p>
+Another way of destroying the connection is your signal handler.
+It has to be of the type <code class="classname">sigc::slot&lt;bool&gt;</code>.
+As you see from the definition your signal handler has to return a value of
+the type <code class="literal">bool</code>. A definition of a sample method might
+look like this:
+
+</p>
+<pre class="programlisting">
+bool MyCallback() { std::cout &lt;&lt; "Hello World!\n" &lt;&lt; std::endl; return true; }
+</pre>
+<p>
+
+</p>
+<p>
+You can stop the timeout method by returning <code class="literal">false</code> from
+your signal handler. Therefore, if you want your
+method to be called repeatedly, it should return <code class="literal">true</code>.
+</p>
+<p>
+Here's an example of this technique:
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/timeout/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">timerexample.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_TIMEREXAMPLE_H
+#define GTKMM_EXAMPLE_TIMEREXAMPLE_H
+
+#include &lt;gtkmm.h&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+
+class TimerExample : public Gtk::Window
+{
+public:
+  TimerExample();
+
+protected:
+  // signal handlers
+  void on_button_add_timer();
+  void on_button_delete_timer();
+  void on_button_quit();
+
+  // This is the callback function the timeout will call
+  bool on_timeout(int timer_number);
+
+  // Member data:
+
+  Gtk::Box m_Box;
+  Gtk::Button m_ButtonAddTimer, m_ButtonDeleteTimer, m_ButtonQuit;
+
+  // Keep track of the timers being added:
+  int m_timer_number;
+
+  // These two constants are initialized in the constructor's member initializer:
+  const int count_value;
+  const int timeout_value;
+
+  // STL map for storing our connections
+  std::map&lt;int, sigc::connection&gt; m_timers;
+
+  // STL map for storing our timer values.
+  // Each timer counts back from COUNT_VALUE to 0 and is removed when it reaches 0
+  std::map&lt;int, int&gt; m_counters;
+};
+
+#endif // GTKMM_EXAMPLE_TIMEREXAMPLE_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "timerexample.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main (int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  TimerExample example;
+  return app-&gt;run(example);
+}
+</pre>
+<p>File: <code class="filename">timerexample.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "timerexample.h"
+
+TimerExample::TimerExample() :
+  m_Box(Gtk::ORIENTATION_HORIZONTAL, 10),
+  m_ButtonAddTimer("_Add", true),
+  m_ButtonDeleteTimer("_Remove", true),
+  m_ButtonQuit("_Quit", true),
+  m_timer_number(0), // start numbering the timers at 0
+  count_value(5), // each timer will count down 5 times before disconnecting
+  timeout_value(1500) // 1500 ms = 1.5 seconds
+{
+  set_border_width(10);
+
+  add(m_Box);
+  m_Box.pack_start(m_ButtonAddTimer);
+  m_Box.pack_start(m_ButtonDeleteTimer);
+  m_Box.pack_start(m_ButtonQuit);
+
+  // Connect the three buttons:
+  m_ButtonQuit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;TimerExample::on_button_quit));
+  m_ButtonAddTimer.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;TimerExample::on_button_add_timer));
+  m_ButtonDeleteTimer.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;TimerExample::on_button_delete_timer));
+
+  show_all_children();
+}
+
+void TimerExample::on_button_quit()
+{
+  hide();
+}
+
+void TimerExample::on_button_add_timer()
+{
+  // Creation of a new object prevents long lines and shows us a little
+  // how slots work.  We have 0 parameters and bool as a return value
+  // after calling sigc::bind.
+  sigc::slot&lt;bool&gt; my_slot = sigc::bind(sigc::mem_fun(*this,
+              &amp;TimerExample::on_timeout), m_timer_number);
+
+  // This is where we connect the slot to the Glib::signal_timeout()
+  sigc::connection conn = Glib::signal_timeout().connect(my_slot,
+          timeout_value);
+
+  // Remember the connection:
+  m_timers[m_timer_number] = conn;
+
+  // Initialize timer count:
+  m_counters[m_timer_number] = count_value + 1;
+
+  // Print some info to the console for the user:
+  std::cout &lt;&lt; "added timeout " &lt;&lt; m_timer_number++ &lt;&lt; std::endl;
+}
+
+void TimerExample::on_button_delete_timer()
+{
+  // any timers?
+  if(m_timers.empty())
+  {
+    // no timers left
+    std::cout &lt;&lt; "Sorry, there are no timers left." &lt;&lt; std::endl;
+  }
+  else
+  {
+    // get the number of the first timer
+    int timer_number = m_timers.begin()-&gt;first;
+
+    // Give some info to the user:
+    std::cout &lt;&lt; "manually disconnecting timer " &lt;&lt; timer_number
+        &lt;&lt; std::endl;
+
+    // Remove the entry in the counter values
+    m_counters.erase(timer_number);
+
+    // Diconnect the signal handler:
+    m_timers[timer_number].disconnect();
+
+    // Forget the connection:
+    m_timers.erase(timer_number);
+  }
+}
+
+bool TimerExample::on_timeout(int timer_number)
+{
+  // Print the timer:
+  std::cout &lt;&lt; "This is timer " &lt;&lt; timer_number;
+
+  // decrement and check counter value
+  if (--m_counters[timer_number] == 0)
+  {
+    std::cout &lt;&lt; " being disconnected" &lt;&lt;  std::endl;
+
+    // delete the counter entry in the STL MAP
+    m_counters.erase(timer_number);
+
+    // delete the connection entry in the STL MAP
+    m_timers.erase(timer_number);
+
+    // Note that we do not have to explicitly call disconnect() on the
+    // connection since Gtk::Main does this for us when we return false.
+    return false;
+  }
+
+  // Print the timer value
+  std::cout &lt;&lt; " - " &lt;&lt; m_counters[timer_number] &lt;&lt; "/"
+      &lt;&lt; count_value &lt;&lt; std::endl;
+
+ // Keep going (do not disconnect yet):
+  return true;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-keyboardevents-propagation.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-monitoring-io.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Event Propagation </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Monitoring I/O</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

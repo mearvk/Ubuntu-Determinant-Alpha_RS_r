@@ -1,0 +1,102 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Asynchronous operations</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-printing.html" title="Chapter 20. Printing">
+<link rel="prev" href="sec-printing-rendering-text.html" title="Rendering text">
+<link rel="next" href="sec-printing-export-to-pdf.html" title="Export to PDF">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Asynchronous operations</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-printing-rendering-text.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 20. Printing</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-printing-export-to-pdf.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-async-printing-ops"></a>Asynchronous operations</h2></div></div></div>
+<p>
+By default, <code class="methodname">PrintOperation::run()</code> returns when a print
+operation is completed. If you need to run a non-blocking print operation,
+call <code class="methodname">PrintOperation::set_allow_async()</code>. Note that <code class="methodname">set_allow_async()</code> is not supported
+on all platforms, however the <code class="literal">done</code> signal will still be emitted.
+</p>
+<p>
+<code class="methodname">run()</code> may return
+<code class="literal">PRINT_OPERATION_RESULT_IN_PROGRESS</code>. To track status
+and handle the result or error you need to implement signal handlers for
+the <code class="literal">done</code> and <code class="literal">status_changed</code> signals:
+</p>
+<p>For instance,
+</p>
+<pre class="programlisting">
+// in class ExampleWindow's method...
+Glib::RefPtr&lt;PrintOperation&gt; op = PrintOperation::create();
+// ...set up op...
+op-&gt;signal_done().connect(sigc::bind(sigc::mem_fun(*this, &amp;ExampleWindow::on_printoperation_done), op));
+// run the op
+</pre>
+<p>
+</p>
+<p>Second, check for an error and connect to the <code class="literal">status_changed</code> signal. For instance:
+</p>
+<pre class="programlisting">
+void ExampleWindow::on_printoperation_done(Gtk::PrintOperationResult result, const Glib::RefPtr&lt;PrintOperation&gt;&amp; op)
+{
+  if (result == Gtk::PRINT_OPERATION_RESULT_ERROR)
+    //notify user
+  else if (result == Gtk::PRINT_OPERATION_RESULT_APPLY)
+    //Update PrintSettings with the ones used in this PrintOperation
+
+  if (! op-&gt;is_finished())
+    op-&gt;signal_status_changed().connect(sigc::bind(sigc::mem_fun(*this, &amp;ExampleWindow::on_printoperation_status_changed), op));
+}
+</pre>
+<p>
+</p>
+<p>Finally, check the status. For instance,
+</p>
+<pre class="programlisting">
+void ExampleWindow::on_printoperation_status_changed(const Glib::RefPtr&lt;PrintFormOperation&gt;&amp; op)
+{
+  if (op-&gt;is_finished())
+    //the print job is finished
+  else
+    //get the status with get_status() or get_status_string()
+
+  //update UI
+}
+</pre>
+<p>
+</p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-printing-rendering-text.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-printing.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-printing-export-to-pdf.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Rendering text </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Export to PDF</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

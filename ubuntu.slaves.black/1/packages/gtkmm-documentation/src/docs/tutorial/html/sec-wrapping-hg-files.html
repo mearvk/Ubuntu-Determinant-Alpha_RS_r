@@ -1,0 +1,1291 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>The .hg and .ccg files</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-wrapping-c-libraries.html" title="Appendix G. Wrapping C Libraries with gmmproc">
+<link rel="prev" href="sec-wrapping-defs-files.html" title="Generating the .defs files.">
+<link rel="next" href="sec-wrapping-hand-coded-files.html" title="Hand-coded source files">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">The .hg and .ccg files</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-wrapping-defs-files.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Appendix G. Wrapping C Libraries with gmmproc</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-wrapping-hand-coded-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-wrapping-hg-files"></a>The .hg and .ccg files</h2></div></div></div>
+<p>The .hg and .ccg source files are very much like
+        .h and .cc C++ source files, but they contain extra macros, such as
+        <code class="function">_CLASS_GOBJECT()</code> and
+        <code class="function">_WRAP_METHOD()</code>, from which
+        <span class="command"><strong>gmmproc</strong></span> generates appropriate C++ source code,
+        usually at the same position in the header. Any additional C++ source
+        code will be copied verbatim into the corresponding
+        .h or .cc file.</p>
+<p>A .hg file will typically include some headers
+        and then declare a class, using some macros to add API or behaviour to
+        this class. For instance, <span class="application">gtkmm</span>'s <code class="filename">button.hg</code> looks
+        roughly like this:
+
+</p>
+<pre class="programlisting">
+#include &lt;gtkmm/bin.h&gt;
+#include &lt;gtkmm/activatable.h&gt;
+_DEFS(gtkmm,gtk)
+_PINCLUDE(gtkmm/private/bin_p.h)
+
+namespace Gtk
+{
+
+class Button
+  : public Bin,
+    public Activatable // Activatable is deprecated. Will be replaced at ABI break.
+{
+  _CLASS_GTKOBJECT(Button,GtkButton,GTK_BUTTON,Gtk::Bin,GtkBin)
+  _IMPLEMENTS_INTERFACE(Activatable)
+public:
+
+  _CTOR_DEFAULT
+  explicit Button(const Glib::ustring&amp; label, bool mnemonic = false);
+
+  _WRAP_METHOD(void set_label(const Glib::ustring&amp; label), gtk_button_set_label)
+
+  ...
+
+  _WRAP_SIGNAL(void clicked(), "clicked")
+
+  ...
+
+  _WRAP_PROPERTY("label", Glib::ustring)
+};
+
+} // namespace Gtk
+</pre>
+<p>
+</p>
+<p>The macros in this example do the following:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term"><code class="function">_DEFS()</code></span></dt>
+<dd><p>Specifies the destination directory for generated sources, and the name of the main .defs file that <span class="command"><strong>gmmproc</strong></span> should parse.</p></dd>
+<dt><span class="term"><code class="function">_PINCLUDE()</code></span></dt>
+<dd><p>Tells <span class="command"><strong>gmmproc</strong></span> to include a header in the generated private/button_p.h file.</p></dd>
+<dt><span class="term"><code class="function">_CLASS_GTKOBJECT()</code></span></dt>
+<dd><p>Tells <span class="command"><strong>gmmproc</strong></span> to add some typedefs, constructors, and standard methods to this class, as appropriate when wrapping a widget.</p></dd>
+<dt><span class="term"><code class="function">_IMPLEMENTS_INTERFACE()</code></span></dt>
+<dd><p>Tells <span class="command"><strong>gmmproc</strong></span> to add initialization code for the interface.</p></dd>
+<dt><span class="term"><code class="function">_CTOR_DEFAULT</code></span></dt>
+<dd><p>Add a default constructor.</p></dd>
+<dt><span class="term"><code class="function">_WRAP_METHOD()</code>,
+            <code class="function">_WRAP_SIGNAL()</code>,
+            <code class="function">_WRAP_PROPERTY()</code>, and
+            <code class="function">_WRAP_CHILD_PROPERTY()</code></span></dt>
+<dd><p>Add methods to wrap parts of the C API.</p></dd>
+</dl></div>
+<p>
+</p>
+<p>The .h and .cc files will be generated from the .hg and .ccg files by
+    processing them with <span class="command"><strong>gmmproc</strong></span> like so, though this happens
+    automatically when using the above build structure:
+</p>
+<pre class="programlisting">
+$ cd gtk/src
+$ /usr/lib/glibmm-2.4/proc/gmmproc -I ../../tools/m4 --defs . button . ./../gtkmm
+</pre>
+<p>
+</p>
+<p>Notice that we provided <span class="command"><strong>gmmproc</strong></span> with the path to the
+    .m4 convert files, the path to the .defs file, the name of a .hg file, the
+    source directory, and the destination directory.</p>
+<p>You should avoid including the C header from your C++ header, to avoid
+    polluting the global namespace, and to avoid exporting unnecessary public
+    API. But you will need to include the necessary C headers from your
+    .ccg file.</p>
+<p>The macros are explained in more detail in the following sections.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-m4-conversions"></a>m4 Conversions</h3></div></div></div>
+<p>The macros that you use in the .hg and .ccg files often need to know how
+to convert a C++ type to a C type, or vice-versa. gmmproc takes this information
+from an .m4 file in your <code class="literal">tools/m4/</code> directory. This allows it
+to call a C function in the implementation of your C++ method, passing the
+appropriate parameters to that C functon. For instance, this
+tells gmmproc how to convert a GtkTreeView pointer to a Gtk::TreeView pointer:
+</p>
+<pre class="programlisting">
+_CONVERSION(`GtkTreeView*',`TreeView*',`Glib::wrap($3)')
+</pre>
+<p>
+</p>
+<p><code class="literal">$3</code> will be replaced by the parameter name when this
+conversion is used by gmmproc.
+</p>
+<p>
+Some extra macros make this easier and consistent. Look in gtkmm's .m4 files
+for examples. For instance:
+</p>
+<pre class="programlisting">
+_CONVERSION(`PrintSettings&amp;',`GtkPrintSettings*',__FR2P)
+_CONVERSION(`const PrintSettings&amp;',`GtkPrintSettings*',__FCR2P)
+_CONVERSION(`const Glib::RefPtr&lt;Printer&gt;&amp;',`GtkPrinter*',__CONVERT_REFPTR_TO_P($3))
+</pre>
+<p>
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-m4-initializations"></a>m4 Initializations</h3></div></div></div>
+<p>
+  Often when wrapping methods, it is desirable to store the return of the C
+  function in what is called an output parameter.  In this case, the C++ method
+  returns <span class="type">void</span> but an output parameter in which to store the value
+  of the C function is included in the argument list of the C++ method.
+  gmmproc allows such functionality, but appropriate initialization macros must
+  be included to tell gmmproc how to initialize the C++ parameter from the
+  return of the C function.
+</p>
+<p>
+  For example, if there was a C function that returned a
+  <span class="type">GtkWidget*</span> and for some reason, instead of having the C++ method
+  also return the widget, it was desirable to have the C++ method place the
+  widget in a specified output parameter, an initialization macro such as the
+  following would be necessary:
+</p>
+<pre class="programlisting">
+_INITIALIZATION(`Gtk::Widget&amp;',`GtkWidget*',`$3 = Glib::wrap($4)')
+</pre>
+<p>
+</p>
+<p>
+  <code class="literal">$3</code> will be replaced by the output parameter name of the
+  C++ method and <code class="literal">$4</code> will be replaced by the return of the C
+  function when this initialization is used by gmmproc.  For convenience,
+  <code class="literal">$1</code> will also be replaced by the C++ type without the
+  ampersand (&amp;) and <code class="literal">$2</code> will be replaced by the C type.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-class-macros"></a>Class macros</h3></div></div></div>
+<p>The class macro declares the class itself and its relationship with the
+    underlying C type. It generates some internal constructors, the member
+    <code class="varname">gobject_</code>, typedefs, the <code class="function">gobj()</code>
+    accessors, type registration, and the <code class="function">Glib::wrap()</code>
+    method, among other things.</p>
+<p>Other macros, such as <code class="function">_WRAP_METHOD()</code> and
+    <code class="function">_WRAP_SIGNAL()</code> may only be used after a call to a
+    <code class="function">_CLASS_*</code> macro.</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-gobject"></a>_CLASS_GOBJECT</h4></div></div></div>
+<p>This macro declares a wrapper for a type that is derived from
+    <code class="classname">GObject</code>, but whose wrapper is not derived from
+    <code class="classname">Gtk::Object</code>.</p>
+<p><code class="function">_CLASS_GOBJECT( C++ class, C class, C casting macro, C++ base class, C base class )</code></p>
+<p>For instance, from <code class="filename">accelgroup.hg</code>:
+</p>
+<pre class="programlisting">
+_CLASS_GOBJECT(AccelGroup, GtkAccelGroup, GTK_ACCEL_GROUP, Glib::Object, GObject)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-gtkobject"></a>_CLASS_GTKOBJECT</h4></div></div></div>
+<p>This macro declares a wrapper for a type whose wrapper is derived from
+    <code class="classname">Gtk::Object</code>, such as a widget or dialog.</p>
+<p><code class="function">_CLASS_GTKOBJECT( C++ class, C class, C casting macro, C++ base class, C base class )</code></p>
+<p>For instance, from <code class="filename">button.hg</code>:
+</p>
+<pre class="programlisting">
+_CLASS_GTKOBJECT(Button, GtkButton, GTK_BUTTON, Gtk::Bin, GtkBin)
+</pre>
+<p>
+</p>
+<p>You will typically use this macro when the class already derives from Gtk::Object. For instance, you will use it when wrapping a GTK+ Widget, because Gtk::Widget derives from Gtk::Object.</p>
+<p>You might also derive non-widget classes from
+    <code class="classname">Gtk::Object</code> so they can be used without
+    <code class="classname">Glib::RefPtr</code>. For instance, they could then be
+    instantiated with <code class="function">Gtk::make_managed()</code> or on the stack
+    as a member variable. This is convenient, but you should use this only when
+    you are sure that true reference-counting is not needed. We consider it
+    useful for widgets.</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-boxedtype"></a>_CLASS_BOXEDTYPE</h4></div></div></div>
+<p>This macro declares a wrapper for a non-<code class="classname">GObject</code>
+    struct, registered with
+    <code class="function">g_boxed_type_register_static()</code>.</p>
+<p><code class="function">_CLASS_BOXEDTYPE( C++ class, C class, new function, copy function, free function )</code></p>
+<p>For instance, from <code class="classname">Gdk::RGBA</code>:
+</p>
+<pre class="programlisting">
+_CLASS_BOXEDTYPE(RGBA, GdkRGBA, NONE, gdk_rgba_copy, gdk_rgba_free)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-boxedtype-static"></a>_CLASS_BOXEDTYPE_STATIC</h4></div></div></div>
+<p>This macro declares a wrapper for a simple assignable struct such as
+    <code class="classname">GdkRectangle</code>. It is similar to
+    <code class="function">_CLASS_BOXEDTYPE</code>, but the C struct is not allocated
+    dynamically.</p>
+<p><code class="function">_CLASS_BOXEDTYPE_STATIC( C++ class, C class )</code></p>
+<p>For instance, for <code class="classname">Gdk::Rectangle</code>:
+</p>
+<pre class="programlisting">
+_CLASS_BOXEDTYPE_STATIC(Rectangle, GdkRectangle)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-opaque-copyable"></a>_CLASS_OPAQUE_COPYABLE</h4></div></div></div>
+<p>This macro declares a wrapper for an opaque struct that has copy and free
+    functions. The new, copy and free functions will be used to instantiate the
+    default constructor, copy constructor and destructor.</p>
+<p><code class="function">_CLASS_OPAQUE_COPYABLE( C++ class, C class, new function, copy function, free function )</code></p>
+<p>For instance, from <code class="classname">Glib::Checksum</code>:
+</p>
+<pre class="programlisting">
+_CLASS_OPAQUE_COPYABLE(Checksum, GChecksum, NONE, g_checksum_copy, g_checksum_free)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-opaque-refcounted"></a>_CLASS_OPAQUE_REFCOUNTED</h4></div></div></div>
+<p>This macro declares a wrapper for a reference-counted opaque struct. The
+    C++ wrapper cannot be directly instantiated and can only be used with
+    <code class="classname">Glib::RefPtr</code>.</p>
+<p><code class="function">_CLASS_OPAQUE_REFCOUNTED( C++ class, C class, new function, ref function, unref function )</code></p>
+<p>For instance, for <code class="classname">Pango::Coverage</code>:
+</p>
+<pre class="programlisting">
+_CLASS_OPAQUE_REFCOUNTED(Coverage, PangoCoverage, pango_coverage_new, pango_coverage_ref, pango_coverage_unref)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-generic"></a>_CLASS_GENERIC</h4></div></div></div>
+<p>This macro can be used to wrap structs which don't fit into any
+    specialized category.</p>
+<p><code class="function">_CLASS_GENERIC( C++ class, C class )</code></p>
+<p>For instance, for <code class="classname">Pango::AttrIter</code>:
+</p>
+<pre class="programlisting">
+_CLASS_GENERIC(AttrIter, PangoAttrIterator)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-class-interface"></a>_CLASS_INTERFACE</h4></div></div></div>
+<p>This macro declares a wrapper for a type that is derived from
+    <code class="classname">GTypeInterface</code>.
+</p>
+<p><code class="function">_CLASS_INTERFACE( C++ class, C class, C casting macro, C interface struct, Base C++ class (optional), Base C class (optional) )</code></p>
+<p>
+For instance, from <code class="filename">celleditable.hg</code>:
+</p>
+<pre class="programlisting">
+_CLASS_INTERFACE(CellEditable, GtkCellEditable, GTK_CELL_EDITABLE, GtkCellEditableIface)
+</pre>
+<p>
+</p>
+<p>Two extra parameters are optional, for the case that the interface derives from another interface,
+which should be the case when the GInterface has another GInterface as a prerequisite.
+For instance, from <code class="filename">loadableicon.hg</code>:
+</p>
+<pre class="programlisting">
+_CLASS_INTERFACE(LoadableIcon, GLoadableIcon, G_LOADABLE_ICON, GLoadableIconIface, Icon, GIcon)
+</pre>
+<p>
+</p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-constructor-macros"></a>Constructor macros</h3></div></div></div>
+<p>The <code class="function">_CTOR_DEFAULT()</code> and
+    <code class="function">_WRAP_CTOR()</code> macros add constructors, wrapping the
+    specified <code class="function">*_new()</code> C functions. These macros assume that
+    the C object has properties with the same names as the function parameters,
+    as is usually the case, so that it can supply the parameters directly to a
+    <code class="function">g_object_new()</code> call. These constructors never actually
+    call the <code class="function">*_new()</code> C functions,
+    because gtkmm must actually instantiate derived GTypes, and the
+    <code class="function">*_new()</code> C functions are meant only as convenience
+    functions for C programmers.</p>
+<p>When using <code class="function">_CLASS_GOBJECT()</code>, the constructors should
+    be protected (rather than public) and each constructor should have a
+    corresponding <code class="function">_WRAP_CREATE()</code> in the public section.
+    This prevents the class from being instantiated without using a
+    <code class="classname">RefPtr</code>. For instance:
+</p>
+<pre class="programlisting">
+class TextMark : public Glib::Object
+{
+  _CLASS_GOBJECT(TextMark, GtkTextMark, GTK_TEXT_MARK, Glib::Object, GObject)
+
+protected:
+  _WRAP_CTOR(TextMark(const Glib::ustring&amp; name, bool left_gravity = true), gtk_text_mark_new)
+
+public:
+  _WRAP_CREATE(const Glib::ustring&amp; name, bool left_gravity = true)
+</pre>
+<p>
+</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-ctor-default"></a>_CTOR_DEFAULT</h4></div></div></div>
+<p>This macro creates a default constructor with no arguments.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-ctor"></a>_WRAP_CTOR</h4></div></div></div>
+<p>This macro creates a constructor with arguments, equivalent to a
+  <code class="function">*_new()</code> C function. It won't actually call the
+  <code class="function">*_new()</code> function, but will simply create an equivalent
+  constructor with the same argument types. It takes a C++ constructor
+  signature, and a C function name.
+</p>
+<p>It also takes an optional extra argument:
+  </p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">errthrow</span></dt>
+<dd><p>This tells gmmproc that the C <code class="function">*_new()</code> has
+            a final GError** parameter which should be ignored.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-ctor-manual"></a>Hand-coding constructors</h4></div></div></div>
+<p>When a constructor must be partly hand written because, for instance, the
+    <code class="function">*_new()</code> C function's parameters do not correspond
+    directly to object properties, or because the <code class="function">*_new()</code> C
+    function does more than call <code class="function">g_object_new()</code>, the
+    <code class="function">_CONSTRUCT()</code> macro may be used in the
+    .ccg file to save some work. The <code class="function">_CONSTRUCT</code> macro takes
+    a series of property names and values. For instance, from
+    <code class="filename">button.ccg</code>:
+</p>
+<pre class="programlisting">
+Button::Button(const Glib::ustring&amp; label, bool mnemonic)
+:
+  _CONSTRUCT("label", label.c_str(), "use_underline", gboolean(mnemonic))
+{}
+</pre>
+<p>
+</p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-suppressing-macros"></a>Macros that suppress generation of some code</h3></div></div></div>
+<p>Some macros suppress the generation of some code when they are used after
+a <code class="function">_CLASS_*</code> macro. Some suppress the definition in the
+generated .cc file, others suppress both the declaration in the .h file and
+the definition in the .cc file.
+</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-default-ctor"></a>_CUSTOM_DEFAULT_CTOR</h4></div></div></div>
+<p>Suppresses declaration and definition of default constructor in
+<code class="function">_CLASS_BOXEDTYPE</code>, <code class="function">_CLASS_BOXEDTYPE_STATIC</code>
+and <code class="function">_CLASS_OPAQUE_COPYABLE</code>.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-ctor-cast"></a>_CUSTOM_CTOR_CAST</h4></div></div></div>
+<p>Suppresses declaration and definition of the constructor that takes a pointer
+to the wrapped C object in <code class="function">_CLASS_BOXEDTYPE</code> and
+<code class="function">_CLASS_BOXEDTYPE_STATIC</code>.
+</p>
+<p>Suppresses definition of the constructor that takes a pointer to the
+wrapped C object in <code class="function">_CLASS_GOBJECT</code>, <code class="function">_CLASS_GTKOBJECT</code>,
+<code class="function">_CLASS_INTERFACE</code> and <code class="function">_CLASS_OPAQUE_COPYABLE</code>.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-dtor"></a>_CUSTOM_DTOR</h4></div></div></div>
+<p>Suppresses definition of destructor in
+<code class="function">_CLASS_GOBJECT</code> and <code class="function">_CLASS_GTKOBJECT</code>.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-move-operations"></a>_CUSTOM_MOVE_OPERATIONS</h4></div></div></div>
+<p>Suppresses declaration and definition of move constructor and move
+assignment operator in <code class="function">_CLASS_GOBJECT</code>.
+</p>
+<p>For example:
+</p>
+<pre class="programlisting">
+class Derived : public Glib::Object
+{
+  _CLASS_GOBJECT(Derived, GDerived, G_DERIVED, Glib::Object, GObject)
+
+  _CUSTOM_MOVE_OPERATIONS
+
+public:
+  Derived(Derived&amp;&amp; src) noexcept;
+  Derived&amp; operator=(Derived&amp;&amp; src) noexcept;
+  // ...
+};
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-wrap-new"></a>_CUSTOM_WRAP_NEW</h4></div></div></div>
+<p>Suppresses definition of <code class="function">Glib::wrap_new()</code> function in
+<code class="function">_CLASS_GOBJECT</code>.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-custom-wrap-function"></a>_CUSTOM_WRAP_FUNCTION</h4></div></div></div>
+<p>Suppresses definition of <code class="function">Glib::wrap()</code> function in
+<code class="function">_CLASS_GOBJECT</code> and <code class="function">_CLASS_GTKOBJECT</code>.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-no-wrap-function"></a>_NO_WRAP_FUNCTION</h4></div></div></div>
+<p>Suppresses declaration and definition of <code class="function">Glib::wrap()</code>
+function in <code class="function">_CLASS_GOBJECT</code>, <code class="function">_CLASS_BOXEDTYPE</code>,
+<code class="function">_CLASS_BOXEDTYPE_STATIC</code>, <code class="function">_CLASS_OPAQUE_COPYABLE</code>,
+<code class="function">_CLASS_INTERFACE</code> and <code class="function">_CLASS_GTKOBJECT</code>.
+</p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-method-macros"></a>Method macros</h3></div></div></div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-method"></a>_WRAP_METHOD</h4></div></div></div>
+<p>This macro generates the C++ method to wrap a C function.</p>
+<p><code class="function">_WRAP_METHOD( C++ method signature, C function name)</code></p>
+<p>For instance, from <code class="filename">entry.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_METHOD(void set_text(const Glib::ustring&amp; text), gtk_entry_set_text)
+</pre>
+<p>
+</p>
+<p>The C function (e.g. <code class="function">gtk_entry_set_text</code>) is described
+    more fully in the .defs file, and the <code class="filename">convert*.m4</code> files
+    contain the necessary conversion from the C++ parameter type to the C
+    parameter type. This macro also generates doxygen documentation comments
+    based on the <code class="filename">*_docs.xml</code> and
+    <code class="filename">*_docs_override.xml</code> files.</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">refreturn</span></dt>
+<dd><p>Do an extra <code class="function">reference()</code> on the return value,
+                in case the C function does not provide a reference.</p></dd>
+<dt><span class="term">errthrow</span></dt>
+<dd><p>Use the last GError** parameter of the C function to
+                throw an exception.</p></dd>
+<dt><span class="term">deprecated ["&lt;text&gt;"]</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks. Text about the
+                deprecation can be specified as an optional
+                parameter.</p></dd>
+<dt><span class="term">constversion</span></dt>
+<dd><p>Just call the non-const version of the same function,
+                instead of generating almost duplicate code.</p></dd>
+<dt><span class="term">newin "&lt;version&gt;"</span></dt>
+<dd><p>Adds a @newin Doxygen command to the documentation, or replaces
+                the @newin command generated from the C documentation.</p></dd>
+<dt><span class="term">ifdef &lt;identifier&gt;</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks.</p></dd>
+<dt><span class="term">slot_name &lt;parameter_name&gt;</span></dt>
+<dd><p>Specifies the name of the slot parameter of the method, if it
+            has one.  This enables <span class="command"><strong>gmmproc</strong></span> to generate code
+            to copy the slot and pass the copy on to the C function in its
+            final <code class="literal">gpointer user_data</code> parameter.  The
+            <code class="literal">slot_callback</code> option must also be used to
+            specify the name of the glue callback function to also pass on to
+            the C function.</p></dd>
+<dt><span class="term">slot_callback &lt;function_name&gt;</span></dt>
+<dd><p>Used in conjunction with the <code class="literal">slot_name</code>
+            option to specify the name of the glue callback function that
+            handles extracting the slot and then calling it.  The address of
+            this callback is also passed on to the C function that the method
+            wraps.</p></dd>
+<dt><span class="term">no_slot_copy</span></dt>
+<dd><p>Tells <span class="command"><strong>gmmproc</strong></span> not to pass a copy of the slot
+            to the C function, if the method has one.  Instead the slot itself
+            is passed.  The slot parameter name and the glue callback function
+            must have been specified with the <code class="literal">slot_name</code> and
+            <code class="literal">slot_callback</code> options respectively.</p></dd>
+</dl></div>
+<p>
+</p>
+<p>Selecting which C++ types should be used is also important when wrapping
+  C API.  Though it's usually obvious what C++ types should be used in the C++
+  method, here are some hints:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>Objects used via <code class="classname">RefPtr</code>: Pass the
+            <code class="classname">RefPtr</code> as a const reference. For instance,
+            <code class="code">const Glib::RefPtr&lt;Gtk::FileFilter&gt;&amp;
+                filter</code>.</p></li>
+<li class="listitem"><p>Const Objects used via <code class="classname">RefPtr</code>: If the
+            object should not be changed by the function, then make sure that
+            the object is const, even if the <code class="classname">RefPtr</code> is
+            already const. For instance, <code class="code">const Glib::RefPtr&lt;const
+            Gtk::FileFilter&gt;&amp; filter</code>.</p></li>
+<li class="listitem"><p>Wrapping <code class="classname">GList*</code> and
+        <code class="classname">GSList*</code> parameters: First, you need to discover
+        what objects are contained in the list's data field for each item,
+        usually by reading the documentation for the C function. The list can
+        then be wrapped by a <code class="classname">std::vector</code> type.
+        For instance, <code class="code">std::vector&lt;
+        Glib::RefPtr&lt;Gdk::Pixbuf&gt; &gt;</code>.
+        You may need to define a Traits type to specify how the C
+        and C++ types should be converted.</p></li>
+<li class="listitem">
+<p>Wrapping <code class="classname">GList*</code> and
+        <code class="classname">GSList*</code> return types: You must discover whether
+        the caller should free the list and whether it should release the items
+        in the list, again by reading the documentation of the C function. With
+        this information you can choose the ownership (none, shallow or deep)
+        for the m4 conversion rule, which you should probably put directly into
+        the .hg file because the ownership depends on the
+        function rather than the type. For instance:
+</p>
+<pre class="programlisting">#m4 _CONVERSION(`GSList*',`std::vector&lt;Widget*&gt;',`Glib::SListHandler&lt;Widget*&gt;::slist_to_vector($3, Glib::OWNERSHIP_SHALLOW)')</pre>
+</li>
+</ul></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-method-docs-only"></a>_WRAP_METHOD_DOCS_ONLY</h4></div></div></div>
+<p>This macro is like <code class="function">_WRAP_METHOD()</code>, but it generates
+    only the documentation for a  C++ method that wraps a C function. Use this
+    when you must hand-code the method, but you want to use the documentation
+    that would be generated if the method was generated.</p>
+<p><code class="function">_WRAP_METHOD_DOCS_ONLY(C function name)</code></p>
+<p>For instance, from <code class="filename">container.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_METHOD_DOCS_ONLY(gtk_container_remove)
+</pre>
+<p>
+</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">errthrow</span></dt>
+<dd><p>Excludes documentation of the last GError** parameter of
+                the C function.</p></dd>
+<dt><span class="term">newin "&lt;version&gt;"</span></dt>
+<dd><p>Adds a @newin Doxygen command to the documentation, or replaces
+                the @newin command generated from the C documentation.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-ignore"></a>_IGNORE, _IGNORE_SIGNAL, _IGNORE_PROPERTY, _IGNORE_CHILD_PROPERTY</h4></div></div></div>
+<p><span class="command"><strong>gmmproc</strong></span> will warn you on stdout about functions, signals,
+    properties and child properties that you have forgotten to wrap, helping to
+    ensure that you are wrapping the complete API. But if you don't want to wrap
+    some functions, signals, properties or child properties, or if you chose
+    to hand-code some methods then you can use the _IGNORE(), _IGNORE_SIGNAL(),
+    _IGNORE_PROPERTY() or _IGNORE_CHILD_PROPERTY() macro to make
+    <span class="command"><strong>gmmproc</strong></span> stop complaining.</p>
+<p>
+</p>
+<div class="literallayout"><p><code class="function">_IGNORE(C function name 1, C function name 2, etc)<br>
+_IGNORE_SIGNAL(C signal name 1, C signal name 2, etc)<br>
+_IGNORE_PROPERTY(C property name 1, C property name 2, etc)<br>
+_IGNORE_CHILD_PROPERTY(C child property name 1, C child property name 2, etc)</code></p></div>
+<p>
+</p>
+<p>For instance, from <code class="filename">flowbox.hg</code>:
+</p>
+<pre class="programlisting">
+_IGNORE(gtk_flow_box_set_filter_func, gtk_flow_box_set_sort_func)
+_IGNORE_SIGNAL(activate-cursor-child, toggle-cursor-child, move-cursor)
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-signal"></a>_WRAP_SIGNAL</h4></div></div></div>
+<p>This macro generates the C++ libsigc++-style signal to wrap a C GObject
+    signal. It actually generates a public accessor method, such as
+    <code class="function">signal_clicked()</code>, which returns a proxy object.
+    <span class="command"><strong>gmmproc</strong></span> uses the .defs file to discover the C parameter
+    types and the .m4 convert files to discover appropriate type
+    conversions.</p>
+<p><code class="function">_WRAP_SIGNAL( C++ signal handler signature, C signal name)</code></p>
+<p>For instance, from <code class="filename">button.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_SIGNAL(void clicked(),"clicked")
+</pre>
+<p>
+</p>
+<p>Signals usually have function pointers in the GTK struct, with a
+    corresponding enum value and a <code class="function">g_signal_new()</code> in the
+    .c file.</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">no_default_handler</span></dt>
+<dd><p>Do not generate an <code class="function">on_something()</code> virtual
+                method to allow easy overriding of the default signal handler.
+                Use this when adding a signal with a default signal handler
+                would break the ABI by increasing the size of the class's
+                virtual function table.</p></dd>
+<dt><span class="term">custom_default_handler</span></dt>
+<dd><p>Generate a declaration of the <code class="function">on_something()</code>
+                virtual method in the <code class="filename">.h</code> file, but do not
+                generate a definition in the <code class="filename">.cc</code> file.
+                Use this when you must generate the definition by hand.</p></dd>
+<dt><span class="term">custom_c_callback</span></dt>
+<dd><p>Do not generate a C callback function for the signal.
+                Use this when you must generate the callback function by hand.</p></dd>
+<dt><span class="term">refreturn</span></dt>
+<dd><p>Do an extra <code class="function">reference()</code> on the return value
+                of the <code class="function">on_something()</code> virtual method, in
+                case the C function does not provide a reference.</p></dd>
+<dt><span class="term">deprecated ["&lt;text&gt;"]</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks. Text about the
+                deprecation can be specified as an optional parameter.</p></dd>
+<dt><span class="term">newin "&lt;version&gt;"</span></dt>
+<dd><p>Adds a @newin Doxygen command to the documentation, or replaces
+                the @newin command generated from the C documentation.</p></dd>
+<dt><span class="term">ifdef &lt;identifier&gt;</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks.</p></dd>
+<dt><span class="term">exception_handler &lt;method_name&gt;</span></dt>
+<dd><p>Allows to use custom exception handler instead of default one.
+	            Exception might be rethrown by user-defined handler, and it will be
+	            caught by default handler.</p></dd>
+<dt><span class="term">detail_name &lt;parameter_name&gt;</span></dt>
+<dd><p>Adds a <span class="type">const Glib::ustring&amp;</span> parameter to the
+	            <code class="methodname">signal_something()</code> method. Use it, if the signal
+	            accepts a detailed signal name, i.e. if the underlying C code registers
+	            the signal with the <code class="literal">G_SIGNAL_DETAILED</code> flag.</p></dd>
+<dt><span class="term">two_signal_methods</span></dt>
+<dd><p>Used in conjunction with the <code class="literal">detail_name</code>
+              option to generate two <code class="methodname">signal_something()</code>
+              methods, one without a parameter and one with a parameter without
+              a default value. With only the <code class="literal">detail_name</code> option
+              one method is generated, with a parameter with default value.
+              Use the <code class="literal">two_signal_methods</code> option, if it's
+              necessary in order to preserve ABI.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-property"></a>_WRAP_PROPERTY</h4></div></div></div>
+<p>This macro generates the C++ method to wrap a C GObject property. You must
+    specify the property name and the wanted C++ type for the property. <span class="command"><strong>gmmproc</strong></span>
+    uses the .defs file to discover the C type and the .m4 convert files to
+    discover appropriate type conversions.</p>
+<p><code class="function">_WRAP_PROPERTY(C property name, C++ type)</code></p>
+<p>For instance, from <code class="filename">button.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_PROPERTY("label", Glib::ustring)
+</pre>
+<p>
+</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">deprecated ["&lt;text&gt;"]</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks. Text about the
+                deprecation can be specified as an optional parameter.</p></dd>
+<dt><span class="term">newin "&lt;version&gt;"</span></dt>
+<dd><p>Adds a @newin Doxygen command to the documentation, or replaces
+                the @newin command generated from the C documentation.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-vfunc"></a>_WRAP_VFUNC</h4></div></div></div>
+<p>This macro generates the C++ method to wrap a virtual C function.</p>
+<p><code class="function">_WRAP_VFUNC( C++ method signature, C function name)</code></p>
+<p>For instance, from <code class="filename">widget.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_VFUNC(SizeRequestMode get_request_mode() const, get_request_mode)
+</pre>
+<p>
+</p>
+<p>The C function (e.g. <code class="function">get_request_mode</code>) is described
+    more fully in the <code class="filename">*_vfuncs.defs</code> file, and the
+    <code class="filename">convert*.m4</code> files contain the necessary conversion from
+    the C++ parameter type to the C parameter type. Conversions can also be
+    written in the .hg file. Virtual functions often require special conversions
+    that are best kept local to the .hg file where they are used.</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">refreturn</span></dt>
+<dd><p>Do an extra <code class="function">reference()</code> on the return value
+                of the <code class="function">something_vfunc()</code> function,
+                in case the virtual C function does not provide a reference.</p></dd>
+<dt><span class="term">refreturn_ctype</span></dt>
+<dd><p>Do an extra <code class="function">reference()</code> on the return value
+                of an overridden <code class="function">something_vfunc()</code> function
+                in the C callback function, in case the calling C function
+                expects it to provide a reference.</p></dd>
+<dt><span class="term">keep_return</span></dt>
+<dd><p>Keep a copy of the return value in the C callback function,
+                in case the calling C function does not expect to get its own
+                reference.</p></dd>
+<dt><span class="term">errthrow</span></dt>
+<dd><p>Use the last GError** parameter of the C virtual function (if
+              there is one) to throw an exception.</p></dd>
+<dt><span class="term">custom_vfunc</span></dt>
+<dd><p>Do not generate a definition of the vfunc in the
+               <code class="filename">.cc</code> file. Use this when you must generate
+               the vfunc by hand.</p></dd>
+<dt><span class="term">custom_vfunc_callback</span></dt>
+<dd><p>Do not generate a C callback function for the vfunc.
+                Use this when you must generate the callback function by hand.</p></dd>
+<dt><span class="term">ifdef &lt;identifier&gt;</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks.</p></dd>
+<dt><span class="term">slot_name &lt;parameter_name&gt;</span></dt>
+<dd><p>Specifies the name of the slot parameter of the method, if it
+            has one.  This enables <span class="command"><strong>gmmproc</strong></span> to generate code
+            to copy the slot and pass the copy on to the C function in its
+            final <code class="literal">gpointer user_data</code> parameter.  The
+            <code class="literal">slot_callback</code> option must also be used to
+            specify the name of the glue callback function to also pass on to
+            the C function.</p></dd>
+<dt><span class="term">slot_callback &lt;function_name&gt;</span></dt>
+<dd><p>Used in conjunction with the <code class="literal">slot_name</code>
+            option to specify the name of the glue callback function that
+            handles extracting the slot and then calling it.  The address of
+            this callback is also passed on to the C function that the method
+            wraps.</p></dd>
+<dt><span class="term">no_slot_copy</span></dt>
+<dd><p>Tells <span class="command"><strong>gmmproc</strong></span> not to pass a copy of the slot
+            to the C function, if the method has one.  Instead the slot itself
+            is passed.  The slot parameter name and the glue callback function
+            must have been specified with the <code class="literal">slot_name</code> and
+            <code class="literal">slot_callback</code> options respectively.</p></dd>
+<dt><span class="term">return_value &lt;value&gt;</span></dt>
+<dd><p>Defines a non-default return value.</p></dd>
+<dt><span class="term">err_return_value &lt;value&gt;</span></dt>
+<dd><p>Defines a non-default return value, used only if the C++
+	          <code class="function">something_vfunc()</code> function throws an exception
+	          which is propagated to the C callback function. If return_value is
+	          specified, but err_return_value is not, then return_value is used
+	          also when an exception is propagated.</p></dd>
+<dt><span class="term">exception_handler &lt;method_name&gt;</span></dt>
+<dd><p>Allows to use custom exception handler instead of default one.
+	            Exception might be rethrown by user-defined handler, and it will be
+	            caught by default handler.</p></dd>
+</dl></div>
+<p>
+</p>
+<p>A rule to which there may be exceptions: If the virtual C function returns
+    a pointer to an object derived from <code class="classname">GObject</code>, i.e. a
+    reference-counted object, then the virtual C++ function shall return a
+    <code class="classname">Glib::RefPtr&lt;&gt;</code> object. One of the extra
+    arguments <em class="parameter"><code>refreturn</code></em> or
+    <em class="parameter"><code>refreturn_ctype</code></em> is required.</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-child-property"></a>_WRAP_CHILD_PROPERTY</h4></div></div></div>
+<p>This macro generates the C++ method to wrap a GtkContainer child property.
+    (See <a class="ulink" href="https://developer.gnome.org/gtk3/stable/GtkContainer.html" target="_top">
+    GtkContainer</a> for more information about child properties).
+    Similarly to _WRAP_PROPERTY, you must specify the property name and the
+    wanted C++ type for the property. <span class="command"><strong>gmmproc</strong></span> uses the .defs
+    file to discover the C type and the .m4 convert files to discover
+    appropriate type conversions.</p>
+<p><code class="function">_WRAP_CHILD_PROPERTY(C child property name, C++ type)</code></p>
+<p>For instance, from <code class="filename">notebook.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_CHILD_PROPERTY("tab-expand", bool)
+</pre>
+<p>
+</p>
+<p>_WRAP_CHILD_PROPERTY() accepts the same optional arguments as _WRAP_PROPERTY().
+</p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-other-macros"></a>Other macros</h3></div></div></div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-implements-interface"></a>_IMPLEMENTS_INTERFACE</h4></div></div></div>
+<p>This macro generates initialization code for the interface.</p>
+<p><code class="function">_IMPLEMENTS_INTERFACE(C++ interface name)</code></p>
+<p>For instance, from <code class="filename">grid.hg</code>:
+</p>
+<pre class="programlisting">
+_IMPLEMENTS_INTERFACE(Orientable)
+</pre>
+<p>
+</p>
+<p>There is one optional extra argument:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">ifdef &lt;identifier&gt;</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-enum"></a>_WRAP_ENUM</h4></div></div></div>
+<p>This macro generates a C++ enum to wrap a C enum. You must specify the desired C++ name and
+    the name of the underlying C enum.</p>
+<p>For instance, from <code class="filename">enums.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_ENUM(WindowType, GtkWindowType)
+</pre>
+<p>
+</p>
+<p>There are some optional extra arguments:
+</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term">NO_GTYPE</span></dt>
+<dd>
+<p>Use this option, if the enum is not a <code class="classname">GType</code>.
+        This is the case when there is no <code class="function">*_get_type()</code>
+        function for the C enum, but be careful that you don't just need to
+        include an extra header for that function. You should also file a bug
+        against the C API, because all enums should be registered as GTypes.</p>
+<p>For example, from <code class="filename">icontheme.hg</code>:
+      </p>
+<pre class="programlisting">
+_WRAP_ENUM(IconLookupFlags, GtkIconLookupFlags, NO_GTYPE)
+      </pre>
+<p>
+      </p>
+</dd>
+<dt><span class="term">s#&lt;from&gt;#&lt;to&gt;#</span></dt>
+<dd>
+<p>Substitutes (part of) the name of one or more enum constants.
+        You can add any number of substitutions.</p>
+<p>For example, from <code class="filename">iochannel.hg</code> in glibmm:
+      </p>
+<pre class="programlisting">
+_WRAP_ENUM(SeekType, GSeekType, NO_GTYPE, s#^SEEK_#SEEK_TYPE_#)
+      </pre>
+<p>
+      </p>
+</dd>
+<dt><span class="term">deprecated ["&lt;text&gt;"]</span></dt>
+<dd><p>Puts the generated code in #ifdef blocks. Text about the
+        deprecation can be specified as an optional parameter.</p></dd>
+<dt><span class="term">newin "&lt;version&gt;"</span></dt>
+<dd><p>Adds a @newin Doxygen command to the documentation, or replaces
+        the @newin command generated from the C documentation.</p></dd>
+</dl></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-enum-docs-only"></a>_WRAP_ENUM_DOCS_ONLY</h4></div></div></div>
+<p>This macro just generates a Doxygen documentationn block for the enum.
+  This is useful for enums that can't be wrapped with
+  <code class="function">_WRAP_ENUM()</code> because they are complexly defined (maybe
+  using C macros) but including the generated enum documentation is still
+  desired.  It is used with the same syntax as
+  <code class="function">_WRAP_ENUM()</code> and also process the same options (though
+  NO_GTYPE is just ignored because it makes no difference when just generating
+  the enum's documentation).
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-wrap-gerror"></a>_WRAP_GERROR</h4></div></div></div>
+<p>This macro generates a C++ exception class, derived from Glib::Error, with
+a Code enum and a code() method. You must specify the desired C++ name, the name
+of the corresponding C enum, and the prefix for the C enum values.</p>
+<p>This exception can then be thrown by methods which are generated from
+_WRAP_METHOD() with the errthrow option.</p>
+<p>For instance, from <code class="filename">pixbuf.hg</code>:
+</p>
+<pre class="programlisting">
+_WRAP_GERROR(PixbufError, GdkPixbufError, GDK_PIXBUF_ERROR)
+</pre>
+<p>
+</p>
+<p>_WRAP_GERROR() accepts the same optional arguments as _WRAP_ENUM().</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-member-set-get"></a>_MEMBER_GET / _MEMBER_SET</h4></div></div></div>
+<p>
+    Use these macros if you're wrapping a simple struct or boxed type that provides
+    direct access to its data members, to create getters and setters for the data members.
+  </p>
+<p><code class="function">_MEMBER_GET(C++ name, C name, C++ type, C type)</code></p>
+<p><code class="function">_MEMBER_SET(C++ name, C name, C++ type, C type)</code></p>
+<p>
+    For example, in <code class="filename">rectangle.hg</code>:
+    </p>
+<pre class="programlisting">_MEMBER_GET(x, x, int, int)</pre>
+<p>
+  </p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-member-get-set-ptr"></a>_MEMBER_GET_PTR / _MEMBER_SET_PTR</h4></div></div></div>
+<p>
+    Use these macros to automatically provide getters and setters for a data
+    member that is a pointer type. For the getter function, it will
+    create two methods, one const and one non-const.
+  </p>
+<p><code class="function">_MEMBER_GET_PTR(C++ name, C name, C++ type, C type)</code></p>
+<p><code class="function">_MEMBER_SET_PTR(C++ name, C name, C++ type, C type)</code></p>
+<p>For example, for <code class="classname">Pango::Analysis</code> in <code class="filename">item.hg</code>:
+</p>
+<pre class="programlisting">
+// _MEMBER_GET_PTR(engine_lang, lang_engine, EngineLang*, PangoEngineLang*)
+// It's just a comment. It's difficult to find a real-world example.
+</pre>
+<p>
+  </p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-member-get-set-gobject"></a>_MEMBER_GET_GOBJECT / _MEMBER_SET_GOBJECT</h4></div></div></div>
+<p>
+    Use these macros to provide getters and setters for a data member that is a
+    <code class="classname">GObject</code> type that must be referenced before being
+    returned.
+  </p>
+<p><code class="function">_MEMBER_GET_GOBJECT(C++ name, C name, C++ type, C type)</code></p>
+<p><code class="function">_MEMBER_SET_GOBJECT(C++ name, C name, C++ type, C type)</code></p>
+<p>For example, in Pangomm, <code class="filename">layoutline.hg</code>:
+</p>
+<pre class="programlisting">
+_MEMBER_GET_GOBJECT(layout, layout, Pango::Layout, PangoLayout*)
+</pre>
+<p>
+  </p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-parameter-processing"></a>gmmproc Parameter Processing</h3></div></div></div>
+<p><span class="command"><strong>gmmproc</strong></span> allows processing the parameters in a method
+    signature for the macros that process method signatures (like
+    <code class="function">_WRAP_METHOD()</code>, <code class="function">_WRAP_CTOR()</code> and
+    <code class="function">_WRAP_CREATE()</code>) in a variety of ways:
+  </p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-parameter-reordering"></a>Parameter Reordering</h4></div></div></div>
+<p>
+      For all the macros that process method signatures, it is possible to
+      specify a different order for the C++ parameters than the existing order
+      in the C function, virtual function or signal.  For example, say that the
+      following C function were being wrapped as a C++ method for the
+      <code class="classname">Gtk::Widget</code> class:
+      </p>
+<pre class="programlisting">
+        void gtk_widget_set_device_events(GtkWidget* widget, GdkDevice* device,
+        GdkEventMask events);
+      </pre>
+<p>
+      However, changing the order of the C++ method's two parameters is
+      necessary.  Something like the following would wrap the function as a C++
+      method with a different order for the two parameters:
+      </p>
+<pre class="programlisting">
+        _WRAP_METHOD(void set_device_events(Gdk::EventMask events{events},
+        const Glib::RefPtr&lt;const Gdk::Device&gt;&amp; device{device}),
+        gtk_widget_set_device_events)
+      </pre>
+<p>
+      The <code class="literal">{c_param_name}</code> following the method parameter
+      names tells <span class="command"><strong>gmmproc</strong></span> to map the C++ parameter to the
+      specified C parameter within the <code class="literal">{}</code>.  Since the C++
+      parameter names correspond to the C ones, the above could be re-written
+      as:
+      </p>
+<pre class="programlisting">
+        _WRAP_METHOD(void set_device_events(Gdk::EventMask events{.}, const
+        Glib::RefPtr&lt;const Gdk::Device&gt;&amp; device{.}),
+        gtk_widget_set_device_events)
+      </pre>
+<p>
+    </p>
+<div class="warning" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Warning">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Warning]" src="icons/warning.png"></td>
+<th align="left">Warning</th>
+</tr>
+<tr><td align="left" valign="top"><p>
+        Please note that when reordering parameters for a
+        <code class="function">_WRAP_SIGNAL()</code> method signature, the C parameter
+        names would always be <code class="literal">p0</code>, <code class="literal">p1</code>,
+        etc. because the <code class="filename">generate_extra_defs</code> utility uses those
+        parameter names no matter what the C API's parameter names may be.
+        It's how the utility is written presently.
+      </p></td></tr>
+</table></div>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-optional-parameter-processing"></a>Optional Parameter Processing</h4></div></div></div>
+<p>
+      For all macros processing method signatures except
+      <code class="function">_WRAP_SIGNAL()</code> and
+      <code class="function">_WRAP_VFUNC()</code> it is also possible to make the
+      parameters optional so that extra C++ methods are generated without the
+      specified optional parameter.  For example, say that the following
+      <code class="function">*_new()</code> function were being wrapped as a constructor
+      in the <code class="classname">Gtk::ToolButton</code> class:
+      </p>
+<pre class="programlisting">
+        GtkToolItem* gtk_tool_button_new(GtkWidget* icon_widget, const gchar*
+        label);
+      </pre>
+<p>
+      Also, say that the C API allowed NULL for the function's
+      <em class="parameter"><code>label</code></em> parameter so that that parameter is optional.
+      It would be possible to have <span class="command"><strong>gmmproc</strong></span> generate the
+      original constructor (with all the parameters) along with an additional
+      constructor without that optional parameter by appending a
+      <code class="literal">{?}</code> to the parameter name like so:
+      </p>
+<pre class="programlisting">
+        _WRAP_CTOR(ToolButton(Widget&amp; icon_widget, const Glib::ustring&amp;
+        label{?}), gtk_tool_button_new)
+      </pre>
+<p>
+      In this case, two constructors would be generated: One with the optional
+      parameter and one without it.
+    </p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-output-parameter-processing"></a>Output Parameter Processing</h4></div></div></div>
+<p>
+      With <code class="function">_WRAP_METHOD()</code> it is also possible for the
+      return of the wrapped C function (if it has one) to be placed in an
+      output parameter of the C++ method instead of having the C++ method also
+      return a value like the C function does.  To do that, simply include the
+      output parameter in the C++ method parameter list appending a
+      <code class="literal">{OUT}</code> to the output parameter name.  For example, if
+      <code class="function">gtk_widget_get_request_mode()</code> is declared as the
+      following:
+      </p>
+<pre class="programlisting">
+        GtkSizeRequestMode gtk_widget_get_request_mode(GtkWidget* widget);
+      </pre>
+<p>
+      And having the C++ method set an output parameter is desired instead of
+      returning a <span class="type">SizeRequestMode</span>, something like the following
+      could be used:
+      </p>
+<pre class="programlisting">
+        _WRAP_METHOD(void get_request_mode(SizeRequestMode&amp; mode{OUT})
+        const, gtk_widget_get_request_mode)
+      </pre>
+<p>
+      The <code class="literal">{OUT}</code> appended to the name of the
+      <em class="parameter"><code>mode</code></em> output parameter tells
+      <span class="command"><strong>gmmproc</strong></span> to place the return of the C function in that
+      output parameter.  In this case, however, a necessary initialization
+      macro like the following would also have to be specified:
+      </p>
+<pre class="programlisting">
+        _INITIALIZATION(`SizeRequestMode&amp;',`GtkSizeRequestMode',`$3 =
+        (SizeRequestMode)($4)')
+      </pre>
+<p>
+      Which could also be written as:
+      </p>
+<pre class="programlisting">
+        _INITIALIZATION(`SizeRequestMode&amp;',`GtkSizeRequestMode',`$3 =
+        ($1)($4)')
+      </pre>
+<p>
+    </p>
+<p>
+      <code class="function">_WRAP_METHOD()</code> also supports setting C++ output
+      parameters from C output parameters if the C function being wrapped has
+      any.  Suppose, for example, that we want to wrap the following C function
+      that returns a value in its C output parameter
+      <em class="parameter"><code>rect</code></em>:
+      </p>
+<pre class="programlisting">
+        gboolean gtk_icon_view_get_cell_rect(GtkIconView* icon_view,
+        GtkTreePath* path, GtkCellRenderer* cell, GdkRectangle* rect);
+      </pre>
+<p>
+      To have <span class="command"><strong>gmmproc</strong></span> place the value returned in the C++
+      <em class="parameter"><code>rect</code></em> output parameter, something like the
+      following <code class="function">_WRAP_METHOD()</code> directive could be used:
+      </p>
+<pre class="programlisting">
+        _WRAP_METHOD(bool get_cell_rect(const TreeModel::Path&amp; path, const
+        CellRenderer&amp; cell, Gdk::Rectangle&amp; rect{&gt;&gt;}) const,
+        gtk_icon_view_get_cell_rect)
+      </pre>
+<p>
+      The <code class="literal">{&gt;&gt;}</code> following the <em class="parameter"><code>rect</code></em>
+      parameter name indicates that the C++ output parameter should be set from
+      the value returned in the C parameter from the C function.
+      <span class="command"><strong>gmmproc</strong></span> will generate a declaration of a temporary
+      variable in which to store the value of the C output parameter and a
+      statement that sets the C++ output parameter from the temporary variable.
+      In this case it may be necessary to have an
+      <code class="function">_INITIALIZATION()</code> describing how to set a
+      <code class="classname">Gdk::Rectangle&amp;</code> from a
+      <code class="classname">GdkRectangle*</code> such as the following:
+      </p>
+<pre class="programlisting">
+        _INITIALIZATION(`Gdk::Rectangle&amp;',`GdkRectangle', `$3 =
+        Glib::wrap(&amp;($4))')
+      </pre>
+<p>
+    </p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="gmmproc-string-parameter-processing"></a>String Parameter Processing</h4></div></div></div>
+<p>
+      A string-valued input parameter in a C++ method is usually a
+      <span class="type">const Glib::ustring&amp;</span> or a <span class="type">const std::string&amp;</span>.
+      In C code it's a <span class="type">const gchar*</span>. When an empty string is converted
+      to <span class="type">const gchar*</span>, it can be converted either to <code class="literal">nullptr</code>
+      or to a pointer to an empty string (with <code class="methodname">c_str()</code>).
+      Some parameters in some C functions accept a <code class="literal">nullptr</code>, and
+      interpret it in a special way. Other parameters must not be <code class="literal">nullptr</code>.
+    </p>
+<p>
+      The default conversion in <code class="function">_WRAP_METHOD()</code> and similar
+      directives is
+      </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>for mandatory parameters (with or without default values):
+          empty string to empty string,</p></li>
+<li class="listitem"><p>for optional parameters (with appended <code class="literal">{?}</code>):
+          empty string to <code class="literal">nullptr</code>.</p></li>
+</ul></div>
+<p>
+      If the default conversion is not the best conversion, append <code class="literal">{NULL}</code>
+      to a mandatory parameter or <code class="literal">{?!NULL}</code> to an optional
+      parameter (<code class="literal">!NULL</code> = not <code class="literal">NULL</code>). If you
+      append both a C parameter name and <code class="literal">NULL</code>, separate them
+      with a space: <code class="literal">{c_param_name NULL}</code>.
+    </p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="gmmproc-basic-types"></a>Basic Types</h3></div></div></div>
+<p>Some of the basic types that are used in C APIs have better alternatives
+    in C++. For example, there's no need for a <span class="type">gboolean</span> type since
+    C++ has <span class="type">bool</span>. The following list shows some commonly-used
+    types in C APIs and what you might convert them to in a C++ wrapper library.
+  </p>
+<div class="segmentedlist">
+<div class="title"><strong><span class="title">Basic Type equivalents</span></strong></div>
+<table border="0">
+<thead><tr class="segtitle">
+<th>C type</th>
+<th>C++ type</th>
+</tr></thead>
+<tbody>
+<tr class="seglistitem">
+<td class="seg"><span class="type">gboolean</span></td>
+<td class="seg"><span class="type">bool</span></td>
+</tr>
+<tr class="seglistitem">
+<td class="seg"><span class="type">gint</span></td>
+<td class="seg"><span class="type">int</span></td>
+</tr>
+<tr class="seglistitem">
+<td class="seg"><span class="type">guint</span></td>
+<td class="seg"><span class="type">guint</span></td>
+</tr>
+<tr class="seglistitem">
+<td class="seg"><span class="type">gdouble</span></td>
+<td class="seg"><span class="type">double</span></td>
+</tr>
+<tr class="seglistitem">
+<td class="seg"><span class="type">gunichar</span></td>
+<td class="seg"><span class="type">gunichar</span></td>
+</tr>
+<tr class="seglistitem">
+<td class="seg"><span class="type">gchar*</span></td>
+<td class="seg">
+<code class="classname">Glib::ustring</code> (or <code class="classname">std::string</code> for filenames)</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-wrapping-defs-files.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-wrapping-c-libraries.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-wrapping-hand-coded-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Generating the .defs files. </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Hand-coded source files</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

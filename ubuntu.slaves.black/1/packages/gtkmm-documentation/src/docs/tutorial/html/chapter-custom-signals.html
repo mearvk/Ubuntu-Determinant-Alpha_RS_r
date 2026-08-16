@@ -1,0 +1,238 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Appendix C. Creating your own signals</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-exceptions-in-signal-handlers.html" title="Exceptions in signal handlers">
+<link rel="next" href="sec-signals-comparison.html" title="Appendix D. Comparison with other signalling systems">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Appendix C. Creating your own signals</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-exceptions-in-signal-handlers.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-signals-comparison.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="appendix">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-custom-signals"></a>Appendix C. Creating your own signals</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc"><li><span class="sect1"><a href="chapter-custom-signals.html#chapter-custom-signals-example">Example</a></span></li></ul>
+</div>
+<p>
+Now that you've seen signals and signal handlers in <span class="application">gtkmm</span>, you
+might like to use the same technique to allow interaction between your
+own classes. That's actually very simple by using the
+<span class="application">libsigc++</span> library directly.
+</p>
+<p>
+This isn't purely a <span class="application">gtkmm</span> or GUI issue. <span class="application">gtkmm</span> uses
+<span class="application">libsigc++</span> to implement its proxy wrappers for the
+<span class="application">GTK+</span> signal system, but for new,
+non-GTK+ signals, you can create pure C++ signals, using the
+<code class="classname">sigc::signal&lt;&gt;</code> template.
+</p>
+<p>
+For instance, to create a signal that sends 2 parameters, a <span class="type">bool</span>
+and an <span class="type">int</span>, just declare a <code class="classname">sigc::signal</code>,
+like so:
+</p>
+<pre class="programlisting">
+sigc::signal&lt;void, bool, int&gt; signal_something;
+</pre>
+<p>
+</p>
+<p>
+You could just declare that signal as a public member variable, but
+some people find that distasteful and prefer to make it available via
+an accessor method, like so:
+</p>
+<pre class="programlisting">
+class Server
+{
+public:
+  //signal accessor:
+  typedef sigc::signal&lt;void, bool, int&gt; type_signal_something;
+  type_signal_something signal_something();
+
+protected:
+  type_signal_something m_signal_something;
+};
+
+Server::type_signal_something Server::signal_something()
+{
+  return m_signal_something;
+}
+</pre>
+<p>
+</p>
+<p>
+You can then connect to the signal using the same syntax used when
+connecting to <span class="application">gtkmm</span> signals. For instance,
+</p>
+<pre class="programlisting">
+server.signal_something().connect(
+  sigc::mem_fun(client, &amp;Client::on_server_something) );
+</pre>
+<p>
+</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="chapter-custom-signals-example"></a>Example</h2></div></div></div>
+<p>
+This is a full working example that defines and uses custom signals.
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/signals/custom/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">server.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_SERVER_H
+#define GTKMM_EXAMPLE_SERVER_H
+
+#include &lt;sigc++/sigc++.h&gt;
+
+class Server
+{
+public:
+  Server();
+  virtual ~Server();
+
+  void do_something();
+
+  //signal accessor:
+  typedef sigc::signal&lt;void, bool, int&gt; type_signal_something;
+  type_signal_something signal_something();
+
+protected:
+  type_signal_something m_signal_something;
+};
+
+#endif //GTKMM_EXAMPLE_SERVER_H
+</pre>
+<p>File: <code class="filename">client.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_CLIENT_H
+#define GTKMM_EXAMPLE_CLIENT_H
+
+#include &lt;sigc++/sigc++.h&gt;
+
+//Client must inherit from sigc::trackable.
+//because libsigc++ needs to keep track of the lifetime of signal handlers.
+class Client : public sigc::trackable
+{
+public:
+  Client();
+  virtual ~Client();
+
+  //Signal handler:
+  void on_server_something(bool a, int b);
+};
+
+#endif //GTKMM_EXAMPLE_CLIENT_H
+</pre>
+<p>File: <code class="filename">server.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "server.h"
+#include &lt;iostream&gt;
+
+Server::Server()
+{
+}
+
+Server::~Server()
+{
+}
+
+Server::type_signal_something Server::signal_something()
+{
+  return m_signal_something;
+}
+
+void Server::do_something()
+{
+  m_signal_something.emit(false, 5);
+}
+
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "server.h"
+#include "client.h"
+#include &lt;iostream&gt;
+
+int main(int, char**)
+{
+  Server server;
+  Client client;
+
+  //Connect a Server signal to the signal handler in Client.
+  server.signal_something().connect(sigc::mem_fun(client,
+              &amp;Client::on_server_something) );
+
+  std::cout &lt;&lt; "Before Server::do_something()" &lt;&lt; std::endl;
+
+  //Tell the server to do something that will eventually cause it to emit the
+  //"something" signal.
+  server.do_something();    // Client::on_server_something() will run before
+                            // Server::do_something() has completed.
+
+  std::cout &lt;&lt; "After Server::do_something()" &lt;&lt; std::endl;
+
+  return 0;
+}
+</pre>
+<p>File: <code class="filename">client.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "client.h"
+#include &lt;iostream&gt;
+
+Client::Client()
+{
+}
+
+Client::~Client()
+{
+}
+
+void Client::on_server_something(bool a, int b)
+{
+  std::cout &lt;&lt; "Client::on_server_something() called with these parameters: "
+      &lt;&lt; a &lt;&lt; ", " &lt;&lt; b &lt;&lt; std::endl;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-exceptions-in-signal-handlers.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-signals-comparison.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Exceptions in signal handlers </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Appendix D. Comparison with other signalling systems</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

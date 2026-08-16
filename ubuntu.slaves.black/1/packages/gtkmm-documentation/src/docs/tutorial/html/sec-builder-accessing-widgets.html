@@ -1,0 +1,155 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Accessing widgets</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-builder.html" title="Chapter 26. Glade and Gtk::Builder">
+<link rel="prev" href="chapter-builder.html" title="Chapter 26. Glade and Gtk::Builder">
+<link rel="next" href="sec-builder-using-derived-widgets.html" title="Using derived widgets">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Accessing widgets</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-builder.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 26. Glade and Gtk::Builder</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-builder-using-derived-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-builder-accessing-widgets"></a>Accessing widgets</h2></div></div></div>
+<p>
+To access a widget, for instance to <code class="methodname">show()</code> a dialog, use
+the <code class="methodname">get_widget()</code> method, providing the widget's name. This
+name should be specified in the <span class="application">Glade</span> Properties
+window. If the widget could not be found, or is of the wrong type, then the
+pointer will be set to nullptr.
+</p>
+<pre class="programlisting">
+Gtk::Dialog* pDialog = nullptr;
+builder-&gt;get_widget("DialogBasic", pDialog);
+</pre>
+<p>
+</p>
+<p>
+<span class="application">Gtk::Builder</span> checks for a null pointer, and checks
+that the widget is of the expected type, and will show warnings on the command
+line about these.
+</p>
+<p>
+Remember that you are not instantiating a widget with
+<code class="methodname">get_widget()</code>, you are just obtaining a pointer to one that
+already exists. You will always receive a pointer to the same instance when you
+call <code class="methodname">get_widget()</code> on the same
+<code class="classname">Gtk::Builder</code>, with the same widget name. The
+widgets are instantiated during <code class="methodname">Gtk::Builder::create_from_file()</code>.
+</p>
+<p>
+<code class="methodname">get_widget()</code> returns child widgets that are
+<code class="function">manage()</code>ed (see the <a class="link" href="chapter-memory.html" title="Chapter 25. Memory management">Memory
+Management</a> chapter), so they will be deleted when their parent
+container is deleted. So, if you get only a child widget from
+<span class="application">Gtk::Builder</span>, instead of a whole window, then you must
+either put it in a <code class="classname">Container</code> or delete it.
+<code class="classname">Windows</code> (such as <code class="classname">Dialogs</code>) cannot
+be managed because they have no parent container, so you must delete them at
+some point.
+</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="builder-example-loading"></a>Example</h3></div></div></div>
+<p>
+This simple example shows how to load a <span class="application">Glade</span> file at runtime and access the widgets with
+<span class="application">Gtk::Builder</span>.
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/builder/basic?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;gtkmm.h&gt;
+#include &lt;iostream&gt;
+
+Gtk::Dialog* pDialog = nullptr;
+
+static
+void on_button_clicked()
+{
+  if(pDialog)
+    pDialog-&gt;hide(); //hide() will cause main::run() to end.
+}
+
+int main (int argc, char **argv)
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  //Load the GtkBuilder file and instantiate its widgets:
+  auto refBuilder = Gtk::Builder::create();
+  try
+  {
+    refBuilder-&gt;add_from_file("basic.glade");
+  }
+  catch(const Glib::FileError&amp; ex)
+  {
+    std::cerr &lt;&lt; "FileError: " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return 1;
+  }
+  catch(const Glib::MarkupError&amp; ex)
+  {
+    std::cerr &lt;&lt; "MarkupError: " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return 1;
+  }
+  catch(const Gtk::BuilderError&amp; ex)
+  {
+    std::cerr &lt;&lt; "BuilderError: " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return 1;
+  }
+
+  //Get the GtkBuilder-instantiated Dialog:
+  refBuilder-&gt;get_widget("DialogBasic", pDialog);
+  if(pDialog)
+  {
+    //Get the GtkBuilder-instantiated Button, and connect a signal handler:
+    Gtk::Button* pButton = nullptr;
+    refBuilder-&gt;get_widget("quit_button", pButton);
+    if(pButton)
+    {
+      pButton-&gt;signal_clicked().connect( sigc::ptr_fun(on_button_clicked) );
+    }
+
+    app-&gt;run(*pDialog);
+  }
+
+  delete pDialog;
+
+  return 0;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-builder.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-builder.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-builder-using-derived-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 26. Glade and Gtk::Builder </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Using derived widgets</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 21. Recently Used Documents</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-printing-example.html" title="Example">
+<link rel="next" href="sec-recentchooser.html" title="RecentChooser">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 21. Recently Used Documents</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-printing-example.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-recentchooser.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-recent-documents"></a>Chapter 21. Recently Used Documents</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-recent-documents.html#sec-recentmanager">RecentManager</a></span></li>
+<li><span class="sect1"><a href="sec-recentchooser.html">RecentChooser</a></span></li>
+</ul>
+</div>
+<p>
+    <span class="application">gtkmm</span> provides an easy way to manage recently used documents. The classes
+    involved in implementing this functionality are
+    <code class="classname">RecentManager</code>,
+    <code class="classname">RecentChooserDialog</code>,
+    <code class="classname">RecentChooserMenu</code>,
+    <code class="classname">RecentChooserWidget</code>, and
+    <code class="classname">RecentFilter</code>.
+  </p>
+<p>
+    Each item in the list of recently used files is identified by its URI, and
+    can have associated metadata. The metadata can be used to specify how the
+    file should be displayed, a description of the file, its mime type, which
+    application registered it, whether it's private to the registering
+    application, and several other things.
+  </p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-recentmanager"></a>RecentManager</h2></div></div></div>
+<p>
+      <code class="classname">RecentManager</code> acts as a database of
+      recently used files. You use this class to register new files, remove
+      files from the list, or look up recently used files. There is one list
+      of recently used files per user.
+    </p>
+<p>
+      You can create a new <code class="classname">RecentManager</code>, but you'll most
+      likely just want to use the default one. You can get a reference to the
+      default <code class="classname">RecentManager</code> with
+      <code class="methodname">get_default()</code>.
+    </p>
+<p>
+      <code class="classname">RecentManager</code> is the model of a model-view pattern,
+      where the view is a class that implements the
+      <code class="classname">RecentChooser</code> interface.
+    </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="recent-files-adding"></a>Adding Items to the List of Recent Files</h3></div></div></div>
+<p>
+        To add a new file to the list of recent documents, in the simplest case,
+        you only need to provide the URI. For example:
+      </p>
+<pre class="programlisting">Glib::RefPtr&lt;Gtk::RecentManager&gt; recent_manager = Gtk::RecentManager::get_default();
+recent_manager-&gt;add_item(uri);</pre>
+<p>
+        If you want to register a file with metadata, you can pass a
+        <code class="classname">RecentManager::Data</code> parameter to
+        <code class="methodname">add_item()</code>. The metadata that can be set on a
+        particular file item is as follows:
+      </p>
+<div class="itemizedlist">
+<a name="list-file-metadata"></a><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p><code class="varname">app_exec</code>: The command line to be used to launch
+            this resource. This string may contain the "f" and "u" escape
+            characters which will be expanded to the resource file path and URI
+            respectively</p></li>
+<li class="listitem"><p><code class="varname">app_name</code>: The name of the application that
+            registered the resource</p></li>
+<li class="listitem"><p><code class="varname">description</code>: A short description of the
+            resource as a UTF-8 encoded string</p></li>
+<li class="listitem"><p><code class="varname">display_name</code>: The name of the resource to be
+            used for display as a UTF-8 encoded string</p></li>
+<li class="listitem"><p><code class="varname">groups</code>: A list of groups associated with this
+            item. Groups are essentially arbitrary strings associated with a
+            particular resource. They can be thought of as 'categories' (such
+            as "email", "graphics", etc) or tags for the resource.</p></li>
+<li class="listitem"><p><code class="varname">is_private</code>: Whether this resource should be
+            visible only to applications that have registered it or not</p></li>
+<li class="listitem"><p><code class="varname">mime_type</code>: The MIME type of the resource</p></li>
+</ul>
+</div>
+<p>
+        In addition to adding items to the list, you can also look up items from
+        the list and modify or remove items.
+      </p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="recent-files-lookup"></a>Looking up Items in the List of Recent Files</h3></div></div></div>
+<p>
+        To look up recently used files, <code class="classname">RecentManager</code>
+        provides several functions. To look up a specific item by its URI, you
+        can use the <code class="methodname">lookup_item()</code> function, which will
+        return a <code class="classname">RecentInfo</code> class. If the specified URI
+        did not exist in the list of recent files,
+        <code class="methodname">lookup_item()</code> throws a
+        <code class="classname">RecentManagerError</code> exception. For example:
+      </p>
+<pre class="programlisting">Glib::RefPtr&lt;Gtk::RecentInfo&gt; info;
+try
+{
+  info = recent_manager-&gt;lookup_item(uri);
+}
+catch(const Gtk::RecentManagerError&amp; ex)
+{
+  std::cerr &lt;&lt; "RecentManagerError: " &lt;&lt; ex.what() &lt;&lt; std::endl;
+}
+if (info)
+{
+  // item was found
+}</pre>
+<p>
+        A <code class="classname">RecentInfo</code> object is essentially an object
+        containing all of the metadata about a single recently-used file. You
+        can use this object to look up any of the properties listed
+        <a class="link" href="chapter-recent-documents.html#list-file-metadata">above</a>.
+      </p>
+<p>
+        If you don't want to look for a specific URI, but instead want to get a
+        list of all recently used items, <code class="classname">RecentManager</code>
+        provides the <code class="methodname">get_items()</code> function. The return
+        value of this function is a <code class="classname">std::vector</code> of all
+        recently used files. The following code demonstrates how you might get a
+        list of recently used files:
+      </p>
+<pre class="programlisting">std::vector&lt; Glib::RefPtr&lt;Gtk::RecentInfo&gt; &gt; info_list = recent_manager-&gt;get_items();</pre>
+<p>
+        The maximum age of items in the recently used files list can be set with
+        <code class="methodname">Gtk::Settings::property_gtk_recent_files_max_age()</code>.
+        Default value: 30 days.
+      </p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="recent-files-modifying"></a>Modifying the List of Recent Files</h3></div></div></div>
+<p>
+        There may be times when you need to modify the list of recent files.
+        For instance, if a file is moved or renamed, you may need to update the
+        file's location in the recent files list so that it doesn't point to an
+        incorrect location. You can update an item's location by using
+        <code class="methodname">move_item()</code>.
+      </p>
+<p>
+        In addition to changing a file's URI, you can also remove items from the
+        list, either one at a time or by clearing them all at once. The former
+        is accomplished with <code class="methodname">remove_item()</code>, the latter with
+        <code class="methodname">purge_items()</code>.
+      </p>
+<div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="icons/note.png"></td>
+<th align="left">Note</th>
+</tr>
+<tr><td align="left" valign="top"><p>
+        The functions <code class="methodname">move_item()</code>,
+        <code class="methodname">remove_item()</code> and
+        <code class="methodname">purge_items()</code> have no effect on the actual files
+        that are referred to by the URIs, they only modify the list of recent
+        files.
+        </p></td></tr>
+</table></div>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-printing-example.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-recentchooser.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Example </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> RecentChooser</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

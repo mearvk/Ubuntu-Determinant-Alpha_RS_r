@@ -1,0 +1,33 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libsoup, to verify that
+# the headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2019 Simon McVittie
+# (C) 2019 Laurent Bigonville
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR=$(mktemp -d)
+export XDG_RUNTIME_DIR="$WORKDIR"
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+cat <<EOF > gspell.c
+#include <gspell/gspell.h>
+
+int main(void)
+{
+    g_assert_true (gspell_checker_new(NULL));
+    return 0;
+}
+EOF
+
+cflags=-Wno-deprecated-declarations
+code=gspell.c
+lib=gspell-1
+
+gcc $cflags -o "${lib}-test" "${code}" $(pkg-config --cflags --libs "$lib")
+echo "build ($lib): OK"
+
+./${lib}-test
+echo "run ($lib): OK"

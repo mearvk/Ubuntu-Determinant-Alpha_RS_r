@@ -1,0 +1,189 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Exceptions in signal handlers</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-signals.html" title="Appendix B. Signals">
+<link rel="prev" href="sec-xeventsignals.html" title="X Event signals">
+<link rel="next" href="chapter-custom-signals.html" title="Appendix C. Creating your own signals">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Exceptions in signal handlers</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-xeventsignals.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Appendix B. Signals</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-custom-signals.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-exceptions-in-signal-handlers"></a>Exceptions in signal handlers</h2></div></div></div>
+<p>
+When a program is aborted because of an unhandled C++ exception, it's sometimes
+possible to use a debugger to find the location where the exception was thrown.
+This is more difficult than usual if the exception was thrown from a signal handler.
+</p>
+<p>
+This section describes primarily what you can expect on a Linux system, when you
+use <a class="ulink" href="http://www.gnu.org/software/gdb/" target="_top">the gdb debugger</a>.
+</p>
+<p>
+First, let's look at a simple example where an exception is thrown from a normal
+function (no signal handler).
+</p>
+<pre class="programlisting">
+// without_signal.cc
+#include &lt;gtkmm.h&gt;
+
+bool throwSomething()
+{
+  throw "Something";
+  return true;
+}
+
+int main(int argc, char** argv)
+{
+  throwSomething();
+  Glib::RefPtr&lt;Gtk::Application&gt; app =
+    Gtk::Application::create(argc, argv, "org.gtkmm.without_signal");
+  return app-&gt;run();
+}
+</pre>
+<p>
+</p>
+<p>
+Here is an excerpt from a <span class="application">gdb</span> session. Only the most
+interesting parts of the output are shown.
+</p>
+<pre class="programlisting">
+&gt; gdb without_signal
+(gdb) run
+terminate called after throwing an instance of 'char const*'
+
+Program received signal SIGABRT, Aborted.
+(gdb) backtrace
+#7  0x08048864 in throwSomething () at without_signal.cc:6
+#8  0x0804887d in main (argc=1, argv=0xbfffecd4) at without_signal.cc:12
+</pre>
+<p>
+You can see that the exception was thrown from <code class="filename">without_signal.cc</code>,
+line 6 (<code class="code">throw "Something";</code>).
+</p>
+<p>
+Now let's see what happens when an exception is thrown from a signal handler.
+Here's the source code.
+</p>
+<pre class="programlisting">
+// with_signal.cc
+#include &lt;gtkmm.h&gt;
+
+bool throwSomething()
+{
+  throw "Something";
+  return true;
+}
+
+int main(int argc, char** argv)
+{
+  Glib::signal_timeout().connect(sigc::ptr_fun(throwSomething), 500);
+  Glib::RefPtr&lt;Gtk::Application&gt; app =
+    Gtk::Application::create(argc, argv, "org.gtkmm.with_signal");
+  app-&gt;hold();
+  return app-&gt;run();
+}
+</pre>
+<p>
+</p>
+<p>
+And here's an excerpt from a <span class="application">gdb</span> session.
+</p>
+<pre class="programlisting">
+&gt; gdb with_signal
+(gdb) run
+(with_signal:2703): glibmm-ERROR **:
+unhandled exception (type unknown) in signal handler
+
+Program received signal SIGTRAP, Trace/breakpoint trap.
+(gdb) backtrace
+#2  0x0063c6ab in glibmm_unexpected_exception () at exceptionhandler.cc:77
+#3  Glib::exception_handlers_invoke () at exceptionhandler.cc:150
+#4  0x0063d370 in glibmm_source_callback (data=0x804d620) at main.cc:212
+#13 0x002e1b31 in Gtk::Application::run (this=0x804f300) at application.cc:178
+#14 0x08048ccc in main (argc=1, argv=0xbfffecd4) at with_signal.cc:16
+</pre>
+<p>
+The exception is caught in <span class="application">glibmm</span>, and the program
+ends with a call to <code class="function">g_error()</code>. Other exceptions may result
+in different behaviour, but in any case the exception from a signal handler is
+caught in <span class="application">glibmm</span> or <span class="application">gtkmm</span>, and
+<span class="application">gdb</span> can't see where it was thrown.
+</p>
+<p>
+To see where the exception is thrown, you can use the <span class="application">gdb</span>
+command <strong class="userinput"><code>catch throw</code></strong>.
+</p>
+<pre class="programlisting">
+&gt; gdb with_signal
+(gdb) catch throw
+Catchpoint 1 (throw)
+(gdb) run
+Catchpoint 1 (exception thrown), 0x00714ff0 in __cxa_throw ()
+(gdb) backtrace
+#0  0x00714ff0 in __cxa_throw () from /usr/lib/i386-linux-gnu/libstdc++.so.6
+#1  0x08048bd4 in throwSomething () at with_signal.cc:6
+(gdb) continue
+Continuing.
+(with_signal:2375): glibmm-ERROR **
+unhandled exception (type unknown) in signal handler
+
+Program received signal SIGTRAP, Trace/breakpoint trap.
+</pre>
+<p>
+</p>
+<p>
+If there are many caught exceptions before the interesting uncaught one, this
+method can be tedious. It can be automated with the following
+<span class="application">gdb</span> commands.
+</p>
+<pre class="programlisting">
+(gdb) catch throw
+(gdb) commands
+(gdb)   backtrace
+(gdb)   continue
+(gdb)   end
+(gdb) set pagination off
+(gdb) run
+</pre>
+<p>
+These commands will print a backtrace from each <code class="code">throw</code> and continue.
+The backtrace from the last (or possibly the last but one) <code class="code">throw</code>
+before the program stops, is the interesting one.
+</p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-xeventsignals.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-signals.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-custom-signals.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">X Event signals </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Appendix C. Creating your own signals</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

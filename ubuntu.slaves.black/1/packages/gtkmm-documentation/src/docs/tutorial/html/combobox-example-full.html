@@ -1,0 +1,226 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Full Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-combobox.html" title="Chapter 10. Combo Boxes">
+<link rel="prev" href="sec-combobox-changes.html" title="Responding to changes">
+<link rel="next" href="combobox-example-simple.html" title="Simple Text Example">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Full Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-combobox-changes.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 10. Combo Boxes</th>
+<td width="20%" align="right"> <a accesskey="n" href="combobox-example-simple.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="combobox-example-full"></a>Full Example</h2></div></div></div>
+<div class="figure">
+<a name="figure-combobox-complex"></a><p class="title"><b>Figure 10.1. ComboBox</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/combobox_complex.png" alt="ComboBox"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/combobox/complex?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm/window.h&gt;
+#include &lt;gtkmm/comboboxtext.h&gt;
+#include &lt;gtkmm/liststore.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  void on_cell_data_extra(const Gtk::TreeModel::const_iterator&amp; iter);
+
+  //Signal handlers:
+  void on_combo_changed();
+
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); add(m_col_extra);}
+
+    Gtk::TreeModelColumn&lt;int&gt; m_col_id;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_extra;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::ComboBox m_Combo;
+  Gtk::CellRendererText m_cell;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+{
+  set_title("ComboBox example");
+
+  //Create the Tree model:
+  //m_refTreeModel = Gtk::TreeStore::create(m_Columns);
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  m_Combo.set_model(m_refTreeModel);
+
+  //Fill the ComboBox's Tree Model:
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 1;
+  row[m_Columns.m_col_name] = "Billy Bob";
+  row[m_Columns.m_col_extra] = "something";
+  m_Combo.set_active(row);
+  /*
+  Gtk::TreeModel::Row childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 11;
+  childrow[m_Columns.m_col_name] = "Billy Bob Junior";
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 12;
+  childrow[m_Columns.m_col_name] = "Sue Bob";
+  */
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 2;
+  row[m_Columns.m_col_name] = "Joey Jojo";
+  row[m_Columns.m_col_extra] = "yadda";
+
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = 3;
+  row[m_Columns.m_col_name] = "Rob McRoberts";
+  row[m_Columns.m_col_extra] = "";
+
+  /*
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 31;
+  childrow[m_Columns.m_col_name] = "Xavier McRoberts";
+  */
+
+  //Add the model columns to the Combo (which is a kind of view),
+  //rendering them in the default way:
+  m_Combo.pack_start(m_Columns.m_col_id);
+  m_Combo.pack_start(m_Columns.m_col_name);
+
+  //An example of adding a cell renderer manually,
+  //instead of using pack_start(model_column)
+  //so we have more control:
+  m_Combo.set_cell_data_func(m_cell,
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_cell_data_extra));
+  m_Combo.pack_start(m_cell);
+
+  //Add the ComboBox to the window.
+  add(m_Combo);
+
+  //Connect signal handler:
+  m_Combo.signal_changed().connect( sigc::mem_fun(*this, &amp;ExampleWindow::on_combo_changed) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_cell_data_extra(const Gtk::TreeModel::const_iterator&amp; iter)
+{
+  auto row = *iter;
+  const Glib::ustring extra = row[m_Columns.m_col_extra];
+
+  //Some arbitrary logic just to show that this is where you can do such things:
+
+  //Transform the value, deciding how to represent it as text:
+  if(extra.empty())
+    m_cell.property_text() = "(none)";
+  else
+    m_cell.property_text() = "-" + extra + "-";
+
+  //Change other cell renderer properties too:
+  m_cell.property_foreground() = (extra == "yadda" ? "red" : "green");
+}
+
+void ExampleWindow::on_combo_changed()
+{
+  Gtk::TreeModel::iterator iter = m_Combo.get_active();
+  if(iter)
+  {
+    Gtk::TreeModel::Row row = *iter;
+    if(row)
+    {
+      //Get the data for the selected row, using our knowledge of the tree
+      //model:
+      int id = row[m_Columns.m_col_id];
+      Glib::ustring name = row[m_Columns.m_col_name];
+
+      std::cout &lt;&lt; " ID=" &lt;&lt; id &lt;&lt; ", name=" &lt;&lt; name &lt;&lt; std::endl;
+    }
+  }
+  else
+    std::cout &lt;&lt; "invalid iter" &lt;&lt; std::endl;
+}
+
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-combobox-changes.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-combobox.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="combobox-example-simple.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Responding to changes </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Simple Text Example</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

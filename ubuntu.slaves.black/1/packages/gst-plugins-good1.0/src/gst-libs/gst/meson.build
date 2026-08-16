@@ -1,0 +1,2 @@
+subdir('basecamerabinsrc')
+subdir('interfaces')

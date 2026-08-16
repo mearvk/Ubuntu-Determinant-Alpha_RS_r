@@ -1,0 +1,415 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>ComboBox with an Entry</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-combobox.html" title="Chapter 10. Combo Boxes">
+<link rel="prev" href="combobox-example-simple.html" title="Simple Text Example">
+<link rel="next" href="chapter-textview.html" title="Chapter 11. TextView">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">ComboBox with an Entry</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="combobox-example-simple.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 10. Combo Boxes</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-textview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-comboboxentry"></a>ComboBox with an Entry</h2></div></div></div>
+<p>A <code class="classname">ComboBox</code> may contain an <code class="classname">Entry</code> widget for entering of arbitrary text, by specifying <code class="literal">true</code> for the constructor's <code class="literal">has_entry</code> parameter.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-comboboxentry-text-column"></a>The text column</h3></div></div></div>
+<p>So that the <code class="classname">Entry</code> can interact with the drop-down list of choices, you must specify which of your model columns is the text column, with <code class="methodname">set_entry_text_column()</code>. For instance:
+</p>
+<pre class="programlisting">m_combo.set_entry_text_column(m_columns.m_col_name);</pre>
+<p>
+</p>
+<p>
+When you select a choice from the drop-down menu, the value from this column will be placed in the <code class="classname">Entry</code>.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-comboboxentry-model"></a>The entry</h3></div></div></div>
+<p>Because the user may enter arbitrary text, an active model row isn't enough to tell us what text the user has entered. Therefore, you should retrieve the <code class="classname">Entry</code> widget with the <code class="methodname">ComboBox::get_entry()</code> method and call <code class="methodname">get_text()</code> on that.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-comboboxentry-changes"></a>Responding to changes</h3></div></div></div>
+<p>
+When the user enters arbitrary text, it may not be enough to connect to the
+<code class="literal">changed</code> signal, which is emitted for every typed character.
+It is not emitted when the user presses the Enter key. Pressing the Enter key or
+moving the keyboard focus to another widget may signal that the user has finished
+entering text. To be notified of these events, connect to the
+<code class="classname">Entry</code>'s <code class="literal">activate</code> and
+<code class="literal">focus_out_event</code> signals, like so
+</p>
+<pre class="programlisting">Gtk::Entry* entry = m_Combo.get_entry();
+if (entry)
+{
+  // The Entry shall receive focus-out events.
+  entry-&gt;add_events(Gdk::FOCUS_CHANGE_MASK);
+
+  // Alternatively you can connect to m_Combo.signal_changed().
+  entry-&gt;signal_changed().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_entry_changed) );
+
+  entry-&gt;signal_activate().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_entry_activate) );
+
+  entry-&gt;signal_focus_out_event().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_entry_focus_out_event) );
+}</pre>
+<p>
+The <code class="literal">changed</code> signals of <code class="classname">ComboBox</code> and
+<code class="classname">Entry</code> are both emitted for every change. It doesn't matter
+which one you connect to. But only <code class="classname">Entry</code>'s
+<code class="literal">focus_out_event</code> signal is useful here.
+</p>
+<p>
+X events are described in more detail in the
+<a class="link" href="sec-xeventsignals.html" title="X Event signals">X Event signals</a> section in the appendix.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="comboboxentry-example-full"></a>Full Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-comboboxentry-complex"></a><p class="title"><b>Figure 10.3. ComboBox with Entry</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/comboboxentry_complex.png" alt="ComboBox with Entry"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/combobox/entry_complex?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm/window.h&gt;
+#include &lt;gtkmm/combobox.h&gt;
+#include &lt;gtkmm/liststore.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_entry_changed();
+  void on_entry_activate();
+  bool on_entry_focus_out_event(GdkEventFocus* event);
+
+  //Signal connection:
+  sigc::connection m_ConnectionFocusOut;
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_id); add(m_col_name); }
+
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_id; //The data to choose - this must be text.
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_name;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::ComboBox m_Combo;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_Combo(true /* has_entry */)
+{
+  set_title("ComboBox example");
+
+  //Create the Tree model:
+  //m_refTreeModel = Gtk::TreeStore::create(m_Columns);
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  m_Combo.set_model(m_refTreeModel);
+
+  //Fill the ComboBox's Tree Model:
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = "1";
+  row[m_Columns.m_col_name] = "Billy Bob";
+  /*
+  Gtk::TreeModel::Row childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 11;
+  childrow[m_Columns.m_col_name] = "Billy Bob Junior";
+
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 12;
+  childrow[m_Columns.m_col_name] = "Sue Bob";
+  */
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = "2";
+  row[m_Columns.m_col_name] = "Joey Jojo";
+
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_id] = "3";
+  row[m_Columns.m_col_name] = "Rob McRoberts";
+
+  /*
+  childrow = *(m_refTreeModel-&gt;append(row.children()));
+  childrow[m_Columns.m_col_id] = 31;
+  childrow[m_Columns.m_col_name] = "Xavier McRoberts";
+  */
+
+  //Add the model columns to the Combo (which is a kind of view),
+  //rendering them in the default way:
+  //This is automatically rendered when we use set_entry_text_column().
+  //m_Combo.pack_start(m_Columns.m_col_id);
+  m_Combo.pack_start(m_Columns.m_col_name);
+
+  m_Combo.set_entry_text_column(m_Columns.m_col_id);
+  m_Combo.set_active(1);
+
+  //Add the ComboBox to the window.
+  add(m_Combo);
+
+  //Connect signal handlers:
+  auto entry = m_Combo.get_entry();
+  if (entry)
+  {
+    // The Entry shall receive focus-out events.
+    entry-&gt;add_events(Gdk::FOCUS_CHANGE_MASK);
+    // Alternatively you can connect to m_Combo.signal_changed().
+    entry-&gt;signal_changed().connect(sigc::mem_fun(*this,
+      &amp;ExampleWindow::on_entry_changed) );
+    entry-&gt;signal_activate().connect(sigc::mem_fun(*this,
+      &amp;ExampleWindow::on_entry_activate) );
+    m_ConnectionFocusOut = entry-&gt;signal_focus_out_event().
+      connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_entry_focus_out_event) );
+  }
+  else
+    std::cout &lt;&lt; "No Entry ???" &lt;&lt; std::endl;
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+  // The focus_out signal may be emitted while m_Combo is being destructed.
+  // The signal handler can generate critical messages, if it's called when
+  // m_Combo has been partly destructed.
+  m_ConnectionFocusOut.disconnect();
+}
+
+void ExampleWindow::on_entry_changed()
+{
+  auto entry = m_Combo.get_entry();
+  if (entry)
+  {
+    std::cout &lt;&lt; "on_entry_changed(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+      &lt;&lt; ", ID=" &lt;&lt; entry-&gt;get_text() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleWindow::on_entry_activate()
+{
+  auto entry = m_Combo.get_entry();
+  if (entry)
+  {
+    std::cout &lt;&lt; "on_entry_activate(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+      &lt;&lt; ", ID=" &lt;&lt; entry-&gt;get_text() &lt;&lt; std::endl;
+  }
+}
+
+bool ExampleWindow::on_entry_focus_out_event(GdkEventFocus* /* event */)
+{
+  auto entry = m_Combo.get_entry();
+  if (entry)
+  {
+    std::cout &lt;&lt; "on_entry_focus_out_event(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+      &lt;&lt; ", ID=" &lt;&lt; entry-&gt;get_text() &lt;&lt; std::endl;
+    return true;
+  }
+  return false;
+}
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="comboboxentry-example-simple"></a>Simple Text Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-comboboxentry-text"></a><p class="title"><b>Figure 10.4. ComboBoxText with Entry</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/comboboxentry_text.png" alt="ComboBoxText with Entry"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/combobox/entry_text?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm/window.h&gt;
+#include &lt;gtkmm/comboboxtext.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_combo_changed();
+  void on_entry_activate();
+  bool on_entry_focus_out_event(GdkEventFocus* event);
+
+  //Signal connection:
+  sigc::connection m_ConnectionFocusOut;
+
+  //Child widgets:
+  Gtk::ComboBoxText m_Combo;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_Combo(true /* has_entry */)
+{
+  set_title("ComboBoxText example");
+
+  //Fill the combo:
+  m_Combo.append("something");
+  m_Combo.append("something else");
+  m_Combo.append("something or other");
+  m_Combo.set_active(0);
+
+  add(m_Combo);
+
+  //Connect signal handlers:
+  auto entry = m_Combo.get_entry();
+  // Alternatively you can connect to entry-&gt;signal_changed().
+  m_Combo.signal_changed().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_combo_changed) );
+  if (entry)
+  {
+    // The Entry shall receive focus-out events.
+    entry-&gt;add_events(Gdk::FOCUS_CHANGE_MASK);
+    entry-&gt;signal_activate().connect(sigc::mem_fun(*this,
+      &amp;ExampleWindow::on_entry_activate) );
+    m_ConnectionFocusOut = entry-&gt;signal_focus_out_event().
+      connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_entry_focus_out_event) );
+  }
+  else
+    std::cout &lt;&lt; "No Entry ???" &lt;&lt; std::endl;
+
+  m_Combo.property_has_frame() = false;
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+  // The focus_out signal may be emitted while m_Combo is being destructed.
+  // The signal handler can generate critical messages, if it's called when
+  // m_Combo has been partly destructed.
+  m_ConnectionFocusOut.disconnect();
+}
+
+void ExampleWindow::on_combo_changed()
+{
+  std::cout &lt;&lt; "on_combo_changed(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+    &lt;&lt; ", Text=" &lt;&lt; m_Combo.get_active_text() &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_entry_activate()
+{
+  std::cout &lt;&lt; "on_entry_activate(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+    &lt;&lt; ", Text=" &lt;&lt; m_Combo.get_active_text() &lt;&lt; std::endl;
+}
+
+bool ExampleWindow::on_entry_focus_out_event(GdkEventFocus* /* event */)
+{
+  std::cout &lt;&lt; "on_entry_focus_out_event(): Row=" &lt;&lt; m_Combo.get_active_row_number()
+    &lt;&lt; ", Text=" &lt;&lt; m_Combo.get_active_text() &lt;&lt; std::endl;
+  return true;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="combobox-example-simple.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-combobox.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-textview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Simple Text Example </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 11. TextView</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

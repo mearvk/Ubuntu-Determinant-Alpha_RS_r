@@ -1,0 +1,186 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Drawing Curved Lines</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="prev" href="sec-cairo-drawing-lines.html" title="Drawing Straight Lines">
+<link rel="next" href="sec-cairo-drawing-arcs.html" title="Drawing Arcs and Circles">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Drawing Curved Lines</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-cairo-drawing-lines.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 17. The Drawing Area Widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-cairo-drawing-arcs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-cairo-curved-lines"></a>Drawing Curved Lines</h2></div></div></div>
+<p>
+            In addition to drawing straight lines Cairo allows you to easily
+            draw curved lines (technically a cubic Bézier spline) using the
+            <code class="methodname">Cairo::Context::curve_to()</code> and
+            <code class="methodname">Cairo::Context::rel_curve_to()</code> functions.
+            These functions take coordinates for a destination point as well as
+            coordinates for two 'control' points. This is best explained using
+            an example, so let's dive in.
+        </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="cairo-example-curves"></a>Example</h3></div></div></div>
+<p>
+                This simple application draws a curve with Cairo and displays
+                the control points for each end of the curve.
+            </p>
+<div class="figure">
+<a name="figure-drawingarea-curve"></a><p class="title"><b>Figure 17.4. Drawing Area - Lines</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drawingarea_curve.png" alt="Drawing Area - Lines"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/curve?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">myarea.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_MYAREA_H
+#define GTKMM_EXAMPLE_MYAREA_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class MyArea : public Gtk::DrawingArea
+{
+public:
+  MyArea();
+  virtual ~MyArea();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+};
+
+#endif // GTKMM_EXAMPLE_MYAREA_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+int main(int argc, char** argv)
+{
+   auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+   Gtk::Window win;
+   win.set_title("DrawingArea");
+
+   MyArea area;
+   win.add(area);
+   area.show();
+
+   return app-&gt;run(win);
+}
+</pre>
+<p>File: <code class="filename">myarea.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;cairomm/context.h&gt;
+
+MyArea::MyArea()
+{
+}
+
+MyArea::~MyArea()
+{
+}
+
+bool MyArea::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+
+  double x0=0.1, y0=0.5, // start point
+         x1=0.4, y1=0.9,  // control point #1
+         x2=0.6, y2=0.1,  // control point #2
+         x3=0.9, y3=0.5;  // end point
+
+  // scale to unit square (0 to 1 width and height)
+  cr-&gt;scale(width, height);
+
+  cr-&gt;set_line_width(0.05);
+  // draw curve
+  cr-&gt;move_to(x0, y0);
+  cr-&gt;curve_to(x1, y1, x2, y2, x3, y3);
+  cr-&gt;stroke();
+  // show control points
+  cr-&gt;set_source_rgba(1, 0.2, 0.2, 0.6);
+  cr-&gt;move_to(x0, y0);
+  cr-&gt;line_to (x1, y1);
+  cr-&gt;move_to(x2, y2);
+  cr-&gt;line_to (x3, y3);
+  cr-&gt;stroke();
+
+  return true;
+}
+</pre>
+<p>
+            The only difference between this example and the straight line
+            example is in the <code class="methodname">on_draw()</code> function,
+            but there are a few new concepts and functions introduced here, so
+            let's examine them briefly.
+        </p>
+<p>
+            We make a call to
+            <code class="methodname">Cairo::Context::scale()</code>, passing in the width
+            and height of the drawing area. This scales the user-space
+            coordinate system such that the width and height of the widget
+            are both equal to 1.0 'units'. There's no particular reason to
+            scale the coordinate system in this case, but sometimes it can make
+            drawing operations easier.
+        </p>
+<p>
+            The call to <code class="methodname">Cairo::Context::curve_to()</code> should
+            be fairly self-explanatory. The first pair of coordinates define
+            the control point for the beginning of the curve. The second set
+            of coordinates define the control point for the end of the curve,
+            and the last set of coordinates define the destination point. To
+            make the concept of control points a bit easier to visualize, a
+            line has been drawn from each control point to the end-point on the
+            curve that it is associated with. Note that these control point
+            lines are both translucent. This is achieved with a variant of
+            <code class="methodname">set_source_rgb()</code> called
+            <code class="methodname">set_source_rgba()</code>. This function takes a
+            fourth argument specifying the alpha value of the color (valid
+            values are between 0 and 1).
+        </p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-cairo-drawing-lines.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-drawingarea.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-cairo-drawing-arcs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Drawing Straight Lines </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Drawing Arcs and Circles</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

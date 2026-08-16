@@ -1,0 +1,52 @@
+#!/usr/bin/perl
+#
+# Check that all aliases point to fonts from scale file.
+#
+# (c) 2018 Roland Rosenfeld <roland@debian.org>
+
+use strict;
+use warnings;
+
+my $dir = '/etc/X11/fonts/Type1';
+my $result = 0;
+my $count = 0;
+my $ok = 0;
+
+my %fonts;
+# scan all fonts in scale file
+open(SCALE, "<$dir/gsfonts-x11.scale") || die "cannot read $dir/gsfonts-x11.scale";
+while (<SCALE>) {
+   if (/^(\S+) (.*)$/) {
+      $fonts{$2} = $1;
+   }
+}
+close SCALE;
+
+# scan and check alias file
+open(ALIAS, "<$dir/gsfonts-x11.alias") || die "cannot read $dir/gsfonts-x11.alias";
+while (<ALIAS>) {
+   chomp;
+   next if /^!/;
+   my ($src, $dst);
+   if (/^"([^"]+)" "([^"]+)"$/) {
+      ($src, $dst) = ($1, $2);
+   } elsif (/^([^"]+) "([^"]+)"$/) {
+      ($src, $dst) = ($1, $2);
+   } elsif (/^"([^"]+)" ([^"]+)$/) {
+      ($src, $dst) = ($1, $2);
+   } elsif (/^([^"]+) ([^"]+)$/) {
+      ($src, $dst) = ($1, $2);
+   } else {
+      print "cannot parse $_\n";
+      $result = 1;
+   }
+   if (defined($fonts{$dst})) {
+      $ok++;
+   } else {
+      $result = 1;
+      print "alias $src => $dst points to nirvana\n";
+   }
+}
+close ALIAS;
+
+exit $result;

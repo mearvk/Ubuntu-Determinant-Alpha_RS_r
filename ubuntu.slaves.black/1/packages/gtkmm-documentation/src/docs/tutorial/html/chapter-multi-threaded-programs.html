@@ -1,0 +1,172 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 29. Multi-threaded programs</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-custom-widgets.html" title="Custom Widgets">
+<link rel="next" href="sec-using-glib-dispatcher.html" title="Using Glib::Dispatcher">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 29. Multi-threaded programs</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-custom-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-using-glib-dispatcher.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-multi-threaded-programs"></a>Chapter 29. Multi-threaded programs</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-multi-threaded-programs.html#sec-the-constraints">The constraints</a></span></li>
+<li><span class="sect1"><a href="sec-using-glib-dispatcher.html">Using Glib::Dispatcher</a></span></li>
+<li><span class="sect1"><a href="sec-multithread-example.html">Example</a></span></li>
+</ul>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-the-constraints"></a>The constraints</h2></div></div></div>
+<p>
+Care is required when writing programs based on <span class="application">gtkmm</span> using
+multiple threads of execution, arising from the fact that
+<span class="application">libsigc++</span>, and in particular
+<code class="classname">sigc::trackable</code>, are not thread-safe. That's
+because none of the complex interactions that occur behind the scenes
+when using <span class="application">libsigc++</span> are protected by a
+mutex or other means of synchronization.
+<a href="#ftn.idm4736" class="footnote" name="idm4736"><sup class="footnote">[1]</sup></a>
+</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="the-rules"></a>The rules</h3></div></div></div>
+<p>
+This requires a number of rules to be observed when writing
+multi-threaded programs using <span class="application">gtkmm</span>. These are set out below, but
+one point to note is that extra care is required when deriving classes
+from <code class="classname">sigc::trackable</code>, because the effects are
+unintuitive (see particularly points 4 and 5 below).
+</p>
+<div class="orderedlist"><ol class="orderedlist" type="1">
+<li class="listitem"><p>
+Use <code class="classname">Glib::Dispatcher</code> to invoke <span class="application">gtkmm</span> functions
+from worker threads (this is dealt with in more detail in the next
+section).
+</p></li>
+<li class="listitem"><p>
+A <code class="classname">sigc::signal</code> object should be regarded as
+owned by the thread which created it. Only that thread should connect
+a <code class="classname">sigc::slot</code> object to the signal object, and
+only that thread should <code class="methodname">emit()</code> or call
+<code class="methodname">operator()()</code> on the signal, or null any
+connected <code class="classname">sigc::slot</code> object. It follows
+(amongst other things) that any signal object provided by a <span class="application">gtkmm</span>
+widget should only be operated on in the main GUI thread and any
+object deriving from <code class="classname">sigc::trackable</code> having its
+non-static methods referenced by slots connected to the signal object
+should only be destroyed in that thread.
+</p></li>
+<li class="listitem"><p>
+Any <code class="classname">sigc::connection</code> object should be regarded
+as owned by the thread in which the method returning the
+<code class="classname">sigc::connection</code> object was called. Only that
+thread should call <code class="classname">sigc::connection</code> methods on
+the object.
+</p></li>
+<li class="listitem"><p>
+A <code class="classname">sigc::slot</code> object created by a call to
+<code class="function">sigc::mem_fun()</code> which references a method of a
+class deriving from <code class="classname">sigc::trackable</code> should
+never be copied to another thread, nor destroyed by a different thread
+than the one which created it.
+</p></li>
+<li class="listitem"><p>
+If a particular class object derives from
+<code class="classname">sigc::trackable</code>, only one thread should create
+<code class="classname">sigc::slot</code> objects representing any of the
+class's non-static methods by calling
+<code class="function">sigc::mem_fun()</code>. The first thread to create such
+a slot should be regarded as owning the relevant object for the
+purpose of creating further slots referencing <span class="emphasis"><em>any</em></span>
+of its non-static methods using that function, or nulling those slots
+by disconnecting them or destroying the trackable object.
+</p></li>
+<li class="listitem">
+<p>
+Although <span class="application">glib</span> is itself thread-safe, any
+<span class="application">glibmm</span> wrappers which use
+<span class="application">libsigc++</span> will not be. So for example, only
+the thread in which a main loop runs should call
+<code class="methodname">Glib::SignalIdle::connect()</code>,
+<code class="methodname">Glib::SignalIO::connect()</code>,
+<code class="methodname">Glib::SignalTimeout::connect()</code>,
+<code class="methodname">Glib::SignalTimeout::connect_seconds</code>
+for that main loop, or manipulate any
+<code class="classname">sigc::connection</code> object returned by them.
+</p>
+<p>
+The connect*_once() variants,
+<code class="methodname">Glib::SignalIdle::connect_once()</code>,
+<code class="methodname">Glib::SignalTimeout::connect_once()</code>,
+<code class="methodname">Glib::SignalTimeout::connect_seconds_once()</code>,
+are thread-safe for any case where the slot is not created by a call to
+<code class="function">sigc::mem_fun()</code> which represents a method of a class
+deriving from <code class="classname">sigc::trackable</code>.
+</p>
+</li>
+</ol></div>
+</div>
+</div>
+<div class="footnotes">
+<br><hr style="width:100; text-align:left;margin-left: 0">
+<div id="ftn.idm4736" class="footnote"><p><a href="#idm4736" class="para"><sup class="para">[1] </sup></a>
+These interactions arise from the fact that, amongst other things, a
+class inheriting from <code class="classname">sigc::trackable</code> will, via
+that inheritance, have a <code class="classname">std::list</code> object
+keeping track of slots created by calls to
+<code class="function">sigc::mem_fun()</code> representing any of its
+non-static methods (more particularly it keeps a list of callbacks
+which will null the connected slots on its destruction). Each
+<code class="classname">sigc::slot</code> object also keeps, via
+<code class="classname">sigc::slot_rep</code>, its own
+<code class="classname">sigc::trackable</code> object to track any
+<code class="classname">sigc::connection</code> objects which it needs to
+inform about its demise, and also has a function to deregister itself
+from any <code class="classname">sigc::trackable</code> on disconnection or
+destruction. <code class="classname">sigc::signal</code> objects also keep
+lists of slots, which will be updated by a call to their
+<code class="methodname">connect()</code> method or calls to any
+<code class="classname">sigc::connection</code> object relating to such a
+connection.
+</p></div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-custom-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-using-glib-dispatcher.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Custom Widgets </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Using Glib::Dispatcher</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Problems in the C API.</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-wrapping-c-libraries.html" title="Appendix G. Wrapping C Libraries with gmmproc">
+<link rel="prev" href="sec-wrapping-initialization.html" title="Initialization">
+<link rel="next" href="sec-wrapping-documentation.html" title="Documentation">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Problems in the C API.</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-wrapping-initialization.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Appendix G. Wrapping C Libraries with gmmproc</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-wrapping-documentation.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-wrapping-problems"></a>Problems in the C API.</h2></div></div></div>
+<p>You are likely to encounter some problems in the library that you are wrapping, particularly if it is a new project. Here are some common problems, with solutions.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="wrapping-predeclare-structs"></a>Unable to predeclare structs</h3></div></div></div>
+<p>By convention, structs are declared in glib/GTK+-style headers like so:
+</p>
+<pre class="programlisting">
+typedef struct _ExampleWidget ExampleWidget;
+
+struct _ExampleWidget
+{
+  ...
+};
+</pre>
+<p>
+</p>
+<p>The extra typedef allows the struct to be used in a header without including
+  its full definition, simply by predeclaring it, by repeating that typedef.
+  This means that you don't have to include the C library's header in your C++ header,
+  thus keeping it out of your public API. <span class="command"><strong>gmmproc</strong></span> assumes that
+  this technique was used, so you will see compiler errors if that is not the case.</p>
+<p>
+This compiler error might look like this:
+</p>
+<pre class="programlisting">
+example-widget.h:56: error: using typedef-name 'ExampleWidget' after 'struct'
+../../libexample/libexamplemm/example-widget.h:34: error: 'ExampleWidget' has a previous declaration here
+make[4]: *** [example-widget.lo] Error 1
+</pre>
+<p>
+or this:
+</p>
+<pre class="programlisting">
+example-widget.h:60: error: '_ExampleWidget ExampleWidget' redeclared as different kind of symbol
+../../libexample/libexamplemm/example-widget.h:34: error: previous declaration of 'typedef struct _ExampleWidget ExampleWidget'
+</pre>
+<p>
+</p>
+<p>This is easy to correct in the C library, so do send a patch to the relevant maintainer.</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="wrapping-no-properties"></a>Lack of properties</h3></div></div></div>
+<p>By convention, glib/GTK+-style objects have <code class="function">*_new()</code>
+    functions, such as <code class="function">example_widget_new()</code> that do nothing
+    more than call <code class="function">g_object_new()</code> and return the result.
+    The input parameters are supplied to <code class="function">g_object_new()</code>
+    along with the names of the properties for which they are values. For
+    instance,
+</p>
+<pre class="programlisting">
+GtkWidget* example_widget_new(int something, const char* thing)
+{
+        return g_object_new (EXAMPLE_TYPE_WIDGET, "something", something, "thing", thing, NULL);
+}
+</pre>
+<p>
+</p>
+<p>This allows language bindings to implement their own equivalents (such as
+    C++ constructors), without using the <code class="function">*_new()</code> function.
+    This is often necessary so that they can actually instantiate a derived
+    GType, to add their own hooks for signal handlers and vfuncs.</p>
+<p>At the least, the <code class="function">_new()</code> function should not use any
+    private API (functions that are only in a .c file). Even when there are no
+    functions, we can sometimes reimplement 2 or 3 lines of code in a
+    <code class="function">_new()</code> function as long as those lines of code use API
+    that is available to us.</p>
+<p>Another workaround is to add a <code class="function">*_construct()</code> function
+    that the C++ constructor can call after instantiating its own type. For
+    instance,
+</p>
+<pre class="programlisting">
+GtkWidget* example_widget_new(int something, const char* thing)
+{
+        ExampleWidget* widget;
+        widget = g_object_new (EXAMPLE_TYPE_WIDGET, NULL);
+        example_widget_construct(widget, "something", something, "thing", thing);
+}
+
+void example_widget_construct(ExampleWidget* widget, int something, const char* thing)
+{
+        //Do stuff that uses private API:
+        widget-&gt;priv-&gt;thing = thing;
+        do_something(something);
+}
+</pre>
+<p>
+</p>
+<p>Adding properties, and ensuring that they interact properly with each
+    other, is relatively difficult to correct in the C library, but it is
+    possible, so do file a bug and try to send a patch to the relevant
+    maintainer.</p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-wrapping-initialization.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-wrapping-c-libraries.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-wrapping-documentation.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Initialization </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Documentation</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

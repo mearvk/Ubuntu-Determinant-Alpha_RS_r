@@ -1,0 +1,1438 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Multiple-item widgets</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-container-widgets.html" title="Chapter 8. Container Widgets">
+<link rel="prev" href="chapter-container-widgets.html" title="Chapter 8. Container Widgets">
+<link rel="next" href="chapter-treeview.html" title="Chapter 9. The TreeView widget">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Multiple-item widgets </th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-container-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 8. Container Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-treeview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-multi-item-containers"></a>Multiple-item widgets </h2></div></div></div>
+<p>
+Multiple-item widgets inherit from <code class="classname">Gtk::Container</code>; just
+as with <code class="classname">Gtk::Bin</code>, you use the <code class="methodname">add()</code>
+and <code class="methodname">remove()</code> methods to add and remove contained widgets.
+Unlike <code class="methodname">Gtk::Bin::remove()</code>, however, the
+<code class="methodname">remove()</code> method for <code class="classname">Gtk::Container</code>
+takes an argument, specifiying which widget to remove.
+</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="container-packing"></a>Packing</h3></div></div></div>
+<p>
+You've probably noticed that <span class="application">gtkmm</span> windows seem "elastic" - they can usually be stretched in many  different ways. This is due to the <span class="emphasis"><em>widget packing</em></span>
+system.
+</p>
+<p>
+Many GUI toolkits require you to precisely place widgets in a window, using absolute positioning, often using a visual editor. This leads to several problems:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>The widgets don't rearrange themselves when the window is resized. Some widgets are hidden when the window is made smaller, and lots of useless space appears when the window is made larger.</p></li>
+<li class="listitem"><p>It's impossible to predict the amount of space necessary for text after it has been translated to other languages, or displayed in a different font. On Unix it is also impossible to anticipate the effects of every theme and window manager.</p></li>
+<li class="listitem"><p>
+Changing the layout of a window "on the fly", to make some extra widgets appear, for instance, is complex. It  requires tedious recalculation of every widget's position.</p></li>
+</ul></div>
+<p>
+<span class="application">gtkmm</span> uses the packing system to solve these problems. Rather than specifying the position and size of each widget in the window,
+you can arrange your widgets in rows, columns,
+and/or grids. <span class="application">gtkmm</span> can size your window automatically, based on the
+sizes of the widgets it contains. And the sizes of the widgets are, in turn, determined by the amount of text they contain, or the minimum and maximum sizes that you specify, and/or how you have requested that the available space should be shared between sets of widgets.
+You can perfect your layout by
+specifying padding distance and centering values for each of your widgets. <span class="application">gtkmm</span> then uses
+all this information to resize and reposition everything sensibly and smoothly when the user manipulates the window. </p>
+<p>
+<span class="application">gtkmm</span> arranges widgets hierarchically, using <span class="emphasis"><em>containers</em></span>.
+A Container widget contains other widgets. Most <span class="application">gtkmm</span> widgets are
+containers. Windows, Notebook tabs, and Buttons are all container widgets.
+There are two flavours of containers: single-child containers, which are all
+descendants of <code class="classname">Gtk::Bin</code>, and multiple-child containers,
+which are descendants of <code class="classname">Gtk::Container</code>. Most widgets
+in <span class="application">gtkmm</span> are descendants of <code class="classname">Gtk::Bin</code>, including
+<code class="classname">Gtk::Window</code>.
+</p>
+<p>
+Yes, that's correct: a Window can contain at most one widget. How, then, can
+we use a window for anything useful?  By placing a multiple-child container in
+the window. The most useful container widgets are
+<code class="classname">Gtk::Grid</code> and <code class="classname">Gtk::Box</code>.
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+<code class="classname">Gtk::Grid</code> arranges its child widgets in rows and
+columns. Use <code class="methodname">attach()</code>,
+<code class="methodname">attach_next_to()</code> and <code class="methodname">add()</code> to
+insert child widgets.
+</p></li>
+<li class="listitem"><p>
+<code class="classname">Gtk::Box</code> arranges its child widgets vertically or horizontally. Use
+<code class="methodname">pack_start()</code> and <code class="methodname">pack_end()</code> to insert
+child widgets.
+</p></li>
+</ul></div>
+<p>
+ There are several other containers, which we will also discuss.
+</p>
+<p>
+If you've never used a packing toolkit before, it can take some
+getting used to. You'll probably find, however, that you don't
+need to rely on visual form editors quite as much as you might with
+other toolkits.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-helloworld2"></a>An improved Hello World</h3></div></div></div>
+<p>
+Let's take a look at a slightly improved <code class="literal">helloworld</code>, showing what we've learnt.
+</p>
+<div class="figure">
+<a name="figure-helloworld2"></a><p class="title"><b>Figure 8.6. Hello World 2</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/helloworld2.png" alt="Hello World 2"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/helloworld2?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">helloworld.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_HELLOWORLD_H
+#define GTKMM_EXAMPLE_HELLOWORLD_H
+
+#include &lt;gtkmm/box.h&gt;
+#include &lt;gtkmm/button.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+class HelloWorld : public Gtk::Window
+{
+public:
+  HelloWorld();
+  virtual ~HelloWorld();
+
+protected:
+
+  // Signal handlers:
+  // Our new improved on_button_clicked(). (see below)
+  void on_button_clicked(Glib::ustring data);
+
+  // Child widgets:
+  Gtk::Box m_box1;
+  Gtk::Button m_button1, m_button2;
+};
+
+#endif // GTKMM_EXAMPLE_HELLOWORLD_H
+</pre>
+<p>File: <code class="filename">helloworld.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "helloworld.h"
+#include &lt;iostream&gt;
+
+HelloWorld::HelloWorld()
+: m_button1("Button 1"),
+  m_button2("Button 2")
+{
+  // This just sets the title of our new window.
+  set_title("Hello Buttons!");
+
+  // sets the border width of the window.
+  set_border_width(10);
+
+  // put the box into the main window.
+  add(m_box1);
+
+  // Now when the button is clicked, we call the "on_button_clicked" function
+  // with a pointer to "button 1" as it's argument
+  m_button1.signal_clicked().connect(sigc::bind&lt;Glib::ustring&gt;(
+              sigc::mem_fun(*this, &amp;HelloWorld::on_button_clicked), "button 1"));
+
+  // instead of gtk_container_add, we pack this button into the invisible
+  // box, which has been packed into the window.
+  // note that the pack_start default arguments are Gtk::EXPAND | Gtk::FILL, 0
+  m_box1.pack_start(m_button1);
+
+  // always remember this step, this tells GTK that our preparation
+  // for this button is complete, and it can be displayed now.
+  m_button1.show();
+
+  // call the same signal handler with a different argument,
+  // passing a pointer to "button 2" instead.
+  m_button2.signal_clicked().connect(sigc::bind&lt;-1, Glib::ustring&gt;(
+              sigc::mem_fun(*this, &amp;HelloWorld::on_button_clicked), "button 2"));
+
+  m_box1.pack_start(m_button2);
+
+  // Show the widgets.
+  // They will not really be shown until this Window is shown.
+  m_button2.show();
+  m_box1.show();
+}
+
+HelloWorld::~HelloWorld()
+{
+}
+
+// Our new improved signal handler.  The data passed to this method is
+// printed to stdout.
+void HelloWorld::on_button_clicked(Glib::ustring data)
+{
+  std::cout &lt;&lt; "Hello World - " &lt;&lt; data &lt;&lt; " was pressed" &lt;&lt; std::endl;
+}
+
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "helloworld.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main (int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  HelloWorld helloworld;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(helloworld);
+}
+</pre>
+<p>
+After building and running this program, try resizing the window to see the
+behaviour. Also, try playing with the options to
+<code class="methodname">pack_start()</code> while reading the <a class="link" href="sec-multi-item-containers.html#sec-boxes" title="Boxes">Boxes</a> section.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-boxes"></a>Boxes</h3></div></div></div>
+<p>
+Most packing uses boxes as in the above example. These
+are invisible containers into which we can pack our widgets. When
+packing widgets into a horizontal box, the objects are inserted
+horizontally from left to right or right to left depending on whether
+<code class="methodname">pack_start()</code> or <code class="methodname">pack_end()</code> is used.
+In a vertical box, widgets are packed from top to bottom or vice
+versa. You may use any combination of boxes inside or beside other
+boxes to create the desired effect.
+</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="boxes-adding-widgets"></a>Adding widgets</h4></div></div></div>
+<div class="sect4">
+<div class="titlepage"><div><div><h5 class="title">
+<a name="per-child-packing-options"></a>Per-child packing options</h5></div></div></div>
+<p>
+The <code class="methodname">pack_start()</code> and
+<code class="methodname">pack_end()</code> methods place widgets inside these
+containers. The <code class="methodname">pack_start()</code> method will start at
+the top and work its way down in a <code class="classname">Box</code> with vertical
+orientation, or pack left to right in a <code class="classname">Box</code> with horizontal
+orientation. <code class="methodname">pack_end()</code> will do the opposite, packing from
+bottom to top or from right to left. Using these methods allows us to right justify or
+left justify our widgets. We will use <code class="methodname">pack_start()</code>
+in most of our examples.
+</p>
+<p>
+There are several options governing how  widgets are to be packed, and this can
+be confusing at first. If you have difficulties then it is sometimes a good
+idea to play with the <span class="application">glade</span> GUI designer to see what
+is possible. You might even decide to use the
+<span class="application">Gtk::Builder</span> API to load your GUI at runtime.
+</p>
+<p>
+There are basically five
+different styles, as shown in this picture:
+</p>
+<div class="figure">
+<a name="figure-box-packing1"></a><p class="title"><b>Figure 8.7. Box Packing 1</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/box_packing1.png" alt="Box Packing 1"></div></div></div>
+</div>
+<br class="figure-break"><p>
+Each line contains one horizontal <code class="classname">Box</code> with
+several buttons. Each of the buttons on a line is packed into the
+<code class="classname">Box</code> with the same arguments to the
+<code class="methodname">pack_start()</code> method.
+</p>
+<p>
+This is the declaration of the <code class="methodname">pack_start()</code> method:
+</p>
+<pre class="programlisting">void pack_start(Gtk::Widget&amp; child,
+                Gtk::PackOptions options = Gtk::PACK_EXPAND_WIDGET,
+                guint padding = 0);</pre>
+<p>
+The first argument is the widget you're packing. In our example these are all <code class="classname">Button</code>s.
+</p>
+<p>
+The <em class="parameter"><code>options</code></em> argument can take one of these three options:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p><code class="literal">Gtk::PACK_SHRINK</code>: Space is contracted to the child widget size. The widget will take up just-enough space and never expand.</p></li>
+<li class="listitem"><p><code class="literal">Gtk::PACK_EXPAND_PADDING</code>: Extra space is filled with padding. The widgets will be spaced out evenly, but their sizes won't change - there will be empty space between the widgets instead. </p></li>
+<li class="listitem"><p><code class="literal">Gtk::PACK_EXPAND_WIDGET</code>: Extra space is taken up by increasing the child widget size, without changing the amount of space between widgets.</p></li>
+</ul></div>
+<p>
+</p>
+<p>
+The <em class="parameter"><code>padding</code></em> argument specifies the width of an extra
+border area to leave around the packed widget.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Box.html" target="_top">Reference</a></p>
+</div>
+<div class="sect4">
+<div class="titlepage"><div><div><h5 class="title">
+<a name="per-container-packing-options"></a>Per-container packing options</h5></div></div></div>
+<p>
+Here's the constructor for the <code class="classname">Box</code> widget,
+and methods that set per-container packing options:
+</p>
+<pre class="programlisting">Gtk::Box(Gtk::Orientation orientation = Gtk::ORIENTATION_HORIZONTAL, int spacing = 0);
+void set_spacing(int spacing);
+void set_homogeneous(bool homogeneous = true);</pre>
+<p>
+Passing <code class="literal">true</code> to <code class="methodname">set_homogeneous()</code> will
+cause all of the contained widgets to be the same size.
+<em class="parameter"><code>spacing</code></em> is a (minimum) number of pixels to leave between
+each widget.
+</p>
+<p>
+What's the difference between spacing (set when the box is created)
+and padding (set when elements are packed)? Spacing is added between
+objects, and padding is added on either side of a widget. The following
+figure should make it clearer:
+</p>
+<div class="figure">
+<a name="figure-box-packing2"></a><p class="title"><b>Figure 8.8. Box Packing 2</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/box_packing2.png" alt="Box Packing 2"></div></div></div>
+</div>
+<br class="figure-break">
+</div>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="boxes-command-line-options"></a>Gtk::Application and command-line options</h4></div></div></div>
+<p>The following example program requires a command-line option.
+The source code shows two ways of handling command-line options in combination
+with <code class="classname">Gtk::Application</code>.
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+Handle the options in <code class="function">main()</code> and hide them from
+<code class="classname">Gtk::Application</code> by setting <code class="literal">argc = 1</code>
+in the call to <code class="methodname">Gtk::Application::create()</code>.
+</p></li>
+<li class="listitem">
+<p>
+Give all command-line options to <code class="methodname">Gtk::Application::create()</code>
+and add the flag <code class="literal">Gio::APPLICATION_HANDLES_COMMAND_LINE</code>.
+Connect a signal handler to the <code class="literal">command_line</code> signal, and
+handle the command-line options in the signal handler.</p>
+<p>You must set the optional parameter <code class="literal">after = false</code> in
+the call to <code class="literal">signal_command_line().connect()</code>, because your signal
+handler must be called before the default signal handler. You must also call
+<code class="methodname">Gio::Application::activate()</code> in the signal handler,
+unless you want your application to exit without showing its main window.
+(<code class="classname">Gio::Application</code> is a base class of
+<code class="classname">Gtk::Application</code>.)
+</p>
+</li>
+</ul></div>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="box-packing-example"></a>Example</h4></div></div></div>
+<p>
+Here is the source code for the example that produced the screenshots above. When you run this example, provide a number between 1 and 3 as a command-line option, to see different packing options in use.</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/box?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow(int which);
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit_clicked();
+
+  //Child widgets:
+  Gtk::Button m_button;
+  Gtk::Box m_box1;
+  Gtk::Box m_boxQuit;
+  Gtk::Button m_buttonQuit;
+
+  Gtk::Label m_Label1, m_Label2;
+
+  Gtk::Separator m_separator1, m_separator2;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">packbox.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_PACKBOX_H
+#define GTKMM_EXAMPLE_PACKBOX_H
+
+#include &lt;gtkmm.h&gt;
+
+class PackBox : public Gtk::Box
+{
+public:
+  PackBox(bool homogeneous, int spacing, Gtk::PackOptions options, int padding = 0);
+  virtual ~PackBox();
+
+protected:
+  Gtk::Button m_button1, m_button2, m_button3;
+  Gtk::Button* m_pbutton4;
+};
+
+#endif //GTKMM_EXAMPLE_PACKBOX_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;iostream&gt;
+#include &lt;cstdlib&gt;
+
+#define GTK_APPLICATION_RECEIVES_COMMAND_LINE_ARGUMENTS 0
+
+#if GTK_APPLICATION_RECEIVES_COMMAND_LINE_ARGUMENTS
+namespace
+{
+int on_command_line(const Glib::RefPtr&lt;Gio::ApplicationCommandLine&gt;&amp; command_line,
+                    Glib::RefPtr&lt;Gtk::Application&gt;&amp; app)
+{
+  int argc = 0;
+  char** argv = command_line-&gt;get_arguments(argc);
+
+  for (int i = 0; i &lt; argc; ++i)
+    std::cout &lt;&lt; "argv[" &lt;&lt; i &lt;&lt; "] = " &lt;&lt; argv[i] &lt;&lt; std::endl;
+
+  app-&gt;activate(); // Without activate() the window won't be shown.
+  return EXIT_SUCCESS;
+}
+} // anonymous namespace
+#endif
+
+
+int main(int argc, char *argv[])
+{
+  if (argc != 2)
+  {
+    std::cerr &lt;&lt; "Usage: example &lt;num&gt;, where &lt;num&gt; is 1, 2, or 3." &lt;&lt; std::endl;
+    return EXIT_FAILURE;
+  }
+
+#if GTK_APPLICATION_RECEIVES_COMMAND_LINE_ARGUMENTS
+  // The command line arguments must be checked before Gtk::Application::run()
+  // is called. The Gio::APPLICATION_HANDLES_COMMAND_LINE flag and the
+  // on_command_line() signal handler are not necessary. This program is simpler
+  // without them, and with argc = 1 in the call to Gtk::Application::create().
+  // They are included to show a program with Gio::APPLICATION_HANDLES_COMMAND_LINE.
+  // Gio::APPLICATION_NON_UNIQUE makes it possible to run several instances of
+  // this application simultaneously.
+  auto app = Gtk::Application::create(argc, argv,
+    "org.gtkmm.example", Gio::APPLICATION_HANDLES_COMMAND_LINE | Gio::APPLICATION_NON_UNIQUE);
+
+  // Note after = false.
+  // Only one signal handler is invoked. This signal handler must run before
+  // the default signal handler, or else it won't run at all.
+  app-&gt;signal_command_line().connect(sigc::bind(sigc::ptr_fun(&amp;on_command_line), app), false);
+#else
+  // Gio::APPLICATION_NON_UNIQUE makes it possible to run several instances of
+  // this application simultaneously.
+  int argc1 = 1; // Don't give the command line arguments to Gtk::Application.
+  auto app = Gtk::Application::create(argc1, argv,
+    "org.gtkmm.example", Gio::APPLICATION_NON_UNIQUE);
+#endif
+
+  ExampleWindow window(std::atoi(argv[1]));
+  return app-&gt;run(window); //Shows the window and returns when it is closed.
+}
+</pre>
+<p>File: <code class="filename">packbox.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "packbox.h"
+
+PackBox::PackBox(bool homogeneous, int spacing, Gtk::PackOptions options,
+        int padding)
+: Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, spacing),
+  m_button1("box.pack_start("),
+  m_button2("button,"),
+  m_button3((options == Gtk::PACK_SHRINK) ? "Gtk::PACK_SHRINK" :
+            ((options == Gtk::PACK_EXPAND_PADDING) ?
+             "Gtk::PACK_EXPAND_PADDING" : "Gtk::PACK_EXPAND_WIDGET"))
+{
+  set_homogeneous(homogeneous);
+
+  pack_start(m_button1, options, padding);
+  pack_start(m_button2, options, padding);
+  pack_start(m_button3, options, padding);
+
+  m_pbutton4 = new Gtk::Button(Glib::ustring::format(padding) + ");");
+  pack_start(*m_pbutton4, options, padding);
+}
+
+PackBox::~PackBox()
+{
+  delete m_pbutton4;
+}
+
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+#include "packbox.h"
+
+ExampleWindow::ExampleWindow(int which)
+: m_box1(Gtk::ORIENTATION_VERTICAL),
+  m_buttonQuit("Quit")
+{
+  set_title("Gtk::Box example");
+
+  PackBox *pPackBox1, *pPackBox2, *pPackBox3, *pPackBox4, *pPackBox5;
+
+  switch(which)
+  {
+    case 1:
+    {
+      m_Label1.set_text("Gtk::Box(Gtk::ORIENTATION_HORIZONTAL); set_homogeneous(false);");
+
+      // Align the label to the left side.
+      m_Label1.set_halign(Gtk::ALIGN_START);
+      m_Label1.set_valign(Gtk::ALIGN_START);
+
+      // Pack the label into the vertical box (vbox box1).  Remember that
+      // widgets added to a vbox will be packed one on top of the other in
+      // order.
+      m_box1.pack_start(m_Label1, Gtk::PACK_SHRINK);
+
+      // Create a PackBox - homogeneous = false, spacing = 0,
+      // options = Gtk::PACK_SHRINK, padding = 0
+      pPackBox1 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_SHRINK);
+      m_box1.pack_start(*pPackBox1, Gtk::PACK_SHRINK);
+
+      // Create a PackBox - homogeneous = false, spacing = 0,
+      // options = Gtk::PACK_EXPAND_PADDING, padding = 0
+      pPackBox2 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_EXPAND_PADDING);
+      m_box1.pack_start(*pPackBox2, Gtk::PACK_SHRINK);
+
+      // Create a PackBox - homogeneous = false, spacing = 0,
+      // options = Gtk::PACK_EXPAND_WIDGET, padding = 0
+      pPackBox3 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_EXPAND_WIDGET);
+      m_box1.pack_start(*pPackBox3, Gtk::PACK_SHRINK);
+
+      // pack the separator into the vbox.  Remember each of these
+      // widgets are being packed into a vbox, so they'll be stacked
+      // vertically.
+      m_box1.pack_start(m_separator1, Gtk::PACK_SHRINK, 5);
+
+      // create another new label, and show it.
+      m_Label2.set_text("Gtk::Box(Gtk::ORIENTATION_HORIZONTAL); set_homogeneous(true);");
+      m_Label2.set_halign(Gtk::ALIGN_START);
+      m_Label2.set_valign(Gtk::ALIGN_START);
+      m_box1.pack_start(m_Label2, Gtk::PACK_SHRINK);
+
+      // Args are: homogeneous, spacing, options, padding
+      pPackBox4 = Gtk::make_managed&lt;PackBox&gt;(true, 0, Gtk::PACK_EXPAND_PADDING);
+      m_box1.pack_start(*pPackBox4, Gtk::PACK_SHRINK);
+
+      // Args are: homogeneous, spacing, options, padding
+      pPackBox5 = Gtk::make_managed&lt;PackBox&gt;(true, 0, Gtk::PACK_EXPAND_WIDGET);
+      m_box1.pack_start(*pPackBox5, Gtk::PACK_SHRINK);
+
+      m_box1.pack_start(m_separator2, Gtk::PACK_SHRINK, 5);
+
+      break;
+    }
+
+    case 2:
+    {
+
+      m_Label1.set_text("Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 10); set_homogeneous(false);");
+      m_Label1.set_halign(Gtk::ALIGN_START);
+      m_Label1.set_valign(Gtk::ALIGN_START);
+      m_box1.pack_start(m_Label1, Gtk::PACK_SHRINK);
+
+      pPackBox1 = Gtk::make_managed&lt;PackBox&gt;(false, 10, Gtk::PACK_EXPAND_PADDING);
+      m_box1.pack_start(*pPackBox1, Gtk::PACK_SHRINK);
+
+      pPackBox2 = Gtk::make_managed&lt;PackBox&gt;(false, 10, Gtk::PACK_EXPAND_WIDGET);
+      m_box1.pack_start(*pPackBox2, Gtk::PACK_SHRINK);
+
+      m_box1.pack_start(m_separator1, Gtk::PACK_SHRINK, 5);
+
+      m_Label2.set_text("Gtk::Box(Gtk::ORIENTATION_HORIZONTAL); set_homogeneous(false);");
+      m_Label2.set_halign(Gtk::ALIGN_START);
+      m_Label2.set_valign(Gtk::ALIGN_START);
+      m_box1.pack_start(m_Label2, Gtk::PACK_SHRINK);
+
+      pPackBox3 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_SHRINK, 10);
+      m_box1.pack_start(*pPackBox3, Gtk::PACK_SHRINK);
+
+      pPackBox4 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_EXPAND_WIDGET, 10);
+      m_box1.pack_start(*pPackBox4, Gtk::PACK_SHRINK);
+
+      m_box1.pack_start(m_separator2, Gtk::PACK_SHRINK, 5);
+
+      break;
+    }
+
+    case 3:
+    {
+      // This demonstrates the ability to use Gtk::Box::pack_end() to
+      // right justify widgets.  First, we create a new box as before.
+      pPackBox1 = Gtk::make_managed&lt;PackBox&gt;(false, 0, Gtk::PACK_SHRINK);
+
+      // create the label that will be put at the end.
+      m_Label1.set_text("end");
+
+      // pack it using pack_end(), so it is put on the right side
+      // of the PackBox.
+      pPackBox1-&gt;pack_end(m_Label1, Gtk::PACK_SHRINK);
+
+      m_box1.pack_start(*pPackBox1, Gtk::PACK_SHRINK);
+
+      // this explicitly sets the separator to 500 pixels wide by 5 pixels
+      // high.  This is so the hbox we created will also be 500 pixels wide,
+      // and the "end" label will be separated from the other labels in the
+      // hbox.  Otherwise, all the widgets in the hbox would be packed as
+      // close together as possible.
+      m_separator1.set_size_request(500, 5);
+
+      // pack the separator into the vbox.
+      m_box1.pack_start(m_separator1, Gtk::PACK_SHRINK, 5);
+
+      break;
+    }
+
+    default:
+    {
+      std::cerr &lt;&lt; "Unexpected command-line option." &lt;&lt; std::endl;
+      break;
+    }
+  }
+
+  // Connect the signal to hide the window:
+  m_buttonQuit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit_clicked) );
+
+  // pack the button into the quitbox.
+  // The last 2 arguments to Box::pack_start are: options, padding.
+  m_boxQuit.pack_start(m_buttonQuit, Gtk::PACK_EXPAND_PADDING);
+  m_box1.pack_start(m_boxQuit, Gtk::PACK_SHRINK);
+
+  // pack the vbox (box1) which now contains all our widgets, into the
+  // main window.
+  add(m_box1);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit_clicked()
+{
+  hide();
+}
+</pre>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-buttonbox"></a>ButtonBoxes</h3></div></div></div>
+<p>
+Button boxes are a convenient way to quickly arrange a group of buttons. Their
+orientation can be either horizontal or vertical.
+</p>
+<p>
+<code class="classname">ButtonBox</code>es help to make applications appear consistent
+because they use standard settings, such as inter-button spacing and packing.
+</p>
+<p>
+Buttons are added to a <code class="classname">ButtonBox</code> with the
+<code class="methodname">add()</code> method.
+</p>
+<p>
+Button boxes support several layout styles. The style can be retrieved and
+changed using <code class="methodname">get_layout()</code> and
+<code class="methodname">set_layout()</code>.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1ButtonBox.html" target="_top">Reference</a></p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="buttonbox-example"></a>Example</h4></div></div></div>
+<div class="figure">
+<a name="figure-buttonbox"></a><p class="title"><b>Figure 8.9. ButtonBox</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buttonbox.png" alt="ButtonBox"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buttonbox?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_clicked();
+
+  //Child widgets:
+  Gtk::Box m_VBox_Main, m_VBox;
+  Gtk::Box m_HBox;
+  Gtk::Frame m_Frame_Horizontal, m_Frame_Vertical;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">examplebuttonbox.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_BUTTONBOX_H
+#define GTKMM_EXAMPLE_BUTTONBOX_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleButtonBox : public Gtk::Frame
+{
+public:
+  ExampleButtonBox(bool horizontal,
+       const Glib::ustring&amp; title,
+       gint spacing,
+       Gtk::ButtonBoxStyle layout);
+
+protected:
+  Gtk::Button m_Button_OK, m_Button_Cancel, m_Button_Help;
+};
+
+#endif //GTKMM_EXAMPLE_BUTTONBOX_H
+</pre>
+<p>File: <code class="filename">examplebuttonbox.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplebuttonbox.h"
+
+ExampleButtonBox::ExampleButtonBox(bool horizontal,
+       const Glib::ustring&amp; title,
+       gint spacing,
+       Gtk::ButtonBoxStyle layout)
+: Gtk::Frame(title),
+  m_Button_OK("OK"),
+  m_Button_Cancel("Cancel"),
+  m_Button_Help("Help")
+{
+  Gtk::ButtonBox* bbox = nullptr;
+
+  if(horizontal)
+    bbox = Gtk::make_managed&lt;Gtk::ButtonBox&gt;(Gtk::ORIENTATION_HORIZONTAL);
+  else
+    bbox = Gtk::make_managed&lt;Gtk::ButtonBox&gt;(Gtk::ORIENTATION_VERTICAL);
+
+  bbox-&gt;set_border_width(5);
+
+  add(*bbox);
+
+  /* Set the appearance of the Button Box */
+  bbox-&gt;set_layout(layout);
+  bbox-&gt;set_spacing(spacing);
+
+  bbox-&gt;add(m_Button_OK);
+  bbox-&gt;add(m_Button_Cancel);
+  bbox-&gt;add(m_Button_Help);
+}
+
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include "examplebuttonbox.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox_Main(Gtk::ORIENTATION_VERTICAL),
+  m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Frame_Horizontal("Horizontal Button Boxes"),
+  m_Frame_Vertical("Vertical Button Boxes")
+{
+  set_title("Gtk::ButtonBox");
+  add(m_VBox_Main);
+
+  m_VBox_Main.pack_start(m_Frame_Horizontal, Gtk::PACK_EXPAND_WIDGET, 10);
+
+  //The horizontal ButtonBoxes:
+  m_VBox.set_border_width(10);
+  m_Frame_Horizontal.add(m_VBox);
+
+  m_VBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (true, "Spread (spacing 40)", 40, Gtk::BUTTONBOX_SPREAD),
+    Gtk::PACK_EXPAND_WIDGET);
+
+  m_VBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (true, "Edge (spacing 30)", 30, Gtk::BUTTONBOX_EDGE),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+  m_VBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (true, "Start (spacing 20)", 20, Gtk::BUTTONBOX_START),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+  m_VBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (true, "End (spacing 10)", 10, Gtk::BUTTONBOX_END),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+
+  //The vertical ButtonBoxes:
+  m_VBox_Main.pack_start(m_Frame_Vertical, Gtk::PACK_EXPAND_WIDGET, 10);
+
+  m_HBox.set_border_width(10);
+  m_Frame_Vertical.add(m_HBox);
+
+  m_HBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (false, "Spread (spacing 5)", 5, Gtk::BUTTONBOX_SPREAD),
+    Gtk::PACK_EXPAND_WIDGET);
+
+  m_HBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (false, "Edge (spacing 30)", 30, Gtk::BUTTONBOX_EDGE),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+  m_HBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (false, "Start (spacing 20)", 20, Gtk::BUTTONBOX_START),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+  m_HBox.pack_start(*Gtk::make_managed&lt;ExampleButtonBox&gt;
+    (false, "End (spacing 10)", 10, Gtk::BUTTONBOX_END),
+    Gtk::PACK_EXPAND_WIDGET, 5);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_clicked()
+{
+  hide();
+}
+</pre>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-grid"></a>Grid</h3></div></div></div>
+<p>
+A <code class="classname">Grid</code> dynamically lays out child widgets in rows and
+columns. The dimensions of the grid do not need to be specified in the constructor.
+</p>
+<p>
+Child widgets can span multiple rows or columns, using
+<code class="methodname">attach()</code>, or added next to an existing widget inside
+the grid with <code class="methodname">attach_next_to()</code>. Individual rows and columns of the grid can be set to have uniform height or width with
+<code class="methodname">set_row_homogeneous()</code> and
+<code class="methodname">set_column_homogeneous()</code>.
+</p>
+<p>You can set the <span class="emphasis"><em>margin</em></span> and <span class="emphasis"><em>expand</em></span> properties of the
+child <code class="classname">Widget</code>s to control their spacing and their behaviour when the Grid is resized.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Grid.html" target="_top">Reference</a></p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="grid-example"></a>Example</h4></div></div></div>
+<p>
+This example creates a window with three buttons in a grid.
+The first two buttons are in the upper row, from left to right. A
+third button is attached underneath the first button, in a new lower row,
+spanning two columns.
+</p>
+<div class="figure">
+<a name="figure-grid"></a><p class="title"><b>Figure 8.10. Grid</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/grid.png" alt="Grid"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/grid?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+private:
+  // Signal handlers:
+  void on_button_quit();
+  void on_button_numbered(const Glib::ustring&amp; data);
+
+  // Child widgets:
+  Gtk::Grid m_grid;
+  Gtk::Button m_button_1, m_button_2, m_button_quit;
+};
+
+#endif /* GTKMM_EXAMPLEWINDOW_H */
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  // Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_button_1("button 1"),
+  m_button_2("button 2"),
+  m_button_quit("Quit")
+{
+  set_title("Gtk::Grid");
+  set_border_width(12);
+
+  add(m_grid);
+
+  m_grid.add(m_button_1);
+  m_grid.add(m_button_2);
+  m_grid.attach_next_to(m_button_quit, m_button_1, Gtk::POS_BOTTOM, 2, 1);
+
+  m_button_1.signal_clicked().connect(
+    sigc::bind&lt;Glib::ustring&gt;( sigc::mem_fun(*this,
+      &amp;ExampleWindow::on_button_numbered), "button 1") );
+  m_button_2.signal_clicked().connect(
+    sigc::bind&lt;Glib::ustring&gt;( sigc::mem_fun(*this,
+      &amp;ExampleWindow::on_button_numbered), "button 2") );
+
+  m_button_quit.signal_clicked().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_button_quit) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void
+ExampleWindow::on_button_numbered(const Glib::ustring&amp; data)
+{
+  std::cout &lt;&lt; data &lt;&lt; " was pressed" &lt;&lt; std::endl;
+}
+</pre>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-table"></a>Table</h3></div></div></div>
+<p>
+<code class="classname">Gtk::Table</code> allows us to place widgets in a grid,
+similar to <code class="classname">Gtk::Grid</code>.
+</p>
+<p>
+<code class="classname">Gtk::Table</code> is deprecated from <span class="application">gtkmm</span> version 3.4 and should
+not be used in newly-written code. Use <code class="classname">Gtk::Grid</code> instead.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-notebook"></a>Notebook</h3></div></div></div>
+<p>
+A <code class="classname">Notebook</code> has a set of stacked
+<code class="literal">pages</code>, each of which contains widgets. Labelled
+<code class="literal">tabs</code> allow the user to select the pages.
+<code class="classname">Notebook</code>s allow several sets of widgets to be placed in a
+small space, by only showing one page at a time. For instance, they are often
+used in preferences dialogs.
+</p>
+<p>
+Use the <code class="methodname">append_page()</code>, <code class="methodname">prepend_page()</code>
+and <code class="methodname">insert_page()</code> methods to add tabbed pages to the
+<code class="literal">Notebook</code>, supplying the child widget and the name for the
+tab.
+</p>
+<p>
+To discover the currently visible page, use the
+<code class="methodname">get_current_page()</code> method. This returns the page number,
+and then calling <code class="methodname">get_nth_page()</code> with that number will give
+you a pointer to the actual child widget.
+</p>
+<p>
+To programmatically change the selected page, use the
+<code class="methodname">set_current_page()</code> method.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Notebook.html" target="_top">Reference</a></p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="notebook-example"></a>Example</h4></div></div></div>
+<div class="figure">
+<a name="figure-notebook"></a><p class="title"><b>Figure 8.11. Notebook</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/notebook.png" alt="Notebook"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/notebook/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+  void on_notebook_switch_page(Gtk::Widget* page, guint page_num);
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::Notebook m_Notebook;
+  Gtk::Label m_Label1, m_Label2;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Label1("Contents of tab 1"),
+  m_Label2("Contents of tab 2"),
+  m_Button_Quit("Quit")
+{
+  set_title("Gtk::Notebook example");
+  set_border_width(10);
+  set_default_size(400, 200);
+
+
+  add(m_VBox);
+
+  //Add the Notebook, with the button underneath:
+  m_Notebook.set_border_width(10);
+  m_VBox.pack_start(m_Notebook);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  //Add the Notebook pages:
+  m_Notebook.append_page(m_Label1, "First");
+  m_Notebook.append_page(m_Label2, "Second");
+
+  m_Notebook.signal_switch_page().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_notebook_switch_page) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void ExampleWindow::on_notebook_switch_page(Gtk::Widget* /* page */, guint page_num)
+{
+  std::cout &lt;&lt; "Switched to tab with index " &lt;&lt; page_num &lt;&lt; std::endl;
+
+  //You can also use m_Notebook.get_current_page() to get this index.
+}
+</pre>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-assistant"></a>Assistant</h3></div></div></div>
+<p>
+An <code class="classname">Assistant</code> splits a complex operation into steps. Each step is a page, containing a header, a child widget and an action area. The Assistant's action area has navigation buttons which update automatically depending on the type of the page, set with <code class="methodname">set_page_type()</code>.
+</p>
+<p>
+Use the <code class="methodname">append_page()</code>, <code class="methodname">prepend_page</code> and <code class="methodname">insert_page()</code> methods to add pages to the <code class="classname">Assistant</code>, supplying the child widget for each page.
+</p>
+<p>
+To determine the currently-visible page, use the <code class="methodname">get_current_page()</code> method, and pass the result to <code class="methodname">get_nth_page()</code>, which returns a pointer to the actual widget. To programmatically change the current page, use the <code class="methodname">set_current_page()</code> method.
+</p>
+<p>
+To set the title of a page, use the <code class="methodname">set_page_title()</code> method. The header and side images of a page can be set with the <code class="methodname">set_page_header_image()</code> and <code class="methodname">set_page_side_image()</code> methods.
+</p>
+<p>
+To add widgets to the action area, use the <code class="methodname">add_action_widget()</code> method. They will be packed alongside the default buttons. Use the <code class="methodname">remove_action_widget()</code> method to remove widgets.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Assistant.html" target="_top">Reference</a></p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="assistant-example"></a>Example</h4></div></div></div>
+<div class="figure">
+<a name="figure-assistant"></a><p class="title"><b>Figure 8.12. Assistant</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/assistant.png" alt="Assistant"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/assistant/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include "exampleassistant.h"
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+private:
+  // Signal handlers:
+  void on_button_clicked();
+  void on_assistant_apply();
+
+  // Child widgets:
+  Gtk::Grid m_grid;
+  Gtk::Button m_button;
+  Gtk::Label m_label1, m_label2;
+  Gtk::CheckButton m_check;
+  Gtk::Entry m_entry;
+  ExampleAssistant m_assistant;
+};
+
+#endif /* GTKMM_EXAMPLEWINDOW_H */
+</pre>
+<p>File: <code class="filename">exampleassistant.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEASSISTANT_H
+#define GTKMM_EXAMPLEASSISTANT_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAssistant : public Gtk::Assistant
+{
+public:
+  ExampleAssistant();
+  virtual ~ExampleAssistant();
+
+  void get_result(bool&amp; check_state, Glib::ustring&amp; entry_text);
+
+private:
+  // Signal handlers:
+  void on_assistant_apply();
+  void on_assistant_cancel();
+  void on_assistant_close();
+  void on_assistant_prepare(Gtk::Widget* widget);
+  void on_entry_changed();
+
+  // Member functions:
+  void print_status();
+
+  // Child widgets:
+  Gtk::Box m_box;
+  Gtk::Label m_label1, m_label2;
+  Gtk::CheckButton m_check;
+  Gtk::Entry m_entry;
+};
+
+#endif /* GTKMM_EXAMPLEASSISTANT_H */
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  // Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">exampleassistant.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "exampleassistant.h"
+
+ExampleAssistant::ExampleAssistant()
+: m_box(Gtk::ORIENTATION_HORIZONTAL, 12),
+  m_label1("Type text to allow the assistant to continue:"),
+  m_label2("Confirmation page"),
+  m_check("Optional extra information")
+{
+  set_title("Gtk::Assistant example");
+  set_border_width(12);
+  set_default_size(400, 300);
+
+  m_box.pack_start(m_label1);
+  m_box.pack_start(m_entry);
+
+  append_page(m_box);
+  append_page(m_check);
+  append_page(m_label2);
+
+  set_page_title(*get_nth_page(0), "Page 1");
+  set_page_title(*get_nth_page(1), "Page 2");
+  set_page_title(*get_nth_page(2), "Confirmation");
+
+  set_page_complete(m_check, true);
+  set_page_complete(m_label2, true);
+
+  set_page_type(m_box, Gtk::ASSISTANT_PAGE_INTRO);
+  set_page_type(m_label2, Gtk::ASSISTANT_PAGE_CONFIRM);
+
+  signal_apply().connect(sigc::mem_fun(*this,
+    &amp;ExampleAssistant::on_assistant_apply));
+  signal_cancel().connect(sigc::mem_fun(*this,
+    &amp;ExampleAssistant::on_assistant_cancel));
+  signal_close().connect(sigc::mem_fun(*this,
+    &amp;ExampleAssistant::on_assistant_close));
+  signal_prepare().connect(sigc::mem_fun(*this,
+    &amp;ExampleAssistant::on_assistant_prepare));
+
+  m_entry.signal_changed().connect(sigc::mem_fun(*this,
+    &amp;ExampleAssistant::on_entry_changed));
+
+  show_all_children();
+}
+
+ExampleAssistant::~ExampleAssistant()
+{
+}
+
+void ExampleAssistant::get_result(bool&amp; check_state, Glib::ustring&amp; entry_text)
+{
+  check_state = m_check.get_active();
+  entry_text = m_entry.get_text();
+}
+
+void ExampleAssistant::on_assistant_apply()
+{
+  std::cout &lt;&lt; "Apply was clicked";
+  print_status();
+}
+
+void ExampleAssistant::on_assistant_cancel()
+{
+  std::cout &lt;&lt; "Cancel was clicked";
+  print_status();
+  hide();
+}
+
+void ExampleAssistant::on_assistant_close()
+{
+  std::cout &lt;&lt; "Assistant was closed";
+  print_status();
+  hide();
+}
+
+void ExampleAssistant::on_assistant_prepare(Gtk::Widget* /* widget */)
+{
+  set_title(Glib::ustring::compose("Gtk::Assistant example (Page %1 of %2)",
+    get_current_page() + 1, get_n_pages()));
+}
+
+void ExampleAssistant::on_entry_changed()
+{
+  // The page is only complete if the entry contains text.
+  if(m_entry.get_text_length())
+    set_page_complete(m_box, true);
+  else
+    set_page_complete(m_box, false);
+}
+
+void ExampleAssistant::print_status()
+{
+  std::cout &lt;&lt; ", entry contents: \"" &lt;&lt; m_entry.get_text()
+    &lt;&lt; "\", checkbutton status: " &lt;&lt; m_check.get_active() &lt;&lt; std::endl;
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include "exampleassistant.h"
+
+ExampleWindow::ExampleWindow()
+: m_button("Show the assistant"),
+  m_label1("State of assistant checkbutton:", Gtk::ALIGN_START, Gtk::ALIGN_CENTER),
+  m_label2("Contents of assistant entry:", Gtk::ALIGN_START, Gtk::ALIGN_CENTER)
+{
+  set_title("Gtk::Assistant example");
+  set_border_width(12);
+
+  m_grid.set_row_homogeneous(true);
+
+  m_grid.attach(m_button, 0, 0, 2, 1);
+  m_button.set_hexpand(true);
+  m_button.set_valign(Gtk::ALIGN_CENTER);
+
+  m_grid.attach(m_label1, 0, 1, 1, 1);
+
+  m_grid.attach(m_label2, 0, 2, 1, 1);
+
+  m_grid.attach(m_check, 1, 1, 1, 1);
+  m_check.set_halign(Gtk::ALIGN_START);
+
+  m_grid.attach(m_entry, 1, 2, 1, 1);
+  m_entry.set_hexpand(true);
+
+  add(m_grid);
+
+  m_button.signal_clicked().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_button_clicked));
+  m_assistant.signal_apply().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_assistant_apply));
+
+  m_check.set_sensitive(false);
+  m_entry.set_sensitive(false);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_assistant_apply()
+{
+  bool check_state;
+  Glib::ustring entry_text;
+
+  m_assistant.get_result(check_state, entry_text);
+  m_check.set_active(check_state);
+  m_entry.set_text(entry_text);
+}
+
+void ExampleWindow::on_button_clicked()
+{
+  m_assistant.show();
+}
+</pre>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-container-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-container-widgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-treeview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 8. Container Widgets </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 9. The TreeView widget</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

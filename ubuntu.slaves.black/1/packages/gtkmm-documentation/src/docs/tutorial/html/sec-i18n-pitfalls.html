@@ -1,0 +1,119 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Pitfalls</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-internationalization.html" title="Chapter 27. Internationalization and Localization">
+<link rel="prev" href="sec-i18n-expecting-utf8.html" title="Expecting UTF8">
+<link rel="next" href="sec-i18n-getting-help-with-translations.html" title="Getting help with translations">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Pitfalls</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-i18n-expecting-utf8.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 27. Internationalization and Localization</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-i18n-getting-help-with-translations.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-i18n-pitfalls"></a>Pitfalls</h2></div></div></div>
+<p>There are a few common mistakes that you would discover eventually yourself. But this section might help you to avoid them.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="i18n-string-semantics"></a>Same strings, different semantics</h3></div></div></div>
+<p>Sometimes two english strings are identical but have different meanings in
+different contexts, so they would probably not be identical when translated. Since the English strings are
+          used as look-up keys, this causes problems.</p>
+<p>
+In these cases, you should add extra characters to the strings. For instance,
+use <code class="literal">"jumps[noun]"</code> and <code class="literal">"jumps[verb]"</code>
+instead of just <code class="literal">"jumps"</code> and strip them again outside the
+<code class="function">gettext</code> call. If you add extra characters you should also
+add a comment for the translators before the <code class="function">gettext</code> call.
+Such comments will be shown in the <code class="filename">.po</code> files. For
+instance:
+</p>
+<pre class="programlisting">// note to translators: don't translate the "[noun]" part - it is
+// just here to distinguish the string from another "jumps" string
+text = strip(gettext("jumps[noun]"), "[noun]");</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="i18n-composition"></a>Composition of strings</h3></div></div></div>
+<p>
+C programmers use <code class="function">sprintf()</code> to compose and concatenate
+strings. C++ favours streams, but unfortunately, this approach makes
+translation difficult, because each fragment of text is translated separately,
+without allowing the translators to rearrange them according to the grammar of
+the language.</p>
+<p>For instance, this code would be problematic:</p>
+<pre class="programlisting">std::cout &lt;&lt; _("Current amount: ") &lt;&lt; amount
+          &lt;&lt; _(" Future: ") &lt;&lt; future &lt;&lt; std::endl;
+
+label.set_text(_("Really delete ") + filename + _(" now?"));</pre>
+<p>
+So you should either avoid this situation or use
+<a class="ulink" href="http://developer.gnome.org/glibmm/2.58/classGlib_1_1ustring.html" target="_top"><code class="function">Glib::ustring::compose()</code></a>
+which supports syntax such as:
+</p>
+<pre class="programlisting">std::cout &lt;&lt; Glib::ustring::compose(
+             _("Current amount: %1 Future: %2"), amount, future) &lt;&lt; std::endl;
+
+label.set_text(Glib::ustring::compose(_("Really delete %1 now?"), filename));</pre>
+<p>
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="i18n-display-size"></a>Assuming the displayed size of strings</h3></div></div></div>
+<p>You never know how much space a string will take on screen when translated. It might very possibly be twice the size of the original English string. Luckily, most <span class="application">gtkmm</span> widgets will expand at runtime to the required size.</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="i18n-unusual-words"></a>Unusual words</h3></div></div></div>
+<p>You should avoid cryptic abbreviations, slang, or jargon.
+          They are usually difficult to translate, and are often difficult
+for even native speakers to understand. For instance, prefer "application" to "app"</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="i18n-non-ascii-characters"></a>Using non-ASCII characters in strings</h3></div></div></div>
+<p>
+Currently, <span class="application">gettext</span> does not support non-ASCII
+characters (i.e. any characters with a code above 127) in source code. For
+instance, you cannot use the copyright sign (©).
+</p>
+<p>To work around this, you could write a comment in the
+          source code just before the string, telling the translators to
+          use the special character if it is available in their languages. For english, you could then make an American English
+          <code class="filename">en_US.po</code> translation which used that special character.</p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-i18n-expecting-utf8.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-internationalization.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-i18n-getting-help-with-translations.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Expecting UTF8 </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Getting help with translations</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

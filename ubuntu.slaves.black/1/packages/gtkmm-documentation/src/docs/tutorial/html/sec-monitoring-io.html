@@ -1,0 +1,216 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Monitoring I/O</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-chapter-timeouts.html" title="Chapter 24. Timeouts, I/O and Idle Functions">
+<link rel="prev" href="chapter-chapter-timeouts.html" title="Chapter 24. Timeouts, I/O and Idle Functions">
+<link rel="next" href="sec-idle-functions.html" title="Idle Functions">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Monitoring I/O</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-chapter-timeouts.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 24. Timeouts, I/O and Idle Functions </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-idle-functions.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-monitoring-io"></a>Monitoring I/O</h2></div></div></div>
+<p>
+A nifty feature of Glib (one of the libraries underlying
+<span class="application">gtkmm</span>) is the ability to have it check for data on a file descriptor
+for you. This is especially useful for networking applications. The
+following method is used to do this:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+sigc::connection Glib::SignalIO::connect(const sigc::slot&lt;bool,Glib::IOCondition&gt;&amp; slot,
+                                 int fd, Glib::IOCondition condition,
+                                 int priority = Glib::PRIORITY_DEFAULT);
+</pre>
+<p>
+</p>
+<p>
+The first argument is a slot you wish to have called when
+the specified event (see argument 3) occurs on the file descriptor you specify
+using argument two. Argument three may be one or more (using
+<code class="literal">|</code>) of:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+Glib::IO_IN - Call your method when there is data ready for
+reading on your file descriptor.
+
+</p></li>
+<li class="listitem"><p>
+Glib::IO_OUT - Call your method when the file descriptor is
+ready for writing.
+
+</p></li>
+<li class="listitem"><p>
+Glib::IO_PRI - Call your method when the file descriptor has urgent data to be read.
+
+</p></li>
+<li class="listitem"><p>
+Glib::IO_ERR - Call your method when an error has occurred on the file descriptor.
+
+</p></li>
+<li class="listitem"><p>
+Glib::IO_HUP - Call your method when hung up (the connection has been broken usually for pipes and sockets).
+</p></li>
+</ul></div>
+<p>
+    The return value is a <code class="classname">sigc::connection</code> that may be used to stop monitoring
+this file descriptor using its <code class="methodname">disconnect()</code> method. The
+<em class="parameter"><code>slot</code></em> signal handler should be declared as follows:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+bool input_callback(Glib::IOCondition condition);
+</pre>
+<p>
+</p>
+<p>
+where <em class="parameter"><code>condition</code></em> is as
+specified above. As usual the slot is created with
+<code class="function">sigc::mem_fun()</code> (for a member method of an object), or
+<code class="function">sigc::ptr_fun()</code> (for a function).
+</p>
+<p>
+A little example follows. To use the example just execute it from a terminal;
+it doesn't create a window. It will create a pipe named
+<code class="literal">testfifo</code> in the current directory. Then start another shell
+and execute <code class="literal">echo "Hello" &gt; testfifo</code>. The example will
+print each line you enter until you execute <code class="literal">echo "Q" &gt;
+testfifo</code>.
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/input/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;build/config.h&gt;
+#include &lt;gtkmm/application.h&gt;
+#include &lt;glibmm/main.h&gt;
+#include &lt;glibmm/iochannel.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;iostream&gt;
+
+#include &lt;unistd.h&gt; //The SUN Forte compiler puts F_OK here.
+
+//The SUN Forte compiler needs these for mkfifo:
+#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+
+Glib::RefPtr&lt;Gtk::Application&gt; app;
+
+int read_fd;
+Glib::RefPtr&lt;Glib::IOChannel&gt; iochannel;
+
+/*
+  send to the fifo with:
+  echo "Hello" &gt; testfifo
+
+  quit the program with:
+  echo "Q" &gt; testfifo
+*/
+
+// this will be our signal handler for read operations
+// it will print out the message sent to the fifo
+// and quit the program if the message was 'Q'.
+bool MyCallback(Glib::IOCondition io_condition)
+{
+  if ((io_condition &amp; Glib::IO_IN) == 0) {
+    std::cerr &lt;&lt; "Invalid fifo response" &lt;&lt; std::endl;
+  }
+  else {
+   Glib::ustring buf;
+
+   iochannel-&gt;read_line(buf);
+   std::cout &lt;&lt; buf;
+   if (buf == "Q\n")
+     app-&gt;quit();
+
+  }
+  return true;
+}
+
+
+int main(int argc, char *argv[])
+{
+  app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  if (access("testfifo", F_OK) == -1) {
+    // fifo doesn't exist - create it
+    #ifdef HAVE_MKFIFO
+    if (mkfifo("testfifo", 0666) != 0) {
+      std::cerr &lt;&lt; "error creating fifo" &lt;&lt; std::endl;
+      return -1;
+    }
+    #else
+      std::cerr &lt;&lt; "error creating fifo: This platform does not have mkfifo()"
+          &lt;&lt; std::endl;
+    #endif //HAVE_MKFIFO
+  }
+
+  // Although we will only read from the fifo, we open it in read/write mode.
+  // Due to a peculiarity with the poll() system call, used deep down in glib,
+  // this small program will use all available CPU time, if the fifo is opened
+  // as O_RDONLY. See a discussion on the gtkmm-list, e.g.
+  // https://mail.gnome.org/archives/gtkmm-list/2015-September/msg00034.html
+  // and the link from there to stackoverflow.
+  read_fd = open("testfifo", O_RDWR);
+  if (read_fd == -1)
+  {
+    std::cerr &lt;&lt; "error opening fifo" &lt;&lt; std::endl;
+    return -1;
+  }
+
+  // connect the signal handler
+  Glib::signal_io().connect(sigc::ptr_fun(MyCallback), read_fd, Glib::IO_IN);
+
+  // Creates a iochannel from the file descriptor
+  iochannel = Glib::IOChannel::create_from_fd(read_fd);
+
+  // and last but not least - run the application main loop
+  app-&gt;hold(); // keep the application running without a window
+  app-&gt;run();
+
+  // now remove the temporary fifo
+  if(unlink("testfifo"))
+    std::cerr &lt;&lt; "error removing fifo" &lt;&lt; std::endl;
+
+  return 0;
+}
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-chapter-timeouts.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-chapter-timeouts.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-idle-functions.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 24. Timeouts, I/O and Idle Functions  </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Idle Functions</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

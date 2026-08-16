@@ -1,0 +1,315 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-range-widgets.html" title="Chapter 6. Range Widgets">
+<link rel="prev" href="sec-scale-widgets.html" title="Scale Widgets">
+<link rel="next" href="chapter-misc-widgets.html" title="Chapter 7. Miscellaneous Widgets">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-scale-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 6. Range Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-misc-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-range-example"></a>Example</h2></div></div></div>
+<p>
+This example displays a window with three range widgets all connected
+to the same adjustment, along with a couple of controls for adjusting
+some of the parameters mentioned above and in the section on
+adjustments, so you can see how they affect the way these widgets work
+for the user.
+</p>
+<div class="figure">
+<a name="figure-range-widgets"></a><p class="title"><b>Figure 6.1. Range Widgets</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/range_widgets.png" alt="Range Widgets"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/range_widgets?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_RANGEWIDGETS_H
+#define GTKMM_EXAMPLE_RANGEWIDGETS_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_checkbutton_toggled();
+  void on_combo_position();
+  void on_adjustment1_value_changed();
+  void on_adjustment2_value_changed();
+  void on_button_quit();
+
+  //Child widgets:
+  Gtk::Box m_VBox_Top, m_VBox2, m_VBox_HScale;
+  Gtk::Box m_HBox_Scales, m_HBox_Combo, m_HBox_Digits, m_HBox_PageSize;
+
+  Glib::RefPtr&lt;Gtk::Adjustment&gt; m_adjustment, m_adjustment_digits, m_adjustment_pagesize;
+
+  Gtk::Scale m_VScale;
+  Gtk::Scale m_HScale, m_Scale_Digits, m_Scale_PageSize;
+
+  Gtk::Separator m_Separator;
+
+  Gtk::CheckButton m_CheckButton;
+
+  Gtk::Scrollbar m_Scrollbar;
+
+  //Tree model columns:
+  class ModelColumns : public Gtk::TreeModel::ColumnRecord
+  {
+  public:
+
+    ModelColumns()
+    { add(m_col_position_type); add(m_col_title); }
+
+    Gtk::TreeModelColumn&lt;Gtk::PositionType&gt; m_col_position_type;
+    Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_title;
+  };
+
+  ModelColumns m_Columns;
+
+  //Child widgets:
+  Gtk::ComboBox m_ComboBox_Position;
+  Glib::RefPtr&lt;Gtk::ListStore&gt; m_refTreeModel;
+
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLE_RANGEWIDGETS_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+:
+  m_VBox_Top(Gtk::ORIENTATION_VERTICAL, 0),
+  m_VBox2(Gtk::ORIENTATION_VERTICAL, 20),
+  m_VBox_HScale(Gtk::ORIENTATION_VERTICAL, 10),
+  m_HBox_Scales(Gtk::ORIENTATION_HORIZONTAL, 10),
+  m_HBox_Combo(Gtk::ORIENTATION_HORIZONTAL, 10),
+  m_HBox_Digits(Gtk::ORIENTATION_HORIZONTAL, 10),
+  m_HBox_PageSize(Gtk::ORIENTATION_HORIZONTAL, 10),
+
+  // Value, lower, upper, step_increment, page_increment, page_size:
+  // Note that the page_size value only makes a difference for
+  // scrollbar widgets, and the highest value you'll get is actually
+  // (upper - page_size).
+  m_adjustment( Gtk::Adjustment::create(0.0, 0.0, 101.0, 0.1, 1.0, 1.0) ),
+  m_adjustment_digits( Gtk::Adjustment::create(1.0, 0.0, 5.0, 1.0, 2.0) ),
+  m_adjustment_pagesize( Gtk::Adjustment::create(1.0, 1.0, 101.0) ),
+
+  m_VScale(m_adjustment, Gtk::ORIENTATION_VERTICAL),
+  m_HScale(m_adjustment, Gtk::ORIENTATION_HORIZONTAL),
+  m_Scale_Digits(m_adjustment_digits),
+  m_Scale_PageSize(m_adjustment_pagesize),
+
+  // A checkbutton to control whether the value is displayed or not:
+  m_CheckButton("Display value on scale widgets", 0),
+
+  // Reuse the same adjustment again.
+  // Notice how this causes the scales to always be updated
+  // continuously when the scrollbar is moved.
+  m_Scrollbar(m_adjustment),
+
+  m_Button_Quit("Quit")
+{
+  set_title("range controls");
+  set_default_size(300, 350);
+
+  //VScale:
+  m_VScale.set_digits(1);
+  m_VScale.set_value_pos(Gtk::POS_TOP);
+  m_VScale.set_draw_value();
+  m_VScale.set_inverted(); // highest value at top
+
+  //HScale:
+  m_HScale.set_digits(1);
+  m_HScale.set_value_pos(Gtk::POS_TOP);
+  m_HScale.set_draw_value();
+
+  add(m_VBox_Top);
+  m_VBox_Top.pack_start(m_VBox2);
+  m_VBox2.set_border_width(10);
+  m_VBox2.pack_start(m_HBox_Scales);
+
+  //Put VScale and HScale (above scrollbar) side-by-side.
+  m_HBox_Scales.pack_start(m_VScale);
+  m_HBox_Scales.pack_start(m_VBox_HScale);
+
+  m_VBox_HScale.pack_start(m_HScale);
+
+  //Scrollbar:
+  m_VBox_HScale.pack_start(m_Scrollbar);
+
+  //CheckButton:
+  m_CheckButton.set_active();
+  m_CheckButton.signal_toggled().connect( sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_checkbutton_toggled) );
+  m_VBox2.pack_start(m_CheckButton, Gtk::PACK_SHRINK);
+
+  //Position ComboBox:
+  //Create the Tree model:
+  m_refTreeModel = Gtk::ListStore::create(m_Columns);
+  m_ComboBox_Position.set_model(m_refTreeModel);
+  m_ComboBox_Position.pack_start(m_Columns.m_col_title);
+
+  //Fill the ComboBox's Tree Model:
+  Gtk::TreeModel::Row row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_position_type] = Gtk::POS_TOP;
+  row[m_Columns.m_col_title] = "Top";
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_position_type] = Gtk::POS_BOTTOM;
+  row[m_Columns.m_col_title] = "Bottom";
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_position_type] = Gtk::POS_LEFT;
+  row[m_Columns.m_col_title] = "Left";
+  row = *(m_refTreeModel-&gt;append());
+  row[m_Columns.m_col_position_type] = Gtk::POS_RIGHT;
+  row[m_Columns.m_col_title] = "Right";
+
+  m_VBox2.pack_start(m_HBox_Combo, Gtk::PACK_SHRINK);
+  m_HBox_Combo.pack_start(
+    *Gtk::make_managed&lt;Gtk::Label&gt;("Scale Value Position:", 0), Gtk::PACK_SHRINK);
+  m_HBox_Combo.pack_start(m_ComboBox_Position);
+  m_ComboBox_Position.signal_changed().connect( sigc::mem_fun(*this, &amp;ExampleWindow::on_combo_position) );
+  m_ComboBox_Position.set_active(0); // Top
+
+  //Digits:
+  m_HBox_Digits.pack_start(
+    *Gtk::make_managed&lt;Gtk::Label&gt;("Scale Digits:", 0), Gtk::PACK_SHRINK);
+  m_Scale_Digits.set_digits(0);
+  m_adjustment_digits-&gt;signal_value_changed().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_adjustment1_value_changed));
+  m_HBox_Digits.pack_start(m_Scale_Digits);
+
+  //Page Size:
+  m_HBox_PageSize.pack_start(
+    *Gtk::make_managed&lt;Gtk::Label&gt;("Scrollbar Page Size:", 0),
+    Gtk::PACK_SHRINK);
+  m_Scale_PageSize.set_digits(0);
+  m_adjustment_pagesize-&gt;signal_value_changed().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_adjustment2_value_changed));
+  m_HBox_PageSize.pack_start(m_Scale_PageSize);
+
+  m_VBox2.pack_start(m_HBox_Digits, Gtk::PACK_SHRINK);
+  m_VBox2.pack_start(m_HBox_PageSize, Gtk::PACK_SHRINK);
+  m_VBox_Top.pack_start(m_Separator, Gtk::PACK_SHRINK);
+  m_VBox_Top.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+
+  m_Button_Quit.set_can_default();
+  m_Button_Quit.grab_default();
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_button_quit));
+  m_Button_Quit.set_border_width(10);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_checkbutton_toggled()
+{
+  m_VScale.set_draw_value(m_CheckButton.get_active());
+  m_HScale.set_draw_value(m_CheckButton.get_active());
+}
+
+void ExampleWindow::on_combo_position()
+{
+  Gtk::TreeModel::iterator iter = m_ComboBox_Position.get_active();
+  if(!iter)
+    return;
+
+  Gtk::TreeModel::Row row = *iter;
+  if(!row)
+    return;
+
+  const Gtk::PositionType postype = row[m_Columns.m_col_position_type];
+
+  m_VScale.set_value_pos(postype);
+  m_HScale.set_value_pos(postype);
+}
+
+void ExampleWindow::on_adjustment1_value_changed()
+{
+  const double val = m_adjustment_digits-&gt;get_value();
+  m_VScale.set_digits((int)val);
+  m_HScale.set_digits((int)val);
+}
+
+void ExampleWindow::on_adjustment2_value_changed()
+{
+  const double val = m_adjustment_pagesize-&gt;get_value();
+  m_adjustment-&gt;set_page_size(val);
+  m_adjustment-&gt;set_page_increment(val);
+
+  // Note that we don't have to emit the "changed" signal
+  // because gtkmm does this for us.
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-scale-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-range-widgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-misc-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Scale Widgets </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 7. Miscellaneous Widgets</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

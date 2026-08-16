@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+# only build documentation if we are building libgspell-1-doc package
+ifneq (,$(filter libgspell-1-doc,$(shell dh_listpackages)))
+BUILD_DOC := --enable-gtk-doc --enable-gtk-doc-html
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(BUILD_DOC) --enable-vala --enable-installed-tests
+
+override_dh_auto_test:
+	NO_AT_BRIDGE=1 dbus-run-session -- xvfb-run dh_auto_test
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+execute_before_dh_install:
+	find debian/ -name '*.la' -print -delete
+	rm -f debian/tmp/usr/bin/gspell-app1

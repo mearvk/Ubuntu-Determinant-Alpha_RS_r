@@ -1,0 +1,425 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-multi-threaded-programs.html" title="Chapter 29. Multi-threaded programs">
+<link rel="prev" href="sec-using-glib-dispatcher.html" title="Using Glib::Dispatcher">
+<link rel="next" href="chapter-recommended-techniques.html" title="Chapter 30. Recommended Techniques">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-using-glib-dispatcher.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 29. Multi-threaded programs</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-recommended-techniques.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-multithread-example"></a>Example</h2></div></div></div>
+<p>
+This is an example program with two threads, one GUI thread, like in all
+<span class="application">gtkmm</span> programs, and one worker thread. The worker thread is created when you
+press the <code class="literal">Start work</code> button. It is deleted when the work is
+finished, when you press the <code class="literal">Stop work</code> button, or when you
+press the <code class="literal">Quit</code> button.
+</p>
+<p>
+A <code class="classname">Glib::Dispatcher</code> is used for sending notifications
+from the worker thread to the GUI thread. The <code class="classname">ExampleWorker</code>
+class contains data which is accessed by both threads. This data is protected
+by a <code class="classname">std::mutex</code>.
+Only the GUI thread updates the GUI.
+</p>
+<div class="figure">
+<a name="figure-multithread"></a><p class="title"><b>Figure 29.1. Multi-Threaded Program</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/multithread.png" alt="Multi-Threaded Program"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/multithread?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "exampleworker.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+
+  // Called from the worker thread.
+  void notify();
+
+private:
+  // Signal handlers.
+  void on_start_button_clicked();
+  void on_stop_button_clicked();
+  void on_quit_button_clicked();
+
+  void update_start_stop_buttons();
+  void update_widgets();
+
+  // Dispatcher handler.
+  void on_notification_from_worker_thread();
+
+  // Member data.
+  Gtk::Box m_VBox;
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_ButtonStart;
+  Gtk::Button m_ButtonStop;
+  Gtk::Button m_ButtonQuit;
+  Gtk::ProgressBar m_ProgressBar;
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TextView m_TextView;
+
+  Glib::Dispatcher m_Dispatcher;
+  ExampleWorker m_Worker;
+  std::thread* m_WorkerThread;
+};
+
+#endif // GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">exampleworker.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWORKER_H
+#define GTKMM_EXAMPLEWORKER_H
+
+#include &lt;gtkmm.h&gt;
+#include &lt;thread&gt;
+#include &lt;mutex&gt;
+
+class ExampleWindow;
+
+class ExampleWorker
+{
+public:
+  ExampleWorker();
+
+  // Thread function.
+  void do_work(ExampleWindow* caller);
+
+  void get_data(double* fraction_done, Glib::ustring* message) const;
+  void stop_work();
+  bool has_stopped() const;
+
+private:
+  // Synchronizes access to member data.
+  mutable std::mutex m_Mutex;
+
+  // Data used by both GUI thread and worker thread.
+  bool m_shall_stop;
+  bool m_has_stopped;
+  double m_fraction_done;
+  Glib::ustring m_message;
+};
+
+#endif // GTKMM_EXAMPLEWORKER_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main (int argc, char* argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">exampleworker.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleworker.h"
+#include "examplewindow.h"
+#include &lt;sstream&gt;
+#include &lt;chrono&gt;
+
+ExampleWorker::ExampleWorker() :
+  m_Mutex(),
+  m_shall_stop(false),
+  m_has_stopped(false),
+  m_fraction_done(0.0),
+  m_message()
+{
+}
+
+// Accesses to these data are synchronized by a mutex.
+// Some microseconds can be saved by getting all data at once, instead of having
+// separate get_fraction_done() and get_message() methods.
+void ExampleWorker::get_data(double* fraction_done, Glib::ustring* message) const
+{
+  std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+
+  if (fraction_done)
+    *fraction_done = m_fraction_done;
+
+  if (message)
+    *message = m_message;
+}
+
+void ExampleWorker::stop_work()
+{
+  std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+  m_shall_stop = true;
+}
+
+bool ExampleWorker::has_stopped() const
+{
+  std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+  return m_has_stopped;
+}
+
+void ExampleWorker::do_work(ExampleWindow* caller)
+{
+  {
+    std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+    m_has_stopped = false;
+    m_fraction_done = 0.0;
+    m_message = "";
+  } // The mutex is unlocked here by lock's destructor.
+
+  // Simulate a long calculation.
+  for (int i = 0; ; ++i) // do until break
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+
+    {
+      std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+
+      m_fraction_done += 0.01;
+
+      if (i % 4 == 3)
+      {
+        std::ostringstream ostr;
+        ostr &lt;&lt; (m_fraction_done * 100.0) &lt;&lt; "% done\n";
+        m_message += ostr.str();
+      }
+
+      if (m_fraction_done &gt;= 1.0)
+      {
+        m_message += "Finished";
+        break;
+      }
+      if (m_shall_stop)
+      {
+        m_message += "Stopped";
+        break;
+      }
+    }
+
+    caller-&gt;notify();
+  }
+
+  {
+    std::lock_guard&lt;std::mutex&gt; lock(m_Mutex);
+    m_shall_stop = false;
+    m_has_stopped = true;
+  }
+
+  caller-&gt;notify();
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow() :
+  m_VBox(Gtk::ORIENTATION_VERTICAL, 5),
+  m_ButtonBox(Gtk::ORIENTATION_HORIZONTAL),
+  m_ButtonStart("Start work"),
+  m_ButtonStop("Stop work"),
+  m_ButtonQuit("_Quit", /* mnemonic= */ true),
+  m_ProgressBar(),
+  m_ScrolledWindow(),
+  m_TextView(),
+  m_Dispatcher(),
+  m_Worker(),
+  m_WorkerThread(nullptr)
+{
+  set_title("Multi-threaded example");
+  set_border_width(5);
+  set_default_size(300, 300);
+
+  add(m_VBox);
+
+  // Add the ProgressBar.
+  m_VBox.pack_start(m_ProgressBar, Gtk::PACK_SHRINK);
+
+  m_ProgressBar.set_text("Fraction done");
+  m_ProgressBar.set_show_text();
+
+  // Add the TextView, inside a ScrolledWindow.
+  m_ScrolledWindow.add(m_TextView);
+
+  // Only show the scrollbars when they are necessary.
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+
+  m_TextView.set_editable(false);
+
+  // Add the buttons to the ButtonBox.
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_ButtonStart, Gtk::PACK_SHRINK);
+  m_ButtonBox.pack_start(m_ButtonStop, Gtk::PACK_SHRINK);
+  m_ButtonBox.pack_start(m_ButtonQuit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_spacing(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+
+  // Connect the signal handlers to the buttons.
+  m_ButtonStart.signal_clicked().connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_start_button_clicked));
+  m_ButtonStop.signal_clicked().connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_stop_button_clicked));
+  m_ButtonQuit.signal_clicked().connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_quit_button_clicked));
+
+  // Connect the handler to the dispatcher.
+  m_Dispatcher.connect(sigc::mem_fun(*this, &amp;ExampleWindow::on_notification_from_worker_thread));
+
+  // Create a text buffer mark for use in update_widgets().
+  auto buffer = m_TextView.get_buffer();
+  buffer-&gt;create_mark("last_line", buffer-&gt;end(), /* left_gravity= */ true);
+
+  update_start_stop_buttons();
+
+  show_all_children();
+}
+
+void ExampleWindow::on_start_button_clicked()
+{
+  if (m_WorkerThread)
+  {
+    std::cout &lt;&lt; "Can't start a worker thread while another one is running." &lt;&lt; std::endl;
+  }
+  else
+  {
+    // Start a new worker thread.
+    m_WorkerThread = new std::thread(
+      [this]
+      {
+        m_Worker.do_work(this);
+      });
+  }
+  update_start_stop_buttons();
+}
+
+void ExampleWindow::on_stop_button_clicked()
+{
+  if (!m_WorkerThread)
+  {
+    std::cout &lt;&lt; "Can't stop a worker thread. None is running." &lt;&lt; std::endl;
+  }
+  else
+  {
+   // Order the worker thread to stop.
+    m_Worker.stop_work();
+    m_ButtonStop.set_sensitive(false);
+  }
+}
+
+void ExampleWindow::update_start_stop_buttons()
+{
+  const bool thread_is_running = m_WorkerThread != nullptr;
+
+  m_ButtonStart.set_sensitive(!thread_is_running);
+  m_ButtonStop.set_sensitive(thread_is_running);
+}
+
+void ExampleWindow::update_widgets()
+{
+  double fraction_done;
+  Glib::ustring message_from_worker_thread;
+  m_Worker.get_data(&amp;fraction_done, &amp;message_from_worker_thread);
+
+  m_ProgressBar.set_fraction(fraction_done);
+
+  if (message_from_worker_thread != m_TextView.get_buffer()-&gt;get_text())
+  {
+    auto buffer = m_TextView.get_buffer();
+    buffer-&gt;set_text(message_from_worker_thread);
+
+    // Scroll the last inserted line into view. That's somewhat complicated.
+    Gtk::TextIter iter = buffer-&gt;end();
+    iter.set_line_offset(0); // Beginning of last line
+    auto mark = buffer-&gt;get_mark("last_line");
+    buffer-&gt;move_mark(mark, iter);
+    m_TextView.scroll_to(mark);
+    // TextView::scroll_to(iter) is not perfect.
+    // We do need a TextMark to always get the last line into view.
+  }
+}
+
+void ExampleWindow::on_quit_button_clicked()
+{
+  if (m_WorkerThread)
+  {
+    // Order the worker thread to stop and wait for it to stop.
+    m_Worker.stop_work();
+    if (m_WorkerThread-&gt;joinable())
+      m_WorkerThread-&gt;join();
+  }
+  hide();
+}
+
+// notify() is called from ExampleWorker::do_work(). It is executed in the worker
+// thread. It triggers a call to on_notification_from_worker_thread(), which is
+// executed in the GUI thread.
+void ExampleWindow::notify()
+{
+  m_Dispatcher.emit();
+}
+
+void ExampleWindow::on_notification_from_worker_thread()
+{
+  if (m_WorkerThread &amp;&amp; m_Worker.has_stopped())
+  {
+    // Work is done.
+    if (m_WorkerThread-&gt;joinable())
+      m_WorkerThread-&gt;join();
+    delete m_WorkerThread;
+    m_WorkerThread = nullptr;
+    update_start_stop_buttons();
+  }
+  update_widgets();
+}
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-using-glib-dispatcher.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-multi-threaded-programs.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-recommended-techniques.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Using Glib::Dispatcher </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 30. Recommended Techniques</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+-include /usr/share/gnome-pkg-tools/1/rules/gnome-get-source.mk
+
+unexport LANGUAGE LANG LC_ALL LC_CTYPE LC_COLLATE LC_TIME LC_NUMERIC LC_MESSAGES
+export LC_ALL=C.UTF-8
+
+%:
+	dh $@ --with gnome,python3 --buildsystem=meson
+
+override_dh_auto_configure:
+	chmod a-x gtkdoc/*.py
+	dh_auto_configure -- \
+		--libdir=lib
+
+override_dh_install:
+	dh_install
+	cp tools/gtk-doc.el debian/gtk-doc-tools/usr/share/emacs/site-lisp/gtk-doc-tools
+	cp debian/gtk-doc.catalog debian/gtk-doc-tools/usr/share/sgml/gtk-doc/
+
+override_dh_installchangelogs:
+	dh_installchangelogs -XChangeLog
+
+override_dh_python3:
+	dh_python3 /usr/share/gtk-doc
+
+override_dh_gnome:
+	dh_gnome --no-gnome-versions
+
+# Needed to avoid build failure on Launchpad
+override_dh_auto_test:
+	V=0 dh_auto_test

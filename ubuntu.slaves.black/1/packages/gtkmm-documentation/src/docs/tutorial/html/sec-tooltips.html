@@ -1,0 +1,290 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Tooltips</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-misc-widgets.html" title="Chapter 7. Miscellaneous Widgets">
+<link rel="prev" href="sec-infobar.html" title="InfoBar">
+<link rel="next" href="chapter-container-widgets.html" title="Chapter 8. Container Widgets">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Tooltips</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-infobar.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 7. Miscellaneous Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-container-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-tooltips"></a>Tooltips</h2></div></div></div>
+<p>
+Tooltips are the little information windows that pop up when you leave your
+pointer over a widget for a few seconds. Use
+<code class="methodname">set_tooltip_text()</code> to set a text string as a tooltip
+on any <code class="classname">Widget</code>. <code class="classname">Gtk::ToolItem</code>s are
+not <code class="classname">Widget</code>s, but have the same method for convenience.
+<code class="classname">Gtk::Tooltip</code> is used for more advanced tooltip usage,
+such as showing an image as well as text.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Widget.html" target="_top">Widget Reference</a></p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1Tooltip.html" target="_top">Tooltip Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="tooltip-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-tooltip"></a><p class="title"><b>Figure 7.9. Tooltip</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/tooltip.png" alt="Tooltip"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/tooltips?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+
+  //Methods:
+  void prepare_textview();
+  void connect_signals();
+
+  //Signal handlers:
+  void on_markup_checkbutton_click();
+  bool on_textview_query_tooltip(int x, int y, bool keyboard_tooltip, const Glib::RefPtr&lt;Gtk::Tooltip&gt;&amp; tooltip);
+  bool on_button_query_tooltip(int x, int y, bool keyboard_tooltip, const Glib::RefPtr&lt;Gtk::Tooltip&gt;&amp; tooltip);
+
+  //Child widgets:
+  Gtk::Box m_vbox;
+
+  Gtk::CheckButton m_checkbutton;
+  Gtk::Label m_label;
+
+  Gtk::ScrolledWindow m_scrolled_window;
+  Gtk::TextView m_text_view;
+  Glib::RefPtr&lt;Gtk::TextBuffer&gt; m_ref_text_buffer;
+  Glib::RefPtr&lt;Gtk::TextTag&gt; m_ref_bold_tag;
+
+  Gtk::Button m_button;
+  Gtk::Window m_button_tooltip_window;
+
+};
+
+#endif // GTKMM_EXAMPLEWINDOW_H
+
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+#include &lt;vector&gt;
+
+const Glib::ustring app_title = "gtkmm tooltips example";
+const Glib::ustring non_markedup_tip = "A tooltip without markup.";
+const Glib::ustring markedup_tip = "&lt;i&gt;Markup&lt;/i&gt; in a tooltip.";
+
+ExampleWindow::ExampleWindow()
+  :
+  m_vbox(Gtk::ORIENTATION_VERTICAL, 3),
+  m_checkbutton("Click to alternate markup in tooltip"),
+  m_label("A label"),
+  m_button("Custom widget in tooltip window"),
+  m_button_tooltip_window(Gtk::WINDOW_POPUP)
+{
+  //Set up window and the top-level container:
+  set_title(app_title);
+  set_border_width(10);
+
+  add(m_vbox);
+
+  //Check button with markup in tooltip:
+  m_checkbutton.set_tooltip_text(non_markedup_tip);
+  m_vbox.pack_start(m_checkbutton, Gtk::PACK_SHRINK);
+
+  //Label:
+  m_label.set_tooltip_text("Another tooltip");
+  m_vbox.pack_start(m_label, Gtk::PACK_SHRINK);
+
+  //Textview:
+  prepare_textview();
+
+  //Button:
+  // set_tooltip_window(), like set_tooltip_text(),
+  // will call set_has_tooltip() for us.
+  m_button.set_tooltip_window(m_button_tooltip_window);
+  m_vbox.pack_start(m_button, Gtk::PACK_SHRINK);
+
+  //Button's custom tooltip window:
+  m_button_tooltip_window.set_default_size(250, 30);
+  Gtk::Label* label =
+    Gtk::make_managed&lt;Gtk::Label&gt;("A label in a custom tooltip window");
+  label-&gt;show();
+  m_button_tooltip_window.add(*label);
+
+  connect_signals();
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::prepare_textview()
+{
+  Gtk::TextIter iter;
+  std::vector&lt; Glib::RefPtr&lt;Gtk::TextTag&gt; &gt; tags;
+
+  //Set up a scrolled window:
+  m_scrolled_window.add(m_text_view);
+  m_scrolled_window.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+  m_vbox.pack_start(m_scrolled_window);
+
+  //Create a text buffer with some text:
+  m_ref_text_buffer = Gtk::TextBuffer::create();
+
+  iter = m_ref_text_buffer-&gt;end();
+  m_ref_text_buffer-&gt;insert(iter, "Hover over the text ");
+
+  //Insert some text with a tag.
+  //In the tooltip signal handler below, we will show a tooltip
+  //when mouse pointer is above this tagged text.
+  m_ref_bold_tag = m_ref_text_buffer-&gt;create_tag("bold");
+  m_ref_bold_tag-&gt;set_property("weight", Pango::WEIGHT_BOLD);
+
+  tags.push_back(m_ref_bold_tag);
+
+  iter = m_ref_text_buffer-&gt;end();
+  m_ref_text_buffer-&gt;insert_with_tags(iter, "in bold", tags);
+
+  iter = m_ref_text_buffer-&gt;end();
+  m_ref_text_buffer-&gt;insert(iter, " to see its tooltip");
+
+  m_text_view.set_buffer(m_ref_text_buffer);
+
+  m_text_view.set_size_request(320, 50);
+
+  //When only connecting to the query-tooltip signal, and not using any
+  //of set_tooltip_text(), set_tooltip_markup() or set_tooltip_window(),
+  //we need to explicitly tell GTK+ that the widget has a tooltip which
+  //we'll show.
+  m_text_view.set_has_tooltip();
+}
+
+void ExampleWindow::connect_signals()
+{
+  m_checkbutton.signal_clicked().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_markup_checkbutton_click));
+
+  m_text_view.signal_query_tooltip().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_textview_query_tooltip));
+
+  m_button.signal_query_tooltip().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_button_query_tooltip));
+}
+
+void ExampleWindow::on_markup_checkbutton_click()
+{
+  if (m_checkbutton.get_active() == true)
+  {
+    m_checkbutton.set_tooltip_markup(markedup_tip);
+  }
+  else
+  {
+    m_checkbutton.set_tooltip_markup(non_markedup_tip);
+  }
+}
+
+bool ExampleWindow::on_textview_query_tooltip(int x, int y, bool keyboard_tooltip, const Glib::RefPtr&lt;Gtk::Tooltip&gt;&amp; tooltip)
+{
+  Gtk::TextIter iter;
+
+  if (keyboard_tooltip)
+  {
+    int offset = m_ref_text_buffer-&gt;property_cursor_position().get_value();
+    iter = m_ref_text_buffer-&gt;get_iter_at_offset(offset);
+  }
+  else
+  {
+    int mouse_x, mouse_y, trailing;
+    m_text_view.window_to_buffer_coords(Gtk::TEXT_WINDOW_TEXT,
+                                        x, y, mouse_x, mouse_y);
+    m_text_view.get_iter_at_position(iter, trailing, mouse_x, mouse_y);
+  }
+
+  //Show a tooltip if the cursor or mouse pointer is over the text
+  //with the specific tag:
+  if (iter.has_tag(m_ref_bold_tag))
+  {
+    tooltip-&gt;set_markup("&lt;b&gt;Information&lt;/b&gt; attached to a text tag");
+    tooltip-&gt;set_icon_from_icon_name("dialog-information", Gtk::ICON_SIZE_MENU);
+  }
+  else
+  {
+    return false;
+  }
+
+  return true;
+}
+
+bool ExampleWindow::on_button_query_tooltip(int, int, bool, const Glib::RefPtr&lt;Gtk::Tooltip&gt;&amp;)
+{
+  //We already have a custom window ready, just return true to show it:
+  return true;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-infobar.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-misc-widgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-container-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">InfoBar </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 8. Container Widgets</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

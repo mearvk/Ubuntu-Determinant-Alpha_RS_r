@@ -1,0 +1,271 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Example Application: Creating a Clock with Cairo</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="prev" href="sec-draw-images.html" title="Drawing Images">
+<link rel="next" href="chapter-draganddrop.html" title="Chapter 18. Drag and Drop">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Example Application: Creating a Clock with Cairo</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-draw-images.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 17. The Drawing Area Widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-draganddrop.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-drawing-clock-example"></a>Example Application: Creating a Clock with Cairo</h2></div></div></div>
+<p>
+          Now that we've covered the basics of drawing with Cairo, let's try to
+          put it all together and create a simple application that actually
+          does something. The following example uses Cairo to create a custom
+          <code class="classname">Clock</code> widget. The clock has a second hand, a
+          minute hand, and an hour hand, and updates itself every second.
+      </p>
+<div class="screenshot"><div><img src="figures/cairo_clock.png"></div></div>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/clock?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">clock.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_CLOCK_H
+#define GTKMM_EXAMPLE_CLOCK_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class Clock : public Gtk::DrawingArea
+{
+public:
+  Clock();
+  virtual ~Clock();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+
+  bool on_timeout();
+
+  double m_radius;
+  double m_line_width;
+
+};
+
+#endif // GTKMM_EXAMPLE_CLOCK_H
+</pre>
+<p>File: <code class="filename">clock.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;ctime&gt;
+#include &lt;cmath&gt;
+#include &lt;cairomm/context.h&gt;
+#include &lt;glibmm/main.h&gt;
+#include "clock.h"
+
+Clock::Clock()
+: m_radius(0.42), m_line_width(0.05)
+{
+  Glib::signal_timeout().connect( sigc::mem_fun(*this, &amp;Clock::on_timeout), 1000 );
+}
+
+Clock::~Clock()
+{
+}
+
+bool Clock::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+
+  // scale to unit square and translate (0, 0) to be (0.5, 0.5), i.e.
+  // the center of the window
+  cr-&gt;scale(width, height);
+  cr-&gt;translate(0.5, 0.5);
+  cr-&gt;set_line_width(m_line_width);
+
+  cr-&gt;save();
+  cr-&gt;set_source_rgba(0.337, 0.612, 0.117, 0.9);   // green
+  cr-&gt;paint();
+  cr-&gt;restore();
+  cr-&gt;arc(0, 0, m_radius, 0, 2 * M_PI);
+  cr-&gt;save();
+  cr-&gt;set_source_rgba(1.0, 1.0, 1.0, 0.8);
+  cr-&gt;fill_preserve();
+  cr-&gt;restore();
+  cr-&gt;stroke_preserve();
+  cr-&gt;clip();
+
+  //clock ticks
+  for (int i = 0; i &lt; 12; i++)
+  {
+    double inset = 0.05;
+
+    cr-&gt;save();
+    cr-&gt;set_line_cap(Cairo::LINE_CAP_ROUND);
+
+    if(i % 3 != 0)
+    {
+      inset *= 0.8;
+      cr-&gt;set_line_width(0.03);
+    }
+
+    cr-&gt;move_to(
+      (m_radius - inset) * cos (i * M_PI / 6),
+      (m_radius - inset) * sin (i * M_PI / 6));
+    cr-&gt;line_to (
+      m_radius * cos (i * M_PI / 6),
+      m_radius * sin (i * M_PI / 6));
+    cr-&gt;stroke();
+    cr-&gt;restore(); /* stack-pen-size */
+  }
+
+  // store the current time
+  time_t rawtime;
+  time(&amp;rawtime);
+  struct tm * timeinfo = localtime (&amp;rawtime);
+
+  // compute the angles of the indicators of our clock
+  double minutes = timeinfo-&gt;tm_min * M_PI / 30;
+  double hours = timeinfo-&gt;tm_hour * M_PI / 6;
+  double seconds= timeinfo-&gt;tm_sec * M_PI / 30;
+
+  cr-&gt;save();
+  cr-&gt;set_line_cap(Cairo::LINE_CAP_ROUND);
+
+  // draw the seconds hand
+  cr-&gt;save();
+  cr-&gt;set_line_width(m_line_width / 3);
+  cr-&gt;set_source_rgba(0.7, 0.7, 0.7, 0.8); // gray
+  cr-&gt;move_to(0, 0);
+  cr-&gt;line_to(sin(seconds) * (m_radius * 0.9),
+    -cos(seconds) * (m_radius * 0.9));
+  cr-&gt;stroke();
+  cr-&gt;restore();
+
+  // draw the minutes hand
+  cr-&gt;set_source_rgba(0.117, 0.337, 0.612, 0.9);   // blue
+  cr-&gt;move_to(0, 0);
+  cr-&gt;line_to(sin(minutes + seconds / 60) * (m_radius * 0.8),
+    -cos(minutes + seconds / 60) * (m_radius * 0.8));
+  cr-&gt;stroke();
+
+  // draw the hours hand
+  cr-&gt;set_source_rgba(0.337, 0.612, 0.117, 0.9);   // green
+  cr-&gt;move_to(0, 0);
+  cr-&gt;line_to(sin(hours + minutes / 12.0) * (m_radius * 0.5),
+    -cos(hours + minutes / 12.0) * (m_radius * 0.5));
+  cr-&gt;stroke();
+  cr-&gt;restore();
+
+  // draw a little dot in the middle
+  cr-&gt;arc(0, 0, m_line_width / 3.0, 0, 2 * M_PI);
+  cr-&gt;fill();
+
+  return true;
+}
+
+
+bool Clock::on_timeout()
+{
+    // force our program to redraw the entire clock.
+    auto win = get_window();
+    if (win)
+    {
+        Gdk::Rectangle r(0, 0, get_allocation().get_width(),
+                get_allocation().get_height());
+        win-&gt;invalidate_rect(r, false);
+    }
+    return true;
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "clock.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+int main(int argc, char** argv)
+{
+   auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+   Gtk::Window win;
+   win.set_title("Cairomm Clock");
+
+   Clock c;
+   win.add(c);
+   c.show();
+
+   return app-&gt;run(win);
+}
+</pre>
+<p>
+          As before, almost all of the interesting stuff is done in the draw
+          signal handler <code class="methodname">on_draw()</code>. Before we dig
+          into the draw signal handler, notice that the constructor for the
+          <code class="classname">Clock</code> widget connects a handler function
+          <code class="methodname">on_timeout()</code> to a timer with a timeout
+          period of 1000 milliseconds (1 second). This means that
+          <code class="methodname">on_timeout()</code> will get called once per
+          second. The sole responsibility of this function is to invalidate
+          the window so that <span class="application">gtkmm</span> will be forced to redraw it.
+      </p>
+<p>
+          Now let's take a look at the code that performs the actual drawing.
+          The first section of <code class="methodname">on_draw()</code> should be
+          pretty familiar by now. This example again scales the coordinate system
+          to be a unit square so that it's easier to draw the clock as a
+          percentage of window size so that it will automatically scale when
+          the window size is adjusted. Furthermore, the coordinate system is
+          scaled over and down so that the (0, 0) coordinate is in the very
+          center of the window.
+      </p>
+<p>
+          The function <code class="methodname">Cairo::Context::paint()</code> is used here
+          to set the background color of the window. This function takes no
+          arguments and fills the current surface (or the clipped portion of
+          the surface) with the source color currently active. After setting
+          the background color of the window, we draw a circle for the clock
+          outline, fill it with white, and then stroke the outline in black.
+          Notice that both of these actions use the
+          <code class="methodname">_preserve</code> variant to preserve the current path,
+          and then this same path is clipped to make sure that our next lines
+          don't go outside the outline of the clock.
+      </p>
+<p>
+          After drawing the outline, we go around the clock and draw ticks for
+          every hour, with a larger tick at 12, 3, 6, and 9. Now we're finally
+          ready to implement the time-keeping functionality of the clock, which
+          simply involves getting the current values for hours, minutes and
+          seconds, and drawing the hands at the correct angles.
+      </p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-draw-images.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-drawingarea.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-draganddrop.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Drawing Images </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 18. Drag and Drop</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

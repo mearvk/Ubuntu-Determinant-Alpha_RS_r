@@ -1,0 +1,494 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Custom Widgets</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-customwidgets.html" title="Chapter 28. Custom Widgets">
+<link rel="prev" href="chapter-customwidgets.html" title="Chapter 28. Custom Widgets">
+<link rel="next" href="chapter-multi-threaded-programs.html" title="Chapter 29. Multi-threaded programs">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Custom Widgets</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-customwidgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 28. Custom Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-multi-threaded-programs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-custom-widgets"></a>Custom Widgets</h2></div></div></div>
+<p>By deriving directly from <code class="classname">Gtk::Widget</code> you can
+        do all the drawing for your widget directly, instead of just arranging
+        child widgets. For instance, a <code class="classname">Gtk::Label</code> draws
+        the text of the label, but does not do this by using other
+        widgets.</p>
+<p>When deriving from <code class="classname">Gtk::Widget</code>, you should
+        override the following virtual methods. The methods marked (optional)
+        need not be overridden in all custom widgets. The base class's methods
+        may be appropriate.
+    </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p><code class="methodname">get_request_mode_vfunc()</code>: (optional) Return what <code class="literal">Gtk::SizeRequestMode</code> is preferred by the widget.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_width_vfunc()</code>: Calculate the minimum and natural width of the widget.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_height_vfunc()</code>: Calculate the minimum and natural height of the widget.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_width_for_height_vfunc()</code>: Calculate the minimum and natural width of the widget, if it would be given the specified height.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_height_for_width_vfunc()</code>: Calculate the minimum and natural height of the widget, if it would be given the specified width.</p></li>
+<li class="listitem"><p><code class="methodname">on_size_allocate()</code>: Position the widget, given the height and width that it has actually been given.</p></li>
+<li class="listitem"><p><code class="methodname">on_realize()</code>: Associate a <code class="classname">Gdk::Window</code> with the widget.</p></li>
+<li class="listitem"><p><code class="methodname">on_unrealize()</code>: (optional) Break the association with the <code class="classname">Gdk::Window</code>. </p></li>
+<li class="listitem"><p><code class="methodname">on_map()</code>: (optional)</p></li>
+<li class="listitem"><p><code class="methodname">on_unmap()</code>: (optional)</p></li>
+<li class="listitem"><p><code class="methodname">on_draw()</code>: Draw on the supplied <code class="classname">Cairo::Context</code>.</p></li>
+</ul></div>
+<p>
+    </p>
+<p>The first 6 methods in the previous table are also overridden in custom
+        containers. They are briefly described in the
+        <a class="link" href="chapter-customwidgets.html#sec-custom-containers" title="Custom Containers">Custom Containers</a> section.
+    </p>
+<p>Most custom widgets need their own <code class="classname">Gdk::Window</code>
+      to draw on. Then you can call
+      <code class="methodname">Gtk::Widget::set_has_window(true)</code> in your
+      constructor. (This is the default value.) If you do not call
+      <code class="methodname">set_has_window(false)</code>, you must override
+      <code class="methodname">on_realize()</code> and call
+      <code class="methodname">Gtk::Widget::set_realized()</code> and
+      <code class="methodname">Gtk::Widget::set_window()</code> from there.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="custom-style-properties"></a>Custom Style Properties</h3></div></div></div>
+<p>You can add style properties to your widget class, whether it's derived directly
+from <code class="classname">Gtk::Widget</code> or from another widget class. The values of
+the style properties can be read from a CSS (Cascading Style Sheets) file. The users
+of your widget, or the users of an application program with your widget, can then
+modify the style of your widget without modifying the source code.
+Useful classes are <code class="classname">Gtk::StyleProperty</code> and <code class="classname">Gtk::CssProvider</code>.
+With <code class="methodname">Gtk::Widget::get_style_property()</code> you can read the values
+of both your own style properties and those of your widget's base class. Note that style
+properties are not wrapped in <span class="application">gtkmm</span>. See <span class="application">GTK+</span>'s
+documentation for lists of existing style properties.
+The following example shows a simple use of a custom style property.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="custom-widget-example"></a>Example</h3></div></div></div>
+<p>This example implements a widget which draws a Penrose triangle.</p>
+<div class="figure">
+<a name="figure-custom-widget"></a><p class="title"><b>Figure 28.2. Custom Widget</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/custom_widget.png" alt="Custom Widget"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/custom/custom_widget/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "mywidget.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  MyWidget m_MyWidget;
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">mywidget.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_CUSTOM_WIDGET_MYWIDGET_H
+#define GTKMM_CUSTOM_WIDGET_MYWIDGET_H
+
+#include &lt;gtkmm/widget.h&gt;
+#include &lt;gtkmm/cssprovider.h&gt;
+#include &lt;gtkmm/styleproperty.h&gt;
+
+class MyWidget : public Gtk::Widget
+{
+public:
+  MyWidget();
+  virtual ~MyWidget();
+
+protected:
+
+  //Overrides:
+  Gtk::SizeRequestMode get_request_mode_vfunc() const override;
+  void get_preferred_width_vfunc(int&amp; minimum_width, int&amp; natural_width) const override;
+  void get_preferred_height_for_width_vfunc(int width, int&amp; minimum_height, int&amp; natural_height) const  override;
+  void get_preferred_height_vfunc(int&amp; minimum_height, int&amp; natural_height) const override;
+  void get_preferred_width_for_height_vfunc(int height, int&amp; minimum_width, int&amp; natural_width) const override;
+  void on_size_allocate(Gtk::Allocation&amp; allocation) override;
+  void on_map() override;
+  void on_unmap() override;
+  void on_realize() override;
+  void on_unrealize() override;
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+
+  //Signal handler:
+  void on_parsing_error(const Glib::RefPtr&lt;const Gtk::CssSection&gt;&amp; section, const Glib::Error&amp; error);
+
+  Gtk::StyleProperty&lt;int&gt; m_scale_prop;
+  Glib::RefPtr&lt;Gdk::Window&gt; m_refGdkWindow;
+  Glib::RefPtr&lt;Gtk::CssProvider&gt; m_refCssProvider;
+
+  int m_scale;
+};
+
+#endif //GTKMM_CUSTOM_WIDGET_MYWIDGET_H
+</pre>
+<p>File: <code class="filename">mywidget.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "mywidget.h"
+#include &lt;gdkmm/general.h&gt;  // for cairo helper functions
+#include &lt;iostream&gt;
+//#include &lt;gtk/gtkwidget.h&gt; //For GTK_IS_WIDGET()
+#include &lt;cstring&gt;
+
+// The MyWidget class uses API which was added in gtkmm 3.15.3 (Gtk::CssProviderError,
+// Gtk::CssProvider::signal_parsing_error() and Gtk::CssSection) and in gtkmm 3.15.2
+// (Gtk::StyleProperty).
+
+MyWidget::MyWidget() :
+  //The GType name will actually be gtkmm__CustomObject_mywidget
+  Glib::ObjectBase("mywidget"),
+  Gtk::Widget(),
+  //Install a style property so that an aspect of this widget may be themed
+  //via a CSS style sheet file:
+  m_scale_prop(*this, "example_scale", 500),
+  m_scale(1000)
+{
+  set_has_window(true);
+
+  //This shows the GType name, which must be used in the CSS file.
+  std::cout &lt;&lt; "GType name: " &lt;&lt; G_OBJECT_TYPE_NAME(gobj()) &lt;&lt; std::endl;
+
+  //This shows that the GType still derives from GtkWidget:
+  //std::cout &lt;&lt; "Gtype is a GtkWidget?:" &lt;&lt; GTK_IS_WIDGET(gobj()) &lt;&lt; std::endl;
+
+  // Set the widget name to use in the CSS file.
+  set_name("my-widget");
+
+  // If you make a custom widget in C code, based on gtk+'s GtkWidget, there is
+  // an alternative to gtk_widget_set_name(): Set a CSS name for your custom
+  // class (instead of the widget instance) with gtk_widget_class_set_css_name()
+  // (new in gtk+ 3.19.1). That's not possible for custom widgets defined in gtkmm.
+  // gtk_widget_class_set_css_name() must be called in the class init function,
+  // which can't be customized, when the widget is based on gtkmm's Gtk::Widget.
+  //
+  // Another alternative: The custom widget inherits the CSS name "widget" from
+  // GtkWidget. That name can be used in the CSS file. This is not a very good
+  // alternative. GtkWidget's CSS name is not documented. It can probably be
+  // changed or removed in the future.
+
+  m_refCssProvider = Gtk::CssProvider::create();
+  auto refStyleContext = get_style_context();
+  refStyleContext-&gt;add_provider(m_refCssProvider,
+    GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  m_refCssProvider-&gt;signal_parsing_error().connect(
+    sigc::mem_fun(*this, &amp;MyWidget::on_parsing_error));
+
+  try
+  {
+    m_refCssProvider-&gt;load_from_path("custom_gtk.css");
+  }
+  catch(const Gtk::CssProviderError&amp; ex)
+  {
+    std::cerr &lt;&lt; "CssProviderError, Gtk::CssProvider::load_from_path() failed: "
+              &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch(const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "Error, Gtk::CssProvider::load_from_path() failed: "
+              &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+MyWidget::~MyWidget()
+{
+}
+
+Gtk::SizeRequestMode MyWidget::get_request_mode_vfunc() const
+{
+  //Accept the default value supplied by the base class.
+  return Gtk::Widget::get_request_mode_vfunc();
+}
+
+//Discover the total amount of minimum space and natural space needed by
+//this widget.
+//Let's make this simple example widget always need minimum 60 by 50 and
+//natural 100 by 70.
+void MyWidget::get_preferred_width_vfunc(int&amp; minimum_width, int&amp; natural_width) const
+{
+  minimum_width = 60;
+  natural_width = 100;
+}
+
+void MyWidget::get_preferred_height_for_width_vfunc(int /* width */,
+   int&amp; minimum_height, int&amp; natural_height) const
+{
+  minimum_height = 50;
+  natural_height = 70;
+}
+
+void MyWidget::get_preferred_height_vfunc(int&amp; minimum_height, int&amp; natural_height) const
+{
+  minimum_height = 50;
+  natural_height = 70;
+}
+
+void MyWidget::get_preferred_width_for_height_vfunc(int /* height */,
+   int&amp; minimum_width, int&amp; natural_width) const
+{
+  minimum_width = 60;
+  natural_width = 100;
+}
+
+void MyWidget::on_size_allocate(Gtk::Allocation&amp; allocation)
+{
+  //Do something with the space that we have actually been given:
+  //(We will not be given heights or widths less than we have requested, though
+  //we might get more)
+
+  //Use the offered allocation for this container:
+  set_allocation(allocation);
+
+  if(m_refGdkWindow)
+  {
+    m_refGdkWindow-&gt;move_resize( allocation.get_x(), allocation.get_y(),
+            allocation.get_width(), allocation.get_height() );
+  }
+}
+
+void MyWidget::on_map()
+{
+  //Call base class:
+  Gtk::Widget::on_map();
+}
+
+void MyWidget::on_unmap()
+{
+  //Call base class:
+  Gtk::Widget::on_unmap();
+}
+
+void MyWidget::on_realize()
+{
+  //Do not call base class Gtk::Widget::on_realize().
+  //It's intended only for widgets that set_has_window(false).
+
+  set_realized();
+
+  //Get the themed style from the CSS file:
+  m_scale = m_scale_prop.get_value();
+  std::cout &lt;&lt; "m_scale (example_scale from the theme/css-file) is: "
+      &lt;&lt; m_scale &lt;&lt; std::endl;
+
+  if(!m_refGdkWindow)
+  {
+    //Create the GdkWindow:
+
+    GdkWindowAttr attributes;
+    memset(&amp;attributes, 0, sizeof(attributes));
+
+    Gtk::Allocation allocation = get_allocation();
+
+    //Set initial position and size of the Gdk::Window:
+    attributes.x = allocation.get_x();
+    attributes.y = allocation.get_y();
+    attributes.width = allocation.get_width();
+    attributes.height = allocation.get_height();
+
+    attributes.event_mask = get_events () | Gdk::EXPOSURE_MASK;
+    attributes.window_type = GDK_WINDOW_CHILD;
+    attributes.wclass = GDK_INPUT_OUTPUT;
+
+    m_refGdkWindow = Gdk::Window::create(get_parent_window(), &amp;attributes,
+            GDK_WA_X | GDK_WA_Y);
+    set_window(m_refGdkWindow);
+
+    //make the widget receive expose events
+    m_refGdkWindow-&gt;set_user_data(gobj());
+  }
+}
+
+void MyWidget::on_unrealize()
+{
+  m_refGdkWindow.reset();
+
+  //Call base class:
+  Gtk::Widget::on_unrealize();
+}
+
+bool MyWidget::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  const Gtk::Allocation allocation = get_allocation();
+  const double scale_x = (double)allocation.get_width() / m_scale;
+  const double scale_y = (double)allocation.get_height() / m_scale;
+  auto refStyleContext = get_style_context();
+
+  // paint the background
+  refStyleContext-&gt;render_background(cr,
+    allocation.get_x(), allocation.get_y(),
+    allocation.get_width(), allocation.get_height());
+
+  // draw the foreground
+  const auto state = refStyleContext-&gt;get_state();
+  Gdk::Cairo::set_source_rgba(cr, refStyleContext-&gt;get_color(state));
+  cr-&gt;move_to(155.*scale_x, 165.*scale_y);
+  cr-&gt;line_to(155.*scale_x, 838.*scale_y);
+  cr-&gt;line_to(265.*scale_x, 900.*scale_y);
+  cr-&gt;line_to(849.*scale_x, 564.*scale_y);
+  cr-&gt;line_to(849.*scale_x, 438.*scale_y);
+  cr-&gt;line_to(265.*scale_x, 100.*scale_y);
+  cr-&gt;line_to(155.*scale_x, 165.*scale_y);
+  cr-&gt;move_to(265.*scale_x, 100.*scale_y);
+  cr-&gt;line_to(265.*scale_x, 652.*scale_y);
+  cr-&gt;line_to(526.*scale_x, 502.*scale_y);
+  cr-&gt;move_to(369.*scale_x, 411.*scale_y);
+  cr-&gt;line_to(633.*scale_x, 564.*scale_y);
+  cr-&gt;move_to(369.*scale_x, 286.*scale_y);
+  cr-&gt;line_to(369.*scale_x, 592.*scale_y);
+  cr-&gt;move_to(369.*scale_x, 286.*scale_y);
+  cr-&gt;line_to(849.*scale_x, 564.*scale_y);
+  cr-&gt;move_to(633.*scale_x, 564.*scale_y);
+  cr-&gt;line_to(155.*scale_x, 838.*scale_y);
+  cr-&gt;stroke();
+
+  return true;
+}
+
+void MyWidget::on_parsing_error(const Glib::RefPtr&lt;const Gtk::CssSection&gt;&amp; section, const Glib::Error&amp; error)
+{
+  std::cerr &lt;&lt; "on_parsing_error(): " &lt;&lt; error.what() &lt;&lt; std::endl;
+  if (section)
+  {
+    const auto file = section-&gt;get_file();
+    if (file)
+    {
+      std::cerr &lt;&lt; "  URI = " &lt;&lt; file-&gt;get_uri() &lt;&lt; std::endl;
+    }
+
+    std::cerr &lt;&lt; "  start_line = " &lt;&lt; section-&gt;get_start_line()+1
+              &lt;&lt; ", end_line = " &lt;&lt; section-&gt;get_end_line()+1 &lt;&lt; std::endl;
+    std::cerr &lt;&lt; "  start_position = " &lt;&lt; section-&gt;get_start_position()
+              &lt;&lt; ", end_position = " &lt;&lt; section-&gt;get_end_position() &lt;&lt; std::endl;
+  }
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("Quit")
+{
+  set_title("Custom Widget example");
+  set_border_width(6);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+  m_VBox.pack_start(m_MyWidget, Gtk::PACK_EXPAND_WIDGET);
+  m_MyWidget.show();
+
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(6);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect( sigc::mem_fun(*this, &amp;ExampleWindow::on_button_quit) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+</pre>
+<p>File: <code class="filename">custom_gtk.css</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+/* Example of a CSS style sheet with a custom style property.
+ *
+ * The name of the style property must have its canonical form, i.e. characters
+ * other than ASCII letters, digits, and hyphens must be replaced by hyphens.
+*/
+
+* {
+  /* -&lt;widget class name&gt;-&lt;style property canonical name&gt;: &lt;value&gt;; */
+  -gtkmm__CustomObject_mywidget-example-scale: 920;
+}
+
+#my-widget {
+  background-color: rgb(255,0,0);
+  color:            rgb(0,0,255);
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-customwidgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-customwidgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-multi-threaded-programs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 28. Custom Widgets </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 29. Multi-threaded programs</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

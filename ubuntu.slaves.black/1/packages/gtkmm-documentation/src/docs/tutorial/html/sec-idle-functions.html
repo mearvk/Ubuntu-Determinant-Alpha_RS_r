@@ -1,0 +1,208 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Idle Functions</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-chapter-timeouts.html" title="Chapter 24. Timeouts, I/O and Idle Functions">
+<link rel="prev" href="sec-monitoring-io.html" title="Monitoring I/O">
+<link rel="next" href="chapter-memory.html" title="Chapter 25. Memory management">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Idle Functions</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-monitoring-io.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 24. Timeouts, I/O and Idle Functions </th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-memory.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-idle-functions"></a>Idle Functions</h2></div></div></div>
+<p>
+If you want to specify a method that gets called when nothing else is happening, use the following:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+sigc::connection  Glib::SignalIdle::connect(const sigc::slot&lt;bool&gt;&amp; slot,
+                                    int priority = Glib::PRIORITY_DEFAULT_IDLE);
+</pre>
+<p>
+</p>
+<p>
+This causes <span class="application">gtkmm</span> to call the specified method whenever nothing else is
+happening. You can add a priority (lower numbers are higher priorities). There are two ways to remove the signal handler: calling
+<code class="methodname">disconnect()</code> on the
+<code class="classname">sigc::connection</code> object, or returning
+<code class="literal">false</code> in the signal handler, which should be declared
+as follows:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+bool idleFunc();
+</pre>
+<p>
+</p>
+<p>
+Since this is very similar to the methods above this explanation should
+be sufficient to understand what's going on. However, here's a little example:
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/idle/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">idleexample.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_IDLEEXAMPLE_H
+#define GTKMM_EXAMPLE_IDLEEXAMPLE_H
+
+#include &lt;gtkmm.h&gt;
+#include &lt;iostream&gt;
+
+class IdleExample : public Gtk::Window
+{
+public:
+  IdleExample();
+
+protected:
+  // Signal Handlers:
+  bool on_timer();
+  bool on_idle();
+  void on_button_clicked();
+
+  // Member data:
+  Gtk::Box m_Box;
+  Gtk::Button m_ButtonQuit;
+  Gtk::ProgressBar m_ProgressBar_c;
+  Gtk::ProgressBar m_ProgressBar_d;
+};
+
+#endif // GTKMM_EXAMPLE_IDLEEXAMPLE_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "idleexample.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main (int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  IdleExample example;
+  return app-&gt;run(example);
+}
+</pre>
+<p>File: <code class="filename">idleexample.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "idleexample.h"
+
+IdleExample::IdleExample() :
+  m_Box(Gtk::ORIENTATION_VERTICAL, 5),
+  m_ButtonQuit("_Quit", true)
+{
+  set_border_width(5);
+
+  // Put buttons into container
+
+  // Adding a few widgets:
+  add(m_Box);
+  m_Box.pack_start(*Gtk::make_managed&lt;Gtk::Label&gt;("Formatting Windows drive C:"));
+  m_Box.pack_start(*Gtk::make_managed&lt;Gtk::Label&gt;("100 MB"));
+  m_Box.pack_start(m_ProgressBar_c);
+
+  m_Box.pack_start(*Gtk::make_managed&lt;Gtk::Label&gt;(""));
+
+  m_Box.pack_start(*Gtk::make_managed&lt;Gtk::Label&gt;("Formatting Windows drive D:"));
+  m_Box.pack_start(*Gtk::make_managed&lt;Gtk::Label&gt;("5000 MB"));
+  m_Box.pack_start(m_ProgressBar_d);
+
+  auto hbox = Gtk::make_managed&lt;Gtk::Box&gt;(Gtk::ORIENTATION_HORIZONTAL,10);
+  m_Box.pack_start(*hbox);
+  hbox-&gt;pack_start(m_ButtonQuit, Gtk::PACK_EXPAND_PADDING);
+
+  // Connect the signal handlers:
+  m_ButtonQuit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;IdleExample::on_button_clicked) );
+
+  // formatting drive c in timeout signal handler - called once every 50ms
+  Glib::signal_timeout().connect( sigc::mem_fun(*this, &amp;IdleExample::on_timer),
+          50 );
+
+  // formatting drive d in idle signal handler - called as quickly as possible
+  Glib::signal_idle().connect( sigc::mem_fun(*this, &amp;IdleExample::on_idle) );
+
+  show_all_children();
+}
+
+
+void IdleExample::on_button_clicked()
+{
+  hide();
+}
+
+// this timer callback function is executed once every 50ms (set in connection
+// above).  Use timeouts when speed is not critical. (ie periodically updating
+// something).
+bool IdleExample::on_timer()
+{
+  double value = m_ProgressBar_c.get_fraction();
+
+  // Update progressbar 1/500th each time:
+  m_ProgressBar_c.set_fraction(value + 0.002);
+
+  return value &lt; 0.99;  // return false when done
+}
+
+
+// This idle callback function is executed as often as possible, hence it is
+// ideal for processing intensive tasks.
+bool IdleExample::on_idle()
+{
+  double value = m_ProgressBar_d.get_fraction();
+
+  // Update progressbar 1/5000th each time:
+  m_ProgressBar_d.set_fraction(value + 0.0002);
+
+  return value &lt; 0.99;  // return false when done
+}
+</pre>
+<p>
+This example points out the difference of idle and timeout methods a
+little. If you need methods that are called periodically, and speed
+is not very important, then you want timeout methods. If
+you want methods that are called as often as possible (like
+calculating a fractal in background), then use idle methods.
+</p>
+<p>
+Try executing the example and increasing the system load. The upper
+progress bar will increase steadily; the lower one will slow down.
+</p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-monitoring-io.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-chapter-timeouts.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-memory.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Monitoring I/O </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 25. Memory management</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

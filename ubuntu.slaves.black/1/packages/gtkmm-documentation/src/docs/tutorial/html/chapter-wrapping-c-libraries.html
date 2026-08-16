@@ -1,0 +1,242 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Appendix G. Wrapping C Libraries with gmmproc</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-installing-jhbuild.html" title="Installing and Using the git version of gtkmm">
+<link rel="next" href="sec-wrapping-defs-files.html" title="Generating the .defs files.">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Appendix G. Wrapping C Libraries with gmmproc</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-installing-jhbuild.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-wrapping-defs-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="appendix">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-wrapping-c-libraries"></a>Appendix G. Wrapping C Libraries with gmmproc</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-wrapping-c-libraries.html#sec-wrapping-build-structure">The build structure</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-defs-files.html">Generating the .defs files.</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-hg-files.html">The .hg and .ccg files</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-hand-coded-files.html">Hand-coded source files</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-initialization.html">Initialization</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-problems.html">Problems in the C API.</a></span></li>
+<li><span class="sect1"><a href="sec-wrapping-documentation.html">Documentation</a></span></li>
+</ul>
+</div>
+<p><span class="application">gtkmm</span> uses the <span class="command"><strong>gmmproc</strong></span> tool to generate most of its
+    source code, using .defs files that define the APIs of
+    <code class="classname">GObject</code>-based libraries. So it's quite easy to create
+    additional gtkmm-style wrappers of other glib/GObject-based
+    libraries.</p>
+<p>This involves a variety of tools, some of them crufty, but at least
+    they work, and has been used successfully by several
+    projects.</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-wrapping-build-structure"></a>The build structure</h2></div></div></div>
+<p>Generation of the source code for a gtkmm-style wrapper API requires use
+    of tools such as <span class="command"><strong>gmmproc</strong></span> and
+    <code class="filename">generate_wrap_init.pl</code>. In theory you could write your
+    own build files to use these appropriately, but a much better option is to
+    make use of the build infrastructure provided by the mm-common module. To
+    get started, it helps a lot to pick an existing binding module as an example
+    to look at.</p>
+<p>For instance, let's pretend that we are wrapping a C library called
+    libsomething. It provides a <code class="classname">GObject</code>-based API with
+    types named, for instance, <code class="classname">SomeWidget</code> and
+    <code class="classname">SomeStuff</code>.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="copying-skeleton-project"></a>Copying the skeleton project</h3></div></div></div>
+<p>Typically our wrapper library would be called libsomethingmm. We can start by
+  copying the <a class="ulink" href="http://git.gnome.org/browse/mm-common/tree/skeletonmm" target="_top">skeleton
+  source tree</a> from the mm-common module.
+</p>
+<pre class="programlisting">
+  $ git clone https://gitlab.gnome.org/GNOME/mm-common.git
+  $ cp -a mm-common/skeletonmm libsomethingmm
+</pre>
+<p>
+</p>
+<p>This provides a directory structure for the source .hg and .ccg files and the generated .h
+  and .cc files, with <code class="filename">filelist.am</code> Automake include files that can specify the
+  various files in use, in terms of generic Automake variables. The directory structure usually
+  looks like this, after we have renamed the directories appropriately:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<p><code class="filename">libsomethingmm</code>: The top-level directory.</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; "><li class="listitem">
+<p><code class="filename">libsomething</code>: Contains the main include file and the pkg-config .pc file.</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: square; ">
+<li class="listitem"><p><code class="filename">src</code>: Contains .hg and .ccg source files.</p></li>
+<li class="listitem">
+<p><code class="filename">libsomethingmm</code>: Contains generated and hand-written .h and .cc files.</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="filename">private</code>: Contains generated <code class="filename">*_p.h</code> files.</p></li></ul></div>
+</li>
+</ul></div>
+</li></ul></div>
+</li></ul></div>
+<p>
+</p>
+<p>As well as renaming the directories, we should rename some of the source
+    files. For instance:
+</p>
+<pre class="programlisting">
+$ for f in $(find libsomethingmm -depth -name '*skeleton*'); do \
+    d="${f%/*}"; b="${f##*/}"; mv "$f" "$d/${b//skeleton/libsomething}"; \
+  done
+</pre>
+<p>
+A number of the skeleton files must still be filled in with project-specific content later.
+</p>
+<p>Note that files ending in <code class="filename">.in</code> will be used to generate
+    files with the same name but without the <code class="filename">.in</code> suffix, by
+    replacing some variables with actual values during the configure stage.</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="modifying-build-files"></a>Modifying build files</h3></div></div></div>
+<p>Now we edit the files to adapt them to our needs. You might prefer to use a multiple-file
+  search-replace utility for this, such as <span class="command"><strong>regexxer</strong></span>. Note that nearly all of the
+  files provided with the skeleton source tree contain placeholder text. Thus, the substitutions
+  should be performed globally, and not be limited to the Automake and Autoconf files.</p>
+<p>All mentions of <code class="varname">skeleton</code> should be replaced by the correct name of the C
+  library you are wrapping, such as "something" or "libsomething". In the same manner, all
+  instances of <code class="varname">SKELETON</code> should be replaced by "SOMETHING" or "LIBSOMETHING", and
+  all occurrences of <code class="varname">Skeleton</code> changed to "Something".</p>
+<p>Likewise, replace all instances of <code class="varname">Joe Hacker</code> by the name of the intended
+  copyright holder, which is probably you. Do the same for the <code class="varname">joe@example.com</code>
+  email address.</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="modifying-configure.ac"></a>configure.ac</h4></div></div></div>
+<p>In <code class="filename">configure.ac</code>,
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>The <code class="function">AC_CONFIG_SRCDIR()</code> line must mention a file
+      in our source tree. We can edit this later if we don't yet know the
+      names of any of the files that we will create.</p></li>
+<li class="listitem"><p>It is common for binding modules to track the version number
+      of the library they are wrapping. So, for instance, if the C library is
+      at version 1.23.4, then the initial version of the binding module would
+      be 1.23.0. However, avoid starting with an even minor version number as
+      that usually indicates a stable release.</p></li>
+<li class="listitem"><p>The <code class="function">AC_CONFIG_HEADERS()</code> line is used to
+      generate two or more configuration header files. The first header file
+      in the list contains all configuration macros which are set during the
+      configure run. The remaining headers in the list contain only a subset
+      of configuration macros and their corresponding <code class="filename">config.h.in</code>
+      file will not be autogenerated. The reason for this separation is that
+      the namespaced configuration headers are installed with your library and
+      define publically visible macros.</p></li>
+<li class="listitem"><p>The <code class="function">AC_SUBST([SOMETHINGMM_MODULES], ['...'])</code>
+      line may need to be modified to check for the correct dependencies.</p></li>
+<li class="listitem"><p>The <code class="function">AC_CONFIG_FILES()</code> block must mention
+      the correct directory names, as described above.</p></li>
+</ul></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="modifying-makefile.am"></a>Makefile.am files</h4></div></div></div>
+<p>Next we must adapt the various <code class="filename">Makefile.am</code> files:
+  </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem">
+<p>In <code class="filename">skeleton/src/Makefile.am</code> we
+            must mention the correct values for the generic variables that are used
+            elsewhere in the build system:</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term"><code class="varname">binding_name</code></span></dt>
+<dd><p>The name of the library, such as
+                        libsomethingmm.</p></dd>
+<dt><span class="term"><code class="varname">wrap_init_flags</code></span></dt>
+<dd><p>Additional command-line flags passed to the
+                    <code class="filename">generate_wrap_init.pl</code> script, such
+                    as the C++ namespace and the parent directory prefix of
+                    include files.</p></dd>
+</dl></div>
+</li>
+<li class="listitem">
+<p>In <code class="filename">skeleton/skeletonmm/Makefile.am</code> we
+            must mention the correct values for the generic variables that are used
+            elsewhere in the build system:</p>
+<div class="variablelist"><dl class="variablelist">
+<dt><span class="term"><code class="varname">lib_LTLIBRARIES</code></span></dt>
+<dd><p>This variable must mention the correct library
+              name, and this library name must be used to form the
+              <code class="varname">_SOURCES</code>, <code class="varname">_LDFLAGS</code>, and
+              <code class="varname">_LIBADD</code> variable names. It is permissible to
+              use variables substituted by <code class="filename">configure</code> like
+              <code class="varname">@SOMETHINGMM_API_VERSION@</code> as part of the
+              variable names.</p></dd>
+<dt><span class="term"><code class="varname">AM_CPPFLAGS</code></span></dt>
+<dd><p>The command line options passed to the C
+              preprocessor.</p></dd>
+<dt><span class="term"><code class="varname">AM_CXXFLAGS</code></span></dt>
+<dd><p>The command line options passed to the C++
+              compiler.</p></dd>
+</dl></div>
+</li>
+</ul></div>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="creating-hg-ccg"></a>Creating .hg and .ccg files</h4></div></div></div>
+<p>We should now create our first <code class="filename">.hg</code> and <code class="filename">.ccg</code> files,
+  to wrap one of the objects in the C library. One pair of example source files already exists:
+  <code class="filename">skeleton.ccg</code> and <code class="filename">skeleton.hg</code>. Create copies of these
+  files as necessary.</p>
+<p>We must mention all of our <code class="filename">.hg</code> and
+  <code class="filename">.ccg</code> files in the
+  <code class="filename">skeleton/src/filelist.am</code> file, typically in the
+  <code class="varname">files_hg</code> variable.</p>
+<p>Any additional non-generated <code class="filename">.h</code> and
+  <code class="filename">.cc</code> source files may be placed in
+  <code class="filename">skeleton/skeletonmm/</code> and listed in
+  <code class="filename">skeleton/skeletonmm/filelist.am</code>, typically in the
+  <code class="varname">files_extra_h</code> and <code class="varname">files_extra_cc</code>
+  variables.</p>
+<p>In the <a class="link" href="sec-wrapping-hg-files.html" title="The .hg and .ccg files">.hg and .ccg files</a>
+  section you can learn about the syntax used in these files.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-installing-jhbuild.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-wrapping-defs-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Installing and Using the git version of <span class="application">gtkmm</span> </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Generating the .defs files.</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

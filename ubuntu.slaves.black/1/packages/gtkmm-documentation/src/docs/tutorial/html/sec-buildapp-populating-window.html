@@ -1,0 +1,296 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Populating the window</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="prev" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="next" href="sec-buildapp-opening-files.html" title="Opening files">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Populating the window</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-building-applications.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 31. Building applications</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-buildapp-opening-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-buildapp-populating-window"></a>Populating the window</h2></div></div></div>
+<p>
+In this step, we use a <code class="classname">Gtk::Builder</code> instance to associate a
+<code class="classname">Gtk::Builder</code> ui file with our application window class.
+</p>
+<p>
+Our simple ui file puts a <code class="classname">Gtk::HeaderBar</code> on top of a
+<code class="classname">Gtk::Stack</code> widget. The header bar contains a
+<code class="classname">Gtk::StackSwitcher</code>, which is a standalone widget to show a row
+of 'tabs' for the pages of a <code class="classname">Gtk::Stack</code>. 
+</p>
+<p>
+To make use of this file in our application, we revisit our
+<code class="classname">Gtk::ApplicationWindow</code> subclass, and call
+<code class="methodname">Gtk::Builder::create_from_resource()</code> and
+<code class="methodname">Gtk::Builder::get_widget_derived()</code> from the
+<code class="methodname">ExampleAppWindow::create()</code> method to get an instance of
+our subclassed <code class="classname">Gtk::ApplicationWindow</code>. See the 
+<a class="link" href="sec-builder-using-derived-widgets.html" title="Using derived widgets">Using derived widgets</a> section
+for more information about <code class="methodname">get_widget_derived()</code>.
+</p>
+<p>
+You may have noticed that we use the <code class="methodname">_from_resource()</code> variant
+of the method that reads the ui file. Now we need to use <span class="application">GLib</span>'s
+resource functionality to include the ui file in the binary. This is commonly done by
+listing all resources in a .gresource.xml file.
+This file has to be converted into a C source file that will be compiled and linked
+into the application together with the other source files. To do so, we use the
+<span class="application">glib-compile-resources</span> utility:
+</p>
+<pre class="screen">$ glib-compile-resources --target=resources.c --generate-source exampleapp.gresource.xml</pre>
+<p>
+The <a class="link" href="sec-gio-resource.html" title="Gio::Resource and glib-compile-resources">Gio::Resource and glib-compile-resources</a>
+section contains more information about resource files.
+</p>
+<p>
+Our application now looks like this:
+</p>
+<div class="figure">
+<a name="figure-buildapp-populating-window"></a><p class="title"><b>Figure 31.2. Populating the window</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buildapp_populating_window.png" alt="Populating the window"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buildapp/step2?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">exampleappwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPWINDOW_H_
+#define GTKMM_EXAMPLEAPPWINDOW_H_
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAppWindow : public Gtk::ApplicationWindow
+{
+public:
+  ExampleAppWindow(BaseObjectType* cobject,
+    const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder);
+
+  static ExampleAppWindow* create();
+
+  void open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file);
+
+protected:
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+};
+
+#endif /* GTKMM_EXAMPLEAPPWINDOW_H */
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step1/exampleapplication.h"
+// Equal to the corresponding file in step1
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleapplication.h"
+#include "exampleappwindow.h"
+#include &lt;iostream&gt;
+#include &lt;exception&gt;
+
+ExampleApplication::ExampleApplication()
+: Gtk::Application("org.gtkmm.examples.application", Gio::APPLICATION_HANDLES_OPEN)
+{
+}
+
+Glib::RefPtr&lt;ExampleApplication&gt; ExampleApplication::create()
+{
+  return Glib::RefPtr&lt;ExampleApplication&gt;(new ExampleApplication());
+}
+
+ExampleAppWindow* ExampleApplication::create_appwindow()
+{
+  auto appwindow = ExampleAppWindow::create();
+
+  // Make sure that the application runs for as long this window is still open.
+  add_window(*appwindow);
+
+  // Gtk::Application::add_window() connects a signal handler to the window's
+  // signal_hide(). That handler removes the window from the application.
+  // If it's the last window to be removed, the application stops running.
+  // Gtk::Window::set_application() does not connect a signal handler, but is
+  // otherwise equivalent to Gtk::Application::add_window().
+
+  // Delete the window when it is hidden.
+  appwindow-&gt;signal_hide().connect(sigc::bind&lt;Gtk::Window*&gt;(sigc::mem_fun(*this,
+    &amp;ExampleApplication::on_hide_window), appwindow));
+
+  return appwindow;
+}
+
+void ExampleApplication::on_activate()
+{
+  try
+  {
+    // The application has been started, so let's show a window.
+    auto appwindow = create_appwindow();
+    appwindow-&gt;present();
+  }
+  // If create_appwindow() throws an exception (perhaps from Gtk::Builder),
+  // no window has been created, no window has been added to the application,
+  // and therefore the application will stop running.
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_activate(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch (const std::exception&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_activate(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleApplication::on_open(const Gio::Application::type_vec_files&amp; files,
+  const Glib::ustring&amp; /* hint */)
+{
+  // The application has been asked to open some files,
+  // so let's open a new view for each one.
+  ExampleAppWindow* appwindow = nullptr;
+  auto windows = get_windows();
+  if (windows.size() &gt; 0)
+    appwindow = dynamic_cast&lt;ExampleAppWindow*&gt;(windows[0]);
+
+  try
+  {
+    if (!appwindow)
+      appwindow = create_appwindow();
+
+    for (const auto&amp; file : files)
+      appwindow-&gt;open_file_view(file);
+
+    appwindow-&gt;present();
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_open(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch (const std::exception&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_open(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleApplication::on_hide_window(Gtk::Window* window)
+{
+  delete window;
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step1/main.cc"
+// Equal to the corresponding file in step1
+</pre>
+<p>File: <code class="filename">exampleappwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappwindow.h"
+#include &lt;stdexcept&gt;
+
+ExampleAppWindow::ExampleAppWindow(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::ApplicationWindow(cobject),
+  m_refBuilder(refBuilder)
+{
+}
+
+//static
+ExampleAppWindow* ExampleAppWindow::create()
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/window.ui");
+
+  ExampleAppWindow* window = nullptr;
+  refBuilder-&gt;get_widget_derived("app_window", window);
+  if (!window)
+    throw std::runtime_error("No \"app_window\" object in window.ui");
+
+  return window;
+}
+
+void ExampleAppWindow::open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; /* file */)
+{
+}
+</pre>
+<p>File: <code class="filename">exampleapp.gresource.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/org/gtkmm/exampleapp"&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;window.ui&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+<p>File: <code class="filename">window.ui</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;interface&gt;
+  &lt;!-- interface-requires gtk+ 3.8 --&gt;
+  &lt;object class="GtkApplicationWindow" id="app_window"&gt;
+    &lt;property name="title" translatable="yes"&gt;Example Application&lt;/property&gt;
+    &lt;property name="default-width"&gt;600&lt;/property&gt;
+    &lt;property name="default-height"&gt;400&lt;/property&gt;
+    &lt;child&gt;
+      &lt;object class="GtkBox" id="content_box"&gt;
+        &lt;property name="visible"&gt;True&lt;/property&gt;
+        &lt;property name="orientation"&gt;vertical&lt;/property&gt;
+        &lt;child&gt;
+          &lt;object class="GtkHeaderBar" id="header"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;child type="title"&gt;
+              &lt;object class="GtkStackSwitcher" id="tabs"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="stack"&gt;stack&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkStack" id="stack"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+      &lt;/object&gt;
+    &lt;/child&gt;
+  &lt;/object&gt;
+&lt;/interface&gt;
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-building-applications.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-building-applications.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-buildapp-opening-files.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 31. Building applications </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Opening files</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

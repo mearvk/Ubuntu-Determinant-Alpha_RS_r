@@ -1,0 +1,995 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Examples</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-menus-and-toolbars.html" title="Chapter 12. Menus and Toolbars">
+<link rel="prev" href="sec-gio-resource.html" title="Gio::Resource and glib-compile-resources">
+<link rel="next" href="chapter-toolpalette.html" title="Chapter 13. ToolPalette">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Examples</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-gio-resource.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 12. Menus and Toolbars</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-toolpalette.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-menus-examples"></a>Examples</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="menu-example-main"></a>Application Menu and Main Menu example</h3></div></div></div>
+<p>
+This program contains an application menu, a menubar and a toolbar.
+Classes are derived from <code class="classname">Gtk::Application</code> and
+<code class="classname">Gtk::ApplicationWindow</code>.
+</p>
+<div class="figure">
+<a name="figure-menus-mainmenu"></a><p class="title"><b>Figure 12.1. App and Main Menu</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/main_menu.png" alt="App and Main Menu"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/menus/main_menu/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::ApplicationWindow
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_menu_others();
+
+  void on_menu_choices(const Glib::ustring&amp; parameter);
+  void on_menu_choices_other(int parameter);
+  void on_menu_toggle();
+
+  //Child widgets:
+  Gtk::Box m_Box;
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+
+  //Two sets of choices:
+  Glib::RefPtr&lt;Gio::SimpleAction&gt; m_refChoice;
+  Glib::RefPtr&lt;Gio::SimpleAction&gt; m_refChoiceOther;
+
+  Glib::RefPtr&lt;Gio::SimpleAction&gt; m_refToggle;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPLICATION_H
+#define GTKMM_EXAMPLEAPPLICATION_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleApplication : public Gtk::Application
+{
+protected:
+  ExampleApplication();
+
+public:
+  static Glib::RefPtr&lt;ExampleApplication&gt; create();
+
+protected:
+  //Overrides of default signal handlers:
+  void on_startup() override;
+  void on_activate() override;
+
+private:
+  void create_window();
+
+  void on_window_hide(Gtk::Window* window);
+  void on_menu_file_new_generic();
+  void on_menu_file_quit();
+  void on_menu_help_about();
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+};
+
+#endif /* GTKMM_EXAMPLEAPPLICATION_H */
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleapplication.h"
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleApplication::ExampleApplication()
+: Gtk::Application("org.gtkmm.example.main_menu")
+{
+  Glib::set_application_name("Main Menu Example");
+}
+
+Glib::RefPtr&lt;ExampleApplication&gt; ExampleApplication::create()
+{
+  return Glib::RefPtr&lt;ExampleApplication&gt;(new ExampleApplication());
+}
+
+void ExampleApplication::on_startup()
+{
+  //Call the base class's implementation:
+  Gtk::Application::on_startup();
+
+  //Create actions for menus and toolbars.
+  //We can use add_action() because Gtk::Application derives from Gio::ActionMap.
+
+  //File|New sub menu:
+  add_action("newstandard",
+    sigc::mem_fun(*this, &amp;ExampleApplication::on_menu_file_new_generic));
+
+  add_action("newfoo",
+    sigc::mem_fun(*this, &amp;ExampleApplication::on_menu_file_new_generic));
+
+  add_action("newgoo",
+    sigc::mem_fun(*this, &amp;ExampleApplication::on_menu_file_new_generic));
+
+  //File menu:
+  add_action("quit", sigc::mem_fun(*this, &amp;ExampleApplication::on_menu_file_quit));
+
+  //Help menu:
+  add_action("about", sigc::mem_fun(*this, &amp;ExampleApplication::on_menu_help_about));
+
+  m_refBuilder = Gtk::Builder::create();
+
+  //Layout the actions in a menubar and an application menu:
+  Glib::ustring ui_info =
+    "&lt;interface&gt;"
+    "  &lt;!-- menubar --&gt;"
+    "  &lt;menu id='menu-example'&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_File&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Standard&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newstandard&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;n&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Foo&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newfoo&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Goo&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newgoo&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Quit&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.quit&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;q&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Edit&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Copy&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.copy&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;c&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Paste&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.paste&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;v&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Something&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.something&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Choices&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Choice _A&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.choice&lt;/attribute&gt;"
+    "          &lt;attribute name='target'&gt;a&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Choice _B&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.choice&lt;/attribute&gt;"
+    "          &lt;attribute name='target'&gt;b&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Other Choices&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Choice 1&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.choiceother&lt;/attribute&gt;"
+    "          &lt;attribute name='target' type='i'&gt;1&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Choice 2&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.choiceother&lt;/attribute&gt;"
+    "          &lt;attribute name='target' type='i'&gt;2&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Some Toggle&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.sometoggle&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Help&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_About&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;win.about&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "  &lt;/menu&gt;"
+    ""
+    "  &lt;!-- application menu --&gt;"
+    "  &lt;menu id='appmenu'&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_File&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Standard&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newstandard&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;n&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Foo&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newfoo&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;New _Goo&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.newgoo&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Quit&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.quit&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;q&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Help&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_About&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;app.about&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "  &lt;/menu&gt;"
+    "&lt;/interface&gt;";
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_info);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "Building menus failed: " &lt;&lt; ex.what();
+  }
+
+  //Get the menubar and the app menu, and add them to the application:
+  auto object = m_refBuilder-&gt;get_object("menu-example");
+  auto gmenu = Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+  object = m_refBuilder-&gt;get_object("appmenu");
+  auto appMenu = Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+  if (!(gmenu &amp;&amp; appMenu)) {
+    g_warning("GMenu or AppMenu not found");
+  }
+  else
+  {
+    set_app_menu(appMenu);
+    set_menubar(gmenu);
+  }
+}
+
+void ExampleApplication::on_activate()
+{
+  //std::cout &lt;&lt; "debug1: " &lt;&lt; G_STRFUNC &lt;&lt; std::endl;
+  // The application has been started, so let's show a window.
+  // A real application might want to reuse this window in on_open(),
+  // when asked to open a file, if no changes have been made yet.
+  create_window();
+}
+
+void ExampleApplication::create_window()
+{
+  auto win = new ExampleWindow();
+
+  //Make sure that the application runs for as long this window is still open:
+  add_window(*win);
+
+  //Delete the window when it is hidden.
+  //That's enough for this simple example.
+  win-&gt;signal_hide().connect(sigc::bind&lt;Gtk::Window*&gt;(
+    sigc::mem_fun(*this, &amp;ExampleApplication::on_window_hide), win));
+
+  win-&gt;show_all();
+}
+
+void ExampleApplication::on_window_hide(Gtk::Window* window)
+{
+  delete window;
+}
+
+void ExampleApplication::on_menu_file_new_generic()
+{
+  std::cout &lt;&lt; "A File|New menu item was selected." &lt;&lt; std::endl;
+}
+
+void ExampleApplication::on_menu_file_quit()
+{
+  std::cout &lt;&lt; G_STRFUNC &lt;&lt; std::endl;
+  quit(); // Not really necessary, when Gtk::Widget::hide() is called.
+
+  // Gio::Application::quit() will make Gio::Application::run() return,
+  // but it's a crude way of ending the program. The window is not removed
+  // from the application. Neither the window's nor the application's
+  // destructors will be called, because there will be remaining reference
+  // counts in both of them. If we want the destructors to be called, we
+  // must remove the window from the application. One way of doing this
+  // is to hide the window.
+  std::vector&lt;Gtk::Window*&gt; windows = get_windows();
+  if (windows.size() &gt; 0)
+    windows[0]-&gt;hide(); // In this simple case, we know there is only one window.
+}
+
+void ExampleApplication::on_menu_help_about()
+{
+  std::cout &lt;&lt; "App|Help|About was selected." &lt;&lt; std::endl;
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleapplication.h"
+
+int main(int argc, char* argv[])
+{
+  auto application = ExampleApplication::create();
+
+  // Start the application, showing the initial window,
+  // and opening extra windows for any files that it is asked to open,
+  // for instance as a command-line parameter.
+  // run() will return when the last window has been closed by the user.
+  const int status = application-&gt;run(argc, argv);
+  return status;
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: Gtk::ApplicationWindow(),
+  m_Box(Gtk::ORIENTATION_VERTICAL)
+{
+  set_title("Main menu example");
+  set_default_size(300, 100);
+
+  // ExampleApplication displays the menubar. Other stuff, such as a toolbar,
+  // is put into the box.
+  add(m_Box);
+
+  // Create actions for menus and toolbars.
+  // We can use add_action() because Gtk::ApplicationWindow derives from Gio::ActionMap.
+  // This Action Map uses a "win." prefix for the actions.
+  // Therefore, for instance, "win.copy", is used in ExampleApplication::on_startup()
+  // to layout the menu.
+
+  //Edit menu:
+  add_action("copy", sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_others));
+  add_action("paste", sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_others));
+  add_action("something", sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_others));
+
+  //Choices menus, to demonstrate Radio items,
+  //using our convenience methods for string and int radio values:
+  m_refChoice = add_action_radio_string("choice",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_choices), "a");
+
+  m_refChoiceOther = add_action_radio_integer("choiceother",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_choices_other), 1);
+
+  m_refToggle = add_action_bool("sometoggle",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_toggle), false);
+
+  //Help menu:
+  add_action("about", sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_others));
+
+  //Create the toolbar and add it to a container widget:
+
+  m_refBuilder = Gtk::Builder::create();
+
+  Glib::ustring ui_info =
+    "&lt;!-- Generated with glade 3.18.3 --&gt;"
+    "&lt;interface&gt;"
+    "  &lt;requires lib='gtk+' version='3.4'/&gt;"
+    "  &lt;object class='GtkToolbar' id='toolbar'&gt;"
+    "    &lt;property name='visible'&gt;True&lt;/property&gt;"
+    "    &lt;property name='can_focus'&gt;False&lt;/property&gt;"
+    "    &lt;child&gt;"
+    "      &lt;object class='GtkToolButton' id='toolbutton_new'&gt;"
+    "        &lt;property name='visible'&gt;True&lt;/property&gt;"
+    "        &lt;property name='can_focus'&gt;False&lt;/property&gt;"
+    "        &lt;property name='tooltip_text' translatable='yes'&gt;New Standard&lt;/property&gt;"
+    "        &lt;property name='action_name'&gt;app.newstandard&lt;/property&gt;"
+    "        &lt;property name='icon_name'&gt;document-new&lt;/property&gt;"
+    "      &lt;/object&gt;"
+    "      &lt;packing&gt;"
+    "        &lt;property name='expand'&gt;False&lt;/property&gt;"
+    "        &lt;property name='homogeneous'&gt;True&lt;/property&gt;"
+    "      &lt;/packing&gt;"
+    "    &lt;/child&gt;"
+    "    &lt;child&gt;"
+    "      &lt;object class='GtkToolButton' id='toolbutton_quit'&gt;"
+    "        &lt;property name='visible'&gt;True&lt;/property&gt;"
+    "        &lt;property name='can_focus'&gt;False&lt;/property&gt;"
+    "        &lt;property name='tooltip_text' translatable='yes'&gt;Quit&lt;/property&gt;"
+    "        &lt;property name='action_name'&gt;app.quit&lt;/property&gt;"
+    "        &lt;property name='icon_name'&gt;application-exit&lt;/property&gt;"
+    "      &lt;/object&gt;"
+    "      &lt;packing&gt;"
+    "        &lt;property name='expand'&gt;False&lt;/property&gt;"
+    "        &lt;property name='homogeneous'&gt;True&lt;/property&gt;"
+    "      &lt;/packing&gt;"
+    "    &lt;/child&gt;"
+    "  &lt;/object&gt;"
+    "&lt;/interface&gt;";
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_info);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "Building toolbar failed: " &lt;&lt;  ex.what();
+  }
+
+  Gtk::Toolbar* toolbar = nullptr;
+  m_refBuilder-&gt;get_widget("toolbar", toolbar);
+  if (!toolbar)
+    g_warning("GtkToolbar not found");
+  else
+    m_Box.pack_start(*toolbar, Gtk::PACK_SHRINK);
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_menu_others()
+{
+  std::cout &lt;&lt; "A menu item was selected." &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_menu_choices(const Glib::ustring&amp; parameter)
+{
+  //The radio action's state does not change automatically:
+  m_refChoice-&gt;change_state(parameter);
+
+  Glib::ustring message;
+  if (parameter == "a")
+    message = "Choice a was selected.";
+  else
+    message = "Choice b was selected.";
+
+  std::cout &lt;&lt; message &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_menu_choices_other(int parameter)
+{
+  //The radio action's state does not change automatically:
+  m_refChoiceOther-&gt;change_state(parameter);
+
+  Glib::ustring message;
+  if (parameter == 1)
+    message = "Choice 1 was selected.";
+  else
+    message = "Choice 2 was selected.";
+
+  std::cout &lt;&lt; message &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_menu_toggle()
+{
+  bool active = false;
+  m_refToggle-&gt;get_state(active);
+
+  //The toggle action's state does not change automatically:
+  active = !active;
+  m_refToggle-&gt;change_state(active);
+
+  Glib::ustring message;
+  if (active)
+    message = "Toggle is active.";
+  else
+    message = "Toggle is not active.";
+
+  std::cout &lt;&lt; message &lt;&lt; std::endl;
+}
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="menu-example-main2"></a>Main Menu example</h3></div></div></div>
+<p>
+This program contains a menubar and a toolbar.
+A class is derived from <code class="classname">Gtk::Window</code>.
+</p>
+<div class="figure">
+<a name="figure-menus-mainmenu2"></a><p class="title"><b>Figure 12.2. Main Menu</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/menus_and_toolbars.png" alt="Main Menu"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/menus_and_toolbars?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app);
+  virtual ~ExampleWindow();
+
+private:
+  //Signal handlers:
+  void on_action_file_new();
+  void on_action_file_quit();
+  void on_action_others();
+  void on_action_toggle();
+
+  //Child widgets:
+  Gtk::Box m_Box;
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+  Glib::RefPtr&lt;Gio::SimpleActionGroup&gt; m_refActionGroup;
+  Glib::RefPtr&lt;Gio::SimpleAction&gt; m_refActionRain;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;gtkmm.h&gt;
+#include "examplewindow.h"
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window(app);
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm.h&gt;
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app)
+: m_Box(Gtk::ORIENTATION_VERTICAL)
+{
+  set_title("main_menu example");
+  set_default_size(200, 200);
+
+  add(m_Box); //We can put a MenuBar at the top of the box and other stuff below it.
+
+  //Define the actions:
+  m_refActionGroup = Gio::SimpleActionGroup::create();
+
+  m_refActionGroup-&gt;add_action("new",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_file_new) );
+  m_refActionGroup-&gt;add_action("open",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_others) );
+
+
+  m_refActionRain = m_refActionGroup-&gt;add_action_bool("rain",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_toggle),
+    false);
+
+  m_refActionGroup-&gt;add_action("quit",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_file_quit) );
+
+  m_refActionGroup-&gt;add_action("cut",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_others) );
+  m_refActionGroup-&gt;add_action("copy",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_others) );
+  m_refActionGroup-&gt;add_action("paste",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_action_others) );
+
+  insert_action_group("example", m_refActionGroup);
+
+  //Define how the actions are presented in the menus and toolbars:
+  m_refBuilder = Gtk::Builder::create();
+
+  //Layout the actions in a menubar and toolbar:
+  const char* ui_info =
+    "&lt;interface&gt;"
+    "  &lt;menu id='menubar'&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_File&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_New&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.new&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;n&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Open&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.open&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;o&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Rain&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.rain&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Quit&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.quit&lt;/attribute&gt;"
+    "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;q&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_Edit&lt;/attribute&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;_Cut&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;example.cut&lt;/attribute&gt;"
+    "        &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;x&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;_Copy&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;example.copy&lt;/attribute&gt;"
+    "        &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;c&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;_Paste&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;example.paste&lt;/attribute&gt;"
+    "        &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;v&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "    &lt;/submenu&gt;"
+    "  &lt;/menu&gt;"
+    "&lt;/interface&gt;";
+
+  // When the menubar is a child of a Gtk::Window, keyboard accelerators are not
+  // automatically fetched from the Gio::Menu.
+  // See the examples/book/menus/main_menu example for an alternative way of
+  // adding the menubar when using Gtk::ApplicationWindow.
+  // Gtk::Application::set_accel_for_action() is new in gtkmm 3.11.9.
+  app-&gt;set_accel_for_action("example.new", "&lt;Primary&gt;n");
+  app-&gt;set_accel_for_action("example.open", "&lt;Primary&gt;o");
+  app-&gt;set_accel_for_action("example.quit", "&lt;Primary&gt;q");
+  app-&gt;set_accel_for_action("example.cut", "&lt;Primary&gt;x");
+  app-&gt;set_accel_for_action("example.copy", "&lt;Primary&gt;c");
+  app-&gt;set_accel_for_action("example.paste", "&lt;Primary&gt;v");
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_info);
+    m_refBuilder-&gt;add_from_resource("/toolbar/toolbar.glade");
+  }
+  catch(const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "Building menus and toolbar failed: " &lt;&lt;  ex.what();
+  }
+
+  //Get the menubar:
+  auto object = m_refBuilder-&gt;get_object("menubar");
+  auto gmenu = Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+  if (!gmenu)
+    g_warning("GMenu not found");
+  else
+  {
+    auto pMenuBar = Gtk::make_managed&lt;Gtk::MenuBar&gt;(gmenu);
+
+    //Add the MenuBar to the window:
+    m_Box.pack_start(*pMenuBar, Gtk::PACK_SHRINK);
+  }
+
+  //Get the toolbar and add it to a container widget:
+  Gtk::Toolbar* toolbar = nullptr;
+  m_refBuilder-&gt;get_widget("toolbar", toolbar);
+  if (!toolbar)
+    g_warning("GtkToolbar not found");
+  else
+    m_Box.pack_start(*toolbar, Gtk::PACK_SHRINK);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_action_file_quit()
+{
+  hide(); //Closes the main window to stop the app-&gt;run().
+}
+
+void ExampleWindow::on_action_file_new()
+{
+   std::cout &lt;&lt; "A File|New menu item was selected." &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_action_others()
+{
+  std::cout &lt;&lt; "A menu item was selected." &lt;&lt; std::endl;
+}
+
+void ExampleWindow::on_action_toggle()
+{
+  std::cout &lt;&lt; "The toggle menu item was selected." &lt;&lt; std::endl;
+
+  bool active = false;
+  m_refActionRain-&gt;get_state(active);
+
+  //The toggle action's state does not change automatically:
+  active = !active;
+  m_refActionRain-&gt;change_state(active);
+
+  Glib::ustring message;
+  if(active)
+    message = "Toggle is active.";
+  else
+    message = "Toggle is not active";
+
+  std::cout &lt;&lt; message &lt;&lt; std::endl;
+}
+</pre>
+<p>File: <code class="filename">toolbar.gresource.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/toolbar"&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;toolbar.glade&lt;/file&gt;
+    &lt;file&gt;rain.png&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="menu-example-popup"></a>Popup Menu example</h3></div></div></div>
+<div class="figure">
+<a name="figure-menus-popup"></a><p class="title"><b>Figure 12.3. Popup Menu</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/menu_popup.png" alt="Popup Menu"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/menus/popup/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  bool on_button_press_event(GdkEventButton* button_event) override;
+
+  void on_menu_file_popup_generic();
+
+  //Child widgets:
+  Gtk::Box m_Box;
+  Gtk::EventBox m_EventBox;
+  Gtk::Label m_Label;
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+
+  Gtk::Menu* m_pMenuPopup;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_Box(Gtk::ORIENTATION_VERTICAL),
+  m_Label("Right-click to see the popup menu."),
+  m_pMenuPopup(nullptr)
+{
+  set_title("popup example");
+  set_default_size(200, 200);
+
+  add(m_Box);
+
+  //Add an event box that can catch button_press events:
+  m_Box.pack_start(m_EventBox);
+  m_EventBox.signal_button_press_event().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_press_event) );
+
+  m_EventBox.add(m_Label);
+
+  //Create actions:
+
+  //Fill menu:
+
+  auto refActionGroup =
+    Gio::SimpleActionGroup::create();
+
+  //File|New sub menu:
+  //These menu actions would normally already exist for a main menu, because a
+  //context menu should not normally contain menu items that are only available
+  //via a context menu.
+
+  refActionGroup-&gt;add_action("edit",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_popup_generic));
+
+  refActionGroup-&gt;add_action("process", //TODO: How to specify "&lt;control&gt;P" as an accelerator.
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_popup_generic));
+
+  refActionGroup-&gt;add_action("remove",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_popup_generic));
+
+  insert_action_group("examplepopup", refActionGroup);
+
+
+  m_refBuilder = Gtk::Builder::create();
+
+  //Layout the actions in a menubar and toolbar:
+  Glib::ustring ui_info =
+    "&lt;interface&gt;"
+    "  &lt;menu id='menu-examplepopup'&gt;"
+    "    &lt;section&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;Edit&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;examplepopup.edit&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;Process&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;examplepopup.process&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "      &lt;item&gt;"
+    "        &lt;attribute name='label' translatable='yes'&gt;Remove&lt;/attribute&gt;"
+    "        &lt;attribute name='action'&gt;examplepopup.remove&lt;/attribute&gt;"
+    "      &lt;/item&gt;"
+    "    &lt;/section&gt;"
+    "  &lt;/menu&gt;"
+    "&lt;/interface&gt;";
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_info);
+  }
+  catch(const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "building menus failed: " &lt;&lt;  ex.what();
+  }
+
+  //Get the menu:
+  auto object =
+    m_refBuilder-&gt;get_object("menu-examplepopup");
+  auto gmenu =
+    Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+  if(!gmenu)
+    g_warning("GMenu not found");
+
+  m_pMenuPopup = new Gtk::Menu(gmenu);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_menu_file_popup_generic()
+{
+   std::cout &lt;&lt; "A popup menu item was selected." &lt;&lt; std::endl;
+}
+
+bool ExampleWindow::on_button_press_event(GdkEventButton* button_event)
+{
+  if( (button_event-&gt;type == GDK_BUTTON_PRESS) &amp;&amp; (button_event-&gt;button == 3) )
+  {
+    if(!m_pMenuPopup-&gt;get_attach_widget())
+    {
+      m_pMenuPopup-&gt;attach_to_widget(*this);
+    }
+
+    if(m_pMenuPopup)
+      m_pMenuPopup-&gt;popup_at_pointer((GdkEvent*)button_event);
+
+      // Menu::popup_at_pointer() is new in gtkmm 3.22.
+      // If you have an older revision, try this:
+      //m_pMenuPopup-&gt;popup(button_event-&gt;button, button_event-&gt;time);
+
+    return true; //It has been handled.
+  }
+  else
+    return false;
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-gio-resource.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-menus-and-toolbars.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-toolpalette.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Gio::Resource and glib-compile-resources </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 13. ToolPalette</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

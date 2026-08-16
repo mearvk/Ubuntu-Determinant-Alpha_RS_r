@@ -1,0 +1,210 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 9. The TreeView widget</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-multi-item-containers.html" title="Multiple-item widgets">
+<link rel="next" href="sec-treeview.html" title="The View">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 9. The TreeView widget</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-multi-item-containers.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-treeview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-treeview"></a>Chapter 9. The TreeView widget</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-treeview.html#sec-treeview-model">The Model</a></span></li>
+<li><span class="sect1"><a href="sec-treeview.html">The View</a></span></li>
+<li><span class="sect1"><a href="sec-iterating-over-model-rows.html">Iterating over Model Rows</a></span></li>
+<li><span class="sect1"><a href="sec-treeview-selection.html">The Selection</a></span></li>
+<li><span class="sect1"><a href="sec-treeview-sort.html">Sorting</a></span></li>
+<li><span class="sect1"><a href="sec-treeview-draganddrop.html">Drag and Drop</a></span></li>
+<li><span class="sect1"><a href="sec-treeview-contextmenu.html">Popup Context Menu</a></span></li>
+<li><span class="sect1"><a href="sec-treeview-examples.html">Examples</a></span></li>
+</ul>
+</div>
+<p>
+The <code class="classname">Gtk::TreeView</code> widget can contain lists or trees of
+data, in columns.
+</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-treeview-model"></a>The Model</h2></div></div></div>
+<p>
+Each <code class="classname">Gtk::TreeView</code> has an associated
+<code class="classname">Gtk::TreeModel</code>, which contains the data displayed by the
+<code class="classname">TreeView</code>. Each <code class="classname">Gtk::TreeModel</code> can
+be used by more than one <code class="classname">Gtk::TreeView</code>. For instance,
+this allows the same underlying data to be displayed and edited in 2 different
+ways at the same time. Or the 2 Views might display different columns from the
+same Model data, in the same way that 2 SQL queries (or "views") might
+show different fields from the same database table.
+</p>
+<p>
+Although you can theoretically implement your own Model, you will normally use
+either the <code class="classname">ListStore</code> or <code class="classname">TreeStore</code>
+model classes.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1TreeModel.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-model-liststore"></a>ListStore, for rows</h3></div></div></div>
+<p>
+The <code class="classname">ListStore</code> contains simple rows of data, and each row
+has no children.
+</p>
+<div class="figure">
+<a name="figure-treeview-liststore-model"></a><p class="title"><b>Figure 9.1. TreeView - ListStore</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_list.png" alt="TreeView - ListStore"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1ListStore.html" target="_top">Reference</a></p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-model-treestore"></a>TreeStore, for a hierarchy</h3></div></div></div>
+<p>
+The <code class="classname">TreeStore</code> contains rows of data, and each row may
+have child rows.
+</p>
+<div class="figure">
+<a name="figure-treeview-treestore-model"></a><p class="title"><b>Figure 9.2. TreeView - TreeStore</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/treeview_tree.png" alt="TreeView - TreeStore"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1TreeStore.html" target="_top">Reference</a></p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-model-columns"></a>Model Columns</h3></div></div></div>
+<p>
+The <code class="classname">TreeModelColumnRecord</code> class is used to keep track
+of the columns and their data types. You add
+<code class="classname">TreeModelColumn</code> instances to the
+<code class="classname">ColumnRecord</code> and then use those
+<code class="classname">TreeModelColumns</code> when getting and setting the data in
+model rows. You will probably find it convenient to derive a new
+<code class="classname">TreeModelColumnRecord</code> which has your
+<code class="classname">TreeModelColumn</code> instances as member data.
+</p>
+<pre class="programlisting">class ModelColumns : public Gtk::TreeModelColumnRecord
+{
+public:
+
+  ModelColumns()
+    { add(m_col_text); add(m_col_number); }
+
+  Gtk::TreeModelColumn&lt;Glib::ustring&gt; m_col_text;
+  Gtk::TreeModelColumn&lt;int&gt; m_col_number;
+};
+
+ModelColumns m_Columns;</pre>
+<p>
+You specify the <code class="classname">ColumnRecord</code> when creating the Model,
+like so:
+</p>
+<pre class="programlisting">Glib::RefPtr&lt;Gtk::ListStore&gt; refListStore =
+    Gtk::ListStore::create(m_Columns);</pre>
+<p>
+As a <code class="classname">TreeModelColumnRecord</code> describes structure, not data,
+it can be shared among multiple models, and this is preferable for efficiency.
+However, the instance (such as <code class="varname">m_Columns</code> here) should usually
+not be static, because it often needs to be instantiated after
+<span class="application">glibmm</span> has been initialized. The best solution is
+to make it a lazily instantiated singleton, so that it will be constructed
+on-demand, whenever the first model accesses it.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-adding-rows"></a>Adding Rows</h3></div></div></div>
+<p>
+Add rows to the model with the <code class="methodname">append()</code>,
+<code class="methodname">prepend()</code>, or <code class="methodname">insert()</code> methods.
+</p>
+<pre class="programlisting">Gtk::TreeModel::iterator iter = m_refListStore-&gt;append();</pre>
+<p>You can dereference the iterator to get the Row:
+</p>
+<pre class="programlisting">Gtk::TreeModel::Row row = *iter;</pre>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="treeview-adding-child-rows"></a>Adding child rows</h4></div></div></div>
+<p>
+<code class="classname">Gtk::TreeStore</code> models can have child items. Add them
+with the <code class="methodname">append()</code>, <code class="methodname">prepend()</code>, or
+<code class="methodname">insert()</code> methods, like so:
+</p>
+<pre class="programlisting">Gtk::TreeModel::iterator iter_child =
+    m_refTreeStore-&gt;append(row.children());</pre>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-setting-values"></a>Setting values</h3></div></div></div>
+<p>
+You can use the <code class="methodname">operator[]</code> override to set the data for a
+particular column in the row, specifying the
+<code class="classname">TreeModelColumn</code> used to create the model.
+</p>
+<pre class="programlisting">row[m_Columns.m_col_text] = "sometext";</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-getting-values"></a>Getting values</h3></div></div></div>
+<p>
+You can use the <code class="methodname">operator[]</code> override to get the data in a
+particular column in a row, specifiying the
+<code class="classname">TreeModelColumn</code> used to create the model.
+</p>
+<pre class="programlisting">Glib::ustring strText = row[m_Columns.m_col_text];
+int number = row[m_Columns.m_col_number];</pre>
+<p>
+The compiler will complain if you use an inappropriate type. For
+instance, this would generate a compiler error:
+</p>
+<pre class="programlisting">//compiler error - no conversion from ustring to int.
+int number = row[m_Columns.m_col_text];</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-hidden-columns"></a>"Hidden" Columns</h3></div></div></div>
+<p>
+You might want to associate extra data with each row. If so, just add
+it as a Model column, but don't add it to the View.
+</p>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-multi-item-containers.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-treeview.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Multiple-item widgets  </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> The View</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

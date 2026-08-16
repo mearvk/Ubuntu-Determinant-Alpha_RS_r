@@ -1,0 +1,649 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-printing.html" title="Chapter 20. Printing">
+<link rel="prev" href="sec-printing-preview.html" title="Preview">
+<link rel="next" href="chapter-recent-documents.html" title="Chapter 21. Recently Used Documents">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-printing-preview.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 20. Printing</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-recent-documents.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-printing-example"></a>Example</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-printing-example-simple"></a>Simple</h3></div></div></div>
+<p>
+The following example demonstrates how to print some input from a user
+interface. It shows how to implement <code class="literal">on_begin_print</code>
+and <code class="literal">on_draw_page</code>, as well as how to track print status
+and update the print settings.
+</p>
+<div class="figure">
+<a name="figure-printing-simple"></a><p class="title"><b>Figure 20.1. Printing - Simple</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/printing.png" alt="Printing - Simple"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/printing/simple/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+// This file is part of the printing/simple and printing/advanced examples
+
+#include &lt;gtkmm.h&gt;
+
+class PrintFormOperation;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app);
+  virtual ~ExampleWindow();
+
+protected:
+
+  void build_main_menu(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app);
+
+  void print_or_preview(Gtk::PrintOperationAction print_action);
+
+  //PrintOperation signal handlers.
+  //We handle these so can get necessary information to update the UI or print settings.
+  //Our derived PrintOperation class also overrides some default signal handlers.
+  void on_printoperation_status_changed();
+  void on_printoperation_done(Gtk::PrintOperationResult result);
+
+  //Action signal handlers:
+  void on_menu_file_new();
+  void on_menu_file_page_setup();
+  void on_menu_file_print_preview();
+  void on_menu_file_print();
+  void on_menu_file_quit();
+
+  //Printing-related objects:
+  Glib::RefPtr&lt;Gtk::PageSetup&gt; m_refPageSetup;
+  Glib::RefPtr&lt;Gtk::PrintSettings&gt; m_refSettings;
+  Glib::RefPtr&lt;PrintFormOperation&gt; m_refPrintFormOperation;
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::Grid m_Grid;
+
+  Gtk::Label m_NameLabel;
+  Gtk::Entry m_NameEntry;
+
+  Gtk::Label m_SurnameLabel;
+  Gtk::Entry m_SurnameEntry;
+
+  Gtk::Label m_CommentsLabel;
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TextView m_TextView;
+
+  Glib::RefPtr&lt;Gtk::TextBuffer&gt; m_refTextBuffer;
+
+  unsigned m_ContextId;
+  Gtk::Statusbar m_Statusbar;
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">printformoperation.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_PRINT_FORM_OPERATION_H
+#define GTKMM_PRINT_FORM_OPERATION_H
+
+#include &lt;gtkmm.h&gt;
+#include &lt;pangomm.h&gt;
+#include &lt;vector&gt;
+
+//We derive our own class from PrintOperation,
+//so we can put the actual print implementation here.
+class PrintFormOperation : public Gtk::PrintOperation
+{
+ public:
+  static Glib::RefPtr&lt;PrintFormOperation&gt; create();
+  virtual ~PrintFormOperation();
+
+  void set_name(const Glib::ustring&amp; name) { m_Name = name; }
+  void set_comments(const Glib::ustring&amp; comments) { m_Comments = comments; }
+
+ protected:
+  PrintFormOperation();
+
+  //PrintOperation default signal handler overrides:
+  void on_begin_print(const Glib::RefPtr&lt;Gtk::PrintContext&gt;&amp; context) override;
+  void on_draw_page(const Glib::RefPtr&lt;Gtk::PrintContext&gt;&amp; context, int page_nr) override;
+
+  Glib::ustring m_Name;
+  Glib::ustring m_Comments;
+  Glib::RefPtr&lt;Pango::Layout&gt; m_refLayout;
+  std::vector&lt;int&gt; m_PageBreaks; // line numbers where a page break occurs
+};
+
+#endif // GTKMM_PRINT_FORM_OPERATION_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char* argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window(app);
+
+  // Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include "printformoperation.h"
+#include &lt;iostream&gt;
+
+const Glib::ustring app_title = "gtkmm Printing Example";
+
+ExampleWindow::ExampleWindow(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app)
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_NameLabel("Name"),
+  m_SurnameLabel("Surname"),
+  m_CommentsLabel("Comments")
+{
+  m_refPageSetup = Gtk::PageSetup::create();
+  m_refSettings = Gtk::PrintSettings::create();
+
+  m_ContextId = m_Statusbar.get_context_id(app_title);
+
+  set_title(app_title);
+  set_default_size(400, 300);
+
+  add(m_VBox);
+
+  build_main_menu(app);
+
+  m_VBox.pack_start(m_Grid);
+
+  //Arrange the widgets inside the grid:
+  m_Grid.set_row_spacing(5);
+  m_Grid.set_column_spacing(5);
+  m_Grid.attach(m_NameLabel, 0, 0, 1, 1);
+  m_Grid.attach(m_NameEntry, 1, 0, 1, 1);
+
+  m_Grid.attach(m_SurnameLabel, 0, 1, 1, 1);
+  m_Grid.attach(m_SurnameEntry, 1, 1, 1, 1);
+
+  //Add the TextView, inside a ScrolledWindow:
+  m_ScrolledWindow.add(m_TextView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_Grid.attach(m_CommentsLabel, 0, 2, 1, 1);
+  m_Grid.attach(m_ScrolledWindow, 1, 2, 1, 1);
+  m_ScrolledWindow.set_hexpand(true);
+  m_ScrolledWindow.set_vexpand(true);
+
+  m_refTextBuffer = Gtk::TextBuffer::create();
+  m_TextView.set_buffer(m_refTextBuffer);
+
+  m_VBox.pack_start(m_Statusbar);
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::build_main_menu(const Glib::RefPtr&lt;Gtk::Application&gt;&amp; app)
+{
+  //Create actions for menus and toolbars:
+  auto refActionGroup = Gio::SimpleActionGroup::create();
+
+  //File menu:
+  refActionGroup-&gt;add_action("new",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_new));
+
+  refActionGroup-&gt;add_action("pagesetup",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_page_setup));
+
+  refActionGroup-&gt;add_action("printpreview",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_print_preview));
+
+  refActionGroup-&gt;add_action("print",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_print));
+
+  refActionGroup-&gt;add_action("quit",
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_menu_file_quit));
+
+  insert_action_group("example", refActionGroup);
+
+  // When the menubar is a child of a Gtk::Window, keyboard accelerators are not
+  // automatically fetched from the Gio::Menu.
+  // See the examples/book/menus/main_menu example for an alternative way of
+  // adding the menubar when using Gtk::ApplicationWindow.
+  app-&gt;set_accel_for_action("example.new", "&lt;Primary&gt;n");
+  app-&gt;set_accel_for_action("example.print", "&lt;Primary&gt;p");
+  app-&gt;set_accel_for_action("example.quit", "&lt;Primary&gt;q");
+
+  m_refBuilder = Gtk::Builder::create();
+
+  // Layout the actions in a menubar:
+  Glib::ustring ui_menu_info =
+    "&lt;interface&gt;"
+    "  &lt;menu id='menu-example'&gt;"
+    "    &lt;submenu&gt;"
+    "      &lt;attribute name='label' translatable='yes'&gt;_File&lt;/attribute&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_New&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.new&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Page _Setup...&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.pagesetup&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;Print Preview&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.printpreview&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Print...&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.print&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "      &lt;section&gt;"
+    "        &lt;item&gt;"
+    "          &lt;attribute name='label' translatable='yes'&gt;_Quit&lt;/attribute&gt;"
+    "          &lt;attribute name='action'&gt;example.quit&lt;/attribute&gt;"
+    "        &lt;/item&gt;"
+    "      &lt;/section&gt;"
+    "    &lt;/submenu&gt;"
+    "  &lt;/menu&gt;"
+    "&lt;/interface&gt;";
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_menu_info);
+  }
+  catch(const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "building menus failed: " &lt;&lt; ex.what();
+  }
+
+  // Layout the actions in a toolbar:
+  Glib::ustring ui_toolbar_info =
+    "&lt;!-- Generated with glade 3.18.3 --&gt;"
+    "&lt;interface&gt;"
+      "&lt;requires lib='gtk+' version='3.8'/&gt;"
+      "&lt;object class='GtkToolbar' id='toolbar'&gt;"
+        "&lt;property name='visible'&gt;True&lt;/property&gt;"
+        "&lt;property name='can_focus'&gt;False&lt;/property&gt;"
+        "&lt;child&gt;"
+          "&lt;object class='GtkToolButton' id='toolbutton_new'&gt;"
+            "&lt;property name='visible'&gt;True&lt;/property&gt;"
+            "&lt;property name='can_focus'&gt;False&lt;/property&gt;"
+            "&lt;property name='tooltip_text' translatable='yes'&gt;New&lt;/property&gt;"
+            "&lt;property name='action_name'&gt;example.new&lt;/property&gt;"
+            "&lt;property name='icon_name'&gt;document-new&lt;/property&gt;"
+          "&lt;/object&gt;"
+          "&lt;packing&gt;"
+            "&lt;property name='expand'&gt;False&lt;/property&gt;"
+            "&lt;property name='homogeneous'&gt;True&lt;/property&gt;"
+          "&lt;/packing&gt;"
+        "&lt;/child&gt;"
+        "&lt;child&gt;"
+          "&lt;object class='GtkToolButton' id='toolbutton_print'&gt;"
+            "&lt;property name='visible'&gt;True&lt;/property&gt;"
+            "&lt;property name='can_focus'&gt;False&lt;/property&gt;"
+            "&lt;property name='tooltip_text' translatable='yes'&gt;Print&lt;/property&gt;"
+            "&lt;property name='action_name'&gt;example.print&lt;/property&gt;"
+            "&lt;property name='icon_name'&gt;document-print&lt;/property&gt;"
+          "&lt;/object&gt;"
+          "&lt;packing&gt;"
+            "&lt;property name='expand'&gt;False&lt;/property&gt;"
+            "&lt;property name='homogeneous'&gt;True&lt;/property&gt;"
+          "&lt;/packing&gt;"
+        "&lt;/child&gt;"
+        "&lt;child&gt;"
+          "&lt;object class='GtkSeparatorToolItem' id='separator1'&gt;"
+            "&lt;property name='visible'&gt;True&lt;/property&gt;"
+            "&lt;property name='can_focus'&gt;False&lt;/property&gt;"
+          "&lt;/object&gt;"
+          "&lt;packing&gt;"
+            "&lt;property name='expand'&gt;False&lt;/property&gt;"
+            "&lt;property name='homogeneous'&gt;False&lt;/property&gt;"
+          "&lt;/packing&gt;"
+        "&lt;/child&gt;"
+        "&lt;child&gt;"
+          "&lt;object class='GtkToolButton' id='toolbutton_quit'&gt;"
+            "&lt;property name='visible'&gt;True&lt;/property&gt;"
+            "&lt;property name='can_focus'&gt;False&lt;/property&gt;"
+            "&lt;property name='tooltip_text' translatable='yes'&gt;Quit&lt;/property&gt;"
+            "&lt;property name='action_name'&gt;example.quit&lt;/property&gt;"
+            "&lt;property name='icon_name'&gt;application-exit&lt;/property&gt;"
+          "&lt;/object&gt;"
+          "&lt;packing&gt;"
+            "&lt;property name='expand'&gt;False&lt;/property&gt;"
+            "&lt;property name='homogeneous'&gt;True&lt;/property&gt;"
+          "&lt;/packing&gt;"
+        "&lt;/child&gt;"
+      "&lt;/object&gt;"
+    "&lt;/interface&gt;";
+
+  try
+  {
+    m_refBuilder-&gt;add_from_string(ui_toolbar_info);
+  }
+  catch(const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "building toolbar failed: " &lt;&lt; ex.what();
+  }
+
+  // Get the menubar and add it to a container widget:
+  auto object = m_refBuilder-&gt;get_object("menu-example");
+  auto gmenu = Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+  if (!gmenu)
+    g_warning("GMenu not found");
+  else
+  {
+    auto pMenuBar = Gtk::make_managed&lt;Gtk::MenuBar&gt;(gmenu);
+
+    // Add the MenuBar to the window:
+    m_VBox.pack_start(*pMenuBar, Gtk::PACK_SHRINK);
+  }
+
+  // Get the toolbar and add it to a container widget:
+  Gtk::Toolbar* toolbar = nullptr;
+  m_refBuilder-&gt;get_widget("toolbar", toolbar);
+  if (!toolbar)
+    g_warning("GtkToolbar not found");
+  else
+    m_VBox.pack_start(*toolbar, Gtk::PACK_SHRINK);
+}
+
+void ExampleWindow::on_printoperation_status_changed()
+{
+  Glib::ustring status_msg;
+
+  if (m_refPrintFormOperation-&gt;is_finished())
+  {
+    status_msg = "Print job completed.";
+  }
+  else
+  {
+    //You could also use get_status().
+    status_msg = m_refPrintFormOperation-&gt;get_status_string();
+  }
+
+  m_Statusbar.push(status_msg, m_ContextId);
+}
+
+void ExampleWindow::on_printoperation_done(Gtk::PrintOperationResult result)
+{
+  //Printing is "done" when the print data is spooled.
+
+  if (result == Gtk::PRINT_OPERATION_RESULT_ERROR)
+  {
+    Gtk::MessageDialog err_dialog(*this, "Error printing form", false,
+            Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+    err_dialog.run();
+  }
+  else if (result == Gtk::PRINT_OPERATION_RESULT_APPLY)
+  {
+    //Update PrintSettings with the ones used in this PrintOperation:
+    m_refSettings = m_refPrintFormOperation-&gt;get_print_settings();
+  }
+
+  if (!m_refPrintFormOperation-&gt;is_finished())
+  {
+    //We will connect to the status-changed signal to track status
+    //and update a status bar. In addition, you can, for example,
+    //keep a list of active print operations, or provide a progress dialog.
+    m_refPrintFormOperation-&gt;signal_status_changed().connect(sigc::mem_fun(*this,
+                    &amp;ExampleWindow::on_printoperation_status_changed));
+  }
+}
+
+void ExampleWindow::print_or_preview(Gtk::PrintOperationAction print_action)
+{
+  //Create a new PrintOperation with our PageSetup and PrintSettings:
+  //(We use our derived PrintOperation class)
+  m_refPrintFormOperation = PrintFormOperation::create();
+
+  m_refPrintFormOperation-&gt;set_name(m_NameEntry.get_text() + " " + m_SurnameEntry.get_text());
+  m_refPrintFormOperation-&gt;set_comments(m_refTextBuffer-&gt;get_text(false /*Don't include hidden*/));
+  // In the printing/advanced example, the font will be set through a custom tab
+  // in the print dialog.
+
+  m_refPrintFormOperation-&gt;set_track_print_status();
+  m_refPrintFormOperation-&gt;set_default_page_setup(m_refPageSetup);
+  m_refPrintFormOperation-&gt;set_print_settings(m_refSettings);
+
+  m_refPrintFormOperation-&gt;signal_done().connect(sigc::mem_fun(*this,
+                  &amp;ExampleWindow::on_printoperation_done));
+  try
+  {
+    m_refPrintFormOperation-&gt;run(print_action /* print or preview */, *this);
+  }
+  catch (const Gtk::PrintError&amp; ex)
+  {
+    //See documentation for exact Gtk::PrintError error codes.
+    std::cerr &lt;&lt; "An error occurred while trying to run a print operation:"
+        &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleWindow::on_menu_file_new()
+{
+  //Clear entries and textview:
+  m_NameEntry.set_text("");
+  m_SurnameEntry.set_text("");
+  m_refTextBuffer-&gt;set_text("");
+  m_TextView.set_buffer(m_refTextBuffer);
+}
+
+void ExampleWindow::on_menu_file_page_setup()
+{
+  //Show the page setup dialog, asking it to start with the existing settings:
+  auto new_page_setup =
+      Gtk::run_page_setup_dialog(*this, m_refPageSetup, m_refSettings);
+
+  //Save the chosen page setup dialog for use when printing, previewing, or
+  //showing the page setup dialog again:
+  m_refPageSetup = new_page_setup;
+}
+
+void ExampleWindow::on_menu_file_print_preview()
+{
+  print_or_preview(Gtk::PRINT_OPERATION_ACTION_PREVIEW);
+}
+
+void ExampleWindow::on_menu_file_print()
+{
+  print_or_preview(Gtk::PRINT_OPERATION_ACTION_PRINT_DIALOG);
+}
+
+void ExampleWindow::on_menu_file_quit()
+{
+  hide();
+}
+</pre>
+<p>File: <code class="filename">printformoperation.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "printformoperation.h"
+
+PrintFormOperation::PrintFormOperation()
+{
+}
+
+PrintFormOperation::~PrintFormOperation()
+{
+}
+
+Glib::RefPtr&lt;PrintFormOperation&gt; PrintFormOperation::create()
+{
+  return Glib::RefPtr&lt;PrintFormOperation&gt;(new PrintFormOperation());
+}
+
+void PrintFormOperation::on_begin_print(
+        const Glib::RefPtr&lt;Gtk::PrintContext&gt;&amp; print_context)
+{
+  //Create and set up a Pango layout for PrintData based on the passed
+  //PrintContext: We then use this to calculate the number of pages needed, and
+  //the lines that are on each page.
+  m_refLayout = print_context-&gt;create_pango_layout();
+
+  Pango::FontDescription font_desc("sans 12");
+  m_refLayout-&gt;set_font_description(font_desc);
+
+  const double width = print_context-&gt;get_width();
+  const double height = print_context-&gt;get_height();
+
+  m_refLayout-&gt;set_width(static_cast&lt;int&gt;(width * Pango::SCALE));
+
+  //Set and mark up the text to print:
+  Glib::ustring marked_up_form_text;
+  marked_up_form_text += "&lt;b&gt;Name&lt;/b&gt;: " + m_Name + "\n\n";
+  marked_up_form_text += "&lt;b&gt;Comments&lt;/b&gt;: " + m_Comments;
+
+  m_refLayout-&gt;set_markup(marked_up_form_text);
+
+  //Set the number of pages to print by determining the line numbers
+  //where page breaks occur:
+  const int line_count = m_refLayout-&gt;get_line_count();
+
+  Glib::RefPtr&lt;Pango::LayoutLine&gt; layout_line;
+  double page_height = 0;
+
+  for (int line = 0; line &lt; line_count; ++line)
+  {
+    Pango::Rectangle ink_rect, logical_rect;
+
+    layout_line = m_refLayout-&gt;get_line(line);
+    layout_line-&gt;get_extents(ink_rect, logical_rect);
+
+    const double line_height = logical_rect.get_height() / 1024.0;
+
+    if (page_height + line_height &gt; height)
+    {
+      m_PageBreaks.push_back(line);
+      page_height = 0;
+    }
+
+    page_height += line_height;
+  }
+
+  set_n_pages(m_PageBreaks.size() + 1);
+}
+
+void PrintFormOperation::on_draw_page(
+        const Glib::RefPtr&lt;Gtk::PrintContext&gt;&amp; print_context, int page_nr)
+{
+  //Decide which lines we need to print in order to print the specified page:
+  int start_page_line = 0;
+  int end_page_line = 0;
+
+  if(page_nr == 0)
+  {
+    start_page_line = 0;
+  }
+  else
+  {
+    start_page_line = m_PageBreaks[page_nr - 1];
+  }
+
+  if(page_nr &lt; static_cast&lt;int&gt;(m_PageBreaks.size()))
+  {
+    end_page_line = m_PageBreaks[page_nr];
+  }
+  else
+  {
+    end_page_line = m_refLayout-&gt;get_line_count();
+  }
+
+  //Get a Cairo Context, which is used as a drawing board:
+  Cairo::RefPtr&lt;Cairo::Context&gt; cairo_ctx = print_context-&gt;get_cairo_context();
+
+  //We'll use black letters:
+  cairo_ctx-&gt;set_source_rgb(0, 0, 0);
+
+  //Render Pango LayoutLines over the Cairo context:
+  Pango::LayoutIter iter = m_refLayout-&gt;get_iter();
+
+  double start_pos = 0;
+  int line_index = 0;
+
+  do
+  {
+    if(line_index &gt;= start_page_line)
+    {
+      auto layout_line = iter.get_line();
+      Pango::Rectangle logical_rect = iter.get_line_logical_extents();
+      int baseline = iter.get_baseline();
+
+      if (line_index == start_page_line)
+      {
+        start_pos = logical_rect.get_y() / 1024.0;
+      }
+
+      cairo_ctx-&gt;move_to(logical_rect.get_x() / 1024.0,
+        baseline / 1024.0 - start_pos);
+
+      layout_line-&gt;show_in_cairo_context(cairo_ctx);
+    }
+
+    line_index++;
+  }
+  while(line_index &lt; end_page_line &amp;&amp; iter.next_line());
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-printing-preview.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-printing.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-recent-documents.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Preview </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 21. Recently Used Documents</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

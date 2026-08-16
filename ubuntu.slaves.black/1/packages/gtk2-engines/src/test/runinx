@@ -1,0 +1,62 @@
+#! /bin/sh
+# gtk-engines - a collection of drawing engines for GTK+ 
+# Copyright (C) 2007 Benjamin Berg <benjamin@sipsolutions.net>
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+# 
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+# Project contact: <gnome-themes-list@gnome.org>
+#
+
+
+# This script is a wrapper to start an X server for tests.
+# there may be better ways to do this, but I don't know any ...
+
+if [ "$DISPLAY" != "" ]; then
+	# Just start everything, and exit after that
+	"$@"
+	exit $?
+fi
+
+for port in `seq 20 1000`; do
+	# Check if there is a lock file, if yes test if the server is running
+	if [ -f /tmp/.X$port-lock ]; then
+		# Test if there is anything running with the PID
+		pid="`cat /tmp/.X$port-lock | sed 's/ //g'`"
+
+		if [ "`ps -e | grep -c ^\\ *$pid`" = "0" ]; then
+			# Remove the stale lock file
+			rm -f /tmp/.X$port-lock
+			break
+		fi
+	else
+		break
+	fi
+done
+
+
+export DISPLAY=:$port
+
+# Start the Xvfb server -- try to ...
+# We need 24bpp as cairo does not support everything
+Xvfb $DISPLAY -ac -screen 0 1280x1024x24 & 2>/dev/null >/dev/null
+xvfb_pid=$!
+
+"$@"
+result="$?"
+
+kill $xvfb_pid 2>/dev/null >/dev/null
+
+exit $result
+

@@ -1,0 +1,214 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 25. Memory management</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-idle-functions.html" title="Idle Functions">
+<link rel="next" href="sec-memory-shared-resources.html" title="Shared resources">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 25. Memory management</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-idle-functions.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-memory-shared-resources.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-memory"></a>Chapter 25. Memory management</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-memory.html#sec-memory-widgets">Widgets</a></span></li>
+<li><span class="sect1"><a href="sec-memory-shared-resources.html">Shared resources</a></span></li>
+</ul>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-memory-widgets"></a>Widgets</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="memory-normal"></a>Normal C++ memory management</h3></div></div></div>
+<p>
+<span class="application">gtkmm</span> allows the programmer to control the lifetime (that is, the construction
+and destruction) of any widget in the same manner as any other C++ object.
+This flexibility allows you to use <code class="literal">new</code> and
+<code class="literal">delete</code> to create and destroy objects dynamically
+or to use regular class members (that are destroyed automatically when the
+class is destroyed) or to use local instances (that are destroyed when the
+instance goes out of scope). This flexibility is not present in some C++ GUI
+toolkits, which restrict the programmer to only a subset of C++'s memory
+management features.
+</p>
+<p>Here are some examples of normal C++ memory management:</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="memory-class-scope"></a>Class Scope widgets</h4></div></div></div>
+<p>
+If a programmer does not need dynamic memory allocation, automatic widgets in class
+scope may be used. One advantage of automatic widgets in class scope is that
+memory management is grouped in one place. The programmer does not
+risk memory leaks from failing to <code class="literal">delete</code> a widget.
+</p>
+<p>
+The primary disadvantage of using class scope widgets is revealing
+the class implementation rather than the class interface in the class header.
+</p>
+<p>
+</p>
+<pre class="programlisting">
+#include &lt;gtkmm/button.h&gt;
+#include &lt;gtkmm/window.h&gt;
+class Foo : public Gtk::Window
+{
+private:
+  Gtk::Button theButton;
+  // will be destroyed when the Foo object is destroyed
+};
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="memory-function-scope"></a>Function scope widgets</h4></div></div></div>
+<p>
+If a programmer does not need a class scope widget, a function scope widget
+may also be used. The advantages to function scope over class scope are the
+increased data hiding and reduced dependencies.
+</p>
+<pre class="programlisting">
+{
+  Gtk::Button aButton;
+  aButton.show();
+  ...
+  app-&gt;run();
+}
+</pre>
+<p>
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="memory-dynamic-allocation"></a>Dynamic allocation with new and delete</h4></div></div></div>
+<p>
+Usually, the programmer will prefer to allow containers to automatically destroy
+their children by creating them using <code class="function">Gtk::make_managed()</code>
+(see below). This is not strictly required, as the <code class="literal">new</code> and
+<code class="literal">delete</code> operators may also be used, but modern C++ style
+discourages those in favour of safer models of memory management, so it is
+better to create widgets using <code class="function">Gtk::make_managed()</code> and
+let their parent destroy them, than to manually perform dynamic allocation.
+</p>
+<pre class="programlisting">
+Gtk::Button* pButton = new Gtk::Button("Test");
+
+// do something useful with pButton
+
+delete pButton;
+</pre>
+<p>
+Here, the programmer deletes <code class="varname">pButton</code> to prevent a memory leak.
+</p>
+</div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="memory-managed-widgets"></a>Managed Widgets</h3></div></div></div>
+<p>
+Alternatively, you can let a widget's container control when the widget is
+destroyed. In most cases, you want a widget to last only as long as the
+container it is in. To delegate the management of a widget's lifetime to its
+container, create it with <code class="function">Gtk::make_managed()</code> and then
+pack it into its container with <code class="methodname">Gtk::Container::add()</code>,
+<code class="methodname">Gtk::Box::pack_start()</code>, or a similar method. Now the
+widget will be destroyed whenever its container is destroyed.
+</p>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="memory-managed-dynamic"></a>Dynamic allocation with make_managed() and add()</h4></div></div></div>
+<p>
+<span class="application">gtkmm</span> provides ways including the <code class="function">make_managed()</code> function
+and <code class="methodname">Gtk::Container::add()</code> method to simplify creation
+and destruction of widgets whose lifetime can be managed by a parent.
+</p>
+<p>
+Every widget except a top-level window must be added to a parent container in
+order to be displayed. The <code class="function">manage()</code> function marks a widget
+so that when that widget is added to a parent container, said container becomes
+responsible for deleting the widget, meaning the user no longer needs to do so.
+The original way to create widgets whose lifetime is managed by their parent in
+this way was to call <code class="function">manage()</code>, passing in the result of a
+<code class="literal">new</code> expression that created a dynamically allocated widget.
+</p>
+<p>
+However, usually, when you create such a widget, you will already know that its
+parent container should be responsible for destroying it, In addition, modern
+C++ style discourages use of the <code class="literal">new</code> operator, which was
+required when passing a newly created widget to <code class="function">manage()</code>.
+Therefore, <span class="application">gtkmm</span> has added <code class="function">make_managed()</code>, which combines
+creation and marking with <code class="function">manage()</code> into a single step. This
+avoids you having to write <code class="literal">new</code>, which is discouraged in
+modern C++ style, and more clearly expresses intent to create a managed widget.
+</p>
+<p>
+</p>
+<pre class="programlisting">
+MyContainer::MyContainer()
+{
+  Gtk::Button* pButton = Gtk::make_managed&lt;Gtk::Button&gt;("Test");
+  add(*pButton); //add *pButton to MyContainer
+}
+</pre>
+<p>
+Now, when objects of type <code class="classname">MyContainer</code> are destroyed, the
+button will also be deleted. It is no longer necessary to delete <code class="varname">pButton</code>
+to free the button's memory; its deletion has been delegated to the
+<code class="classname">MyContainer</code> object.
+</p>
+<p>
+Note that if you never added the widget to any parent container, or you did but
+later <code class="methodname">Gtk::Container::remove()</code>d it from said parent,
+<span class="application">gtkmm</span> restores the widget’s lifetime management to whatever state it had
+before <code class="function">manage()</code> was called, which typically means that the
+responsibility for <code class="literal">delete</code>ing the widget returns to the user.
+</p>
+<p>
+Of course, a top-level container will not be added to another container. The
+programmer is responsible for destroying the top-level container using one of
+the traditional C++ techniques. For instance, your top-level Window might just
+be an instance in your <code class="function">main()</code> function.
+</p>
+</div>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-idle-functions.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-memory-shared-resources.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Idle Functions </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Shared resources</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

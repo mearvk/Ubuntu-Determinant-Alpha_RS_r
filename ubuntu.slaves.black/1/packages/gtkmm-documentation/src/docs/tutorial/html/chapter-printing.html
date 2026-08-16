@@ -1,0 +1,153 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 20. Printing</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-clipboard-examples.html" title="Examples">
+<link rel="next" href="sec-page-setup.html" title="Page setup">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 20. Printing</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-clipboard-examples.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-page-setup.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-printing"></a>Chapter 20. Printing</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-printing.html#sec-printoperation">PrintOperation</a></span></li>
+<li><span class="sect1"><a href="sec-page-setup.html">Page setup</a></span></li>
+<li><span class="sect1"><a href="sec-printing-rendering-text.html">Rendering text</a></span></li>
+<li><span class="sect1"><a href="sec-async-printing-ops.html">Asynchronous operations</a></span></li>
+<li><span class="sect1"><a href="sec-printing-export-to-pdf.html">Export to PDF</a></span></li>
+<li><span class="sect1"><a href="sec-extending-print-dialog.html">Extending the print dialog</a></span></li>
+<li><span class="sect1"><a href="sec-printing-preview.html">Preview</a></span></li>
+<li><span class="sect1"><a href="sec-printing-example.html">Example</a></span></li>
+</ul>
+</div>
+<p>
+At the application development level, <span class="application">gtkmm</span>'s printing API
+provides dialogs that are consistent across applications and allows use of Cairo's common drawing API, with Pango-driven text rendering. In the implementation of this common API, platform-specific backends and printer-specific drivers are used.
+</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-printoperation"></a>PrintOperation</h2></div></div></div>
+<p>
+The primary object is <code class="classname">Gtk::PrintOperation</code>, allocated
+for each print operation. To handle page drawing connect to its signals,
+or inherit from it and override the default virtual signal handlers.
+<code class="classname">PrintOperation</code> automatically handles all the settings
+affecting the print loop.
+</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-printoperation-signals"></a>Signals</h3></div></div></div>
+<p>
+The <code class="methodname">PrintOperation::run()</code> method starts the print loop,
+during which various signals are emitted:
+
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+      <code class="literal">begin_print</code>:
+      You must handle this signal, because this is where you
+      create and set up a <code class="classname">Pango::Layout</code> using the
+      provided <code class="classname">Gtk::PrintContext</code>, and break up your
+      printing output into pages.
+    </p></li>
+<li class="listitem"><p>
+      <code class="literal">paginate</code>: Pagination is potentially slow so if you
+      need to monitor it you can call the
+      <code class="methodname">PrintOperation::set_show_progress()</code> method and
+      handle this signal.
+    </p></li>
+<li class="listitem">
+<p>
+      For each page that needs to be rendered, the following signals
+      are emitted:
+      </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: circle; ">
+<li class="listitem"><p>
+            <code class="literal">request_page_setup</code>: Provides a
+            <code class="classname">PrintContext</code>, page number and
+            <code class="classname">Gtk::PageSetup</code>. Handle this signal if you
+            need to modify page setup on a per-page basis.
+          </p></li>
+<li class="listitem"><p>
+            <code class="literal">draw_page</code>: You must handle this signal, which provides a
+            <code class="classname">PrintContext</code> and a page number.
+            The <code class="classname">PrintContext</code> should be used
+            to create a <code class="classname">Cairo::Context</code> into which
+            the provided page should be drawn. To render text, iterate over
+            the <code class="classname">Pango::Layout</code> you created in the
+            <code class="literal">begin_print</code> handler.
+          </p></li>
+</ul></div>
+<p>
+    </p>
+</li>
+<li class="listitem"><p>
+      <code class="literal">end_print</code>: A handler for it is a safe place to free
+      any resources related to a <code class="classname">PrintOperation</code>.
+      If you have your custom class that inherits from
+      <code class="classname">PrintOperation</code>, it is naturally simpler to do it
+      in the destructor.
+    </p></li>
+<li class="listitem"><p>
+      <code class="literal">done</code>: This signal is emitted when printing is finished, meaning when the
+      print data is spooled. Note that the provided
+      <code class="literal">Gtk::PrintOperationResult</code> may indicate that
+      an error occurred. In any case you probably want to notify the user
+      about the final status.
+    </p></li>
+<li class="listitem"><p>
+      <code class="literal">status_changed</code>: Emitted whenever a print job's
+      status changes, until it is finished. Call the
+      <code class="methodname">PrintOperation::set_track_print_status()</code> method to
+      monitor the job status after spooling. To see the status, use
+      <code class="methodname">get_status()</code> or
+      <code class="methodname">get_status_string()</code>.
+    </p></li>
+</ul></div>
+<p>
+
+</p>
+<p>
+<a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1PrintOperation.html" target="_top">Reference</a>
+</p>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-clipboard-examples.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-page-setup.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Examples </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Page setup</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

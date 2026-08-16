@@ -1,0 +1,207 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 15. Widgets Without X-Windows</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-adjustment-internals.html" title="Adjustment Internals">
+<link rel="next" href="chapter-dialogs.html" title="Chapter 16. Dialogs">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 15. Widgets Without X-Windows</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-adjustment-internals.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-dialogs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-widgets-without-xwindows"></a>Chapter 15. Widgets Without X-Windows</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc"><li><span class="sect1"><a href="chapter-widgets-without-xwindows.html#sec-eventbox">EventBox</a></span></li></ul>
+</div>
+<p>
+Some Widgets do not have an associated X-Window, so they therefore do not
+receive X events. This means that the signals described in the  <a class="link" href="sec-xeventsignals.html" title="X Event signals">X event signals</a> section will not be
+emitted. If you want to capture events for these widgets you can use a special
+container called <code class="classname">Gtk::EventBox</code>, which is described in
+the <a class="link" href="chapter-widgets-without-xwindows.html#sec-eventbox" title="EventBox">EventBox</a> section.
+</p>
+<p>
+Here is a list of some of these Widgets:
+</p>
+<pre class="programlisting">Gtk::Alignment (deprecated from <span class="application">gtkmm</span> version 3.14)
+Gtk::Arrow (deprecated from <span class="application">gtkmm</span> version 3.14)
+Gtk::AspectFrame
+Gtk::Bin
+Gtk::Box
+Gtk::Button
+Gtk::CheckButton
+Gtk::Fixed
+Gtk::Frame
+Gtk::Grid
+Gtk::Image
+Gtk::Label
+Gtk::MenuItem
+Gtk::Notebook
+Gtk::Paned
+Gtk::RadioButton
+Gtk::Range
+Gtk::ScrolledWindow
+Gtk::Separator
+Gtk::Table (deprecated from <span class="application">gtkmm</span> version 3.4)
+Gtk::Toolbar</pre>
+<p>
+These widgets are mainly used for decoration or layout, so you won't often need
+to capture events on them. They are intended to have no X-Window in order to improve performance.
+</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-eventbox"></a>EventBox</h2></div></div></div>
+<p>
+Some <span class="application">gtkmm</span> widgets don't have associated X windows; they draw on
+their parents' windows. Because of this, they cannot receive events.
+Also, if they are incorrectly sized, they don't clip, so you can get
+messy overwriting etc. To receive events on one of these widgets, you can place it
+inside an <code class="classname">EventBox</code> widget and then call
+<code class="methodname">Gtk::Widget::set_events()</code> on the EventBox before showing it.</p>
+<p>Although the name
+<code class="classname">EventBox</code> emphasises the event-handling method, the
+widget can also be used for clipping (and more; see the example below).
+</p>
+<p>
+The constructor for <code class="classname">Gtk::EventBox</code> is:
+</p>
+<pre class="programlisting">Gtk::EventBox();</pre>
+<p>
+A child widget can be added to the <code class="classname">EventBox</code> using:
+</p>
+<pre class="programlisting">event_box.add(child_widget);</pre>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1EventBox.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="eventbox-example"></a>Example</h3></div></div></div>
+<p>
+The following example demonstrates both uses of an
+<code class="classname">EventBox</code> - a label is created that is clipped to a small
+box, and set up so that a mouse-click on the label causes the program to exit.
+Resizing the window reveals varying amounts of the label.
+</p>
+<div class="figure">
+<a name="figure-eventbox"></a><p class="title"><b>Figure 15.1. EventBox</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/eventbox.png" alt="EventBox"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/eventbox?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  bool on_eventbox_button_press(GdkEventButton* button_event);
+
+  //Child widgets:
+  Gtk::EventBox m_EventBox;
+  Gtk::Label m_Label;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_Label("Click here to quit, quit, quit, quit, quit")
+{
+  set_title ("EventBox");
+  set_border_width(10);
+
+  add(m_EventBox);
+
+  m_EventBox.add(m_Label);
+
+  //Clip the label short:
+  set_default_size(110, 20);
+  m_Label.set_size_request(110, 20);
+  m_Label.set_ellipsize(Pango::ELLIPSIZE_END);
+
+  //And bind an action to it:
+  m_EventBox.set_events(Gdk::BUTTON_PRESS_MASK);
+  m_EventBox.signal_button_press_event().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_eventbox_button_press) );
+
+  m_EventBox.set_tooltip_text("Click me!");
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+bool ExampleWindow::on_eventbox_button_press(GdkEventButton*)
+{
+  hide();
+  return true;
+}
+</pre>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-adjustment-internals.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-dialogs.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Adjustment Internals </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 16. Dialogs</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

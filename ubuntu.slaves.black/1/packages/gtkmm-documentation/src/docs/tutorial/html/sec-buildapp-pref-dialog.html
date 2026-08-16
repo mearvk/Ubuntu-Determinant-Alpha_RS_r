@@ -1,0 +1,584 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>A preference dialog</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="prev" href="sec-buildapp-app-menu.html" title="An application menu">
+<link rel="next" href="sec-buildapp-search-bar.html" title="Adding a search bar">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">A preference dialog</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-buildapp-app-menu.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 31. Building applications</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-buildapp-search-bar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-buildapp-pref-dialog"></a>A preference dialog</h2></div></div></div>
+<p>
+A typical application will have some preferences that should be remembered from one run
+to the next. Even for our simple example application, we may want to change the font
+that is used for the content.
+</p>
+<p>
+We are going to use <code class="classname">Gio::Settings</code> to store our preferences.
+<code class="classname">Gio::Settings</code> requires a schema that describes our settings,
+in our case the <code class="filename">org.gtkmm.exampleapp.gschema.xml</code> file.
+</p>
+<p>
+Before we can make use of this schema in our application, we need to compile it into
+the binary form that <code class="classname">Gio::Settings</code> expects. GIO provides macros
+to do this in autotools-based projects. See the description of
+<a class="ulink" href="https://developer.gnome.org/gio/stable/GSettings.html" target="_top">GSettings</a>.
+</p>
+<p>
+Next, we need to connect our settings to the widgets that they are supposed to control.
+One convenient way to do this is to use <code class="methodname">Gio::Settings::bind()</code>
+to bind settings keys to object properties, as we do for the transition setting in
+<code class="classname">ExampleAppWindow</code>'s constructor.
+</p>
+<pre class="programlisting">
+m_settings = Gio::Settings::create("org.gtkmm.exampleapp");
+m_settings-&gt;bind("transition", m_stack-&gt;property_transition_type());
+</pre>
+<p>
+</p>
+<p>
+The code to connect the font setting is a little more involved, since it corresponds to
+an object property in a <code class="classname">Gtk::TextTag</code> that we must first create.
+The code is in <code class="methodname">ExampleAppWindow::open_file_view()</code>.
+</p>
+<pre class="programlisting">
+auto tag = buffer-&gt;create_tag();
+m_settings-&gt;bind("font", tag-&gt;property_font());
+buffer-&gt;apply_tag(tag, buffer-&gt;begin(), buffer-&gt;end());
+</pre>
+<p>
+</p>
+<p>
+At this point, the application will already react if you change one of the settings,
+e.g. using the <span class="command"><strong>gsettings</strong></span> commandline tool. Of course, we expect
+the application to provide a preference dialog for these. So lets do that now.
+Our preference dialog will be a subclass of <code class="classname">Gtk::Dialog</code>, and
+we'll use the same techniques that we've already seen in <code class="classname">ExampleAppWindow</code>:
+a <code class="classname">Gtk::Builder</code> ui file and settings bindings.
+</p>
+<p>
+When we've created the <code class="filename">prefs.ui</code> file and the <code class="classname">ExampleAppPrefs</code>
+class, we revisit the <code class="methodname">ExampleApplication::on_action_preferences()</code>
+method in our application class, and make it open a new preference dialog.
+</p>
+<pre class="programlisting">
+auto prefs_dialog = ExampleAppPrefs::create(*get_active_window());
+prefs_dialog-&gt;present();
+</pre>
+<p>
+</p>
+<p>
+After all this work, our application can now show a preference dialog like this:
+</p>
+<div class="figure">
+<a name="figure-buildapp-pref-dialog"></a><p class="title"><b>Figure 31.5. An preference dialog</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buildapp_pref_dialog.png" alt="An preference dialog"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buildapp/step5?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">exampleappwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPWINDOW_H_
+#define GTKMM_EXAMPLEAPPWINDOW_H_
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAppWindow : public Gtk::ApplicationWindow
+{
+public:
+  ExampleAppWindow(BaseObjectType* cobject,
+    const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder);
+
+  static ExampleAppWindow* create();
+
+  void open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file);
+
+protected:
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+  Glib::RefPtr&lt;Gio::Settings&gt; m_settings;
+  Gtk::Stack* m_stack;
+};
+
+#endif /* GTKMM_EXAMPLEAPPWINDOW_H */
+</pre>
+<p>File: <code class="filename">exampleappprefs.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPPREFS_H_
+#define GTKMM_EXAMPLEAPPPREFS_H_
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAppPrefs : public Gtk::Dialog
+{
+public:
+  ExampleAppPrefs(BaseObjectType* cobject,
+    const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder);
+
+  static ExampleAppPrefs* create(Gtk::Window&amp; parent);
+
+protected:
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+  Glib::RefPtr&lt;Gio::Settings&gt; m_settings;
+  Gtk::FontButton* m_font;
+  Gtk::ComboBoxText* m_transition;
+};
+
+#endif /* GTKMM_EXAMPLEAPPPREFS_H_ */
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step4/exampleapplication.h"
+// Equal to the corresponding file in step4
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleapplication.h"
+#include "exampleappwindow.h"
+#include "exampleappprefs.h"
+#include &lt;iostream&gt;
+#include &lt;exception&gt;
+
+ExampleApplication::ExampleApplication()
+: Gtk::Application("org.gtkmm.examples.application", Gio::APPLICATION_HANDLES_OPEN)
+{
+}
+
+Glib::RefPtr&lt;ExampleApplication&gt; ExampleApplication::create()
+{
+  return Glib::RefPtr&lt;ExampleApplication&gt;(new ExampleApplication());
+}
+
+ExampleAppWindow* ExampleApplication::create_appwindow()
+{
+  auto appwindow = ExampleAppWindow::create();
+
+  // Make sure that the application runs for as long this window is still open.
+  add_window(*appwindow);
+
+  // Gtk::Application::add_window() connects a signal handler to the window's
+  // signal_hide(). That handler removes the window from the application.
+  // If it's the last window to be removed, the application stops running.
+  // Gtk::Window::set_application() does not connect a signal handler, but is
+  // otherwise equivalent to Gtk::Application::add_window().
+
+  // Delete the window when it is hidden.
+  appwindow-&gt;signal_hide().connect(sigc::bind&lt;Gtk::Window*&gt;(sigc::mem_fun(*this,
+    &amp;ExampleApplication::on_hide_window), appwindow));
+
+  return appwindow;
+}
+
+void ExampleApplication::on_startup()
+{
+  // Call the base class's implementation.
+  Gtk::Application::on_startup();
+
+  // Add actions and keyboard accelerators for the application menu.
+  add_action("preferences", sigc::mem_fun(*this, &amp;ExampleApplication::on_action_preferences));
+  add_action("quit", sigc::mem_fun(*this, &amp;ExampleApplication::on_action_quit));
+  set_accel_for_action("app.quit", "&lt;Ctrl&gt;Q");
+
+  auto refBuilder = Gtk::Builder::create();
+  try
+  {
+    refBuilder-&gt;add_from_resource("/org/gtkmm/exampleapp/app_menu.ui");
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_startup(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return;
+  }
+
+  auto object = refBuilder-&gt;get_object("appmenu");
+  auto app_menu = Glib::RefPtr&lt;Gio::MenuModel&gt;::cast_dynamic(object);
+  if (app_menu)
+    set_app_menu(app_menu);
+  else
+    std::cerr &lt;&lt; "ExampleApplication::on_startup(): No \"appmenu\" object in app_menu.ui"
+              &lt;&lt; std::endl;
+}
+
+void ExampleApplication::on_activate()
+{
+  try
+  {
+    // The application has been started, so let's show a window.
+    auto appwindow = create_appwindow();
+    appwindow-&gt;present();
+  }
+  // If create_appwindow() throws an exception (perhaps from Gtk::Builder),
+  // no window has been created, no window has been added to the application,
+  // and therefore the application will stop running.
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_activate(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch (const std::exception&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_activate(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleApplication::on_open(const Gio::Application::type_vec_files&amp; files,
+  const Glib::ustring&amp; /* hint */)
+{
+  // The application has been asked to open some files,
+  // so let's open a new view for each one.
+  ExampleAppWindow* appwindow = nullptr;
+  auto windows = get_windows();
+  if (windows.size() &gt; 0)
+    appwindow = dynamic_cast&lt;ExampleAppWindow*&gt;(windows[0]);
+
+  try
+  {
+    if (!appwindow)
+      appwindow = create_appwindow();
+
+    for (const auto&amp; file : files)
+      appwindow-&gt;open_file_view(file);
+
+    appwindow-&gt;present();
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_open(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch (const std::exception&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_open(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleApplication::on_hide_window(Gtk::Window* window)
+{
+  delete window;
+}
+
+void ExampleApplication::on_action_preferences()
+{
+  try
+  {
+    auto prefs_dialog = ExampleAppPrefs::create(*get_active_window());
+    prefs_dialog-&gt;present();
+
+    // Delete the dialog when it is hidden.
+    prefs_dialog-&gt;signal_hide().connect(sigc::bind&lt;Gtk::Window*&gt;(sigc::mem_fun(*this,
+      &amp;ExampleApplication::on_hide_window), prefs_dialog));
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_action_preferences(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+  catch (const std::exception&amp; ex)
+  {
+    std::cerr &lt;&lt; "ExampleApplication::on_action_preferences(): " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+
+void ExampleApplication::on_action_quit()
+{
+  // Gio::Application::quit() will make Gio::Application::run() return,
+  // but it's a crude way of ending the program. The window is not removed
+  // from the application. Neither the window's nor the application's
+  // destructors will be called, because there will be remaining reference
+  // counts in both of them. If we want the destructors to be called, we
+  // must remove the window from the application. One way of doing this
+  // is to hide the window. See comment in create_appwindow().
+  auto windows = get_windows();
+  for (auto window : windows)
+    window-&gt;hide();
+
+  // Not really necessary, when Gtk::Widget::hide() is called, unless
+  // Gio::Application::hold() has been called without a corresponding call
+  // to Gio::Application::release().
+  quit();
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleapplication.h"
+
+int main(int argc, char* argv[])
+{
+  // Since this example is running uninstalled, we have to help it find its
+  // schema. This is *not* necessary in a properly installed application.
+  Glib::setenv ("GSETTINGS_SCHEMA_DIR", ".", false);
+
+  auto application = ExampleApplication::create();
+
+  // Start the application, showing the initial window,
+  // and opening extra views for any files that it is asked to open,
+  // for instance as a command-line parameter.
+  // run() will return when the last window has been closed.
+  return application-&gt;run(argc, argv);
+}
+</pre>
+<p>File: <code class="filename">exampleappwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappwindow.h"
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+ExampleAppWindow::ExampleAppWindow(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::ApplicationWindow(cobject),
+  m_refBuilder(refBuilder),
+  m_settings(),
+  m_stack(nullptr)
+{
+  m_refBuilder-&gt;get_widget("stack", m_stack);
+  if (!m_stack)
+    throw std::runtime_error("No \"stack\" object in window.ui");
+
+  m_settings = Gio::Settings::create("org.gtkmm.exampleapp");
+  m_settings-&gt;bind("transition", m_stack-&gt;property_transition_type());
+}
+
+//static
+ExampleAppWindow* ExampleAppWindow::create()
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/window.ui");
+
+  ExampleAppWindow* window = nullptr;
+  refBuilder-&gt;get_widget_derived("app_window", window);
+  if (!window)
+    throw std::runtime_error("No \"app_window\" object in window.ui");
+
+  return window;
+}
+
+void ExampleAppWindow::open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file)
+{
+  const auto basename = file-&gt;get_basename();
+
+  auto scrolled = Gtk::make_managed&lt;Gtk::ScrolledWindow&gt;();
+  scrolled-&gt;set_hexpand(true);
+  scrolled-&gt;set_vexpand(true);
+  scrolled-&gt;show();
+  auto view = Gtk::make_managed&lt;Gtk::TextView&gt;();
+  view-&gt;set_editable(false);
+  view-&gt;set_cursor_visible(false);
+  view-&gt;show();
+  scrolled-&gt;add(*view);
+  m_stack-&gt;add(*scrolled, basename, basename);
+
+  auto buffer = view-&gt;get_buffer();
+  try
+  {
+    char* contents = nullptr;
+    gsize length = 0;
+    
+    file-&gt;load_contents(contents, length);
+    buffer-&gt;set_text(contents, contents+length);
+    g_free(contents);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::open_file_view(\"" &lt;&lt; file-&gt;get_parse_name()
+      &lt;&lt; "\"):\n  " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+
+  auto tag = buffer-&gt;create_tag();
+  m_settings-&gt;bind("font", tag-&gt;property_font());
+  buffer-&gt;apply_tag(tag, buffer-&gt;begin(), buffer-&gt;end());
+}
+</pre>
+<p>File: <code class="filename">exampleappprefs.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappprefs.h"
+#include "exampleappwindow.h"
+#include &lt;stdexcept&gt;
+
+ExampleAppPrefs::ExampleAppPrefs(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::Dialog(cobject),
+  m_refBuilder(refBuilder),
+  m_settings(),
+  m_font(nullptr),
+  m_transition(nullptr)
+{
+  m_refBuilder-&gt;get_widget("font", m_font);
+  if (!m_font)
+    throw std::runtime_error("No \"font\" object in prefs.ui");
+
+  m_refBuilder-&gt;get_widget("transition", m_transition);
+  if (!m_transition)
+    throw std::runtime_error("No \"transition\" object in prefs.ui");
+
+  m_settings = Gio::Settings::create("org.gtkmm.exampleapp");
+  m_settings-&gt;bind("font", m_font-&gt;property_font_name());
+  m_settings-&gt;bind("transition", m_transition-&gt;property_active_id());
+}
+
+//static
+ExampleAppPrefs* ExampleAppPrefs::create(Gtk::Window&amp; parent)
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/prefs.ui");
+
+  ExampleAppPrefs* dialog = nullptr;
+  refBuilder-&gt;get_widget_derived("prefs_dialog", dialog);
+  if (!dialog)
+    throw std::runtime_error("No \"prefs_dialog\" object in prefs.ui");
+
+  dialog-&gt;set_transient_for(parent);
+
+  return dialog;
+}
+</pre>
+<p>File: <code class="filename">exampleapp.gresource.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/org/gtkmm/exampleapp"&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;window.ui&lt;/file&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;app_menu.ui&lt;/file&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;prefs.ui&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+<p>File: <code class="filename">prefs.ui</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;interface&gt;
+  &lt;!-- interface-requires gtk+ 3.8 --&gt;
+  &lt;object class="GtkDialog" id="prefs_dialog"&gt;
+    &lt;property name="title" translatable="yes"&gt;Preferences&lt;/property&gt;
+    &lt;property name="resizable"&gt;False&lt;/property&gt;
+    &lt;property name="modal"&gt;True&lt;/property&gt;
+    &lt;property name="use-header-bar"&gt;1&lt;/property&gt;
+    &lt;child internal-child="vbox"&gt;
+      &lt;object class="GtkBox" id="vbox"&gt;
+        &lt;child&gt;
+          &lt;object class="GtkGrid" id="grid"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;property name="margin"&gt;6&lt;/property&gt;
+            &lt;property name="row-spacing"&gt;12&lt;/property&gt;
+            &lt;property name="column-spacing"&gt;6&lt;/property&gt;
+            &lt;child&gt;
+              &lt;object class="GtkLabel" id="fontlabel"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="label"&gt;_Font:&lt;/property&gt;
+                &lt;property name="use-underline"&gt;True&lt;/property&gt;
+                &lt;property name="mnemonic-widget"&gt;font&lt;/property&gt;
+                &lt;property name="xalign"&gt;1&lt;/property&gt;
+              &lt;/object&gt;
+              &lt;packing&gt;
+                &lt;property name="left-attach"&gt;0&lt;/property&gt;
+                &lt;property name="top-attach"&gt;0&lt;/property&gt;
+              &lt;/packing&gt;
+            &lt;/child&gt;
+            &lt;child&gt;
+              &lt;object class="GtkFontButton" id="font"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+              &lt;/object&gt;
+              &lt;packing&gt;
+                &lt;property name="left-attach"&gt;1&lt;/property&gt;
+                &lt;property name="top-attach"&gt;0&lt;/property&gt;
+              &lt;/packing&gt;
+            &lt;/child&gt;
+            &lt;child&gt;
+              &lt;object class="GtkLabel" id="transitionlabel"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="label"&gt;_Transition:&lt;/property&gt;
+                &lt;property name="use-underline"&gt;True&lt;/property&gt;
+                &lt;property name="mnemonic-widget"&gt;transition&lt;/property&gt;
+                &lt;property name="xalign"&gt;1&lt;/property&gt;
+              &lt;/object&gt;
+              &lt;packing&gt;
+                &lt;property name="left-attach"&gt;0&lt;/property&gt;
+                &lt;property name="top-attach"&gt;1&lt;/property&gt;
+              &lt;/packing&gt;
+            &lt;/child&gt;
+            &lt;child&gt;
+              &lt;object class="GtkComboBoxText" id="transition"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;items&gt;
+                  &lt;item translatable="yes" id="none"&gt;None&lt;/item&gt;
+                  &lt;item translatable="yes" id="crossfade"&gt;Fade&lt;/item&gt;
+                  &lt;item translatable="yes" id="slide-left-right"&gt;Slide&lt;/item&gt;
+                &lt;/items&gt;
+              &lt;/object&gt;
+              &lt;packing&gt;
+                &lt;property name="left-attach"&gt;1&lt;/property&gt;
+                &lt;property name="top-attach"&gt;1&lt;/property&gt;
+              &lt;/packing&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+      &lt;/object&gt;
+    &lt;/child&gt;
+  &lt;/object&gt;
+&lt;/interface&gt;
+</pre>
+<p>File: <code class="filename">org.gtkmm.exampleapp.gschema.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;schemalist&gt;
+  &lt;schema path="/org/gtkmm/exampleapp/" id="org.gtkmm.exampleapp"&gt;
+    &lt;key name="font" type="s"&gt;
+      &lt;default&gt;'Monospace 12'&lt;/default&gt;
+      &lt;summary&gt;Font&lt;/summary&gt;
+      &lt;description&gt;The font to be used for content.&lt;/description&gt;
+    &lt;/key&gt;
+    &lt;key name="transition" type="s"&gt;
+      &lt;choices&gt;
+        &lt;choice value='none'/&gt;
+        &lt;choice value='crossfade'/&gt;
+        &lt;choice value='slide-left-right'/&gt;
+      &lt;/choices&gt;
+      &lt;default&gt;'none'&lt;/default&gt;
+      &lt;summary&gt;Transition&lt;/summary&gt;
+      &lt;description&gt;The transition to use when switching tabs.&lt;/description&gt;
+    &lt;/key&gt;
+  &lt;/schema&gt;
+&lt;/schemalist&gt;
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-buildapp-app-menu.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-building-applications.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-buildapp-search-bar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">An application menu </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Adding a search bar</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

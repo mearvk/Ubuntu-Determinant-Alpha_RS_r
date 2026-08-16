@@ -1,0 +1,358 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Adding a search bar</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="prev" href="sec-buildapp-pref-dialog.html" title="A preference dialog">
+<link rel="next" href="sec-buildapp-side-bar.html" title="Adding a side bar">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Adding a search bar</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-buildapp-pref-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 31. Building applications</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-buildapp-side-bar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-buildapp-search-bar"></a>Adding a search bar</h2></div></div></div>
+<p>
+We continue to flesh out the functionality of our application. For now, we add search.
+<span class="application">gtkmm</span> supports this with <code class="classname">Gtk::SearchEntry</code> and <code class="classname">Gtk::SearchBar</code>.
+The search bar is a widget that can slide in from the top to present a search entry.
+</p>
+<p>
+We add a toggle button to the header bar, which can be used to slide out the search bar
+below the header bar. The new widgets are added in the <code class="filename">window.ui</code> file.
+</p>
+<p>
+Implementing the search needs quite a few code changes that we are not going to completely
+go over here. The central piece of the search implementation is a signal handler that
+listens for text changes in the search entry, shown here without error handling.
+</p>
+<pre class="programlisting">
+void ExampleAppWindow::on_search_text_changed()
+{
+  const auto text = m_searchentry-&gt;get_text();
+  auto tab = dynamic_cast&lt;Gtk::ScrolledWindow*&gt;(m_stack-&gt;get_visible_child());
+  auto view = dynamic_cast&lt;Gtk::TextView*&gt;(tab-&gt;get_child());
+
+  // Very simple-minded search implementation.
+  auto buffer = view-&gt;get_buffer();
+  Gtk::TextIter match_start;
+  Gtk::TextIter match_end;
+  if (buffer-&gt;begin().forward_search(text, Gtk::TEXT_SEARCH_CASE_INSENSITIVE,
+      match_start, match_end))
+  {
+    buffer-&gt;select_range(match_start, match_end);
+    view-&gt;scroll_to(match_start);
+  }
+}
+</pre>
+<p>
+</p>
+<p>
+With the search bar, our application now looks like this:
+</p>
+<div class="figure">
+<a name="figure-buildapp-search-bar"></a><p class="title"><b>Figure 31.6. Adding a search bar</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buildapp_search_bar.png" alt="Adding a search bar"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buildapp/step6?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">exampleappwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPWINDOW_H_
+#define GTKMM_EXAMPLEAPPWINDOW_H_
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAppWindow : public Gtk::ApplicationWindow
+{
+public:
+  ExampleAppWindow(BaseObjectType* cobject,
+    const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder);
+
+  static ExampleAppWindow* create();
+
+  void open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file);
+
+protected:
+  // Signal handlers
+  void on_search_text_changed();
+  void on_visible_child_changed();
+
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+  Glib::RefPtr&lt;Gio::Settings&gt; m_settings;
+  Gtk::Stack* m_stack;
+  Gtk::ToggleButton* m_search;
+  Gtk::SearchBar* m_searchbar;
+  Gtk::SearchEntry* m_searchentry;
+  Glib::RefPtr&lt;Glib::Binding&gt; m_prop_binding;
+};
+
+#endif /* GTKMM_EXAMPLEAPPWINDOW_H */
+</pre>
+<p>File: <code class="filename">exampleappprefs.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleappprefs.h"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step4/exampleapplication.h"
+// Equal to the corresponding file in step4
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleapplication.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/main.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">exampleappwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappwindow.h"
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+ExampleAppWindow::ExampleAppWindow(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::ApplicationWindow(cobject),
+  m_refBuilder(refBuilder),
+  m_settings(),
+  m_stack(nullptr),
+  m_search(nullptr),
+  m_searchbar(nullptr),
+  m_searchentry(nullptr),
+  m_prop_binding()
+{
+  m_refBuilder-&gt;get_widget("stack", m_stack);
+  if (!m_stack)
+    throw std::runtime_error("No \"stack\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("search", m_search);
+  if (!m_search)
+    throw std::runtime_error("No \"search\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("searchbar", m_searchbar);
+  if (!m_searchbar)
+    throw std::runtime_error("No \"searchbar\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("searchentry", m_searchentry);
+  if (!m_searchentry)
+    throw std::runtime_error("No \"searchentry\" object in window.ui");
+
+  m_settings = Gio::Settings::create("org.gtkmm.exampleapp");
+  m_settings-&gt;bind("transition", m_stack-&gt;property_transition_type());
+
+  m_prop_binding = Glib::Binding::bind_property(m_search-&gt;property_active(),
+    m_searchbar-&gt;property_search_mode_enabled(), Glib::BINDING_BIDIRECTIONAL);
+
+  // Connect signal handlers.
+  m_searchentry-&gt;signal_search_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleAppWindow::on_search_text_changed));
+  m_stack-&gt;property_visible_child().signal_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleAppWindow::on_visible_child_changed));
+}
+
+//static
+ExampleAppWindow* ExampleAppWindow::create()
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/window.ui");
+
+  ExampleAppWindow* window = nullptr;
+  refBuilder-&gt;get_widget_derived("app_window", window);
+  if (!window)
+    throw std::runtime_error("No \"app_window\" object in window.ui");
+
+  return window;
+}
+
+void ExampleAppWindow::open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file)
+{
+  const auto basename = file-&gt;get_basename();
+
+  auto scrolled = Gtk::make_managed&lt;Gtk::ScrolledWindow&gt;();
+  scrolled-&gt;set_hexpand(true);
+  scrolled-&gt;set_vexpand(true);
+  scrolled-&gt;show();
+  auto view = Gtk::make_managed&lt;Gtk::TextView&gt;();
+  view-&gt;set_editable(false);
+  view-&gt;set_cursor_visible(false);
+  view-&gt;show();
+  scrolled-&gt;add(*view);
+  m_stack-&gt;add(*scrolled, basename, basename);
+
+  auto buffer = view-&gt;get_buffer();
+  try
+  {
+    char* contents = nullptr;
+    gsize length = 0;
+    
+    file-&gt;load_contents(contents, length);
+    buffer-&gt;set_text(contents, contents+length);
+    g_free(contents);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::open_file_view(\"" &lt;&lt; file-&gt;get_parse_name()
+      &lt;&lt; "\"):\n  " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return;
+  }
+
+  auto tag = buffer-&gt;create_tag();
+  m_settings-&gt;bind("font", tag-&gt;property_font());
+  buffer-&gt;apply_tag(tag, buffer-&gt;begin(), buffer-&gt;end());
+
+  m_search-&gt;set_sensitive(true);
+}
+
+void ExampleAppWindow::on_search_text_changed()
+{
+  const auto text = m_searchentry-&gt;get_text();
+  if (text.empty())
+    return;
+
+  auto tab = dynamic_cast&lt;Gtk::ScrolledWindow*&gt;(m_stack-&gt;get_visible_child());
+  if (!tab)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::on_search_text_changed(): No visible child." &lt;&lt; std::endl;
+    return;
+  }
+
+  auto view = dynamic_cast&lt;Gtk::TextView*&gt;(tab-&gt;get_child());
+  if (!view)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::on_search_text_changed(): No visible text view." &lt;&lt; std::endl;
+    return;
+  }
+
+  // Very simple-minded search implementation.
+  auto buffer = view-&gt;get_buffer();
+  Gtk::TextIter match_start;
+  Gtk::TextIter match_end;
+  if (buffer-&gt;begin().forward_search(text, Gtk::TEXT_SEARCH_CASE_INSENSITIVE,
+      match_start, match_end))
+  {
+    buffer-&gt;select_range(match_start, match_end);
+    view-&gt;scroll_to(match_start);
+  }
+}
+
+void ExampleAppWindow::on_visible_child_changed()
+{
+  m_searchbar-&gt;set_search_mode(false);
+}
+
+</pre>
+<p>File: <code class="filename">exampleappprefs.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleappprefs.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">window.ui</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;interface&gt;
+  &lt;!-- interface-requires gtk+ 3.8 --&gt;
+  &lt;object class="GtkApplicationWindow" id="app_window"&gt;
+    &lt;property name="title" translatable="yes"&gt;Example Application&lt;/property&gt;
+    &lt;property name="default-width"&gt;600&lt;/property&gt;
+    &lt;property name="default-height"&gt;400&lt;/property&gt;
+    &lt;child&gt;
+      &lt;object class="GtkBox" id="content_box"&gt;
+        &lt;property name="visible"&gt;True&lt;/property&gt;
+        &lt;property name="orientation"&gt;vertical&lt;/property&gt;
+        &lt;child&gt;
+          &lt;object class="GtkHeaderBar" id="header"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;child type="title"&gt;
+              &lt;object class="GtkStackSwitcher" id="tabs"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="stack"&gt;stack&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+            &lt;child&gt;
+              &lt;object class="GtkToggleButton" id="search"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="sensitive"&gt;False&lt;/property&gt;
+                &lt;style&gt;
+                  &lt;class name="image-button"/&gt;
+                &lt;/style&gt;
+                &lt;child&gt;
+                  &lt;object class="GtkImage" id="search-icon"&gt;
+                    &lt;property name="visible"&gt;True&lt;/property&gt;
+                    &lt;property name="icon-name"&gt;edit-find-symbolic&lt;/property&gt;
+                    &lt;property name="icon-size"&gt;1&lt;/property&gt;
+                  &lt;/object&gt;
+                &lt;/child&gt;
+              &lt;/object&gt;
+              &lt;packing&gt;
+                &lt;property name="pack-type"&gt;end&lt;/property&gt;
+              &lt;/packing&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkSearchBar" id="searchbar"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;child&gt;
+              &lt;object class="GtkSearchEntry" id="searchentry"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkStack" id="stack"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;property name="transition-duration"&gt;500&lt;/property&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+      &lt;/object&gt;
+    &lt;/child&gt;
+  &lt;/object&gt;
+&lt;/interface&gt;
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-buildapp-pref-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-building-applications.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-buildapp-side-bar.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">A preference dialog </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Adding a side bar</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

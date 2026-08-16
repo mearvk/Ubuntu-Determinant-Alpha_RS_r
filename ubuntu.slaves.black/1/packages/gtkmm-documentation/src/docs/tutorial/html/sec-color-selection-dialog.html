@@ -1,0 +1,198 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>ColorChooserDialog</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-dialogs.html" title="Chapter 16. Dialogs">
+<link rel="prev" href="sec-dialogs-filechooserdialog.html" title="FileChooserDialog">
+<link rel="next" href="sec-font-chooser-dialog.html" title="FontChooserDialog">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">ColorChooserDialog</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-dialogs-filechooserdialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 16. Dialogs</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-font-chooser-dialog.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-color-selection-dialog"></a>ColorChooserDialog</h2></div></div></div>
+<p>
+The <code class="classname">ColorChooserDialog</code> allows the user to choose a
+color. The <code class="classname">ColorButton</code> opens a color selection dialog
+when it is clicked.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1ColorChooserDialog.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="colorchooserdialog-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-dialogs-colorchooserdialog"></a><p class="title"><b>Figure 16.3. ColorChooserDialog</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/dialogs_colorchooserdialog.png" alt="ColorChooserDialog"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/dialogs/colorchooserdialog?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_color_button_color_set();
+  void on_button_dialog_clicked();
+  bool on_drawing_area_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr);
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::ColorButton m_ColorButton;
+  Gtk::Button m_Button_Dialog;
+  Gtk::DrawingArea m_DrawingArea; //To show the color.
+
+  Gdk::RGBA m_Color;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL, 5),
+  m_Button_Dialog("Choose Color")
+{
+  set_title("Gtk::ColorChooserDialog example");
+  set_default_size(200, 200);
+
+  add(m_VBox);
+
+  m_VBox.pack_start(m_ColorButton, Gtk::PACK_SHRINK);
+  m_ColorButton.signal_color_set().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_color_button_color_set) );
+
+  m_VBox.pack_start(m_Button_Dialog, Gtk::PACK_SHRINK);
+  m_Button_Dialog.signal_clicked().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_button_dialog_clicked) );
+
+  //Set start color:
+  m_Color.set_red(0.0);
+  m_Color.set_green(0.0);
+  m_Color.set_blue(1.0);
+  m_Color.set_alpha(1.0); //opaque
+  m_ColorButton.set_rgba(m_Color);
+
+  m_VBox.pack_start(m_DrawingArea);
+  m_DrawingArea.signal_draw().connect(sigc::mem_fun(*this,
+    &amp;ExampleWindow::on_drawing_area_draw));
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_color_button_color_set()
+{
+  //Store the chosen color:
+  m_Color = m_ColorButton.get_rgba();
+}
+
+void ExampleWindow::on_button_dialog_clicked()
+{
+  Gtk::ColorChooserDialog dialog("Please choose a color");
+  dialog.set_transient_for(*this);
+
+  //Get the previously selected color:
+  dialog.set_rgba(m_Color);
+
+  const int result = dialog.run();
+
+  //Handle the response:
+  switch(result)
+  {
+    case Gtk::RESPONSE_OK:
+    {
+      //Store the chosen color:
+      m_Color = dialog.get_rgba();
+      m_ColorButton.set_rgba(m_Color);
+      break;
+    }
+    case Gtk::RESPONSE_CANCEL:
+    {
+      std::cout &lt;&lt; "Cancel clicked." &lt;&lt; std::endl;
+      break;
+    }
+    default:
+    {
+      std::cout &lt;&lt; "Unexpected button clicked: " &lt;&lt; result &lt;&lt; std::endl;
+      break;
+    }
+  }
+}
+
+bool ExampleWindow::on_drawing_area_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gdk::Cairo::set_source_rgba(cr, m_Color);
+  cr-&gt;paint();
+
+  return true;
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-dialogs-filechooserdialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-dialogs.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-font-chooser-dialog.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">FileChooserDialog </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> FontChooserDialog</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

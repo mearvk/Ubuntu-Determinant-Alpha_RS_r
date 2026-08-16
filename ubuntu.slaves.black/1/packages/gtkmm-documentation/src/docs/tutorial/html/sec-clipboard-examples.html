@@ -1,0 +1,475 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Examples</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-clipboard.html" title="Chapter 19. The Clipboard">
+<link rel="prev" href="sec-clipboard-paste.html" title="Paste">
+<link rel="next" href="chapter-printing.html" title="Chapter 20. Printing">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Examples</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-clipboard-paste.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 19. The Clipboard</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-printing.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-clipboard-examples"></a>Examples</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-clipboard-example-simple"></a>Simple</h3></div></div></div>
+<p>
+This example allows copy and pasting of application-specific data, using the
+standard text target. Although this is simple, it's not ideal because it does
+not identify the <code class="classname">Clipboard</code> data as being of a particular
+type.
+</p>
+<div class="figure">
+<a name="figure-clipboard-simple"></a><p class="title"><b>Figure 19.1. Clipboard - Simple</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/clipboard_simple.png" alt="Clipboard - Simple"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/clipboard/simple/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_copy();
+  void on_button_paste();
+  void on_clipboard_text_received(const Glib::ustring&amp; text);
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::Label m_Label;
+
+  Gtk::Grid m_Grid;
+  Gtk::ToggleButton m_ButtonA1, m_ButtonA2, m_ButtonB1, m_ButtonB2;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Copy, m_Button_Paste;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  //APPLICATION_NON_UNIQUE because it shall be possible to run several
+  //instances of this application simultaneously.
+  auto app = Gtk::Application::create(
+    argc, argv, "org.gtkmm.example", Gio::APPLICATION_NON_UNIQUE);
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Label("Select cells in the grid, click Copy, then open a second "
+        "instance of this example to try pasting the copied data."),
+  m_ButtonA1("A1"), m_ButtonA2("A2"), m_ButtonB1("B1"), m_ButtonB2("B2"),
+  m_Button_Copy("_Copy", /* mnemonic= */ true), m_Button_Paste("_Paste", true)
+{
+  set_title("Gtk::Clipboard example");
+  set_border_width(12);
+
+  add(m_VBox);
+
+  m_VBox.pack_start(m_Label, Gtk::PACK_SHRINK);
+
+  //Fill Grid:
+  m_VBox.pack_start(m_Grid);
+  m_Grid.set_row_homogeneous(true);
+  m_Grid.set_column_homogeneous(true);
+  m_Grid.attach(m_ButtonA1, 0, 0, 1, 1);
+  m_Grid.attach(m_ButtonA2, 1, 0, 1, 1);
+  m_Grid.attach(m_ButtonB1, 0, 1, 1, 1);
+  m_Grid.attach(m_ButtonB2, 1, 1, 1, 1);
+
+  //Add ButtonBox to bottom:
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+  m_VBox.set_spacing(6);
+
+  //Fill ButtonBox:
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_ButtonBox.pack_start(m_Button_Copy, Gtk::PACK_SHRINK);
+  m_Button_Copy.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_copy) );
+  m_ButtonBox.pack_start(m_Button_Paste, Gtk::PACK_SHRINK);
+  m_Button_Paste.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_paste) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_copy()
+{
+  //Build a string representation of the stuff to be copied:
+  //Ideally you would use XML, with an XML parser here:
+  Glib::ustring strData;
+  strData += m_ButtonA1.get_active() ? "1" : "0";
+  strData += m_ButtonA2.get_active() ? "1" : "0";
+  strData += m_ButtonB1.get_active() ? "1" : "0";
+  strData += m_ButtonB2.get_active() ? "1" : "0";
+
+  auto refClipboard = Gtk::Clipboard::get();
+  refClipboard-&gt;set_text(strData);
+}
+
+void ExampleWindow::on_button_paste()
+{
+  //Tell the clipboard to call our method when it is ready:
+  auto refClipboard = Gtk::Clipboard::get();
+  refClipboard-&gt;request_text(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_clipboard_text_received) );
+}
+
+void ExampleWindow::on_clipboard_text_received(const Glib::ustring&amp; text)
+{
+  //See comment in on_button_copy() about this silly clipboard format.
+  if(text.size() &gt;= 4)
+  {
+    m_ButtonA1.set_active( text[0] == '1' );
+    m_ButtonA2.set_active( text[1] == '1' );
+    m_ButtonB1.set_active( text[2] == '1' );
+    m_ButtonB2.set_active( text[3] == '1' );
+  }
+}
+</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-clipboard-example-ideal"></a>Ideal</h3></div></div></div>
+<p>This is like the simple example, but it
+</p>
+<div class="orderedlist"><ol class="orderedlist" type="1">
+<li class="listitem">Defines a custom clipboard target, though the format of that target is still text.</li>
+<li class="listitem">It supports pasting of 2 targets - both the custom one and a text one that creates an arbitrary text representation of the custom data.</li>
+<li class="listitem">It uses <code class="methodname">request_targets()</code> and the <code class="literal">owner_change</code> signal and disables the Paste button if it can't use anything on the clipboard.</li>
+</ol></div>
+<p>
+</p>
+<div class="figure">
+<a name="figure-clipboard-ideal"></a><p class="title"><b>Figure 19.2. Clipboard - Ideal</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/clipboard_ideal.png" alt="Clipboard - Ideal"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/clipboard/ideal/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_copy();
+  void on_button_paste();
+
+  void on_clipboard_owner_change(GdkEventOwnerChange* event);
+  void on_clipboard_get(Gtk::SelectionData&amp; selection_data, guint info);
+  void on_clipboard_clear();
+
+  void on_clipboard_received(const Gtk::SelectionData&amp; selection_data);
+  void on_clipboard_received_targets(const std::vector&lt;Glib::ustring&gt;&amp; targets);
+
+  void update_paste_status(); //Disable the paste button if there is nothing to paste.
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::Label m_Label;
+
+  Gtk::Grid m_Grid;
+  Gtk::ToggleButton m_ButtonA1, m_ButtonA2, m_ButtonB1, m_ButtonB2;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Copy, m_Button_Paste;
+
+  Glib::ustring m_ClipboardStore; //Keep copied stuff here, until it is pasted. This could be a big complex data structure.
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  //APPLICATION_NON_UNIQUE because it shall be possible to run several
+  //instances of this application simultaneously.
+  auto app = Gtk::Application::create(
+    argc, argv, "org.gtkmm.example", Gio::APPLICATION_NON_UNIQUE);
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;algorithm&gt;
+
+namespace
+{
+
+//These should usually be MIME types.
+const char example_target_custom[] = "gtkmmclipboardexample";
+const char example_target_text[]   = "UTF8_STRING";
+
+} // anonymous namespace
+
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Label("Select cells in the grid, click Copy, then open a second instance "
+          "of this example to try pasting the copied data.\nOr try pasting the "
+          "text representation into gedit."),
+  m_ButtonA1("A1"), m_ButtonA2("A2"), m_ButtonB1("B1"), m_ButtonB2("B2"),
+  m_Button_Copy("_Copy", /* mnemonic= */ true), m_Button_Paste("_Paste", true)
+{
+  set_title("Gtk::Clipboard example");
+  set_border_width(12);
+
+  add(m_VBox);
+
+  m_VBox.pack_start(m_Label, Gtk::PACK_SHRINK);
+
+  //Fill Grid:
+  m_VBox.pack_start(m_Grid);
+  m_Grid.set_row_homogeneous(true);
+  m_Grid.set_column_homogeneous(true);
+  m_Grid.attach(m_ButtonA1, 0, 0, 1, 1);
+  m_Grid.attach(m_ButtonA2, 1, 0, 1, 1);
+  m_Grid.attach(m_ButtonB1, 0, 1, 1, 1);
+  m_Grid.attach(m_ButtonB2, 1, 1, 1, 1);
+
+  //Add ButtonBox to bottom:
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+  m_VBox.set_spacing(6);
+
+  //Fill ButtonBox:
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_ButtonBox.pack_start(m_Button_Copy, Gtk::PACK_SHRINK);
+  m_Button_Copy.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_copy) );
+  m_ButtonBox.pack_start(m_Button_Paste, Gtk::PACK_SHRINK);
+  m_Button_Paste.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_paste) );
+
+  //Connect a signal handler that will be called when the contents of
+  //the clipboard change.
+  Gtk::Clipboard::get()-&gt;signal_owner_change().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_clipboard_owner_change) );
+
+  show_all_children();
+
+  update_paste_status();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_copy()
+{
+  //Build a string representation of the stuff to be copied:
+  //Ideally you would use XML, with an XML parser here:
+  Glib::ustring strData;
+  strData += m_ButtonA1.get_active() ? "1" : "0";
+  strData += m_ButtonA2.get_active() ? "1" : "0";
+  strData += m_ButtonB1.get_active() ? "1" : "0";
+  strData += m_ButtonB2.get_active() ? "1" : "0";
+
+  auto refClipboard = Gtk::Clipboard::get();
+
+  //Targets:
+  std::vector&lt;Gtk::TargetEntry&gt; targets;
+
+  targets.push_back( Gtk::TargetEntry(example_target_custom) );
+  targets.push_back( Gtk::TargetEntry(example_target_text) );
+
+  refClipboard-&gt;set(targets,
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_clipboard_get),
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_clipboard_clear) );
+
+  //Store the copied data until it is pasted:
+  //(Must be done after the call to refClipboard-&gt;set(), because that call
+  //may trigger a call to on_clipboard_clear.)
+  m_ClipboardStore = strData;
+
+  update_paste_status();
+}
+
+void ExampleWindow::on_button_paste()
+{
+  //Tell the clipboard to call our method when it is ready:
+  auto refClipboard = Gtk::Clipboard::get();
+
+  refClipboard-&gt;request_contents(example_target_custom,
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_clipboard_received) );
+
+  update_paste_status();
+}
+
+void ExampleWindow::on_clipboard_owner_change(GdkEventOwnerChange*)
+{
+  update_paste_status();
+}
+
+void ExampleWindow::on_clipboard_get(Gtk::SelectionData&amp; selection_data,
+  guint /* info */)
+{
+  // info corresponds to the optional info parameter in Gtk::TargetEntry's
+  // constructor. We don't use that, so we use selection_data's target instead.
+
+  const std::string target = selection_data.get_target();
+
+  if(target == example_target_custom)
+  {
+    // This set() override uses an 8-bit text format for the data.
+    selection_data.set(example_target_custom, m_ClipboardStore);
+  }
+  else if(target == example_target_text)
+  {
+    //Build some arbitrary text representation of the data,
+    //so that people see something when they paste into a text editor:
+    Glib::ustring text_representation;
+
+    text_representation += m_ButtonA1.get_active() ? "A1, " : "";
+    text_representation += m_ButtonA2.get_active() ? "A2, " : "";
+    text_representation += m_ButtonB1.get_active() ? "B1, " : "";
+    text_representation += m_ButtonB2.get_active() ? "B2, " : "";
+
+    selection_data.set_text(text_representation);
+  }
+  else
+  {
+    g_warning("ExampleWindow::on_clipboard_get(): "
+            "Unexpected clipboard target format.");
+  }
+}
+
+void ExampleWindow::on_clipboard_clear()
+{
+  //This isn't really necessary. I guess it might save memory.
+  m_ClipboardStore.clear();
+}
+
+void ExampleWindow::on_clipboard_received(
+        const Gtk::SelectionData&amp; selection_data)
+{
+  const std::string target = selection_data.get_target();
+
+  //It should always be this, because that's what we asked for when calling
+  //request_contents().
+  if(target == example_target_custom)
+  {
+    Glib::ustring clipboard_data = selection_data.get_data_as_string();
+
+    //See comment in on_button_copy() about this silly clipboard format.
+    if(clipboard_data.size() &gt;= 4)
+    {
+      m_ButtonA1.set_active( clipboard_data[0] == '1' );
+      m_ButtonA2.set_active( clipboard_data[1] == '1' );
+      m_ButtonB1.set_active( clipboard_data[2] == '1' );
+      m_ButtonB2.set_active( clipboard_data[3] == '1' );
+    }
+  }
+}
+
+void ExampleWindow::update_paste_status()
+{
+  //Disable the paste button if there is nothing to paste.
+
+  auto refClipboard = Gtk::Clipboard::get();
+
+  //Discover what targets are available:
+  refClipboard-&gt;request_targets(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_clipboard_received_targets) );
+}
+
+void ExampleWindow::on_clipboard_received_targets(
+  const std::vector&lt;Glib::ustring&gt;&amp; targets)
+{
+  const bool bPasteIsPossible =
+    std::find(targets.begin(), targets.end(),
+      example_target_custom) != targets.end();
+
+  // Enable/Disable the Paste button appropriately:
+  m_Button_Paste.set_sensitive(bPasteIsPossible);
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-clipboard-paste.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-clipboard.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-printing.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Paste </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 20. Printing</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 17. The Drawing Area Widget</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-about-dialog.html" title="Non-modal AboutDialog">
+<link rel="next" href="sec-cairo-drawing-lines.html" title="Drawing Straight Lines">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 17. The Drawing Area Widget</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-about-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-cairo-drawing-lines.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-drawingarea"></a>Chapter 17. The Drawing Area Widget</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-drawingarea.html#sec-cairo-drawing-model">The Cairo Drawing Model</a></span></li>
+<li><span class="sect1"><a href="sec-cairo-drawing-lines.html">Drawing Straight Lines</a></span></li>
+<li><span class="sect1"><a href="sec-cairo-curved-lines.html">Drawing Curved Lines</a></span></li>
+<li><span class="sect1"><a href="sec-cairo-drawing-arcs.html">Drawing Arcs and Circles</a></span></li>
+<li><span class="sect1"><a href="sec-drawing-text.html">Drawing Text</a></span></li>
+<li><span class="sect1"><a href="sec-draw-images.html">Drawing Images</a></span></li>
+<li><span class="sect1"><a href="sec-drawing-clock-example.html">Example Application: Creating a Clock with Cairo</a></span></li>
+</ul>
+</div>
+<p>
+    The <code class="classname">DrawingArea</code> widget is a blank window that gives
+    you the freedom to create any graphic you desire. Along with that freedom
+    comes the responsibility to handle draw signals on the widget. When a
+    widget is first shown, or when it is covered and then uncovered again it
+    needs to redraw itself. Most widgets have code to do this, but the
+    DrawingArea does not, allowing you to write your own draw signal
+    handler to determine how the contents of the widget will be drawn. This is
+    most often done by overriding the virtual
+    <code class="methodname">on_draw()</code> member function.
+  </p>
+<p>
+      GTK+ uses the <a class="ulink" href="http://cairographics.org" target="_top">Cairo</a> drawing API.
+      With <span class="application">gtkmm</span>, you may use the <a class="ulink" href="http://www.cairographics.org/cairomm/" target="_top">cairomm</a> C++ API for cairo.
+  </p>
+<p>
+      You can draw very sophisticated shapes using Cairo, but the methods to do
+      so are quite basic. Cairo provides methods for drawing straight lines,
+      curved lines, and arcs (including circles). These basic shapes can be
+      combined to create more complex shapes and paths which can be filled with
+      solid colors, gradients, patterns, and other things. In addition, Cairo
+      can perform complex transformations, do compositing of images, and render
+      antialiased text.
+  </p>
+<div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note: Cairo and Pango">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="icons/note.png"></td>
+<th align="left">Cairo and Pango</th>
+</tr>
+<tr><td align="left" valign="top"><p>Although Cairo can render text, it's not meant to be a replacement for
+      Pango. Pango is a better choice if you need to perform more advanced
+      text rendering such as wrapping or ellipsizing text. Drawing text with
+      Cairo should only be done if the text is part of a graphic.</p></td></tr>
+</table></div>
+<p>
+      In this section of the tutorial, we'll cover the basic Cairo drawing
+      model, describe each of the basic drawing elements in some detail (with
+      examples), and then present a simple application that uses Cairo to draw
+      a custom clock widget.
+  </p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-cairo-drawing-model"></a>The Cairo Drawing Model</h2></div></div></div>
+<p>
+        The basic concept of drawing in Cairo involves defining 'invisible'
+        paths and then stroking or filling them to make them visible.
+    </p>
+<p>
+        To do any drawing in <span class="application">gtkmm</span> with Cairo, you must first create a
+        <code class="classname">Cairo::Context</code> object. This class holds all of the graphics state parameters that
+        describe how drawing is to be done. This includes information such as
+        line width, color, the surface to draw to, and many other things. This
+        allows the actual drawing functions to take fewer arguments to simplify
+        the interface. In <span class="application">gtkmm</span>, a <code class="classname">Cairo::Context</code> is
+        created by calling the
+        <code class="methodname">Gdk::Window::create_cairo_context()</code> function.
+        Since Cairo contexts are reference-counted objects, this function
+        returns a <code class="classname">Cairo::RefPtr&lt;Cairo::Context&gt;</code>
+        object.
+    </p>
+<p>
+        The following example shows  how to set up a Cairo context with a
+        foreground color of red and a width of 2. Any drawing functions that
+        use this context will use these settings.
+    </p>
+<pre class="programlisting">Gtk::DrawingArea myArea;
+Cairo::RefPtr&lt;Cairo::Context&gt; myContext = myArea.get_window()-&gt;create_cairo_context();
+myContext-&gt;set_source_rgb(1.0, 0.0, 0.0);
+myContext-&gt;set_line_width(2.0);</pre>
+<p>
+        Each <code class="classname">Cairo::Context</code> is associated with a
+        particular <code class="classname">Gdk::Window</code>, so the first line of the
+        above example creates a <code class="classname">Gtk::DrawingArea</code> widget
+        and the second line uses its associated
+        <code class="classname">Gdk::Window</code> to create a
+        <code class="classname">Cairo::Context</code> object. The final two lines
+        change the graphics state of the context.
+    </p>
+<p>
+        There are a number of graphics state variables that can be set for a
+        Cairo context. The most common context attributes are color (using
+        <code class="methodname">set_source_rgb()</code> or
+        <code class="methodname">set_source_rgba()</code> for translucent colors), line
+        width (using <code class="methodname">set_line_width()</code>), line dash pattern
+        (using <code class="methodname">set_dash()</code>), line cap style (using
+        <code class="methodname">set_line_cap()</code>), and line join style (using
+        <code class="methodname">set_line_join()</code>), and font styles (using
+        <code class="methodname">set_font_size()</code>,
+        <code class="methodname">set_font_face()</code> and others).
+        There are many other settings as well, such as transformation matrices,
+        fill rules, whether to perform antialiasing, and others. For further
+        information, see the <a class="ulink" href="http://www.cairographics.org/cairomm/" target="_top">cairomm</a> API documentation.
+    </p>
+<p>
+        The current state of a <code class="classname">Cairo::Context</code> can be
+        saved to an internal stack of saved states and later be restored to the
+        state it was in when you saved it. To do this, use the
+        <code class="methodname">save()</code>
+        method and the <code class="methodname">restore()</code> method. This can be
+        useful if you need to temporarily change the line width and color (or
+        any other graphics setting) in order to draw something and then return
+        to the previous settings. In this situation, you could call
+        <code class="methodname">Cairo::Context::save()</code>, change the graphics
+        settings, draw the lines, and then call
+        <code class="methodname">Cairo::Context::restore()</code> to restore the original
+        graphics state. Multiple calls to <code class="methodname">save()</code> and
+        <code class="methodname">restore()</code> can be nested; each call to
+        <code class="methodname">restore()</code> restores the state from the
+        matching paired <code class="methodname">save()</code>.
+        </p>
+<div class="tip" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Tip">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Tip]" src="icons/tip.png"></td>
+<th align="left">Tip</th>
+</tr>
+<tr><td align="left" valign="top">
+<p>It is good practice to put all modifications to the graphics state
+            between <code class="methodname">save()</code>/<code class="methodname">restore()</code>
+            function calls. For example, if you have a function that takes a
+            <code class="classname">Cairo::Context</code> reference as an argument, you
+            might implement it as follows:
+          </p>
+<pre class="programlisting">void doSomething(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; context, int x)
+{
+    context-&gt;save();
+    // change graphics state
+    // perform drawing operations
+    context-&gt;restore();
+}</pre>
+</td></tr>
+</table></div>
+<p>
+    </p>
+<p>
+        The virtual <code class="methodname">on_draw()</code> method provides a
+        Cairo context that you shall use for drawing in the
+        <code class="classname">Gtk::DrawingArea</code> widget. It is not necessary to
+        save and restore this Cairo context in <code class="methodname">on_draw()</code>.
+    </p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-about-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-cairo-drawing-lines.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Non-modal AboutDialog </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Drawing Straight Lines</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Menubar and Toolbar</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-menus-and-toolbars.html" title="Chapter 12. Menus and Toolbars">
+<link rel="prev" href="chapter-menus-and-toolbars.html" title="Chapter 12. Menus and Toolbars">
+<link rel="next" href="sec-menus-popup.html" title="Popup Menus">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Menubar and Toolbar</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-menus-and-toolbars.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 12. Menus and Toolbars</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-menus-popup.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-menubar-and-toolbar"></a>Menubar and Toolbar</h2></div></div></div>
+<p>
+Next you should create a <code class="classname">Gtk::Builder</code>. At this point is
+also a good idea to tell the application to respond to keyboard shortcuts,
+by using <code class="methodname">Gtk::Application::set_accel_for_action()</code>.
+</p>
+<p>For instance,
+</p>
+<pre class="programlisting">
+Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder = Gtk::Builder::create();
+
+app-&gt;set_accel_for_action("example.new", "&lt;Primary&gt;n");
+app-&gt;set_accel_for_action("example.quit", "&lt;Primary&gt;q");
+app-&gt;set_accel_for_action("example.copy", "&lt;Primary&gt;c");
+app-&gt;set_accel_for_action("example.paste", "&lt;Primary&gt;v");
+</pre>
+<p>
+If your main window is derived from <code class="classname">ApplicationWindow</code> and
+you instantiate your menubar with <code class="methodname">Gtk::Application::set_menubar()</code>,
+then you don't have to call <code class="methodname">set_accel_for_action()</code>.
+See <a class="link" href="sec-menus-examples.html#menu-example-main" title="Application Menu and Main Menu example">Application Menu and Main Menu example</a>
+for an example.
+</p>
+<p>
+Then, you can define the actual visible layout of the menus and toolbars, and
+add the UI layout to the <code class="classname">Builder</code>. This "ui
+string" uses an XML format, in which you should mention the names of the
+actions that you have already created. For instance:
+</p>
+<pre class="programlisting">
+const char* ui_info =
+  "&lt;interface&gt;"
+  "  &lt;menu id='menubar'&gt;"
+  "    &lt;submenu&gt;"
+  "      &lt;attribute name='label' translatable='yes'&gt;_File&lt;/attribute&gt;"
+  "      &lt;section&gt;"
+  "        &lt;item&gt;"
+  "          &lt;attribute name='label' translatable='yes'&gt;_New&lt;/attribute&gt;"
+  "          &lt;attribute name='action'&gt;example.new&lt;/attribute&gt;"
+  "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;n&lt;/attribute&gt;"
+  "        &lt;/item&gt;"
+  "      &lt;/section&gt;"
+  "      &lt;section&gt;"
+  "        &lt;item&gt;"
+  "          &lt;attribute name='label' translatable='yes'&gt;_Quit&lt;/attribute&gt;"
+  "          &lt;attribute name='action'&gt;example.quit&lt;/attribute&gt;"
+  "          &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;q&lt;/attribute&gt;"
+  "        &lt;/item&gt;"
+  "      &lt;/section&gt;"
+  "    &lt;/submenu&gt;"
+  "    &lt;submenu&gt;"
+  "      &lt;attribute name='label' translatable='yes'&gt;_Edit&lt;/attribute&gt;"
+  "      &lt;item&gt;"
+  "        &lt;attribute name='label' translatable='yes'&gt;_Copy&lt;/attribute&gt;"
+  "        &lt;attribute name='action'&gt;example.copy&lt;/attribute&gt;"
+  "        &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;c&lt;/attribute&gt;"
+  "      &lt;/item&gt;"
+  "      &lt;item&gt;"
+  "        &lt;attribute name='label' translatable='yes'&gt;_Paste&lt;/attribute&gt;"
+  "        &lt;attribute name='action'&gt;example.paste&lt;/attribute&gt;"
+  "        &lt;attribute name='accel'&gt;&amp;lt;Primary&amp;gt;v&lt;/attribute&gt;"
+  "      &lt;/item&gt;"
+  "    &lt;/submenu&gt;"
+  "  &lt;/menu&gt;"
+  "&lt;/interface&gt;";
+
+m_refBuilder-&gt;add_from_string(ui_info);
+m_refBuilder-&gt;add_from_resource("/toolbar/toolbar.glade");
+</pre>
+<p>This is where we specify the names of the menu items as they will be seen
+by users in the menu. Therefore, this is where you should make strings
+translatable, by adding <code class="literal">translatable='yes'</code>.
+</p>
+<p>
+To instantiate a <code class="classname">Gtk::MenuBar</code> and
+<code class="classname">Gtk::Toolbar</code> which you can actually show, you should use
+the <code class="methodname">Builder::get_object()</code> and
+<code class="methodname">Builder::get_widget()</code> methods, and then add the widgets
+to a container. For instance:
+</p>
+<pre class="programlisting">
+Glib::RefPtr&lt;Glib::Object&gt; object = m_refBuilder-&gt;get_object("menubar");
+Glib::RefPtr&lt;Gio::Menu&gt; gmenu = Glib::RefPtr&lt;Gio::Menu&gt;::cast_dynamic(object);
+Gtk::MenuBar* pMenuBar = Gtk::make_managed&lt;Gtk::MenuBar&gt;(gmenu);
+m_Box.pack_start(*pMenuBar, Gtk::PACK_SHRINK);
+
+Gtk::Toolbar* toolbar = nullptr;
+m_refBuilder-&gt;get_widget("toolbar", toolbar);
+m_Box.pack_start(*toolbar, Gtk::PACK_SHRINK);
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-menus-and-toolbars.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-menus-and-toolbars.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-menus-popup.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 12. Menus and Toolbars </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Popup Menus</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

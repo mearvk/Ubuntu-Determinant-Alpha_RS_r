@@ -1,0 +1,190 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Examples</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-textview.html" title="Chapter 11. TextView">
+<link rel="prev" href="sec-widgets-and-childanchors.html" title="Widgets and ChildAnchors">
+<link rel="next" href="chapter-menus-and-toolbars.html" title="Chapter 12. Menus and Toolbars">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Examples</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-widgets-and-childanchors.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 11. TextView</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-menus-and-toolbars.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-textview-examples"></a>Examples</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="textview-example-simple"></a>Simple Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-textview"></a><p class="title"><b>Figure 11.1. TextView</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/textview.png" alt="TextView"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/textview/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+
+  void fill_buffers();
+
+  //Signal handlers:
+  void on_button_quit();
+  void on_button_buffer1();
+  void on_button_buffer2();
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TextView m_TextView;
+
+  Glib::RefPtr&lt;Gtk::TextBuffer&gt; m_refTextBuffer1, m_refTextBuffer2;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit, m_Button_Buffer1, m_Button_Buffer2;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_Quit("_Quit", true),
+  m_Button_Buffer1("Use buffer 1"),
+  m_Button_Buffer2("Use buffer 2")
+{
+  set_title("Gtk::TextView example");
+  set_border_width(5);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the TreeView, inside a ScrolledWindow, with the button underneath:
+  m_ScrolledWindow.add(m_TextView);
+
+  //Only show the scrollbars when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+
+  //Add buttons:
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Buffer1, Gtk::PACK_SHRINK);
+  m_ButtonBox.pack_start(m_Button_Buffer2, Gtk::PACK_SHRINK);
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(5);
+  m_ButtonBox.set_spacing(5);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+
+  //Connect signals:
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+  m_Button_Buffer1.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_buffer1) );
+  m_Button_Buffer2.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_buffer2) );
+
+  fill_buffers();
+  on_button_buffer1();
+
+  show_all_children();
+}
+
+void ExampleWindow::fill_buffers()
+{
+  m_refTextBuffer1 = Gtk::TextBuffer::create();
+  m_refTextBuffer1-&gt;set_text("This is the text from TextBuffer #1.");
+
+  m_refTextBuffer2 = Gtk::TextBuffer::create();
+  m_refTextBuffer2-&gt;set_text(
+          "This is some alternative text, from TextBuffer #2.");
+
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void ExampleWindow::on_button_buffer1()
+{
+  m_TextView.set_buffer(m_refTextBuffer1);
+}
+
+void ExampleWindow::on_button_buffer2()
+{
+  m_TextView.set_buffer(m_refTextBuffer2);
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-widgets-and-childanchors.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-textview.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-menus-and-toolbars.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Widgets and ChildAnchors </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 12. Menus and Toolbars</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

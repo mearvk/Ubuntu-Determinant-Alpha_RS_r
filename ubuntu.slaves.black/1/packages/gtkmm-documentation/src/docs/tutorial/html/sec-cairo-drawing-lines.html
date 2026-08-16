@@ -1,0 +1,450 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Drawing Straight Lines</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="prev" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="next" href="sec-cairo-curved-lines.html" title="Drawing Curved Lines">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Drawing Straight Lines</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-drawingarea.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 17. The Drawing Area Widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-cairo-curved-lines.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-cairo-drawing-lines"></a>Drawing Straight Lines</h2></div></div></div>
+<p>
+        Now that we understand the basics of the Cairo graphics library, we're
+        almost ready to start drawing. We'll start with the simplest of
+        drawing elements: the straight line. But first you need to know a
+        little bit about Cairo's coordinate system. The origin of the Cairo
+        coordinate system is located in the upper-left corner of the window
+        with positive x values to the right and positive y values going down.
+        </p>
+<div class="tip" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Tip">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Tip]" src="icons/tip.png"></td>
+<th align="left">Tip</th>
+</tr>
+<tr><td align="left" valign="top"><p>Since the Cairo graphics library was written with support for
+            multiple output targets (the X window system, PNG images, OpenGL,
+            etc), there is a distinction between user-space and device-space
+            coordinates. The mapping between these two coordinate systems
+            defaults to one-to-one so that integer values map roughly to pixels
+            on the screen, but this setting can be adjusted if desired.
+            Sometimes it may be useful to scale the coordinates so that the
+            full width and height of a window both range from 0 to 1 (the 'unit
+            square') or some other mapping that works for your application.
+            This can be done with the
+            <code class="methodname">Cairo::Context::scale()</code> function.</p></td></tr>
+</table></div>
+<p>
+    </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="cairo-example-lines"></a>Example</h3></div></div></div>
+<p>
+        In this example, we'll construct a small but fully functional <span class="application">gtkmm</span>
+        program and draw some lines into the window. The lines are drawn by
+        creating a path and then stroking it. A path is created using the
+        functions <code class="methodname">Cairo::Context::move_to()</code> and
+        <code class="methodname">Cairo::Context::line_to()</code>. The function
+        <code class="methodname">move_to()</code> is similar to the act of lifting your
+        pen off of the paper and placing it somewhere else -- no line is drawn
+        between the point you were at and the point you moved to. To draw a
+        line between two points, use the <code class="methodname">line_to()</code>
+        function.
+    </p>
+<p>
+        After you've finished creating your path, you still haven't
+        drawn anything visible yet. To make the path visible, you must use the
+        function <code class="methodname">stroke()</code> which will stroke the current
+        path with the line width and style specified in your
+        <code class="classname">Cairo::Context</code> object. After stroking, the
+        current path will be cleared so that you can start on your next path.
+    </p>
+<div class="tip" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Tip">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Tip]" src="icons/tip.png"></td>
+<th align="left">Tip</th>
+</tr>
+<tr><td align="left" valign="top"><p>Many Cairo drawing functions have a <code class="methodname">_preserve()</code>
+            variant. Normally drawing functions such as
+            <code class="methodname">clip()</code>, <code class="methodname">fill()</code>, or
+            <code class="methodname">stroke()</code> will clear the current path. If you
+            use the <code class="methodname">_preserve()</code> variant, the current path
+            will be retained so that you can use the same path with the next
+            drawing function.</p></td></tr>
+</table></div>
+<div class="figure">
+<a name="figure-drawingarea-lines"></a><p class="title"><b>Figure 17.1. Drawing Area - Lines</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drawingarea_lines.png" alt="Drawing Area - Lines"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/simple?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">myarea.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_MYAREA_H
+#define GTKMM_EXAMPLE_MYAREA_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class MyArea : public Gtk::DrawingArea
+{
+public:
+  MyArea();
+  virtual ~MyArea();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+};
+
+#endif // GTKMM_EXAMPLE_MYAREA_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+int main(int argc, char** argv)
+{
+   auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+   Gtk::Window win;
+   win.set_title("DrawingArea");
+
+   MyArea area;
+   win.add(area);
+   area.show();
+
+   return app-&gt;run(win);
+}
+</pre>
+<p>File: <code class="filename">myarea.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;cairomm/context.h&gt;
+
+MyArea::MyArea()
+{
+}
+
+MyArea::~MyArea()
+{
+}
+
+bool MyArea::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+
+  // coordinates for the center of the window
+  int xc, yc;
+  xc = width / 2;
+  yc = height / 2;
+
+  cr-&gt;set_line_width(10.0);
+
+  // draw red lines out from the center of the window
+  cr-&gt;set_source_rgb(0.8, 0.0, 0.0);
+  cr-&gt;move_to(0, 0);
+  cr-&gt;line_to(xc, yc);
+  cr-&gt;line_to(0, height);
+  cr-&gt;move_to(xc, yc);
+  cr-&gt;line_to(width, yc);
+  cr-&gt;stroke();
+
+  return true;
+}
+</pre>
+<p>
+        This program contains a single class, <code class="classname">MyArea</code>,
+        which is a subclass of <code class="classname">Gtk::DrawingArea</code> and
+        contains an <code class="methodname">on_draw()</code> member function.
+        This function is called whenever the image in the drawing area needs to
+        be redrawn. It is passed a <code class="classname">Cairo::RefPtr</code>
+        pointer to a <code class="classname">Cairo::Context</code> that we use
+        for the drawing.
+        The actual drawing code sets the color we want to use for drawing by
+        using <code class="methodname">set_source_rgb()</code> which takes arguments
+        defining the Red, Green, and Blue components of the desired color
+        (valid values are between 0 and 1). After setting the color, we
+        created a new path using the functions <code class="methodname">move_to()</code>
+        and <code class="methodname">line_to()</code>, and then stroked this path with
+        <code class="methodname">stroke()</code>.
+    </p>
+<div class="tip" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Tip: Drawing with relative coordinates">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Tip]" src="icons/tip.png"></td>
+<th align="left">Drawing with relative coordinates</th>
+</tr>
+<tr><td align="left" valign="top"><p>In the example above we drew everything using absolute coordinates. You can also draw using
+        relative coordinates. For a straight line, this is done with the
+        function <code class="methodname">Cairo::Context::rel_line_to()</code>.</p></td></tr>
+</table></div>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="cairo-line-styles"></a>Line styles</h3></div></div></div>
+<p>
+            In addition to drawing basic straight lines, there are a number of
+            things that you can customize about a line. You've already seen
+            examples of setting a line's color and width, but there are others
+            as well.
+        </p>
+<p>
+            If you've drawn a series of lines that form a path, you may
+            want them to join together in a certain way. Cairo offers
+            three different ways to join lines together: Miter, Bevel, and
+            Round. These are show below:
+        </p>
+<div class="figure">
+<a name="figure-cairo-joins"></a><p class="title"><b>Figure 17.2. Different join types in Cairo</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/cairo_joins.png" alt="Different join types in Cairo"></div></div></div>
+</div>
+<br class="figure-break"><p>
+            The line join style is set using the function
+            <code class="methodname">Cairo::Context::set_line_join()</code>.
+        </p>
+<p>
+            Line ends can have different styles as well. The default style
+            is for the line to start and stop exactly at the destination
+            points of the line. This is called a Butt cap. The other
+            options are Round (uses a round ending, with the center of the
+            circle at the end point) or Square (uses a squared ending, with
+            the center of the square at the end point). This setting is set
+            using the function
+            <code class="methodname">Cairo::Context::set_line_cap()</code>.
+        </p>
+<p>
+            There are other things you can customize as well, including
+            creating dashed lines and other things. For more information, see
+            the Cairo API documentation.
+        </p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-cairo-thin-lines"></a>Drawing thin lines</h3></div></div></div>
+<p>
+        If you try to draw one pixel wide lines, you may notice that the line
+        sometimes comes up blurred and wider than it ought to be.
+        This happens because Cairo will try to draw from the selected position,
+        to both sides (half to each), so if you're positioned right on the
+        intersection of the pixels, and want a one pixel wide line, Cairo will try
+        to use half of each adjacent pixel, which isn't possible (a pixel is the
+        smallest unit possible). This happens when the width of the line is an
+        odd number of pixels (not just one pixel).
+      </p>
+<p>
+        The trick is to position in the middle of the pixel where you want the
+        line to be drawn, and thus guaranteeing you get the desired results.
+        See <a class="ulink" href="http://cairographics.org/FAQ/#sharp_lines" target="_top">Cairo FAQ</a>.
+      </p>
+<div class="figure">
+<a name="figure-drawingarea-thin-lines"></a><p class="title"><b>Figure 17.3. Drawing Area - Thin Lines</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drawingarea_thin_lines.png" alt="Drawing Area - Thin Lines"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/thin_lines?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm/window.h&gt;
+#include &lt;gtkmm/grid.h&gt;
+#include &lt;gtkmm/checkbutton.h&gt;
+#include "myarea.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_toggled();
+
+private:
+  Gtk::Grid m_Container;
+  MyArea m_Area_Lines;
+  Gtk::CheckButton m_Button_FixLines;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">myarea.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_MYAREA_H
+#define GTKMM_EXAMPLE_MYAREA_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class MyArea : public Gtk::DrawingArea
+{
+public:
+  MyArea();
+  virtual ~MyArea();
+
+  void fix_lines(bool fix = true);
+  void force_redraw();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+
+private:
+  double m_fix;
+};
+
+#endif // GTKMM_EXAMPLE_MYAREA_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char* argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">myarea.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+
+MyArea::MyArea()
+: m_fix (0)
+{
+  set_size_request (200, 100);
+}
+
+MyArea::~MyArea()
+{
+}
+
+bool MyArea::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+
+  cr-&gt;set_line_width(1.0);
+
+  // draw one line, every two pixels
+  // without the 'fix', you won't notice any space between the lines,
+  // since each one will occupy two pixels (width)
+  for (int i = 0; i &lt; width; i += 2)
+  {
+    cr-&gt;move_to(i + m_fix, 0);
+    cr-&gt;line_to(i + m_fix, height);
+  }
+
+  cr-&gt;stroke();
+
+  return true;
+}
+
+// Toogle between both values (0 or 0.5)
+void MyArea::fix_lines(bool fix)
+{
+  // to get the width right, we have to draw in the middle of the pixel
+  m_fix = fix ? 0.5 : 0.0;
+
+  force_redraw();
+}
+
+// force the redraw of the image
+void MyArea::force_redraw()
+{
+  auto win = get_window();
+  if (win)
+  {
+    Gdk::Rectangle r(0, 0, get_allocation().get_width(), get_allocation().get_height());
+    win-&gt;invalidate_rect(r, false);
+  }
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_Button_FixLines("Fix lines")
+{
+  set_title("Thin lines example");
+
+  m_Container.set_orientation(Gtk::ORIENTATION_HORIZONTAL);
+
+  m_Container.add(m_Area_Lines);
+  m_Container.add(m_Button_FixLines);
+
+  add(m_Container);
+
+  m_Button_FixLines.signal_toggled().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_button_toggled));
+
+  // Synchonize the drawing in m_Area_Lines with the state of the toggle button.
+  on_button_toggled();
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_toggled()
+{
+  m_Area_Lines.fix_lines(m_Button_FixLines.get_active());
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-drawingarea.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-drawingarea.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-cairo-curved-lines.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 17. The Drawing Area Widget </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Drawing Curved Lines</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

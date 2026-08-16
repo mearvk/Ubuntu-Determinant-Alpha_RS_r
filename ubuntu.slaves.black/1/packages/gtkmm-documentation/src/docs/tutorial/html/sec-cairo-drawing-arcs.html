@@ -1,0 +1,248 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Drawing Arcs and Circles</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="prev" href="sec-cairo-curved-lines.html" title="Drawing Curved Lines">
+<link rel="next" href="sec-drawing-text.html" title="Drawing Text">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Drawing Arcs and Circles</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-cairo-curved-lines.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 17. The Drawing Area Widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-drawing-text.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-cairo-drawing-arcs"></a>Drawing Arcs and Circles</h2></div></div></div>
+<p>
+          With Cairo, the same function is used to draw arcs, circles, or
+          ellipses: <code class="methodname">Cairo::Context::arc()</code>. This function
+          takes five arguments. The first two are the coordinates of the
+          center point of the arc, the third argument is the radius of the arc,
+          and the final two arguments define the start and end angle of the
+          arc. All angles are defined in radians, so drawing a circle is the
+          same as drawing an arc from 0 to 2 * M_PI radians.
+          An angle of 0 is in the direction of the positive X axis (in user-space). An
+          angle of M_PI/2 radians (90 degrees) is in the direction of the positive Y axis
+          (in user-space). Angles increase in the direction from the positive X axis
+          toward the positive Y axis. So with the default transformation matrix, angles
+          increase in a clockwise direction. (Remember that the positive Y axis
+          points downwards.)
+      </p>
+<p>
+          To draw an ellipse, you can scale the current transformation matrix
+          by different amounts in the X and Y directions. For example, to draw
+          an ellipse with center at <code class="varname">x</code>, <code class="varname">y</code>
+          and size <code class="varname">width</code>, <code class="varname">height</code>:
+
+          </p>
+<pre class="programlisting">context-&gt;save();
+context-&gt;translate(x, y);
+context-&gt;scale(width / 2.0, height / 2.0);
+context-&gt;arc(0.0, 0.0, 1.0, 0.0, 2 * M_PI);
+context-&gt;restore();</pre>
+<p>
+      </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="cairo-example-arcs"></a>Example</h3></div></div></div>
+<p>
+              Here's an example of a simple program that draws an arc, a circle
+              and an ellipse into a drawing area.
+          </p>
+<div class="figure">
+<a name="figure-drawingarea-arc"></a><p class="title"><b>Figure 17.5. Drawing Area - Arcs</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drawingarea_arcs.png" alt="Drawing Area - Arcs"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/arcs?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">myarea.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_MYAREA_H
+#define GTKMM_EXAMPLE_MYAREA_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class MyArea : public Gtk::DrawingArea
+{
+public:
+  MyArea();
+  virtual ~MyArea();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+};
+
+#endif // GTKMM_EXAMPLE_MYAREA_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+int main(int argc, char** argv)
+{
+   auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+   Gtk::Window win;
+   win.set_title("DrawingArea");
+
+   MyArea area;
+   win.add(area);
+   area.show();
+
+   return app-&gt;run(win);
+}
+</pre>
+<p>File: <code class="filename">myarea.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;cairomm/context.h&gt;
+#include &lt;cmath&gt;
+
+MyArea::MyArea()
+{
+}
+
+MyArea::~MyArea()
+{
+}
+
+bool MyArea::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  // This is where we draw on the window
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+  const int lesser = MIN(width, height);
+
+  // coordinates for the center of the window
+  int xc, yc;
+  xc = width / 2;
+  yc = height / 2;
+
+  cr-&gt;set_line_width(lesser * 0.02);  // outline thickness changes
+                                      // with window size
+
+  // first draw a simple unclosed arc
+  cr-&gt;save();
+  cr-&gt;arc(width / 3.0, height / 4.0, lesser / 4.0, -(M_PI / 5.0), M_PI);
+  cr-&gt;close_path();   // line back to start point
+  cr-&gt;set_source_rgb(0.0, 0.8, 0.0);
+  cr-&gt;fill_preserve();
+  cr-&gt;restore();  // back to opaque black
+  cr-&gt;stroke();   // outline it
+
+  // now draw a circle
+  cr-&gt;save();
+  cr-&gt;arc(xc, yc, lesser / 4.0, 0.0, 2.0 * M_PI); // full circle
+  cr-&gt;set_source_rgba(0.0, 0.0, 0.8, 0.6);    // partially translucent
+  cr-&gt;fill_preserve();
+  cr-&gt;restore();  // back to opaque black
+  cr-&gt;stroke();
+
+  // and finally an ellipse
+  double ex, ey, ew, eh;
+  // center of ellipse
+  ex = xc;
+  ey = 3.0 * height / 4.0;
+  // ellipse dimensions
+  ew = 3.0 * width / 4.0;
+  eh = height / 3.0;
+
+  cr-&gt;save();
+
+  cr-&gt;translate(ex, ey);  // make (ex, ey) == (0, 0)
+  cr-&gt;scale(ew / 2.0, eh / 2.0);  // for width: ew / 2.0 == 1.0
+                                  // for height: eh / 2.0 == 1.0
+
+  cr-&gt;arc(0.0, 0.0, 1.0, 0.0, 2 * M_PI);  // 'circle' centered at (0, 0)
+                                          // with 'radius' of 1.0
+
+  cr-&gt;set_source_rgba(0.8, 0.0, 0.0, 0.7);
+  cr-&gt;fill_preserve();
+  cr-&gt;restore();  // back to opaque black
+  cr-&gt;stroke();
+
+  return true;
+}
+</pre>
+<p>
+              There are a couple of things to note about this example code.
+              Again, the only real difference between this example and the
+              previous ones is the <code class="methodname">on_draw()</code>
+              function, so we'll limit our focus to that function. In
+              addition, the first part of the function is nearly identical to
+              the previous examples, so we'll skip that portion.
+          </p>
+<p>
+              Note that in this case, we've expressed nearly everything in
+              terms of the height and width of the window, including the width
+              of the lines. Because of this, when you resize the window,
+              everything scales with the window. Also note that there are
+              three drawing sections in the function and each is wrapped with a
+              <code class="methodname">save()</code>/<code class="methodname">restore()</code> pair
+              so that we're back at a known state after each drawing.
+          </p>
+<p>
+              The section for drawing an arc introduces one new function,
+              <code class="methodname">close_path()</code>. This function will in effect
+              draw a straight line from the current point back to the first
+              point in the path. There is a significant difference between
+              calling <code class="methodname">close_path()</code> and manually drawing a
+              line back to the starting point, however. If you use
+              <code class="methodname">close_path()</code>, the lines will be nicely
+              joined together. If you use <code class="methodname">line_to()</code>
+              instead, the lines will end at the same point, but Cairo won't do
+              any special joining.
+          </p>
+<div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note: Drawing counter-clockwise">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="icons/note.png"></td>
+<th align="left">Drawing counter-clockwise</th>
+</tr>
+<tr><td align="left" valign="top"><p>
+                  The function
+                  <code class="methodname">Cairo::Context::arc_negative()</code> is
+                  exactly the same as
+                  <code class="methodname">Cairo::Context::arc()</code> but the angles go
+                  the opposite direction.
+              </p></td></tr>
+</table></div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-cairo-curved-lines.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-drawingarea.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-drawing-text.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Drawing Curved Lines </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Drawing Text</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

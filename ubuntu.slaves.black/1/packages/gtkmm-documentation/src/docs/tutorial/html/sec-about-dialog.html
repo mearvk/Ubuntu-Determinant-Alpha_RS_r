@@ -1,0 +1,214 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Non-modal AboutDialog</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-dialogs.html" title="Chapter 16. Dialogs">
+<link rel="prev" href="sec-font-chooser-dialog.html" title="FontChooserDialog">
+<link rel="next" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Non-modal AboutDialog</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-font-chooser-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 16. Dialogs</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-drawingarea.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-about-dialog"></a>Non-modal AboutDialog</h2></div></div></div>
+<p>
+The <code class="classname">AboutDialog</code> offers a simple way to display information
+about a program, like its logo, name, copyright, website and license.
+</p>
+<p>
+Most dialogs in this chapter are modal, that is, they freeze the rest of
+the application while they are shown. It's also possible to create a non-modal
+dialog, which does not freeze other windows in the application.
+The following example shows a non-modal <code class="classname">AboutDialog</code>. This is
+perhaps not the kind of dialog you would normally make non-modal, but non-modal
+dialogs can be useful in other cases. E.g. <span class="application">gedit</span>'s
+search-and-replace dialog is non-modal.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1AboutDialog.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="aboutdialog-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-dialogs-about"></a><p class="title"><b>Figure 16.5. AboutDialog</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/dialogs_about.png" alt="AboutDialog"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/dialogs/aboutdialog?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_clicked();
+  void on_about_dialog_response(int response_id);
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  Gtk::Label m_Label;
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button;
+  Gtk::AboutDialog m_Dialog;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Label("The AboutDialog is non-modal. "
+    "You can select parts of this text while the AboutDialog is shown."),
+  m_ButtonBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button("Show AboutDialog")
+{
+  set_title("Gtk::AboutDialog example");
+
+  add(m_VBox);
+
+  m_VBox.pack_start(m_Label);
+  m_Label.set_line_wrap(true);
+  m_Label.set_selectable(true);
+
+  m_VBox.pack_start(m_ButtonBox);
+  m_ButtonBox.pack_start(m_Button);
+  m_Button.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_clicked) );
+
+  m_Dialog.set_transient_for(*this);
+
+  m_Dialog.set_logo(Gdk::Pixbuf::create_from_resource("/about/gtkmm_logo.gif", -1, 40, true));
+  m_Dialog.set_program_name("Example application");
+  m_Dialog.set_version("1.0.0");
+  m_Dialog.set_copyright("Murray Cumming");
+  m_Dialog.set_comments("This is just an example application.");
+  m_Dialog.set_license("LGPL");
+
+  m_Dialog.set_website("http://www.gtkmm.org");
+  m_Dialog.set_website_label("gtkmm website");
+
+  std::vector&lt;Glib::ustring&gt; list_authors;
+  list_authors.push_back("Murray Cumming");
+  list_authors.push_back("Somebody Else");
+  list_authors.push_back("AN Other");
+  m_Dialog.set_authors(list_authors);
+
+  m_Dialog.signal_response().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::on_about_dialog_response) );
+
+  show_all_children();
+
+  // The widget must be realized and mapped before grab_focus() is called.
+  // That's why it's called after show_all_children().
+  m_Button.grab_focus();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+
+}
+
+void ExampleWindow::on_about_dialog_response(int response_id)
+{
+  std::cout &lt;&lt; response_id
+    &lt;&lt; ", close=" &lt;&lt; Gtk::RESPONSE_CLOSE
+    &lt;&lt; ", cancel=" &lt;&lt; Gtk::RESPONSE_CANCEL
+    &lt;&lt; ", delete_event=" &lt;&lt; Gtk::RESPONSE_DELETE_EVENT
+    &lt;&lt; std::endl;
+
+  switch (response_id)
+  {
+  case Gtk::RESPONSE_CLOSE:
+  case Gtk::RESPONSE_CANCEL:
+  case Gtk::RESPONSE_DELETE_EVENT:
+    m_Dialog.hide();
+    break;
+  default:
+    std::cout &lt;&lt; "Unexpected response!" &lt;&lt; std::endl;
+    break;
+  }
+}
+
+void ExampleWindow::on_button_clicked()
+{
+  m_Dialog.show();
+
+  //Bring it to the front, in case it was already shown:
+  m_Dialog.present();
+}
+</pre>
+<p>File: <code class="filename">aboutdialog.gresource.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/about"&gt;
+    &lt;file&gt;gtkmm_logo.gif&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-font-chooser-dialog.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-dialogs.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-drawingarea.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">FontChooserDialog </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 17. The Drawing Area Widget</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

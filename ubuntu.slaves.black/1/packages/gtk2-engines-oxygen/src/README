@@ -1,0 +1,269 @@
+Oxygen-Gtk is a port of the default KDE widget theme (Oxygen), to gtk.
+
+It's primary goal is to ensure visual consistency between gtk and qt-based applications running under kde. A secondary objective is to also have a stand-alone nice looking gtk theme that would behave well on other Desktop Environments.
+
+Unlike other attempts made to port the kde oxygen theme to gtk, this attempt does not depend on Qt (via some Qt to Gtk conversion engine), nor does render the widget appearance via hard coded pixmaps, which otherwise breaks everytime some setting is changed in kde.
+
+Contents:
+---------
+
+I. Introduction
+
+II. Install
+
+III. Hacks
+III.1 ARGB support
+III.2 DBus support
+III.3 Window grabbing
+III.4 Window background
+III.5 GtkTreeView
+III.6 GtkScrolledWindow
+III.7 Button order in dialogs
+III.8 Mouse-over support
+III.9 Tab close buttons
+III.10 Combobox list resize
+III.11 Inner shadows
+
+IV. Technical details
+IV.1 Directories
+IV.2 Some details on some files in src
+IV.3 Some details on some files in animations
+
+V. Example configuration (aka: how to select the oxygen-gtk style)
+
+VI. How to determine oxygen-gtk version
+
+I. introduction
+---------------
+
+Oxygen-Gtk is a port of the default KDE widget theme (Oxygen) to GTK.
+
+Its primary goal is to ensure visual consistency between gtk-based and qt-based applications running under KDE. A secondary objective is to also have a stand-alone nice looking gtk theme that would behave well on other Desktop Environments.
+
+Unlike other attempts made to port the KDE oxygen theme to gtk, this attempt does not depend on Qt (via some Qt to Gtk conversion engine), nor does render the widget appearance via hard coded pixmaps, which otherwise breaks everytime some setting is changed in KDE.
+
+II. install
+-----------
+see the INSTALL file in top-level directory
+
+III. Hacks
+----------
+This section describes some of the hacks we used in oxygen-gtk to make the style match its Qt/Kde counterpart better.
+These details are given here because:
+
+- they might cause crashes or rendering glitches for some apps (at least until we fix it, once aware of it)
+- they might cause some widgets to behave differently from what application designers might have expected 
+
+III.1 ARGB support
+------------------
+
+Oxygen-gtk renders menus tooltips, drowdown lists, using ARGB (semi-transparent) colormaps. This is needed to have nice non-pixelated rounded corners, as in Oxygen-Qt, and semi-transparent background for tooltips, when compositing is enabled.
+
+Since release 1.0.2, only the colormap for the windows corresponding widgets mentionned above are modified. The colormap for all other windows (notably main windows and dialogs), are unchanged. Unlike with previous relieses of Oxygen-gtk, this now works for 99% of the applications (with firefox and company being the only exception we are aware of). 
+
+In case this still causes issues (typically: crashes, or menus not being rendered properly) for applications that we have not tested, we provide a way to black-list applications (so that ARGB support is not enabled). 
+
+The full list of black-listed applications is in rc/argb-apps.conf, and is usually installed at:
+
+  /usr/share/themes/oxygen-gtk/gtk-2.0/argb-apps.conf
+
+There is also a per-user config file usually in 
+
+  $HOME/.config/oxygen-gtk/argb-apps.conf
+
+This file will be parsed AFTER the system-wide one, thus allowing the user to override SOME or ALL of the rules set in the system-wide file. I.e., using "disable:all" as a first statement in the per-user config file will make system-wide one inactive.
+
+It can be edited by the user to add (or remove) new applications in case we overlooked some. 
+The syntax used to add/remove an application in the black-list is described in the argb-apps.conf file.
+When there is a need to add new applications, user should also post it in this bug: https://bugs.kde.org/show_bug.cgi?id=260640 so that it also gets added in the distributed code.
+
+There are some environment variables to help debug ARGB hack:
+
+  OXYGEN_DISABLE_ARGB_HACK - set it to 1 to check if app will crash without the hack. Oxygen-GTK will print app name to report.
+  OXYGEN_ARGB_DEBUG - set it to 1 to print all debug information concerning ARGB hack (mainly to debug blacklist logic).
+  OXYGEN_DISABLE_INNER_SHADOWS_HACK - set it to 1 to disable inner shadows hack, which might make some widgets render in a wrong way or not render at all
+
+III.2 DBus support
+------------------
+Provided that dbus-glib-1 is found on the system, oxygen-gtk is compiled with DBus support. This allows gtk applications to be updated automatically when kde (or oxygen) configuration is changed. This covers:
+- changing the color scheme
+- changing icon theme and sizes
+- changing oxygen style options, like the number and position of scrollbar arrows
+- ...
+
+The style still compiles (and runs) when dbus support is not found, but the feature above is missing, naturally.
+
+So far we have encountered no issue with this feature.
+
+III.3 Window grabbing
+---------------------
+
+Oxygen-gtk supports the oxygen-qt feature that one can grab a window from any empty area and move it around as one usually does from the window decoration. The detection of 'empty' areas is quite tedious, but works well for all the applications we have tested so far. It is based mostly on main windows (or dialogs) recieving mouse button press/release events, assuming that no other child widget had any use of such events and thus allowing oxygen-gtk to use such events for moving the window.
+
+It might unfortunately happen that some widgets (so far unknown to us) make use of a mouse button press/release events and still pass them to their parent window, in which case the window-grab feature will conflict with the widget's usage of the event.
+
+If this happens, user should 
+- disable window-grab (using the oxygen-qt's configuration tool; called 'oxygen-settings'), to be able to still use the faulty application
+- file a bug report and wait for the bug to be fixed.
+
+III.4 Window background
+-----------------------
+
+Oxygen uses gradients for windows and menus background (there is a linear vertical gradient, and a radial gradient at the center of the window's top part) that match the window decoration's background. Some widgets however, paint their own flat background, without any possibility for the style to overwrite these, which results in plain flat squares being painted in the middle of the otherwise well-matched background. 
+
+Unfortunately in most cases, there is not much we can do about it. This is most likely either a missing feature on the gtk style (letting the style render the widget's background), or an ill-design of the widget itself.
+
+III.5 GtkTreeView
+-----------------
+
+Tree-lines are rendered by default on all tree-views (unless it is disabled in oxygen-qt's configuration tool).
+However, in order to have 'solid' grey lines instead of dotted black lines (provided by Gtk, with no way for the style to change it), we completely rewrote the tree-line drawing code (and disabled Gtk's equivalent code). This also allowed us to change the placement of the tree expander and the lines, so that they match Qt. 
+So far we have encountered no issue with this feature.
+
+III.6 GtkScrolledWindow
+-----------------------
+
+For scrolled windows that contain a GtkTreeView, we force the frame to be sunken. This is consistent with Qt, and allows us to properly render mouse-over and focus effects on such lists. There might be some specific widget's layouts however for which this results in rendering glitches (for instance, two sunken frames one embedded in the other). If you observe such things, please report and we'll fix. 
+
+III.7 Button order in dialogs
+-----------------------------
+
+We changed the button order in dialogs so that it matches the Qt convention. Notably, "accept" buttons are usually located 'left-of' "cancel" buttons. This choice was driven to improve consistency accross applications, although it might disorient Gnome users.
+
+III.8 Mouse-over support
+------------------------
+
+We added mouse-over support (that is: highlight when mouse pointer enters the widget) for a number of widgets for which gtk did not support it. This is notably the case for: GtkTreeView, GtkEntry, GtkNoteBook. This is achieved by watching enter/leave and mouse-move events for such widgets and some of their children. To our knowledge there is no remaining issue with this feature.
+
+III.9 Tab close buttons
+-----------------------
+
+GTK notebook doesn't provide a standard way for apps to put close buttons on tabs. Because of this, close buttons in different apps are implemented differently. Oxygen-gtk hides such buttons' icons/text, and draws Qt close button images instead. But there's no way of detecting if the button is really _close_ one. So, current implementation may break apps which have some additional buttons in the tabs. If you find such apps with multiple buttons on single tab (which all look like close buttons) when using oxygen-gtk, file a bug report.
+
+III.10 Combobox list resize
+---------------------------
+
+We haven't figured out any way to draw combobox button glow outside of the button widget, so the button is drawn reduced by glow dimensions. This leads to combobox list not match button in size (it's 6px wider than the button). To make popped-up combobox look nicer, we resize it on each popup.
+This may result in flicker, so if it's undesirable, this hack can be disabled this in CMakeLists.txt: set ENABLE_COMBOBOX_LIST_RESIZE to 0 instead of default 1.
+
+III.11 Inner shadows
+--------------------
+
+To implement inner shadows so that they get inside their child windows, we make children windows composited (gdk_window_set_composited()).
+This may lead to inexpected effects such as not rendered (or rendered as garbage) children of GtkScrolledWindow and GtkViewport.
+Currently no such problems are known.
+To disable this hack, set ENABLE_INNER_SHADOWS_HACK to 0 in CMakeLists.txt.
+
+Note: this feature requires gtk version 2.24.2 or later.
+
+
+IV. Technical details
+---------------------
+
+Oxygen-Gtk is written in c++ (but makes only 'c' style calls to Gtk methods).
+This section provides some details about the files and classes structure of oxygen-gtk.
+
+IV.1. Directories:
+------------------
+
+rc/ contains 'default' configuration files
+src/ contains all the source code.
+src/animations/ contains code needed for hover/focus effects, and will contain code for smooth animations. 
+It connects to various widgets signals and events to setup and trigger widget updates when appropriate conditions are fullfilled.
+
+IV.2. Some details on some files in src/
+----------------------------------------
+
+oxygenrcstyle:
+oxygenstylewrapper: 
+are the core gtk style files. Oxygenstylewrapper wraps all gtk painting calls to oxygenstyle singleton painting class.
+
+oxygenstyle:
+does all the painting, as called by oxygenstylewrapper
+
+oxygenstylehelper: 
+contains some lower level painting classes, that depend on cairo context, and not on gtk windows/widgets any more. It is also responsible for generating the tilesets.
+
+oxygentileset:
+stores 3x3 pixmap array to handle scalable widgets, similar to what KDE/plasma does (as well as oxygen-qt)
+These tilesets are cached using home-made stl-based cache containers can be cached.
+
+oxygenwindowmanager: handles window grabbing
+
+oxygenrgba:
+stores rgba color representation and has some conversion utility functions, mostly imported from KDE/Qt.
+
+oxygencolorutils:
+all color handling, used to shade, mix, blend, etc. It is based on code in oxygen-qt and kde/kdelibs/kdeui kcolorutils and kcolorscheme.
+
+oxygenpalette: 
+internal storage of colors. It extends the colors used by gdk and passed via gtkstyle
+
+oxygenqtsettings:
+does all the handling of Qt/Kde options, and conversion to gtk options where needed
+
+oxygengtkicons:
+is responsible for mapping/replacing gtk icons by oxygen icons. This is largely inspired from QtCurve-gtk
+
+utility files/classes:
+oxygengeometry.h: some low-level geometry classes
+oxygencairocontext: a self-freed wrapper around cairo_context_t;
+oxygencairopattern: a self-freed wrapper around cairo_pattern_t;
+oxygencache: some stl based implementation of a fifo cache and a mru cache;
+oxygencairoutils: some cairo/gdk-cairo utilities 
+oxygengtkdetail: wrapper around the 'detail' strings passed to painting routines
+oxygengtkutils: some widget/window ancestry tree navigation utility functions.
+oxygenflags: generic utility class to handle enumeration based bit patterns, inspired from the QFlag Qt class.
+oxygentaboptions: stores options relevant for tab rendering in notebooks.
+oxygenstyleoptions: stores generic options for widget rendering, based on their state, shadow, etc.
+
+IV.3. some details on some files in animations/
+-----------------------------------------------
+
+All types of animations (mostly mouse-over effects for the moment) have two classes:
+- a Data class, that stores widget specific information on a per widget basis
+- an Engine class, that collects all Data objects and map them to their matching GtkWidget. When a GtkWidget is destroyed, the corresponding entry in the map is removed. 
+
+All engines are stored inside the oxygenanimations class, and owned by it.
+All engines must derive from Oxygen::BaseEngine, to be stored inside Animations.
+For convenience and to minimize redundant code, an Oxygen::GenericEngine class is used as a base class for most engines.
+
+For a "Data" object to be used in an engine, it must contain a "::connect(GtkWidget*)" and a "::disconnect(GtkWidget*)" class. 
+These two methods are responsible for the initialization and clean-up of the Data object.
+
+utility files/classes:
+oxygendatamap: 
+keeps track of association between widgets and data objects. It also keeps track of the last accessed widget, in case it is re-used immediately; for optimization.
+
+oxygentimer:
+a convenience class to handle delayed actions.
+
+oxygensignal: 
+a convenience class to handle signal/callback connections and disconnections.
+
+V. Example configuration (aka: how to select the oxygen-gtk style)
+------------------------------------------------------------------
+Below is a 'sample' .gtkrc-2.0 file used to select oxygen-gtk for a style. 
+For kde users this should be copied to $HOME/.gtkrc-2.0-kde
+For others, in $HOME/.gtkrc-2.0 (or make a soft-link to the file above).
+It is provided here without any warranty, and users should backup their old config file before modifying.
+It is unclear whether this file will work for all configurations, all desktop environments and all systems (your distribution and DM would know better). On the other hand it has worked (by experience) in many cases.
+
+----- begin of file ------
+include "/usr/share/themes/oxygen-gtk/gtk-2.0/gtkrc"
+
+style "user-font"
+{
+	font_name="Sans Serif"
+}
+widget_class "*" style "user-font"
+
+gtk-theme-name="oxygen-gtk"
+gtk-font-name="Sans Serif 8"
+----- end of file -----
+
+VI. How to determine oxygen-gtk version
+---------------------------------------
+If you have installed oxygen-gtk from source, then deleted the sources, you can still determine oxygen-gtk version when needed using either of these commands:
+oxygen-gtk-demo --version
+oxygen-gtk-deco --version

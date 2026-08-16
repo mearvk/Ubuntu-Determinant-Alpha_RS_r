@@ -1,0 +1,558 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 28. Custom Widgets</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-i18n-getting-help-with-translations.html" title="Getting help with translations">
+<link rel="next" href="sec-custom-widgets.html" title="Custom Widgets">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 28. Custom Widgets</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-i18n-getting-help-with-translations.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-custom-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-customwidgets"></a>Chapter 28. Custom Widgets</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-customwidgets.html#sec-custom-containers">Custom Containers</a></span></li>
+<li><span class="sect1"><a href="sec-custom-widgets.html">Custom Widgets</a></span></li>
+</ul>
+</div>
+<p><span class="application">gtkmm</span> makes it very easy to derive new widgets by inheriting from an
+      existing widget class, either by deriving from a container and adding child
+      widgets, or by deriving from a single-item widget, and changing its behaviour.
+      But you might occasionally find that no suitable starting point already exists.
+      In this case, you can implement a widget from scratch.</p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-custom-containers"></a>Custom Containers</h2></div></div></div>
+<p>When deriving from <code class="classname">Gtk::Container</code>, you should override the following virtual methods:
+    </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p><code class="methodname">get_request_mode_vfunc()</code>: Return what <code class="literal">Gtk::SizeRequestMode</code> is preferred by the container.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_width_vfunc()</code>: Calculate the minimum and natural width of the container.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_height_vfunc()</code>: Calculate the minimum and natural height of the container.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_width_for_height_vfunc()</code>: Calculate the minimum and natural width of the container, if it would be given the specified height.</p></li>
+<li class="listitem"><p><code class="methodname">get_preferred_height_for_width_vfunc()</code>: Calculate the minimum and natural height of the container, if it would be given the specified width.</p></li>
+<li class="listitem"><p><code class="methodname">on_size_allocate()</code>: Position the child widgets, given the height and width that the container has actually been given.</p></li>
+<li class="listitem"><p><code class="methodname">forall_vfunc()</code>: Call the same callback for each of the children.</p></li>
+<li class="listitem"><p><code class="methodname">on_add()</code>: Add a child widget to the container.</p></li>
+<li class="listitem"><p><code class="methodname">on_remove()</code>: Remove a child widget from the container.</p></li>
+<li class="listitem"><p><code class="methodname">child_type_vfunc()</code>: Return what type of child can be added.</p></li>
+</ul></div>
+<p>
+    </p>
+<p>The <code class="methodname">get_request_mode_vfunc()</code>,
+        <code class="methodname">get_preferred_width_vfunc()</code>,
+        <code class="methodname">get_preferred_height_vfunc()</code>,
+        <code class="methodname">get_preferred_width_for_height_vfunc()</code>,
+        <code class="methodname">get_preferred_height_for_width_vfunc()</code>, and
+        <code class="methodname">on_size_allocate()</code> virtual methods control the
+        layout of the child widgets. For instance, if your container has 2
+        child widgets, with one below the other, your
+        <code class="methodname">get_request_mode_vfunc()</code> might request
+        height-for-width layout. Then your
+        <code class="methodname">get_preferred_width_vfunc()</code>
+        might report the maximum of the widths of the child widgets, and
+        <code class="methodname">get_preferred_height_for_width_vfunc()</code>
+        might report the sum of their heights. If you want padding between
+        the child widgets then you would add that to the width and height too.
+        Your widget's container will use this result to ensure that your widget
+        gets enough space, and not less. By examining each widget's parent, and
+        its parent, this logic will eventually decide the size of the top-level
+        window.</p>
+<p>You are not guaranteed to get the <code class="literal">Gtk::SizeRequestMode</code>
+        that you request. Therefore all four of the
+        <code class="methodname">get_preferred_xxx_vfunc()</code> methods must return
+        sensible values.</p>
+<p><code class="methodname">on_size_allocate()</code> receives the actual
+       height and width that the parent container has decided to give to your
+       widget. This might be more than the minimum, or even more than the natural
+       size, for instance if the
+       top-level window has been expanded. You might choose to ignore the extra
+       space and leave a blank area, or you might choose to expand your child
+       widgets to fill the space, or you might choose to expand the padding
+       between your widgets. It's your container, so you decide. Don't forget to
+       call <code class="methodname">set_allocation()</code> inside your
+       <code class="methodname">on_size_allocate()</code> implementation to actually use the
+       allocated space that has been offered by the parent container.</p>
+<p>Unless your container is a top-level window that derives from
+      <code class="classname">Gtk::Window</code>, you should probably also call
+      <code class="methodname">Gtk::Widget::set_has_window(false)</code> in your
+      constructor. This means that your container does not create its own
+      <code class="classname">Gdk::Window</code>, but uses its parent's
+      window. (Note the difference between <code class="classname">Gtk::Window</code>
+      and <code class="classname">Gdk::Window</code>.) If your container does need
+      its own <code class="classname">Gdk::Window</code>, and does not derive from
+      <code class="classname">Gtk::Window</code>, you must also override the
+      <code class="methodname">on_realize()</code> method as described in the
+      <a class="link" href="sec-custom-widgets.html" title="Custom Widgets">Custom Widgets</a> section.
+      And unless your container draws directly onto the underlying
+      <code class="classname">Gdk::Window</code>, you should probably call
+      <code class="methodname">set_redraw_on_allocate(false)</code> to improve
+      performance.</p>
+<p>By overriding <code class="methodname">forall_vfunc()</code> you can allow
+      applications to operate on all of the container's child widgets. For
+      instance, <code class="methodname">show_all_children()</code> uses this to find all
+      the child widgets and show them.</p>
+<p>Although your container might have its own method to set the child
+      widgets, you should still provide an implementation for the virtual
+      <code class="methodname">on_add()</code> and <code class="methodname">on_remove()</code>
+      methods from the base class, so that the add() and remove() methods will
+      do something appropriate if they are called.</p>
+<p>Your implementation of the <code class="methodname">child_type_vfunc()</code>
+      method should report the type of widget that may be added to your
+      container, if it is not yet full. This is usually
+      <code class="methodname">Gtk::Widget::get_type()</code> to indicate that the
+      container may contain any class derived from
+      <code class="classname">Gtk::Widget</code>. If the container may not contain any
+      more widgets, then this method should return
+      <code class="literal">G_TYPE_NONE</code>.</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="custom-container-example"></a>Example</h3></div></div></div>
+<p>This example implements a container with two child widgets, one above
+        the other. Of course, in this case it would be far simpler just to use
+        a vertical <code class="classname">Gtk::Box</code>.</p>
+<div class="figure">
+<a name="figure-custom-container"></a><p class="title"><b>Figure 28.1. Custom Container</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/custom_container.png" alt="Custom Container"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/custom/custom_container/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+#include "mycontainer.h"
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_quit();
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+  MyContainer m_MyContainer;
+  Gtk::Button m_Button_One;
+  Gtk::Label m_Label_Two;
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">mycontainer.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_CUSTOM_CONTAINER_MYCONTAINER_H
+#define GTKMM_CUSTOM_CONTAINER_MYCONTAINER_H
+
+#include &lt;gtkmm/container.h&gt;
+
+class MyContainer : public Gtk::Container
+{
+public:
+  MyContainer();
+  virtual ~MyContainer();
+
+  void set_child_widgets(Gtk::Widget&amp; child_one, Gtk::Widget&amp; child_two);
+
+protected:
+
+  //Overrides:
+  Gtk::SizeRequestMode get_request_mode_vfunc() const override;
+  void get_preferred_width_vfunc(int&amp; minimum_width, int&amp; natural_width) const override;
+  void get_preferred_height_for_width_vfunc(int width, int&amp; minimum_height, int&amp; natural_height) const override;
+  void get_preferred_height_vfunc(int&amp; minimum_height, int&amp; natural_height) const override;
+  void get_preferred_width_for_height_vfunc(int height, int&amp; minimum_width, int&amp; natural_width) const override;
+  void on_size_allocate(Gtk::Allocation&amp; allocation) override;
+
+  void forall_vfunc(gboolean include_internals, GtkCallback callback, gpointer callback_data) override;
+
+  void on_add(Gtk::Widget* child) override;
+  void on_remove(Gtk::Widget* child) override;
+  GType child_type_vfunc() const override;
+
+  Gtk::Widget* m_child_one;
+  Gtk::Widget* m_child_two;
+};
+
+#endif //GTKMM_CUSTOM_CONTAINER_MYCONTAINER_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">mycontainer.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include &lt;algorithm&gt; // std::max
+#include "mycontainer.h"
+
+MyContainer::MyContainer()
+: m_child_one(nullptr), m_child_two(nullptr)
+{
+  set_has_window(false);
+  set_redraw_on_allocate(false);
+}
+
+MyContainer::~MyContainer()
+{
+/*
+  // These calls to Gtk::Widget::unparent() are necessary if MyContainer is
+  // deleted before its children. But if you use a version of gtkmm where bug
+  // https://bugzilla.gnome.org/show_bug.cgi?id=605728
+  // has not been fixed (gtkmm 3.7.10 or earlier) and the children are deleted
+  // before the container, these calls can make the program crash.
+  // That's because on_remove() is not called, when the children are deleted.
+  if (m_child_one)
+    m_child_one-&gt;unparent();
+
+  if (m_child_two)
+    m_child_two-&gt;unparent();
+*/
+}
+
+void MyContainer::set_child_widgets(Gtk::Widget&amp; child_one,
+        Gtk::Widget&amp; child_two)
+{
+  m_child_one = &amp;child_one;
+  m_child_two = &amp;child_two;
+
+  m_child_one-&gt;set_parent(*this);
+  m_child_two-&gt;set_parent(*this);
+}
+
+//This example container is a simplified VBox with at most two children.
+Gtk::SizeRequestMode MyContainer::get_request_mode_vfunc() const
+{
+  return Gtk::SIZE_REQUEST_HEIGHT_FOR_WIDTH;
+}
+
+//Discover the total amount of minimum space and natural space needed by
+//this container and its children.
+void MyContainer::get_preferred_width_vfunc(int&amp; minimum_width, int&amp; natural_width) const
+{
+  int child_minimum_width[2] = {0, 0};
+  int child_natural_width[2] = {0, 0};
+
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+    m_child_one-&gt;get_preferred_width(child_minimum_width[0], child_natural_width[0]);
+
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+    m_child_two-&gt;get_preferred_width(child_minimum_width[1], child_natural_width[1]);
+
+  //Request a width equal to the width of the widest visible child.
+  minimum_width = std::max(child_minimum_width[0], child_minimum_width[1]);
+  natural_width = std::max(child_natural_width[0], child_natural_width[1]);
+}
+
+void MyContainer::get_preferred_height_for_width_vfunc(int width,
+   int&amp; minimum_height, int&amp; natural_height) const
+{
+  int child_minimum_height[2] = {0, 0};
+  int child_natural_height[2] = {0, 0};
+  int nvis_children = 0;
+
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+  {
+    ++nvis_children;
+    m_child_one-&gt;get_preferred_height_for_width(width, child_minimum_height[0],
+                                                child_natural_height[0]);
+  }
+
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+  {
+    ++nvis_children;
+    m_child_two-&gt;get_preferred_height_for_width(width, child_minimum_height[1],
+                                                child_natural_height[1]);
+  }
+
+  //The allocated height will be divided equally among the visible children.
+  //Request a height equal to the number of visible children times the height
+  //of the highest child.
+  minimum_height = nvis_children * std::max(child_minimum_height[0],
+                                            child_minimum_height[1]);
+  natural_height = nvis_children * std::max(child_natural_height[0],
+                                            child_natural_height[1]);
+}
+
+void MyContainer::get_preferred_height_vfunc(int&amp; minimum_height, int&amp; natural_height) const
+{
+  int child_minimum_height[2] = {0, 0};
+  int child_natural_height[2] = {0, 0};
+  int nvis_children = 0;
+
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+  {
+    ++nvis_children;
+    m_child_one-&gt;get_preferred_height(child_minimum_height[0], child_natural_height[0]);
+  }
+
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+  {
+    ++nvis_children;
+    m_child_two-&gt;get_preferred_height(child_minimum_height[1], child_natural_height[1]);
+  }
+
+  //The allocated height will be divided equally among the visible children.
+  //Request a height equal to the number of visible children times the height
+  //of the highest child.
+  minimum_height = nvis_children * std::max(child_minimum_height[0],
+                                            child_minimum_height[1]);
+  natural_height = nvis_children * std::max(child_natural_height[0],
+                                            child_natural_height[1]);
+}
+
+void MyContainer::get_preferred_width_for_height_vfunc(int height,
+   int&amp; minimum_width, int&amp; natural_width) const
+{
+  int child_minimum_width[2] = {0, 0};
+  int child_natural_width[2] = {0, 0};
+  int nvis_children = 0;
+
+  //Get number of visible children.
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+    ++nvis_children;
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+    ++nvis_children;
+
+  if(nvis_children &gt; 0)
+  {
+    //Divide the height equally among the visible children.
+    const int height_per_child = height / nvis_children;
+
+    if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+      m_child_one-&gt;get_preferred_width_for_height(height_per_child,
+                   child_minimum_width[0], child_natural_width[0]);
+
+    if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+      m_child_two-&gt;get_preferred_width_for_height(height_per_child,
+                   child_minimum_width[1], child_natural_width[1]);
+  }
+
+  //Request a width equal to the width of the widest child.
+  minimum_width = std::max(child_minimum_width[0], child_minimum_width[1]);
+  natural_width = std::max(child_natural_width[0], child_natural_width[1]);
+}
+
+void MyContainer::on_size_allocate(Gtk::Allocation&amp; allocation)
+{
+  //Do something with the space that we have actually been given:
+  //(We will not be given heights or widths less than we have requested, though
+  //we might get more.)
+
+  //Use the offered allocation for this container:
+  set_allocation(allocation);
+
+  //Get number of visible children.
+  int nvis_children = 0;
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+    ++nvis_children;
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+    ++nvis_children;
+
+  if(nvis_children &lt;= 0)
+    return;
+
+  //Assign space to the children:
+  Gtk::Allocation child_allocation_one;
+  Gtk::Allocation child_allocation_two;
+
+  //Place the first child at the top-left:
+  child_allocation_one.set_x( allocation.get_x() );
+  child_allocation_one.set_y( allocation.get_y() );
+
+  //Make it take up the full width available:
+  child_allocation_one.set_width( allocation.get_width() );
+
+  if(m_child_one &amp;&amp; m_child_one-&gt;get_visible())
+  {
+    //Divide the height equally among the visible children.
+    child_allocation_one.set_height( allocation.get_height() / nvis_children);
+    m_child_one-&gt;size_allocate(child_allocation_one);
+  }
+  else
+    child_allocation_one.set_height(0);
+
+  //Place the second child below the first child:
+  child_allocation_two.set_x( allocation.get_x() );
+  child_allocation_two.set_y( allocation.get_y() +
+          child_allocation_one.get_height());
+
+  //Make it take up the full width available:
+  child_allocation_two.set_width( allocation.get_width() );
+
+  //Make it take up the remaining height:
+  child_allocation_two.set_height( allocation.get_height() -
+          child_allocation_one.get_height());
+
+  if(m_child_two &amp;&amp; m_child_two-&gt;get_visible())
+    m_child_two-&gt;size_allocate(child_allocation_two);
+}
+
+void MyContainer::forall_vfunc(gboolean, GtkCallback callback, gpointer callback_data)
+{
+  if(m_child_one)
+    callback(m_child_one-&gt;gobj(), callback_data);
+
+  if(m_child_two)
+    callback(m_child_two-&gt;gobj(), callback_data);
+}
+
+void MyContainer::on_add(Gtk::Widget* child)
+{
+  if(!m_child_one)
+  {
+    m_child_one = child;
+    m_child_one-&gt;set_parent(*this);
+  }
+  else if(!m_child_two)
+  {
+    m_child_two = child;
+    m_child_two-&gt;set_parent(*this);
+  }
+}
+
+void MyContainer::on_remove(Gtk::Widget* child)
+{
+  if(child)
+  {
+    const bool visible = child-&gt;get_visible();
+    bool found = false;
+
+    if(child == m_child_one)
+    {
+      m_child_one = nullptr;
+      found = true;
+    }
+    else if(child == m_child_two)
+    {
+      m_child_two = nullptr;
+      found = true;
+    }
+
+    if(found)
+    {
+      child-&gt;unparent();
+
+      if(visible)
+        queue_resize();
+    }
+  }
+}
+
+GType MyContainer::child_type_vfunc() const
+{
+  //If there is still space for one widget, then report the type of widget that
+  //may be added.
+  if(!m_child_one || !m_child_two)
+    return Gtk::Widget::get_type();
+  else
+  {
+    //No more widgets may be added.
+    return G_TYPE_NONE;
+  }
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include &lt;iostream&gt;
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL),
+  m_Button_One("Child One"),
+  m_Label_Two("Child 2", Gtk::ALIGN_END, Gtk::ALIGN_CENTER),
+  m_Button_Quit("Quit")
+{
+  set_title("Custom Container example");
+  set_border_width(6);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  //Add the child widgets to the custom container:
+  m_MyContainer.set_child_widgets(m_Button_One, m_Label_Two);
+
+  m_VBox.pack_start(m_MyContainer, Gtk::PACK_EXPAND_WIDGET);
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_border_width(6);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+  m_Button_Quit.signal_clicked().connect( sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+
+  show_all_children();
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+</pre>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-i18n-getting-help-with-translations.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-custom-widgets.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Getting help with translations </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Custom Widgets</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

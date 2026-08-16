@@ -1,0 +1,207 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Drawing Text</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-drawingarea.html" title="Chapter 17. The Drawing Area Widget">
+<link rel="prev" href="sec-cairo-drawing-arcs.html" title="Drawing Arcs and Circles">
+<link rel="next" href="sec-draw-images.html" title="Drawing Images">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Drawing Text</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-cairo-drawing-arcs.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 17. The Drawing Area Widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-draw-images.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-drawing-text"></a>Drawing Text</h2></div></div></div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="drawing-text-pango"></a>Drawing Text with Pango</h3></div></div></div>
+<p>
+              Text is drawn via Pango Layouts. The easiest way to create a
+              <code class="classname">Pango::Layout</code> is to use
+              <code class="methodname">Gtk::Widget::create_pango_layout()</code>.
+              Once created, the layout can be manipulated in various ways,
+              including changing the text, font, etc. Finally, the layout can
+              be rendered using the
+              <code class="methodname">Pango::Layout::show_in_cairo_context()</code> method.
+          </p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="pango-text-example"></a>Example</h3></div></div></div>
+<p>
+           Here is an example of a program that draws some text, some of it
+           upside-down. The Printing chapter contains another
+           <a class="link" href="sec-printing-example.html" title="Example">example</a> of drawing text.
+        </p>
+<div class="figure">
+<a name="figure-drawingarea-pango-text"></a><p class="title"><b>Figure 17.6. Drawing Area - Text</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drawingarea_pango_text.png" alt="Drawing Area - Text"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drawingarea/pango_text?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">myarea.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_MYAREA_H
+#define GTKMM_EXAMPLE_MYAREA_H
+
+#include &lt;gtkmm/drawingarea.h&gt;
+
+class MyArea : public Gtk::DrawingArea
+{
+public:
+  MyArea();
+  virtual ~MyArea();
+
+protected:
+  //Override default signal handler:
+  bool on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr) override;
+
+private:
+  void draw_rectangle(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr, int width, int height);
+  void draw_text(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr, int rectangle_width, int rectangle_height);
+
+};
+
+#endif // GTKMM_EXAMPLE_MYAREA_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+#include &lt;gtkmm/application.h&gt;
+#include &lt;gtkmm/window.h&gt;
+
+int main(int argc, char* argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  Gtk::Window window;
+  window.set_title("Drawing text example");
+
+  MyArea area;
+  window.add(area);
+  area.show();
+
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">myarea.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "myarea.h"
+
+MyArea::MyArea()
+{
+}
+
+MyArea::~MyArea()
+{
+}
+
+bool MyArea::on_draw(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr)
+{
+  Gtk::Allocation allocation = get_allocation();
+  const int width = allocation.get_width();
+  const int height = allocation.get_height();
+
+  const int rectangle_width = width;
+  const int rectangle_height = height / 2;
+
+  // Draw a black rectangle
+  cr-&gt;set_source_rgb(0.0, 0.0, 0.0);
+  draw_rectangle(cr, rectangle_width, rectangle_height);
+
+  // and some white text
+  cr-&gt;set_source_rgb(1.0, 1.0, 1.0);
+  draw_text(cr, rectangle_width, rectangle_height);
+
+  // flip the image vertically
+  // see http://www.cairographics.org/documentation/cairomm/reference/classCairo_1_1Matrix.html
+  // the -1 corresponds to the yy part (the flipping part)
+  // the height part is a translation (we could have just called cr-&gt;translate(0, height) instead)
+  // it's height and not height / 2, since we want this to be on the second part of our drawing
+  // (otherwise, it would draw over the previous part)
+  Cairo::Matrix matrix(1.0, 0.0, 0.0, -1.0, 0.0, height);
+
+  // apply the matrix
+  cr-&gt;transform(matrix);
+
+  // white rectangle
+  cr-&gt;set_source_rgb(1.0, 1.0, 1.0);
+  draw_rectangle(cr, rectangle_width, rectangle_height);
+
+  // black text
+  cr-&gt;set_source_rgb(0.0, 0.0, 0.0);
+  draw_text(cr, rectangle_width, rectangle_height);
+
+  return true;
+}
+
+void MyArea::draw_rectangle(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr,
+                            int width, int height)
+{
+  cr-&gt;rectangle(0, 0, width, height);
+  cr-&gt;fill();
+}
+
+void MyArea::draw_text(const Cairo::RefPtr&lt;Cairo::Context&gt;&amp; cr,
+                       int rectangle_width, int rectangle_height)
+{
+  // http://developer.gnome.org/pangomm/unstable/classPango_1_1FontDescription.html
+  Pango::FontDescription font;
+
+  font.set_family("Monospace");
+  font.set_weight(Pango::WEIGHT_BOLD);
+
+  // http://developer.gnome.org/pangomm/unstable/classPango_1_1Layout.html
+  auto layout = create_pango_layout("Hi there!");
+
+  layout-&gt;set_font_description(font);
+
+  int text_width;
+  int text_height;
+
+  //get the text dimensions (it updates the variables -- by reference)
+  layout-&gt;get_pixel_size(text_width, text_height);
+
+  // Position the text in the middle
+  cr-&gt;move_to((rectangle_width-text_width)/2, (rectangle_height-text_height)/2);
+
+  layout-&gt;show_in_cairo_context(cr);
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-cairo-drawing-arcs.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-drawingarea.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-draw-images.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Drawing Arcs and Circles </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Drawing Images</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

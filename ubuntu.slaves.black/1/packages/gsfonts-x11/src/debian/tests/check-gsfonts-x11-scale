@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Check that all files in gsfonts-x11.scale really exist
+#
+# (c) 2018 Roland Rosenfeld <roland@debian.org>
+
+scale=/etc/X11/fonts/Type1/gsfonts-x11.scale
+fontdir=/usr/share/fonts/X11/Type1
+
+RESULT=0
+count=0
+ok=0
+
+# Check path of all fonts:
+for f in $(sed '1d;s/ .*//' "$scale")
+do
+    count=$((count+1))
+    f="$fontdir/$f"
+    if ! [ -L "$f" ]
+    then
+	RESULT=1
+	echo "$f is not a symlink"
+    else
+	dest=$(readlink -f "$f")
+	if ! [ -f "$dest" ]
+	then
+	    RESULT=1
+	    echo "$f points to $dest, which is not a regular file"
+	else
+	    ok=$((ok+1))
+	fi
+    fi
+done
+
+echo "$ok/$count fonts okay"
+
+# Check line count in first line:
+filecount=$(head -1 "$scale")
+if [ $count -eq $count ]
+then
+    echo "line count $count okay"
+else
+    RESULT=1
+fi
+
+exit $RESULT

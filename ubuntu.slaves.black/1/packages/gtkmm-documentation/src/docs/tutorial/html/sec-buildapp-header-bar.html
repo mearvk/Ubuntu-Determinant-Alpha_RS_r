@@ -1,0 +1,539 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Header bar</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="prev" href="sec-buildapp-properties.html" title="Properties">
+<link rel="next" href="chapter-contributing.html" title="Chapter 32. Contributing">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Header bar</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-buildapp-properties.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 31. Building applications</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-contributing.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-buildapp-header-bar"></a>Header bar</h2></div></div></div>
+<p>
+Our application already uses a <code class="classname">Gtk::HeaderBar</code>, but so far it still
+gets a 'normal' window titlebar on top of that. This is a bit redundant, and we will now
+tell <span class="application">gtkmm</span> to use the header bar as replacement for the titlebar. To do so, we move
+it around to be a direct child of the window, and set its type to be <code class="literal">titlebar</code>.
+This is done in the <code class="filename">window.ui</code> file.
+</p>
+<p>
+A small extra bonus of using a header bar is that we get a fallback application menu
+button for free. We include an icon in the resource file, and set up this icon as the
+window icon. Then it is displayed in the menu button.
+</p>
+<p>
+Here is how the application now looks, if the fallback menu is used:
+</p>
+<div class="figure">
+<a name="figure-buildapp-header-bar"></a><p class="title"><b>Figure 31.9. Header bar</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buildapp_header_bar.png" alt="Header bar"></div></div></div>
+</div>
+<br class="figure-break"><p>
+The <code class="filename">window.ui</code> file sets a header bar title, but this title is not shown.
+That's because the stack switcher is a child of type <code class="literal">title</code>. The stack
+switcher becomes a custom title that hides the title label, as if it had been set with
+<code class="methodname">Gtk::HeaderBar::set_custom_title()</code>.
+</p>
+<p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buildapp/step9?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">exampleappwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step8/exampleappwindow.h"
+// Equal to the corresponding file in step8
+</pre>
+<p>File: <code class="filename">exampleappprefs.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleappprefs.h"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step4/exampleapplication.h"
+// Equal to the corresponding file in step4
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleapplication.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/main.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">exampleappwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappwindow.h"
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;set&gt;
+
+ExampleAppWindow::ExampleAppWindow(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::ApplicationWindow(cobject),
+  m_refBuilder(refBuilder),
+  m_settings(),
+  m_stack(nullptr),
+  m_search(nullptr),
+  m_searchbar(nullptr),
+  m_searchentry(nullptr),
+  m_gears(nullptr),
+  m_sidebar(nullptr),
+  m_words(nullptr),
+  m_lines(nullptr),
+  m_lines_label(nullptr),
+  m_binding_search_enabled(),
+  m_binding_lines_visible()
+{
+  // Get widgets from the Gtk::Builder file.
+  m_refBuilder-&gt;get_widget("stack", m_stack);
+  if (!m_stack)
+    throw std::runtime_error("No \"stack\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("search", m_search);
+  if (!m_search)
+    throw std::runtime_error("No \"search\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("searchbar", m_searchbar);
+  if (!m_searchbar)
+    throw std::runtime_error("No \"searchbar\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("searchentry", m_searchentry);
+  if (!m_searchentry)
+    throw std::runtime_error("No \"searchentry\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("gears", m_gears);
+  if (!m_gears)
+    throw std::runtime_error("No \"gears\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("sidebar", m_sidebar);
+  if (!m_sidebar)
+    throw std::runtime_error("No \"sidebar\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("words", m_words);
+  if (!m_words)
+    throw std::runtime_error("No \"words\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("lines", m_lines);
+  if (!m_lines)
+    throw std::runtime_error("No \"lines\" object in window.ui");
+
+  m_refBuilder-&gt;get_widget("lines_label", m_lines_label);
+  if (!m_lines_label)
+    throw std::runtime_error("No \"lines_label\" object in window.ui");
+
+  // Bind settings.
+  m_settings = Gio::Settings::create("org.gtkmm.exampleapp");
+  m_settings-&gt;bind("transition", m_stack-&gt;property_transition_type());
+  m_settings-&gt;bind("show-words", m_sidebar-&gt;property_reveal_child());
+
+  // Bind properties of the search button to the search bar.
+  m_binding_search_enabled = Glib::Binding::bind_property(m_search-&gt;property_active(),
+    m_searchbar-&gt;property_search_mode_enabled(), Glib::BINDING_BIDIRECTIONAL);
+
+  // Connect signal handlers.
+  m_searchentry-&gt;signal_search_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleAppWindow::on_search_text_changed));
+  m_stack-&gt;property_visible_child().signal_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleAppWindow::on_visible_child_changed));
+  m_sidebar-&gt;property_reveal_child().signal_changed().connect(
+    sigc::mem_fun(*this, &amp;ExampleAppWindow::on_reveal_child_changed));
+
+  // Connect the menu to the MenuButton m_gears, and bind the show-words setting
+  // to the win.show-words action and the "Words" menu item.
+  // (The connection between action and menu item is specified in gears_menu.ui.)
+  auto menu_builder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/gears_menu.ui");
+  auto object = menu_builder-&gt;get_object("menu");
+  auto menu = Glib::RefPtr&lt;Gio::MenuModel&gt;::cast_dynamic(object);
+  if (!menu)
+    throw std::runtime_error("No \"menu\" object in gears_menu.ui");
+
+  m_gears-&gt;set_menu_model(menu);
+  add_action(m_settings-&gt;create_action("show-words"));
+
+  // Bind the "visible" property of m_lines to the win.show-lines action, to
+  // the "Lines" menu item and to the "visible" property of m_lines_label.
+  // The GPropertyAction class is not wrapped in a glibmm class at the time of
+  // writing (october 2016). We have to call a glib function directly.
+  add_action(Glib::wrap((GAction*)
+    g_property_action_new("show-lines", m_lines-&gt;gobj(), "visible")));
+  m_binding_lines_visible = Glib::Binding::bind_property(m_lines-&gt;property_visible(),
+    m_lines_label-&gt;property_visible());
+
+  // Display the application menu in the application, not in the desktop environment.
+  auto gtk_settings = Gtk::Settings::get_default();
+  if (gtk_settings)
+    gtk_settings-&gt;property_gtk_shell_shows_app_menu() = false;
+  set_show_menubar(true);
+
+  // Set the window icon.
+  set_icon(Gdk::Pixbuf::create_from_resource("/org/gtkmm/exampleapp/exampleapp.png"));
+}
+
+//static
+ExampleAppWindow* ExampleAppWindow::create()
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/window.ui");
+
+  ExampleAppWindow* window = nullptr;
+  refBuilder-&gt;get_widget_derived("app_window", window);
+  if (!window)
+    throw std::runtime_error("No \"app_window\" object in window.ui");
+
+  return window;
+}
+
+void ExampleAppWindow::open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file)
+{
+  const auto basename = file-&gt;get_basename();
+
+  auto scrolled = Gtk::make_managed&lt;Gtk::ScrolledWindow&gt;();
+  scrolled-&gt;set_hexpand(true);
+  scrolled-&gt;set_vexpand(true);
+  scrolled-&gt;show();
+  auto view = Gtk::make_managed&lt;Gtk::TextView&gt;();
+  view-&gt;set_editable(false);
+  view-&gt;set_cursor_visible(false);
+  view-&gt;show();
+  scrolled-&gt;add(*view);
+  m_stack-&gt;add(*scrolled, basename, basename);
+
+  auto buffer = view-&gt;get_buffer();
+  try
+  {
+    char* contents = nullptr;
+    gsize length = 0;
+    
+    file-&gt;load_contents(contents, length);
+    buffer-&gt;set_text(contents, contents+length);
+    g_free(contents);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::open_file_view(\"" &lt;&lt; file-&gt;get_parse_name()
+      &lt;&lt; "\"):\n  " &lt;&lt; ex.what() &lt;&lt; std::endl;
+    return;
+  }
+
+  auto tag = buffer-&gt;create_tag();
+  m_settings-&gt;bind("font", tag-&gt;property_font());
+  buffer-&gt;apply_tag(tag, buffer-&gt;begin(), buffer-&gt;end());
+
+  m_search-&gt;set_sensitive(true);
+  update_words();
+  update_lines();
+}
+
+void ExampleAppWindow::on_search_text_changed()
+{
+  const auto text = m_searchentry-&gt;get_text();
+  if (text.empty())
+    return;
+
+  auto tab = dynamic_cast&lt;Gtk::ScrolledWindow*&gt;(m_stack-&gt;get_visible_child());
+  if (!tab)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::on_search_text_changed(): No visible child." &lt;&lt; std::endl;
+    return;
+  }
+
+  auto view = dynamic_cast&lt;Gtk::TextView*&gt;(tab-&gt;get_child());
+  if (!view)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::on_search_text_changed(): No visible text view." &lt;&lt; std::endl;
+    return;
+  }
+
+  // Very simple-minded search implementation.
+  auto buffer = view-&gt;get_buffer();
+  Gtk::TextIter match_start;
+  Gtk::TextIter match_end;
+  if (buffer-&gt;begin().forward_search(text, Gtk::TEXT_SEARCH_CASE_INSENSITIVE,
+      match_start, match_end))
+  {
+    buffer-&gt;select_range(match_start, match_end);
+    view-&gt;scroll_to(match_start);
+  }
+}
+
+void ExampleAppWindow::on_visible_child_changed()
+{
+  m_searchbar-&gt;set_search_mode(false);
+  update_words();
+  update_lines();  
+}
+
+void ExampleAppWindow::on_find_word(const Gtk::Button* button)
+{
+  m_searchentry-&gt;set_text(button-&gt;get_label());
+}
+
+void ExampleAppWindow::on_reveal_child_changed()
+{
+  update_words();
+}
+
+void ExampleAppWindow::update_words()
+{
+  auto tab = dynamic_cast&lt;Gtk::ScrolledWindow*&gt;(m_stack-&gt;get_visible_child());
+  if (!tab)
+    return;
+
+  auto view = dynamic_cast&lt;Gtk::TextView*&gt;(tab-&gt;get_child());
+  if (!view)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::update_words(): No visible text view." &lt;&lt; std::endl;
+    return;
+  }
+  auto buffer = view-&gt;get_buffer();
+
+  // Find all words in the text buffer.
+  std::set&lt;Glib::ustring&gt; words;
+  auto start = buffer-&gt;begin();
+  Gtk::TextIter end;
+  while (start)
+  {
+    while (start &amp;&amp; !start.starts_word())
+      ++start;
+
+    if (!start)
+      break;
+
+    end = start;
+    end.forward_word_end();
+    if (start == end)
+      break;
+
+    auto word = buffer-&gt;get_text(start, end, false);
+    words.insert(word.lowercase());
+    start = end;
+  }
+
+  // Remove old children from the ListBox.
+  auto old_children = m_words-&gt;get_children();
+  for (auto child : old_children)
+  {
+    m_words-&gt;remove(*child);
+    delete child;
+  }
+
+  // Add new child buttons, one per unique word.
+  for (const auto&amp; word : words)
+  {
+    auto row = Gtk::make_managed&lt;Gtk::Button&gt;(word);
+    row-&gt;signal_clicked().connect(sigc::bind(sigc::mem_fun(*this,
+      &amp;ExampleAppWindow::on_find_word), row));
+    row-&gt;show();
+    m_words-&gt;add(*row);
+  }
+}
+
+void ExampleAppWindow::update_lines()
+{
+  auto tab = dynamic_cast&lt;Gtk::ScrolledWindow*&gt;(m_stack-&gt;get_visible_child());
+  if (!tab)
+    return;
+
+  auto view = dynamic_cast&lt;Gtk::TextView*&gt;(tab-&gt;get_child());
+  if (!view)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::update_lines(): No visible text view." &lt;&lt; std::endl;
+    return;
+  }
+  auto buffer = view-&gt;get_buffer();
+
+  int count = 0;
+  auto iter = buffer-&gt;begin();
+  while (iter)
+  {
+    ++count;
+    if (!iter.forward_line())
+      break;
+  }
+  m_lines-&gt;set_text(Glib::ustring::format(count));
+}
+</pre>
+<p>File: <code class="filename">exampleappprefs.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step5/exampleappprefs.cc"
+// Equal to the corresponding file in step5
+</pre>
+<p>File: <code class="filename">exampleapp.gresource.xml</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/org/gtkmm/exampleapp"&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;window.ui&lt;/file&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;app_menu.ui&lt;/file&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;gears_menu.ui&lt;/file&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;prefs.ui&lt;/file&gt;
+    &lt;file&gt;exampleapp.png&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+<p>File: <code class="filename">window.ui</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;interface&gt;
+  &lt;!-- interface-requires gtk+ 3.8 --&gt;
+  &lt;object class="GtkApplicationWindow" id="app_window"&gt;
+    &lt;property name="default-width"&gt;600&lt;/property&gt;
+    &lt;property name="default-height"&gt;400&lt;/property&gt;
+    &lt;child type="titlebar"&gt;
+      &lt;object class="GtkHeaderBar" id="header"&gt;
+        &lt;property name="title" translatable="yes"&gt;Example Application&lt;/property&gt;
+        &lt;property name="visible"&gt;True&lt;/property&gt;
+        &lt;property name="show-close-button"&gt;True&lt;/property&gt;
+        &lt;property name="decoration-layout"&gt;menu:close&lt;/property&gt;
+        &lt;child&gt;
+          &lt;object class="GtkLabel" id="lines_label"&gt;
+            &lt;property name="visible"&gt;False&lt;/property&gt;
+            &lt;property name="label" translatable="yes"&gt;Lines:&lt;/property&gt;
+          &lt;/object&gt;
+          &lt;packing&gt;
+            &lt;property name="pack-type"&gt;start&lt;/property&gt;
+          &lt;/packing&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkLabel" id="lines"&gt;
+            &lt;property name="visible"&gt;False&lt;/property&gt;
+          &lt;/object&gt;
+          &lt;packing&gt;
+            &lt;property name="pack-type"&gt;start&lt;/property&gt;
+          &lt;/packing&gt;
+        &lt;/child&gt;
+        &lt;child type="title"&gt;
+          &lt;object class="GtkStackSwitcher" id="tabs"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;property name="stack"&gt;stack&lt;/property&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkToggleButton" id="search"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;property name="sensitive"&gt;False&lt;/property&gt;
+            &lt;style&gt;
+              &lt;class name="image-button"/&gt;
+            &lt;/style&gt;
+            &lt;child&gt;
+              &lt;object class="GtkImage" id="search-icon"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="icon-name"&gt;edit-find-symbolic&lt;/property&gt;
+                &lt;property name="icon-size"&gt;1&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+          &lt;packing&gt;
+            &lt;property name="pack-type"&gt;end&lt;/property&gt;
+          &lt;/packing&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkMenuButton" id="gears"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;property name="direction"&gt;none&lt;/property&gt;
+            &lt;property name="use-popover"&gt;True&lt;/property&gt;
+            &lt;style&gt;
+              &lt;class name="image-button"/&gt;
+            &lt;/style&gt;
+          &lt;/object&gt;
+          &lt;packing&gt;
+            &lt;property name="pack-type"&gt;end&lt;/property&gt;
+          &lt;/packing&gt;
+        &lt;/child&gt;
+      &lt;/object&gt;
+    &lt;/child&gt;
+    &lt;child&gt;
+      &lt;object class="GtkBox" id="content_box"&gt;
+        &lt;property name="visible"&gt;True&lt;/property&gt;
+        &lt;property name="orientation"&gt;vertical&lt;/property&gt;
+        &lt;child&gt;
+          &lt;object class="GtkSearchBar" id="searchbar"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;child&gt;
+              &lt;object class="GtkSearchEntry" id="searchentry"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+        &lt;child&gt;
+          &lt;object class="GtkBox" id="hbox"&gt;
+            &lt;property name="visible"&gt;True&lt;/property&gt;
+            &lt;child&gt;
+              &lt;object class="GtkRevealer" id="sidebar"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="transition-type"&gt;slide-right&lt;/property&gt;
+                &lt;child&gt;
+                 &lt;object class="GtkScrolledWindow" id="sidebar-sw"&gt;
+                   &lt;property name="visible"&gt;True&lt;/property&gt;
+                   &lt;property name="hscrollbar-policy"&gt;never&lt;/property&gt;
+                   &lt;property name="vscrollbar-policy"&gt;automatic&lt;/property&gt;
+                   &lt;child&gt;
+                     &lt;object class="GtkListBox" id="words"&gt;
+                       &lt;property name="visible"&gt;True&lt;/property&gt;
+                       &lt;property name="selection-mode"&gt;none&lt;/property&gt;
+                     &lt;/object&gt;
+                   &lt;/child&gt;
+                 &lt;/object&gt;
+                &lt;/child&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+            &lt;child&gt;
+              &lt;object class="GtkStack" id="stack"&gt;
+                &lt;property name="visible"&gt;True&lt;/property&gt;
+                &lt;property name="transition-duration"&gt;500&lt;/property&gt;
+              &lt;/object&gt;
+            &lt;/child&gt;
+          &lt;/object&gt;
+        &lt;/child&gt;
+      &lt;/object&gt;
+    &lt;/child&gt;
+  &lt;/object&gt;
+&lt;/interface&gt;
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-buildapp-properties.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-building-applications.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-contributing.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Properties </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 32. Contributing</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

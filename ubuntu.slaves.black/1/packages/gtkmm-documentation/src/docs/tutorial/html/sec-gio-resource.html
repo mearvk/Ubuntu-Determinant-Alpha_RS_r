@@ -1,0 +1,116 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Gio::Resource and glib-compile-resources</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-menus-and-toolbars.html" title="Chapter 12. Menus and Toolbars">
+<link rel="prev" href="sec-menus-popup.html" title="Popup Menus">
+<link rel="next" href="sec-menus-examples.html" title="Examples">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Gio::Resource and glib-compile-resources</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-menus-popup.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 12. Menus and Toolbars</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-menus-examples.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-gio-resource"></a>Gio::Resource and glib-compile-resources</h2></div></div></div>
+<p>
+Applications and libraries often contain binary or textual data that is
+really part of the application, rather than user data. For instance
+<code class="classname">Gtk::Builder</code> <code class="filename">.glade</code> files,
+splashscreen images, <code class="classname">Gio::Menu</code> markup xml, CSS files,
+icons, etc. These are often shipped as files in <code class="filename">$datadir/appname</code>,
+or manually included as literal strings in the code.
+</p>
+<p>
+The <code class="classname">Gio::Resource</code> API and the <span class="application">glib-compile-resources</span>
+program provide a convenient and efficient alternative to this, which has some nice properties. You
+maintain the files as normal files, so it's easy to edit them, but during the build the files
+are combined into a binary bundle that is linked into the executable. This means that loading
+the resource files is efficient (as they are already in memory, shared with other instances) and
+simple (no need to check for things like I/O errors or locate the files in the filesystem). It
+also makes it easier to create relocatable applications.
+</p>
+<p>
+Resource bundles are created by the <a class="ulink" href="https://developer.gnome.org/gio/stable/glib-compile-resources.html" target="_top">glib-compile-resources</a>
+program which takes an xml file that describes the bundle, and a set of files that the xml references.
+These are combined into a binary resource bundle.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/glibmm/2.58/classGio_1_1Resource.html" target="_top">Gio::Resource Reference</a></p>
+<p>
+An example:
+</p>
+<pre class="programlisting">
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;gresources&gt;
+  &lt;gresource prefix="/toolbar"&gt;
+    &lt;file preprocess="xml-stripblanks"&gt;toolbar.glade&lt;/file&gt;
+    &lt;file&gt;rain.png&lt;/file&gt;
+  &lt;/gresource&gt;
+&lt;/gresources&gt;
+</pre>
+<p>
+This will create a resource bundle with the files
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p><code class="filename">/toolbar/toolbar.glade</code></p></li>
+<li class="listitem"><p><code class="filename">/toolbar/rain.png</code></p></li>
+</ul></div>
+<p>
+</p>
+<p>
+You can then use <span class="application">glib-compile-resources</span> to compile the xml to a binary bundle
+that you can load with <code class="methodname">Gio::Resource::create_from_file()</code>.
+However, it's more common to use the <em class="parameter"><code>--generate-source</code></em>
+argument to create a C source file to link directly into your application. E.g.
+</p>
+<pre class="screen">$ glib-compile-resources --target=resources.c --generate-source toolbar.gresource.xml</pre>
+<p>
+</p>
+<p>
+Once a <code class="classname">Gio::Resource</code> has been created and registered all the data
+in it can be accessed globally in the process by using API calls like
+<code class="methodname">Gio::Resource::open_stream_from_global_resources()</code>
+to stream the data or <code class="methodname">Gio::Resource::lookup_data_in_global_resources()</code>
+to get a direct pointer to the data. You can also use URIs like <code class="uri">resource:///toolbar/rain.png</code>
+with <code class="classname">Gio::File</code> to access the resource data.
+</p>
+<p>
+Often you don't need a <code class="classname">Gio::Resource</code> instance,
+because resource data can be loaded with methods such as
+<code class="methodname">Gdk::Pixbuf::create_from_resource()</code>,
+<code class="methodname">Gtk::Builder::add_from_resource()</code> and
+<code class="methodname">Gtk::Image::set_from_resource()</code>.
+</p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-menus-popup.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-menus-and-toolbars.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-menus-examples.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Popup Menus </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Examples</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

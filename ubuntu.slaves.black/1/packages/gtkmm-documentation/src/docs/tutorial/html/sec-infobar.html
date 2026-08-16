@@ -1,0 +1,211 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>InfoBar</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-misc-widgets.html" title="Chapter 7. Miscellaneous Widgets">
+<link rel="prev" href="sec-progressbar.html" title="ProgressBar">
+<link rel="next" href="sec-tooltips.html" title="Tooltips">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">InfoBar</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-progressbar.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 7. Miscellaneous Widgets</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-tooltips.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-infobar"></a>InfoBar</h2></div></div></div>
+<p>
+An <code class="classname">InfoBar</code> may show small items of information or ask brief questions. Unlike a <code class="classname">Dialog</code>, it appears at the top of the current window instead of opening a new window. Its API is very similar to the <a class="link" href="chapter-dialogs.html" title="Chapter 16. Dialogs">Gtk::Dialog</a> API.</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1InfoBar.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="infobar-example"></a>Example</h3></div></div></div>
+<div class="figure">
+<a name="figure-infobar"></a><p class="title"><b>Figure 7.8. InfoBar</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/infobar.png" alt="InfoBar"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/infobar?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEWINDOW_H
+#define GTKMM_EXAMPLEWINDOW_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+protected:
+  //Signal handlers:
+  void on_infobar_response(int response);
+  void on_button_quit();
+  void on_button_clear();
+  void on_textbuffer_changed();
+
+  //Child widgets:
+  Gtk::Box m_VBox;
+
+  Gtk::ScrolledWindow m_ScrolledWindow;
+  Gtk::TextView m_TextView;
+
+  Glib::RefPtr&lt;Gtk::TextBuffer&gt; m_refTextBuffer;
+
+  Gtk::InfoBar m_InfoBar;
+  Gtk::Label m_Message_Label;
+
+  Gtk::ButtonBox m_ButtonBox;
+  Gtk::Button m_Button_Quit, m_Button_Clear;
+};
+
+#endif //GTKMM_EXAMPLEWINDOW_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+
+ExampleWindow::ExampleWindow()
+: m_VBox(Gtk::ORIENTATION_VERTICAL, 6),
+  m_Button_Quit("_Quit", true),
+  m_Button_Clear("_Clear", true)
+{
+  set_title("Gtk::InfoBar example");
+  set_border_width(6);
+  set_default_size(400, 200);
+
+  add(m_VBox);
+
+  // Add the message label to the InfoBar:
+  auto infoBarContainer =
+    dynamic_cast&lt;Gtk::Container*&gt;(m_InfoBar.get_content_area());
+  if (infoBarContainer)
+    infoBarContainer-&gt;add(m_Message_Label);
+
+  // Add an ok button to the InfoBar:
+  m_InfoBar.add_button("_OK", 0);
+
+  // Add the InfoBar to the vbox:
+  m_VBox.pack_start(m_InfoBar, Gtk::PACK_SHRINK);
+
+  // Create the buffer and set it for the TextView:
+  m_refTextBuffer = Gtk::TextBuffer::create();
+  m_TextView.set_buffer(m_refTextBuffer);
+
+  // Add the TreeView, inside a ScrolledWindow:
+  m_ScrolledWindow.add(m_TextView);
+
+  // Show the scrollbars only when they are necessary:
+  m_ScrolledWindow.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+
+  m_VBox.pack_start(m_ScrolledWindow);
+
+  // Add button box:
+  m_VBox.pack_start(m_ButtonBox, Gtk::PACK_SHRINK);
+
+  m_ButtonBox.pack_start(m_Button_Clear, Gtk::PACK_SHRINK);
+  m_ButtonBox.pack_start(m_Button_Quit, Gtk::PACK_SHRINK);
+  m_ButtonBox.set_spacing(6);
+  m_ButtonBox.set_layout(Gtk::BUTTONBOX_END);
+
+  // Connect signals:
+  m_InfoBar.signal_response().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_infobar_response) );
+  m_Button_Quit.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_quit) );
+  m_Button_Clear.signal_clicked().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_button_clear) );
+  m_refTextBuffer-&gt;signal_changed().connect(sigc::mem_fun(*this,
+              &amp;ExampleWindow::on_textbuffer_changed) );
+
+  show_all();
+
+  // Keep the InfoBar hidden until a message needs to be shown:
+  m_InfoBar.hide();
+
+  // Make the clear button insensitive until text is typed in the buffer.  When
+  // the button is sensitive and it is pressed, the InfoBar is displayed with a
+  // message.
+  m_Button_Clear.set_sensitive(false);
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+void ExampleWindow::on_infobar_response(int)
+{
+  // Clear the message and hide the info bar:
+  m_Message_Label.set_text("");
+  m_InfoBar.hide();
+}
+
+void ExampleWindow::on_button_quit()
+{
+  hide();
+}
+
+void ExampleWindow::on_button_clear()
+{
+  m_refTextBuffer-&gt;set_text("");
+  m_Message_Label.set_text("Cleared the text.");
+  m_InfoBar.set_message_type(Gtk::MESSAGE_INFO);
+  m_InfoBar.show();
+}
+
+void ExampleWindow::on_textbuffer_changed()
+{
+  m_Button_Clear.set_sensitive(m_refTextBuffer-&gt;size() &gt; 0);
+}
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-progressbar.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-misc-widgets.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-tooltips.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">ProgressBar </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Tooltips</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

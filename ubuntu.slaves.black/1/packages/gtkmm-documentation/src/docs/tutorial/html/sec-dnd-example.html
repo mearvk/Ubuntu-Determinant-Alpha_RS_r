@@ -1,0 +1,179 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Example</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-draganddrop.html" title="Chapter 18. Drag and Drop">
+<link rel="prev" href="sec-dragcontext.html" title="DragContext">
+<link rel="next" href="chapter-clipboard.html" title="Chapter 19. The Clipboard">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Example</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-dragcontext.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 18. Drag and Drop</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-clipboard.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-dnd-example"></a>Example</h2></div></div></div>
+<p>Here is a very simple example, demonstrating a drag and drop <code class="literal">Copy</code> operation:</p>
+<div class="figure">
+<a name="figure-drag-and-drop"></a><p class="title"><b>Figure 18.1. Drag and Drop</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/drag_and_drop.png" alt="Drag and Drop"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/drag_and_drop?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">dndwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLE_DNDWINDOW_H
+#define GTKMM_EXAMPLE_DNDWINDOW_H
+
+#include &lt;gtkmm/box.h&gt;
+#include &lt;gtkmm/label.h&gt;
+#include &lt;gtkmm/window.h&gt;
+#include &lt;gtkmm/button.h&gt;
+
+class DnDWindow : public Gtk::Window
+{
+
+public:
+  DnDWindow();
+  virtual ~DnDWindow();
+
+protected:
+  //Signal handlers:
+  void on_button_drag_data_get(
+          const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context,
+          Gtk::SelectionData&amp; selection_data, guint info, guint time);
+  void on_label_drop_drag_data_received(
+          const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, int x, int y,
+          const Gtk::SelectionData&amp; selection_data, guint info, guint time);
+
+  //Member widgets:
+  Gtk::Box m_HBox;
+  Gtk::Button m_Button_Drag;
+  Gtk::Label m_Label_Drop;
+};
+
+#endif // GTKMM_EXAMPLE_DNDWINDOW_H
+</pre>
+<p>File: <code class="filename">dndwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "dndwindow.h"
+#include &lt;iostream&gt;
+
+DnDWindow::DnDWindow()
+: m_Button_Drag("Drag Here\n"),
+  m_Label_Drop("Drop here\n")
+{
+  set_title("DnD example");
+
+  add(m_HBox);
+
+  //Targets:
+  std::vector&lt;Gtk::TargetEntry&gt; listTargets;
+  listTargets.push_back( Gtk::TargetEntry("STRING") );
+  listTargets.push_back( Gtk::TargetEntry("text/plain") );
+
+  //Drag site:
+
+  //Make m_Button_Drag a DnD drag source:
+  m_Button_Drag.drag_source_set(listTargets);
+
+  //Connect signals:
+  m_Button_Drag.signal_drag_data_get().connect(sigc::mem_fun(*this,
+              &amp;DnDWindow::on_button_drag_data_get));
+
+  m_HBox.pack_start(m_Button_Drag);
+
+  //Drop site:
+
+  //Make m_Label_Drop a DnD drop destination:
+  m_Label_Drop.drag_dest_set(listTargets);
+
+  //Connect signals:
+  m_Label_Drop.signal_drag_data_received().connect(sigc::mem_fun(*this,
+              &amp;DnDWindow::on_label_drop_drag_data_received) );
+
+  m_HBox.pack_start(m_Label_Drop);
+
+  show_all();
+}
+
+DnDWindow::~DnDWindow()
+{
+}
+
+void DnDWindow::on_button_drag_data_get(
+        const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp;,
+        Gtk::SelectionData&amp; selection_data, guint, guint)
+{
+  selection_data.set(selection_data.get_target(), 8 /* 8 bits format */,
+          (const guchar*)"I'm Data!",
+          9 /* the length of I'm Data! in bytes */);
+}
+
+void DnDWindow::on_label_drop_drag_data_received(
+        const Glib::RefPtr&lt;Gdk::DragContext&gt;&amp; context, int, int,
+        const Gtk::SelectionData&amp; selection_data, guint, guint time)
+{
+  const int length = selection_data.get_length();
+  if((length &gt;= 0) &amp;&amp; (selection_data.get_format() == 8))
+  {
+    std::cout &lt;&lt; "Received \"" &lt;&lt; selection_data.get_data_as_string()
+        &lt;&lt; "\" in label " &lt;&lt; std::endl;
+  }
+
+  context-&gt;drag_finish(false, false, time);
+}
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "dndwindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main (int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  DnDWindow dndWindow;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(dndWindow);
+}
+</pre>
+<p>
+There is a more complex example in examples/others/dnd.
+</p>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-dragcontext.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-draganddrop.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-clipboard.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">DragContext </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 19. The Clipboard</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

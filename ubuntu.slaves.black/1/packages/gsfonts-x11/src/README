@@ -1,0 +1,78 @@
+gsfonts-x11 for Debian
+======================
+
+This packages makes the 35 Postscript fonts from the gsfonts package
+available to your X server under their "urw" names and via fonts.alias
+with the official "adobe" names, too.
+
+This package does not contain any fonts itself but allows to reuse the
+ghostscript fonts as X11 screen fonts.
+
+It may be a good idea to use these fonts under X11 because many
+drawing programs (xfig, sketch, gimp, ...) need high quality fonts,
+especially the 35 "standard" Postscript fonts, which are used by
+Postscript printers and Ghostscript.
+
+If you have the original Adobe fonts available for X11, I suggest to
+place them somewhere under /usr/local/share/fonts and add this
+directory to the font path before /usr/share/fonts/X11/Type1, so the
+Adobe fonts have priority over the ghostscript fonts while the latter
+can be used as a fallback, if some Adobe font is missing.  You can
+change your font path by editing the xorg.conf(5x) file or by using
+xset(1x).  "xset q" displays the current font path configuration
+(among others).
+
+You need the line
+  Load "type1"
+in your xorg.conf(5x) file in Section "Module", otherwise the X
+server cannot handle the postscript fonts.
+
+
+Font path order
+^^^^^^^^^^^^^^^
+
+If you notice problems with ugly small screen fonts (especially
+adobe-helvetica, adobe-courier and adobe-times) after installing
+gsfonts-x11, have a look at the order of your font path entries.
+I suggest the following entries in xorg.conf:
+
+Section "Files"
+        FontPath        "/usr/share/fonts/X11/misc"
+        FontPath        "/usr/share/fonts/X11/cyrillic"
+        FontPath        "/usr/share/fonts/X11/100dpi/:unscaled"
+        FontPath        "/usr/share/fonts/X11/75dpi/:unscaled"
+        FontPath        "/usr/share/fonts/X11/Type1"
+        FontPath        "/var/lib/defoma/x-ttcidfont-conf.d/dirs/TrueType"
+        FontPath        "/usr/share/fonts/X11/100dpi"
+        FontPath        "/usr/share/fonts/X11/75dpi"
+EndSection
+
+With this font path the Adobe fonts are mentioned multiple times:
+1) /usr/share/fonts/X11/100dpi/:unscaled, /usr/share/fonts/X11/75dpi/:unscaled
+   These contain the bitmap fonts from xfonts-75dpi(-transcoded) and
+   xfonts-100dpi(-transcoded) which contain bitmap Adobe fonts, which
+   are optimized for some screen resolutions.  The ":unscaled" option
+   tells the X server to use them only in their original size without
+   scaling them, which makes them ugly, because the pixels are scaled.
+2) /usr/share/fonts/X11/Type1
+   This contains the postscript vector fonts from gsfonts-x11.  If no
+   optimized bitmap font was available above, this uses vector fonts
+   which are scalable and look good especially in big sizes.
+3) /usr/share/fonts/X11/100dpi/, /usr/share/fonts/X11/75dpi
+   These again contain the bitmap fonts but this time the fonts can be
+   scaled.  This is a last resort fallback, if no scalable font was
+   available in the Type1 directory.
+
+It isn't a good idea to use 100dpi/75dpi without the ":unscaled" tag
+before including Type1 in the font path, because this implies that the
+X server always tries to scale the bitmap fonts to large sizes instead
+of using the vector fonts, which look much better for large font
+sizes.
+
+It also isn't a good idea to place the Type1 entry at the head of the
+font path, because the vector fonts aren't optimized or hinted for
+small font sizes, where the unscaled pixel fonts from 100dpi or 75dpi
+are preferable.
+
+
+Roland Rosenfeld <roland@debian.org>

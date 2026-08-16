@@ -1,0 +1,181 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Opening files</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-building-applications.html" title="Chapter 31. Building applications">
+<link rel="prev" href="sec-buildapp-populating-window.html" title="Populating the window">
+<link rel="next" href="sec-buildapp-app-menu.html" title="An application menu">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Opening files</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-buildapp-populating-window.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 31. Building applications</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-buildapp-app-menu.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-buildapp-opening-files"></a>Opening files</h2></div></div></div>
+<p>
+In this step, we make our application show the contents of all the files that it is
+given on the commandline.
+</p>
+<p>
+To this end, we add a data member to our application window and keep a pointer to the
+<code class="classname">Gtk::Stack</code> there. We get the pointer with a call to
+<code class="methodname">Gtk::Builder::get_widget()</code> in the application window's constructor.
+</p>
+<p>
+Now we revisit the <code class="methodname">ExampleAppWindow::open_file_view()</code> method
+that is called for each commandline argument, and construct a <code class="classname">Gtk::TextView</code>
+that we then add as a page to the stack.
+</p>
+<p>
+Note that we do not have to touch the stack switcher at all. It gets all its information
+from the stack that it belongs to. Here, we are passing the label to show for each file
+as the last argument to the <code class="methodname">Gtk::Stack::add()</code> method.
+</p>
+<p>
+Our application is beginning to take shape:
+</p>
+<div class="figure">
+<a name="figure-buildapp-opening-files"></a><p class="title"><b>Figure 31.3. Opening files</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/buildapp_opening_files.png" alt="Opening files"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/buildapp/step3?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">exampleappwindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EXAMPLEAPPWINDOW_H_
+#define GTKMM_EXAMPLEAPPWINDOW_H_
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleAppWindow : public Gtk::ApplicationWindow
+{
+public:
+  ExampleAppWindow(BaseObjectType* cobject,
+    const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder);
+
+  static ExampleAppWindow* create();
+
+  void open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file);
+
+protected:
+  Glib::RefPtr&lt;Gtk::Builder&gt; m_refBuilder;
+  Gtk::Stack* m_stack;
+};
+
+#endif /* GTKMM_EXAMPLEAPPWINDOW_H */
+</pre>
+<p>File: <code class="filename">exampleapplication.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step1/exampleapplication.h"
+// Equal to the corresponding file in step1
+</pre>
+<p>File: <code class="filename">exampleapplication.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step2/exampleapplication.cc"
+// Equal to the corresponding file in step2
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "../step1/main.cc"
+// Equal to the corresponding file in step1
+</pre>
+<p>File: <code class="filename">exampleappwindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "exampleappwindow.h"
+#include &lt;iostream&gt;
+#include &lt;stdexcept&gt;
+
+ExampleAppWindow::ExampleAppWindow(BaseObjectType* cobject,
+  const Glib::RefPtr&lt;Gtk::Builder&gt;&amp; refBuilder)
+: Gtk::ApplicationWindow(cobject),
+  m_refBuilder(refBuilder),
+  m_stack(nullptr)
+{
+  m_refBuilder-&gt;get_widget("stack", m_stack);
+  if (!m_stack)
+    throw std::runtime_error("No \"stack\" object in window.ui");
+}
+
+//static
+ExampleAppWindow* ExampleAppWindow::create()
+{
+  // Load the Builder file and instantiate its widgets.
+  auto refBuilder = Gtk::Builder::create_from_resource("/org/gtkmm/exampleapp/window.ui");
+
+  ExampleAppWindow* window = nullptr;
+  refBuilder-&gt;get_widget_derived("app_window", window);
+  if (!window)
+    throw std::runtime_error("No \"app_window\" object in window.ui");
+
+  return window;
+}
+
+void ExampleAppWindow::open_file_view(const Glib::RefPtr&lt;Gio::File&gt;&amp; file)
+{
+  const auto basename = file-&gt;get_basename();
+
+  auto scrolled = Gtk::make_managed&lt;Gtk::ScrolledWindow&gt;();
+  scrolled-&gt;set_hexpand(true);
+  scrolled-&gt;set_vexpand(true);
+  scrolled-&gt;show();
+  auto view = Gtk::make_managed&lt;Gtk::TextView&gt;();
+  view-&gt;set_editable(false);
+  view-&gt;set_cursor_visible(false);
+  view-&gt;show();
+  scrolled-&gt;add(*view);
+  m_stack-&gt;add(*scrolled, basename, basename);
+
+  try
+  {
+    char* contents = nullptr;
+    gsize length = 0;
+    
+    file-&gt;load_contents(contents, length);
+    view-&gt;get_buffer()-&gt;set_text(contents, contents+length);
+    g_free(contents);
+  }
+  catch (const Glib::Error&amp; ex)
+  {
+    std::cout &lt;&lt; "ExampleAppWindow::open_file_view(\"" &lt;&lt; file-&gt;get_parse_name()
+      &lt;&lt; "\"):\n  " &lt;&lt; ex.what() &lt;&lt; std::endl;
+  }
+}
+</pre>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-buildapp-populating-window.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-building-applications.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-buildapp-app-menu.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Populating the window </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> An application menu</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>The View</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-treeview.html" title="Chapter 9. The TreeView widget">
+<link rel="prev" href="chapter-treeview.html" title="Chapter 9. The TreeView widget">
+<link rel="next" href="sec-iterating-over-model-rows.html" title="Iterating over Model Rows">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">The View</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-treeview.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 9. The TreeView widget</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-iterating-over-model-rows.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-treeview"></a>The View</h2></div></div></div>
+<p>
+The View is the actual widget (<code class="classname">Gtk::TreeView</code>) that
+displays the model (<code class="classname">Gtk::TreeModel</code>) data and allows the
+user to interact with it. The View can show all of the model's columns, or just
+some, and it can show them in various ways.
+</p>
+<p><a class="ulink" href="http://developer.gnome.org/gtkmm/3.24/classGtk_1_1TreeView.html" target="_top">Reference</a></p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="sec-treeview-using-a-model"></a>Using a Model</h3></div></div></div>
+<p>
+You can specify a <code class="classname">Gtk::TreeModel</code> when constructing the
+<code class="classname">Gtk::TreeView</code>, or you can use the
+<code class="methodname">set_model()</code> method, like so:
+</p>
+<pre class="programlisting">m_TreeView.set_model(m_refListStore);</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-adding-view-columns"></a>Adding View Columns</h3></div></div></div>
+<p>
+You can use the <code class="methodname">append_column()</code> method to  tell the View
+that it should display certain Model columns, in a certain order, with a
+certain column title.
+</p>
+<pre class="programlisting">m_TreeView.append_column("Messages", m_Columns.m_col_text);</pre>
+<p>
+When using this simple <code class="methodname">append_column()</code> override, the
+<code class="classname">TreeView</code> will display the model data with an appropriate
+<code class="classname">CellRenderer</code>. For instance, strings and numbers are
+shown in a simple <code class="classname">Gtk::Entry</code> widget, and booleans are
+shown in a <code class="classname">Gtk::CheckButton</code>. This is usually what you
+need. For other column types you must either connect a callback that converts
+your type into a string representation, with
+<code class="methodname">TreeViewColumn::set_cell_data_func()</code>, or derive a custom
+<code class="classname">CellRenderer</code>. Note that (unsigned) short is not
+supported by default - You could use (unsigned) int or (unsigned) long as the
+column type instead.
+</p>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-multiple-model-columns-per-view-column"></a>More than one Model Column per View Column</h3></div></div></div>
+<p>
+To render more than one model column in a view column, you need to create the
+<code class="classname">TreeView::Column</code> widget manually, and use
+<code class="methodname">pack_start()</code> to add the model columns to it.
+</p>
+<p>
+Then use <code class="methodname">append_column()</code> to add the view Column to the
+View. Notice that <code class="methodname">Gtk::TreeView::append_column()</code> is overridden
+to accept either a prebuilt <code class="classname">Gtk::TreeView::Column</code> widget, or
+just the <code class="classname">TreeModelColumn</code> from which it generates an
+appropriate <code class="classname">Gtk::TreeView::Column</code> widget.
+</p>
+<p>
+Here is some example code from
+<code class="filename">gtkmm/demos/gtk-demo/example_icontheme.cc</code>, which has a pixbuf
+icon and a text name in the same column:
+</p>
+<pre class="programlisting">Gtk::TreeView::Column* pColumn =
+  Gtk::make_managed&lt;Gtk::TreeView::Column&gt;("Icon Name");
+
+// m_columns.icon and m_columns.iconname are columns in the model.
+// pColumn is the column in the TreeView:
+pColumn-&gt;pack_start(m_columns.icon, /* expand= */ false);
+pColumn-&gt;pack_start(m_columns.iconname);
+
+m_TreeView.append_column(*pColumn);</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-cellrenderer-details"></a>Specifying CellRenderer details</h3></div></div></div>
+<p>
+The default <code class="classname">CellRenderers</code> and their default behaviour
+will normally suffice, but you might occasionally need finer control. For
+instance, this example code from
+<code class="filename">gtkmm/demos/gtk-demo/example_treeview_treestore.cc</code>, appends a
+<code class="classname">Gtk::CellRenderer</code> widget and instructs it to render the
+data from various model columns through various aspects of its appearance.
+</p>
+<pre class="programlisting">int cols_count = m_TreeView.append_column_editable("Alex", m_columns.alex);
+Gtk::TreeViewColumn* pColumn = m_TreeView.get_column(cols_count-1);
+if(pColumn)
+{
+  Gtk::CellRendererToggle* pRenderer =
+    static_cast&lt;Gtk::CellRendererToggle*&gt;(pColumn-&gt;get_first_cell());
+  pColumn-&gt;add_attribute(pRenderer-&gt;property_visible(), m_columns.visible);
+  pColumn-&gt;add_attribute(pRenderer-&gt;property_activatable(), m_columns.world);</pre>
+<p>
+    You can also connect to <code class="classname">CellRenderer</code> signals to detect user
+actions. For instance:
+</p>
+<pre class="programlisting">Gtk::CellRendererToggle* pRenderer =
+    Gtk::make_managed&lt;Gtk::CellRendererToggle&gt;();
+pRenderer-&gt;signal_toggled().connect(
+    sigc::bind( sigc::mem_fun(*this,
+        &amp;Example_TreeView_TreeStore::on_cell_toggled), m_columns.dave)
+);</pre>
+</div>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="treeview-editable-cells"></a>Editable Cells</h3></div></div></div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="treeview-editable-cells-automatic"></a>Automatically-stored editable cells.</h4></div></div></div>
+<p>
+Cells in a <code class="classname">TreeView</code> can be edited in-place by the user.
+To allow this, use the <code class="classname">Gtk::TreeView</code>
+<code class="methodname">insert_column_editable()</code> and
+<code class="methodname">append_column_editable()</code> methods instead of
+<code class="methodname">insert_column()</code> and <code class="methodname">append_column()</code>.
+When these cells are edited the new values will be stored immediately in the
+Model. Note that these methods are templates which can only be instantiated for
+simple column types such as <code class="classname">Glib::ustring</code>, int, and
+long.
+</p>
+</div>
+<div class="sect3">
+<div class="titlepage"><div><div><h4 class="title">
+<a name="treeview-editable-cells-custom"></a>Implementing custom logic for editable cells.</h4></div></div></div>
+<p>
+However, you might not want the new values to be stored
+immediately. For instance, maybe you want to restrict the input to
+certain characters or ranges of values.
+</p>
+<p>
+To achieve this, you should use the normal <code class="classname">Gtk::TreeView</code>
+<code class="methodname">insert_column()</code> and <code class="methodname">append_column()</code>
+methods, then use <code class="methodname">get_column_cell_renderer()</code> to get the
+<code class="classname">Gtk::CellRenderer</code> used by that column.
+</p>
+<p>
+You should then cast that <code class="classname">Gtk::CellRenderer*</code> to the
+specific <code class="classname">CellRenderer</code> that you expect, so you can use specific API.
+</p>
+<p>For instance, for a CellRendererText, you would set the cell's <span class="emphasis"><em>editable</em></span> property to true, like
+so:
+</p>
+<pre class="programlisting">cell.property_editable() = true;</pre>
+<p>
+For a CellRendererToggle, you would set the <span class="emphasis"><em>activatable</em></span>
+property instead.
+</p>
+<p>You can then connect
+to the appropriate "edited" signal. For instance, connect to
+<code class="methodname">Gtk::CellRendererText::signal_edited()</code>, or
+<code class="methodname">Gtk::CellRendererToggle::signal_toggled()</code>. If the column
+contains more than one <code class="classname">CellRenderer</code> then you will need
+to use <code class="methodname">Gtk::TreeView::get_column()</code> and then call
+<code class="methodname">get_cell_renderers()</code> on that view Column.
+</p>
+<p>
+In your signal handler, you should examine the new value and then
+store it in the Model if that is appropriate for your application.
+</p>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-treeview.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-treeview.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-iterating-over-model-rows.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 9. The TreeView widget </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Iterating over Model Rows</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

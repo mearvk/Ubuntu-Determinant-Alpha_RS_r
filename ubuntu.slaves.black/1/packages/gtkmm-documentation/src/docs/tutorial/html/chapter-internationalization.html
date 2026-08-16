@@ -1,0 +1,271 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Chapter 27. Internationalization and Localization</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-builder-using-derived-widgets.html" title="Using derived widgets">
+<link rel="next" href="sec-i18n-marking-strings.html" title="Marking strings for translation">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Chapter 27. Internationalization and Localization</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-builder-using-derived-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-i18n-marking-strings.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="chapter">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-internationalization"></a>Chapter 27. Internationalization and Localization</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-internationalization.html#sec-internationalization-intro">Preparing your project</a></span></li>
+<li><span class="sect1"><a href="sec-i18n-marking-strings.html">Marking strings for translation</a></span></li>
+<li><span class="sect1"><a href="sec-i18n-expecting-utf8.html">Expecting UTF8</a></span></li>
+<li><span class="sect1"><a href="sec-i18n-pitfalls.html">Pitfalls</a></span></li>
+<li><span class="sect1"><a href="sec-i18n-getting-help-with-translations.html">Getting help with translations</a></span></li>
+</ul>
+</div>
+<p>
+    <span class="application">gtkmm</span> applications can easily support multiple languages, including
+    non-European languages such as Chinese and right-to-left languages such as
+    Arabic. An appropriately-written and translated <span class="application">gtkmm</span> application will use
+    the appropriate language at runtime based on the user's environment.
+  </p>
+<p>
+    You might not anticipate the need to support additional languages, but
+    you can never rule it out. And it's easier to develop the application
+    properly in the first place rather than retrofitting later.
+  </p>
+<p>
+    The process of writing source code that allows for translation is called
+    <code class="literal">internationalization</code>, often abbreviated to
+    <code class="literal">i18n</code>. The <code class="literal">Localization</code> process,
+    sometimes abbreviated as <code class="literal">l10n</code>, provides translated text
+    for other languages, based on that source code.
+  </p>
+<p>
+    The main activity in the internationalization process is finding strings
+    seen by users and marking them for translation. You do not need to do it all
+    at once - if you set up the necessary project infrastructure correctly then
+    your application will work normally regardless of how many strings you've
+    covered.
+  </p>
+<p>
+    String literals should be typed in the source code in English, but
+    surrounded by a macro. The <span class="application">gettext</span> (or intltool)
+    utility can then extract the marked strings for translation, and substitute
+    the translated text at runtime.
+  </p>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-internationalization-intro"></a>Preparing your project</h2></div></div></div>
+<div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note">
+<tr>
+<td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="icons/note.png"></td>
+<th align="left">Note</th>
+</tr>
+<tr><td align="left" valign="top">
+<p>
+        In the instructions below we will assume that you will not be using
+        <span class="application">gettext</span> directly, but
+        <span class="application">intltool</span>, which was written specifically for
+        <code class="literal">GNOME</code>. <span class="application">intltool</span> uses
+        <code class="function">gettext()</code>, which extracts strings from source code,
+        but <span class="application">intltool</span> can also combine strings from
+        other files, for example from desktop menu details, and GUI resource
+        files such as <span class="application">Glade</span> files, into standard
+        <span class="application">gettext</span> <code class="filename">.pot/.po</code> files.
+      </p>
+<p>
+        We also assume that you are using autotools (e.g.
+        <span class="application">automake</span> and
+        <span class="application">autoconf</span>) to build your project, and
+        that you are using <a class="ulink" href="http://git.gnome.org/browse/gnome-common/tree/autogen.sh" target="_top">
+          <code class="literal">./autogen.sh</code> from
+          <span class="application">gnome-common</span></a>
+        or a similar <code class="literal">autogen.sh</code> file, which, among other
+        things, takes care of some <span class="application">intltool</span>
+        initialization.
+      </p>
+</td></tr>
+</table></div>
+<p>
+      An alternative to <span class="application">gnome-common</span>'s
+      <code class="literal">autogen.sh</code> may look like this:
+    </p>
+<pre class="programlisting">#! /bin/sh -e
+test -n "$srcdir" || srcdir=`dirname "$0"`
+test -n "$srcdir" || srcdir=.
+
+autoreconf --force --install --verbose --warnings=all "$srcdir"
+echo "Running intltoolize --copy --force --automake"
+intltoolize --copy --force --automake
+test -n "$NOCONFIGURE" || "$srcdir/configure" "$@"</pre>
+<p>
+      Create a sub-directory named <code class="literal">po</code> in your project's root
+      directory. This directory will eventually contain all of your
+      translations. Within it, create a file named <code class="literal">LINGUAS</code>
+      and a file named <code class="literal">POTFILES.in</code>. It is common practice to
+      also create a <code class="literal">ChangeLog</code> file in the
+      <code class="literal">po</code> directory so that translators can keep track of
+      translation changes.
+    </p>
+<p>
+      <code class="literal">LINGUAS</code> contains an alphabetically sorted list of codes
+      identifying the languages for which your program is translated (comment
+      lines starting with a <code class="literal">#</code> are ignored). Each language
+      code listed in the <code class="literal">LINGUAS</code> file must have a
+      corresponding <code class="literal">.po</code> file. So, if your program has German
+      and Japanese translations, your <code class="literal">LINGUAS</code> file would
+      look like this:
+    </p>
+<pre class="programlisting"># keep this file sorted alphabetically, one language code per line
+de
+ja</pre>
+<p>
+      (In addition, you'd have the files <code class="literal">ja.po</code> and
+      <code class="literal">de.po</code> in your
+      <code class="literal">po</code> directory which contain the German and Japanese
+      translations, respectively.)
+    </p>
+<p>
+      <code class="literal">POTFILES.in</code> is a list of paths to all files which
+      contain strings marked up for translation, starting from the project root
+      directory. So for example, if your project sources were located in a
+      subdirectory named <code class="literal">src</code>, and you had two files that
+      contained strings that should be translated, your
+      <code class="literal">POTFILES.in</code> file might look like this:
+    </p>
+<pre class="programlisting">src/main.cc
+src/other.cc</pre>
+<p>
+      If you are using <span class="application">gettext</span> directly, you can only
+      mark strings for translation if they are in source code file. However, if
+      you use <span class="application">intltool</span>, you can mark strings for
+      translation in a variety of other file formats, including
+      <span class="application">Glade</span> UI files, xml, <a class="ulink" href="http://standards.freedesktop.org/desktop-entry-spec/latest/" target="_top">.desktop
+        files</a> and several more. So, if you have designed some of the
+      application UI in <span class="application">Glade</span> then also add your
+      <code class="filename">.glade</code> files to the list in
+      <code class="literal">POTFILES.in</code>.
+    </p>
+<p>
+      Now that there is a place to put your translations, you need to initialize
+      <span class="application">intltool</span> and <span class="application">gettext</span>.
+      Add the following code to your <code class="literal">configure.ac</code>,
+      substituting 'programname' with the name of your program:
+    </p>
+<pre class="programlisting">IT_PROG_INTLTOOL([0.35.0])
+
+GETTEXT_PACKAGE=programname
+AC_SUBST(GETTEXT_PACKAGE)
+AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE], ["$GETTEXT_PACKAGE"],
+                   [The domain to use with gettext])
+AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT_VERSION([0.17])
+
+PROGRAMNAME_LOCALEDIR=[${datadir}/locale]
+AC_SUBST(PROGRAMNAME_LOCALEDIR)</pre>
+<p>
+      This <code class="varname">PROGRAMNAME_LOCALEDIR</code> variable will be used later
+      in the <code class="literal">Makefile.am</code> file, to define a macro that will be
+      used when you initialize <span class="application">gettext</span> in your source
+      code.
+    </p>
+<p>
+      <code class="literal">AM_GLIB_GNU_GETTEXT</code> has been an alternative to
+      <code class="literal">AM_GNU_GETTEXT</code> and <code class="literal">AM_GNU_GETTEXT_VERSION</code>,
+      but <code class="literal">AM_GLIB_GNU_GETTEXT</code> is now deprecated, and shall
+      not be used in new code.
+    </p>
+<p>
+      In the top-level Makefile.am:
+      </p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>Add <code class="literal">po</code> to the <code class="literal">SUBDIRS</code>
+            variable. Without this, your translations won't get built and
+            installed when you build the program</p></li>
+<li class="listitem">
+<p>
+            Define <code class="literal">INTLTOOL_FILES</code> as:
+            </p>
+<pre class="programlisting">INTLTOOL_FILES = intltool-extract.in \
+                 intltool-merge.in \
+                 intltool-update.in</pre>
+<p>
+          </p>
+</li>
+<li class="listitem"><p>
+            Add <code class="literal">INTLTOOL_FILES</code> to the
+            <code class="literal">EXTRA_DIST</code> list of files. This ensures that when
+            you do a <span class="command"><strong>make dist</strong></span>, these commands will be
+            included in the source tarball.
+          </p></li>
+<li class="listitem">
+<p>
+            Update your <code class="literal">DISTCLEANFILES</code>:
+            </p>
+<pre class="programlisting">DISTCLEANFILES = ... intltool-extract \
+                 intltool-merge \
+                 intltool-update \
+                 po/.intltool-merge-cache</pre>
+<p>
+          </p>
+</li>
+<li class="listitem">
+<p>
+            Depending on the types of files that contain translatable strings,
+            add code such as
+            </p>
+<pre class="programlisting">desktopdir = $(datadir)/applications
+desktop_in_files = programname.desktop.in
+desktop_DATA = $(desktop_in_files:.desktop.in=.desktop)
+@INTLTOOL_DESKTOP_RULE@</pre>
+<p>
+          </p>
+</li>
+</ul></div>
+<p>
+    </p>
+<p>
+      In your <code class="literal">src/Makefile.am</code>, update your
+      <code class="literal">AM_CPPFLAGS</code> to add the following preprocessor macro
+      definition:
+    </p>
+<pre class="programlisting">AM_CPPFLAGS = ... -DPROGRAMNAME_LOCALEDIR=\"${PROGRAMNAME_LOCALEDIR}\"</pre>
+<p>
+      This macro will be used when you initialize <code class="literal">gettext</code> in
+      your source code.
+    </p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-builder-using-derived-widgets.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-i18n-marking-strings.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Using derived widgets </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Marking strings for translation</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

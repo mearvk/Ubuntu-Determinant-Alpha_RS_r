@@ -1,0 +1,256 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Event Propagation</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-keyboardevents.html" title="Chapter 23. Keyboard Events">
+<link rel="prev" href="chapter-keyboardevents.html" title="Chapter 23. Keyboard Events">
+<link rel="next" href="chapter-chapter-timeouts.html" title="Chapter 24. Timeouts, I/O and Idle Functions">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Event Propagation</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="chapter-keyboardevents.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Chapter 23. Keyboard Events</th>
+<td width="20%" align="right"> <a accesskey="n" href="chapter-chapter-timeouts.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-keyboardevents-propagation"></a>Event Propagation</h2></div></div></div>
+<p>
+      Event propagation means that, when an event is emitted on a particular
+      widget, it can be passed to its parent widget (and that widget can pass
+      it to its parent, and so on) and, if the parent has an event handler,
+      that handler will be called. 
+    </p>
+<p>
+      Contrary to other events, keyboard events are first sent to the toplevel window
+      (<code class="classname">Gtk::Window</code>), where it will be checked
+      for any keyboard shortcuts that may be set (accelerator keys and mnemonics,
+      used for selecting menu items from the keyboard). After this (and assuming
+      the event wasn't handled), it is sent to the widget which has focus,
+      and the propagation begins from there.
+    </p>
+<p>
+      The event will propagate until it reaches the top-level widget, or until
+      you stop the propagation by returning <code class="literal">true</code> from an
+      event handler.
+    </p>
+<p>
+      Notice, that after canceling an event, no other function will be called
+      (even if it is from the same widget).
+    </p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="keyboardevents-propagation-example"></a>Example</h3></div></div></div>
+<p>
+        In this example there are three event handlers that are called after
+        <code class="classname">Gtk::Window</code>'s default event handler, one in the
+        <code class="classname">Gtk::Entry</code>, one in the <code class="classname">Gtk::Grid</code>
+        and one in the <code class="classname">Gtk::Window</code>.
+      </p>
+<p>
+        In the <code class="classname">Gtk::Window</code>, we have also the default handler
+        overridden (<code class="methodname">on_key_release_event()</code>), and
+        another handler being called before the default handler
+        (<code class="methodname">windowKeyReleaseBefore()</code>).
+      </p>
+<p>
+        The purpose of this example is to show the steps the event takes when it is emitted.
+      </p>
+<p>
+        When you write in the entry, a key release event will be emitted,
+        which will go first to the toplevel window (<code class="classname">Gtk::Window</code>),
+        since we have one event handler set to be called before, that's what is
+        called first (<code class="methodname">windowKeyReleaseBefore()</code>).
+        Then the default handler is called (which we have overridden), and after
+        that the event is sent to the widget that has focus,
+        the <code class="classname">Entry</code> in our example and, depending on whether we let
+        it propagate, it can reach the <code class="classname">Grid</code>'s and the
+        <code class="classname">Window</code>'s event handlers. If it propagates,
+        the text you're writing will appear in the <code class="classname">Label</code>
+        above the <code class="classname">Entry</code>.
+      </p>
+<div class="figure">
+<a name="figure-keyboardevents-propagation"></a><p class="title"><b>Figure 23.2. Keyboard Events - Event Propagation</b></p>
+<div class="figure-contents"><div class="screenshot"><div><img src="figures/keyboardevents_propagation.png" alt="Keyboard Events - Event Propagation"></div></div></div>
+</div>
+<br class="figure-break"><p><a class="ulink" href="http://git.gnome.org/browse/gtkmm-documentation/tree/examples/book/keyboard_events/propagation/?h=gtkmm-3-24" target="_top">Source Code</a></p>
+<p>File: <code class="filename">examplewindow.h</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#ifndef GTKMM_EVENT_PROPAGATION_H
+#define GTKMM_EVENT_PROPAGATION_H
+
+#include &lt;gtkmm.h&gt;
+
+class ExampleWindow : public Gtk::Window
+{
+public:
+
+  ExampleWindow();
+  virtual ~ExampleWindow();
+
+private:
+  //Override default signal handler:
+  bool on_key_release_event(GdkEventKey* event) override;
+
+  bool entryKeyRelease(GdkEventKey* event);
+  bool gridKeyRelease(GdkEventKey* event);
+  bool windowKeyReleaseBefore(GdkEventKey* event);
+  bool windowKeyRelease(GdkEventKey* event);
+
+  Gtk::Grid m_container;
+
+  Gtk::Label m_label;
+  Gtk::Entry m_entry;
+  Gtk::CheckButton m_checkbutton_can_propagate;
+};
+
+#endif //GTKMM_EVENT_PROPAGATION_H
+</pre>
+<p>File: <code class="filename">main.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;gtkmm/application.h&gt;
+
+int main(int argc, char *argv[])
+{
+  auto app = Gtk::Application::create(argc, argv, "org.gtkmm.example");
+
+  ExampleWindow window;
+
+  //Shows the window and returns when it is closed.
+  return app-&gt;run(window);
+}
+</pre>
+<p>File: <code class="filename">examplewindow.cc</code> (For use with gtkmm 3, not gtkmm 2)
+</p>
+<pre class="programlisting">
+#include "examplewindow.h"
+#include &lt;iostream&gt;
+
+ExampleWindow::ExampleWindow()
+{
+  add(m_container);
+  set_title("Event Propagation");
+  set_border_width(10);
+
+  m_label.set_label("A label");
+  m_checkbutton_can_propagate.set_label("Can Propagate");
+  m_checkbutton_can_propagate.set_active();
+
+  // Main Container
+  m_container.set_orientation(Gtk::ORIENTATION_VERTICAL);
+  m_container.add(m_label);
+  m_container.add(m_entry);
+  m_container.add(m_checkbutton_can_propagate);
+
+  // Events
+  add_events(Gdk::KEY_RELEASE_MASK);
+
+  m_entry.signal_key_release_event().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::entryKeyRelease));
+
+  m_container.signal_key_release_event().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::gridKeyRelease));
+
+  // Called before the default event signal handler.
+  signal_key_release_event().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::windowKeyReleaseBefore), false);
+
+  // Called after the default event signal handler.
+  signal_key_release_event().connect(
+    sigc::mem_fun(*this, &amp;ExampleWindow::windowKeyRelease));
+
+  show_all_children();
+}
+
+//By changing the return value we allow, or don't allow, the event to propagate to other elements.
+bool ExampleWindow::entryKeyRelease(GdkEventKey* /* event */ )
+{
+  std::cout &lt;&lt; "Entry" &lt;&lt; std::endl;
+
+  if(m_checkbutton_can_propagate.get_active())
+  {
+    return false;
+  }
+
+  return true;
+}
+
+bool ExampleWindow::gridKeyRelease(GdkEventKey* /* event */ )
+{
+  std::cout &lt;&lt; "Grid" &lt;&lt; std::endl;
+
+  //Let it propagate:
+  return false;
+}
+
+bool ExampleWindow::windowKeyReleaseBefore(GdkEventKey* /* event */ )
+{
+  std::cout &lt;&lt; "Window before" &lt;&lt; std::endl;
+  return false;
+}
+
+bool ExampleWindow::on_key_release_event(GdkEventKey* key_event)
+{
+  std::cout &lt;&lt; "Window overridden" &lt;&lt; std::endl;
+
+  // call base class function (to get the normal behaviour)
+  return Gtk::Window::on_key_release_event(key_event);
+}
+
+// This will set the entry's text in the label, every time a key is pressed.
+bool ExampleWindow::windowKeyRelease(GdkEventKey* /* event */ )
+{
+  std::cout &lt;&lt; "Window after";
+
+  //checking if the entry is on focus, otherwise the label would get changed by pressing keys
+  //on the window (when the entry is not on focus), even if m_checkbutton_can_propagate wasn't active
+  if(m_entry.has_focus())
+  {
+    m_label.set_text(m_entry.get_text());
+    std::cout &lt;&lt; ", " &lt;&lt; m_entry.get_text();
+  }
+  std::cout &lt;&lt; std::endl;
+
+  return true;
+}
+
+ExampleWindow::~ExampleWindow()
+{
+}
+
+</pre>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="chapter-keyboardevents.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-keyboardevents.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="chapter-chapter-timeouts.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Chapter 23. Keyboard Events </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Chapter 24. Timeouts, I/O and Idle Functions </td>
+</tr>
+</table>
+</div>
+</body>
+</html>

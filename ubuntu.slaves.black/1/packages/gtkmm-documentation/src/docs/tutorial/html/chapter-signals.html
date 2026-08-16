@@ -1,0 +1,188 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Appendix B. Signals</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="index.html" title="Programming with gtkmm 3">
+<link rel="prev" href="sec-refptr-constness.html" title="Constness">
+<link rel="next" href="sec-writing-signal-handlers.html" title="Writing signal handlers">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">Appendix B. Signals</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-refptr-constness.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center"> </th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-writing-signal-handlers.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="appendix">
+<div class="titlepage"><div><div><h1 class="title">
+<a name="chapter-signals"></a>Appendix B. Signals</h1></div></div></div>
+<div class="toc">
+<p><b>Table of Contents</b></p>
+<ul class="toc">
+<li><span class="sect1"><a href="chapter-signals.html#sec-connecting-signal-handlers">Connecting signal handlers</a></span></li>
+<li><span class="sect1"><a href="sec-writing-signal-handlers.html">Writing signal handlers</a></span></li>
+<li><span class="sect1"><a href="sec-disconnecting-signal-handlers.html">Disconnecting signal handlers</a></span></li>
+<li><span class="sect1"><a href="sec-overriding-default-signal-handlers.html">Overriding default signal handlers</a></span></li>
+<li><span class="sect1"><a href="sec-binding-extra-arguments.html">Binding extra arguments</a></span></li>
+<li><span class="sect1"><a href="sec-xeventsignals.html">X Event signals</a></span></li>
+<li><span class="sect1"><a href="sec-exceptions-in-signal-handlers.html">Exceptions in signal handlers</a></span></li>
+</ul>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-connecting-signal-handlers"></a>Connecting signal handlers</h2></div></div></div>
+<p>
+<span class="application">gtkmm</span> widget classes have signal accessor methods, such as
+<code class="methodname">Gtk::Button::signal_clicked()</code>, which allow you to connect
+your signal handler. Thanks to the flexibility of
+<span class="application">libsigc++</span>, the callback library used by <span class="application">gtkmm</span>, the
+signal handler can be almost any kind of function, but you will probably want
+to use a class method. Among <span class="application">GTK+</span> C coders, these
+signal handlers are often named callbacks.
+</p>
+<p>
+Here's an example of a signal handler being connected to a signal:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+#include &lt;gtkmm/button.h&gt;
+
+void on_button_clicked()
+{
+    std::cout &lt;&lt; "Hello World" &lt;&lt; std::endl;
+}
+
+int main()
+{
+    Gtk::Button button("Hello World");
+    button.signal_clicked().connect(sigc::ptr_fun(&amp;on_button_clicked));
+}
+</pre>
+<p>
+</p>
+<p>
+There's rather a lot to think about in this (non-functional) code.
+First let's identify the parties involved:
+</p>
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
+<li class="listitem"><p>
+The signal handler is <code class="methodname">on_button_clicked()</code>.
+</p></li>
+<li class="listitem"><p>
+We're hooking it up to the <code class="classname">Gtk::Button</code> object called
+<code class="varname">button</code>.
+</p></li>
+<li class="listitem"><p>
+When the Button emits its <code class="literal">clicked</code> signal,
+<code class="methodname">on_button_clicked()</code> will be called.
+</p></li>
+</ul></div>
+<p>
+Now let's look at the connection again:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+    ...
+    button.signal_clicked().connect(sigc::ptr_fun(&amp;on_button_clicked));
+    ...
+</pre>
+<p>
+</p>
+<p>
+Note that we don't pass a pointer to <code class="methodname">on_button_clicked()</code>
+directly to the signal's <code class="methodname">connect()</code> method. Instead, we
+call <code class="function">sigc::ptr_fun()</code>, and pass the result to
+<code class="methodname">connect()</code>.
+</p>
+<p>
+<code class="function">sigc::ptr_fun()</code>  generates a <code class="classname">sigc::slot</code>.
+A slot is an object which
+looks and feels like a function, but is actually an object. These are also
+known as function objects, or functors.
+<code class="function">sigc::ptr_fun()</code> generates a slot for a standalone function or static method.
+<code class="function">sigc::mem_fun()</code> generates a slot for a member method of a particular instance.
+</p>
+<p>
+Here's a slightly larger example of slots in action:
+</p>
+<p>
+</p>
+<pre class="programlisting">
+void on_button_clicked();
+
+class some_class
+{
+    void on_button_clicked();
+};
+
+some_class some_object;
+
+int main()
+{
+    Gtk::Button button;
+    button.signal_clicked().connect( sigc::ptr_fun(&amp;on_button_clicked) );
+    button.signal_clicked().connect( sigc::mem_fun(some_object, &amp;some_class::on_button_clicked) );
+}
+</pre>
+<p>
+</p>
+<p>
+The first call to <code class="methodname">connect()</code> is just like the one we saw
+last time; nothing new here.</p>
+<p>The next is more interesting.
+<code class="function">sigc::mem_fun()</code> is called with two arguments. The first
+argument is <em class="parameter"><code>some_object</code></em>, which is the object that our
+new slot will be pointing at. The second argument is a pointer to one of its
+methods. This particular version of <code class="function">sigc::mem_fun()</code>
+creates a slot which will, when "called", call the pointed-to method of the
+specified object, in this case
+<code class="methodname">some_object.on_button_clicked()</code>.
+</p>
+<p>
+Another thing to note about this example is that we made the call to
+<code class="methodname">connect()</code> twice for the same signal object. This is
+perfectly fine - when the button is clicked, both signal handlers will be
+called.
+</p>
+<p>
+We just told you that the button's <code class="literal">clicked</code> signal is expecting
+to call a method with no arguments. All signals have
+requirements like this - you can't hook a function with two arguments
+to a signal expecting none (unless you use an adapter, such as
+<code class="function">sigc::bind()</code>, of course). Therefore, it's important to
+know what type of signal handler you'll be expected to connect to a given
+signal.
+</p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-refptr-constness.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"> </td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-writing-signal-handlers.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Constness </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Writing signal handlers</td>
+</tr>
+</table>
+</div>
+</body>
+</html>

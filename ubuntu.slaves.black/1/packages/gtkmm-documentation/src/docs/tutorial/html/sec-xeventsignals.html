@@ -1,0 +1,121 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>X Event signals</title>
+<link rel="stylesheet" type="text/css" href="style.css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.79.1">
+<link rel="home" href="index.html" title="Programming with gtkmm 3">
+<link rel="up" href="chapter-signals.html" title="Appendix B. Signals">
+<link rel="prev" href="sec-binding-extra-arguments.html" title="Binding extra arguments">
+<link rel="next" href="sec-exceptions-in-signal-handlers.html" title="Exceptions in signal handlers">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr><th colspan="3" align="center">X Event signals</th></tr>
+<tr>
+<td width="20%" align="left">
+<a accesskey="p" href="sec-binding-extra-arguments.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<th width="60%" align="center">Appendix B. Signals</th>
+<td width="20%" align="right"> <a accesskey="n" href="sec-exceptions-in-signal-handlers.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+</table>
+<hr>
+</div>
+<div class="sect1">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="sec-xeventsignals"></a>X Event signals</h2></div></div></div>
+<p>
+The <code class="classname">Widget</code> class has some special signals which
+correspond to the underlying X-Windows events. These are suffixed by
+<code class="literal">_event</code>; for instance,
+<code class="methodname">Widget::signal_button_press_event()</code>.
+</p>
+<p>
+You might occasionally find it useful to handle X events when there's something
+you can't accomplish with normal signals. <code class="classname">Gtk::Button</code>,
+for example, does not send mouse-pointer coordinates with its
+<code class="literal">clicked</code> signal, but you could handle
+<code class="literal">button_press_event</code> if you needed this
+information. X events are also often used to handle key-presses.
+</p>
+<p>
+These signals behave slightly differently. The value returned from the signal handler indicates whether it has fully "handled"
+the event. If the value is <code class="literal">false</code> then <span class="application">gtkmm</span> will pass the event on to the next signal handler. If the value is <code class="literal">true</code> then no other signal handlers will need to be called.
+</p>
+<p>
+Handling an X event doesn't affect the Widget's other signals. If you handle
+<code class="literal">button_press_event</code> for
+<code class="classname">Gtk::Button</code>, you'll still be able to get the
+<code class="literal">clicked</code> signal. They are emitted at (nearly) the same time.
+</p>
+<p>Note also that not all widgets receive all X events by default. To receive additional
+X events, you can use <code class="methodname">Gtk::Widget::set_events()</code> before showing the
+widget, or <code class="methodname">Gtk::Widget::add_events()</code> after showing the widget. However,
+some widgets must first be placed inside an <code class="classname">EventBox</code> widget. See
+the <a class="link" href="chapter-widgets-without-xwindows.html" title="Chapter 15. Widgets Without X-Windows">Widgets Without X-Windows</a> chapter.
+</p>
+<p>
+Here's a simple example:
+</p>
+<pre class="programlisting">
+bool on_button_press(GdkEventButton* event);
+Gtk::Button button("label");
+button.signal_button_press_event().connect( sigc::ptr_fun(&amp;on_button_press) );
+</pre>
+<p>
+</p>
+<p>
+When the mouse is over the button and a mouse button is pressed,
+<code class="methodname">on_button_press()</code> will be called.
+</p>
+<p>
+<span class="type">GdkEventButton</span> is a structure containing the event's parameters,
+such as the coordinates of the mouse pointer at the time the button was
+pressed. There are several different types of <span class="type">GdkEvent</span> structures
+for the various events.
+</p>
+<div class="sect2">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="signal-handler-sequence"></a>Signal Handler sequence</h3></div></div></div>
+<p>By default, your signal handlers are called after any previously-connected
+signal handlers. However, this can be a problem with the X Event signals. For instance,
+the existing signal handlers, or the default signal handler, might return <code class="literal">true</code>
+to stop other signal handlers from being called. To specify that your signal handler
+should be called before the other signal handlers, so that it will always be called,
+you can specify <code class="literal">false</code> for the optional <code class="literal">after</code>
+parameter. For instance,
+</p>
+<pre class="programlisting">
+button.signal_button_press_event().connect( sigc::ptr_fun(&amp;on_mywindow_button_press), false );
+</pre>
+<p>
+</p>
+<p>The event is delivered first to the widget the event occurred in. If all
+signal handlers in that widget return <code class="literal">false</code> (indicating that
+the event has not been handled), then the signal will be propagated to the parent
+widget and emitted there. This continues all the way up to the top-level widget
+if no one handles the event. 
+</p>
+</div>
+</div>
+<div class="navfooter">
+<hr>
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left">
+<a accesskey="p" href="sec-binding-extra-arguments.html"><img src="icons/prev.png" alt="Prev"></a> </td>
+<td width="20%" align="center"><a accesskey="u" href="chapter-signals.html"><img src="icons/up.png" alt="Up"></a></td>
+<td width="40%" align="right"> <a accesskey="n" href="sec-exceptions-in-signal-handlers.html"><img src="icons/next.png" alt="Next"></a>
+</td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Binding extra arguments </td>
+<td width="20%" align="center"><a accesskey="h" href="index.html"><img src="icons/home.png" alt="Home"></a></td>
+<td width="40%" align="right" valign="top"> Exceptions in signal handlers</td>
+</tr>
+</table>
+</div>
+</body>
+</html>
