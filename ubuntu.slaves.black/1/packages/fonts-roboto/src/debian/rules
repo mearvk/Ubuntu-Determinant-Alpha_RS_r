@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2013, 2015 Jonas Smedegaard <dr@jones.dk>
+# Copyright © 2013-2015 Vasudev Kamath <kamathvasudev@gmail.com>
+# Description: Main Debian packaging script for fonts-roboto
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# This needs to declared/run before including CDBS snippets
+
+include /usr/share/cdbs/1/rules/upstream-tarball.mk
+include /usr/share/cdbs/1/rules/utils.mk
+include /usr/share/cdbs/1/rules/debhelper.mk
+
+
+DEB_UPSTREAM_URL = https://github.com/google/roboto/archive
+DEB_UPSTREAM_PACKAGE = RobotoFonts
+DEB_UPSTREAM_TARBALL_SRCDIR = roboto-fonts-$(DEB_UPSTREAM_TARBALL_BASENAME)
+
+DEB_UPSTREAM_TARBALL_SRCDIR += $(if \
+ $(filter $(DEB_UPSTREAM_PACKAGE)-%,$(DEB_UPSTREAM_TARBALL_BASENAME)),\
+  $(error set DEB_UPSTREAM_TARBALL_BASENAME to commit hash))
+
+# extract metadata from images before copyright check
+CDBS_BUILD_DEPENDS +=, libregexp-assemble-perl, libimage-exiftool-perl
+CDBS_BUILD_DEPENDS +=, libfont-ttf-perl
+local_inspection_regex = ttf|ttc
+DEB_COPYRIGHT_CHECK_IGNORE_REGEX = ^((.*/)?[^/]+\.($(local_inspection_regex))|debian/(changelog|copyright(|_hints|_newhints)|*))$$
+
+debian/stamp-copyright-check: debian/stamp-extract-copyright
+debian/stamp-extract-copyright:
+	find * -type f -regextype posix-extended \
+		-regex '.*\.($(local_inspection_regex))' \
+		-print0 | perl -0 debian/license-miner
+	touch $@
+pre-build:: clean-extracted-copyright-during-build
+clean-extracted-copyright-during-build: debian/stamp-copyright-check
+	find -type f -name '*.metadata_dump' -delete
+clean::
+	find -type f -name '*.metadata_dump' -delete
+	rm -f debian/stamp-extract-copyright
+
+binary-install/fonts-roboto-hinted:: binary-install/fonts-roboto-unhinted
+	mkdir -p debian/fonts-roboto-hinted/usr/share/fonts/truetype/roboto/hinted
+	for d in debian/fonts-roboto-unhinted/usr/share/fonts/truetype/roboto/unhinted/*.ttf \
+	         debian/fonts-roboto-unhinted/usr/share/fonts/truetype/roboto/unhinted/*/*.ttf; \
+	do \
+		echo ln -s $${d#debian/fonts-roboto-unhinted} debian/fonts-roboto-hinted/usr/share/fonts/truetype/roboto/hinted/; \
+		ln -s $${d#debian/fonts-roboto-unhinted} debian/fonts-roboto-hinted/usr/share/fonts/truetype/roboto/hinted/; \
+	done
