@@ -1,0 +1,46 @@
+From: Jeremy Harris <jgh146exb@wizmail.org>
+Date: Sun, 6 Mar 2022 14:25:13 +0000
+Subject: Utilities: fix exiqgrep perl syntax, add testcases. Bug 2821
+
+Utilities: fix exiqgrep perl syntax, add testcases.  Bug 2821
+
+Broken-by: df618101a5
+
+Origin: backport, https://git.exim.org/exim.git/commitdiff/42ed39da5af85552a35626348bb77e5576e18aa4
+Bug: https://bugs.exim.org/show_bug.cgi?id=2821
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1006661
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/exim4/+bug/1966923
+---
+ src/exiqgrep.src | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/src/exiqgrep.src b/src/exiqgrep.src
+index 10664bb..9304160 100644
+--- a/src/exiqgrep.src
++++ b/src/exiqgrep.src
+@@ -53,12 +53,14 @@ if ($ARGV[0] eq '--version') {
+         exit 0;
+ }
+ 
+-if (!getopts('hf:r:y:o:s:C:zxlibRcaG:',\%opt) { &help; exit;}
+-if ($ARGV[0]) { &help; exit;}
+-if ($opt{h}) { &help; exit;}
++if (!getopts('hf:r:y:o:s:C:zxlibRcaG:E:',\%opt)) { &help; exit; }
++if ($opt{h}) { &help; exit; }
++if ($ARGV[0] || !($opt{f} || $opt{r} || $opt{s} || $opt{y} || $opt{o} || $opt{z} || $opt{x} || $opt{c}))
++   { &help; exit(1); }
+ if ($opt{a}) { $eargs = '-bp'; }
+ if ($opt{C} && -e $opt{C} && -f $opt{C} && -R $opt{C}) { $eargs .= ' -C '.$opt{C}; }
+ if ($opt{G}) { $eargs .= ' -qG'.$opt{G}; }
++if ($opt{E}) { $exim = $opt{E}; }
+ 
+ # Read message queue output into hash
+ &collect();
+@@ -75,6 +77,7 @@ Exim message queue display utility.
+ 
+ 	-h		This help message.
+ 	-C		Specify which exim.conf to use.
++	-E		Specify exim binary to use.
+ 
+ Selection criteria:
+ 	-f <regexp>	Match sender address sender (field is "< >" wrapped)

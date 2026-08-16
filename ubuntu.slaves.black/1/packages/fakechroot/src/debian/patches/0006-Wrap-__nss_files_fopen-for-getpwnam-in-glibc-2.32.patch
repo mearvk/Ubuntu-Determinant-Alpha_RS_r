@@ -1,0 +1,122 @@
+From 5b372f346b61f4200d0c667d9517bfe5ebcf4c4e Mon Sep 17 00:00:00 2001
+From: Johannes Schauer Marin Rodrigues <josch@mister-muffin.de>
+Date: Thu, 9 Sep 2021 18:21:07 +0200
+Subject: [PATCH 6/7] Wrap __nss_files_fopen for getpwnam in glibc >= 2.32
+
+Starting with glibc 2.32 the compat nss module for getpwnam calls
+__nss_files_fopen (which is a GLIBC_PRIVATE symbol provided by glibc)
+instead of fopen (see 299210c1fa67e2dfb564475986fce11cd33db9ad). This
+leads to getpwnam calls accessing /etc/passwd from *outside* the chroot
+and as a result programs like adduser do not work correctly anymore
+under fakechroot.
+
+Adhemerval Zanella (azanella) argued on IRC:
+
+ > But another problem is the ship has sailed, so there are nss modules that
+ > will bind to an external symbol. And there is not much we can do about
+ > it. And since nss modules are most compat, I am not sure community will
+ > be willing to move back. I think it will be better to add the interpose
+ > logic of private symbols on fakechroot instead, it is ugly but it is
+ > better than messing even more with the nss interface.
+
+Thus, instead of changing glibc, we instead wrap __nss_files_fopen.
+---
+ configure.ac            |  1 +
+ src/Makefile.am         |  1 +
+ src/__nss_files_fopen.c | 60 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 62 insertions(+)
+ create mode 100644 src/__nss_files_fopen.c
+
+diff --git a/configure.ac b/configure.ac
+index a1f1c89..9087d84 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -165,6 +165,7 @@ AC_CHECK_FUNCS(m4_normalize([
+     __getwd_chk
+     __lxstat
+     __lxstat64
++    __nss_files_fopen
+     __open
+     __open_2
+     __open64
+diff --git a/src/Makefile.am b/src/Makefile.am
+index eb311c0..aa44644 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -7,6 +7,7 @@ libfakechroot_la_SOURCES = \
+     __lxstat.c \
+     __lxstat64.c \
+     __lxstat64.h \
++    __nss_files_fopen.c \
+     __open.c \
+     __open64.c \
+     __open64_2.c \
+diff --git a/src/__nss_files_fopen.c b/src/__nss_files_fopen.c
+new file mode 100644
+index 0000000..aa55237
+--- /dev/null
++++ b/src/__nss_files_fopen.c
+@@ -0,0 +1,60 @@
++/*
++    libfakechroot -- fake chroot environment
++    Copyright (c) 2010, 2013 Piotr Roszatycki <dexter@debian.org>
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Lesser General Public
++    License as published by the Free Software Foundation; either
++    version 2.1 of the License, or (at your option) any later version.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Lesser General Public License for more details.
++
++    You should have received a copy of the GNU Lesser General Public
++    License along with this library; if not, write to the Free Software
++    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307  USA
++*/
++
++
++#include <config.h>
++
++/*
++ * Starting with glibc 2.32 the compat nss module for getpwnam calls
++ * __nss_files_fopen (which is a GLIBC_PRIVATE symbol provided by glibc)
++ * instead of fopen (see 299210c1fa67e2dfb564475986fce11cd33db9ad). This
++ * leads to getpwnam calls accessing /etc/passwd from *outside* the chroot
++ * and as a result programs like adduser do not work correctly anymore
++ * under fakechroot.
++ *
++ * Adhemerval Zanella (azanella) argued on IRC:
++ *
++ *  > But another problem is the ship has sailed, so there are nss modules that
++ *  > will bind to an external symbol. And there is not much we can do about
++ *  > it. And since nss modules are most compat, I am not sure community will
++ *  > be willing to move back. I think it will be better to add the interpose
++ *  > logic of private symbols on fakechroot instead, it is ugly but it is
++ *  > better than messing even more with the nss interface.
++ *
++ * Thus, instead of changing glibc, we instead wrap __nss_files_fopen.
++ *
++ */
++#ifdef HAVE___NSS_FILES_FOPEN
++
++#include <stdio.h>
++#include "libfakechroot.h"
++
++
++wrapper(__nss_files_fopen, FILE *, (const char * path))
++{
++    char fakechroot_abspath[FAKECHROOT_PATH_MAX];
++    char fakechroot_buf[FAKECHROOT_PATH_MAX];
++    debug("__nss_files_fopen(\"%s\")", path);
++    expand_chroot_path(path);
++    return nextcall(__nss_files_fopen)(path);
++}
++
++#else
++typedef int empty_translation_unit;
++#endif
+-- 
+2.30.2
+

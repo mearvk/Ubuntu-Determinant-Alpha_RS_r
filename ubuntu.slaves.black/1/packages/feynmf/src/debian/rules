@@ -1,0 +1,79 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+#
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# use this to build this package reproducible
+export FORCE_SOURCE_DATE=1
+
+export TEXMFVAR = $(CURDIR)/.texmf-var
+PKGDIR = $(CURDIR)/debian/feynmf
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+
+build-stamp:
+	dh_testdir
+	mkdir -p "$(TEXMFVAR)"
+	$(MAKE) MP=mpost MF=mf-nowin all manual.ps
+	/usr/bin/ps2pdf manual.ps manual.pdf
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp manual.ps manual.ps.gz feynmf.1 manual.pdf
+	$(MAKE) distclean
+	rm -rf "$(TEXMFVAR)"
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) install prefix=$(PKGDIR)/usr \
+			mandir=$(PKGDIR)/usr/share/man/man1 \
+			texdir=$(PKGDIR)/usr/share/texmf/tex/latex/feynmf \
+			mfdir=$(PKGDIR)/usr/share/texmf/metafont/feynmf
+	mv -f $(PKGDIR)/usr/share/texmf/metafont/feynmf/feynmp.mp \
+		$(PKGDIR)/usr/share/texmf/metapost/feynmf/
+
+# Build architecture-independent files here.
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs ChangeLog
+	dh_installdocs
+	dh_installexamples
+	dh_installman
+	dh_installtex
+	dh_link
+	dh_compress
+	# move docs to correct directory/name
+	mv $(PKGDIR)/usr/share/doc/feynmf/manual.ps.gz \
+		$(PKGDIR)/usr/share/doc/feynmf/feynmf.ps.gz
+	-rm -rf $(PKGDIR)/usr/share/texmf/doc
+#		$(PKGDIR)/usr/share/texmf/doc/latex/feynmf/feynmf.ps.gz
+	mv manual.pdf $(PKGDIR)/usr/share/doc/feynmf/feynmf.pdf
+	dh_fixperms
+	dh_perl
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+# Build architecture-dependent files here.
+binary-arch:
+# We have nothing to do by default.
+
+binary: binary-indep
+
+.PHONY: build clean binary-indep binary-arch binary install

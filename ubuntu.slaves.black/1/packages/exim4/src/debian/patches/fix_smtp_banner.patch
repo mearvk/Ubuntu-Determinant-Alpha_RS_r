@@ -1,0 +1,55 @@
+Description: Add EXIM_DISTRIBUTION var to display it on the SMTP banner
+Origin: https://blueprints.launchpad.net/ubuntu/+spec/servercloud-s-server-app-banner-updates
+Author: Yolanda Robla <yolanda.robla@canonical.com>
+Forwarded: https://salsa.debian.org/exim-team/exim4/merge_requests/2
+Last-Update: 2021-11-08
+
+--- a/src/globals.c
++++ b/src/globals.c
+@@ -1489,7 +1489,7 @@
+ uschar *smtp_active_hostname   = NULL;
+ int	smtp_backlog_monitor   = 0;
+ uschar *smtp_banner            = US"$smtp_active_hostname ESMTP "
+-                             "Exim $version_number $tod_full"
++                             "Exim $version_number " EXIM_DISTRIBUTION " $tod_full"
+                              "\0<---------------Space to patch smtp_banner->";
+ int     smtp_ch_index          = 0;
+ uschar *smtp_cmd_argument      = NULL;
+--- a/src/config.h.defaults
++++ b/src/config.h.defaults
+@@ -234,4 +234,6 @@
+ #define SC_EXIM_ARITH "%" SCNi64		/* scanf incl. 0x prefix */
+ #define SC_EXIM_DEC   "%" SCNd64		/* scanf decimal */
+ 
++#define EXIM_DISTRIBUTION
++
+ /* End of config.h.defaults */
+--- a/scripts/Configure-config.h
++++ b/scripts/Configure-config.h
+@@ -23,6 +23,13 @@
+ if [ "$1" != "" ] ; then MAKE=$1 ; fi
+ if [ "$MAKE" = "" ] ; then MAKE=make ; fi
+ 
++# exporting distribution to use it in smtp banner
++if test -x /usr/bin/lsb_release && lsb_release -si; then
++	export EXIM_DISTRIBUTION=\"$(lsb_release -si)\"
++else
++	export EXIM_DISTRIBUTION=\"\"
++fi
++
+ $MAKE buildconfig || exit 1
+ 
+ # BEWARE: tab characters needed in the following sed command. They have had
+--- a/src/exim.h
++++ b/src/exim.h
+@@ -651,6 +651,10 @@
+ # define EXIM_GROUPLIST_SIZE NGROUPS_MAX
+ #endif
+ 
++#ifndef EXIM_DISTRIBUTION
++  #define EXIM_DISTRIBUTION ""
++#endif
++
+ /* Linux has TCP_CORK, FreeBSD has TCP_NOPUSH; they do pretty much the same */
+ 
+ #ifdef TCP_CORK

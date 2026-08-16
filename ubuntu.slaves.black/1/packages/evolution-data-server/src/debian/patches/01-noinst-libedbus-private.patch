@@ -1,0 +1,46 @@
+From: Emilio Pozuelo Monfort <pochu@debian.org>
+Date: Fri, 29 May 2015 18:12:45 +0200
+Subject: [PATCH] Revert installation of libedbus-private.so
+
+That was done in a2790163 to fix a problem in Windows.
+
+Installing libedbus-private.so only causes us issues:
+
+It is a private library, with no SONAME. We don't want to ship it in
+a libedbus-private0 package because it doesn't have any rdeps outside
+of e-d-s, and it doesn't have any guaranteed stability. Also, shipping
+it inside e.g. evolution-data-server (as happened in 3.16.2-2) isn't
+very helpful because dh_makeshlibs doesn't detect it as it doesn't have
+a SONAME, which means it doesn't get a shlibs file, and the libs that
+depend on it (e.g. libecal-1.2.so, libedataserver-1.2.so) don't end
+with a dependency on evolution-data-server, leading to undefined references
+at runtime.
+
+We could remove the -avoid-version switch so it gets a SONAME, a shlibs
+file and the other libs get dependencies, but then we'd need to restrict
+that so that the dependencies are very tight, given the unstable nature
+of this private library. Those tight dependencies would make different
+versions of the libraries, e.g. libecal-1.2-7 and libecal-1.2-8
+uninstallable.
+
+However we can just revert that as it happened to fix an issue in Windows,
+and let the libraries embed the code as it was happening before.
+
+Signed-off-by: Emilio Pozuelo Monfort <pochu@debian.org>
+---
+ src/private/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/private/CMakeLists.txt b/src/private/CMakeLists.txt
+index c2de59b..f568acf 100644
+--- a/src/private/CMakeLists.txt
++++ b/src/private/CMakeLists.txt
+@@ -173,7 +173,7 @@ gdbus_codegen_custom(org.gnome.evolution.dataserver.Subprocess.Backend.xml
+ 	GENERATED_DBUS_SUBPROCESS_BACKEND
+ 	--c-generate-object-manager)
+ 
+-add_library(edbus-private SHARED
++add_library(edbus-private STATIC
+ 	${GENERATED_DBUS_LOCALE}
+ 	${GENERATED_DBUS_SOURCE}
+ 	${GENERATED_DBUS_SOURCE_MANAGER}

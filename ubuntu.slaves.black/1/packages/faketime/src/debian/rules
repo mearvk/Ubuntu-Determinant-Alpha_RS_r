@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+DEB_CFLAGS_MAINT_APPEND=-DMULTI_ARCH
+
+# why -DFORCE_MONOTONIC_FIX and -DFORCE_PTHREAD_NONVER: see README and
+# timetest.c and https://github.com/wolfcw/libfaketime/issues/287
+ifneq (,$(filter $(DEB_HOST_ARCH_OS),linux))
+DEB_CFLAGS_MAINT_APPEND += -DFORCE_MONOTONIC_FIX
+endif
+
+ifneq (,$(filter $(DEB_HOST_ARCH),ppc64el riscv64 x32))
+DEB_CFLAGS_MAINT_APPEND += -DFORCE_PTHREAD_NONVER
+endif
+
+export DEB_CFLAGS_MAINT_APPEND
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# make sure dh_makeshlibs does not modify post{inst,rm} scripts:
+# (avoids lintian's postinst-has-useless-call-to-ldconfig)
+override_dh_makeshlibs:
+	dh_makeshlibs --noscripts
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+%:
+	PREFIX=/usr dh $@

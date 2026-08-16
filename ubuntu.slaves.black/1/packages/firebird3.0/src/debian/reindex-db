@@ -1,0 +1,55 @@
+#!/bin/sh
+
+set -eu
+
+usage()
+{
+    cat <<"_EOF" >& 2
+Usage: `sh basename $0` database
+_EOF
+    exit 1
+}
+
+[ -n "${1:-}" ] && [ -z "${2:-}" ] || usage
+
+DB="$1"
+
+ISQL=isql-fb
+
+reindex()
+{
+    echo "Refreshing indices of '$DB':"
+    while read i; do
+        echo -n " $i"
+        echo "ALTER INDEX $i ACTIVE;" | $ISQL "$DB" \
+        || echo "ALTER INDEX $i ACTIVE;" | $ISQL "$DB"
+    done
+}
+
+TMP=`tempfile`
+
+trap "rm -f $TMP" QUIT INT EXIT
+
+cat <<'EOF' | $ISQL "$DB" | perl -ne 's/ +$//; next if /^=*$/; next unless $start++; print' > $TMP
+SET heading;
+SELECT DISTINCT i.rdb$index_name
+FROM rdb$indices i
+JOIN rdb$relations r
+  ON r.rdb$relation_name=i.rdb$relation_name
+JOIN rdb$index_segments s
+  ON s.rdb$index_name=i.rdb$index_name
+JOIN rdb$relation_fields f
+  ON f.rdb$relation_name=i.rdb$relation_name
+JOIN rdb$fields fd
+  ON fd.rdb$field_name=f.rdb$field_source
+JOIN rdb$character_sets cs
+  ON cs.rdb$character_set_id = fd.rdb$character_set_id
+WHERE fd.rdb$field_type IN (14,15,37,38,40,41)
+  AND (i.rdb$index_inactive=0 OR i.rdb$index_inactive IS NULL)
+--  AND (r.rdb$system_flag=0 OR r.rdb$system_flag IS NULL)
+  AND cs.rdb$character_set_name NOT IN ('NONE', 'OCTETS');
+EOF
+
+sleep 1
+
+reindex < $TMP

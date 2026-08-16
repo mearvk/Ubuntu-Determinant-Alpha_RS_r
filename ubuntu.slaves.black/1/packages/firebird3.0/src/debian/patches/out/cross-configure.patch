@@ -1,0 +1,111 @@
+From: Helmut Grohne <helmut@subdivi.de>
+Subject: improve cross buildability
+
+ * Rather than checking $build (the architecture we are building on), we should
+   be checking $host. Unfortunately, $host tends to lack the vendor part, so we
+   need a tricky sed expression for inserting it. For native builds, $host and
+   $build are equal.
+ * The check for whether sem_init works only aborts the build in case of
+   failure. Since the check cannot be performed during cross building, the only
+   sane way is to just assume sem_init to work.
+ * Replace a pile of AC_RUN_IFELSE with AC_CHECK_SIZEOF and AC_CHECK_ALIGNOF.
+   The latter macros have a slower fallback path for cross compilation that use
+   compiler bisection to determine the values.
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -85,7 +85,11 @@ STD_EDITLINE=false
+ dnl Test for special ar options?
+ AR_OPT_CHECK=false
+ 
+-case "$build" in
++if test -z "$host" ; then host="$build"; fi
++
++host_quadruplet=$(echo "$host" | sed 's/^\(@<:@^-@:>@*\)-\(@<:@^-@:>@*\)-\(@<:@^-@:>@*\)$/\1-pc-\2-\3/')
++echo "considering >$build< >$host< >$host_quadruplet<"
++case "$host_quadruplet" in
+   x*64-*-darwin*)
+     MAKEFILE_PREFIX=darwin_x86_64
+     MAKEFILE_POSTFIX=darwin
+@@ -149,7 +153,7 @@ dnl CPU_TYPE=ppc64
+ 
+   amd64-*-freebsd* | x86_64*-*-freebsd* | x86_64*-*-k*bsd*-gnu)
+     MAKEFILE_PREFIX=freebsd_amd64
+-    case "$build" in
++    case "$host_quadruplet" in
+         x86_64*-*-k*bsd-gnu)      # Debian/kFreeBSD
+             PLATFORM=GENTOOFREEBSD
+             INSTALL_PREFIX=linux
+@@ -498,7 +502,7 @@ dnl CPU_TYPE=ppc64
+     ;;
+ 
+   *)
+-    AC_MSG_ERROR(unsupported platform ${build})
++    AC_MSG_ERROR(unsupported platform ${host_quadruplet})
+     ;;
+ esac
+ 
+@@ -975,7 +979,8 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include
+ 		}
+ 	]])],[AC_DEFINE(WORKING_SEM_INIT,1,[Define this if sem_init() works on the platform])
+ AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)
+-AC_SEARCH_LIBS(sem_open, rt pthread)],[])
++AC_SEARCH_LIBS(sem_open, rt pthread)],[AC_DEFINE(WORKING_SEM_INIT,1)
++AC_MSG_RESULT([assuming yes (cross compiling)])])
+ fi
+ fi
+ 
+@@ -1000,12 +1005,10 @@ AC_TYPE_SIZE_T
+ AC_TYPE_UID_T
+ AC_SYS_LARGEFILE
+ if test "$ac_cv_sys_file_offset_bits" = "no"; then
+-  AC_MSG_CHECKING(for native large file support)
+-  AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <unistd.h>
+-    main () {
+-    exit(!(sizeof(off_t) == 8));
+-  }]])],[ac_cv_sys_file_offset_bits=64; AC_DEFINE(_FILE_OFFSET_BITS,64)
+-   AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)],[])
++  AC_CHECK_SIZEOF([off_t],[],[#include <unistd.h>])
++  if test "$ac_cv_sizeof_off_t" = 8; then
++    ac_cv_sys_file_offset_bits=64; AC_DEFINE(_FILE_OFFSET_BITS,64)
++  fi
+ fi
+ 
+ AC_CHECK_SIZEOF(void *)
+@@ -1038,27 +1041,17 @@ AC_CHECK_MEMBER([struct dirent.d_type],
+ 
+ dnl EKU: try to determine the alignment of long and double
+ dnl      replaces FB_ALIGNMENT and FB_DOUBLE_ALIGN in src/jrd/common.h
+-AC_MSG_CHECKING(alignment of long)
+-AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <semaphore.h>
+-main () {
+-  struct s {
+-    char a;
+-    union { long long x; sem_t y; } b;
+-  };
+-  exit((int)&((struct s*)0)->b);
+-}]])],[ac_cv_c_alignment=$ac_status],[ac_cv_c_alignment=$ac_status],[])
+-AC_MSG_RESULT($ac_cv_c_alignment)
++AC_CHECK_ALIGNOF([long long])
++AC_CHECK_ALIGNOF([sem_t],[#include <semaphore.h>])
++if test "$ac_cv_alignof_long_long" -gt "$ac_cv_alignof_sem_t"; then
++	ac_cv_c_alignment=$ac_cv_alignof_long_long
++else
++	ac_cv_c_alignment=$ac_cv_alignof_sem_t
++fi
+ AC_DEFINE_UNQUOTED(FB_ALIGNMENT, $ac_cv_c_alignment, [Alignment of long])
+ 
+-AC_MSG_CHECKING(alignment of double)
+-AC_RUN_IFELSE([AC_LANG_SOURCE([[main () {
+-  struct s {
+-    char a;
+-    double b;
+-  };
+-  exit((int)&((struct s*)0)->b);
+-}]])],[ac_cv_c_double_align=$ac_status],[ac_cv_c_double_align=$ac_status],[])
+-AC_MSG_RESULT($ac_cv_c_double_align)
++AC_CHECK_ALIGNOF([double])
++ac_cv_c_double_align=$ac_cv_alignof_double
+ AC_DEFINE_UNQUOTED(FB_DOUBLE_ALIGN, $ac_cv_c_double_align, [Alignment of double])
+ 
+ dnl EKU: Add any platform specific tests below

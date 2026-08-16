@@ -1,0 +1,131 @@
+#!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DPKG_EXPORT_BUILDFLAGS = yes
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildflags.mk
+
+XCFLAGS = -Wall -Wunused -Wno-format-y2k -fPIE -fno-strict-aliasing
+
+libdir = /usr/lib/$(DEB_HOST_MULTIARCH)
+GAMES = blocks checkers sudoku
+EXTRA_MFLAGS = OPTIM="$(CFLAGS) $(XCFLAGS)" STRIP=@:
+
+FLTK_CONFIG = $(DEB_HOST_GNU_TYPE)-fltk-config
+PKG_CONFIG = /usr/bin/$(DEB_HOST_GNU_TYPE)-pkg-config
+export PKG_CONFIG
+
+%:
+	dh $@
+
+override_dh_autoreconf:
+# FLTK uses a hand-maintained configh.in and an autoheader-unfriendly
+# configure.ac.
+	AUTOHEADER=/bin/true dh_autoreconf
+
+override_dh_auto_clean:
+	[ -e fltk.spec.saved ] || mv fltk.spec fltk.spec.saved
+# Avoid reconfigure.  Removed by distclean.  >> deliberate -- keeping
+# existing contents allows for proper cleaning between builds.
+	echo 'RMDIR = rm -Rf' >> makeinclude
+	echo 'USEMMFILES = No' >> makeinclude
+	dh_auto_clean
+	mv fltk.spec.saved fltk.spec
+
+override_dh_clean:
+	rm -rf CMakeTmp
+	dh_clean documentation/doxygen_sqlite3.db debian/common-build-stamp
+	chmod +x debian/fix-fltk-targets debian/fltk-config
+
+override_dh_auto_configure:
+	[ -e fltk.spec.saved ] || mv fltk.spec fltk.spec.saved
+ifneq "" "$(filter libfltk1.3-dev, $(shell dh_listpackages))"
+	mkdir -p CMakeTmp
+	dh_auto_configure -S cmake -B CMakeTmp -- -DOPTION_CAIRO:BOOL=ON \
+	    -DOPTION_BUILD_SHARED_LIBS:BOOL=ON -DOPTION_CREATE_LINKS:BOOL=ON \
+	    -DFLTK_BUILD_TEST:BOOL=OFF
+	debian/fix-fltk-targets \
+	    debian/FLTK-Targets-head.cmake \
+	    CMakeTmp/CMakeFiles/Export/share/fltk/FLTK-Targets.cmake \
+	    > CMakeTmp/etc/FLTK-Targets.cmake
+	debian/fix-fltk-targets \
+	    CMakeTmp/CMakeFiles/Export/share/fltk/FLTK-Targets-none.cmake \
+	    debian/FLTK-Targets-none-tail.cmake \
+	    > CMakeTmp/etc/FLTK-Targets-none.cmake
+endif
+	dh_auto_configure -- FTCONFIG="$(PKG_CONFIG) freetype2" \
+            DSOFLAGS="$(filter-out -fPIE -pie,$(LDFLAGS))" \
+	    --enable-shared --enable-cairo --enable-cp936 --with-links \
+	    --with-optim=$(filter -O%,$(CXXFLAGS)) --libdir=$(libdir)
+	mv fltk.spec.saved fltk.spec
+
+override_dh_auto_build-arch:
+	dh_auto_build -- $(EXTRA_MFLAGS) DIRS='$$(IMAGEDIRS) src cairo fluid'
+	$(MAKE) -C test $(EXTRA_MFLAGS) $(GAMES)
+
+override_dh_auto_build-indep:
+ifneq "" "$(filter nodoc,$(DEB_BUILD_OPTIONS))"
+	dh_auto_build -- $(EXTRA_MFLAGS) \
+	    DIRS='$$(IMAGEDIRS) src cairo fluid test'
+else
+	dh_auto_build -- $(EXTRA_MFLAGS)
+	$(MAKE) -C documentation html pdf
+endif
+
+override_dh_auto_install-arch:
+	dh_auto_install -a -- DIRS='$$(IMAGEDIRS) src cairo fluid'
+	mkdir -p debian/tmp/usr/games
+	mkdir -p debian/tmp/usr/lib/fltk
+	mkdir -p debian/tmp/usr/share/applications
+	mkdir -p debian/tmp/usr/share/icons/hicolor/32x32/apps
+	mkdir -p debian/tmp/usr/share/icons/hicolor/128x128/apps
+	mkdir -p debian/tmp/usr/share/man/man6
+	mkdir -p debian/tmp/usr/share/pixmaps
+## fltk1.3-games (installed by hand to be able to add fl prefixes.)
+	for game in $(GAMES); do \
+	    cp test/$$game debian/tmp/usr/games/fl$$game && \
+	    sed -e 's,Exec=,&/usr/games/fl,; s,Icon=,&fl,; s,Name=,&FLTK ,' \
+	      test/desktop/$$game.desktop \
+	      >debian/tmp/usr/share/applications/fl$$game.desktop && \
+	    cp test/desktop/$$game-32.png \
+	      debian/tmp/usr/share/icons/hicolor/32x32/apps/fl$$game.png && \
+	    cp test/desktop/$$game-128.png \
+	      debian/tmp/usr/share/icons/hicolor/128x128/apps/fl$$game.png && \
+	    sed -e '1s,^\.TH ,&fl,; 3s,^,fl,' documentation/src/$$game.man \
+	      >debian/tmp/usr/share/man/man6/fl$$game.6 \
+	    || exit 1; \
+	done
+## fluid
+	$(MAKE) -C fluid install-linux DESTDIR=$(CURDIR)/debian/tmp
+## libfltk1.3-dev
+	cp debian/CMakeCache.txt CMakeTmp/etc/*.cmake \
+	    CMake/FLTK-Functions.cmake debian/tmp/usr/lib/fltk
+	sed -e 's/ -f[a-z]*-prefix-map=[^ ]*//' fltk-config \
+	    > debian/tmp/usr/bin/$(FLTK_CONFIG)
+	chmod 755 debian/tmp/usr/bin/$(FLTK_CONFIG)
+	rm -f debian/tmp/usr/bin/fltk-config
+
+  override_dh_auto_install-indep:
+ifeq "" "$(filter nodoc,$(DEB_BUILD_OPTIONS))"
+	dh_auto_install -i -- DIRS='test'
+else
+	dh_auto_install -i
+endif
+	rm -f debian/tmp/usr/bin/fltk-config
+
+override_dh_installdocs:
+	dh_installdocs -A CREDITS README
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGES
+	for x in debian/*/usr/share/doc/*/changelog; do \
+	    mv -v $$x `dirname $$x`/NEWS; \
+	done
+
+override_dh_installman-arch:
+	dh_installman
+	ln -snfv fltk-config.1 \
+	    debian/libfltk1.3-dev/usr/share/man/man1/$(FLTK_CONFIG).1
+
+override_dh_missing:
+	dh_missing -Xusr/include/Fl

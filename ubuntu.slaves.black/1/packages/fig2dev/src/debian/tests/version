@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Test version output of fig2dev
+#
+# (c) 2019-2021  Roland Rosenfeld <roland@debian.org>
+
+if [ -z "$AUTOPKGTEST_TMP" ]; then
+    AUTOPKGTEST_TMP=$(mktemp -d)
+fi
+
+trap "rm -rf $AUTOPKGTEST_TMP" EXIT
+
+VERSION=$(dpkg-parsechangelog -SVersion | sed -e 's/-[^-]*$//;s/^[0-9]://')
+case $VERSION in
+    *+git*) # work around git snapshot version naming scheme:
+	VERSION=$(echo $VERSION | sed -e 's/+git.*$/-dev/')
+	;;
+    *~git*) # work around git pre-release version naming scheme:
+	VERSION=$(echo $VERSION | sed -e 's/~git.*$//')
+	;;
+esac
+
+cd $AUTOPKGTEST_TMP
+
+for a in /usr/bin/fig2dev /usr/bin/transfig
+do
+    BASENAME=$(basename $a)
+    CMD="$a -V"
+    GOT=$($CMD 2>&1)
+    case "$a" in
+	*/transfig)
+	    EXPECT="TransFig Version $VERSION"
+	    ;;
+	*)
+	    EXPECT="$BASENAME Version $VERSION"
+	    ;;
+    esac
+
+
+    if [ "$GOT" != "$EXPECT" ]
+    then
+	echo "$CMD: got '$GOT' expected '$EXPECT'" >> errors
+    fi
+done
+
+if [ -f errors ] && [ -s errors ]
+then
+    cat errors
+    exit 1
+else
+    exit 0
+fi

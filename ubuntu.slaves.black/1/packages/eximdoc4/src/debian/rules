@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+export EXIM_VER := $(shell echo $(DEB_VERSION_UPSTREAM) | sed -e 's/~.*//g')
+
+override_dh_auto_build:
+	cp -a doc-docbook build-tree
+
+	cd build-tree && \
+		$(MAKE) DOCBOOK2TEXI=docbook2x-texi os-fixup && \
+		$(MAKE) DOCBOOK2TEXI="docbook2x-texi" spec.xml filter.xml && \
+		$(MAKE) DOCBOOK2TEXI="docbook2x-texi --encoding=UTF-8" \
+			spec.info filter.info
+	mkdir build-tree/html
+	cd build-tree && \
+		$(CURDIR)/website/script/gen.pl --verbose \
+		--spec $(CURDIR)/build-tree/spec.xml \
+		--filter $(CURDIR)/build-tree/filter.xml \
+		--latest $(EXIM_VER) --tmpl $(CURDIR)/website/templates \
+		--docroot $(CURDIR)/build-tree/html
+	cd build-tree/html/exim-html-4*/doc/html/spec_html/ && \
+		find -name 'ch??.html' -or -name 'filter_ch??.html' | \
+		while read i ; do s=`readlink "$$i" | sed -e 's:.*/::'` ; \
+		rm "$$i" ; ln -vs "$$s" "$$i" ; done
+	find build-tree/html/exim-html-4*/doc/html/spec_html/ -type f \
+		-name '*.html' -print0 | xargs -r0 \
+		sed -i -e 's:href="[^"]*/\([^"]*\.css"\):href="\1:g' \
+		-e 's:img src="\.[^"]*/\([^"]*\.png\):img src="\1:g'
+
+%:
+	dh $@ --builddirectory=build-tree

@@ -1,0 +1,59 @@
+# Author: Damyan Ivanov <dmn@debian.org>
+# Description: Remove usage of binary .gbak files
+#  These can't be in Debian-shipped sources
+#
+#  help.fbk is removed from Debian sources so we remove mentions of it,
+#  together with qli, which needs it
+# Forwarded: no
+--- a/builds/posix/Makefile.in
++++ b/builds/posix/Makefile.in
+@@ -354,7 +354,7 @@ HELP_FDB = $(FIREBIRD)/help/help.fdb
+ SECURITY_FDB = $(FIREBIRD)/security3.fdb
+ SECURITY_TMP = security.tmp
+ 
+-databases:		yachts.lnk msg.timestamp $(HELP_FDB) $(SECURITY_FDB)
++databases:		yachts.lnk msg.timestamp $(SECURITY_FDB)
+ 
+ export LD_LIBRARY_PATH := $(LD_LIBRARY_PATH):$(FIREBIRD)/lib
+ 
+@@ -368,15 +368,6 @@ metadata.fdb:	$(RUN_ISQL) $(SRC_ROOT)/db
+ 	$(RUN_GFIX) -mode read_only $@
+ 	$(CHMOD) 0444 $@
+ 
+-$(HELP_FDB):	help.fdb
+-	-$(RM) $@
+-	$(CP) $^ $@
+-	$(CHMOD) 0444 $@
+-
+-help.fdb:	$(BLD_ROOT)/misc/help.gbak
+-	$(RUN_GBAK) -MODE read_only -R $< $@
+-	$(CHMOD) 0444 $@
+-
+ $(SECURITY_FDB):	security.fdb
+ 	-$(RM) $@
+ 	$(CP) $^ $@
+@@ -580,22 +571,17 @@ $(IDS):		$(SRC_ROOT)/misc/ids.m $(SRC_RO
+ # all the rest we need to build
+ #
+ 
+-.PHONY:	qli message_file gbak_files
++.PHONY:	message_file gbak_files
+ 
+ FDB_FILES := $(HELP_FDB) $(ROOT)/gen/msg.fdb $(SECURITY_FDB) $(FIREBIRD)/examples/empbuild/employee.fdb
+ GBAK_FILES := $(FDB_FILES:.fdb=.gbak) $(FIREBIRD)/msg.gbak
+ GBAK_FILES := $(subst Native,$(TARGET),$(GBAK_FILES))
+ 
+-rest:	qli message_file
++rest:	message_file
+ 
+ cross_rest:	qli gbak_files
+ 	$(MAKE) $(BUILD_FILE)
+ 
+-qli:		$(QLI)
+-
+-$(QLI):		$(QLI_Objects) $(COMMON_LIB)
+-	$(EXE_LINK) $(EXE_LINK_OPTIONS) $^ -o $@ $(FIREBIRD_LIBRARY_LINK) $(LINK_LIBS) $(call LINK_DARWIN_RPATH,..)
+-
+ examples: include_generic
+ 	$(MAKE) -f Makefile.examples -C $(GEN_ROOT)/examples/
+ 	$(MAKE) -f Makefile.plugins_examples

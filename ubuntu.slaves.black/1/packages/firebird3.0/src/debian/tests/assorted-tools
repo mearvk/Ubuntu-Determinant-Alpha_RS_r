@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+set -u
+
+export FIREBIRD_TEMP="$AUTOPKGTEST_TMP"
+
+A="$AUTOPKGTEST_ARTIFACTS"
+cd "$A"
+
+log() {
+    echo "V: $@"
+}
+
+log "Creating employee.fdb via isql-fb -i"
+zcat /usr/share/doc/firebird3.0-examples/examples/employee.sql.gz \
+    | isql-fb -quiet -user SYSDBA -input /dev/stdin -bail
+
+log "Backing up"
+gbak -user SYSDBA -backup employee.fdb employee.fbk
+
+log "Restoring the backup"
+gbak -user SYSDBA -create employee.fbk restored-employee.fdb
+
+log "Extracting definition of employee.fdb via isql-fb -a"
+isql-fb -quiet -user SYSDBA -a employee.fdb > employee.sql
+
+log "Checking the size of employee.sql"
+[ -s employee.sql ]
+
+ls -l employee.sql
+
+log "Running fbstat on employee.fdb"
+fbstat -user SYSDBA employee.fdb
+
+log "Running gfix -v"
+gfix -user SYSDBA -validate -full employee.fdb

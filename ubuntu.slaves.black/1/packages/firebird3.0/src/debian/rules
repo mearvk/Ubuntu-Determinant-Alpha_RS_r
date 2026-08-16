@@ -1,0 +1,195 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@ --without autoreconf
+# autogen is being run during the configure phase
+
+FB_MAJOR:= $(shell awk '/FB_MAJOR_VER/ { v=$$3; gsub("\"", "", v); print v}' < src/jrd/build_no.h )
+FB_MINOR:= $(shell awk '/FB_MINOR_VER/ { v=$$3; gsub("\"", "", v); print v}' < src/jrd/build_no.h )
+FB_REV	:= $(shell awk '/FB_REV_NO/    { v=$$3; gsub("\"", "", v); print v}' < src/jrd/build_no.h )
+FB_VER	:= $(FB_MAJOR).$(FB_MINOR)
+FB_FULL_VER:= $(FB_VER).$(FB_REV)
+
+include /usr/share/dpkg/pkg-info.mk
+SOURCE_DATE := $(shell date -d@$(SOURCE_DATE_EPOCH) -u +"%Y-%m-%d")
+
+CLIENT_SOVER := 2
+UTIL_SOVER :=
+
+ifndef FB_MAJOR
+$(error FB_MAJOR not defined)
+else ifndef FB_MINOR
+$(error FB_MINOR not defined)
+else ifndef FB_REV
+$(error FB_REV not defined)
+else ifndef FB_VER
+$(error FB_VER not defined)
+else ifndef FB_FULL_VER
+$(error FB_FULL_VER not defined)
+else ifndef CLIENT_SOVER
+$(error CLIENT_SOVER not defined)
+endif
+
+-include /usr/share/dpkg/buildtools.mk
+PKG_CONFIG ?= pkg-config
+# Use the following lines to set the compiler if
+# the default Debian one can't be used (or you want to try
+# the bleeding edge)
+#export CC=gcc-5
+#export CXX=g++-5
+#export CPP=cpp-5
+#export CXXPP=cpp-5
+
+
+export DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+export DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+export DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+   NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
+ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
+	confflags += --build $(DEB_HOST_GNU_TYPE)
+else
+	confflags += --build $(DEB_BUILD_GNU_TYPE) --host $(DEB_HOST_GNU_TYPE)
+endif
+
+ifeq ($(shell dpkg-architecture -qDEB_HOST_ARCH_OS), linux)
+	confflags += --enable-raw-devices
+else
+	confflags += --disable-raw-devices
+endif
+
+DOC := /usr/share/doc/firebird${FB_VER}-common-doc
+ULFB := /usr/lib/${DEB_HOST_MULTIARCH}/firebird/${FB_VER}
+USFB := /usr/share/firebird/${FB_VER}
+VAR := /var/lib/firebird/${FB_VER}
+RUN := /run/firebird${FB_VER}
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+bindnow
+export DEB_CXXFLAGS_MAINT_APPEND := -DUCHAR_TYPE=uint16_t -fno-lifetime-dse -fno-strict-aliasing
+export DEB_CFLAGS_MAINT_APPEND := -fno-strict-aliasing
+
+DPKG_EXPORT_BUILDFLAGS := 1
+include /usr/share/dpkg/buildflags.mk
+
+confflags += --disable-rpath --with-gpre-cobol \
+	     --with-system-editline --prefix=${ULFB} --with-fbsbin=/usr/sbin \
+	     --with-fblib=/usr/lib/${DEB_HOST_MULTIARCH} \
+	     --with-fbconf=${ULFB} --with-fbdoc=${DOC} \
+	     --with-fbudf=${ULFB}/UDF --with-fbsample=${DOC}/examples \
+	     --with-fbsample-db=${DOC}/examples/empbuild \
+	     --with-fbhelp=${VAR}/system --with-fbintl=${ULFB}/intl \
+	     --with-fbmisc=${ULFB}/misc --with-fbsecure-db=${VAR}/system \
+	     --with-fblog=/var/log/firebird --with-fbglock=${RUN} \
+	     --with-fblogfilename=firebird$(FB_VER).log \
+	     --with-fbplugins=${ULFB}/plugins \
+	     --with-fbmsg=${ULFB}
+
+# see #575564
+export FIREBIRD_LOCK := $(CURDIR)/debian/tmp-lock
+
+# Packaging is split into several packages:
+# * firebirdVV-server (incl libengineXX)
+# * libfbclient2
+# * libib-util
+# * firebirdVV-utils
+# * firebirdVV-common (common parts to client and utils)
+# * firebirdVV-common-doc (big copyright and changelog in one place)
+# * firebirdVV-doc
+# * firebirdVV-examples
+# * firebird-dev
+
+
+override_dh_auto_configure:
+	mkdir -p builds/make.new
+	NOCONFIGURE=1 sh autogen.sh
+	dh_auto_configure -- $(confflags)
+
+ifneq (,$(filter nodoc,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+    MANUALS_BASE_USR :=
+    MANUALS_BASE_SYS :=
+else
+    MANUALS_BASE_USR := isql-fb gbak gfix gpre gsec fbstat nbackup \
+                        fbsvcmgr fbtracemgr fb_lock_print fb_config
+    MANUALS_BASE_SYS := fbguard firebird
+endif
+MANUALS := $(addprefix debian/man/,$(addsuffix .1,$(MANUALS_BASE_USR))) \
+           $(addprefix debian/man/,$(addsuffix .8,$(MANUALS_BASE_SYS)))
+
+%.1 : %.pod
+	pod2man -c "Firebird documentation" --release "Firebird $(FB_VER)"  $< > $@
+%.8 : %.pod
+	pod2man -c "Firebird documentation" --release "Firebird $(FB_VER)"  --section 8 $< > $@
+
+FB_IMG := debian/firebird-image
+
+override_dh_auto_build:
+	$(MAKE) -f debian/rules $(NJOBS) $(MANUALS)
+	[ -d $(FIREBIRD_TMP) ] || mkdir $(FIREBIRD_TMP)
+	rm -rf $(FB_IMG)
+	dh_auto_build -- QUIET=1
+
+	#fakeroot $(MAKE) -C gen -f Makefile.install buildRoot
+	#mv ./gen/buildroot ./debian/firebird-build
+	cp -a ./gen/Release/firebird $(FB_IMG)
+	cp -a src/include/gen $(FB_IMG)/include-gen
+
+	echo "Built image contents"
+	cd $(FB_IMG) && ls -lR
+
+	sed -i -e's,-I$$fb_incdir,,'  $(FB_IMG)/bin/fb_config
+	sed -i -e's,-L$$fb_libdir ,,' $(FB_IMG)/bin/fb_config
+
+	sh $(FB_IMG)/bin/fb_config --cflags
+	sh $(FB_IMG)/bin/fb_config --libs
+
+override_dh_clean:
+	dh_clean
+	
+	rm -f $(MANUALS)
+	
+	debconf-updatepo
+	
+	@echo FB_MAJOR = $(FB_MAJOR)
+	@echo FB_MINOR = $(FB_MINOR)
+	@echo FB_REV   = $(FB_REV)
+	@echo FB_VER   = $(FB_VER)
+	@echo FB_FULL_VER = $(FB_FULL_VER)
+	@echo CLIENT_SOVER= $(CLIENT_SOVER)
+	@echo UTIL_SOVER= $(UTIL_SOVER)
+
+override_dh_auto_install:
+	sh debian/make_packages.sh
+
+ICU_VER := $(shell $(PKG_CONFIG) icu-i18n --modversion|sed 's/[^0-9]*\([0-9]\+\).*/\1/')
+ifeq ($(ICU_VER),)
+    $(error Unable to determine ICU version)
+endif
+
+override_dh_installchangelogs:
+	dh_installchangelogs ChangeLog -p firebird$(FB_VER)-common-doc
+override_dh_installdocs:
+	dh_installdocs -p firebird$(FB_VER)-common-doc
+	dh_installdocs -Xchangelog -Xcopyright -p firebird$(FB_VER)-doc
+override_dh_installlogrotate:
+	dh_installlogrotate --name firebird$(FB_VER)
+override_dh_installinit:
+	dh_installinit -pfirebird$(FB_VER)-server --name=firebird$(FB_VER)
+override_dh_installsystemd:
+	dh_installsystemd -pfirebird$(FB_VER)-server --name=firebird$(FB_VER)
+override_dh_link-arch:
+	dh_link -a -A
+override_dh_makeshlibs:
+	dh_makeshlibs -p libfbclient$(CLIENT_SOVER) -V'libfbclient$(CLIENT_SOVER) (>= $(FB_FULL_VER)~)'
+	dh_makeshlibs -p libib-util$(UTIL_SOVER) -V'libib-util$(UTIL_SOVER) (>= $(FB_FULL_VER)~)'
+	dpkg-gensymbols -plibfbclient$(CLIENT_SOVER) -Pdebian/libfbclient$(CLIENT_SOVER)
+	dpkg-gensymbols -plibib-util$(UTIL_SOVER) -Pdebian/libib-util$(UTIL_SOVER)
+override_dh_shlibdeps:
+	dh_shlibdeps -a -X /plugins/
+override_dh_gencontrol-arch:
+	dh_gencontrol -a -- -V"icu:Depends=libicu$(ICU_VER)"

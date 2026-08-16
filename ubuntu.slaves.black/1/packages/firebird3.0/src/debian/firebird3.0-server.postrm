@@ -1,0 +1,67 @@
+#! /bin/sh
+# postrm script for firebird3.0-server
+
+set -e
+if [ -f /usr/share/debconf/confmodule ]; then
+    . /usr/share/debconf/confmodule
+fi
+set -u
+
+# summary of how this script can be called:
+#        * <postrm> `remove'
+#        * <postrm> `purge'
+#        * <old-postrm> `upgrade' <new-version>
+#        * <new-postrm> `failed-upgrade' <old-version>
+#        * <new-postrm> `abort-install'
+#        * <new-postrm> `abort-install' <old-version>
+#        * <new-postrm> `abort-upgrade' <old-version>
+#        * <disappearer's-postrm> `disappear' <r>overwrit>r> <new-version>
+
+FB_VER="3.0"
+SYS_DB_DIR="/var/lib/firebird/$FB_VER/system"
+SEC_DB="$SYS_DB_DIR/security3.fdb"
+USER_DB_DIR="/var/lib/firebird/$FB_VER/data"
+RUN="/var/run/firebird/$FB_VER"
+LOG="/var/log/firebird/firebird$FB_VER.log"
+DBAPasswordFile="/etc/firebird/$FB_VER/SYSDBA.password"
+
+#DEBHELPER#
+
+case "$1" in
+    remove)
+        # remove lock/init/guard files
+        rm -f $RUN/isc_lock1.*
+        rm -f $RUN/isc_init1.*
+        rm -f $RUN/isc_guard1.*
+
+    ;;
+
+    purge)
+        # remove stored password
+        if [ -f "$DBAPasswordFile" ]; then
+            rm "$DBAPasswordFile"
+        fi
+
+        # remove security database
+        rm -f "$SEC_DB"
+        for d in "$SYS_DB_DIR" "/var/lib/firebird/$FB_VER" /var/lib/firebird; do
+            if [ -d "$d" ]; then
+                rmdir --ignore-fail-on-non-empty "$d"
+            fi
+        done
+
+        # remove log files
+        rm -f "$LOG"*
+
+        # remove databases
+        if [ -d "$USER_DB_DIR" ]; then
+            find "$USER_DB_DIR" -type f -name "*.fdb" -delete
+        fi
+    ;;
+
+esac
+
+
+exit 0
+
+# vi: set ts=8 sts=4 sw=4 filetype=sh ai et :

@@ -1,0 +1,186 @@
+From: Jeremy Harris <jgh146exb@wizmail.org>
+Date: Thu, 19 May 2022 14:23:02 +0100
+Subject: GnuTLS: Do not free the cached creds on transport connection close.
+ Bug 2886
+
+Origin: upstream, https://git.exim.org/exim.git/commitdiff/8c74b00980bc7e3e479e8dfcd7c0008b2ac3f543
+Bug: https://bugs.exim.org/show_bug.cgi?id=2886
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/exim4/+bug/1974214
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1004740
+---
+ confs/2011               | 72 ++++++++++++++++++++++++++++++++++++++++++++++++
+ log/2011                 | 13 +++++++++
+ rejectlog/2011           |  3 ++
+ scripts/2000-GnuTLS/2011 | 20 ++++++++++++++
+ src/tls-gnu.c            |  8 ++----
+ 5 files changed, 111 insertions(+), 5 deletions(-)
+ create mode 100644 confs/2011
+ create mode 100644 log/2011
+ create mode 100644 rejectlog/2011
+ create mode 100644 scripts/2000-GnuTLS/2011
+
+diff --git a/confs/2011 b/confs/2011
+new file mode 100644
+index 0000000..eac8ccd
+--- /dev/null
++++ b/confs/2011
+@@ -0,0 +1,72 @@
++# Exim test configuration 2011
++
++SERVER=
++
++keep_environment = PATH:EXIM_TESTHARNESS_DISABLE_OCSPVALIDITYCHECK
++add_environment = SSLKEYLOGFILE=DIR/spool/sslkeys
++exim_path = EXIM_PATH
++host_lookup_order = bydns
++spool_directory = DIR/spool
++
++.ifdef SERVER
++log_file_path = DIR/spool/log/SERVER%slog
++.else
++log_file_path = DIR/spool/log/%slog
++.endif
++
++gecos_pattern = ""
++gecos_name = CALLER_NAME
++dns_cname_loops = 9
++chunking_advertise_hosts = *
++
++.ifdef _HAVE_PIPE_CONNECT
++pipelining_connect_advertise_hosts = :
++.endif
++.ifdef _HAVE_DMARC
++dmarc_tld_file =
++.endif
++.ifdef _EXP_LIMITS
++limits_advertise_hosts = !*
++.endif
++
++primary_hostname = test.ex
++
++# ----- Main settings -----
++
++acl_smtp_rcpt = check_rcpt
++
++log_selector = +received_recipients +dkim_verbose
++queue_only
++queue_run_in_order
++
++# ----- ACL -----
++begin acl
++
++check_rcpt:
++  defer	hosts = HOSTIPV4
++  accept
++
++# ----- Routers -----
++
++begin routers
++
++d0:
++  driver =	manualroute
++  route_list =	*	"HOSTIPV4::PORT_D : 127.0.0.1::PORT_D"
++  self =	send
++  transport =	gsmtp
++
++# ----- Transports -----
++
++begin transports
++
++gsmtp:
++  driver =			smtp
++  allow_localhost
++  tls_verify_certificates =	system
++  hosts_require_tls =		*
++
++begin retry
++* * F,5d,10s
++
++# End
+diff --git a/log/2011 b/log/2011
+new file mode 100644
+index 0000000..f0fad26
+--- /dev/null
++++ b/log/2011
+@@ -0,0 +1,13 @@
++1999-03-02 09:44:33 10HmaX-0005vi-00 <= CALLER@test.ex U=CALLER P=local S=sss for fred@test.net
++1999-03-02 09:44:33 Start queue run: pid=pppp
++1999-03-02 09:44:33 10HmaX-0005vi-00 H=ip4.ip4.ip4.ip4 [ip4.ip4.ip4.ip4]: SMTP error from remote mail server after RCPT TO:<fred@test.net>: 451 Temporary local problem - please try later
++1999-03-02 09:44:33 10HmaX-0005vi-00 => fred@test.net R=d0 T=gsmtp H=127.0.0.1 [127.0.0.1] X=TLS1.x:ke-RSA-AES256-SHAnnn:xxx CV=no K C="250- 3nn byte chunk, total 3nn\\n250 OK id=10HmaY-0005vi-00"
++1999-03-02 09:44:33 10HmaX-0005vi-00 Completed
++1999-03-02 09:44:33 End queue run: pid=pppp
++
++******** SERVER ********
++1999-03-02 09:44:33 Warning: No server certificate defined; will use a selfsigned one.
++ Suggested action: either install a certificate or change tls_advertise_hosts option
++1999-03-02 09:44:33 exim x.yz daemon started: pid=pppp, no queue runs, listening for SMTP on port PORT_D
++1999-03-02 09:44:33 H=the.local.host.name (test.ex) [ip4.ip4.ip4.ip4] X=TLS1.x:ke-RSA-AES256-SHAnnn:xxx CV=no F=<CALLER@test.ex> temporarily rejected RCPT <fred@test.net>
++1999-03-02 09:44:33 10HmaY-0005vi-00 <= CALLER@test.ex H=localhost (test.ex) [127.0.0.1] P=esmtps X=TLS1.x:ke-RSA-AES256-SHAnnn:xxx CV=no K S=sss id=E10HmaX-0005vi-00@test.ex for fred@test.net
+diff --git a/rejectlog/2011 b/rejectlog/2011
+new file mode 100644
+index 0000000..b8ae22a
+--- /dev/null
++++ b/rejectlog/2011
+@@ -0,0 +1,3 @@
++
++******** SERVER ********
++1999-03-02 09:44:33 H=the.local.host.name (test.ex) [ip4.ip4.ip4.ip4] X=TLS1.x:ke-RSA-AES256-SHAnnn:xxx CV=no F=<CALLER@test.ex> temporarily rejected RCPT <fred@test.net>
+diff --git a/scripts/2000-GnuTLS/2011 b/scripts/2000-GnuTLS/2011
+new file mode 100644
+index 0000000..c5504c3
+--- /dev/null
++++ b/scripts/2000-GnuTLS/2011
+@@ -0,0 +1,20 @@
++# Cached CA bundle re-use
++#
++# Preload a message into spool
++exim -odq fred@test.net
++Subject: test
++
++this is a test
++
++****
++#
++# Server to work against
++exim -DSERVER=server -bd -oX PORT_D
++****
++#
++# Send message from spool
++exim -q
++****
++#
++killdaemon
++no_msglog_check
+diff --git a/src/tls-gnu.c b/src/tls-gnu.c
+index 31327c8..01a04be 100644
+--- a/src/tls-gnu.c
++++ b/src/tls-gnu.c
+@@ -1586,6 +1586,9 @@ return lifetime;
+ /* Preload whatever creds are static, onto a transport.  The client can then
+ just copy the pointer as it starts up. */
+ 
++/*XXX this is not called for a cmdline send. But one needing to use >1 conn would benefit,
++and there seems little downside. */
++
+ static void
+ tls_client_creds_init(transport_instance * t, BOOL watch)
+ {
+@@ -3061,8 +3064,6 @@ if (rc != GNUTLS_E_SUCCESS)
+     tls_error_gnu(state, US"gnutls_handshake", rc, errstr);
+     (void) gnutls_alert_send_appropriate(state->session, rc);
+     gnutls_deinit(state->session);
+-    gnutls_certificate_free_credentials(state->lib_state.x509_cred);
+-    state->lib_state = null_tls_preload;
+     millisleep(500);
+     shutdown(state->fd_out, SHUT_WR);
+     for (int i = 1024; fgetc(smtp_in) != EOF && i > 0; ) i--;	/* drain skt */
+@@ -3749,9 +3750,6 @@ if (!ct_ctx)	/* server */
+   }
+ 
+ gnutls_deinit(state->session);
+-gnutls_certificate_free_credentials(state->lib_state.x509_cred);
+-state->lib_state = null_tls_preload;
+-
+ tlsp->active.sock = -1;
+ tlsp->active.tls_ctx = NULL;
+ /* Leave bits, peercert, cipher, peerdn, certificate_verified set, for logging */

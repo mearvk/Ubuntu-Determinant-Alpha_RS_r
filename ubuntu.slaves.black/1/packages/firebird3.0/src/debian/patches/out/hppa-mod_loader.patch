@@ -1,0 +1,26 @@
+Description: fix mod_loader on HPPA
+ The problem is dlsym returns a function pointer on hppa when passed the name
+ of a function symbol.  It points at a function descriptor for the function
+ when the plabel bit is set in the pointer.  The descriptor has an entry which
+ points at the function after it has been bound.  Otherwise, it points at
+ trampoline code to fix up the descriptor.
+ .
+ In any case, dladdr doesn't do the expected thing when passed a function
+ pointer.  It needs the actual address of the function.
+ .
+ The attached patch fixes the build on hppa-linux.  Another option would be to
+ adjust the configure check.
+Author: John David Anglin <dave.anglin@bell.net>
+Bug-Debian: https://bugs.debian.org/858868
+
+--- a/src/common/os/posix/mod_loader.cpp
++++ b/src/common/os/posix/mod_loader.cpp
+@@ -144,7 +144,7 @@ void* DlfcnModule::findSymbol(const Fire
+ 	if (!result)
+ 		return NULL;
+ 
+-#ifdef HAVE_DLADDR
++#if defined(HAVE_DLADDR) && !defined(__hppa__)
+ 	Dl_info info;
+ 	if (!dladdr(result, &info))
+ 		return NULL;

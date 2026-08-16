@@ -1,0 +1,72 @@
+#!/bin/sh
+if ! [ -x /snap/bin/firefox ]; then
+    echo "" >&2
+    echo "Command '$0' requires the firefox snap to be installed." >&2
+    echo "Please install it with:" >&2
+    echo "" >&2
+    echo "snap install firefox" >&2
+    echo "" >&2
+    exit 1
+fi
+
+if [ "$(xdg-settings get default-web-browser)" = "firefox.desktop" ]; then
+  xdg-settings set default-web-browser firefox_firefox.desktop
+fi
+
+# GNOME Shell
+OLD="firefox.desktop"
+NEW="firefox_firefox.desktop"
+FAVS=$(gsettings get org.gnome.shell favorite-apps 2> /dev/null)
+if echo "$FAVS" | grep -q "'$OLD'"; then
+  NEWFAVS=$(echo $FAVS | sed -e "s#'$OLD'#'$NEW'#")
+  gsettings set org.gnome.shell favorite-apps "$NEWFAVS"
+fi
+
+# Unity
+OLD="application://firefox.desktop"
+NEW="application://firefox_firefox.desktop"
+FAVS=$(gsettings get com.canonical.Unity.Launcher favorites 2> /dev/null)
+if echo "$FAVS" | grep -q "'$OLD'"; then
+  NEWFAVS=$(echo $FAVS | sed -e "s#'$OLD'#'$NEW'#")
+  gsettings set com.canonical.Unity.Launcher favorites "$NEWFAVS"
+fi
+
+# MATE
+OLD="/usr/share/applications/firefox.desktop"
+NEW="/var/lib/snapd/desktop/applications/firefox_firefox.desktop"
+OBJECTS=$(gsettings get org.mate.panel object-id-list 2> /dev/null)
+for object in $OBJECTS; do
+  object=$(echo $object | cut -d\' -f2)
+  launcher=$(gsettings get org.mate.panel.object:/org/mate/panel/objects/$object/ launcher-location)
+  if [ "$launcher" = "'$OLD'" ]; then
+    gsettings set org.mate.panel.object:/org/mate/panel/objects/$object/ launcher-location "'$NEW'"
+  fi
+done
+
+# KDE Plasma
+OLD="applications:firefox.desktop"
+NEW="applications:firefox_firefox.desktop"
+if which qdbus > /dev/null; then
+  SCRIPT="$(cat <<-EOF
+    for (var i = 0; i < panelIds.length; ++i) {
+      var panel = panelById(panelIds[i]);
+      var widgets = panel.widgets();
+      for (var j = 0; j < widgets.length; ++j) {
+        var widget = widgets[j];
+        if (widget.type == "org.kde.plasma.taskmanager") {
+          widget.currentConfigGroup = "General";
+          var launchers = widget.readConfig("launchers");
+          if (launchers.includes("$OLD")) {
+            widget.writeConfig("launchers", launchers.replace(/$OLD/g, "$NEW"));
+          }
+        }
+      }
+    }
+EOF
+  )"
+  qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$SCRIPT" 2> /dev/null
+fi
+
+# TODO: handle other desktop environments
+
+exec /snap/bin/firefox "$@"

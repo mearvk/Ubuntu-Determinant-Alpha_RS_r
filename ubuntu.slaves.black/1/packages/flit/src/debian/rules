@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+export FLIT_NO_NETWORK=True
+export FLIT_ROOT_INSTALL=1
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+
+override_dh_auto_install:
+	cp debian/build.py .
+	python3 build.py
+	# Debian will use the system tomli, so we neither need nor want the
+	# the vendored copy.
+	rm -rf $(CURDIR)/debian/flit/usr/lib/python3*/dist-packages/flit_core/vendor
+	# Not useful in Debian
+	rm -f $(CURDIR)/debian/flit/usr/lib/python3*/dist-packages/flit*.dist-info/direct_url.json
+	# Clean up RECORD file
+	for py in $(shell py3versions -d); do \
+		for flt in flit flit_core; do \
+			sed -i '/__pycache__/d' $(CURDIR)/debian/flit/usr/lib/$$py/dist-packages/$$flt-$(DEB_VERSION_UPSTREAM).dist-info/RECORD; \
+			sed -i '/vendor\//d' $(CURDIR)/debian/flit/usr/lib/$$py/dist-packages/$$flt-$(DEB_VERSION_UPSTREAM).dist-info/RECORD; \
+			sed -i '/direct_url/d' $(CURDIR)/debian/flit/usr/lib/$$py/dist-packages/$$flt-$(DEB_VERSION_UPSTREAM).dist-info/RECORD; \
+			sed -i '/debian/d' $(CURDIR)/debian/flit/usr/lib/$$py/dist-packages/$$flt-$(DEB_VERSION_UPSTREAM).dist-info/RECORD; \
+		done \
+	done
+	dh_install
+
+override_dh_installman:
+	sphinx-build -b man -D extensions='sphinx.ext.ifconfig' -D man_show_urls=True doc/ debian/
+	dh_installman
+
+override_dh_python3:
+	dh_python3 -p flit
+
+override_dh_auto_clean:
+	dh_clean
+	rm -f build.py
+	find flit flit_core -depth -type d -name __pycache__ -exec rm -r {} \;
+	rm -rf $(CURDIR)/debian/.doctrees
+	rm -f $(CURDIR)/debian/flit.1
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	for py in $(shell py3versions -s); do \
+		$$py -m pytest -k 'not test_find_in_path' --pyargs flit_core; \
+	done
+endif

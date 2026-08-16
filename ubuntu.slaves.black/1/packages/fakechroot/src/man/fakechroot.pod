@@ -1,0 +1,415 @@
+# pod2man --section=1 --release="fakechroot" --center=" " --date="16 Mar 2019"
+#
+
+=head1 NAME
+
+fakechroot - gives a fake chroot environment
+
+=head1 SYNOPSIS
+
+B<fakechroot>
+S<[B<-s>|B<--use-system-libs>]>
+S<[B<-l>|B<--lib> I<library>]>
+S<[B<-d>|B<--elfloader> I<ldso>]>
+S<[B<-e>|B<--environment> I<type>]>
+S<[B<-c>|B<--config-dir> I<directory>]>
+S<[B<-b>|B<--bindir> I<directory>]>
+S<[B<-->]>
+S<[I<command>]>
+
+B<fakechroot>
+S<B<-h>|B<--help>>
+
+B<fakechroot>
+S<B<-v>|B<--version>>
+
+=head1 DESCRIPTION
+
+fakechroot runs a command in an environment where is additional possibility to
+use chroot(8) command without root privileges. This is useful for allowing
+users to create own chrooted environment with possibility to install another
+packages without need for root privileges.
+
+fakechroot replaces some C library functions (chroot(2), open(2), etc.)
+by ones that simulate the effect of being called with root privileges.
+
+These wrapper functions are provided as a shared library F<libfakechroot.so>
+which is loaded through the C<LD_PRELOAD> mechanism of the dynamic loader.
+(See ld.so(8))
+
+In fake chroot you can install i.e. Debian bootstrap with debootstrap(8)
+command. In such environment you can run i.e. apt-get(8) command to install
+another packages. You don't need a special privileges and you can run it on
+common user's account.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-b>|B<--bindir> I<directory>
+
+Specify a directory which contains the replacement executables
+shipped with fakechroot.
+Those are script files with the extension C<.fakechroot>.
+By default they are distributed over the
+C<bin> and C<sbin> directories in fakechroot's install prefix,
+but sometimes a fixed location at build time is not feasible.
+
+=item B<-c>|B<--config-dir> I<directory>
+
+Specify a directory which contains additional configuration for fakechroot. The
+default directory are C<$HOME/.fakechroot> and C</etc/fakechroot>.
+
+=item B<-d> I<ldso>|B<--elfloader> I<ldso>
+
+Specify an alternative dynamic linker. This dynamic linker will be invoked
+directly.
+
+=item B<-e>|B<--environment> I<type>
+
+Load additional configuration with environment. This configuration file
+is a shell script which is executed before calling I<command>. The
+script can set additional environment variables, like i.e.:
+C<FAKECHROOT_EXCLUDE_PATH>, C<FAKECHROOT_CMD_SUBST> or C<LD_LIBRARY_PATH>.
+
+The environment type is guessed based on command name with optional extension
+removed (e.g. running F<gettext.sh> loads C<gettext> environment file). If
+I<command> argument is fakeroot(1) this argument is omitted and next argument
+is taken as environment type.
+
+The configuration file name is F<I<type>.env> and is searched at
+F<$HOME/.fakechroot> and F</etc/fakechroot> directories.
+
+The default environment type is B<default> and its configuration file name is
+C<default.env>.
+
+The special environment B<none> means that no environment settings are loaded
+at all.
+
+=item B<-l> I<library>|B<--lib> I<library>
+
+Specify an alternative wrapper library. The default is F<libfakechroot.so>
+
+=item B<-h>|B<--help>
+
+Display help.
+
+=item B<-s>|B<--use-system-libs>
+
+Use system libraries before chroot's libraries. This might be a workaround if
+system dynamic linker cannot load F<libc.so> from fake chroot.
+
+Try this setting if you noticed following errors:
+
+ $ fakechroot /usr/sbin/chroot /tmp/sarge /bin/true
+ /bin/true: relocation error: /srv/sarge/lib/tls/libc.so.6: symbol _dl
+ _starting_up, version GLIBC_PRIVATE not defined in file ld-linux.so.2
+  with link time reference
+
+ $ fakechroot /usr/sbin/chroot /tmp/centos4 /bin/true
+ Segmentation fault
+
+=item B<-v>|B<--version>
+
+Display version.
+
+=item [B<-->] I<command>
+
+Any command you want to be run as fakechroot. Use 'B<-->' if in the command
+you have other options that may confuse fakechroot's option parsing.
+
+=back
+
+=head1 EXAMPLES
+
+An example session with fakechroot:
+
+  $ id
+  uid=1000(dexter) gid=1000(dexter) groups=1000(dexter)
+
+  $ fakechroot fakeroot debootstrap sid /tmp/sid
+  I: Retrieving Release 
+  I: Retrieving Release.gpg 
+  I: Checking Release signature
+  ...
+  I: Base system installed successfully.
+
+  $ fakechroot fakeroot chroot /tmp/sid apt-get install -q hello
+  Reading package lists...
+  Building dependency tree...
+  Reading state information...
+  The following NEW packages will be installed:
+    hello
+  0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+  Need to get 57.4 kB of archives.
+  After this operation, 558 kB of additional disk space will be used.
+  Get:1 http://ftp.us.debian.org/debian/ sid/main hello amd64 2.8-4 [57.4 kB]
+  Fetched 57.4 kB in 0s (127 kB/s)
+  Selecting previously unselected package hello.
+  (Reading database ... 24594 files and directories currently installed.)
+  Unpacking hello (from .../archives/hello_2.8-4_amd64.deb) ...
+  Processing triggers for man-db ...
+  Processing triggers for install-info ...
+  Setting up hello (2.8-4) ...
+
+  $ fakechroot chroot /tmp/sid hello
+  Hello, world!
+
+=head1 FAKEROOT
+
+fakeroot(1) is a complementary tool which emulates root environment. fakeroot
+and fakechroot might wrap the same C library functions, i.e. mknod(2)
+function. It is important to start fake environment in proper order. fakeroot
+should be started inside fakechroot:
+
+  $ fakechroot fakeroot chroot /tmp/sid /bin/mknod /tmp/device c 1 2
+
+=head1 SECURITY ASPECTS
+
+fakechroot is a regular, non-setuid program. It does not enhance a user's
+privileges.
+
+fakechroot should not be used as a tool for enhancing system security i.e. by
+separating (sandboxing) applications. It is very easy to escape from a fake
+chroot environment.
+
+fakechroot should not be run with real root privileges. It might decrease the
+security of the system because the fakechroot provides own version of core
+functions with behavior depended on some environment variables.
+
+=head1 FILES
+
+=over
+
+=item F<libfakechroot.so>
+
+The shared library containing the wrapper functions.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item B<FAKECHROOT>
+
+The value is true for fake chroot environment.
+
+=item B<FAKECHROOT_AF_UNIX_PATH>
+
+The root directory for unix sockets. The default value is the same as
+C<FAKECHROOT_BASE> and it can be set separately if the C<FAKECHROOT_BASE> is
+too long and the unix socket path could exceed the limit of B<108> bytes.
+
+=item B<FAKECHROOT_BASE>
+
+The root directory of fake chroot environment.
+
+=item B<FAKECHROOT_CMD_SUBST>
+
+A list of command substitutions. If a program tries to execute one of
+the commands given (path relative to the chroot, trailing dot is removed) then
+the substitute command runs instead (path to substitute command is not
+chrooted).
+
+The substituted command inherits C<FAKECHROOT_*> variables but the original
+C<FAKECHROOT_BASE> variable which is saved as C<FAKECHROOT_BASE_ORIG>. It
+means that substituted command runs outside fakechroot environment. Also
+original command name is saved as C<FAKECHROOT_CMD_ORIG>.
+
+For example:
+
+  export FAKECHROOT_CMD_SUBST=/usr/bin/mkfifo=/bin/true
+
+will substitute C</bin/true> for C</usr/bin/mkfifo> and will make possible to
+install sysvinit binary package.
+
+Give as many substitute commands as you want, separated by C<:>
+(colon) characters.
+
+It is suggested to substitute at least:
+
+=over 2
+
+=item *
+
+C</bin/mount=/bin/true>
+
+=item *
+
+C</sbin/insserv=/bin/true>
+
+=item *
+
+C</sbin/ldconfig=/bin/true>
+
+=item *
+
+C</usr/bin/env=/usr/bin/env.fakechroot>
+
+=item *
+
+C</usr/bin/ischroot=/bin/true>
+
+=item *
+
+C</usr/bin/ldd=/usr/bin/ldd.fakechroot>
+
+=item *
+
+C</usr/bin/mkfifo=/bin/true>
+
+=back
+
+to make debootstrap(8) working correctly.
+
+To prevent some looping, the command substitution is done only if
+C<FAKECHROOT_CMD_ORIG> variable is not set currently.
+
+=item B<FAKECHROOT_DEBUG>
+
+The fakechroot library will dump some debugging info if this variable is set.
+
+=item B<FAKECHROOT_DETECT>
+
+If this variable is set then C<fakechroot I<version>> string is printed to
+standard output and the current process is terminated with status taken from
+this variable. It can be a method to check if fakechroot is preloaded
+correctly.
+
+  $ case "`FAKECHROOT_DETECT=1 /bin/echo`" in fakechroot*) echo LOADED;; esac
+
+=item B<FAKECHROOT_ELFLOADER>
+
+A path to another dynamic linker (i.e. F</lib/ld-linux.so.2> for i386
+architecture, F</lib64/ld-linux-x86-64.so.2> for x86_64 architecture).
+
+This dynamic linker will be invoked directly. The dynamic linker don't allow
+to change C<argv[0]> besides the file name of the executable file, so some
+application won't work correctly, i.e. busybox(1).
+
+=item B<FAKECHROOT_EXCLUDE_PATH>
+
+The list of directories which are excluded from being chrooted. The elements
+of list are separated with colon.
+
+The F</dev>, F</proc> and F</sys> directories are excluded by default if this
+environment variable is not set.
+
+This list has to contain at most 100 elements.
+
+=item B<FAKECHROOT_EXTRA_LIBRARY_PATH>
+
+The list of extra directories in fake chroot environment that are added to
+C<LD_LIBRARY_PATH> variable. The directories might be used by some important
+commands which use libraries placed in the I<runpath>. In that case dynamic
+linker can't find correct directory in a fake chroot environment without the
+extra library path.
+
+The default value is C</lib/systemd:/usr/lib/man-db> for systemctl(1) and
+man(1) commands.
+
+=item B<FAKECHROOT_VERSION>
+
+The version number of the current fakechroot library.
+
+=item B<LD_LIBRARY_PATH>, B<LD_PRELOAD>
+
+Fakechroot is implemented by wrapping system calls. This is accomplished by
+setting C<LD_PRELOAD=libfakechroot.so>. If this library can't be found by
+dynamic linker, the F</etc/ld.so.conf> file or C<LD_LIBRARY_PATH> variable
+have to be modified.
+
+=back
+
+=head1 LIMITATIONS
+
+=over
+
+=item *
+
+F</lib/ld-linux.so.2> and F</lib64/ld-linux-x86-64.so.2> are always loaded
+from real environment. This path is hardcoded by linker for all binaries.
+You can set the C<FAKECHROOT_ELFLOADER> environment variable or use
+C<--elfloader> option.
+
+=item *
+
+Every command executed within fakechroot needs to be linked to the same
+version of the dynamic linker from real environment. If the libraries in
+chroot are not compatible, try to use C<--use-system-libs> option.
+
+=item *
+
+You can provide symlinks to the outside. The symlink have to be created
+before chroot is called. It can be useful for accessing the real F</proc>
+and F</dev> directory. You can also set the C<FAKECHROOT_EXCLUDE_PATH>
+environment variable:
+
+  $ export FAKECHROOT_EXCLUDE_PATH=/tmp:/proc:/dev:/sys:/var/run:/home
+
+=item *
+
+Statically linked binaries doesn't work, especially ldconfig(8), so you have
+to wrap this command with dummy version and set the proper
+C<FAKECHROOT_CMD_SUBST> environment variable.
+
+=item *
+
+ldd(1) also doesn't work. You have to use C<alias
+ldd='LD_TRACE_LOADED_OBJECTS=1'> or to use a wrapper instead. The wrapper is
+installed as F<ldd.fakechroot> and can be used with C<FAKECHROOT_CMD_SUBST>
+environment variable.
+
+=item *
+
+The full screen applications hangs up if F</dev/tty> file is not a real
+device. Link F</dev/tty> file or whole F</dev> directory to the real one or
+remove it from fake chroot environment with C<FAKECHROOT_EXCLUDE_PATH>
+variable.
+
+=item *
+
+lckpwdf(3) and ulckpwdf(3) are ignored so passwd(1) command should work
+
+=item *
+
+Your real uid should exist in F</etc/passwd>. Create it with adduser --uid
+I<realuid> I<realuser> inside fake chroot environment.
+
+=item *
+
+debuild(1) cleans environment. Use --preserve-env option to prevent this
+behavior.
+
+=item *
+
+rpmbuild(8) uses own glob(3) implementation which breaks fakechroot so
+buildroot directory have to be the same inside and outside fakechroot.
+
+=back
+
+=head1 SEE ALSO
+
+fakeroot(1), debuild(1), debootstrap(8), rinse(8),
+http://fakechroot.alioth.debian.org/
+
+=head1 BUGS
+
+If you find the bug or want to implement new features, please report it at
+L<https://github.com/fakechroot/fakechroot/issues>
+
+=head1 AUTHORS
+
+Copyright (c) 2003-2017, 2019 Piotr Roszatycki <dexter@debian.org>
+
+Copyright (c) 2007 Mark Eichin <eichin@metacarta.com>
+
+Copyright (c) 2006, 2007 Alexander Shishkin <virtuoso@slind.org>
+
+Copyright (c) 2006, 2007 Lionel Tricon <lionel.tricon@free.fr>
+
+=head1 COPYING
+
+fakechroot is distributed under the GNU Lesser General Public License (LGPL
+2.1 or greater).

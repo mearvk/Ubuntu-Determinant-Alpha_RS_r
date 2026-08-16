@@ -1,0 +1,105 @@
+%%ifdef DEB_BUILD_GNU_TYPE
+ac_add_options --build=@DEB_BUILD_GNU_TYPE@
+%%endif
+ac_add_options --host=@DEB_HOST_GNU_TYPE@
+ac_add_options --prefix=/usr
+ac_add_options --with-l10n-base=@TOPSRCDIR@/@DEB_BUILDDIR@/l10n
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/@MOZ_OBJDIR@
+ac_add_options --enable-release
+ac_add_options --disable-install-strip
+ac_add_options --disable-updater
+ac_add_options --enable-application=browser
+ac_add_options --with-distribution-id=com.ubuntu
+%%if DEB_BUILD_ARCH_BITS == 32
+ac_add_options --enable-debug-symbols=-g1
+%%else
+ac_add_options --enable-debug-symbols
+%%endif
+%%ifdef MOZ_NO_OPTIMIZE
+ac_add_options --disable-optimize
+%%else
+%%ifndef MOZ_VALGRIND
+ac_add_options --enable-optimize
+%%else
+ac_add_options --enable-optimize="-g -O -freorder-blocks"
+%%endif
+%%endif
+%%ifdef MOZ_VALGRIND
+ac_add_options --disable-jemalloc
+ac_add_options --enable-valgrind
+%%endif
+%%ifdef DEB_PARALLEL_JOBS
+mk_add_options MOZ_MAKE_FLAGS=-j@DEB_PARALLEL_JOBS@
+%%endif
+ac_add_options --enable-tests
+%%ifdef MOZ_ENABLE_BREAKPAD
+ac_add_options --enable-crashreporter
+%%else
+ac_add_options --disable-crashreporter
+%%endif
+ac_add_options @MOZ_BRANDING_OPTION@
+%%ifdef MOZ_BUILD_PGO
+mk_add_options MOZ_PGO=1
+mk_add_options PROFILE_GEN_SCRIPT='xvfb-run -a @MOZ_PYTHON@ @TOPSRCDIR@/@MOZ_OBJDIR@/_profile/pgo/profileserver.py 10'
+%%endif
+ac_add_options --enable-update-channel=@MOZ_UPDATE_CHANNEL@
+%%ifdef MOZ_DEBUG
+ac_add_options --enable-debug
+%%else
+ac_add_options --disable-debug
+%%endif
+%%if DEB_HOST_ARCH != arm64
+%%if DEB_HOST_ARCH != ppc64el
+%%if DEB_HOST_ARCH != s390x
+ac_add_options --disable-elf-hack
+%%endif
+%%endif
+%%endif
+%%if DEB_HOST_ARCH != amd64
+%%if DEB_HOST_ARCH != i386
+%%if DEB_HOST_ARCH != armhf
+%%if DEB_HOST_ARCH != arm64
+# See https://bugzilla.mozilla.org/show_bug.cgi?id=1430094
+ac_add_options --disable-webrtc
+ac_add_options --disable-av1
+%%endif
+%%endif
+%%endif
+%%endif
+%%if MOZ_APP_NAME != MOZ_DEFAULT_APP_NAME
+ac_add_options --with-app-name=@MOZ_APP_NAME@
+%%endif
+%%ifdef MOZ_APP_PROFILE
+ac_add_options --with-app-profile=@MOZ_APP_PROFILE@
+%%endif
+%%if DISTRIB == Ubuntu
+ac_add_options --with-ua-vendor=Ubuntu
+%%endif
+ac_add_options --without-wasm-sandboxed-libraries
+%%if MOZ_UPDATE_CHANNEL == nightly
+ac_add_options --enable-profiling
+%%endif
+mk_add_options "export MOZ_BUILD_DATE=@MOZ_BUILDID@"
+ac_add_options CC=clang-@DEB_LLVM_VERSION@
+ac_add_options CXX=clang++-@DEB_LLVM_VERSION@
+ac_add_options CBINDGEN=@TOPSRCDIR@/@DEB_BUILDDIR@/cbindgen/bin/cbindgen
+ac_add_options DUMP_SYMS=@TOPSRCDIR@/@DEB_BUILDDIR@/dump_syms/bin/dump_syms
+%%if DEB_HOST_ARCH != i386
+%%if DEB_HOST_ARCH != armhf
+ac_add_options --enable-rust-simd
+%%endif
+%%endif
+ac_add_options --with-unsigned-addon-scopes=app
+# Re-enable addon sideloading to allow langpacks installed system-wide (LP: #1866059)
+ac_add_options --allow-addon-sideload
+# Set up Google API keys, see http://www.chromium.org/developers/how-tos/api-keys .
+# Note: these are for Ubuntu use ONLY. For your own distribution,
+# please get your own set of keys.
+# Included with permission from Paweł Hajdan.
+# Feel free to contact Chris Coulson (chris.coulson@canonical.com) for more info.
+# Since firefox 66.0, the single API key was split into two (potentially)
+# separate keys, one for the Google Location Services, and one for the
+# Safe Browsing API. See https://bugzilla.mozilla.org/show_bug.cgi?id=1531176
+# for details. It is fine to use the same key file for both.
+ac_add_options --with-google-location-service-api-keyfile=@TOPSRCDIR@/debian/ga
+ac_add_options --with-google-safebrowsing-api-keyfile=@TOPSRCDIR@/debian/ga

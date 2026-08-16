@@ -1,0 +1,60 @@
+#! /usr/bin/perl -w
+
+# Program to add page label information to the PDF output file. I have not
+# found a way of automatically discovering the number of frontmatter pages
+# in the document. It is therefore taken as an argument to be inserted into the
+# next statement.
+
+$add = "/PageLabels << /Nums [ 0 << /S /r >>\n" .
+       "                      $ARGV[0] << /S /D >>\n" .
+       "                     ]\n" .
+       "            >>\n";
+
+$extra = length $add;
+
+$before = 0;
+while (<STDIN>)
+  {
+  print;
+  $before += length($_);
+  last if $_ =~ "^<< /Type /Catalog";
+  }
+
+print $add;
+
+while (<STDIN>)
+  {
+  print;
+  last if $_ =~ /^xref$/;
+  }
+
+while (<STDIN>)
+  {
+  if (/^(\d{10}) (.*)/)
+    {
+    my($was) = $1;
+    my($rest) = $2;
+    printf "%010d $rest\n", $was + (($was > $before)? $extra : 0);
+    }
+  elsif (/^startxref/)
+    {
+    print;
+    $_ = <STDIN>;
+    if (/^(\d+)/)
+      {
+      print $1 + $extra, "\n";
+      }
+    else
+      {
+      print;
+      }
+    }
+  else
+    {
+    print;
+    }
+  }
+
+# End
+
+

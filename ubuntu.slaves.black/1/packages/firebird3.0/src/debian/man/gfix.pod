@@ -1,0 +1,321 @@
+=head1 NAME
+
+gfix -- miscelenous Firebird database maintenance
+
+=head1 SYNOPSIS
+
+B<gfix> I<command> [I<option>...] I<database>
+
+=head1 DESCRIPTION
+
+B<gfix> is a program that allows the Firebird administrator or database owner
+to perform various maintenance tasks.
+
+=head1 COMMANDS
+
+=over
+
+=item B<-ac>
+
+=item B<-activate_shadow>
+
+Activate database shadow file.
+
+=item B<-b> I<number>
+
+=item B<-buffers> I<number>
+
+Set database buffer size, in pages.
+
+=item B<-co> I<number>|C<all>
+
+=item B<-commit> I<number>|C<all>
+
+Commit a limbo transaction with a given number or all limbo transactions.
+
+=item B<-h> I<number>
+
+=item B<-housekeeping> I<number>
+
+Set the housekeeping interval. When the difference between the oldest
+interesting transaction and the current transaction exceeds I<number>, an
+automatic garbage collection (sweep) process is started to make possible
+increasing of the oldest interesting transaction number.
+
+When I<number> is C<0>, there is no automatic sweep and OIT advancement should
+be arranged by other means, e.g. B<gfix -sweep> via L<cron(1)>.
+
+=item B<-icu>
+
+Fix the database to be usable with the available ICU version.
+
+Some collations in Firebird are bound the the version of the ICU library. When
+such a collation needs to be used in an environment with a different version of
+ICU, an error occurs. B<gfix -icu> is the remedy.
+
+=item B<-k>
+
+=item B<-kill_shadow>
+
+Kill unavailable database shadow files.
+
+=item B<-l>
+
+=item B<-list>
+
+List limbo transactions.
+
+=over
+
+=item B<-pr>
+
+=item B<-prompt>
+
+Prompt for commit/rollback for each transaction in limbo.
+
+=back
+
+=item B<-me>
+
+=item B<-mend>
+
+Prepare corrupt database for backup.
+
+=item B<-mo> I<access>
+
+=item B<-mode> I<access>
+
+Set database access mode. Possibla values are C<read_only> and C<read_write>.
+
+=item B<-nol>
+
+=item B<-nolinger>
+
+Temporary remove linger setting of the database.
+
+Similar to the following SQL statement:
+
+ alter database drop linger;
+
+but the next attachment to the database will restore the linger setting.
+
+See F<sql.extensions/README.linger>.
+
+=item B<-o> [I<mode>]
+
+=item B<-online> [I<mode>]
+
+Brings the database online. The reverse of B<-shut>.
+
+I<mode> can be:
+
+=over
+
+=item B<normal>
+
+This is the default. Brings the database fully online, all normal connections
+are permitted.
+
+=item B<multi>
+
+Permits multiple connections from SYSDBA and the database owner.
+
+=item B<single>
+
+Permins only one connection from SYSDBA or the database owner.
+
+=back
+
+=item B<-v>
+
+=item B<-validate>
+
+Perform database validation.
+
+Validation options:
+
+=over
+
+=item B<-fu>
+
+=item B<-full>
+
+Full validation. Record fragments are verified.
+
+=item B<-i>
+
+=item B<-ignore>
+
+Ignore record checksum errors.
+
+=item B<-n>
+
+=item B<-no_update>
+
+Peform read-only validation.
+
+=back
+
+=item B<-r> I<number>|C<all>
+
+=item B<-rollback> I<number>|C<all>
+
+Rollback given limbo transaction or all limbo transactions.
+
+=item B<-sq> I<number>
+
+=item B<-sql_dialect> I<number>
+
+Change the SQL dialect of the database.
+
+=item B<-sw>
+
+=item B<-sweep>
+
+Perform immediate garbage collection on the database.
+
+=item B<-sh> [I<mode>] I<option> I<timeout>
+
+=item B<-shutdown> [I<mode>] I<option> I<timeout>
+
+Shuts the database down. I<mode> is either of
+
+=over
+
+=item B<multi>
+
+Multiple connections from SYSDBA and the database owner are allowed. Ordinary
+osers are denied any requests to the database. This is the default I<mode>.
+
+=item B<single>
+
+Only a single connection from SYSDBA or the database owner is allowed.
+
+=item B<full>
+
+No connections to the database are allowed.
+
+=item B<-ca>
+
+=item B<-cache>
+
+Ignored. Equivalent to L<-multi>.
+
+=back
+
+I<option> is either of
+
+=over
+
+=item B<-at>
+
+=item B<-attach>
+
+Prevents new attachments (connections). Active connections continue to work.
+
+=item B<-tra>
+
+=item B<-transaction>
+
+Prevents new transactions. Open transactions continue to work.
+
+=item B<-fo>
+
+=item B<-force_shutdown>
+
+Force immediate database shutdown. All running
+statements, transactions and connections are aborted.
+
+=back
+
+=item B<-tw>
+
+=item B<-two_phase>
+
+Perform two-phase recovery of limbo transactions.
+
+=item B<-u> I<mode>
+
+=item B<-use> I<mode>
+
+Set the page allocation preference. When I<mode> is C<reserve> a certain amount
+of the page is kept aside for record versions. When I<mode> is C<full> database
+pages are used fully without such reservarions.
+
+Corresponds to the B<-use_all> option of L<gbak(1)>.
+
+=item B<-w> I<mode>
+
+=item B<-write> I<mode>
+
+Sets the synchronous writes flag. C<sync> sets the synchronous mode flag (also known as C<forced writes>). C<async> clears the flag.
+
+When the flag is on, all writes to the database are synchronised via a call to
+the operating system to ensure that the data has reached stable storage.
+
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item B<-fe> I<file>
+
+=item B<-fetch_password> I<file>
+
+Read password from I<file>.
+
+=item B<-pas> I<string>
+
+=item B<-password> I<string>
+
+Password for the connection.
+
+=item B<-ro> I<string>
+
+=item B<-role> I<string>
+
+Use supplied SQL role for the connection.
+
+=item B<-user> I<string>
+
+Use supplied user name for the connection.
+
+=item B<-z>
+
+Prints the B<gfix> version number before anything else.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over
+
+=item B<ISC_USER>
+
+Default value for the L<-user> option.
+
+=item B<ISC_ROLE>
+
+Default value for the L<-role> option.
+
+=item B<ISC_PASSWORD>
+
+Default value for the L<-password> option.
+
+=back
+
+=head1 SEE ALSO
+
+L<fbstat(1)>.
+
+Additional documentation about Firebird can be found on the Firebird Project
+website, L<http://www.firebirdsql.org>.
+
+=head1 AUTHOR
+
+This manual page was written by Damyan Ivanov L<dmn@debian.org> for the Debian
+project. Permission is granted to use this document, with or without
+modifications, provided that this notice is retained. If we meet some day, and
+you think this stuff is worth it, you can buy me a beer in return.

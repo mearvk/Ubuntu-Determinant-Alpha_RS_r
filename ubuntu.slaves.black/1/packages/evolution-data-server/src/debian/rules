@@ -1,0 +1,77 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all reproducible=+fixfilepath
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+
+# see https://bugzilla.gnome.org/show_bug.cgi?id=594473 for details
+export DEB_LDFLAGS_MAINT_STRIP = -Wl,-Bsymbolic-functions
+
+export SENDMAIL_PATH = /usr/sbin/sendmail
+
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes) $(DEB_HOST_ARCH), yes i386)
+   skip_packages = -Nevolution-data-server -N evolution-data-server-tests
+endif
+
+%:
+	dh $@
+
+ifeq (,$(filter $(DEB_HOST_ARCH), hppa hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64))
+CONFFLAGS = -DWITH_PHONENUMBER=ON
+endif
+ifeq (,$(filter $(DEB_HOST_ARCH), ia64 kfreebsd-i386 kfreebsd-amd64))
+CONFFLAGS += -DENABLE_OAUTH2=ON
+else
+CONFFLAGS += -DENABLE_OAUTH2=OFF
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DSYSCONF_INSTALL_DIR=/etc \
+		-DWITH_LIBDB=/usr \
+		-DWITH_OPENLDAP=ON \
+		-DWITH_KRB5=ON \
+		-DCMAKE_SKIP_RPATH=ON \
+		-DENABLE_GTK=ON \
+		-DENABLE_GTK_DOC=ON \
+		-DENABLE_GOA=ON \
+		-DENABLE_EXAMPLES=ON \
+		-DENABLE_WEATHER=ON \
+		-DENABLE_INSTALLED_TESTS=ON \
+		-DENABLE_INTROSPECTION=ON \
+		-DENABLE_VALA_BINDINGS=ON \
+		$(CONFFLAGS)
+
+# don't configure with --libdir, but move the files manually, because
+# /usr/lib/evolution-data-server must not change.
+override_dh_install:
+	mkdir -p debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
+	mv debian/tmp/usr/lib/*.so debian/tmp/usr/lib/*.so.* debian/tmp/usr/lib/girepository-1.0 \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
+	mv debian/tmp/usr/lib/pkgconfig/*.pc \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig
+	find debian/tmp/usr/lib -name '*.a' -delete -print
+	dh_install
+
+override_dh_fixperms-arch:
+	chgrp mail $(CURDIR)/debian/evolution-data-server/usr/libexec/camel-lock-helper*
+	chmod g+s $(CURDIR)/debian/evolution-data-server/usr/libexec/camel-lock-helper*
+	dh_fixperms -a -X/usr/libexec/camel-lock-helper* -Xusr/libexec/evolution-data-server/installed-tests
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+ifneq ($(filter %-tests,$(built_binaries)),)
+	chmod --changes u=rw,og=r debian/*-tests/usr/libexec/*/installed-tests/components/*
+	chmod --changes u=rw,og=r debian/*-tests/usr/libexec/*/installed-tests/vcards/*
+	chmod --changes a+rX,u+w,og-w debian/*-tests/usr/libexec/*/installed-tests/*
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs -X/usr/lib/evolution-data-server/ -- -c4
+
+override_dh_auto_test:
+	dbus-run-session -- dh_auto_test || true
+
+override_dh_builddeb:
+	dh_builddeb ${skip_packages}
+
+override_dh_gencontrol:
+	dh_gencontrol ${skip_packages}

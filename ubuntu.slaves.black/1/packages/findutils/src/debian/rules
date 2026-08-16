@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+export DEB_CFLAGS_MAINT_APPEND := -Wall
+export DEB_CXXFLAGS_MAINT_APPEND := -Wall
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export RUN_VERY_EXPENSIVE_TESTS := yes
+export RUN_EXPENSIVE_TESTS := yes
+
+override_dh_auto_configure:
+	dh_auto_configure --verbose -- \
+		--localstatedir=/var/cache/locate \
+		--enable-d_type-optimisation
+
+
+override_dh_auto_clean:
+	[ ! -f Makefile ] || dh_auto_clean --verbose
+	rm -fv doc/find.info*
+
+override_dh_auto_install:
+	dh_auto_install --verbose
+	cd "$(CURDIR)/debian/tmp/usr/" && \
+		for i in updatedb locate ; do \
+			mv -v bin/$$i bin/$$i.findutils ; \
+			mv -v share/man/man1/$${i}.1 share/man/man1/$${i}.findutils.1 ; \
+		done
+
+%:
+	dh $@

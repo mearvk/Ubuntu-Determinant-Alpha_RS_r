@@ -1,0 +1,84 @@
+From 3b3f5a12fce4ccb5c09b4201aa93e3e17adf024c Mon Sep 17 00:00:00 2001
+From: Hajime Yoshimori <lugia.kun@gmail.com>
+Date: Fri, 1 May 2020 21:14:32 +0900
+Subject: [PATCH] check return value of dladdr
+
+---
+ src/dladdr.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+--- a/src/dladdr.c
++++ b/src/dladdr.c
+@@ -36,11 +36,13 @@ wrapper(dladdr, int, (const void * addr,
+ 
+     ret = nextcall(dladdr)(addr, info);
+ 
+-    if (info->dli_fname) {
+-        narrow_chroot_path(info->dli_fname);
+-    }
+-    if (info->dli_sname) {
+-        narrow_chroot_path(info->dli_sname);
++    if (ret != 0) {
++        if (info->dli_fname) {
++            narrow_chroot_path(info->dli_fname);
++        }
++        if (info->dli_sname) {
++            narrow_chroot_path(info->dli_sname);
++        }
+     }
+ 
+     return ret;
+--- a/test/src/Makefile.am
++++ b/test/src/Makefile.am
+@@ -3,6 +3,7 @@ check_PROGRAMS = \
+     test-chroot \
+     test-clearenv \
+     test-dedotdot \
++    test-dladdr \
+     test-execlp \
+     test-execve-null-envp \
+     test-fts \
+--- /dev/null
++++ b/test/src/test-dladdr.c
+@@ -0,0 +1,14 @@
++#define _GNU_SOURCE
++#include <dlfcn.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdio.h>
++
++int main(int argc, char** argv)
++{
++  Dl_info info;
++  memset(&info, 0xfe, sizeof(info)); /* fill with inaccessible address */
++  int ret = dladdr(NULL, &info);
++  printf("%ld\n", ret);
++  return 0;
++}
+--- /dev/null
++++ b/test/t/dladdr.t
+@@ -0,0 +1,14 @@
++#!/bin/sh
++
++srcdir=${srcdir:-.}
++. $srcdir/common.inc.sh
++
++prepare 1
++
++PATH=$srcdir/bin:$PATH
++
++t=`$srcdir/fakechroot.sh $testtree /bin/test-dladdr`
++[ "$t" != "0" ] && not
++ok "dladdr returns" $t
++
++cleanup
+--- a/test/Makefile.am
++++ b/test/Makefile.am
+@@ -9,6 +9,7 @@ TESTS = \
+     t/cmd-subst.t \
+     t/cp.t \
+     t/dedotdot.t \
++    t/dladdr.t \
+     t/execlp.t \
+     t/execve-elfloader.t \
+     t/execve-null-envp.t \

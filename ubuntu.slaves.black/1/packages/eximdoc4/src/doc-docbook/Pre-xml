@@ -1,0 +1,193 @@
+#! /usr/bin/perl
+
+# Script to pre-process XML input before processing it for various purposes.
+# Options specify which transformations are to be done. Monospaced literal
+# layout blocks are never touched.
+
+# Changes:
+
+# -ascii:    Replace &#x2019; by '
+#            Replace &copy;   by (c)
+#            Replace &dagger; by *
+#            Replace &Dagger; by **
+#            Replace &nbsp;   by a space
+#            Replace &ndash;  by -
+#            Put quotes round <quote> text
+#
+# -quoteliteral:
+#            Put quotes round <literal> text
+#
+# -bookinfo: Remove the <bookinfo> element from the file
+#
+# -fi:       Replace "fi" by &#xFB01; except when it is in an XML element, or
+#            inside a <literal>.
+#
+# -html:     Certain things are done only for HTML output:
+#
+#            If <literallayout> is followed by optional space and then a
+#            newline, the space and newline are removed, because otherwise you
+#            get a blank line in the HTML output.
+#
+# -noindex   Remove the XML that generates indexes.
+# -oneindex  Ditto, but add XML to generate a single index.
+#
+# -optbreak  Insert an optional line break (zero-width space, &#x200B;) after
+#            every underscore in text within <option> and <variable> elements,
+#            except when preceded by <entry> (i.e. not in tables). The same is
+#            also done within a word of four or more upper-case letters (for
+#            compile-time options).
+
+
+
+# The function that processes non-literal, non-monospaced text
+
+sub process()
+{
+my($s) = $_[0];
+
+$s =~ s/fi(?![^<>]*>)/&#xFB01;/g if $ligatures;
+
+if ($optbreak)
+  {
+  $s =~ s%(?<!<entry>)(<option>|<varname>)([^<]+)%
+    my($x,$y) = ($1,$2); $y =~ s/_/_&#x200B;/g; "$x"."$y"%gex;
+
+  $s =~ s?\b([A-Z_]{4,})\b?
+    my($x) = $1; $x =~ s/_/_&#x200B;/g; "$x"?gex;
+  }
+
+if ($ascii)
+  {
+  $s =~ s/&#x2019;/'/g;
+  $s =~ s/&copy;/(c)/g;
+  $s =~ s/&dagger;/*/g;
+  $s =~ s/&Dagger;/**/g;
+  $s =~ s/&nsbp;/ /g;
+  $s =~ s/&ndash;/-/g;
+  $s =~ s/<quote>/"/g;
+  $s =~ s/<\/quote>/"/g;
+  }
+
+$s;
+}
+
+
+# The main program
+
+$ascii     = 0;
+$bookinfo  = 0;
+$html      = 0;
+$inliteral = 0;
+$inliterallayout = 0;
+$ligatures = 0;
+$madeindex = 0;
+$noindex   = 0;
+$oneindex  = 0;
+$optbreak  = 0;
+$quoteliteral = 0;
+
+foreach $arg (@ARGV)
+  {
+  if    ($arg eq "-fi")       { $ligatures = 1; }
+  elsif ($arg eq "-ascii")    { $ascii = 1; }
+  elsif ($arg eq "-bookinfo") { $bookinfo = 1; }
+  elsif ($arg eq "-html")     { $html = 1; }
+  elsif ($arg eq "-noindex")  { $noindex = 1; }
+  elsif ($arg eq "-oneindex") { $oneindex = 1; }
+  elsif ($arg eq "-optbreak") { $optbreak = 1; }
+  elsif ($arg eq "-quoteliteral") { $quoteliteral = 1; }
+  else  { die "** Pre-xml: Unknown option \"$arg\"\n"; }
+  }
+
+while (<STDIN>)
+  {
+  # Remove <bookinfo> if required
+
+  if ($bookinfo && /^<bookinfo/)
+    {
+    while (<STDIN>) { last if /^<\/bookinfo/; }
+    next;
+    }
+
+  # Copy monospaced literallayout blocks
+
+  if (/^<literallayout class="monospaced">/)
+    {
+    $_ = substr($_, 0, -1) if $html;
+    print;
+    while (<STDIN>)
+      {
+      print;
+      last if /^<\/literallayout>/;
+      }
+    next;
+    }
+
+  # Adjust index-generation code if required
+
+  if (($noindex || $oneindex) && /^<index[\s>]/)
+    {
+    while (<STDIN>)
+      {
+      last if /^<\/index>/;
+      }
+
+    if ($oneindex && !$madeindex)
+      {
+      $madeindex = 1;
+      print "<index><title>Index</title></index>\n";
+      }
+
+    next;
+    }
+
+  # A line that is not in a monospaced literal block; keep track of which
+  # parts are in <literal> and which not. The latter get processed by the
+  # function above. Items in <literal> get quoted unless they are also in
+  # a <literallayout> block, or are already being quoted.
+
+  for (;;)
+    {
+    $_ = substr($_, 0, -1) if $html && /^<literallayout[^>]*>\s*\n$/;
+    $inliterallayout = 1 if /^<literallayout/;
+    $inliterallayout = 0 if /^<\/literallayout/;
+
+    if ($inliteral)
+      {
+      if (/^(.*?)<\/literal>(?!<\/quote>)(.*)$/)
+        {
+        print $1;
+        print "\"" if $quoteliteral && !$inliterallayout;
+        print "</literal>";
+        $inliteral = 0;
+        $_ = "$2\n";
+        }
+      else
+        {
+        print;
+        last;
+        }
+      }
+
+    # Not in literal state
+
+    else
+      {
+      if (/^(.*?)(?<!<quote>)<literal>(.*)$/)
+        {
+        print &process($1);
+        print "<literal>";
+        print "\"" if $quoteliteral && !$inliterallayout;
+        $inliteral = 1;
+        $_ = "$2\n";
+        }
+      else
+        {
+        print &process($_);
+        last;
+        }
+      }
+    }    # Loop for different parts of one line
+  }      # Loop for multiple lines
+
+# End

@@ -1,0 +1,78 @@
+#!/usr/bin/make -f
+#
+# (C) 1999-2021 Roland Rosenfeld <roland@debian.org>
+#
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+#export DH_OPTIONS=-v
+
+DEBDIR=`pwd`/debian/fig2dev
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export FIG2DEV_RGBFILE = $(shell pwd)/fig2dev/rgb.txt
+
+%:
+	dh $@
+
+override_dh_autoreconf:
+#	preserve files overwritten by dh_autoreconf:
+	tar cf debian/autoreconf.tar Makefile.in aclocal.m4 ar-lib compile \
+		configure depcomp fig2dev/Makefile.in fig2dev/dev/Makefile.in \
+		fig2dev/i18n/Makefile.in fig2dev/tests/Makefile.in install-sh \
+		man/Makefile.in missing transfig/Makefile.in config.h.in
+	dh_autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- --enable-transfig
+
+override_dh_auto_build:
+#	preserve some files from upstream tarball:
+	tar cf debian/preserve.tar fig2dev/config.vc \
+		transfig/doc/manual.pdf fig2dev/tests/testsuite
+
+# 	rebuild testsuite:
+	(cd fig2dev/tests; rm -f testsuite; make testsuite)
+
+	dh_auto_build
+
+#	Build test programs, despite of "nocheck":
+	(cd fig2dev/tests; make test1 test2)
+
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+	(cd transfig/doc; \
+	 ../../fig2dev/fig2dev -L latex trans.fig > trans.tex; \
+	 latex manual; \
+	 latex manual; \
+	 dvips -o manual.ps manual.dvi; \
+	 ps2pdf manual.ps)
+endif
+
+override_dh_auto_install:
+	dh_auto_install --destdir=$(DEBDIR)
+
+#	Install autotest binaries to /usr/libexec/fig2dev:
+	install -m755 fig2dev/tests/test1 $(DEBDIR)/usr/libexec/fig2dev/
+	install -m755 fig2dev/tests/test2 $(DEBDIR)/usr/libexec/fig2dev/
+
+override_dh_installdocs:
+	dh_installdocs
+
+override_dh_clean:
+	dh_clean
+
+	rm -f transfig/doc/trans.tex transfig/doc/*.aux transfig/doc/*.log \
+		transfig/doc/*.dvi transfig/doc/*.ps
+
+#	restore files overwritten by dh_autoreconf:
+	[ ! -f debian/autoreconf.tar ] || tar xf debian/autoreconf.tar
+	rm -f debian/autoreconf.tar
+
+#	restore files from upstream tarball:
+	[ ! -f debian/preserve.tar ] || tar xf debian/preserve.tar
+	rm -f debian/preserve.tar
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGES
+
+override_dh_compress:
+	dh_compress -X.pdf

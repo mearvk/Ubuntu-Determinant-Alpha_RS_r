@@ -1,0 +1,97 @@
+# Author: Damyan Ivanov <dmn@debian.org>
+# Description: avoid linking with libraries whose symbols are not used
+# Forwarded: no
+--- a/builds/posix/make.defaults
++++ b/builds/posix/make.defaults
+@@ -288,10 +288,10 @@ endif
+ LIB_PATH_OPTS = $(call LIB_LINK_RPATH,lib) $(call LIB_LINK_RPATH,intl)
+ LIB_LINK_SONAME= -Wl,-soname,$(1)
+ LIB_LINK_MAPFILE= -Wl,--version-script,$(1)
+-FIREBIRD_LIBRARY_LINK= -L$(LIB) -lfbclient $(MATHLIB)
++FIREBIRD_LIBRARY_LINK= -L$(LIB) -lfbclient $(MATHLIB) $(THR_FLAGS)
+ 
+-EXE_LINK_OPTIONS= $(LDFLAGS) $(THR_FLAGS) $(UNDEF_FLAGS) $(LIB_PATH_OPTS) $(LINK_EMPTY_SYMBOLS)
+-LIB_LINK_OPTIONS= $(LDFLAGS) $(THR_FLAGS) -shared
++EXE_LINK_OPTIONS= $(LDFLAGS) $(UNDEF_FLAGS) $(LIB_PATH_OPTS) $(LINK_EMPTY_SYMBOLS)
++LIB_LINK_OPTIONS= $(LDFLAGS) -shared
+ 
+ FB_DAEMON = $(BIN)/firebird$(EXEC_EXT)
+ 
+@@ -302,11 +302,11 @@ LINK_UDF_LIBS = $(THR_LIBS) -L$(LIB) -li
+ 
+ LINK_IB_UTIL = $(LIB_LINK) $(LINK_IBUTIL_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS)\
+  $(call LIB_LINK_SONAME,$(IbUtilLibraryName)) $(call LIB_LINK_RPATH,lib)
+-LINK_IB_UTIL_LIBS = $(THR_LIBS)
++LINK_IB_UTIL_LIBS =
+ 
+ LINK_INTL = $(LIB_LINK) $(LINK_FBINTL_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS)\
+  $(call LIB_LINK_SONAME,libintl.$(SHRLIB_EXT).1) $(call LIB_LINK_RPATH,lib)
+-LINK_INTL_LIBS = -L$(LIB) $(SO_LINK_LIBS) $(FIREBIRD_LIBRARY_LINK)
++LINK_INTL_LIBS = -L$(LIB) $(SO_LINK_LIBS) $(FIREBIRD_LIBRARY_LINK) @DL_LIBS@
+ 
+ LINK_TRACE = $(LIB_LINK) $(LINK_PLUGIN_SYMBOLS) $(LIB_LINK_OPTIONS) $(UNDEF_FLAGS)\
+  $(call LIB_LINK_SONAME,$(LIB_PREFIX)fbtrace.$(SHRLIB_EXT).0) $(call LIB_LINK_RPATH,lib)
+@@ -314,7 +314,7 @@ LINK_TRACE_LIBS = -L$(LIB) $(SO_LINK_LIB
+ 
+ LINK_FIREBIRD = $(LIB_LINK) $(LINK_FIREBIRD_SYMBOLS) $(LIB_LINK_OPTIONS) $(LIB_FIREBIRD_OPTIONS) $(UNDEF_FLAGS)\
+  $(call LIB_LINK_SONAME,$(LibrarySoName)) $(call LIB_LINK_RPATH,lib)
+-LINK_FIREBIRD_LIBS = -L$(LIB) $(LIB_GUI) $(SO_LINK_LIBS) $(MATHLIB)
++LINK_FIREBIRD_LIBS = -L$(LIB) $(LIB_GUI) $(SO_LINK_LIBS) $(MATHLIB) $(THR_FLAGS) @DL_LIBS@
+ 
+ LINK_ENGINE = $(LIB_LINK) $(LINK_PLUGIN_SYMBOLS) $(LIB_LINK_OPTIONS) $(LIB_FIREBIRD_OPTIONS) $(UNDEF_FLAGS)\
+  $(call LIB_LINK_SONAME,$(EngineSoName)) $(call LIB_LINK_RPATH,lib)
+--- a/configure.ac
++++ b/configure.ac
+@@ -707,7 +707,13 @@ XE_RESTORE_ENV()
+ AC_SUBST(MATHLIB)
+ 
+ dnl Check for libraries
++save_LIBS=$LIBS
++LIBS=
+ AC_SEARCH_LIBS(dlopen, dl)
++DL_LIBS=$LIBS
++LIBS=$save_LIBS
++AC_SUBST(DL_LIBS)
++
+ AC_CHECK_LIB(m, main)
+ if test "$EDITLINE_FLG" = "Y"; then
+ 	AC_CHECK_LIB(curses, tgetent, TERMLIB=curses, \
+@@ -716,7 +722,6 @@ if test "$EDITLINE_FLG" = "Y"; then
+ 				AC_CHECK_LIB(tinfo, tgetent, TERMLIB=tinfo, \
+ 					AC_MSG_ERROR(termcap support not found)))))
+ 	AC_SUBST(TERMLIB)
+-	XE_APPEND(-l$TERMLIB, LIBS)
+ fi
+ 
+ AC_SEARCH_LIBS(inet_aton, resolv)
+@@ -839,6 +844,10 @@ AC_CHECK_FUNCS(fallocate)
+ 
+ dnl Semaphores
+ if test "$ac_cv_header_semaphore_h" = "yes"; then
++    save_sem_libs=$LIBS
++    save_sem_cflags=$CFLAGS
++    LIBS="$LIBS $PTHREAD_LIBS"
++    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+ AC_SEARCH_LIBS(sem_init, rt pthread)
+ AC_CHECK_FUNCS(sem_timedwait)
+ AC_CHECK_FUNCS(sem_init)
+@@ -853,6 +862,8 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include
+ AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)
+ AC_SEARCH_LIBS(sem_open, rt)],[])
+ fi
++LIBS=$save_sem_libs
++CFLAGS=$save_sem_cflags
+ fi
+ 
+ dnl Some OS place iconv() support in separate library
+--- a/builds/posix/Makefile.in
++++ b/builds/posix/Makefile.in
+@@ -210,7 +210,7 @@ $(COMMON_LIB):	$(Common_Objects)
+ boot: $(GPRE_BOOT)
+ 
+ $(GPRE_BOOT):	$(GPRE_Boot_Objects) $(COMMON_LIB)
+-	$(STATICEXE_LINK) $(EXE_LINK_OPTIONS) $^ -o $@ -L$(LIB) $(LINK_LIBS)
++	$(STATICEXE_LINK) $(EXE_LINK_OPTIONS) $^ -o $@ -L$(LIB) $(LINK_LIBS) $(THR_FLAGS)
+ 	-$(RM) $(GPRE_CURRENT)
+ 	(cd $(@D); $(LN) $(@F) $(notdir $(GPRE_CURRENT)))
+ 

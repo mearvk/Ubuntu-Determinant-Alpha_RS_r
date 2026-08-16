@@ -1,0 +1,30 @@
+From: Robin Linden <dev@robinlinden.eu>
+Date: Thu, 28 May 2020 23:09:07 +0200
+Subject: Fix make test build failure on gcc 9.3
+
+On Ubuntu 20.04 using gcc 9.3, make test fails due to a deprecated
+function (ftime) warning in combination with -Werror in timetest.c.
+Since the warning is from a test testing that the deprecated function
+can be replaced using LD_PRELOAD, I think it's reasonable to just
+silence the warning in that case.
+
+(cherry picked from commit f19d68ea3231f1af7a6e3913dc6d3c46f73947b2)
+---
+ test/timetest.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/test/timetest.c b/test/timetest.c
+index e9aa837..c33368c 100644
+--- a/test/timetest.c
++++ b/test/timetest.c
+@@ -216,7 +216,10 @@ printf("%s", 0 == 1 ? argv[0] : "");
+     printf("time()         : Current date and time: %s", ctime(&now));
+     printf("time(NULL)     : Seconds since Epoch  : %u\n", (unsigned int)time(NULL));
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+     ftime(&tb);
++#pragma GCC diagnostic pop
+     printf("ftime()        : Current date and time: %s", ctime(&tb.time));
+ 
+     printf("(Intentionally sleeping 2 seconds...)\n");

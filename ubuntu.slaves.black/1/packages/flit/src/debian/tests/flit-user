@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+user=testing
+
+if [ "$AUTOPKGTEST_TMP" = "" ] ; then
+        AUTOPKGTEST_TMP=$(mktemp -d /tmp/${pkg}-test.XXXXXX)
+fi
+cd "$AUTOPKGTEST_TMP"
+
+if [ $(id -u) = 0 ]
+then
+    adduser --quiet --system --group --no-create-home $user
+    chown -R $user .
+    runuser="runuser -p -u $user --"
+else
+    runuser=""
+fi
+
+for py in $(py3versions -s); do
+	$runuser $py -m pytest -k 'not test_find_in_path' --pyargs flit_core
+done
+
+if [ $(id -u) = 0 ]
+then
+    deluser --quiet $user
+fi

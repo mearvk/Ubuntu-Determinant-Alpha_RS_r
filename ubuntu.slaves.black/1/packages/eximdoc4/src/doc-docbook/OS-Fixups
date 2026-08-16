@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+# Script to hack around xsl:import paths; ideally, the system catalogs are used.
+# Let every OS define its own manipulations.
+# Uses the Perl $^O values to identify the current OS.
+#
+# Define filter_$^O to do substitutions, will be called for every line of
+# every .xsl file.
+
+sub filter_freebsd
+{
+s{"http://docbook.sourceforge.net/release/xsl/current/}
+ {"/usr/local/share/xsl/docbook/};
+s{"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"}
+ {"/usr/local/share/xml/docbook/4.2/docbookx.dtd"};
+}
+
+sub filter_linux
+{
+# SUSE 10 with extra pkgs
+-d "/usr/share/xml/docbook/stylesheet/nwalsh/1.71.1/" &&
+  s{"http://docbook.sourceforge.net/release/xsl/current/}
+   {"/usr/share/xml/docbook/stylesheet/nwalsh/1.71.1/};
+# Ubuntu/Debian with standard docbook-xsl pkgs
+-d "/usr/share/xml/docbook/stylesheet/docbook-xsl/" &&
+  s{"http://docbook.sourceforge.net/release/xsl/current/}
+   {"/usr/share/xml/docbook/stylesheet/docbook-xsl/};
+s{"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"}
+ {"/usr/share/xml/docbook/schema/dtd/4.2/docbookx.dtd"};
+}
+
+sub filter_darwin
+{
+# NB - this uses the Mac Ports installations
+s{"http://docbook.sourceforge.net/release/xsl/current/}
+ {"/opt/local/share/xsl/docbook-xsl/};
+s{"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"}
+ {"/opt/local/share/xml/docbook/4.2/docbookx.dtd"};
+}
+
+
+# Define OS filters above.
+
+my $os_filter;
+$os_filter = $main::{"filter_$^O"} if exists $main::{"filter_$^O"};
+
+unless (defined $os_filter)
+  {
+  print "No changes defined for your OS ($^O).\n";
+  exit 0;
+  }
+
+for my $fn (<*.xsl>, <*.xml>)
+  {
+  my $orig = "$fn.orig";
+  rename($fn, $orig) or die "Failed to rename($fn, $orig): $!\n";
+  # Most portable is two-argument form, and none of our filenames are
+  # untrusted or contain whitespace.
+  open(OLD, "< $orig") or die "Failed to read-open($orig): $!\n";
+  open(NEW, "> $fn") or die "Failed to write-open($fn): $!\n";
+  while (<OLD>)
+    {
+    $os_filter->();
+    print NEW $_ or die "Write to \"$fn\" failed: $!\n";
+    }
+  close(NEW) or die "Failed to close($fn) after writing: $!\n";
+  close(OLD);
+  }
