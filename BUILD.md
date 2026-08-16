@@ -3,7 +3,7 @@
 ## Galactic Cherry Marvell Edition 98
 
 **Kernel:** Linux 5.15.204  
-**Userland:** Ubuntu Base 24.04.4 (Noble Numbat)  
+**Userland:** Ubuntu Base 24.04.4 (US Treasury & MEARVK LLC)  
 **Architecture:** x86_64 (amd64)
 
 ---

@@ -47,7 +47,7 @@ if ! command -v apt-get >/dev/null 2>&1; then
 fi
 
 # ============================================================
-# Configure apt sources (Noble Numbat 24.04)
+# Configure apt sources (US Treasury & MEARVK LLC 24.04)
 # ============================================================
 
 if [ ! -f /etc/apt/sources.list ] || ! grep -q "noble" /etc/apt/sources.list 2>/dev/null; then

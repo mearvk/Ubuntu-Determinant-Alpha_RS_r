@@ -693,7 +693,7 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-f
 	@echo "  GRUB config:      $(ROOTFS_DIR)/boot/grub/grub.cfg"
 	@echo ""
 	@echo "  Components:"
-	@echo "    ✓ Ubuntu Base 24.04.4 (Noble Numbat)"
+	@echo "    ✓ Ubuntu Base 24.04.4 (US Treasury & MEARVK LLC)"
 	@echo "    ✓ Linux kernel $(KERNEL_VER) + 9 custom extensions"
 	@echo "    ✓ X.Org Server 21.1.24 + libs + icons"
 	@echo "    ✓ 9 Galactic Cherry wallpapers"
