@@ -1,0 +1,79 @@
+#!/bin/sh
+# Copyright 2020  Jonas Smedegaard <dr@jones.dk>
+# Copyright 2020  Purism, SPC
+# Description: helper script to update copyright_hints
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+set -eu
+
+SKIPFILES='skip|meta'
+
+# cleanup stray hint files from a previous run
+find -type f -regextype posix-egrep -regex "^.*:($SKIPFILES)$" -delete
+
+# omit files not copyright protected nor stating copyright or licensing
+RE_omit='.*\.(ico)'
+
+1>&2 echo 'skip binary files without parsable metadata ...'
+RE_skip='.*\.(eot|woff2?)'
+find -type f -regextype posix-egrep -regex "^($RE_skip)$" -exec sh -c "echo 'License: UNKNOWN' > '{}:skip'" ';'
+
+1>&2 echo 'extract metadata from binary files ...'
+RE_meta='.*\.(jpg|otf|png|ttf)'
+exiftool '-textOut!' %d%f.%e:meta -short -short -recurse -ext jpg -ext otf -ext png -ext ttf -ext woff -ext woff2 .
+
+RE_SKIP="$RE_omit|$RE_skip|$RE_meta"
+
+# TODO: automate more of this manual cleanup:
+#  * strip garbage copyright holders
+#  * optionally merge equally licensed Files sections
+#  * do "sort -k2 -k1,1 -u" on copyright holders
+#  * merge copyright years for each copyright holder
+# TODO: strip files matching glob in current (only, no later) section
+_licensecheck() {
+	GLOB=$1
+	shift
+	case "$GLOB" in
+		'*') 1>&2 echo "check default section(s) ...";;
+		'') 1>&2 echo "check remaining upstream section(s) ...";;
+		*) 1>&2 echo "check section(s) $GLOB ...";;
+	esac
+	licensecheck --copyright --deb-machine --recursive --lines 0 "$@" -- * \
+		| GLOB=$GLOB SKIPFILES=$SKIPFILES perl -0777 -p \
+		-e 'BEGIN { our $GLOB = join "\n ", split(" ",$ENV{GLOB}) }' \
+		-e 's/^.*?\n\nFiles: \K/$GLOB\n /s if $GLOB;' \
+		-e 's/^.*?\n\nFiles: \K.*?(?=\n\w)/$GLOB/s if $GLOB and $GLOB =~ /^[*]\//;' \
+		-e 's/^.*?\n\n//s unless $GLOB and $GLOB =~ /^[*]$/m;' \
+		-e 's/^Files:\K /\n /mg;' \
+		-e 's/^Copyright:\K /\n  /mg;' \
+		-e 's/(?:(?<=^  )|(?<=\d{4})),\K (?=\d{4})//mg;' \
+		-e 's/:(?:$ENV{SKIPFILES})$//mg;' \
+		>> debian/copyright_hints
+}
+
+rm -f debian/copyright_hints
+
+# initially, check all to know roughly what to group and in which order
+#rm -f debian/copyright_hints
+#_licensecheck '' --check '.*' --ignore "^($RE_SKIP|debian/.*)$"
+#exit 0
+
+# check generally
+#  * omit non-copyright-protected Debian files
+_licensecheck '*' --check '.*' --ignore "^($RE_SKIP|debian/.*)$"
+_licensecheck '*/debian' --check '^debian/' --ignore '^debian/(changelog|copyright(_hints)?|source/lintian-overrides)$'
+
+# cleanup hint files
+find -type f -regextype posix-egrep -regex "^.*:($SKIPFILES)$" -delete
