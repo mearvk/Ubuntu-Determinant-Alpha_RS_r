@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with quilt --builddirectory=build/
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release
+
+ifneq (,$(filter $(DEB_HOST_ARCH), hppa powerpc ppc64 s390x sparc64))
+override_dh_auto_test:
+endif
+
+gentarball: SOURCE=glslang
+gentarball: UV=$(shell dpkg-parsechangelog|awk '/^Version:/ {print $$2}'|sed 's/-.*$$//')
+gentarball:
+	git archive --format=tar upstream-unstable --prefix=$(SOURCE)-$(UV)/ | gzip -9 > \
+		../$(SOURCE)_$(UV).orig.tar.gz

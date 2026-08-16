@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes) $(DEB_HOST_ARCH), yes i386)
+   skip_packages = -Ngnome-online-accounts
+endif
+
+ifneq ($(filter ia64 kfreebsd-amd64 kfreebsd-i386,$(DEB_HOST_ARCH)),)
+  DISABLE_BACKEND := --disable-backend
+endif
+
+%:
+	dh $@
+
+override_dh_autoreconf:
+	dh_autoreconf --as-needed
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-documentation \
+		--enable-gtk-doc \
+		--enable-kerberos \
+		--disable-media-server \
+		--disable-facebook \
+		--enable-flickr \
+		--disable-fedora \
+		--disable-lastfm \
+		--enable-windows-live \
+		--enable-google \
+		--enable-owncloud \
+		--enable-imap-smtp \
+		--enable-exchange \
+		--enable-foursquare \
+		--enable-ubuntu-sso \
+		$(DISABLE_BACKEND)
+
+execute_before_dh_install:
+	find debian/tmp -name '*.a' -print -delete
+	find debian/tmp -name '*.la' -print -delete
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+override_dh_translations:
+	mv po/gnome-online-accounts.pot po/gnome-online-accounts.pot.bak
+	dh_translations
+
+override_dh_clean:
+	if [ -f po/gnome-online-accounts.pot.bak ]; then \
+		mv po/gnome-online-accounts.pot.bak po/gnome-online-accounts.pot; \
+	fi
+	dh_clean
+
+override_dh_builddeb:
+	dh_builddeb ${skip_packages}
+
+override_dh_gencontrol:
+	dh_gencontrol ${skip_packages}

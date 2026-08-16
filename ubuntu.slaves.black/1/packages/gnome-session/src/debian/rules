@@ -1,0 +1,39 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+
+GS_MAJOR_VERSION = $(shell echo $(DEB_VERSION_UPSTREAM) | sed 's/[~.].*//')
+
+%:
+	dh $@
+
+ifeq (linux,$(DEB_HOST_ARCH_OS))
+CONFFLAGS = -Dsystemd=true -Dsystemd_journal=true -Dsystemd_session=default
+else
+CONFFLAGS = -Dsystemd=false -Dsystemd_journal=false -Dsystemd_session=disable
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dman=true \
+		$(CONFFLAGS)
+
+override_dh_install:
+	cd debian/tmp/usr/share; \
+	for f in wayland-sessions/*.desktop xsessions/*.desktop applications/*.desktop; do \
+		echo X-Ubuntu-Gettext-Domain=gnome-session-$(GS_MAJOR_VERSION) >> "$$f"; \
+	done
+	dh_install
+	dh_migrations
+
+override_dh_auto_build:
+	dh_auto_build
+	ninja -C obj-$(DEB_HOST_GNU_TYPE) gnome-session-$(GS_MAJOR_VERSION)-pot
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f po/gnome-session-$(GS_MAJOR_VERSION).pot
+

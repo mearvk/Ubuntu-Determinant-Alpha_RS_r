@@ -1,0 +1,522 @@
+From: Andrea Azzarone <andrea.azzarone@canonical.com>
+Date: Wed, 28 Feb 2018 08:53:38 +0000
+Subject: Get livepatch authentication token.
+
+Forwarded: not-needed
+Bug: https://bugzilla.gnome.org/show_bug.cgi?id=793755
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1752472
+---
+ configure.ac                          |   1 +
+ data/Makefile.am                      |   3 +-
+ data/scripts/Makefile.am              |  14 +++
+ data/scripts/lpa_helper.py            | 139 ++++++++++++++++++++++
+ src/goabackend/Makefile.am            |   1 +
+ src/goabackend/goaubuntussoprovider.c | 209 +++++++++++++++++++++++++++++++++-
+ 6 files changed, 362 insertions(+), 5 deletions(-)
+ create mode 100644 data/scripts/Makefile.am
+ create mode 100644 data/scripts/lpa_helper.py
+
+Index: gnome-online-accounts-3.35.90/configure.ac
+===================================================================
+--- gnome-online-accounts-3.35.90.orig/configure.ac
++++ gnome-online-accounts-3.35.90/configure.ac
+@@ -545,6 +545,7 @@ data/Makefile
+ data/icons/Makefile
+ data/icons/scalable/Makefile
+ data/icons/symbolic/Makefile
++data/scripts/Makefile
+ src/Makefile
+ src/goa/Makefile
+ src/goa/goa-1.0.pc
+Index: gnome-online-accounts-3.35.90/data/Makefile.am
+===================================================================
+--- gnome-online-accounts-3.35.90.orig/data/Makefile.am
++++ gnome-online-accounts-3.35.90/data/Makefile.am
+@@ -1,7 +1,7 @@
+ 
+ NULL =
+ 
+-SUBDIRS = icons
++SUBDIRS = icons scripts
+ 
+ gsettings_schema_files = org.gnome.online-accounts.gschema.xml
+ 
+@@ -37,3 +37,4 @@ clean-local :
+ 	rm -f *~
+ 
+ -include $(top_srcdir)/git.mk
++
+Index: gnome-online-accounts-3.35.90/data/scripts/Makefile.am
+===================================================================
+--- /dev/null
++++ gnome-online-accounts-3.35.90/data/scripts/Makefile.am
+@@ -0,0 +1,14 @@
++NULL =
++
++scriptdir = $(datadir)/goa-1.0/scripts/
++script_SCRIPTS =   	\
++	lpa_helper.py		\
++	$(NULL)
++
++EXTRA_DIST = \
++	$(script_SCRIPTS)
++
++clean-local :
++	rm -f *~
++
++-include $(top_srcdir)/git.mk
+\ No newline at end of file
+Index: gnome-online-accounts-3.35.90/data/scripts/lpa_helper.py
+===================================================================
+--- /dev/null
++++ gnome-online-accounts-3.35.90/data/scripts/lpa_helper.py
+@@ -0,0 +1,139 @@
++#!/usr/bin/env python3
++import json
++import os
++import sys
++
++from urllib.parse import urlencode
++import requests  # fades
++import macaroonbakery  # fades
++import pymacaroons  # fades
++from macaroonbakery import httpbakery  # fades
++
++
++LIVEPATCH_AUTH_ROOT_URL = os.environ.get(
++    'LIVEPATCH_AUTH_ROOT_URL', 'https://auth.livepatch.canonical.com')
++UBUNTU_SSO_ROOT_URL = os.environ.get(
++    'UBUNTU_SSO_ROOT_URL', 'https://login.ubuntu.com')
++
++generic_error = "GENERIC_ERROR"
++
++
++class AuthenticationFailed(Exception):
++    def __init__(self, code, msg):
++        super(AuthenticationFailed, self).__init__(msg)
++        self.code = code
++
++class USSOMacaroonInteractor(httpbakery.LegacyInteractor):
++
++    def __init__(self, session):
++        self.session = requests.Session()
++
++    def kind(self):
++        return "interactive"
++
++    def legacy_interact(self, client, location, visit_url):
++        # get usso_macaroon
++        usso_url = self.get_usso_macaroon_url(visit_url)
++        usso_macaroon = self.get_usso_macaroon(usso_url)
++
++        def callback(discharges):
++            self.complete_usso_macaroon_discharge(usso_url, discharges)
++        discharges = self.discharge_usso_macaroon(usso_macaroon, callback)
++
++
++    def get_usso_macaroon_url(self, url):
++        # find interaction methods for discharge
++        response = self.session.get(
++            url, headers={'Accept': 'application/json'})
++        if not response.ok:
++            raise AuthenticationFailed(generic_error, 'can not find interaction methods')
++
++        data = response.json()
++
++        # expect usso_macaroon interaction method
++        if 'usso_macaroon' not in data:
++            raise AuthenticationFailed(generic_error, 'missing usso_macaroon interaction method')
++        return data['usso_macaroon']
++
++    def get_usso_macaroon(self, url):
++        response = self.session.get(url)
++        if not response.ok:
++            raise AuthenticationFailed(generic_error, 'can not get usso macaroon')
++        usso_macaroon = response.json()['macaroon']
++        return usso_macaroon
++
++    def discharge_usso_macaroon(self, macaroon, callback):
++        usso_caveats = [
++            cav['cid'] for cav in macaroon.get('caveats', [])
++            if cav.get('cl') == UBUNTU_SSO_ROOT_URL]
++        if len(usso_caveats) <= 0:
++            raise AuthenticationFailed(generic_error, 'no valid usso caveat found')
++
++        data = {'caveat_id': usso_caveats[0]}
++        data.update(get_usso_credentials())
++
++        def _discharge_macaroon(data):
++            response = self.session.post(
++                '{}/api/v2/tokens/discharge'.format(UBUNTU_SSO_ROOT_URL),
++                data=json.dumps(data),
++                headers={'Content-Type': 'application/json'})
++            return response
++
++        response = _discharge_macaroon(data)
++        if not response.ok:
++            if response.status_code in (400, 401, 403):
++                raise AuthenticationFailed(response.json().get('code'), response.json().get('message'))
++            else:
++                raise AuthenticationFailed(generic_error, 'authentication issue')
++
++        root_m = macaroonbakery.bakery.Macaroon.deserialize_json(
++            json.dumps(macaroon)).macaroon
++        discharge_m = pymacaroons.Macaroon.deserialize(
++            response.json()['discharge_macaroon'])
++        bound_discharge = root_m.prepare_for_request(discharge_m)
++
++        callback([root_m.serialize(), bound_discharge.serialize()])
++
++    def complete_usso_macaroon_discharge(self, url, discharges):
++        data = {'macaroons': discharges}
++        response = self.session.post(
++            url, data=json.dumps(data),
++            headers={'Content-Type': 'application/json'})
++        if not response.ok:
++            raise AuthenticationFailed(generic_error, 'can not complete usso macaroon discharge')
++
++
++def get_usso_credentials():
++    email = input('Email: ')
++    password = input('Password: ')
++    ret = {'email': email, 'password': password}
++    otp = input('Two-factor code: ')
++    if otp and len(otp) > 0:
++        ret.update({'otp': otp})
++    return ret
++
++def get_lpa_token(session):
++    url = '{}/api/v1/tokens?{}'.format(
++        LIVEPATCH_AUTH_ROOT_URL, urlencode({'token_type': 'user'}))
++    return session.get(url, timeout=10)
++
++if __name__ == '__main__':
++    cookies = requests.cookies.RequestsCookieJar()
++    session = requests.Session()
++
++    client = httpbakery.Client(
++        interaction_methods=[USSOMacaroonInteractor(session)], cookies=cookies)
++
++    session.auth = client.auth()
++    session.cookies = cookies
++
++    try:
++        response = get_lpa_token(session)
++        if response.ok:
++            print(response.json()['token'], file=sys.stderr)
++    except AuthenticationFailed as af:
++        print(af.code, af, file=sys.stderr)
++        sys.exit(1)
++    except Exception as e:
++        print(generic_error, e, file=sys.stderr)
++        sys.exit(1)
+Index: gnome-online-accounts-3.35.90/src/goabackend/Makefile.am
+===================================================================
+--- gnome-online-accounts-3.35.90.orig/src/goabackend/Makefile.am
++++ gnome-online-accounts-3.35.90/src/goabackend/Makefile.am
+@@ -12,6 +12,7 @@ AM_CPPFLAGS = 							\
+ 	-DG_LOG_DOMAIN=\"GoaBackend\"				\
+ 	-DGOA_BACKEND_COMPILATION				\
+ 	-DGOA_API_IS_SUBJECT_TO_CHANGE				\
++	-DDATADIR=\""$(datadir)"\"				\
+ 	-DPACKAGE_LIBEXEC_DIR=\""$(libexecdir)"\" 		\
+ 	-DPACKAGE_SYSCONF_DIR=\""$(sysconfdir)"\" 		\
+ 	-DPACKAGE_DATA_DIR=\""$(pkgdatadir)"\" 			\
+Index: gnome-online-accounts-3.35.90/src/goabackend/goaubuntussoprovider.c
+===================================================================
+--- gnome-online-accounts-3.35.90.orig/src/goabackend/goaubuntussoprovider.c
++++ gnome-online-accounts-3.35.90/src/goabackend/goaubuntussoprovider.c
+@@ -20,6 +20,7 @@
+ 
+ #include "config.h"
+ 
++#include <gio/gio.h>
+ #include <glib/gi18n-lib.h>
+ #include <snapd-glib/snapd-glib.h>
+ 
+@@ -69,6 +70,7 @@ typedef struct
+ 
+   gchar  *macaroon;
+   gchar **discharges;
++  gchar  *livepatch_token;
+   gchar  *account_object_path;
+ 
+   GError *error;
+@@ -91,6 +93,7 @@ add_account_data_clear (AddAccountData *
+   g_clear_object (&data->snapd_client);
+   g_free (data->macaroon);
+   g_strfreev (data->discharges);
++  g_free (data->livepatch_token);
+   g_free (data->account_object_path);
+   g_clear_error (&data->error);
+ }
+@@ -196,6 +199,9 @@ ensure_credentials_sync (GoaProvider   *
+   if (!goa_utils_get_credentials (provider, object, "discharges", NULL, &discharges_str, cancellable, error))
+     goto edit_error_and_return;
+ 
++  if (!goa_utils_get_credentials (provider, object, "livepatch", NULL, &discharges_str, cancellable, error))
++    goto edit_error_and_return;
++
+   if (discharges_str)
+     discharges_var = g_variant_parse (G_VARIANT_TYPE ("as"), discharges_str, NULL, NULL, NULL);
+   if (discharges_var)
+@@ -467,7 +473,6 @@ create_account_details_ui (GoaProvider
+ 
+   row = 0;
+   add_entry (grid2, row++, _("Passc_ode:"), &data->otp_entry);
+-
+   g_signal_connect (data->otp_entry, "changed", G_CALLBACK (on_otp_changed), data);
+ 
+   gtk_dialog_add_button (data->dialog, _("_Cancel"), GTK_RESPONSE_CANCEL);
+@@ -535,8 +540,8 @@ get_snapd_error_message (GError *error)
+ {
+   g_return_val_if_fail (error != NULL, NULL);
+ 
+-  g_debug ("Error logging in snapd: %s (%s, %d)",
+-           error->message, g_quark_to_string (error->domain), error->code);
++  g_warning ("Error logging in snapd: %s (%s, %d)",
++             error->message, g_quark_to_string (error->domain), error->code);
+ 
+   if (g_error_matches (error, SNAPD_ERROR, SNAPD_ERROR_AUTH_DATA_REQUIRED))
+     return _("Provided email/password is not correct");
+@@ -546,6 +551,31 @@ get_snapd_error_message (GError *error)
+     return _("Something went wrong, please try again");
+ }
+ 
++static GError*
++get_error_from_livepatch_message (const gchar *message)
++{
++  gint code;
++  g_auto(GStrv) v = NULL;
++
++  g_return_val_if_fail (message != NULL, NULL);
++
++  v = g_strsplit (message, " ", 2);
++
++  if (!g_strcmp0 (v[0], "INVALID_CREDENTIALS"))
++    code = SNAPD_ERROR_AUTH_DATA_REQUIRED;
++  else if (!g_strcmp0 (v[0], "TWOFACTOR_REQUIRED"))
++    code = SNAPD_ERROR_TWO_FACTOR_REQUIRED;
++  else if (!g_strcmp0 (v[0], "TWOFACTOR_FAILURE"))
++    code = SNAPD_ERROR_TWO_FACTOR_INVALID;
++  else
++    code = SNAPD_ERROR_FAILED;
++
++  if (g_strv_length (v) <= 1)
++    return g_error_new (SNAPD_ERROR, code, "%s", v[0]);
++  else
++    return g_error_new (SNAPD_ERROR, code, "%s", v[1]);
++}
++
+ static void
+ dialog_response_cb (GtkDialog *dialog,
+                     gint response_id,
+@@ -580,6 +610,120 @@ snapd_login_ready_cb (GObject *object,
+ }
+ 
+ static void
++subprocess_wait_cb (GObject      *object,
++                    GAsyncResult *res,
++                    gpointer      user_data)
++{
++  GSubprocess *subprocess = (GSubprocess *)object;
++  g_autoptr(GTask) task = user_data;
++  gint exit_status;
++  g_autoptr(GDataInputStream) data_input = NULL;
++  GInputStream *istream = NULL;
++  g_autofree gchar *message = NULL;
++  GError *error = NULL;
++
++  g_return_if_fail (G_IS_SUBPROCESS (subprocess));
++  g_return_if_fail (G_IS_TASK (task));
++
++  if (!g_subprocess_wait_finish (subprocess, res, &error))
++    {
++      g_task_return_error (task, error);
++      return;
++    }
++
++  exit_status = g_subprocess_get_exit_status (subprocess);
++  istream = g_subprocess_get_stderr_pipe (subprocess);
++  data_input = g_data_input_stream_new (istream);
++  message = g_data_input_stream_read_line (data_input,
++                                           NULL, g_task_get_cancellable (task),
++                                           &error);
++
++  if (message == NULL)
++    g_task_return_error (task, error);
++  else if (exit_status == 0)
++    g_task_return_pointer (task, g_strdup (message), g_free);
++  else if (exit_status == 1)
++    // Use snapd-glib errors in order to simplify the login logic
++    g_task_return_error (task, get_error_from_livepatch_message (message));
++}
++
++static void
++livepatch_login_async (const gchar *email,
++                       const gchar *password,
++                       const gchar *otp,
++                       GCancellable *cancellable,
++                       GAsyncReadyCallback callback,
++                       gpointer user_data)
++{
++  AddAccountData *data = user_data;
++  g_autoptr(GSubprocess) process = NULL;
++  g_autoptr(GTask) task = NULL;
++  GSubprocessFlags flags;
++  GError *error = NULL;
++
++  g_return_if_fail (email != NULL && password != NULL);
++  g_return_if_fail (cancellable == NULL || G_IS_CANCELLABLE (cancellable));
++
++  task = g_task_new (NULL, cancellable, callback, data);
++
++  flags = G_SUBPROCESS_FLAGS_STDOUT_SILENCE |
++          G_SUBPROCESS_FLAGS_STDIN_PIPE |
++          G_SUBPROCESS_FLAGS_STDERR_PIPE;
++
++    process = g_subprocess_new (flags, &error, DATADIR"/goa-1.0/scripts/lpa_helper.py" , NULL);
++
++  if (process)
++    {
++      GOutputStream *ostream = g_subprocess_get_stdin_pipe (process);
++
++      g_output_stream_printf (ostream, NULL, cancellable, &error,
++                              "%s\n%s\n", email, password);
++
++      if (error)
++        goto out;
++
++      if (otp)
++        g_output_stream_printf (ostream, NULL, cancellable, &error,
++                                "%s\n", otp);
++      else
++        g_output_stream_printf (ostream, NULL, cancellable, &error,
++                                "\n");
++
++      if (error)
++        goto out;
++
++      g_subprocess_wait_async (process,
++                               cancellable,
++                               subprocess_wait_cb,
++                               g_object_ref (task));
++    }
++
++out:
++  if (error)
++    {
++      g_task_return_error (task, error);
++      g_subprocess_force_exit (process);
++    }
++}
++
++static void
++livepatch_login_ready_cb (GObject *object,
++                          GAsyncResult *result,
++                          gpointer user_data)
++{
++  AddAccountData *data = user_data;
++  g_autofree gchar *token = NULL;
++
++  token = g_task_propagate_pointer (G_TASK (result), &data->error);
++  if (token != NULL)
++    data->livepatch_token = g_strdup (token);
++
++  update_widgets (data);
++  show_progress_ui (GTK_CONTAINER (data->progress_grid), FALSE);
++  g_main_loop_quit (data->loop);
++}
++
++static void
+ add_account_cb (GoaManager *manager,
+                 GAsyncResult *res,
+                 gpointer user_data)
+@@ -603,8 +747,8 @@ add_credentials_key_values (GVariantBuil
+   discharges_var = g_variant_new_strv ((const gchar * const*) data->discharges, -1);
+   discharges_str = g_variant_print (discharges_var, FALSE);
+   g_variant_builder_add (builder, "{sv}", "discharges", g_variant_new_string (discharges_str));
++  g_variant_builder_add (builder, "{sv}", "livepatch", g_variant_new_string (data->livepatch_token));
+ }
+-
+ static gboolean
+ get_tokens_and_identity (GoaProvider    *provider,
+                          gboolean        add_account,
+@@ -618,6 +762,7 @@ get_tokens_and_identity (GoaProvider
+   const gchar *username;
+   const gchar *otp;
+   gint response;
++  gboolean first_lp_attemp = TRUE;
+ 
+   g_return_val_if_fail (GOA_IS_UBUNTU_SSO_PROVIDER (provider), FALSE);
+   g_return_val_if_fail ((!add_account && existing_identity != NULL && existing_identity[0] != '\0')
+@@ -662,6 +807,9 @@ get_tokens_and_identity (GoaProvider
+   otp = gtk_entry_get_text (GTK_ENTRY (data->otp_entry));
+   otp = otp && strlen (otp) > 0 ? otp : NULL;
+ 
++  if (data->macaroon != NULL)
++    goto livepath_login;
++
+   g_clear_object (&data->cancellable);
+   data->cancellable = g_cancellable_new ();
+ 
+@@ -722,6 +870,59 @@ get_tokens_and_identity (GoaProvider
+       goto login_again;
+     }
+ 
++  // Try to get the livepatch authentication token.
++ livepath_login:
++  g_clear_object (&data->cancellable);
++  data->cancellable = g_cancellable_new ();
++
++  gtk_widget_set_sensitive (data->connect_button, FALSE);
++  show_progress_ui (GTK_CONTAINER (data->progress_grid), TRUE);
++  livepatch_login_async (username, password, otp,
++                         data->cancellable, livepatch_login_ready_cb, data);
++  g_main_loop_run (data->loop);
++
++  if (g_cancellable_is_cancelled (data->cancellable))
++    {
++      g_prefix_error (&data->error,
++                      _("Dialog was dismissed (%s, %d): "),
++                      g_quark_to_string (data->error->domain),
++                      data->error->code);
++      data->error->domain = GOA_ERROR;
++      data->error->code = GOA_ERROR_DIALOG_DISMISSED;
++      goto out;
++    }
++  else if (data->error != NULL)
++    {
++      g_autofree gchar *markup = NULL;
++      if (first_lp_attemp == TRUE && data->error->code == SNAPD_ERROR_TWO_FACTOR_INVALID)
++        {
++          markup = g_strdup_printf ("<b>%s</b>", _("This account requires a second passcode from your authentication device or app"));
++          gtk_label_set_markup (GTK_LABEL (data->cluebar_label), markup);
++          gtk_info_bar_set_message_type (GTK_INFO_BAR (data->cluebar), GTK_MESSAGE_INFO);
++          gtk_widget_set_no_show_all (data->cluebar, FALSE);
++          gtk_widget_show_all (data->cluebar);
++          gtk_button_set_label (GTK_BUTTON (data->connect_button), _("C_onnect"));
++          gtk_entry_set_text (GTK_ENTRY (data->otp_entry), "");
++          gtk_widget_grab_focus (data->otp_entry);
++        }
++      else
++        {
++          markup = g_strdup_printf ("<b>%s:</b>\n%s",
++                                    _("Error connecting to Ubuntu Single Sign-On server"),
++                                    get_snapd_error_message (data->error));
++          gtk_info_bar_set_message_type (GTK_INFO_BAR (data->cluebar), GTK_MESSAGE_ERROR);
++          gtk_button_set_label (GTK_BUTTON (data->connect_button), _("_Try Again"));
++        }
++
++      g_clear_error (&data->error);
++      gtk_label_set_markup (GTK_LABEL (data->cluebar_label), markup);
++      gtk_widget_set_no_show_all (data->cluebar, FALSE);
++      gtk_widget_show_all (data->cluebar);
++
++      first_lp_attemp = FALSE;
++      goto login_again;
++    }
++
+   gtk_widget_hide (GTK_WIDGET (dialog));
+ 
+   ret = TRUE;

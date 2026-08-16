@@ -1,0 +1,1750 @@
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/*
+ * Copyright (C) 2017-2022 Canonical Ltd
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General
+ * Public License along with this library; if not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "config.h"
+
+#include <string.h>
+#include <glib/gi18n-lib.h>
+#include <glib.h>
+#include <gio/gio.h>
+#include <gio/gdesktopappinfo.h>
+#include <libhandy-1/handy.h>
+
+#include "list-box-helper.h"
+#include "cc-ubuntu-panel.h"
+#include "cc-ubuntu-dock-dialog.h"
+#include "cc-ubuntu-resources.h"
+#include "shell/cc-application.h"
+#include "shell/cc-object-storage.h"
+
+#include "panels/display/cc-display-config-manager-dbus.h"
+#include "panels/display/cc-display-config.h"
+
+#define DING_SCHEMA "org.gnome.shell.extensions.ding"
+
+#define MIN_ICONSIZE 16.0
+#define MAX_ICONSIZE 64.0
+#define DEFAULT_ICONSIZE 48.0
+#define ICONSIZE_KEY "dash-max-icon-size"
+
+#define UBUNTU_DOCK_SCHEMA "org.gnome.shell.extensions.dash-to-dock"
+#define UBUNTU_DOCK_ALL_MONITORS_KEY "multi-monitor"
+#define UBUNTU_DOCK_PREFERRED_MONITOR_KEY "preferred-monitor"
+#define UBUNTU_DOCK_PREFERRED_CONNECTOR_KEY "preferred-monitor-by-connector"
+
+/*
+ * This allows to migrate settings from 'preferred-monitor' to
+ * 'preferred-monitor-by-connector', and can be removed after 22.04
+ * simplifying all the logic, by relying on connector names only.
+ */
+#define UBUNTU_DOCK_MONITOR_INDEX_USE_CONNECTOR -2
+
+#define INTERFACE_SCHEMA "org.gnome.desktop.interface"
+#define GTK_THEME_KEY "gtk-theme"
+#define CURSOR_THEME_KEY "cursor-theme"
+#define ICON_THEME_KEY "icon-theme"
+#define COLOR_SCHEME_KEY "color-scheme"
+
+#define GEDIT_PREFRENCES_SCHEMA "org.gnome.gedit.preferences.editor"
+#define GEDIT_THEME_KEY "scheme"
+
+#define DEFAULT_ACCENT_COLOR "default"
+
+struct _CcUbuntuPanel {
+  CcPanel                 parent_instance;
+
+  HdyPreferencesGroup    *ding_preferences_group;
+  HdyComboRow            *ding_icon_size_row;
+  HdyComboRow            *ding_icons_new_alignment_row;
+  GtkSwitch              *ding_showhome_switch;
+  HdyPreferencesGroup    *dock_preferences_group;
+  GtkSwitch              *dock_autohide_switch;
+  GtkSwitch              *dock_extendheight_switch;
+  HdyComboRow            *dock_monitor_row;
+  GListStore             *dock_monitors_liststore;
+  HdyComboRow            *dock_position_row;
+  GtkAdjustment          *icon_size_adjustment;
+  GtkScale               *icon_size_scale;
+  GtkFlowBox             *theme_box;
+  GtkFlowBoxChild        *theme_dark;
+  GtkFlowBoxChild        *theme_light;
+  HdyActionRow           *color_row;
+  GtkFlowBox             *color_box;
+  GtkFlowBoxChild        *accent_bark;
+  GtkFlowBoxChild        *accent_blue;
+  GtkFlowBoxChild        *accent_olive;
+  GtkFlowBoxChild        *accent_default;
+  GtkFlowBoxChild        *accent_magenta;
+  GtkFlowBoxChild        *accent_purple;
+  GtkFlowBoxChild        *accent_prussiangreen;
+  GtkFlowBoxChild        *accent_sage;
+  GtkFlowBoxChild        *accent_red;
+  GtkFlowBoxChild        *accent_viridian;
+
+  GSettings              *ding_settings;
+  GSettings              *dock_settings;
+  GSettings              *interface_settings;
+  GSettings              *gedit_settings;
+  CcDisplayConfigManager *display_config_manager;
+  CcDisplayConfig        *display_current_config;
+  GDBusProxy             *shell_proxy;
+
+  gboolean                updating;
+};
+
+CC_PANEL_REGISTER (CcUbuntuPanel, cc_ubuntu_panel);
+
+static void monitor_labeler_hide (CcUbuntuPanel *self);
+static void update_dock_monitor_combo_row_selection (CcUbuntuPanel *self);
+static GQuark accent_quark (void);
+
+G_DEFINE_QUARK (accent-quark, accent);
+
+static void
+cc_ubuntu_panel_dispose (GObject *object)
+{
+  CcUbuntuPanel *self = CC_UBUNTU_PANEL (object);
+
+  monitor_labeler_hide (self);
+
+  /* Upstream code is wrong at handling configuration finalization if happens
+   * earlier than one of its child nodes, so we need to remove the entries
+   * not to make this happen implicitly too late, causing a crash.
+   * This can be removed when the follow MR is merged:
+   * https://gitlab.gnome.org/GNOME/gnome-control-center/-/merge_requests/1175
+   */
+  if (self->dock_monitors_liststore)
+    g_list_store_remove_all (self->dock_monitors_liststore);
+
+  g_clear_object (&self->ding_settings);
+  g_clear_object (&self->dock_settings);
+  g_clear_object (&self->dock_monitors_liststore);
+  g_clear_object (&self->interface_settings);
+  g_clear_object (&self->gedit_settings);
+  g_clear_object (&self->display_current_config);
+  g_clear_object (&self->display_config_manager);
+  g_clear_object (&self->shell_proxy);
+
+  G_OBJECT_CLASS (cc_ubuntu_panel_parent_class)->dispose (object);
+}
+
+static void
+monitor_labeler_hide (CcUbuntuPanel *self)
+{
+  if (!self->shell_proxy)
+    return;
+
+  g_dbus_proxy_call (self->shell_proxy,
+                     "HideMonitorLabels",
+                     NULL, G_DBUS_CALL_FLAGS_NONE,
+                     -1, NULL, NULL, NULL);
+}
+
+static void
+monitor_labeler_show (CcUbuntuPanel *self)
+{
+  GList *outputs, *l;
+  GVariantBuilder builder;
+  gint number = 0;
+  guint n_monitors = 0;
+
+  if (!self->shell_proxy || !self->display_current_config)
+    return;
+
+  outputs = cc_display_config_get_ui_sorted_monitors (self->display_current_config);
+  if (!outputs)
+    return;
+
+  if (cc_display_config_is_cloning (self->display_current_config))
+    return monitor_labeler_hide (self);
+
+  g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
+  g_variant_builder_open (&builder, G_VARIANT_TYPE_ARRAY);
+
+  for (l = outputs; l != NULL; l = l->next)
+    {
+      CcDisplayMonitor *output = l->data;
+
+      if (!cc_display_monitor_is_active (output))
+        continue;
+
+      number = cc_display_monitor_get_ui_number (output);
+      if (number == 0)
+        continue;
+
+      g_variant_builder_add (&builder, "{sv}",
+                             cc_display_monitor_get_connector_name (output),
+                             g_variant_new_int32 (number));
+      n_monitors++;
+    }
+
+  g_variant_builder_close (&builder);
+
+  if (number < 2 || n_monitors < 2)
+    {
+      g_variant_builder_clear (&builder);
+      return monitor_labeler_hide (self);
+    }
+
+  g_dbus_proxy_call (self->shell_proxy,
+                     "ShowMonitorLabels",
+                     g_variant_builder_end (&builder),
+                     G_DBUS_CALL_FLAGS_NONE,
+                     -1, NULL, NULL, NULL);
+}
+
+static void
+ensure_monitor_labels (CcUbuntuPanel *self)
+{
+  g_autoptr(GList) windows = NULL;
+  GList *w;
+
+  windows = gtk_window_list_toplevels ();
+
+  for (w = windows; w; w = w->next)
+    {
+      if (gtk_window_has_toplevel_focus (GTK_WINDOW (w->data)))
+        {
+          monitor_labeler_show (self);
+          break;
+        }
+    }
+
+  if (!w)
+    monitor_labeler_hide (self);
+}
+
+static void
+shell_proxy_ready (GObject        *source,
+                   GAsyncResult   *res,
+                   CcUbuntuPanel *self)
+{
+  GDBusProxy *proxy;
+  g_autoptr(GError) error = NULL;
+
+  proxy = cc_object_storage_create_dbus_proxy_finish (res, &error);
+  if (!proxy)
+    {
+      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        g_warning ("Failed to contact gnome-shell: %s", error->message);
+      return;
+    }
+
+  self->shell_proxy = proxy;
+
+  ensure_monitor_labels (self);
+}
+
+static GList *
+get_valid_monitors (CcUbuntuPanel   *self,
+                    gint            *n_monitors,
+                    gint            *primary_index)
+{
+  CcDisplayMonitor *primary_monitor;
+  GList *config_monitors = NULL;
+  GList *valid_monitors, *l;
+  gint n_valid_monitors;
+
+  config_monitors = cc_display_config_get_monitors (self->display_current_config);
+  primary_monitor = NULL;
+  valid_monitors = NULL;
+  n_valid_monitors = 0;
+
+  for (l = config_monitors; l != NULL; l = l->next)
+    {
+      CcDisplayMonitor *monitor = l->data;
+
+      if (!cc_display_monitor_is_active (monitor))
+        continue;
+
+      /* The default monitors list uses reversed order, so prepend to
+       * set it back to mutter order */
+      valid_monitors = g_list_prepend (valid_monitors, monitor);
+
+      if (cc_display_monitor_is_primary (monitor))
+        primary_monitor = monitor;
+
+      n_valid_monitors++;
+    }
+
+  if (n_monitors)
+    *n_monitors = n_valid_monitors;
+
+  if (primary_index)
+    *primary_index = g_list_index (valid_monitors, primary_monitor);
+
+  return valid_monitors;
+}
+
+static int
+ui_sort_monitor (gconstpointer a, gconstpointer b)
+{
+  CcDisplayMonitor *monitor_a = (CcDisplayMonitor *) a;
+  CcDisplayMonitor *monitor_b = (CcDisplayMonitor *) b;
+
+  return cc_display_monitor_get_ui_number (monitor_a) -
+         cc_display_monitor_get_ui_number (monitor_b);
+}
+
+static GList *
+get_valid_monitors_sorted (CcUbuntuPanel   *self,
+                           gint            *n_monitors,
+                           gint            *primary_index)
+{
+  GList *monitors = get_valid_monitors (self, n_monitors, primary_index);
+
+  return g_list_sort (monitors, ui_sort_monitor);
+}
+
+static int
+dock_monitor_to_id (gint index,
+                    gint primary_monitor,
+                    gint n_monitors)
+{
+  if (index < 0)
+    return -1;
+
+  /* The The dock uses the Gdk index for monitors, where the primary monitor
+   * always has index 0, so let's follow what dash-to-dock does in docking.js
+   * (as part of _createDocks) */
+  return (primary_monitor + index) % n_monitors;
+}
+
+typedef enum
+{
+  GSD_UBUNTU_DOCK_MONITOR_ALL,
+  GSD_UBUNTU_DOCK_MONITOR_PRIMARY,
+} GsdUbuntuDockMonitor;
+
+static char *
+get_dock_monitor_value_object_name (HdyValueObject *object,
+                                    CcUbuntuPanel  *self)
+{
+  const GValue *value = hdy_value_object_get_value (object);
+
+  if (G_VALUE_TYPE (value) == G_TYPE_STRING)
+    return g_value_dup_string (value);
+
+  if (G_VALUE_TYPE (value) == CC_TYPE_DISPLAY_MONITOR)
+    {
+      CcDisplayMonitor *monitor = g_value_get_object (value);
+      int monitor_number = cc_display_monitor_get_ui_number (monitor);
+      const char *monitor_name = cc_display_monitor_get_display_name (monitor);
+
+      if (gtk_widget_get_state_flags (GTK_WIDGET (self)) & GTK_STATE_FLAG_DIR_LTR)
+        return g_strdup_printf ("%d. %s", monitor_number, monitor_name);
+      else
+        return g_strdup_printf ("%s .%d", monitor_name, monitor_number);
+    }
+
+  g_return_val_if_reached (NULL);
+}
+
+static void
+populate_dock_monitor_combo_row (CcUbuntuPanel *self)
+{
+  g_autoptr(CcDisplayMonitor) primary_monitor = NULL;
+  g_autoptr(GList) valid_monitors = NULL;
+  g_autoptr(HdyValueObject) primary_value_object = NULL;
+  g_autoptr(HdyValueObject) all_displays_value_object = NULL;
+  GList *l;
+  gint index;
+
+  if (self->display_config_manager == NULL)
+    return;
+
+  g_list_store_remove_all (self->dock_monitors_liststore);
+
+  valid_monitors = get_valid_monitors_sorted (self, NULL, NULL);
+  gtk_widget_set_visible (GTK_WIDGET (self->dock_monitor_row), valid_monitors != NULL);
+
+  if (!valid_monitors)
+    return;
+
+  all_displays_value_object = hdy_value_object_new_string (_("All displays"));
+  g_list_store_insert (self->dock_monitors_liststore,
+                       GSD_UBUNTU_DOCK_MONITOR_ALL,
+                       all_displays_value_object);
+
+  for (l = valid_monitors, index = 0; l != NULL; l = l->next, index++)
+    {
+      g_auto(GValue) value = G_VALUE_INIT;
+      g_autoptr(HdyValueObject) monitor_value_object = NULL;
+      CcDisplayMonitor *monitor = l->data;
+
+      if (cc_display_monitor_is_primary (monitor))
+        g_set_object (&primary_monitor, monitor);
+
+      g_value_init (&value, CC_TYPE_DISPLAY_MONITOR);
+      g_value_set_object (&value, monitor);
+      monitor_value_object = hdy_value_object_new (&value);
+
+      g_list_store_append (self->dock_monitors_liststore, monitor_value_object);
+    }
+
+  if (primary_monitor)
+    {
+      int ui_number = cc_display_monitor_get_ui_number (primary_monitor);
+
+      if (gtk_widget_get_state_flags (GTK_WIDGET (self)) & GTK_STATE_FLAG_DIR_LTR)
+        {
+          primary_value_object = hdy_value_object_new_take_string(
+            g_strdup_printf ("%s (%d)", _("Primary Display"), ui_number));
+        }
+      else
+        {
+          primary_value_object = hdy_value_object_new_take_string(
+            g_strdup_printf ("(%d) %s", ui_number, _("Primary Display")));
+        }
+    }
+  else
+    {
+      primary_value_object = hdy_value_object_new_string (_("Primary Display"));
+    }
+
+  g_list_store_insert (self->dock_monitors_liststore,
+                       GSD_UBUNTU_DOCK_MONITOR_PRIMARY,
+                       primary_value_object);
+}
+
+static void
+on_screen_changed (CcUbuntuPanel *self)
+{
+  g_autoptr(CcDisplayConfig) current = NULL;
+
+  if (self->display_config_manager == NULL)
+    return;
+
+  current = cc_display_config_manager_get_current (self->display_config_manager);
+  if (current == NULL)
+    return;
+
+  self->updating = TRUE;
+
+  g_set_object (&self->display_current_config, current);
+
+  populate_dock_monitor_combo_row (self);
+  ensure_monitor_labels (self);
+
+  self->updating = FALSE;
+
+  update_dock_monitor_combo_row_selection (self);
+}
+
+static void
+session_bus_ready (GObject        *source,
+                   GAsyncResult   *res,
+                   gpointer        user_data)
+{
+  CcUbuntuPanel *self = user_data;
+  GDBusConnection *bus;
+  g_autoptr(GError) error = NULL;
+
+  bus = g_bus_get_finish (res, &error);
+  if (!bus)
+    {
+      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        g_warning ("Failed to get session bus: %s", error->message);
+      return;
+    }
+
+  self->display_config_manager = cc_display_config_manager_dbus_new ();
+  g_signal_connect_object (self->display_config_manager, "changed",
+                           G_CALLBACK (on_screen_changed),
+                           self,
+                           G_CONNECT_SWAPPED);
+}
+
+static void
+transition_screen (CcUbuntuPanel *self)
+{
+  g_autoptr (GError) error = NULL;
+
+  if (!self->shell_proxy)
+    return;
+
+  g_dbus_proxy_call_sync (self->shell_proxy,
+                          "ScreenTransition",
+                          NULL,
+                          G_DBUS_CALL_FLAGS_NONE,
+                          -1,
+                          NULL,
+                          &error);
+
+  if (error)
+    g_warning ("Couldn't transition screen: %s", error->message);
+}
+
+static void
+on_theme_box_selected_children_changed (CcUbuntuPanel *self)
+{
+  GtkFlowBoxChild *selected_variant_item = NULL;
+  g_autoptr(GList) selected_variant = NULL;
+  g_autoptr(GList) colors = NULL;
+  g_autoptr(GString) gtk_theme = NULL;
+  g_autoptr(GString) icon_theme = NULL;
+  g_autoptr(GString) gedit_theme = NULL;
+  g_autofree char *current_gtk_theme = NULL;
+  g_autofree char *current_color_scheme = NULL;
+  g_autofree char *current_icon_theme = NULL;
+  const char *color_scheme = "prefer-light";
+  gboolean has_selected_accent;
+  GList *l;
+
+  colors = gtk_container_get_children (GTK_CONTAINER (self->color_box));
+  selected_variant = gtk_flow_box_get_selected_children (self->theme_box);
+
+  if (selected_variant)
+    selected_variant_item = GTK_FLOW_BOX_CHILD (g_list_nth_data (selected_variant, 0));
+
+  gtk_theme = g_string_new ("Yaru");
+  icon_theme = g_string_new ("Yaru");
+  gedit_theme = g_string_new ("Yaru");
+  has_selected_accent = FALSE;
+
+  for (l = colors; l; l = l->next)
+    {
+      GtkFlowBoxChild *accent_color = GTK_FLOW_BOX_CHILD (l->data);
+      const char *color = g_object_get_qdata (G_OBJECT (accent_color), accent_quark ());
+
+      if (!gtk_widget_is_visible (GTK_WIDGET (accent_color)))
+        continue;
+
+      if (color && gtk_flow_box_child_is_selected (accent_color))
+        {
+          has_selected_accent = TRUE;
+
+          if (g_str_equal (color, DEFAULT_ACCENT_COLOR))
+            break;
+
+          g_string_append_printf (gtk_theme, "-%s", color);
+          g_string_append_printf (icon_theme, "-%s", color);
+          break;
+        }
+    }
+
+  if (!selected_variant && !has_selected_accent)
+    return;
+
+  if (selected_variant_item == self->theme_dark)
+    {
+      color_scheme = "prefer-dark";
+      g_string_append (gtk_theme, "-dark");
+      g_string_append (gedit_theme, "-dark");
+    }
+
+  current_gtk_theme = g_settings_get_string (self->interface_settings, GTK_THEME_KEY);
+  current_color_scheme = g_settings_get_string (self->interface_settings, COLOR_SCHEME_KEY);
+
+  if (g_strcmp0 (current_gtk_theme, gtk_theme->str) != 0 ||
+      g_strcmp0 (current_color_scheme, color_scheme) != 0)
+    {
+      transition_screen (self);
+      g_settings_set_string (self->interface_settings, GTK_THEME_KEY, gtk_theme->str);
+      g_settings_set_string (self->interface_settings, COLOR_SCHEME_KEY, color_scheme);
+    }
+
+  current_icon_theme = g_settings_get_string (self->interface_settings, ICON_THEME_KEY);
+
+  if (!current_icon_theme || !self->updating ||
+      g_str_has_prefix (current_icon_theme, "Yaru"))
+    g_settings_set_string (self->interface_settings, ICON_THEME_KEY, icon_theme->str);
+
+  if (self->gedit_settings)
+    {
+      g_autoptr(GVariant) gedit_user_value = NULL;
+      const char *gedit_theme_name = NULL;
+
+      gedit_user_value = g_settings_get_user_value (self->gedit_settings,
+                                                    GEDIT_THEME_KEY);
+
+      if (gedit_user_value)
+        gedit_theme_name = g_variant_get_string (gedit_user_value, NULL);
+
+      if (!gedit_theme_name || *gedit_theme_name == '\0' ||
+          g_str_has_prefix (gedit_theme_name, "Yaru"))
+        {
+          /* Only change the gedit setting if user is using a Yaru theme, or unset */
+          g_settings_set_string (self->gedit_settings, GEDIT_THEME_KEY,
+                                 gedit_theme->str);
+        }
+    }
+}
+
+static void
+on_interface_settings_changed (CcUbuntuPanel *self)
+{
+  g_autofree gchar *gtk_theme = NULL;
+  g_autofree gchar *cursor_theme = NULL;
+  g_autofree gchar *icon_theme = NULL;
+  g_autofree gchar *color_scheme = NULL;
+  g_autoptr(GList) colors = NULL;
+  g_auto(GStrv) parts = NULL;
+  const char *accent_color = DEFAULT_ACCENT_COLOR;
+  gboolean is_dark = FALSE;
+  GList *l;
+
+  gtk_theme = g_settings_get_string (self->interface_settings, GTK_THEME_KEY);
+  cursor_theme = g_settings_get_string (self->interface_settings, CURSOR_THEME_KEY);
+  icon_theme = g_settings_get_string (self->interface_settings, ICON_THEME_KEY);
+  color_scheme = g_settings_get_string (self->interface_settings, COLOR_SCHEME_KEY);
+
+  if (!g_str_has_prefix (gtk_theme, "Yaru"))
+    {
+      g_warning ("No yaru theme selected!");
+
+      gtk_flow_box_unselect_all (self->theme_box);
+      gtk_flow_box_unselect_all (self->color_box);
+      return;
+    }
+
+  is_dark = g_str_has_suffix (gtk_theme, "-dark");
+  parts = g_strsplit (gtk_theme, "-", 3);
+
+  switch (g_strv_length (parts))
+    {
+      case 3:
+        g_return_if_fail (is_dark);
+        accent_color = parts[1];
+        break;
+      case 2:
+        if (!is_dark)
+          accent_color = parts[1];
+        break;
+    }
+
+  if (!is_dark && g_strcmp0 (color_scheme, "prefer-dark") == 0)
+    is_dark = TRUE;
+  else if (is_dark && g_strcmp0 (color_scheme, "prefer-light") == 0)
+    is_dark = FALSE;
+
+  colors = gtk_container_get_children (GTK_CONTAINER (self->color_box));
+
+  for (l = colors; l; l = l->next)
+    {
+      GtkFlowBoxChild *item = GTK_FLOW_BOX_CHILD (l->data);
+      const char *color = g_object_get_qdata (G_OBJECT (item), accent_quark ());
+
+      if (!gtk_widget_is_visible (GTK_WIDGET (item)))
+        continue;
+
+      if (g_strcmp0 (color, accent_color) == 0)
+        {
+          gtk_flow_box_select_child (self->color_box, item);
+          break;
+        }
+    }
+
+  if (is_dark)
+    gtk_flow_box_select_child (self->theme_box, self->theme_dark);
+  else
+    gtk_flow_box_select_child (self->theme_box, self->theme_light);
+}
+
+static gchar *
+get_theme_dir (void)
+{
+  const gchar *var;
+
+  var = g_getenv ("GTK_DATA_PREFIX");
+  if (var == NULL)
+    var = "/usr";
+
+  return g_build_filename (var, "share", "themes", NULL);
+}
+
+
+#if (GTK_MINOR_VERSION % 2)
+#define MINOR (GTK_MINOR_VERSION + 1)
+#else
+#define MINOR GTK_MINOR_VERSION
+#endif
+
+
+static gchar *
+find_theme_dir (const gchar *dir,
+                const gchar *subdir,
+                const gchar *name,
+                const gchar *variant)
+{
+  g_autofree gchar *file = NULL;
+  g_autofree gchar *base = NULL;
+  gchar *path;
+  gint i;
+
+  if (variant)
+    file = g_strconcat ("gtk-", variant, ".css", NULL);
+  else
+    file = g_strdup ("gtk.css");
+
+  if (subdir)
+    base = g_build_filename (dir, subdir, name, NULL);
+  else
+    base = g_build_filename (dir, name, NULL);
+
+  for (i = MINOR; i >= 0; i = i - 2) {
+    g_autofree gchar *subsubdir = NULL;
+
+    if (i < 14)
+      i = 0;
+
+    subsubdir = g_strdup_printf ("gtk-3.%d", i);
+    path = g_build_filename (base, subsubdir, file, NULL);
+
+    if (g_file_test (path, G_FILE_TEST_EXISTS))
+      break;
+
+    g_free (path);
+    path = NULL;
+  }
+
+  return path;
+}
+
+#undef MINOR
+
+static gchar *
+find_theme (const gchar *name,
+            const gchar *variant)
+{
+  g_autofree gchar *dir = NULL;
+  const gchar *const *dirs;
+  gchar *path;
+  gint i;
+
+  /* First look in the user's data directory */
+  path = find_theme_dir (g_get_user_data_dir (), "themes", name, variant);
+  if (path)
+    return path;
+
+  /* Next look in the user's home directory */
+  path = find_theme_dir (g_get_home_dir (), ".themes", name, variant);
+  if (path)
+    return path;
+
+  /* Look in system data directories */
+  dirs = g_get_system_data_dirs ();
+  for (i = 0; dirs[i]; i++) {
+    path = find_theme_dir (dirs[i], "themes", name, variant);
+    if (path)
+      return path;
+  }
+
+  /* Finally, try in the default theme directory */
+  dir = get_theme_dir ();
+  path = find_theme_dir (dir, NULL, name, variant);
+
+  return path;
+}
+
+/* Courtesy of libhandy... */
+static gboolean
+check_theme_exists (const gchar *name,
+                    const gchar *variant)
+{
+  g_autofree gchar *resource_path = NULL;
+  g_autofree gchar *path = NULL;
+
+  /* try loading the resource for the theme. This is mostly meant for built-in
+   * themes.
+   */
+  if (variant)
+    resource_path = g_strdup_printf ("/org/gtk/libgtk/theme/%s/gtk-%s.css", name, variant);
+  else
+    resource_path = g_strdup_printf ("/org/gtk/libgtk/theme/%s/gtk.css", name);
+
+  if (g_resources_get_info (resource_path, 0, NULL, NULL, NULL))
+    return TRUE;
+
+  g_clear_pointer (&resource_path, g_free);
+
+  if (variant)
+    resource_path = g_strdup_printf ("/com/ubuntu/themes/%s/3.0/gtk-%s.css", name, variant);
+  else
+    resource_path = g_strdup_printf ("/com/ubuntu/themes/%s/3.0/gtk.css", name);
+
+  if (g_resources_get_info (resource_path, 0, NULL, NULL, NULL))
+    return TRUE;
+
+  /* Next try looking for files in the various theme directories. */
+  path = find_theme (name, variant);
+
+  return path != NULL;
+}
+
+static void
+check_theme_accents_availability (CcUbuntuPanel *self)
+{
+  g_autoptr (GList) colors = NULL;
+  gint available_accents = 0;
+  GList *l;
+
+  if (!check_theme_exists ("Yaru", NULL))
+    g_critical ("No Yaru theme found");
+
+  if (!check_theme_exists ("Yaru", "dark"))
+    g_critical ("No Yaru-dark theme found");
+
+  colors = gtk_container_get_children (GTK_CONTAINER (self->color_box));
+
+  for (l = colors; l; l = l->next)
+    {
+      GtkFlowBoxChild *item = GTK_FLOW_BOX_CHILD (l->data);
+      const char *accent = g_object_get_qdata (G_OBJECT (item), accent_quark ());
+      g_autofree char *theme_name = NULL;
+
+      if (g_strcmp0 (accent, DEFAULT_ACCENT_COLOR) == 0)
+        continue;
+
+      theme_name = g_strdup_printf("Yaru-%s", accent);
+
+      if (check_theme_exists (theme_name, NULL) && check_theme_exists (theme_name, "dark"))
+        available_accents++;
+      else
+        gtk_widget_hide (GTK_WIDGET (item));
+    }
+
+  if (!available_accents)
+    gtk_widget_hide (GTK_WIDGET (self->color_row));
+}
+
+static void
+load_custom_css (CcUbuntuPanel *self)
+{
+  g_autoptr(GtkCssProvider) provider = NULL;
+
+  /* use custom CSS */
+  provider = gtk_css_provider_new ();
+  gtk_css_provider_load_from_resource (provider, "/org/gnome/control-center/ubuntu/appearance.css");
+  gtk_style_context_add_provider_for_screen (gdk_screen_get_default (),
+                                             GTK_STYLE_PROVIDER (provider),
+                                             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+}
+
+static void
+icon_size_widget_refresh (CcUbuntuPanel *self)
+{
+  gint value = g_settings_get_int (self->dock_settings, ICONSIZE_KEY);
+  gtk_adjustment_set_value (self->icon_size_adjustment, (gdouble) value / 2);
+}
+
+static gchar *
+on_icon_size_format_value (CcUbuntuPanel *self, gdouble value)
+{
+  return g_strdup_printf ("%d", (int)value * 2);
+}
+
+static void
+on_icon_size_adjustment_value_changed (CcUbuntuPanel *self)
+{
+  gint value = (gint)gtk_adjustment_get_value (self->icon_size_adjustment) * 2;
+  if (g_settings_get_int (self->dock_settings, ICONSIZE_KEY) != value)
+    g_settings_set_int (self->dock_settings, ICONSIZE_KEY, value);
+}
+
+static void
+on_dock_monitor_row_changed (CcUbuntuPanel *self)
+{
+  gboolean ubuntu_dock_on_all_monitors;
+  g_autofree char *ubuntu_dock_current_connector = NULL;
+  int selected;
+
+  if (self->updating)
+    return;
+
+  selected = hdy_combo_row_get_selected_index (self->dock_monitor_row);
+  if (selected < 0)
+    return;
+
+  ubuntu_dock_on_all_monitors =
+    g_settings_get_boolean (self->dock_settings, UBUNTU_DOCK_ALL_MONITORS_KEY);
+  ubuntu_dock_current_connector =
+    g_settings_get_string (self->dock_settings, UBUNTU_DOCK_PREFERRED_CONNECTOR_KEY);
+  if (selected == GSD_UBUNTU_DOCK_MONITOR_ALL)
+    {
+      if (!ubuntu_dock_on_all_monitors)
+        {
+          g_settings_set_boolean (self->dock_settings,
+                                  UBUNTU_DOCK_ALL_MONITORS_KEY,
+                                  TRUE);
+          g_settings_apply (self->dock_settings);
+        }
+    }
+  else
+    {
+      g_autoptr(GSettings) delayed_settings = g_settings_new (UBUNTU_DOCK_SCHEMA);
+      g_settings_delay (delayed_settings);
+      g_autofree char *connector_name = NULL;
+
+      if (ubuntu_dock_on_all_monitors)
+        g_settings_set_boolean (delayed_settings, UBUNTU_DOCK_ALL_MONITORS_KEY, FALSE);
+
+      if (selected == GSD_UBUNTU_DOCK_MONITOR_PRIMARY)
+        {
+          connector_name = g_strdup ("primary");
+        }
+      else
+        {
+          g_autoptr(HdyValueObject) value_object = NULL;
+          CcDisplayMonitor *monitor;
+
+          value_object = g_list_model_get_item (G_LIST_MODEL (self->dock_monitors_liststore),
+                                                selected);
+
+          monitor = g_value_get_object (hdy_value_object_get_value (value_object));
+          connector_name = g_strdup (cc_display_monitor_get_connector_name (monitor));
+        }
+
+      if (g_strcmp0 (ubuntu_dock_current_connector, connector_name) != 0)
+        {
+          g_settings_set_int (delayed_settings, UBUNTU_DOCK_PREFERRED_MONITOR_KEY,
+                                                UBUNTU_DOCK_MONITOR_INDEX_USE_CONNECTOR);
+          g_settings_set_string (delayed_settings, UBUNTU_DOCK_PREFERRED_CONNECTOR_KEY,
+                                 connector_name);
+        }
+
+      g_settings_apply (delayed_settings);
+    }
+}
+
+static void
+on_dock_behavior_row_activated (CcUbuntuPanel *self)
+{
+  CcUbuntuDockDialog *dialog;
+
+  dialog = cc_ubuntu_dock_dialog_new (self->dock_settings);
+  gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (gtk_widget_get_toplevel (GTK_WIDGET (self))));
+  gtk_widget_show (GTK_WIDGET (dialog));
+}
+
+static CcDisplayMonitor *
+get_dock_monitor (CcUbuntuPanel *self)
+{
+  g_autoptr(GList) monitors = NULL;
+  int index;
+  int n_monitors;
+  int primary_monitor;
+
+  monitors = get_valid_monitors_sorted (self, &n_monitors, &primary_monitor);
+  index = g_settings_get_int (self->dock_settings, UBUNTU_DOCK_PREFERRED_MONITOR_KEY);
+
+  if (index == UBUNTU_DOCK_MONITOR_INDEX_USE_CONNECTOR)
+    {
+      g_autofree char *connector = NULL;
+      GList *l;
+      int i;
+
+      connector = g_settings_get_string (self->dock_settings,
+                                         UBUNTU_DOCK_PREFERRED_CONNECTOR_KEY);
+
+      for (l = monitors, i = 0; l; l = l->next, i++)
+        {
+          CcDisplayMonitor *monitor = l->data;
+          const char *monitor_connector = cc_display_monitor_get_connector_name (monitor);
+          if (g_strcmp0 (monitor_connector, connector) == 0)
+            return g_object_ref (monitor);
+        }
+    }
+
+  if (index < 0 || index >= n_monitors)
+    return NULL;
+
+  index = dock_monitor_to_id (index, primary_monitor, n_monitors);
+
+  return g_object_ref (g_list_nth_data (monitors, index));
+}
+
+static gboolean
+dock_placement_row_compare (gconstpointer a, gconstpointer b)
+{
+  const GValue *row_value_a;
+  const GValue *row_value_b;
+
+  row_value_a = hdy_value_object_get_value (HDY_VALUE_OBJECT ((gpointer) a));
+  row_value_b = hdy_value_object_get_value (HDY_VALUE_OBJECT ((gpointer) b));
+
+  if (row_value_a == NULL || row_value_b == NULL)
+    return row_value_a == row_value_b;
+
+  if (G_VALUE_TYPE (row_value_a) != G_VALUE_TYPE (row_value_b))
+    return FALSE;
+
+  if (G_VALUE_TYPE (row_value_a) == CC_TYPE_DISPLAY_MONITOR)
+    {
+      return cc_display_monitor_get_ui_number (g_value_get_object (row_value_a)) ==
+             cc_display_monitor_get_ui_number (g_value_get_object (row_value_b));
+    }
+
+  if (G_VALUE_TYPE (row_value_a) == G_TYPE_STRING)
+    {
+      return g_strcmp0 (g_value_get_string (row_value_a),
+                        g_value_get_string (row_value_b)) == 0;
+    }
+
+  g_return_val_if_reached (FALSE);
+}
+
+static void
+update_dock_monitor_combo_row_selection (CcUbuntuPanel *self)
+{
+  guint selection = GSD_UBUNTU_DOCK_MONITOR_PRIMARY;
+
+  if (g_settings_get_boolean (self->dock_settings, UBUNTU_DOCK_ALL_MONITORS_KEY))
+    {
+      selection = GSD_UBUNTU_DOCK_MONITOR_ALL;
+    }
+  else
+    {
+      g_autoptr (CcDisplayMonitor) monitor = get_dock_monitor (self);
+
+      if (monitor)
+        {
+          g_autoptr(HdyValueObject) monitor_value_object = NULL;
+          g_auto(GValue) value = G_VALUE_INIT;
+
+          g_value_init (&value, CC_TYPE_DISPLAY_MONITOR);
+          g_value_set_object (&value, monitor);
+          monitor_value_object = hdy_value_object_new (&value);
+
+          if (!g_list_store_find_with_equal_func (self->dock_monitors_liststore,
+                                                  monitor_value_object,
+                                                  dock_placement_row_compare,
+                                                  &selection))
+            selection = GSD_UBUNTU_DOCK_MONITOR_PRIMARY;
+        }
+    }
+
+  hdy_combo_row_set_selected_index (self->dock_monitor_row, selection);
+}
+
+static void
+cc_ubuntu_panel_class_init (CcUbuntuPanelClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+
+  object_class->dispose = cc_ubuntu_panel_dispose;
+
+  gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/ubuntu/cc-ubuntu-panel.ui");
+
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, ding_preferences_group);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, ding_icon_size_row);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, ding_icons_new_alignment_row);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, ding_showhome_switch);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, dock_preferences_group);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, dock_autohide_switch);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, dock_extendheight_switch);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, dock_monitor_row);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, dock_position_row);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, icon_size_adjustment);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, icon_size_scale);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, theme_box);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, theme_dark);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, theme_light);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, color_row);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, color_box);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_bark);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_blue);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_olive);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_default);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_magenta);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_purple);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_prussiangreen);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_red);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_sage);
+  gtk_widget_class_bind_template_child (widget_class, CcUbuntuPanel, accent_viridian);
+
+  gtk_widget_class_bind_template_callback (widget_class, on_dock_monitor_row_changed);
+  gtk_widget_class_bind_template_callback (widget_class, on_dock_behavior_row_activated);
+  gtk_widget_class_bind_template_callback (widget_class, on_icon_size_adjustment_value_changed);
+  gtk_widget_class_bind_template_callback (widget_class, on_icon_size_format_value);
+  gtk_widget_class_bind_template_callback (widget_class, on_theme_box_selected_children_changed);
+}
+
+static void
+mapped_cb (CcUbuntuPanel *self)
+{
+  CcShell *shell;
+  GtkWidget *toplevel;
+
+  shell = cc_panel_get_shell (CC_PANEL (self));
+  toplevel = cc_shell_get_toplevel (shell);
+
+  g_signal_handlers_disconnect_by_func (toplevel, mapped_cb, self);
+  g_signal_connect_object (toplevel, "notify::has-toplevel-focus",
+                           G_CALLBACK (ensure_monitor_labels), self,
+                           G_CONNECT_SWAPPED);
+}
+
+typedef enum
+{
+  GSD_UBUNTU_DOCK_POSITION_TOP,
+  GSD_UBUNTU_DOCK_POSITION_RIGHT,
+  GSD_UBUNTU_DOCK_POSITION_BOTTOM,
+  GSD_UBUNTU_DOCK_POSITION_LEFT,
+
+  GSD_UBUNTU_DOCK_POSITION_FIRST = GSD_UBUNTU_DOCK_POSITION_RIGHT,
+} GsdUbuntuDockPosition;
+
+static GsdUbuntuDockPosition
+get_dock_position_for_direction (CcUbuntuPanel         *self,
+                                 GsdUbuntuDockPosition  position)
+{
+  if (gtk_widget_get_state_flags (GTK_WIDGET (self)) & GTK_STATE_FLAG_DIR_RTL)
+    {
+      switch (position)
+        {
+          case GSD_UBUNTU_DOCK_POSITION_RIGHT:
+            position = GSD_UBUNTU_DOCK_POSITION_LEFT;
+            break;
+          case GSD_UBUNTU_DOCK_POSITION_LEFT:
+            position = GSD_UBUNTU_DOCK_POSITION_LEFT;
+            break;
+          default:
+            break;
+        }
+    }
+
+  return position;
+}
+
+static const char *
+get_dock_position_string (GsdUbuntuDockPosition  position)
+{
+  switch (position)
+    {
+      case GSD_UBUNTU_DOCK_POSITION_TOP:
+        return "TOP";
+      case GSD_UBUNTU_DOCK_POSITION_RIGHT:
+        return "RIGHT";
+      case GSD_UBUNTU_DOCK_POSITION_BOTTOM:
+        return "BOTTOM";
+      case GSD_UBUNTU_DOCK_POSITION_LEFT:
+        return "LEFT";
+      default:
+        g_return_val_if_reached ("LEFT");
+    }
+}
+
+static GsdUbuntuDockPosition
+get_dock_position_from_string (const char *position)
+{
+  if (g_str_equal (position, "TOP"))
+    return GSD_UBUNTU_DOCK_POSITION_TOP;
+
+  if (g_str_equal (position, "RIGHT"))
+    return GSD_UBUNTU_DOCK_POSITION_RIGHT;
+
+  if (g_str_equal (position, "BOTTOM"))
+    return GSD_UBUNTU_DOCK_POSITION_BOTTOM;
+
+  if (g_str_equal (position, "LEFT"))
+    return GSD_UBUNTU_DOCK_POSITION_LEFT;
+
+  g_return_val_if_reached (GSD_UBUNTU_DOCK_POSITION_LEFT);
+}
+
+static GsdUbuntuDockPosition
+get_dock_position_row_position (CcUbuntuPanel *self,
+                                int            index)
+{
+  GListModel *model = hdy_combo_row_get_model (self->dock_position_row);
+  HdyValueObject *value_object = g_list_model_get_item (model, index);
+
+  return GPOINTER_TO_INT (g_object_get_data (G_OBJECT (value_object), "position"));
+}
+
+static int
+get_dock_position_row_index (CcUbuntuPanel         *self,
+                             GsdUbuntuDockPosition  position)
+{
+  GListModel *model = hdy_combo_row_get_model (self->dock_position_row);
+  guint n_items;
+  guint i;
+
+  n_items = g_list_model_get_n_items (model);
+
+  for (i = 0; i < n_items; i++)
+    {
+      HdyValueObject *value_object = g_list_model_get_item (model, i);
+      GsdUbuntuDockPosition item_position;
+
+      item_position = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (value_object), "position"));
+
+      if (item_position == position)
+        return i;
+    }
+
+  g_return_val_if_reached (0);
+}
+
+static gboolean
+dock_position_get_mapping (GValue   *value,
+                           GVariant *variant,
+                           gpointer  user_data)
+{
+  CcUbuntuPanel *self = user_data;
+  GsdUbuntuDockPosition position;
+
+  position = get_dock_position_from_string (g_variant_get_string (variant, NULL));
+  position = get_dock_position_for_direction (self, position);
+
+  if (G_VALUE_TYPE (value) == G_TYPE_INT)
+    {
+      g_value_set_int (value, get_dock_position_row_index (self, position));
+      return TRUE;
+    }
+  else if (G_VALUE_TYPE (value) == G_TYPE_STRING)
+    {
+      g_value_set_string (value, get_dock_position_string (position));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static GVariant *
+dock_position_set_mapping (const GValue       *value,
+                           const GVariantType *type,
+                           gpointer            user_data)
+{
+  CcUbuntuPanel *self = user_data;
+  GsdUbuntuDockPosition position;
+
+  position = get_dock_position_row_position (self, g_value_get_int (value));
+  position = get_dock_position_for_direction (self, position);
+
+  return g_variant_new_string (get_dock_position_string (position));
+}
+
+static void
+populate_dock_position_row (HdyComboRow *combo_row)
+{
+  g_autoptr (GListStore) list_store = NULL;
+  struct {
+    char *name;
+    GsdUbuntuDockPosition position;
+  } positions[] = {
+    {
+      NC_("Position on screen for the Ubuntu dock", "Left"),
+          GSD_UBUNTU_DOCK_POSITION_LEFT,
+    },
+    {
+      NC_("Position on screen for the Ubuntu dock", "Bottom"),
+          GSD_UBUNTU_DOCK_POSITION_BOTTOM,
+    },
+    {
+      NC_("Position on screen for the Ubuntu dock", "Right"),
+          GSD_UBUNTU_DOCK_POSITION_RIGHT,
+    },
+  };
+  guint i;
+
+  list_store = g_list_store_new (HDY_TYPE_VALUE_OBJECT);
+  for (i = 0; i < G_N_ELEMENTS (positions); i++)
+    {
+      g_autoptr (HdyValueObject) value_object = NULL;
+
+      value_object = hdy_value_object_new_string (g_dpgettext2(NULL, "Position on screen for the Ubuntu dock", positions[i].name));
+      g_object_set_data (G_OBJECT (value_object),
+                         "position",
+                         GUINT_TO_POINTER (positions[i].position));
+      g_list_store_append (list_store, value_object);
+    }
+
+  hdy_combo_row_bind_name_model (combo_row,
+                                 G_LIST_MODEL (list_store),
+                                 (HdyComboRowGetNameFunc) hdy_value_object_dup_string,
+                                 NULL, NULL);
+}
+
+typedef enum
+{
+  UBUNTU_DING_ICONS_SIZE_SMALL,
+  UBUNTU_DING_ICONS_SIZE_STANDARD,
+  UBUNTU_DING_ICONS_SIZE_LARGE,
+  UBUNTU_DING_ICONS_SIZE_TINY,
+} UbuntuDingIconsSize;
+
+static const char *
+get_ding_size_string (UbuntuDingIconsSize size)
+{
+  switch (size)
+    {
+      case UBUNTU_DING_ICONS_SIZE_TINY:
+        return "tiny";
+      case UBUNTU_DING_ICONS_SIZE_SMALL:
+        return "small";
+      case UBUNTU_DING_ICONS_SIZE_STANDARD:
+        return "standard";
+      case UBUNTU_DING_ICONS_SIZE_LARGE:
+        return "large";
+      default:
+        g_return_val_if_reached ("standard");
+    }
+}
+
+static UbuntuDingIconsSize
+get_ding_size_from_string (const char *size)
+{
+  if (g_str_equal (size, "tiny"))
+    return UBUNTU_DING_ICONS_SIZE_TINY;
+
+  if (g_str_equal (size, "small"))
+    return UBUNTU_DING_ICONS_SIZE_SMALL;
+
+  if (g_str_equal (size, "standard"))
+    return UBUNTU_DING_ICONS_SIZE_STANDARD;
+
+  if (g_str_equal (size, "large"))
+    return UBUNTU_DING_ICONS_SIZE_LARGE;
+
+  g_return_val_if_reached (UBUNTU_DING_ICONS_SIZE_STANDARD);
+}
+
+static int
+get_ding_size_row_index (CcUbuntuPanel       *self,
+                         UbuntuDingIconsSize  size)
+{
+  GListModel *model = hdy_combo_row_get_model (self->ding_icon_size_row);
+  guint n_items;
+  guint i;
+
+  n_items = g_list_model_get_n_items (model);
+
+  for (i = 0; i < n_items; i++)
+    {
+      HdyValueObject *value_object = g_list_model_get_item (model, i);
+      UbuntuDingIconsSize item_size;
+
+      item_size = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (value_object), "size"));
+
+      if (item_size == size)
+        return i;
+    }
+
+  g_return_val_if_reached (0);
+}
+
+static gboolean
+ding_size_get_mapping (GValue   *value,
+                       GVariant *variant,
+                       gpointer  user_data)
+{
+  CcUbuntuPanel *self = user_data;
+  UbuntuDingIconsSize size = 0;
+
+  size = get_ding_size_from_string (g_variant_get_string (variant, NULL));
+
+  if (G_VALUE_TYPE (value) == G_TYPE_INT)
+    {
+      g_value_set_int (value, get_ding_size_row_index (self, size));
+      return TRUE;
+    }
+  else if (G_VALUE_TYPE (value) == G_TYPE_STRING)
+    {
+      g_value_set_string (value, get_ding_size_string (size));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static GVariant *
+ding_size_set_mapping (const GValue           *value,
+                           const GVariantType *type,
+                           gpointer            user_data)
+{
+  UbuntuDingIconsSize size = g_value_get_int (value);
+
+  return g_variant_new_string (get_ding_size_string (size));
+}
+
+static void
+populate_ding_size_row (HdyComboRow *combo_row)
+{
+  g_autoptr (GListStore) list_store = NULL;
+  struct {
+    char *name;
+    UbuntuDingIconsSize size;
+  } sizes[] = {
+    {
+      NC_("Size of the desktop icons", "Small"),
+          UBUNTU_DING_ICONS_SIZE_SMALL,
+    },
+    {
+      NC_("Size of the desktop icons", "Normal"),
+          UBUNTU_DING_ICONS_SIZE_STANDARD,
+    },
+    {
+      NC_("Size of the desktop icons", "Large"),
+          UBUNTU_DING_ICONS_SIZE_LARGE,
+    },
+    {
+      NC_("Size of the desktop icons", "Tiny"),
+          UBUNTU_DING_ICONS_SIZE_TINY,
+    },
+  };
+  guint i;
+
+  list_store = g_list_store_new (HDY_TYPE_VALUE_OBJECT);
+  for (i = 0; i < G_N_ELEMENTS (sizes); i++)
+    {
+      g_autoptr (HdyValueObject) value_object = NULL;
+
+      value_object = hdy_value_object_new_string (g_dpgettext2(NULL, "Size of the desktop icons", sizes[i].name));
+      g_object_set_data (G_OBJECT (value_object),
+                         "size",
+                         GUINT_TO_POINTER (sizes[i].size));
+      g_list_store_append (list_store, value_object);
+    }
+
+  hdy_combo_row_bind_name_model (combo_row,
+                                 G_LIST_MODEL (list_store),
+                                 (HdyComboRowGetNameFunc) hdy_value_object_dup_string,
+                                 NULL, NULL);
+}
+
+typedef enum
+{
+  UBUNTU_DING_START_CORNER_TOP_LEFT,
+  UBUNTU_DING_START_CORNER_TOP_RIGHT,
+  UBUNTU_DING_START_CORNER_BOTTOM_LEFT,
+  UBUNTU_DING_START_CORNER_BOTTOM_RIGHT,
+} UbuntuDingStartCorner;
+
+static const char *
+get_ding_start_corner_string (UbuntuDingStartCorner corner)
+{
+  switch (corner)
+    {
+      case UBUNTU_DING_START_CORNER_TOP_LEFT:
+        return "top-left";
+      case UBUNTU_DING_START_CORNER_TOP_RIGHT:
+        return "top-right";
+      case UBUNTU_DING_START_CORNER_BOTTOM_LEFT:
+        return "bottom-left";
+      case UBUNTU_DING_START_CORNER_BOTTOM_RIGHT:
+        return "bottom-right";
+      default:
+        g_return_val_if_reached ("standard");
+    }
+}
+
+static UbuntuDingStartCorner
+get_ding_start_corner_from_string (const char *corner)
+{
+  if (g_str_equal (corner, "top-left"))
+    return UBUNTU_DING_START_CORNER_TOP_LEFT;
+
+  if (g_str_equal (corner, "top-right"))
+    return UBUNTU_DING_START_CORNER_TOP_RIGHT;
+
+  if (g_str_equal (corner, "bottom-left"))
+    return UBUNTU_DING_START_CORNER_BOTTOM_LEFT;
+
+  if (g_str_equal (corner, "bottom-right"))
+    return UBUNTU_DING_START_CORNER_BOTTOM_RIGHT;
+
+  g_warning("Value is %s", corner);
+
+  g_return_val_if_reached (UBUNTU_DING_START_CORNER_BOTTOM_RIGHT);
+}
+
+static int
+ding_start_corner_get_row_index (CcUbuntuPanel         *self,
+                                 UbuntuDingStartCorner  corner)
+{
+  GListModel *model = hdy_combo_row_get_model (self->ding_icons_new_alignment_row);
+  guint n_items;
+  guint i;
+
+  n_items = g_list_model_get_n_items (model);
+
+  for (i = 0; i < n_items; i++)
+    {
+      HdyValueObject *value_object = g_list_model_get_item (model, i);
+      UbuntuDingStartCorner item_corner;
+
+      item_corner = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (value_object), "corner"));
+
+      if (item_corner == corner)
+        return i;
+    }
+
+  g_return_val_if_reached (0);
+}
+
+static gboolean
+ding_start_corner_get_mapping (GValue   *value,
+                               GVariant *variant,
+                               gpointer  user_data)
+{
+  CcUbuntuPanel *self = user_data;
+  UbuntuDingStartCorner corner = 0;
+
+  corner = get_ding_start_corner_from_string (g_variant_get_string (variant, NULL));
+
+  if (G_VALUE_TYPE (value) == G_TYPE_INT)
+    {
+      g_value_set_int (value, ding_start_corner_get_row_index (self, corner));
+      return TRUE;
+    }
+  else if (G_VALUE_TYPE (value) == G_TYPE_STRING)
+    {
+      g_value_set_string (value, get_ding_start_corner_string (corner));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static GVariant *
+ding_start_corner_set_mapping (const GValue       *value,
+                               const GVariantType *type,
+                               gpointer            user_data)
+{
+  UbuntuDingStartCorner corner = g_value_get_int (value);
+
+  return g_variant_new_string (get_ding_start_corner_string (corner));
+}
+
+static void
+populate_ding_start_corner_row (HdyComboRow *combo_row)
+{
+  g_autoptr (GListStore) list_store = NULL;
+  struct {
+    char *name;
+    UbuntuDingStartCorner corner;
+  } corners[] = {
+    {
+      NC_("Alignment of new desktop icons", "Top Left"),
+          UBUNTU_DING_START_CORNER_TOP_LEFT,
+    },
+    {
+      NC_("Alignment of new desktop icons", "Top Right"),
+          UBUNTU_DING_START_CORNER_TOP_RIGHT,
+    },
+    {
+      NC_("Alignment of new desktop icons", "Bottom Left"),
+          UBUNTU_DING_START_CORNER_BOTTOM_LEFT,
+    },
+    {
+      NC_("Alignment of new desktop icons", "Bottom Right"),
+          UBUNTU_DING_START_CORNER_BOTTOM_RIGHT,
+    },
+  };
+  guint i;
+
+  list_store = g_list_store_new (HDY_TYPE_VALUE_OBJECT);
+  for (i = 0; i < G_N_ELEMENTS (corners); i++)
+    {
+      g_autoptr (HdyValueObject) value_object = NULL;
+
+      value_object = hdy_value_object_new_string (g_dpgettext2(NULL, "Alignment of new desktop icons", corners[i].name));
+      g_object_set_data (G_OBJECT (value_object),
+                         "corner",
+                         GUINT_TO_POINTER (corners[i].corner));
+      g_list_store_append (list_store, value_object);
+    }
+
+  hdy_combo_row_bind_name_model (combo_row,
+                                 G_LIST_MODEL (list_store),
+                                 (HdyComboRowGetNameFunc) hdy_value_object_dup_string,
+                                 NULL, NULL);
+}
+
+static void
+cc_ubuntu_panel_init (CcUbuntuPanel *self)
+{
+  GSettingsSchemaSource *schema_source = g_settings_schema_source_get_default ();
+  g_autoptr(GSettingsSchema) schema = NULL;
+
+  g_resources_register (cc_ubuntu_get_resource ());
+
+  gtk_widget_init_template (GTK_WIDGET (self));
+
+  self->interface_settings = g_settings_new (INTERFACE_SCHEMA);
+  g_signal_connect_object (self->interface_settings, "changed::" GTK_THEME_KEY,
+                           G_CALLBACK (on_interface_settings_changed), self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->interface_settings, "changed::" CURSOR_THEME_KEY,
+                           G_CALLBACK (on_interface_settings_changed), self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->interface_settings, "changed::" ICON_THEME_KEY,
+                           G_CALLBACK (on_interface_settings_changed), self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->interface_settings, "changed::" COLOR_SCHEME_KEY,
+                           G_CALLBACK (on_interface_settings_changed), self,
+                           G_CONNECT_SWAPPED);
+
+  schema = g_settings_schema_source_lookup (schema_source, GEDIT_PREFRENCES_SCHEMA, TRUE);
+  if (schema)
+    {
+      self->gedit_settings = g_settings_new (GEDIT_PREFRENCES_SCHEMA);
+      g_signal_connect_object (self->gedit_settings, "changed::" GEDIT_THEME_KEY,
+                               G_CALLBACK (on_interface_settings_changed), self, G_CONNECT_SWAPPED);
+    }
+  else
+    {
+      g_warning ("No gedit is installed here. Colors won't be updated. Please fix your installation.");
+    }
+
+  /* Only load if we ding installed */
+  schema = g_settings_schema_source_lookup (schema_source, DING_SCHEMA, TRUE);
+  if (schema)
+    {
+      self->ding_settings = g_settings_new_full (schema, NULL, NULL);
+
+      populate_ding_size_row (self->ding_icon_size_row);
+      g_settings_bind_with_mapping (self->ding_settings, "icon-size",
+                                    self->ding_icon_size_row, "selected-index",
+                                    G_SETTINGS_BIND_DEFAULT,
+                                    ding_size_get_mapping,
+                                    ding_size_set_mapping,
+                                    self, NULL);
+
+      populate_ding_start_corner_row (self->ding_icons_new_alignment_row);
+      g_settings_bind_with_mapping (self->ding_settings, "start-corner",
+                                    self->ding_icons_new_alignment_row, "selected-index",
+                                    G_SETTINGS_BIND_DEFAULT,
+                                    ding_start_corner_get_mapping,
+                                    ding_start_corner_set_mapping,
+                                    self, NULL);
+
+      g_settings_bind (self->ding_settings, "show-home",
+                       self->ding_showhome_switch, "active",
+                       G_SETTINGS_BIND_DEFAULT);
+    }
+  else
+    {
+      g_warning ("No Ding is installed here. Please fix your installation.");
+      gtk_widget_hide (GTK_WIDGET (self->ding_preferences_group));
+    }
+
+  self->updating = TRUE;
+
+  /* Only load if we have ubuntu dock or dash to dock installed */
+  schema = g_settings_schema_source_lookup (schema_source, UBUNTU_DOCK_SCHEMA, TRUE);
+  if (schema)
+    {
+      self->dock_settings = g_settings_new_full (schema, NULL, NULL);
+      self->dock_monitors_liststore = g_list_store_new (HDY_TYPE_VALUE_OBJECT);
+
+      hdy_combo_row_bind_name_model (self->dock_monitor_row,
+                                     G_LIST_MODEL (self->dock_monitors_liststore),
+                                     (HdyComboRowGetNameFunc) get_dock_monitor_value_object_name,
+                                     self, NULL);
+
+      populate_dock_position_row (self->dock_position_row);
+
+      g_signal_connect_object (self->dock_settings,
+                               "changed::" ICONSIZE_KEY,
+                               G_CALLBACK (icon_size_widget_refresh),
+                               self, G_CONNECT_SWAPPED);
+      g_signal_connect_object (self->dock_settings,
+                               "changed::" UBUNTU_DOCK_ALL_MONITORS_KEY,
+                               G_CALLBACK (update_dock_monitor_combo_row_selection),
+                               self, G_CONNECT_SWAPPED);
+      g_signal_connect_object (self->dock_settings,
+                               "changed::" UBUNTU_DOCK_PREFERRED_MONITOR_KEY,
+                               G_CALLBACK (update_dock_monitor_combo_row_selection),
+                               self, G_CONNECT_SWAPPED);
+      g_signal_connect_object (self->dock_settings,
+                               "changed::" UBUNTU_DOCK_PREFERRED_CONNECTOR_KEY,
+                               G_CALLBACK (update_dock_monitor_combo_row_selection),
+                               self, G_CONNECT_SWAPPED);
+      g_settings_bind_with_mapping (self->dock_settings, "dock-position",
+                                    self->dock_position_row, "selected-index",
+                                    G_SETTINGS_BIND_DEFAULT,
+                                    dock_position_get_mapping,
+                                    dock_position_set_mapping,
+                                    self, NULL);
+      g_settings_bind (self->dock_settings, "dock-fixed",
+                       self->dock_autohide_switch, "active",
+                       G_SETTINGS_BIND_INVERT_BOOLEAN);
+      g_settings_bind (self->dock_settings, "extend-height",
+                       self->dock_extendheight_switch, "active",
+                       G_SETTINGS_BIND_DEFAULT);
+
+      /* Icon size change - we halve the sizes so we can only get even values */
+      gtk_adjustment_set_value (self->icon_size_adjustment, DEFAULT_ICONSIZE / 2);
+      gtk_adjustment_set_lower (self->icon_size_adjustment, MIN_ICONSIZE / 2);
+      gtk_adjustment_set_upper (self->icon_size_adjustment, MAX_ICONSIZE / 2);
+      gtk_scale_add_mark (self->icon_size_scale, DEFAULT_ICONSIZE / 2, GTK_POS_BOTTOM, NULL);
+
+      icon_size_widget_refresh (self);
+
+      g_bus_get (G_BUS_TYPE_SESSION, NULL, session_bus_ready, self);
+    }
+  else
+    {
+      g_warning ("No Ubuntu Dock is installed here. Panel disabled. Please fix your installation.");
+      gtk_widget_hide (GTK_WIDGET (self->dock_preferences_group));
+    }
+
+  g_object_set_qdata (G_OBJECT (self->accent_bark), accent_quark (), "bark");
+  g_object_set_qdata (G_OBJECT (self->accent_blue), accent_quark (), "blue");
+  g_object_set_qdata (G_OBJECT (self->accent_magenta), accent_quark (), "magenta");
+  g_object_set_qdata (G_OBJECT (self->accent_olive), accent_quark (), "olive");
+  g_object_set_qdata (G_OBJECT (self->accent_default), accent_quark (), "default");
+  g_object_set_qdata (G_OBJECT (self->accent_purple), accent_quark (), "purple");
+  g_object_set_qdata (G_OBJECT (self->accent_prussiangreen), accent_quark (), "prussiangreen");
+  g_object_set_qdata (G_OBJECT (self->accent_red), accent_quark (), "red");
+  g_object_set_qdata (G_OBJECT (self->accent_sage), accent_quark (), "sage");
+  g_object_set_qdata (G_OBJECT (self->accent_viridian), accent_quark (), "viridian");
+  check_theme_accents_availability (self);
+
+  on_interface_settings_changed (self);
+  load_custom_css (self);
+
+  cc_object_storage_create_dbus_proxy (G_BUS_TYPE_SESSION,
+                                       G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES |
+                                       G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
+                                       G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                       "org.gnome.Shell",
+                                       "/org/gnome/Shell",
+                                       "org.gnome.Shell",
+                                       cc_panel_get_cancellable (CC_PANEL (self)),
+                                       (GAsyncReadyCallback) shell_proxy_ready,
+                                       self);
+
+  g_signal_connect (self, "map", G_CALLBACK (mapped_cb), NULL);
+
+  self->updating = FALSE;
+}
+
+void
+cc_ubuntu_panel_static_init_func (void)
+{
+  CcApplication *application;
+  const gchar *desktop_list;
+  g_auto(GStrv) desktops = NULL;
+
+  desktop_list = g_getenv ("XDG_CURRENT_DESKTOP");
+  if (desktop_list != NULL)
+    desktops = g_strsplit (desktop_list, ":", -1);
+
+  if (desktops == NULL || !g_strv_contains ((const gchar * const *) desktops, "ubuntu")) {
+    application = CC_APPLICATION (g_application_get_default ());
+    cc_shell_model_set_panel_visibility (cc_application_get_model (application),
+                                         "ubuntu",
+                                         CC_PANEL_HIDDEN);
+  }
+}

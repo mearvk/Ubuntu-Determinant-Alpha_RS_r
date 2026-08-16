@@ -1,0 +1,282 @@
+From: Sergio Costas <rastersoft@gmail.com>
+Date: Fri, 1 Apr 2022 21:40:48 +0000
+Subject: Remove the 'size-changed' signal
+
+(cherry picked from commit 0799b37cf500c3c3fb029ce649204b0cd5d96704)
+---
+ dbusUtils.js      |  7 +++++
+ desktopManager.js | 37 +++++++++++--------------
+ ding.js           | 17 ------------
+ extension.js      | 81 +++++++++++++++++++++++++------------------------------
+ 4 files changed, 58 insertions(+), 84 deletions(-)
+
+diff --git a/dbusUtils.js b/dbusUtils.js
+index 37444aa..4fd9ca4 100644
+--- a/dbusUtils.js
++++ b/dbusUtils.js
+@@ -27,6 +27,7 @@ var GnomeNautilusPreview = null;
+ var SwitcherooControl = null;
+ var GnomeArchiveManager = null;
+ var GtkVfsMetadata = null;
++var extensionControl = null;
+ 
+ var discreteGpuAvailable = false;
+ var dbusManagerObject;
+@@ -974,4 +975,10 @@ function init() {
+     } else {
+         RemoteFileOperations = new LegacyRemoteFileOperationsManager(NautilusFileOperations2, FreeDesktopFileManager, GnomeNautilusPreview, GnomeArchiveManager);
+     }
++
++    extensionControl = Gio.DBusActionGroup.get(
++        Gio.DBus.session,
++        'com.rastersoft.dingextension',
++        '/com/rastersoft/dingextension/control'
++    );
+ }
+diff --git a/desktopManager.js b/desktopManager.js
+index 6f58ee7..8403f39 100644
+--- a/desktopManager.js
++++ b/desktopManager.js
+@@ -192,7 +192,6 @@ var DesktopManager = class {
+         this._configureSelectionColor();
+         this._createDesktopBackgroundMenu();
+         this._createGridWindows();
+-        this._dbusAdvertiseUpdate();
+ 
+         DBusUtils.NautilusFileOperations2.connectToProxy('g-properties-changed', this._undoStatusChanged.bind(this));
+         DBusUtils.GtkVfsMetadata.connectSignalToProxy('AttributeChanged', this._metadataChanged.bind(this));
+@@ -232,7 +231,7 @@ var DesktopManager = class {
+                 return false;
+             });
+         }
+-
++        this._dbusAdvertiseUpdate();
+     }
+ 
+     _metadataChanged(proxy, nameOwner, args) {
+@@ -248,26 +247,20 @@ var DesktopManager = class {
+     }
+ 
+     _dbusAdvertiseUpdate() {
+-        let updateGridWindows = new Gio.SimpleAction({
+-            name: 'updateGridWindows',
+-            parameter_type: new GLib.VariantType('av')
++        DBusUtils.extensionControl.connect('action-state-changed', (actionGroup, actionName, data) => {
++            if (actionName == 'desktopGeometry') {
++                this.updateGridWindows(data.recursiveUnpack());
++            }
+         });
+-        updateGridWindows.connect('activate', (action, parameter) => {
+-            this.updateGridWindows(parameter.recursiveUnpack());
++        DBusUtils.extensionControl.connect('action-added', (actionGroup, actionName) => {
++            // this signal allows us to know when the action is available and we can read the initial value
++            if (actionName == 'desktopGeometry') {
++                let data = DBusUtils.extensionControl.get_action_state('desktopGeometry');
++                this.updateGridWindows(data.recursiveUnpack());
++            }
+         });
+-        let actionGroup = new Gio.SimpleActionGroup();
+-        actionGroup.add_action(updateGridWindows);
+-        let busname = this.mainApp.get_dbus_object_path();
+-        this._connection = Gio.DBus.session;
+-        this._dbusConnectionGroupId = this._connection.export_action_group(
+-            `${busname}/actions`,
+-            actionGroup
+-        );
+-        this._extensionControl = Gio.DBusActionGroup.get(
+-            Gio.DBus.session,
+-            'com.rastersoft.dingextension',
+-            '/com/rastersoft/dingextension/control'
+-        );
++        // This is required to trigger the 'action-added' signal
++        DBusUtils.extensionControl.list_actions();
+     }
+ 
+     updateGridWindows(newdesktoplist) {
+@@ -1394,11 +1387,11 @@ var DesktopManager = class {
+      * with a GLib.SimpleAction.
+      */
+     doCopy() {
+-        this._extensionControl.activate_action('doCopy', this._getClipboardText());
++        DBusUtils.extensionControl.activate_action('doCopy', this._getClipboardText());
+     }
+ 
+     doCut() {
+-        this._extensionControl.activate_action('doCut', this._getClipboardText());
++        DBusUtils.extensionControl.activate_action('doCut', this._getClipboardText());
+     }
+ 
+     doTrash() {
+diff --git a/ding.js b/ding.js
+index 596482f..d017fbf 100755
+--- a/ding.js
++++ b/ding.js
+@@ -30,7 +30,6 @@ let errorFound = false;
+ let asDesktop = false;
+ let primaryIndex = 0;
+ let desktopVariants = [];
+-let remoteDingActions;
+ 
+ function parseCommandLine(argv) {
+     desktops = [];
+@@ -122,20 +121,6 @@ const DesktopManager = imports.desktopManager;
+ 
+ var desktopManager = null;
+ 
+-if (asDesktop) {
+-    remoteDingActions = Gio.DBusActionGroup.get(
+-        Gio.DBus.session,
+-        'com.rastersoft.ding',
+-        '/com/rastersoft/ding/actions'
+-    );
+-} else {
+-    remoteDingActions = Gio.DBusActionGroup.get(
+-        Gio.DBus.session,
+-        'com.rastersoft.dingtest',
+-        '/com/rastersoft/dingtest/actions'
+-    );
+-}
+-
+ // Use different AppIDs to allow to test it from a command line while the main desktop is also running from the extension
+ const dingApp = new Gtk.Application({application_id: asDesktop ? 'com.rastersoft.ding' : 'com.rastersoft.dingtest',
+                                      flags: Gio.ApplicationFlags.HANDLES_COMMAND_LINE});
+@@ -162,8 +147,6 @@ dingApp.connect('command-line', (app, commandLine) => {
+     if (! errorFound) {
+         if (commandLine.get_is_remote()) {
+             desktopManager.updateGridWindows(desktops);
+-            // If testing Dbus activations, comment the above and uncomment the following
+-            //remoteDingActions.activate_action('updateGridWindows', new GLib.Variant('av', desktopVariants));
+         } else {
+             dingApp.activate();
+         }
+diff --git a/extension.js b/extension.js
+index 3742180..bd5a90e 100644
+--- a/extension.js
++++ b/extension.js
+@@ -116,37 +116,27 @@ function innerEnable(removeId) {
+      * thus adapting to it on-the-fly.
+      */
+     data.monitorsChangedId = Main.layoutManager.connect('monitors-changed', () => {
+-        reloadIfSizesChanged();
++        updateDesktopGeometry();
+     });
+     /*
+      * Any change in the workareas must be detected too, for example if the used size
+      * changes.
+      */
+     data.workareasChangedId = global.display.connect('workareas-changed', () => {
+-        reloadIfSizesChanged();
++        updateDesktopGeometry();
+     });
+ 
+     /*
+      * This callback allows to detect a change in the working area (like when changing the Scale value)
+      */
+-    data.sizeChangedId = global.window_manager.connect('size-changed', () => {
+-        reloadIfSizesChanged();
+-    });
+-
+     data.visibleAreaId = data.visibleArea.connect('updated-usable-area', () => {
+-        reloadIfSizesChanged();
++        updateDesktopGeometry();
+     });
+ 
+     data.isEnabled = true;
+     if (data.launchDesktopId) {
+         GLib.source_remove(data.launchDesktopId);
+     }
+-    launchDesktop();
+-    data.remoteDingActions = Gio.DBusActionGroup.get(
+-        Gio.DBus.session,
+-        'com.rastersoft.ding',
+-        '/com/rastersoft/ding/actions'
+-    );
+ 
+     /*
+      * Due to a problem in the Clipboard API in Gtk3, it is not possible to do the CUT/COPY operation from
+@@ -171,16 +161,20 @@ function innerEnable(removeId) {
+             name: 'doCut',
+             parameter_type: new GLib.VariantType('as')
+         });
++        let desktopGeometry = Gio.SimpleAction.new_stateful('desktopGeometry', new GLib.VariantType('av'), getDesktopGeometry());
++        desktopGeometry.set_enabled(true);
+         doCopy.connect('activate', manageCutCopy);
+         doCut.connect('activate', manageCutCopy);
+-        let actionGroup = new Gio.SimpleActionGroup();
+-        actionGroup.add_action(doCopy);
+-        actionGroup.add_action(doCut);
++        data.actionGroup = new Gio.SimpleActionGroup();
++        data.actionGroup.add_action(doCopy);
++        data.actionGroup.add_action(doCut);
++        data.actionGroup.add_action(desktopGeometry);
+ 
+         this._dbusConnectionGroupId = data.dbusConnection.export_action_group(
+             '/com/rastersoft/dingextension/control',
+-            actionGroup
++            data.actionGroup
+         );
++        launchDesktop();
+     }, null);
+ }
+ 
+@@ -278,35 +272,32 @@ function disable() {
+     }
+ }
+ 
+-function reloadIfSizesChanged() {
+-    if (data.dbusTimeoutId !== 0) {
+-        return;
++function updateDesktopGeometry() {
++    if (data.actionGroup) {
++        data.actionGroup.change_action_state('desktopGeometry', getDesktopGeometry());
+     }
+-    // limit the update signals to a maximum of one per second
+-    data.dbusTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+-        let desktopList = [];
+-        let ws = global.workspace_manager.get_workspace_by_index(0);
+-        for(let monitorIndex = 0; monitorIndex < Main.layoutManager.monitors.length; monitorIndex++) {
+-            let area = data.visibleArea.getMonitorGeometry(ws, monitorIndex);
+-            let desktopListElement = new GLib.Variant('a{sd}', {
+-                'x' : area.x,
+-                'y': area.y,
+-                'width' : area.width,
+-                'height' : area.height,
+-                'zoom' : area.scale,
+-                'marginTop' : area.marginTop,
+-                'marginBottom' : area.marginBottom,
+-                'marginLeft' : area.marginLeft,
+-                'marginRight' : area.marginRight,
+-                'monitorIndex' : monitorIndex
+-            });
+-            desktopList.push(desktopListElement);
+-        }
+-        let desktopListVariant = new GLib.Variant('av', desktopList);
+-        data.remoteDingActions.activate_action('updateGridWindows', desktopListVariant);
+-        data.dbusTimeoutId = 0;
+-        return false;
+-    });
++}
++
++function getDesktopGeometry() {
++    let desktopList = [];
++    let ws = global.workspace_manager.get_workspace_by_index(0);
++    for(let monitorIndex = 0; monitorIndex < Main.layoutManager.monitors.length; monitorIndex++) {
++        let area = data.visibleArea.getMonitorGeometry(ws, monitorIndex);
++        let desktopListElement = new GLib.Variant('a{sd}', {
++            'x' : area.x,
++            'y': area.y,
++            'width' : area.width,
++            'height' : area.height,
++            'zoom' : area.scale,
++            'marginTop' : area.marginTop,
++            'marginBottom' : area.marginBottom,
++            'marginLeft' : area.marginLeft,
++            'marginRight' : area.marginRight,
++            'monitorIndex' : monitorIndex
++        });
++        desktopList.push(desktopListElement);
++    }
++    return new GLib.Variant('av', desktopList);
+ }
+ 
+ /**

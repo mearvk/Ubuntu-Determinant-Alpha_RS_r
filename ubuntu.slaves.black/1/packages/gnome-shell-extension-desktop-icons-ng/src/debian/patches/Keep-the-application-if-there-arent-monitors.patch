@@ -1,0 +1,45 @@
+From: Sergio Costas <rastersoft@gmail.com>
+Date: Sun, 1 May 2022 21:51:54 +0200
+Subject: Keep the application if there arent' monitors
+
+If, at any moment, there are no monitors, the number of windows
+will be zero and the application will exit. The extension will
+relaunch it, of course, but it will produce a CPU overload
+until a monitor does appear.
+
+It seems that it is possible to have no monitors in several
+cases, like when having an external monitor connected through
+an USB-C connector with DisplayPort and disconnecting it.
+
+This patch fixes this problem by adding a hold() call.
+
+Bug-Ubuntu: https://pad.lv/1978331
+---
+ desktopManager.js | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/desktopManager.js b/desktopManager.js
+index d38ed59..776962b 100644
+--- a/desktopManager.js
++++ b/desktopManager.js
+@@ -44,6 +44,9 @@ var DesktopManager = class {
+     constructor(mainApp, desktopList, codePath, asDesktop, primaryIndex) {
+ 
+         this.mainApp = mainApp;
++        this.mainApp.hold(); // Don't close the application if there are no desktops
++        this._hold_active = true;
++        this._selectedFiles = null;
+ 
+         this._premultiplied = false;
+         try {
+@@ -228,6 +231,10 @@ var DesktopManager = class {
+                 if (this._desktopEnumerateCancellable) {
+                     this._desktopEnumerateCancellable.cancel();
+                 }
++                if (this._hold_active) {
++                    this.mainApp.release();
++                    this._hold_active = false;
++                }
+                 return false;
+             });
+         }

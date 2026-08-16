@@ -1,0 +1,36 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Thu, 14 Apr 2022 18:51:47 +0200
+Subject: appIndicator: Handle promises rejections gracefully
+
+LP: #1968498
+Fixes #334
+---
+ appIndicator.js | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/appIndicator.js b/appIndicator.js
+index 2a00b36..6386d8e 100644
+--- a/appIndicator.js
++++ b/appIndicator.js
+@@ -147,11 +147,17 @@ var AppIndicator = class AppIndicatorsAppIndicator {
+         return this.id && this.menuPath;
+     }
+ 
+-    _nameOwnerChanged() {
+-        if (!this.hasNameOwner)
++    async _nameOwnerChanged() {
++        if (!this.hasNameOwner) {
+             this._checkIfReady();
+-        else
+-            this._checkNeededProperties();
++        } else {
++            try {
++                await this._checkNeededProperties();
++            } catch (e) {
++                if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
++                    Util.Logger.warn(`${this.uniqueId}, Impossible to get basic properties: ${e}`);
++            }
++        }
+ 
+         this.emit('name-owner-changed');
+     }

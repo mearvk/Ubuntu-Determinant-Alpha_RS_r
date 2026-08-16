@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+# Cross building support
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+export CROSS_COMPILE = $(DEB_HOST_GNU_TYPE)-
+endif
+
+# The architecture we are building on
+ifeq (i386,$(DEB_BUILD_ARCH_CPU))
+	BUILD_ARCH := ia32
+else ifeq (amd64,$(DEB_BUILD_ARCH_CPU))
+	BUILD_ARCH := x86_64
+else
+	BUILD_ARCH := $(shell dpkg-architecture -qDEB_BUILD_GNU_CPU)
+endif
+
+# The architecture we are building for
+ifeq (i386,$(DEB_BUILD_ARCH_CPU))
+	HOST_ARCH := ia32
+	ifeq (linux,$(DEB_BUILD_ARCH_OS))
+		COMPAT_ARCH := x86_64
+		COMPAT_APPEND := 64
+	endif
+else ifeq (amd64,$(DEB_BUILD_ARCH_CPU))
+	HOST_ARCH := x86_64
+	COMPAT_ARCH := ia32
+	COMPAT_APPEND := 32
+else
+	# ARM CPUs
+	HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_GNU_CPU)
+endif
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	$(MAKE) clean ARCH=$(HOST_ARCH)
+ifneq (,$(COMPAT_ARCH))
+		$(MAKE) clean ARCH=$(COMPAT_ARCH) HOSTARCH=$(BUILD_ARCH)
+endif
+
+override_dh_auto_build:
+	$(MAKE) ARCH=$(HOST_ARCH)
+ifneq (,$(COMPAT_ARCH))
+		$(MAKE) ARCH=$(COMPAT_ARCH) HOSTARCH=$(BUILD_ARCH)
+endif
+
+# Fixme: This somehow rebuilds some parts
+override_dh_auto_install:
+	$(MAKE) install ARCH=$(HOST_ARCH) INSTALLROOT=$(CURDIR)/debian/gnu-efi PREFIX=/usr LIBDIR=/usr/lib
+ifneq (,$(COMPAT_ARCH))
+	$(MAKE) install ARCH=$(COMPAT_ARCH) HOSTARCH=$(BUILD_ARCH) INSTALLROOT=$(CURDIR)/debian/gnu-efi PREFIX=/usr LIBDIR=/usr/lib$(COMPAT_APPEND)
+endif

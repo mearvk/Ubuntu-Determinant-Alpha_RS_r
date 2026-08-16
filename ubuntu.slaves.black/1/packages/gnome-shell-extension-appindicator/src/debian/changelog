@@ -1,0 +1,537 @@
+gnome-shell-extension-appindicator (42-2~fakesync1) jammy; urgency=medium
+
+  * Manual upload from salsa, to not have to wait for debian publishing
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 14 Apr 2022 22:51:52 +0200
+
+gnome-shell-extension-appindicator (42-2) unstable; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * appIndicator: Fix indicator IDs on error logs
+  * appIndicator: Handle promises rejections gracefully (LP: #1968498)
+  * statusNotifierWatcher: Handle initialization / destruction errors
+  * extension: Cleanup indicators leftovers on startup
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 14 Apr 2022 22:50:56 +0200
+
+gnome-shell-extension-appindicator (42-1) unstable; urgency=medium
+
+  * New upstream release:
+    - IndicatorStatusTrayIcon: Use the latest valid touch event on long press
+    - iconCache: Handle errors on timeout cancellations
+    - metadata: Add support for gnome-shell 42
+    - promiseUtils: Update _promisify definition to match latest gjs one
+    - promiseUtils: Ensure we don't leave dangling CancellablePromise
+    - indicatorStatusIcon: Try to pass the event coordinates to activate methods
+    - indicatorStatusIcon: Use XAyatanaSecondaryActivate passing timestamp
+    - appIndicator: Pass GCancellable to remote proxy operations
+    - statusNotifierWatcher: Use Promise.allSettled to introspect dbus names
+    - appIndicator: Handle some unhandled promise rejections
+  * debian/control: Add support for GNOME Shell 42
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 24 Feb 2022 03:37:29 +0100
+
+gnome-shell-extension-appindicator (41-1) unstable; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream release
+  * build: Use meson to configure, test and install the extension.
+  * Locale: Update PO files as per new strings
+  * indicatorStatusIcon: Handle events on the whole legacy tray icon area.
+  * appIndicator: Also ensure that indicator ID is always defined.
+  * satusNotifierWatcher: code cleanup
+  * indicatorStatusIcon: Only redirect events coming from tray icon container.
+    It seems that processing events that we get from the tray icon itself
+    results in mutter not accepting them when running in pure wayland, as
+    the clients should be in an "allowed-list" of windows who can require
+    grabs.
+    If we do this from a shell actor, instead, this works. So let's just
+    use the container events.
+  * indicatorStatusIcon: Properly handle tray key events and key navigation
+  * IndicatorStatusTrayIcon: Mark the button as active while pressing a key/button
+  * IndicatorStatusTrayIcon: Handle touch events under wayland.
+    Simulate classic button events when we got touch events.
+    A simple tap event is considered a left click, while long-press events
+    are sent as right-clicks.
+  * statusNotifierWatcher: Handle promise rejection on items seeking
+  * statusNotifierWatcher: Keep track if we've ever acquired bus name.
+    This was only for controlling debug statements
+  * appIndicator: Avoid checking for ready state multiple times.
+    This may lead to emitting signals that lead to rebuilding menus mutliple
+    times.
+  * dbusMenu: random cleanups
+  * debian/control: Add support to gnome-shell 41
+  * debian/patches: Refresh and drop applied upstream
+
+  [ Ivan Mironov ]
+  * Add support for GNOME 41.
+
+  [ Andreas Angerer ]
+  * appIndicator: Add option to change indicator icons with a custom icon
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Tue, 05 Oct 2021 05:17:15 +0200
+
+gnome-shell-extension-appindicator (40-2) unstable; urgency=medium
+
+  * Team upload
+  * Upload to unstable for GNOME 40 transition (Closes: #994126)
+  * Don't run eslint as a build-time test.
+    This is a lint tool rather than a functional test, which is useful
+    for upstream maintainers but likely to be too fragile to be a
+    downstream CI gate. This change also works around the eslint and
+    node-strip-json-comments versions in unstable being incompatible,
+    causing FTBFS.
+
+ -- Simon McVittie <smcv@debian.org>  Sun, 12 Sep 2021 16:10:15 +0100
+
+gnome-shell-extension-appindicator (40-1) experimental; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream release:
+    - statusNotifierWatcher: Emit StatusNotifierHostRegistered (and
+      Unregistered) signals.
+      Other signals we were missing for long time, the specs includes these
+      signals and they should be emitted when the watcher appears/disappears
+      So do this, although it seems that Qt apps are still ignoring it.
+    - indicatorStatusIcon: add polyfill for versionCheck in GNOME 40
+    - iconCache: Do not dispose the icon when clearing the cache.
+      The icon can be a property of the Gio.EmblemedIcon and we should not
+      dispose it as its parent doesn't support handling the child removal
+    - metadata: Remove 40.beta as supported given we support 40 already.
+    - promiseUtils: Promptly remove a source if was already cancelled
+    - promiseUtils: Disconnect cancellable when the promise is resolved.
+      In CancellablePromise we were connecting to the cancellable in order to
+      monitor its cancellation, however we never disconnected from it and this
+      was causing gjs to keep a reference on the promise itself, being the
+      scope of the cancellable callback, and thus never garbaging collecting
+      both the promise and its children (such as GSources).
+      So, connect earlier to the signal and once we've resolved the promise,
+      disconnect form the cancellable.
+    - promiseUtils: Disconnect cancellation signal after resolving or rejecting.
+      As per the previous commit we do disconnect from cancellation, but this
+      happens too early so the cancellation event isn't ever tracked.
+      We need in fact to handle it after that the promise is resolved or
+      rejected.
+      In the rejected case, we need to be extra careful though, as in case
+      the cancellation happens as per cancellation's ::cancelled signal
+      callback we need to do this in the next idle cycle or we'll deadlock.
+    - prefs: Use es6 class and support Gtk4. GNOME 40 requires it
+    - appIndicator: Do not lower opacity on versions after GNOME 40.
+      There's no such effect upstream anymore so we don't want to switch that
+    - appIndicator: Also toggle desaturate effect on mouse hover
+    - settingsManager: Move gsettings initializtion to SettingsManager.
+      Quite simple class for now but it avoids us to initialize a new
+      gsettings instance for each indicator
+    - appIndicator: Track hover status using native StWidget's hover property
+    - IndicatorStatusIcon: Bind hover property with child IconActor.
+      Whatever happens during hover on the whole indicator (including label)
+      should affect also the icon, so we can just bind the hover property
+    - appIndicator: Use more consistent names for settings updates
+    - appIndicator: Cleanup emission of icon signal on status changes.
+      We were handling this already in a common place, so let's move there
+    - appIndicator: Get and expose the accessibility name.
+      Some indicators (such as the Ayatana appindicator based) may include
+      accessible descriptions so read and expose them if any or fallback with
+      the indicator title otherwise.
+    - appIndicator: Do not reload icons when updating the effects applied to it.
+      Those are just effects that are not dependent on the icon content, so
+      we can just update the icon without having check the effects all the
+      times.
+    - trayIconsManager: Move handling of legacy tray icons into a nicer class.
+      Also move more into the wrapper AppIndicatorsIndicatorTrayIcon, and use
+      Shell.TrayManager's unmanage_screen() in newer versions of the shell
+      instead of relying on the ugly (and unreliable) tray unset + garbage
+      collector invocation.
+    - indicatorStatusIcon: Use the accessible name or WM class for a11y.
+      We wrongly passed the indicator unique id as the accessible name to the
+      shell for ages, we must instead use something that the screen readers
+      may use for that.
+      So, on appindicators we can use the exposed accessible name while for
+      tray icons we can try use the wm class, even if it could be very generic
+    - indicatorStatusIcon: Do not create a menu for tray icons
+    - util: Wait for display opened only on X11 setup.
+      This is actually only relevant for wayland sessions with Xwayland, as
+      it may lead to opening the X11 display with some delay.
+      But let's keep it to be a bit more conservative, and unblock the case
+      for setups with no-x11 at all.
+    - appIndicator: Use custom theme icon based on Shell one as default theme.
+      Especially under wayland we should avoid to get the theme from the
+      default gtk one as it may be always unset, as it depends on the Gdk
+      Screen that is undefined in such scenario.
+      So add an helper function to create a new Gtk theme using the shell's
+      gtk icon theme and try to use it when no default gtk theme is available.
+      We could probably do this in all the cases, but for now let's keep X11
+      environment as it is.
+  * debian/gbp.conf: Do not use patch numbers
+  * debian/patches: Refresh
+  * debian/control: Add full support to gnome-shell 40
+  * debian/control: Update extension description
+  * debian/patches: Use meson based build system
+  * debian/control: Build depend on jq and meson
+  * debian/rules: Do not install compiled schemas
+  * debian/control: Add suggestions on extension prefs and libappindicator
+  * debian/upstream/metadata: Add upstream references
+  * debian/control: Use dh-sequence-gnome.
+    In this way we also get for free ubuntu-specific tools such as
+    dh-translations without having to do an ubuntu-specific fork
+
+  [ Fini Jastrow ]
+  * Add icon opacity, size, position and other effects settings.
+    The icons can be very colorful. Some people might not like it and older
+    icons do not blend too well with newer monochrome ones.
+    Add settings to configure multiple values of the icons and in
+    particular:
+     - Icons position in the panel
+     - Icon size
+     - Opacity
+     - Desaturation
+     - Brightness
+     - Contrast
+    As per this a new preference dialog is provided to configure such values
+  * appIndicator: Fix resizing pixmap icons
+    Icons created from pixmaps can not be resized (properly).
+    When we create a icon from a pixmap we actually crate the icon in the
+    native size. For example if the smallest available pixmap is 22 px the
+    icon will also be 22 px, regardless of requested icon size.
+    This is ok if the pixmap is by chance the requested size. But this is
+    not always the case, especiually if the icon size is user selectable.
+    So after creating the pixmap image we tell it how big it shall be.
+
+  [ jingi_jeong ]
+  * feature: Add topicons-plus extension logic.
+    To add support to legacy tray, merge topicons-plus extension logic.
+    Create topicons.js file and connect with original appindicator code.
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Tue, 15 Jun 2021 01:18:26 +0200
+
+gnome-shell-extension-appindicator (35-1) experimental; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream release
+  * debian/control:
+    - Add myself to the Uploaders
+    - Build depend on eslint when tests are enabled
+  * debian/gbp.conf:
+    - Use multimaint-merge in dch and sign tags
+    - Set upstream branch to upstream/latest
+    - Set upstream-vcs-tag while use default upsteram-tag
+  * debian/patches:
+    - Use tap formatter for eslint by default
+    - Refresh
+  * util: Ignore errors if we can't find a listed dbus name
+  * util: Properly call logger static method
+  * appIndicator: Use promises for the async code
+  * appIndicator: Re-indent and cleanup code to create from pixmaps
+  * appIndicator: Cancel icons loading when we're required to invalidate it
+  * appIndicator: Use low-priority idles to load pixmap icons in batches
+  * cleanup: Replace more GLib Sources with promises
+  * promiseUtils: Backport the current gjs promisfy implementation
+  * appIndicator: Use an async function to initialize the proxy
+  * appIndicator: Fix a typo in a variable name
+  * util: Promisify refreshPropertyOnProxy
+  * promiseUtils: Polyfill a Promise.allSettled implementation
+  * statusNotifierWatcher: Use fully async implementation for DBus traversing
+  * statusNotifierWatcher: Only perform DBus lookup on idle
+  * promiseUtils: Add promise to wait for a single signal emission
+  * statusNotifierWatcher: Use a simple promise to wait startup
+  * statusNotifierWatcher: Ensure we catch errors on indicator initialization
+  * statusNotifierWatcher: Move name watching into the indicator logic
+  * statusNotifierItem: Emit signals about removed items on destruction
+  * statusNotifierWatcher: Emit the uniqueId when emitting (Un)Registered events
+  * Util: define an unique name watcher and reuse it as watch dog and for the indicator
+  * indicatorStatusIcon: Handle scroll events on label too, not only on icon
+  * indicatorStatusIcon: Use virtual functions to monitor button events
+  * eslint: Add linter rules based on upstream gnome-shell and gjs and use auto-fix
+  * cleanup: Cleanup code to match eslint rules
+  * Utils: Do not support connecting to signals via method names
+
+  [ Matteo F. Vescovi ]
+  * debian/control: debhelper bump 12 -> 13
+
+  [ Fran Dieguez ]
+  * Add support for GNOME 40
+
+  [ Dennis Fölster ]
+  * Register the StatusNotifierWatcher as soon as possible (LP: #1905370,
+     Closes: #977695).
+  * Fix incorrect placed import.
+  * Use strict equals comparison.
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 18 Mar 2021 01:11:51 +0100
+
+gnome-shell-extension-appindicator (34-1) unstable; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream release
+    - appIndicator: Remove the callbackIdle if we destroy while waiting it
+    - StatusNotifierWatcher: Remove ProtocolVersion method
+    - appIndicator: Ignore further icons creation during an idle
+    - README: Remove statement about indicator-multiload not being supported
+    - statusNotifierWatcher: Fix RegisterStatusNotifierHost method name and
+      returned error
+    - interfaces: Sync interfaces XML with upstream ones
+    - StatusNotifierItem: Disable Tooltip properties and signals
+    - testTool: Add support for secondary indication
+    - indicatorStatusIcon: Remove deleted y_fill property on St.Bin
+    - testTool: Import the Gtk version 3.0
+    - testTool: Use nicer default icons and support random ones from a pool
+    - testTool: Replace icons on scroll events
+    - testTool: Show a longer label by default
+    - testTool: Use a checked menu item to toggle attention
+    - testTool: Set the secondary activation to a more complete change
+    - testTool: Print the icon to be used on new-icon signal
+    - testTool: Explain why we repeat the separators
+    - testTool: Don't use escape sequences as we use verbatim strings
+    - testTool: Add ability to use a random icon from a custom theme
+    - util: Use Shell's param to handle multiple named arguments
+    - util: Delete proxyCancellables only if we didn't cancel already
+    - appIndicator: Use String.startsWith intead of substr
+    - appIndicator: Cleanup the interface info properties map computation
+    - util: Use variable keys for object initializer
+    - appIndicator: Don't deep unpack changed properties array
+    - appIndicator: Use native checks to look for equal emblems
+    - appIndicator: Mark a valid cached icon as inUse again
+    - appIndicator: Correctly mark cached GIcon's as in use
+    - iconCache: Rewrite simplifying the usage for GIcon's only
+    - iconCache: Dispose an icon when we remove it
+    - iconCache: Add weakClear() method
+    - iconCache: Increase the garbage-collector timings
+    - appIndicator: Remove deprecate usage of Mainloop
+    - appIndicator: Only iterate through the proxy available properties
+    - appIndicator: Don't try to check equality on Pixmap variants
+      (LP: #1884396)
+    - testTool: Add case simulating lots of icon and labe updates
+    - util: Try to batch properties updates when they comes close enough
+    - appIndicator: Accumulate signals to batch close updates
+    - appIndicator: Emit the same signal once on properties updates
+    - appIndicator: Improve the warning message on lookup failed
+    - dbusMenu: Use proper argument name when parsing error
+    - dbusMenu: Stop idle requests if we've been destroyed
+    - cleanup: Use Set instead of Arrays when convenient
+    - cleanup: Use Map instead of objects for simple associative arrays
+    - metadata: Add support for GNOME 3.38
+  * debian/changelog:
+    - Bump dependency on GNOME Shell << 40~
+
+  [ Fini Jastrow ]
+  * appIndicator: Remove unneeded padding
+  * appIndicator: Fix 'reduce padding' for some icons
+
+  [ Sergio Costas ]
+  * Wait until the desktop ends starting up
+  * Wait until Gtk.IconTheme.get_default() works
+  * Don't fail if no icon is found (LP: #1849142)
+  * Use signal to detect display availability
+
+  [ Tasos Sahanidis ]
+  * kstatusnotifierwatcher: Implement ProtocolVersion property
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Sat, 19 Sep 2020 06:47:31 +0200
+
+gnome-shell-extension-appindicator (33-3) unstable; urgency=medium
+
+  * debian/control: Bump dependency on gnome-shell << 3.38
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 27 Aug 2020 22:06:38 +0200
+
+gnome-shell-extension-appindicator (33-2) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Sat, 11 Apr 2020 20:23:02 +0200
+
+gnome-shell-extension-appindicator (33-1) experimental; urgency=medium
+
+  * Team upload.
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream version:
+    - Completely refactored the icons handling, to use the same look and
+      behavior of the default gnome-shell indicators and properly handle
+      HiDPI cases.
+    - appIndicator: Always use Gio.Icon as model and St.Icon ui (LP: #1723827,
+      LP: #1817073, LP: #1832793, LP: #1825623)
+    - appIndicator: Don't try to reload multiple times a pending icon
+    - appIndicator: Lookup theme icons using scale factor
+    - testTool: Add test to show a changing label
+    - indicatorStatusIcon: Use Clutter actor alignment on 3.35+ versions
+      (LP: #1866042)
+    - appIndicator: Add a cancellable to stop the proxy on destruction
+    - Util: Cancel previous properties refresh requests on new one
+    - util: Don't emit signal changed if a property contents is equal
+    - Util: add message structured logging as well
+    - Util: Cleanup syntax of refreshPropertyOnProxy
+    - appIndicator: Use simpler implementation for argbToRgba
+    - appIndicator: Use warning level for not found icons
+
+  [ Fini Jastrow ]
+  * appIndicator: Fix runtime error when icon can not be loaded
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Thu, 12 Mar 2020 22:36:05 +0100
+
+gnome-shell-extension-appindicator (32-1) experimental; urgency=medium
+
+  * Team upload.
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream version:
+    - Added support for indicator-multiload
+    - Made lots of logging visible only in debug mode
+    - Fixed rendering of named icons in HiDPI
+    - Monitor service name to track Qt applications
+    - Mitigate non-working state after unlock
+    - Reload icons, label and state when the app requests us
+  * debian/patches: Refresh
+  * debian/control: Add compatibility with gnome-shell 3.36
+  * debian/gbp.conf: Set the upstream-tag format
+
+  [ Matteo F. Vescovi ]
+  * debian/control: S-V bump 4.4.0 -> 4.5.0 (no changes needed)
+  * debian/control: RRR set
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Wed, 26 Feb 2020 20:31:17 +0100
+
+gnome-shell-extension-appindicator (30-2) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Tue, 01 Oct 2019 20:27:11 +0200
+
+gnome-shell-extension-appindicator (30-1) experimental; urgency=medium
+
+  * New upstream release
+    - debian/patches/: patchset refreshed against v30
+      - metadata-use-appindicator-namespace-and-naming.patch updated
+  * debian/control:
+    - S-V bump 4.3.0 -> 4.4.0 (no changes needed)
+    - bump versioning for gnome-shell dependency
+  * debian/: debhelper bump 11 -> 12
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Tue, 13 Aug 2019 22:50:46 +0200
+
+gnome-shell-extension-appindicator (29-2) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Mon, 08 Jul 2019 14:40:53 +0200
+
+gnome-shell-extension-appindicator (29-1) experimental; urgency=medium
+
+  [ Matteo F. Vescovi ]
+  * New upstream release
+
+  [ Marco Trevisan (Treviño) ]
+  * dbusMenu: Fix indentation
+  * testTool: Remove trailing spaces
+  * testTool: Add item to toggle attention
+  * testTool: Log signals to terminal
+  * appIndicator: Connect to scroll-event signal.
+    Fixes #169
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Thu, 25 Apr 2019 14:35:24 +0200
+
+gnome-shell-extension-appindicator (28-1) experimental; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream release
+  * indicatorStatusIcon: Ignore indicators with no menus, monitoring changes
+    (LP: #1714504)
+  * appIndicator: Retry getting a valid menu path (LP: #1714504)
+  * dbusMenu: Ignore error on invalid return in AboutToShow
+  * appIndicator: Update icon actor size on scale factor change (LP: #1730071)
+  * dbusMenu: add isReady property when the menu is available on bus
+  * indicatorStatusIcon: Don't support activation if we have a menu
+    (LP: #1714191, LP: #1716056)
+  * d/p/metadata-use-appindicator-namespace-and-naming.patch:
+    - refresh and reduce diff with upstream
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Tue, 09 Apr 2019 22:28:45 +0200
+
+gnome-shell-extension-appindicator (23.1-1) experimental; urgency=medium
+
+  [ Matteo F. Vescovi ]
+  * debian/patches/: patchset refreshed against v23.1
+  * debian/control: S-V bump 4.2.1 -> 4.3.0 (no changes needed)
+
+  [ Marco Trevisan (Treviño) ]
+  * metadata: remove 3.30 from the supported versions. Fixes #161
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Mon, 04 Mar 2019 22:01:30 +0100
+
+gnome-shell-extension-appindicator (23-2) experimental; urgency=medium
+
+  * Depend on gnome-shell 3.31—3.32. Despite what metadata.json says this
+    extension doesn't actually work with 3.30. (LP: #1817490)
+
+ -- Iain Lane <laney@debian.org>  Mon, 25 Feb 2019 16:15:10 +0000
+
+gnome-shell-extension-appindicator (23-1) experimental; urgency=medium
+
+  [ Marco Trevisan (Treviño) ]
+  * New upstream version: v23
+  * iconCache: don't add an icon multiple times and remove it on destruction
+  * iconCache: use seconds granulated timeout for garbage collector
+  * iconCache: only run the garbage collector when we've icons
+  * Util: use var to define module functions
+  * statusNotifierWatcher: use nicer lambda functions in traverseBusNames
+  * iconCache: connect to destroy signal if the object has it
+  * indicatorStatusIcon: don't override the destroy, react on 'destroy' signal instead
+  * appIndicator: don't treat XAyatana* properties as 2nd clas citizen
+  * dbusMenu: add better logging on errors
+  * metadata: update url
+  * statusNotifierWatcher: return extension UUID
+  * appIndicators: use arrow functions in lambdas
+  * appindicators: rewrite classes using pure ES6 classes
+  * metadata: set supported shell versions to 3.30+
+  * debian/control: update Homepage and Vcs-* flags
+  * debian/gbp.conf: add debian-tag option
+  * debian/patches/metadata-use-appindicator-namespace-and-naming.patch:
+    - Use ubuntu appindicator namespace, update description
+
+  [ Andrea Azzarone ]
+  * interfaces: Explicitly convert raw data to strings
+
+ -- Marco Trevisan (Treviño) <marco@ubuntu.com>  Fri, 22 Feb 2019 08:54:12 +0000
+
+gnome-shell-extension-appindicator (22-1) unstable; urgency=medium
+
+  * Initial release (Closes: #898144)
+
+ -- Matteo F. Vescovi <mfv@debian.org>  Mon, 07 May 2018 23:37:59 +0200
+
+gnome-shell-extension-appindicator (18.04.1) bionic; urgency=medium
+
+  * Rebase on latest upstream with those fixes:
+    - Fix icons vertically stretched on HDPI screen
+    - Fix warnings from GNOME Shell 3.26
+
+ -- Didier Roche <didrocks@ubuntu.com>  Tue, 27 Mar 2018 09:26:22 +0200
+
+gnome-shell-extension-appindicator (18.04) bionic; urgency=medium
+
+  * Rebase on latest upstream release:
+    - Fix icon are too small with some tray icons such as Telegram
+      (LP: #1730406)
+    - Fix warning with latest GJS.
+
+ -- Didier Roche <didrocks@ubuntu.com>  Thu, 16 Nov 2017 15:40:48 +0100
+
+gnome-shell-extension-appindicator (17.10.2) artful; urgency=medium
+
+  * Fix icons from qt applications disappearing after screen lock/sleep.
+    Thanks Marco (LP: #1712866)
+
+ -- Didier Roche <didrocks@ubuntu.com>  Mon, 23 Oct 2017 10:15:12 +0200
+
+gnome-shell-extension-appindicator (17.10.1) artful; urgency=medium
+
+  * Fix telegram icon not scaled is not properly scaled on hidpi setups.
+    Thanks Andrea (LP: #1720143)
+
+ -- Didier Roche <didrocks@ubuntu.com>  Thu, 05 Oct 2017 10:29:46 +0200
+
+gnome-shell-extension-appindicator (17.10) artful; urgency=medium
+
+  * Initial release of appindicator extension.
+
+ -- Didier Roche <didrocks@ubuntu.com>  Tue, 22 Aug 2017 08:51:13 +0200

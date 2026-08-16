@@ -1,0 +1,37 @@
+From: Daniel van Vugt <daniel.van.vugt@canonical.com>
+Date: Thu, 23 Jun 2022 19:57:06 +0800
+Subject: desktopGrid: Use the maximized state on startup
+
+During startup (including monitor hotplugging), mutter can get stuck
+in an infinite loop trying to adhere to its window constraints logic
+for our fixed-size window, if there are two monitors of different
+scales in a Wayland session.
+
+When this happens, we don't have `hide_from_window_list` set because
+the infinite loop starts before we can even set it. So we need a
+solution that works for regular window types.
+
+To solve this we make the window maximized by default. This stops
+mutter's constraints logic from wanting to automatically move the
+window between monitors.
+
+Yes we should fix mutter, but that will take much longer to get right.
+
+Fixes: https://launchpad.net/bugs/1976204
+---
+ desktopGrid.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/desktopGrid.js b/desktopGrid.js
+index 3d78f91..61e629d 100644
+--- a/desktopGrid.js
++++ b/desktopGrid.js
+@@ -67,6 +67,8 @@ var DesktopGrid = class {
+                 this._window.set_type_hint(Gdk.WindowTypeHint.DESKTOP);
+                 this._window.stick();
+                 this._window.move(this._x / this._size_divisor, this._y / this._size_divisor);
++            } else { // Wayland
++                this._window.maximize();
+             }
+         } else {
+             // Opaque black test window

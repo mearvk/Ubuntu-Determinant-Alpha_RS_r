@@ -1,0 +1,45 @@
+From: Sergio Costas <rastersoft@gmail.com>
+Date: Wed, 11 May 2022 23:13:47 +0200
+Subject: Ensure that DING isn't launched twice
+
+Before an extension is disabled, any other extensions that were
+enabled after it are disabled in reversed order to guarantee
+that any changes done by monkey patching are correctly reversed
+and avoid problems. After the desired extension has been
+disabled, all those other extensions are enabled again.
+
+This process is quite fast, so we have a disable and an enable
+process without passing through the main loop. This means that
+the wait_async() method isn't called between the disable()
+and the enable() calls, so, when it is finally called, the
+isEnabled property is again as TRUE, so it launches a new
+process while the code is waiting to own the DBus bus name.
+And when the name is acquired, a new DING process is launched,
+but it won't show because there is already one running.
+
+This results in a desktop window "detached", that isn't
+managed by the emulateX11WindowType object.
+
+This patch fixes this by setting to NULL the
+data.currentProcess element, thus ensuring that the
+wait_async() function will return without launching
+a new child.
+
+Bug-Ubuntu: https://pad.lv/1978330
+---
+ extension.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/extension.js b/extension.js
+index 976077e..3148400 100644
+--- a/extension.js
++++ b/extension.js
+@@ -322,6 +322,8 @@ function killCurrentProcess() {
+         data.currentProcess.cancellable.cancel();
+         data.currentProcess.subprocess.send_signal(15);
+     }
++    data.currentProcess = null;
++    data.x11Manager.set_wayland_client(null);
+ }
+ 
+ /**

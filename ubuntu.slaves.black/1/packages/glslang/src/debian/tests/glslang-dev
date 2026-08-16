@@ -1,0 +1,68 @@
+#!/bin/sh
+# Copyright © 2019 Collabora Ltd.
+# SPDX-License-Identifier: MIT
+# (see debian/copyright)
+
+# Check that the library can be linked.
+
+set -e
+set -u
+set -x
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+CXX="${CROSS_COMPILE}g++"
+PKG_CONFIG="${CROSS_COMPILE}pkg-config"
+
+tempdir="$(mktemp -d)"
+cd "$tempdir"
+
+cat > trivial.cpp <<'EOF'
+#undef NDEBUG
+#include <cassert>
+
+#include <glslang/Public/ShaderLang.h>
+
+int main (void)
+{
+  ShHandle handle;
+  handle = ShConstructUniformMap();
+  ShDestruct(handle);
+  return 0;
+}
+EOF
+
+cat > spirv.cpp <<'EOF'
+#include <glslang/SPIRV/GlslangToSpv.h>
+
+int main (void)
+{
+  std::string s;
+  glslang::GetSpirvVersion(s);
+  return 0;
+}
+EOF
+
+# This is hard-coded because there used to be no pkg-config, but matches
+# what renderdoc does.
+"${CXX}" -std=c++11 -o trivial trivial.cpp -lglslang -lMachineIndependent -lGenericCodeGen -lHLSL -lOGLCompiler -lOSDependent -lSPIRV -lpthread
+test -x trivial
+./trivial
+
+# Or with the pkg-config metadata.
+# Deliberately word-splitting the output of pkg-config:
+# shellcheck disable=SC2046
+"${CXX}" -std=c++11 -o trivial trivial.cpp $("$PKG_CONFIG" --cflags --libs glslang)
+test -x trivial
+./trivial
+
+# shellcheck disable=SC2046
+"${CXX}" -std=c++11 -o spirv spirv.cpp $("$PKG_CONFIG" --cflags --libs spirv)
+test -x spirv
+./spirv
+
+cd /
+rm -fr "$tempdir"

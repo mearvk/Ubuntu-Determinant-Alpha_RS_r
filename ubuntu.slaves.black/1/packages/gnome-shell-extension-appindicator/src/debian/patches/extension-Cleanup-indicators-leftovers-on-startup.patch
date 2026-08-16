@@ -1,0 +1,89 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Thu, 14 Apr 2022 22:42:15 +0200
+Subject: extension: Cleanup indicators leftovers on startup
+
+At times some indicators may be left around, so clean them up on startup
+---
+ extension.js           |  1 +
+ indicatorStatusIcon.js |  4 ++--
+ util.js                | 22 +++++++++++++++++++++-
+ 3 files changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/extension.js b/extension.js
+index 81fbf92..11947a8 100644
+--- a/extension.js
++++ b/extension.js
+@@ -56,6 +56,7 @@ function maybeEnableAfterNameAvailable() {
+ 
+ function enable() {
+     isEnabled = true;
++    Util.tryCleanupOldIndicators();
+     maybeEnableAfterNameAvailable();
+     TrayIconsManager.TrayIconsManager.initialize();
+ }
+diff --git a/indicatorStatusIcon.js b/indicatorStatusIcon.js
+index adfeb2d..a721b2a 100644
+--- a/indicatorStatusIcon.js
++++ b/indicatorStatusIcon.js
+@@ -14,7 +14,7 @@
+ // along with this program; if not, write to the Free Software
+ // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ 
+-/* exported IndicatorStatusIcon, IndicatorStatusTrayIcon */
++/* exported BaseStatusIcon, IndicatorStatusIcon, IndicatorStatusTrayIcon */
+ 
+ const Clutter = imports.gi.Clutter;
+ const GObject = imports.gi.GObject;
+@@ -34,7 +34,7 @@ const Util = Extension.imports.util;
+ const PromiseUtils = Extension.imports.promiseUtils;
+ const SettingsManager = Extension.imports.settingsManager;
+ 
+-const BaseStatusIcon = GObject.registerClass(
++var BaseStatusIcon = GObject.registerClass(
+ class AppIndicatorsIndicatorBaseStatusIcon extends PanelMenu.Button {
+     _init(menuAlignment, nameText, iconActor, dontCreateMenu) {
+         super._init(menuAlignment, nameText, dontCreateMenu);
+diff --git a/util.js b/util.js
+index 0a61b8c..4dff496 100644
+--- a/util.js
++++ b/util.js
+@@ -16,7 +16,8 @@
+ 
+ /* exported refreshPropertyOnProxy, getUniqueBusName, getBusNames,
+    introspectBusObject, dbusNodeImplementsInterfaces, waitForStartupCompletion,
+-   connectSmart, versionCheck, getDefaultTheme, BUS_ADDRESS_REGEX */
++   connectSmart, versionCheck, getDefaultTheme, tryCleanupOldIndicators,
++   BUS_ADDRESS_REGEX */
+ 
+ const Gio = imports.gi.Gio;
+ const GLib = imports.gi.GLib;
+@@ -30,6 +31,7 @@ const St = imports.gi.St;
+ const Config = imports.misc.config;
+ const ExtensionUtils = imports.misc.extensionUtils;
+ const Extension = ExtensionUtils.getCurrentExtension();
++const IndicatorStatusIcon = Extension.imports.indicatorStatusIcon;
+ const Params = imports.misc.params;
+ const PromiseUtils = Extension.imports.promiseUtils;
+ const Signals = imports.signals;
+@@ -380,3 +382,21 @@ function versionCheck(required) {
+     }
+     return false;
+ }
++
++function tryCleanupOldIndicators() {
++    const indicatorType = IndicatorStatusIcon.BaseStatusIcon;
++    const indicators = Object.values(Main.panel.statusArea).filter(i => i instanceof indicatorType);
++
++    try {
++        const panelBoxes = [
++            Main.panel._leftBox, Main.panel._centerBox, Main.panel._rightBox,
++        ];
++
++        panelBoxes.forEach(box =>
++            indicators.push(...box.get_children().filter(i => i instanceof indicatorType)));
++    } catch (e) {
++        logError(e);
++    }
++
++    new Set(indicators).forEach(i => i.destroy());
++}
