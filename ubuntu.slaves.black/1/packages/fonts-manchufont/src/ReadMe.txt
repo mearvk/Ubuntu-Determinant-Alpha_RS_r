@@ -1,0 +1,37 @@
+README for Manchu Font
+
+1. This Manchu Font contains glyphs to properly display Manchu script.
+
+2. Features:
+Manchu Font is a TrueType favored OpenType font for Mac and PC. It contains Manchu characters in Unicode range start from #1800, extend glyhps which are missing from Unicode standard, ligature features, substitution features and hinting.
+
+3. Documents producted by using Manchu Font and ManjuKey are compitable with Windows Vista built-in Mongolian Baiti font. Which means when you switch between Manchu Font and Mongolian Baiti, Windows can display the same Manchu scripts. Windows Vista users do not require to install Manchu Font to read/write Manchu scripts.
+
+Files Included:
+ReadMe.txt (This file)
+FONTLOG.txt (Font changelog)
+OFL.txt (License agreement for Manchu Font) 
+OFL-FAQ.txt - Frequently Asked Questions about the SIL Open Font License
+Manchu Font.ttf (The Manchu Font library)
+Manchu Font.vfb (FontLab source code for Manchu Font)
+ManchuFontStandard(Draft).pdg (Document for Manchu Font)
+Manchu Font Roadmap,pdg (Manchu Font project Roadmap)
+
+Installation:
+
+To install the font, just copy the ManchuFont.ttf file into your Control Panel/Fonts folder.
+
+Upgrade:
+If you already have a previous Manchu font installed, you need to uninstall it from Control Panel/Fonts folder first. 
+
+Uninstall:
+To uninstall the font, delete Manchu font from your Control Panel/Fonts folder. This is also required when you upgrade the font from a previous version.
+
+
+License:
+The original font library was created by Manchu Group(http://groups.msn.com/manchu). Its released to public domain under SIL Open Font License, Version 1.1(http://scripts.sil.org/OFL).
+
+In simple English, feel free to download, use, redistribute, modify, add, comment and, most important, contribute to this font library.
+Feel free to claim your works and respect other people's.
+ 
+4. Acknowledgements
