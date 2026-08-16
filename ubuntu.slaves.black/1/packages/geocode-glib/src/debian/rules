@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs -Wl,--as-needed
+
+binaries := $(shell dh_listpackages)
+
+ifeq ($(filter %-doc,$(binaries)),)
+enable_gtk_doc = false
+else
+enable_gtk_doc = true
+endif
+
+%:
+	dh $@ --with gnome,gir --buildsystem=meson
+
+override_dh_auto_configure:
+	dh_auto_configure -- -Denable-gtk-doc=$(enable_gtk_doc)
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4
+
+# https://bugs.debian.org/908445
+override_dh_missing:
+	dh_missing --fail-missing

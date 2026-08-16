@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -eu
+
+# This is an automated release checklist. Call it to ensure that all known
+# mentions of the gcovr version have been updated to a target version.
+
+printerr() {
+    echo "$@" >&2
+}
+
+verify_tags=yes
+verify_docs_next_version=yes
+target_version=
+usage="usage: $0 [OPTIONS] TARGET_REVISION
+
+Options:
+  --no-verify-tags
+  --no-verify-docs-next-version
+"
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --no-verify-tags)
+            verify_tags=no
+            shift
+            ;;
+        --no-verify-docs-next-version)
+            verify_docs_next_version=no
+            shift
+            ;;
+        -*)
+            printerr "unknown argument $1"
+            printerr "$usage"
+            exit 1
+            ;;
+        *)
+            target_version="$1"
+            shift
+            break
+            ;;
+    esac
+done
+
+if [[ -z "$target_version" || "$#" -ne 0 ]]; then
+    printerr "$usage"
+    exit 1
+fi
+
+ok=yes
+
+maybe_error() {
+    local iserr="$1"
+    shift
+    if [[ "$iserr" = yes ]]; then
+        ok=no
+        printerr "ERROR:" "$@"
+    else
+        # ok stays unchanged
+        printerr "WARNING:" "$@"
+    fi
+}
+
+error() {
+    maybe_error yes "$@"
+}
+
+if ! [[ -d .git ]]; then
+    error "Please run this script from the repository root"
+    exit 1
+fi
+
+grep -qE "^__version__ = ['\"]$target_version['\"]\$" gcovr/version.py \
+    || error "gcovr/version.py: Please update with this version"
+
+grep -qE "^$target_version \\(.+\\)\$" CHANGELOG.rst \
+    || error "CHANGELOG.rst: Please update with this version"
+
+grep -qE "version=['\"]gcovr $target_version['\"]" doc/examples/example_xml.xml \
+    || error "examples: Please regenerate: " \
+             "cd doc/examples; ./example_xml.sh > example_xml.xml"
+
+grep -qE "^ *$0 --no-verify-tags --no-verify-docs-next-version $target_version\$" .github/workflows/test.yml \
+    || error ".github/workflows/test.yml: Please update the $0 version"
+
+grep -qE "^ *$0 $target_version\$" .github/workflows/deploy.yml \
+    || error ".github/workflows/deploy.yml: Please update the $0 version"
+
+occurrences="$(
+  grep -E '\.\. (versionadded|versionchanged|deprecated):: NEXT' \
+       -A 1 doc/source/*.rst || exit 0)"
+test -z "$occurrences" || {
+    maybe_error $verify_docs_next_version \
+                "doc/source/*.rst: please update notes with next version"
+    # shellcheck disable=SC2001
+    echo "$occurrences" | sed 's/^/INFO: /' >&2
+}
+
+if git tag | grep -qE "^$target_version\$"; then
+    # grandfathering of non-annotated 3.4 tag
+    [[ "$target_version" = 3.4 ]] \
+        || [[ "$(git cat-file -t "$target_version")" = tag ]] \
+        || maybe_error $verify_tags \
+                       "Please use annotated tags (git tag -a) for releases"
+else
+    maybe_error $verify_tags \
+                "Please publish the release $target_version in GitHub"
+fi
+
+if [[ "$ok" = yes ]]; then
+    echo "SUCCESS: release may proceed"
+else
+    echo "FAILURE: please fix the above problems"
+    exit 1
+fi

@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-z,defs -Wl,-O1
+
+# needed with the Ubuntu toolchain to avoid plugin issues
+export DEB_LDFLAGS_MAINT_STRIP := -Wl,-Bsymbolic-functions
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- -Dgtk_doc=true
+
+execute_after_dh_python3:
+	dh_python3 /usr/lib/$(DEB_HOST_MULTIARCH)/gedit/plugins
+	dh_python3 /usr/share/gedit/plugins
+
+override_dh_girepository:
+	dh_girepository	-ldebian/tmp/usr/share/gedit/gir-1.0 \
+		/usr/lib/$(DEB_HOST_MULTIARCH)/gedit/girepository-1.0 \
+		/usr/lib/$(DEB_HOST_MULTIARCH)/gedit
+
+execute_after_dh_fixperms-indep:
+	chmod 0755 debian/gedit-common/usr/share/gedit/plugins/externaltools/tools/*
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l/usr/lib/$(DEB_HOST_MULTIARCH)/gedit
+
+override_dh_makeshlibs:
+	dh_makeshlibs --no-scripts

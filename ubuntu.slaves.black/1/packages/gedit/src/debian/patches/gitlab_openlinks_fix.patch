@@ -1,0 +1,52 @@
+From a51cafc7de9187150e56299866ea4452a8f38c5e Mon Sep 17 00:00:00 2001
+From: Sebastien Bacher <seb128@ubuntu.com>
+Date: Wed, 2 Mar 2022 12:02:24 +0100
+Subject: [PATCH] Fix the openlinks test by properly converting gunicode to
+ gchar
+
+---
+ plugins/openlinks/gedit-open-links-plugin.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/plugins/openlinks/gedit-open-links-plugin.c b/plugins/openlinks/gedit-open-links-plugin.c
+index 9d7562881..5193511a4 100644
+--- a/plugins/openlinks/gedit-open-links-plugin.c
++++ b/plugins/openlinks/gedit-open-links-plugin.c
+@@ -85,8 +85,8 @@ gedit_open_links_plugin_get_uri (GtkTextIter *start,
+ 				 GString     **uri)
+ {
+ 	GtkTextIter *end;
+-	gunichar uri_test[2];
+-	uri_test[1] = '\0';
++	gchar uri_test[6];
++	gint len;
+ 
+ 	end = g_malloc (sizeof (GtkTextIter));
+ 	memcpy (end, start, sizeof (GtkTextIter));
+@@ -95,8 +95,9 @@ gedit_open_links_plugin_get_uri (GtkTextIter *start,
+ 	gtk_text_iter_backward_char (end);
+ 	while (gtk_text_iter_forward_char (end))
+ 	{
+-		uri_test[0] = gtk_text_iter_get_char (end);
+-		if (!g_regex_match (uri_char_regex, (const gchar *) &uri_test, 0, NULL))
++		len = g_unichar_to_utf8 (gtk_text_iter_get_char (end), uri_test);
++		uri_test[len] = '\0';
++		if (!g_regex_match (uri_char_regex, uri_test, 0, NULL))
+ 		{
+ 			break;
+ 		}
+@@ -104,8 +105,9 @@ gedit_open_links_plugin_get_uri (GtkTextIter *start,
+ 	
+ 	while (gtk_text_iter_backward_char (start))
+ 	{
+-		uri_test[0] = gtk_text_iter_get_char (start);
+-		if (!g_regex_match (uri_char_regex, (const gchar *) &uri_test, 0, NULL))
++		len = g_unichar_to_utf8 (gtk_text_iter_get_char (start), uri_test);
++		uri_test[len] = '\0';
++		if (!g_regex_match (uri_char_regex, uri_test, 0, NULL))
+ 		{
+ 			gtk_text_iter_forward_char (start);
+ 			break;
+-- 
+2.32.0
+

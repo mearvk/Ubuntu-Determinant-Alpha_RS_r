@@ -1,0 +1,79 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Thu, 9 Sep 2021 01:39:13 +0200
+Subject: test-certificate-chain: Wait for objects being released by GTask's
+
+As per switching to GTask we are facing GNOME/glib#1346 in various
+places, including the certificate tests, as we were checking whether the
+mock certificates were finalized in the same thread in which we created
+them.
+
+This may not always happen right now because GTask may release the last
+reference of it later than we do.
+So, to force this to happen let's wait until we're owing last reference
+and only at that point we actually release it, so that we can be sure
+that the objects are finalized on tear-down.
+
+Fixes: https://gitlab.gnome.org/GNOME/gcr/-/issues/84
+
+Origin: https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/72
+---
+ gcr/test-certificate-chain.c | 40 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
+
+diff --git a/gcr/test-certificate-chain.c b/gcr/test-certificate-chain.c
+index 7a2f40b..a0bc45f 100644
+--- a/gcr/test-certificate-chain.c
++++ b/gcr/test-certificate-chain.c
+@@ -262,17 +262,47 @@ add_pinned_to_module (GcrCertificate *certificate, const gchar *purpose, const g
+ 	gck_mock_module_add_object (gck_builder_end (&builder));
+ }
+ 
++void
++on_toggle_notify (gpointer data,
++                  GObject *object,
++                  gboolean is_last_ref)
++{
++	gboolean *last_ref = data;
++
++	*last_ref = is_last_ref;
++}
++
++static void
++wait_for_object_finalized (GObject *object)
++{
++	gpointer weak_object = object;
++	gboolean last_ref = FALSE;
++
++	/* GTask may release the object later than us as per GNOME/glib#1346,
++	 * causing the test to fail when checking in which thread the objects
++	 * are finalized. To ensure that the order is preserved we need then
++	 * to wait that the GTask releases its last reference before we do.
++	 */
++	g_object_add_weak_pointer (object, &weak_object);
++	g_object_add_toggle_ref (object, on_toggle_notify, &last_ref);
++	g_object_unref (object);
++	egg_test_wait_for_gtask_thread (!last_ref);
++
++	g_object_remove_toggle_ref (object, on_toggle_notify, &last_ref);
++	g_assert_null (weak_object);
++}
++
+ static void
+ teardown (Test *test, gconstpointer unused)
+ {
+ 	CK_RV rv;
+ 
+ 	g_object_unref (test->cert_self);
+-	g_object_unref (test->cert_signed);
+-	g_object_unref (test->cert_ca);
+-	g_object_unref (test->cert_host);
+-	g_object_unref (test->cert_inter);
+-	g_object_unref (test->cert_root);
++	wait_for_object_finalized (G_OBJECT (test->cert_signed));
++	wait_for_object_finalized (G_OBJECT (test->cert_ca));
++	wait_for_object_finalized (G_OBJECT (test->cert_host));
++	wait_for_object_finalized (G_OBJECT (test->cert_inter));
++	wait_for_object_finalized (G_OBJECT (test->cert_root));
+ 
+ 	rv = (test->funcs.C_Finalize) (NULL);
+ 	gck_assert_cmprv (rv, ==, CKR_OK);

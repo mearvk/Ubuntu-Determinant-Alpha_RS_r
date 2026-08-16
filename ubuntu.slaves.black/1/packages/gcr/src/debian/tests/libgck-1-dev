@@ -1,0 +1,40 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against gck, to verify that the
+# headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2019 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR="$(mktemp -d)"
+export XDG_RUNTIME_DIR="$WORKDIR"
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > test.c
+#include <gck/gck.h>
+
+int main(void)
+{
+    GckUriData *data = gck_uri_data_new();
+    gck_uri_data_free(data);
+    return 0;
+}
+EOF
+
+cflags="-DGCK_API_SUBJECT_TO_CHANGE"
+
+# Deliberately word-splitting cflags and pkg-config's output:
+# shellcheck disable=SC2046 disable=SC2086
+${CROSS_COMPILE}gcc ${cflags} -o gck-test test.c $(${CROSS_COMPILE}pkg-config --cflags --libs gck-1)
+echo "build: OK"
+[ -x gck-test ]
+./gck-test
+echo "run: OK"

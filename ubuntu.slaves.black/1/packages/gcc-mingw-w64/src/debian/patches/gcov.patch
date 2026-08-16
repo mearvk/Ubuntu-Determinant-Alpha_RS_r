@@ -1,0 +1,35 @@
+Description: Fix gcov build issues
+Author: Stephen Kitt <skitt@debian.org>
+
+When gcov is not supported on the target, gcc uses a fallback
+do-nothing implementation. That’s missing a __gcov_exit()
+implementation, causing linking errors.
+
+When gcov is supported in a cross-compiler setup, GCC assumes that
+either the headers are present and shared with the host, or present
+and set up in a sysroot, or absent. We have headers which aren’t
+shared and aren’t in a sysroot, so we need to tell GCC where they are
+*without* specifying them as an argument to --with-headers (the latter
+must only be enabled).
+
+--- a/src/libgcc/libgcov-driver.c
++++ b/src/libgcc/libgcov-driver.c
+@@ -31,6 +31,7 @@
+ 
+ #if defined(L_gcov)
+ void __gcov_init (struct gcov_info *p __attribute__ ((unused))) {}
++void __gcov_exit (void) {}
+ #endif
+ 
+ #else /* inhibit_libc */
+--- a/src/gcc/configure.ac
++++ b/src/gcc/configure.ac
+@@ -2268,7 +2268,7 @@
+   if test "x$with_build_sysroot" != "x"; then
+     target_header_dir="${with_build_sysroot}${native_system_header_dir}"
+   elif test "x$with_sysroot" = x; then
+-    target_header_dir="${test_exec_prefix}/${target_noncanonical}/sys-include"
++    target_header_dir="${test_exec_prefix}/${target_noncanonical}/include"
+   elif test "x$with_sysroot" = xyes; then
+     target_header_dir="${test_exec_prefix}/${target_noncanonical}/sys-root${native_system_header_dir}"
+   else

@@ -1,0 +1,89 @@
+#!/usr/bin/ruby
+#
+# Copyright © 2011, Lucas Nussbaum <lucas@debian.org>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+require 'gem2deb'
+require 'gem2deb/dh_ruby'
+include Gem2Deb
+
+`dh_listpackages`.split.each do |package|
+  next if not File::exists?("debian/#{package}.substvars")
+  s = IO::read("debian/#{package}.substvars")
+  fd = File::new("debian/#{package}.substvars", "w")
+  s.each_line do |l|
+    if l =~ /^shlibs:Depends=/
+      deps = l.chomp.split('=', 2)[1].split(', ')
+      std_deps = []
+      libruby_deps = []
+      ruby_deps = []
+      deps.each do |dep|
+        if SUPPORTED_RUBY_SHARED_LIBRARIES.include?(dep.split.first)
+          libruby_deps << dep
+          rdep = RubyDebianDev.min_ruby_dependency_for(dep.split.first)
+          if rdep
+            ruby_deps << rdep
+          end
+        else
+          std_deps << dep
+        end
+      end
+      if ruby_deps.empty? && libruby_deps.empty?
+        fd.puts l
+      else
+        upper_bound = RubyDebianDev.ruby_upper_bound
+        newdeps = (std_deps + [libruby_deps.join(' | ')] + [ruby_deps.join(' | ')] + [upper_bound]).join(', ')
+        fd.puts "shlibs:Depends=#{newdeps}"
+      end
+    else
+      fd.puts l
+    end
+  end
+  fd.close
+end
+__END__
+=head1 NAME
+
+dh_ruby_fixdepends - fix dependencies in shlibs file after dh_shlibdeps
+
+=head1 SYNOPSIS
+
+B<dh_ruby_fixdepends>
+
+=head1 DESCRIPTION
+
+B<dh_ruby_fixdepends> is called by the I<ruby> dh sequence. You should
+not call it directly.
+
+=head1 SEE ALSO
+
+L<B<gem2deb>>(1), L<B<dh_ruby>>(1)
+
+=head1 COPYRIGHT AND AUTHORS
+
+Copyright (c) 2011, Lucas Nussbaum <lucas@debian.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.

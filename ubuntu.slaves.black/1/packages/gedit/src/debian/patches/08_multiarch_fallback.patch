@@ -1,0 +1,83 @@
+From: Jeremy Bicha <jbicha@debian.org>
+Date: Sun, 14 Jul 2013 10:37:31 -0500
+Subject: Also load plugins from pre-multiarch directory
+
+Forwarded: not-needed
+---
+ gedit/gedit-dirs.c           | 11 +++++++++++
+ gedit/gedit-dirs.h           |  2 ++
+ gedit/gedit-plugins-engine.c |  5 +++++
+ 3 files changed, 18 insertions(+)
+
+diff --git a/gedit/gedit-dirs.c b/gedit/gedit-dirs.c
+index 81f32c2..964e0a8 100644
+--- a/gedit/gedit-dirs.c
++++ b/gedit/gedit-dirs.c
+@@ -33,6 +33,7 @@ static gchar *user_plugins_dir       = NULL;
+ static gchar *gedit_locale_dir       = NULL;
+ static gchar *gedit_lib_dir          = NULL;
+ static gchar *gedit_plugins_dir      = NULL;
++static gchar *gedit_fallback_plugins_dir      = NULL;
+ static gchar *gedit_plugins_data_dir = NULL;
+ 
+ void
+@@ -110,6 +111,9 @@ gedit_dirs_init ()
+ 	gedit_plugins_dir = g_build_filename (gedit_lib_dir,
+ 					      "plugins",
+ 					      NULL);
++	gedit_fallback_plugins_dir = g_build_filename ("/usr/lib/gedit",
++					      "plugins",
++					      NULL);
+ }
+ 
+ void
+@@ -122,6 +126,7 @@ gedit_dirs_shutdown ()
+ 	g_clear_pointer (&gedit_locale_dir, g_free);
+ 	g_clear_pointer (&gedit_lib_dir, g_free);
+ 	g_clear_pointer (&gedit_plugins_dir, g_free);
++	g_clear_pointer (&gedit_fallback_plugins_dir, g_free);
+ 	g_clear_pointer (&gedit_plugins_data_dir, g_free);
+ }
+ 
+@@ -167,6 +172,12 @@ gedit_dirs_get_gedit_plugins_dir (void)
+ 	return gedit_plugins_dir;
+ }
+ 
++const gchar *
++gedit_dirs_get_gedit_fallback_plugins_dir (void)
++{
++	return gedit_fallback_plugins_dir;
++}
++
+ const gchar *
+ gedit_dirs_get_gedit_plugins_data_dir (void)
+ {
+diff --git a/gedit/gedit-dirs.h b/gedit/gedit-dirs.h
+index 3fc7ab5..7f0126c 100644
+--- a/gedit/gedit-dirs.h
++++ b/gedit/gedit-dirs.h
+@@ -46,6 +46,8 @@ const gchar	*gedit_dirs_get_gedit_lib_dir		(void);
+ 
+ const gchar	*gedit_dirs_get_gedit_plugins_dir	(void);
+ 
++const gchar	*gedit_dirs_get_gedit_fallback_plugins_dir	(void);
++
+ const gchar	*gedit_dirs_get_gedit_plugins_data_dir	(void);
+ 
+ G_END_DECLS
+diff --git a/gedit/gedit-plugins-engine.c b/gedit/gedit-plugins-engine.c
+index 28e6096..f47f369 100644
+--- a/gedit/gedit-plugins-engine.c
++++ b/gedit/gedit-plugins-engine.c
+@@ -93,6 +93,11 @@ gedit_plugins_engine_init (GeditPluginsEngine *engine)
+ 	                             gedit_dirs_get_gedit_plugins_dir (),
+ 	                             gedit_dirs_get_gedit_plugins_data_dir ());
+ 
++	peas_engine_add_search_path (PEAS_ENGINE (engine),
++	                             gedit_dirs_get_gedit_fallback_plugins_dir (),
++	                             gedit_dirs_get_gedit_plugins_data_dir ());
++
++
+ 	g_settings_bind (engine->plugin_settings,
+ 	                 GEDIT_SETTINGS_ACTIVE_PLUGINS,
+ 	                 engine,

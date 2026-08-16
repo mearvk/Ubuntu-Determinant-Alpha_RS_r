@@ -1,0 +1,65 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against gcr, to verify that the
+# headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2019 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR="$(mktemp -d)"
+export XDG_RUNTIME_DIR="$WORKDIR"
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > base.c
+#include <gcr/gcr.h>
+
+int main(void)
+{
+    const gchar hello[] = "hello, world!";
+    const gchar goodbye[] = "goodbye, world!";
+
+    g_assert_cmpint(gcr_comparable_memcmp(hello, sizeof(hello), goodbye, sizeof(goodbye)), >, 0);
+    return 0;
+}
+EOF
+cat <<EOF > ui.c
+#include <ui/gcr-ui.h>
+
+int main(void)
+{
+    g_assert_cmpuint(GCR_TYPE_PROMPT_DIALOG, !=, G_TYPE_INVALID);
+    return 0;
+}
+EOF
+
+cflags="-DGCK_API_SUBJECT_TO_CHANGE -DGCR_API_SUBJECT_TO_CHANGE"
+
+# Deliberately word-splitting cflags and pkg-config's output:
+# shellcheck disable=SC2046 disable=SC2086
+${CROSS_COMPILE}gcc ${cflags} -o gcr-test ui.c $(${CROSS_COMPILE}pkg-config --cflags --libs gcr-3)
+echo "build: OK"
+[ -x gcr-test ]
+xvfb-run -a dbus-run-session -- ./gcr-test
+echo "run: OK"
+
+# shellcheck disable=SC2046 disable=SC2086
+${CROSS_COMPILE}gcc ${cflags} -o base-test base.c $(${CROSS_COMPILE}pkg-config --cflags --libs gcr-ui-3)
+echo "build: OK"
+[ -x base-test ]
+./base-test
+echo "run: OK"
+
+# shellcheck disable=SC2046 disable=SC2086
+${CROSS_COMPILE}gcc ${cflags} -o ui-test ui.c $(${CROSS_COMPILE}pkg-config --cflags --libs gcr-ui-3)
+echo "build: OK"
+[ -x ui-test ]
+xvfb-run -a dbus-run-session -- ./ui-test
+echo "run: OK"

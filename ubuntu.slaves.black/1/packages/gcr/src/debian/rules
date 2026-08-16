@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+
+# Filter out that flag for Ubuntu, it's default there but fails the build
+# https://gitlab.gnome.org/GNOME/gcr/issues/43
+export DEB_LDFLAGS_MAINT_STRIP = -Wl,-Bsymbolic-functions
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dgtk_doc=true \
+		-Dintrospection=true \
+		-Dgtk=true
+
+override_dh_auto_test:
+	# Disable fakeroot as this confuses some of the tests
+	env -u LD_PRELOAD dbus-run-session -- dh_auto_test
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4

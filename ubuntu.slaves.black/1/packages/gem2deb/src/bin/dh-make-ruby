@@ -1,0 +1,164 @@
+#!/usr/bin/ruby
+#
+# Copyright © 2011, Lucas Nussbaum <lucas@debian.org>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+require 'gem2deb'
+require 'gem2deb/dh_make_ruby'
+require 'optparse'
+
+options = {}
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: dh-make-ruby [OPTIONS] [TARBALL|DIRECTORY]"
+  opts.separator 'Options:'
+
+  opts.on('-h', '--help', 'show help') do
+    puts opts
+    exit
+  end
+
+  opts.on('-v', '--version', 'show version') do
+    puts "dh-make-ruby version #{Gem2Deb::VERSION}"
+    exit
+  end
+
+  opts.on('-p', '--package PACKAGE', 'specify package name (default: ruby-*)') do |package_name|
+    options[:source_package_name] = package_name
+  end
+
+  opts.on('-w', '--overwrite', 'overwrite existing files (default: don\'t)') do
+    options[:overwrite] = true
+  end
+
+  opts.on('', '--ruby-versions VERSIONS', 'ruby versions to use (default: all)') do |versions|
+    options[:ruby_versions] = versions
+  end
+
+  options[:do_wnpp_check] = true
+  opts.on('', '--no-wnpp-check', 'prevent dh-make-ruby from checking wnpp reports') do
+    options[:do_wnpp_check] = false
+  end
+
+  options[:dependencies] = true
+  opts.on('', '--no-dependencies', 'skip collecting dependencies from the archive') do
+    options[:dependencies] = false
+  end
+
+  opts.on('-o', '--offline', 'Do not access the internet for anything') do
+    options[:do_wnpp_check] = false
+  end
+end
+optparse.parse!
+
+if ARGV.length == 0
+  input = '.'
+elsif ARGV.length == 1
+  input = ARGV[0]
+else
+  puts optparse
+  exit(1)
+end
+
+dmr = Gem2Deb::DhMakeRuby::new(input, options)
+dmr.build
+
+__END__
+=head1 NAME
+
+dh-make-ruby - build Debian source package from Ruby library
+
+=head1 USAGE
+
+B<dh-make-ruby> [I<OPTIONS>] [I<TARBALL>|I<DIRECTORY>]
+
+=head1 DESCRIPTION
+
+B<dh-make-ruby> will create a basic Debian source package from a tarball named
+I<TARBALL> generated with B<gem2tgz>, or from a I<DIRECTORY> containing Ruby
+code and metadata in a .gemspec file. If no argument is specified, B<dh-make-ruby>
+will build a Debian source package from the current directory.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-p PACKAGE>, B<--package PACKAGE>
+
+Uses PACKAGE as package name. By default, new packages will be named as
+ruby-$gem, where $gem is the upstream name. If the package is mainly used as a
+library, then it should use the default. On the other hand, if the packages is
+mainly used as an application, then you should drop the ruby- prefix by using
+this option an explicit package u.
+
+=item B<-w>, B<--overwrite>
+
+Overwrites packaging files that already exists but would be created by
+dh-make-ruby if they didn't. Exception: I<debian/copyright> is never touched.
+
+=item B<--ruby-versions VERSIONS>
+
+Ruby versions to build the package for. This is used to generate the
+X-Ruby-Versions: field in the source package, that can later be used to tune
+this value.  By default, gem2deb generates a package that works on all known
+Ruby versions, but it might be necessary to only build the package for Ruby
+1.9.1, for example (using B<--ruby-versions "ruby1.9.1">).
+
+=item B<-h>, B<--help>
+
+Displays the help
+
+=item B<-v>, B<--version>
+
+Displays version information and exits.
+
+=item B<--no-wnpp-check>
+
+Prevents B<dh-make-ruby> to check wnpp reports to get the number of a possible
+ITP (intend to package) bug report. By default, B<dh-make-ruby> does check these
+reports, which requires an Internet access.
+
+=item B<--no-dependencies>
+
+Skips the dependency detection based on Rubygems and APT metadata. You should
+usually not do this, unless you know what you are doing.
+
+=item B<-o>, B<--offline>
+
+Prevents B<dh-make-ruby> from accessing the internet at all.
+
+=back
+
+=head1 SEE ALSO
+
+L<B<gem2deb>>(1), L<B<dh_ruby>>(1)
+
+=head1 COPYRIGHT AND AUTHORS
+
+Copyright (c) 2011, Lucas Nussbaum <lucas@debian.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+

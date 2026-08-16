@@ -1,0 +1,62 @@
+#! /usr/bin/python3
+
+import optparse
+import sys
+
+def main():
+    usage = """usage: %prog [OPTIONS] <control file> <exclude list>
+strip not-built packages from the control file.
+"""
+    parser = optparse.OptionParser(usage)
+    parser.add_option("--skip-dbg-packages", dest="skip_dbg_packages",
+                      action="store_true", default=False,
+                      help="skip debug packages in the control file")
+    parser.add_option("--skip-arm32ml-packages", dest="skip_arm32ml_packages",
+                      action="store_true", default=False,
+                      help="skip arm32 multilib packages in the control file")
+    parser.add_option("--skip-common-packages", dest="skip_common_packages",
+                      action="store_true", default=False,
+                      help="skip packages built by the next GCC in the control file")
+    (options, args) = parser.parse_args()
+
+    if len(args) > 4 or len(args) < 4:
+        parser.error("takes 4 arguments (<control file> <invalid list> <arm32ml list> <common list>)")
+    (control_file, exclude_list, arm32ml_list, common_list) = args
+
+    with open(exclude_list, 'r') as f:
+        excludes = set([s.strip() for s in f.readlines()])
+    with open(arm32ml_list, 'r') as f:
+        arm32mls = set([s.strip() for s in f.readlines()])
+    with open(common_list, 'r') as f:
+        commons = set([s.strip() for s in f.readlines()])
+    if options.skip_common_packages:
+        arm32mls = arm32mls.difference(commons)
+    if options.skip_arm32ml_packages:
+        commons = commons.difference(arm32mls)
+
+    sys.stderr.write("%d packages in the exclude list\n" % len(excludes))
+    skip = False
+    excluded = 0
+    with open(control_file, 'r') as f:
+        for line in f:
+            if line.startswith('Package:'):
+                pkg = line.split()[-1].strip()
+                if pkg in excludes:
+                    skip = True
+                if options.skip_dbg_packages and '-dbg' in pkg:
+                    skip = True
+                if options.skip_arm32ml_packages and pkg in arm32mls:
+                        skip = True
+                if options.skip_common_packages and pkg in commons:
+                        skip = True
+                if skip:
+                    excluded += 1
+            if skip and line == '\n':
+                skip = False
+                continue
+            if not skip:
+                sys.stdout.write(line)
+    sys.stderr.write("%d packages excluded from the control file\n" % excluded)
+
+if __name__ == '__main__':
+    main()

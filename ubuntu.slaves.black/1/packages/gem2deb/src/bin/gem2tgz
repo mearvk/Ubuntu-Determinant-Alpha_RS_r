@@ -1,0 +1,100 @@
+#!/usr/bin/ruby
+#
+# Copyright © 2010, Antonio Terceiro <terceiro@softwarelivre.org>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+require 'gem2deb'
+require 'gem2deb/gem2tgz'
+require 'optparse'
+require 'rubygems'
+
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: gem2tgz [OPTIONS] GEMNAME|GEMFILE [TARBALL]"
+  opts.separator "Options:"
+
+  opts.on('-h', '--help', 'show help') do
+    puts opts
+    exit
+  end
+
+  opts.on('-v', '--version', 'show version') do
+    puts "gem2tgz version #{Gem2Deb::VERSION}"
+    exit
+  end
+end
+optparse.parse!
+
+if ARGV.length != 1 && ARGV.length != 2
+  puts optparse
+  exit(1)
+end
+
+gemfile = ARGV[0]
+# Download gem if not available locally
+if not File::exists?(gemfile) and gemfile !~ /.gem$/
+  puts "#{gemfile} doesn't seem to exist. Let's try to download it with 'gem fetch #{ARGV[0]}'"
+  if gemfile =~ /^rails-assets/
+    run("gem", "fetch", "--source", "https://rails-assets.org", gemfile)
+  else
+    run("gem", "fetch", gemfile)
+  end
+  versions = Dir::glob("#{gemfile}-*.gem").map do |a|
+    Gem::Version.new(a.sub(/#{gemfile}-(.+)\.gem/, '\1'))
+  end
+  # and pick the most recent one
+  last_version = versions.max
+  gemfile = "#{gemfile}-#{last_version}.gem"
+end
+
+Gem2Deb::Gem2Tgz.convert!(gemfile, ARGV[1] || nil)
+
+__END__
+=head1 NAME
+
+gem2tgz - converts Rubygems' .gem file into tarballs
+
+=head1 SYNOPSIS
+
+B<gem2tgz> [I<OPTIONS>] I<GEMNAME> [I<TARBALL>] (to download the gem with I<gem fetch>)
+
+B<gem2tgz> [I<OPTIONS>] I<GEMFILE> [I<TARBALL>] (to use a local .gem file)
+
+=head1 DESCRIPTION
+
+B<gem2tgz> will convert the .gem file I<GEM> into a tarball named I<TARBALL>.
+If I<TARBALL> is omitted, B<gem2tgz> will try to guess the filename for the
+tarball by taking I<GEM> and replacing '.gem' with '.tar.gz'.
+
+=head1 SEE ALSO
+
+L<B<gem2deb>>(1)
+
+=head1 COPYRIGHT AND AUTHORS
+
+Copyright (c) 2010, Antonio Terceiro <terceiro@softwarelivre.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.

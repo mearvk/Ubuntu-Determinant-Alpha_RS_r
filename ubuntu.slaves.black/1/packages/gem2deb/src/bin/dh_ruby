@@ -1,0 +1,452 @@
+#!/usr/bin/ruby
+#
+# Copyright © 2011, Lucas Nussbaum <lucas@debian.org>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+require 'gem2deb'
+require 'gem2deb/dh_ruby'
+require 'gem2deb/gem_installer'
+require 'optparse'
+require 'shellwords'
+include Gem2Deb
+
+if ENV['DH_RUBY']
+  opts = Shellwords.split(ENV['DH_RUBY'])
+  ARGV.unshift(*opts)
+end
+
+engine = Gem2Deb::DhRuby.new
+action = nil
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: dh_ruby [OPTIONS] ACTION"
+  opts.separator "Options:"
+
+  opts.on('-h', '--help', 'show help') do
+    puts opts
+    exit
+  end
+
+  opts.on('--gem-install', 'install files as a gem') do
+    engine.installer_class = Gem2Deb::GemInstaller
+  end
+
+  opts.on('-v', '--version', 'show dh_ruby version') do
+    puts "dh_ruby version #{Gem2Deb::VERSION}"
+    exit
+  end
+
+  opts.on('--print-supported', 'prints supported Ruby versions') do
+    Gem2Deb::SUPPORTED_RUBY_VERSIONS.keys.each do |v|
+      puts v
+    end
+    exit
+  end
+
+  opts.separator "ACTION must be one of:"
+  opts.on('--clean', 'debhelper clean helper') do
+    action = :clean
+  end
+
+  opts.on('--configure', 'debhelper configure helper') do
+    action = :configure
+  end
+
+  opts.on('--build', 'debhelper build helper') do
+    action = :build
+  end
+
+  opts.on('--test', 'debhelper test helper') do
+    action = :test
+  end
+
+  opts.on('--install', 'debhelper install helper') do
+    action = :install
+  end
+end
+optparse.parse!
+
+if action.nil?
+  puts "E: no action selected. You must pass one (and only one) of:"
+  puts "   --install, --clean, --configure, --build, --test"
+  puts optparse
+  exit(1)
+end
+
+if action == :install
+  engine.install(ARGV)
+else
+  engine.send(action)
+end
+
+__END__
+=head1 NAME
+
+dh_ruby - debhelper build system for Ruby software
+
+=head1 SYNOPSIS
+
+
+B<dh_ruby> [I<OPTIONS>]
+
+=head1 DESCRIPTION
+
+B<dh_ruby> is a Debhelper build system for Ruby software. It will
+automatically build and install files contained in Ruby packages, trying to
+work as close to Rubygems as possible but respecting Debian standards for Ruby
+packages.
+
+dh_ruby can automatically run your tests against all supported Ruby versions,
+see the "FILES" section below.
+
+See dh_ruby --help for details.
+
+=head1 SOURCE PACKAGE LAYOUT
+
+B<dh_ruby> supports two different source package styles: single-binary source
+packages, and multi-binary source packages.
+
+=head2 Single-binary layout
+
+The default layout is the B<single-binary> layout. This is the layout used by
+most Ruby packages upstream, i.e. Ruby code in I<lib>/, executable programs in
+I<bin>/, etc. Packages imported from Rubygems using B<gem2deb(1)> will have
+this layout.
+
+When using this layout, B<dh_ruby> will install files (Ruby code,
+executables, gemspecs) to the I<first binary package> listed in
+I<debian/control>.
+
+=head2 Multi-binary layout
+
+B<gem2deb> version I<0.4.0> introduced support for the B<multi-binary>
+layout. This layout should be used when you have a set of different Ruby
+packages maintained upstream in a single VCS, and you decide that you
+also want to maintain a single source package in Debian having the
+different components as separate binary packages.
+
+In this layout, the source package contains the separate components in
+subdirectories where each of them will use the standard Ruby layout
+(I<lib>/, I<bin>/, etc).
+
+This layout does not support creating separate binary packages from the same
+root directory. For those cases, see the documentation on
+I<DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR> below.
+
+To indicate that you want to use a multi-binary layout, we have to 1)
+list your multiple binary packages in I<debian/control> as usual, and
+add an extra-field called I<X-DhRuby-Root> to each binary package
+stanza, indicating which directory has to be used as the root for that
+binary package.
+
+An example:
+
+    Source: mymultibinarypackage
+    [...]
+    
+    Package: ruby-foo
+    X-DhRuby-Root: path/to/foo
+    [...]
+    
+    Package: ruby-bar
+    X-DhRuby-Root: path/to/bar
+
+The corresponding source package should be layed out like this:
+
+    foo/
+      foo.gemspec
+      lib/
+        foo.rb
+      bin/foo
+    bar/
+      bar.gemspec
+      lib/
+        bar.rb
+      bin/
+        bar
+
+Important notes about multi-binary packages and the usage of
+I<X-DhRuby-Root>:
+
+=over
+
+=item
+
+If your package uses the multi-binary layout, it must include
+`I<gem2deb> (>= 0.4.0~)` in I<Build-Depends>.
+
+B<Version 0.4.0 had a bug in the support for native extensions> in
+multi-binary packages, so if your package uses the multi-binary feature
+and at least one of the sub-components has native extensions, you must
+use `I<gem2deb> (>= 0.4.1~)` in I<Build-Depends> instead.
+
+=item
+
+The path indicated in I<X-DhRuby-Root>, as you have probably guessed by
+now, must be relative to the root of the source package.
+
+=item
+
+If any binary package declares a I<X-DhRuby-Root> field, all other
+binary packages that don't have one will be ignored by B<dh_ruby>.
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item B<--clean>, B<--configure>, B<--build>, B<--test>, B<--install>
+
+Commands called by debhelper at various steps of the build process.
+
+=item B<--print-supported>
+
+Prints the supported Ruby versions.
+
+=item B<-h>, B<--help>
+
+Displays B<dh_ruby> usage information.
+
+=item B<-v>, B<--version>
+
+Displays B<dh_ruby> version information.
+
+=item B<--gem-install>
+
+This option indicates that the build should use the B<gem> command to install
+the files, instead of the homegrown installer. Native packages will be
+installed to I</usr/lib/$ARCH/rubygems-integration/$RUBY_VERSION>, while pure
+Ruby packages will be installed to I</usr/share/rubygems-integration/all>.
+
+There is an internal include list of directories from the source package that need
+to be installed, but we can't possibly know all possibilities: if a package
+needs to install a directory that is not automatically installed, use
+I<DH_RUBY_GEM_INSTALL_INCLUDE>. If you want to exclude a directory
+from  being installed, use I<DH_RUBY_GEM_INSTALL_EXCLUDE>. Note that for using
+those variables, you need to build depend on gem2deb (>= 1.6~).
+
+=back
+
+=head1 SUBSTITUTION VARIABLES
+
+=over
+
+=item I<${ruby:Depends}>
+
+${ruby:Depends} will expand to the runtime dependencies of the package. This is
+determined by taking the runtime dependencies from the Rubygems metadata, and
+then mapping them to Debian package names.
+
+The relevant packages must be installed during the package build for the
+mapping to be successful (normally they should be hardcoded in the
+Build-Depends: field).
+
+=back
+
+=head1 ENVIRONMENT VARIABLES
+
+=over
+
+=item I<DH_RUBY>
+
+Use this variable to pass command line parameters to dh_ruby. For example in
+debian/rules:
+
+    export DH_RUBY = --gem-install
+
+=item I<DH_RUBY_IGNORE_TESTS>
+
+This is a space-separated list of tests that dh_ruby will ignore during package
+build. The available test names are the names of all supported Ruby versions
+(you can list them with `dh_ruby --print-supported`).
+
+If set to "all", all tests will be ignored during the package build.
+
+=item I<DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR>
+
+If this variable is defined (to anything), dh_ruby will respect the directory
+informed by dh_auto_install(1), usually I<debian/tmp>. By default, gem2deb will
+install files to debian/I<package>, where I<package> is the first binary
+package listed in debian/control.
+
+This is useful for multi-binary source packages that don't conform to
+the supported layout (i.e. separate subdirectories each with I<lib>/,
+I<bin>/ etc). Using this, all files will be installed to I<debian/tmp>, and
+you can them distribute them into separate binary packages by using
+I<debian/$package.install> files or explicit shell calls in
+I<debian/rules>.
+
+Mixing I<DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR> and multi-binary layout is
+not supported.
+
+=item I<DH_RUBY_GEMSPEC>
+
+Determines which file contain the gem specification with package metadata.  By
+default, dh_ruby will read metadata from a .gemspec file in the root of source
+package directory. You can use this variable to override that if you want to
+provide custom metadata for the Debian package.
+
+In the case there are more than one .gemspec in the source package root, you
+will I<need> to use DH_RUBY_GEMSPEC to instruct dh_ruby about which one to use.
+
+=item I<DH_RUBY_GEM_INSTALL_INCLUDE>.
+
+When using --gem-install, this variable adds B<files> to the list of files that
+need to be installed. Entries must be separated by spaces, and can be either
+exact filenames, of glob expressions (e.g. I<*.txt>, I<foo/*>).
+
+Directories cannot be added directly, only files. If you want to include an
+entire directory, say I<foo>, use a glob expression like I<foo/*>.
+
+Note that by default all top-level files are automatically excluded, except
+I<VERSION*> which is used by some packages. If you need a top-level file to be
+installed, you need to explicit list it as included.
+
+=item I<DH_RUBY_GEM_INSTALL_EXCLUDE>.
+
+When using --gem-install, this variable adds files to the list of files that
+SHOULD NOT be installed. Entries must be separated by spaces, and must be
+either specific filenames, or glob expressions (e.g. I<*.txt>).
+
+Directories cannot be excluded directly. To exclude an entire directory,
+use a glob expression such as I<foo/*>.
+
+=back
+
+=head1 FILES
+
+=over
+
+=item debian/I<ruby-test-files.yaml>, debian/I<ruby-tests.rake>, debian/I<ruby-tests.rb>
+
+Theses files can be used to explicitly tell dh_ruby how to run the tests in your
+package. When running the tests, dh_ruby will automatically set RUBYLIB to
+include the appropriate directories where the package files were installed in
+your package to make sure the tests use them instead of the files in the source
+directory.
+
+B<Your package can only contain at most one of these files.>
+
+debian/I<ruby-test-files.yaml> must contain a YAML document with a list of test
+files to be run. If the package metadata contains an explicit list of test
+files, gem2deb(1) will automatically generate this file for you. Example from
+ruby-mime-types:
+
+  --- 
+  - test/test_mime_type.rb
+  - test/test_mime_types.rb
+
+debian/I<ruby-tests.rake> can be used to run the tests with rake(1). You can
+use anything you would use in a regular Rakefile, but you must define a default
+task. gem2deb includes a utility test task that makes it easier for you by
+creating a default task automatically. Example:
+
+  require 'gem2deb/rake/testtask'
+  Gem2Deb::Rake::TestTask.new do |t|
+    t.test_files = FileList['test/*_test.rb']
+  end
+
+You can also use the equivalent RSpec task:
+
+  require 'gem2deb/rake/spectask'
+  Gem2Deb::Rake::RSpecTask.new do |spec|
+    spec.pattern = './spec/**/*_spec.rb'
+  end
+
+If debian/I<ruby-tests.rb> exists, it will be run with each supported Ruby
+version, and must finish with a exit status of I<0>, otherwise dh_ruby assumes
+the tests failed. A simple example:
+
+  require 'test/unit'
+  require 'mypackage' # if 'mypackage.rb' or 'mypackage.so' was not installed properly, this will fail
+  class MyPackageTest < Test::Unit::TestCase
+    def test_features
+      assert_equal 4, MyPackage.sum(2,2)
+    end
+  end
+
+=item debian/I<dh_ruby.mk>
+
+If this file is present, dh_ruby will call B<make> passing it as the makefile
+during the build, in the I<clean>, I<build>, and I<install> steps, like this:
+
+=over
+
+=item clean: B<make -f debian/dh_ruby.mk clean>
+
+=item build: B<make -f debian/dh_ruby.mk>
+
+=item install: B<make -f debian/dh_ruby.mk install>
+
+=back
+
+If you want the upstream Makefile to be used, just make I<debian/dh_ruby.mk> a
+symlink to I<../Makefile>.
+
+=item debian/I<dh_ruby.rake>
+
+If this file is present, dh_ruby will call B<rake> passing it as the rakefile
+during the build, in the I<clean>, I<build>, and I<install> steps, like this:
+
+=over
+
+=item clean: B<rake -f debian/dh_ruby.rake clean>
+
+=item build: B<rake -f debian/dh_ruby.rake>
+
+=item install: B<rake -f debian/dh_ruby.rake install>
+
+=back
+
+If you want the upstream Rakefile to be used, just make I<debian/dh_ruby.rake> a
+symlink to I<../Rakefile>.
+
+=item debian/I<gemspec>
+
+If this file exists, it will be used as the package gemspec, regardless of
+I<metadata.yml> and any I<*.gemspec> that exists in the upstream source. Using
+this is only advised on single-binary source packages, and the behavior of this
+feature is undefined for multi-binary source packages (see B<SOURCE PACKAGE
+LAYOUT> above).
+
+If debian/I<gemspec> is a symlink, it will first be expanded, and then the
+symlink target will be used as a gemspec.
+
+Hint: for packages with multiple gemspec, you can have debian/I<gemspec> as a
+symlink pointing to the one you want to use.
+
+=back
+
+=head1 SEE ALSO
+
+L<B<gem2deb>>(1)
+
+=head1 COPYRIGHT AND AUTHORS
+
+Copyright (c) 2011, Lucas Nussbaum <lucas@debian.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.

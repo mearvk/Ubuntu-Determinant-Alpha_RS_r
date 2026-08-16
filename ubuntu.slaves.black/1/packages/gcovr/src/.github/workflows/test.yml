@@ -1,0 +1,194 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Test
+
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+
+  milestone-check:
+    runs-on: ubuntu-20.04
+
+    continue-on-error: true
+
+    env:
+      PR_MILESTONE: "${{ github.event.pull_request.milestone.number }}"
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check if PR is assigned to a milestone
+      if: ${{ github.event_name == 'pull_request' }}
+      run: |
+        if [ -z "$PR_MILESTONE" ]; then
+          echo 'No milestone selected for PR'
+          exit 1
+        fi
+        exit 0
+
+  changelog-check:
+    runs-on: ubuntu-20.04
+
+    env:
+      PR_BODY: "${{ github.event.pull_request.body }}"
+      CHANGELOG_ISSUE: ":issue:`${{ github.event.pull_request.number }}`"
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check if PR is mentioned in changelog
+      if: ${{ always() }}
+      run: |
+        if [ -z "${{ github.event.pull_request.number }}" ]; then
+          echo 'No PR defined'
+        else
+          if grep -qE '^\[no changelog\]' <<<"$PR_BODY"; then
+            echo 'Marker "[no changelog]" found in PR body'
+            if [ "$(grep -F "$CHANGELOG_ISSUE" CHANGELOG.rst)" != "" ]; then
+              echo "ERROR: $CHANGELOG_ISSUE found in CHANGELOG.rst."
+              exit 1
+            else
+              echo "OK: $CHANGELOG_ISSUE not found in CHANGELOG.rst"
+            fi
+          else
+            echo 'Marker "[no changelog]" not found in PR body'
+            if [ "$(grep -F "$CHANGELOG_ISSUE" CHANGELOG.rst)" == "" ]; then
+              echo "ERROR: $CHANGELOG_ISSUE not found in CHANGELOG.rst."
+              exit 1
+            else
+              echo "OK: $CHANGELOG_ISSUE found in CHANGELOG.rst"
+            fi
+          fi
+        fi
+        exit 0
+
+  release-check:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup environment
+      run: |
+        echo "GITHUB_PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+      shell: bash
+    - name: Run release_checklist
+      run: |
+        admin/release_checklist --no-verify-tags --no-verify-docs-next-version 5.0
+
+  build:
+    runs-on: ${{ matrix.os }}
+
+    needs: [milestone-check, changelog-check, release-check]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, windows-2019]
+        gcc: [gcc-8]
+        python-version: [3.6, 3.7, 3.8]
+
+        include:
+          - os: ubuntu-18.04
+            gcc: gcc-5
+            python-version: 3.8
+          - os: ubuntu-18.04
+            gcc: gcc-6
+            python-version: 3.8
+          - os: ubuntu-20.04
+            gcc: gcc-8
+            python-version: pypy3
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup environment
+      run: |
+        echo "USE_COVERAGE=${{ ( ( matrix.os == 'windows-2019' ) && ( matrix.python-version == '3.7' ) ) || ( ( matrix.os == 'ubuntu-18.04' ) && ( matrix.gcc == 'gcc-6' ) && ( matrix.python-version == '3.8' ) ) }}" >> $GITHUB_ENV
+        echo "CC=${{ matrix.gcc }}" >> $GITHUB_ENV
+        echo "PYTHON=python" >> $GITHUB_ENV
+      shell: bash
+    - name: Install msys with GCC (Windows)
+      if: ${{ startsWith(matrix.os,'windows-') }}
+      uses: msys2/setup-msys2@v2
+      with:
+        install: gcc make
+    - name: Install GCC (Linux)
+      if: ${{ startsWith(matrix.os,'ubuntu-') }}
+      run: |
+        sudo apt update
+        sudo apt-get install -y make ${{ matrix.gcc }} $(echo ${{ matrix.gcc }} | sed -e 's/gcc/g\+\+/')
+        sudo apt-get clean
+    - name: Install ninja
+      uses: seanmiddleditch/gha-setup-ninja@master
+    - name: Install libxml2 and libxslt dev (pypy3)
+      if: ${{ startsWith(matrix.os,'ubuntu-') && ( matrix.python-version == 'pypy3' ) }}
+      run: |
+        sudo apt-get install -y libxml2-dev libxslt-dev
+        sudo apt-get clean
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Cache pip
+      uses: actions/cache@v2
+      with:
+        # This path is specific to Ubuntu
+        path: ~/.cache/pip
+        # Look to see if there is a cache hit for the corresponding requirements file
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'doc/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          ${{ runner.os }}-
+    - name: Install dependencies
+      run: |
+        make setup-dev
+    - name: Lint files
+      run: |
+        make lint
+    - name: Check format of files
+      if: ${{ ( matrix.python-version != 'pypy3' ) }}
+      # Currently fail of this job is OK.
+      continue-on-error: true
+      run: |
+        make check-format
+    - name: Test with pytest
+      run: |
+        make test TEST_OPTS="--archive_differences"
+    - name: Upload pytest test results
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: diffs-${{ matrix.os }}-${{ matrix.python-version }}
+        path: gcovr/tests/diff.zip
+    - name: Creating coverage report
+      if: ${{ env.USE_COVERAGE == 'true' }}
+      run: |
+        codecov --flags ${{ matrix.os }} -X gcov search
+    - name: Generate documentation
+      run: |
+        make doc
+
+  run-docker:
+    runs-on: ubuntu-18.04
+    needs: [milestone-check, changelog-check, release-check]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        gcc: [gcc-5, gcc-6, gcc-8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build Docker
+      run: |
+        make docker-qa-build CC=${{ matrix.gcc }}
+    - name: Run Docker
+      run: |
+        make docker-qa TEST_OPTS="--archive_differences" CC=${{ matrix.gcc }}
+    - name: Upload pytest test results
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: diffs-docker
+        path: gcovr/tests/diff.zip

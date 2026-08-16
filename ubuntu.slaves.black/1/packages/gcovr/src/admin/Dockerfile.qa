@@ -1,0 +1,35 @@
+FROM ubuntu:18.04
+
+ARG USERID
+ARG CC
+ARG CXX
+
+RUN \
+  apt update && \
+  apt-get install -y sudo make $CC $CXX python3 python3-pip ninja-build && \
+  apt-get clean
+
+WORKDIR /gcovr
+COPY requirements.txt .
+COPY doc/requirements.txt doc/
+
+ENV PYTHON=python3 CC=$CC CXX=$CXX
+
+RUN \
+  $PYTHON -m pip install --no-cache-dir --upgrade pip && \
+  $PYTHON -m pip install --no-cache-dir -r requirements.txt -r doc/requirements.txt
+
+# Create new user "docker" and set password to "docker"
+RUN addgroup docker
+RUN useradd -d $HOME -u $USERID -g docker -g sudo -s /bin/bash docker
+RUN echo "docker:docker" | chpasswd
+
+USER docker:docker
+
+# Select language-agnostic "C" locale.
+# Unicode is necessary for some tools like "black" to work.
+ENV LC_ALL=C.UTF-8 LANG=C.UTF-8
+
+CMD ( echo docker | sudo -S -p "Running pip with sudo" $PYTHON -m pip install -e . ) && \
+  ( echo docker | sudo -S -p "Running chmod with sudo" chown -R docker:docker /gcovr ) && \
+  make qa
