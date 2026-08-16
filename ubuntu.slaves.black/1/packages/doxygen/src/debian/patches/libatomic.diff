@@ -1,0 +1,48 @@
+Description: Inject libatomic dependency to fix armel build as in #918060
+Author: Paolo Greppi <paolo.greppi@libpf.com>
+Last-Update: 2019-09-15
+
+Index: doxygen/src/CMakeLists.txt
+===================================================================
+--- doxygen.orig/src/CMakeLists.txt
++++ doxygen/src/CMakeLists.txt
+@@ -339,6 +339,9 @@ if (use_libclang)
+         set(CLANG_LIBS libclang clang-cpp)
+     endif()
+     target_compile_definitions(doxygen PRIVATE ${LLVM_DEFINITIONS})
++    if ($ENV{DEB_HOST_ARCH} STREQUAL "armel")
++        set(EXTRA_CLANG_LIBS atomic)
++    endif()
+ endif()
+ 
+ target_link_libraries(doxygen PRIVATE
+@@ -357,6 +360,7 @@ target_link_libraries(doxygen PRIVATE
+     ${CLANG_LIBS}
+     ${COVERAGE_LINKER_FLAGS}
+     ${DOXYGEN_EXTRA_LINK_OPTIONS}
++    ${EXTRA_CLANG_LIBS}
+ )
+ 
+ set_project_warnings(doxycfg)
+Index: doxygen/addon/doxyparse/CMakeLists.txt
+===================================================================
+--- doxygen.orig/addon/doxyparse/CMakeLists.txt
++++ doxygen/addon/doxyparse/CMakeLists.txt
+@@ -20,6 +20,9 @@ if (use_libclang)
+     else()
+         set(CLANG_LIBS libclang clang-cpp ${llvm_libs})
+     endif()
++    if ($ENV{DEB_HOST_ARCH} STREQUAL "armel")
++        set(EXTRA_CLANG_LIBS atomic)
++    endif()
+ endif()
+ 
+ target_link_libraries(doxyparse
+@@ -37,6 +40,7 @@ ${SQLITE3_LIBRARIES}
+ ${EXTRA_LIBS}
+ ${CLANG_LIBS}
+ ${COVERAGE_LINKER_FLAGS}
++${EXTRA_CLANG_LIBS}
+ )
+ 
+ install(TARGETS doxyparse DESTINATION bin)

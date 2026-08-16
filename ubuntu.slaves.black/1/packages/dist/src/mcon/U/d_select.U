@@ -1,0 +1,61 @@
+?RCS: $Id$
+?RCS:
+?RCS: Copyright (c) 1991-1997, 2004-2006, Raphael Manfredi
+?RCS:
+?RCS: You may redistribute only under the terms of the Artistic License,
+?RCS: as specified in the README file that comes with the distribution.
+?RCS: You may reuse parts of this distribution only within the terms of
+?RCS: that same Artistic License; a copy of which may be found at the root
+?RCS: of the source tree for dist 4.0.
+?RCS:
+?RCS: $Log: d_select.U,v $
+?RCS: Revision 3.0  1993/08/18  12:07:02  ram
+?RCS: Baseline for dist 3.0 netwide release.
+?RCS:
+?MAKE:d_select: Trylink cat i_unistd i_systypes i_sysselct i_winsock2
+?MAKE:	-pick add $@ %<
+?S:d_select:
+?S:	This variable conditionally defines HAS_SELECT if select() is
+?S:	available to select active file descriptors. A <sys/time.h>
+?S:	inclusion may be necessary for the timeout field.
+?S:.
+?C:HAS_SELECT:
+?C:	This symbol, if defined, indicates that the select routine is
+?C:	available to select active file descriptors. If the timeout field
+?C:	is used, <sys/time.h> may need to be included.
+?C:.
+?H:#$d_select HAS_SELECT	/**/
+?H:.
+?LINT:set d_select
+: see if select exists
+$cat >try.c <<EOC
+#$i_unistd I_UNISTD
+#$i_systypes I_SYS_TYPES
+#$i_sysselct I_SYS_SELECT
+#$i_winsock2 I_WINSOCK2
+?X: This is still required on some systems
+#ifdef I_SYS_TYPES
+#include <sys/types.h>
+#endif
+#ifdef I_UNISTD
+#include <unistd.h>
+#endif
+#ifdef I_SYS_SELECT
+#include <sys/select.h>
+#endif
+#ifdef I_WINSOCK2
+#include <Winsock2.h>
+#endif
+int main(void)
+{
+	static int ret, n;
+	static fd_set r, w, x;
+	static struct timeval timeout;
+	ret |= select(n, &r, &w, &x, &timeout);
+	return ret ? 0 : 1;
+}
+EOC
+cyn=select
+set d_select '-lWs2_32'
+eval $trylink
+

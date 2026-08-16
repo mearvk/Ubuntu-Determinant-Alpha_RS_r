@@ -1,0 +1,76 @@
+#!/bin/sh
+set -f
+
+# Copyright (C) 2012 Canonical Ltd.
+# Author: Scott Moser <smoser@ubuntu.com>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+DISTRO_INFO_NAME="Debian"
+DISTRO_INFO_ARGS="--all --devel --elts --lts --oldstable --stable --supported
+                  --testing --unsupported"
+DISTRO_INFO_DATA="/usr/share/distro-info/debian.csv"
+
+. "${0%/*}/distro-info-util.sh"
+
+Usage() {
+	cat <<EOF
+Usage: debian-distro-info [options]
+
+Options:
+  -h  --help         show this help message and exit
+      --date=DATE    date for calculating the version (default: today)
+  -a  --all          list all known versions
+  -d  --devel        latest development version
+  -t  --testing      current testing version
+  -s  --stable       latest stable version
+  -o  --oldstable    latest oldstable version
+      --supported    list of all supported versions (including development)
+  -l  --lts          list of all LTS versions
+  -e  --elts         list of all Extended LTS versions
+      --unsupported  list of all unsupported stable versions
+  -c  --codename     print the codename (default)
+  -r  --release      print the release version
+  -f  --fullname     print the full name
+
+See debian-distro-info(1) for more info.
+EOF
+}
+
+cb_devel() {
+	[ "$series" = "sid" ] && store
+	return 1
+}
+cb_oldstable() {
+	released && next_is released && store
+	return 1;
+}
+cb_testing() {
+	date_ge "$CMP_DATE" "$created" &&
+		{ [ -z "$release" -a -n "$version" ] || date_ge "$release" "$CMP_DATE"; } &&
+		store
+	return 1;
+}
+cb_supported() {
+	date_ge "$eol" "$CMP_DATE" && created
+}
+cb_lts() {
+	date_ge "$eollts" "$CMP_DATE" && ! date_ge "$eol" "$CMP_DATE" && created
+}
+cb_elts() {
+	date_ge "$eolelts" "$CMP_DATE" && ! date_ge "$eollts" "$CMP_DATE" && created
+}
+
+main "$@"
+
+# vi: ts=4 noexpandtab

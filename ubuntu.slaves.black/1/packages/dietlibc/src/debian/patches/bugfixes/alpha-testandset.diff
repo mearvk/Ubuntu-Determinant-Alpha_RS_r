@@ -1,0 +1,19 @@
+Description: Fix return value of __testandset on alpha
+ __testandset would always return 1, irrespective of whether the lock
+ was previously set or not, causing an endless loop even with an
+ unlocked spinlock. Fix this by returning 0 in the case where the lock
+ could be taken.
+Author: Christian Seiler <christian@iwakd.de>
+Last-Update: 2017-01-25
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/alpha/__testandset.S
++++ b/alpha/__testandset.S
+@@ -8,4 +8,7 @@ __testandset:
+ 	lda	$0, 1($31)		/* load a 1 to register 0 */
+ 	stq_c	$0, 0($16)		/* write lock is locked :) */
+ 	beq	$0, 1b			/* oops someone changed MY lock */
++	clr	$0			/* we just set the lock, so return
++					   0 as the lock was previously
++					   unlocked 0 */
+ 1:	ret	$31, ($26), 0x01	/* return */

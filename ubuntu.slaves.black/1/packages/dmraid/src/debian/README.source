@@ -1,0 +1,135 @@
+dmraid subversion repository has been converted into a git repository, hosted
+at git.debian.org.
+
+http://git.debian.org/?p=users/derevko-guest/dmraid.git
+git://git.debian.org/git/users/derevko-guest/dmraid.git
+
+For dmraid-debian developers:
+
+git clone ssh://<your-login>@git.debian.org/git/users/derevko-guest/dmraid.git
+
+
+== Best practices ==
+
+* debian/changelog
+
+Do not update your change in debian/changelog, we will use git-dch(1) before
+doing a release or anytime between releases.
+
+The simplest way is doing all the changes to the debian-branch without touching
+debian/changelog at all. Then, when done, do:
+
+git-dch --release
+
+This will look up the latest released version in the changelog, increment the
+version in the Debian changelog, generate changelog messages from the
+corresponding Git commit id up to the branch head and finally spawns an editor
+for final changelog file editing by invoking dch --release.
+
+But what if you want to have an (unreleased) snapshot for intermediate testing:
+
+git-dch --snapshot
+
+will generate a snapshot release with a specially crafted version number and a
+warning in the changelog that this is a snapshort release:
+
+git-buildpackage (0.3.7~1.gbp470ce2) UNRELEASED; urgency=low
+
+  ** SNAPSHOT build @470ce29ec7877705c844474a2fd89869aea0406d **
+
+  * add support for automatic snapshot 
+
+During subsequent calls with --snapshot this version number will continue to
+increase. Since the snapshot banners contains the commit id of the current
+branch head, git-dch can figure out what to append to the changelog by itself:
+
+git-dch --snapshot --auto
+
+will fetch the commit id and add changelog entries from that point to the
+current HEAD - again auto incrementing the version number. If you don't want to
+start at that commit id, you can specify any id or tag with:
+
+git-dch --since=e76a6a180a57701ae4ae381f74523cacb3152780 --snapshot
+
+After testing you can remove the snapshot header by a final git-dch call:
+
+git-dch --since=HEAD --release
+
+This will add no further entries but simply remove the specially crafted version
+number and the snapshort header. Again you can use any commit id or tag instead
+of HEAD if you want to add further changelog entries - or you can (of course)
+use --auto again. 
+
+
+* git commit
+
+Usually changelog entries should correspond to a single Git commit. In this case
+it's convenient to include the commit id in the changelog entry. This has the
+advantage that it's easy for people to identify changes without having to write
+very extensive changelog messages - the link back to Git can be automated via
+the Vcs-Browser and Vcs-Git fields in debian/control.
+
+See Cl2vcs for how this looks: https://honk.sigxcpu.org/cl2vcs/index.cgi?pkg=dmraid
+
+For this reason it´s a good idea to begin the commit message with a single
+line summarizing the change (it will be the changelog entry, so add the Close:
+or LP: entry), followed by a blank line and then a more thorough description.
+
+
+* Configuration files
+
+Here my configuration files, if you like cowbuilder you can use them.
+
+~/.gbp.conf :
+
+[DEFAULT]
+builder = /usr/bin/git-pbuilder
+cleaner = fakeroot debian/rules clean
+pristine-tar = True
+
+[git-buildpackage]
+export-dir = ../build-area/
+tarball-dir = ../tarballs/
+sign-tags = True
+#keyid = 0xAE3BE9AA
+[git-dch]
+id-length=7
+meta=True
+
+
+
+
+~/.gitconfig
+
+[user]
+	name = Giuseppe Iuculano
+	email = giuseppe@iuculano.it
+[color]
+	diff = auto
+	status = auto
+	branch = auto
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[branch "upstream"]
+	remote = origin
+	merge = refs/heads/upstream
+[branch "pristine-tar"]
+	remote = origin
+	merge = refs/heads/pristine-tar
+
+
+
+
+
+/usr/bin/git-pbuilder
+
+#!/bin/sh
+# 
+# pbuilder helper for git-buildpackage
+# use this as "builder" in gbp.conf
+set -e
+
+# pass all options to dpkg-buildpackage:
+pdebuild --pbuilder cowbuilder --auto-debsign --debsign-k AE3BE9AA $PBUILDER_OPTS --debbuildopts "-i\.git/ -I.git $*"
+

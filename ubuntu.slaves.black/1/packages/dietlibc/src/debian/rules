@@ -1,0 +1,149 @@
+#!/usr/bin/make -f
+
+ifeq (,$(filter terse,${DEB_BUILD_OPTIONS}))
+export DH_VERBOSE=1
+export V=1
+export VERBOSE=1
+endif
+
+LC_ALL:=C.UTF-8
+export LC_ALL
+
+# dietlibc is static, where PIE is currently unsupported
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all,-pie
+export DEB_CFLAGS_MAINT_APPEND=-Wall -fno-pie
+export DEB_LDFLAGS_MAINT_APPEND=-no-pie
+
+# for "debian/rules get-orig-source"
+ORIGTGZ_DATE:=          '2016-06-06 15:30Z'
+ORIGTGZ_SOURCE:=	-D${ORIGTGZ_DATE}
+ORIGTGZ_DESTINATION:=	0.34~cvs20160606
+
+# determine whether we are cross-compiling
+DEB_BUILD_GNU_TYPE?=$(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_HOST_GNU_TYPE?=$(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+ifeq (${DEB_BUILD_GNU_TYPE},${DEB_HOST_GNU_TYPE})
+CROSS:=0
+else
+CROSS:=1
+endif
+
+EXTRA_MAKE_FLAGS =
+
+TRIPLET?=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+DEBIANARCH?=$(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+ARCH=$(DEBIANARCH)
+ifeq ($(ARCH),amd64)
+  ARCH=x86_64
+else
+ifeq ($(ARCH),powerpc)
+  ARCH=ppc
+else
+ifeq ($(ARCH),powerpcspe)
+  ARCH=ppc
+  EXTRA_MAKE_FLAGS+=SOFTFPU=1
+else
+ifeq ($(ARCH),ppc64el)
+  ARCH=ppc64le
+else
+ifeq ($(ARCH),mips64el)
+  ARCH=mips64
+else
+ifeq ($(ARCH),hppa)
+  ARCH=parisc
+else
+ifeq ($(ARCH),arm64)
+  ARCH=aarch64
+else
+ifneq (,$(findstring arm,$(ARCH)))
+  ARCH=arm
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+
+VERSION=$(shell head -n1 debian/changelog | sed --posix -e 's/.*(\(.*\)).*/\1/')
+# Make this a recursively expanded variable, because we only want to
+# evaluate it in the very last moment. Also, unset MAKELEVEL/MAKEFLAGS
+# because this is not really a recursive make we want here.
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+  DIETLIBC_CFLAGS=$(shell env -u MAKELEVEL -u MAKEFLAGS -- make --silent -f debian/find_orig_cflags.mk print_orig_dietlibc_cflags MYARCH='$(ARCH)' DEBUG=1)
+else
+  DIETLIBC_CFLAGS=$(shell env -u MAKELEVEL -u MAKEFLAGS -- make --silent -f debian/find_orig_cflags.mk print_orig_dietlibc_cflags MYARCH='$(ARCH)')
+endif
+# dietlibc doesn’t care about CPPFLAGS/LDFLAGS, so add them to CFLAGS
+DEBIAN_CFLAGS=$(shell dpkg-buildflags --get CPPFLAGS) $(shell dpkg-buildflags --get CFLAGS) $(shell dpkg-buildflags --get LDFLAGS)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+override_dh_auto_build-indep:
+override_dh_auto_build-arch:
+	# cf. Debian bug #523086
+	test '!' -f parisc/strstr.S || \
+	    mv -f parisc/strstr.S parisc/strstr.S.disabled
+	# cf. Debian bug #944489
+	test '!' -f parisc/setsockopt.S || \
+	    mv -f parisc/setsockopt.S parisc/setsockopt.S.disabled
+	#
+	dh_auto_build -- prefix=/usr/lib/$(TRIPLET)/diet \
+		MYARCH='$(ARCH)' VERSION='$(VERSION)' DEBUG=1 \
+		$(EXTRA_MAKE_FLAGS) \
+		CFLAGS='$(DEBIAN_CFLAGS) $(DIETLIBC_CFLAGS)'
+
+override_dh_auto_test-indep:
+override_dh_auto_test-arch:
+ifeq (,$(filter nocheck,${DEB_BUILD_OPTIONS}))
+ifeq (${CROSS},0)
+	debian/unittests/suite.sh '$(ARCH)'
+endif
+endif
+
+override_dh_auto_clean-indep:
+override_dh_auto_clean-arch:
+	dh_auto_clean -- MYARCH='$(ARCH)'
+	rm -f debian/dietlibc-dev.postinst debian/dietlibc-dev.prerm
+	# cf. Debian bug #523086
+	test '!' -f parisc/strstr.S.disabled || \
+	    mv -f parisc/strstr.S.disabled parisc/strstr.S
+	# cf. Debian bug #944489
+	test '!' -f parisc/setsockopt.S.disabled || \
+	    mv -f parisc/setsockopt.S.disabled parisc/setsockopt.S
+	#
+
+override_dh_auto_install-indep:
+override_dh_auto_install-arch:
+	mkdir -p debian/tmp/etc
+	dh_auto_install --max-parallel=1 -- prefix=/usr/lib/$(TRIPLET)/diet MYARCH='$(ARCH)' VERSION='$(VERSION)' DEBUG=1 \
+		CFLAGS='$(DEBIAN_CFLAGS) $(DIETLIBC_CFLAGS)'
+	sed -e 's/|ARCH|/$(ARCH)/g;s/|TRIPLET|/$(TRIPLET)/g;s/|DEBIANARCH|/$(DEBIANARCH)/g' <debian/dietlibc-dev.postinst.in \
+	  >debian/dietlibc-dev.postinst
+	sed -e 's/|ARCH|/$(ARCH)/g;s/|TRIPLET|/$(TRIPLET)/g;s/|DEBIANARCH|/$(DEBIANARCH)/g' <debian/dietlibc-dev.prerm.in \
+	  >debian/dietlibc-dev.prerm
+
+_ANONCVSROOT:=		:pserver:cvs@cvs.fefe.de:/cvs
+_CVSEXPORT:=		env CVS_RSH=ssh TZ=UTC cvs -qd ${_ANONCVSROOT} -z9 export
+_RESET_TIMES:=          find dietlibc-${ORIGTGZ_DESTINATION} -type f | xargs touch -d${ORIGTGZ_DATE}
+_PACK:=			find dietlibc-${ORIGTGZ_DESTINATION} -type f | LC_ALL=C.UTF-8 sort | \
+			    paxcpio -oC512 -Hustar -Mdist
+get-orig-source:
+	rm -rf $@.tmp
+	mkdir $@.tmp
+	# to get a Debian .orig.tar.gz we need to pull the source from CVS
+	cd $@.tmp; ${_CVSEXPORT} ${ORIGTGZ_SOURCE} dietlibc
+	# fixup files with CR-LF line endings
+	cd $@.tmp; find dietlibc -type f -print0 | \
+	    xargs -0 perl -pi -e 's/\r$$//' --
+	# then rename and pack it up
+	mv $@.tmp/dietlibc $@.tmp/dietlibc-${ORIGTGZ_DESTINATION}
+	cd $@.tmp; ${_RESET_TIMES}
+	cd $@.tmp; ${_PACK} | xz -7e >../dietlibc_${ORIGTGZ_DESTINATION}.orig.tar.xz
+	rm -rf $@.tmp
+	# there we are...
+	ls -l dietlibc_${ORIGTGZ_DESTINATION}.orig.tar.xz

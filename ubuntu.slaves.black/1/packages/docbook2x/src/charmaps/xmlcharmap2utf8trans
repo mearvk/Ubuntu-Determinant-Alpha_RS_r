@@ -1,0 +1,184 @@
+#!/usr/bin/env perl
+
+=head1 NAME
+
+xmlchar2utf8trans - convert XSLT 2.0 character maps to utf8trans character maps
+
+=head1 SYNOPSIS
+
+xmlchar2utf8trans [xslt-charmap-file]
+
+=head1 DESCRIPTION
+
+This script converts a XML character map in XSLT 2.0 format
+to the plain text format used by utf8trans(1).
+
+Note:  The parsing of the XSLT 2.0 character map is really
+minimal, and does not conform to the full specification.
+
+=cut
+
+use XML::SAX::ParserFactory;
+use strict;
+
+package CharmapProcessor;
+use base qw(XML::SAX::Base);
+
+sub start_document {
+    my ($self, $elem) = @_;
+    $self->{imported_charmaps} = {};
+    $self->{local_charmaps} = {};
+}
+
+sub xsl_import_element {
+    my ($self, $elem) = @_;
+
+    my $href = $elem->{Attributes}->{'{}href'};
+    if(not defined $href) {
+        $self->report_static_error("<xsl:import> does not have required 'href' attribute");
+        return;
+    }
+
+    my $import_charmap_proc = CharmapProcessor->new;
+    my $import_parser = XML::SAX::ParserFactory->parser(
+                        DocumentHandler => $import_charmap_proc);
+    $import_parser->parse_uri($href->{Value});
+    
+    copy_hash_entries($self->{imported_charmaps},
+                      $import_charmap_proc->{imported_charmaps});
+    copy_hash_entries($self->{imported_charmaps},
+                      $import_charmap_proc->{local_charmaps});
+}
+
+sub copy_hash_entries
+{
+    my ($to, $from) = @_;
+    my @conflicts = 0;
+    while( my ($k,$v) = each %{$from} ) {
+        push(@conflicts, $k) if exists($to->{$k});
+        $to->{$k} = $v;
+    }
+    return @conflicts;
+}
+
+sub xsl_include_element {
+    my ($self, $elem) = @_;
+
+    my $href = $elem->{Attributes}->{'{}href'};
+    if(not defined $href) {
+        $self->report_static_error("<xsl:import> does not have required 'href' attribute");
+        return;
+    }
+
+    my $include_parser = XML::SAX::ParserFactory->parser(
+                        DocumentHandler => $self);
+    $include_parser->parse_uri($href->{Value});
+}
+
+sub xsl_output_character_element {
+    my ($self, $elem) = @_;
+
+    if(not defined $self->{current_charmap}) {
+        print STDERR "no current charmap\n";
+        return;
+    }
+
+    my $char = ord($elem->{Attributes}->{'{}character'}->{Value});
+    my $string = $elem->{Attributes}->{'{}string'}->{Value};
+
+    push(@{$self->{current_charmap}}, [ $char, $string ]);
+}
+
+sub xsl_character_map_element {
+    my ($self, $elem) = @_;
+
+    my $charmap_name = $elem->{Attributes}->{'{}name'}->{Value};
+
+    $self->{current_charmap} = [];
+    $self->{local_charmaps}->{$charmap_name} = $self->{current_charmap};
+}
+
+sub xsl_output_element {
+    my ($self, $elem) = @_;
+
+    if(exists $elem->{Attributes}->{'{}use-character-maps'}) {
+      # FIXME doesn't handle namespaced names yet !
+      $_ = $elem->{Attributes}->{'{}use-character-maps'}->{Value};
+      my @k = split;
+
+      $self->{use_charmaps} = \@k;
+    }
+}
+
+sub start_element {
+    my ($self, $elem) = @_;
+    
+    if($elem->{NamespaceURI} eq 'http://www.w3.org/1999/XSL/Transform')
+    {
+        if($elem->{LocalName} eq 'output-character') {
+            &xsl_output_character_element;
+        } elsif($elem->{LocalName} eq 'character-map') {
+            &xsl_character_map_element;
+        } elsif($elem->{LocalName} eq 'import') {
+            &xsl_import_element;
+        } elsif($elem->{LocalName} eq 'include') {
+            &xsl_include_element;
+        } elsif($elem->{LocalName} eq 'output') {
+            &xsl_output_element;
+        } 
+    }
+}
+
+sub report_static_error {
+    my ($self, $error_code, $message) = @_;
+    print STDERR "$0: $error_code: $message\n";
+}
+
+sub set_document_locator {
+    my ($self, $arg) = @_;
+    $self->{locator} = $arg->{Locator};
+}
+
+# sub comment {
+#     my ($self, $node) = @_;
+#     my @lines = split(/\n/, $node->{Data});
+#     
+#     print "\n" if @lines > 1;
+#     
+#     foreach my $line (@lines) {
+#         $line =~ s/^[ \t]+//;
+#         print "# $line\n";
+#     }
+# }
+
+package main;
+
+my $charmap_proc = CharmapProcessor->new;
+
+unshift(@ARGV, '-') unless @ARGV;
+my $parser = XML::SAX::ParserFactory->parser(
+                DocumentHandler => $charmap_proc);
+
+binmode(STDOUT, ":utf8") unless $] < 5.008;
+
+foreach my $file (@ARGV)
+{
+    if($file eq '-') {
+        $parser->parse_file(\*STDIN);
+    } else {
+        $parser->parse_uri($file);
+    }
+}
+
+if(!exists $charmap_proc->{use_charmaps}) {
+  print STDERR "no character maps are indicated to be used";
+}
+
+foreach my $k (@{$charmap_proc->{use_charmaps}}) {
+  my $charmap = $charmap_proc->{local_charmaps}->{$k};
+
+  foreach my $entry (@$charmap) {
+    $entry->[1] =~ tr/\n\0/  /;
+    printf "%x\t%s\n", $entry->[0], $entry->[1];
+  }
+}

@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+# For update-alternatives, use a higher automatic priority for the
+# native architecture.
+PRIO="30"
+if [ "|DEBIANARCH|" = "$(dpkg --print-architecture)" ] ; then
+	PRIO="60"
+fi
+
+if [ "$1" = "configure" ] ; then
+	if dpkg --compare-versions "$2" le-nl "0.34~cvs20160402.1-1"; then
+		# We are upgrading from a non-MultiArch package version, so
+		# remove the arch-symlink, because that will be recreated
+		# via update-alternatives.
+		if [ -L /usr/lib/diet/lib-|ARCH| ] ; then
+			rm -f /usr/lib/diet/lib-|ARCH|
+		fi
+	fi
+	# Always use update-alternatives, even for the case where the
+	# dietlibc name is unique, as it makes it easier if an architecture
+	# name stops being unique.
+	update-alternatives --install /usr/lib/diet/lib-|ARCH| dietlibc-libdir-|ARCH| \
+		/usr/lib/|TRIPLET|/diet/lib-|ARCH| ${PRIO}
+
+	# Register the diet binary in /usr/bin, create compatibility symlinks
+	# in /usr/lib/diet/bin as slave links.
+	mkdir -p -m 0755 /usr/lib/diet/bin
+	update-alternatives --install /usr/bin/diet diet \
+		/usr/lib/|TRIPLET|/diet/bin/diet ${PRIO} \
+		--slave /usr/lib/diet/bin/diet     dietlibc-bin-diet     /usr/lib/|TRIPLET|/diet/bin/diet \
+		--slave /usr/lib/diet/bin/elftrunc dietlibc-bin-elftrunc /usr/lib/|TRIPLET|/diet/bin/elftrunc \
+		--slave /usr/lib/diet/bin/dnsd     dietlibc-bin-dnsd     /usr/lib/|TRIPLET|/diet/bin/dnsd
+fi
+
+#DEBHELPER#

@@ -1,0 +1,78 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Before pop-up menus are built set ispell-dictionary-alist variable to 
+debian-ispell-dictionary-alist containing values for the really
+installed dictionaries using values provided by dicts maintainers.
+
+If not present means that no ispell/aspell dict is properly
+registered and so debian-ispell.el is not loaded. Set
+debian-{i,a}spell-dictionary to something sane in this case.
+
+(with-no-warnings) availability
+   emacs21: no
+   emacs22: yes
+   emacs23: yes
+   emacs-snapshot: yes
+   xemacs: no
+
+Index: dictionaries-common/support/emacsen/ispell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/ispell.el	2014-10-14 18:27:29.695503625 +0200
++++ dictionaries-common/support/emacsen/ispell.el	2014-10-14 18:27:29.691503634 +0200
+@@ -821,7 +821,57 @@
+ ;;; The following are used by ispell, and should not be changed.
+ ;;; **********************************************************************
+ 
++;; -----------------------------------------------------------------------
++;; Debian changes
++;;
+ 
++;; Obtain buffer encoding in the format aspell prefers
++
++(defun ispell-get-mime-charset ()
++  "Obtain buffer encoding in a format aspell understands"
++  (condition-case ()
++      (if (featurep 'xemacs)
++	  (coding-system-name
++	   (coding-system-base buffer-file-coding-system))
++	(coding-system-get buffer-file-coding-system 'mime-charset))
++    (error nil)))
++
++;; Try to obtain a list of supported aspell charsets
++
++(defun ispell-get-aspell-encodings ()
++  (let ((encodings '(utf-8)))
++    (dolist (file (directory-files "/usr/lib/aspell" nil ".*\\.cset$" 'nosort))
++      (string-match "\\.cset$" file)
++      (add-to-list 'encodings (replace-match "" t t file )))
++    encodings))
++
++;; These defs are already in debian-ispell.el, but since both files
++;; might be used separately is better to have them here too.
++
++(defcustom debian-dict-common-debug nil
++  "A lot of debugging info will be shown if non nil."
++  :type 'boolean
++  :group 'ispell)
++
++(defvar debian-ispell-valid-dictionary-list nil
++  "A list that will contain the list of emacsen names provided by
++registered ispell or aspell dicts")
++
++;; Make sure debian-ispell-program-name is not void, but initially
++;; set to ispell-program-name. Currently unused.
++
++(if (not (boundp 'debian-ispell-program-name))
++    (setq debian-ispell-program-name ispell-program-name))
++
++;; Define cp1251 as an alias to windows-1251 for xemacs
++
++(if (featurep 'xemacs)
++    (condition-case ()
++	(define-coding-system-alias 'cp1251 'windows-1251)
++      (error nil)))
++
++;;; End of Debian changes
++;;; -----------------------------------------------------------------------
+ 
+ ;; The version must be 3.1 or greater for this version of ispell.el
+ ;; There is an incompatibility between version 3.1.12 and lower versions.

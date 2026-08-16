@@ -1,0 +1,48 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Revert (sgml-lexical-context) use in flyspell (bzr#98607 and bzr#98656)
+    
+Use of (sgml-lexical-context) has some problems:
+            
+ * It is not available under XEmacs.
+ 
+ * There is some obscure conflict with psgml (probably a psgml problem)
+   that sometimes causes errors of the form:
+                            
+   Error in post-command-hook: (wrong-type-argument stringp nil)
+   sgml-lexical-context: Wrong type argument: stringp, nil
+                                              
+   This happens even in emacs-snapshot when used original code with
+   (sgml-lexical-context) together with psgml as preferred sgml mode.
+   psgml provides 'sgml-mode, but has no `sgml-lexical-context'
+   definition. Either if I manually load 'sgml-mode' or trust autoload
+   at some points I sometimes get errors above.
+                                                                                
+   Function seems loaded since describe-function sgml-lexical-context
+   works, and I can even explicitly evaluate it in the buffer (and
+   seems to evaluate correctly).
+   
+* Is way slower than an own dedicated regexp.
+
+Index: dictionaries-common/support/emacsen/flyspell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/flyspell.el	2014-10-14 18:27:36.959487652 +0200
++++ dictionaries-common/support/emacsen/flyspell.el	2014-10-14 18:27:36.955487661 +0200
+@@ -393,9 +393,15 @@
+ 
+ String values of attributes are checked because they can be text
+ like <img alt=\"Some thing.\">."
+-
+-  (not (memq (car (sgml-lexical-context))
+-	     '(tag pi))))
++  (not (save-excursion
++	 (or (and (looking-at "[^<\n]*>")          ;; Has unmatched > to the right
++		  (not (looking-at "[^=>\n]*\""))) ;; Not inside a string in a tag
++	     (and (ispell-looking-back "<[^>\n]*"  ;; Has unmatched < to the left
++				       (line-beginning-position))
++		  (not (looking-at "[^=\n]*\"")))  ;; Not inside a string
++	     (and (looking-at "[^&\n]*;")          ;; An SGML entity
++		  (ispell-looking-back "&[^;\n]*"
++				       (line-beginning-position)))))))
+ 
+ ;;*---------------------------------------------------------------------*/
+ ;;*    Programming mode                                                 */

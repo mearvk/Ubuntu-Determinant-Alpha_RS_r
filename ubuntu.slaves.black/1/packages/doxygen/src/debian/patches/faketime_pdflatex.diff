@@ -1,0 +1,37 @@
+Description: Make the output of latex \year macro reproducible
+Author: Paolo Greppi <paolo.greppi@libpf.com>
+Last-Update: 2020-12-05
+
+Index: doxygen/doc/Makefile.latex
+===================================================================
+--- doxygen.orig/doc/Makefile.latex
++++ doxygen/doc/Makefile.latex
+@@ -16,10 +16,10 @@ all: doxygen_manual.pdf
+ 
+ doxygen_manual.pdf: doxygen_manual.tex doxygen.sty
+ 	echo "Running latex..."
+-	pdflatex -cnf-line="openout_any=r" doxygen_manual.tex
++	faketime @$(SOURCE_DATE_EPOCH) pdflatex -cnf-line="openout_any=r" doxygen_manual.tex
+ 	echo "Running makeindex..."
+ 	makeindex doxygen_manual.idx
+ 	echo "Rerunning latex...."
+-	pdflatex -cnf-line="openout_any=r" doxygen_manual.tex
++	faketime @$(SOURCE_DATE_EPOCH) pdflatex -cnf-line="openout_any=r" doxygen_manual.tex
+ clean:
+ 	rm -f *.ps *.dvi *.aux *.toc *.idx *.ind *.ilg *.log doxygen_manual.pdf
+Index: doxygen/doc/CMakeLists.txt
+===================================================================
+--- doxygen.orig/doc/CMakeLists.txt
++++ doxygen/doc/CMakeLists.txt
+@@ -195,9 +195,9 @@ add_custom_target(doxygen_pdf
+         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/doxygen_manual.tex  .
+         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/doc/manual.sty  .
+         COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/doc/doxygen_logo.pdf  .
+-        COMMAND ${PDFLATEX}  -cnf-line="openout_any=r" -shell-escape doxygen_manual.tex
++        COMMAND faketime @$ENV{SOURCE_DATE_EPOCH} ${PDFLATEX}  -cnf-line="openout_any=r" -shell-escape doxygen_manual.tex
+         COMMAND ${MAKEINDEX} doxygen_manual.idx
+-        COMMAND ${PDFLATEX}  -cnf-line="openout_any=r" -shell-escape doxygen_manual.tex
++        COMMAND faketime @$ENV{SOURCE_DATE_EPOCH} ${PDFLATEX}  -cnf-line="openout_any=r" -shell-escape doxygen_manual.tex
+         DEPENDS run_doxygen
+         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/latex
+ )

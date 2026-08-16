@@ -1,0 +1,278 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content=
+"HTML Tidy for Linux/x86 (vers 1 September 2005), see www.w3.org" />
+<meta http-equiv="Content-Type" content=
+"text/html; charset=us-ascii" />
+<title>docbook2X: Design notes</title>
+<link rel="stylesheet" href="docbook2X.css" type="text/css" />
+<link rev="made" href="mailto:stevecheng@users.sourceforge.net" />
+<meta name="generator" content="DocBook XSL Stylesheets V1.68.1" />
+<meta name="description" content=
+"Author&rsquo;s notes on the grand scheme of docbook2X" />
+<link rel="start" href="docbook2X.html" title=
+"docbook2X: Documentation Table of Contents" />
+<link rel="up" href="docbook2X.html" title=
+"docbook2X: Documentation Table of Contents" />
+<link rel="prev" href="changes.html" title=
+"docbook2X: Release history" />
+<link rel="next" href="install.html" title=
+"docbook2X: Package installation" />
+</head>
+<body>
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr>
+<th colspan="3" align="center">Design notes</th>
+</tr>
+<tr>
+<td width="20%" align="left"><a accesskey="p" href=
+"changes.html">&lt;&lt; Previous</a>&nbsp;</td>
+<th width="60%" align="center">&nbsp;</th>
+<td width="20%" align="right">&nbsp;<a accesskey="n" href=
+"install.html">Next &gt;&gt;</a></td>
+</tr>
+</table>
+<hr /></div>
+<div class="sect1" lang="en" xml:lang="en">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title"><a id="design-notes" name=
+"design-notes"></a>Design notes</h2>
+</div>
+</div>
+</div>
+<a id="id2545417" class="indexterm" name="id2545417"></a><a id=
+"id2545424" class="indexterm" name="id2545424"></a>
+<p>Lessons learned:</p>
+<div class="itemizedlist">
+<ul>
+<li><a id="id2545438" class="indexterm" name="id2545438"></a><a id=
+"id2546053" class="indexterm" name="id2546053"></a>
+<p>Think four times before doing stream-based XML processing, even
+though it appears to be more efficient than tree-based.
+Stream-based processing is usually more difficult.</p>
+<p>But if you have to do stream-based processing, make sure to use
+robust, fairly scaleable tools like <code class=
+"classname">XML::Templates</code>, <span class=
+"emphasis"><em>not</em></span> <span><strong class=
+"command">sgmlspl</strong></span>. Of course it cannot be as
+pleasant as tree-based XML processing, but examine
+<span><strong class="command">db2x_manxml</strong></span> and
+<span><strong class="command">db2x_texixml</strong></span>.</p>
+</li>
+<li>
+<p>Do not use <code class="classname">XML::DOM</code> directly for
+stylesheets. Your &ldquo;stylesheet&rdquo; would become seriously
+unmanageable. Its also extremely slow for anything but trivial
+documents.</p>
+<p>At least take a look at some of the XPath modules out there.
+Better yet, see if your solution really cannot use XSLT. A
+C/C++-based implementation of XSLT can be fast enough for many
+tasks.</p>
+</li>
+<li><a id="id2546124" class="indexterm" name="id2546124"></a>
+<p>Avoid XSLT extensions whenever possible. I don't think there is
+anything wrong with them intrinsically, but it is a headache to
+have to compile your own XSLT processor. (libxslt is written in C,
+and the extensions must be compiled-in and cannot be loaded
+dynamically at runtime.) Not to mention there seems to be a
+thousand different set-ups for different XSLT processors.</p>
+</li>
+<li><a id="id2546145" class="indexterm" name="id2546145"></a>
+<p>Perl is not as good at XML as it&rsquo;s hyped to be.</p>
+<p>SAX comes from the Java world, and its port to Perl (with all
+the object-orientedness, and without adopting Perl idioms) is
+awkward to use.</p>
+<p>Another problem is that Perl SAX does not seem to be
+well-maintained. The implementations have various bugs; while they
+can be worked around, they have been around for such a long time
+that it does not inspire confidence that the Perl XML modules are
+reliable software.</p>
+<p>It also seems that no one else has seriously used Perl SAX for
+robust applications. It seems to be unnecessarily hard to certain
+tasks such as displaying error diagnostics on its input, processing
+large documents with complicated structure.</p>
+</li>
+<li><a id="id2546183" class="indexterm" name="id2546183"></a><a id=
+"id2546190" class="indexterm" name="id2546190"></a>
+<p>Do not be afraid to use XML intermediate formats (e.g. Man-XML
+and Texi-XML) for converting to other markup languages, implemented
+with a scripting language. The syntax rules for these formats are
+made for authoring by hand, not machine generation; hence a
+conversion using tools designed for XML-to-XML conversion, requires
+jumping through hoops.</p>
+<p>You might think that we could, instead, make a separate module
+that abstracts all this complexity from the rest of the conversion
+program. For example, there is nothing stopping a XSLT processor
+from serializing the output document as a text document obeying the
+syntax rules for man pages or Texinfo documents.</p>
+<p>Theoretically you would get the same result, but it is much
+harder to implement. It is far easier to write plain text
+manipulation code in a scripting language than in Java or C or
+XSLT. Also, if the intermediate format is hidden in a Java class or
+C API, output errors are harder to see. Whereas with the
+intermediate-format approach, we can visually examine the textual
+output of the XSLT processor and fix the Perl script as we go
+along.</p>
+<p>Some XSLT processors support scripting to go beyond XSLT
+functionality, but they are usually not portable, and not always
+easy to use. Therefore, opt to do two-pass processing, with a
+standalone script as the second stage. (The first stage using
+XSLT.)</p>
+<p><a id="xslt-extensions-move" name="xslt-extensions-move"></a>
+Finally, another advantage of using intermediate XML formats
+processed by a Perl script is that we can often eliminate the use
+of XSLT extensions. In particular, all the way back when XSLT
+stylesheets first went into docbook2X, the extensions related to
+Texinfo node handling could have been easily moved to the Perl
+script, but I didn't realize it! I feel stupid now.</p>
+<p>If I had known this in the very beginning, it would have saved a
+lot of development time, and docbook2X would be much more advanced
+by now.</p>
+<p>Note that even the man-pages stylesheet from the DocBook XSL
+distribution essentially does two-pass processing just the same as
+the docbook2X solution. That stylesheet had formerly used one-pass
+processing, and its authors probably finally realized what a mess
+that was.</p>
+</li>
+<li>
+<p>Design the XML intermediate format to be easy to use from the
+standpoint of the conversion tool, and similar to how XML document
+types work in general. e.g. abstract the paragraphs of a document,
+rather than their paragraph <span class=
+"emphasis"><em>breaks</em></span> (the latter is typical of
+traditional markup languages, but not of XML).</p>
+</li>
+<li>
+<p>I am quite impressed by some of the things that people make XSLT
+1.0 do. Things that I thought were impossible, or at least
+unworkable without using &ldquo;real&rdquo; scripting language.
+(<span><strong class="command">db2x_manxml</strong></span> and
+<span><strong class="command">db2x_texixml</strong></span> fall in
+the category of things that can be done in XSLT 1.0 but
+inelegantly.)</p>
+</li>
+<li>
+<p>Internationalize as soon as possible. That is much easier than
+adding it in later.</p>
+<p>Same advice for build system.</p>
+</li>
+<li>
+<p>I would suggest against using build systems based on Makefiles
+or any form of automake. Of course it is inertia that prevents
+people from switching to better build systems. But also consider
+that while Makefile-based build systems can do many of the things
+newer build systems are capable of, they often require too many
+fragile hacks. Developing these hacks take too much time that would
+be better spent developing the program itself.</p>
+<p>Alas, better build systems such as scons were not available when
+docbook2X was at an earlier stage. It&rsquo;s too late to switch
+now.</p>
+</li>
+<li>
+<p>Writing good documentation takes skill. This manual has has been
+revised substantially at least four times <sup>[<a id="id2546361"
+href="#ftn.id2546361" name="id2546361">5</a>]</sup>, with the
+author consciously trying to condense information each time.</p>
+</li>
+<li>
+<p>Table processing in the pure-XSLT man-pages conversion is
+convoluted &mdash; it goes through HTML(!) tables as an
+intermediary. That is the same way that the DocBook XSL stylesheets
+implement it (due to Michael Smith), and I copied the code there
+almost verbatim. I did it this way to save myself time and energy
+re-implementing tables conversion <span class=
+"emphasis"><em>again</em></span>.</p>
+<p>And Michael Smith says that going through HTML is better,
+because some varieties of DocBook allow the HTML table model in
+addition to the CALS table model. (I am not convinced that this is
+such a good idea, but anyway.) Then HTML tables in DocBook can be
+translated to man pages too without much more effort.</p>
+<p>Is this inefficient? Probably. But that&rsquo;s what you get if
+you insist on using pure XSLT. The Perl implementation of
+docbook2X. already supported tables conversion for two years
+prior.</p>
+</li>
+<li>
+<p>The design of <span><strong class=
+"command">utf8trans</strong></span> is not the best. It was chosen
+to simplify implementations while being efficient. A more general
+design, while still retaining efficiency, is possible, which I
+describe below. However, unfortunately, at this point changing
+<span><strong class="command">utf8trans</strong></span> will be too
+disruptive to users with little gain in functionality.</p>
+<p>Instead of working with characters, we should work with byte
+strings. This means that, if all input and output is in UTF-8, with
+no escape sequences, then UTF-8 decoding or encoding is not
+necessary at all. Indeed the program becomes agnostic to the
+character set used. Of course, multi-character matches become
+possible.</p>
+<p>The translation map will be an unordered list of key-value
+pairs. The key and value are both arbitrary-length byte strings,
+with an explicit length attached (so null bytes in the input and
+output are retained).</p>
+<p>The program would take the translation map, and transform the
+input file by matching the start of input, seen as a sequence of
+bytes, against the keys in the translation map, greedily. (Since
+the matching is greedy, the translation keys do not need to be
+restricted to be prefix-free.) Once the longest (in byte length)
+matching key is found, the corresponding value (another byte
+string) is substituted in the output, and processing repeats (until
+the input is finished). If, on the other hand, no match is found,
+the next byte in the input file is copied as-is, and processing
+repeats at the next byte of input.</p>
+<p>Since bytes are 8 bits and the key strings are typically very
+short (up to 3 bytes for a Unicode BMP character encoded in UTF-8),
+this algorithm can be implemented with radix search. It would be
+competitive, in both execution time and space, with character
+codepoint hashing and sparse multi-level arrays, the primary
+techniques for implementing Unicode <span class=
+"emphasis"><em>character</em></span> translation.
+(<span><strong class="command">utf8trans</strong></span> is
+implemented using sparse multi-level arrays.)</p>
+<p>One could even try to generalize the radix searching further, so
+that keys can include wildcard characters, for example. Taken to
+the extremes, the design would end up being a regular expressions
+processor optimized for matching many strings with common
+prefixes.</p>
+</li>
+</ul>
+</div>
+<div class="footnotes"><br />
+<hr width="100" align="left" />
+<div class="footnote">
+<p><sup>[<a id="ftn.id2546361" href="#id2546361" name=
+"ftn.id2546361">5</a>]</sup> This number is probably inflated
+because of the so many design mistakes in the process.</p>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr />
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left"><a accesskey="p" href=
+"changes.html">&lt;&lt; Previous</a>&nbsp;</td>
+<td width="20%" align="center">&nbsp;</td>
+<td width="40%" align="right">&nbsp;<a accesskey="n" href=
+"install.html">Next &gt;&gt;</a></td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">Release
+history&nbsp;</td>
+<td width="20%" align="center"><a accesskey="h" href=
+"docbook2X.html">Table of Contents</a></td>
+<td width="40%" align="right" valign="top">&nbsp;Package
+installation</td>
+</tr>
+</table>
+</div>
+<p class="footer-homepage"><a href=
+"http://docbook2x.sourceforge.net/" title=
+"docbook2X: Home page">docbook2X home page</a></p>
+</body>
+</html>

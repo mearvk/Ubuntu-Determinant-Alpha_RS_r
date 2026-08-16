@@ -1,0 +1,138 @@
+Description: Avoid use of compass
+ Compass is obsoleted by Sass and its reimplementation in C, sassc.
+ .
+ This patch avoids use of sass mixins border-radius and box-shadow
+ shipped in libraries part of Compass, and adapts build rules to use
+ sassc instead of Compass and YUI Compressor.
+ .
+ Sass mixins border-radius and box-shadow added vendored selectors now
+ obsolete: Would help only browsers released in 2011 or earlier, used by
+ 0.02% of public web browsing today according to <https://caniuse.com/>.
+ .
+ If the reference Ruby implementation of Sass is preferred over sassc,
+ simply replace "sassc" with "scss" in the Makefile rule.
+Author: Jonas Smedegaard <dr@jones.dk>
+Last-Update: 2019-08-13
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: doxygen/jquery/Makefile
+===================================================================
+--- doxygen.orig/jquery/Makefile
++++ doxygen/jquery/Makefile
+@@ -28,10 +28,7 @@ doxmenu-min.css: sm-core-css.css \
+                  sass/_round-corners-last-item.scss \
+                  sass/_sm-dox.scss \
+                  sass/_sub-items-indentation.scss
+-	compass compile --css-dir . --force sass/sm-dox.scss
+-	cat sm-core-css.css sm-dox.css > doxmenu.css
+-	java -jar $(MINIFIER).jar doxmenu.css > doxmenu-min.css
+-	rm -f sm-dox.css doxmenu.css
++	cat sm-core-css.css sass/sm-dox.scss | sassc -I sass --style compressed > doxmenu-min.css
+ 
+ clean:
+ 	rm -rf $(RESULTS) doxmenu.css .sass-cache
+Index: doxygen/jquery/sass/_round-corners-last-item.scss
+===================================================================
+--- doxygen.orig/jquery/sass/_round-corners-last-item.scss
++++ doxygen/jquery/sass/_round-corners-last-item.scss
+@@ -8,7 +8,7 @@
+ 		$selector: $selector + ', ' + $chain + ' a, ' + $chain + '*:not(ul) a, ' + $chain + ' ul';
+ 	}
+ 	#{$selector} {
+-		@include border-radius(0 0 $amount $amount);
++		border-radius: 0 0 $amount $amount;
+ 	}
+ 	// highlighted items, don't need rounding since their sub is open
+ 	$chain: $chain_prefix;
+@@ -18,6 +18,6 @@
+ 		$selector: $selector + ', ' + $chain + ' a.highlighted, ' + $chain + '*:not(ul) a.highlighted';
+ 	}
+ 	#{$selector} {
+-		@include border-radius(0);
++		border-radius: 0;
+ 	}
+ }
+Index: doxygen/jquery/sass/_sm-dox.scss
+===================================================================
+--- doxygen.orig/jquery/sass/_sm-dox.scss
++++ doxygen/jquery/sass/_sm-dox.scss
+@@ -1,5 +1,3 @@
+-@import 'compass';
+-
+ // This file is best viewed with Tab size 4 code indentation
+ 
+ 
+@@ -164,7 +162,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+ // Main menu box
+ .sm-dox {
+     background-image: $sm-dox__collapsible-bg;
+-    //@include border-radius($sm-dox__collapsible-border-radius);
++    //border-radius: $sm-dox__collapsible-border-radius;
+ 
+     // Main menu items
+     a {
+@@ -215,7 +213,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+             text-align: center;
+             text-shadow: none;
+             background: $sm-dox__collapsible-toggle-bg;
+-            @include border-radius($sm-dox__border-radius);
++            border-radius: $sm-dox__border-radius;
+         }
+         // Change + to - on sub menu expand
+         &.highlighted span.sub-arrow:before {
+@@ -226,7 +224,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+ 
+     // round the corners of the first item
+     > li:first-child > a, > li:first-child > :not(ul) a {
+-        @include border-radius($sm-dox__collapsible-border-radius $sm-dox__collapsible-border-radius 0 0);
++        border-radius: $sm-dox__collapsible-border-radius $sm-dox__collapsible-border-radius 0 0;
+     }
+     // round the corners of the last item
+     @include sm-dox__round-corners-last-item($sm-dox__collapsible-border-radius);
+@@ -303,7 +301,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+         padding: 0 $sm-dox__desktop-padding-horizontal;
+         background-image: $sm-dox__desktop-bg;
+         line-height: 36px;
+-        //@include border-radius($sm-dox__desktop-border-radius);
++        //border-radius: $sm-dox__desktop-border-radius;
+ 
+         // Main menu items
+         a {
+@@ -318,7 +316,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+                 border-style: solid dashed dashed dashed;
+                 border-color: $sm-dox__main-text-color transparent transparent transparent;
+                 background: transparent;
+-                @include border-radius(0);
++                border-radius: 0;
+             }
+ 
+             &,
+@@ -331,7 +329,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+                 background-image:url('tab_s.png');
+                 background-repeat:no-repeat;
+                 background-position:right;
+-                @include border-radius(0 !important);
++                border-radius: 0 !important;
+             }
+             &:hover {
+               background-image: url('tab_a.png');
+@@ -380,8 +378,8 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+             border: $sm-dox__border-width solid $sm-dox__gray-dark;
+             padding: $sm-dox__desktop-sub-padding-vertical $sm-dox__desktop-sub-padding-horizontal;
+             background: $sm-dox__desktop-sub-bg;
+-            @include border-radius($sm-dox__desktop-sub-border-radius !important);
+-            @include box-shadow($sm-dox__desktop-sub-box-shadow);
++            border-radius: $sm-dox__desktop-sub-border-radius !important;
++            box-shadow: $sm-dox__desktop-sub-box-shadow;
+ 
+             // Sub menus items
+             a {
+@@ -536,7 +534,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
+         // Main menu box
+         &.sm-vertical {
+             padding: $sm-dox__desktop-vertical-padding-vertical 0;
+-            @include border-radius($sm-dox__desktop-vertical-border-radius);
++            border-radius: $sm-dox__desktop-vertical-border-radius;
+ 
+             // Main menu items
+             a {

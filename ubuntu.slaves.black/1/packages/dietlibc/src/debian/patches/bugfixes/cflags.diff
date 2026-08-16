@@ -1,0 +1,39 @@
+Description: Do not override main CFLAGS for amd64 or x32
+ Fixes, at least, stack smashing on x32 due to missing EXTRACFLAGS.
+ .
+ We need the GCC include path restored (main CFLAGS contain -nostdinc)
+ for building a file that uses GCC vector math intrinsics, though.
+Author: mirabilos <tg@debian.org>
+Bug-Debian: https://bugs.debian.org/943429
+Last-Update: 2019-10-24
+Forwarded: not-yet
+
+--- a/x32/Makefile.add
++++ b/x32/Makefile.add
+@@ -1,3 +1,6 @@
+-CFLAGS := -Os -fstrict-aliasing -momit-leaf-frame-pointer -mfancy-math-387
++GCC_INCLUDE_PATHS:=$(shell : | env LC_ALL=C gcc -E -Wp,-v - 2>&1 >/dev/null | sed --posix -e '1,/<\.\.\.> search starts here/d' -e '/End of search list/,$$d' -e 's/^ //' | while IFS= read -r line; do realpath "$$line"; done | grep -E '^/usr/lib(|data|exec)/gcc/' | sed --posix 's/^/-isystem /')
++CFLAGS += -Os -fstrict-aliasing -momit-leaf-frame-pointer -mfancy-math-387
+ VPATH  := x32:x86_64:syscalls.s:$(VPATH)
+ LIBOBJ += $(OBJDIR)/arch_prctl.o $(OBJDIR)/__CAS.o $(OBJDIR)/__munmap_and_exit.o
++
++$(OBJDIR)/memccpy.o $(PICODIR)/memccpy.o: SPECIFICCFLAGS+=${GCC_INCLUDE_PATHS}
+--- a/x86_64/Makefile.add
++++ b/x86_64/Makefile.add
+@@ -1,10 +1,11 @@
+-ifeq ($(CC),clang)
+-CFLAGS := -Os -fstrict-aliasing -momit-leaf-frame-pointer $(EXTRACFLAGS)
+-else
+-CFLAGS := -Os -fstrict-aliasing -momit-leaf-frame-pointer -mfancy-math-387 $(EXTRACFLAGS)
+-#CFLAGS := -Os -fstrict-aliasing -momit-leaf-frame-pointer -mfancy-math-387 $(EXTRACFLAGS)
++GCC_INCLUDE_PATHS:=$(shell : | env LC_ALL=C gcc -E -Wp,-v - 2>&1 >/dev/null | sed --posix -e '1,/<\.\.\.> search starts here/d' -e '/End of search list/,$$d' -e 's/^ //' | while IFS= read -r line; do realpath "$$line"; done | grep -E '^/usr/lib(|data|exec)/gcc/' | sed --posix 's/^/-isystem /')
++CFLAGS += -Os -fstrict-aliasing -momit-leaf-frame-pointer
++ifneq ($(CC),clang)
++CFLAGS += -mfancy-math-387
+ endif
+ ALWAYS_PIC=1
+ VPATH  := x86_64:syscalls.s:$(VPATH)
+ LIBOBJ += $(OBJDIR)/arch_prctl.o $(OBJDIR)/__CAS.o $(OBJDIR)/__munmap_and_exit.o $(OBJDIR)/getcontext.o
+ LIBOBJ += $(OBJDIR)/setcontext.o $(OBJDIR)/start-pie.o $(OBJDIR)/stackgap-pie.o
++
++$(OBJDIR)/memccpy.o $(PICODIR)/memccpy.o: SPECIFICCFLAGS+=${GCC_INCLUDE_PATHS}

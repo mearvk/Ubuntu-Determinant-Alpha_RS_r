@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_configure override_dh_auto_install:
+	:
+
+override_dh_auto_build:
+	# Verify root-anchors.xml using OpenSSL
+	openssl smime -verify -noverify -inform DER -in root-anchors.p7s -content root-anchors.xml
+
+	# Verify root.hints
+	gpgv --keyring $(CURDIR)/registry-admin.key $(CURDIR)/root.hints.sig $(CURDIR)/root.hints
+
+	# Create key from validated root-anchors.xml
+	./parse-root-anchors.sh < root-anchors.xml | sort -k 4 -n > root-anchors.ds
+
+	# Create key from downloaded root.key
+	/usr/bin/ldns-key2ds -n -2 root.key | cut --fields=1,3- --output-delimiter=' ' | sort -k 4 -n > root.ds
+
+	# Compare the DS from root.key and from root-anchors.xml
+	diff -u root-anchors.ds root.ds
+
+override_dh_auto_clean:
+	rm -f root-anchors.ds root.ds
+
+get_orig_source:
+	# Create root.key and root.hints using wget and unbound-anchor
+	# This needs Internet connection
+	/usr/sbin/unbound-anchor \
+		-a $(CURDIR)/root-auto.key \
+		-c $(CURDIR)/icannbundle.pem || echo "Check the root-auto.key"
+	< $(CURDIR)/root-auto.key grep -Ev "^($$|;)" | sed -e 's/ ;;count=.*//' > $(CURDIR)/root.key
+	rm $(CURDIR)/root-auto.key
+	wget -O $(CURDIR)/root.hints "https://www.internic.net/domain/named.root"
+	wget -O $(CURDIR)/root.hints.sig "https://www.internic.net/domain/named.root.sig"
+	# get root-anchors.xml and root-anchors.p7s as well
+	wget -O $(CURDIR)/root-anchors.xml 'https://data.iana.org/root-anchors/root-anchors.xml'
+	wget -O $(CURDIR)/root-anchors.p7s 'https://data.iana.org/root-anchors/root-anchors.p7s'

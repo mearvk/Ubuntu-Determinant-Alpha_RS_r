@@ -1,0 +1,50 @@
+Author: Lennart Borgman
+Description: function ispell-comment-or-string for spell checking of current comment or string
+  ** DISABLED **
+  Disable. Do not diverge from upstream with non integrated patch.
+
+Index: dictionaries-common/support/emacsen/ispell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/ispell.el	2014-10-14 18:27:16.735531777 +0200
++++ dictionaries-common/support/emacsen/ispell.el	2014-10-14 18:27:16.731531786 +0200
+@@ -3709,11 +3709,21 @@
+ 
+ 
+ ;;;###autoload
+-(defun ispell-comments-and-strings ()
++(defun ispell-comments-and-strings (only-current)
+   "Check comments and strings in the current buffer for spelling errors."
+-  (interactive)
+-  (goto-char (point-min))
++  (interactive (list nil))
+   (let (state done)
++    (if (not only-current)
++  (goto-char (point-min))
++      (let* ((here (point))
++             (state (parse-partial-sexp (point-min) (point)))
++             (inside (or (nth 3 state) (nth 4 state)))
++             (start (when inside (nth 8 state))))
++        (if start
++            (goto-char start)
++          (setq done t)
++          (goto-char here)
++          (message "Not inside a string or comment"))))
+     (while (not done)
+       (setq done t)
+       (setq state (parse-partial-sexp (point) (point-max)
+@@ -3725,8 +3735,14 @@
+ 	    (if (or (nth 3 state) (nth 4 state))
+ 		(error "Unterminated string or comment"))
+ 	    (save-excursion
+-	      (setq done (not (ispell-region start (point))))))))))
++	      (setq done (not (ispell-region start (point)))))))
++      (when only-current (setq done t)))))
+ 
++;;;###autoload
++(defun ispell-comment-or-string ()
++  "Check comments or strings at point for spelling errors."
++  (interactive)
++  (ispell-comments-and-strings t))
+ 
+ ;;;###autoload
+ (defun ispell-buffer ()

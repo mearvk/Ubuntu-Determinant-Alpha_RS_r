@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+PACKAGE := docbook2x
+
+override_dh_auto_configure:
+	dh_auto_configure -- --program-transform-name="s/^docbook2/docbook2x-/" --with-html-xsl
+
+override_dh_auto_build:
+	dh_auto_build
+	sed "s/^INFO-DIR-SECTION Document Preparation/INFO-DIR-SECTION Text/" \
+	    doc/docbook2X.info > debian/docbook2X.info
+	sed "s/^INFO-DIR-SECTION Document Preparation/INFO-DIR-SECTION Text/" \
+	    xslt/documentation/docbook2man-xslt.info > debian/docbook2man-xslt.info
+	sed "s/^INFO-DIR-SECTION Document Preparation/INFO-DIR-SECTION Text/" \
+	    xslt/documentation/docbook2texi-xslt.info > debian/docbook2texi-xslt.info
+
+override_dh_installinfo:
+	dh_installinfo -pdocbook2x debian/docbook2X.info \
+	                           debian/docbook2man-xslt.info \
+	                           debian/docbook2texi-xslt.info
+
+override_dh_installchangelogs:
+	dh_installchangelogs doc/changes.html
+	dh_installxmlcatalogs
+
+override_dh_installdocs:
+	dh_installdocs -pdocbook2x ./README ./NEWS ./TODO ./AUTHORS ./THANKS
+	mv $(CURDIR)/debian/$(PACKAGE)/usr/share/doc/docbook2X \
+	   $(CURDIR)/debian/$(PACKAGE)/usr/share/doc/docbook2x
+	sed -i -e 's/docbook2man/docbook2x\\-man/g' \
+	   $(CURDIR)/debian/$(PACKAGE)/usr/share/man/man1/docbook2x-man.1
+	sed -i -e 's/docbook2texi/docbook2x\\-texi/g' \
+	   $(CURDIR)/debian/$(PACKAGE)/usr/share/man/man1/docbook2x-texi.1
+
+override_dh_auto_clean:
+	$(MAKE) -C debian/examples clean
+	rm -f debian/docbook2X.info debian/docbook2man-xslt.info debian/docbook2texi-xslt.info
+	dh_auto_clean
+
+override_dh_auto_test:

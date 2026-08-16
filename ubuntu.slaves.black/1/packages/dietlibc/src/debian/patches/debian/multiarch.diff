@@ -1,0 +1,178 @@
+Description: Add Debian multiarch to diet wrapper
+ In order to properly support Debian-style multiarch, make the diet
+ wrapper use /usr/lib/<triplet>/diet instead of /usr/lib/diet as its
+ default diethome, while still detecting cross compilers. This is far
+ easier than patching dietlibc to use different short architecture
+ names for the cases where the same name is used for multiple Debian
+ archs (powerpc/powerpcspe: ppc, armel/armhf: arm, etc.), all the
+ while still retaining some degree of compatibility with upstream.
+ .
+ If no cross compiler is detected, the native architecture is used, if
+ an unknown cross compiler is detected, /usr/lib/diet is used as the
+ default fallback. Setting the DIETHOME environment variable can
+ override this, of course.
+Author: Christian Seiler <christian@iwakd.de>
+Forwarded: no (Debian-specific)
+Last-Update: 2016-05-02
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/diet.c
++++ b/diet.c
+@@ -1,4 +1,4 @@
+-#include <string.h>
++
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <stdio.h>
+@@ -47,6 +47,96 @@ static const char* Os[] = {
+   "ia64","-Os","-fno-omit-frame-pointer",0,
+   0};
+ 
++#ifdef INSTALLVERSION
++static char *debian_diethome(int argc, char *argv[]) {
++  int cc_arg = 1;
++  /* All architectures that are currently supported in Debian's
++   * dietlibc package. */
++  static const char *debian_arch_table[] = {
++    "alpha-linux-gnu",
++    "x86_64-linux-gnu",
++    "aarch64-linux-gnu",
++    "arm-linux-gnu",
++    "armeb-linux-gnu",
++    "arm-linux-gnueabi",
++    "arm-linux-gnueabihf",
++    "hppa-linux-gnu",
++    "i386-linux-gnu",
++    "ia64-linux-gnu",
++    "mips-linux-gnu",
++    "mipsel-linux-gnu",
++    "mips64el-linux-gnuabi64",
++    "powerpc-linux-gnu",
++    "powerpc-linux-gnuspe",
++    "powerpc64-linux-gnu",
++    "powerpc64le-linux-gnu",
++    "s390-linux-gnu",
++    "s390x-linux-gnu",
++    "sparc-linux-gnu",
++    "sparc64-linux-gnu",
++    "x86_64-linux-gnux32",
++    0
++  };
++  /* Increase this if there's ever an arch with more than 64 characeters. */
++  static char result[64 + sizeof("/usr/lib/") - 1 + sizeof("/diet")];
++  const char **debian_arch;
++  int m, i;
++
++  /* The following code repeats some stuff that is done in main(), but
++   * but we want the dietlibc change to be as uninvasive as possible. */
++  m=0;
++  for (i=1; i<argc; ++i) {
++    if (!strcmp(argv[i],"-m32")) m=32; else
++    if (!strcmp(argv[i],"-mx32")) m=33; else
++    if (!strcmp(argv[i],"-m64")) m=64;
++  }
++
++  while (argv[cc_arg] && (
++    strcmp(argv[cc_arg], "-v") == 0 ||
++    strcmp(argv[cc_arg], "-L") == 0 ||
++    strcmp(argv[cc_arg], "-Os") == 0
++  )) cc_arg++;
++  if (!argv[cc_arg]) {
++    strcpy(result, DIETHOME);
++    goto check_m;
++  }
++  for (debian_arch = debian_arch_table; *debian_arch; debian_arch++) {
++    if (strncmp(*debian_arch, argv[cc_arg], strlen(*debian_arch)) == 0 &&
++        argv[cc_arg][strlen(*debian_arch)] == '-') {
++      strcpy(result, "/usr/lib/");
++      strcat(result, *debian_arch);
++      strcat(result, "/diet");
++      goto check_m;
++    }
++  }
++  /* Unknown cross-compiler, default to /usr/lib/diet */
++  if (strstr(argv[cc_arg], "-linux-")) {
++    strcpy(result, "/usr/lib/diet");
++    return result;
++  } else {
++    strcpy(result, DIETHOME);
++    goto check_m;
++  }
++
++check_m:
++  /* If x86 is selected, check if multilib -m{32,x32,64} is specified,
++   * and use alternative diethome instead. This is required for
++   * diet gcc -m32 to work on amd64. */
++  if (!strcmp(result, "/usr/lib/x86_64-linux-gnu/diet")
++   || !strcmp(result, "/usr/lib/i386-linux-gnu/diet")
++   || !strcmp(result, "/usr/lib/x86_64-linux-gnux32/diet")
++  ) {
++    switch (m) {
++      case 32: strcpy(result, "/usr/lib/i386-linux-gnu/diet"); break;
++      case 33: strcpy(result, "/usr/lib/x86_64-linux-gnux32/diet"); break;
++      case 64: strcpy(result, "/usr/lib/x86_64-linux-gnu/diet"); break;
++      default: break;
++    }
++  }
++  return result;
++}
++#endif
++
+ static void usage(void) {
+   __write2(
+ #ifdef __DYN_LIB
+@@ -68,6 +158,7 @@ int main(int argc,char *argv[]) {
+   int preprocess=0;
+   int verbose=0;
+   int profile=0;
++  int cross=0;
+   char* diethome;
+   char* platform;
+ #ifdef __DYN_LIB
+@@ -82,6 +173,11 @@ int main(int argc,char *argv[]) {
+   const char *libgcc="-lgcc";
+   char *libpthread="-lpthread";
+   char dashL[1000];
++  /* Older, MultiArch-unaware dietlibc versions would install the libs
++   * into /usr/lib/diet/lib, and some packages might still put other
++   * static libraries there, so we need to support that for at least
++   * one Debian release. */
++  char dashL_debian_old[] = "-L/usr/lib/diet/lib";
+   char dashstatic[]="-static";
+   char dashshared[]="-shared";	// for -fpie
+   int i;
+@@ -91,7 +187,11 @@ int main(int argc,char *argv[]) {
+   int m,pie;
+ 
+   if (!(diethome = getenv("DIETHOME")))
++#ifdef INSTALLVERSION
++    diethome=debian_diethome(argc, argv);
++#else
+     diethome=DIETHOME;
++#endif
+ #ifdef WANT_SAFEGUARD
+   safeguard2=alloca(strlen(diethome)+30);
+   strcpy(safeguard2, diethome);
+@@ -160,6 +260,7 @@ int main(int argc,char *argv[]) {
+         strcpy(shortplatform, "mips64");
+       if (!strncmp(cc, "x86_64-linux-gnux32-", 20) || !strncmp(cc, "x86_64-pc-linux-gnux32-", 23))
+         strcpy(shortplatform, "x32");
++      cross=1;
+     } else {
+ #ifdef __sparc__
+ #ifdef __arch64__
+@@ -341,11 +442,13 @@ pp:
+ 	*dest++=(char*)nostdlib;
+ 	*dest++=pie ? dashshared : dashstatic;
+ 	*dest++=dashL;
++	if (!cross)
++	  *dest++=dashL_debian_old;
+       }
+ #else
+       /* avoid R_*_COPY relocations */
+       *dest++="-fPIC";
+-      if (_link || shared) { *dest++=(char*)nostdlib; *dest++=dashL; }
++      if (_link || shared) { *dest++=(char*)nostdlib; *dest++=dashL; if (!cross) *dest++=dashL_debian_old; }
+ #endif
+ #ifdef WANT_SAFEGUARD
+       if (compile && !preprocess) {

@@ -1,0 +1,34 @@
+From 64a882a32fdf126ef20e6b6403b5cb158dad21f4 Mon Sep 17 00:00:00 2001
+From: Damir Islamov <damir@secretlaboratory.ru>
+Date: Tue, 19 Oct 2021 13:12:55 +0700
+Subject: [PATCH] Fix kernel removing: ... run-parts: executing
+ /etc/kernel/prerm.d/dkms 5.14.8-1 /boot/vmlinuz-5.14.8-1 dkms: removing:  
+ (5.14.8-1) (x86_64) Error! Arguments <module> and <module-version> are not
+ specified. Usage: remove <module>/<module-version> or        remove -m
+ <module>/<module-version> or        remove -m <module> -v <module-version>
+ ...
+
+Origin: upstream, https://github.com/dell/dkms/commit/64a882a32fdf126ef20e6b6403b5cb158dad21f4
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=996104
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1005812
+Bug-Ubuntu: https://launchpad.net/bugs/1963835
+Last-Update: 2022-04-01
+---
+ kernel_prerm.d_dkms | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/kernel_prerm.d_dkms b/kernel_prerm.d_dkms
+index 13eff2e..fd2ebda 100755
+--- a/kernel_prerm.d_dkms
++++ b/kernel_prerm.d_dkms
+@@ -13,8 +13,8 @@ remove_initrd_backup() {
+ 
+ if [ -x /usr/sbin/dkms ]; then
+ while read line; do
+-   name=`echo "$line" | awk '{print $1}' | sed 's/,$//'` | cut -d'/' -f1
+-   vers=`echo "$line" | awk '{print $1}' | sed 's/,$//'` | cut -d'/' -f2
++   name=`echo "$line" | awk '{print $1}' | sed 's/,$//' | cut -d'/' -f1`
++   vers=`echo "$line" | awk '{print $1}' | sed 's/,$//' | cut -d'/' -f2`
+    arch=`echo "$line" | awk '{print $3}' | sed 's/:$//'`
+    echo "dkms: removing: $name $vers ($inst_kern) ($arch)" >&2
+    dkms remove -m $name -v $vers -k $inst_kern -a $arch

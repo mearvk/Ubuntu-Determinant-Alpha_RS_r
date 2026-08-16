@@ -1,0 +1,50 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Insert some debugging code in flyspell-external-point-words
+
+Index: dictionaries-common/support/emacsen/flyspell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/flyspell.el	2014-10-14 18:27:32.099498354 +0200
++++ dictionaries-common/support/emacsen/flyspell.el	2014-10-14 18:27:32.095498363 +0200
+@@ -1352,7 +1352,10 @@
+   (let (words-not-found
+ 	(ispell-otherchars (ispell-get-otherchars))
+ 	(buffer-scan-pos flyspell-large-region-beg)
+-	case-fold-search)
++	case-fold-search
++	misspell-mismatches
++	(debian-debug (and (boundp 'debian-dict-common-debug)
++			   debian-dict-common-debug)))
+     (with-current-buffer flyspell-external-ispell-buffer
+       (goto-char (point-min))
+       ;; Loop over incorrect words, in the order they were reported,
+@@ -1397,7 +1400,11 @@
+ 			     ;; what flyspell considers the word.
+                              ;; Caused by boundary-chars mismatch.
+                              ;; Validating seems safe.
+-			     (< found-length misspell-length)
++			     (and (< found-length misspell-length)
++				  (add-to-list
++				   'misspell-mismatches
++				   (concat "ispell: " word
++					   ", flyspell-get-word: " found)))
+ 			     ;; ispell treats beginning of some TeX
+ 			     ;; commands as nroff control sequences
+ 			     ;; and strips them in the list of
+@@ -1428,9 +1435,15 @@
+     ;; Warn about not found misspellings
+     (dolist (word words-not-found)
+       (message "%s: word not found" word))
++    (when (and debian-debug misspell-mismatches)
++      (message "Misspelling length is higher than what flyspell-get-word considers
++a word. Possible boundary chars or encoding mismatch:")
++      (dolist (mismatch misspell-mismatches)
++	(message " %s:     misspelled and found string mismatch" mismatch)))
+     ;; Kill and forget the buffer with the list of incorrect words.
+-    (kill-buffer flyspell-external-ispell-buffer)
+-    (setq flyspell-external-ispell-buffer nil)))
++    (unless debian-debug
++      (kill-buffer flyspell-external-ispell-buffer)
++      (setq flyspell-external-ispell-buffer nil))))
+ 
+ ;;*---------------------------------------------------------------------*/
+ ;;*    flyspell-process-localwords ...                                  */

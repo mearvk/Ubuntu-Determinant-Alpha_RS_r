@@ -1,0 +1,37 @@
+# --------------------------------------------------------------------------
+# dictionaries-common.config-footer:
+#  Specific final stuff to be run from dictionaries-common.config
+# --------------------------------------------------------------------------
+
+&dc_debugprint("\ndictionaries-common: (re)configuring ...\n");
+
+# Prompting the questions if required
+if ( not -e $dcscript ){            # First dictionaries-common installation
+  foreach my $class ("ispell","wordlist"){
+    &dc_debugprint("\n- dictionaries-common.config: Initial configuration for class \"$class\".\n\n");
+    # This returns $class and $priority (along with here unused $guess)
+    my $classinfo = &dc_set_default_value_for_class($class);
+    if ( $classinfo ){
+      &dc_debconf_select($classinfo);
+      # This might have been pre-seeded and question not asked.
+      # Make sure question is tagged as seen in this case
+      fset ("dictionaries-common/default-$class", "seen", "true");
+      go();
+    } else {
+      &dc_debconf_select($class);
+    }
+  }
+} else {                              # Reconfiguring or upgrading
+  foreach my $class ("ispell","wordlist"){
+    &dc_debconf_select({'class' => $class});
+  }
+}
+
+&dc_debugprint("\ndictionaries-common: (re)configuring ...Done.\n\n");
+
+# Local Variables:
+# mode: perl
+# perl-indent-level: 2
+# coding: iso-8859-1
+# End:
+

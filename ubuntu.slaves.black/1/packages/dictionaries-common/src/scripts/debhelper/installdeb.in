@@ -1,0 +1,380 @@
+#!/usr/bin/perl -w
+#
+# Registration with [I:ispell dictionary:][A:aspell dictionary:][H:hunspell dictionary:][W:wordlists:]
+
+use strict;
+
+my $class = "[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]";
+my $program = "installdeb-$class";
+my $debug;
+
+# =======================================================
+# Main part
+# =======================================================
+
+use Text::Wrap;
+$Text::Wrap::columns = 72;
+
+use Debian::Debhelper::Dh_Lib;
+use Debian::DictionariesCommon q(:all);
+use Devel::DictionariesCommon q(:all);
+
+if ( "$class" eq "wordlist" or "$class" eq "ispell" ){
+  init( options => { 'write-elanguages'  => \$dh{WRITE_ELANGUAGES},
+		     'no-elanguages'     => \$dh{DISABLE_ELANGUAGES},
+		     'no-pre-post'       => \$dh{DISABLE_PREPOST},
+		     'no-installdebconf' => \$dh{NO_INSTALLDEBCONF}
+		   });
+} elsif ( $class eq "aspell" ){
+  init(options => { 'aspell-simple' => \$dh{ASPELL_SIMPLE} });
+} else {
+  init();
+}
+
+if ( $dh{NOSCRIPTS} ){
+  $dh{DISABLE_PREPOST}++;
+  $dh{NO_INSTALLDEBCONF}++;
+};
+
+delete $dh{WRITE_ELANGUAGES} if ( $dh{DISABLE_ELANGUAGES} );
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+  my $lib_dir       = tmpdir($package) . getlibdir($class);
+  my $usr_lib_dir   = tmpdir($package) . "/usr/lib/$class";
+  my $var_lib_dir   = tmpdir($package) . "/var/lib/$class";
+  my $usr_share_dir = tmpdir($package) . "/usr/share/$class";
+  my %options       = ('class'         => $class,
+		       'program'       => $program,
+		       'package'       => $package,
+		       'lib_dir'       => $lib_dir,
+		       'usr_lib_dir'   => $usr_lib_dir,
+		       'var_lib_dir'   => $var_lib_dir,
+		       'usr_share_dir' => $usr_share_dir
+		      );
+
+  # "cdbs" snippets call installdeb-* scripts unconditionally in
+  # case there is something for them.
+  # Do not trigger an error if not found, just try next one.
+  my $dicts = dico_process_infofile(\%options)
+    or next;
+
+  #[A:
+  # Will return undef unless  $dh{ASPELL_SIMPLE} is enabled
+  my $dico_aspell_simple =  dico_process_aspell_simple(\%options);
+  # :A]
+
+  # Install debhelper and debhelper-like auto-scripts
+  unless ( $dh{NOSCRIPTS} or $dh{DISABLE_PREPOST}) {
+
+    # Install normal autoscripts. While called earlier than autocompat
+    # autoscripts, will be placed later in maintainer scripts.
+    autoscript ($package, "postinst", "postinst-$class",
+		"s/#PACKAGE#/$package/");
+    autoscript ($package, "postrm", "postrm-$class",
+		"s/#PACKAGE#/$package/");
+
+    if ( $class eq "ispell" || $class eq "aspell" ){
+      my %hash_extension   = ("ispell" => "hash", "aspell" => "rws");
+      my $autocompat_info  = dico_process_autocompat($dicts,\%options);
+
+      #[A:
+      if ( $dh{ASPELL_SIMPLE}
+	   && ! %{$autocompat_info->{'auto-compat'}}
+	   && defined $dico_aspell_simple->{'lang'} ){
+	$autocompat_info = $dico_aspell_simple;
+	if ( defined $dico_aspell_simple->{'auto-contents'}
+	     && %{$dico_aspell_simple->{'auto-contents'}} ){
+	  # Install a contents file in $(DESTDIR) share dir
+	  my $contents = join(" ",sort keys %{$dico_aspell_simple->{'auto-hash'}});
+	  complex_doit("echo $contents | tr -s ' ' '\n' > $usr_share_dir/$dico_aspell_simple->{'lang'}.contents");
+	}
+      }
+      #:A]
+
+      if ( %{$autocompat_info->{'auto-compat'}} ){
+	verbose_print("$program info:");
+	if ( defined  $autocompat_info->{'auto-contents'}
+	     && %{$autocompat_info->{'auto-contents'}} ){
+	  verbose_print(" auto-contents: \"",join(', ',sort keys %{$autocompat_info->{'auto-contents'}}),"\"");
+	}
+	verbose_print(" auto-compat: \"",join(', ',sort keys %{$autocompat_info->{'auto-compat'}}),"\"");
+	verbose_print(" auto-hash: \"",  join(', ',sort keys %{$autocompat_info->{'auto-hash'}}), "\"");
+      }
+
+      # Install autocompat autoscripts
+      if ( %{$autocompat_info->{'auto-compat'}} ){
+	dico_install_autocompat($autocompat_info,\%options);
+      }
+    }
+
+    # Populate substvars $class:Depends
+    dico_populate_substvars(\%options);
+  }
+  #[IW: -- Handle debconf stuff for this package
+  unless ( $dh{NOSCRIPTS} ){
+    dico_create_debconf_files($class,$package,$dicts);
+    dico_installcleandebconf($package) unless ( $dh{NO_INSTALLDEBCONF} )
+  }
+  #:IW][AH:# -- No debconf handling needed for aspell or hunspell --:]
+}
+
+
+__END__
+
+=head1 NAME
+
+B<installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> - debhelper-like utility for
+maintainers of [I:ispell dictionary:][A:aspell dictionary:][W:wordlist:] Debian packages
+
+=head1 SYNOPSIS
+
+ installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:] [debhelper options] [IW:[options]:IW]
+
+=head1 DESCRIPTION
+
+B<installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> is a debhelper like program that is
+responsible for installing appropriate [IW:debconf config and templates
+files and :IW]debhelper snippets in
+a[IA:n:IA] [I:ispell dictionary:][A:aspell dictionary:A][W:wordlist:] package,
+according to the Debian Spell Dictionaries and Tools Policy.
+
+For more details, see
+ /usr/share/doc/dictionaries-common-dev/dsdt-policy.txt.gz
+
+The actions executed by B<installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> are the
+following:
+
+=over
+
+=item * Maintainer Scripts
+
+B<installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> installs the necessary
+scraps of code in the F<postinst> and F<postrm> scripts.
+
+=item * Language info file
+
+B<installdeb-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> also checks a file containing
+[I:ispell dictionary:][A:aspell dictionary:][W:wordlist:] information, called
+F<debian/info-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> or
+F<debian/package.info-[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]>.  If this file is
+successfully parsed, it is installed in the
+F</var/lib/dictionaries-common/[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]> directory.
+
+=item * Substvars substitutions
+
+This script will populate a F<substvars> file, so Depends line in
+control file can contain
+${[I:ispell:][A:aspell:][H:hunspell:][W:wordlist:]:Depends} to
+automatically care for dictionaries-common dependencies.
+
+This requires C<Build-Depends> on at least dictionaries-common-dev
+1.23.0 and is highly recommended.
+
+=item * Debconf files
+[IW:
+=over
+
+=item o templates and config files
+
+B<installdeb-[I:ispell:][W:wordlist:]> installs the Policy compliant
+Debconf files from the information contained in the
+F<info-[I:ispell:][W:wordlist:]> file.  These files are created as
+F<debian/config> (or F<debian/package.config>) and F<debian/templates>
+(or F<debian/package.templates>).  No intervention is needed here,
+since B<installdeb-[I:ispell:][W:wordlist:]> will make a call to
+dh_installdebconf(1).
+
+If the package needs to have special code in the F<config> file, the maintainer
+should supply files called F<debian/config.in> (or
+F<debian/package.config.in>). In the F<config.in> file, the string
+C<#DEBHELPER#> must appear alone in one line and start at the first
+column.  B<installdeb-[I:ispell:][W:wordlist:]> will replace that
+token with the necessary Policy compliant code (this works with
+F<config.in> is either a Bourne shell or Perl script).
+
+If the package needs to define its own questions via the F<templates>
+file the maintainer should either supply files F<debian/po-master.templates>
+(or F<debian/package.po-master.templates>) together with the appropriate
+po files if the package handles template localization through po-debconf,
+or F<debian/templates.in> (or F<debian/package.templates.in>) otherwise.
+See the po-debconf(7) manual page for more details and remember that the
+master templates name is now different.
+
+The templates defined in the F<templates.in> or F<po-master.templates> files
+are merged into the Policy compliant templates by
+installdeb-[I:ispell:][W:wordlist:] and a call to dh_installdebconf(1)
+is internally done.
+
+=item o The elanguages template field
+
+This field is useful if you want to override the debconf languages string
+with something different (since the master string remains the same, this
+will not trigger a new debconf call) or if you really think that the
+languages string should be internationalized for your package. Note that
+for most packages the poor man default localization should be enough, and
+translators should have another priorities.
+
+installdeb-[I:ispell:I][W:wordlist:W] default behavior is not adding an
+C<elanguages> field to the templates file. If you want it added you have
+to call the script with the explicit B<--write-elanguages> option.
+
+This field will be added with value taken from the C<Elanguage> entry in
+the info file if present, or after the C<Language> value otherwise. Note
+that this is useful only if:
+
+=over
+
+=item - You want to fix a buggy entry
+
+In this case just fill the C<Elanguage> field in the info file with the
+new value. This will be shown at the debconf prompt.
+
+=item - You want to fully internationalize your entries
+
+In this case some black magic is needed at first time for smooth use,
+
+=over
+
+=item (a) Run B<installdeb-{ispell,wordlist} --no-installdebconf --write-elanguages> for
+      every package whose string should be internationalized. Edit the
+      created F<.templates> files and remove the leading underscores in
+      the elanguages entry if present.
+
+=item (b) Run B<debconf-gettextize templates_to_be_internationalized>.
+      Check that all the desired F<.templates> files are in
+      F<debian/po/POTFILES.in> and remove old F<.config> and
+      F<.templates> files.
+
+=item (c) Run again B<installdeb-{ispell,wordlist} --no-installdebconf --write-elanguages> and
+      B<debconf-updatepo> (no edit here) to remove references to
+      non-translatable strings. Check that the desired strings are in the po
+      master file (F<debian/po/templates.pot>) and remove F<.config> and
+      F<.templates> files. You are done. If the master C<Elanguages> string
+      is changed, repeat (c) afterward.
+
+=back
+
+=back
+
+=back
+
+:IW][AH:
+As opposed to B<installdeb-ispell> and B<installdeb-wordlist>, neither B<installdeb-aspell>
+nor B<installdeb-hunspell> do anything related to debconf files, since both aspell and
+hunspell rely on the environment variable C<LANG> for default dictionary selection
+instead of using symlinks set after a debconf question on dictionary
+installation. For that reason if you need to add debconf stuff with debhelper
+to your aspell or hunspell dictionary package do it in the usual way and call
+dh_installdebconf(1) as for any other package.
+:AH][I:
+
+=item * Extra installdeb-ispell options in Language info file
+
+For benefit of ispell dictionaries using B<ispell-autobuildhash>,
+B<installdeb-ispell> script will look for C<'auto-compat'> fields in
+F<$dict.info-ispell>, containing base name(s) of your compat file(s).
+If C<'auto-compat'> entry is found two debhelper snippets are added,
+one to create/reset compatfile(s) in postinst and the other to remove
+files in a removal list from postrm.
+Removal list will contain compat file(s) and associated hash(es) with
+the same basename.
+
+F</usr/lib/ispell/$dict.hash -E<gt> /var/lib/ispell/$dict.hash>
+symlinks are no longer created automatically by this script.
+They are now created by new ispell-autobuildhash together with the
+relevant hashes.
+Make sure to depend on at least dictionaries-common 1.23
+(See F<dictionaries-common.checklist>). :I][A:
+
+=item * Extra installdeb-aspell options in Language info file
+
+For benefit of aspell dictionaries using B<aspell-autobuildhash>,
+B<installdeb-aspell> script will look for C<'auto-compat'> and
+C<'auto-contents'> fields in F<$lang.info-aspell>, containing base
+name(s) of your compat and, if needed, contents file(s).  If
+C<'auto-compat'> entry is found two debhelper snippets are added, one
+to create/reset compatfile(s) in postinst and the other to remove
+files in a removal list (initially containing compat files) from
+postrm.  If C<'auto-contents'> entry is found, contents file at
+F<debian/> will be parsed and its contents added to the removal list,
+otherwise a hash with the same basename of the compatfile is expected
+and added to the removal list.  If you use a contents file and enable
+it in C<'auto-contents'> you usually will need only the same base name
+enabled in C<'auto-compat'>.
+
+If you are interested in a simple install of a pristine aspell
+dictionary with a minimal debian/rules please look at
+L<dh_aspell-simple(1)>.
+You will still need an aspell-info file, but compat/contents stuff
+will be guessed if not explicitly provided in the aspell-info file.
+
+F</usr/lib/aspell/$dict.rws -E<gt> /var/lib/aspell/$dict.rws>
+symlinks are no longer created automatically by this script.
+They are now created by new aspell-autobuildhash together with the
+relevant hashes.
+Make sure to depend on at least dictionaries-common 1.23
+(See F<dictionaries-common.checklist>).
+
+:A]
+
+=back
+
+=head1 OPTIONS
+
+The usual dephelper(1) options are accepted. [IW:Options below are specific
+to B<installdeb-[I:ispell:I][W:wordlist:W]>
+
+=over
+
+=item B<--no-installdebconf>
+
+Do not run B<dh_installdebconf> nor remove templates and config file.
+
+=item B<--no-pre-post>
+
+Do not install {pre,post}{inst,rm} snippets.
+
+=item B<--write-elanguages>
+
+Create the elanguages stuff.
+
+=item B<--debug>
+
+Show some extra info.
+
+=back
+:IW]
+
+=head1 NOTES
+
+This program is not part of debhelper, although it is intended to be used
+in [I:ispell dictionary:][A:aspell dictionary:][H:hunspell dictionary:][W:wordlist:] packages using debhelper in its
+building.
+
+=head1 SEE ALSO
+
+debhelper(1),
+dictionaries-common.checklist,
+dsdt-policy.txt
+
+This program is part of the dictionaries-common-dev package. It is
+intended to be used by maintainers of
+[I:ispell dictionary:][A:aspell dictionary:][H:hunspell dictionary:][W:wordlist:]
+packages for Debian. See the documentation
+under /usr/share/doc/dictionaries-common-dev.
+
+=head1 AUTHORS
+
+Rafael Laboissiere, Agustin Martin
+
+=cut
+
+# Local Variables:
+#  mode: perl
+#  mode: flyspell-prog
+#  ispell-local-dictionary: "american"
+# End:
+
+#  LocalWords:  aspell ispell wordlist debconf debhelper Debian config postrm
+#  LocalWords:  debian elanguages installdeb dephelper installdebconf Elanguage
+#  LocalWords:  Laboissiere

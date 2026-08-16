@@ -1,0 +1,54 @@
+Description: Fix waitpid with -lpthread on s390{,x}, mips64, ia64
+ On these four architectures waitpid() was defined as a strong function
+ in libc directly, instead of having a weak alias to __libc_waitpid.
+ Due to the unavailability of __libc_waitpid for this reason, linking
+ against -lpthread was not possible in many cases. Follow the scheme
+ for waitpid that is used on other architectures to make linking
+ against -lpthread work again.
+Author: Christian Seiler <christian@iwakd.de>
+Bug-Debian: https://bugs.debian.org/844781
+Last-Update: 2017-01-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/ia64/__waitpid.c
++++ b/ia64/__waitpid.c
+@@ -1,6 +1,10 @@
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ 
+-pid_t waitpid(pid_t pid, int * wait_stat, int flags) {
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags);
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags) {
+   return wait4(pid, wait_stat, flags, 0);
+ }
++
++pid_t waitpid(pid_t pid, int * wait_stat, int flags)
++__attribute__((weak,alias("__libc_waitpid")));
+--- a/s390/__waitpid.c
++++ b/s390/__waitpid.c
+@@ -1,6 +1,10 @@
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ 
+-pid_t waitpid(pid_t pid, int * wait_stat, int flags) {
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags);
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags) {
+   return wait4(pid, wait_stat, flags, 0);
+ }
++
++pid_t waitpid(pid_t pid, int * wait_stat, int flags)
++__attribute__((weak,alias("__libc_waitpid")));
+--- a/s390x/__waitpid.c
++++ b/s390x/__waitpid.c
+@@ -1,6 +1,10 @@
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ 
+-pid_t waitpid(pid_t pid, int * wait_stat, int flags) {
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags);
++pid_t __libc_waitpid(pid_t pid, int * wait_stat, int flags) {
+   return wait4(pid, wait_stat, flags, 0);
+ }
++
++pid_t waitpid(pid_t pid, int * wait_stat, int flags)
++__attribute__((weak,alias("__libc_waitpid")));

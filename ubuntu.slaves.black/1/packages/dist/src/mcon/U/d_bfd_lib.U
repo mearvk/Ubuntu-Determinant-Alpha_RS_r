@@ -1,0 +1,51 @@
+?RCS: $Id: d_dlopen.U 40 2010-11-27 20:54:48Z rmanfredi $
+?RCS:
+?RCS: Copyright (c) 2012 Raphael Manfredi
+?RCS:
+?RCS: You may redistribute only under the terms of the Artistic License,
+?RCS: as specified in the README file that comes with the distribution.
+?RCS: You may reuse parts of this distribution only within the terms of
+?RCS: that same Artistic License; a copy of which may be found at the root
+?RCS: of the source tree for dist 4.0.
+?RCS:
+?MAKE:d_bfd_lib: Trylink cat
+?MAKE:	-pick add $@ %<
+?S:d_bfd_lib:
+?S:	This variable conditionally defines the HAS_BFD_LIBRARY symbol, which
+?S:	indicates to the C program that the BFD library is available.
+?S:.
+?C:HAS_BFD_LIBRARY :
+?C:	This symbol, if defined, indicates that the BFD library is available
+?C:	to inspect symbols and debugging information.  You can safely include
+?C:	the <bfd.h> file when this symbol is defined, making sure to define
+?C:	the PACKAGE and PACKAGE_VERSION symbols, just in case we're facing
+?C:	binutils 2.23 or higher.
+?C:.
+?H:#$d_bfd_lib HAS_BFD_LIBRARY		/**/
+?H:.
+?LINT:set d_bfd_lib
+: see whether the bfd library is available
+$cat >try.c <<EOC
+?X: Starting with binutils 2.23, it is necessary to define some symbols before
+?X: including <bfd.h>, or the file does not compile properly.  Do it blindly
+?X: since we do not want to bother with the actual version of the file.
+?X: This is a BFD library bug, as reported in:
+?X: https://sourceware.org/bugzilla/show_bug.cgi?id=15920
+#define PACKAGE
+#define PACKAGE_VERSION
+#include <bfd.h>
+int main(void)
+{
+	bfd *b;
+	b = bfd_openr("file", 0);
+	return b ? 0 : 1;
+}
+EOC
+cyn="whether the BFD library is available"
+?X: Modern BFD library versions no longer require -lintl and -liberty but do
+?X: require -ldl, on Linux at least. -- RAM, 2014-07-22
+set d_bfd_lib '-lbfd -lintl -liberty' '-lbfd -liberty' '-lbfd -liberty -lz' \
+	'-lbfd -lintl -liberty -lz' '-lbfd -lz' '-lbfd -lintl -lz' \
+	'-lbfd -lz -ldl'
+eval $trylink
+

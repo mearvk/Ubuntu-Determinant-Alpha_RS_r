@@ -1,0 +1,11 @@
+GCC_INCLUDE_PATHS:=$(shell : | env LC_ALL=C gcc -E -Wp,-v - 2>&1 >/dev/null | sed --posix -e '1,/<\.\.\.> search starts here/d' -e '/End of search list/,$$d' -e 's/^ //' | while IFS= read -r line; do realpath "$$line"; done | grep -E '^/usr/lib(|data|exec)/gcc/' | sed --posix 's/^/-isystem /')
+CFLAGS += -Os -fstrict-aliasing -momit-leaf-frame-pointer
+ifneq ($(CC),clang)
+CFLAGS += -mfancy-math-387
+endif
+ALWAYS_PIC=1
+VPATH  := x86_64:syscalls.s:$(VPATH)
+LIBOBJ += $(OBJDIR)/arch_prctl.o $(OBJDIR)/__CAS.o $(OBJDIR)/__munmap_and_exit.o $(OBJDIR)/getcontext.o
+LIBOBJ += $(OBJDIR)/setcontext.o $(OBJDIR)/start-pie.o $(OBJDIR)/stackgap-pie.o
+
+$(OBJDIR)/memccpy.o $(PICODIR)/memccpy.o: SPECIFICCFLAGS+=${GCC_INCLUDE_PATHS}

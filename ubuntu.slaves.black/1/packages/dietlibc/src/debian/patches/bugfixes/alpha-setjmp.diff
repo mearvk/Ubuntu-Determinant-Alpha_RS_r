@@ -1,0 +1,55 @@
+Description: alpha: fix broken setjmp()
+ setjmp() on alpha was broken (due to the way the GP was handled). This
+ patch adds a proper prologue to all setjmp variants, and ensures that
+ the jump to __sigjmp_save includes the information that the GP hasn't
+ changed, so __sigjmp_save doesn't erroneously try to reload it in its
+ own prologue, reading a wrong value and crashing.
+Author: Christian Seiler <christian@iwakd.de>
+Last-Update: 2017-01-25
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/alpha/setjmp.S
++++ b/alpha/setjmp.S
+@@ -1,16 +1,34 @@
+ #include <setjmp.h>
+ 
+ .text
++
+ .weak setjmp
++.ent setjmp
+ .type setjmp,@function
+ setjmp:
++	ldgp	$gp, 0($27)
++.prologue 1
++	mov	0, $17
++	br	.Lsetjmp_impl
++.end setjmp
++
+ .weak __setjmp
++.ent __setjmp
+ .type __setjmp,@function
+ __setjmp:
++	ldgp	$gp, 0($27)
++.prologue 1
+ 	mov	0, $17
++	br	.Lsetjmp_impl
++.end __setjmp
++
+ .global __sigsetjmp
++.ent __sigsetjmp
+ .type __sigsetjmp,@function
+ __sigsetjmp:
++	ldgp	$gp, 0($27)
++.prologue 1
++.Lsetjmp_impl:
+ 	stq	 $9, (JB_S0*8) ($16)	/* s0 */
+ 	stq	$10, (JB_S1*8) ($16)	/* s1 */
+ 	stq	$11, (JB_S2*8) ($16)	/* s2 */
+@@ -31,5 +49,5 @@ __sigsetjmp:
+ 	stt	$f8, (JB_F8*8) ($16)	/* f8 */
+ 	stt	$f9, (JB_F9*8) ($16)	/* f9 */
+ 
+-	br	$31, __sigjmp_save	/* jmp  __sigjmp_save */
+-
++	br	$31, __sigjmp_save	!samegp /* jmp  __sigjmp_save */
++.end __sigsetjmp

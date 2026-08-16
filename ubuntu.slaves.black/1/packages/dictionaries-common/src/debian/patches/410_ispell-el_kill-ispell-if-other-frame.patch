@@ -1,0 +1,82 @@
+Author: <agmartin@debian.org>
+Description: Disable kill-ispell-if-other-frame-event until we can make it portable 
+
+(characterp) availability
+emacs21: no
+emacs22: no
+emacs23: yes
+emacs-snapshot: yes
+xemacs: yes
+
+(read-event) availability
+emacs21: yes
+emacs22: yes
+emacs23: yes
+emacs-snapshot: yes
+xemacs: no
+
+(read-key) availability
+emacs23: yes
+xemacs: no
+
+(mouse-event-p) availability
+emacs21: no
+emacs22: no
+emacs23: yes
+emacs-snapshot: yes
+xemacs: yes
+
+(posn-window) availability
+emacs21: yes
+emacs22: yes
+emacs23: yes
+emacs-snapshot: yes
+xemacs: no
+
+(event-start) availability
+emacs21: yes
+emacs22: yes
+emacs23: yes
+emacs-snapshot: yes
+xemacs: no
+
+Index: dictionaries-common/support/emacsen/ispell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/ispell.el	2014-10-14 18:27:17.891529285 +0200
++++ dictionaries-common/support/emacsen/ispell.el	2014-10-14 18:27:17.887529293 +0200
+@@ -2301,19 +2301,22 @@
+ 				     "unchanged, Character to replace word")))
+ 		  (let ((inhibit-quit t)
+ 			(input-valid t))
+-		    (setq char nil skipped 0)
+-		    ;; If the user types C-g, or generates some other
+-		    ;; non-character event (such as a frame switch
+-		    ;; event), stop ispell.  As a special exception,
+-		    ;; ignore mouse events occurring in the same frame.
+-		    (while (and input-valid (not (characterp char)))
+-		      (setq char (read-key))
+-		      (setq input-valid
+-			    (or (characterp char)
+-				(and (mouse-event-p char)
+-				     (eq (selected-frame)
+-					 (window-frame
+-					  (posn-window (event-start char))))))))
++		    (setq skipped 0)
++		    (if (featurep 'xemacs)
++			(setq char (read-char-exclusive))
++		      (setq char nil)
++		      ;; Stop ispell when user generates a non-character event
++		      ;; (such as a frame switch event). As a special exception,
++		      ;; ignore mouse events occurring in the same frame.
++		      (while (and input-valid (not (characterp char)))
++			(setq char (read-key))
++			(setq input-valid
++			      (or (characterp char)
++				  (and (mouse-event-p char)
++				       (eq (selected-frame)
++					   (window-frame
++					    (posn-window (event-start char)))))))))
++		    ;; Stop ispell when user types C-g. C-g is like typing X
+ 		    (when (or quit-flag (not input-valid) (= char ?\C-g))
+ 		      (setq char ?X quit-flag nil)))
+ 		  ;; Adjust num to array offset skipping command characters.

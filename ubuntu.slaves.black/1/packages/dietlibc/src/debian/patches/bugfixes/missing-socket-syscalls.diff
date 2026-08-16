@@ -1,0 +1,151 @@
+Description: Add missing socket-related syscalls on various platforms
+ Various platforms were missng socket-related syscalls (e.g. send(),
+ recv()); make sure they are available.
+ .
+  - define accept4() in sys/socket.h
+  - generic: define ppoll() syscall, been available since 2.6.16 (a
+    decade ago)
+  - aarch64, mips64: re-use x86_64's recv/send implementation that
+    defers to recvfrom()/sendto()
+  - parisc: fix weak syscalls (wrong order in macro definition),
+    declare sendto in __sendto.S not sendto.S to properly override the
+    generic version (need syscall6 here)
+  - arm, ia64: define __NR_ppoll
+  - add generic __accept4 implementation via socketcall if that's what
+    the architecture supports (currently s390[x] only)
+Author: Christian Seiler <christian@iwakd.de>
+Forwarded: not-yet
+Last-Update: 2018-10-06
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- /dev/null
++++ b/aarch64/recv.c
+@@ -0,0 +1,2 @@
++/* recv() not available, emulate via recvfrom(), same as x86_64 */
++#include "../x86_64/recv.c"
+--- /dev/null
++++ b/aarch64/send.c
+@@ -0,0 +1,2 @@
++/* send() not available, emulate via sendto(), same as x86_64 */
++#include "../x86_64/send.c"
+--- a/arm/syscalls.h
++++ b/arm/syscalls.h
+@@ -346,7 +346,7 @@
+ #define __NR_fchmodat			(__NR_SYSCALL_BASE+333)
+ #define __NR_faccessat			(__NR_SYSCALL_BASE+334)
+ 					/* 335 for pselect6 */
+-					/* 336 for ppoll */
++#define __NR_ppoll			(__NR_SYSCALL_BASE+336)
+ #define __NR_unshare			(__NR_SYSCALL_BASE+337)
+ #define __NR_set_robust_list		(__NR_SYSCALL_BASE+338)
+ #define __NR_get_robust_list		(__NR_SYSCALL_BASE+339)
+--- a/ia64/syscalls.h
++++ b/ia64/syscalls.h
+@@ -271,7 +271,8 @@
+ #define __NR_readlinkat			1291
+ #define __NR_fchmodat			1292
+ #define __NR_faccessat			1293
+-/* 1294, 1295 reserved for pselect/ppoll */
++#define __NR_pselect6			1294
++#define __NR_ppoll			1295
+ #define __NR_unshare			1296
+ #define __NR_splice			1297
+ #define __NR_set_robust_list		1298
+--- a/include/sys/socket.h
++++ b/include/sys/socket.h
+@@ -577,6 +577,8 @@ int recvmmsg(int sockfd, struct mmsghdr
+ 	     unsigned int flags, struct timespec *timeout) __THROW;
+ int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+ 	     unsigned int flags);
++int accept4(int s, struct sockaddr *addr, socklen_t *addrlen,
++            int flags);
+ #endif
+ 
+ /* currently not supported: */
+--- /dev/null
++++ b/lib/__accept4.c
+@@ -0,0 +1,17 @@
++#include "syscalls.h"
++#if defined(__NR_socketcall) && !defined(__NR_accept4)
++
++#include <linuxnet.h>
++
++extern int socketcall(int callno,long* args);
++
++int __libc_accept4(int a, void * addr, void * addr2, int flags);
++
++int __libc_accept4(int a, void * addr, void * addr2, int flags) {
++  long args[] = { a, (long) addr, (long) addr2, flags };
++  return socketcall(SYS_ACCEPT4, args);
++}
++
++int accept4(int a, void * addr, void * addr2, int flags) __attribute__((weak,alias("__libc_accept4")));
++
++#endif
+--- /dev/null
++++ b/mips64/recv.c
+@@ -0,0 +1,2 @@
++/* recv() not available, emulate via recvfrom(), same as x86_64 */
++#include "../x86_64/recv.c"
+--- /dev/null
++++ b/mips64/send.c
+@@ -0,0 +1,2 @@
++/* send() not available, emulate via sendto(), same as x86_64 */
++#include "../x86_64/send.c"
+--- /dev/null
++++ b/parisc/__sendto.S
+@@ -0,0 +1,3 @@
++#include "syscalls.h"
++
++syscall6_weak(sendto, sendto, __libc_sendto);
+--- a/parisc/sendto.S
++++ /dev/null
+@@ -1,3 +0,0 @@
+-#include "syscalls.h"
+-
+-syscall6(sendto, sendto);
+--- a/parisc/syscalls.h
++++ b/parisc/syscalls.h
+@@ -360,7 +360,7 @@
+ 
+ #define LINUX_GATEWAY_ADDR      0x100
+ 
+-#define syscall_weak(name, sym, wsym) 	\
++#define __syscall_weak(name, wsym, sym, imp) 	\
+ .text!					\
+ .type wsym, @function!			\
+ .weak wsym!				\
+@@ -368,7 +368,7 @@ wsym:	!				\
+ .type sym, @function!			\
+ .globl sym!				\
+ sym:					\
+-	b __unified_syscall!		\
++	b imp!				\
+ 	ldi __NR_##name, %r20!		\
+ 
+ #define __syscall(name, sym, imp)  	\
+@@ -384,3 +384,7 @@ sym:					\
+ #define syscall5(name, sym)	__syscall(name, sym, __unified_syscall5)
+ #define syscall6(name, sym)	__syscall(name, sym, __unified_syscall6)
+ 
++#define syscall_weak(name, wsym, sym)	__syscall_weak(name, wsym, sym, __unified_syscall)
++#define syscall5_weak(name, wsym, sym)	__syscall_weak(name, wsym, sym, __unified_syscall5)
++#define syscall6_weak(name, wsym, sym)	__syscall_weak(name, wsym, sym, __unified_syscall6)
++
+--- a/syscalls.s/accept4.S
++++ b/syscalls.s/accept4.S
+@@ -1,5 +1,5 @@
+ #include "syscalls.h"
+ 
+ #ifdef __NR_accept4
+-syscall(accept4,accept4)
++syscall_weak(accept4,accept4,__libc_accept4)
+ #endif
+--- /dev/null
++++ b/syscalls.s/ppoll.S
+@@ -0,0 +1,5 @@
++#include "syscalls.h"
++
++#ifdef __NR_ppoll
++syscall(ppoll,ppoll)
++#endif

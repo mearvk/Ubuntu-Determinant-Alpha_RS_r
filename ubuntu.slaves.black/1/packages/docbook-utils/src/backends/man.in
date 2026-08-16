@@ -1,0 +1,27 @@
+# Backend to convert a DocBook file into a man page
+# Send any comments to Jochem Huhmann <joh@revier.com>
+# This program is under GPL license. See LICENSE file for details.
+
+# Convert to *roff
+HELPER=docbook2man-spec.pl
+TMPDIR=`mktemp -d /tmp/man.XXXXXX` || \
+ { echo >&2 "man backend: could not create secure temporary directory"; exit 1;}
+trap 'rm -rf "${TMPDIR}"' EXIT
+onsgmls $SGML_FILE > "${TMPDIR}/onsgmls.tmp"
+sgmlspl $HELPER <"${TMPDIR}/onsgmls.tmp" 2>"${TMPDIR}/errs"
+if [ $? -ne 0 ]
+then
+  cat "${TMPDIR}/errs"
+  exit 1
+fi
+
+if grep unresolved "${TMPDIR}/errs" >/dev/null 2>&1
+then
+  echo "Resolving references.."
+  sgmlspl $HELPER <"${TMPDIR}/onsgmls.tmp"
+  if [ $? -ne 0 ]
+  then exit 1
+  fi
+fi
+
+exit 0

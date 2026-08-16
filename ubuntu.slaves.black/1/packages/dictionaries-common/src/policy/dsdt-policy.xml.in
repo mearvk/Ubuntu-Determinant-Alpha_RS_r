@@ -1,0 +1,1916 @@
+<?xml version="1.0"?>
+<!DOCTYPE article PUBLIC "-//Norman Walsh//DTD DocBk XML V4.0//EN"
+     "dtd/docbook-xml/docbookx.dtd" [
+<!ENTITY doc-prefix "/usr/share/doc/dictionaries-common">
+<!ENTITY autoscript-prefix "/usr/share/debhelper/autoscripts">
+<!ENTITY new-design SYSTEM "../NEW-DESIGN">
+<!ENTITY version-checklist SYSTEM "dictionaries-common.checklist">
+
+<!-- The ispell stuff -->
+<!ENTITY postinst-ispell SYSTEM "../scripts/maintainer/postinst-ispell">
+<!ENTITY postrm-ispell SYSTEM "../scripts/maintainer/postrm-ispell">
+<!ENTITY config-ispell SYSTEM "../scripts/maintainer/config-ispell">
+<!ENTITY templates-ispell SYSTEM "../scripts/maintainer/templates-ispell">
+<!ENTITY new-dic-name "ispell dictionary">
+<!ENTITY old-dic-name "i<replaceable>&lt;language&gt;</replaceable>">
+
+<!-- The wordlist stuff -->
+<!ENTITY postinst-wordlist SYSTEM "../scripts/maintainer/postinst-wordlist">
+<!ENTITY postrm-wordlist SYSTEM "../scripts/maintainer/postrm-wordlist">
+<!ENTITY config-wordlist SYSTEM "../scripts/maintainer/config-wordlist">
+<!ENTITY templates-wordlist SYSTEM "../scripts/maintainer/templates-wordlist">
+<!ENTITY new-wlist-name "wordlist">
+<!ENTITY old-wlist-name "w<replaceable>&lt;language&gt;</replaceable>">
+
+<!-- The aspell stuff -->
+<!ENTITY postinst-aspell SYSTEM "../scripts/maintainer/postinst-aspell">
+<!ENTITY postrm-aspell SYSTEM "../scripts/maintainer/postrm-aspell">
+
+<!-- The myspell and hunspell stuff -->
+<!ENTITY MDP "myspell dictionary package">
+<!ENTITY MHDP "myspell/hunspell dictionary package">
+<!ENTITY HDP "hunspell dictionary package">
+<!ENTITY postinst-hunspell SYSTEM "../scripts/maintainer/postinst-hunspell">
+<!ENTITY postrm-hunspell SYSTEM "../scripts/maintainer/postrm-hunspell">
+
+<!-- The enchant ispell stuff -->
+<!ENTITY enchant-ispell SYSTEM "../enchant.mapping">
+
+<!-- Other misc or combined stuff -->
+<!ENTITY RTSM "<filename>region-to-spelling.map</filename>">
+<!ENTITY IDWP "ispell dictionary or wordlist package">
+<!ENTITY IADWP "ispell or aspell dictionary or wordlist package">
+<!ENTITY IAMDWP "ispell or aspell or myspell dictionary or wordlist package">
+<!ENTITY IMDWP "ispell or myspell dictionary or wordlist package">
+<!ENTITY SDWP "spellchecking dictionary or wordlist package">
+<!ENTITY SDWPS "spellchecking dictionaries or wordlist packages">
+]>
+
+<!--
+[bracketed expressions were marked for later consideration by Rafael]
+[[double-bracked expressions are comments by David]]
+?? double-questionmarks flag unanswered questions and still-needed clarifications
+-->
+
+<!-- [[ Note: I changed many of our comments and questions to <caution> blocks,
+to make them easy to find and externally visible for now ]] -->
+
+
+<article>
+  <articleinfo>
+    <title>
+      Debian Spelling Dictionaries and Tools Policy
+    </title>
+    <author>
+      <firstname>
+	Rafael
+      </firstname>
+      <surname>
+	Laboissi&egrave;re
+      </surname>
+      <affiliation>
+	<orgname>
+	  The Debian Project
+	</orgname>
+	<address><email>rafael@debian.org</email></address>
+      </affiliation>
+    </author>
+    <author>
+      <firstname>
+	David
+      </firstname>
+      <surname>
+	Coe
+      </surname>
+      <affiliation>
+	<orgname>
+	  The Debian Project
+	</orgname>
+	<address><email>davidc@debian.org</email></address>
+      </affiliation>
+    </author>
+    <author>
+      <firstname>
+	Agust&iacute;n
+      </firstname>
+      <surname>
+	Mart&iacute;n Domingo
+      </surname>
+      <affiliation>
+	<orgname>
+	  The Debian Project
+	</orgname>
+	<address><email>agmartin@debian.org</email></address>
+      </affiliation>
+    </author>
+    <author>
+      <firstname>
+        Ren&eacute;
+      </firstname>
+      <surname>
+        Engelhard
+      </surname>
+      <affiliation>
+        <orgname>
+	  The Debian Project
+	</orgname>
+	<address><email>rene@debian.org</email></address>
+      </affiliation>
+    </author>
+    <releaseinfo>
+      Release @RELEASE@ (@DATE@)
+    </releaseinfo>
+    <releaseinfo>
+      Status: draft
+    </releaseinfo>
+    <copyright>
+      <year>
+	1999-2014
+      </year>
+      <holder>
+	Rafael Laboissi&egrave;re, David Coe, Agust&iacute;n
+	Mart&iacute;n Domingo &amp; Ren&eacute; Engelhard
+      </holder>
+    </copyright>
+    <legalnotice><!-- [[should be legalnotice, but that doesn't print]] -->
+      <para>
+	This text is distributed according to the
+	<ulink url="http://www.gnu.org/copyleft/gpl.html">
+	  GNU General Public License
+	</ulink>.
+      </para>
+    </legalnotice>
+  </articleinfo>
+
+  <!-- ************************************************************************** -->
+  <sect1> <title> Introduction  </title>
+    <!-- *********************************************************************** -->
+    <para>
+      This document is intended for Debian maintainers whose packages
+      relate in some manner to spell-checking programs,
+      ispell/aspell/myspell or hunspell dictionaries and/or wordlists
+      (application-independent dictionaries).
+      It concerns therefore the ispell package itself, the
+      language-specific ispell/aspell/myspell or hunspell
+      dictionaries, the language-specific wordlists, some
+      editors like (X)Emacs and jed, some of the mail and news user
+      agents (MUAs, NUAs), and other tools that give the user a
+      choice of dictionaries for spell checking.
+    </para>
+    <!--    <para>
+      From now on the convention
+      IDWP = "&IDWP;" will be used for
+      that packages when a short generic reference to them is desired.
+    </para> -->
+    <para>
+      The main goal of this Policy is to establish the basic requirements
+      for the said packages in a Debian system, allowing a high degree of
+      integration among them.  This should yield a coherent behavior of all
+      ispell/aspell/myspell or hunspell dictionary and wordlist-related
+      packages, both at installation and usage time.
+    </para>
+    <para>
+      This document no longer affects aspell packages for anything but its
+      use under emacs (see <xref linkend="aspell-registration"/>).
+      For information on aspell dictionary policy please look at the aspell
+      package documentation and at the aspell manuals
+    </para>
+    <itemizedlist>
+      <listitem><para>
+	  <ulink
+	    url="http://aspell.net/dist.txt">http://aspell.net/dist.txt</ulink>
+	</para></listitem>
+      <listitem><para>
+	  <ulink
+	    url="http://savannah.gnu.org/download/aspell/manual/user/manual.html"
+	    >http://savannah.gnu.org/download/aspell/manual/user/manual.html</ulink>
+	</para></listitem>
+    </itemizedlist>
+    <warning>
+      <para>
+	emacs-snapshot package should not be affected by this document. It will
+	contain the bleeding edge code from emacs cvs and we have decided to keep
+	it as standalone as possible to minimize interferences from external code.
+      </para>
+    </warning>
+    <sect2 renderas="sect3"> <title> Advantages For Debian Users </title>
+      <!-- ********************************************************************** -->
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Correct selection of available dictionaries by applications.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Consistent, simpler, management of multiple dictionaries, for
+	    e.g. multiple languages and/or multiple specialties.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Single question at ispell dictionary or wordlist installation time,
+	    via debconf.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Consistent ways for administrators and users to select from
+	    among the available spelling dictionaries and wordlists
+	    for system-wide
+	    default, user default and individual application session
+	    default.
+	  </para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+    <sect2 renderas="sect3"><title>Advantages For Debian Package Maintainers </title>
+      <!-- ********************************************************************* -->
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Easier package configuration.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Fewer bug reports.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Better integration of wordlists and spelling dictionaries.
+<!--
+	    <caution>
+	    <title>To-Do</title>
+	    <para>
+	    Explain this better.</para>
+	  </caution>
+-->
+
+	  </para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+    <sect2 renderas="sect3"><title>Quick checklist for the impatient maintainer </title>
+      <!-- ********************************************************************** -->
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    If you maintain an &IDWP; you must install the package
+	    dictionaries-common. This package will conflict with all old
+	    style &IDWP;s. Since from this policy on ispell hash files should
+	    be 128 character per string it will also conflict with older ispell
+	    packages. If you use debhelper and want to use the debhelper like
+	    scripts you must also install package dictionaries-common-dev.
+	  </para>
+	  <para>
+	    There is no need to change the name of your package for &IDWP;s.
+	    <emphasis>You however have to take care with one thing</emphasis>;
+	    since all such packages conforming to this policy will replace the
+	    old packages and pre-depend on the package dictionaries-common, you
+	    need to notify the dictionaries-common maintainer which one will
+	    be the last version of your package(s) not using the new policy.
+	    That versioned conflict will be added to the dictionaries-common
+	    package and after that your new policy compliant package can be
+	    used.
+	  </para>
+	  <para>
+	    For &MDP;s however you have to rename your existing package
+	    if it followed the old &quot;OpenOffice.org Spellcheck Packages
+	    Packaging Guide&quot;. You have to rename
+	    openoffice.org-spellcheck-&lt;langcode&gt; to
+	    myspell-&lt;langcode&gt;
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Set the correct dependency relationships as in <xref
+	      linkend="relationships"/>.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Verify the architecture and priority level in
+	    <filename>debian/control</filename> (see <xref
+	      linkend="arch"/>).
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Be sure that you are installing the correct files and symlinks
+	    in <filename>/usr/lib/ispell/</filename>,
+	    <filename>/usr/share/hunspell/</filename>
+	    or <filename>/usr/share/dict/</filename>. (see <xref
+	      linkend="installdir"/>).
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Update the maintainer scripts.
+	    <itemizedlist>
+	      <listitem>
+		<para>
+		  First of all you need to have an
+		  <filename>info-{ispell,wordlist}</filename> or
+		  for myspell just a file conforming to
+		  the specified in <xref linkend="infofile"/>.
+		</para>
+		<para>
+		  If you are a happy debhelper user, all you have to do is to
+		  call <command>installdeb-{ispell,wordlist}</command> (it
+		  internally calls <command>dh_installdebconf</command>, so do
+		  not call it again) in <filename>debian/rules</filename>
+		  You will need to install the dictionaries-common-dev package
+		  first in order to have the new debhelper scripts
+		  available. Unless you need extra features in your maintainer
+		  scripts or extra templates you are done. Otherwise, take a
+		  look at <xref linkend="config"/> or
+		  <xref linkend="templates"/>. There is no script like that
+		  necessary for &MDP; although one exist which could be used.
+		</para>
+	      </listitem>
+	      <listitem>
+		<para>
+		  If you are not building your package with debhelper, you
+		  should set up things by hand. We strongly suggest you to
+		  migrate your package to debhelper to take advantage of the
+		  helpers provided by the system, but you can do things without
+		  using debhelper:
+		  <itemizedlist>
+		    <listitem>
+		      <para>
+			Change the <filename>debian/{postinst,prerm}</filename> scripts
+			according to <xref linkend="scripts"/>.
+		      </para>
+		    </listitem>
+		    <listitem>
+		      <para>
+			Add debconf support (files
+			<filename>debian/{templates,config}</filename> as described in
+			<xref linkend="debconf"/>).
+		      </para>
+		    </listitem>
+		    <listitem>
+		      <para>
+			Create and install the info file (See <xref
+			  linkend="infofile"/>).
+		      </para>
+		    </listitem>
+		  </itemizedlist>
+		</para>
+	      </listitem>
+	    </itemizedlist>
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    If you are packaging a ispell dictionary, you no longer need to add
+	    an emacsen startup file. It will be automatically generated from the
+	    info file once all the dictionaries are installed.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Rebuild and test that everything is working O.K. When adding a new
+	    &IDWP; <command>debconf</command> will query for the default
+	    selection. When removing or
+	    purging a package containing the default selection that query will
+	    be done again unless only one package of his class is left. Also
+	    check that the emacs menu(s) corresponding to your package displays
+	    properly. If not, look at the info file and at your package entries
+	    in the autogenerated file at
+	    <filename>/var/cache/dictionaries-common/emacsen-ispell-dicts.el</filename>
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Upload.
+	  </para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+  </sect1>
+  <!-- ************************************************************************** -->
+  <sect1><title>Background</title>
+    <!-- ********************************************************************** -->
+    <para>
+      Wordlists and Ispell dictionaries are interrelated but separate
+      packages. This system provides a common background for them and intends to
+      be able to handle a number of different possibilities. The simplest one is
+      a package providing just one dictionary. There are also some packages that
+      do provide more that one dictionary. For instance, ifrench-gut provides
+      both french-gut and french-gut-tex8b, or the norwegian dictionary provides
+      both nynorsk and bokm&aring;l. That will be handled properly by the system.
+    </para>
+    <para>
+      The miscfiles package also provides an english wordlist
+      (<filename>web2</filename>, all the words from the 1934 Webster's
+      Second International Dictionary), as well as many other different
+      things. This can also be handled properly by the system.
+    </para>
+  </sect1>
+  <!-- ********************************************************************* -->
+  <sect1>
+    <title>The dictionaries-common and dictionaries-common-dev Packages</title>
+    <!-- ********************************************************************* -->
+    <para>
+      A package called dictionaries-common is created. It allows
+      (ispell/aspell/myspell/hunspell)-dictionary and wordlist packages to be
+      coherently
+      integrated by providing necessary infrastructure, including configuration
+      scripts, commands for selecting default dictionaries, and
+      initialization routines for the different emacsen flavors and jed.
+      It also provides support for registering ispell/aspell/myspell/hunspell
+      dictionaries for use under emacs and squirrelmail. This is the basic
+      package for the system to work.
+    </para>
+    <para>
+      A package dictionaries-common-dev, to which this Policy belongs, is also
+      provided. This is a package for maintainers of &SDWP;s.
+      It contains the Policy document itself, as well as debhelper-like scripts
+      to simplify the debianization of &SDWP;s for maintainers using
+      debhelper.
+      It also (via this policy document) may provide suggestions or
+      patches for other related packages.
+    </para>
+    <!-- * -->
+    <sect2 id="sytemwide" renderas="sect3"><title> System wide configuration </title>
+      <!-- ****************************************************************** -->
+      <para>
+        Besides the debconf configuration at installation time, there will be a
+        <command>/usr/sbin/select-default-(ispell|wordlist)</command> script
+        available to the system administrator (in
+        <filename>/usr/sbin/</filename>) that will call the debconf question at
+        any time and will be responsible to set the appropriate links
+        <command>/usr/lib/(ispell|words)/default.*</command>. This scripts are
+        included in the dictionaries-common package.
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 id="wrapper" renderas="sect3"> <title>Ispell wrapper</title>
+      <!-- ******************************************************************* -->
+      <para>
+	A ispell wrapper command will be made available by dictionaries
+	common. This command will accept all the ispell options plus -L
+	&lt;language&gt;, where language must correspond to one of the languages
+	installed in the system (Perl regular expressions will be probably
+	available here, such that calling <command>ispell-wrapper -L
+	  ".*brasil.*"</command> will select "Portugu&ecirc;s  Brasileiro").
+      </para>
+      <para>
+	An interactive selection script (<command>select-default-iwrap</command>)
+	will also be available. This is an interactive selection script for
+	selecting the user-specific default ispell dictionary for
+	<command>ispell-wrapper</command>. The result will be placed in
+	<filename>~/.default-ispell</filename>.
+      </para>
+      <para>
+	The system wide default value for <command>ispell-wrapper</command> will
+	be the globally selected one at installation time or through
+	<command>select-default-ispell</command>.
+<!--
+      An interactive selection script will also be available for selecting the
+      default ispell dictionary for <command>ispell-wrapper</command> both
+      system-wide (when run by root, placing the result in
+      <filename>/etc/dictionaries-common/default-ispell</filename>) or
+      user-specific (placing the result in
+      <filename>~/.default-ispell</filename>).
+-->
+      </para>
+      <para>
+	These are included in the dictionaries-common package.
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 id="addon" renderas="sect3"><title>Add-on support</title>
+      <!-- ******************************************************************** -->
+      <para>
+	Emacsen, jed and mutt add-on support will be fully auto-generated by the
+	<command>update-default-(ispell|wordlist)</command> or
+	<command>update-dictcommon-(aspell|hunspell)</command>script.
+      </para>
+      <para>
+	Do not add emacs or jed startup files to your package. That will surely
+	interfere with the autogenerated system and be the major source for
+	problems.
+      </para>
+    </sect2>
+  </sect1>
+  <!-- ************************************************************************* -->
+  <sect1> <title> General Requirements on the Packages (for maintainers) </title>
+    <!-- ********************************************************************* -->
+    <!-- * -->
+    <sect2 id="naming" renderas="sect3">
+      <title> Naming of Language-specific ispell dictionary and wordlist Packages</title>
+      <!-- ********************************************************************** -->
+      <para>
+	Language-specific ispell dictionary packages and wordlists must be
+	named the classical way,
+	like <quote>ifrench</quote>, <quote>wfrench</quote>,
+	<quote>iswedish</quote>, etc.
+	Use of non-English language names is discouraged; for example
+	<quote>ingerman</quote> should <emphasis>not</emphasis> be
+	named <quote>indeutsch</quote>.  (This is based on existing
+	practice, and is for consistency and the convenience
+	of Debian administrators in all languages.)
+      </para>
+      <para>
+	Dictionary sources may provide multiple dictionaries.  Each of the
+        binary packages can contain more than one dictionary. In this case,
+        the maintainer must provide info entries for each dictionary in the
+        package info file (see <xref linkend="infofile"/>).
+      </para>
+      <note>
+	<para>
+	  It is not possible for a system to have a mixture of
+	  new-style and old-style &IDWP;
+	  concurrently.
+	  The package dictionaries-common conflicts with all the old
+	  &old-dic-name; and &old-wlist-name; packages prior to the first
+	  version using the new policy, because there is now a new way to manage
+	  their alternative symlinks.
+        </para>
+	<para>
+	  For that reason you have to check the entry corresponding to your
+	  &IDWP; in the versioned conflicts line of dictionaries-common package
+	  and notify maintainer of that package which was the last version of your
+	  package using the old system, to include the right versioned conflict
+	  in the dictionaries-common package.
+	</para>
+      </note>
+    </sect2>
+    <!-- * -->
+    <sect2 id="naming-myspell" renderas="sect3">
+      <title> Naming of Language-specific myspell or hunspell dictionary Packages</title>
+      <!-- ********************************************************************** -->
+      <para>
+        &MDP;s must be called myspell-&lt;isocode&gt; and &HDP;s must be called
+        hunspell-&lt;isocode&gt; (&lt;isocode&gt; being the two-digit isocode of
+        the language).
+        Use the myspell prefix for myspell dictionaries and the hunspell prefix
+        for hunspell only dictionaries that use hunspell features.
+      </para>
+      <para>
+        If there are more dictionaries for a language (e.g. de_DE, de_CH, ..)
+        then the country code can be added to the package name (e.g.
+        myspell-&lt;langcode&gt;-&lt;countrycode&gt;).
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 id="relationships" renderas="sect3"><title>Relationships </title>
+      <!-- *************************************************************** -->
+       <!--
+      <note>
+	<para>
+	  Since when a versioned (build) dependency is required version to
+	  add depends on the added feature is better to set it, if required, to
+	  the one corresponding to the last changes, see
+	  <xref linkend="checklist"/>
+	</para>
+      </note>
+      -->
+      <note>
+      <para>
+        Please check <xref linkend="checklist"/> for information about
+	versions where some features were introduced. This is needed to set
+	correct versioned dependencies and build-dependencies.
+      </para>
+      </note>
+      <para>
+	The package relationships declared in the
+	<filename>debian/control</filename> files should be as follows
+	for &IDWP;s:
+      </para>
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    Because wamerican will provide a
+	    <filename>/usr/share/dict/words->/usr/share/dict/american-english</filename>
+	    symlink, needs to conflict with
+	    <filename>dictionaries-common (&lt;&lt; 0.98)</filename> where
+	    <filename>/usr/share/dict/words</filename> diversion was first
+	    introduced. No dependency on
+	    <filename>dictionaries-common</filename> is needed as long as
+	    wamerican maintainer scripts do not fail without it
+	    (see <xref linkend="scripts"/>).
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    All &IDWP;s but wamerican have to <emphasis>depend</emphasis> on
+	    <filename>dictionaries-common</filename> in their
+	    <filename>debian/control</filename> files.
+	  </para>
+	  <para>
+	    Every &IDWP; using the helpers from
+	    <filename>dictionaries-common-dev</filename> has also to declare
+	  </para>
+	  <programlisting>
+Build-Depends: debhelper, dictionaries-common-dev</programlisting>
+	  <para>
+	  if your package contains architecture dependent ispell or aspell
+	  dicts (See <command>ispell-autobuildhash</command> or
+	  <command>aspell-autobuildhash</command> manual pages for info about
+	  how to make our ispell or aspell dict package 'arch: all' by building
+	  hashes from package postinst), or
+	  </para>
+	  <programlisting>
+Build-Depends: debhelper
+Build-Depends-Indep: dictionaries-common-dev</programlisting>
+	  <para>
+	    if all ispell, aspell, myspell/hunspell dicts and wordlist packages
+	    using <filename>dictionaries-common-dev</filename> are
+	    architecture independent. This will make
+	    <command>autobuilders</command>,
+	    <command>lintian</command> and
+	    <command>debuild</command> happy.
+	  </para>
+	  <para>
+	    They must also <emphasis>provide</emphasis> the appropriate
+	    virtual package (<quote>ispell-dictionary</quote> or
+	    <quote>wordlist</quote>).
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Ispell dictionaries must depend on ispell. If your package uses ispell
+	    during the building process you must also set the appropriate build
+	    dependency.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Each &new-dic-name; package should <emphasis>suggest</emphasis>
+	    the corresponding &new-wlist-name; package.  (This is because ispell
+	    can use wordlists in addition to ispell dictionaries, but
+	    doesn't actually require them.)
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    The dictionaries-common package suggests ispell.  (A stronger
+	    relationship was considered and rejected, because
+	    users might want some wordlists and not want ispell.)
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    The	ispell package depends on ispell-dictionary and recommends
+	    wordlist.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Packages containing tools that can use ispell (editors, MUA,
+	    etc.) may suggest or recommend ispell, but should not depend on
+	    ispell.  <!--[[I'd rather say: ...should suggest or recommend
+	    ispell, but should not depend on it unless necessary... or
+	    something to that effect (maybe that's pedantic; why do we
+	    care, here, whether or not other packages *depend* on ispell?
+	    Isn't that a package-specific question??)]]-->
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    Packages that use ispell and allow users to select or specify
+	    (from within the running application) which dictionary
+	    to use, should depend on dictionaries-common and should invoke an
+	    appropriate dictionaries-common dictionary-selection interface as
+	    documented in <xref linkend="debconf"/>).
+	  </para>
+	</listitem>
+      </itemizedlist>
+      <para>
+      For &MHDP;s the relationships in <filename>debian/control</filename>
+      should be as follows:
+      </para>
+      <itemizedlist>
+        <listitem>
+	  <para>
+	    The &MHDP;s must depend on at least dictionaries-common (>= 0.10)
+	    because in that revision the myspell support was added.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+            The myspell-&lt;isocode&gt; packages must
+            <emphasis>provide</emphasis> the virtual packages
+            myspell-dictionary and
+            myspell-dictionary-&lt;isocode&gt;.
+            The hunspell-&lt;isocode&gt; packages must
+            <emphasis>provide</emphasis> the virtual packages
+            hunspell-dictionary and
+            hunspell-dictionary-&lt;isocode&gt;.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+            hunspell and myspell dictionary packages should declare a
+            <emphasis>Suggests</emphasis> on Libreoffice and on the Mozilla
+            flavors in Debian that support the spellchecker.
+            Something like
+        <programlisting>
+Suggests: hunspell,
+ libreoffice-core,
+ firefox | firebox-esr | icedove</programlisting>
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+            myspell dictionary packages must
+            Conflict: against openoffice.org (&lt;= 1.0.3-2)
+          </para>
+	</listitem>
+	<listitem>
+	  <para>
+            hunspell dictionary packages should conflict against old
+            versions of Mozilla / OpenOffice.org not supporting hunspell
+<programlisting>
+mozilla-browser (<< 1.8+1.1.1-2),
+ iceape-browser (<< 1.1.1-2),
+ firefox (<< 2.0.0.3-2),
+ thunderbird (<< 2.0.0.1+0dfsg-0),
+ iceweasel (<< 2.0.0.3-2),
+ icedove (<< 2.0.0.0-4),
+ libxul0d (= 1.8.0.11-3),
+ openoffice.org (<= 1.0.3-2),
+ openoffice.org-core (<< 2.1~m190-1)
+</programlisting>
+        </para>
+	</listitem>
+	<listitem>
+	  <para>
+	   The myspell/hunspell packages having an &quot;old&quot; version named
+	   openoffice.org-spellcheck-* (regardless of whether that was in Debian
+           once or not) must declare the magic
+           Conflicts: / Provides: / Replaces: combination &quot;against&quot;
+	   the old package.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+            If there are hunspell and myspell dictionary packages for a given
+            language and the hunspell dictionary package installs files
+            with the same name as the myspell dictionary package, the
+            hunspell dictionary package must conflict against the
+            myspell dictionary package.
+          </para>
+	</listitem>
+      </itemizedlist>
+    </sect2>
+    <!-- * -->
+    <sect2 id="infofile" renderas="sect3"><title>The info file</title>
+      <!-- *************************************************************** -->
+      <para>
+	All &IDWP;s must install a file
+	<filename>/var/lib/dictionaries-common/(ispell|wordlist)/&lt;package-name&gt;</filename>.
+	Aspell dictionaries can install it at
+	<filename>/var/lib/dictionaries-common/aspell/&lt;package-name&gt;</filename>.
+	myspell/hunspell dictionaries can install it at
+	<filename>/var/lib/dictionaries-common/hunspell/&lt;package-name&gt;</filename>
+	(not to be confused with the now obsolete info file that was needed for
+	OpenOffice.org &lt; 3).
+	General format of that file (reminiscent of the RFC 822 format) is,
+	including all possible entries for ispell and wordlist packages:
+      </para>
+      <programlisting>
+Language: portugu&ecirc;s brasileiro (Brazilian Portuguese)
+Hash-Name: brazilian
+Emacsen-Name: brasileiro
+Elanguage: portugues brasileiro (Brazilian Portuguese)
+Casechars: [a-z&aacute;&eacute;&iacute;&oacute;&uacute;&agrave;&egrave;&igrave;&ograve;&ugrave;&atilde;&otilde;&ccedil;&uuml;&acirc;&ecirc;&ocirc;A-Z&Aacute;&Eacute;&Iacute;&Oacute;&Uacute;&Agrave;&Egrave;&Igrave;&Ograve;&Ugrave;&Atilde;&Otilde;&Ccedil;&Uuml;&Acirc;&Ecirc;&Ocirc;]
+Not-Casechars: [^a-z&aacute;&eacute;&iacute;&oacute;&uacute;&agrave;&egrave;&igrave;&ograve;&ugrave;&atilde;&otilde;&ccedil;&uuml;&acirc;&ecirc;&ocirc;A-Z&Aacute;&Eacute;&Iacute;&Oacute;&Uacute;&Agrave;&Egrave;&Igrave;&Ograve;&Ugrave;&Atilde;&Otilde;&Ccedil;&Uuml;&Acirc;&Ecirc;&Ocirc;]
+Otherchars: [---']
+Many-Otherchars: yes
+Additionalchars: &aacute;&eacute;&iacute;&oacute;&uacute;&agrave;&egrave;&igrave;&ograve;&ugrave;&atilde;&otilde;&ccedil;&uuml;&acirc;&ecirc;&ocirc;&Aacute;&Eacute;&Iacute;&Oacute;&Uacute;&Agrave;&Egrave;&Igrave;&Ograve;&Ugrave;&Atilde;&Otilde;&Ccedil;&Uuml;&Acirc;&Ecirc;&Ocirc;
+Ispell-Args:
+Extended-Character-Mode:
+Coding-System: iso-8859-1</programlisting>
+      <para>
+        adapted to the corresponding language and &IDWP;.
+      </para>
+      <para>
+	Each field in this file must be contained in a single line.  They may
+	also have the right side (i.e., after the character ":") empty, which is
+	equivalent to suppressing the field (the default value will be used in
+	this case, see below). 8-bit chars in <literal>Casechars</literal>,
+	<literal>Not-Casechars</literal> and <literal>Additionalchars</literal>
+	must be represented in the same encoding declared for the dict in the
+	info file, either as the char itself or as its octal
+	<literal>\xxx</literal> representation. This later is highly preferable
+	if another string like <literal>Language</literal> contains utf-8 chars.
+      </para>
+      <para>
+	Several records as the above may be present in each file and must be
+	separated by a blank line. They can correspond to different dictionaries
+	or to different ways of accessing the same dictionary from ispell wrapper
+	or emacs (this will have no effect for use of plain ispell). They must
+	have unique values for the Language field.
+      </para>
+      <para>
+	The records supplied by each dictionary package will be used by the core
+	of <filename>dictionaries-common</filename> to provide site-wide
+	configuration, including Debconf list of choices, ispell/wordlist default
+	symlinks, automatic generation of add-on support (emacsen, jed and mutt).
+	This file is therefore <emphasis>essential</emphasis> for the correct
+	integration of the dictionary packages into the
+	<filename>dictionaries-common</filename> scheme.
+      </para>
+      <note>
+	<para>
+	  It is very important that the Language name be unambiguous and informative
+	  to the system administrator, because at debconf dictionary-selection time
+	  only the list of package names, and not their descriptions, will be
+	  visible.
+	</para>
+      </note>
+      <para>
+	Here is an explanation of the fields shown above:
+      </para>
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    <literal>Language</literal>: (this field is mandatory)
+	  </para>
+	  <para>
+	    Comprehensive description of the language.  It is advised to include
+	    both the description in the original language (in UTF-8 coding system)
+	    and a description in English between parentheses.  This will help the
+	    system administrators around the
+	    world, who does not now how the dictionaries are spelled in their
+	    original language.
+	    Once set, do not change it for entries triggering a debconf question
+	    unless there is a really good reason for that, because any change may
+	    trigger a debconf prompt or, if choice was the old one, even change
+	    current settings without prompt if in debconf low priority.
+	  </para>
+	  <para>
+	    If you think you really need to change text in
+	    <literal>Language</literal> field for a debconf used entry, please
+	    look first at <literal>Elanguage</literal> field, described below.
+	  </para>
+	  <para>
+	    You need to use UTF-8 for this string, because otherwise
+	    it will not be displayed (will display an empty value) in UTF-8 systems.
+	    The drawback is that 8bit characters will display strangely in a non UTF-8
+	    terminal, but it will still be readable. You should consider using
+	    only 7 bit chars if possible when you create this field for the
+	    first time.
+	  </para>
+	  <para>
+	    This field will be used in the Debconf list of choices as well as
+	    a key for determining the language default for the
+	    <command>ispell-wrapper</command> utility.  Hence, it has to be unique
+	    among all the installed dictionaries in the system. English
+	    description should preferably be unique too.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Hash-Name</literal>:
+	    (this field is mandatory)</para>
+	  <para>
+	    Base name of the files that will appear as symlinks in both
+	    <filename>/usr/lib/ispell</filename> or
+	    <filename>/usr/share/dict</filename>.  Has to be unique among the
+	    installed dictionaries in the system.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Emacsen-Name</literal>:
+	    (optional, defaults to <literal>Hash-Name</literal> value)</para>
+	  <para>
+	    Entry name of the dictionary that appears in the list of choices of
+	    the emacsen ispell package.  Maintainers should try to respect the
+	    tradition of that package, by keeping the name that they used to have
+	    in the past.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Elanguage</literal>:
+	    (optional, defaults to <literal>Language</literal> value)</para>
+	  <para>
+	    Alternative language name to be displayed by
+	    <command>debconf</command>. Not needed at all unless you use the
+	    debhelper like scripts and are changing the language name to be
+	    displayed, avoiding extra debconf prompts. Its format is the same as
+	    <literal>Language</literal>. See <xref linkend="templates"/> for more
+	    info about this.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Casechars</literal>:
+	    (optional, defaults to <literal>[a-zA-Z]</literal>)</para>
+	  <para>
+	    Emacs-Lisp regexp of valid characters that comprise a word.
+	    It is typically enclosed between square brackets. Do not use
+	    ranges here for non 7bit chars.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Not-Casechars</literal>:
+	    (optional, defaults to <literal>[^a-zA-Z]</literal>)</para>
+	  <para>
+	    Opposite regexp of <literal>Casechars</literal>.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Otherchars</literal>:
+	    (optional, defaults to <literal>[']</literal>)</para>
+	  <para>
+	    Regexp of characters in the <literal>Not-Casechars</literal> set but
+	    which can be used to construct words in some special way. (See the
+	    ispell.el documentation for details.)
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Many-Otherchars</literal>:
+	    (optional, default value <literal>no</literal>)</para>
+	  <para>
+	    Boolean variable (assuming either the values yes or no). If it is
+	    non-nil when multiple Otherchars are allowed in a word. Otherwise
+	    only a single Otherchars character is allowed to be part of any
+	    single word.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Additionalchars</literal>:
+	    (optional, defaults to an empty string)</para>
+	  <para>
+	    Characters other than ASCII that may be part of a word. For emacsen
+	    this is somehow redundant with the <literal>Casechars</literal>
+	    field, but is necessary for the proper working of jed and the -w
+	    option to ispell.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Ispell-Args</literal>:
+	    (optional, defaults to <literal>-d &lt;Hash-Name&gt;</literal>)</para>
+	  <para>
+	    List of additional arguments passed to the ispell.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Extended-Character-Mode</literal>:
+	    (optional, defaults to the empty string)</para>
+	  <para>
+	    Set when dictionaries are used which have been configured in an
+	    ispell affix file.  (For example, umlauts can be encoded as \&quot;a,
+	    a&quot;, &quot;a, ...)
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>Coding-System</literal>:
+	    (optional, defaults to the empty string)</para>
+	  <para>
+	    Used for languages with multibyte characters. Any coding system
+	    will be accepted if the {x}emacs version being run accepts it.
+	    Maintainers, please check that the provided coding system works
+	    with the different emacsen flavors. If the coding system is not
+	    one of
+	    <filename>iso-8859-1</filename>,
+	    <filename>iso-8859-2</filename>,
+	    <filename>iso-8859-3</filename> or
+	    <filename>koi8-r</filename>
+	    make your package depend on at least dictionaries-common (>=0.24),
+	    where the other encodings were allowed.
+	  </para>
+	  <warning>
+	    <para>
+	      At the time of this writing there are some encoding unification
+	      problems in at least XEmacs between iso-8859-1 and iso-8859-15
+	      charsets, being the same character represented differently in the
+	      emacs internal mule encoding. For this reason please do not
+	      blindly replace the old iso-8859-1 entry by iso-8859-15. If you
+	      require the iso-8859-15 encoding, better add a new emacs only
+	      iso-8859-15 entry (see debconf-display: no) as a temporary
+	      workaround. This way the iso-8859-1 entry will work with
+	      iso-8859-1 and UTF-8 texts and fail with iso-8859-15, while the
+	      new iso-8859-15 entry will work with iso-8859-15, but will fail
+	      with iso-8859-1 and UTF-8. The same might also apply to other
+	      charsets, please doublecheck.
+	    </para>
+	  </warning>
+	</listitem>
+	<listitem>
+	  <para><literal>{debconf,emacs,jed}-display</literal>:
+	    (optional, defaults to <literal>yes</literal>)</para>
+	  <para>
+	    If <literal>emacs-display</literal> or <literal>jed-display</literal> are
+	    set to <literal>no</literal>, the corresponding entry will not be
+	    displayed by emacs or jed when building the cache files. Needs
+	    a versioned dependency on <filename>dictionaries-common</filename>.
+	  </para>
+	  <para>
+	    If <literal>debconf-display</literal> is set to <literal>no</literal>,
+	    this entry will not be added by <command>installdeb-ispell</command>
+	    to the debconf template with the possible values of choice. It will
+	    remain available to <command>ispell-wrapper</command> and
+	    <command>emacs/jed</command>  unless
+	    <literal>{emacs,jed}-display</literal> are set to no. Needs a versioned
+	    build dependency on <filename>dictionaries-common-dev</filename>
+	  </para>
+	</listitem>
+	<listitem>
+	  <para><literal>squirrelmail</literal>:
+	    (optional, defaults to <literal>Language</literal> value)
+	  </para>
+	  <para>
+	    If <literal>squirrelmail</literal> is set to <literal>no</literal>,
+	    this entry will not be added to the <command>squirrelmail</command>
+	    spellcheck list. Any other value will override string derived from
+	    <literal>Language</literal> value in spellcheck list.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	  <literal>aspell-locales</literal>:
+	    (aspell only, optional, no default),
+	    <literal>hunspell-locales</literal>:
+	    (myspell/hunspell only, optional, no default)
+	    </para>
+	  <para>
+	    Comma separated list that represents the set of locales
+	    associated to the aspell (or myspell/hunspell) dictionary to try
+	    guessing the <command>emacs</command> <filename>ispell.el</filename>
+	    default aspell (or myspell/hunspell dictionary) after the contents
+	    of the <literal>LANG</literal> environment variable.
+	    When there is no
+	    possible confusion the two digits language iso code is enough,
+	    but you can add other locales to make it more complete
+	    (e.g. <literal>Aspell-Locales: es, es_ES, es_ES@variant</literal>).
+	    The long form will be selected first if matches the value of the
+	    <literal>LANG</literal> environment variable. This last will be
+	    stripped of <literal>@..</literal> and compared and stripped of
+	    <literal>_...</literal> and compared for a match.
+	    Same for <literal>hunspell-locales</literal>.
+	  </para>
+	  <para>
+	    When there are two variants of a language (e.g., for new and old
+	    German) use the prefix <literal>1:</literal> for the non preferred
+	    variant, e.g. <literal>Aspell-Locales: de, de_DE</literal> for new
+	    German and <literal>Aspell-Locales: 1:de, 1:de_DE</literal> for old
+	    German. Same for <literal>hunspell-locales</literal>.
+	  </para>
+	</listitem>
+      </itemizedlist>
+      <para>
+        The values of the fields <literal>Otherchars</literal>,
+        <literal>Many-Otherchars</literal>, and <literal>Additionalchars</literal>
+        must have the same encoding as the dictionary encoding.  Each
+        character can be written in the <literal>&#92;xxx</literal> format,
+        where <literal>xxx</literal> is its octal value.  For instance,
+        <literal>&eacute;</literal> can be written as <literal>&#92;351</literal>.
+      </para>
+      <para>
+        Wordlist packages only need to set the <literal>Language</literal> and
+	<literal>Hash-Name</literal> fields. Other fields will silently be ignored.
+      </para>
+      <caution>
+	<title>Note for debhelper users</title>
+	<para>
+	  If you use debhelper and the helpers
+	  <command>installdeb-{ispell,wordlist}</command> provided by the package
+	  dictionaries-common-dev most of the required work will be
+	  automatically done after this info file. In this case you have to name
+	  this file with extension <filename>.info-ispell</filename> or
+	  <filename>.info-wordlist</filename> depending of the package
+	  class.
+	</para>
+	<para>
+	  The full name rules are similar than for other debhelper files
+	  like <filename>dirs</filename> or <filename>docs</filename>.
+	</para>
+      </caution>
+      <caution>
+	<title>Note for cdbs users</title>
+	<para>
+	  If you use cdbs for building your package, just use:
+        </para>
+        <programlisting>
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/doc/dictionaries-common/cdbs/dict-common.mk</programlisting>
+        <para>
+          in your <filename>debian/rules</filename>.  This will take care of
+          the inclusion of all the <command>installdeb-*</command> commands
+          at the appropriate places.  Notice that this is only guaranteed to
+          work when used in conjunction with debhelper.
+        </para>
+        <para>
+          For this to work the package should build-depend on cdbs
+          and debhelper, and also contain a versioned build-dependency on
+          <filename>dictionaries-common-dev</filename> &gt;= 0.70.
+        </para>
+	<para>
+          For an example of use of the cdbs support see the myspell.pt
+          source package (version 20060602-2 or later).
+	</para>
+      </caution>
+    </sect2>
+    <!-- * -->
+    <sect2 id="arch" renderas="sect3">
+      <title>Choice of Architecture and Priority Level</title>
+      <!-- ********************************************************************** -->
+      <para>
+	Because the hash files generated by the buildhash program are
+	binary files subject to big/little-endian differences, all
+	&new-dic-name; dictionary packages directly installing the hash file
+	should have <quote>Architecture: any</quote> in their
+	<filename>debian/control</filename> files.  All  &new-wlist-name; packages
+	should have <quote>Architecture: all</quote> (unless other
+	files in the package prevent that).
+      </para>
+      <para>
+	If your ispell hash file is built at package postinst it should have
+	<quote>Architecture: all</quote> in the
+	<filename>debian/control</filename> file. See
+	<command>ispell-autobuildhash</command> or
+	<command>aspell-autobuildhash</command> manual pages for info about
+	how to make your ispell or aspell dict package
+	<quote>Architecture: all</quote> by building hashes
+	from package postinst.
+      </para>
+      <para>
+	The priority level for all &new-dic-name;  and
+	&new-wlist-name; packages should be set to <quote>optional</quote>, as
+	we believe that any production system should provide spelling support
+	for at least one language.
+      </para>
+      <para>
+	wamerican has priority
+	<quote>standard</quote>, because the idea of "standard" is to define a
+	minimal, standard Unix-like setup. A wordlist is certainly part of that,
+	and since wamerican wordlist contains what has traditionally been in
+	<filename>/usr/dict/words</filename>, it is made priority standard.
+	(thanks to Charles Briscoe-Smith, previous wenglish maintainer)
+      </para>
+      <para>
+       &MHDP;s are <quote>Architecture: all</quote> and have
+       priority <quote>optional</quote>.
+      </para>
+      <para>
+	dictionaries-common will be of optional priority. There will be a
+	special fine-tuning between wamerican and dictionaries-common so
+	wamerican can be installed standalone, but will use all the
+	dictionaries-common capabilities if present.
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 id="installdir" renderas="sect3">
+      <title>Installation Directories and Symlinks</title>
+      <!-- *********************************************************** -->
+      <para>
+      <emphasis>* ispell dictionaries and wordlists</emphasis>
+      </para>
+      <para>
+	Ispell dictionary hashed files (<filename>.hash</filename>) and affix
+	table files (<filename>.aff</filename>) must be placed in the directory
+	<filename>/usr/lib/ispell/</filename>.
+	Wordlist dictionary files must be placed in the directory
+	<filename>/usr/share/dict/</filename>. wamerican will also set a
+	<filename>/usr/share/dict/words->/usr/share/dict/american-english</filename>
+	symlink.
+      </para>
+      <para>
+	When, as in the polish ispell dictionary, hash table is build at install
+	time and can be later rebuilt with different options, things need to be
+	done in a different way. In that case, the hashed table must be
+	installed in <filename>/var/lib/ispell</filename> and a link from
+	<filename>/usr/lib/ispell</filename>  must be installed pointing to the
+	hash file. The aff file will be installed as for any other dictionary.
+      </para>
+      <para>
+	If desired, symlinks can be created in this same directory with
+	other language names, like italiano.hash -&gt; italian.hash.
+	This may be of some help to local users who do not know the
+	language names in English.
+      </para>
+      <para>
+        <command>enchant</command> is a spell-checking portable
+	library similar to what <command>pspell</command> was, but with more
+	possible backends, developed by the Abiword people. Currently Debian
+        ispell dictionaries are compatible with <command>enchant</command> and
+        can be made available to it under the names and encodings expected by
+        enchant (See <xref linkend="enchant-ispell"/>). If your ispell
+        dictionary is one of those listed there and the default encoding is the
+	right one you only need to set a symlink, e.g.
+      </para>
+      <para>
+        <programlisting>
+/usr/share/enchant/ispell/espanol.hash -> /usr/lib/ispell/espa~nol.hash</programlisting>
+      </para>
+      <para>
+      <emphasis>* myspell/hunspell dictionary files</emphasis>
+      </para>
+      <para>
+        myspell/hunspell dictionary files (<filename>*.dic</filename> and
+	<filename>*.aff</filename>) must be installed in
+	<filename>/usr/share/hunspell</filename>.
+      </para>
+      <note>
+	<para>
+          Temporary symlinks at <filename>/usr/share/myspell/dicts</filename>
+          location are obsolete. Do not set them!.
+        </para>
+      </note>
+      <para>
+	For better Mozilla integration,
+	<filename>xx-XX.{dic,aff}-&gt;xx_XX.{dic,aff}</filename> symlinks were
+	previously needed. Mozilla* now understands both variants, so this is
+	no longer the case. For that reason, dictionaries must 	always be
+	installed in the<filename> xx_XX.{dic,aff}</filename> variant.
+      </para>
+      <para>
+      	When used, the script <command>installdeb-myspell</command>, from the
+	<filename>dictionaries-common-dev</filename> package, will take care of
+	setting the appropriate symlinks if required, after the names found in
+	the myspell info file if given
+	(See <command>installdeb-myspell</command> manual page).
+	With the <filename>--srcdir</filename> option can in some
+	systems try to install the <filename>{.dic,.aff}</filename> files, see
+	its documentation. Use of <command>installdeb-myspell</command> needs
+	a versioned build dependency on
+	<filename>dictionaries-common-dev</filename>
+	(See <xref linkend="checklist"/>)
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 id="scripts" renderas="sect3">
+      <title>Maintainer Scripts for ispell dictionaries and wordlists</title>
+      <!-- ********************************************************************* -->
+      <para>
+	Notice that the debhelper scripts <command>installdeb-ispell</command> and
+	<command>installdeb-wordlist</command>, provided by
+	dictionaries-common-dev will handle most of the following automatically
+	after the info file (See <xref linkend="infofile"/>). These are
+	<quote>debhelper-like</quote> commands but are not officially part of
+	the debhelper package. Debhelper may one day contain something with a
+	completely different design and usage, that accomplishes about the same
+	thing.
+      </para>
+      <itemizedlist>
+	<listitem>
+	  <para>
+	    wamerican: For the special case of wamerican scripts should be
+	    similar as below, but modified so they do not fail in case
+	    dictionaries-common is not installed. Note that this needs to be
+	    done manually, <command>installdeb-wordlist</command> will only
+	    create the standard maintainer scripts.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    postinst: should source the script
+	    <command>update-default-ispell</command> or
+	    <command>update-default-wordlist</command>
+	    (provided by the dictionaries-common package) when called with
+	    argument <quote>configure</quote>.  Here is a template for
+	    inclusion in the postinst script of ispell dictionary packages,
+	  </para>
+	  <para>
+	    <programlisting><![RCDATA[&postinst-ispell;]]></programlisting>
+	  </para>
+	  <para>
+	    And here is a similar template for the wordlist packages,
+	  </para>
+	  <para>
+	    <programlisting><![RCDATA[&postinst-wordlist;]]></programlisting>
+	  </para>
+	  <para>
+	    <command>installdeb-ispell</command> and
+	    <command>installdeb-words</command> will automatically include
+	    above code into the final postinst scripts.
+	  </para>
+	</listitem>
+	<listitem>
+	  <para>
+	    postrm: should source the script
+            <literal>remove-default-ispell</literal> or
+            <literal>remove-default-wordlist</literal>.
+	    when invoked with argument
+	    <quote>remove</quote>
+	    <!-- , <quote>purge</quote>,  -->
+	    or <quote>abort-install</quote>. The goal here is to prompt the
+            administrator for a new selection if the package being removed
+            is the current default.  Here is a template for the code to be
+	    inserted into the postrm script of ispell dictionary packages
+	    (<emphasis>do not forget to edit <literal>#PACKAGE#</literal></emphasis>),
+	  </para>
+	  <para>
+	    <programlisting><![RCDATA[&postrm-ispell;]]></programlisting>
+	  </para>
+	  <para>
+	    The template for the wordlist packages is pretty similar:
+	  </para>
+	  <para>
+	    <programlisting><![RCDATA[&postrm-wordlist;]]></programlisting>
+	  </para>
+	</listitem>
+      </itemizedlist>
+      <para>
+	where <literal>#PACKAGE#</literal> will be substituted by the package
+	name. <command>installdeb-ispell</command> and
+	<command>installdeb-wordlist</command> will automatically included above
+	codes into the final postrm scripts with the right substitution for
+	<literal>#PACKAGE#</literal>.
+      </para>
+      <para>
+	The scripts <command>update-default-ispell</command>
+	and <command>update-default-wordlist</command>
+	are responsible for the manipulation of the appropriate symlinks
+	in <filename>/usr/lib/ispell/</filename> and
+        in <filename>/usr/share/dict/</filename>, respectively,
+	taking into account the selections made via debconf (see
+	<xref linkend="debconf"/>).
+      </para>
+    </sect2>
+    <!-- * -->
+  </sect1>
+  <!-- ************************************************************************** -->
+  <sect1 id="debconf">
+    <title>Ispell Dictionary and wordlist selection Support via Debconf</title>
+    <!-- *********************************************************************** -->
+    <para>
+      <command>debconf</command> makes it possible to have the
+      selection of a default dictionary happen only once,
+      just before dpkg install phase, even if several dictionary
+      packages are being installed at the same time.  This is in contrast
+      with the old system, where the user was prompted for each new package
+      being installed/upgraded, or was just advised to manually update the
+      wordlist dictionary symlink in /etc/alternatives.
+    </para>
+<!--
+    <para>
+      Via <command>dpkg-reconfigure</command>, debconf also allows the
+      system administrator to select a different default dictionary at any
+      time, and have that selection affect ispell and the other
+      applications that use ispell dictionaries.
+    </para>
+-->
+    <para>
+      Individual users may, of course, override the administrator's chosen
+      default ispell dictionary, by using either <envar>DICTIONARY</envar> environment
+      variable, or by explicitly giving the dictionary name in the command
+      line (e.g. with the <literal>-d</literal> option of
+      <command>ispell</command>).
+      <!-- [This stuff here is not going to be implemented.]
+      dictionaries-common
+      provides a command, <command>default-ispell-dictionary</command> [[??]]
+      which allows
+      a user to select from the available dictionaries and set
+      <envar>$DICTIONARY</envar>
+      in a persistent manner. [[ (how??); there could be a wrapper around
+      ispell, too, if desired??]]-->
+    </para>
+    <para>
+      Some applications also allow the user to select a dictionary from
+      within that application -- such changes affect only that application
+      and (usually) only the current application session.
+      (See <xref linkend="other_packages"/>).
+    </para>
+    <para>
+      In order to accomplish these things, some discipline is required.
+    </para>
+    <!-- * -->
+    <sect2 id="templates" renderas="sect3"><title>The templates file</title>
+      <!-- ******************************************************************** -->
+    <para>
+	Every ispell dictionary or wordlist package must have a
+	<filename>templates</filename> file defining a shared debconf
+	multiple-choice question as well as another template defining the
+	languages the package provides. This is an example for an ispell dictionary:
+      </para>
+      <para>
+	<programlisting><![RCDATA[&templates-ispell;]]></programlisting>
+      </para>
+      <para>
+	The example for the wordlist is this one:
+      </para>
+      <para>
+	<programlisting><![RCDATA[&templates-wordlist;]]></programlisting>
+      </para>
+      <para>
+	The token <literal>#PACKAGE#</literal> must be replaced by *exactly* the
+	name of the package and <literal>#LANGUAGES#</literal> must be replaced
+	by a comma separated list of languages provided by the package.  The
+	entries in the <literal>#LANGUAGES#</literal> substitution must be
+	<emphasis>*exactly*</emphasis> (including that <emphasis>this entry is
+	not to be localized</emphasis>) the same that appear in the
+	Languages field in file
+	<filename>
+	/var/lib/dictionaries-common/(ispell|wordlist)/&lt;package-name&gt;
+	</filename> unless you really know what you are doing. Any missing entry
+        will not be displayed by debconf. While sometimes this might be what you
+        want, you are suggested to use for that the
+        <quote>debconf-display</quote> entry in your info-file and the
+	debhelper-like command <command>installdeb-ispell</command>.
+      </para>
+      <para>
+	A <literal>#PACKAGE#/elanguages</literal> template entry similar to
+	<literal>#PACKAGE#/languages</literal> can be used to override the
+	debconf prompt text in the later. Its format is the same as for
+	language.
+	If containing more that one language, both <literal>languages</literal>
+	and <literal>elanguages</literal> must have entries for the same
+	languages and in the exact same ordering.
+	Please try making <literal>elanguages</literal> base text as portable
+	as possible (that is, try hard to make it 7 bit clean, using appropriate
+	transliteration if possible).
+	<literal>#PACKAGE#/elanguages</literal> has another difference, it can
+	be localized. While this field is localizable, for most cases the former
+	poor man <literal>Language</literal> internationalization is enough and
+	translators should have another priorities. When localizing, please
+	change only the non-parenthesized part for consistency with other
+	entries.
+	A <literal>#PACKAGE#/elanguages</literal> will be created
+	by the <command>installdeb-*</command> scripts after either
+	<literal>Elanguage</literal> value, if given in the info file, or
+	<literal>Language</literal> value otherwise. This can be disabled when
+	calling the script.
+      </para>
+      <para>
+	Additional templates may be added, if needed.
+      </para>
+      <note>
+	<para>
+	  If you are using <command>debhelper</command> and the debhelper
+	  like scripts provided by the dictionaries common system, the above
+	  templates file will be automatically generated from information
+	  gathered from the info file. If you do not need additional templates
+	  you do not have to worry about this.
+	</para>
+	<para>
+	  Otherwise, if you need additional templates, do not put them in a
+	  file named <filename>debian/&lt;package-name&gt;.templates</filename>,
+	  since it will be overwritten by the <command>installdeb-*</command>
+	  scripts. The exact way for doing that depends on whether you use
+	  <command>po-debconf</command> or not to maintain localized versions of
+	  the templates.
+	</para>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	    If you use <command>po-debconf</command>, your master templates
+	    file is expected to be named
+	    <filename>debian/&lt;package-name&gt;.po-master.templates</filename>.
+	    You do not need to merge the translations by yourself, since
+	    <command>installdeb-*</command> will do that for you. See the
+	    <command>po-debconf</command> manual page for details about how to
+	    create master templates file and po files. Remember that the
+	    templates file is now named
+	    <filename>debian/&lt;package-name&gt;.po-master.templates</filename>
+	    to avoid conflicts with the autogenerated one. Remember also putting
+	    the appropriate <command>po-debconf</command> dependencies as
+	    described in the <command>po-debconf</command> manual since
+	    dictionaries-common sets no dependency on it.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	    If you do not use <command>po-debconf</command>, put them in a file
+	    named <filename>debian/&lt;package-name&gt;.templates.in</filename>.
+	    <command>installdeb-*</command> will merge the templates and will
+	    install the merged templates file the right way. This system can
+	    coexist with localized templates like
+	    <filename>debian/&lt;package-name&gt;.templates.ru</filename>
+	    corresponding to localizations of your extra
+	    templates. <command>dh_installdebconf</command>, called internally
+	    from the <command>installdeb-*</command> scripts will merge them with
+	    the templates file that is auto generated at
+	    <filename>debian/&lt;package-name&gt;.templates</filename>. Note
+	    that this is being deprecated by <command>debconf</command>.
+	    </para>
+	  </listitem>
+	</itemizedlist>
+      </note>
+    </sect2>
+    <!-- * -->
+    <sect2 id="config" renderas="sect3"> <title>The config file </title>
+      <!-- ******************************************************************** -->
+      <para>
+	There must also exist a <filename>config</filename> file, which
+	will be responsible for getting the user selection during the
+	configuration run of <command>dpkg</command>. The
+	<filename>debian/config</filename> script for a ispell dictionary must
+	contain (after the <literal>#!/usr/bin/perl</literal> line) exactly the
+	Perl code below,
+      </para>
+      <para>
+	<programlisting><![RCDATA[&config-ispell;]]></programlisting>
+      </para>
+      <para>
+	wordlist packages other than wamerican must contain (after the
+	<literal>#!/usr/bin/perl</literal> line) exactly the following perl code
+      </para>
+      <para>
+	<programlisting><![RCDATA[&config-wordlist;]]></programlisting>
+      </para>
+      <para>
+	config file for wamerican is similar to the above, but checking also for
+	existence of
+	<filename>/usr/share/dictionaries-common/elanguages</filename> before
+	loading the common stuff. This is intended to avoid problems if
+	dictionaries-common is made an optional package in the future, as
+	intended. (See
+	<ulink
+	  url="http://lists.alioth.debian.org/pipermail/dict-common-dev/2008-June/000739.html">
+	  http://lists.alioth.debian.org/pipermail/dict-common-dev/2008-June/000739.html</ulink>
+	for more details).
+      </para>
+      <para>
+	If some other debconf actions need to be added and they are in Perl, just
+	add them to the script above.  If you prefer to write in shell, wrap the
+	script above in the following shell code:
+	<programlisting>
+tmp=`tempfile`
+cat &gt; $tmp &lt;&lt;EOF
+** (the script above) **
+EOF
+perl $tmp
+rm -f $tmp</programlisting>
+      </para>
+      <para>
+	Both the <filename>templates</filename> and the
+	<filename>config</filename> files are package-independent, so that
+	the maintainer should just copy the files above to his control area
+	at build time, typically <filename>debian/tmp/DEBIAN</filename>
+	directory.
+      </para>
+      <note>
+	<para>
+	  If the maintainer is using debhelper and package dictionaries-common-dev
+	  is installed, the <command>installdeb-ispell</command> and
+	  <command>installdeb-wordlist</command>, when called in
+	  <filename>debian/rules</filename>, will create the above files
+	  automatically when no other actions are required in the config file. Do
+	  not call <command>dh_instaldebconf</command> in your rules file, since the
+	  scripts above already call it internally.
+	</para>
+	<para>
+	  If other actions are to be added in the <filename>debian/config</filename>
+	  file and you are using debhelper and the helper scripts from
+	  dictionaries-common-dev proceed as follows. Add your actions to a
+	  <filename>debian/config.in</filename> (or
+	  <filename>debian/&lt;package-name&gt;.config.in</filename>) file.
+	</para>
+	<para>
+	  If your actions are written in perl the <filename>config.in</filename>
+	  should look something like
+	  <programlisting>
+#!/usr/bin/perl
+
+#DEBHELPER#
+
+# Now the package local stuff with your code</programlisting>
+	</para>
+	<para>
+	  and if they are written in a sh script, they should look like
+	  <programlisting>
+#!/bin/sh
+
+#DEBHELPER#
+
+# Now the package local stuff with your code</programlisting>
+	</para>
+	<para>
+	  <command>installdeb-ispell</command> or
+	  <command>installdeb-wordlist</command> will take care of including the
+	  code required by this policy document into the config scripts.
+	</para>
+      </note>
+    </sect2>
+  </sect1>
+  <!-- ************************************************************************** -->
+  <sect1 id="emacsen"><title>Emacs, jed and mutt Support</title>
+    <!-- ************************************************************************ -->
+    <para>
+      Startup files for emacs and jed are automatically generated after
+      installation of the ispell dictionaries (see <xref
+	linkend="addon"/>). Mutt support is also provided.
+    </para>
+    <para>
+      As regards the user interface, a new jed command is now available:
+      <userinput>
+	<keycombo><keycap>M</keycap><keycap>x</keycap></keycombo>
+        ispell_change_dictionary
+      </userinput>, which prompts the user for the ispell dictionary which
+      will be used in the current editing session for spell checking.
+    </para>
+
+  </sect1>
+
+  <!-- [From here on it's under David's responsibility.] -->
+
+  <sect1 id="other_packages">
+    <title>
+      Support for Other Packages
+    </title>
+    <para>
+      Many debian packages (and non-debian-packaged applications) don't
+      provide a way for the user to select from multiple spelling
+      dictionaries -- they just use ispell, which uses its
+      currently-selected default dictionary.  This is fine, and the user
+      doesn't have to learn anything new to switch from one dictionary to
+      another (see <xref linkend="debconf"/>).
+    </para>
+  </sect1>
+  <!-- ************************************************************************** -->
+  <sect1 id="aspell-registration">
+    <title>
+    Registering aspell and myspell/hunspell dictionaries for use from emacs and
+    squirrelmail.
+    </title>
+    <!-- *********************************************************************** -->
+    <para>
+      The <filename>dictionaries-common</filename> system will only use the
+      contents of the emacs <command>ispell-dictionary-alist</command> variable
+      in <filename>ispell.el</filename> if the corresponding entry is not
+      redefined after the really installed dictionaries. A registration system
+      similar to that provided for ispell dictionaries is available for aspell
+      and myspell/hunspell dictionaries.
+      To use this system, please see the following guidelines
+    </para>
+    <!-- * -->
+    <sect2 renderas="sect3"> <title>Add an info file </title>
+      <!-- ******************************************************************** -->
+      <para>
+	An info file similar to that described in <xref linkend="infofile"/>
+	must be installed as
+	<filename>/var/lib/dictionaries-common/aspell/&lt;package-name&gt;</filename>
+	for aspell dictionaries, or as
+	<filename>/var/lib/dictionaries-common/hunspell/&lt;package-name&gt;</filename>
+	for myspell/hunspell dictionaries, containing one entry for each aspell
+	(or myspell/hunspell) dictionary it provides.
+    </para>
+      <para>
+	If there is an equivalent ispell dictionary,
+	<filename>Emacsen-Name</filename>
+	must be the same of it. Otherwise things like
+	<filename>;; ispell-local-dictionary: "brasileiro"</filename>
+	in the spell checked file will not work similarly under ispell, aspell
+	or hunspell.
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 renderas="sect3"> <title>Modify the maintainer scripts </title>
+      <!-- ******************************************************************** -->
+      <para>
+	For aspell, add a call to update-dictcommon-aspell to your postinst
+	<programlisting><![RCDATA[&postinst-aspell;]]></programlisting>
+	and to your postrm
+	<programlisting><![RCDATA[&postrm-aspell;]]></programlisting>
+      </para>
+      <para>
+	For myspell/hunspell, add a call to update-dictcommon-hunspell to your
+	postinst
+	<programlisting><![RCDATA[&postinst-hunspell;]]></programlisting>
+	and to your postrm
+	<programlisting><![RCDATA[&postrm-hunspell;]]></programlisting>
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 renderas="sect3"> <title>Set the right relationships </title>
+      <!-- ***************************************************************  -->
+      <para>
+	If you want to use this system for your aspell dictionary you must make
+	it depend on <filename>dictionaries-common (>= 0.9.1)</filename>.
+      </para>
+      <para>
+	If you want to use this system for your myspell/hunspell dictionary you
+	must make it depend on
+	<filename>dictionaries-common (>= 1.0)</filename>.
+      </para>
+    </sect2>
+    <!-- * -->
+    <sect2 renderas="sect3">
+    <title>
+    <command>installdeb-aspell</command> and
+    <command>installdeb-hunspell</command>: debhelper like helpers for aspell
+    and myspell/hunspell dictionaries.
+    </title>
+      <!-- ***************************************************************  -->
+      <para>
+	Debhelper like scripts are provided to make even easier the steps
+	above. They are <command>installdeb-aspell</command> and
+	<command>installdeb-hunspell</command>, and rely in the existence of
+	a <filename>info-{aspell,hunspell}</filename> file conforming to the
+	specified in <xref linkend="infofile"/>, and named as for other
+	debhelper files (<filename>.docs, .manpages, ...</filename>).
+	Calling it in <filename>debian/rules</filename> will install the
+	aspell/hunspell info file and create postinst and postrm debhelper
+	snippets to be installed by debhelper.
+	Note, that, unlike <command>installdeb-{ispell,wordlist}</command> this
+	script does not	know about debconf so you should install your debconf
+	stuff, if any, in the usual way.
+      </para>
+      <para>
+	If you use the <command>installdeb-aspell</command> script you must make
+	your package build depend on
+	<filename>dictionaries-common-dev (>= 0.9.1)</filename>. If you use the
+	<command>installdeb-hunspell</command> script you must make your package
+	build depend on <filename>dictionaries-common-dev (>= 1.0)</filename>
+      </para>
+    </sect2>
+  </sect1>
+  <!-- ***************************************************************** -->
+  <appendix id="checklist"> <title>Dictionaries common dependencies checklist</title>
+  <!-- ***************************************************************** -->
+  <para>
+  This is a summary of the <filename>dictionaries-common(-dev)</filename>
+  versions that may imply a dependency or build-dependency in your package.
+  </para>
+    <para>
+      <programlisting><![RCDATA[&version-checklist;]]></programlisting>
+    </para>
+  </appendix>
+
+  <!-- ***************************************************************** -->
+  <appendix id="internals"> <title>Dictionaries common internals</title>
+    <!-- *********************************************************************** -->
+    <itemizedlist>
+       <listitem>
+	<para>
+	  This is a summary of the system scripts provided by the system and
+	  their purpose:
+	</para>
+	<itemizedlist>
+	  <listitem>
+	    <para>
+	      <command>select-default-(ispell|wordlist):</command></para>
+	    <para>
+	      Make debconf always ask the shared question. Calls internally
+	      <command>update-default-(ispell|wordlist)</command>.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>update-default-(ispell|wordlist):</command>
+	    </para>
+	    <para>
+	      Read the system default from the debconf database and set links in
+	      default links in <filename>/etc/dictionaries-common</filename>
+	      pointing to the appropriate files in
+	      <filename>/usr/lib/ispell/</filename> or
+	      <filename>/usr/share/dict/</filename>. Also updates the
+	      system-wide setting
+	      <filename>/etc/dictionaries-common/(ispell|wordlist)-default</filename>.
+	      If option <command>--rebuild</command> is given, rebuilds the
+	      <filename>/var/cache/dictionaries-common/(ispell|wordlist).db</filename>
+	      and the emacsen and jed support (to be put in
+	      <filename>/var/cache/dictionaries-common/(emacsen|jed)</filename>)
+	      from the files in
+	      <filename>/var/lib/dictionaries-common/(ispell|wordlist)</filename>
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>update-dictcommon-aspell:</command>
+	    </para>
+	    <para>
+	      Rebuilds the
+	      <filename>/var/cache/dictionaries-common/aspell.db</filename>
+	      and the emacsen support (to be put in
+	      <filename>/var/cache/dictionaries-common/</filename>)
+	      from the files in
+	      <filename>/var/lib/dictionaries-common/aspell</filename> (merged
+	      for the emacsen support with stuff from
+	      <filename>/var/lib/dictionaries-common/ispell</filename>).
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>update-dictcommon-hunspell:</command>
+	    </para>
+	    <para>
+	      Same as <command>update-dictcommon-aspell</command>, but for
+	      myspell/hunspell dictionaries.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>update-openoffice-dicts:</command>
+	    </para>
+	    <para>
+	      REMOVED.
+	    </para>
+	    <para>
+	      If was used with ancient OpenOffice.org (&lt; 3) installed to update
+	      OpenOffice.org myspell/hunspell dictionary list at
+	      <filename>/etc/openoffice/dictionary.lst</filename>.
+	      It is no longer shipped.
+	      Any package still conditionally calling it should stop doing so.
+	    </para>
+	  </listitem>
+	  <listitem>
+	    <para>
+	      <command>remove-default-(ispell|wordlist):</command>
+	    </para>
+	    <para>
+	      Call <command>update-default-(ispell|wordlist) --rebuild</command>.
+	    </para>
+	  </listitem>
+	</itemizedlist>
+      </listitem>
+      <listitem>
+	<para>
+	  The emacsen implementation that follows is essentially an implementation
+	  of the proposal made by Rob Browning some time ago (see file
+  	  <filename>emacsen.historic</filename> in the source package).
+	</para>
+	<para>
+	  Emacsen support for the ispell dictionaries is built upon the
+	  requirements of the emacsen-common packages. Package maintainers are
+	  encouraged to read the Debian Emacsen Policy, included in the
+	  emacsen-common package
+	  (<filename>/usr/share/doc/emacsen-common/debian-emacs-policy.gz</filename>),
+	  although they do not need to know it for maintaining ispell dictionaries
+	  or wordlist packages.
+	</para>
+	<para>
+	  The goal here is to allow a coherent behavior of the ispell.el ELisp
+	  package, available in all emacsen flavors.
+	</para>
+	<para>
+	  Information from each ispell and aspell dictionary info file is
+	  gathered and used to create an emacs elisp initialization file
+	  (<filename>/var/cache/dictionaries-common/emacsen-ispell-dicts.el</filename>)
+	  in which certain language-specific parameters are set after the contents
+	  of the info files, resulting in correct entries in the
+	  <varname>ispell-dictionary-alist</varname> variable.
+	</para>
+	<para>
+	  Remember that this file is automatically generated, so do no not edit
+	  it for any other purpose than debugging problems with the emacs menus,
+	  since it will be overwritten at some time. In case of problems, with the
+	  information in this appendix, check entries in that file to verify that
+	  they have the expected values and double check the syntax of the info file
+	  (see <xref linkend="infofile"/>) in case of problems. Also look at the
+	  entries corresponding to other dictionaries, a wrong entry from other
+	  dictionary can cause problems with menus for all dictionaries.
+	</para>
+      </listitem>
+    </itemizedlist>
+  </appendix>
+  <!-- ***************************************************************** -->
+  <appendix id="enchant-ispell"> <title>Enchant ispell mapping</title>
+   <!-- *********************************************************************** -->
+    <para>
+      This mapping shows locale name, expected hash name and expected
+      encoding for enchant ispell interface. Extracted from file
+      <filename>src/ispell/ispell_checker.cpp</filename> at the enchant
+      sources. This appendix might be out of date, please refer to that file for
+      the most recent values.
+    </para>
+    <para>
+      <programlisting><![RCDATA[&enchant-ispell;]]></programlisting>
+    </para>
+  </appendix>
+</article>
+
+
+<!-- Keep this comment at the end of the file
+Local Variables:
+ mode: sgml
+ coding: iso-8859-1
+ ispell-local-dictionary: "american"
+End:
+-->
+
+
+
+<!--  LocalWords:  debian debhelper idict debinst installdebconf postinst prerm
+ -->
+<!--  LocalWords:  debconf config emacsen wordlists ibrazilian icatalan iczech
+ -->
+<!--  LocalWords:  wcatalan idanish wdanish idutch wdutch iamerican ibritish rm
+ -->
+<!--  LocalWords:  wenglish iesperanto ifaroese wfaroese ifinnish wfinnish jed
+ -->
+<!--  LocalWords:  ifrench wfrench igerman ingerman wgerman wngerman iitalian
+ -->
+<!--  LocalWords:  witalian inorwegian wnorwegian ipolish wpolish iportuguese
+ -->
+<!--  LocalWords:  irussian ispanish wspanish iswedish wswedish miscfiles dev
+ -->
+<!--  LocalWords:  wordlist buildhash american english symlink dpkg nynorsk MUA
+ -->
+<!--  LocalWords:  installemacsen bokmal Perl indeutsch IDWP autobuilders RFC
+ -->
+<!--  LocalWords:  debuild brasileiro Casechars Otherchars Additionalchars Args
+ -->
+<!--  LocalWords:  iso symlinks regexp umlauts endian Briscoe aff italiano perl
+ -->
+<!--  LocalWords:  italian installdeb postrm deconfigure tmp tempfile EOF popup
+ -->
+<!--  LocalWords:  instaldebconf ELisp elisp alist ngerman Laboissi Coe Agust
+ -->
+<!--  LocalWords:  MUAs NUAs french tex norwegian symlinked README FHS TKMail
+ -->
+<!--  LocalWords:  brazilian Tkmail versioned DICT aspell myspell emacs lintian
+ -->
+<!--  LocalWords:  Engelhard copyleft mozilla thunderbird openoffice spellcheck
+ -->
+<!--  LocalWords:  UTF abiword pspell wamerican ispell OpenOffice hunspell
+ -->
+<!--  LocalWords:  squirrelmail
+ -->

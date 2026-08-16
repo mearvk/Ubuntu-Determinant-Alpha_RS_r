@@ -1,0 +1,365 @@
+#!/bin/sh
+
+# Copyright (C) 2012-2014, Benjamin Drung <bdrung@debian.org>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+COMMAND="${COMMAND:-${0%/*}/debian-distro-info}"
+
+. "${0%/*}/shunit2-helper-functions.sh"
+
+testAlias() {
+    success "--alias sid" "unstable"
+    success "--date 2010-10-20 --alias squeeze" "testing"
+    success "--date 2011-11-20 --alias squeeze" "stable"
+    success "--alias whatever" "whatever"
+}
+
+testAll() {
+    local result="buzz
+rex
+bo
+hamm
+slink
+potato
+woody
+sarge
+etch
+lenny
+squeeze
+sid
+experimental"
+    local pattern=$(echo $result | sed "s/ /\\\\|/g")
+    success "--date 2007-07-07 --all | grep -w \"$pattern\"" "$result"
+    success "-a | grep -w \"$pattern\"" "$result"
+}
+
+testDevel() {
+    success "--date 2011-01-10 --devel" "sid"
+    success "-d --date=2002-01-10 --codename" "sid"
+}
+
+testOldstable() {
+    success "--oldstable --date=2011-01-10" "etch"
+    success "-c --date=2008-07-06 -o" "sarge"
+    # Compatibility with 0.2.2
+    success "--old --date=2011-01-10" "etch"
+}
+
+testStable() {
+    success "--date=2011-01-10 --stable" "lenny"
+    success "--date=2001-02-10 -s" "potato"
+}
+
+testSupported() {
+    local result="lenny
+squeeze
+sid
+experimental"
+    success "--date=2011-01-10 --supported" "$result"
+}
+
+testLTS() {
+    success "--date=2016-02-28 --lts" "squeeze"
+}
+
+testELTS() {
+    success "--date=2018-09-01 --elts" "wheezy"
+}
+
+testUnsupported() {
+    local result="buzz
+rex
+bo
+hamm
+slink
+potato
+woody
+sarge
+etch"
+    success "--date=2011-01-10 --unsupported" "$result"
+}
+
+testTesting() {
+    success "--date=2011-01-10 --testing" "squeeze"
+    success "-t --date=2010-01-10" "squeeze"
+}
+
+testFullname() {
+    success "--date=2011-01-10 --stable --fullname" 'Debian 5.0 "Lenny"'
+    success "--date=2011-01-10 --stable --fullname -ycreated" \
+        'Debian 5.0 "Lenny" -1373'
+    success "--date=2011-01-10 --stable --fullname --days=created" \
+        'Debian 5.0 "Lenny" -1373'
+    success "--date=2011-01-10 --stable --fullname -y" \
+        'Debian 5.0 "Lenny" -695'
+    success "--date=2011-01-10 --stable --fullname --days" \
+        'Debian 5.0 "Lenny" -695'
+    success "--date=2011-01-10 --stable --fullname -yrelease" \
+        'Debian 5.0 "Lenny" -695'
+    success "--date=2011-01-10 --stable --fullname --days=release" \
+        'Debian 5.0 "Lenny" -695'
+    success "--date=2011-01-10 --stable --fullname -yeol" \
+        'Debian 5.0 "Lenny" 392'
+    success "--date=2011-01-10 --stable --fullname --days=eol" \
+        'Debian 5.0 "Lenny" 392'
+
+    success "--date=2011-01-10 -f --testing" 'Debian 6.0 "Squeeze"'
+    success "--date=2011-01-10 -f --testing -ycreated" \
+        'Debian 6.0 "Squeeze" -695'
+    success "--date=2011-01-10 -f --testing --days=created" \
+        'Debian 6.0 "Squeeze" -695'
+    success "--date=2011-01-10 -f --testing -y" \
+        'Debian 6.0 "Squeeze" 27'
+    success "--date=2011-01-10 -f --testing --days" \
+        'Debian 6.0 "Squeeze" 27'
+    success "--date=2011-01-10 -f --testing -yrelease" \
+        'Debian 6.0 "Squeeze" 27'
+    success "--date=2011-01-10 -f --testing --days=release" \
+        'Debian 6.0 "Squeeze" 27'
+
+    # sid is never released so can never go eol
+    success "--date=2011-01-10 -f --devel -yeol" \
+        'Debian  "Sid" (unknown)'
+    success "--date=2011-01-10 -f --devel --days=eol" \
+        'Debian  "Sid" (unknown)'
+}
+
+testRelease() {
+    success "--date=2011-01-10 -r --devel" "sid"
+    success "--date=2011-01-10 --testing --release" "6.0"
+    success "--date=2011-01-10 --release --stable" "5.0"
+}
+
+testSeries() {
+    success "-r --series rex" "1.2"
+}
+
+testCombinedShortform() {
+    success "-rd" "sid"
+}
+
+testReleaseDate() {
+    success "--date 2009-02-13 -o" "sarge"
+    success "--date 2009-02-13 -s" "etch"
+    success "--date 2009-02-13 -t" "lenny"
+    success "--date 2009-02-13 -d" "sid"
+    success "--date 2009-02-14 -o" "etch"
+    success "--date 2009-02-14 -s" "lenny"
+    success "--date 2009-02-14 -t" "squeeze"
+    success "--date 2009-02-14 -d" "sid"
+}
+
+testHelp() {
+    local help='Usage: debian-distro-info [options]
+
+Options:
+  -h  --help             show this help message and exit
+      --date=DATE        date for calculating the version (default: today)
+      --series=SERIES    series to calculate the version for
+  -y[MILESTONE]          additionally, display days until milestone
+      --days=[MILESTONE] (created, release, eol, eol-lts, eol-elts)
+      --alias=DIST       print the alias (oldstable, stable, testing, unstable)
+                         relative to the given distribution codename
+  -a  --all              list all known versions
+  -d  --devel            latest development version
+  -t  --testing          current testing version
+  -s  --stable           latest stable version
+  -o  --oldstable        latest oldstable version
+      --supported        list of all supported versions (including development)
+  -l  --lts              list of all LTS supported versions
+  -e  --elts             list of all Extended LTS supported versions
+      --unsupported      list of all unsupported stable versions
+  -c  --codename         print the codename (default)
+  -f  --fullname         print the full name
+  -r  --release          print the release version
+
+See debian-distro-info(1) for more info.'
+    success "--help" "$help"
+    success "-h" "$help"
+}
+
+testExactlyOne() {
+    local result='debian-distro-info: You have to select exactly one of --alias, --all, --devel, --elts, --lts, --oldstable, --stable, --supported, --series, --testing, --unsupported.'
+    failure "" "$result"
+    failure "-ad" "$result"
+    failure "--alias foo -a" "$result"
+}
+
+testUnrecognizedOption() {
+    failure "--foo" "debian-distro-info: unrecognized option \`--foo'"
+    failure "-x" "debian-distro-info: unrecognized option \`-x'"
+    failure "--supported-esm" "debian-distro-info: unrecognized option \`--supported-esm'"
+}
+
+testUnrecognizedArguments() {
+    failure "bar" "debian-distro-info: unrecognized arguments: bar"
+    failure "baz -s foo" "debian-distro-info: unrecognized arguments: baz foo"
+}
+
+testMissingArgumentAlias() {
+    failure "--alias" "debian-distro-info: option \`--alias' requires an argument DIST"
+}
+
+testMissingArgumentDate() {
+    failure "--date" "debian-distro-info: option \`--date' requires an argument DATE"
+}
+
+testMissingArgumentSeries() {
+    failure "--series" "debian-distro-info: option \`--series' requires an argument SERIES"
+}
+
+testInvalidAlias() {
+    failure "--alias Sid" "debian-distro-info: invalid distribution codename \`Sid'"
+    failure "--alias wr0ng" "debian-distro-info: invalid distribution codename \`wr0ng'"
+}
+
+testInvalidDate() {
+    failure "--date fail -s" "debian-distro-info: invalid date \`fail'"
+    failure "--date=2010-02-30 -d" "debian-distro-info: invalid date \`2010-02-30'"
+}
+
+testInvalidSeries() {
+    failure "--series wr0ng" "debian-distro-info: invalid distribution series \`wr0ng'"
+}
+
+
+testMultipleAlias() {
+    failure "--alias a --alias b" "debian-distro-info: --alias requested multiple times."
+}
+
+testMultipleDates() {
+    failure "--date 2007-06-05 -s --date 2004-03-02" "debian-distro-info: Date specified multiple times."
+}
+
+testMultipleSeries() {
+    failure "--series wheezy --series jessie" "debian-distro-info: series requested multiple times."
+}
+
+testUnknownSeries() {
+    failure "--series foobar" "debian-distro-info: unknown distribution series \`foobar'"
+}
+
+testDays() {
+    # day after lenny released
+    date=2009-02-15
+
+    success "--date=$date --stable " "lenny"
+
+    success "--date=$date --stable --days=created" "-679"
+    success "--date=$date --stable --days=created -c" "lenny -679"
+    success "--date=$date --stable --days=created -f" "Debian 5.0 \"Lenny\" -679"
+    success "--date=$date --stable --days=created -r" "5.0 -679"
+
+    success "--date=$date --stable --days=release" "-1"
+    success "--date=$date --stable --days=release -c" "lenny -1"
+    success "--date=$date --stable --days=release -f" "Debian 5.0 \"Lenny\" -1"
+    success "--date=$date --stable --days=release -r" "5.0 -1"
+
+    success "--date=$date --stable --days" "-1"
+    success "--date=$date --stable --days -c" "lenny -1"
+    success "--date=$date --stable --days -f" "Debian 5.0 \"Lenny\" -1"
+    success "--date=$date --stable --days -r" "5.0 -1"
+
+    success "--date=$date --stable --days=eol" "1086"
+    success "--date=$date --stable --days=eol -c" "lenny 1086"
+    success "--date=$date --stable --days=eol -f" "Debian 5.0 \"Lenny\" 1086"
+    success "--date=$date --stable --days=eol -r" "5.0 1086"
+
+    # date woody released
+    date=2002-07-19
+
+    success "--date=$date --stable" "woody"
+
+    success "--date=$date --stable --days=created" "-703"
+    success "--date=$date --stable --days=created -c" "woody -703"
+    success "--date=$date --stable --days=created -f" "Debian 3.0 \"Woody\" -703"
+    success "--date=$date --stable --days=created -r" "3.0 -703"
+
+    success "--date=$date --stable --days=release" "0"
+    success "--date=$date --stable --days=release -c" "woody 0"
+    success "--date=$date --stable --days=release -f" "Debian 3.0 \"Woody\" 0"
+    success "--date=$date --stable --days=release -r" "3.0 0"
+
+    success "--date=$date --stable --days" "0"
+    success "--date=$date --stable --days -c" "woody 0"
+    success "--date=$date --stable --days -f" "Debian 3.0 \"Woody\" 0"
+    success "--date=$date --stable --days -r" "3.0 0"
+
+    success "--date=$date --stable --days=eol" "1442"
+    success "--date=$date --stable --days=eol -c" "woody 1442"
+    success "--date=$date --stable --days=eol -f" "Debian 3.0 \"Woody\" 1442"
+    success "--date=$date --stable --days=eol -r" "3.0 1442"
+
+    # day before etch was released
+    date=2007-04-07
+
+    success "--testing --date=$date" "etch"
+
+    success "--testing --date=$date --days=created" "-670"
+    success "--testing --date=$date --days=created -c" "etch -670"
+    success "--testing --date=$date --days=created -f" "Debian 4.0 \"Etch\" -670"
+    success "--testing --date=$date --days=created -r" "4.0 -670"
+
+    success "--testing --date=$date --days" "1"
+    success "--testing --date=$date --days -c" "etch 1"
+    success "--testing --date=$date --days -f" "Debian 4.0 \"Etch\" 1"
+    success "--testing --date=$date --days -r" "4.0 1"
+
+    success "--testing --date=$date --days=release" "1"
+    success "--testing --date=$date --days=release -c" "etch 1"
+    success "--testing --date=$date --days=release -f" "Debian 4.0 \"Etch\" 1"
+    success "--testing --date=$date --days=release -r" "4.0 1"
+
+    success "--testing --date=$date --days=eol" "1045"
+    success "--testing --date=$date --days=eol -c" "etch 1045"
+    success "--testing --date=$date --days=eol -f" "Debian 4.0 \"Etch\" 1045"
+    success "--testing --date=$date --days=eol -r" "4.0 1045"
+
+    # day before wheezy was released
+    date=2013-05-03
+
+    success "--testing --date=$date" "wheezy"
+
+    success "--testing --date=$date --days=created" "-817"
+    success "--testing --date=$date --days=created -c" "wheezy -817"
+    success "--testing --date=$date --days=created -f" "Debian 7 \"Wheezy\" -817"
+    success "--testing --date=$date --days=created -r" "7 -817"
+
+    success "--testing --date=$date --days" "1"
+    success "--testing --date=$date --days -c" "wheezy 1"
+    success "--testing --date=$date --days -f" "Debian 7 \"Wheezy\" 1"
+    success "--testing --date=$date --days -r" "7 1"
+
+    success "--testing --date=$date --days=release" "1"
+    success "--testing --date=$date --days=release -c" "wheezy 1"
+    success "--testing --date=$date --days=release -f" "Debian 7 \"Wheezy\" 1"
+    success "--testing --date=$date --days=release -r" "7 1"
+
+    success "--testing --date=$date --days=eol" "1089"
+    success "--testing --date=$date --days=eol -c" "wheezy 1089"
+    success "--testing --date=$date --days=eol -f" "Debian 7 \"Wheezy\" 1089"
+    success "--testing --date=$date --days=eol -r" "7 1089"
+
+    success "--testing --date=$date --days=eol-lts" "1854"
+    success "--testing --date=$date --days=eol-lts -c" "wheezy 1854"
+    success "--testing --date=$date --days=eol-lts -f" "Debian 7 \"Wheezy\" 1854"
+    success "--testing --date=$date --days=eol-lts -r" "7 1854"
+
+    success "--testing --date=$date --days=eol-elts" "2615"
+    success "--testing --date=$date --days=eol-elts -c" "wheezy 2615"
+    success "--testing --date=$date --days=eol-elts -f" "Debian 7 \"Wheezy\" 2615"
+    success "--testing --date=$date --days=eol-elts -r" "7 2615"
+}
+
+. shunit2

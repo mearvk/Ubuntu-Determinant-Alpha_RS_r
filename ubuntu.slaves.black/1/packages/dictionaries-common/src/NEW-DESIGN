@@ -1,0 +1,271 @@
+-*- indented-text -*-
+
+		    New Design for dictionaries-common
+                    ==================================
+ 
+		  Rafael Laboissiere <rafael@debian.org>
+		Last modified: Mon Nov 19 15:53:56 CET 2001
+
+
+[ Convention: IDWP = "ispell dictionary or wordlist package" ]
+
+Dependencies
+============
+
+Every IDWP has to declare 
+
+    Pre-Depends: dictionaries-common
+
+in its debian/control.  The reason for that is because the config script
+must call a script contained in the dictionaries-common package.  Hence,
+when the IDWP is going to be configured, dictionaries-common must be
+already installed and fully configured.
+
+Every IDWP has also to declare 
+
+    Build-Depends: dictionaries-common-dev
+
+to make autobuilders and debuild happy.
+
+
+/var/lib/dictionaries-common/(ispell|wordlist)/<package-name>
+=============================================================
+
+This file must be installed by the package and have the following format
+(reminiscent of the RFC 822 format):
+
+    Language: portuguÍs brasileiro (Brazilian Portuguese) 
+    Hash-Name: brazilian
+    Emacsen-Name: brasileiro
+    Casechars: [a-z·ÈÌÛ˙‡ËÏÚ˘„ıÁ¸‚ÍÙA-Z¡…Õ”⁄¿»Ã“Ÿ√’«‹¬ ‘]
+    Not-Casechars: [^a-z·ÈÌÛ˙‡ËÏÚ˘„ıÁ¸‚ÍÙA-Z¡…Õ”⁄¿»Ã“Ÿ√’«‹¬ ‘]
+    Otherchars: [---']
+    Many-Otherchars: yes
+    Additionalchars: ·ÈÌÛ˙‡ËÏÚ˘„ıÁ¸‚ÍÙ¡…Õ”⁄¿»Ã“Ÿ√’«‹¬ ‘
+    Ispell-Args: 
+    Extended-Character-Mode: 
+    Coding-System: iso-8859-1
+
+Each field in this file must be contained in a single line.  They may also
+have the right side (i.e., after the character ":") empty, which is
+equivalent to suppressing the field (the default value will be used in this
+case, see below).
+
+Several records as the above may be present in each file and must be
+separated by a blank line.  They must have unique values for the Language
+field.
+
+The records supplied by each dictionary package will be used by the core of
+dictionaries-common to provide site-wide configuration, including
+Debconf list of choices, ispell/wordlist default symlinks, automatic
+generation of add-on support (emacsen, jed and mutt).  This file is
+therefore essential for the correct integration of the dictionary packages
+into the dictionaries-common scheme.
+
+Here is an explanation of the fields shown above:
+
+    Language: (this field is mandatory)
+
+      Comprehensive description of the language.  It is advised to include
+      both the description in the original language (with the appropriate
+      character coding system) and a description in English between
+      parentheses.  This will help the system administrators around the
+      world, who does not now how the dictionaries are spelled in their
+      original language.
+
+      This field will be used in the Debconf list of choices as well as
+      a key for determining the language default for the ispell-wrapper
+      utility.  Hence, it has to be unique among all the installed
+      dictionaries in the system.
+
+    Hash-Name: (this field is mandatory)
+  
+      Base name of the files that will appear as symlinks in both
+      /usr/lib/ispell of /usr/share/dict.  Has to be unique among the
+      installed dictionaries in the system.
+
+    Emacsen-Name: (optional, defaults to Hash-Name)
+
+      Entry name of the dictionary that appears in the list of choices of
+      the emacsen ispell package.  Maintainers should try to respect the
+      tradition of that package, by keeping the name that they used to have
+      in the past.
+
+    Casechars: (optional, defaults to [a-zA-Z])
+
+      Emacs-Lisp regular expression of valid characters that comprise a
+      word.  It is typically enclodes between square brackets.
+
+    Not-Casechars: (optional, defaults to [^a-zA-Z])
+
+      Opposite regexp of Casechars.
+
+    Otherchars: (optional, defaults to ['])
+
+      Regexp of characters in the Not-Casechars set but which can be
+      used to construct words in some special way. (See the ispell.el
+      documentation for details.)
+
+    Many-Otherchars: (optional, default value no)
+
+      Boolean variable (assuming either the values yes or no). If it is
+      non-nil when multiple Otherchars are allowed in a word.  Otherwise
+      only a single Otherchars character is allowed to be part of any
+      single word. 
+
+    Additionalchars: (optional, defaults to an empty string)
+
+      Characters other than ASCII that may be part of a word.  This is
+      somehow redundant with the Casechars field, but is necessary for the
+      proper working of the -w option to ispell.
+
+    Ispell-Args: (optional, defaults to -d <Hash-Name>)
+
+      List of additional arguments passed to the ispell.
+
+    Extended-Character-Mode: (optional, defaults to the empty string)
+
+      Set when dictionaries are used which have been configured in an
+      ispell affix file.  (For example, umlauts can be encoded as \\\"a,
+      a\\\", \"a, ...) 
+
+    Coding-System : (optional, defaults to the empty string)
+    
+      Used for languages with multibyte characters.
+
+
+Debconf
+=======
+
+Each IDWP must have the following debian/templates file:
+
+    Template: shared/packages-(ispell|wordlist)
+    Type: text
+    Description:
+
+    Template: #PACKAGE#/languages
+    Type: text
+    Default: #LANGUAGES#
+    Description:
+
+The token #PACKAGE# must be replaced by *exactly* the name of the package
+and #LANGUAGES# must be replaced by a comma separated list of languages
+provided by the package.  The entries in the #LANGUAGES# substitution must
+be *exactly* the same that appear in the file
+/var/lib/dictionaries-common/(idict|wordlist)/<package-name>.
+
+Additional templates may be added, if needed.
+
+The debian/config script must contain exactly the Perl code below:
+
+    use Debconf::Client::ConfModule q(:all);
+
+    version ('2.0');
+
+    my $class = "[I:ispell:][W:wordlist:]";
+    my $question = "shared/packages-$class";
+
+    my @choices = ();
+    map {
+      push (@choices, split (/\s*,\s*/, metaget ("$_/languages", "default")));
+    } sort split (/\s*,\s*/, metaget ($question, "owners"));
+    my $choices = join (', ', @choices);
+
+    $question = "dictionaries-common/default-$class";
+    if ($choices ne metaget ($question, "choices")) {
+      subst ($question, "choices", $choices);
+      fset ($question, "isdefault", "true");
+      input ("critical", $question);
+      title ("[I:Ispell dictionary:][W:Wordlist dictionary:]");
+      go ();
+    }
+
+If some other debconf actions need to be added and they are in Perl, just
+add them to the script above.  If you prefer to write in shell, wrap the
+script above in the following shell code:
+
+    tmp=`tempfile`
+    cat > $tmp <<EOF
+    # (the script above)
+    EOF
+    perl $tmp
+    rm -f $tmp
+
+
+Maintainer scripts
+==================
+
+Each IDWP postint script must include the following code:
+
+    . /usr/share/debconf/confmodule
+    if [ "$1" = "configure" ] ; then 
+      /usr/sbin/update-default-(ispell|wordlist) --rebuild
+    fi
+
+Each IDWP postrm script must include the following code:
+
+    case "$1" in remove|deconfigure)
+      /usr/sbin/remove-default-(ispell|wordlist) <package-name>
+      if [ -e /usr/share/debconf/confmodule ] ; then
+        . /usr/share/debconf/confmodule
+        db_purge
+      fi
+    esac
+
+
+Ispell wrapper
+==============
+
+A ispell wrapper command will be made available by dictionaries common.
+This command will accept all the ispell options plus -L <language>, where
+language must correspond to one of the languages intalled in the system
+(Perl regular expressions will be probably available here, such that
+calling ispell-wrapper -L ".*brasil.*" will select "PortuguÍs
+Brasileiro").  
+
+An interactive selection script will also be available for selecting the
+default ispell dictionary both system-wide (when run by root, placing the
+result in /etc/dictionaries-common/default-ispell) or user-specific (placing
+the result in ~/.default-ispell).
+
+
+System wide configuration
+=========================
+
+Besides the debconf configuration at installation time, there will be a
+/usr/sbin/select-default-(ispell|wordlist) script that will call the
+debconf question and will be responsible to set the appropriate links
+/usr/lib/(ispell|words)/default.*.
+
+
+Add-on support
+==============
+
+Emacsen, jed and mutt add-on support will be fully auto-generated by the
+update-default-(ispell|wordlist) script.  Also, links in /usr/lib/ispell
+correponding to the Emacsen-Name: field will be automatically generated.
+
+
+dictionaries-common internals
+=============================
+
+System scripts:
+
+    select-default-(ispell|wordlist):
+        Make debconf always ask the shared question. Call
+        update-default-(ispell|wordlist). 
+
+    update-default-(ispell|wordlist):
+        Read the system default from the debconf database and set links in
+        default links in /etc/dictionaries-common pointing to the
+        appropriate files in /usr/lib/ispell or /usr/share/dict.  
+        Also updates the system-wide setting
+        /etc/dictionaries-common/(ispell|wordlist)-default.  
+        If option --rebuild is given, rebuilds the
+        /var/cache/dictionaries-common/(ispell|wordlist).db and the emacsen
+        and jed support (to be put in
+        /var/cache/dictionaries-common/(emacsen|jed)) from the files in
+        /var/lib/dictionaries-common/(ispell|wordlist) 
+
+    remove-default-(ispell|wordlist):
+        Call update-default-(ispell|wordlist) --rebuild.

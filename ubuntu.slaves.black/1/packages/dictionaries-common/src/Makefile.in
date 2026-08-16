@@ -1,0 +1,271 @@
+# File: Makefile.in   -*- Makefile -*-
+# Description: Makefile for the dictionaries-common Debian package
+# Author:      Rafael Laboissière <rafael@debian.org>
+#              Some modifications by Agustin Martin <agmartin@debian.org>
+# Created on:  Tue Oct 26 11:08:11 CEST 1999
+
+#########################################################################
+# Release definitions (set by from configure script from information
+# extracted from debian/changelog)
+
+release 	:= @RELEASE@
+date		:= @DATE@
+
+#########################################################################
+# Installation directories
+
+DESTDIR          =
+usr_dir		:= $(DESTDIR)/usr
+bin_dir		:= $(usr_dir)/bin
+sbin_dir	:= $(usr_dir)/sbin
+share_dir       := $(usr_dir)/share
+policy_dir      := $(share_dir)/doc/dictionaries-common-dev
+man1_dir	:= $(share_dir)/man/man1
+man3_dir	:= $(share_dir)/man/man3
+man8_dir	:= $(share_dir)/man/man8
+perl_dir 	:= $(share_dir)/perl5
+ispell_dir      := $(usr_dir)/lib/ispell
+wordlist_dir    := $(share_dir)/dict
+
+#########################################################################
+# Perl module definitions
+
+lib_dir		:= $(DESTDIR)@LIBDIR@
+cache_dir 	:= $(DESTDIR)@CACHEDIR@
+
+emacs_init_dir  := $(DESTDIR)/etc/emacs/site-start.d
+share_dict_dir	:= $(share_dir)/dictionaries-common
+debconf_dir	:= $(share_dict_dir)/debconf
+emacs_lisp_dir  := $(share_dict_dir)/site-elisp
+
+dh_auto_dir     := $(share_dir)/debhelper/autoscripts
+
+cdbs_dir	:= $(share_dict_dir)/cdbs
+
+#########################################################################
+# Script definitions
+
+base_maintainer_scripts := config postinst postrm templates
+auto_maintainer_scripts := preinst-compatfile postinst-compatfile postrm-varlibrm
+ispell_maintainer_scripts := $(addsuffix -ispell, \
+		$(base_maintainer_scripts) \
+		$(auto_maintainer_scripts))
+aspell_maintainer_scripts := $(addsuffix -aspell, \
+		postinst postrm \
+		$(auto_maintainer_scripts))
+hunspell_maintainer_scripts := $(addsuffix -hunspell, postinst postrm)
+wordlist_maintainer_scripts := \
+                  $(addsuffix -wordlist,$(base_maintainer_scripts))
+maintainer_scripts := $(addprefix scripts/maintainer/,\
+                  $(ispell_maintainer_scripts) \
+                  $(aspell_maintainer_scripts) \
+                  $(hunspell_maintainer_scripts) \
+                  $(wordlist_maintainer_scripts))
+
+base_system_scripts := update-default select-default remove-default
+ispell_system_scripts := $(addsuffix -ispell,$(base_system_scripts))
+aspell_system_scripts := $(addsuffix -aspell, update-dictcommon)
+hunspell_system_scripts := $(addsuffix -hunspell, update-dictcommon)
+wordlist_system_scripts := $(addsuffix -wordlist,$(base_system_scripts))
+# myspell system script moved to system_scripts_noauto
+
+system_scripts := $(addprefix scripts/system/,\
+                  $(ispell_system_scripts)   \
+                  $(aspell_system_scripts)   \
+                  $(hunspell_system_scripts) \
+		  $(myspell_system_scripts)  \
+                  $(wordlist_system_scripts))
+
+base_debhelper_script := installdeb
+debhelper_scripts := $(addprefix scripts/debhelper/,\
+                  $(base_debhelper_script)-ispell \
+                  $(base_debhelper_script)-aspell \
+                  $(base_debhelper_script)-hunspell \
+                  $(base_debhelper_script)-wordlist)
+
+select_readmes := README.select-ispell README.select-wordlist
+varlib_readmes := README.varlib-aspell README.varlib-ispell
+
+# noauto scripts. This will not be generated from .in files but directly handled
+# user scripts also fit in this section
+
+user_scripts :=	$(addprefix scripts/system/, \
+		select-default-iwrap \
+		ispell-wrapper)
+system_scripts_noauto := $(addprefix scripts/system/,\
+		ispell-autobuildhash \
+		aspell-autobuildhash)
+maintainer_scripts_noauto :=
+debhelper_scripts_noauto := $(addprefix scripts/debhelper/, \
+		installdeb-myspell \
+		dh_aspell-simple)
+
+dico_config := debian/dictionaries-common.config
+dico_config_parts := debian/dictionaries-common.config-header \
+	        scripts/system/dc-debconf-default-value.pl \
+	        scripts/system/dc-debconf-select.pl \
+	        debian/dictionaries-common.config-footer
+
+#########################################################################
+# Policy definitions
+
+policy := policy/dsdt-policy
+html_stylesheet := policy/html.dsl
+
+#########################################################################
+# Main target for build
+
+all: $(policy).txt \
+	$(system_scripts) \
+	$(debhelper_scripts) \
+	$(select_readmes) \
+	$(varlib_readmes) \
+	$(dico_config)
+
+#########################################################################
+# Policy XML document
+
+$(policy).html: $(policy).xml $(html_stylesheet) $(maintainer_scripts)
+	openjade -t sgml -V nochunks -d $(html_stylesheet) \
+	  /usr/share/sgml/declaration/xml.decl $< > $@
+
+%.txt: %.html
+	w3m -dump -O iso-8859-1 $< | \
+		perl -pi -e 's/\015 *//g' | \
+		iconv -f iso-8859-1 -t utf-8 > $@
+
+#########################################################################
+# Make dictionaries-common debconf config file combining the diferent parts
+
+$(dico_config): $(dico_config_parts)
+	cat $^ > $@
+
+#########################################################################
+# Template rules using the slice filter
+
+%-ispell: %.in
+	slice -oUNDEF+I+IW+IA-A-H-W-AH:$@ $<
+
+%-aspell: %.in
+	slice -oUNDEF+A+IA+AH-I-H-W:$@ $<
+
+%-hunspell: %.in
+	slice -oUNDEF+H+AH-I-A-W-IA-IW:$@ $<
+
+%-wordlist: %.in
+	slice -oUNDEF+W+IW-I-A-AH:$@ $<
+
+#########################################################################
+# Installation
+
+install: all
+
+	# -- Superuser scripts
+	install -d $(sbin_dir)
+	install --mode=755 $(system_scripts) $(system_scripts_noauto) $(sbin_dir)
+
+	# -- Regular system scripts
+	install -d $(bin_dir)
+	install --mode=755 $(user_scripts) $(bin_dir)
+
+	# -- Debhelper scripts
+	install --mode=755 $(debhelper_scripts) $(debhelper_scripts_noauto) $(bin_dir)
+
+	# -- CDBS makefile scrap
+	install -d $(cdbs_dir)
+	install --mode=644 scripts/cdbs/dict-common.mk $(cdbs_dir)
+
+	# -- Maintainer script
+	install -d $(dh_auto_dir)
+	install --mode=644 $(maintainer_scripts) $(maintainer_scripts_noauto) $(dh_auto_dir)
+	install -d $(debconf_dir)
+	mv $(dh_auto_dir)/config-* $(dh_auto_dir)/templates-* $(debconf_dir)
+
+	# -- Perl module
+	install -d $(perl_dir)/Debian $(perl_dir)/Devel
+	install --mode=644 scripts/perl5/Debian/DictionariesCommon.pm $(perl_dir)/Debian
+	install --mode=644 scripts/perl5/Devel/DictionariesCommon.pm  $(perl_dir)/Devel
+
+	# -- Man pages
+	install -d $(man1_dir)
+	install -d $(man3_dir)
+	install -d $(man8_dir)
+	for i in $(sbin_dir)/* ; do \
+	  b=`basename $$i` ; \
+	  ( cd $(sbin_dir) ; \
+            pod2man --release=$(release) --section=8 --date=$(date) \
+              --center=" "  $$b ) > $(man8_dir)/$$b.8 ; \
+	done
+	for i in $(bin_dir)/* ; do \
+	  b=`basename $$i` ; \
+	  ( cd $(bin_dir) ; \
+            pod2man --release=$(release) --section=1 --date=$(date) \
+              --center=" "  $$b ) | sed s/E\<ecirc\>/\\\\[^e]/ > $(man1_dir)/$$b.1 ; \
+	done
+	( cd scripts/perl5/Debian ; \
+          pod2man --release=$(release) --section=3pm --date=$(date) \
+            --center=" " DictionariesCommon.pm ) \
+            > $(man3_dir)/Debian::DictionariesCommon.3pm
+	( cd scripts/perl5/Devel ; \
+          pod2man --release=$(release) --section=3pm --date=$(date) \
+            --center=" " DictionariesCommon.pm ) \
+            > $(man3_dir)/Devel::DictionariesCommon.3pm
+
+	# -- dictionaries-common cache & lib directories
+	install -d $(lib_dir)/ispell
+	install -d $(lib_dir)/wordlist
+	install -d $(cache_dir)
+
+	# -- README files for ispell and wordlist dirs
+	install -d $(ispell_dir)
+	install -d $(wordlist_dir)
+	install --mode=644 README.select-ispell   $(ispell_dir)
+	install --mode=644 README.select-wordlist $(wordlist_dir)
+
+	# -- README files for aspell and ispell dirs under /var/lib
+	for i in aspell ispell; do \
+		mkdir -p $(DESTDIR)/var/lib/$$i; \
+		install --mode=644 README.varlib-$$i $(DESTDIR)/var/lib/$$i/README; \
+	done
+
+	# -- Policy
+	install -d $(policy_dir)
+	install --mode=644 $(policy).html $(policy).txt $(policy_dir)
+
+	# -- Emacsen support
+	install -d $(emacs_lisp_dir) $(emacs_init_dir)
+	install --mode=644 support/emacsen/*.el $(emacs_lisp_dir)
+	touch $(emacs_lisp_dir)/.nosearch
+	mv $(emacs_lisp_dir)/startup.el \
+	  $(emacs_init_dir)/50dictionaries-common.el
+
+	# -- Mutt support
+	install --mode=644 support/mutt/ispell-init \
+	  $(share_dict_dir)/mutt-ispell-init
+
+	# -- Shared debconf stuff
+	install --mode=644 scripts/system/dc-debconf-select.pl \
+		scripts/system/dc-debconf-default-value.pl \
+	  $(share_dict_dir)
+
+#########################################################################
+# Mr Proper
+
+clean:
+	rm -f $(policy).html $(policy).txt $(maintainer_scripts) \
+	  $(system_scripts) $(debhelper_scripts) $(select_readmes) \
+	  $(dico_config)
+
+distclean: clean
+	rm -f Makefile config.* \
+	  scripts/perl5/Debian/DictionariesCommon.pm \
+	  scripts/perl5/Devel/DictionariesCommon.pm  \
+	  support/emacsen/startup.el $(policy).xml
+
+maintainer-clean: distclean
+	rm -f configure
+
+#########################################################################
+# Postlog
+
+.PHONY: all clean distclean maintainer-clean install

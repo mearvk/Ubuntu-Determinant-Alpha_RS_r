@@ -1,0 +1,1635 @@
+Index: sgml/docbook-to-man/Instant/Makefile
+diff -c sgml/docbook-to-man/Instant/Makefile:1.1.1.1 sgml/docbook-to-man/Instant/Makefile:1.3
+*** sgml/docbook-to-man/Instant/Makefile:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/Makefile	Tue Feb 23 22:21:26 1999
+***************
+*** 47,53 ****
+  #
+  # J.Bowe, 1993
+  #
+! #  $Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/Makefile,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $
+  #
+  # This assumes you have the (tpt)regexp package (includes and library)
+  # available.
+--- 47,53 ----
+  #
+  # J.Bowe, 1993
+  #
+! #  $Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/Makefile,v 1.3 1999/02/23 22:21:26 db3l Exp $
+  #
+  # This assumes you have the (tpt)regexp package (includes and library)
+  # available.
+***************
+*** 59,71 ****
+  #   BINDIR     = /usr/local/bin			# where you keep your programs
+  # (You should set DEF_TPT_LIB to something, or set it in general.h.
+  # At OSF we use the default in that file.)
+! 
+  MAKE =	make
+  SHELL =	/bin/sh
+  
+  ROOT		= /usr/local
+  
+! TPTLIB		= $(ROOT)/lib/tpt
+  REGEX_INC	= -Itptregexp
+  REGEX_LIB	= tptregexp
+  BINDIR		= $(ROOT)/bin
+--- 59,73 ----
+  #   BINDIR     = /usr/local/bin			# where you keep your programs
+  # (You should set DEF_TPT_LIB to something, or set it in general.h.
+  # At OSF we use the default in that file.)
+! #
+! #   -DSTRERROR to DEFINES if library does not have strerror()   [ANS-db3l]
+! #
+  MAKE =	make
+  SHELL =	/bin/sh
+  
+  ROOT		= /usr/local
+  
+! TPTLIB		= $(ROOT)/share/sgml/transpec
+  REGEX_INC	= -Itptregexp
+  REGEX_LIB	= tptregexp
+  BINDIR		= $(ROOT)/bin
+Index: sgml/docbook-to-man/Instant/general.h
+diff -c sgml/docbook-to-man/Instant/general.h:1.1.1.1 sgml/docbook-to-man/Instant/general.h:1.2
+*** sgml/docbook-to-man/Instant/general.h:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/general.h	Mon Nov 16 22:23:50 1998
+***************
+*** 53,59 ****
+  #ifdef STORAGE
+  #ifndef lint
+  static char *gen_h_RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/general.h,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $";
+  #endif
+  #endif
+  
+--- 53,59 ----
+  #ifdef STORAGE
+  #ifndef lint
+  static char *gen_h_RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/general.h,v 1.2 1998/11/16 22:23:50 db3l Exp $";
+  #endif
+  #endif
+  
+***************
+*** 281,286 ****
+--- 281,287 ----
+  Relation_t	FindRelByName(char *);
+  char		*FindAttValByName(Element_t *, char *);
+  char		*FindContext(Element_t *, int, char *);
++ char	        *LookupSDATA(char *);
+  char		*AddElemName(char *);
+  char		*AddAttName(char *);
+  void		 OutputString(char *, FILE *, int);
+Index: sgml/docbook-to-man/Instant/main.c
+diff -c sgml/docbook-to-man/Instant/main.c:1.1.1.1 sgml/docbook-to-man/Instant/main.c:1.3
+*** sgml/docbook-to-man/Instant/main.c:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Instant/main.c	Tue Feb 23 20:31:37 1999
+***************
+*** 62,72 ****
+   *
+   *  Takes input from James Clark's "sgmls" program (v. 1.1).
+   * ________________________________________________________________________
+   */
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/main.c,v 1.1.1.1 1998/11/13 21:31:58 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+--- 62,81 ----
+   *
+   *  Takes input from James Clark's "sgmls" program (v. 1.1).
+   * ________________________________________________________________________
++  *
++  *
++  * [ANS-db3l]
++  *   General modifications for better interaction with DocBook markup.
++  *   Significant changes (but not every change) marked in source with
++  *   ANS tag as above.  Primary for this module is processing of ESIS
++  *   data for elements (ESIS quoting/CMAP/SDATA) here rather than holding
++  *   off until DoData() or OutputString().
++  *
+   */
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/main.c,v 1.3 1999/02/23 20:31:37 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+***************
+*** 83,88 ****
+--- 92,106 ----
+  #define STORAGE
+  #include "general.h"
+  
++ /* [ANS-db3l] Included for character mapping in ReadESIS */
++ #include <tptregexp.h>
++ #include "translate.h"
++ 
++ /* [ANS-db3l] Don't have "makeVersionFile", so just stamp the overall */
++ /* release here.  Starting with 2.0 to isolate from earlier releases, */ 
++ /* and tagging with ANS to distinguish it a bit further.	      */
++ #define VERSION "2.0(0)-ANS"
++ 
+  static int	do_context, do_tree, do_summ, do_stats, do_validate, do_idlist;
+  static int	do_DATAhack = 0;
+  static char	*this_prog;
+***************
+*** 120,125 ****
+--- 138,146 ----
+      HandleArgs(ac, av);
+      Initialize2();
+  
++     if (sdatafile) ReadSDATA(sdatafile);
++     if (cmapfile)  ReadCharMap(cmapfile);
++ 
+      ReadInstance(in_file);
+  
+      if (interactive) {
+***************
+*** 139,146 ****
+  		}
+  	    }
+  	    else e = DocTree;
+- 	    if (sdatafile) ReadSDATA(sdatafile);
+- 	    if (cmapfile)  ReadCharMap(cmapfile);
+  	    /* If we're doing validation, make output file pointer null.
+  	     * This means that we generate no output, except error messages. */
+  	    if (do_validate) outfp = NULL;
+--- 160,165 ----
+***************
+*** 276,282 ****
+  	    case 'l': tpt_lib		= optarg;	break;
+  	    case 'i': start_id		= optarg;	break;
+  	    case 'o': out_file		= optarg;	break;
+! 	    case 'd': do_DATAhack	= 1;		break;
+  	    case 'f': BOFTTextThresh	= atoi(optarg);	break;
+  	    case 'b': interactive	= 1;		break;
+  	    case 'W': warnings		= 0;		break;
+--- 295,301 ----
+  	    case 'l': tpt_lib		= optarg;	break;
+  	    case 'i': start_id		= optarg;	break;
+  	    case 'o': out_file		= optarg;	break;
+! 	    case 'd': do_DATAhack++;	 		break;
+  	    case 'f': BOFTTextThresh	= atoi(optarg);	break;
+  	    case 'b': interactive	= 1;		break;
+  	    case 'W': warnings		= 0;		break;
+***************
+*** 334,342 ****
+  DoHelpMessage()
+  {
+      char	**s = help_msg;
+      printf("usage: %s [option ...] [file]", this_prog);
+      while (*s) puts(*s++);
+!     printf("\nVersion: %s\n", _HeadVeRsIoN_);
+  }
+  
+  /* ______________________________________________________________________ */
+--- 353,364 ----
+  DoHelpMessage()
+  {
+      char	**s = help_msg;
++     printf("Instant: SGML document processor/translator, Version %s\n",
++ 	   VERSION);
+      printf("usage: %s [option ...] [file]", this_prog);
+      while (*s) puts(*s++);
+!     /*    printf("\nVersion: %s\n", _HeadVeRsIoN_); */
+!     
+  }
+  
+  /* ______________________________________________________________________ */
+***************
+*** 526,532 ****
+  	}
+      }
+      fprintf(stderr, "Error: End of AccumElemInfo - should not be here: %s\n",
+! 	e->gi);
+  /*    return e;*/
+      exit(1);
+  }
+--- 548,554 ----
+  	}
+      }
+      fprintf(stderr, "Error: End of AccumElemInfo - should not be here: %s\n",
+! 	    (e && e->gi) ? e->gi : "(No element)");
+  /*    return e;*/
+      exit(1);
+  }
+***************
+*** 534,557 ****
+  /*  Read ESIS lines.
+   *  Limitation?  Max 5000 children per node.  (done for efficiency --
+   *  should do some malloc and bookkeeping games later).
+   */
+  
+  static Element_t *
+  ReadESIS(
+      FILE	*fp,
+!     int		depth
+  )
+  {
+!     char	*buf;
+!     int		i, c, ncont;
+!     Element_t	*e;
+      Content_t	cont[5000];
+  
+      Malloc( LINESIZE+1, buf, char );
+  
+      /* Read input stream - the output of "sgmls", called "ESIS".  */
+      e = AccumElemInfo(fp);
+      e->depth = depth;
+  
+      ncont = 0;
+      while (1) {
+--- 556,587 ----
+  /*  Read ESIS lines.
+   *  Limitation?  Max 5000 children per node.  (done for efficiency --
+   *  should do some malloc and bookkeeping games later).
++  *
++  *  [ANS-db3l]
++  *    Changes to process ESIS input quoting/cmap/sdata at this point.  Also
++  *    pass in parent element to function so it can look up the hierarchy
++  *    for parent attributes if necessary (such as for FORMAT).
+   */
+  
+  static Element_t *
+  ReadESIS(
+      FILE	*fp,
+!     int		depth,
+!     Element_t   *parent
+  )
+  {
+!     char	*buf, *xlatebuf, *dst, *src, *pch, *sdata;
+!     int		i, c, ncont, inspace, nomap;
+!     Element_t	*e, *cur_e;
+      Content_t	cont[5000];
+  
+      Malloc( LINESIZE+1, buf, char );
++     Malloc( LINESIZE+1, xlatebuf, char );
+  
+      /* Read input stream - the output of "sgmls", called "ESIS".  */
+      e = AccumElemInfo(fp);
+      e->depth = depth;
++     e->parent = parent;
+  
+      ncont = 0;
+      while (1) {
+***************
+*** 563,574 ****
+  	    case CMD_DATA:	/* -data */
+  		fgets(buf, LINESIZE, fp);
+  		stripNL(buf);
+! 		if (do_DATAhack && (buf[0] == '\\') && (buf[1] == 'n'))	{
+  			if ( ! buf[2] )
+  				break;
+  			buf[0] = ' ';
+  			memcpy(&buf[1], &buf[2], strlen(buf)-1);
+  		}
+  		cont[ncont].ch.data = strdup(buf);
+  		cont[ncont].type = CMD_DATA;
+  		ncont++;
+--- 593,779 ----
+  	    case CMD_DATA:	/* -data */
+  		fgets(buf, LINESIZE, fp);
+  		stripNL(buf);
+! 
+! 		/* [ANS-db3l]  Process/sanitize element data		   */
+! 		/*							   */
+! 		/* The new default behavior (unless "-d" - do_DATAhack is  */
+! 		/* given) is to process inbound translation of ESIS data   */
+! 		/* elements at the input stage.  This handles all quoting  */
+! 		/* from [n]sgmls, as well as character mapping.  Doing it  */
+! 		/* now avoids a lot of headaches later.  OutputString will */
+! 		/* still do Transpec mappings but this way character maps  */
+! 		/* only apply to input data, thus freeing the SDATA and    */
+! 		/* translation spec from knowing what is in the CMAP.      */
+! 		/*							   */
+! 		/* After translating quoting and mapping characters, as    */
+! 		/* long as this attribute doesn't have a defined format of */
+! 		/* linespecific (preserve whitespace/line formatting), the */
+! 		/* result is further processed to translate all spans of   */
+! 		/* whitespace into a single space.			   */
+! 		/*							   */
+! 		/* Using "-d" restores the previous do_DATAhack behavior,  */
+! 		/* while "-d -d" restores original non-translating mode.   */
+! 
+! 		if (!do_DATAhack) {
+! #ifdef DEBUG
+! 		   fprintf(stderr,"Data: Element '%s'\n      Input='%s'\n",
+! 			   e->gi,buf);
+! #endif
+! 		   /* Use the secondary buffer to avoid moving things    */
+! 		   /* around too much.  Note that unless no further cmap */
+! 		   /* translation should be performed (nomap==1), *dst   */
+! 		   /* should point to the last character stored and not  */
+! 		   /* one past (it should be one past for no cmap).	 */
+! 		   src = buf;
+! 		   dst = xlatebuf;
+! 		   while (*src) {
+! 		      nomap = 0;
+! 		      if (*src == '\\') {
+! 			 src++;
+! 			 switch (*src) {
+! 			    case '\\':
+! 			       /* Quoted backslash */
+! 			       *dst = *src++;
+! 			       break;
+! 			    case 'n':
+! 			       /* Newline */
+! 			       *dst = '\n'; src++;
+! 			       break;
+! 			    case '0':  case '1':  case '2':  case '3':
+! 			    case '4':  case '5':  case '6':  case '7':
+! 			       /* Octal encoding */
+! 			       *dst = ((*src-'0') << 6) +
+! 				      ((*(src+1)-'0') << 3) +
+! 				      ((*(src+2)-'0'));
+! 			       src += 3;
+! 			       break;
+! 			    case '#':  case '%':
+! 			       /* Decimal internal(#)/document(%) char */
+! 			       /* XXX: Handle better */
+! 			       *dst++ = '[';
+! 			       while (*src != ';') {
+! 				  *dst++ = *src++;
+! 			       }
+! 			       *dst++ = ']';
+! 			       src++;
+! 			       /* XXX: Whimp out - no translation */
+! 			       nomap = 1;
+! 			       break;
+! 			    case '|':
+! 			       /* SDATA reference */
+! 			       sdata = ++src;
+! 			       while (*src && *src != '\\' &&	
+! 				      *(src+1) != '|') {
+! 				  src++;
+! 			       }
+! 			       if (!*src) break;
+! 			       *src = '\0';  /* Terminate SDATA name */
+! 			       src += 2;	/* and skip past */
+! 			       if (pch = LookupSDATA(sdata)) {
+! 				  strcpy(dst,pch);
+! 				  dst += strlen(pch);
+! 			       } else {
+! 				  /* Output in brackets */
+! 				  *dst++ = '[';
+! 				  strcpy(dst,sdata);
+! 				  dst += strlen(sdata);
+! 				  *dst++ = ']';
+! 			       }
+! 			       /* No cmap translation of sdata */
+! 			       nomap = 1;
+! 			       break;
+! 			    default:
+! 			       fprintf(stderr,
+! 				       "? Warning: Unknown ESIS escape "
+! 				       "sequence in stream: ('%c')\n",
+! 				       *src);
+! 			       *dst++ = *src++;
+! 			       nomap = 1;
+! 			 }
+! 		      } else {
+! 			 *dst = *src++;
+! 		      }
+! 
+! 		      /* Handle any character mapping of last character */
+! 		      if (!nomap) {
+! 			 if (nCharMap) {
+! 			    for (i=0; i<nCharMap; i++) {
+! 			       if (*dst != CharMap[i].name[0]) continue;
+! 			       strcpy(dst,CharMap[i].sval);
+! 			       dst += strlen(CharMap[i].sval)-1;
+! 			    }
+! 			 } else if (*dst == '\\') {
+! 			    /* If no map, we'll quote \ automatically to */
+! 			    /* avoid always requiring a single line cmap */
+! 			    *++dst = '\\';
+! 			 }
+! 			 dst++;
+! 		      }
+! 		   } /* while *src */
+! 		   *dst = '\0';
+! 
+! 		   /* So it still ends up in "buf" (doesn't matter */
+! 		   /* if we just keep swapping them over time.     */
+! 		   pch      = xlatebuf;
+! 		   xlatebuf = buf;
+! 		   buf      = pch;
+! #ifdef DEBUG
+! 		   fprintf(stderr,"   D: ESIS/Charmap xlate='%s'\n",buf);
+! #endif
+! 		   /* Attempt to locate a FORMAT attribute for this element */
+! 		   /* or any parent elements, to use as the guide for	    */
+! 		   /* whether or not whitespace is kept in this element     */
+! 		   cur_e = e;
+! 		   while (cur_e) {
+! 		      if (pch = FindAttValByName(cur_e,"FORMAT")) {
+! #ifdef DEBUG
+! 			 fprintf(stderr,"   D: Using FORMAT from %s element\n",
+! 				 cur_e->gi);
+! #endif			 
+! 			 break;
+! 		      }
+! 		      cur_e = cur_e->parent;
+! 		   }
+! 		   if (!(pch && !(strcmp(pch,"LINESPECIFIC")))) {
+! #ifdef DEBUG
+! 		      fprintf(stderr,"   D: Compressing whitespace\n");
+! #endif
+! 		      /* Replace any span of whitespace with a single space */
+! 		      dst = src = buf;
+! 		      inspace = 0;
+! 		      while (*src) {
+! 			 i = isspace(*src);
+! 			 if (!(inspace && i)) {
+! 			    *dst++ = i ? ' ' : *src;
+! 			 }
+! 			 inspace = i;
+! 			 src++;
+! 		      }
+! 		      *dst = '\0';
+! 		   } /* if !linespecific */
+! #ifdef DEBUG
+! 		   fprintf(stderr,"   D: Output='%s'\n",buf);
+! #endif
+! 		} /* if !do_DATAhack */
+! 
+! 		/* Remove any empty elements (not sure you can ever */
+! 		/* get this from NSGMLS, but while I'm here...)     */
+! 		if (*buf == '\0') {
+! 		   /* Nothing left - skip this chunk */
+! 		   break;
+! 		}
+! 
+! 		/* Original "do_DATAhack" support.  We check explicitly */
+! 		/* here for a do_DATAhack value of 1, since using -d    */
+! 		/* twice on the command line can now restore the older  */
+! 		/* default behavior of not doing anything.		*/
+! 		if (do_DATAhack==1 && (buf[0] == '\\') && (buf[1] == 'n')) {
+  			if ( ! buf[2] )
+  				break;
+  			buf[0] = ' ';
+  			memcpy(&buf[1], &buf[2], strlen(buf)-1);
+  		}
++ 
+  		cont[ncont].ch.data = strdup(buf);
+  		cont[ncont].type = CMD_DATA;
+  		ncont++;
+***************
+*** 591,596 ****
+--- 796,802 ----
+  		    for (i=0; i<ncont; i++) e->cont[i] = cont[i];
+  		}
+  		free(buf);
++ 		free(xlatebuf);
+  		return e;
+  		break;
+  
+***************
+*** 607,613 ****
+  	    case CMD_PUBID:	/* ppubid */
+  	    case CMD_FILENAME:	/* ffilename */
+  		ungetc(c, fp);
+! 		cont[ncont].ch.elem = ReadESIS(fp, depth+1);
+  		cont[ncont].type = CMD_OPEN;
+  		cont[ncont].ch.elem->parent = e;
+  		ncont++;
+--- 813,819 ----
+  	    case CMD_PUBID:	/* ppubid */
+  	    case CMD_FILENAME:	/* ffilename */
+  		ungetc(c, fp);
+! 		cont[ncont].ch.elem = ReadESIS(fp, depth+1,e);
+  		cont[ncont].type = CMD_OPEN;
+  		cont[ncont].ch.elem->parent = e;
+  		ncont++;
+***************
+*** 633,638 ****
+--- 839,845 ----
+      }
+      fprintf(stderr, "Error: End of ReadESIS - should not be here: %s\n", e->gi);
+      free(buf);
++     free(xlatebuf);
+      return NULL;
+  }
+  
+***************
+*** 659,665 ****
+      }
+      else fp = stdin;
+      last_file = filename;
+!     DocTree = ReadESIS(fp, 0);
+      if (filename) fclose(fp);
+  
+      /* Traverse tree, filling in econt and figuring out which child
+--- 866,872 ----
+      }
+      else fp = stdin;
+      last_file = filename;
+!     DocTree = ReadESIS(fp, 0, NULL);
+      if (filename) fclose(fp);
+  
+      /* Traverse tree, filling in econt and figuring out which child
+Index: sgml/docbook-to-man/Instant/tables.c
+diff -c sgml/docbook-to-man/Instant/tables.c:1.1.1.1 sgml/docbook-to-man/Instant/tables.c:1.2
+*** sgml/docbook-to-man/Instant/tables.c:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Instant/tables.c	Mon Nov 16 22:23:51 1998
+***************
+*** 73,79 ****
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/tables.c,v 1.1.1.1 1998/11/13 21:31:58 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+--- 73,79 ----
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/tables.c,v 1.2 1998/11/16 22:23:51 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+***************
+*** 1091,1096 ****
+--- 1091,1103 ----
+   *  TO DO:
+   *
+   *	deallocate colspecs and spanspecs
++  *
++  * [ANS-db3l]
++  *   I found that if you ended a table with a spanning entry, tbl got
++  *   confused and seemed to use the spanning row definition for the default
++  *   row entry in the table.  So we output a final row adjustment if the
++  *   current (last) row format wasn't the same as the tgroup element.  The
++  *   code is adapted from from the original code in TblTFoot().
+   */
+  
+  
+***************
+*** 1100,1105 ****
+--- 1107,1132 ----
+  {
+  	register struct tblcolspec * tcsp, * tcsp2;
+  	register struct tblspanspec * tssp, * tssp2;
++ 	register struct tblformat * ffp, * ffp2;
++ 	static struct tblformat * tfp, * tfp2;
++ 
++ 	tfp = TblBuild1Format(ep, FALSE, TGroup);/* gen format for the row */
++ 
++ 	for ( tfp2=formP;  tfp2 && tfp2->next;  tfp2=tfp2->next )
++ 		;
++ 
++ 	if (!TblFormatMatch(tfp,tfp2)) {
++ 
++ 		for ( ffp=formP;  ffp;  ffp=ffp2 )	{
++ 			ffp2 = ffp->next;
++ 			free(ffp);		/* clear entire list */
++ 		}
++ 
++ 		formP = tfp;	/* this becomes the prevailing format */
++ 
++ 		OutputString("^.T&^", fP, 1);
++ 		TblPrintFormat(fP, formP);
++ 	}
+  
+  
+  	for ( tcsp=tblColSpec;  tcsp;  tcsp=tcsp2 )	{
+***************
+*** 1198,1203 ****
+--- 1225,1237 ----
+  
+  /*	TblBuild1Format()  --  build one row's worth of format information
+   *
++  *
++  * [ANS-db3l]
++  *   Added check for spanning columns, and if they exist, move any width
++  *   information to the previous non-spanning column (scanning left) since
++  *   that seems to be the way that tbl wants it.  E.g., tbl works if you
++  *   have "lw(6i) s s" but not with "lw(2i) sw(2i) sw(2i)".
++  *
+   */
+  
+  
+***************
+*** 1207,1213 ****
+  		bool addinRowsep,	/* insert rowsep into model? */
+  		tblsource source)	/* type type of row */
+  {
+! 	register int i;
+  	register bool allProp;
+  	float totalProp;
+  	register struct tblformat * tfp;
+--- 1241,1247 ----
+  		bool addinRowsep,	/* insert rowsep into model? */
+  		tblsource source)	/* type type of row */
+  {
+! 	register int i, j;
+  	register bool allProp;
+  	float totalProp;
+  	register struct tblformat * tfp;
+***************
+*** 1228,1233 ****
+--- 1262,1290 ----
+  			allProp = tfp->colpwidth[i][0];
+  			totalProp += atof(tfp->colpwidth[i]);
+  		}
++ 		if (i>1 && tfp->colformat[i] == 's') {
++ 		   for (j=i; j>=1; j--) {
++ 		      if (tfp->colformat[j] != 's') {
++ 			 if (tfp->colwidth[i][0]) {
++ 			    sprintf(tfp->colwidth[j],"%fi",
++ 				    atof(tfp->colwidth[j])+
++ 				    atof(tfp->colwidth[i]));
++ 			 }
++ 			 if (tfp->colpwidth[i][0]) {
++ 			    sprintf(tfp->colpwidth[j],"%fi",
++ 				    atof(tfp->colpwidth[j])+
++ 				    atof(tfp->colpwidth[i]));
++ 			 }
++ 			 tfp->colwidth[i][0] = '\0';
++ 			 tfp->colpwidth[i][0] = '\0';
++ 			 break;
++ 		      }
++ 		   }
++ 		   if (j<1) {
++ 		      fprintf(stderr, "? Warning: missed earlier column to "
++ 			      "add span width to\n");
++ 		   }
++ 		}
+  		strcpy(tfp->font[i], TblGetFont(i, ep, source));
+  		tfp->colsep[i] = tblgcolsep || TblGetColSep(i, ep, source);
+  		if ( addinRowsep )
+***************
+*** 1243,1248 ****
+--- 1300,1306 ----
+  
+      	if ( allProp )	{
+      		for ( i=1;  i <= tblcols;  i++ )	{
++ 		   if (tfp->colpwidth[i][0]) 
+      			sprintf(tfp->colwidth[i], "%fi",
+      				(atof(tfp->colpwidth[i]) / totalProp) * TEXTWIDTH);
+      		}
+***************
+*** 1597,1602 ****
+--- 1655,1666 ----
+   *
+   *	nothing..
+   *
++  * [ANS-db3l]
++  *   We need to look and see if the upcoming row is going to be any different
++  *   than the current row formatting in place, and if so, output a new
++  *   row control line and make it the default format.  This is adapted from
++  *   the existing code in TblTFoot().
++  *
+   */
+  
+  
+***************
+*** 1605,1612 ****
+  TblTRowStart(Element_t * ep,
+  	     FILE * fP)
+  {
+  
+!     /* nothing to do */
+  
+  	tblrow++;	/* except note that we're within a new row */
+  
+--- 1669,1694 ----
+  TblTRowStart(Element_t * ep,
+  	     FILE * fP)
+  {
++ 	register struct tblformat * ffp, * ffp2;
++ 	static struct tblformat * tfp, * tfp2;
++ 
++ 	tfp = TblBuild1Format(ep, FALSE, TGroup);/* gen format for the row */
++ 
++ 	for ( tfp2=formP;  tfp2 && tfp2->next;  tfp2=tfp2->next )
++ 		;
++ 
++ 	if (!TblFormatMatch(tfp,tfp2)) {
+  
+! 		for ( ffp=formP;  ffp;  ffp=ffp2 )	{
+! 			ffp2 = ffp->next;
+! 			free(ffp);		/* clear entire list */
+! 		}
+! 
+! 		formP = tfp;	/* this becomes the prevailing format */
+! 
+! 		OutputString("^.T&^", fP, 1);
+! 		TblPrintFormat(fP, formP);
+! 	}
+  
+  	tblrow++;	/* except note that we're within a new row */
+  
+Index: sgml/docbook-to-man/Instant/traninit.c
+diff -c sgml/docbook-to-man/Instant/traninit.c:1.1.1.1 sgml/docbook-to-man/Instant/traninit.c:1.2
+*** sgml/docbook-to-man/Instant/traninit.c:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/traninit.c	Mon Nov 16 22:38:12 1998
+***************
+*** 61,67 ****
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/traninit.c,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+--- 61,67 ----
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/traninit.c,v 1.2 1998/11/16 22:38:12 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+***************
+*** 100,108 ****
+      Trans_t	T;
+  
+      if ((fp=OpenFile(transfile)) == NULL) {
+! 	fprintf(stderr, "Can not open translation spec file '%s'.\n%s\n",
+! 		transfile, strerror(errno));
+! 	return;
+      }
+  
+      memset(&T, 0, sizeof T);		/* initialize/clear structure */
+--- 100,108 ----
+      Trans_t	T;
+  
+      if ((fp=OpenFile(transfile)) == NULL) {
+!        sprintf(buf,"Can not open translation spec '%s'", transfile);
+!        perror(buf);
+!        return;
+      }
+  
+      memset(&T, 0, sizeof T);		/* initialize/clear structure */
+***************
+*** 361,369 ****
+      int		n_alloc=0;	/* number of slots allocated so far */
+  
+      if ((fp=OpenFile(filename)) == NULL) {
+! 	fprintf(stderr, "Can not open character mapping file '%s'.\n%s\n",
+! 		filename, strerror(errno));
+! 	return;
+      }
+  
+      /* We allocate slots in blocks of N, so we don't have to call
+--- 361,370 ----
+      int		n_alloc=0;	/* number of slots allocated so far */
+  
+      if ((fp=OpenFile(filename)) == NULL) {
+!        sprintf(buf,"Can not open character mapping file file '%s': ",
+! 	       filename);
+!        perror(buf);
+!        return;
+      }
+  
+      /* We allocate slots in blocks of N, so we don't have to call
+***************
+*** 419,427 ****
+      int		lineno=0;
+  
+      if ((fp=OpenFile(filename)) == NULL) {
+! 	fprintf(stderr, "Can not open SDATA file '%s': %s", filename,
+! 		strerror(errno));
+! 	return;
+      }
+  
+      if (!SDATAmap) SDATAmap = NewMap(IMS_sdata);
+--- 420,428 ----
+      int		lineno=0;
+  
+      if ((fp=OpenFile(filename)) == NULL) {
+!        sprintf(buf,"Can not open SDATA file '%s': ", filename);
+!        perror(buf);
+!        return;
+      }
+  
+      if (!SDATAmap) SDATAmap = NewMap(IMS_sdata);
+Index: sgml/docbook-to-man/Instant/translate.c
+diff -c sgml/docbook-to-man/Instant/translate.c:1.1.1.1 sgml/docbook-to-man/Instant/translate.c:1.2
+*** sgml/docbook-to-man/Instant/translate.c:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/translate.c	Mon Nov 16 22:23:51 1998
+***************
+*** 58,64 ****
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/translate.c,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+--- 58,64 ----
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/translate.c,v 1.2 1998/11/16 22:23:51 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+***************
+*** 610,615 ****
+--- 610,620 ----
+   *  Arguments:
+   *	Pointer to data content to process
+   *	FILE pointer to where to write output.
++  *
++  * [ANS-db3l]
++  *   No longer perform character mapping here - that's done on the input
++  *   side when parsing the ESIS data block for an element.
++  *
+   */
+  
+  void
+***************
+*** 628,633 ****
+--- 633,640 ----
+  
+      /* CLEANUP: this should really all be done in OutputString(). (I think) */
+  
++ #if 0
++     /* [ANS-db3l] Moved to input processing of ESIS in main.c */
+      if (nCharMap) {
+  	/* for each character, see if it's mapped to something else */
+  	for (prev=0,cp=data,dp=buf; *cp; cp++) {
+***************
+*** 650,656 ****
+  	dp = buf;
+      }
+      else dp = data;
+!     OutputString(dp, fp, 1);
+  }
+  
+  /* ______________________________________________________________________ */
+--- 657,665 ----
+  	dp = buf;
+      }
+      else dp = data;
+! #endif
+! 
+!     OutputString(data, fp, 1);
+  }
+  
+  /* ______________________________________________________________________ */
+Index: sgml/docbook-to-man/Instant/util.c
+diff -c sgml/docbook-to-man/Instant/util.c:1.1.1.1 sgml/docbook-to-man/Instant/util.c:1.4
+*** sgml/docbook-to-man/Instant/util.c:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/util.c	Tue Feb 23 22:21:27 1999
+***************
+*** 72,78 ****
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/util.c,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+--- 72,78 ----
+  
+  #ifndef lint
+  static char *RCSid =
+!   "$Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/util.c,v 1.4 1999/02/23 22:21:27 db3l Exp $";
+  #endif
+  
+  #include <stdio.h>
+***************
+*** 89,96 ****
+  
+  #include "general.h"
+  
+! /* forward references */
+! static char	*LookupSDATA(char *);
+  
+  /* ______________________________________________________________________ */
+  /*  "Split" a string into tokens.  Given a string that has space-separated
+--- 89,100 ----
+  
+  #include "general.h"
+  
+! #ifdef _AIX
+! 
+! /* This should be prototyped in string.h but isn't */
+! int strcasecmp (char *String1, char *String2);
+! 
+! #endif
+  
+  /* ______________________________________________________________________ */
+  /*  "Split" a string into tokens.  Given a string that has space-separated
+***************
+*** 533,538 ****
+--- 537,543 ----
+   *	FILE pointer of where to print.
+   *	Flag saying whether or not to keep track of our position in the output
+   *	  stream. (We want to when writing to a file, but not for stderr.)
++  *
+   */
+  
+  void
+***************
+*** 573,578 ****
+--- 578,587 ----
+  		    break;
+  
+  		case '|':		/* SDATA */
++ 		    /* [ANS-db3l] In non-"DATAhack" (-d) operation, this is */
++ 		    /* now normally done while reading the ESIS input, but   */
++ 		    /* I've left it here just in case some existing users of */
++ 		    /* OutputString need it (don't think so, but...)	    */
+  		    s++;		/* point past \| */
+  		    sdata = s;
+  		    /* find matching/closing \| */
+***************
+*** 612,618 ****
+  	    }
+  	    else if (c == ANCHOR) c = NL;
+  	}
+! 	if (c) putc(c, fp);
+      }
+  }
+  
+--- 621,632 ----
+  	    }
+  	    else if (c == ANCHOR) c = NL;
+  	}
+! 	if (c) {
+! 	   if (track_pos) {
+! 	      char_pos = ((c == '\n') ? 0 : char_pos+1);
+! 	   }
+! 	   putc(c, fp);
+! 	} /* if c */
+      }
+  }
+  
+***************
+*** 628,634 ****
+   *	Mapped value of the SDATA entity.
+   */
+  
+! static char *
+  LookupSDATA(
+      char	*s
+  )
+--- 642,648 ----
+   *	Mapped value of the SDATA entity.
+   */
+  
+! char *
+  LookupSDATA(
+      char	*s
+  )
+***************
+*** 1009,1021 ****
+  {
+      ID_t	*id;
+      for (id=IDList; id; id=id->next)
+! 	if (id->id[0] == idval[0] && !strcmp(id->id, idval)) return id->elem;
+      return 0;
+  }
+  
+  /* ______________________________________________________________________ */
+  
+! #ifndef linux
+  
+  char *
+  strerror(int number)
+--- 1023,1040 ----
+  {
+      ID_t	*id;
+      for (id=IDList; id; id=id->next)
+! 	if (toupper(id->id[0]) == toupper(idval[0]) && !strcasecmp(id->id, idval)) return id->elem;
+      return 0;
+  }
+  
+  /* ______________________________________________________________________ */
+  
+! /* [ANS-db3l] Change this to a config'd request for a replacement function */
+! /* since later Sun systems have this and on other systems not explicitly   */
+! /* checked here (existing code only excluded Linux) such as FreeBSD/BSDI   */
+! /* it would crash on perror() calls.					   */
+! 
+! #ifdef STRERROR
+  
+  char *
+  strerror(int number)
+Index: sgml/docbook-to-man/Instant/tptregexp/Makefile
+diff -c sgml/docbook-to-man/Instant/tptregexp/Makefile:1.1.1.1 sgml/docbook-to-man/Instant/tptregexp/Makefile:1.2
+*** sgml/docbook-to-man/Instant/tptregexp/Makefile:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/tptregexp/Makefile	Tue Feb 23 22:21:27 1999
+***************
+*** 18,24 ****
+  # Dalrymple Consulting
+  #
+  #
+! #  $Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/tptregexp/Makefile,v 1.1.1.1 1998/11/13 21:31:59 db3l Exp $
+  #
+  
+  ROOT	= /usr/local
+--- 18,24 ----
+  # Dalrymple Consulting
+  #
+  #
+! #  $Header: /aolnet/dev/src/CVS/sgml/docbook-to-man/Instant/tptregexp/Makefile,v 1.2 1999/02/23 22:21:27 db3l Exp $
+  #
+  
+  ROOT	= /usr/local
+***************
+*** 36,41 ****
+--- 36,42 ----
+  # -DSTRCSPN		library does not have strcspn()
+  # -Dstrchr=index	library does not have strchr()
+  # -DERRAVAIL		have utzoo-compatible error() function and friends
++ # -DSTRERROR		library does not have strerror()   [ANS-db3l]
+  #ENV=-Dvoid=int -DCHARBITS=0377 -DSTATIC=extern
+  #LENV=-Dvoid=int -DCHARBITS=0377
+  
+Index: sgml/docbook-to-man/Instant/tptregexp/strerror.c
+diff -c sgml/docbook-to-man/Instant/tptregexp/strerror.c:1.1.1.1 sgml/docbook-to-man/Instant/tptregexp/strerror.c:1.2
+*** sgml/docbook-to-man/Instant/tptregexp/strerror.c:1.1.1.1	Fri Nov 13 21:31:59 1998
+--- sgml/docbook-to-man/Instant/tptregexp/strerror.c	Tue Feb 23 22:21:28 1999
+***************
+*** 1,3 ****
+--- 1,8 ----
++ /* [ANS-db3l] Change this to a config'd request for a replacement function */
++ /* since later Sun systems have this and on other systems not explicitly   */
++ /* checked here such as FreeBSD/BSDI it would crash on perror() calls.	   */
++ 
++ #ifdef STRERROR
+  
+  /* standin for strerror(3) which is missing on some systems
+   * (eg, SUN)
+***************
+*** 9,11 ****
+--- 14,18 ----
+  	perror(num);
+  	return "";
+  }    
++ 
++ #endif
+Index: sgml/docbook-to-man/Transpec/Makefile
+diff -c sgml/docbook-to-man/Transpec/Makefile:1.1.1.1 sgml/docbook-to-man/Transpec/Makefile:1.2
+*** sgml/docbook-to-man/Transpec/Makefile:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Transpec/Makefile	Mon Nov 16 22:23:53 1998
+***************
+*** 37,43 ****
+  #############################################################################
+  
+  ROOT =		/usr/local
+! TPTLIB =	$(ROOT)/lib/tpt
+  
+  MAKE =		make
+  SHELL =		/bin/sh
+--- 37,43 ----
+  #############################################################################
+  
+  ROOT =		/usr/local
+! TPTLIB =	$(ROOT)/share/sgml/transpec
+  
+  MAKE =		make
+  SHELL =		/bin/sh
+Index: sgml/docbook-to-man/Transpec/docbook-to-man.ts
+diff -c sgml/docbook-to-man/Transpec/docbook-to-man.ts:1.1.1.1 sgml/docbook-to-man/Transpec/docbook-to-man.ts:1.2
+*** sgml/docbook-to-man/Transpec/docbook-to-man.ts:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Transpec/docbook-to-man.ts	Mon Nov 16 22:23:53 1998
+***************
+*** 36,41 ****
+--- 36,45 ----
+  #
+  #############################################################################
+  #
++ # $Id: docbook-to-man.ts,v 1.2 1998/11/16 22:23:53 db3l Exp $
++ #
++ #############################################################################
++ #
+  #  Variables
+  #
+  Var:	callout 0
+***************
+*** 53,59 ****
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		REFENTRY
+! StartText:	^.ta 8n 16n 24n 32n 40n 48n 56n 64n 72n
+  		^.TH "${_followrel descendant REFENTRYTITLE 1000}"
+  		"${_followrel descendant MANVOLNUM 1000}"^
+  EndText:	^...\\" created by instant / docbook-to-man, ${date}^
+--- 57,63 ----
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		REFENTRY
+! StartText:	^'\\" t^${_action 1001}
+  		^.TH "${_followrel descendant REFENTRYTITLE 1000}"
+  		"${_followrel descendant MANVOLNUM 1000}"^
+  EndText:	^...\\" created by instant / docbook-to-man, ${date}^
+***************
+*** 133,138 ****
+--- 137,147 ----
+  -
+  #
+  GI:		TITLE
++ Context:	REFSYNOPSISDIV
++ Ignore:		all
++ -
++ #
++ GI:		TITLE
+  Context:	REFSECT1
+  Ignore:		all
+  -
+***************
+*** 297,309 ****
+  -
+  #
+  GI:		PROGRAMLISTING
+! StartText:	^.PP^.nf^\\f(CW
+  EndText:	\\fR^.fi^.PP^
+  -
+  #
+  GI:		LITERALLAYOUT
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+  GI:		BLOCKQUOTE
+--- 306,320 ----
+  -
+  #
+  GI:		PROGRAMLISTING
+! StartText:	^.PP^.nf^${_action 1001}^\\f(CW
+  EndText:	\\fR^.fi^.PP^
++ Verbatim:
+  -
+  #
+  GI:		LITERALLAYOUT
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
++ Verbatim:
+  -
+  #
+  GI:		BLOCKQUOTE
+***************
+*** 376,383 ****
+  -
+  #
+  GI:		SCREEN
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+  GI:		SCREENCO
+--- 387,395 ----
+  -
+  #
+  GI:		SCREEN
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
++ Verbatim:
+  -
+  #
+  GI:		SCREENCO
+***************
+*** 489,496 ****
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		ADDRESS
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+  GI:		STREET
+--- 501,509 ----
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		ADDRESS
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
++ Verbatim:
+  -
+  #
+  GI:		STREET
+***************
+*** 1155,1162 ****
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		SYNOPSIS
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+  GI:		CMDSYNOPSIS
+--- 1168,1176 ----
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		SYNOPSIS
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
++ Verbatim:
+  -
+  #
+  GI:		CMDSYNOPSIS
+***************
+*** 1237,1244 ****
+  -
+  #
+  GI:		FUNCSYNOPSIS
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+  GI:		FUNCSYNOPSISINFO
+--- 1251,1259 ----
+  -
+  #
+  GI:		FUNCSYNOPSIS
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
++ Verbatim:
+  -
+  #
+  GI:		FUNCSYNOPSISINFO
+***************
+*** 1313,1328 ****
+  #
+  GI:		XREF
+  AttValue:	ENDTERM
+! StartText:	\\fI(cross-reference to ``${_followlink ENDTERM 1000}'')\\fR\s
+  -
+  #
+  GI:		XREF
+! StartText:	\\fI(cross-reference to ``${_followlink LINKEND 600})''\\fR\s
+  -
+  #
+  GI:		_xref
+  SpecID:		600
+! StartText:	${XREFLABEL}
+  Ignore:		all
+  -
+  #
+--- 1328,1356 ----
+  #
+  GI:		XREF
+  AttValue:	ENDTERM
+! StartText:	\\fI"${_followlink ENDTERM 1000}"\\fR\s
+  -
+  #
+  GI:		XREF
+! StartText:	\\fI"${_followlink LINKEND 600}"\\fR\s
+  -
+  #
+  GI:		_xref
+  SpecID:		600
+! StartText:	${_set xreflabel no}${_isset XREFLABEL 601}${_isset xreflabel no 602}
+! Ignore:		all
+! -
+! #
+! GI:		_xref_label
+! SpecID:		601
+! StartText:	${_set xreflabel yes}${XREFLABEL}
+! Ignore:		all
+! -
+! #
+! GI:		_xref_title
+! SpecID:		602
+! Set:             
+! StartText:	${_followrel child TITLE 1000}
+  Ignore:		all
+  -
+  #
+***************
+*** 1757,1762 ****
+--- 1785,1794 ----
+  #	no special presentation
+  -
+  #
++ GI:		PROMPT
++ #	no special presentation
++ -
++ #
+  GI:		SHORTCUT
+  #	no special presentation
+  -
+***************
+*** 1965,1970 ****
+--- 1997,2013 ----
+  #
+  GI:		_passthrough
+  SpecID:		1000
++ -
++ #
++ # Used to reset trap positions, either at start of file or when .nf is
++ # restarted, such as for literal output.  Assumes caller is responsible
++ # for line starting characters as appropriate.  (it helps the calling
++ # definitions read more logically).
++ #
++ GI:		_tabset
++ SpecID:		1001
++ StartText:	.ta 8n 16n 24n 32n 40n 48n 56n 64n 72n
++ Ignore:		all
+  -
+  #
+  GI:		_doTitle
+Index: sgml/docbook-to-man/Transpec/docbook-to-man.ts-PUSHPOP
+diff -c sgml/docbook-to-man/Transpec/docbook-to-man.ts-PUSHPOP:1.1.1.1 sgml/docbook-to-man/Transpec/docbook-to-man.ts-PUSHPOP:1.5
+*** sgml/docbook-to-man/Transpec/docbook-to-man.ts-PUSHPOP:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Transpec/docbook-to-man.ts-PUSHPOP	Tue Feb 23 20:31:38 1999
+***************
+*** 36,41 ****
+--- 36,45 ----
+  #
+  #############################################################################
+  #
++ # $Id: docbook-to-man.ts-PUSHPOP,v 1.5 1999/02/23 20:31:38 db3l Exp $
++ #
++ #############################################################################
++ #
+  #  Variables
+  #
+  Var:	callout 0
+***************
+*** 53,62 ****
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		REFENTRY
+! StartText:	^.ta 8n 16n 24n 32n 40n 48n 56n 64n 72n
+! 		^.TH "${_followrel descendant REFENTRYTITLE 1000}"
+! 		"${_followrel descendant MANVOLNUM 1000}"^
+! EndText:	^...\\" created by instant / docbook-to-man, ${date}
+  -
+  #
+  GI:		DOCINFO
+--- 57,66 ----
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		REFENTRY
+! StartText:	^'\\" t^.TH "${_followrel descendant REFENTRYTITLE 1000}"
+! 		"${_followrel descendant MANVOLNUM 1000}" "${date}"
+! 		^${_action 1002}^${_action 1001}^
+! EndText:	^...\\" created by instant / docbook-to-man, ${date}^
+  -
+  #
+  GI:		DOCINFO
+***************
+*** 133,138 ****
+--- 137,147 ----
+  -
+  #
+  GI:		TITLE
++ Context:	REFSYNOPSISDIV
++ Ignore:		all
++ -
++ #
++ GI:		TITLE
+  Context:	REFSECT1
+  Ignore:		all
+  -
+***************
+*** 292,303 ****
+  -
+  #
+  GI:		PROGRAMLISTING
+! StartText:	^.PP^.nf^\\f(CW
+  EndText:	\\fR^.fi^.PP^
+  -
+  #
+  GI:		LITERALLAYOUT
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+--- 301,312 ----
+  -
+  #
+  GI:		PROGRAMLISTING
+! StartText:	^.PP^.nf^${_action 1001}^\\f(CW
+  EndText:	\\fR^.fi^.PP^
+  -
+  #
+  GI:		LITERALLAYOUT
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
+  -
+  #
+***************
+*** 371,377 ****
+  -
+  #
+  GI:		SCREEN
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+--- 380,386 ----
+  -
+  #
+  GI:		SCREEN
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
+  -
+  #
+***************
+*** 484,490 ****
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		ADDRESS
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+--- 493,499 ----
+  #   ####     #####     #####     #####     #####     #####     ####     #####     
+  #
+  GI:		ADDRESS
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
+  -
+  #
+***************
+*** 1230,1236 ****
+  -
+  #
+  GI:		FUNCSYNOPSIS
+! StartText:	^.PP^.nf^
+  EndText:	^.fi^
+  -
+  #
+--- 1239,1245 ----
+  -
+  #
+  GI:		FUNCSYNOPSIS
+! StartText:	^.PP^.nf^${_action 1001}^
+  EndText:	^.fi^
+  -
+  #
+***************
+*** 1306,1321 ****
+  #
+  GI:		XREF
+  AttValue:	ENDTERM
+! StartText:	\\fI(cross-reference to ``${_followlink ENDTERM 1000}'')\\fR\s
+  -
+  #
+  GI:		XREF
+! StartText:	\\fI(cross-reference to ``${_followlink LINKEND 600})''\\fR\s
+  -
+  #
+  GI:		_xref
+  SpecID:		600
+! StartText:	${XREFLABEL}
+  Ignore:		all
+  -
+  #
+--- 1315,1343 ----
+  #
+  GI:		XREF
+  AttValue:	ENDTERM
+! StartText:	\\fI"${_followlink ENDTERM 1000}"\\fR\s
+  -
+  #
+  GI:		XREF
+! StartText:	\\fI"${_followlink LINKEND 600}"\\fR\s
+  -
+  #
+  GI:		_xref
+  SpecID:		600
+! StartText:	${_set xreflabel no}${_isset XREFLABEL 601}${_isset xreflabel no 602}
+! Ignore:		all
+! -
+! #
+! GI:		_xref_label
+! SpecID:		601
+! StartText:	${_set xreflabel yes}${XREFLABEL}
+! Ignore:		all
+! -
+! #
+! GI:		_xref_title
+! SpecID:		602
+! Set:             
+! StartText:	${_followrel child TITLE 1000}
+  Ignore:		all
+  -
+  #
+***************
+*** 1685,1691 ****
+  -
+  #
+  GI:		COMMAND
+! Action:		910
+  -
+  #
+  GI:		COMPUTEROUTPUT
+--- 1707,1714 ----
+  -
+  #
+  GI:		COMMAND
+! StartText:	${_action 910}\s
+! Ignore:		all
+  -
+  #
+  GI:		COMPUTEROUTPUT
+***************
+*** 1851,1856 ****
+--- 1874,1883 ----
+  #	no special presentation
+  -
+  #
++ GI:		PROMPT
++ #	no special presentation
++ -
++ #
+  GI:		SHORTCUT
+  #	no special presentation
+  -
+***************
+*** 2125,2130 ****
+--- 2152,2178 ----
+  #
+  GI:		_passthrough
+  SpecID:		1000
++ -
++ #
++ # Used to reset trap positions, either at start of file or when .nf is
++ # restarted, such as for literal output.  Assumes caller is responsible
++ # for line starting characters as appropriate.  (it helps the calling
++ # definitions read more logically).
++ #
++ GI:		_tabset
++ SpecID:		1001
++ StartText:	.ta 8n 16n 24n 32n 40n 48n 56n 64n 72n
++ Ignore:		all
++ -
++ #
++ # Sets up macros for push/pop of fonts to better handle nested cases.
++ # Moved reference into this file rather than assuming the wrapper script
++ # will add it, since it's tightly coupled with this file anyway.
++ #
++ GI:		_fontmac
++ SpecID:		1002
++ StartText:	^${_include docbook-to-man.prolog}^
++ Ignore:		all
+  -
+  #
+  GI:		_doTitle
+Index: sgml/docbook-to-man/Transpec/roff.cmap
+diff -c sgml/docbook-to-man/Transpec/roff.cmap:1.1.1.1 sgml/docbook-to-man/Transpec/roff.cmap:1.2
+*** sgml/docbook-to-man/Transpec/roff.cmap:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Transpec/roff.cmap	Mon Nov 16 22:23:54 1998
+***************
+*** 43,50 ****
+  #
+  #  Character strings to map for troff/nroff.
+  #
+  # From		To
+! #\\		\\e
+  ^		\^
+  .		\\&.
+  '		\\&'
+--- 43,54 ----
+  #
+  #  Character strings to map for troff/nroff.
+  #
++ #
++ # $Id: roff.cmap,v 1.2 1998/11/16 22:23:54 db3l Exp $
++ #
++ #
+  # From		To
+! \\		\\e
+  ^		\^
+  .		\\&.
+  '		\\&'
+Index: sgml/docbook-to-man/Transpec/roff.sdata
+diff -c sgml/docbook-to-man/Transpec/roff.sdata:1.1.1.1 sgml/docbook-to-man/Transpec/roff.sdata:1.2
+*** sgml/docbook-to-man/Transpec/roff.sdata:1.1.1.1	Fri Nov 13 21:31:58 1998
+--- sgml/docbook-to-man/Transpec/roff.sdata	Mon Nov 16 22:23:55 1998
+***************
+*** 47,52 ****
+--- 47,55 ----
+  #
+  #	Numeric and Special Graphic     ________________________________
+  #
++ #
++ # $Id: roff.sdata,v 1.2 1998/11/16 22:23:55 db3l Exp $
++ #
+  [half  ]		\\(12
+  [frac12]		\\(12
+  [frac14]		\\(14
+***************
+*** 202,208 ****
+  # [mldr  ]		em leader
+  [rdquor]		\\&''
+  [rsquor]		\\&'
+! # [vellip]		vertical ellipsis
+  # [hybull]		rectangle, filled (hyphen bullet)
+  # [loz   ]		/lozenge - lozenge or total mark
+  # [lozf  ]		/blacklozenge - lozenge, filled
+--- 205,212 ----
+  # [mldr  ]		em leader
+  [rdquor]		\\&''
+  [rsquor]		\\&'
+! # Vertical ellipsis - cheat for now and treat like horizontal
+! [vellip]		\\&...
+  # [hybull]		rectangle, filled (hyphen bullet)
+  # [loz   ]		/lozenge - lozenge or total mark
+  # [lozf  ]		/blacklozenge - lozenge, filled

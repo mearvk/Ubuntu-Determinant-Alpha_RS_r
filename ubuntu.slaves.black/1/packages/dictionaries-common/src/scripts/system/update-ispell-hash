@@ -1,0 +1,622 @@
+#! /usr/bin/perl -w 
+# update-ispell-hash 0.4 -- creating dictionary hash from subdictionaries
+#
+# (c) 1999 Piotr Roszatycki <dexter@debian.org>
+# (C) 2003-2004 Agustin Martin <agmartin@debian.org>
+#
+# Some subroutines taken from yada 0.6
+# Copyright 1999 Charles Briscoe-Smith
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# Changes:
+#  * 0.4 - bugfix, "Can't open file" if file didn't exist
+#  * 0.3 - renamed dictionary.info -> dictionary.desc
+#        - gzip, bzip2 and sq support
+#        - fixed error messages
+#        - new options
+#        - build process uses icombine
+#  * 0.2 - security check for temporary file
+#  * 0.1 - initial release
+#
+# Todo:
+# * clean code?
+
+
+# ----------------------------------------------------------------------
+# Standard ways of printing error messages
+# ----------------------------------------------------------------------
+
+sub choke {
+  print STDERR "@_\n";
+  &clean();
+  exit 1;
+}
+
+sub debugprint {
+    print STDERR "@_\n" if $debug;
+}
+
+# ----------------------------------------------------------------------
+# Clean temporary files
+# ----------------------------------------------------------------------
+sub clean {
+    unlink <$tmppath*>;
+    rmdir $tmpdir;
+}
+
+# ----------------------------------------------------------------------
+# Signal trap
+# ----------------------------------------------------------------------
+sub trap {
+    &clean();
+    exit 1;
+}
+
+# ----------------------------------------------------------------------
+# About info
+# ----------------------------------------------------------------------
+sub about {
+    choke "Usage: (update-ispell-hash --help will give more details)\n"
+."  update-ispell-hash [options] [<dictionary>]\n"
+}
+
+sub usage {
+    choke "Usage:\n"
+."  update-ispell-hash [options] [<dictionary>]\n"
+         ."\n"
+         ."Options:\n"
+         ."\t-h | --help           this help info\n"
+         ."\t-a | --all            build from all dictionaries\n"
+         ."\t-d | --default        build from default dictionaries\n"
+         ."\t-f | --file <file>    build hash to file\n"
+         ."\t-x | --affix <file>   use affix file\n"
+         ."\t--debug               Show debugging information\n"
+         ."\t--resetdefaults       reset initial list of default\n" 
+         ."\t                      dictionaries and build from them\n"
+         ."\t--vardir <dir>        Explicitely set output dir\n"
+         ."\t<dictionary>          dictionary to build\n";
+}
+
+# ----------------------------------------------------------------------
+#   Choices functions
+# ----------------------------------------------------------------------
+
+sub text_select (){
+    my @selected_dicts = ();
+    print "\nPlease choose dictionary modules for $source hash\n\n";
+    
+    foreach my $subdict ( keys %subdictshash ){
+	my $desc      = $subdictshash{$subdict}{"description"};
+	my $yesno     = "y/N";
+	my $isdefault = '';
+	
+	$isdefault = "yes" if exists $dicts_in_list{$subdict};
+	
+	$yesno = "Y/n" if ( $isdefault );
+	printf "[$subdict] $desc? [%s/i/q] ", $yesno;
+	chomp ( $opt = <STDIN> );
+	
+	if( lc($opt) eq "y" || $opt eq "" && $isdefault ) {
+	    push @selected_dicts,$subdict;
+	} elsif( lc($opt) eq "i" ) {
+	    print $subdictshash{$subdict}{"longdescription"}, "\n\n";
+	    redo;
+	} elsif( lc($opt) eq "q" ) {
+	    print "Abort.\n";
+	    &clean();
+	    exit 0;
+	}
+    }
+    return (@selected_dicts);
+}
+
+sub dialog_select (){
+    my $status       = '';
+    my $choice       = '';
+    my $pending      = "yes";
+    my $text         = "\"Subdictionaries selection\"";
+    my $dummy        = '';
+    my %oldvals      = my %newvals      = %dicts_in_list;
+
+    while ( $pending ){
+	my @dialog_array = ("\"exit\"","\"Exit without changes\"",
+			    "\"accept\"","\"Accept current settings\"",
+			    "\"----\"","\"-----------------------\"");
+	foreach my $subdict ( keys %subdictshash ){
+	    my $desc    = $subdictshash{$subdict}{"description"};
+	    my $action;
+
+	    if ( exists $oldvals{$subdict} ){
+		if ( exists $newvals{$subdict} ){
+		    $action = "*";
+		} else {
+		    $action = "-";
+		}
+	    } else {
+		if ( exists $newvals{$subdict} ){
+		    $action = "+";
+		} else {
+		    $action = " ";
+		}
+	    }
+	    
+	    push @dialog_array,"\"$subdict\"", "\"$action $desc\"";
+	}
+
+	($status,$choice) = run_dialog ("$dialog "
+					. "--title update-ispell-hash "
+					. "--menu  "
+					. "$text 0 0 0 @dialog_array");
+
+	if ( $status != 0 || $choice eq "exit" || $choice eq "----" ) {
+	    choke "Aborting ...";
+	} elsif ( $choice eq "accept" ){
+	    undef $pending;
+	    return (keys %newvals);
+	} else {
+	    my $selecttext = "Select $choice?";
+	    my $selecttitle = "$choice:";
+	    my $desc     = $subdictshash{$choice}{"description"};
+	    my $longdesc = $subdictshash{$choice}{"longdescription"};
+	    $longdesc = " " if ( $longdesc eq "unavailable" );
+
+	    ($status, $dummy ) = run_dialog ("$dialog --clear " .
+					     "--title \"$selecttitle\" " .
+					     "--yesno " .
+					     "\"$desc \n\n$longdesc \n\n$selecttext\" 0 0");
+	    if ( $status == 0 ){
+		$newvals{$choice}++;
+	    } elsif ( $status == 256 ){
+		delete $newvals{$choice} if exists $newvals{$choice};
+	    } 
+	}
+    }
+}
+
+# #####################################################################
+# testing dialog
+# #####################################################################
+    
+# ---------------------------------------------------------------------
+#      Compare two versions a la dpkg --compare-versions
+# ---------------------------------------------------------------------
+
+sub dpkg_isgt {
+    my ( $vera, $verb ) = @_;
+    debugprint "** Is ($vera) greater than ($verb)";
+    system("dpkg --compare-versions $vera gt $verb") == 0
+        or  return 0;
+    return 1  
+}
+
+sub get_dialog {
+    my $dialog    = '';
+    my $tmp       = '';
+    my $output_fd = '';
+
+    if ( -x "/usr/bin/dialog" ){
+	$output_fd = 2;
+	chomp ($tmp = `dialog --version 2>&1`);
+	$tmp =~ s/.*: //g;
+	if ( dpkg_isgt($tmp,"0.9b-20020814") ){
+	    $dialog="dialog --output-fd $output_fd";
+	} else {
+	    $dialog="dialog";
+	}
+    }
+    return ($output_fd,$dialog);
+}
+
+sub run_dialog {
+    # ($status,$choice) = run_dialog ("dialog_command");
+    my $dialog_status = "$tmppath-dialog.status";
+    my $fd            = $output_fd;
+
+    my $systemcall = "@_" . " $fd> $dialog_status";
+    my $status = system ("$systemcall");
+    debugprint($systemcall);
+    open(INPUTFILE,"$dialog_status") or die "Could not open $dialog_status ";
+    my $choice = <INPUTFILE>;
+    debugprint("\n" . $choice . "\n") if $choice;
+    close INPUTFILE;
+    return ($status,$choice);
+}
+
+# ----------------------------------------------------------------------
+# Get the source file to use
+# ----------------------------------------------------------------------
+
+sub get_source {
+    my $title     = "Please choose dictionary";
+    my @descfiles = <$ispellsharepath/*.desc>;
+
+    debugprint(join('\n',@descfiles));
+
+    for (@descfiles ){
+	s/.*\///;
+	s/\.desc//;
+    }
+    
+    my $ndescfiles = scalar @descfiles;
+    
+    if ( $ndescfiles == 0 ){
+	choke "Can't find any $ispellsharepath/*.desc file";
+    } elsif ( $ndescfiles == 1 ){
+	$choice = $descfiles[0];
+	print STDERR 
+	    "Only one .desc file found [$choice]. Using it...\n";
+    } elsif ( $ndescfiles > 1 ){  
+	if ( $dialog ){
+	    foreach ( @descfiles ){
+		push @dlist, $_, "\"\"";
+	    }
+	    ($status,$choice) = run_dialog
+		("$dialog --title \"$title\" --menu \" \" 0 0 0 @dlist");
+	    choke "Abort" if ( $status != 0 );      
+	} else {
+	    print "\n$title:\n\n";
+	    foreach my $i ( 1..$ndescfiles){
+		print "\t[$i] $descfiles[$i-1]\n";
+	    }
+	    print "\nSelect the number of dictionary [1] ";
+	    chomp ( $choice = <STDIN> );
+	    if( $choice =~ /^\d+$/ ) {  
+		$choice = $descfiles[$choice-1];
+	    } elsif ( $choice eq "" ) {
+		$choice = $choice[0];  
+	    }
+	}
+    } else {
+	choke "Invalid value [$ndescfiles] for descfiles number";
+    }
+    
+    -d "$ispellsharepath/$choice" or
+	choke "Can't find \"$ispellsharepath/$choice\" dictionary\n";
+    
+    return $choice;
+}
+
+# ----------------------------------------------------------------------
+# Parse the .desc file
+# ----------------------------------------------------------------------
+
+sub parsedesc {
+    my $file          = shift;
+    my @dictfields    = ("source","affix","hash","sort_opts");
+    my @subdictfields = ("dictionary","default","description");
+
+    open(DESC,"$file") or choke "Could not open $file for reading";
+    my @tmp = grep { not /^\s*\#/ } <DESC>;
+    close DESC;
+    $inputstring=join ("",@tmp);
+    
+    @subdicts = split('\s*\n+[\n \t]*\n+\s*',$inputstring);
+    
+    $dictstring = shift @subdicts;
+    $dictstring = $dictstring . "\n";
+
+    # Reading main headers
+    
+    while ($dictstring =~ s/^\n*(\S+):[ \t]*(.*(\n[ \t].*)*)\n//) {
+	$dictfield = lc $1; $dictfieldvalue = $2;
+	if ( my @tmp = grep {/^$dictfield$/} @dictfields ){
+	    debugprint "@tmp: $dictfield, $dictfieldvalue";
+	    $$dictfield = $dictfieldvalue;
+	} else {
+	    print "--- Wrong dict field name \"$dictfield\". " 
+		. "Must be one of \"@dictfields\".\n";
+	}
+    } 
+
+    choke "Source: field not found\n" unless $source;
+    choke "Affix: field not found\n" unless $affix;
+    choke "Hash: field not found\n" unless $hash;
+
+    $sort_opts = "-u" unless $sort_opts;
+
+    debugprint "* $source, $affix, $hash\n";
+    
+    # Reading info for each subdictionary
+
+    foreach my $subdict ( @subdicts ){
+	my %tmpsubdict   = ();
+	my $dictionary   = '';
+	my $description  = '';
+	
+	$subdict = $subdict . "\n";
+	while ($subdict =~ s/^\n*(\S+):[ \t]*(.*(\n[ \t].*)*)\n//) {
+	    $subdictfield = lc $1; $subdictfieldvalue = $2;
+	    if ( my @tmp = grep {/^$subdictfield$/} @subdictfields ){
+		debugprint "@tmp: $subdictfield, $subdictfieldvalue";
+		$tmpsubdict{$subdictfield}=$subdictfieldvalue;
+	    } else {
+		print "--- Wrong subdict field name \"$subdictfield\". " 
+		    . "Must be one of \"@subdictfields\".\n";
+	    }
+	}
+
+	if ( exists $tmpsubdict{"dictionary"} ) {
+	    $dictionary = $tmpsubdict{"dictionary"};
+	    debugprint "$dictionary\n";
+	} else {
+	    choke "No 'dictionary' name defined in entry $subdict";
+	}
+	
+	if ( lc $tmpsubdict{"default"} eq "yes" ){
+	    $defaultdicts{$dictionary}++;
+	    debugprint "Default: -- yes -- [$dictionary]\n";
+	} 
+	
+	if ( $tmpsubdict{"description"} ){
+	    my @tmp = split ("\n", $tmpsubdict{"description"});
+	    $subdictshash{$dictionary}{"description"} = shift @tmp;
+	    $description = join ("\n",@tmp);
+	    if ( $description ){
+		$subdictshash{$dictionary}{"longdescription"} = $description;
+	    } else {
+		$subdictshash{$dictionary}{"longdescription"} = "unavailable";
+	    }
+	} else {
+	    $subdictshash{$dictionary}{"description"} = "unavailable";
+	    $subdictshash{$dictionary}{"longdescription"} = "unavailable";
+	}
+    }
+}
+
+
+########################################################################
+# Main program
+########################################################################
+
+#use Getopt::Long;
+
+$SIG{INT}  = \&trap;
+$SIG{KILL} = \&trap;
+$SIG{TERM} = \&trap;
+
+$output_fd       = '';
+$debug           = '';
+$usedefault      = '';
+$all             = '';
+$resetdefault    = '';
+$write_listfile  = '';
+@selected_dicts  = ();
+%defaultdicts    = (); # The hash whose keys are the default subdicts
+%dicts_in_list   = (); # The hash whose keys are the subdicts in list
+%subdictshash    = (); # The hash containing information for each subdict
+
+# The hash whose keys are the subdicts in list that are no longer provided
+# by the package
+%failed_dicts_in_list = (); 
+
+$ispelllibpath   = "/usr/lib/ispell";
+$ispellvarpath   = "/var/lib/ispell";
+$ispellsharepath = "/usr/share/ispell";
+
+$tmpdir          = "/tmp/ispell-config.$$";
+$tmppath         = "$tmpdir/ispell-config";
+
+mkdir($tmpdir,0700) 
+    or choke "Could not create tempdir [$tmpdir]";
+
+while( $_ = shift @ARGV ) {
+    if( $_ eq "-h" || $_ eq "--help" ) {
+	&usage();
+    } elsif( $_ eq "-a" || $_ eq "--all" ) {
+	$all = 1;
+    } elsif( $_ eq "-d" || $_ eq "--default" ) {
+	$usedefault = 1;
+    } elsif( $_ eq "-f" || $_ eq "--file" ) {
+	$ispellhashfile = shift @ARGV;
+    } elsif( $_ eq "-x" || $_ eq "--affix" ) {
+	$ispellaffixfile = shift @ARGV;
+    } elsif( $_ eq "-l" || $_ eq "--list" ) {
+	$ispelllistfile = shift @ARGV;
+    } elsif( $_ eq "--debug" ) {
+	$debug = 1;
+    } elsif( $_ eq "--resetdefaults" ) {
+	$resetdefault = 1;
+    } elsif( $_ eq "--vardir" ) {
+	$ispellvarpath = shift @ARGV;
+    } elsif( $_ =~ /^-/ || $source ) {
+	&about();
+    } else {
+	$source = $_;
+    }
+}
+
+$write_listfile      = "yes" unless ( $all || $usedefault );
+
+($output_fd,$dialog) = get_dialog ();
+$source              = get_source unless $source;
+
+&parsedesc ("$ispellsharepath/$source.desc");
+
+$ispellaffixfile =  $affix 
+    unless $ispellaffixfile;
+$ispellaffixfile = "$ispelllibpath/$ispellaffixfile" 
+    unless $ispellaffixfile =~ /\//;
+#
+$ispellhashfile  =  $hash 
+    unless $ispellhashfile;
+$ispellhashfile  = "$ispellvarpath/$ispellhashfile" 
+    unless $ispellhashfile =~ /\//;
+$ispellhashfile  = "$ispellhashfile.hash" 
+    unless $ispellhashfile =~ /\.hash$/;
+#
+$ispelllistfile  = "$source" 
+    unless $ispelllistfile;
+$ispelllistfile  = "$ispellvarpath/$ispelllistfile" 
+    unless $ispelllistfile =~ /\//;
+$ispelllistfile  = "$ispelllistfile.list" 
+    unless $ispelllistfile =~ /\.list$/;
+
+# check if hash file is writable
+
+if( ! -w $ispellhashfile ) {
+    open TMP, ">$ispellhashfile" or
+	choke "Can't write $ispellhashfile file";
+    close TMP;
+    unlink $ispellhashfile;
+}
+
+if( -f $ispelllistfile ) {
+    open LIST, "$ispelllistfile" or
+	choke "Can't open $ispelllistfile for reading";
+    while (<LIST>){
+	chomp;
+	if ( exists $subdictshash{$_} ){
+	    $dicts_in_list{$_}++;
+	} else {
+	    $failed_dicts_in_list{$_}++;
+	}
+    }
+    
+    if ( scalar keys %failed_dicts_in_list != 0 ){
+	foreach ( keys %defaultdicts ){
+	    $dicts_in_list{$_}++;
+	}
+	$write_listfile = "yes";
+	print STDERR
+	    "\nWarning (update-ispell-hash): subdicts\n  " . 
+	    join(", ",sort keys %failed_dicts_in_list) . "\n" .
+	    "are no longer provided. " .
+	    "Merging valid values with default dicts, giving\n  " .
+	    join(", ",sort keys %dicts_in_list) . "\n" .
+	    "Run \'update-ispell-hash $choice\' to change that selection\n";
+    }
+    
+    close LIST;
+    debugprint("Found $ispelllistfile");
+} else {
+    %dicts_in_list = %defaultdicts;
+}
+
+# Set selected_dicts or get it when appropriate
+
+if ( $all ){
+    debugprint "* all selected\n";
+    @selected_dicts = keys %subdictshash;
+} elsif ( $usedefault ) {
+    @selected_dicts = keys %dicts_in_list;
+    debugprint "* default selected [@selected_dicts]\n";
+} elsif ( $resetdefault ) {
+    @selected_dicts = keys %defaultdicts;
+} else {
+    if ( $dialog ) { 
+	@selected_dicts = &dialog_select (); 
+    } else {
+	@selected_dicts = &text_select ();
+    }
+}
+
+# ----------------------------------------------------------------
+#  Time to merge the contents of all subdicts into a single file
+# ----------------------------------------------------------------
+
+open WORDS, ">$tmppath.words" or
+    choke "Can't open $tmppath.words file for writing";
+foreach $subdict_base ( @selected_dicts ){
+    my $subdict = "$ispellsharepath/$source/$subdict_base";
+    if( -f "$subdict" ) {
+	open FILE, "$subdict" or
+	    choke "Can't open $subdict file for reading";
+    } elsif( -f "$subdict.sq" ) {
+	open FILE, "unsq $subdict.sq |" or
+	    choke "Can't open $subdict.sq file for reading";
+    } elsif( -f "$subdict.gz" ) {
+	open FILE, "gzip -cd $subdict.gz |" or
+	    choke "Can't open $subdict.gz file for reading";
+    } elsif( -f "$subdict.sq.gz" ) {
+	open FILE, "gzip -cd $subdict.sq.gz | unsq |" or
+	    choke "Can't open $subdict.sq.gz file for reading";
+    } elsif( -f "$subdict.bz2" ) {
+	open FILE, "bzip2 -cd $subdict.bz2 |" or
+	    choke "Can't open $subdict.bz2 file for reading";
+    } elsif( -f "$subdict.sq.bz2" ) {
+	open FILE, "bzip2 -cd $subdict.sq.bz2 | unsq |" or
+	    choke "Can't open $subdict.sq.bz2 file for reading";
+    } else {
+	choke "Can't find \"$subdict\" sub-dictionary";
+    }
+    while( <FILE> ) {
+	print WORDS;
+    }
+    close FILE;
+}
+close WORDS;
+
+# Save selected dicts list when appropriate
+
+if( $write_listfile ) {
+    open LIST, ">$ispelllistfile" or
+	choke "Can't open $ispelllistfile for writing";
+    map { print LIST "$_\n" } @selected_dicts;
+    close LIST;
+}
+
+choke  "$tmppath.dict already exists\n" if ( -e "$tmppath.dict");
+
+system("cat $tmppath.words | tr -d \'\\r\' | grep -v \"^/\" | ".
+       "cut -f1 | sort $sort_opts | icombine $ispellaffixfile > $tmppath.dict") == 0
+    or choke "Failed to build munched wordlist for $source";
+system("buildhash $tmppath.dict $ispellaffixfile $ispellhashfile") == 0
+    or choke "Failed to build hash file for $source";
+print "Done.\n";
+
+&clean();
+
+1;
+
+__END__
+
+
+
+sub dialog_select_con_help (){
+    my @dialog_array = ();
+    my $status       = '';
+    my $choice       = '';
+    my $pending      = "yes";
+    while ( $pending ){
+	foreach my $subdict ( keys %subdictshash ){
+	    my $default = " off ";
+	    my $desc    = $subdictshash{$subdict}{"description"};
+	    $default = " on " if ( exists $defaultdicts{$subdict} 
+				   or exists $dicts_in_list{$subdict});
+	    push @dialog_array,"\"$subdict\"", "\"$desc\"", $default;
+	}
+	($status,$choice) = run_dialog ("$dialog "
+					#. "--separate-output "
+					. "--help-button "
+					. "--title titulo "
+					. "--checklist  \"prueba +\" "
+					. "0 0 0 @dialog_array"); 
+	print "$status, $choice\n"; 
+	if ( $status == 0 ){
+	    @selected_dicts = split(/[\" ]*/,$choice);
+	    print @selected_dicts, "\n";
+	    $pending = '';
+	} elsif ( $choice =~ m/HELP/ ) {
+	    $choice =~ s/HELP //;
+	    $choice =~ s/\s //g;
+	    my $longdesc = $subdictshash{$choice}{"longdescription"};
+	    ($status,$choice) = run_dialog ("$dialog --title \"notitle\" --infobox \"$longdesc\" 0 0");
+	    choke "Aborting ..." if ( $status != 0 );
+	} else {
+	    choke "Aborting ...";
+	} exit;
+    }
+}   

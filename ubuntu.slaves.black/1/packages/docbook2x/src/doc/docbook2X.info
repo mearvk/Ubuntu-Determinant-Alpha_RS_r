@@ -1,0 +1,2914 @@
+This is docbook2X.info, produced by makeinfo version 4.8 from
+docbook2X.texi.
+
+INFO-DIR-SECTION Document Preparation
+START-INFO-DIR-ENTRY
+* docbook2X: (docbook2X).       Convert DocBook into man pages and Texinfo
+END-INFO-DIR-ENTRY
+
+
+File: docbook2X.info,  Node: Top,  Next: Quick start,  Up: (dir)
+
+docbook2X
+*********
+
+docbook2X converts DocBook documents into man pages and Texinfo
+documents.
+
+   It aims to support DocBook version 4.2, excepting the features that
+cannot be supported or are not useful in a man page or Texinfo document.  
+
+   For information on the latest releases of docbook2X, and downloads,
+please visit the docbook2X home page
+(http://docbook2x.sourceforge.net/).
+
+* Menu:
+
+* Quick start::                 Examples to get you started
+* Converting to man pages::     Details on man-page conversion
+* Converting to Texinfo::       Details on Texinfo conversion
+* The XSLT stylesheets::        How to run the docbook2X XSLT stylesheets
+* Character set conversion::    Discussion on reproducing non-ASCII
+                                  characters in the converted output
+* FAQ::                         Answers and tips for common problems
+* Performance analysis::        Discussion on conversion speed
+* How docbook2X is tested::     Discussion of correctness-testing
+* To-do list::                  Ideas for future improvements
+* Release history::             Changes to the package between releases
+* Design notes::                Author's notes on the grand scheme of
+                                  docbook2X
+* Package installation::        Where to get docbook2X, and details on how
+                                  to install it
+* Index: Concept index.
+
+--- The Detailed Node Listing ---
+
+Converting to man pages
+
+* docbook2man: docbook2man wrapper script.   Convert DocBook to man pages
+* db2x_manxml::                 Make man pages from Man-XML
+
+Converting to Texinfo
+
+* docbook2texi: docbook2texi wrapper script.   Convert DocBook to Texinfo
+* db2x_texixml::                Make Texinfo files from Texi-XML
+
+The XSLT stylesheets
+
+* db2x_xsltproc::               XSLT processor invocation wrapper
+* sgml2xml-isoent::             Convert SGML to XML with support for ISO
+                                  entities
+
+Character set conversion
+
+* utf8trans::                   Transliterate UTF-8 characters according to
+                                  a table
+
+Package installation
+
+* Installation::                Package install procedure
+* Dependencies on other software::   Other software packages that docbook2X
+                                       needs
+
+
+File: docbook2X.info,  Node: Quick start,  Next: Converting to man pages,  Prev: Top,  Up: Top
+
+1 Quick start
+*************
+
+To convert to man pages, you run the command `docbook2man' (*note
+docbook2man wrapper script::).  For example,
+
+     $ docbook2man --solinks manpages.xml
+
+   The man pages will be output to your current directory.
+
+   The `--solinks' options tells `docbook2man' to create man page
+links.  You may want to omit this option when developing documentation
+so that your working directory does not explode with many stub man
+pages.  (If you don't know what this means, you can read about it in
+detail in `db2x_manxml', or just ignore the previous two sentences and
+always specify this option.)
+
+   To convert to Texinfo, you run the command `docbook2texi' (*note
+docbook2texi wrapper script::).  For example,
+
+     $ docbook2texi tdg.xml
+
+   One (or more) Texinfo files will be output to your current directory.
+
+   The rest of this manual describes in detail all the other options
+and how to customize docbook2X's output.
+
+
+File: docbook2X.info,  Node: Converting to man pages,  Next: Converting to Texinfo,  Prev: Quick start,  Up: Top
+
+2 Converting to man pages
+*************************
+
+DocBook documents are converted to man pages in two steps:
+
+  1. The DocBook source is converted by a XSLT stylesheet into an
+     intermediate XML format, Man-XML.
+
+     Man-XML is simpler than DocBook and closer to the man page format;
+     it is intended to make the stylesheets' job easier.
+
+     The stylesheet for this purpose is in `xslt/man/docbook.xsl'.  For
+     portability, it should always be referred to by the following URI:
+
+          http://docbook2x.sourceforge.net/latest/xslt/man/docbook.xsl
+
+     Run this stylesheet with *Note `db2x_xsltproc': db2x_xsltproc.  
+
+     *Customizing. * You can also customize the output by creating your
+     own XSLT stylesheet -- changing parameters or adding new templates
+     -- and importing `xslt/man/docbook.xsl'.
+
+  2. Man-XML is converted to the actual man pages by *Note
+     `db2x_manxml': db2x_manxml.
+
+   The `docbook2man' (*note docbook2man wrapper script::) command does
+both steps automatically, but if any problems occur, you can see the
+errors more clearly if you do each step separately:
+
+     $ db2x_xsltproc -s man mydoc.xml -o mydoc.mxml
+     $ db2x_manxml mydoc.mxml
+
+   Options to the conversion stylesheet are described in *Note the
+man-pages stylesheets reference: (docbook2man-xslt)Top.  
+
+   *Pure XSLT conversion. * An alternative to the `db2x_manxml' Perl
+script is the XSLT stylesheet in `xslt/backend/db2x_manxml.xsl'.  This
+stylesheet performs a similar function of converting Man-XML to actual
+man pages.  It is useful if you desire a pure XSLT solution to man-page
+conversion.  Of course, the quality of the conversion using this
+stylesheet will never be as good as the Perl `db2x_manxml', and it runs
+slower.  In particular, the pure XSLT version currently does not
+support tables in man pages, but its Perl counterpart does.
+
+* Menu:
+
+* docbook2man: docbook2man wrapper script.   Convert DocBook to man pages
+* db2x_manxml::                 Make man pages from Man-XML
+
+
+File: docbook2X.info,  Node: docbook2man wrapper script,  Next: db2x_manxml,  Up: Converting to man pages
+
+2.1 docbook2man
+===============
+
+Name
+----
+
+`docbook2man' -- Convert DocBook to man pages
+
+Synopsis
+--------
+
+     docbook2man [options]  xml-document
+
+Description
+-----------
+
+`docbook2man' converts the given DocBook XML document into man pages.
+By default, the man pages will be output to the current directory.
+
+   Only the `refentry' content in the DocBook document is converted.
+(To convert content outside of a `refentry', stylesheet customization
+is required.  See the docbook2X package for details.)
+
+   The `docbook2man' command is a wrapper script for a two-step
+conversion process.
+
+Options
+-------
+
+The available options are essentially the union of the options from
+*Note `db2x_xsltproc': db2x_xsltproc. and *Note `db2x_manxml':
+db2x_manxml.
+
+   Some commonly-used options are listed below:
+
+`--encoding=ENCODING'
+     Sets the character encoding of the output.
+
+`--string-param PARAMETER=VALUE'
+     Sets a stylesheet parameter (options that affect how the output
+     looks).  See "Stylesheet parameters" below for the parameters that
+     can be set.
+
+`--sgml'
+     Accept an SGML source document as input instead of XML.
+
+`--solinks'
+     Make stub pages for alternate names for an output man page.
+
+Stylesheet parameters
+.....................
+
+`uppercase-headings'
+     *Brief. * Make headings uppercase?
+
+     *Default setting. * `1' (boolean true)
+
+     Headings in man page content should be or should not be uppercased.
+
+`manvolnum-cite-numeral-only'
+     *Brief. * Man page section citation should use only the number
+
+     *Default setting. * `1' (boolean true)
+
+     When citing other man pages, the man-page section is either given
+     as is, or has the letters stripped from it, citing only the number
+     of the section (e.g. section `3x' becomes `3').  This option
+     specifies which style.
+
+`quotes-on-literals'
+     *Brief. * Display quotes on `literal' elements?
+
+     *Default setting. * `0' (boolean false)
+
+     If true, render `literal' elements with quotes around them.
+
+`show-comments'
+     *Brief. * Display `comment' elements?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, comments will be displayed, otherwise they are suppressed.
+     Comments here refers to the `comment' element, which will be
+     renamed `remark' in DocBook V4.0, not XML comments (<- like this
+     ->) which are unavailable.
+
+`function-parens'
+     *Brief. * Generate parentheses after a function?
+
+     *Default setting. * `0' (boolean false)
+
+     If true, the formatting of a `<function>' element will include
+     generated parenthesis.
+
+`xref-on-link'
+     *Brief. * Should `link' generate a cross-reference?
+
+     *Default setting. * `1' (boolean true)
+
+     Man pages cannot render the hypertext links created by `link'.  If
+     this option is set, then the stylesheet renders a cross reference
+     to the target of the link.  (This may reduce clutter).  Otherwise,
+     only the content of the `link' is rendered and the actual link
+     itself is ignored.
+
+`header-3'
+     *Brief. * Third header text
+
+     *Default setting. * (blank)
+
+     Specifies the text of the third header of a man page, typically
+     the date for the man page.  If empty, the `date' content for the
+     `refentry' is used.
+
+`header-4'
+     *Brief. * Fourth header text
+
+     *Default setting. * (blank)
+
+     Specifies the text of the fourth header of a man page.  If empty,
+     the `refmiscinfo' content for the `refentry' is used.
+
+`header-5'
+     *Brief. * Fifth header text
+
+     *Default setting. * (blank)
+
+     Specifies the text of the fifth header of a man page.  If empty,
+     the `manual name', that is, the title of the `book' or `reference'
+     container is used.
+
+`default-manpage-section'
+     *Brief. * Default man page section
+
+     *Default setting. * `1'
+
+     The source document usually indicates the sections that each man
+     page should belong to (with `manvolnum' in `refmeta').  In case
+     the source document does not indicate man-page sections, this
+     option specifies the default.
+
+`custom-localization-file'
+     *Brief. * URI of XML document containing custom localization data
+
+     *Default setting. * (blank)
+
+     This parameter specifies the URI of a XML document that describes
+     text translations (and other locale-specific information) that is
+     needed by the stylesheet to process the DocBook document.
+
+     The text translations pointed to by this parameter always override
+     the default text translations (from the internal parameter
+     `localization-file').  If a particular translation is not present
+     here, the corresponding default translation is used as a fallback.
+
+     This parameter is primarily for changing certain punctuation
+     characters used in formatting the source document.  The settings
+     for punctuation characters are often specific to the source
+     document, but can also be dependent on the locale.
+
+     To not use custom text translations, leave this parameter as the
+     empty string.
+
+`custom-l10n-data'
+     *Brief. * XML document containing custom localization data
+
+     *Default setting. * `document($custom-localization-file)'
+
+     This parameter specifies the XML document that describes text
+     translations (and other locale-specific information) that is
+     needed by the stylesheet to process the DocBook document.
+
+     This parameter is internal to the stylesheet.  To point to an
+     external XML document with a URI or a file name, you should use
+     the `custom-localization-file' parameter instead.
+
+     However, inside a custom stylesheet (_not on the command-line_)
+     this paramter can be set to the XPath expression `document('')',
+     which will cause the custom translations directly embedded inside
+     the custom stylesheet to be read.
+
+`author-othername-in-middle'
+     *Brief. * Is `othername' in `author' a middle name?
+
+     *Default setting. * `1'
+
+     If true, the `othername' of an `author' appears between the
+     `firstname' and `surname'.  Otherwise, `othername' is suppressed.
+
+Examples
+--------
+
+     $ docbook2man --solinks manpages.xml
+     $ docbook2man --solinks --encoding=utf-8//TRANSLIT manpages.xml
+     $ docbook2man --string-param header-4="Free Recode 3.6" document.xml
+
+Limitations
+-----------
+
+   * Internally there is one long pipeline of programs which your
+     document goes through.  If any segment of the pipeline fails (even
+     trivially, like from mistyped program options), the resulting
+     errors can be difficult to decipher -- in this case, try running
+     the components of docbook2X separately.
+
+
+File: docbook2X.info,  Node: db2x_manxml,  Prev: docbook2man wrapper script,  Up: Converting to man pages
+
+2.2 `db2x_manxml'
+=================
+
+Name
+----
+
+`db2x_manxml' -- Make man pages from Man-XML
+
+Synopsis
+--------
+
+     db2x_manxml [options] [xml-document]
+
+Description
+-----------
+
+`db2x_manxml' converts a Man-XML document into one or more man pages.
+They are written in the current directory.
+
+   If XML-DOCUMENT is not given, then the document to convert is read
+from standard input.
+
+Options
+-------
+
+`--encoding=ENCODING'
+     Select the character encoding used for the output files.  The
+     available encodings are those of iconv(1).  The default encoding
+     is `us-ascii'.
+
+     The XML source may contain characters that are not representable
+     in the encoding that you select;  in this case the program will
+     bomb out during processing, and you should choose another encoding.
+     (This is guaranteed not to happen with any Unicode encoding such as
+     UTF-8, but unfortunately not everyone is able to process Unicode
+     texts.)
+
+     If you are using GNU's version of iconv(1), you can affix
+     `//TRANSLIT' to the end of the encoding name to attempt
+     transliterations of any unconvertible characters in the output.
+     Beware, however, that the really inconvertible characters will be
+     turned into another of those damned question marks.  (Aren't you
+     sick of this?)
+
+     The suffix `//TRANSLIT' applied to a Unicode encoding -- in
+     particular, `utf-8//TRANSLIT' -- means that the output files are
+     to remain in Unicode, but markup-level character translations
+     using `utf8trans' are still to be done.  So in most cases, an
+     English-language document, converted using
+     `--encoding=`utf-8//TRANSLIT'' will actually end up as a US-ASCII
+     document, but any untranslatable characters will remain as UTF-8
+     without any warning whatsoever.  (Note: strictly speaking this is
+     not "transliteration".)  This method of conversion is a compromise
+     over strict `--encoding=`us-ascii'' processing, which aborts if
+     any untranslatable characters are encountered.
+
+     Note that man pages and Texinfo documents in non-ASCII encodings
+     (including UTF-8) may not be portable to older
+     (non-internationalized) systems, which is why the default value
+     for this option is `us-ascii'.
+
+     To suppress any automatic character mapping or encoding conversion
+     whatsoever, pass the option `--encoding=`utf-8''.
+
+`--list-files'
+     Write a list of all the output files to standard output, in
+     addition to normal processing.
+
+`--output-dir=DIR'
+     Specify the directory where the output files are placed.  The
+     default is the current working directory.
+
+     This option is ignored if the output is to be written to standard
+     output (triggered by the option `--to-stdout').
+
+`--to-stdout'
+     Write the output to standard output instead of to individual files.
+
+     If this option is used even when there are supposed to be multiple
+     output documents, then everything is concatenated to standard
+     output.  But beware that most other programs will not accept this
+     concatenated output.
+
+     This option is incompatible with `--list-files', obviously.
+
+`--help'
+     Show brief usage information and exit.
+
+`--version'
+     Show version and exit.
+
+   Some man pages may be referenced under two or more names, instead of
+just one.  For example, strcpy(3) and strncpy(3) often point to the
+same man page which describes the two functions together.  Choose one
+of the following options to select how such man pages are to be
+generated:
+
+`--symlinks'
+     For each of all the alternate names for a man page, erect symbolic
+     links to the file that contains the real man page content.
+
+`--solinks'
+     Generate stub pages (using `.so' roff requests) for the alternate
+     names, pointing them to the real man page content.
+
+`--no-links'
+     Do not make any alternative names available.  The man page can
+     only be referenced under its principal name.
+
+   This program uses certain other programs for its operation.  If they
+are not in their default installed locations, then use the following
+options to set their location:
+
+`--utf8trans-program=PATH'
+`--utf8trans-map=CHARMAP'
+     Use the character map CHARMAP with the *Note `utf8trans':
+     utf8trans. program, included with docbook2X, found under PATH.
+
+`--iconv-program=PATH'
+     The location of the iconv(1) program, used for encoding
+     conversions.
+
+Notes
+-----
+
+The man pages produced should be compatible with most troff
+implementations and other tools that process man pages.  Some
+backwards-compatible groff(1) extensions are used to make the output
+look nicer.
+
+See Also
+--------
+
+The input to `db2x_manxml' is defined by the XML DTD present at
+`dtd/Man-XML' in the docbook2X distribution.
+
+
+File: docbook2X.info,  Node: Converting to Texinfo,  Next: The XSLT stylesheets,  Prev: Converting to man pages,  Up: Top
+
+3 Converting to Texinfo
+***********************
+
+DocBook documents are converted to Texinfo in two steps:
+
+  1. The DocBook source is converted by a XSLT stylesheet into an
+     intermediate XML format, Texi-XML.
+
+     Texi-XML is simpler than DocBook and closer to the Texinfo format;
+     it is intended to make the stylesheets' job easier.
+
+     The stylesheet for this purpose is in `xslt/texi/docbook.xsl'.
+     For portability, it should always be referred to by the following
+     URI:
+
+          http://docbook2x.sourceforge.net/latest/xslt/texi/docbook.xsl
+
+     Run this stylesheet with *Note `db2x_xsltproc': db2x_xsltproc.  
+
+     *Customizing. * You can also customize the output by creating your
+     own XSLT stylesheet -- changing parameters or adding new templates
+     -- and importing `xslt/texi/docbook.xsl'.
+
+  2. Texi-XML is converted to the actual Texinfo files by *Note
+     `db2x_texixml': db2x_texixml.
+
+   The `docbook2texi' (*note docbook2texi wrapper script::) command
+does both steps automatically, but if any problems occur, you can see
+the errors more clearly if you do each step separately:
+
+     $ db2x_xsltproc -s texi mydoc.xml -o mydoc.txml
+     $ db2x_texixml mydoc.txml
+
+   Options to the conversion stylesheet are described in *Note the
+Texinfo stylesheets reference: (docbook2texi-xslt)Top.
+
+* Menu:
+
+* docbook2texi: docbook2texi wrapper script.   Convert DocBook to Texinfo
+* db2x_texixml::                Make Texinfo files from Texi-XML
+
+
+File: docbook2X.info,  Node: docbook2texi wrapper script,  Next: db2x_texixml,  Up: Converting to Texinfo
+
+3.1 docbook2texi
+================
+
+Name
+----
+
+`docbook2texi' -- Convert DocBook to Texinfo
+
+Synopsis
+--------
+
+     docbook2texi [options]  xml-document
+
+Description
+-----------
+
+`docbook2texi' converts the given DocBook XML document into one or more
+Texinfo documents.  By default, these Texinfo documents will be output
+to the current directory.
+
+   The `docbook2texi' command is a wrapper script for a two-step
+conversion process.
+
+Options
+-------
+
+The available options are essentially the union of the options for
+*Note `db2x_xsltproc': db2x_xsltproc. and *Note `db2x_texixml':
+db2x_texixml.
+
+   Some commonly-used options are listed below:
+
+`--encoding=ENCODING'
+     Sets the character encoding of the output.
+
+`--string-param PARAMETER=VALUE'
+     Sets a stylesheet parameter (options that affect how the output
+     looks).  See "Stylesheet parameters" below for the parameters that
+     can be set.
+
+`--sgml'
+     Accept an SGML source document as input instead of XML.
+
+Stylesheet parameters
+.....................
+
+`captions-display-as-headings'
+     *Brief. * Use heading markup for minor captions?
+
+     *Default setting. * `0' (boolean false)
+
+     If true, `title' content in some (formal) objects are rendered
+     with the Texinfo `@HEADING' commands.
+
+     If false, captions are rendered as an emphasized paragraph.
+
+`links-use-pxref'
+     *Brief. * Translate `link' using `@pxref'
+
+     *Default setting. * `1' (boolean true)
+
+     If true, `link' is translated with the hypertext followed by the
+     cross reference in parentheses.
+
+     Otherwise, the hypertext content serves as the cross-reference name
+     marked up using `@ref'.  Typically info displays this contruct
+     badly.
+
+`explicit-node-names'
+     *Brief. * Insist on manually constructed Texinfo node names
+
+     *Default setting. * `0' (boolean false)
+
+     Elements in the source document can influence the Texinfo node name
+     generation specifying either a `xreflabel', or for the sectioning
+     elements, a `title' with `role='texinfo-node'' in the `*info'
+     container.
+
+     However, for the majority of source documents, explicit Texinfo
+     node names are not available, and the stylesheet tries to generate
+     a reasonable one instead, e.g. from the normal title of an element.
+     The generated name may not be optimal.  If this option is set and
+     the stylesheet needs to generate a name, a warning is emitted and
+     `generate-id' is always used for the name.
+
+     When the hashtable extension is not available, the stylesheet
+     cannot check for node name collisions, and in this case, setting
+     this option and using explicit node names are recommended.
+
+     This option is not set (i.e. false) by default.
+
+          *Note*
+
+          The absolute fallback for generating node names is using the
+          XSLT function `generate-id', and the stylesheet always emits
+          a warning in this case regardless of the setting of
+          `explicit-node-names'.
+
+`show-comments'
+     *Brief. * Display `comment' elements?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, comments will be displayed, otherwise they are suppressed.
+     Comments here refers to the `comment' element, which will be
+     renamed `remark' in DocBook V4.0, not XML comments (<- like this
+     ->) which are unavailable.
+
+`funcsynopsis-decoration'
+     *Brief. * Decorate elements of a FuncSynopsis?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, elements of the FuncSynopsis will be decorated (e.g. bold
+     or italic).  The decoration is controlled by functions that can be
+     redefined in a customization layer.
+
+`function-parens'
+     *Brief. * Generate parentheses after a function?
+
+     *Default setting. * `0' (boolean false)
+
+     If true, the formatting of a `<function>' element will include
+     generated parenthesis.
+
+`refentry-display-name'
+     *Brief. * Output NAME header before 'RefName'(s)?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, a "NAME" section title is output before the list of
+     'RefName's.
+
+`manvolnum-in-xref'
+     *Brief. * Output `manvolnum' as part of `refentry' cross-reference?
+
+     *Default setting. * `1' (boolean true)
+
+     if true, the `manvolnum' is used when cross-referencing
+     `refentry's, either with `xref' or `citerefentry'.
+
+`prefer-textobjects'
+     *Brief. * Prefer `textobject' over `imageobject'?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, the `textobject' in a `mediaobject' is preferred over any
+     `imageobject'.
+
+     (Of course, for output formats other than Texinfo, you usually
+     want to prefer the `imageobject', but Info is a text-only format.)
+
+     In addition to the values true and false, this parameter may be
+     set to `2' to indicate that both the text and the images should be
+     output.  You may want to do this because some Texinfo viewers can
+     read images.  Note that the Texinfo `@image' command has its own
+     mechanism for switching between text and image output -- but we do
+     not use this here.
+
+     The default is true.
+
+`semantic-decorations'
+     *Brief. * Use Texinfo semantic inline markup?
+
+     *Default setting. * `1' (boolean true)
+
+     If true, the semantic inline markup of DocBook is translated into
+     (the closest) Texinfo equivalent.  This is the default.
+
+     However, because the Info format is limited to plain text, the
+     semantic inline markup is often distinguished by using explicit
+     quotes, which may not look good.  You can set this option to false
+     to suppress these.  (For finer control over the inline formatting,
+     you can use your own stylesheet.)
+
+`custom-localization-file'
+     *Brief. * URI of XML document containing custom localization data
+
+     *Default setting. * (blank)
+
+     This parameter specifies the URI of a XML document that describes
+     text translations (and other locale-specific information) that is
+     needed by the stylesheet to process the DocBook document.
+
+     The text translations pointed to by this parameter always override
+     the default text translations (from the internal parameter
+     `localization-file').  If a particular translation is not present
+     here, the corresponding default translation is used as a fallback.
+
+     This parameter is primarily for changing certain punctuation
+     characters used in formatting the source document.  The settings
+     for punctuation characters are often specific to the source
+     document, but can also be dependent on the locale.
+
+     To not use custom text translations, leave this parameter as the
+     empty string.
+
+`custom-l10n-data'
+     *Brief. * XML document containing custom localization data
+
+     *Default setting. * `document($custom-localization-file)'
+
+     This parameter specifies the XML document that describes text
+     translations (and other locale-specific information) that is
+     needed by the stylesheet to process the DocBook document.
+
+     This parameter is internal to the stylesheet.  To point to an
+     external XML document with a URI or a file name, you should use
+     the `custom-localization-file' parameter instead.
+
+     However, inside a custom stylesheet (_not on the command-line_)
+     this paramter can be set to the XPath expression `document('')',
+     which will cause the custom translations directly embedded inside
+     the custom stylesheet to be read.
+
+`author-othername-in-middle'
+     *Brief. * Is `othername' in `author' a middle name?
+
+     *Default setting. * `1'
+
+     If true, the `othername' of an `author' appears between the
+     `firstname' and `surname'.  Otherwise, `othername' is suppressed.
+
+`output-file'
+     *Brief. * Name of the Info file
+
+     *Default setting. * (blank) 
+
+     This parameter specifies the name of the final Info file,
+     overriding the setting in the document itself and the automatic
+     selection in the stylesheet.  If the document is a `set', this
+     parameter has no effect.
+
+          *Important*
+
+          Do _not_ include the `.info' extension in the name.
+
+     (Note that this parameter has nothing to do with the name of the
+     _Texi-XML output_ by the XSLT processor you are running this
+     stylesheet from.)
+
+`directory-category'
+     *Brief. * The categorization of the document in the Info directory
+
+     *Default setting. * (blank) 
+
+     This is set to the category that the document should go under in
+     the Info directory of installed Info files.  For example, `General
+     Commands'.
+
+          *Note*
+
+          Categories may also be set directly in the source document.
+          But if this parameter is not empty, then it always overrides
+          the setting in the source document.
+
+`directory-description'
+     *Brief. * The description of the document in the Info directory
+
+     *Default setting. * (blank) 
+
+     This is a short description of the document that appears in the
+     Info directory of installed Info files.  For example, `An
+     Interactive Plotting Program.'
+
+          *Note*
+
+          Menu descriptions may also be set directly in the source
+          document.  But if this parameter is not empty, then it always
+          overrides the setting in the source document.
+
+`index-category'
+     *Brief. * The Texinfo index to use
+
+     *Default setting. * `cp'
+
+     The Texinfo index for `indexterm' and `index' is specified using
+     the `role' attribute.  If the above elements do not have a `role',
+     then the default specified by this parameter is used.
+
+     The predefined indices are:
+
+    `c'
+    `cp'
+          Concept index
+
+    `f'
+    `fn'
+          Function index
+
+    `v'
+    `vr'
+          Variable index
+
+    `k'
+    `ky'
+          Keystroke index
+
+    `p'
+    `pg'
+          Program index
+
+    `d'
+    `tp'
+          Data type index
+
+     User-defined indices are not yet supported.
+
+`qanda-defaultlabel'
+     *Brief. * Sets the default for defaultlabel on QandASet.
+
+     *Default setting. * `'
+
+     If no defaultlabel attribute is specified on a QandASet, this
+     value is used. It must be one of the legal values for the
+     defaultlabel attribute.
+
+`qandaset-generate-toc'
+     *Brief. * Is a Table of Contents created for QandASets?
+
+     *Default setting. * `'
+
+     If true, a ToC is constructed for QandASets.
+
+Examples
+--------
+
+     $ docbook2texi tdg.xml
+     $ docbook2texi --encoding=utf-8//TRANSLIT tdg.xml
+     $ docbook2texi --string-param semantic-decorations=0 tdg.xml
+
+Limitations
+-----------
+
+   * Internally there is one long pipeline of programs which your
+     document goes through.  If any segment of the pipeline fails (even
+     trivially, like from mistyped program options), the resulting
+     errors can be difficult to decipher -- in this case, try running
+     the components of docbook2X separately.
+
+
+File: docbook2X.info,  Node: db2x_texixml,  Prev: docbook2texi wrapper script,  Up: Converting to Texinfo
+
+3.2 `db2x_texixml'
+==================
+
+Name
+----
+
+`db2x_texixml' -- Make Texinfo files from Texi-XML
+
+Synopsis
+--------
+
+     db2x_texixml [options]... [xml-document]
+
+Description
+-----------
+
+`db2x_texixml' converts a Texi-XML document into one or more Texinfo
+documents.
+
+   If XML-DOCUMENT is not given, then the document to convert comes
+from standard input.
+
+   The filenames of the Texinfo documents are determined by markup in
+the Texi-XML source.  (If the filenames are not specified in the markup,
+then `db2x_texixml' attempts to deduce them from the name of the input
+file.  However, the Texi-XML source should specify the filename, because
+it does not work when there are multiple output files or when the
+Texi-XML source comes from standard input.)
+
+Options
+-------
+
+`--encoding=ENCODING'
+     Select the character encoding used for the output files.  The
+     available encodings are those of iconv(1).  The default encoding
+     is `us-ascii'.
+
+     The XML source may contain characters that are not representable
+     in the encoding that you select;  in this case the program will
+     bomb out during processing, and you should choose another encoding.
+     (This is guaranteed not to happen with any Unicode encoding such as
+     UTF-8, but unfortunately not everyone is able to process Unicode
+     texts.)
+
+     If you are using GNU's version of iconv(1), you can affix
+     `//TRANSLIT' to the end of the encoding name to attempt
+     transliterations of any unconvertible characters in the output.
+     Beware, however, that the really inconvertible characters will be
+     turned into another of those damned question marks.  (Aren't you
+     sick of this?)
+
+     The suffix `//TRANSLIT' applied to a Unicode encoding -- in
+     particular, `utf-8//TRANSLIT' -- means that the output files are
+     to remain in Unicode, but markup-level character translations
+     using `utf8trans' are still to be done.  So in most cases, an
+     English-language document, converted using
+     `--encoding=`utf-8//TRANSLIT'' will actually end up as a US-ASCII
+     document, but any untranslatable characters will remain as UTF-8
+     without any warning whatsoever.  (Note: strictly speaking this is
+     not "transliteration".)  This method of conversion is a compromise
+     over strict `--encoding=`us-ascii'' processing, which aborts if
+     any untranslatable characters are encountered.
+
+     Note that man pages and Texinfo documents in non-ASCII encodings
+     (including UTF-8) may not be portable to older
+     (non-internationalized) systems, which is why the default value
+     for this option is `us-ascii'.
+
+     To suppress any automatic character mapping or encoding conversion
+     whatsoever, pass the option `--encoding=`utf-8''.
+
+`--list-files'
+     Write a list of all the output files to standard output, in
+     addition to normal processing.
+
+`--output-dir=DIR'
+     Specify the directory where the output files are placed.  The
+     default is the current working directory.
+
+     This option is ignored if the output is to be written to standard
+     output (triggered by the option `--to-stdout').
+
+`--to-stdout'
+     Write the output to standard output instead of to individual files.
+
+     If this option is used even when there are supposed to be multiple
+     output documents, then everything is concatenated to standard
+     output.  But beware that most other programs will not accept this
+     concatenated output.
+
+     This option is incompatible with `--list-files', obviously.
+
+`--info'
+     Pipe the Texinfo output to makeinfo(1), creating Info files
+     directly instead of Texinfo files.
+
+`--plaintext'
+     Pipe the Texinfo output to `makeinfo `--no-headers'', thereby
+     creating plain text files.
+
+`--help'
+     Show brief usage information and exit.
+
+`--version'
+     Show version and exit.
+
+   This program uses certain other programs for its operation.  If they
+are not in their default installed locations, then use the following
+options to set their location:
+
+`--utf8trans-program=PATH'
+`--utf8trans-map=CHARMAP'
+     Use the character map CHARMAP with the *Note `utf8trans':
+     utf8trans. program, included with docbook2X, found under PATH.
+
+`--iconv-program=PATH'
+     The location of the iconv(1) program, used for encoding
+     conversions.
+
+Notes
+-----
+
+*Texinfo language compatibility. * The Texinfo files generated by
+`db2x_texixml' sometimes require Texinfo version 4.7 (the latest
+version) to work properly.  In particular:
+
+   * `db2x_texixml' relies on `makeinfo' to automatically add
+     punctuation after a `@ref' if it it not already there.  Otherwise
+     the hyperlink will not work in the Info reader (although
+     `makeinfo' will not emit any error).
+
+   * The new `@comma{}' command is used for commas (`,') occurring
+     inside argument lists to Texinfo commands, to disambiguate it from
+     the comma used to separate different arguments.  The only
+     alternative otherwise would be to translate `,' to `.' which is
+     obviously undesirable (but earlier docbook2X versions did this).
+
+     If you cannot use version 4.7 of `makeinfo', you can still use a
+     `sed' script to perform manually the procedure just outlined.
+
+   *Relation of Texi-XML with the XML output format of `makeinfo'. *
+The Texi-XML format used by docbook2X is _different_ and incompatible
+with the XML format generated by makeinfo(1) with its `--xml' option.
+This situation arose partly because the Texi-XML format of docbook2X
+was designed and implemented independently before the appearance of
+`makeinfo''s XML format.  Also Texi-XML is very much geared towards
+being _machine-generated from other XML formats_, while there seems to
+be no non-trivial applications of `makeinfo''s XML format.  So there is
+no reason at this point for docbook2X to adopt `makeinfo''s XML format
+in lieu of Texi-XML.
+
+Bugs
+----
+
+   * Text wrapping in menus is utterly broken for non-ASCII text.  It
+     is probably also broken everywhere else in the output, but that
+     would be `makeinfo''s fault.
+
+   * `--list-files' might not work correctly with `--info'.
+     Specifically, when the output Info file get too big, `makeinfo'
+     will decide to split it into parts named `ABC.info-1',
+     `ABC.info-2', `ABC.info-3', etc.  `db2x_texixml' does not know
+     exactly how many of these files there are, though you can just do
+     an `ls' to find out.
+
+See Also
+--------
+
+The input to `db2x_texixml' is defined by the XML DTD present at
+`dtd/Texi-XML' in the docbook2X distribution.
+
+
+File: docbook2X.info,  Node: The XSLT stylesheets,  Next: Character set conversion,  Prev: Converting to Texinfo,  Up: Top
+
+4 The XSLT stylesheets
+**********************
+
+docbook2X uses a XSLT 1.0 processor to run its stylesheets.  docbook2X
+comes with a wrapper script, *Note `db2x_xsltproc': db2x_xsltproc, that
+invokes the XSLT processor, but you can invoke the XSLT processor in
+any other way you wish.
+
+   The stylesheets are described in *Note the man-pages stylesheets
+reference: (docbook2man-xslt)Top.  and *Note the Texinfo stylesheets
+reference: (docbook2texi-xslt)Top.  
+
+   Pure-XSLT implementations of `db2x_manxml' and `db2x_texixml' also
+exist.  They may be used as follows (assuming libxslt as the XSLT
+processor).
+
+   *Convert to man pages using pure-XSLT db2x_manxml*
+
+     $ xsltproc -o mydoc.mxml \
+         docbook2X-path/xslt/man/docbook.xsl \
+         mydoc.xml
+     $ xsltproc \
+         docbook2X-path/xslt/backend/db2x_manxml.xsl \
+         mydoc.mxml
+
+
+   *Convert to Texinfo using Pure-XSLT db2x_texixml*
+
+     $ xsltproc -o mydoc.txml \
+         docbook2X-path/xslt/texi/docbook.xsl \
+         mydoc.xml
+     $ xsltproc \
+         docbook2X-path/xslt/backend/db2x_texixml.xsl \
+         mydoc.txml
+
+   Here, xsltproc(1) is used instead of `db2x_xsltproc', since if you
+are in a situtation where you cannot use the Perl implementation of
+`db2x_manxml', you probably cannot use `db2x_xsltproc' either.
+
+   If for portability reasons you prefer not to use the file-system path
+to the docbook2X files, you can use the XML catalog provided in
+`xslt/catalog.xml' and the global URIs contained therein.
+
+* Menu:
+
+* db2x_xsltproc::               XSLT processor invocation wrapper
+* sgml2xml-isoent::             Convert SGML to XML with support for ISO
+                                  entities
+
+
+File: docbook2X.info,  Node: db2x_xsltproc,  Next: sgml2xml-isoent,  Up: The XSLT stylesheets
+
+4.1 `db2x_xsltproc'
+===================
+
+Name
+----
+
+`db2x_xsltproc' -- XSLT processor invocation wrapper
+
+Synopsis
+--------
+
+     db2x_xsltproc [options]  xml-document
+
+Description
+-----------
+
+`db2x_xsltproc' invokes the XSLT 1.0 processor for docbook2X.
+
+   This command applies the XSLT stylesheet (usually given by the
+`--stylesheet' option) to the XML document in the file XML-DOCUMENT.
+The result is written to standard output (unless changed with
+`--output').
+
+   To read the source XML document from standard input, specify `-' as
+the input document.
+
+Options
+-------
+
+`--version'
+     Display the docbook2X version.
+
+Transformation output options
+.............................
+
+`--output FILE'
+`-o FILE'
+     Write output to the given file (or URI), instead of standard
+     output.
+
+Source document options
+.......................
+
+`--xinclude'
+`-I'
+     Process XInclude directives in the source document.
+
+`--sgml'
+`-S'
+     Indicate that the input document is SGML instead of XML.  You need
+     this set this option if XML-DOCUMENT is actually a SGML file.
+
+     SGML parsing is implemented by conversion to XML via sgml2xml(1)
+     from the SP package (or osx(1) from the OpenSP package).  All tag
+     names in the SGML file will be normalized to lowercase (i.e. the
+     `-xlower' option of sgml2xml(1) is used).  ID attributes are
+     available for the stylesheet (i.e. option `-xid').  In addition,
+     any ISO SDATA entities used in the SGML document are automatically
+     converted to their XML Unicode equivalents.  (This is done by a
+     `sed' filter.)
+
+     The encoding of the SGML document, if it is not `us-ascii', must
+     be specified with the standard SP environment variables:
+     `SP_CHARSET_FIXED=1 SP_ENCODING=ENCODING'.  (Note that XML files
+     specify their encoding with the XML declaration `<?xml
+     version="1.0" encoding="ENCODING" ?>' at the top of the file.)
+
+     The above conversion options cannot be changed.  If you desire
+     different conversion options, you should invoke sgml2xml(1)
+     manually, and then pass the results of that conversion to this
+     program.
+
+Retrieval options
+.................
+
+`--catalogs CATALOG-FILES'
+`-C CATALOG-FILES'
+     Specify additional XML catalogs to use for resolving Formal Public
+     Identifiers or URIs.  SGML catalogs are not supported.
+
+     These catalogs are _not_ used for parsing an SGML document under
+     the `--sgml' option.  Use the environment variable
+     `SGML_CATALOG_FILES' instead to specify the catalogs for parsing
+     the SGML document.
+
+`--network'
+`-N'
+     `db2x_xsltproc' will normally refuse to load external resources
+     from the network, for security reasons.  If you do want to load
+     from the network, set this option.
+
+     Usually you want to have installed locally the relevent DTDs and
+     other files, and set up catalogs for them, rather than load them
+     automatically from the network.
+
+Stylesheet options
+..................
+
+`--stylesheet FILE'
+`-s FILE'
+     Specify the filename (or URI) of the stylesheet to use.  The
+     special values `man' and `texi' are accepted as abbreviations, to
+     specify that XML-DOCUMENT is in DocBook and should be converted to
+     man pages or Texinfo (respectively).
+
+`--param NAME=EXPR'
+`-p NAME=EXPR'
+     Add or modify a parameter to the stylesheet.  NAME is a XSLT
+     parameter name, and EXPR is an XPath expression that evaluates to
+     the desired value for the parameter.  (This means that strings
+     must be quoted, _in addition_ to the usual quoting of shell
+     arguments; use `--string-param' to avoid this.)
+
+`--string-param NAME=STRING'
+`-g NAME=STRING'
+     Add or modify a string-valued parameter to the stylesheet.
+
+     The string must be encoded in UTF-8 (regardless of the locale
+     character encoding).
+
+Debugging and profiling
+.......................
+
+`--debug'
+`-d'
+     Display, to standard error, logs of what is happening during the
+     XSL transformation.
+
+`--nesting-limit N'
+`-D N'
+     Change the maximum number of nested calls to XSL templates, used to
+     detect potential infinite loops.  If not specified, the limit is
+     500 (libxslt's default).
+
+`--profile'
+`-P'
+     Display profile information: the total number of calls to each
+     template in the stylesheet and the time taken for each.  This
+     information is output to standard error.
+
+`--xslt-processor PROCESSOR'
+`-X PROCESSOR'
+     Select the underlying XSLT processor used.  The possible choices
+     for PROCESSOR are: `libxslt', `saxon', `xalan-j'.
+
+     The default processor is whatever was set when docbook2X was built.
+     libxslt is recommended (because it is lean and fast), but SAXON is
+     much more robust and would be more helpful when debugging
+     stylesheets.
+
+     All the processors have XML catalogs support enabled.  (docbook2X
+     requires it.)  But note that not all the options above work with
+     processors other than the libxslt one.
+
+Environment
+-----------
+
+`XML_CATALOG_FILES'
+     Specify XML Catalogs.  If not specified, the standard catalog
+     (`/etc/xml/catalog') is loaded, if available.
+
+`DB2X_XSLT_PROCESSOR'
+     Specify the XSLT processor to use.  The effect is the same as the
+     `--xslt-processor' option.  The primary use of this variable is to
+     allow you to quickly test different XSLT processors without having
+     to add `--xslt-processor' to every script or make file in your
+     documentation build system.
+
+Conforming to
+-------------
+
+XML Stylesheet Language - Transformations (XSLT), version 1.0
+(http://www.w3.org/TR/xslt), a W3C Recommendation.
+
+Notes
+-----
+
+In its earlier versions (< 0.8.4), docbook2X required XSLT extensions
+to run, and `db2x_xsltproc' was a special libxslt-based processor that
+had these extensions compiled-in. When the requirement for XSLT
+extensions was dropped, `db2x_xsltproc' became a Perl script which
+translates the options to `db2x_xsltproc' to conform to the format
+accepted by the stock xsltproc(1) which comes with libxslt.
+
+   The prime reason for the existence of this script is backward
+compatibility with any scripts or make files that invoke docbook2X.
+However, it also became easy to add in support for invoking other XSLT
+processors with a unified command-line interface.  Indeed, there is
+nothing special in this script to docbook2X, or even to DocBook, and it
+may be used for running other sorts of stylesheets if you desire.
+Certainly the author prefers using this command, because its invocation
+format is sane and is easy to use.  (e.g. no typing long class names
+for the Java-based processors!)
+
+See Also
+--------
+
+You may wish to consult the documentation that comes with libxslt,
+SAXON, or Xalan.  The W3C XSLT 1.0 specification would be useful for
+writing stylesheets.
+
+
+File: docbook2X.info,  Node: sgml2xml-isoent,  Prev: db2x_xsltproc,  Up: The XSLT stylesheets
+
+4.2 `sgml2xml-isoent'
+=====================
+
+Name
+----
+
+`sgml2xml-isoent' -- Convert SGML to XML with support for ISO entities
+
+Synopsis
+--------
+
+     sgml2xml-isoent [sgml-document]
+
+Description
+-----------
+
+`sgml2xml-isoent' converts an SGML document to XML, with support for
+the ISO entities.  This is done by using sgml2xml(1) from the SP
+package (or osx(1) from the OpenSP package), and the declaration for
+the XML version of the ISO entities is added to the output.  This means
+that the output of this conversion should work as-is with any XML tool.
+
+   This program is often used for processing SGML DocBook documents
+with XML-based tools.  In particular, *Note `db2x_xsltproc':
+db2x_xsltproc.  calls this program as part of its `--sgml' option.  On
+the other hand, it is probably not helpful for migrating a source SGML
+text file to XML, since the conversion mangles the original formatting.
+
+   Since the XML version of the ISO entities are referred to directly,
+not via a DTD, this tool also works with document types other than
+DocBook.
+
+Notes
+-----
+
+The ISO entities are referred using the public identifiers `ISO
+8879:1986//ENTITIES//...//EN//XML'.  The catalogs used when parsing the
+converted document should resolve these entities to the appropriate
+place (on the local filesystem).  If the entities are not resolved in
+the catalog, then the fallback is to get the entity files from the
+`http://www.docbook.org/' Web site.
+
+See Also
+--------
+
+sgml2xml(1), osx(1)
+
+
+File: docbook2X.info,  Node: Character set conversion,  Next: FAQ,  Prev: The XSLT stylesheets,  Up: Top
+
+5 Character set conversion
+**************************
+
+When translating XML to legacy ASCII-based formats with poor support
+for Unicode, such as man pages and Texinfo, there is always the problem
+that Unicode characters in the source document also have to be
+translated somehow.
+
+   A straightforward character set conversion from Unicode does not
+suffice, because the target character set, usually US-ASCII or ISO
+Latin-1, do not contain common characters such as dashes and
+directional quotation marks that are widely used in XML documents.  But
+document formatters (man and Texinfo) allow such characters to be
+entered by a markup escape: for example, `\(lq' for the left
+directional quote ```'.  And if a markup-level escape is not available,
+an ASCII transliteration might be used: for example, using the ASCII
+less-than sign `<' for the angle quotation mark `<'.
+
+   So the Unicode character problem can be solved in two steps:
+
+  1. *Note `utf8trans': utf8trans, a program included in docbook2X, maps
+     Unicode characters to markup-level escapes or transliterations.
+
+     Since there is not necessarily a fixed, official mapping of
+     Unicode characters, `utf8trans' can read in user-modifiable
+     character mappings expressed in text files and apply them.
+     (Unlike most character set converters.)
+
+     In `charmaps/man/roff.charmap' and `charmaps/man/texi.charmap' are
+     character maps that may be used for man-page and Texinfo
+     conversion.  The programs *Note `db2x_manxml': db2x_manxml. and
+     *Note `db2x_texixml': db2x_texixml. will apply these character
+     maps, or another character map specified by the user,
+     automatically.
+
+  2. The rest of the Unicode text is converted to some other character
+     set (encoding).  For example, a French document with accented
+     characters (such as `e'') might be converted to ISO Latin 1.
+
+     This step is applied after `utf8trans' character mapping, using the
+     iconv(1) encoding conversion tool.  Both *Note `db2x_manxml':
+     db2x_manxml. and *Note `db2x_texixml': db2x_texixml. can call
+     iconv(1) automatically when producing their output.
+
+* Menu:
+
+* utf8trans::                   Transliterate UTF-8 characters according to
+                                  a table
+
+
+File: docbook2X.info,  Node: utf8trans,  Up: Character set conversion
+
+5.1 `utf8trans'
+===============
+
+Name
+----
+
+`utf8trans' -- Transliterate UTF-8 characters according to a table
+
+Synopsis
+--------
+
+     utf8trans  charmap  [file]...
+
+Description
+-----------
+
+`utf8trans' transliterates characters in the specified files (or
+standard input, if they are not specified) and writes the output to
+standard output.  All input and output is in the UTF-8 encoding.
+
+   This program is usually used to render characters in Unicode text
+files as some markup escapes or ASCII transliterations.  (It is not
+intended for general charset conversions.)  It provides functionality
+similar to the character maps in XSLT 2.0 (XML Stylesheet Language -
+Transformations, version 2.0).
+
+Options
+-------
+
+`-m'
+`--modify'
+     Modifies the given files in-place with their transliterated output,
+     instead of sending it to standard output.
+
+     This option is useful for efficient transliteration of many files
+     at once.
+
+`--help'
+     Show brief usage information and exit.
+
+`--version'
+     Show version and exit.
+
+Usage
+-----
+
+The translation is done according to the rules in the `character map',
+named in the file CHARMAP.  It has the following format:
+
+  1. Each line represents a translation entry, except for blank lines
+     and comment lines, which are ignored.
+
+  2. Any amount of whitespace (space or tab) may precede the start of
+     an entry.
+
+  3. Comment lines begin with `#'.  Everything on the same line is
+     ignored.
+
+  4. Each entry consists of the Unicode codepoint of the character to
+     translate, in hexadecimal, followed _one_ space or tab, followed
+     by the translation string, up to the end of the line.
+
+  5. The translation string is taken literally, including any leading
+     and trailing spaces (except the delimeter between the codepoint
+     and the translation string), and all types of characters.  The
+     newline at the end is not included.
+
+   The above format is intended to be restrictive, to keep `utf8trans'
+simple.  But if a XML-based format is desired, there is a
+`xmlcharmap2utf8trans' script that comes with the docbook2X
+distribution, that converts character maps in XSLT 2.0 format to the
+`utf8trans' format.
+
+Limitations
+-----------
+
+   * `utf8trans' does not work with binary files, because malformed
+     UTF-8 sequences in the input are substituted with U+FFFD
+     characters.  However, null characters in the input are handled
+     correctly. This limitation may be removed in the future.
+
+   * There is no way to include a newline or null in the substitution
+     string.
+
+
+File: docbook2X.info,  Node: FAQ,  Next: Performance analysis,  Prev: Character set conversion,  Up: Top
+
+6 FAQ
+*****
+
+  Q:
+     I have a SGML DocBook document.  How do I use docbook2X?  
+
+  A:
+     Use the `--sgml' option to `db2x_xsltproc'.
+
+     (Formerly, we described a quite intricate hack here to convert to
+     SGML to XML while preserving the ISO entities.  That hack is
+     actually what `--sgml' does.)
+
+  Q:
+     docbook2X bombs with this document!
+
+  A:
+     It is probably a bug in docbook2X.  (Assuming that the input
+     document is valid DocBook in the first place.)  Please file a bug
+     report.  In it, please include the document which causes docbook2X
+     to fail, or a pointer to it, or a test case that reproduces the
+     problem.
+
+     I don't want to hear about bugs in obsolete tools (i.e. tools that
+     are not in the current release of docbook2X.)  I'm sorry, but
+     maintaining all that is a lot of work that I don't have time for.
+
+  Q:
+     Must I use `refentry' to write my man pages?  
+
+  A:
+     Under the default settings of docbook2X: yes, you have to.  The
+     contents of the source document that lie outside of `refentry'
+     elements are probably written in a book/article style that is
+     usually not suited for the reference style of man pages.
+
+     Nevertheless, sometimes you might want to include inside your man
+     page, (small) snippets or sections of content from other parts of
+     your book or article.  You can achieve this by using a custom XSLT
+     stylesheet to include the content manually.  The docbook2X
+     documentation demonstrates this technique: see the docbook2man(1)
+     and the docbook2texi(1) man pages and the stylesheet that produces
+     them in `doc/ss-man.xsl'.
+
+  Q:
+     Where have the SGML-based docbook2X tools gone?
+
+  A:
+     They are in a separate package now, docbook2man-sgmlspl.
+
+  Q:
+     I get some `iconv' error when converting documents.  
+
+  A:
+     It's because there is some Unicode character in your document that
+     docbook2X fails to convert to ASCII or a markup escape (in roff or
+     Texinfo).  The error message is intentional because it alerts you
+     to a possible loss of information in your document, although
+     admittedly it could be less cryptic, but I unfortunately can't
+     control what `iconv' says.
+
+     You can look at the partial man or Texinfo output -- the offending
+     Unicode character should be near the point that the output is
+     interrupted.  Since you probably wanted that Unicode character to
+     be there, the way you want to fix this error is to add a
+     translation for that Unicode character to the `utf8trans'
+     character map.  Then use the `--utf8trans-map' option to the Perl
+     docbook2X tools to use your custom character map.
+
+     Alternatively, if you want to close your eyes to the utterly broken
+     Unicode handling in groff and Texinfo, just use the
+     `--encoding=utf-8' option.  Note that the UTF-8 output is unlikely
+     to display correctly everywhere.
+
+  Q:
+     Texinfo output looks ugly.
+
+  A:
+     You have to keep in mind that Info is extremely limited in its
+     formatting.  Try setting the various parameters to the stylesheet
+     (see `xslt/texi/param.xsl').
+
+     Also, if you look at native Info pages, you will see there is a
+     certain structure, that your DocBook document may not adhere to.
+     There is really no fix for this.  It is possible, though, to give
+     rendering hints to the Texinfo stylesheet in your DocBook source,
+     like this this manual does. Unfortunately these are not yet
+     documented in a prominent place.
+
+  Q:
+     How do I use SAXON (or Xalan-Java) with docbook2X?  
+
+  A:
+     Bob Stayton's DocBook XSL: The Complete Guide has a nice section
+     on setting up the XSLT processors
+     (http://www.sagehill.net/docbookxsl/InstallingAProcessor.html).
+     It talks about Norman Walsh's DocBook XSL stylesheets, but for
+     docbook2X you only need to change the stylesheet argument (any
+     file with the extension `.xsl').
+
+     If you use the Perl wrapper scripts provided with docbook2X, you
+     only need to "install" the XSLT processors (i.e. for Java, copying
+     the `*.jar' files to `/usr/local/share/java'), and you don't need
+     to do anything else.
+
+  Q:
+     XML catalogs don't work with Xalan-Java.  (Or: Stop connecting to
+     the Internet when running docbook2X!)  
+
+  A:
+     I have no idea why -- XML catalogs with Xalan-Java don't work for
+     me either, no matter how hard I try.  Just go use SAXON or libxslt
+     instead (which do work for me at least).
+
+  Q:
+     I don't like how docbook2X renders this markup.  
+
+  A:
+     The XSLT stylesheets are customizable, so assuming you have
+     knowledge of XSLT, you should be able to change the rendering
+     easily.  See `doc/ss-texinfo.xsl' of docbook2X's own documentation
+     for a non-trivial example.
+
+     If your customizations can be generally useful, I would like to
+     hear about it.
+
+     If you don't want to muck with XSLT, you can still tell me what
+     sort of features you want.  Maybe other users want them too.
+
+  Q:
+     Does docbook2X support other XML document types or output formats?  
+
+  A:
+     No.  But if you want to create code for a new XML document type or
+     output format, the existing infrastructure of docbook2X may be able
+     to help you.
+
+     For example, if you want to convert a document in the W3C spec DTD
+     to Texinfo, you can write a XSLT stylesheet that outputs a
+     document conformant to the Texi-XML, and run that through
+     `db2x_texixml' to get your Texinfo pages.  Writing the said XSLT
+     stylesheet should not be any more difficult than if you were to
+     write a stylesheet for HTML output, in fact probably even easier.
+
+     An alternative approach is to convert the source document to
+     DocBook first, then apply docbook2X conversion afterwards.  The
+     stylesheet reference documentation in docbook2X uses this
+     technique: the documentation embedded in the XSLT stylesheets is
+     first extracted into a DocBook document, then that is converted to
+     Texinfo.  This approach obviously is not ideal if the source
+     document does not map well into DocBook, but it does allow you to
+     use the standard DocBook HTML and XSL-FO stylesheets to format the
+     source document with little effort.
+
+     If you want, on the other hand, to get troff output but using a
+     different macro set, you will have to rewrite both the stylesheets
+     and the post-processor (performing the function of `db2x_manxml'
+     but with a different macro set).  In this case some of the code in
+     `db2x_manxml' may be reused, and you can certainly reuse
+     `utf8trans' and the provided roff character maps.
+
+
+File: docbook2X.info,  Node: Performance analysis,  Next: How docbook2X is tested,  Prev: FAQ,  Up: Top
+
+7 Performance analysis
+**********************
+
+The performance of docbook2X, and most other DocBook tools(1) can be
+summed up in a short phrase: _they are slow_.
+
+   On a modern computer producing only a few man pages at a time, with
+the right software -- namely, libxslt as the XSLT processor -- the
+DocBook tools are fast enough.  But their slowness becomes a hindrance
+for generating hundreds or even thousands of man pages at a time.
+
+   The author of docbook2X encounters this problem whenever he tries to
+do automated tests of the docbook2X package.  Presented below are some
+actual benchmarks, and possible approaches to efficient DocBook  to man
+pages conversion.
+
+   *docbook2X running times on 2157 refentry documents*
+
+Step                     Time for all pages       Avg. time per page
+DocBook to Man-XML       519.61s                  0.24s
+Man-XML to man-pages     383.04s                  0.18s
+roff character mapping   6.72s                    0.0031s
+Total                    909.37s                  0.42s
+
+   The above benchmark was run on 2157 documents coming from the
+doclifter (http://www.catb.org/~esr/doclifter/) man-page-to-DocBook
+conversion tool.  The man pages come from the section 1 man pages
+installed in the author's Linux system.  The XML files total 44.484
+MiB, and on average are 20.6KiB long.
+
+   The results were obtained using the test script in
+`test/mass/test.pl', using the default man-page conversion options.
+The test script employs the obvious optimizations, such as only loading
+once the XSLT processor, the man-pages stylesheet, `db2x_manxml' and
+`utf8trans'.
+
+   Unfortunately, there does not seem to be obvious ways that the
+performance can be improved, short of re-implementing the tranformation
+program in a tight programming language such as C.
+
+   Some notes on possible bottlenecks:
+
+   * Character mapping by `utf8trans' is very fast compared to the
+     other stages of the transformation.  Even loading `utf8trans'
+     separately for each document only doubles the running time of the
+     character mapping stage.
+
+   * Even though the XSLT processor is written in C, XSLT processing is
+     still comparatively slow.  It takes double the time of the Perl
+     script(2) `db2x_manxml', even though the XSLT portion and the Perl
+     portion are processing documents of around the same size(3)
+     (DocBook `refentry' documents and Man-XML documents).
+
+     In fact, profiling the stylesheets shows that a significant amount
+     of time is spent on the localization templates, in particular the
+     complex XPath navigation used there.  An obvious optimization is
+     to use XSLT keys for the same functionality.
+
+     However, when that is implemented, the author found that the time
+     used for _setting up keys_ dwarfs the time savings from avoiding
+     the complex XPath navigation.  It adds an extra 10s to the
+     processing time for the 2157 documents.  Upon closer examination
+     of the libxslt source code, XSLT keys are seen to be implemented
+     rather inefficiently: _each_ key pattern X causes the entire input
+     document to be traversed once by evaluating the XPath `//X'!
+
+   * Perhaps a C-based XSLT processor written with the best performance
+     in mind (libxslt is not particularly the most efficiently coded)
+     may be able to achieve better conversion times, without losing all
+     the nice advantages of XSLT-based tranformation.  Or failing that,
+     one can look into efficient, stream-based transformations (STX
+     (http://stx.sourceforge.net/)).
+
+   ---------- Footnotes ----------
+
+   (1) with the notable exception of the docbook-to-man tool
+(http://packages.debian.org/unstable/text/docbook-to-man) based on the
+`instant' stream processor (but this tool has many correctness problems)
+
+   (2) From preliminary estimates, the Pure-XSLT solution takes only
+slightly longer at this stage: .22s per page
+
+   (3) Of course, conceptually, DocBook processing is more complicated.
+So these timings also give us an estimate of the cost of DocBook's
+complexity: twice the cost over a simpler document type, which is
+actually not too bad.
+
+
+File: docbook2X.info,  Node: How docbook2X is tested,  Next: To-do list,  Prev: Performance analysis,  Up: Top
+
+8 How docbook2X is tested
+*************************
+
+The testing of the process of converting from DocBook to man pages, or
+Texinfo, is complicated by the fact that a given input (the DocBook
+document) usually does not have one specific, well-defined output.
+Variations on the output are allowed for the result to look "nice".
+
+   When docbook2X was in the early stages of development, the author
+tested it simply by running some sample DocBook documents through it,
+and visually inspecting the output.
+
+   Clearly, this procedure is not scaleable for testing a large number
+of documents.  In the later 0.8.X versions of docbook2X, the testing
+has been automated as much as possible.
+
+   The testing is implemented by heuristic checks on the output to see
+if it comprises a "good" man page or Texinfo file.  These are the
+checks in particular:
+
+  1. Validation of the Man-XML or Texi-XML output, from the first
+     stage, XSLT stylesheets, against the XML DTDs defining the formats.
+
+  2. Running groff(1) and makeinfo(1) on the output, and noting any
+     errors or warnings from those programs.
+
+  3. Other heuristic checks on the output, implemented by a Perl
+     script.  Here, spurious blank lines, uncollapsed whitespace in the
+     output that would cause a bad display are checked.
+
+   There are about 8000 test documents, mostly `refentry' documents,
+that can be run against the current version of docbook2X.  A few of
+them have been gathered by the author from various sources and test
+cases from bug reports.  The majority come from using doclifter
+(http://www.catb.org/~esr/doclifter/) on existing man pages.  Most
+pages pass the above tests.
+
+   To run the tests, go to the `test/' directory in the docbook2X
+distribution.  The command `make check' will run some tests on a few
+documents.
+
+   For testing using doclifter, first generate the DocBook XML sources
+using doclifter, then take a look at the `test/mass/test.pl' testing
+script and run it.  Note that a small portion of the doclifter pages
+will fail the tests, because they do not satisfy the heuristic tests
+(but are otherwise correct), or, more commonly, the source coming from
+the doclifter heuristic up-conversion has errors.
+
+
+File: docbook2X.info,  Node: To-do list,  Next: Release history,  Prev: How docbook2X is tested,  Up: Top
+
+9 To-do list
+************
+
+With regards to DocBook support:
+
+   * `qandaset' table of contents Perhaps allow `qandadiv' elements to
+     be nodes in Texinfo.
+
+   * `olink' (do it like what the DocBook XSL stylesheets do)
+
+   * `synopfragmentref'
+
+   * Man pages should support `qandaset', `footnote', `mediaobject',
+     `bridgehead', `synopfragmentref' `sidebar', `msgset', `procedure'
+     (and there's more).
+
+   * Some DocBook 4.0 stuff: e.g. `methodsynopsis'.  On the other hand
+     adding the DocBook 4.2 stuff shouldn't be that hard.
+
+   * `programlisting' line numbering, and call-out bugs specified using
+     `area'.  Seems to need XSLT extensions though.
+
+   * A template-based system for title pages, and `biblioentry'.
+
+   * Setting column widths in tables are not yet supported in man
+     pages, but they should be.
+
+   * Support for typesetting mathematics.  However, I have never seen
+     any man pages or Texinfo manuals that require this, obviously
+     because math looks horrible in ASCII text.
+
+   For other work items, see the `limitations' or `bugs' section in the
+individual tools' reference pages.
+
+   Other work items:
+
+   * Implement tables in pure XSLT.  Probably swipe the code that is in
+     the DocBook XSL stylesheets to do so.
+
+   * Many stylesheet templates are still undocumented.
+
+   * Write documentation for Man-XML and Texi-XML.  Write a smaller
+     application (smaller than DocBook, that is!)  of Man-XML and/or
+     Texi-XML (e.g. for W3C specs).  A side benefit is that we can
+     identify any bugs or design misfeatures that are not noticed in
+     the DocBook application.
+
+   * Need to go through the stylesheets and check/fill in any missing
+     DocBook functionality.  Make a table outlining what part of
+     DocBook we support.
+
+     For example, we have to check that each attribute is actually
+     supported for an element that we claim to support, or else at
+     least raise a warning to the user when that attribute is used.
+
+     Also some of the DocBook elements are not rendered very nicely
+     even when they are supported.
+
+   * Fault-tolerant, complete error handling.
+
+   * Full localization for the output, as well as the messages from
+     docbook2X programs.  (Note that we already have
+     internationalization for the output.)
+
+
+File: docbook2X.info,  Node: Release history,  Next: Design notes,  Prev: To-do list,  Up: Top
+
+10 Release history
+******************
+
+*docbook2X 0.8.8. *
+
+   * Errors in the Man-XML and Texi-XML DTD were fixed.
+
+     These DTDs are now used to validate the output coming out of the
+     stylesheets, as part of automated testing.  (Validation provides
+     some assurance that the result of the conversions are correct.)
+
+   * Several rendering errors were fixed after they had been discovered
+     through automated testing.
+
+   * Two HTML files in the docbook2X documentation were accidentally
+     omitted in the last release.  They have been added.
+
+   * The pure-XSLT-based man-page conversion now supports table markup.
+     The implemented was copied from the one by Michael Smith in the
+     DocBook XSL stylesheets.  Many thanks!
+
+   * As requested by Daniel Leidert, the man-pages stylesheets now
+     support the `segmentedlist', `segtitle' and `seg' DocBook elements.
+
+   * As suggested by Matthias Kievermagel, docbook2X now supports the
+     `code' element.
+
+   *docbook2X 0.8.7. *
+
+   * Some stylistic improvements were made to the man-pages output.
+
+     This includes fixing a bug that, in some cases, caused an extra
+     blank line to occur after lists in man pages.
+
+   * There is a new value `utf-8//TRANSLIT' for the `--encoding' option
+     to `db2x_manxml' and `db2x_texixml'.
+
+   * Added `-m' to `utf8trans' for modifying (a large number of) files
+     in-place.
+
+   * Added a section to the documentation discussing conversion
+     performance.
+
+     There is also a new test script, `test/mass/test.pl' that can
+     exercise docbook2X by converting many documents at one time, with
+     a focus on achieving the fastest conversion speed.
+
+   * The documentation has also been improved in several places.  Most
+     notably, the docbook2X(1) man page has been split into two much
+     more detailed man pages explaining man-page conversion and Texinfo
+     conversion separately, along with a reference of stylesheet
+     parameters.
+
+     The documentation has also been re-indexed (finally!)
+
+     Also, due to an oversight, the last release omitted the stylesheet
+     reference documentation.  They are now included again.
+
+   * Craig Ruff's patches were not integrated correctly in the last
+     release; this has been fixed.
+
+   * By popular demand, man-page conversion can also be done with XSLT
+     alone -- i.e. no Perl scripts or compiling required, just a XSLT
+     processor.
+
+     If you want to convert with pure XSLT, invoke the XSLT stylesheet
+     in `xslt/backend/db2x_manxml.xsl' in lieu of the `db2x_manxml'
+     Perl script.
+
+   * Make the `xmlcharmap2utf8trans' script (convert XSLT 2.0 character
+     maps to character maps in utf8trans format) really work.
+
+   *docbook2X 0.8.6. *
+
+   * Added rudimentary support for `entrytbl' in man pages; patch by
+     Craig Ruff.
+
+   * Added template for `personname'; patch by Aaron Hawley.
+
+   * Fix a build problem that happened on IRIX; patch by Dirk Tilger.
+
+   * Better rendering of man pages in general.  Fixed an
+     incompatibility with Solaris troff of some generated man pages.
+
+   * Fixed some minor bugs in the Perl wrapper scripts.
+
+   * There were some fixes to the Man-XML and Texi-XML document types.
+     Some of these changes are backwards-incompatible with previous
+     docbook2X releases.  In particular, Man-XML and Texi-XML now have
+     their own XML namespaces, so if you were using custom XSLT
+     stylesheets you will need to add the appropriate namespace
+     declarations.
+
+   *docbook2X 0.8.5. *
+
+   * Fixed a bug, from version 0.8.4, with the generated Texinfo files
+     not setting the Info directory information correctly.  (This is
+     exactly the patch that was on the docbook2X Web site.)
+
+   * Fixed a problem with `db2x_manxml' not calling `utf8trans'
+     properly.
+
+   * Added heavy-duty testing to the docbook2X distribution.
+
+   *docbook2X 0.8.4. *
+
+   * There is now an _experimental_ implementation of `db2x_manxml' and
+     `db2x_texixml' using pure XSLT, for those who can't use the Perl
+     one for whatever reason.  See the `xslt/backend/' directory.  Do
+     not expect this to work completely yet.  In particular, tables are
+     not yet available in man pages.  (They are, of course, still
+     available in the Perl implementation.)
+
+   * Texinfo conversion does not require XSLT extensions anymore!  See
+     *Note Design notes: the elimination of XSLT extensions: Design
+     notes; the elimination of XSLT extensions. for the full story.
+
+     As a consequence, `db2x_xsltproc' has been rewritten to be a Perl
+     wrapper script around the stock xsltproc(1).
+
+   * The `-S' option to `db2x_xsltproc' no longer uses libxml's hackish
+     "SGML DocBook" parser, but now calls sgml2xml(1).  The
+     corresponding long option has been renamed to `--sgml' from
+     `--sgml-docbook'.
+
+   * Fixed a heap of bugs -- that caused invalid output -- in the XSLT
+     stylesheets, `db2x_manxml' and `db2x_texixml'.
+
+     Some features such as `cmdsynopsis' and `funcsynopsis' are
+     rendered more nicely.
+
+   * Man-XML and Texi-XML now have DTDs -- these are useful when
+     writing and debugging stylesheets.
+
+   * Added a `--plaintext' option to `db2x_texixml'.
+
+   * Updates to the docbook2X manual.  Stylesheet documentation is in.
+
+   *docbook2X 0.8.3. *
+
+   * Incorporated Michael Smith's much-expanded roff character maps.
+
+   * There are some improvements to the stylesheets themselves, here and
+     there.
+
+     Also I made the Texinfo stylesheets adapt to the XSLT processor
+     automatically (with regards to the XSLT extensions).  This might
+     be of interest to anybody wanting to use the stylesheets with some
+     other XSLT processor (especially SAXON).
+
+   * Fixed a couple of bugs that prevented docbook2X from working on
+     Cygwin.
+
+   * Fixed a programming error in `utf8trans' that caused it to
+     segfault.  At the same time, I rewrote parts of it to make it more
+     efficient for large character maps (those with more than a
+     thousand entries).
+
+   * The Perl component of docbook2X has switched from using
+     libxml-perl (a SAX1 interface) to XML-SAX (a SAX2 interface).  I
+     had always wanted to do the switch since libxml-perl is not
+     maintained, but the real impetus this time is that XML-SAX has a
+     pure Perl XML parser.  If you have difficulties building
+     `XML::Parser' on Cygwin, like I did, the Perl component will
+     automatically fall back on the pure Perl parser.
+
+   *docbook2X 0.8.2. *
+
+   * Added support for tables in man pages.  Almost all table features
+     that can be supported with `tbl' will work.  The rest will be
+     fixed in a subsequent release.
+
+   * Copied the "gentext" stuff over from Norman Walsh's XSL
+     stylesheets.  This gives (incomplete) localizations for the same
+     languages that are supported by the Norman Walsh's XSL stylesheets.
+
+     Although incomplete, they should be sufficient for localized
+     man-page output, for which there are only a few strings like
+     "Name" and "Synopsis" that need to be translated.
+
+     If you do make non-English man pages, you will need to revise the
+     localization files; please send patches to fix them afterwards.
+
+   * Rendering of bibliography, and other less common DocBook elements
+     is broken.  Actually, it was probably also slightly broken before.
+     Some time will be needed to go through the stylesheets to
+     check/document everything in it and to add anything that is still
+     missing.
+
+   * Added `--info' option to `db2x_texixml', to save typing the
+     `makeinfo' command.
+
+   * Rename `--stringparam' option in `db2x_xsltproc' to
+     `--string-param', though the former option name is still accepted
+     for compatibility.
+
+   * Added the stylesheet for generating the XSLT reference
+     documentation.  But the reference documentation is not integrated
+     into the main docbook2X documentation yet.
+
+   * docbook2X no longer uses SGML-based tools to build.  HTML
+     documentation is now built with the DocBook XSL stylesheets.
+
+   * Changed the license of this package to the MIT license.  This is
+     in case someone wants to copy snippets of the XSLT stylesheets,
+     and requiring the resulting stylesheet to be GPL seems too onerous.
+     Actually there is no real loss since no one wants to hide XSLT
+     source anyway.
+
+   * Switched to a newer version of autoconf.
+
+   * Fixes for portability (to non-Linux OSes).
+
+   * A number of small rendering bug fixes, as usual.
+
+   *docbook2X 0.8.1. *
+
+   * Bug fixes.
+
+   * Texinfo menu generation has been improved: the menus now look
+     almost as good as human-authored Texinfo pages and include
+     detailed node listings (`@detailmenu') also.
+
+   * Added option to process XInclude in `db2x_xsltproc' just like
+     standard `xsltproc'.
+
+   *docbook2X 0.8.0. *
+
+   * Moved `docbook2man-spec.pl' to a sister package,
+     docbook2man-sgmlspl, since it seems to be used quite a lot.
+
+   * There are now XSLT stylesheets for man page conversion,
+     superceding the `docbook2manxml'.  `docbook2manxml' had some neat
+     code in it, but I fear maintaining two man-page converters will
+     take too much time in the future, so I am dropping it now instead
+     of later.
+
+   * Fixed build errors involving libxslt headers, etc. that plagued
+     the last release.  The libxslt wrapper (name changed to
+     `db2x_xsltproc', formerly called `docbook2texi-libxslt') has been
+     updated for the recent libxslt changes.  Catalog support working.
+
+   * Transcoding output to non-UTF-8 charsets is automatic.
+
+   * Made some wrapper scripts for the two-step conversion process.
+
+   *docbook2X 0.7.0. *
+
+   * More bug squashing and features in XSLT stylesheets and Perl
+     scripts.  Too many to list.
+
+   * Added `docbook2texi-libxslt', which uses libxslt.  Finally, no
+     more Java is necessary.
+
+   * Added a C-based tool to translate UTF-8 characters to arbitrary
+     (byte) sequences, to avoid having to patch `recode' every time the
+     translation changes.  However, Christoph Spiel has ported the
+     recode utf8..texi patch to GNU recode 3.6 if you prefer to use
+     recode.
+
+   * As usual, the documentation has been improved.
+
+     The documentation for the XSLT stylesheets can be extracted
+     automatically.  (Caveat: libxslt has a bug which affects this
+     process, so if you want to build this part of the documentation
+     yourself you must use some other XSLT processor. There is no
+     `jrefentry' support in docbook2X yet, so the reference is packaged
+     in HTML format; this will change in the next release, hopefully.)
+
+   * Build system now uses autoconf and automake.
+
+   *docbook2X 0.6.9. *
+
+   * Removed old unmaintained code such as `docbook2man',
+     `docbook2texi'.  Moved Perl scripts to `perl/' directory and did
+     some renaming of the scripts to saner names.
+
+   * Better make system.
+
+   * Debugged, fixed the XSLT stylesheets more and added libxslt
+     invocation.
+
+   * Cut down the superfluity in the documentation.
+
+   * Fixed other bugs in `docbook2manxml' and the Texi-XML, Man-XML
+     tools.
+
+   *docbook2X 0.6.1. *
+
+   * `docbook2man-spec.pl' has an option to strip or not strip letters
+     in man page section names, and xref may now refer to `refsectN'.
+     I have not personally tested these options, but loosing them in
+     the interests of release early and often.
+
+   * Menu label quirks, `paramdef' non-conformance, and vertical
+     simplelists with multiple columns fixed in `docbook2texixml'.
+
+   * Brought `docbook2manxml' up to speed. It builds its own
+     documentation now.
+
+   * Arcane bugs in `texi_xml' and `man_xml' fixed.
+
+   *docbook2X 0.6.0. *
+
+   * Introduced Texinfo XSLT stylesheets.
+
+   * Bugfixes to `texi_xml' and `docbook2texixml'.
+
+   * Produced patch to GNU `recode' which maps Unicode characters to
+     the corresponding Texinfo commands or characters.  It is in
+     `ucs2texi.patch'.  I have already sent this patch to the
+     maintainer of `recode'.
+
+   * Updated documentation.
+
+   *docbook2X 0.5.9. *
+
+   * Both `docbook2texixml' transform into intermediate XML format
+     which closely resembles the Texinfo format, and then another tool
+     is used to convert this XML to the actual format.
+
+     This scheme moves all the messy whitespace, newline, and escaping
+     issues out of the actual transformation code.  Another benefit is
+     that other stylesheets (systems), can be used to do the
+     transformation, and it serves as a base for transformation to
+     Texinfo from other DTDs.
+
+   * Texinfo node handling has been rewritten.  Node handling used to
+     work back and forth between IDs and node names, which caused a lot
+     of confusion.  The old code also could not support DocBook `set's
+     because it did not keep track of the Texinfo file being processed.
+
+     As a consequence,  the bug in which `docbook2texixml' did not
+     output the `@setinfofile' is fixed.  `xreflabel' handling is also
+     sane now.
+
+     In the new scheme, elements are referred to by their ID
+     (auto-generated if necessary).  The Texinfo node names are
+     generated before doing the actual transformation, and subsequent
+     `texinode_get' simply looks up the node name when given an element.
+
+   * The stylesheet architecture allows internationalization to be
+     implemented easily, although it is not done yet.
+
+   * The (non-XML-based) old code is still in the CVS tree, but I'm not
+     really interested in maintaining it.  I'll still accept patches to
+     them, and probably will keep them around for reference and porting
+     purposes.
+
+     There are some changes to the old code base in this new release;
+     see old change log for details.
+
+   * The documentation has been revised.
+
+   * I am currently rewriting docbook2man using the same
+     transform-to-XML technique.  It's not included in 0.5.9 simply
+     because I wanted to get the improved Texinfo tool out quickly.
+     Additional XSLT stylesheets will be written.
+
+
+File: docbook2X.info,  Node: Design notes,  Next: Package installation,  Prev: Release history,  Up: Top
+
+11 Design notes
+***************
+
+Lessons learned:
+
+   * Think four times before doing stream-based XML processing, even
+     though it appears to be more efficient than tree-based.
+     Stream-based processing is usually more difficult.
+
+     But if you have to do stream-based processing, make sure to use
+     robust, fairly scaleable tools like `XML::Templates', _not_
+     `sgmlspl'.  Of course it cannot be as pleasant as tree-based XML
+     processing, but examine `db2x_manxml' and `db2x_texixml'.
+
+   * Do not use `XML::DOM' directly for stylesheets.  Your "stylesheet"
+     would become seriously unmanageable.  Its also extremely slow for
+     anything but trivial documents.
+
+     At least take a look at some of the XPath modules out there.
+     Better yet, see if your solution really cannot use XSLT.  A
+     C/C++-based implementation of XSLT can be fast enough for many
+     tasks.
+
+   * Avoid XSLT extensions whenever possible.  I don't think there is
+     anything wrong with them intrinsically, but it is a headache to
+     have to compile your own XSLT processor. (libxslt is written in C,
+     and the extensions must be compiled-in and cannot be loaded
+     dynamically at runtime.)  Not to mention there seems to be a
+     thousand different set-ups for different XSLT processors.
+
+   * Perl is not as good at XML as it's hyped to be.
+
+     SAX comes from the Java world, and its port to Perl (with all the
+     object-orientedness, and without adopting Perl idioms) is awkward
+     to use.
+
+     Another problem is that Perl SAX does not seem to be
+     well-maintained.  The implementations have various bugs; while
+     they can be worked around, they have been around for such a long
+     time that it does not inspire confidence that the Perl XML modules
+     are reliable software.
+
+     It also seems that no one else has seriously used Perl SAX for
+     robust applications.  It seems to be unnecessarily hard to certain
+     tasks such as displaying error diagnostics on its input,
+     processing large documents with complicated structure.
+
+   * Do not be afraid to use XML intermediate formats (e.g. Man-XML and
+     Texi-XML) for converting to other markup languages, implemented
+     with a scripting language.  The syntax rules for these formats are
+     made for authoring by hand, not machine generation; hence a
+     conversion using tools designed for XML-to-XML conversion,
+     requires jumping through hoops.
+
+     You might think that we could, instead, make a separate module
+     that abstracts all this complexity from the rest of the conversion
+     program.  For example, there is nothing stopping a XSLT processor
+     from serializing the output document as a text document obeying
+     the syntax rules for man pages or Texinfo documents.
+
+     Theoretically you would get the same result, but it is much harder
+     to implement.  It is far easier to write plain text manipulation
+     code in a scripting language than in Java or C or XSLT.  Also, if
+     the intermediate format is hidden in a Java class or C API, output
+     errors are harder to see.  Whereas with the intermediate-format
+     approach, we can visually examine the textual output of the XSLT
+     processor and fix the Perl script as we go along.
+
+     Some XSLT processors support scripting to go beyond XSLT
+     functionality, but they are usually not portable, and not always
+     easy to use.  Therefore, opt to do two-pass processing, with a
+     standalone script as the second stage.  (The first stage using
+     XSLT.)
+
+     Finally, another advantage of using intermediate XML formats
+     processed by a Perl script is that we can often eliminate the use
+     of XSLT extensions.  In particular, all the way back when XSLT
+     stylesheets first went into docbook2X, the extensions related to
+     Texinfo node handling could have been easily moved to the Perl
+     script, but I didn't realize it!  I feel stupid now.
+
+     If I had known this in the very beginning, it would have saved a
+     lot of development time, and docbook2X would be much more advanced
+     by now.
+
+     Note that even the man-pages stylesheet from the DocBook XSL
+     distribution essentially does two-pass processing just the same as
+     the docbook2X solution.  That stylesheet had formerly used
+     one-pass processing, and its authors probably finally realized
+     what a mess that was.
+
+   * Design the XML intermediate format to be easy to use from the
+     standpoint of the conversion tool, and similar to how XML document
+     types work in general.  e.g. abstract the paragraphs of a
+     document, rather than their paragraph _breaks_ (the latter is
+     typical of traditional markup languages, but not of XML).
+
+   * I am quite impressed by some of the things that people make XSLT
+     1.0 do.  Things that I thought were impossible, or at least
+     unworkable without using "real" scripting language.
+     (`db2x_manxml' and `db2x_texixml' fall in the category of things
+     that can be done in XSLT 1.0 but inelegantly.)
+
+   * Internationalize as soon as possible.  That is much easier than
+     adding it in later.
+
+     Same advice for build system.
+
+   * I would suggest against using build systems based on Makefiles or
+     any form of automake.  Of course it is inertia that prevents
+     people from switching to better build systems.  But also consider
+     that while Makefile-based build systems can do many of the things
+     newer build systems are capable of, they often require too many
+     fragile hacks.  Developing these hacks take too much time that
+     would be better spent developing the program itself.
+
+     Alas, better build systems such as scons were not available when
+     docbook2X was at an earlier stage.  It's too late to switch now.
+
+   * Writing good documentation takes skill.  This manual has has been
+     revised substantially at least four times (1), with the author
+     consciously trying to condense information each time.
+
+   * Table processing in the pure-XSLT man-pages conversion is
+     convoluted -- it goes through HTML(!) tables as an intermediary.
+     That is the same way that the DocBook XSL stylesheets implement it
+     (due to Michael Smith), and I copied the code there almost
+     verbatim.  I did it this way to save myself time and energy
+     re-implementing tables conversion _again_.
+
+     And Michael Smith says that going through HTML is better, because
+     some varieties of DocBook allow the HTML table model in addition
+     to the CALS table model.  (I am not convinced that this is such a
+     good idea, but anyway.)  Then HTML tables in DocBook can be
+     translated to man pages too without much more effort.
+
+     Is this inefficient? Probably.  But that's what you get if you
+     insist on using pure XSLT.  The Perl implementation of docbook2X.
+     already supported tables conversion for two years prior.
+
+   * The design of `utf8trans' is not the best.  It was chosen to
+     simplify implementations while being efficient.  A more general
+     design, while still retaining efficiency, is possible, which I
+     describe below.  However, unfortunately, at this point changing
+     `utf8trans' will be too disruptive to users with little gain in
+     functionality.
+
+     Instead of working with characters, we should work with byte
+     strings.  This means that, if all input and output is in UTF-8,
+     with no escape sequences, then UTF-8 decoding or encoding is not
+     necessary at all.  Indeed the program becomes agnostic to the
+     character set used.  Of course, multi-character matches become
+     possible.
+
+     The translation map will be an unordered list of key-value pairs.
+     The key and value are both arbitrary-length byte strings, with an
+     explicit length attached (so null bytes in the input and output
+     are retained).
+
+     The program would take the translation map, and transform the
+     input file by matching the start of input, seen as a sequence of
+     bytes, against the keys in the translation map, greedily.  (Since
+     the matching is greedy, the translation keys do not need to be
+     restricted to be prefix-free.)  Once the longest (in byte length)
+     matching key is found, the corresponding value (another byte
+     string) is substituted in the output, and processing repeats
+     (until the input is finished).  If, on the other hand, no match is
+     found, the next byte in the input file is copied as-is, and
+     processing repeats at the next byte of input.
+
+     Since bytes are 8 bits and the key strings are typically very
+     short (up to 3 bytes for a Unicode BMP character encoded in UTF-8),
+     this algorithm can be implemented with radix search.  It would be
+     competitive, in both execution time and space, with character
+     codepoint hashing and sparse multi-level arrays, the primary
+     techniques for implementing Unicode _character_ translation.
+     (`utf8trans' is implemented using sparse multi-level arrays.)
+
+     One could even try to generalize the radix searching further, so
+     that keys can include wildcard characters, for example.  Taken to
+     the extremes, the design would end up being a regular expressions
+     processor optimized for matching many strings with common prefixes.
+
+   ---------- Footnotes ----------
+
+   (1) This number is probably inflated because of the so many design
+mistakes in the process.
+
+
+File: docbook2X.info,  Node: Package installation,  Next: Concept index,  Prev: Design notes,  Up: Top
+
+Appendix A Package installation
+*******************************
+
+* Menu:
+
+* Installation::                Package install procedure
+* Dependencies on other software::   Other software packages that docbook2X
+                                       needs
+
+
+File: docbook2X.info,  Node: Installation,  Next: Dependencies on other software,  Up: Package installation
+
+A.1 Installation
+================
+
+After checking that you have the necessary prerequisites (*note
+Dependencies on other software::), unpack the tarball, then run
+`./configure', and then `make', `make install', as usual.
+
+     *Note*
+
+     If you intend to use only the pure XSLT version of docbook2X, then
+     you do not need to compile or build the package at all.  Simply
+     unpack the tarball, and point your XSLT processor to the XSLT
+     stylesheets under the `xslt/' subdirectory.
+
+   (The last `make install' step, to install the files of the package
+onto the filesystem, is optional.  You may use docbook2X from its own
+directory after building it, although in that case, when invoking
+docbook2X, you will have to specify some paths manually on the
+command-line.)
+
+   You may also want to run `make check' to do some checks that the
+package is working properly.  Typing `make -W docbook2X.xml man texi' in
+the `doc/' directory will rebuild docbook2X's own documentation, and
+can serve as an additional check.
+
+   You need GNU make to build docbook2X properly.  
+
+   If you are using the CVS version, you will also need the autoconf
+and automake tools, and must run `./autogen.sh' first.  But see also
+the note below about the CVS version.
+
+   If you want to (re-)build HTML documentation (after having installed
+Norman Walsh's DocBook XSL stylesheets), pass `--with-html-xsl' to
+`./configure'.  You do not really need this, since docbook2X releases
+already contain pre-built HTML documentation.
+
+   Some other packages also call their conversion programs
+`docbook2man' and `docbook2texi'; you can use the
+`--program-transform-name' parameter to `./configure' if you do not
+want docbook2X to clobber over your existing `docbook2man' or
+`docbook2texi'.
+
+   If you are using a Java-based XSLT processor, you need to use pass
+`--with-xslt-processor=saxon' for SAXON, or
+`--with-xslt-processor=xalan-j' for Xalan-Java.  (The default is for
+libxslt.)  In addition, since the automatic check for the installed
+JARs is not very intelligent, you will probably need to pass some
+options to `./configure' to tell it where the JARs are.  See
+`./configure --help' for details.
+
+   The docbook2X package supports VPATH builds (building in a location
+other than the source directory), but any newly generated documentation
+will not end up in the right place for installation and redistribution.
+Cross compilation is not supported at all.
+
+
+
+A.1.1 Installation problems
+---------------------------
+
+  Q:
+     Where is `XML::Handler::SGMLSpl'?
+
+  A:
+     It's included in the docbook2X package.  If Perl says it cannot
+     find it, then that is a bug in the docbook2X distribution.  Please
+     report it.
+
+     In older versions of docbook2X, the SGMLSpl module had to be
+     installed, or specified manually on the Perl command line.  That
+     is no longer the case.
+
+  Q:
+     `db2x_xsltproc' tells me that `one input document is required'
+     when building docbook2X.
+
+  A:
+     Use GNU make to build docbook2X (as opposed to BSD make).
+
+     I could fix this incompatibility in the docbook2X make files, but
+     some of the default automake rules have the same problem, so I
+     didn't bother.
+
+  Q:
+     When docbook2X attempts to build its documentation, I get errors
+     about "attempting to load network entity", etc.
+
+  A:
+     You will need to set up the XML catalogs for the DocBook XML DTDs
+     correctly.  This tells the XSLT processor where to find the
+     DocBook DTDs on your system.  Recent Linux distributions should
+     already have this done for you.
+
+     This error (or rather, warning) is harmless in the case of
+     docbook2X documentation -- it does not actually require the DTD to
+     build.  But your other DocBook documents might (mainly because
+     they use the ISO entities).
+
+     libxml also understands SGML catalogs, but last time I tried it
+     there was some bug that stopped it from working.  Your Mileage May
+     Vary.
+
+  Q:
+     I cannot build from CVS.
+
+  A:
+     If the problem is related to HTML files, then you must pass
+     `--with-html-xsl' to `configure'.  The problem is that the HTML
+     files are automatically generated from the XML source and are not
+     in CVS, but the Makefile still tries to install them.  (This issue
+     does not appear when building from release tarballs.)
+
+   For other docbook2X problems, please also look at its main
+documentation.
+
+
+File: docbook2X.info,  Node: Dependencies on other software,  Prev: Installation,  Up: Package installation
+
+A.2 Dependencies on other software
+==================================
+
+To use docbook2X you need:
+
+A reasonable Unix system, with Perl 5
+     docbook2X can work on Linux, FreeBSD, Solaris, and Cygwin on
+     Windows.
+
+     A C compiler is required to compile a small ANSI C program
+     (`utf8trans').
+
+XML-NamespaceSupport, XML-SAX, XML-Parser and XML-SAX-Expat (Perl modules)
+     The last two are optional: they add a Perl interface to the
+     C-based XML parser Expat.  It is recommended that you install them
+     anyway; otherwise, the fallback Perl-based XML parser makes
+     docbook2X real slow.
+
+     You can get all the Perl modules here: CPAN XML module listing
+     (http://www.cpan.org/modules/by-category/11_String_Lang_Text_Proc/XML/).
+
+iconv
+     If you are running Linux glibc, you already have it.  Otherwise,
+     see the GNU libiconv home page
+     (http://www.gnu.org/software/libiconv/).
+
+XSLT 1.0 processor
+     You have a choice of:
+
+    libxslt
+          See the libxml2, libxslt home page (http://xmlsoft.org/).
+
+    SAXON
+          See the SAXON home page (http://saxon.sourceforge.net/).
+
+    Xalan-Java
+          See the Xalan-Java home page (http://xml.apache.org/xalan-j/).
+
+     For the Java-based processors (SAXON and Xalan-Java), you will
+     also need(1) the Apache XML Commons
+     (http://xml.apache.org/commons/) distribution.  This adds XML
+     catalogs support to any Java-based processor.
+
+     Out of the three processors, libxslt is recommended.  (I would
+     have added support for other XSLT processors, but only these three
+     seem to have proper XML catalogs support.)
+
+     Unlike previous versions of docbook2X, these Java-based processors
+     can work almost out-of-the-box.  Also docbook2X no longer needs to
+     compile XSLT extensions, so you if you use an OS distribution
+     package of libxslt, you do not need the development versions of the
+     library any more.
+
+DocBook XML DTD
+     Make sure you set up the XML catalogs for the DTDs you install.
+
+     The DocBook: The Definitive Guide website
+     (http://www.docbook.org/) has more information.
+
+     You may also need the SGML DTD if your documents are SGML rather
+     than XML.
+
+Norman Walsh's DocBook XSL stylesheets
+     See the Open DocBook Repository (http://docbook.sourceforge.net/).
+
+     This is optional and is only used to build documentation in HTML
+     format.  In your XML catalog, point the URI in `doc/ss-html.xsl'
+     to a local copy of the stylesheets.
+
+   For all the items above, it will be easier for you to install the OS
+packaging of the software (e.g. Debian packages), than to install them
+manually.  But be aware that sometimes the OS package may not be for an
+up-to-date version of the software.  
+
+   If you cannot satisfy all the prerequisites above (say you are on a
+vanilla Win32 system), then you will not be able to "build" docbook2X
+properly, but if you are knowledgeable, you can still salvage its parts
+(e.g. the XSLT stylesheets, which can be run alone).
+
+   ---------- Footnotes ----------
+
+   (1) Strictly speaking this component is not required, but if you do
+not have it, you will almost certainly have your computer downloading
+large XML files from the Internet all the time, as portable XML files
+will not refer directly to cached local copies of the required files.
+
+
+File: docbook2X.info,  Node: Concept index,  Prev: Package installation,  Up: Top
+
+Index
+*****
+
+ [index ]
+* Menu:
+
+* bugs <1>:                              Release history.     (line   6)
+* bugs <2>:                              To-do list.          (line   6)
+* bugs:                                  FAQ.                 (line   6)
+* catalog <1>:                           Dependencies on other software.
+                                                              (line  41)
+* catalog <2>:                           FAQ.                 (line 110)
+* catalog <3>:                           db2x_xsltproc.       (line  80)
+* catalog:                               The XSLT stylesheets.
+                                                              (line   6)
+* change log:                            Release history.     (line   6)
+* character map <1>:                     utf8trans.           (line   6)
+* character map:                         Character set conversion.
+                                                              (line   6)
+* character sets:                        Character set conversion.
+                                                              (line   6)
+* charsets:                              Character set conversion.
+                                                              (line   6)
+* compatibility <1>:                     db2x_texixml.        (line 125)
+* compatibility:                         db2x_manxml.         (line 128)
+* converting to man pages <1>:           db2x_manxml.         (line   6)
+* converting to man pages <2>:           docbook2man wrapper script.
+                                                              (line   6)
+* converting to man pages <3>:           Converting to man pages.
+                                                              (line   6)
+* converting to man pages:               Quick start.         (line   6)
+* converting to Texinfo <1>:             db2x_texixml.        (line   6)
+* converting to Texinfo <2>:             docbook2texi wrapper script.
+                                                              (line   6)
+* converting to Texinfo <3>:             Converting to Texinfo.
+                                                              (line   6)
+* converting to Texinfo:                 Quick start.         (line   6)
+* correctness:                           How docbook2X is tested.
+                                                              (line   6)
+* customizing <1>:                       FAQ.                 (line 118)
+* customizing <2>:                       Converting to Texinfo.
+                                                              (line  20)
+* customizing:                           Converting to man pages.
+                                                              (line  19)
+* CVS:                                   Installation.        (line  28)
+* db2x_manxml:                           db2x_manxml.         (line   6)
+* db2x_xsltproc <1>:                     db2x_xsltproc.       (line   6)
+* db2x_xsltproc:                         The XSLT stylesheets.
+                                                              (line   6)
+* dependencies:                          Dependencies on other software.
+                                                              (line   6)
+* design:                                Design notes.        (line   6)
+* DocBook <1>:                           Dependencies on other software.
+                                                              (line  57)
+* DocBook <2>:                           To-do list.          (line   6)
+* DocBook <3>:                           sgml2xml-isoent.     (line   6)
+* DocBook:                               Top.                 (line   6)
+* docbook2man:                           docbook2man wrapper script.
+                                                              (line   6)
+* docbook2texi:                          docbook2texi wrapper script.
+                                                              (line   6)
+* docbook2X package <1>:                 Dependencies on other software.
+                                                              (line   6)
+* docbook2X package:                     Installation.        (line   6)
+* download:                              Top.                 (line  10)
+* efficiency:                            Performance analysis.
+                                                              (line   6)
+* encoding <1>:                          Character set conversion.
+                                                              (line   6)
+* encoding <2>:                          db2x_texixml.        (line   6)
+* encoding:                              db2x_manxml.         (line   6)
+* escapes <1>:                           utf8trans.           (line   6)
+* escapes:                               Character set conversion.
+                                                              (line   6)
+* example usage <1>:                     docbook2texi wrapper script.
+                                                              (line 330)
+* example usage <2>:                     docbook2man wrapper script.
+                                                              (line 195)
+* example usage:                         Quick start.         (line   6)
+* FAQ:                                   FAQ.                 (line   6)
+* future:                                To-do list.          (line   6)
+* groff:                                 db2x_manxml.         (line 128)
+* history <1>:                           Design notes.        (line   6)
+* history:                               Release history.     (line   6)
+* HTML documentation <1>:                Dependencies on other software.
+                                                              (line  66)
+* HTML documentation:                    Installation.        (line  34)
+* iconv <1>:                             Dependencies on other software.
+                                                              (line  25)
+* iconv <2>:                             FAQ.                 (line  54)
+* iconv:                                 Character set conversion.
+                                                              (line   6)
+* installation:                          Installation.        (line   6)
+* ISO entities:                          sgml2xml-isoent.     (line   6)
+* libxslt <1>:                           Dependencies on other software.
+                                                              (line  30)
+* libxslt <2>:                           db2x_xsltproc.       (line   6)
+* libxslt:                               The XSLT stylesheets.
+                                                              (line   6)
+* makeinfo:                              db2x_texixml.        (line   6)
+* man pages <1>:                         db2x_manxml.         (line   6)
+* man pages <2>:                         docbook2man wrapper script.
+                                                              (line   6)
+* man pages:                             Converting to man pages.
+                                                              (line   6)
+* Man-XML <1>:                           Design notes.        (line  50)
+* Man-XML <2>:                           db2x_manxml.         (line   6)
+* Man-XML:                               Converting to man pages.
+                                                              (line   6)
+* news:                                  Release history.     (line   6)
+* non-DocBook document type:             FAQ.                 (line 133)
+* optimize:                              Performance analysis.
+                                                              (line   6)
+* other document types:                  FAQ.                 (line 133)
+* other output formats:                  FAQ.                 (line 133)
+* output directory <1>:                  db2x_texixml.        (line   6)
+* output directory:                      db2x_manxml.         (line   6)
+* performance:                           Performance analysis.
+                                                              (line   6)
+* Perl <1>:                              Dependencies on other software.
+                                                              (line  16)
+* Perl:                                  Design notes.        (line  33)
+* prerequisites:                         Dependencies on other software.
+                                                              (line   6)
+* problems <1>:                          Installation.        (line  63)
+* problems:                              FAQ.                 (line   6)
+* pure XSLT <1>:                         Installation.        (line  12)
+* pure XSLT <2>:                         The XSLT stylesheets.
+                                                              (line  13)
+* pure XSLT:                             Converting to man pages.
+                                                              (line  36)
+* re-encoding:                           Character set conversion.
+                                                              (line   6)
+* refentry <1>:                          FAQ.                 (line  31)
+* refentry:                              docbook2man wrapper script.
+                                                              (line  22)
+* release history:                       Release history.     (line   6)
+* rendering:                             FAQ.                 (line 118)
+* SAXON <1>:                             Dependencies on other software.
+                                                              (line  30)
+* SAXON <2>:                             FAQ.                 (line  93)
+* SAXON:                                 The XSLT stylesheets.
+                                                              (line   6)
+* SGML <1>:                              FAQ.                 (line   7)
+* SGML <2>:                              sgml2xml-isoent.     (line   6)
+* SGML:                                  db2x_xsltproc.       (line  52)
+* sgml2xml-isoent:                       sgml2xml-isoent.     (line   6)
+* speed:                                 Performance analysis.
+                                                              (line   6)
+* stream processing:                     Design notes.        (line   8)
+* stub pages:                            db2x_manxml.         (line   6)
+* stylesheet parameters <1>:             docbook2texi wrapper script.
+                                                              (line  49)
+* stylesheet parameters:                 docbook2man wrapper script.
+                                                              (line  55)
+* symbolic links:                        db2x_manxml.         (line   6)
+* testing:                               How docbook2X is tested.
+                                                              (line   6)
+* Texi-XML <1>:                          Design notes.        (line  50)
+* Texi-XML <2>:                          db2x_texixml.        (line   6)
+* Texi-XML:                              Converting to Texinfo.
+                                                              (line   6)
+* Texinfo <1>:                           db2x_texixml.        (line   6)
+* Texinfo <2>:                           docbook2texi wrapper script.
+                                                              (line   6)
+* Texinfo:                               Converting to Texinfo.
+                                                              (line   6)
+* Texinfo metadata:                      docbook2texi wrapper script.
+                                                              (line 229)
+* tips:                                  FAQ.                 (line   6)
+* to-do:                                 To-do list.          (line   6)
+* transliteration <1>:                   utf8trans.           (line   6)
+* transliteration:                       Character set conversion.
+                                                              (line   6)
+* tree processing:                       Design notes.        (line   8)
+* Unicode <1>:                           utf8trans.           (line   6)
+* Unicode:                               Character set conversion.
+                                                              (line   6)
+* UTF-8 <1>:                             utf8trans.           (line   6)
+* UTF-8:                                 Character set conversion.
+                                                              (line   6)
+* utf8trans <1>:                         utf8trans.           (line   6)
+* utf8trans:                             Character set conversion.
+                                                              (line   6)
+* validation:                            How docbook2X is tested.
+                                                              (line   6)
+* web site:                              Top.                 (line  10)
+* Windows:                               Dependencies on other software.
+                                                              (line   9)
+* wishlist:                              To-do list.          (line   6)
+* wrapper script <1>:                    docbook2texi wrapper script.
+                                                              (line   6)
+* wrapper script:                        docbook2man wrapper script.
+                                                              (line   6)
+* Xalan-Java <1>:                        Dependencies on other software.
+                                                              (line  30)
+* Xalan-Java:                            FAQ.                 (line  93)
+* XSLT extensions <1>:                   Design notes.        (line  26)
+* XSLT extensions:                       db2x_xsltproc.       (line 180)
+* XSLT processor <1>:                    db2x_xsltproc.       (line   6)
+* XSLT processor:                        The XSLT stylesheets.
+                                                              (line   6)
+* XSLT stylesheets <1>:                  Converting to Texinfo.
+                                                              (line   6)
+* XSLT stylesheets:                      Converting to man pages.
+                                                              (line   6)
+* xsltproc:                              The XSLT stylesheets.
+                                                              (line  13)
+
+
+
+Tag Table:
+Node: Top233
+Node: Quick start2600
+Node: Converting to man pages3645
+Node: docbook2man wrapper script5774
+Node: db2x_manxml12483
+Node: Converting to Texinfo17356
+Node: docbook2texi wrapper script18963
+Node: db2x_texixml29900
+Node: The XSLT stylesheets36550
+Ref: Convert to man pages using pure-XSLT db2x_manxml37284
+Ref: Convert to Texinfo using Pure-XSLT db2x_texixml37531
+Node: db2x_xsltproc38370
+Node: sgml2xml-isoent45254
+Node: Character set conversion46832
+Node: utf8trans49207
+Node: FAQ51836
+Node: Performance analysis58637
+Ref: Performance analysis-Footnote-162333
+Ref: Performance analysis-Footnote-262539
+Ref: Performance analysis-Footnote-362654
+Node: How docbook2X is tested62882
+Node: To-do list65201
+Node: Release history67615
+Ref: docbook2X 0_8_867752
+Ref: docbook2X 0_8_768691
+Ref: docbook2X 0_8_670428
+Ref: docbook2X 0_8_571214
+Ref: docbook2X 0_8_471581
+Ref: docbook2X 0_8_372999
+Ref: docbook2X 0_8_274194
+Ref: docbook2X 0_8_176225
+Ref: docbook2X 0_8_076542
+Ref: docbook2X 0_7_077377
+Ref: docbook2X 0_6_978404
+Ref: docbook2X 0_6_178850
+Ref: docbook2X 0_6_079404
+Ref: docbook2X 0_5_979778
+Node: Design notes81754
+Ref: Design notes; the elimination of XSLT extensions85417
+Ref: Design notes-Footnote-191207
+Node: Package installation91303
+Node: Installation91663
+Ref: Installation problems94211
+Node: Dependencies on other software96200
+Ref: Dependencies on other software-Footnote-199368
+Node: Concept index99650
+
+End Tag Table

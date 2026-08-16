@@ -1,0 +1,184 @@
+#!/usr/bin/make -f
+
+COMMA = ,
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
+export DEB_BUILD_MAINT_OPTIONS=reproducible=+fixfilepath
+
+#export DH_VERBOSE=1
+export DH_OPTIONS=
+
+CFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CFLAGS)
+CXXFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CXXFLAGS)
+LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+export CFLAGS
+export CXXFLAGS
+export LDFLAGS
+DEB_BUILD_ARCH ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+llvm_ver = $(shell sed -n 's/.*\bllvm-\([^[:space:]]*\)-dev.*/\1/p' debian/control)
+clang_archs = $(shell sed -n 's/.*\bllvm-[^[:space:]]*-dev[[:space:]]*\[\(.*\)\].*/\1/p' debian/control)
+
+export LLVM_DIR = /usr/lib/llvm-$(llvm_ver)/lib/cmake/llvm/
+export Clang_DIR = /usr/lib/llvm-$(llvm_ver)/lib/cmake/clang/
+
+with_doxywizard = $(if $(findstring stage1,$(DEB_BUILD_PROFILES)),no,yes)
+
+CONFIGUREFLAGS += -DCMAKE_INSTALL_PREFIX=/usr
+CONFIGUREFLAGS += -Dbuild_wizard=$(if $(filter yes, $(with_doxywizard)),ON,OFF)
+CONFIGUREFLAGS += -Dbuild_doc=$(if $(filter yes, $(with_docs)),ON,OFF)
+CONFIGUREFLAGS += -DPYTHON_EXECUTABLE=/usr/bin/python3
+CONFIGUREFLAGS += -Duse_libclang=$(if $(filter $(DEB_HOST_ARCH),$(clang_archs)),ON,OFF)
+CONFIGUREFLAGS += -Dbuild_search=ON
+CONFIGUREFLAGS += -Dbuild_parse=ON
+# still experimental according to upstream
+#CONFIGUREFLAGS += -Duse_sqlite3=ON
+
+configure-stamp:
+	dh_testdir
+	$(MAKE) -C jquery install
+	rm -rf build
+	mkdir -p build
+	cd build && cmake -G "Unix Makefiles" $(CONFIGUREFLAGS) $(CURDIR)
+	touch $@
+
+build: with_docs=yes
+build-arch: with_docs=no
+build-indep: with_docs=yes
+
+build: build-stamp
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp: configure-stamp
+	dh_testdir
+	$(MAKE) -C build $(NJOBS) VERBOSE=1
+	[ "$(with_docs)" = no ] || $(MAKE) -C build $(NJOBS) VERBOSE=1 docs
+	[ "$(with_docs)" = no ] || find build/html/examples/ -type f -iregex .*pdf -exec mat2 --inplace '{}' \;
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f configure-stamp build-stamp install*stamp doc/config.doc doc/language.doc doc/mailto.txt doc/translator_report.txt templates/html/jquery.js
+	rm -rf build
+	rm -f src/jquery_*.js
+	rm -rf jquery/.sass-cache
+	rm -f qtools/Makefile.qtools
+	rm -f doxygen_sqlite3.db
+	rm -f jquery/*-min.js
+	rm -f jquery/jquery.js
+	rm -f jquery/doxmenu-min.css
+	dh_clean
+
+uninstall:
+	dh_testdir
+	dh_testroot
+	rm -f install*stamp
+	dh_prep
+
+install-indep: install-arch
+install-indep: install-indep-stamp
+install-indep-stamp: DH_OPTIONS=-i
+install-indep-stamp:
+	dh_testdir
+	dh_testroot
+	dh_installdirs
+	$(MAKE) -C build install \
+		VERBOSE=1 \
+		DESTDIR=$(CURDIR)/debian/doxygen-doc
+	  mkdir -p debian/doxygen-doc/usr/share/doc/doxygen
+	  mv debian/doxygen-doc/usr/share/doc/packages/doxygen/* \
+		debian/doxygen-doc/usr/share/doc/doxygen/.
+	  rm -rf debian/doxygen-doc/usr/share/doc/packages
+	  rm -rf debian/doxygen-doc/usr/bin
+	  rm -rf debian/doxygen-doc/usr/share/man
+	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
+	touch $@
+
+install-arch: build
+install-arch: install-arch-stamp
+install-arch-stamp: DH_OPTIONS=-a
+install-arch-stamp:
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	$(MAKE) -C build install \
+		VERBOSE=1 \
+		DESTDIR=$(CURDIR)/debian/doxygen
+	cd debian/dh-doxygen && pod2man -c Debhelper -r '' dh_doxygen dh_doxygen.1
+	: # FIXME: man pages not installed when building without docs
+	[ -f debian/doxygen/usr/share/man/man1/doxygen.1 ] \
+	  || install -D doc/doxygen.1 debian/doxygen/usr/share/man/man1/doxygen.1
+	[ -f debian/doxygen/usr/share/man/man1/doxyindexer.1 ] \
+	  || install -D doc/doxyindexer.1 debian/doxygen/usr/share/man/man1/doxyindexer.1
+	[ -f debian/doxygen/usr/share/man/man1/doxysearch.cgi.1 ] \
+	  || install -D doc/doxysearch.1 debian/doxygen/usr/share/man/man1/doxysearch.cgi.1
+ifeq ($(with_doxywizard),yes)
+	[ -f debian/doxygen/usr/share/man/man1/doxywizard.1 ] \
+	  || install -D doc/doxywizard.1 debian/doxygen/usr/share/man/man1/doxywizard.1
+	dh_movefiles -Ndoxygen --sourcedir=debian/doxygen \
+		usr/bin/doxywizard \
+		usr/share/man/man1/doxywizard.1
+endif
+	rm -rf debian/doxygen/usr/share/doc/packages
+	-find debian -name .cvsignore -o -name CVS | xargs rm -rf
+	dh_movefiles -Ndoxygen -Ndoxygen-gui -pdoxygen-doxyparse --sourcedir=debian/doxygen usr/bin/doxyparse
+	touch $@
+
+install: install-indep install-arch
+
+binary: with_docs=yes
+binary-arch: with_docs=no
+binary-indep: with_docs=yes
+
+binary-indep:
+binary-indep: install-indep
+	dh_testdir
+	dh_testroot
+	dh_installdocs -i
+	dh_lintian -i
+	./debian/dh-doxygen/dh_doxygen
+	rdfind -outputname /dev/null -makehardlinks true debian/doxygen-doc/usr/share/doc/doxygen
+	dh_installchangelogs doc/changelog.doc
+	dh_link -i
+	dh_compress -i -X.pdf
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_shlibdeps -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+ifeq ($(with_doxywizard),yes)
+binary-arch:
+else
+binary-arch: DH_OPTIONS=-Ndoxygen-gui -Ndoxygen-doxyparse
+endif
+binary-arch: install-arch
+	dh_testdir
+	dh_testroot
+	dh_install
+	dh_installdocs -a LANGUAGE.HOWTO README.md VERSION
+	dh_installman -a
+	dh_installchangelogs -a doc/changelog.doc
+	dh_strip -a
+	dh_link -a
+	dh_installmenu -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary: binary-arch binary-indep
+
+.PHONY: configure build clean uninstall
+.PHONY: install-arch install-indep install
+.PHONY: binary-arch binary-indep binary

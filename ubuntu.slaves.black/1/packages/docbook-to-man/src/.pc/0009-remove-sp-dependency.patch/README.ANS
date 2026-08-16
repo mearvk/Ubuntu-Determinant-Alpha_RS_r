@@ -1,0 +1,157 @@
+                           ANS Modifications
+                       David Bolen (db3l@ans.net)
+                                2/23/99
+
+
+This package is derived from the docbook-to-man package made available
+on the Davenport (later OASIS) DocBook web site.  Various modifications
+were made (as described below) to resolve some issues when processing
+our own documents.  I have attempted to contact Fred Dalrymple with
+respect to these changes, but have not received a reply.
+
+This modified version of the package is being released AS-IS, without
+any promise of support nor guarantee as to function.  All I can say is
+that this changed version appears to suit our needs for the generation
+of man pages from our DocBook sources.  I have compiled and run this
+version on the following platforms:
+
+   * AIX 3.2.5 (RS/6000)
+   * Solaris 2.5.1 (Sparc)
+   * BSDI 2.1 and 4.0 (i386)
+   * Linux 2.0.36 (Slackware - i386)
+   * FreeBSD 2.2.7-RELEASE (i386)
+
+We use the package as follows:
+
+  * Install Jade and DocBook as normal - the command below assumes that
+    the 'nsgmls' binary is available to parse a DocBook document.
+
+  * Install 'instant' binary into appropriate directory (/usr/local/bin
+    or wherever).
+
+  * Place these auxiliary files into /usr/local/share/sgml/transpec:
+        * One of either docbook-to-man.ts or the pair of 
+          docbook-to-man.ts-PUSHPOP and docbook-to-man.prolog.  We
+          use the PUSHPOP version but rename to just .ts.
+        * roff.cmap
+        * roff.sdata
+
+  * Translate a source with a command such as (shown on multiple lines
+    but entered as a single line command):
+
+        nsgmls -i roff {document} |
+        instant -t docbook-to-man.ts -c roff.cmap -s roff.sdata > {output}
+ 
+    This assumes a document with a RefEntry as the top level element.
+    To extract a single RefEntry from a larger document, the "-i id"
+    option should be given to instant.  For documents containing a
+    number of RefEntry elements, the initial nsgmls output may be saved
+    and reused for each instant execution (thus saving the SGML parsing
+    overhead).
+
+    Note: the "-i roff" to nsgmls is not required, but we use that to
+    control conditional entities in our documents)
+
+-- David
+
+
+           - - - - - - - - - - - - - - - - - - - - - - - - -
+
+                             Modifications
+
+
+Most significant changes are notated within the source with "[ANS-db3l]"
+along with explanatory comments, but such markup is not exhaustive.
+
+The primary changes made were as described below.  A patch file with the
+exact set of changes (already contained in the files, patch based on
+FLD's 6/4/1996 release) can be found in the root directory of the
+package as ans.patch.
+
+
+General
+-------
+
+  * Adjusted default file location (used for .ts, .cmap, .sdata files) 
+    to /usr/local/share/sgml/transpec.  Controlled by TPTLIB definition
+    in Makefiles, or can be overridden at run-time by TPT_LIB
+    environment variable or "-l" command line option.
+
+  * Use STRERROR define (in Instant and Instant/tptregexp Makefiles) to
+    conditionally include strerror() replacement function.  Does not
+    include by default.  Should be re-defined for older Sun systems
+    for example, but its presence by default was causing crashes on
+    systems such as FreeBSD and BSDI in calls to perror().
+
+
+Instant
+-------
+
+  * Process ESIS data for document (output from nsgmls) during the first
+    stage of input rather than waiting until eventual output in the
+    DoData/OutputString functions.  The "pre-processing" handles
+    quoting, CMAP and SDATA and cleans up a lot of the trickier issues
+    with "\" translation in the earlier code, since "\" is used both by
+    nsgmls for quoting as well as by the instant output processing for
+    items such as the cmap file.
+
+  * Absorb whitespace during ESIS parsing unless within an environment
+    that has a FORMAT of LINESPECIFIC (or has inherited such a format
+    from a parent environment).  Previously, docbook-to-man would only
+    work best if the input document had no extraneous indentation.  This
+    caused problems if, for example, the input document was written in
+    Emacs with PSGML with sgml-indent-data.  Such extraneous whitespace
+    in the output often caused erroneous paragraph breaks or wide
+    regions of spacing within paragraphs.
+
+    The current parsing has worked in the documents I have thrown at it
+    so far.  If necessary, the existing (but undocumented) "-d" option
+    may be used to implement the previously existing "datahack" option
+    or "-d -d" may be used to restore the previously default behavior of
+    no whitespace adjustment at all.
+
+  * Some adjustment made for the CALS table support, generally dealing
+    with rows containing spanning columns, or tables that changed their
+    row definitions within the table.
+
+
+*.ts
+----
+
+  * Prolog includes header to automatically include table support on
+    Solaris.  This appears system specific (works under Solaris), but
+    ignored on other systems (it's a roff comment), so on most other
+    systems the output will still need to be manually sent through tbl
+    or an adjustment must be made appropriate to the system (such as
+    an appropriate file extension or another option to man).
+
+  * Always reset tab definitions after use of ".nf"
+
+  * Fixed XREF to use the title if no XREFLABEL available.
+
+  * Added TITLE in REFSYNOPSYSDIV, and PROMPT in general.
+
+  * Tidied up cross reference text.
+
+  * Moved pf/fP macros into external .prolog file, now included by the
+    PUSHPOP version.  This removes the dependence on the controlling
+    shell script to manually append the definition.
+
+  Note that while both the normal and "PUSHPOP" versions of the transpec
+  files were adjusted, we use the PUSHPOP version for our own
+  conversions.  So far, I haven't noticed any significant problems (as
+  alluded to in the older README) - some of this may be due to
+  side-effects of the above parsing changes to Instant.
+
+    
+roff.cmap
+---------
+
+  * Added back in the \ -> \e sequence so that actual backslashes in the
+    input source are properly escaped in the roff output.  (This works
+    cleanly now with the above parsing changes to Instant).
+
+roff.sdata
+----------
+
+  * Map vellip to be hellip (personal preference given lack of options).

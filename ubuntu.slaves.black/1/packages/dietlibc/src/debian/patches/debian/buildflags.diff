@@ -1,0 +1,198 @@
+Description: allow useful passing-in of external CFLAGS
+ Make it possible to pass in external CFLAGS to the compiler. This way
+ we can use dpkg-buildflags in debian/rules.
+Author: Christian Seiler <christian@iwakd.de>
+Forwarded: no
+ Maybe we should forward this?
+Last-Update: 2016-10-31
+--- a/Makefile
++++ b/Makefile
+@@ -9,6 +9,7 @@ BINDIR=${prefix}/bin
+ MAN1DIR=${prefix}/man/man1
+ 
+ EXTRACFLAGS=
++SPECIFICCFLAGS=
+ 
+ MYARCH:=$(shell uname -m | sed -e 's/i[4-9]86/i386/' -e 's/armv[3-7]t\?e\?[lb]/arm/')
+ 
+@@ -199,17 +200,17 @@ $(OBJDIR)/%.o: %.c | $(OBJDIR)
+ 	-$(STRIP) -x -R .comment -R .note $@
+ else
+ $(OBJDIR)/pstart.o: start.S | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) -DPROFILING -c $< $(ASM_CFLAGS) -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(SPECIFICCFLAGS) -DPROFILING -c $< $(ASM_CFLAGS) -o $@
+ 
+ $(OBJDIR)/%.o: %.S $(ARCH)/syscalls.h | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c $< $(ASM_CFLAGS) -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c $< $(ASM_CFLAGS) -o $@
+ 
+ $(OBJDIR)/pthread_%.o: libpthread/pthread_%.c | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c $< -o $@
+ 	-$(STRIP) -x -R .comment -R .note $@
+ 
+ $(OBJDIR)/%.o: %.c | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c $< -o $@ -D__dietlibc__
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c $< -o $@ -D__dietlibc__
+ 	-$(STRIP) -x -R .comment -R .note $@
+ endif
+ 
+@@ -226,14 +227,14 @@ endif
+ CC+=-D__dietlibc__
+ 
+ $(OBJDIR)/start-pie.o: start.S | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c $< $(ASM_CFLAGS) -fpie -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c $< $(ASM_CFLAGS) -fpie -o $@
+ 
+ $(OBJDIR)/start.o: start.S | $(OBJDIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c $< $(ASM_CFLAGS) -fno-pie -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c $< $(ASM_CFLAGS) -fno-pie -o $@
+ 
+ 
+ $(OBJDIR)/crypt.o: libcrypt/crypt.c | $(OBJDIR)
+-	$(CCC) $(INC) $(SAFER_CFLAGS) -c $< -o $@
++	$(CCC) $(INC) $(SAFER_CFLAGS) $(SPECIFICCFLAGS) -c $< -o $@
+ 
+ DIETLIBC_OBJ = $(OBJDIR)/unified.o \
+ $(SYSCALLOBJ) $(LIBOBJ) $(LIBSTDIOOBJ) $(LIBUGLYOBJ) \
+@@ -249,7 +250,7 @@ $(OBJDIR)/librpc.a: $(LIBRPCOBJ)
+ 
+ $(OBJDIR)/libcrypt.a: | $(OBJDIR)
+ 	touch dummy.c
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -c dummy.c -D__dietlibc__
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -c dummy.c -D__dietlibc__
+ 	-$(STRIP) -x -R .comment -R .note dummy.o
+ 	$(CROSS)ar cru $@ dummy.o
+ 	rm -f dummy.c dummy.o
+@@ -275,7 +276,7 @@ $(OBJDIR)/libm.a: $(LIBMATHOBJ)
+ $(OBJDIR)/seekdir.o $(OBJDIR)/clnt_raw.o $(OBJDIR)/clnt_udp.o \
+ $(PICODIR)/seekdir.o $(PICODIR)/clnt_raw.o $(PICODIR)/clnt_udp.o \
+ $(OBJDIR)/sha256crypt.o $(OBJDIR)/sha512crypt.o \
+-$(PICODIR)/sha256crypt.o $(PICODIR)/sha512crypt.o: CFLAGS+=-fno-strict-aliasing
++$(PICODIR)/sha256crypt.o $(PICODIR)/sha512crypt.o: SPECIFICCFLAGS+=-fno-strict-aliasing
+ 
+ LD_UNSET = env -u LD_RUN_PATH
+ 
+@@ -291,21 +292,21 @@ dyn_lib: $(PICODIR) $(PICODIR)/libc.so $
+ 	$(PICODIR)/libm.so $(PICODIR)/diet-dyn $(PICODIR)/diet-dyn-i
+ 
+ $(PICODIR)/%.o: %.S $(ARCH)/syscalls.h | $(PICODIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -fPIC -D__DYN_LIB $(ASM_CFLAGS) -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -fPIC -D__DYN_LIB $(ASM_CFLAGS) -c $< -o $@
+ 
+ $(PICODIR)/pthread_%.o: libpthread/pthread_%.c | $(PICODIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -fPIC -D__DYN_LIB -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -fPIC -D__DYN_LIB -c $< -o $@
+ 	$(STRIP) -x -R .comment -R .note $@
+ 
+ $(PICODIR)/%.o: %.c | $(PICODIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -fPIC -D__DYN_LIB -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -fPIC -D__DYN_LIB -c $< -o $@
+ 	$(STRIP) -x -R .comment -R .note $@
+ 
+ $(PICODIR)/dstart.o: start.S | $(PICODIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -fPIC -D__DYN_LIB $(ASM_CFLAGS) -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -fPIC -D__DYN_LIB $(ASM_CFLAGS) -c $< -o $@
+ 
+ $(PICODIR)/dyn_so_start.o: dyn_start.c | $(PICODIR)
+-	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) -fPIC -D__DYN_LIB -D__DYN_LIB_SHARED -c $< -o $@
++	$(CCC) $(INC) $(CCFLAGS) $(EXTRACFLAGS) $(SPECIFICCFLAGS) -fPIC -D__DYN_LIB -D__DYN_LIB_SHARED -c $< -o $@
+ 	$(STRIP) -x -R .comment -R .note $@
+ 
+ DYN_LIBC_PIC = $(LIBOBJ) $(LIBSTDIOOBJ) $(LIBUGLYOBJ) \
+@@ -323,59 +324,59 @@ DYN_LIBCOMPAT_OBJS = $(patsubst $(OBJDIR
+ DYN_LIBMATH_OBJS = $(patsubst $(OBJDIR)/%.o,$(PICODIR)/%.o,$(LIBMATHOBJ))
+ 
+ $(PICODIR)/libc.so: $(PICODIR) $(DYN_LIBC_OBJ)
+-	$(LD_UNSET) $(CCC) -nostdlib -shared -o $@ $(CCFLAGS) -fPIC $(DYN_LIBC_OBJ) -lgcc -Wl,-soname=libc.so
++	$(LD_UNSET) $(CCC) -nostdlib -o $@ $(CCFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(DYN_LIBC_OBJ) -lgcc -Wl,-soname=libc.so
+ 
+ $(PICODIR)/libpthread.so: $(DYN_PTHREAD_OBJS) dietfeatures.h $(PICODIR)/libc.so
+-	$(LD_UNSET) $(CCC) -nostdlib -shared -o $@ $(CCFLAGS) -fPIC $(DYN_PTHREAD_OBJS) -L$(PICODIR) -lc -Wl,-soname=libpthread.so
++	$(LD_UNSET) $(CCC) -nostdlib -o $@ $(CCFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(DYN_PTHREAD_OBJS) -L$(PICODIR) -lc -Wl,-soname=libpthread.so
+ 
+ $(PICODIR)/libdl.so: libdl/_dl_main.c dietfeatures.h $(PICODIR)/libc.so
+-	$(LD_UNSET) $(CCC) -D__OD_CLEAN_ROOM -DNODIETREF -fPIC -nostdlib -shared -Bsymbolic -Wl,-Bsymbolic \
+-		-o $@ $(SAFE_CFLAGS) $(INC) libdl/_dl_main.c -Wl,-soname=libdl.so
++	$(LD_UNSET) $(CCC) -D__OD_CLEAN_ROOM -DNODIETREF -nostdlib -Bsymbolic -Wl,-Bsymbolic \
++		-o $@ $(SAFE_CFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(INC) libdl/_dl_main.c -Wl,-soname=libdl.so
+ 
+ $(OBJDIR)/pthread_create.o $(PICODIR)/pthread_create.o: dietfeatures.h
+ $(OBJDIR)/pthread_internal.o $(PICODIR)/pthread_internal.o: dietfeatures.h
+ 
+ #$(PICODIR)/libdl.so: $(DYN_LIBDL_OBJS) dietfeatures.h
+-#	$(CCC) -nostdlib -shared -o $@ $(CCFLAGS) -fPIC $(DYN_LIBDL_OBJS) -L$(PICODIR) -ldietc -Wl,-soname=libdl.so
++#	$(CCC) -nostdlib -o $@ $(CCFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(DYN_LIBDL_OBJS) -L$(PICODIR) -ldietc -Wl,-soname=libdl.so
+ 
+ $(PICODIR)/libcompat.so: $(DYN_LIBCOMPAT_OBJS) dietfeatures.h $(PICODIR)/libc.so
+-	$(LD_UNSET) $(CCC) -nostdlib -shared -o $@ $(CCFLAGS) -fPIC $(DYN_LIBCOMPAT_OBJS) -L$(PICODIR) -lc -Wl,-soname=libcompat.so
++	$(LD_UNSET) $(CCC) -nostdlib -o $@ $(CCFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(DYN_LIBCOMPAT_OBJS) -L$(PICODIR) -lc -Wl,-soname=libcompat.so
+ 
+ $(PICODIR)/libm.so: $(DYN_LIBMATH_OBJS) dietfeatures.h $(PICODIR)/libc.so
+-	$(LD_UNSET) $(CCC) -nostdlib -shared -o $@ $(CCFLAGS) -fPIC $(DYN_LIBMATH_OBJS) -L$(PICODIR) -lc -Wl,-soname=libm.so
++	$(LD_UNSET) $(CCC) -nostdlib -o $@ $(CCFLAGS) $(SPECIFICCFLAGS) -shared -fPIC $(DYN_LIBMATH_OBJS) -L$(PICODIR) -lc -Wl,-soname=libm.so
+ 
+ 
+ $(SYSCALLOBJ): syscalls.h
+ 
+ $(OBJDIR)/elftrunc: $(OBJDIR)/diet contrib/elftrunc.c
+-	bin-$(MYARCH)/diet $(CCC) $(CFLAGS) -o $@ contrib/elftrunc.c
++	bin-$(MYARCH)/diet $(CCC) $(CFLAGS) $(SPECIFICCFLAGS) -o $@ contrib/elftrunc.c
+ 
+ $(OBJDIR)/dnsd: $(OBJDIR)/diet contrib/dnsd.c
+-	bin-$(MYARCH)/diet $(CCC) $(CFLAGS) -o $@ contrib/dnsd.c
++	bin-$(MYARCH)/diet $(CCC) $(CFLAGS) $(SPECIFICCFLAGS) -o $@ contrib/dnsd.c
+ 
+ VERSION=dietlibc-$(shell head -n 1 CHANGES|sed 's/://')
+ CURNAME=$(notdir $(shell pwd))
+ 
+ $(OBJDIR)/diet: $(OBJDIR)/start.o $(OBJDIR)/dyn_start.o diet.c $(OBJDIR)/dietlibc.a $(OBJDIR)/dyn_stop.o
+-	$(CCC) -isystem include $(CFLAGS) -nostdlib -o $@ $^ -DDIETHOME=\"$(DIETHOME)\" -DVERSION=\"$(VERSION)\" -lgcc
++	$(CCC) -isystem include $(CFLAGS) $(SPECIFICCFLAGS) -nostdlib -o $@ $^ -DDIETHOME=\"$(DIETHOME)\" -DVERSION=\"$(VERSION)\" -lgcc
+ 	$(STRIP) -R .comment -R .note $@
+ 
+ $(OBJDIR)/diet-i: $(OBJDIR)/start.o $(OBJDIR)/dyn_start.o diet.c $(OBJDIR)/dietlibc.a $(OBJDIR)/dyn_stop.o
+-	$(CCC) -isystem include $(CFLAGS) -nostdlib -o $@ $^ -DDIETHOME=\"$(prefix)\" -DVERSION=\"$(VERSION)\" -DINSTALLVERSION -lgcc
++	$(CCC) -isystem include $(CFLAGS) $(SPECIFICCFLAGS) -nostdlib -o $@ $^ -DDIETHOME=\"$(prefix)\" -DVERSION=\"$(VERSION)\" -DINSTALLVERSION -lgcc
+ 	$(STRIP) -R .comment -R .note $@
+ 
+ $(PICODIR)/diet-dyn: $(PICODIR)/start.o $(PICODIR)/dyn_start.o diet.c
+-	$(LD_UNSET) $(CCC) -isystem include $(CFLAGS) -fPIC -nostdlib -o $@ $^ -DDIETHOME=\"$(DIETHOME)\" -D__DYN_LIB -DVERSION=\"$(VERSION)\" -L$(PICODIR) -lc -lgcc $(PICODIR)/dyn_stop.o -Wl,-dynamic-linker=$(DIETHOME)/$(PICODIR)/libdl.so
++	$(LD_UNSET) $(CCC) -isystem include $(CFLAGS) $(SPECIFICCFLAGS) -fPIC -nostdlib -o $@ $^ -DDIETHOME=\"$(DIETHOME)\" -D__DYN_LIB -DVERSION=\"$(VERSION)\" -L$(PICODIR) -lc -lgcc $(PICODIR)/dyn_stop.o -Wl,-dynamic-linker=$(DIETHOME)/$(PICODIR)/libdl.so
+ 	$(STRIP) -R .command -R .note $@
+ 
+ $(PICODIR)/diet-dyn-i: $(PICODIR)/start.o $(PICODIR)/dyn_start.o diet.c
+-	$(LD_UNSET) $(CCC) -isystem include $(CFLAGS) -fPIC -nostdlib -o $@ $^ -DDIETHOME=\"$(prefix)\" -D__DYN_LIB -DVERSION=\"$(VERSION)\" -L$(PICODIR) -lc -lgcc $(PICODIR)/dyn_stop.o -Wl,-dynamic-linker=$(ILIBDIR)/libdl.so -DINSTALLVERSION
++	$(LD_UNSET) $(CCC) -isystem include $(CFLAGS) $(SPECIFICCFLAGS) -fPIC -nostdlib -o $@ $^ -DDIETHOME=\"$(prefix)\" -D__DYN_LIB -DVERSION=\"$(VERSION)\" -L$(PICODIR) -lc -lgcc $(PICODIR)/dyn_stop.o -Wl,-dynamic-linker=$(ILIBDIR)/libdl.so -DINSTALLVERSION
+ 	$(STRIP) -R .command -R .note $@
+ 
+ $(OBJDIR)/djb: $(OBJDIR)/compile $(OBJDIR)/load
+ 
+ $(OBJDIR)/compile:
+-	echo 'exec' $(CC) '$(CCFLAGS) -I$(PWD)/$(OBJDIR)/include -c $${1+"$$@"}' > $@
++	echo 'exec' $(CC) '$(CCFLAGS) $(SPECIFICCFLAGS) -I$(PWD)/$(OBJDIR)/include -c $${1+"$$@"}' > $@
+ 	chmod 755 $@
+ 
+ $(OBJDIR)/load:
+@@ -400,7 +401,7 @@ $(OBJDIR)/exports: $(OBJDIR)/dietlibc.a
+ 
+ .PHONY: t t1
+ t:
+-	$(CCC) -g $(CFLAGS) -fno-builtin -nostdlib -isystem include -o t t.c $(OBJDIR)/start.o $(OBJDIR)/dyn_start.o $(OBJDIR)/dietlibc.a -lgcc $(OBJDIR)/dyn_stop.o -Wl,-Map,mapfile
++	$(CCC) -g $(CFLAGS) $(SPECIFICCFLAGS) -fno-builtin -nostdlib -isystem include -o t t.c $(OBJDIR)/start.o $(OBJDIR)/dyn_start.o $(OBJDIR)/dietlibc.a -lgcc $(OBJDIR)/dyn_stop.o -Wl,-Map,mapfile
+ 
+ t1:
+ 	$(CCC) -g -o t1 t.c
+@@ -587,9 +588,9 @@ $(OBJDIR)/fcntl64.o: dietfeatures.h
+ 
+ # WANT_SSP
+ # This facepalm brought to you by: Ubuntu!
+-$(PICODIR)/stackgap.o: EXTRACFLAGS:=-fno-stack-protector
+-$(OBJDIR)/stackgap.o: EXTRACFLAGS:=-fno-stack-protector -fno-pie
+-$(OBJDIR)/stackgap-pie.o: EXTRACFLAGS:=-fno-stack-protector -Dstackgap=stackgap_pie -fpie -fvisibility=hidden
++$(PICODIR)/stackgap.o: SPECIFICCFLAGS:=-fno-stack-protector
++$(OBJDIR)/stackgap.o: SPECIFICCFLAGS:=-fno-stack-protector -fno-pie
++$(OBJDIR)/stackgap-pie.o: SPECIFICCFLAGS:=-fno-stack-protector -Dstackgap=stackgap_pie -fpie -fvisibility=hidden
+ 
+ $(OBJDIR)/stackgap.o $(OBJDIR)/stackgap-pie.o $(PICODIR)/stackgap.o: lib/stackgap-common.h
+ 

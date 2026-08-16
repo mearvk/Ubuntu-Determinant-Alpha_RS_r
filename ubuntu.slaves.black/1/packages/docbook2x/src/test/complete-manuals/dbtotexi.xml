@@ -1,0 +1,1000 @@
+<?xml version='1.0'?>
+
+<!--
+  docbook2X author's note:
+    The program described here has nothing to do with docbook2X,
+    though it performed some of its functions.
+-->
+    
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+  "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+
+  <!ENTITY version "???">
+
+  <!ENTITY CVS  "<acronym>CVS</acronym>">
+  <!ENTITY DTD  "<acronym>DTD</acronym>">
+  <!ENTITY GNU  "<acronym>GNU</acronym>">
+  <!ENTITY GUI  "<acronym>GUI</acronym>">
+  <!ENTITY ISO  "<acronym>ISO</acronym>">
+  <!ENTITY JDK  "<acronym>JDK</acronym>">
+  <!ENTITY SGML "<acronym>SGML</acronym>">
+  <!ENTITY XML  "<acronym>XML</acronym>">
+  <!ENTITY XSL  "<acronym>XSL</acronym>">
+  <!ENTITY XSLT "<acronym>XSLT</acronym>">
+  <!ENTITY VM   "<acronym>VM</acronym>">
+
+  <!ENTITY dbtotexi "<application>dbtotexi</application>">
+]>
+
+<?dircategory Texinfo documentation system?>
+<?direntry * Dbtotexi: (dbtotexi). DocBook to Texinfo convertor.?>
+
+<article>
+ <articleinfo>
+  <titleabbrev role="texinfo-file">dbtotexi</titleabbrev>
+ 
+  <title>Dbtotexi</title>
+  <subtitle>V&version;</subtitle>
+  <author>
+   <firstname>Mark</firstname>
+   <surname>Burton</surname>
+  </author>
+  <copyright>
+   <year>1999</year>
+   <holder>Mark Burton</holder>
+  </copyright>
+
+  <abstract role="texinfo-node">
+    <para>DocBook to Texinfo convertor.</para>
+  </abstract>
+    
+ </articleinfo>
+ 
+ <sect1>
+  <title>Introduction</title>
+  <para>
+   This document describes &dbtotexi;, a simple utility for
+   converting &XML; documents that conform to a subset of the DocBook
+   &DTD; into &GNU; texinfo format. The &dbtotexi; program is
+   implemented using the &XSL; Transformations language as described
+   in the working document <ulink
+   url="http://www.w3.org/TR/1999/WD-xslt-19990421"></ulink>. A Java
+   based &XSL; engine<footnote>
+     <para>
+      Currently, I am using James Clark's <application>xt</application>.
+     </para>
+    </footnote> carries out the actual transformation as determined by
+    the style sheet <filename>dbtotexi.xsl</filename>. A small
+    amount of additional Java code provides a few utility routines not
+    provided by the &XSL; implementation.
+  </para>
+ </sect1>
+
+ <sect1>
+  <title>License</title>
+  <para>
+    This software is subject to the terms of the
+    &GNU; General Public License. Please see the file
+    <filename>COPYING</filename> for details. The license terms that
+    apply to the supplied third party software contained in the files
+    <filename>sax.jar</filename>, <filename>xp.jar</filename> and
+    <filename>xt.jar</filename> are specified in the files
+    <filename>sax-copying.txt</filename>,
+    <filename>xp-copying.txt</filename> and
+    <filename>xt-copying.txt</filename> respectively.
+  </para>
+ </sect1>
+
+ <sect1>
+  <title>Installation</title>
+  <para>
+   Once the tar archive has been unpacked<footnote>
+    <para>
+     You must have done that already to be reading this!
+    </para>
+   </footnote>, check the <filename>Makefile</filename> to see if the
+   settings at the top are suitable for your site and then just type
+   <literal>make</literal> and <literal>make install</literal>. By
+   default, the <filename>dbtotexi</filename> bash shell script
+   goes into <filename>/usr/local/bin</filename> and the support files
+   into <filename>/usr/local/share/dbtotexi</filename>. A compiled
+   version of the Java support code is supplied so that you do not
+   need a Java compiler unless you change the Java code.
+  </para>
+  <para>
+   The installation defaults to using Sun's
+   <application>jre</application> &VM; but any &JDK; 1.1 compliant
+   implementation (such as Kaffe<footnote>
+    <para>
+     <literal>http://www.kaffe.org/</literal>
+    </para>
+   </footnote>) should work. No &GUI; facilities or additional
+   libraries are required. If you use a different &VM; then the shell
+   script, <filename>dbtotexi.sh</filename> may need editing.
+  </para>
+ </sect1>
+
+ <sect1>
+  <title>Usage</title>
+  <para>
+   A DocBook source file, <filename>foo.xml</filename>, is converted
+   to texinfo format very simply:
+  </para>
+  <screen>
+dbtotexi foo.xml
+  </screen>
+  <para>
+   Will produce output in <filename>foo.texinfo</filename>. The name
+   of the output file can be explicitly specified as a second
+   argument. If the output file name is specified as
+   <literal>-</literal>, the output is sent to stdout. A third
+   argument will specify the name of the info file to produce, this
+   defaults to the input file name modified to have a
+   <literal>.info</literal> suffix. Any DocBook elements that are not
+   recognised (due to either an error in the input document or because
+   the translator does not yet support a translation for that element)
+   are reported to stderr and shown in the output in bold.
+  </para>
+  <para>
+   A document that conforms to the &SGML; DocBook &DTD; must first be
+   converted to &XML; before it can be processed by
+   &dbtotexi;. This can be done using the
+   <application>sx</application> program that is part of James Clark's
+   <literal>SP</literal> &SGML; toolset. Typical usage would be:
+  </para>
+  <screen>
+sx -xlower foo.sgm > foo.xml
+  </screen>
+  <note>
+   <title>Note</title>
+   <para>
+    The &XML; version of the DocBook &DTD; is not actually required by
+    the conversion process (but see <xref
+    linkend="sec.texinfopi"/>). In fact, if the document to be
+    converted doesn't contain a <literal>DOCTYPE</literal> declaration
+    then the conversion process is somewhat quicker. Irrespective of
+    whether the document contains a <literal>DOCTYPE</literal>
+    declaration, it should be valid (i.e. it conforms to the DocBook
+    &XML; &DTD;).
+   </para>
+  </note>
+ </sect1>
+
+ <sect1>
+  <title>Role Attributes</title>
+  <para>
+   This section describes how the translation of some the elements are
+   influenced by the setting of the element's <literal>role</literal>
+   attribute.
+  </para>
+  <variablelist role="fixed">
+   <varlistentry>
+    <term>indexterm</term>
+    <listitem>
+     <para>
+      The <literal>role</literal> attribute can be set to one of
+      <literal>c</literal>, <literal>f</literal>,
+      <literal>v</literal>, <literal>k</literal>, <literal>p</literal>
+      and <literal>d</literal> to indicate which index the entry
+      should be entered in. If the <literal>role</literal> attribute
+      is not specified the entry will be entered into the concept
+      index by default.
+     </para>
+    </listitem>
+   </varlistentry>
+   <varlistentry>
+    <term>index</term>
+    <listitem>
+     <para>
+      The <literal>role</literal> attribute can be set to one of
+      <literal>c</literal>, <literal>f</literal>,
+      <literal>v</literal>, <literal>k</literal>, <literal>p</literal>
+      and <literal>d</literal> to indicate which index should be
+      output.  If the <literal>role</literal> attribute is not
+      specified the concept index will be output by default.
+     </para>
+    </listitem>
+   </varlistentry>
+   <varlistentry>
+    <term>variablelist</term>
+    <listitem>
+     <para>
+      The <literal>role</literal> attribute can be set to one of
+      <literal>bold</literal> or <literal>fixed</literal> to indicate
+      that the list's terms should be displayed in bold or fixed-width
+      font respectively. If the <literal>role</literal> attribute is
+      not specified, the list's terms be displayed <quote>as
+       is</quote>.
+     </para>
+    </listitem>
+   </varlistentry>
+  </variablelist>
+ </sect1>
+
+ <sect1 id="sec.texinfopi">
+  <title>The <literal>texinfo</literal> Processing Instruction</title>
+  <para>
+   The <literal>texinfo</literal> processing instruction can be used
+   within a document to insert arbitrary markup into the output. The
+   characters <literal>@</literal>, <literal>{</literal> and
+   <literal>}</literal> are not escaped. This facility can be used to
+   define entities that contain texinfo markup. For example, given
+   that the following general entity declaration is placed in the DTD
+   subset:
+   <screen>
+&lt;!ENTITY hellip "&lt;?texinfo @dots{}?>">
+   </screen>
+   One can write <literal>&amp;hellip;</literal> and expect to get
+   dots&hellip;!
+  </para>
+ </sect1>
+
+ <sect1 id="sec.dirpi">
+  <title>The <literal>dircategory</literal> &amp;
+  <literal>direntry</literal> Processing Instructions</title>
+  <para>
+   The <literal>dircategory</literal> and <literal>direntry</literal>
+   processing instructions may be used to set the resulting info
+   file's directory category and menu entry. These processing
+   instructions are best positioned after the document type
+   declaration but before the first element (<sgmltag>book</sgmltag>
+   or <sgmltag>article</sgmltag>). Here's what this document uses:
+  </para>
+  <programlisting> 
+&lt;?dircategory Texinfo documentation system?>
+&lt;?direntry * Dbtotexi: (dbtotexi). DocBook to Texinfo convertor.?>
+  </programlisting>
+ </sect1>
+
+ <sect1 id="sec.unicode">
+  <title>Support for Unicode Characters</title>
+  <para>
+   A few Unicode characters are recognised in element content and
+   converted into the equivalent texinfo command. Unrecognised Unicode
+   characters are passed through unchanged. Norman Walsh's DocBook
+   &XML; &DTD; defines the &ISO; entity set in terms of Unicode
+   characters. <xref linkend="app.unicode"/> lists the set of
+   Unicode characters that are currently recognised.
+  </para>
+ </sect1>
+
+ <sect1>
+  <title>Caveats</title>
+  <para>
+   A couple of points should be born in mind:
+   <orderedlist>
+    <listitem>
+     <para>
+       Only a small subset of the DocBook &DTD; has currently been
+       implemented. Furthermore, of the elements that have been
+       implemented, most of their attributes are ignored. As time goes
+       by, the implementation will become more complete. However, some
+       features of DocBook may never be implemented due to
+       limitatations in the texinfo format and some features of
+       DocBook may never be implemented because they are not
+       considered useful enough. All contributions are welcome. Please
+       send contributions and bug reports to
+       <email>markb@ordern.com</email>.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+       The &XSL; Transformations language has not yet been
+       standardised and, therefore, applications that use it are
+       subject to change. I envisage having to modify the &XSL; script
+       to track the development of &XSL; and its implementations.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+       It is possible that some existing &SGML; documents may require
+       modification before they can be successfully converted to &XML;
+       and hence into texinfo.
+     </para>
+    </listitem>
+   </orderedlist>
+  </para>
+ </sect1>
+
+ <sect1>
+  <title>Links</title>
+  <para>
+   More information can be found from these links:
+   <variablelist role="fixed">
+    <varlistentry>
+     <term>http://www.w3.org/TR/WD-xslt</term>
+     <listitem>
+      <para>
+        The latest version of the &XSL; Transformations (&XSLT;)
+        Specification.
+      </para>
+     </listitem>
+    </varlistentry>
+    <varlistentry>
+     <term>http://www.jclark.com/</term>
+     <listitem>
+      <para>
+        James Clark's website contains much useful stuff including the
+        &XSLT; engine <literal>xt</literal> and the
+        <literal>SP</literal> toolset.
+      </para>
+     </listitem>
+    </varlistentry>
+    <varlistentry>
+      <term>http://nwalsh.com/</term>
+     <listitem>
+      <para>
+        Norman Walsh's website contains lots of DocBook and
+        &XML;/&XSL; related stuff.
+      </para>
+     </listitem>
+    </varlistentry>
+    <varlistentry>
+     <term>http://www.kaffe.org/</term>
+     <listitem>
+       <para>
+        Home of the <quote>Open Source</quote> Kaffe Java &VM;.
+      </para>
+     </listitem>
+    </varlistentry>
+   </variablelist>
+  </para>
+ </sect1>
+
+ <appendix id="app.unicode">
+  <title>Recognised Unicode Characters</title>
+  <para>
+   The following table lists the set of Unicode characters that are
+   currently recognised. The name of the &XML; entity that yields each
+   character is also listed.
+  </para>
+  <informaltable>
+   <tgroup cols="3">
+    <thead>
+     <row>
+      <entry>
+       Unicode Character
+      </entry>
+      <entry>
+       Rendered As
+      </entry>
+      <entry>
+       Entity Name
+      </entry>
+     </row>
+    </thead>
+    <tbody>
+     <row>
+      <entry><literal>00a0</literal></entry>
+      <entry>&nbsp;</entry>
+      <entry><literal>nbsp</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00a1</literal></entry>
+      <entry>&iexcl;</entry>
+      <entry><literal>iexcl</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00a3</literal></entry>
+      <entry>&pound;</entry>
+      <entry><literal>pound</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00a9</literal></entry>
+      <entry>&copy;</entry>
+      <entry><literal>copy</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00bf</literal></entry>
+      <entry>&iquest;</entry>
+      <entry><literal>iquest</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c6</literal></entry>
+      <entry>&AElig;</entry>
+      <entry><literal>AElig</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00df</literal></entry>
+      <entry>&szlig;</entry>
+      <entry><literal>szlig</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e6</literal></entry>
+      <entry>&aelig;</entry>
+      <entry><literal>aelig</literal></entry>
+     </row>
+     <row>
+      <entry><literal>2022</literal></entry>
+      <entry>&bull;</entry>
+      <entry><literal>bull</literal></entry>
+     </row>
+     <row>
+      <entry><literal>2026</literal></entry>
+      <entry>&hellip;</entry>
+      <entry><literal>hellip</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+     <row>
+      <entry><literal>0131</literal></entry>
+      <entry>&inodot;</entry>
+      <entry><literal>inodot</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00a8</literal></entry>
+      <entry>&uml;</entry>
+      <entry><literal>uml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e4</literal></entry>
+      <entry>&auml;</entry>
+      <entry><literal>auml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c4</literal></entry>
+      <entry>&Auml;</entry>
+      <entry><literal>Auml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00eb</literal></entry>
+      <entry>&euml;</entry>
+      <entry><literal>euml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00cb</literal></entry>
+      <entry>&Euml;</entry>
+      <entry><literal>Euml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ef</literal></entry>
+      <entry>&iuml;</entry>
+      <entry><literal>iuml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00cf</literal></entry>
+      <entry>&Iuml;</entry>
+      <entry><literal>Iuml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f6</literal></entry>
+      <entry>&ouml;</entry>
+      <entry><literal>ouml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d6</literal></entry>
+      <entry>&Ouml;</entry>
+      <entry><literal>Ouml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00fc</literal></entry>
+      <entry>&uuml;</entry>
+      <entry><literal>uuml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00dc</literal></entry>
+      <entry>&Uuml;</entry>
+      <entry><literal>Uuml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ff</literal></entry>
+      <entry>&yuml;</entry>
+      <entry><literal>yuml</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0178</literal></entry>
+      <entry>&Yuml;</entry>
+      <entry><literal>Yuml</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00b4</literal></entry>
+      <entry>&acute;</entry>
+      <entry><literal>acute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e1</literal></entry>
+      <entry>&aacute;</entry>
+      <entry><literal>aacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c1</literal></entry>
+      <entry>&Aacute;</entry>
+      <entry><literal>Aacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e9</literal></entry>
+      <entry>&eacute;</entry>
+      <entry><literal>eacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c9</literal></entry>
+      <entry>&Eacute;</entry>
+      <entry><literal>Eacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ed</literal></entry>
+      <entry>&iacute;</entry>
+      <entry><literal>iacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00cd</literal></entry>
+      <entry>&Iacute;</entry>
+      <entry><literal>Iacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f3</literal></entry>
+      <entry>&oacute;</entry>
+      <entry><literal>oacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d3</literal></entry>
+      <entry>&Oacute;</entry>
+      <entry><literal>Oacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00fa</literal></entry>
+      <entry>&uacute;</entry>
+      <entry><literal>uacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00da</literal></entry>
+      <entry>&Uacute;</entry>
+      <entry><literal>Uacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00fd</literal></entry>
+      <entry>&yacute;</entry>
+      <entry><literal>yacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00dd</literal></entry>
+      <entry>&Yacute;</entry>
+      <entry><literal>Yacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0107</literal></entry>
+      <entry>&cacute;</entry>
+      <entry><literal>cacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0106</literal></entry>
+      <entry>&Cacute;</entry>
+      <entry><literal>Cacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>01f5</literal></entry>
+      <entry>&gacute;</entry>
+      <entry><literal>gacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>013a</literal></entry>
+      <entry>&lacute;</entry>
+      <entry><literal>lacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0139</literal></entry>
+      <entry>&Lacute;</entry>
+      <entry><literal>Lacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0144</literal></entry>
+      <entry>&nacute;</entry>
+      <entry><literal>nacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0143</literal></entry>
+      <entry>&Nacute;</entry>
+      <entry><literal>Nacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0155</literal></entry>
+      <entry>&racute;</entry>
+      <entry><literal>racute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0154</literal></entry>
+      <entry>&Racute;</entry>
+      <entry><literal>Racute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015b</literal></entry>
+      <entry>&sacute;</entry>
+      <entry><literal>sacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015a</literal></entry>
+      <entry>&Sacute;</entry>
+      <entry><literal>Sacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>017a</literal></entry>
+      <entry>&zacute;</entry>
+      <entry><literal>zacute</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0179</literal></entry>
+      <entry>&Zacute;</entry>
+      <entry><literal>Zacute</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00b8</literal></entry>
+      <entry>&cedil;</entry>
+      <entry><literal>cedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e7</literal></entry>
+      <entry>&ccedil;</entry>
+      <entry><literal>ccedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c7</literal></entry>
+      <entry>&Ccedil;</entry>
+      <entry><literal>Ccedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0122</literal></entry>
+      <entry>&Gcedil;</entry>
+      <entry><literal>Gcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0137</literal></entry>
+      <entry>&kcedil;</entry>
+      <entry><literal>kcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0136</literal></entry>
+      <entry>&Kcedil;</entry>
+      <entry><literal>Kcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>013c'</literal></entry>
+      <entry>&lcedil;</entry>
+      <entry><literal>lcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>013b</literal></entry>
+      <entry>&Lcedil;</entry>
+      <entry><literal>Lcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0146</literal></entry>
+      <entry>&ncedil;</entry>
+      <entry><literal>ncedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0145</literal></entry>
+      <entry>&Ncedil;</entry>
+      <entry><literal>Ncedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0157</literal></entry>
+      <entry>&rcedil;</entry>
+      <entry><literal>rcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0156</literal></entry>
+      <entry>&Rcedil;</entry>
+      <entry><literal>Rcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015f</literal></entry>
+      <entry>&scedil;</entry>
+      <entry><literal>scedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015e</literal></entry>
+      <entry>&Scedil;</entry>
+      <entry><literal>Scedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0163</literal></entry>
+      <entry>&tcedil;</entry>
+      <entry><literal>tcedil</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0162</literal></entry>
+      <entry>&Tcedil;</entry>
+      <entry><literal>Tcedil</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00af</literal></entry>
+      <entry>&macr;</entry>
+      <entry><literal>macr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0101</literal></entry>
+      <entry>&amacr;</entry>
+      <entry><literal>amacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0100</literal></entry>
+      <entry>&Amacr;</entry>
+      <entry><literal>Amacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0113</literal></entry>
+      <entry>&emacr;</entry>
+      <entry><literal>emacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0112</literal></entry>
+      <entry>&Emacr;</entry>
+      <entry><literal>Emacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>012a</literal></entry>
+      <entry>&Imacr;</entry>
+      <entry><literal>Imacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>012b</literal></entry>
+      <entry>&imacr;</entry>
+      <entry><literal>imacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>014c</literal></entry>
+      <entry>&Omacr;</entry>
+      <entry><literal>Omacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>014d</literal></entry>
+      <entry>&omacr;</entry>
+      <entry><literal>omacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>016b</literal></entry>
+      <entry>&umacr;</entry>
+      <entry><literal>umacr</literal></entry>
+     </row>
+     <row>
+      <entry><literal>016a</literal></entry>
+      <entry>&Umacr;</entry>
+      <entry><literal>Umacr</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00e2</literal></entry>
+      <entry>&acirc;</entry>
+      <entry><literal>acirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c2</literal></entry>
+      <entry>&Acirc;</entry>
+      <entry><literal>Acirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ea</literal></entry>
+      <entry>&ecirc;</entry>
+      <entry><literal>ecirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00cA</literal></entry>
+      <entry>&Ecirc;</entry>
+      <entry><literal>Ecirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ee</literal></entry>
+      <entry>&icirc;</entry>
+      <entry><literal>icirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ce</literal></entry>
+      <entry>&Icirc;</entry>
+      <entry><literal>Icirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f4</literal></entry>
+      <entry>&ocirc;</entry>
+      <entry><literal>ocirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d4</literal></entry>
+      <entry>&Ocirc;</entry>
+      <entry><literal>Ocirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00db</literal></entry>
+      <entry>&ucirc;</entry>
+      <entry><literal>ucirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00fb</literal></entry>
+      <entry>&Ucirc;</entry>
+      <entry><literal>Ucirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0109</literal></entry>
+      <entry>&ccirc;</entry>
+      <entry><literal>ccirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0108</literal></entry>
+      <entry>&Ccirc;</entry>
+      <entry><literal>Ccirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>011d</literal></entry>
+      <entry>&gcirc;</entry>
+      <entry><literal>gcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>011c</literal></entry>
+      <entry>&Gcirc;</entry>
+      <entry><literal>Gcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0125</literal></entry>
+      <entry>&hcirc;</entry>
+      <entry><literal>hcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0124</literal></entry>
+      <entry>&Hcirc;</entry>
+      <entry><literal>Hcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0135</literal></entry>
+      <entry>&jcirc;</entry>
+      <entry><literal>jcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0134</literal></entry>
+      <entry>&Jcirc;</entry>
+      <entry><literal>Jcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015d</literal></entry>
+      <entry>&scirc;</entry>
+      <entry><literal>scirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>015c</literal></entry>
+      <entry>&Scirc;</entry>
+      <entry><literal>Scirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0175</literal></entry>
+      <entry>&wcirc;</entry>
+      <entry><literal>wcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0174</literal></entry>
+      <entry>&Wcirc;</entry>
+      <entry><literal>Wcirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0177</literal></entry>
+      <entry>&ycirc;</entry>
+      <entry><literal>ycirc</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0176</literal></entry>
+      <entry>&Ycirc;</entry>
+      <entry><literal>Ycirc</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00e0</literal></entry>
+      <entry>&agrave;</entry>
+      <entry><literal>agrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c0</literal></entry>
+      <entry>&Agrave;</entry>
+      <entry><literal>Agrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00e8</literal></entry>
+      <entry>&egrave;</entry>
+      <entry><literal>egrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c8</literal></entry>
+      <entry>&Egrave;</entry>
+      <entry><literal>Egrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00ec</literal></entry>
+      <entry>&igrave;</entry>
+      <entry><literal>igrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00cc</literal></entry>
+      <entry>&Igrave;</entry>
+      <entry><literal>Igrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f2</literal></entry>
+      <entry>&ograve;</entry>
+      <entry><literal>ograve</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d2</literal></entry>
+      <entry>&Ograve;</entry>
+      <entry><literal>Ograve</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f9</literal></entry>
+      <entry>&ugrave;</entry>
+      <entry><literal>ugrave</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d9</literal></entry>
+      <entry>&Ugrave;</entry>
+      <entry><literal>Ugrave</literal></entry>
+     </row>
+
+     <row><entry></entry><entry></entry><entry></entry></row>
+
+     <row>
+      <entry><literal>00e3</literal></entry>
+      <entry>&atilde;</entry>
+      <entry><literal>atilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00c3</literal></entry>
+      <entry>&Atilde;</entry>
+      <entry><literal>Atilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f1</literal></entry>
+      <entry>&ntilde;</entry>
+      <entry><literal>ntilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d1</literal></entry>
+      <entry>&Ntilde;</entry>
+      <entry><literal>Ntilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00f5</literal></entry>
+      <entry>&otilde;</entry>
+      <entry><literal>otilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>00d5</literal></entry>
+      <entry>&Otilde;</entry>
+      <entry><literal>Otilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0129</literal></entry>
+      <entry>&itilde;</entry>
+      <entry><literal>itilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0128</literal></entry>
+      <entry>&Itilde;</entry>
+      <entry><literal>Itilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0169</literal></entry>
+      <entry>&utilde;</entry>
+      <entry><literal>utilde</literal></entry>
+     </row>
+     <row>
+      <entry><literal>0168</literal></entry>
+      <entry>&Utilde;</entry>
+      <entry><literal>Utilde</literal></entry>
+     </row>
+    </tbody>
+   </tgroup>
+  </informaltable>
+ </appendix>
+
+</article>

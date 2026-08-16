@@ -1,0 +1,68 @@
+Description: fix IA64 build by backporting enough from upstream
+Author: mirabilos <tg@debian.org>
+
+--- a/ia64/Makefile.add
++++ b/ia64/Makefile.add
+@@ -1,2 +1,2 @@
+ VPATH:=ia64:syscalls.s:$(VPATH)
+-LIBOBJ+=$(OBJDIR)/__time.o $(OBJDIR)/__waitpid.o $(OBJDIR)/__nice.o $(OBJDIR)/__alarm.o $(OBJDIR)/__CAS.o $(OBJDIR)/umount-wrapper.o
++LIBOBJ+=$(OBJDIR)/__time.o $(OBJDIR)/__waitpid.o $(OBJDIR)/__alarm.o $(OBJDIR)/__CAS.o $(OBJDIR)/umount-wrapper.o
+--- a/ia64/clone.S
++++ b/ia64/clone.S
+@@ -43,5 +43,4 @@ __clone:
+ 	br.call.dptk.few b0=__error_unified_syscall
+ 	br.ret.sptk.few b0
+ .endp __clone
+-.endp __clone2
+ .size __clone, . - __clone
+--- a/ia64/unified.S
++++ b/ia64/unified.S
+@@ -1,3 +1,5 @@
++#include <dietfeatures.h>
++
+ /*
+    Copyright (C) 2002 Thomas M. Ogrisegg
+ 
+@@ -18,9 +20,14 @@
+ .globl __unified_syscall
+ .globl __error_unified_syscall
+ .globl _exit
++.weak exit
++.globl _Exit
+ .proc  _exit
++.proc  _Exit
+ 
+ _exit:
++_Exit:
++exit:
+ 	mov r15 = 1025
+ .endp _exit
+ .size _exit, . - _exit
+@@ -28,7 +35,16 @@ _exit:
+ .proc  __unified_syscall
+ __unified_syscall:
+ 	break.i 0x100000
++#ifdef WANT_THREAD_SAFE
++	addl r2 = @ltoff(@tprel(errno#)), r1
++	;;
++	ld8 r2 = [r2]
++	;;
++	add r2 = r2, r13
++	;;
++#else
+ 	movl r2=errno
++#endif
+ 	cmp.eq p6,p0=-1,r10
+ 	;;
+ .endp __unified_syscall
+--- a/include/asm/ia64-sigcontext.h
++++ b/include/asm/ia64-sigcontext.h
+@@ -2,6 +2,8 @@
+ 
+ #define PC(ctx) (ctx.sc_ip)
+ 
++#include <signal.h>
++
+ struct sigcontext {
+ 	unsigned long		sc_flags;
+ 	unsigned long		sc_nat;

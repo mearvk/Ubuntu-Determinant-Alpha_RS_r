@@ -1,0 +1,44 @@
+Description: fix weak symbols on IA64
+Author: mirabilos <tg@debian.org>
+
+--- a/ia64/fork.S
++++ b/ia64/fork.S
+@@ -3,11 +3,10 @@
+ #define SIGCLD 17
+ 
+ 	.text
+-	.globl fork
+-	.proc  fork
+-	.weak  __libc_fork
+ 	.type fork,@function
+ 	.type __libc_fork,@function
++	.weak fork
++	.globl __libc_fork
+ fork:
+ __libc_fork:
+ 	alloc r2=ar.pfs,0,0,2,0
+--- a/ia64/syscalls.h
++++ b/ia64/syscalls.h
+@@ -323,18 +323,20 @@
+ 
+ #define syscall(name, sym) \
+ .text; \
++.type sym,@function; \
+ .globl sym; \
+ sym: \
+ 	mov r15 = __NR_##name; \
+ 	br __unified_syscall;
+ 
+-#define syscall_weak(name, sym, wsym) \
++#define syscall_weak(name, wsym, sym) \
+ .text; \
++.type wsym,@function; \
+ .weak wsym; \
+ wsym: \
++.type sym,@function; \
+ .globl sym; \
+ sym: \
+-wsym: ; \
+ 	mov r15 = __NR_##name; \
+ 	br __unified_syscall;
+ 

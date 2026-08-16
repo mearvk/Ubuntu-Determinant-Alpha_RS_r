@@ -1,0 +1,658 @@
+#!/usr/bin/perl
+
+package Devel::DictionariesCommon;
+
+use strict;
+use warnings;
+use base qw(Exporter);
+use Debian::Debhelper::Dh_Lib;
+use Debian::DictionariesCommon q(:all);
+
+# List all exported symbols here.
+our @EXPORT_OK = qw(dico_warning
+		    dico_error
+		    dico_create_debconf_files
+		    dico_install_autocompat
+		    dico_installcleandebconf
+		    dico_populate_substvars
+		    dico_process_aspell_simple
+		    dico_process_autocompat
+		    dico_process_infofile
+		    );
+# Import :all to get everything.
+our %EXPORT_TAGS = (all => [@EXPORT_OK]);
+
+my $infodir             = "@LIBDIR@";
+my $cachedir            = "@CACHEDIR@";
+
+# ------------------------------------------------------------------
+sub dico_error {
+# ------------------------------------------------------------------
+# Wrapper to debhelper error function
+#
+#  dico_error("text")
+# ------------------------------------------------------------------
+  my $msg = shift;
+  my $see = shift;
+  error(die "$msg\nPlease see $see.");
+}
+
+# ------------------------------------------------------------------
+sub dico_warning {
+# ------------------------------------------------------------------
+# Wrapper to debhelper warning function
+#
+#  dico_warning("text")
+# ------------------------------------------------------------------
+  my $msg = shift;
+  my $see = shift;
+  warning("$msg\nPlease see $see.");
+}
+
+# ------------------------------------------------------------------
+sub dico_create_debconf_files {
+# ------------------------------------------------------------------
+# Create .config and .template debconf files
+#
+#  dico_create_debconf_files($class,$package,$dicts)
+# ------------------------------------------------------------------
+  my $class   = shift;
+  my $package = shift;
+  my $dicts   = shift;
+  my $program = "installdeb-$class";
+
+  return if $dh{NOSCRIPTS};
+
+  my $dictdir = "/usr/share/dictionaries-common/debconf";
+
+  my $orig_config_file;
+  my $orig_templates_file;
+  my $orig_templates_txt;
+
+  # Check and trigger an error if debian/[package].{config,templates} exist
+  # -----------------------------------------------------------------------
+
+  if (pkgfile ($package, "config")) {
+    dico_error("debian/[package.]config file exists.  You should probably move
+it to debian/[package.]config.in", "${program}(1)");
+  }
+  if (pkgfile ($package, "templates")) {
+    dico_error("debian/[package.]templates file exists.  You should probably move
+it to debian/[package.]templates.in", "${program}(1)");
+  }
+
+  # We are okay.  Generate the config file
+  # -----------------------------------------------------------------------
+
+  open (CONFIG, "> debian/$package.config");
+
+  # Get the dictionaries-common Policy compliant config code
+  my $config_dc = `cat $dictdir/config-$class`;
+
+  # Check if there is a debian/[package.]config.in file
+  if ($orig_config_file = pkgfile ($package, "config.in")) {
+    my $isshell;
+    # Read it and check if it is a Bourne shell or a Perl script
+    open (INCONFIG, "< $orig_config_file");
+    if ((my $shell_line = <INCONFIG>) =~ m{^\#!\s*(/bin/sh|/usr/bin/perl)}){
+      $isshell = ($1 eq "/bin/sh");
+    } else {
+      dico_error("The $orig_config_file file must be either a shell or Perl script.",
+	     "${program}(1)");
+    }
+    close INCONFIG;
+
+    # Okay, look now for a the valid #DEBHELPER# string
+    my $config_in;
+    unless (($config_in = `cat $orig_config_file`) =~ /\n\#DEBHELPER\#\s*\n/) {
+      dico_error("No valid #DEBHELPER# string in $orig_config_file. Aborting.",
+	     "${program}(1)");
+    }
+
+    # The valid #DEBHELPER# string was found, so replace it by the
+    # Policy specified code, taking care if it is a Bourne shell or
+    # Perl script.
+    if ($isshell) {
+      $config_dc = qq(tmp=`tempfile`
+cat > \$tmp <<EOF
+$config_dc
+EOF
+perl \$tmp
+rm -f \$tmp
+);
+    }
+    $config_in =~ s/\#DEBHELPER\#/$config_dc/;
+    # Save the whole thing in the config file
+    print CONFIG $config_in;
+  } else {
+    # Put the Policy compliant code in creating a Perl script
+    print CONFIG "#!/usr/bin/perl -w\n$config_dc";
+  }
+  close CONFIG;
+
+  # Generate the templates file
+  # -----------------------------------------------------------------------
+
+  my @tmp_languages  = ();
+  my @tmp_elanguages = ();
+  my @tmp_defaults   = ();
+  my $has_elanguages;
+
+  foreach (sort keys %{$dicts}){
+    my $lang  = $dicts->{$_};
+    unless ( defined $lang->{'debconf-display'} &&  lc($lang->{'debconf-display'}) eq "no" ) {
+      push (@tmp_languages,$_);
+      if ( defined $lang->{'elanguage'} ){
+	push (@tmp_elanguages,$lang->{'elanguage'});
+	$has_elanguages++;
+      } else {
+	push (@tmp_elanguages,$_);
+      }
+    }
+    if ( defined $lang->{'debconf-default'}
+	 &&  lc($lang->{'debconf-default'}) eq "yes"){
+      push (@tmp_defaults,$_);
+    }
+  }
+
+  my $languages     = join (', ', @tmp_languages);
+  my $elanguages    = join (', ', @tmp_elanguages);
+  my $templates_txt = `cat $dictdir/templates-$class`;
+
+  $templates_txt =~ s/\#LANGUAGES\#/$languages/;
+  $templates_txt =~ s/\#PACKAGE\#/$package/g;
+
+  # Do we have local templates to be added to the dict-common stuff?
+  if ($orig_templates_file = pkgfile ($package, "po-master.templates")) {
+    $orig_templates_txt = `cat $orig_templates_file`;
+  } elsif ($orig_templates_file = pkgfile ($package, "templates.in")) {
+    warning("$orig_templates_file use is deprecated.\n" .
+      "      Please base your template localization in po-debconf\n");
+    $orig_templates_txt = `cat $orig_templates_file`;
+  }
+
+  if ($orig_templates_txt){
+    $orig_templates_txt =~ s/^[\s\n]+//;
+    $orig_templates_txt =~ s/[\s\n]+$//;
+    $templates_txt .= "\n$orig_templates_txt\n";
+  }
+
+  # Add elanguages stuff
+  if ( $dh{WRITE_ELANGUAGES} or $has_elanguages ){
+    # po-debconf will only process "^__" if "debian/po" dir is present
+    my $translate_default_elanguage = ( -d "debian/po" ) ? "__" : "";
+    $templates_txt .="
+Template: $package/elanguages
+Type: text
+$translate_default_elanguage" . "Default: $elanguages
+Description: Alternative name for $package/languages
+ Useful to override the debconf languages string with something
+ different without triggering a new debconf call.
+ Do not modify directly, see man installdeb-$class instead.
+";
+  }
+
+  # Add template for defaults if present
+  if ( scalar(@tmp_defaults) > 0 ){
+    my $the_defaults = join (', ', @tmp_defaults);
+    $templates_txt .= "
+Template: $package/defaults
+Type: text
+Default: $the_defaults
+Description: Do not translate, for internal use.
+";
+  }
+
+  open (TEMPLATES, "> debian/$package.templates");
+  print TEMPLATES $templates_txt;
+  close TEMPLATES;
+}
+
+# ------------------------------------------------------------------
+sub dico_install_autocompat {
+# ------------------------------------------------------------------
+# Install debhelper snippets for autocompat
+#
+#  dico_install_autocompat($autocompat_info,$options)
+#
+# Needs: $options->{'class'} and $options->{'package'}
+# ------------------------------------------------------------------
+  my $autocompat_info = shift;
+  my $options         = shift;
+  my $class           = $options->{'class'}
+    or error("No 'class' passed in options file");
+  my $package = $options->{'package'}
+    or error("No 'package' passed in options file");
+  my %hash_extension  = ("ispell" => "hash", "aspell" => "rws");
+
+  # Return if no auto-compat info is available
+  unless ( defined $autocompat_info->{'auto-compat'}
+	   && %{$autocompat_info->{'auto-compat'}} ){
+    warning("No auto-compat info seems available for \"$package\"");
+    return;
+  }
+
+  my $auto_compats  = join(" ", map { $_ . ".compat" } sort keys %{$autocompat_info->{'auto-compat'}});
+  my $auto_hashes   = join(" ", map { $_ . ".$hash_extension{$class}" } sort keys %{$autocompat_info->{'auto-hash'}});
+  my $varlibrmfiles = join(" ", map { $_ . ".remove" } sort keys %{$autocompat_info->{'auto-compat'}});
+  my $varlibrm      = "$auto_compats $varlibrmfiles $auto_hashes";
+
+  # Install extra auto-scripts for auto-compat handling
+  autoscript ($package, "preinst", "preinst-compatfile-$class",
+	      "s/#COMPAT#/$auto_compats/");
+  autoscript ($package, "postinst", "postinst-compatfile-$class",
+	      "s/#COMPAT#/$auto_compats/");
+  autoscript ($package, "postrm", "postrm-varlibrm-$class",
+	      "s/#VARLIBRM#/$varlibrm/;s/#VARLIBRMFILES#/$varlibrmfiles/");
+}
+
+# ------------------------------------------------------------------
+sub dico_installcleandebconf {
+# ------------------------------------------------------------------
+# Call dh_installdebconf and do the clean up
+#
+#  dico_installcleandebconf($class)
+# -----------------------------------------------------------------------
+  my $package = shift;
+  error("dico_installcleandebconf: No package name provided") unless $package;
+  doit ("dh_installdebconf", "-p$package");
+  doit ("rm", "-f", "debian/$package.config", "debian/$package.templates");
+}
+
+# ------------------------------------------------------------------
+sub dico_populate_substvars {
+# ------------------------------------------------------------------
+# Populate $class:Depends substvars
+#
+#  dico_populate_substvars($options)
+#
+# $options->{'class'}
+# $options->{'package'}
+# $options->{'lib_dir'}
+  # ------------------------------------------------------------------
+  my $options = shift;
+  my $class   = $options->{'class'}
+    or error("No 'class' passed in options file");
+  my $package = $options->{'package'}
+    or error("No 'package' passed in options file");
+
+  if ( "$class" eq "aspell" ){
+    # aspell >= 0.60.3-3, satisfied in squeeze. No need to version.
+    addsubstvar ($package, "$class:Depends", "$class");
+    addsubstvar ($package, "$class:Depends", "dictionaries-common", ">= 1.23~");
+  } elsif ( "$class" eq "ispell" ){
+    # ispell minimal version is ancient. No need to version
+    addsubstvar ($package, "$class:Depends", "$class");
+    addsubstvar ($package, "$class:Depends", "dictionaries-common", ">= 1.23~");
+  } elsif ( "$class" eq "hunspell" ){
+    addsubstvar ($package, "$class:Depends", "dictionaries-common", ">= 1.0");
+  } elsif ( "$class" eq "wordlist" ){
+    addsubstvar ($package, "$class:Depends", "dictionaries-common", ">= 1.0");
+  } else {
+    error("dico_populate_substvars: Wrong class \"$class\".");
+  }
+}
+
+# ------------------------------------------------------------------
+sub dico_process_aspell_simple {
+# ------------------------------------------------------------------
+# Postprocess aspell official dictionary after installation and return
+# info found
+#
+# Should only be used if $dh{ASPELL_SIMPLE} is enabled, after make
+# install from aspell dict has been run.  This will get $lang info
+# from Makefile.pre. Other info will be extracted from installed .rws
+# and .dat. Will install .cwl files after it and try guessing correct
+# values for auto-compat and auto-hash
+#
+# \%autocompat = dico_process_aspell_simple($options)
+#
+# $options->{'program'}
+# $options->{'class'}
+# $options->{'lib_dir'}
+# $options->{'usr_lib_dir'}
+# $options->{'usr_share_dir'}
+# -----------------------------------------------------------------------
+
+  my $options            = shift;
+  my %dico_aspell_simple = ();
+
+  my $program            = $options->{'program'}
+    or error("dico_process_aspell_simple: No 'program' passed in options hash");
+  my $class              = $options->{'class'}
+    or error("dico_process_aspell_simple: No 'class' passed in options hash");
+  my $lib_dir            = $options->{'lib_dir'};
+  my $usr_lib_dir        = $options->{'usr_lib_dir'};
+  # my $var_lib_dir        = $options->{'var_lib_dir'};
+  my $usr_share_dir      = $options->{'usr_share_dir'};
+
+  # aspell-simple is only for aspell with enabled $dh{ASPELL_SIMPLE}
+  return unless ( $class eq "aspell" );
+  return unless ( defined $dh{ASPELL_SIMPLE} );
+
+  # Parse Makefile.pre to extract .dat and .compat file names after lang info
+  if ( -f "Makefile.pre" ){
+    open (my $MAKEFILEPRE, "<Makefile.pre");
+    while (<$MAKEFILEPRE>){
+      chomp;
+      if ( s/^lang\s+=\s+// ){
+	s/\s+$//;
+	my $dat = "$_.dat";
+	if ( $_ && -e "$dat" ){
+	  $dico_aspell_simple{'lang'}= $_;
+	  $dico_aspell_simple{'auto-compat'}{$_}++;
+	} else {
+	  error("Malformed aspell dict: \$lang.dat file \"$dat\" not found.");
+	}
+	last;
+      }
+    }
+    close $MAKEFILEPRE;
+    error("No \$lang found in Makefile.pre.")
+      unless ( defined $dico_aspell_simple{'lang'} );
+  } else {
+    error("\"Makefile.pre\" not found. --aspell-simple works only with pristine aspell dicts created with proc utility. See dh_aspell-simple(1) for more info.");
+  }
+
+  # Parse rws files. Should be a matching .cwl file for each one.
+  my @rwsfiles = map {basename $_} glob("$usr_lib_dir/*.rws");
+  doit ("install", "-d", $usr_share_dir) if (scalar @rwsfiles );
+  foreach my $rws ( @rwsfiles ){
+    my $base = $rws;
+    $base =~ s/\.rws$//;
+    my $cwl = "$base.cwl";
+    if ( -e "$cwl" ){
+      doit ("install","-m644","$cwl","$usr_share_dir");
+      doit ("gzip", "-9nf", "$usr_share_dir/$cwl");
+      $dico_aspell_simple{'auto-hash'}{$base}++;
+    } else {
+      warning("$program: No \"$cwl\" found for matching \"$rws\".");
+    }
+    verbose_print("Erasing $usr_lib_dir/$rws");
+    doit ("rm", "-f", "$usr_lib_dir/$rws") unless ( -l "$usr_lib_dir/$rws" );
+  }
+
+  # Check if we need a contents file. Other sanity checks.
+  if ( scalar keys %{$dico_aspell_simple{'auto-hash'}} == 0 ){
+    error("No installed .rws hashes found for this aspell dictionary.");
+  } else {
+    my $tmp_dat = $dico_aspell_simple{'lang'};
+    if ( scalar keys %{$dico_aspell_simple{'auto-hash'}} == 1 ){
+      my $tmp_hash = (keys %{$dico_aspell_simple{'auto-hash'}})[0];
+      if ( "$tmp_hash" ne "$tmp_dat" ){
+	error("$program: Not matching \"$tmp_dat.dat\" and \"$tmp_hash.rws\".");
+      }
+    } else {
+      $dico_aspell_simple{'auto-contents'}{$tmp_dat}++;
+    }
+  }
+
+  # If valid auto-compat info is derived, return a hash with it.
+  if ( defined $dico_aspell_simple{'auto-compat'} ){
+    return \%dico_aspell_simple;
+  }
+}
+
+# ------------------------------------------------------------------
+sub dico_process_autocompat {
+# ------------------------------------------------------------------
+# Parse and return autocompat info from info file
+#
+#  \%autocompat = dico_process_autocompat($dicts,$options)
+#
+# Needs: $options->{'class'}
+# ------------------------------------------------------------------
+  my $dicts           = shift;
+  my $options         = shift;
+  my $class           = $options->{'class'}
+    or error("No 'class' passed in options file");
+  my %hash_extension  = ("ispell" => "hash", "aspell" => "rws");
+  my %autocompat_info = ();
+
+  # autocompat is only for ispell and aspell autobuildhash
+  return unless ( $class eq "aspell" or $class eq "ispell" );
+
+  # Get list of basenames for compat and contents files
+  foreach my $language ( keys %{$dicts} ){
+    my $entry  = $dicts->{$language};
+    if ( defined $entry->{'auto-compat'} ) {
+      my $compat = $entry->{'auto-compat'};
+      foreach ( split(" ", $compat) ){
+	s/\.compat$//;
+	$autocompat_info{'auto-compat'}{$_}++;
+      }
+    }
+    if ( defined $entry->{'auto-contents'} ) {
+      my $contents = $entry->{'auto-contents'};
+      foreach ( split(" ", $contents) ){
+	s/\.contents$//;
+	$autocompat_info{'auto-contents'}{$_}++;
+      }
+    }
+    # Hashes list should be created automatically. This is here to
+    # add an extra hash name to the clean list on package
+    # removal. If you think about this, you may prefer to
+    # unconditionally remove old file from maintainer scripts.
+    if ( defined $entry->{'auto-extra-hash'} ) {
+      my $extra_hashes = $entry->{'auto-extra-hash'};
+      foreach ( split(" ", $extra_hashes) ){
+	s/\.$hash_extension{$class}$//;
+	$autocompat_info{'auto-hash'}{$_}++;
+	$autocompat_info{'auto-extra-hashes'}{$_}++;
+      }
+    }
+
+    # Get automatic list of basenames for different hashes
+    foreach my $base_name ( sort keys %{$autocompat_info{'auto-compat'}} ){
+      my $contents_file;
+      if ( $class eq "aspell" ) {
+	# Check if there is an associated contents file.
+	my $tmp_contents_file = "debian/$base_name.contents";
+	if ( -e $tmp_contents_file ) {
+	  verbose_print("Found contents file \"$tmp_contents_file\".");
+	  # and if it has been declared.
+	  if ( defined $autocompat_info{'auto-contents'}{$base_name} ){
+	    verbose_print("Contents file \"$tmp_contents_file\" is properly declared.");
+	    $contents_file = $tmp_contents_file;
+	  } else {
+	    warning("\"$tmp_contents_file\" found, but no associated 'auto-compat' entry in info file.\n"
+		    . "Ignoring \"$tmp_contents_file\"...");
+	  }
+	} elsif ( defined $autocompat_info{'auto-contents'}{$base_name} ){
+	  error("No matching \"$tmp_contents_file\" for 'auto-compat' entry \"$base_name\". Aborting ...");
+	}
+      }
+      # Parse aspell contents file if enabled and present.
+      if ( $contents_file ){
+	open (my $CONTENTS, "< $contents_file")
+	  or error("Could not open contents file \"$contents_file\". Aborting ...");
+	while (<$CONTENTS>){
+	  next if m /^\s*\#/;
+	  next if m/^\s*$/;
+	  chomp;
+	  s/\.rws$//;
+	  # Add contents info to list of hashes to be removed.
+	  $autocompat_info{'auto-hash'}{$_}++;
+	}
+	close $CONTENTS;
+      } else {
+	# Add base name to list of hashes to be removed.
+	$autocompat_info{'auto-hash'}{$base_name}++;
+      }
+    }
+  }
+
+  # If valid auto-compat info is found, return a hash with it.
+  if ( defined $autocompat_info{'auto-compat'} ){
+    return \%autocompat_info;
+  }
+}
+
+# ------------------------------------------------------------------
+sub dico_process_infofile {
+# ------------------------------------------------------------------
+# Parse, install and return info about info file
+#
+# \%infofile = dico_process_infofile($options)
+#
+# $options->{'class'}
+# $options->{'package'}
+# $options->{'lib_dir'}
+# ------------------------------------------------------------------
+  my $options = shift;
+  # my $program = $options->{'program'};
+  my $class   = $options->{'class'}
+    or error("No 'class' passed in options file");
+  my $package = $options->{'package'}
+    or error("No 'package' passed in options file");
+  my $lib_dir = $options->{'lib_dir'}
+    or error("No 'lib_dir' passed in options file");
+  my $infofile;
+
+  # Process the debian/info-$class file
+  unless ( $infofile = pkgfile ($package, "info-$class") ) {
+    # If not found, just return. Calling program must interpret this.
+    dico_warning("No debian/[package.]info-$class file found for package \"$package\".",
+            "the dictionaries-common Policy");
+    return;
+  }
+
+
+  # Parse the debian/info-$class file
+  my $dicts = parseinfo ($infofile);
+
+  # If we get here, the parseinfo call was successful. Install the
+  # file in the dictionaries-common lib dir.
+  doit ("install", "-d", $lib_dir);
+  doit ("install", "-m644", $infofile, "$lib_dir/$package");
+
+  return $dicts;
+}
+
+# ------------------------------------------------------------------
+# ------------------------------------------------------------------
+# Ensure we evaluate to true.
+1;
+
+__END__
+
+#Local Variables:
+#perl-indent-level: 2
+#End:
+
+=head1 NAME
+
+Devel::DictionariesCommon.pm - dictionaries-common library for its debhelper-like scripts
+
+=head1 SYNOPSIS
+
+    use Devel::DictionariesCommon q(:all)
+
+=head1 DESCRIPTION
+
+Common functions for use from the dictionaries-common debhelper-like installdeb-* scripts.
+
+=head1 CALLING FUNCTIONS
+
+=over
+
+=item C<dico_warning>
+
+Wrapper to debhelper warning function
+
+  dico_warning("warning message")
+
+=item C<dico_error>
+
+Wrapper to debhelper error function
+
+  dico_error("error message")
+
+=item C<dico_create_debconf_files>
+
+Create .config and .template debconf files
+
+  dico_create_debconf_files($class,$package,$dicts)
+
+=item C<dico_install_autocompat>
+
+Install debhelper snippets for auto-compat
+
+  dico_install_autocompat($autocompat_info,$options)
+
+Needs:
+
+  $options->{'class'}
+  $options->{'package'}
+
+=item C<dico_installcleandebconf>
+
+Call dh_installdebconf and do the clean up
+
+  dico_installcleandebconf($class)
+
+=item C<dico_populate_substvars>
+
+Populate $class:Depends substvars
+
+ dico_populate_substvars($options)
+
+Needs:
+
+  $options->{'class'}
+  $options->{'package'}
+
+=item C<dico_process_aspell_simple>
+
+Postprocess aspell official dictionary after installation and return
+info found
+
+  \%autocompat = dico_process_aspell_simple($options)
+
+Needs:
+
+  $options->{'program'}
+  $options->{'lib_dir'}
+  $options->{'usr_lib_dir'}
+  $options->{'usr_share_dir'}
+
+Should only be used if $dh{ASPELL_SIMPLE} is enabled, after make
+install from aspell dict has been run.  This will get $lang info
+from Makefile.pre. Other info will be extracted from installed .rws
+and .dat. Will install .cwl files after it and try guessing correct
+values for auto-compat and auto-hash
+
+=item C<dico_process_autocompat>
+
+Parse and return autocompat info from info file
+
+  \%autocompat = dico_process_autocompat($dicts,$options)
+
+Needs:
+
+  $options->{'class'}
+
+=item C<dico_process_infofile>
+
+Parse, install and return info about info file
+
+  \%infofile = dico_process_infofile($options)
+
+Needs:
+
+  $options->{'class'}
+  $options->{'package'}
+  $options->{'lib_dir'}
+
+=back
+
+=head1 SEE ALSO
+
+Debian dictionaries-common policy.
+
+=head1 AUTHORS
+
+ Rafael Laboissiere
+ Agustin Martin
+
+=cut

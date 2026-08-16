@@ -1,0 +1,28 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Protect against missing (multibyte-string-p) and (string-to-multibyte str) for XEmacs
+
+
+Index: dictionaries-common/support/emacsen/ispell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/ispell.el	2014-10-14 18:27:24.159515705 +0200
++++ dictionaries-common/support/emacsen/ispell.el	2014-10-14 18:27:24.155515714 +0200
+@@ -1633,11 +1633,14 @@
+ 		(error "No data for dictionary \"%s\", neither in `ispell-local-dictionary-alist' nor in `ispell-dictionary-alist'"
+ 		       ispell-current-dictionary)))
+ 	 (str (nth n slot)))
+-    (when (and (> (length str) 0)
+-	       (not (multibyte-string-p str)))
+-      (setq str (ispell-decode-string str))
+-      (or (multibyte-string-p str)
+-	  (setq str (string-to-multibyte str))))
++    ;; XEmacs: Not available `multibyte-string-p' `string-to-multibyte'
++    (if (featurep 'xemacs)
++	(setq str (ispell-decode-string str))
++      (when (and (> (length str) 0)
++		 (not (multibyte-string-p str)))
++	(setq str (ispell-decode-string str))
++	(or (multibyte-string-p str)
++	    (setq str (string-to-multibyte str)))))
+     str))
+ 
+ (defun ispell-get-casechars ()

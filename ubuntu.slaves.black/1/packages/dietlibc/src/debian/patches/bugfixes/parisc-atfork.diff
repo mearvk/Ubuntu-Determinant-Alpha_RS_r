@@ -1,0 +1,21 @@
+Description: Properly initialize pthread_atfork's spinlock
+ On PA-RISC (due to some quirk of the instruction set) an unlocked
+ spinlock is initialized with a 1, not a 0, as on other platforms. But
+ pthread_atfork's spinlock wasn't properly initialized with
+ PTHREAD_SPIN_UNLOCKED, instead it was just zero'd out, causing the
+ code to loop endlessly on fork() whenever -lpthread was linked in.
+Author: Christian Seiler <christian@iwakd.de>
+Last-Update: 2017-01-25
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/libpthread/pthread_atfork.c
++++ b/libpthread/pthread_atfork.c
+@@ -5,7 +5,7 @@
+ #include <pthread.h>
+ #include "thread_internal.h"
+ 
+-static struct _pthread_fastlock __atfork_struct_lock;
++static struct _pthread_fastlock __atfork_struct_lock = { PTHREAD_SPIN_UNLOCKED };
+ static struct __thread_atfork {
+   struct __thread_atfork*next,*prev;
+ 

@@ -1,0 +1,1212 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- -*- DocBook -*- -->
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+    "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+ <!ENTITY % versiondata SYSTEM "version.ent"> %versiondata;
+]>
+
+<book lang="en">
+
+<title>Debian <systemitem role="package">doc-base</systemitem> Manual</title>
+
+<bookinfo><!--{{{-->
+
+   <authorgroup>
+    <author>
+      <personname><firstname>Christian</firstname><surname>Schwarz</surname></personname>
+      <email>schwarz@debian.org</email>
+    </author>
+    <author>
+      <personname><firstname>Adam</firstname><surname>Di Carlo</surname></personname>
+      <email>aph@debian.org</email>
+    </author>
+    <author>
+      <personname><firstname>Robert</firstname><surname>Luberda</surname></personname>
+      <email>robert@debian.org</email>
+    </author>
+  </authorgroup>
+
+  <releaseinfo>ver. &version;</releaseinfo>
+
+  <pubdate>&date;</pubdate>
+
+  <abstract>
+    <para>This manual describes what <systemitem role="package">doc-base</systemitem>
+      is and how it can be used to manage online manuals on Debian systems.</para>
+  </abstract>
+
+  <copyright><year>1998,</year><holder>Christian Schwarz</holder></copyright>
+  <copyright><year>1999 – 2002,</year><holder>Adam Di Carlo</holder></copyright>
+  <copyright><year>2006 – 2018,</year><holder>Robert Luberda</holder></copyright>
+
+  <legalnotice>
+    <para>
+      This manual is free software; you may redistribute it and/or modify it under
+      the terms of the GNU General Public License as published by the Free Software
+      Foundation; either version 2, or (at your option) any later version.
+    </para>
+    <para>
+      This is distributed in the hope that it will be useful, but <emphasis>without
+      any warranty</emphasis>; without even the implied warranty of merchantability
+      or fitness for a particular purpose.  See the GNU General Public License for
+      more details.
+    </para>
+    <para>
+      A copy of the GNU General Public License is available as
+      <literal>/usr/share/common-licenses/GPL</literal> in the Debian GNU/Linux
+      distribution or on the World Wide Web at the <ulink
+      url="http://www.gnu.org/copyleft/gpl.html">GNU website</ulink>.  You can also
+      obtain it by writing to the Free Software Foundation, Inc., 51 Franklin St,
+      Fifth Floor, Boston, MA 02110-1301 USA.
+    </para>
+  </legalnotice>
+
+</bookinfo><!--}}}-->
+
+<chapter id="about"><title>About <systemitem role="package">doc-base</systemitem></title><!--{{{-->
+  <para>
+    Some time ago, there was a big discussion on the Debian mailing lists about the
+    preferred documentation format in Debian.  The discussion showed clearly that
+    people have very different opinions on that topic and thus, we'll have to
+    implement a flexible solution.
+  </para>
+  <para>
+    The <systemitem role="package">doc-base</systemitem> package tries to implement
+    such a flexible solution: every Debian package that provides online
+    documentation (other than manual pages) will register these documents to
+    <systemitem role="package">doc-base</systemitem> via the
+    <command>install-docs</command> script (see <xref
+    linkend="registering-documents"/>) at installation time and de-register the
+    manuals again when the package is removed.
+  </para>
+  <para>
+    Since all manuals will eventually be registered, <systemitem
+    role="package">doc-base</systemitem> can also be used to solve another
+    outstanding problem: Debian currently has four different online documentation
+    systems,
+    <systemitem role="package">doc-central</systemitem>,
+    <systemitem role="package">dwww</systemitem>,
+    <systemitem role="package">dochelp</systemitem>,
+    and <systemitem role="package">dhelp</systemitem>.
+    Each system has advantages and
+    disadvantages; thus <systemitem role="package">doc-base</systemitem> supports
+    all of them.  The system administrator can choose which implementation he/she
+    prefers.
+  </para>
+  <!--para>
+    Additionally <systemitem role="package">doc-base</systemitem> registers the
+    documentation with <ulink
+    url="http://scrollkeeper.sourceforge.net/">scrollkeepr</ulink>, thus making it
+    possible to view the manuals using programs like <systemitem
+    role="package">yelp</systemitem> or <systemitem
+    role="package">khelpcenter</systemitem>.
+  </para-->
+</chapter><!--}}}-->
+
+<chapter id="interface"><title>The packages interface</title><!--{{{-->
+
+  <section id="s2.1"><title>Introduction</title>
+    <para>
+      Each Debian package that installs online manuals (in any format) should
+      register its manuals to <systemitem role="package">doc-base</systemitem>.  This
+      is done by installing a <systemitem role="package">doc-base</systemitem>
+      <emphasis>control file</emphasis> (see <xref linkend="control-files"/>) and
+      calling <command>install-docs</command> from the <command>postinst</command>
+      script (see <xref linkend="registering-documents"/>).
+    </para>
+  </section>
+
+  <section id="document-ids"><title>Document IDs</title>
+    <para>
+      Each document that is registered to <systemitem
+      role="package">doc-base</systemitem> must have a unique <emphasis>document
+      ID</emphasis>.
+    </para>
+    <para>
+      The document ID is usually taken from the document's title or from the package
+      name.  Here are a few examples:
+    </para>
+    <screen>
+DOCID                  Title
+---------------------- ----------------------------
+debian-policy          Debian Policy Manual
+developers-reference   Debian Developers Reference
+doc-base               Debian doc-base Manual
+emacs-manual           GNU Emacs Manual
+    </screen>
+    <para>
+      Legal characters for the document ID are lower case letters (a-z), digits
+      (0-9), plus (+) or minus (-) signs, and dots (.) (the same characters allowed
+      in package names).
+    </para>
+  </section>
+
+  <section id="control-files"><title>Control Files</title>
+    <para>
+      For each piece of online documentation, <systemitem
+      role="package">doc-base</systemitem> needs a <emphasis>control file</emphasis>
+      that describes the documentation and the documentation file formats that are
+      provided initially.
+    </para>
+    <section id="s2.3.1"><title>Example</title>
+      <para>
+        Here is an example of a <emphasis>control file</emphasis>:
+      </para>
+      <screen>
+Document: doc-base
+Title: Debian doc-base Manual
+Author: Christian Schwarz
+Abstract: This manual describes what doc-base is
+ and how it can be used to
+ manage online manuals on Debian systems.
+Section: Debian
+
+Format: DebianDoc-SGML
+Files: /usr/share/doc/doc-base/doc-base.sgml.gz
+
+Format: Text
+Files: /usr/share/doc/doc-base/doc-base.txt.gz
+
+Format: HTML
+Index: /usr/share/doc/doc-base/doc-base.html/index.html
+Files: /usr/share/doc/doc-base/doc-base.html/*.html
+      </screen>
+      <para>
+        If the <systemitem role="package">doc-base</systemitem> package provided
+        necessary files in other formats, it would be possible to add more sections at
+        the end of the <emphasis>control file</emphasis>:
+      </para>
+      <screen>
+Format: PDF
+Files: /usr/share/doc-base/doc-base.pdf
+
+Format: PostScript
+Files: /usr/share/doc-base/doc-base.ps.gz
+
+Format: DVI
+Files: /usr/share/doc-base/doc-base.dvi.gz
+
+Format: Info
+Index: /usr/share/info/doc-base.info.gz
+Files: /usr/share/info/doc-base.info*.gz
+      </screen>
+    </section>
+
+    <section id="s2.3.2"><title>Syntax of the control file</title>
+      <para>
+        As you can see from the above example, the syntax -- as is the whole design of
+        <systemitem role="package">doc-base</systemitem> -- is heavily influenced by
+        dpkg.  This is important since every maintainer will have to work with
+        <systemitem role="package">doc-base</systemitem> and thus, it should be simple
+        to remember the basic ideas.
+      </para>
+      <para>The syntax of the control file is simple:</para>
+      <itemizedlist>
+        <listitem>
+          <para>
+            The file consist of
+          </para>
+          <itemizedlist>
+            <listitem>
+              <para>
+                exactly one main section providing base information about the registered manual
+                (see <xref linkend="main-section"/> below);
+              </para>
+            </listitem>
+            <listitem>
+              <para>
+                one or more format sections (see <xref linkend="format-sections"/>) containing
+                pointers to the registered documentation files.
+              </para>
+            </listitem>
+          </itemizedlist>
+        </listitem>
+
+        <listitem>
+          <para>
+            Successive sections must be separated with empty lines.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Non-empty lines use a `<literal>field-name: value</literal>' syntax.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            The field names are case-insensitive.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            The field values are case-sensitive (except for the <emphasis>Format</emphasis>
+            field).
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+            Field values may be wrapped over several lines by making the first character of
+            subsequent lines a space.
+          </para>
+          <itemizedlist>
+            <listitem>
+              <para>
+                If a multi-line value should contain an empty line, a single dot (.) must be
+                placed in the second column.
+              </para>
+            </listitem>
+            <listitem>
+              <para>
+                If the <emphasis>Abstract</emphasis> field value should contain lines displayed
+                verbatim, the lines must begin with two spaces.
+              </para>
+            </listitem>
+          </itemizedlist>
+        </listitem>
+
+        <listitem>
+          <para>
+            The file should be encoded in UTF-8.
+          </para>
+        </listitem>
+      </itemizedlist>
+
+      <section id="main-section"><title>The main section</title>
+        <para>The first section of the control file describes the document.  The following
+          fields are available:</para>
+        <variablelist>
+          <varlistentry>
+            <term><emphasis>Document</emphasis></term>
+            <listitem>
+              <para><link linkend="document-ids">Document ID</link>, required field;
+                should be the first field.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Title</emphasis></term>
+            <listitem>
+              <para>Title of the document; required field.</para>
+           </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Author</emphasis></term>
+              <listitem>
+                <para>Author(s) of the document; optional field.</para>
+              </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Abstract</emphasis></term>
+            <listitem>
+              <para>Short paragraph giving an overview of the document;
+                optional but recommended field.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Section</emphasis></term>
+            <listitem>
+              <para>Section where the document belongs;
+                see <xref linkend="section-field"/>.  Required field.</para>
+            </listitem>
+          </varlistentry>
+        </variablelist>
+      </section>
+
+      <section id="format-sections"><title><emphasis>Format</emphasis> sections</title>
+        <para>The next sections describe the different formats for the provided document,
+          which is described in the first section.  The following fields are available:</para>
+        <variablelist>
+          <varlistentry>
+            <term><emphasis>Format</emphasis></term>
+            <listitem>
+              <para>Format for the document.  Required field.  The following formats are
+                recognised:</para>
+              <itemizedlist>
+                <listitem>
+                  <para><literal>HTML</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para><literal>Text</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para><literal>PDF</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para><literal>PostScript</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para><literal>Info</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para><literal>DVI</literal>,</para>
+                </listitem>
+                <listitem>
+                  <para>and <literal>DebianDoc-SGML</literal>.</para>
+                </listitem>
+              </itemizedlist>
+
+              <para>The values of this field are case-insensitive (e.g.  both
+                <literal>Text</literal> and <literal>text</literal> are valid).</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Index</emphasis></term>
+            <listitem>
+              <para>Index or top-level file for this document format.  Only applies
+                to document formats <literal>HTML</literal> and <literal>Info</literal>,
+                and required if the format is <literal>HTML</literal> or
+                <literal>Info</literal>.</para>
+              <para>This field has to contain the absolute file name of the main page
+                of the document.  This file will be specified as the front page link when
+                the document is registered.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry>
+            <term><emphasis>Files</emphasis></term>
+            <listitem>
+              <para>Space separated list of filenames or POSIX shell globs (i.e.
+                <literal>*</literal>, <literal>?</literal>, and <literal>[]</literal>
+                meta-characters) representing the files which constitute the documentation in
+                this format.  Required field.</para>
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        <para>There must be at least one such section.  If there are more, each of them
+          must register files in different formats (e.g.  having two <literal>Format:
+          HTML</literal> sections in one <emphasis>control file</emphasis> is not
+          allowed).</para>
+        <para>Except for the <literal>Info</literal> format the files referred to in both
+          <emphasis>Index</emphasis> and <emphasis>Files</emphasis> fields should be
+          placed somewhere under the <filename>/usr/share/doc</filename> hierarchy.  If
+          for some reason it's not possible, then the registering package should provide
+          a symbolic link pointing from the above hierarchy to the real files and
+          register its documentation through the link, allowing the <systemitem
+          role="package">doc-base</systemitem>, <systemitem
+          role="package">dhelp</systemitem>, or <systemitem
+          role="package">dwww</systemitem> packages to actually handle the documentation.
+          Of course, files in the <literal>Info</literal> format should be located in the
+          <filename>/usr/share/info</filename> directory.
+        </para>
+      </section>
+    </section>
+
+    <section id="section-field"><title>The <literal>section</literal> field</title>
+      <para>The <literal>section</literal> field holds a slash-separated list of
+        hierarchical section components.  The hierarchy is mostly based on the
+        sections outlined in chapter 2.1 of the <ulink
+        url="http://www.debian.org/doc/packaging-manuals/menu-policy/ch2.html#s2.1">Debian
+        Menu Policy</ulink>; however the top-level <literal>Applications</literal>
+        component was removed and a few <systemitem
+          role="package">doc-base</systemitem>-specific sections were added.</para>
+      <para>The full section list is presented below.</para>
+
+<!-- section list begin -->
+      <variablelist>
+        <varlistentry>
+          <term><literal>Accessibility</literal></term>
+          <listitem>
+            <para>Documentation of tools to aid people with disabilities or
+              for machines lacking usual input devices.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Amateur Radio</literal></term>
+          <listitem>
+            <para>Anything relating to ham radio.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Data Management</literal></term>
+          <listitem>
+            <para>Interactive database programs, collection managers,
+              address books, bibliography tools, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Debian</literal></term>
+          <listitem>
+            <para>Documentation of Debian specific tools, policies, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Editors</literal></term>
+          <listitem>
+            <para>Documentation of editors, other than office word processors,
+              for text-based information.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Education</literal></term>
+          <listitem>
+            <para>Educational and training software.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Emulators</literal></term>
+          <listitem>
+            <para>Software that allows you to run non-native software
+              or more than one OS at a time.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>File Management</literal></term>
+          <listitem>
+            <para>Tools for file management, archiving, searching,
+              CD/DVD burning, backup, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Games</literal></term><!-- secion list skip -->
+          <listitem>
+            <para>Games and recreations.  Entries should be placed in
+              the appropriate subsection.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>Games/Action</literal></term>
+                <listitem>
+                  <para>Games that involve a lot of action and require
+                    fast reflexes.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Adventure</literal></term>
+                <listitem>
+                  <para>Role playing and adventure games, interactive movies
+                    and stories, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Blocks</literal></term>
+                <listitem>
+                  <para>Tetris-like games involving falling blocks.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Board</literal></term>
+                <listitem>
+                  <para>Games played on a board.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Card</literal></term>
+                <listitem>
+                  <para>Games involving a deck of cards.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Puzzles</literal></term>
+                <listitem>
+                  <para>Tests of ingenuity and logic.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Simulation</literal></term>
+                <listitem>
+                  <para>Simulations of the real world in all detail
+                    and complexity.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Strategy</literal></term>
+                <listitem>
+                  <para>Games involving long-term strategic thinking.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Tools</literal></term>
+                <listitem>
+                  <para>Server browsers, configurators, editors, and other
+                    game-related tools that are not games themselves.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Games/Toys</literal></term>
+                <listitem>
+                  <para>Amusements, eye-candy, entertaining demos, screen hacks
+                    (screen-savers), etc.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Graphics</literal></term>
+          <listitem>
+            <para>2D and 3D graphics manipulation software.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Help</literal></term>
+          <listitem>
+            <para>Documentation of programs that provide user documentation.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>Help/Books</literal></term>
+                <listitem>
+                  <para>Books.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Help/FAQ</literal></term>
+                <listitem>
+                  <para>Frequently Asked Questions.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Help/HOWTO</literal></term>
+                <listitem>
+                  <para>Various HOWTOs.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Help/RFC</literal></term>
+                <listitem>
+                  <para>RFCs</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Help/Standards</literal></term>
+                <listitem>
+                  <para>Standards</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Mobile Devices</literal></term>
+          <listitem>
+            <para>Software that allows you to interface with mobile
+              devices (phones, PDAs, etc.).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Network</literal></term><!-- secion list skip -->
+          <listitem>
+            <para>Network related software.  This is a two-level section; do not put entries
+              directly here.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>Network/Communication</literal></term>
+                <listitem>
+                  <para>Mail, USENET news, chat, instant messaging, IP telephony,
+                    video conferencing software, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Network/File Transfer</literal></term>
+                <listitem>
+                  <para>File transfer software such as download managers,
+                    FTP clients, P2P clients, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Network/Monitoring</literal></term>
+                <listitem>
+                  <para>Network monitoring software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Network/Remote Access</literal></term>
+                <listitem>
+                  <para>Tools for remotely managing a computer.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Network/Web Browsing</literal></term>
+                <listitem>
+                  <para>Web browsers, tools for offline browsing, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Network/Web News</literal></term>
+                <listitem>
+                  <para>Web feed (RSS, Atom, etc.) and podcast aggregators.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Office</literal></term>
+          <listitem>
+            <para>Office suites, word processors, spreadsheets, CRM, ERP,
+              financial software, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Programming</literal></term>
+          <listitem>
+            <para>IDEs, debuggers, compilers, APIs, libraries, programming languages.
+              Documentation related to only one specific language should be put in
+              the subsection named like the language, for example:</para>
+            <itemizedlist>
+              <listitem>
+                <para><literal>Programming/C</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/C++</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/Java</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/OCaml</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/Perl</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/Python</literal></para>
+              </listitem>
+              <listitem>
+                <para><literal>Programming/Ruby</literal></para>
+              </listitem>
+            </itemizedlist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Project Management</literal></term>
+          <listitem>
+            <para>Timetable managers, group task trackers, bug
+              tracking software, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Science</literal></term><!-- secion list skip -->
+          <listitem>
+            <para>Documentation of scientific and engineering-related
+              software.  Please use the appropriate subsection.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>Science/Astronomy</literal></term>
+                <listitem>
+                  <para>Astronomy-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Biology</literal></term>
+                <listitem>
+                  <para>Biology-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Chemistry</literal></term>
+                <listitem>
+                  <para>Chemistry-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Data Analysis</literal></term>
+                <listitem>
+                  <para>Software designed for processing, extracting, and presenting
+                    generic scientific data.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Electronics</literal></term>
+                <listitem>
+                  <para>Circuit design tools, simulators and assemblers for microprocessors, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Engineering</literal></term>
+                <listitem>
+                  <para>CAD, UML tools, diagram-drawing and other engineering-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Geoscience</literal></term>
+                <listitem>
+                  <para>Geoscience-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Mathematics</literal></term>
+                <listitem>
+                  <para>Mathematics-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Medicine</literal></term>
+                <listitem>
+                  <para>Medicine-related software.</para>
+                  </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Physics</literal></term>
+                <listitem>
+                  <para>Physics-related software.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Science/Social</literal></term>
+                <listitem>
+                  <para>Social sciences-related software.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Screen</literal></term>
+          <listitem>
+            <para>Programs that affect the whole screen.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>Screen/Saving</literal></term>
+                <listitem>
+                  <para>Tools for blanking the screen.  Entries of screen hacks
+                    and configuration GUIs should go to other appropriate sections.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>Screen/Locking</literal></term>
+                <listitem>
+                  <para>Tools for locking the screen.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Shells</literal></term>
+          <listitem>
+            <para>Various shells to be used inside a terminal emulator.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Sound</literal></term>
+            <listitem>
+              <para>Sound players, editors, and rippers/recorders.</para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>System</literal></term><!-- secion list skip -->
+          <listitem>
+            <para>System related software.  Place entries in one of the subsections.</para>
+            <variablelist>
+              <varlistentry>
+                <term><literal>System/Administration</literal></term>
+                <listitem>
+                  <para>Administrative and system configuration utilities,
+                    also tools for personal user settings.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>System/Hardware</literal></term>
+                <listitem>
+                  <para>Tools for manipulating specific hardware, especially
+                    non-standard laptop hardware.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>System/Language Environment</literal></term>
+                <listitem>
+                  <para>This section is reserved for language-env as a special case.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>System/Monitoring</literal></term>
+                <listitem>
+                  <para>System information and monitoring tools, log viewers, etc.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>System/Package Management</literal></term>
+                <listitem>
+                  <para>Package managers and related tools.</para>
+                </listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><literal>System/Security</literal></term>
+                <listitem>
+                  <para>Security, cryptography and privacy related software,
+                    antiviruses, tools to track and report bugs, etc.</para>
+                </listitem>
+              </varlistentry>
+            </variablelist>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Terminal Emulators</literal></term>
+            <listitem>
+              <para>Graphical terminal emulators.</para>
+            </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Text</literal></term>
+          <listitem>
+            <para>Text oriented tools like dictionaries, OCR, translation,
+              text analysis software, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>TV and Radio</literal></term>
+          <listitem>
+            <para>TV-in, TV-out, FM radio, teletext browsers, etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Typesetting</literal></term>
+          <listitem>
+            <para>Software for typesetting text and graphics from structured
+              input files like LaTeX or docbook sources, database exports etc.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Viewers</literal></term>
+          <listitem>
+            <para>Software for viewing images, documents and other (non-video) media.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Video</literal></term>
+          <listitem>
+            <para>Video players, editors, and rippers/recorders.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Web Development</literal></term>
+          <listitem>
+            <para>Software for web site editing, web programming, and site administration.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term><literal>Window Managers</literal></term>
+          <listitem>
+            <para>X window managers.</para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+    </section>
+  </section>
+<!-- section list end -->
+
+  <section id="registering-documents"><title>Registering Documents With <command>doc-base</command></title>
+    <para>
+      In order to register a piece of online documentation to <systemitem
+      role="package">doc-base</systemitem>, all the package needs to do is install
+      the control file (see <xref linkend="control-files"/>) as file
+      <filename>/usr/share/doc-base/<replaceable>document-id</replaceable></filename>.
+    </para>
+    <para>
+      Further processing of the control file is handled by a <systemitem
+      role="package">dpkg</systemitem> trigger (cf.
+      <filename>/usr/share/doc/dpkg/triggers.txt.gz</filename>) provided by
+      <systemitem role="package">doc-base</systemitem>.  The trigger will call
+      <command>install-docs</command> to generate the
+      <filename>/var/lib/doc-base/documents/<replaceable>&lt;document-id&gt;</replaceable></filename>
+      file and register the online manuals to <systemitem
+      role="package">dwww</systemitem>, and <systemitem
+      role="package">dhelp</systemitem>, when the package is installed, and
+      de-register the manuals when the package is removed.
+    </para>
+  </section>
+
+  <section id="s2.5"><title>doc-base 0.8.x features and incompatibilities</title>
+    <section id="s2.5.1"><title>Splitting control files over multiple binary packages</title>
+      <para>
+        Since version 0.8.7 it is possible to provide documents with the same
+        <emphasis>document-id</emphasis> by more than one binary package.  All such
+        documents will be merged together and the merged document will be generated in the
+        <filename>/var/lib/doc-base/documents/<!--emphasis-->document-id<!--/emphasis--></filename>
+        file.  This feature can be useful in cases when the same documentation, but in
+        different formats, is provided by two binary packages.
+      </para>
+      <para>
+        For example the <systemitem role="package">foo-text</systemitem> package could
+        install the <filename>/usr/share/doc-base/foo-text</filename> file with the
+        following contents:
+      </para>
+      <screen>
+Document: foo
+Title: This is foo
+Author: John Foo &lt;foo@foo.net&gt;
+Abstract: Description of foo
+Section: Text
+
+Format: text
+Files: /usr/share/foo-text/foo.txt.gz
+      </screen>
+      <para>
+        and the <systemitem role="package">foo-html</systemitem> package could install
+        the following <filename>/usr/share/doc-base/foo-html</filename> file:
+      </para>
+      <screen>
+Document: foo
+Title: This is foo
+Author: John Foo &lt;foo@foo.net&gt;
+Abstract: Description of foo
+Section: Text
+
+Format: HTML
+Index: /usr/share/foo-html/index.html
+Files: /usr/share/foo-html/*.html
+      </screen>
+      <para>
+        When both packages are installed, <command>install-docs</command> will merge
+        the contents of the two files into
+        <filename>/var/lib/doc-base/documents/foo</filename>:
+      </para>
+      <screen>
+Document: foo
+Title: This is foo
+Author: John Foo &lt;foo@foo.net&gt;
+Abstract: Description of foo
+Section: Text
+
+Format: HTML
+Index: /usr/share/foo-html/index.html
+Files: /usr/share/foo-html/*.html
+
+Format: text
+Files: /usr/share/foo-text/foo.txt.gz
+      </screen>
+    </section>
+
+    <section id="s2.5.2"><title>Registering local documents</title>
+      <para>
+        Version 0.8.7 and further allow a user to register local documentation.  In
+        order to do this local administrators need to create their own control file
+        (see <xref linkend="control-files"/>, place it in the
+        <filename>/etc/doc-base/documents</filename> directory, and then register it
+        with
+      </para>
+      <screen>
+install-docs -i /etc/doc-base/documents/&lt;document-id&gt;
+      </screen>
+      <para>
+        Before removing the file, it should be de-registered with
+      </para>
+      <screen>
+install-docs -r /etc/doc-base/documents/&lt;document-id&gt;
+      </screen>
+      <para>
+        Since version 0.8.12
+      </para>
+      <screen>
+install-docs --install-changed
+      </screen>
+      <para>
+        may be used instead of the two above commands.
+      </para>
+    </section>
+
+    <section id="s2.5.3"><title>dpkg triggers</title>
+      <para>
+        <systemitem role="package">doc-base</systemitem> 0.8.11 and greater use the
+        <systemitem role="package">dpkg</systemitem> triggers feature to register and
+        de-register the documentation.  There is no longer a need to call
+        <command>install-docs</command> from maintainer scripts.
+      </para>
+    </section>
+  </section>
+
+  <section id="checking-syntax"><title>Checking Syntax of <emphasis>Control Files</emphasis></title>
+    <para>
+      With the new <literal>--check</literal> (<literal>-c</literal>) option of
+      <command>install-docs</command> it is possible to check the <emphasis>control
+      file</emphasis>:
+    </para>
+    <screen>
+$ install-docs --check /usr/share/doc-base/doc-base
+/usr/share/doc-base/doc-base: No problems found
+    </screen>
+    <screen>
+$ install-docs -c /usr/share/doc-base/xlogmaster
+Error in `/usr/share/doc-base/xlogmaster', line 15: `Index' value missing for format info
+/usr/share/doc-base/xlogmaster: Fatal error found, the file won't be registered
+    </screen>
+    <screen>
+$ install-docs -c /usr/share/doc-base/MC-FAQ /usr/share/doc-base/gnu-privacy-handbook
+/usr/share/doc-base/MC-FAQ: 1 warning(s) or non-fatal error(s) found
+/usr/share/doc-base/gnu-privacy-handbook: 1 warning(s) or non-fatal error(s) found
+    </screen>
+    <para>
+      More details about the warnings and non-fatal errors can be found using the
+      <literal>--verbose</literal> (<literal>-v</literal>) option:
+    </para>
+    <screen>
+$ install-docs -v -c /usr/share/doc-base/MC-FAQ /usr/share/doc-base/gnu-privacy-handbook
+Warning in `/usr/share/doc-base/MC-FAQ', line 1: invalid value of `Document' field
+/usr/share/doc-base/MC-FAQ: 1 warning(s) or non-fatal error(s) found
+Warning in `/usr/share/doc-base/gnu-privacy-handbook', line 12: file `/usr/share/doc/gnupg-doc/GNU_Privacy_Handbook/html/book1.html' does not exist
+/usr/share/doc-base/gnu-privacy-handbook: 1 warning(s) or non-fatal error(s) found
+    </screen>
+    <para>
+        With the <literal>--rootdir</literal> option it is possible to check non-installed
+        packages:
+    </para>
+    <screen>
+$ dpkg-deb -x autoclass_3.3.4-6_i386.deb AUTOCLASS_UNPACKED
+$ install-docs --rootdir AUTOCLASS_UNPACKED -vc AUTOCLASS_UNPACKED/usr/share/doc-base/*
+AUTOCLASS_UNPACKED/usr/share/doc-base/autoclass-results: No problems found
+AUTOCLASS_UNPACKED/usr/share/doc-base/autoclass-theory: No problems found
+    </screen>
+    <para>
+      If the <literal>--rootdir</literal> option was omitted,
+      <command>install-docs</command> would complain:
+    </para>
+    <screen>
+Warning in `AUTOCLASS_UNPACKED/usr/share/doc-base/autoclass-results', line 20: file mask `/usr/share/doc/autoclass/kdd-95.pdf' does not match any files
+Warning in `AUTOCLASS_UNPACKED/usr/share/doc-base/autoclass-theory', line 20: file mask `/usr/share/doc/autoclass/tr-fia-90-12-7-01.pdf' does not match any files
+    </screen>
+  </section>
+</chapter><!--}}}-->
+
+<chapter id="informations"><title>Getting information about installed documents</title><!--{{{-->
+  <para>
+    If you want to get information about the status of an installed manual, you can
+    use the `<literal>-s</literal>' or `<literal>--status</literal>' option of
+    <command>install-docs</command> followed by the document id:
+  </para>
+  <screen>
+$ install-docs -s foo
+---document-information---
+Document: foo
+Abstract: This manual is about foos, bars, and Debian.
+Author: Wile E. Coyote
+Section: Debian
+Title: Debian Foo's Manual
+
+---format-description---
+Format: debiandoc-sgml
+Files: /usr/share/doc/foo/sgml/foo.sgml.gz
+
+---format-description---
+Format: html
+Files: /usr/share/doc/foo/html-sgml/*.html
+Index: /usr/share/doc/foo/html-sgml/index.html
+
+---status-information---
+Control-Files: /usr/share/doc-base/foo (changed: Tue Apr  8 23:09:24 2008)
+  </screen>
+  <para>
+    <systemitem role="package">doc-base</systemitem> always creates a
+    <filename>/var/lib/doc-base/documents/&lt;document-id&gt;</filename> file when
+    installing a document.
+  </para>
+</chapter><!--}}}-->
+
+<chapter id="todo"><title>TODO List</title><!--{{{-->
+  <section id="s4.1"><title>Roadmap for 0.9.* releases</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Internationalisation and po-debconf support.  Unfortunately this would require
+          merging <emphasis>Abstract</emphasis> and <emphasis>Title</emphasis> fields
+          into one <emphasis>Description</emphasis> field.  See <ulink
+          url="http://bugs.debian.org/171373">Bug#171363</ulink>, <ulink
+          url="http://bugs.debian.org/171375">Bug#171375</ulink>, and <ulink
+          url="http://bugs.debian.org/171378">Bug#171378</ulink>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Introduce some new fields, like <emphasis>Package</emphasis> (<ulink
+          url="http://bugs.debian.org/71955">Bug#71955</ulink>), or
+          <emphasis>SortSkip</emphasis> (<ulink
+          url="http://bugs.debian.org/187590">Bug#187590</ulink>).
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Possibly allow documents to appear in multiple sections; see <ulink
+          url="http://bugs.debian.org/cgi-bin/bugreport.cgi?msg=54;bug=109431">Steve M.
+          Robbins' mail</ulink>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Possibly index documentation with swish++ that could be used by frontends like
+          <systemitem role="package">dhelp</systemitem> or <systemitem
+          role="package">dwww</systemitem>.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </section>
+
+  <section id="s4.2"><title>Old TODO entries</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Policy: document the <systemitem role="package">doc-base</systemitem> document
+          registration file format separately (or SUBDOC it) as a proposed Debian
+          documentation system policy.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Policy: define a first-cut standard as the document hierarchy.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Documentation update: show clean and minimal use of
+          <command>install-docs</command> from a maintainer script.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          It is <emphasis>extremely</emphasis> difficult to deal coherently with a
+          misnamed control file, or a mismatch between a control file and the document
+          field.  This hit me in the transition between <systemitem
+          role="package">doc-base</systemitem> 0.4 to 0.5 (in 0.4 I had added, in a file
+          install-docs-man, a document ID named install-doc-man).  Something needs to be
+          done about that.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Automated format conversion, including user preferences.  (For example, convert
+          Texinfo source to GNU info or PostScript, optionally compress or remove HTML
+          manuals which are also available in GNU info format, etc.  etc.)
+        </para>
+      </listitem>
+    </itemizedlist>
+  </section>
+</chapter><!--}}}-->
+
+</book>
+<!--
+vim:ts=2:et:sts=2:sw=2:fdm=marker
+-->

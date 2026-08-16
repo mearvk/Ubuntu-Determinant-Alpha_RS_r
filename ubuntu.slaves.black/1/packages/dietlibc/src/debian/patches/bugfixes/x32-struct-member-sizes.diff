@@ -1,0 +1,172 @@
+Description: Fix some struct member sizes on x32
+ These need to be of the same size as amd64 uses.
+ .
+ Also fix signedness of useconds_t.
+Author: mirabilos <tg@debian.org>
+Bug-Debian: https://bugs.debian.org/925359
+Last-Update: 2019-10-24
+Forwarded: not-yet
+
+--- a/include/asm/x86_64-sigcontext.h
++++ b/include/asm/x86_64-sigcontext.h
+@@ -18,32 +18,35 @@ struct _fpstate {
+ };
+ 
+ struct sigcontext { 
+-	unsigned long r8;
+-	unsigned long r9;
+-	unsigned long r10;
+-	unsigned long r11;
+-	unsigned long r12;
+-	unsigned long r13;
+-	unsigned long r14;
+-	unsigned long r15;
+-	unsigned long rdi;
+-	unsigned long rsi;
+-	unsigned long rbp;
+-	unsigned long rbx;
+-	unsigned long rdx;
+-	unsigned long rax;
+-	unsigned long rcx;
+-	unsigned long rsp;
+-	unsigned long rip;
+-	unsigned long eflags;		/* RFLAGS */
++	__u64 r8;
++	__u64 r9;
++	__u64 r10;
++	__u64 r11;
++	__u64 r12;
++	__u64 r13;
++	__u64 r14;
++	__u64 r15;
++	__u64 rdi;
++	__u64 rsi;
++	__u64 rbp;
++	__u64 rbx;
++	__u64 rdx;
++	__u64 rax;
++	__u64 rcx;
++	__u64 rsp;
++	__u64 rip;
++	__u64 eflags;		/* RFLAGS */
+ 	__u16         cs;
+ 	__u16         gs;
+ 	__u16         fs;
+ 	__u16         __pad0;
+-	unsigned long err;
+-	unsigned long trapno;
+-	unsigned long oldmask;
+-	unsigned long cr2;
+-	struct _fpstate *fpstate;	/* zero when no FPU context */
+-	unsigned long reserved1[8];
++	__u64 err;
++	__u64 trapno;
++	__u64 oldmask;
++	__u64 cr2;
++	__extension__ union {
++		struct _fpstate *fpstate;	/* zero when no FPU context */
++		__u64 __fpstate_word;
++	};
++	__u64 reserved1[8];
+ };
+--- a/include/sys/resource.h
++++ b/include/sys/resource.h
+@@ -13,6 +13,24 @@ __BEGIN_DECLS
+ struct	rusage {
+   struct timeval ru_utime;	/* user time used */
+   struct timeval ru_stime;	/* system time used */
++#if defined(__x86_64__) && defined(__ILP32__)
++  /* x32 needs these 64 bits wide */
++  __extension__ union { long ru_maxrss; uint64_t __ru_maxrss_word; };
++  __extension__ union { long ru_ixrss; uint64_t __ru_ixrss_word; };
++  __extension__ union { long ru_idrss; uint64_t __ru_idrss_word; };
++  __extension__ union { long ru_isrss; uint64_t __ru_isrss_word; };
++  __extension__ union { long ru_minflt; uint64_t __ru_minflt_word; };
++  __extension__ union { long ru_majflt; uint64_t __ru_majflt_word; };
++  __extension__ union { long ru_nswap; uint64_t __ru_nswap_word; };
++  __extension__ union { long ru_inblock; uint64_t __ru_inblock_word; };
++  __extension__ union { long ru_oublock; uint64_t __ru_oublock_word; };
++  __extension__ union { long ru_msgsnd; uint64_t __ru_msgsnd_word; };
++  __extension__ union { long ru_msgrcv; uint64_t __ru_msgrcv_word; };
++  __extension__ union { long ru_nsignals; uint64_t __ru_nsignals_word; };
++  __extension__ union { long ru_nvcsw; uint64_t __ru_nvcsw_word; };
++  __extension__ union { long ru_nivcsw; uint64_t __ru_nivcsw_word; };
++#else
++  /* all other architectures use native sizes */
+   long	ru_maxrss;		/* maximum resident set size */
+   long	ru_ixrss;		/* integral shared memory size */
+   long	ru_idrss;		/* integral unshared data size */
+@@ -27,11 +45,18 @@ struct	rusage {
+   long	ru_nsignals;		/* signals received */
+   long	ru_nvcsw;		/* voluntary context switches */
+   long	ru_nivcsw;		/* involuntary " */
++#endif
+ };
+ 
++#if defined(__x86_64__) && defined(__ILP32__)
++typedef unsigned long long rlim_t;
++#else
++typedef unsigned long rlim_t;
++#endif
++
+ struct rlimit {
+-  unsigned long	rlim_cur;
+-  unsigned long	rlim_max;
++  rlim_t rlim_cur;
++  rlim_t rlim_max;
+ };
+ 
+ #define PRIO_MIN	(-20)
+@@ -82,6 +107,8 @@ struct rlimit {
+ 
+ #if defined(__alpha__) || (defined(__mips__) && !defined(__mips64__)) || defined(__sparc__)
+ #define RLIM_INFINITY ((long)(~0UL>>1))
++#elif defined(__x86_64__) && defined(__ILP32__)
++#define RLIM_INFINITY (~0ULL)
+ #else
+ #define RLIM_INFINITY (~0UL)
+ #endif
+@@ -93,8 +120,6 @@ int getrlimit (int resource, struct rlim
+ int getrusage (int who, struct rusage *usage);
+ int setrlimit (int resource, const struct rlimit *rlim);
+ 
+-typedef unsigned long rlim_t;
+-
+ __END_DECLS
+ 
+ #endif
+--- a/include/sys/time.h
++++ b/include/sys/time.h
+@@ -8,7 +8,13 @@ __BEGIN_DECLS
+ 
+ struct timespec {
+   time_t tv_sec;	/* seconds */
++#if defined(__x86_64__) && defined(__ILP32__)
++  /* x32 needs these 64 bits wide */
++  int64_t tv_nsec;
++#else
++  /* all other architectures use native sizes */
+   long tv_nsec;		/* nanoseconds */
++#endif
+ };
+ 
+ struct timeval {
+--- a/include/sys/types.h
++++ b/include/sys/types.h
+@@ -94,10 +94,14 @@ typedef signed long ssize_t;		/* Used fo
+ /* sparc64 has 32bit suseconds_t for some reason, even though struct
+  * timeval is padded to 16 bytes anyway. */
+ typedef signed int suseconds_t;		/* Used for time in microseconds. */
+-typedef signed int useconds_t;		/* Used for time in microseconds. */
++typedef unsigned int useconds_t;	/* Used for time in microseconds. */
++#elif defined(__x86_64__) && defined(__ILP32__)
++/* x32 has 64-bit suseconds_t but 32-bit useconds_t */
++typedef signed long long suseconds_t;
++typedef unsigned int useconds_t;
+ #else
+ typedef signed long suseconds_t;	/* Used for time in microseconds. */
+-typedef signed long useconds_t;		/* Used for time in microseconds. */
++typedef unsigned long useconds_t;	/* Used for time in microseconds. */
+ #endif
+ #if defined(__x86_64__) && defined(__ILP32__)
+ typedef signed long long time_t;

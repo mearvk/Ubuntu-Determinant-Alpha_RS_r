@@ -1,0 +1,26 @@
+Description: Fix register reuse in __testandset on arm64
+ In the case where the stlxr instruction fails on arm64 (either due to
+ another thread having accesed that memory location or spuriously) the
+ register x2 (which stores the pointer to the memory location) is now
+ useless because the original implementation reused it (which it should
+ not have).
+ .
+ Just use the unused w3 register for the status result instead.
+Author: Christian Seiler <christian@iwakd.de>
+Bug-Debian: https://bugs.debian.org/851379
+Last-Update: 2017-02-18
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/aarch64/__testandset.S
++++ b/aarch64/__testandset.S
+@@ -8,8 +8,8 @@ FUNC_START	__testandset
+ 	 * for details why we want to use ldxr (instead of ldaxr) here and a full memory
+ 	 * barrier afterwards. */
+ 1:	ldxr	w0, [x2]
+-	stlxr	w2, w1, [x2]
+-	cbnz	w2, 1b
++	stlxr	w3, w1, [x2]
++	cbnz	w3, 1b
+ 	dmb	ish
+ 	ret
+ FUNC_END	__testandset

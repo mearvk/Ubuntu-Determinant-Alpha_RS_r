@@ -1,0 +1,53 @@
+?RCS: $Id$
+?RCS:
+?RCS: Copyright (c) 1991-1997, 2004-2006, Raphael Manfredi
+?RCS:
+?RCS: You may redistribute only under the terms of the Artistic License,
+?RCS: as specified in the README file that comes with the distribution.
+?RCS: You may reuse parts of this distribution only within the terms of
+?RCS: that same Artistic License; a copy of which may be found at the root
+?RCS: of the source tree for dist 4.0.
+?RCS:
+?RCS: $Log: d_mmap.U,v $
+?RCS: Revision 3.0.1.1  1993/12/15  08:19:12  ram
+?RCS: patch15: created
+?RCS:
+?MAKE:d_mmap: Trylink cat i_sysmman
+?MAKE:	-pick add $@ %<
+?S:d_mmap:
+?S:	This variable conditionally defines HAS_MMAP if mmap() is
+?S:	available to map a file into memory.
+?S:.
+?C:HAS_MMAP:
+?C:	This symbol, if defined, indicates that the mmap system call is
+?C:	available to map a file into memory.
+?C:.
+?H:#$d_mmap HAS_MMAP		/**/
+?H:.
+?LINT:set d_mmap
+: see if mmap exists
+$cat >try.c <<EOC
+#include <sys/types.h>
+#$i_sysmman I_SYS_MMAN
+#ifdef I_SYS_MMAN
+#include <sys/mman.h>
+#endif
+int main(void)
+{
+	static off_t offset;
+	static void *addr;
+	static size_t len;
+	static int flags, fd, prot;
+	void *p;
+	flags |= PROT_NONE;
+	flags |= PROT_READ;
+	flags |= PROT_WRITE;
+	flags |= PROT_EXEC;
+	p = mmap(addr, len, prot, flags, fd, offset);
+	return p ? 0 : 1;
+}
+EOC
+cyn=mmap
+set d_mmap
+eval $trylink
+

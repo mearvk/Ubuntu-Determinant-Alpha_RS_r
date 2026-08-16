@@ -1,0 +1,293 @@
+#!/usr/bin/perl -w
+#
+# Libreoffice/ooo dict/thesauri/hyphenation file installation.
+
+use strict;
+use Text::Wrap;
+$Text::Wrap::columns = 72;
+
+use Debian::Debhelper::Dh_Lib;
+use Devel::DictionariesCommon q(:all);
+
+my $srcdir;
+my $do_altlinks = 1;
+
+# Initialize debhelper with extra installdeb-myspell specific options
+
+init(options => { 'dico-debug'        => \$dh{VERBOSE},
+		  'dico-alt-links'    => \$do_altlinks,
+		  'dico-no-alt-links' => sub { $do_altlinks = undef },
+		  'o2compat'          => sub { warning("Ignoring obsolete \"--o2compat\" option. o2compat support has been removed.") },
+		  'no-o2compat'       => sub { warning("Ignoring obsolete \"--no-o2compat\" option. o2compat support has been removed.") },
+		  'srcdir=s'          => \$srcdir
+		});
+
+# and do the real work
+
+my $old_destdir;
+my $class          = "myspell";
+my %installdir     = ( "hunspell"    => "/usr/share/hunspell",
+		       "hyphenation" => "/usr/share/hyphen",
+		       "thesauri"    => "/usr/share/mythes");
+
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+
+  my %datahash    = ();
+
+  # Process the debian/info-myspell file. This is not the same kind of
+  # info file as info-{wordlist,ispell,aspell,hunspell}.
+  # dico_process_infofile cannot be used here.
+  my $infofile = "";
+  unless( $infofile = pkgfile ($package, "info-$class")) {
+    dico_warning ("There is no debian/info-$class file for package $package.",
+		  "the dictionaries-common Policy");
+    exit;
+  }
+
+  # Parse info file for dict, hyphen, thesauri, lang and country data..
+  my $INFOFILE;
+  open $INFOFILE, $infofile;
+  while (<$INFOFILE>){
+    chomp;
+    next if m/^\s*$/;        # Skip empty lines
+    next if m/^\s*\#/;       # Skip comment lines
+    s/\#.*$//;               # Remove comments after dict info
+    verbose_print("info line: $_");
+    my ( $type, $lang, $country, $file) = split(' ',$_);
+    $datahash{$type}{$file}{"$lang\_$country"}++;
+  }
+  close $INFOFILE;
+
+  # If --srcdir is passed, install .aff and .dic in dicts dir as
+  # well as mozilla symlinks if it contains an underscore.
+  if ( $srcdir && defined $datahash{'DICT'} ){
+    foreach my $dictionary ( keys %{$datahash{'DICT'}} ) {
+      my $dictdir = $installdir{"hunspell"};
+      my $destdir = tmpdir ($package) . $dictdir;
+      my @alternatives = keys %{$datahash{'DICT'}{$dictionary}};
+
+      print STDERR "Installing DICT $dictionary files in $destdir\n";
+      verbose_print(" Alternatives: " . join(', ',@alternatives));
+      doit ("install", "-d", $destdir);
+      $dictdir =~ s/.*\///;
+      for my $ext ("aff", "dic") {
+	my $basefrom = my $basedest = "$dictionary.$ext";
+	my $srcfile  = "$srcdir/$basefrom";
+
+	error("There is no $srcfile file here\n")
+	  unless ( -f "$srcfile" );
+
+	# Install base dict in destination directory.
+	$basedest =~ tr/-/_/;
+	if ( $basefrom ne $basedest ){
+	  warning("$basefrom renamed to $basedest");
+	}
+	doit ("install", "-m644", "$srcfile", "$destdir/$basedest");
+
+	# Install normal and Mozilla symlinks for alternative names if needed.
+	if ( $do_altlinks ){
+	  foreach my $altlink ( @alternatives) {
+	    my $newlink = "$altlink.$ext";
+	    unless ( $newlink eq $basedest ){
+	      verbose_print("Installing alternative symlink $newlink to $basedest");
+	      doit ("ln", "-fs", $basedest, "$destdir/$newlink");
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  # If --srcdir is passed, install Openoffice hyphenation files
+  # after data in info file
+  if ( $srcdir && defined $datahash{'HYPH'} ){
+    foreach my $hyphenation ( keys %{$datahash{'HYPH'}} ) {
+      my $hyphdir  = $installdir{"hyphenation"};
+      my $destdir  = tmpdir ($package) . $hyphdir;
+      print STDERR "Installing HYPH $hyphenation files in $destdir\n";
+      my $basefile = "$hyphenation.dic";
+      my $srcfile  = "$srcdir/$basefile";
+      $hyphdir =~ s/.*\///;
+      my $ltarget  = "../../$hyphdir/$basefile";
+      error("There is no $srcfile file here\n")
+	unless ( -f "$srcfile" );
+      doit ("install", "-d", $destdir);
+      doit ("install", "-m644", "$srcfile", $destdir);
+    }
+  }
+
+  # If --srcdir is passed, install Openoffice thesaurus files
+  # after data in info file
+  if ( $srcdir && defined $datahash{'THES'} ){
+    foreach my $thesaurus ( keys %{$datahash{'THES'}} ) {
+      my $thesdir = $installdir{"thesauri"};
+      my $destdir = tmpdir ($package) . $thesdir;
+      print STDERR "Installing THES $thesaurus files in $destdir\n";
+      $thesdir =~ s/.*\///;
+      doit ("install", "-d", $destdir);
+      foreach my $ext ("dat","idx"){
+	my $basefile = "$thesaurus.$ext";
+	my $srcfile  = "$srcdir/$basefile";
+	my $ltarget  = "../../$thesdir/$basefile";
+	error("There is no $srcfile file here\n")
+	  unless ( -f "$srcfile" );
+	doit ("install", "-m644", "$srcfile", $destdir);
+      }
+    }
+  }
+}
+
+__END__
+
+=head1 NAME
+
+B<installdeb-myspell> - debhelper-like helper for Debian packages
+containing myspell/hunspell dictionaries or Openoffice.org
+thesauri/hyphenation files.
+
+=head1 SYNOPSIS
+
+ installdeb-myspell [--srcdir=dir] [--dico-debug] [debhelper options]
+
+=head1 DESCRIPTION
+
+B<installdeb-myspell> is a debhelper like program to help
+installing myspell/hunspell dicts as well as Openoffice.org
+thesauri or hyphenation files, after contents of an
+F<info-myspell> file whose format is that for old
+Openoffice.org 2. This needs the B<--srcdir> option enabled.
+
+Note that unless B<--srcdir> option this program will do nothing.
+
+For more details, see
+ /usr/share/doc/dictionaries-common/dsdt-policy.txt.
+
+The actions executed by B<installdeb-myspell> are the
+following (only some of them are done if not in o2
+compatibility mode):
+
+=over
+
+=item Maintainer Scripts
+
+B<installdeb-myspell> installs the necessary
+scraps of code in the F<postinst> and F<postrm> scripts.
+
+=item Language info file
+
+B<installdeb-myspell> will look for a file named F<debian/info-myspell>
+or F<debian/package.info-myspell>. That file contains myspell/hunspell
+dictionary, OOO thesauri or hyphenation information with lines like
+
+TYPE LANG COUNTRY NAME
+
+A typical F<info-myspell> file for a myspell/hunspell dictionary will
+contain something like
+
+ # Spanish variants
+ DICT es ES es_ES
+ DICT es AR es_ES
+ ...
+
+while will, for a typical hyphenation file, be something like
+
+ # Danish hyphenation
+ HYPH da DK hyph_da_DK
+
+or for a sample thesaurus,
+
+ THES en US th_en_US
+
+all with no leading whitespace. Commented lines are allowed.
+
+=item Dictionary, thesaurus and hyphenation files installation
+
+If the B<--srcdir=dir> option is set B<installdeb-myspell> will look for
+the F<.aff/.dic> files in the directory specified by dir and install them
+in the default target directory (F<[tmpdir]/usr/share/hunspell>).
+Base name will be extracted from the F<info-myspell> file (last string in
+the line). If target dict uses the ancient Mozilla hyphen form, it will
+be renamed to the lowbar form on installation.
+Same (but the renaming) for hyphenation and thesaurus files, to be installed in
+F<[tmpdir]/usr/share/hyphen> and F<[tmpdir]/usr/share/mythes>.
+
+=item Dictionaries alternative symlinks creation
+
+B<installdeb-myspell> will, according to info extracted from the F<info-myspell>,
+automatically set B<lang_COUNTRY> symlinks to the dict files installed by
+B<installdeb-myspell>. This will only be done when the B<--srcdir> option is
+used.
+
+If B<--srcdir> option is used and the F<info-myspell> file contains something
+like
+
+ # Spanish variants
+ DICT es ES es
+ DICT es AR es
+ ...
+
+B<installdeb-myspell> will automatically set B<es_ES> and B<es_AR> symlinks
+
+=item Mozilla spellchecker compatibility
+
+For myspell/hunspell dictionaries, Mozilla had a B<lang{,-COUNTRY}> to names
+translation table using hyphens as separators (and for some languages not using
+country part at all) instead of lowbars.
+
+Shortly, that will no longer be the case. Mozilla will also accept
+B<lang_COUNTRY> format for that translation table, no special things
+will be needed. In particular, do not duplicate entries in both lowbar
+and hyphen forms. Use lowbar.
+
+=item Debconf files
+
+As opposed to B<installdeb-ispell> and B<installdeb-wordlist>, B<installdeb-myspell>
+does nothing related to debconf files, not needed for myspell/hunspell dicts and
+OOO thesauri and hyphenation files. If you need to add debconf stuff with debhelper
+proceed in the usual way and call dh_installdebconf(1) as for any other package.
+
+=back
+
+=head1 OPTIONS
+
+--dico-debug  Show some B<installdeb-myspell> specific debugging info.
+              Does not enable debhelper debug, you need to enable
+              it separately.
+
+--srcdir=dir  Will look for F<.aff/.dic> files in the specified directory
+              for myspell/hunspell dict packages, for F<.dic> files in
+              Openoffice.org hyphenation packages and for F<.dat/.idx>
+              files in Openoffice.org thesaurus packages, installing
+              them if present in the default target directory. Base
+              name will be extracted from the info-myspell file. If
+              this option is specified and files are not present an
+              error will appear.
+
+--dico-{no-}alt-links {Process/Do not process} alternative symlinks
+              according to info found in the myspell info file.
+
+The usual debhelper(7) options are accepted.
+
+=head1 NOTES
+
+This program is not part of debhelper, although depends on and is
+intended to work together with it.
+
+=head1 SEE ALSO
+
+debhelper(7)
+
+This program is part of the dictionaries-common-dev package.  It is
+intended for use by maintainers of packages containing myspell/hunspell
+dictionaries or Openoffice.org thesauri/hyphenation files.
+See the documentation under /usr/share/doc/dictionaries-common-dev.
+
+=head1 AUTHORS
+
+Rafael Laboissiere <rafael@debian.org>,
+Agustin Martin <agmartin@debian.org>
+
+=cut
+
+#  LocalWords:  debhelper Debian myspell Openoffice

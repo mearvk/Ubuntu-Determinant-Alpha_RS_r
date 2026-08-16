@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<sect1 id="charsets">
+<sect1info>
+<abstract role="texinfo-node">
+  <para>Discussion on reproducing non-ASCII characters in the 
+        converted output</para>
+</abstract>
+</sect1info>
+
+<title>Character set conversion</title>
+
+<indexterm><primary>character map</primary></indexterm>
+<indexterm><primary>character sets</primary></indexterm>
+<indexterm><primary>charsets</primary></indexterm>
+<indexterm><primary>encoding</primary></indexterm>
+<indexterm><primary>transliteration</primary></indexterm>
+<indexterm><primary>re-encoding</primary></indexterm>
+<indexterm><primary>UTF-8</primary></indexterm>
+<indexterm><primary>Unicode</primary></indexterm>
+<indexterm><primary>&utf8trans;</primary></indexterm>
+<indexterm><primary>escapes</primary></indexterm>
+<indexterm><primary><command>iconv</command></primary></indexterm>
+
+<para>
+When translating XML to legacy ASCII-based formats
+with poor support for Unicode, such as man pages and Texinfo,
+there is always the problem that Unicode characters in
+the source document also have to be translated somehow.
+</para>
+
+<para>
+A straightforward character set conversion from Unicode 
+does not suffice,
+because the target character set, usually US-ASCII or ISO Latin-1,
+do not contain common characters such as 
+dashes and directional quotation marks that are widely
+used in XML documents.  But document formatters (man and Texinfo)
+allow such characters to be entered by a markup escape:
+for example, <markup>\(lq</markup> for the left directional quote 
+<literal>“</literal>.
+And if a markup-level escape is not available,
+an ASCII transliteration might be used: for example,
+using the ASCII less-than sign <markup>&lt;</markup> for 
+the angle quotation mark <markup>&#x2329;</markup>.
+</para>
+
+<para>
+So the Unicode character problem can be solved in two steps:
+</para>
+
+<orderedlist>
+<listitem>
+<para>
+&utf8trans_ref;, a program included in docbook2X, maps
+Unicode characters to markup-level escapes or transliterations.
+</para>
+
+<para>
+Since there is not necessarily a fixed, official mapping of Unicode characters,
+&utf8trans; can read in user-modifiable character mappings 
+expressed in text files and apply them.  (Unlike most character
+set converters.)
+</para>
+
+<para>
+In <filename>charmaps/man/roff.charmap</filename>
+and <filename>charmaps/man/texi.charmap</filename>
+are character maps that may be used for man-page and Texinfo conversion.
+The programs &db2x_manxml_ref; and &db2x_texixml_ref; will apply
+these character maps, or another character map specified by the user,
+automatically.
+</para>
+</listitem>
+
+<listitem>
+<para>
+The rest of the Unicode text is converted to some other character set 
+(encoding).
+For example, a French document with accented characters 
+(such as <literal>é</literal>) might be converted to ISO Latin 1.
+</para>
+
+<para>
+This step is applied after &utf8trans; character mapping,
+using the &iconv; encoding conversion tool.
+Both &db2x_manxml_ref; and &db2x_texixml_ref; can call
+&iconv; automatically when producing their output.
+</para>
+</listitem>
+</orderedlist>
+
+
+
+<!-- ==================================================================== -->
+
+<refentry id="utf8trans">
+<indexterm><primary>character map</primary></indexterm>
+<indexterm><primary>UTF-8</primary></indexterm>
+<indexterm><primary>Unicode</primary></indexterm>
+<indexterm><primary>&utf8trans;</primary></indexterm>
+<indexterm><primary>escapes</primary></indexterm>
+<indexterm><primary>transliteration</primary></indexterm>
+<refmeta>
+<refentrytitle id="utf8trans_name">&utf8trans;</refentrytitle>
+<manvolnum>1</manvolnum>
+</refmeta>
+
+<refnamediv>
+<refname>&utf8trans;</refname>
+<refpurpose>Transliterate UTF-8 characters according to a table</refpurpose>
+</refnamediv>
+
+<refsynopsisdiv>
+<cmdsynopsis>
+&utf8trans;
+<arg choice="plain"><replaceable>charmap</replaceable></arg>
+<arg rep="repeat"><replaceable>file</replaceable></arg>
+</cmdsynopsis>
+</refsynopsisdiv>
+
+<refsect1>
+<title>Description</title>
+
+<indexterm><primary>utf8trans</primary></indexterm>
+
+<para>
+&utf8trans; transliterates characters in the specified files (or 
+standard input, if they are not specified) and writes the output to
+standard output.  All input and output is in the UTF-8 encoding.  
+</para>
+
+<para>
+This program is usually used to render characters in Unicode text files
+as some markup escapes or ASCII transliterations.
+(It is not intended for general charset conversions.)
+It provides functionality similar to the character maps
+in XSLT 2.0 (XML Stylesheet Language – Transformations, version 2.0).
+</para>
+
+</refsect1>
+
+<refsect1>
+<title>Options</title>
+
+<variablelist>
+  <varlistentry>
+    <term><option>-m</option></term>
+    <term><option>--modify</option></term>
+
+    <listitem>
+      <para>
+        Modifies the given files in-place with their transliterated output,
+        instead of sending it to standard output.
+      </para>
+
+      <para>
+        This option is useful for efficient transliteration of many files
+        at once.
+      </para>
+    </listitem>
+  </varlistentry>
+
+  &common-options;
+</variablelist>
+</refsect1>
+
+
+
+<refsect1>
+<title>Usage</title>
+
+<para>
+The translation is done according to the rules in the <quote>character
+map</quote>, named in the file <replaceable>charmap</replaceable>.  It
+has the following format:
+
+<orderedlist>
+
+<listitem><para>Each line represents a translation entry, except for
+blank lines and comment lines, which are ignored.</para></listitem>
+
+<listitem><para>Any amount of whitespace (space or tab) may precede 
+the start of an entry.</para></listitem>
+
+<listitem><para>Comment lines begin with <literal>#</literal>.
+Everything on the same line is ignored.</para></listitem>
+
+<listitem><para>Each entry consists of the Unicode codepoint of the
+character to translate, in hexadecimal, followed
+<emphasis>one</emphasis> space or tab, followed by the translation
+string, up to the end of the line.</para></listitem>
+
+<listitem><para>The translation string is taken literally, including any
+leading and trailing spaces (except the delimeter between the codepoint
+and the translation string), and all types of characters.  The newline
+at the end is not included.  </para></listitem>
+
+</orderedlist>
+</para>
+
+<para>
+The above format is intended to be restrictive, to keep
+&utf8trans; simple.  But if a XML-based format is desired,
+there is a <filename>xmlcharmap2utf8trans</filename> script that 
+comes with the docbook2X distribution, that converts character
+maps in XSLT 2.0 format to the &utf8trans; format.
+</para>
+
+</refsect1>
+
+<refsect1>
+<title>Limitations</title>
+
+<itemizedlist>
+<listitem>
+<para>
+&utf8trans; does not work with binary files, because malformed
+UTF-8 sequences in the input are substituted with
+U+FFFD characters.  However, null characters in the input
+are handled correctly. This limitation may be removed in the future.
+</para>
+</listitem>
+
+<listitem>
+<para>
+There is no way to include a newline or null in the substitution string.
+</para>
+</listitem>
+</itemizedlist>
+
+</refsect1>
+
+&man-page-author-section;
+
+</refentry>
+
+</sect1>
+

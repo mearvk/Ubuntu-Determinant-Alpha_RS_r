@@ -1,0 +1,440 @@
+Description: backport a number of general bugfixes from upstream
+ some bounds checking, out of bounds writes, nil pointer dereference
+ in error path, uninitialised variable, plus a few warning fixes for
+ pointer casts and fallthroughs
+Author: mirabilos <tg@debian.org>
+
+--- a/lib/__v_printf.c
++++ b/lib/__v_printf.c
+@@ -83,6 +83,7 @@ inn_printf:
+       /* FLAGS */
+       case '#':
+ 	flag_hash=-1;
++	/* fall through */
+ 
+       case 'h':
+ 	--flag_long;
+@@ -92,7 +93,11 @@ inn_printf:
+ #endif
+       case 'q':		/* BSD ... */
+       case 'L':
+-	++flag_long; /* fall through */
++	++flag_long;	/* fall through */
++#if defined(__GNUC__) && (__GNUC__ >= 7)
++	__attribute__((fallthrough));
++#endif
++
+ #if __WORDSIZE == 64
+       case 'j':
+ #endif
+@@ -143,6 +148,7 @@ inn_printf:
+ 	  if ((width=(unsigned long)tmp)>MAX_WIDTH) return -1;
+ 	  goto inn_printf;
+ 	}
++	/* fall through */
+       case '.':
+ 	flag_dot=1;
+ 	if (*format=='*') {
+@@ -160,6 +166,7 @@ inn_printf:
+       /* print a char or % */
+       case 'c':
+ 	ch=(char)va_arg(arg_ptr,int);
++	/* fall through */
+       case '%':
+ 	B_WRITE(fn,&ch,1);
+ 	++len;
+@@ -262,8 +269,10 @@ print_out:
+ 	flag_hash=2;
+ 	flag_long=1;
+ 	ch='x';
++	/* fall through */
+       case 'X':
+ 	flag_upcase=(ch=='X');
++	/* fall through */
+       case 'x':
+ 	base=16;
+ 	sz=0;
+@@ -278,6 +287,7 @@ print_out:
+       case 'd':
+       case 'i':
+ 	flag_in_sign=1;
++	/* fall through */
+       case 'u':
+ 	base=10;
+ 	sz=0;
+--- a/lib/__v_scanf.c
++++ b/lib/__v_scanf.c
+@@ -115,10 +115,13 @@ in_scan:
+ 	case 'X':
+ 	case 'x':
+ 	  _div+=6;
++	  /* fall through */
+ 	case 'd':
+ 	  _div+=2;
++	  /* fall through */
+ 	case 'o':
+ 	  _div+=8;
++	  /* fall through */
+ 	case 'u':
+ 	case 'i':
+ 	  {
+--- a/lib/atoi.c
++++ b/lib/atoi.c
+@@ -8,7 +8,7 @@ int atoi(const char* s) {
+   int sign=1;
+   while ( *s == ' '  ||  (unsigned int)(*s - 9) < 5u) s++;
+   switch (*s) {
+-  case '-': sign=-1;
++  case '-': sign=-1; /* fall through */
+   case '+': ++s;
+   }
+   while ((unsigned int) (*s - '0') < 10u) {
+--- a/lib/atol.c
++++ b/lib/atol.c
+@@ -7,7 +7,7 @@ long int atol(const char* s) {
+   int sign=0;
+   while ( *s == ' '  ||  (unsigned int)(*s - 9) < 5u) ++s;
+   switch (*s) {
+-  case '-': sign=-1;
++  case '-': sign=-1;	/* fall through */
+   case '+': ++s;
+   }
+   while ((unsigned int) (*s - '0') < 10u) {
+--- a/lib/siphash24.c
++++ b/lib/siphash24.c
+@@ -44,13 +44,13 @@ siphash24(const unsigned char key[16], c
+ 	}
+ 
+ 	switch (len - blocks) {
+-		case 7: last7 |= (uint64_t)m[i + 6] << 48;
+-		case 6: last7 |= (uint64_t)m[i + 5] << 40;
+-		case 5: last7 |= (uint64_t)m[i + 4] << 32;
+-		case 4: last7 |= (uint64_t)m[i + 3] << 24;
+-		case 3: last7 |= (uint64_t)m[i + 2] << 16;
+-		case 2: last7 |= (uint64_t)m[i + 1] <<  8;
+-		case 1: last7 |= (uint64_t)m[i + 0]      ;
++		case 7: last7 |= (uint64_t)m[i + 6] << 48; /* fall through */
++		case 6: last7 |= (uint64_t)m[i + 5] << 40; /* fall through */
++		case 5: last7 |= (uint64_t)m[i + 4] << 32; /* fall through */
++		case 4: last7 |= (uint64_t)m[i + 3] << 24; /* fall through */
++		case 3: last7 |= (uint64_t)m[i + 2] << 16; /* fall through */
++		case 2: last7 |= (uint64_t)m[i + 1] <<  8; /* fall through */
++		case 1: last7 |= (uint64_t)m[i + 0]      ; /* fall through */
+ 		case 0:
+ 		default:;
+ 	};
+--- a/lib/strchr.c
++++ b/lib/strchr.c
+@@ -6,11 +6,19 @@ char *strchr(register const char *t, int
+ 
+   ch = c;
+   for (;;) {
+-    if (__unlikely(*t == ch)) break; if (__unlikely(!*t)) return 0; ++t;
++    if (__unlikely(*t == ch)) break;
++				     if (__unlikely(!*t)) return 0;
++								    ++t;
+ #ifndef WANT_SMALL_STRING_ROUTINES
+-    if (__unlikely(*t == ch)) break; if (__unlikely(!*t)) return 0; ++t;
+-    if (__unlikely(*t == ch)) break; if (__unlikely(!*t)) return 0; ++t;
+-    if (__unlikely(*t == ch)) break; if (__unlikely(!*t)) return 0; ++t;
++    if (__unlikely(*t == ch)) break;
++				     if (__unlikely(!*t)) return 0;
++								    ++t;
++    if (__unlikely(*t == ch)) break;
++				     if (__unlikely(!*t)) return 0;
++								    ++t;
++    if (__unlikely(*t == ch)) break;
++				     if (__unlikely(!*t)) return 0;
++								    ++t;
+ #endif
+   }
+   return (char*)t;
+--- a/lib/strtod.c
++++ b/lib/strtod.c
+@@ -19,7 +19,7 @@ double strtod(const char* s, char** endp
+         p++;
+ 
+     switch (*p) {
+-    case '-': sign = -1;
++    case '-': sign = -1;	/* fall through */
+     case '+': p++;
+     default : break;
+     }
+@@ -41,8 +41,8 @@ double strtod(const char* s, char** endp
+         expo   = 0;
+         factor = 10.;
+ 
+-        switch (*++p) {                 // ja hier weiß ich nicht, was mindestens nach einem 'E' folgenden MUSS.
+-        case '-': factor = 0.1;
++        switch (*++p) {                 // ja hier weiÃŸ ich nicht, was mindestens nach einem 'E' folgenden MUSS.
++        case '-': factor = 0.1;	/* fall through */
+         case '+': p++;
+                   break;
+         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+--- a/lib/strtof.c
++++ b/lib/strtof.c
+@@ -13,7 +13,7 @@ float strtof(const char* s, char** endpt
+         p++;
+ 
+     switch (*p) {
+-    case '-': sign = -1;
++    case '-': sign = -1;	/* fall through */
+     case '+': p++;
+     default : break;
+     }
+@@ -35,8 +35,8 @@ float strtof(const char* s, char** endpt
+         expo   = 0;
+         factor = 10.L;
+ 
+-        switch (*++p) {                 // ja hier weiß ich nicht, was mindestens nach einem 'E' folgenden MUSS.
+-        case '-': factor = 0.1;
++        switch (*++p) {                 // ja hier weiÃŸ ich nicht, was mindestens nach einem 'E' folgenden MUSS.
++        case '-': factor = 0.1;	/* fall through */
+         case '+': p++;
+                   break;
+         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+--- a/lib/strtold.c
++++ b/lib/strtold.c
+@@ -13,7 +13,7 @@ long double strtold(const char* s, char*
+         p++;
+ 
+     switch (*p) {
+-    case '-': sign = -1;
++    case '-': sign = -1;	/* fall through */
+     case '+': p++;
+     default : break;
+     }
+@@ -35,8 +35,8 @@ long double strtold(const char* s, char*
+         expo   = 0;
+         factor = 10.L;
+ 
+-        switch (*++p) {                 // ja hier weiß ich nicht, was mindestens nach einem 'E' folgenden MUSS.
+-        case '-': factor = 0.1;
++        switch (*++p) {                 // ja hier weiÃŸ ich nicht, was mindestens nach einem 'E' folgenden MUSS.
++        case '-': factor = 0.1;	/* fall through */
+         case '+': p++;
+                   break;
+         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+--- a/lib/tcflush.c
++++ b/lib/tcflush.c
+@@ -6,4 +6,4 @@ int __libc_tcflush(int fd, int queue_sel
+   return ioctl(fd, TCFLSH, queue_selector);
+ }
+ 
+-int tcflush(int fd) __attribute__((weak,alias("__libc_tcflush")));
++int tcflush(int fd, int queue_selector) __attribute__((weak,alias("__libc_tcflush")));
+--- a/lib/vsprintf.c
++++ b/lib/vsprintf.c
+@@ -6,7 +6,7 @@
+ 
+ int vsprintf(char *dest,const char *format, va_list arg_ptr)
+ {
+-  return vsnprintf(dest,(size_t)-1,format,arg_ptr);
++  return vsnprintf(dest,(size_t)-1-(uintptr_t)dest,format,arg_ptr);
+ }
+ 
+ link_warning("vsprintf","warning: Avoid *sprintf; use *snprintf. It is more secure.")
+--- a/libcruft/dnscruft.c
++++ b/libcruft/dnscruft.c
+@@ -53,7 +53,8 @@ void __dns_make_fd6(void) {
+ #endif
+ 
+ static int parsesockaddr(const char* c,void* x) {
+-  struct sockaddr_in to;
++  struct sockaddr_in_pad to;
++  memset(&to,0,sizeof(to));
+   if (inet_aton(c,&to.sin_addr)) {
+     to.sin_port=htons(53);
+     to.sin_family=AF_INET;
+--- a/libregex/rx.c
++++ b/libregex/rx.c
+@@ -268,6 +268,7 @@ openbracket:
+     tmp=parseregex(&a->u.r,s+1,rx);
+     if (closebracket(tmp,rx))
+       return tmp+1+((rx->cflags&REG_EXTENDED)==0);
++    /* fall through */
+   case ')':
+     if ((rx->cflags&REG_EXTENDED)==0) goto handle_char;
+     /* fall through */
+@@ -404,6 +405,7 @@ static const char* parsepiece(struct pie
+       if (*tmp!='}') return s;
+       ++tmp;
+     }
++    /* fall through */
+   default:
+     return tmp;
+   }
+--- a/librpc/clnt_perror.c
++++ b/librpc/clnt_perror.c
+@@ -150,7 +150,8 @@ char *clnt_sperror __P ((CLIENT *rpch, c
+ 
+ void clnt_perror __P ((CLIENT *rpch, const char *s))
+ {
+-	(void) fprintf(stderr, "%s", clnt_sperror(rpch, s));
++//	(void) fprintf(stderr, "%s", clnt_sperror(rpch, s));
++	(void) fprintf(stderr, "(not supported)");
+ }
+ 
+ 
+@@ -263,7 +264,8 @@ char *clnt_spcreateerror __P ((__const c
+ 
+ extern void clnt_pcreateerror __P ((__const char *s))
+ {
+-	(void) fprintf(stderr, "%s", clnt_spcreateerror(s));
++//	(void) fprintf(stderr, "%s", clnt_spcreateerror(s));
++	(void) fprintf(stderr, "(not supported)");
+ }
+ 
+ struct auth_errtab {
+--- a/librpc/pmap_rmt.c
++++ b/librpc/pmap_rmt.c
+@@ -261,6 +261,8 @@ resultproc_t eachresult;		/* call with e
+ 	struct timeval t;
+ 	char outbuf[MAX_BROADCAST_SIZE], inbuf[UDPMSGSIZE];
+ 
++	memset(addrs,0,sizeof(addrs));
++
+ 	/*
+ 	 * initialization: create a socket, a broadcast address, and
+ 	 * preserialize the arguments into a send buffer.
+--- a/librpc/xdr.c
++++ b/librpc/xdr.c
+@@ -99,6 +99,7 @@ bool_t xdr_int(XDR* xdrs, int* ip)
+ 		if (!XDR_GETLONG(xdrs, &l))
+ 		  return FALSE;
+ 		*ip = (int) l;
++		/* fall through */
+ 	  case XDR_FREE:
+ 		return TRUE;
+ 	  }
+@@ -125,6 +126,7 @@ bool_t xdr_u_int(XDR* xdrs, unsigned int
+ 		if (!XDR_GETLONG(xdrs, (long*)&l))
+ 		  return FALSE;
+ 		*up = (unsigned int) l;
++		/* fall through */
+ 	  case XDR_FREE:
+ 		return TRUE;
+ 	  }
+@@ -319,6 +321,7 @@ enum_t *ep;
+ 		if (!XDR_GETLONG(xdrs, &l))
+ 		  return FALSE;
+ 		*ep = l;
++		/* fall through */
+ 	  case XDR_FREE:
+ 		return TRUE;
+ 	  }
+@@ -422,7 +425,7 @@ unsigned int maxsize;
+ 			(void) fprintf(stderr, "xdr_bytes: out of memory\n");
+ 			return (FALSE);
+ 		}
+-		/* fall into ... */
++		/* fall through */
+ 
+ 	case XDR_ENCODE:
+ 		return (xdr_opaque(xdrs, sp, nodesize));
+@@ -548,7 +551,7 @@ unsigned int maxsize;
+ 			return (FALSE);
+ 		}
+ 		sp[size] = 0;
+-		/* fall into ... */
++		/* fall through */
+ 
+ 	case XDR_ENCODE:
+ 		return (xdr_opaque(xdrs, sp, size));
+--- a/libstdio/fdglue2.c
++++ b/libstdio/fdglue2.c
+@@ -31,7 +31,7 @@ err_out:
+     tmp->flags=(S_ISFIFO(st.st_mode))?FDPIPE:0;
+   }
+   switch (mode&3) {
+-  case O_RDWR: tmp->flags|=CANWRITE;
++  case O_RDWR: tmp->flags|=CANWRITE;	/* fall through */
+   case O_RDONLY: tmp->flags|=CANREAD|BUFINPUT; break;
+   case O_WRONLY: tmp->flags|=CANWRITE;
+   }
+--- a/libstdio/freopen.c
++++ b/libstdio/freopen.c
+@@ -17,7 +17,7 @@ FILE *freopen_unlocked(const char *path,
+       fstat(stream->fd,&st);
+       stream->flags=(S_ISFIFO(st.st_mode))?FDPIPE:0;
+       switch (f&3) {
+-      case O_RDWR: stream->flags|=CANWRITE;
++      case O_RDWR: stream->flags|=CANWRITE;	/* fall through */
+       case O_RDONLY: stream->flags|=CANREAD; break;
+       case O_WRONLY: stream->flags|=CANWRITE;
+       }
+--- a/libstdio/vfdprintf.c
++++ b/libstdio/vfdprintf.c
+@@ -4,12 +4,12 @@
+ #include <stdlib.h>
+ #include "dietstdio.h"
+ 
+-static int __fwrite(void*ptr, size_t nmemb, int fd) {
+-  return write(fd,ptr,nmemb);
++static int __fwrite(const void*ptr, size_t nmemb, void* cookie) {
++  return write((uintptr_t)cookie,ptr,nmemb);
+ }
+ 
+ int vfdprintf(int fd, const char *format, va_list arg_ptr)
+ {
+-  struct arg_printf ap = { (void*)(long)fd, (int(*)(void*,size_t,void*)) __fwrite };
++  struct arg_printf ap = { (void*)(long)fd, __fwrite };
+   return __v_printf(&ap,format,arg_ptr);
+ }
+--- a/libstdio/vprintf.c
++++ b/libstdio/vprintf.c
+@@ -2,14 +2,15 @@
+ #include <unistd.h>
+ #include "dietstdio.h"
+ 
+-int __stdio_outs(const char *s,size_t len) __attribute__((weak));
+-int __stdio_outs(const char *s,size_t len) {
++int __stdio_outs(const void *s,size_t len,void* cookie) __attribute__((weak));
++int __stdio_outs(const void *s,size_t len,void* cookie) {
++  (void)cookie;
+   return (write(1,s,len)==(ssize_t)len)?1:0;
+ }
+ 
+ int vprintf(const char *format, va_list ap)
+ {
+-  struct arg_printf _ap = { 0, (int(*)(void*,size_t,void*)) __stdio_outs };
++  struct arg_printf _ap = { 0, __stdio_outs };
+   return __v_printf(&_ap,format,ap);
+ }
+ 
+--- a/libugly/asprintf.c
++++ b/libugly/asprintf.c
+@@ -8,8 +8,9 @@ int asprintf(char **s, const char *forma
+ {
+   int n;
+   va_list arg_ptr;
++  char tmp[8];
+   va_start(arg_ptr, format);
+-  n=vsnprintf(0,1000000,format,arg_ptr);
++  n=vsnprintf(tmp,0,format,arg_ptr);
+   va_start (arg_ptr, format);
+   if ((*s=malloc(n+1))) {
+     n=vsnprintf(*s,n+1,format,arg_ptr);
+--- a/libugly/iconv.c
++++ b/libugly/iconv.c
+@@ -135,6 +135,7 @@ bloat:
+       out[0]=0xff;
+       out[1]=0xfe;
+       out+=2; *outbytesleft-=2;
++      /* fall through */
+     case UTF_16_LE:
+       if (v>0xffff) {
+ 	long a,b;
+--- a/libugly/vasprintf.c
++++ b/libugly/vasprintf.c
+@@ -9,8 +9,9 @@ int vasprintf(char **s, const char *form
+ {
+   int n;
+   va_list arg_ptr;
++  char tmp[8];
+   va_copy(arg_ptr,ap);
+-  n=vsnprintf(0,1000000,format,arg_ptr);
++  n=vsnprintf(tmp,0,format,arg_ptr);
+   va_end(arg_ptr);
+   if ((*s=malloc(n+1))) {
+     n=vsnprintf(*s,n+1,format,ap);

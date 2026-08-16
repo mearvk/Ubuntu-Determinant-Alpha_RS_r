@@ -1,0 +1,48 @@
+Description: Fix libpthread's __thread_self on most non-x86 platforms
+ The thread descriptor is (in general) not to be found at the thread
+ pointer register (that's where the TCB is). The code for x86 (both 32
+ and 64 bit) does this correctly because it directly reads the ->self
+ data member (via a segment register based memory access). However, the
+ other platforms would just return the thread pointer directly - and
+ hence the wrong data structure.
+ .
+ Since there are open questions w.r.t. the TCB layout on msot platforms
+ fall back to the less efficient (but working) global search on non-x86
+ for now.
+Author: Christian Seiler <christian@iwakd.de>
+Last-Update: 2017-01-06
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/libpthread/pthread_internal.c
++++ b/libpthread/pthread_internal.c
+@@ -110,21 +110,9 @@ static _pthread_descr __thread_find_(int
+ /* get thread-self descriptor O(1)/O(n*) */
+ _pthread_descr __thread_self(void) {
+   /* O(1) "search" */
+-#if defined(__alpha__)
+-  register _pthread_descr cur asm("$0");
+-  asm("call_pal 158" : "=r"(cur) );	/* PAL_rduniq = 158 */
+-#else	/* alpha */
+   register _pthread_descr cur=0;
+-#if defined(__sparc__)
+-  asm("mov %%g6,%0" : "=r"(cur) );	/* %g6 (res. system use) is used as thread pointer */
+-#elif defined(__s390__)
+-  asm("ear %0,%%a0" : "=d"(cur) );	/* a0 (access register 0) is used as thread pointer */
+-#elif defined(__ia64__)
+-  asm("mov %0 = r13" : "=r"(cur) );	/* r13 (tp) is used as thread pointer */
+-#elif defined(__x86_64__)
++#if defined(__x86_64__)
+   asm("mov %%fs:(16),%0" : "=r"(cur));
+-#elif defined(__aarch64__)
+-  asm("mrs %0, tpidr_el0" : "=r"(cur));
+ #elif defined(__i386__)
+   if (__likely(__modern_linux==1))
+     asm("mov %%gs:(8),%0" : "=r"(cur));
+@@ -139,7 +127,6 @@ _pthread_descr __thread_self(void) {
+   cur=__thread_find_(getpid());
+   if (cur) UNLOCK(cur);
+ #endif	/* other */
+-#endif	/* alpha */
+   return (cur)?cur:&_main_thread;
+ }
+ 

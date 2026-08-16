@@ -1,0 +1,1303 @@
+dietlibc (0.34~cvs20160606-12) unstable; urgency=low
+
+  [ John David Anglin ]
+  * Fix FTBFS due to bad syscall argument layout (Closes: #944489)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 10 Nov 2019 21:44:57 +0100
+
+dietlibc (0.34~cvs20160606-11) unstable; urgency=low
+
+  * d/patches/bugfixes/cflags.diff: retain main CFLAGS on amd64, x32
+    which adds missing EXTRACFLAGS on x32 (Closes: #943429)
+  * Bump Policy; slightly update packaging
+  * Update lintian overrides
+  * d/patches/bugfixes/x32-struct-member-sizes.diff: Correct some
+    struct member sizes, partially spotted by Bernhard Übelacker,
+    fix smashed stack from undersized buffer (Closes: #925359)
+  * idem: fix useconds_t not being unsigned while here
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Thu, 24 Oct 2019 21:47:00 +0200
+
+dietlibc (0.34~cvs20160606-10) unstable; urgency=high
+
+  * Back out “add latest syscalls” backport: the .s files and most
+    arches are not yet capable of handling 5-/6-argument syscalls
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Mon, 08 Oct 2018 22:29:45 +0200
+
+dietlibc (0.34~cvs20160606-9) unstable; urgency=high
+
+  [ Larry Doolittle ]
+  * Fix rare utime test failure
+
+  [ Thorsten Glaser ]
+  * Policy 4.2.1.1
+    - Handle “terse” build option
+    - I *think* we can R³=no
+  * Backport some things from upstream
+    - fix for FTBFS on IA64
+    - some bounds and null/uninitialised plus warning fixes
+    - add latest syscalls
+  * Plug stack overflow in regex engine (FTBFS on alpha)
+  * Fix weak symbols (FTBFS) on IA64
+  * Hook up ppoll (needed for socketcall Debian patch) on IA64
+  * Fix pthread SIGBUS (during atomic operations) on several
+    architectures by making _pthread_fastlock.__spinlock and
+    pthread_once_t “long”s (changes ABI but we’re static-only)
+  * Fix pasto in UMEGAYA metadata
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 07 Oct 2018 00:19:36 +0200
+
+dietlibc (0.34~cvs20160606-8) unstable; urgency=medium
+
+  [ Thorsten Glaser ]
+  * Fix typo in <stddef.h> causing warning on offsetof() uses.
+  * Refresh all patches.
+  * Update VCS-* URIs for Salsa.
+  * Fix build log scanner warnings.
+  * Address lintian concerns.
+
+  [ Larry Doolittle ]
+  * Fix applications using newer Linux headers. (Closes: #883534)
+  * Hook up the unshare() syscall.
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 01 Jul 2018 20:32:34 +0200
+
+dietlibc (0.34~cvs20160606-7) unstable; urgency=medium
+
+  * Make builds reproducible on ARM by working around ld.bfd issue.
+
+ -- Christian Seiler <christian@iwakd.de>  Mon, 03 Jul 2017 06:32:54 +0200
+
+dietlibc (0.34~cvs20160606-6) unstable; urgency=medium
+
+  [ Héctor Orón Martínez ]
+  * debian/control: drop myself from maintainers field.
+
+  [ Christian Seiler ]
+  * arm64: fix accidental register reuse in __testandset (Closes: #851379)
+  * Add Thorsten Glaser to Uploaders.
+
+ -- Christian Seiler <christian@iwakd.de>  Sat, 18 Feb 2017 12:10:09 +0100
+
+dietlibc (0.34~cvs20160606-5) unstable; urgency=medium
+
+  * hppa: fix pthread_atfork() and getsockopt() FTBFS bugs
+  * alpha: fix FTBFS due to same TCB / TP issue
+  * alpha: fix __testandset return value
+  * alpha: fix setjmp() (previously completely broken)
+  * Unit tests: mark tst-calloc as expected failure on arm64 for now.
+    This build failure is not a regression: the test was enabled only in
+    the latest version, and would have failed im previous versions as well.
+
+ -- Christian Seiler <christian@iwakd.de>  Wed, 25 Jan 2017 22:25:27 +0100
+
+dietlibc (0.34~cvs20160606-4) unstable; urgency=medium
+
+  * Also run unittests linked against -lpthread.
+  * Only show unit test error output at the very end.
+  * Don't override errno_location in libpthread if TLS is enabled.
+    (Closes: #850276)
+  * aarch64: define __clone, make clone a weak alias to it
+  * Build __munmap_and_exit on x32.
+  * Fix waitpid with -lpthread on s390, s390x, mips64 and ia64.
+    (Closes: #844781)
+  * s390x: fix __testandset.
+  * Work around problem of atexit() functions accessing the TCB.
+  * Fix libpthread's __thread_self on non-x86 platforms.
+
+ -- Christian Seiler <christian@iwakd.de>  Fri, 06 Jan 2017 01:20:47 +0100
+
+dietlibc (0.34~cvs20160606-3) unstable; urgency=medium
+
+  * Properly pass in CFLAGS from dpkg-buildflags.
+    Rework Debian-specific patches to make sure we pass in dpkg-buildflags
+    to dietlibc's build system. Also make sure that we pass -fno-pie and
+    -no-pie to the build system so that the new default setting of gcc in
+    Debian for PIE (enabled by default) is overridden, as static binaries
+    don't support PIE. Drop the hardening patch that explicitly added
+    stack protector support, as that is now passed in externally. This
+    should also make the build reproducible again, as -fdebug-prefix-map
+    is now passed to the compiler. (Closes: #837420)
+  * Make dietlibc-doc a Multi-Arch: foreign package
+
+ -- Christian Seiler <christian@iwakd.de>  Tue, 01 Nov 2016 02:32:22 +0100
+
+dietlibc (0.34~cvs20160606-2) unstable; urgency=high
+
+  * Add missing socket-related syscalls on various architectures
+    (Closes: #828848)
+  * debian/unittests: add test for pselect()
+  * debian/rules: dh_auto_install --max-parallel=1 (fixes incomplete
+    packages, and FTBR due to non-determinism)
+  * Security: fix insecure default PATH.
+    Thanks to Thorsten Glaser <t.glaser@tarent.de> for discovering this
+
+ -- Christian Seiler <christian@iwakd.de>  Wed, 20 Jul 2016 08:43:37 +0200
+
+dietlibc (0.34~cvs20160606-1) unstable; urgency=medium
+
+  * Imported Upstream version 0.34~cvs20160606
+      - Now includes all non-Debian-specific patches
+      - x32: fix struct stat size (fixes memory corruption bug)
+        (Closes: #826359)
+      - arm64: add weak aliases for open/fork (fixes fopen())
+  * debian/rules: Update get-orig-source to match current upstream version
+  * debian/patches: rebase on new upstream version
+  * debian/patches: reorganize patches for clarity
+  * debian/unittests: add simple test for fopen()
+  * Build unit tests with SSP enabled (Closes: #826360)
+  * debian/unittests [ppc*]: temporarily disable SSP for tst-calloc
+  * debian/copyright: reflect addition of glibc softfpu code
+
+ -- Christian Seiler <christian@iwakd.de>  Mon, 06 Jun 2016 20:19:45 +0200
+
+dietlibc (0.34~cvs20160508-1) unstable; urgency=medium
+
+  * Merge changes from experimental to unstable
+  * debian/patches: use Enrico Scholz's variant for TLS register access
+  * debian/patches: Update Forwarded: headers
+
+ -- Christian Seiler <christian@iwakd.de>  Sat, 04 Jun 2016 18:44:25 +0200
+
+dietlibc (0.34~cvs20160508-1~exp7) experimental; urgency=medium
+
+  * ppc: make posix_fadvise work (fixes FTBFS on ppc/ppcspe)
+
+ -- Christian Seiler <christian@iwakd.de>  Mon, 30 May 2016 15:06:56 +0200
+
+dietlibc (0.34~cvs20160508-1~exp6) experimental; urgency=medium
+
+  * debian/gbp.conf: use pristine-tar for orig tarballs
+  * hppa: properly implement posix_fadvise (fixes test failure FTBFS)
+  * test/mmap_test.c: assume 64k pages (fixes test failure FTBFS on ppc*)
+  * ppc64: make atexit work (previously broken), add test case for it
+
+ -- Christian Seiler <christian@iwakd.de>  Mon, 30 May 2016 09:43:49 +0200
+
+dietlibc (0.34~cvs20160508-1~exp5) experimental; urgency=medium
+
+  * arm64: fix struct stat member names (fixes FTBFS of rdeps)
+  * arm64: properly handle errors from syscalls with 64bit return values
+  * arm64: make readdir use getdents64, as getdents isn't available
+  * mips64el: fix segfault after __longjmp ($gp is 64bit)
+  * debian/unittests: run more upstream tests during build
+  * arm64: return -1 on syscall error, not -errno (fixes mmap test failure)
+  * debian/unittests: ignore specific unit test errors under qemu-user
+  * sparc64: work around compiler bug w.r.t. TLS variable handling
+
+ -- Christian Seiler <christian@iwakd.de>  Sun, 29 May 2016 23:18:27 +0200
+
+dietlibc (0.34~cvs20160508-1~exp4) experimental; urgency=medium
+
+  * arm64: fix FTBFS due to the kernel not implementing old syscalls
+
+ -- Christian Seiler <christian@iwakd.de>  Sun, 15 May 2016 02:50:14 +0200
+
+dietlibc (0.34~cvs20160508-1~exp3) experimental; urgency=medium
+
+  * mips64el: update ptrace, sigcontext and socket definitions
+  * mips64el: fix __testandset argument type (expects int, not long)
+  * signal.h: fix off by one error (Closes: #677074)
+  * arm64: add port of dietlibc to that architecture
+  * debian/unittests: add test for stat() and syscall errno handling
+
+ -- Christian Seiler <christian@iwakd.de>  Sat, 14 May 2016 08:07:25 +0200
+
+dietlibc (0.34~cvs20160508-1~exp2) experimental; urgency=medium
+
+  * multiarch: add support for detecting ppc64el as a cross platform
+  * debian/patches: reformat patch headers (DEP-3), add Forwarded: everywhere
+  * diet wrapper: fix arch wrangling for some cross compiler (hppa, x32)
+  * mip64el: add port of dietlibc to that architecture
+  * debian/unittests: add strerror() unit test
+
+ -- Christian Seiler <christian@iwakd.de>  Thu, 12 May 2016 02:07:11 +0200
+
+dietlibc (0.34~cvs20160508-1~exp1) experimental; urgency=medium
+
+  * New upstream CVS snapshot 0.34~cvs20160508
+     - stdio.h bugfixes
+     - Improved source code formatting in some routines
+  * hppa: fix EWOULDBLOCK errno number
+  * s390x: fix segfaults in programs due to setjmp/longjmp
+  * alpha: fix signal handler return crash
+  * sparc64: fix sigreturn segfault + suseconds_t size
+  * Unit tests: move to separate script, run during dh_auto_test
+  * debian/unittests: add two more tests (sigreturn, gettimeofday)
+  * debian/control: Bump Standards-Version to 3.9.8 (no changes)
+  * debian/rules: don't build dietlibc for arch-independent builds
+  * debian/rules: don't run unit tests with DEB_BUILD_OPTIONS=nocheck
+  * Let dh autocreate -dbgsym packages, compile with -g, don't strip *.o
+  * debian/{postinst,prerm}: remove obsolete upgrade code
+  * hardening: compile with -fstack-protector-strong
+  * diet wrapper: properly mangle cross-compiler architecture names
+  * Make dietlibc-dev Multi-Arch: same, move arch-depdendent libraries to
+    /usr/lib/TRIPLET/diet
+  * x32: use proper syscall number on sigreturn (fixes segfault)
+  * debian/tests: add simple autopkgtests
+  * debian/rules: enable parallel builds
+  * Port glibc's software FPU for powerpcspe (Closes: #819069)
+  * ppc64el: add port of dietlibc to that architecture
+
+ -- Christian Seiler <christian@iwakd.de>  Sun, 08 May 2016 22:06:23 +0200
+
+dietlibc (0.34~cvs20160402.1-1~exp2) experimental; urgency=medium
+
+  * hppa: fix trivial build failure
+
+ -- Christian Seiler <christian@iwakd.de>  Sun, 03 Apr 2016 12:47:03 +0200
+
+dietlibc (0.34~cvs20160402.1-1~exp1) experimental; urgency=medium
+
+  * Imported Upstream version 0.34~cvs20160402.1
+  * Rebase patches on new upstream version
+  * Make TLS setup code work again on multiple platforms
+  * hppa: multiple porting fixes.
+    Thanks to Helge Deller (Closes: #769105, #769177)
+  * Add valgrind checks to more optimized string functions
+  * porting: don't fail install if PIE startcode isn't built
+  * Fix corner case in lib/strlen.c on big endian systems after
+    reenabling the optimized code path
+  * mipsel: fix trivial build failure
+  * sparc64: fix build failure
+  * debian/rules: prefer cgit over gitweb for Vcs-Browser
+
+ -- Christian Seiler <christian@iwakd.de>  Sun, 03 Apr 2016 10:55:52 +0200
+
+dietlibc (0.34~cvs20160209.1-1~exp1) experimental; urgency=medium
+
+  [ Christian Seiler ]
+  * Imported Upstream version 0.34~cvs20160209.1
+    (Closes: #757052, #741882)
+  * Enable support for the x32 architecture
+  * debian/watch: check for GPG signature of releases
+  * debian/control: Add myself to Uploaders
+  * debian/copyright: fix lintian warning, update metadata
+  * debian/rules: update get-orig-source to match current version
+  * Fix __lltostr parameter mismatch (Closes: #748037)
+  * Switch to debhelper and dh-style debian/rules
+
+  [ Reiner Herrmann ]
+  * Reproducible builds: remove gzip timestamps and sort file lists
+    (Closes: #813892)
+
+  [ John David Anglin ]
+  * Flush streams on return from main on hppa (Closes: #743254)
+
+ -- Christian Seiler <christian@iwakd.de>  Thu, 17 Mar 2016 18:04:04 +0100
+
+dietlibc (0.33~cvs20120325-6) unstable; urgency=low
+
+  * Team upload.
+  * Upload to unstable
+  * debian/watch: Update for new download location, 0.33 is out
+  * Remove myself from Uploaders
+  * debian/control: Use canonical VCS-* URI, says lintian
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Tue, 11 Feb 2014 21:48:06 +0100
+
+dietlibc (0.33~cvs20120325-5) experimental; urgency=low
+
+  [ Roland Stigge ]
+  * Add support for the https://wiki.debian.org/PowerPCSPEPort
+    (Closes: #694366)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 25 Nov 2012 21:41:02 +0000
+
+dietlibc (0.33~cvs20120325-4) unstable; urgency=low
+
+  [ Peter Michael Green ]
+  * Tweak arm assembler patch so it works with armv6 vfp too.
+
+  [ Thorsten Glaser ]
+  * Fix jmp_buf size for armhf (Closes: #689222)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 30 Sep 2012 14:15:34 +0000
+
+dietlibc (0.33~cvs20120325-3) unstable; urgency=low
+
+  * Make the select testcase we run at build-time actually useful
+  * Fix #394928 on ppc64, too (same patch, different directory)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Tue, 27 Mar 2012 20:18:03 +0000
+
+dietlibc (0.33~cvs20120325-2) unstable; urgency=low
+
+  * Upstream added a real mipsel port, use it instead of saying mips
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Mon, 26 Mar 2012 19:01:10 +0000
+
+dietlibc (0.33~cvs20120325-1) unstable; urgency=low
+
+  * Fix compile time warning (utimes undeclared) on armel, armhf, ia64
+  * Policy 3.9.3 (no relevant changes)
+  * Add VCS-* fields to debian/control
+  * Take new upstream CVS snapshot (CVE-2012-1577)
+  * Add -fno-strict-aliasing to files that emit a warning otherwise
+  * Drop patches merged upstream
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 25 Mar 2012 15:52:21 +0000
+
+dietlibc (0.33~cvs20111108-5) unstable; urgency=low
+
+  * Really fix s390 (Probably Closes: #523110)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sun, 20 Nov 2011 16:52:41 +0000
+
+dietlibc (0.33~cvs20111108-4) unstable; urgency=low
+
+  [ Thorsten Glaser ]
+  * “Schlösser Alt” upload
+  * Patch to fix the ssize_t definition, for -Wformat benefit
+  * Testcase to catch a specifically aligned strlen bug, from
+    mtest-ascii1 of the Debian mksh package
+  * Patch for string functions to not read past end of allocation
+  * Patch to make strtod not use 'long double' on alpha, sparc
+    (and sparc64) to make it link again (Closes: #547404)
+
+  [ Bastian Blank ]
+  * Patch to fix sigsetjmp on s390 (Closes: #523110)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Sat, 19 Nov 2011 21:15:46 +0000
+
+dietlibc (0.33~cvs20111108-3) unstable; urgency=low
+
+  * The team of Héctor and me seems to have taken over well enough
+    to close the ITA and drop Gerrit from Uploaders (Closes: #544060)
+  * Upload to unstable
+  * Enable s390x and sparc64 architectures, which are supported
+    upstream, and see what happens
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Fri, 11 Nov 2011 18:06:11 +0000
+
+dietlibc (0.33~cvs20111108-2) experimental; urgency=low
+
+  * Remove parisc/strstr.S again (Closes: #523086)
+  * Next attempt: use = instead of .equ or .set
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Thu, 10 Nov 2011 18:06:15 +0000
+
+dietlibc (0.33~cvs20111108-1) experimental; urgency=low
+
+  * debian/rules: New target "get-orig-source" to automate the
+    process of exporting a CVS snapshot, without the CVS dirs,
+    replace CR-LF line endings with LF ones, and tar it up
+  * Update to cvs20111108
+  * Use .equ instead of .set so it compiles on alpha
+  * Honour nostrip for the diet* binaries, too (Closes: #436767)
+  * Fix "debian/rules clean" not removing a ttt (test) binary
+  * Make "lintian -vIiE --pedantic" clean
+  * Repair ARM mmap syscall (Paul Brook, Timo Juhani Lindfors)
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Tue, 08 Nov 2011 22:36:48 +0000
+
+dietlibc (0.33~cvs20110918-5) experimental; urgency=low
+
+  * Remove more mentions of the gone dynamic linking support
+  * quilt refresh all patches
+  * Pass -fno-stack-protector from diet to gcc when dietlibc is
+    compiled without SSP support because otherwise programs will
+    segfault, as dietlibc does not set up the registers needed
+  * Re-enable tc523086, as I believe the testcase is right, and
+    if an armhf buildd fails, the buildd is bad (Closes: #644646)
+  * Fix all lintian warnings except CVS in orig.tar.gz
+    - debian/copyright Format URI, fix format (spurious newline)
+    - add comment to d/patches/0014-sparc_v9-does-not-imply-arch64
+    - remove the .comment section when stripping binaries
+  * Honour DEB_BUILD_OPTIONS=nostrip as well
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Thu, 03 Nov 2011 21:33:39 +0000
+
+dietlibc (0.33~cvs20110918-4) unstable; urgency=low
+
+  * d/rules: disable tc523086.c test on ARM (segfaults on armhf)
+
+ -- Hector Oron <zumbi@debian.org>  Fri, 07 Oct 2011 17:33:34 +0100
+
+dietlibc (0.33~cvs20110918-3) unstable; urgency=low
+
+  [ Thorsten Glaser ]
+  * d/control: do not Recommend or Suggest the dietlibc package
+    which is currently not built for any architecture
+  * d/control: move homepage link from Description into its header
+
+ -- Hector Oron <zumbi@debian.org>  Thu, 06 Oct 2011 13:51:39 +0100
+
+dietlibc (0.33~cvs20110918-2) unstable; urgency=low
+
+  * d/patches/fix-ppc64-ftbfs.diff: Fix FTBFS (Closes: #644405)
+    - Thanks Hiroyuki Yamamoto for the fix
+
+ -- Hector Oron <zumbi@debian.org>  Thu, 06 Oct 2011 13:17:24 +0100
+
+dietlibc (0.33~cvs20110918-1) experimental; urgency=low
+
+  [ Hector Oron ]
+  * Update to cvs20110918.
+    - Fixes memchr('\0') (Closes: #582654)
+
+  [ Thorsten Glaser ]
+  * d/control: mention dynamic linking is currently disabled
+
+ -- Hector Oron <zumbi@debian.org>  Sun, 18 Sep 2011 10:33:12 +0200
+
+dietlibc (0.33~cvs20110710-2) experimental; urgency=low
+
+  [ Hector Oron ]
+  * Fix build for ARMv7 arches.
+  * Fix FTBFS on s390.
+  * Drop 0015-arm-soft-and-hard-support.diff
+
+  [ Thorsten Glaser ]
+  * d/diff/0017-disable-propolice: fix FTBFS on SSP-by-default gcc
+  * d/diff/0018-manpage: fix manpage
+
+ -- Hector Oron <zumbi@debian.org>  Sat, 17 Sep 2011 13:09:44 +0100
+
+dietlibc (0.33~cvs20110710-1) experimental; urgency=low
+
+  * New upstream pre-release
+  * Bump Standards-Version
+  * Use DEP5 as copyright format
+  * Don't build arm* with DEBUG flag
+  * Use debian source format 3.0 (quilt)
+  * Move tc523086.c into debian/test directory
+  * Add local-options file
+  * Refresh debian patchset
+  * parisc/strstr.S: remove local removal
+  * strip elftrunc and dnsd resulting binaries
+
+ -- Hector Oron <zumbi@debian.org>  Sun, 10 Jul 2011 23:48:50 +0100
+
+dietlibc (0.32-5.2exp1) experimental; urgency=low
+
+  [ Thorsten Glaser ]
+  * Make Héctor Orón the new Maintainer (keeping Gerrit as Uploader)
+  * Add myself to Uploaders
+  * d/rules: run tests only if not cross compiling
+  * d/tc523086.c: add reduced testcase from pa-risc strstr bug
+  * d/rules: compile and try to execute tc523086 during build
+  * parisc/strstr.S: remove broken asm implementation (use generic)
+  * d/source/format, d/watch: add to please lintian
+
+ -- Thorsten Glaser <tg@mirbsd.de>  Tue, 08 Mar 2011 20:47:55 +0000
+
+dietlibc (0.32-5.2) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Add ARM (armel and armhf) support. (Closes: #459482)
+
+ -- Hector Oron <zumbi@debian.org>  Fri, 25 Feb 2011 00:35:53 +0000
+
+dietlibc (0.32-5.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * Fix sparc64 detection, based on a patch by Ivan Jager (closes: #604717).
+    Don't use defined(__sparc_v9__) to detect 64bit sparc, use
+    defined(__sparcv9) || defined(__arch64__) instead.
+
+ -- Julien Cristau <jcristau@debian.org>  Mon, 27 Dec 2010 13:09:27 +0100
+
+dietlibc (0.32-5) unstable; urgency=medium
+
+  * debian/diff/0013-mips-divdi3.c-fix-include-path-to-longlong.h.diff:
+    remove; obsolete.
+  * debian/diff/0013-sparc-use-mcpu-v9-instead-of-mcpu-supersparc.diff:
+    new; sparc: use -mcpu=v9 instead of -mcpu=supersparc (fixes libowfat
+    build failure on sparc).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 20 Apr 2010 19:38:47 +0000
+
+dietlibc (0.32-4) unstable; urgency=low
+
+  * debian/diff/0001-cvs-snapshot-20100209.diff: replace with
+    debian/diff/0001-cvs-snapshot-20100320.diff: cvs snapshot 20100320
+    (should fix build failure on mips[el]).
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 20 Mar 2010 13:36:20 +0000
+
+dietlibc (0.32-3) unstable; urgency=low
+
+  * debian/rules: add MYARCH var to make clean to not rely on the output
+    of uname -m (fixes build failure on mips).
+  * debian/diff/0013-mips-divdi3.c-fix-include-path-to-longlong.h.diff:
+    new; mips/divdi3.c: fix include path to "longlong.h" (fixed build
+    failure on mipsel).
+  * debian/rules, debian/control: no longer build the i386 dietlibc
+    package (shared libraries) (see also #544060, closes: #569816).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 15 Feb 2010 22:25:03 +0000
+
+dietlibc (0.32-2) unstable; urgency=low
+
+  * debian/diff/0001-cvs-snapshot-20100209.diff: new; cvs snapshot
+    20100209.
+  * debian/implicit: update to revision a09db2e (thx Daniel Schepler,
+    closes: #445819).
+  * debian/control: Standards-Version: 3.8.3.0.
+  * debian/rules: do not ignore-make-clean-error.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 10 Feb 2010 10:12:22 +0000
+
+dietlibc (0.32-1) unstable; urgency=low
+
+  * Thanks Micah Anderson, Simon McVittie for NUMs.
+  * debian/diff/0011-undefined-symbol-umount2-alpha-ia64.diff: rename
+    to debian/diff/0011-Add-new-defines-to-indicate-which-...diff.
+  * new upstream version (closes: #532897).
+    * add %Z to strptime, make stdarg work with gcc 4.4 (closes:
+      #530861).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 22 Sep 2009 11:47:27 +0000
+
+dietlibc (0.31-1.2) unstable; urgency=medium
+
+  * Non-maintainer upload from the Cambridge BSP.
+  * debian/diff/0011-undefined-symbol-umount2-alpha-ia64.diff: treat
+    __NR_umount as the 2-argument version on ia64 (really closes: #508397)
+  * debian/diff/0012-Add-an-implementation-of-umount-3-for-ia64.diff:
+    supply a 1-argument version of umount on ia64
+  * Verified to pass MNT_DETACH to the kernel in the expected way on ia64
+  * Verified with strace to do the same thing as glibc on architectures
+    representing the other three families mentioned in 0011-*.diff
+    (i386, x86_64 and alpha)
+
+ -- Simon McVittie <smcv@debian.org>  Sat, 03 Jan 2009 17:11:00 +0000
+
+dietlibc (0.31-1.1) unstable; urgency=high
+
+  * Non-maintainer upload.
+  * debian/diff/0011-undefined-symbol-umount2-alpha-ia64.diff:
+    new; util-vserver: fails to compile on alpha and ia64 due to
+    unresolved umount2 symbols, thanks to Daniel Hokka Zakrisson and
+    Herbert Poetzel, closes: #508397)
+
+ -- Micah Anderson <micah@debian.org>  Thu, 11 Dec 2008 11:28:17 -0500
+
+dietlibc (0.31-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/control: Recommends: dietlibc (= ${source:Version}) instead of
+    ${Source-Version}.
+  * debian/diff/????-cvs-snapshot-200705030800.diff: remove; obsolete.
+  * debian/diff/????-arm-syscalls.h-fix-__ARGS_-according-to-comment.diff,
+    debian/diff/????-arm-syscalls.h-add-__ARGS_mbind-__ARGS_get_mempolic.diff:
+    remove; fixed upstream.
+  * debian/diff/0010-util-vserver-vsched-fails-to-read-config-directory.diff:
+    new; util-vserver: vsched fails to read config directory (patch from
+    http://people.linux-vserver.org/~dhozac/p/m/delta-dietdirent-fix01.diff,
+    thx Daniel Hokka Zakrisson, closes: #435538).
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 26 Aug 2007 10:02:26 +0000
+
+dietlibc (0.30-7) unstable; urgency=low
+
+  * debian/diff/0012-workaround-Bug-428814-powerpc-error-initializer-e.diff:
+    new; workaround Bug#428814: [powerpc] error: initializer element is not
+    constant (fixes build failure on powerpc).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 02 Jul 2007 09:59:03 +0000
+
+dietlibc (0.30-6) unstable; urgency=low
+
+  * debian/diff/ia64-no-fno-omit-frame-pointer.diff: remove; obsolete
+    (see #286840).
+  * debian/diff/*: redo diffs with git.
+  * debian/diff/0010-arm-syscalls.h-fix-__ARGS_-according-to-comment.diff:
+    new; arm/syscalls.h: fix __ARGS_* according to comment.
+  * debian/diff/0011-arm-syscalls.h-add-__ARGS_mbind-__ARGS_get_mempolic.diff:
+    new; arm/syscalls.h: add __ARGS_mbind, __ARGS_get_mempolicy,
+    __ARGS_set_mempolicy (fixes build failure on arm).
+  * debian/rules: apply diffs with patch -p1, not -p0.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 03 May 2007 10:12:39 +0000
+
+dietlibc (0.30-5) unstable; urgency=low
+
+  * debian/diff/cvs-20070411.diff: new; cvs snapshot 20070411.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 11 Apr 2007 08:27:19 +0000
+
+dietlibc (0.30-4) unstable; urgency=high
+
+  * debian/diff/select.diff: remove again; doesn't work for all archs.
+  * debian/diff/ppc-select.diff: new; use syscall _newselect instead of
+    select on ppc (closes: #394928).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 31 Oct 2006 07:53:57 +0000
+
+dietlibc (0.30-3) unstable; urgency=high
+
+  * debian/diff/select.diff: new; use syscall _newselect on all archs (thx
+    Bastian Blank, closes: #394928).
+  * debian/rules: run select selftest after building.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 30 Oct 2006 20:57:45 +0000
+
+dietlibc (0.30-2) unstable; urgency=low
+
+  * debian/diff/parisc-sem.diff: new; parisc has the semctl, semop,
+    semget syscalls (closes: #393678).
+  * debian/diff/no-clobber-home.diff: new; don't clobber the HOME
+    environment variable for the duration of the build (closes: #393682,
+    thx Ted Percival).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 17 Oct 2006 19:11:27 +0000
+
+dietlibc (0.30-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/diff/cvs-20060609.diff: remove; obsolete.
+  * debian/diff/ia64-proc-endp.diff, debian/diff/xarm-comment-char.diff:
+    remove; fixed upstream.
+  * debian/diff/arm-waitpid.diff: remove; possibly out of date, and we
+    stopped building dynamic lib on arm anyway.
+  * debian/diff/mips-pic.diff: adapt.
+  * debian/diff/parisc-iitlbp.diff: minor.
+
+ -- Gerrit Pape <pape@smarden.org>  Sat,  8 Jul 2006 13:34:24 +0000
+
+dietlibc (0.29-15) unstable; urgency=low
+
+  * debian/diff/no-ssp.diff: don't WANT_SSP; it causes similar problems as
+    WANT_STACKGAP back in Dec 2004 (closes: #374349).
+  * debian/diff/xgcc-4.1-ssp.diff: remove, ssp is disabled.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 19 Jun 2006 18:02:34 +0000
+
+dietlibc (0.29-14) unstable; urgency=low
+
+  * debian/diff/xarm-comment-char.diff: new: s/@/%/ for arm assembler (fixes
+    build failure on arm).
+  * debian/diff/xgcc-4.1-ssp.diff: new: ssp with gcc 4.1 needs __guard.o
+    in libc.so (fixes build failure on i386).
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 14 Jun 2006 16:17:05 +0000
+
+dietlibc (0.29-13) unstable; urgency=low
+
+  * debian/diff/cvs-20060609.diff: new: cvs snapshot from 200606090800.
+  * debian/diff/cvs-20060416.diff: remove; obsolete.
+  * debian/diff/fflush-null.diff: don't skip flushing streams with
+    flags&BUFINPUT (closes: #370274).
+  * debian/rules: fix sed script for parsing debian/dietlibc-dev.*.in
+    (closes: #372178).
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 10 Jun 2006 10:37:12 +0000
+
+dietlibc (0.29-12) unstable; urgency=low
+
+  * debian/diff/fflush-null.diff: new; fflush(NULL): don't flush input
+    streams (stdin) (closes: #346437).
+  * debian/control: Standards-Version: 3.7.2.0.
+  * debian/dietlibc-dev.prerm.in: minor.
+
+ -- Gerrit Pape <pape@smarden.org>  Fri, 26 May 2006 18:29:49 +0000
+
+dietlibc (0.29-11) unstable; urgency=low
+
+  * debian/diff/cvs-20060416.diff: new: cvs snapshot from 200604161700.
+  * debian/diff/cvs-20051012.diff: remove; obsolete.
+  * debian/diff/patch-diet-parisc-fix06.diff, debian/diff/s390-mmap.diff:
+    remove; applied upstream cvs.
+  * debian/implicit: update to revision 1.11.
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 16 Apr 2006 17:55:52 +0000
+
+dietlibc (0.29-10) unstable; urgency=low
+
+  * debian/diff/patch-diet-parisc-fix06.diff: new; fixes issues with the
+    parisc syscalls that all contain 5 or 6 arguments (thx Herbert Poetzwl,
+    Micah Anderson, closes: #351875, #360007).
+  * debian/diff/parisc-sendto-recvfrom.diff: remove; obsolete.
+
+ -- Gerrit Pape <pape@smarden.org>  Sat,  1 Apr 2006 10:31:30 +0000
+
+dietlibc (0.29-9) unstable; urgency=low
+
+  * debian/diff/s390-mmap.diff: new; fix mmap and missing mmap64
+    implementation for s390 (thx Bastian Blank, closes: #356557).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 20 Mar 2006 20:27:13 +0000
+
+dietlibc (0.29-8) unstable; urgency=low
+
+  * debian/rules: binary-arch: set MYARCH on make install also (fixes build
+    failure on sparc).
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 22 Dec 2005 16:30:02 +0000
+
+dietlibc (0.29-7) unstable; urgency=low
+
+  * debian/diff/parisc-sendto-recvfrom.diff: new: fix sendto(), recvfrom()
+    on hppa.
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 20 Dec 2005 13:14:04 +0000
+
+dietlibc (0.29-6) unstable; urgency=low
+
+  * debian/diff/parisc-iitlbp.diff: new; from glibc: Update hppa assembly
+    for current CVS binutils (fixes build failure on hppa).
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 16 Oct 2005 18:29:25 +0000
+
+dietlibc (0.29-5) unstable; urgency=low
+
+  * debian/dietlibc-dev.prerm.in: new; remove /usr/lib/diet/lib-|ARCH| on
+    'remove'.
+  * debian/rules: create debian/dietlibc-dev.prerm from
+    debian/dietlibc-dev.prerm.in (closes: #328283).
+  * debian/diff/cvs-20051012.diff: new; cvs snapshot from 200510120900.
+  * debian/diff/cvs-20050731.diff, debian/diff/rpc_svcauth_.diff: remove;
+    obsolete.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 12 Oct 2005 09:12:58 +0000
+
+dietlibc (0.29-4) unstable; urgency=low
+
+  * ia64-proc-endp.diff: new; ia64 asm: A2124 previous proedure not yet
+    ended (fixes build failure on ia64).
+  * debian/control, debian/rules: no longer build dynamic library on arm,
+    it's not really usable anyway (fixes build failure on arm).
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 13 Aug 2005 13:59:57 +0000
+
+dietlibc (0.29-3) unstable; urgency=low
+
+  * debian/diff/cvs-20050731.diff: new; cvs snapshot from 200507311100.
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 31 Jul 2005 11:25:07 +0000
+
+dietlibc (0.29-2) unstable; urgency=low
+
+  * debian/diff/arm-waitpid.diff: new; re-add #define __NR_waitpid for arm
+    (works around build failure of dynamic lib on arm; still not really
+    usable though).
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 29 May 2005 10:51:51 +0000
+
+dietlibc (0.29-1) unstable; urgency=low
+
+  * new upstream version.
+    - switches gcc option -malign-functions to -falign-functions in diet on
+      i386 (no longer supports gcc 2, closes: #234961).
+  * debian/diff/LD_RUN_PATH.diff, debian/diff/__powerpc__.diff,
+    debian/diff/dns-decoding.diff, debian/diff/fcntl.h.diff,
+    debian/diff/s390-select.diff, debian/diff/siginfo-64bit.diff: remove;
+    obsolete.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 25 May 2005 19:33:41 +0000
+
+dietlibc (0.28-3) unstable; urgency=medium
+
+  * debian/diff/s390-select.diff: new; add select for s390 (using
+    _newselect) (see #297806).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 28 Mar 2005 12:28:30 +0000
+
+dietlibc (0.28-2) unstable; urgency=low
+
+  * debian/control: add Architecture: ppc64 (thx Andreas Jochens, closes:
+    #299226).
+  * debian/diff/LD_RUN_PATH.diff: new; from upstream cvs: oops, fix
+    LD_RUN_PATH unsetting (Enrico Scholz).
+  * debian/diff/__powerpc__.diff: new; from upstream cvs: #ifdef powerpc ->
+    #ifdef __powerpc__ (Enrico Scholz) (closes: #300917).
+  * debian/diff/dns-decoding.diff: new; from upstream cvs: fix stupid dns
+    decoding bug (Gernot Tenchio) (plus undocumented __NO_STAT64 fix).
+  * debian/diff/siginfo-64bit.diff: new; from upstream cvs: struct siginfo
+    was wrong for 64-bit platforms.
+  * debian/diff/fcntl.h.diff: new; update to include/fcntl.h from cvs
+    20050325 (don't include readahead(2)).
+
+ -- Gerrit Pape <pape@smarden.org>  Fri, 25 Mar 2005 13:22:38 +0000
+
+dietlibc (0.28-1) unstable; urgency=low
+
+  * new upstream version (.orig.tar.gz re-packaged without CVS/
+    directories).
+  * debian/diff/cvs-20041219.diff: remove; obsolete.
+  * debian/diff/nice.diff: adapt; still set errno=EPERM on error.
+  * debian/dietlibc-doc.docs: add README.security.
+  * debian/rules: minor.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 31 Jan 2005 22:21:06 +0000
+
+dietlibc (0.27-7) unstable; urgency=low
+
+  * debian/diff/ia64-no-fno-omit-frame-pointer.diff: new; don't use
+    -fno-omit-frame-pointer on ia64 (works around #286840).
+  * debian/rules: get VERSION from debian/changelog.
+  * debian/diff/nice.diff: update; set errno=EPERM on error.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 23 Dec 2004 14:18:36 +0000
+
+dietlibc (0.27-6) unstable; urgency=low
+
+  * debian/diff/nice.diff: new; fixes nice() on alpha, ia64 (closes:
+    #286603).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 21 Dec 2004 11:06:32 +0000
+
+dietlibc (0.27-5) unstable; urgency=low
+
+  * debian/diff/cvs-20041219.diff: new; cvs snapshot (closes: #285631).
+  * debian/diff/mmap64.diff, debian/diff/strcat-compliant.diff,
+    debian/diff/cvs-20041207.diff: remove; included upstream.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 20 Dec 2004 19:57:06 +0000
+
+dietlibc (0.27-4) unstable; urgency=low
+
+  * debian/rules: announce VERSION='0.27-4' (also in dynlib package).
+  * debian/diff/make-clean.diff: remove; unneeded.
+  * debian/diff/mmap64.diff: new; (fixes build failure on arm; fixes build
+    failure of fnord on parisc, ppc).
+  * debian/diff/mips-pic.diff: re-add: still don't use -fno-pic on mips/el
+    (fixes build failure of cvm on mips/el).
+
+ -- Gerrit Pape <pape@smarden.org>  Fri, 10 Dec 2004 11:55:59 +0000
+
+dietlibc (0.27-3) unstable; urgency=low
+
+  * debian/diff/arm-waitpid.diff, debian/diff/mips-pic.diff: remove; fixed
+    in debian/diff/cvs-20041207.diff.
+  * debian/diff/64bitenviron.diff, debian/diff/64bitfixes.diff,
+    debian/diff/memleak.diff, debian/diff/setlocale.diff: remove; included
+    in debian/diff/cvs-20041207.diff.
+  * debian/diff/cvs-20041207.diff: new; cvs snapshot.
+  * debian/diff/rpc_svcauth_.diff: new; make _svcauth_unix, _svcauth_short
+    non-static.
+  * debian/rules: apply diffs in order; announce VERSION='0.27-3'.
+  * debian/dietlibc-dev.postinst.in: minor.
+  * debian/diff/strcat-compliant.diff: new; don't WANT_NON_COMPLIANT_STRNCAT.
+
+ -- Gerrit Pape <pape@smarden.org>  Tue,  7 Dec 2004 18:15:08 +0000
+
+dietlibc (0.27-2) unstable; urgency=medium
+
+  * debian/diff/64bitenviron.diff: new; from upstream cvs:
+      #include <endian.h> in syscalls.s/environ.S to make sure environ is
+        actually large enough (Enrico Scholz) (closes: #273748).
+  * debian/diff/64bitfixes.diff: new; from upstream cvs:
+      several fixes from Gwenole Beauchesne, AMD64 and otherwise.
+  * debian/diff/memleak.diff: new; from upstream cvs:
+      fix memory leak in regfree (thanks, Valgrind!).
+  * debian/diff/setlocale.diff: new; from upstream cvs:
+      setlocale now accepts setting the locale to "C".
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 28 Sep 2004 17:25:12 +0000
+
+dietlibc (0.27-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/copyright: minor.
+  * debian/implicit: update to revision 1.10.
+  * debian/dietlibc-dev.postinst.in: typo.
+  * debian/rules: minor cleanup.
+  * debian/diff/cvs-20040620.diff: remove; obsolete.
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 31 Jul 2004 20:03:44 +0000
+
+dietlibc (0.26-3) unstable; urgency=low
+
+  * debian/diff/cvs-20040609.diff: remove.
+  * debian/diff/ppc-redefinition.diff: remove; fixed upstream.
+  * debian/diff/cvs-20040620.diff: new; cvs snapshot:
+    o PowerPC build fix (Gerrit Pape)
+    o Olaf: added missing settimeofday
+    o add netinet/ether.h and netinet/if_ether.h
+  * debian/rules: install diet compiled libraries in /usr/lib/diet/lib/
+    (static and shared); process dietlibc-dev.postinst.in; minor.
+  * debian/dietlibc-dev.postinst.in: make sure /usr/lib/diet/lib-$(ARCH) ->
+    lib is a symlink, move libraries if necessary.
+  * debian/dietlibc-doc.README.Debian: new; document DEB_BUILD_OPTIONS=diet
+    and where to put libraries, include files.
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 20 Jun 2004 18:14:51 +0000
+
+dietlibc (0.26-2) unstable; urgency=low
+
+  * debian/diff/ppc-redefinition.diff: new; remove duplicate definition from
+    include/asm/ppc-sigcontext.h (fixes build failure on ppc).
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 10 Jun 2004 09:28:58 +0000
+
+dietlibc (0.26-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/rules: remove ia64/waitpid.S workaround, fixed by upstream.
+  * debian/diff/make-clean.diff, debian/diff/mips-pic.diff: adapt to new
+    upstream version.
+  * debian/diff/cvs-20040609.diff: new; cvs snapshot:
+    o change DNS routines to look for ip6.arpa instead of ip6.int
+    o WANT_FREAD_OPTIMIZATION was broken on sockets (Johannes Stezenbach)
+    o added fix for getgrouplist (Nikola Vladov)
+    o fix the fd leak on error path (Denis Vlasenko)
+    o the regparm attribute in typedefinition generats error with gcc-2.95
+      on non-x86 arch... (reported: Johannes Stezenbach)
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 10 Jun 2004 07:15:35 +0000
+
+dietlibc (0.25-3) unstable; urgency=low
+
+  * debian/rules: remove erroneous ia64/waitpid.S before build.
+
+ -- Gerrit Pape <pape@smarden.org>  Fri, 28 May 2004 20:13:03 +0000
+
+dietlibc (0.25-2) unstable; urgency=low
+
+  * debian/control, debian/rules: dietlibc-dev package for amd64 (thx
+    Andreas Jochens; closes: #245292).
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 25 Apr 2004 05:15:48 +0000
+
+dietlibc (0.25-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/diff/cvs-20040325.diff: remove; obsolete.
+  * debian/implicit: update to revision 1.8.
+
+ -- Gerrit Pape <pape@smarden.org>  Sun, 28 Mar 2004 08:14:10 +0000
+
+dietlibc (0.24-5cvs20040325) unstable; urgency=low
+
+  * debian/diff/cvs-20040325.diff: new; cvs snapshot while waiting for 0.25;
+    (fixes #232200).
+  * debian/diff/arm-waitpid.diff: new; (fixes build problem with runit package
+    on arm).
+  * debian/diff/mips-pic.diff: adapt.
+  * debian/implicit: update to revision 1.7.
+  * debian/rules: typo.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 25 Mar 2004 13:28:44 +0000
+
+dietlibc (0.24-4) unstable; urgency=medium
+
+  * debian/rules: set MYARCH=parisc on hppa, MYARCH=mips on mipsel (fixes
+    build failure on hppa, mipsel).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon,  9 Feb 2004 10:35:12 +0000
+
+dietlibc (0.24-3) unstable; urgency=low
+
+  * debian/implicit: update to revision 1.5.
+  * debian/rules: override upstream's Makefile test for MYARCH with
+    dpkg-architecture -qDEB_HOST_ARCH; minor.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 28 Jan 2004 10:51:46 +0000
+
+dietlibc (0.24-2) unstable; urgency=low
+
+  * debian/control: Standards-Version: 3.6.1.0; no longer Build-Depends:
+    debhelper.
+  * debian/copyright: quote license header.
+  * debian/rules: stop using debhelper, use implicit Makefile rules; use
+    dpkg-architecture instead of uname -m.
+  * debian/implicit: new; implicit rules.
+  * debian/dietlibc.conffiles: new.
+  * debian/dietlibc-dev.files, debian/dietlibc.files: remove; obsolete.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 17 Dec 2003 20:04:54 +0000
+
+dietlibc (0.24-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/diff/cvs-20031119.diff: remove.
+  * debian/diff/make-clean.diff: new; make clean in libpthread.
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 25 Nov 2003 19:58:51 +0000
+
+dietlibc (0.23-4) unstable; urgency=low
+
+  * debian/diff/cvs-20031119.diff: new; snapshot from upstream cvs.
+  * debian/diff/ia64-assembly.diff, debian/diff/ia64-pipe.diff,
+    debian/diff/parisc-assembly.diff: remove; obsolete.
+  * debian/control: add s390 to Architectures: field of dietlibc-dev; add
+    arm to Architectures: field of dietlibc; adapt long descriptions.
+  * debian/rules: build dynamic diet libc library on arm (additionally to
+    i386); don't dh_fixperms of libdl.so only.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 19 Nov 2003 10:36:41 +0000
+
+dietlibc (0.23-3) unstable; urgency=low
+
+  * debian/diff/ia64-assembly.diff: new; taken from upstream cvs; fixes
+    fork() on ia64.
+  * debian/diff/ia64-pipe.diff: new; fixes pipe() (thx Thomas Ogrisegg).
+  * debian/diff/parisc-assembly.diff: new; taken from upstream cvs; fixes
+    typo in setjmp.S; fixes str*.S assembly routines.
+  * debian/rules: re-enable building parisc/str*.S assembly routines.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon,  3 Nov 2003 10:07:41 +0000
+
+dietlibc (0.23-2) unstable; urgency=medium
+
+  * force package re-build on arm (bug #215913, #216958).
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 23 Oct 2003 10:55:03 +0000
+
+dietlibc (0.23-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/diff/cvs-20030904.diff: remove.
+  * debian/rules: still don't build parisc/str*.S for now.
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 13 Sep 2003 09:02:31 +0000
+
+dietlibc (0.22-3cvs20030904.1) unstable; urgency=low
+
+  * debian/rules: don't build new parisc assembly routines for now (fixes
+    build failure on hppa).
+  * new cvs snapshot provides vasprintf() (closes: #192233).
+
+ -- Gerrit Pape <pape@smarden.org>  Fri,  5 Sep 2003 10:19:57 +0200
+
+dietlibc (0.22-3cvs20030904) unstable; urgency=low
+
+  * debian/diff/cvs-20030714.diff: remove.
+  * debian/diff/cvs-20030904.diff: new; new cvs snapshot.
+  * debian/diff/parisc-stat-struct.diff: remove; applied upstream.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu,  4 Sep 2003 16:50:20 +0200
+
+dietlibc (0.22-3cvs20030714.1) unstable; urgency=low
+
+  * debian/diff/parisc-stat-struct.diff: new; fix 'stat struct' on parisc
+    (closes: #200619).
+  * debian/control: Standards-Version: 3.6.0.
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 19 Aug 2003 10:40:51 +0200
+
+dietlibc (0.22-3cvs20030714) unstable; urgency=low
+
+  * debian/control: package dietlibc-dev: Section: libdevel.
+  * debian/diff/cvs-20030714.diff: new; upstream cvs snapshot.
+    * fixes linker failure on sparc (closes: #200756).
+    * removes unmotivated gcc3 workaround (closes: #192936).
+  * debian/diff/rpc-int-overflow.diff: remove; included in cvs snapshot.
+  * debian/diff/mips-pic.diff: adapt to cvs snapshot changes.
+  * debian/rules: use ls -t and ls -tr when applying patches.
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 14 Jul 2003 14:26:08 +0200
+
+dietlibc (0.22-2) unstable; urgency=high
+
+  * debian/diff/rpc-int-overflow.diff: new; fix integer overflow in sun rpc
+    code (taken from upstream: taken from glibc; CA-2003-10)
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 22 Mar 2003 22:37:29 +0100
+
+dietlibc (0.22-1) unstable; urgency=low
+
+  * new upstream version.
+  * debian/diff/64bit-lseek64.diff: remove; applied upstream.
+  * debian/diff/parisc64-build.diff: remove; applied upstream.
+  * debian/diff/sparc32-sysdep.diff: remove; fixed/partly applied upstream.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 20 Feb 2003 10:29:20 +0100
+
+dietlibc (0.22-0cvs20021128.3) unstable; urgency=low
+
+  * debian/rules: build architecture independent package in target
+    binary-indep (closes: #179403); do not install undocumented.7 symlink.
+  * debian/diff/sparc32-sysdep.diff: new; include udiv, umel, urem objects
+    in libc.a (fixes fnord build failure on sparc); libc6 also does this,
+    but generally '-msupersparc' should make this obsolete, hmm; I'm not
+    completely sure about this fix.
+  * debian/control: Standards-Version: 3.5.8
+  * debian/copyright: typo.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed,  5 Feb 2003 13:00:37 +0100
+
+dietlibc (0.22-0cvs20021128.2) unstable; urgency=low
+
+  * debian/diff/64bit-lseek64.diff: new: fix lseek64 on 64-bit
+    architectures (fixes fnord build failure on ia64).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue, 28 Jan 2003 11:21:43 +0100
+
+dietlibc (0.22-0cvs20021128.1) unstable; urgency=low
+
+  * i386/mmap64.S, i386/dyn_syscalls.S: from upstream cvs; fixes dynamic
+    library pic problem (thx Frank Bennett).
+  * include/signal.h: from upstream cvs.
+  * debian/diff/sparc-signal.h.diff: remove; patch is applied upstream.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu,  9 Jan 2003 10:29:08 +0100
+
+dietlibc (0.22-0cvs20021128) unstable; urgency=low
+
+  * debian/diff/sparc-signal.h.diff: new; fix typo in upstream CVS
+    (fixes build failure on sparc).
+  * debian/rules: support 'debug' in DEB_BUILD_OPTIONS; minor cleanup.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu, 28 Nov 2002 13:21:22 +0100
+
+dietlibc (0.22-0cvs20021127) unstable; urgency=low
+
+  * debian/control: dietlibc-doc is Section: doc.
+  * upstream cvs snapshot 20021127.
+  * debian/diff/parisc64-build.diff: new; build on parisc64.
+  * available for ia64 (please test).
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 27 Nov 2002 10:57:32 +0100
+
+dietlibc (0.21-4) unstable; urgency=low
+
+  * debian/rules: don't 'dh_fixperms' of .so libraries (closes:
+    #167846).
+
+ -- Gerrit Pape <pape@smarden.org>  Tue,  5 Nov 2002 10:58:39 +0100
+
+dietlibc (0.21-3) unstable; urgency=low
+
+  * debian/rules: add target patch, patch-stamp: apply diffs from
+    debian/diff/; apply reverse diffs in clean target.
+  * debian/diff/mips-pic.diff: new;
+    * avoid -fno-pic on mips/mipsel, libgcc.a is compiled with -fPIC on
+      Debian (thx Johannes Stezenbach).
+
+ -- Gerrit Pape <pape@smarden.org>  Wed, 30 Oct 2002 13:34:07 +0100
+
+dietlibc (0.21-2) unstable; urgency=medium
+
+  * libshell/realpath.c: include fix from upstream cvs (closes:
+    #165802).
+  * alpha/__alarm.c, syscalls.s/alarm.S, alpha/Makefile.add: include
+    fix for alarm() on alpha from upstream cvs (fixes fnord build
+    failure).
+  * include/signal.h: from upstream cvs.
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 26 Oct 2002 12:26:37 +0200
+
+dietlibc (0.21-1) unstable; urgency=low
+
+  * new upstream version.
+  * Makefile: minor patch to build the parisc port on ARCH=parisc64.
+  * available for hppa (please test).
+  * dietlibc-dev: add lintian override: statically-linked-binary.
+
+ -- Gerrit Pape <pape@smarden.org>  Wed,  9 Oct 2002 12:53:39 +0200
+
+dietlibc (0.20-0cvs20020808) unstable; urgency=medium
+
+  * new cvs snapshot: includes fix for integer overflow checks:
+    * lib/alloc.c, libstdio/fwrite.c: remove division by zero chance
+      in integer overflow check.
+
+ -- Gerrit Pape <pape@smarden.org>  Thu,  8 Aug 2002 21:46:01 +0200
+
+dietlibc (0.20-0cvs20020806) unstable; urgency=high
+
+  * new upstream version 0.19 plus security fix: add several integer
+    overflow checks from upstream cvs:
+    * lib/alloc.c, include/limits.h: fix calloc integer overflow
+      (notified by RUS-CERT).
+
+ -- Gerrit Pape <pape@smarden.org>  Wed,  7 Aug 2002 00:38:50 +0200
+
+dietlibc (0.18-1) unstable; urgency=low
+
+  * new upstream version.
+    * lib/sscanf.c: fix "%d%n" handling (closes: #147315).
+
+ -- Gerrit Pape <pape@smarden.org>  Sat, 20 Jul 2002 15:26:31 +0200
+
+dietlibc (0.17-2) unstable; urgency=low
+
+  * bugfix taken from upstream cvs (closes: #143668):
+    * libstdio/ftell.c: ftell did not take ungetc into account (Kevin
+      Ryde through Debian).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon, 13 May 2002 11:14:07 +0200
+
+dietlibc (0.17-1) unstable; urgency=low
+
+  * new maintainer.
+  * new upstream version.
+  * installs into /usr/lib/diet.
+  * builds successfully on powerpc (closes: #143397).
+
+ -- Gerrit Pape <pape@smarden.org>  Mon,  6 May 2002 09:52:21 +0200
+
+dietlibc (0.16-2) unstable; urgency=low
+
+  * Changed rules script to only compile the dynamic library if
+    if it is i386 only (Closes: #141795)
+
+ -- Abraham vd Merwe <abz@debian.org>  Mon,  8 Apr 2002 18:22:15 +0200
+
+dietlibc (0.16-1) unstable; urgency=low
+
+  * New version. Sorry about this (Closes: #132315, #138338, #139223)
+  * Dynamic linking support - shaky of course
+  * S/390 (s390) support
+  * Removed README.Debian (all the questions is now covered in the
+    main FAQ)
+  * Use a slightly modified version of Felix's diet binaries instead
+    of my shell script.
+  * Probably other things which I can't remember :P
+
+ -- Abraham vd Merwe <abz@debian.org>  Fri, 22 Mar 2002 19:19:19 +0200
+
+dietlibc (0.12-2) unstable; urgency=low
+
+  * Fixed mipsel bug in Makefile.add (Closes: #125781)
+  * Changed debian rules file so that copyright can be installed
+    for architecture dependant files as well (Closes: #124152)
+
+ -- Abraham vd Merwe <abz@debian.org>  Wed, 19 Dec 2001 22:17:51 +0200
+
+dietlibc (0.12-1) unstable; urgency=low
+
+  * New upstream version
+  * I've changed debian/rules to make diet executable after
+    replacing the default diet wrappers (Closes: #120297)
+  * Added the new documents to debian/docs
+  * Added Russel Nelson's patch (posted on dietlibc-dev). Dietlibc
+    should build on ARM now (Closes: #120396)
+  * The fputc('\n',stderr) bug seems to be fixed in 0.12 (Closes: #122164)
+  * I've split the package up into three seperate packages.
+
+ -- Abraham vd Merwe <abz@debian.org>  Thu, 4 Dec 2001 22:19:07 +0200
+
+dietlibc (0.11-4) unstable; urgency=low
+
+  * Changed Makefile and debian/rules to use 'uname -m' again in order
+    to determine the architecture (Closes: #119715)
+
+ -- Abraham vd Merwe <abz@debian.org>  Thu, 15 Nov 2001 19:50:32 +0200
+
+dietlibc (0.11-3) unstable; urgency=low
+
+  * Removed the -EB flag from mips/Makefile.add. The mipsel bug should
+    hopefully now be fixed. (Closes: #109209)
+
+ -- Abraham vd Merwe <abz@debian.org>  Sat, 10 Nov 2001 11:11:09 +0200
+
+dietlibc (0.11-2) unstable; urgency=low
+
+  * Changed Makefile and debian/rules to use 'dpkg --print-architecture'
+    in order to determine the host architecture (Closes: #109209)
+  * Added a rule in debian/rules to remove backup files (Closes: #117273)
+
+ -- Abraham vd Merwe <abz@debian.org>  Mon, 29 Oct 2001 18:29:15 +0200
+
+dietlibc (0.11-1) unstable; urgency=low
+
+  * Updated README.Debian
+  * Dietlibc will now only build for all the officially supported
+    platforms (Closes: #104688)
+  * Removed preinst kernel header compatibility hack. Since the new
+    dietlibc doesn't depend on the kernel headers, this is not necessary
+    anymore.
+
+ -- Abraham vd Merwe <abz@debian.org>  Thu, 2 Aug 2001 00:16:23 +0200
+
+dietlibc (0.10-1) unstable; urgency=low
+
+  * Initial Release. (Closes: #99955)
+
+ -- Abraham vd Merwe <abz@debian.org>  Sat, 16 Jun 2001 01:06:56 +0200

@@ -1,0 +1,94 @@
+#!/usr/bin/make -f
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+package:=dist
+SRCTOP:= $(shell if [ "$$PWD" != "" ]; then echo $$PWD; else pwd; fi)
+INSTALL = install
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+    INSTALL_PROGRAM += -s
+endif
+install_file	= $(INSTALL) -p	   -o root -g root  -m	644
+install_program = $(INSTALL) -p	   -o root -g root  -m	755
+install_script	= $(INSTALL) -p	   -o root -g root  -m	755
+make_directory	= $(INSTALL) -p -d -o root -g root  -m	755
+email := srivasta@debian.org
+TMPTOP:=$(SRCTOP)/debian/tmp
+DOCDIR=$(SRCTOP)/debian/$(package)/usr/share/doc/$(package)
+DEBDOCDIR=$(TMPTOP)/usr/share/doc/$(package)
+DEBLIBDIR=$(TMPTOP)/usr/lib/$(package)
+PKG_DIR = $(TMPTOP)/usr/share/$(package)
+MAN1DIR = $(TMPTOP)/usr/share/man/man1
+MAN7DIR = $(TMPTOP)/usr/share/man/man7
+PAT_EXEC       = patcil patdiff patbase patlog patmake patsend \
+                 patnotify patpost patftp patname patsnap patcol \
+                 patclean patindex
+
+# For DEB_HOST_MULTIARCH
+include /usr/share/dpkg/architecture.mk
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	/bin/cp -rpf debian/Config      .config         && \
+          /bin/cp -pf  debian/config.over config.over   && \
+	    touch .config/nomail                        && \
+              sh ./Configure                               \
+                -de                                        \
+                -D prefix=/usr                             \
+                -D orgname=/etc/news/organization          \
+                -D myhostname=localhost                    \
+                -D mydomain=localdomain                    \
+                -D defeditor=/usr/ae                       \
+                -D privlib=/usr/share/$(package)           \
+                -D pager=/bin/more                         \
+                -D mansrc=/usr/share/man/                  \
+                -D cf_email='$(email)'                     \
+                -D grep=/bin/grep                          \
+                -D sed=/bin/sed                            \
+                -D cat=/bin/cat                            \
+                -D zcat=/bin/zcat                          \
+                -D d_berknames='define'
+
+
+override_dh_auto_build:
+	dh_auto_build
+	bash -m debian/dist.postinst
+	bash -n debian/dist.config
+	bash -n debian/dist.postrm
+	bash -n debian/dist.prerm
+
+override_dh_install:
+	test -d $(MAN1DIR) || $(make_directory) $(MAN1DIR)
+	$(MAKE) install
+	for script in $(TMPTOP)/usr/bin/*; do    \
+        test `head -1 $$script` = '#!/usr/bin/perl' && perl -c $$script ;\
+    done
+	$(MAKE) install.man
+	$(make_directory) $(MAN7DIR)
+	(cd $(MAN1DIR); for file in $(PAT_EXEC) ; do \
+                        ln -s pat.1.gz $$file.1.gz ; \
+                        done )
+	mv $(MAN1DIR)/dist.1 $(MAN7DIR)/dist.7
+	dh_install
+
+override_dh_installdocs:
+	dh_installdocs
+	test ! -d $(DOCDIR) || $(make_directory) $(DOCDIR)
+	$(install_file) mcon/INTRO	$(DOCDIR)/INTRO.mcon
+	$(install_file) jmake/NOTES	$(DOCDIR)/NOTES.jmake
+	$(install_file) mcon/NOTES	$(DOCDIR)/NOTES.mcon
+	$(install_file) jmake/README	$(DOCDIR)/README.jmake
+	$(install_file) kit/README	$(DOCDIR)/README.kit
+	$(install_file) mcon/README	$(DOCDIR)/README.mcon
+	$(install_file) pat/README	$(DOCDIR)/README.pat
+
+
+override_dh_clean:
+	test ! -f Makefile || $(MAKE) clobber
+	dh_clean
+	test ! -d .config || rm -rf .config
+
+#Local variables:
+#mode: makefile
+#End:

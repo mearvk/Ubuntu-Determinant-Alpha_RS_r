@@ -1,0 +1,82 @@
+Doxygen embeds jquery
+=====================
+
+This document describes how and why Doxygen embeds jquery. It serves as an
+explanation of what problems need to be addressed before removing these
+embeddings. If you are not interested in the reasons, skip to consequences.
+
+Where?
+======
+
+ 1. The Doxygen source contains jquery library sources in the `jquery/` folder.
+ 2. These are minified at release time by the Doxygen upstream and stored as
+    `src/*.js`. See `jquery/Makefile`.
+ 3. They are then converted to C header files and stored as
+    `generated_src/doxygen/*_js.h`.  See `src/libdoxygen.t`.
+ 4. At build-time these headers are compiled into the `doxygen` binary and
+    installed as `usr/bin/doxygen` into the `doxygen` binary package.
+ 5. When running Doxygen the jquery libraries are embedded into the generated
+    documentation.
+ 6. Packages using Doxygen as a build-dependency for creating their
+    documentation therefore also embed these jquery libraries.
+
+Why?
+====
+
+While it would be nice to remove the need for any of these embedding, it is
+practically difficult to do so.
+
+ 6. It was considered to introduce a `doxygen-common` package that pulls in the
+    relevant jquery libraries and provides them at a canonical location for
+    usage with symbolic links. When doing this the question of how to handle
+    upgrades of Doxygen arises. [Upstream indicated] that the documentation
+    generated with one version of Doxygen will not necessarily work with the
+    jquery libraries from a different version of Doxygen. This leaves two
+    options:
+
+    * Ship all previous versions of jquery libraries in the `doxygen-common`
+      package.
+    * Rebuild all reverse build dependencies of Doxygen whenever uploading a
+      new version of Doxygen.
+
+    Both options were deemed infeasible. The first option simply is
+    unmaintainable. The second option requires architecture independent
+    binNMUs. Since the archive does not do any architecture independent
+    auto-building this is not available either. (This was discussed with the
+    buildd maintainers during DebConf13.)
+
+ 5. This is simply how Doxygen is designed to operate. The generated
+    documentation should be usable as is without dependencies on external
+    files.
+
+ 4. To facilitate embedding 5 the `doxygen` binary needs some kind of access
+    to the jquery libraries. Changing this aspect would require significant
+    modification of the Doxygen source.
+
+ 3. These files are regenerated during a regular build.
+
+ 2. The Debian package recreates these artifacts from step 1 by running `make
+    -C jquery install` before the build.
+
+ 1. This is an aspect of the upstream source and build system. Each doxygen
+    release ships a tightly coupled conglomerate of various javascript
+    libraries. Replacing them with system copies is simply unmaintainable,
+    because it is not mechanically testable.
+
+One of the major reasons behind removing embedded copies of code is to be able
+to do security updates. Arguably there are little options to exploit a
+vulnerable jquery library as embedded by Doxygen, because from a user point of
+view it is static data. Thus one of the primary motivations to remove embedded
+copies does not apply in this case.
+
+[Upstream indicated]: http://doxygen.10944.n7.nabble.com/release-tarballs-td5837.html
+
+Consequences
+============
+
+It is not considered a problem for Doxygen or packages using Doxygen to embed
+jquery. In fact replacing the `jquery.js` file created by Doxygen likely
+results in broken documentation. Packages doing that are buggy. Lintian will
+have to learn that a `jquery.js` embedded by Doxygen is a normal thing.
+
+Helmut Grohne

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<sect1 id="performance">
+<sect1info>
+<abstract role="texinfo-node">
+  <para>Discussion on conversion speed</para>
+</abstract>
+</sect1info>
+
+<title>Performance analysis</title>
+
+<indexterm><primary>speed</primary></indexterm>
+<indexterm><primary>performance</primary></indexterm>
+<indexterm><primary>optimize</primary></indexterm>
+<indexterm><primary>efficiency</primary></indexterm>
+
+<para>
+The performance of docbook2X,
+and most other DocBook tools<footnote>
+<para>with the notable exception of the 
+<ulink url="http://packages.debian.org/unstable/text/docbook-to-man">docbook-to-man tool</ulink>
+based on the <command>instant</command> stream processor
+(but this tool has many correctness problems)
+</para>
+</footnote>
+can be summed up in a short phrase:
+<emphasis>they are slow</emphasis>.
+</para>
+
+<para>
+On a modern computer producing only a few man pages
+at a time, 
+with the right software — namely, libxslt as the XSLT processor —
+the DocBook tools are fast enough.
+But their slowness becomes a hindrance for
+generating hundreds or even thousands of man pages
+at a time.
+</para>
+
+<para>
+The author of docbook2X encounters this problem
+whenever he tries to do automated tests of the docbook2X package.
+Presented below are some actual benchmarks, and possible approaches
+ to efficient DocBook  to man pages conversion.
+</para>
+
+<table>
+  <title>docbook2X running times on 2157 
+<sgmltag class="element">refentry</sgmltag> documents</title>
+
+  <tgroup cols="3" rowsep="1" colsep="1">
+    <thead>
+      <row>
+        <entry>Step</entry>
+        <entry>Time for all pages</entry>
+        <entry>Avg. time per page</entry>
+      </row>
+    </thead>
+
+    <tbody>
+      <row>
+        <entry>DocBook to Man-XML</entry>
+        <entry>519.61&#x2007;s</entry>
+        <entry>0.24&#x2007;s</entry>
+      </row>
+
+      <row>
+        <entry>Man-XML to man-pages</entry>
+        <entry>383.04&#x2007;s</entry>
+        <entry>0.18&#x2007;s</entry>
+      </row>
+
+      <row>
+        <entry>roff character mapping</entry>
+        <entry>6.72&#x2007;s</entry>
+        <entry>0.0031&#x2007;s</entry>
+      </row>
+      
+      <row>
+        <entry>Total</entry>
+        <entry>909.37&#x2007;s</entry>
+        <entry>0.42&#x2007;s</entry>
+      </row>
+    </tbody>
+  </tgroup>
+</table>
+
+<para>
+The above benchmark was run on 2157 documents 
+coming from the <ulink url="http://www.catb.org/~esr/doclifter/">doclifter</ulink> man-page-to-DocBook conversion tool.  The man pages
+come from the section 1 man pages installed in the 
+author’s Linux system.
+The XML files total 44.484 MiB, and on average are 20.6KiB long. 
+</para>
+
+<para>
+The results were obtained using the test script in 
+<filename>test/mass/test.pl</filename>,
+using the default man-page conversion options.
+The test script employs the obvious optimizations, 
+such as only loading once the XSLT processor, the 
+man-pages stylesheet, &db2x_manxml; and &utf8trans;.
+</para>
+
+<para>
+Unfortunately, there does not seem to be obvious ways
+that the performance can be improved, short of re-implementing the
+tranformation program in a tight programming language such as C.
+</para>
+
+<para>
+Some notes on possible bottlenecks:
+
+<itemizedlist>
+  <listitem>
+    <para>
+      Character mapping by &utf8trans; is very fast compared to 
+      the other stages of the transformation.  Even loading &utf8trans;
+      separately for each document only doubles the running time
+      of the character mapping stage.
+    </para>
+  </listitem>
+
+  <listitem>
+    <para>
+      Even though the XSLT processor is written in C,
+      XSLT processing is still comparatively slow.
+      It takes double the time of the Perl script<footnote>
+<para>
+From preliminary estimates, the Pure-XSLT solution takes only 
+slightly longer at this stage: .22&#x2007;s per page</para></footnote>
+      &db2x_manxml;,
+      even though the XSLT portion and the Perl portion
+      are processing documents of around the same size<footnote>
+<para>Of course, conceptually, DocBook processing is more complicated.
+So these timings also give us an estimate of the cost
+of DocBook’s complexity: twice the cost over a simpler document type,
+which is actually not too bad.</para></footnote>
+      (DocBook <sgmltag class="element">refentry</sgmltag>
+       documents and Man-XML documents).  
+    </para>
+
+    <para>
+      In fact, profiling the stylesheets shows that a significant
+      amount of time is spent on the localization templates,
+      in particular the complex XPath navigation used there.
+      An obvious optimization is to use XSLT keys for the same
+      functionality.  
+    </para>
+
+    <para>
+      However, when that is implemented,
+      the author found that the time used for 
+      <emphasis>setting up keys</emphasis> dwarfs the time savings
+      from avoiding the complex XPath navigation.  It adds an
+      extra 10s to the processing time for the 2157 documents.
+      Upon closer examination of the libxslt source code,
+      XSLT keys are seen to be implemented rather inefficiently:
+      <emphasis>each</emphasis> key pattern <replaceable>x</replaceable>
+      causes the entire input document to be traversed once
+      by evaluating the XPath <literal>//<replaceable>x</replaceable></literal>!
+    </para>
+
+
+  </listitem>
+    
+  <listitem>
+    <para>
+      Perhaps a C-based XSLT processor written
+      with the best performance in mind (libxslt is not particularly
+      the most efficiently coded) may be able to achieve
+      better conversion times, without losing all the nice
+      advantages of XSLT-based tranformation.
+      Or failing that, one can look into efficient, stream-based
+      transformations (<ulink url="http://stx.sourceforge.net/">STX</ulink>).
+    </para>
+  </listitem>
+
+</itemizedlist>
+</para>
+      
+</sect1>
+
+
+

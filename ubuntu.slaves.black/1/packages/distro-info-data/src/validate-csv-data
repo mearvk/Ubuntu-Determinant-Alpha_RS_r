@@ -1,0 +1,162 @@
+#!/usr/bin/python3
+
+# Copyright (C) 2012, Benjamin Drung <bdrung@debian.org>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# pylint: disable=invalid-name
+# pylint: enable=invalid-name
+
+"""Validates a given Debian or Ubuntu distro-info CSV file."""
+
+import csv
+import sys
+from datetime import date
+
+from lib.tools import convert_date, main
+
+
+_COLUMNS = {
+    "debian": (
+        "version",
+        "codename",
+        "series",
+        "created",
+        "release",
+        "eol",
+        "eol-lts",
+        "eol-elts",
+    ),
+    "ubuntu": (
+        "version",
+        "codename",
+        "series",
+        "created",
+        "release",
+        "eol",
+        "eol-server",
+        "eol-esm",
+    ),
+}
+_DATES = ("created", "release", "eol", "eol-server", "eol-esm", "eol-lts", "eol-elts")
+_EARLIER_DATES = (
+    ("created", "release"),
+    ("release", "eol"),
+    ("eol", "eol-server"),
+    ("eol", "eol-esm"),
+    ("eol", "eol-lts"),
+    ("eol-lts", "eol-elts"),
+)
+_STRINGS = {
+    "debian": ("codename", "series"),
+    "ubuntu": ("version", "codename", "series"),
+}
+
+
+def error(filename, line, message, *args):
+    """Prints an error message"""
+    print("%s:%i: %s." % (filename, line, message % args), file=sys.stderr)
+
+
+def validate(filename, distro):
+    """Validates a given CSV file.
+
+    Returns True if the given CSV file is valid and otherwise False.
+    """
+    failures = 0
+    content = open(filename).readlines()
+    # Remove comments
+    for counter, line in enumerate(content):
+        if line.startswith("#"):
+            content[counter] = "\n"
+    csvreader = csv.DictReader(content)
+    for row in csvreader:
+        # Check for missing columns
+        for column in _COLUMNS[distro]:
+            if not column in row:
+                msg = "Column `%s' is missing"
+                error(filename, csvreader.line_num, msg, column)
+                failures += 1
+        # Check for additinal columns
+        for column in row:
+            if not column in _COLUMNS[distro]:
+                msg = "Additional column `%s' is specified"
+                error(filename, csvreader.line_num, msg, column)
+                failures += 1
+        # Check required strings columns
+        for column in _STRINGS[distro]:
+            if column in row and not row[column]:
+                msg = "Empty column `%s' specified"
+                error(filename, csvreader.line_num, msg, column)
+                failures += 1
+        # Check dates
+        for column in _DATES:
+            if column in row:
+                try:
+                    row[column] = convert_date(row[column])
+                except ValueError:
+                    msg = "Invalid date `%s' in column `%s'"
+                    error(filename, csvreader.line_num, msg, row[column], column)
+                    failures += 1
+                    row[column] = None
+        # Check required date columns
+        column = "created"
+        if column in row and not row[column]:
+            msg = "No date specified in column `%s'"
+            error(filename, csvreader.line_num, msg, column)
+            failures += 1
+        # Compare dates
+        for (date1, date2) in _EARLIER_DATES:
+            if date2 in row and row[date2]:
+                if date1 in row and row[date1]:
+                    # date1 needs to be earlier than date2
+                    if row[date1] > row[date2]:
+                        msg = (
+                            "Date %s of column `%s' needs to be >= "
+                            "than %s of column `%s'"
+                        )
+                        error(
+                            filename,
+                            csvreader.line_num,
+                            msg,
+                            row[date2].isoformat(),
+                            date2,
+                            row[date1].isoformat(),
+                            date1,
+                        )
+                        failures += 1
+                else:
+                    # date1 needs to be specified if date1 is specified
+                    msg = (
+                        "A date needs to be specified in column `%s' due "
+                        "to the given date in column `%s'"
+                    )
+                    error(filename, csvreader.line_num, msg, date1, date2)
+                    failures += 1
+        # Check that Ubuntu EOL lands on a weekday
+        if distro == 'ubuntu':
+            for column, eol_date in row.items():
+                if not column.startswith('eol'):
+                    continue
+                if not eol_date:
+                    continue
+                if eol_date.weekday() > 5 and eol_date >= date(2021, 1, 1):
+                    msg = '%s for %s lands on a weekend (%s)'
+                    error(filename, csvreader.line_num, msg, column,
+                          row['codename'], date)
+
+    return failures == 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(validate))

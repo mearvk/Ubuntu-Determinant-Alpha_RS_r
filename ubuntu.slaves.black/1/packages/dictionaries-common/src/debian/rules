@@ -1,0 +1,81 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# Build in reproducible and known to work LC_ALL=C language environment
+LC_ALL = C
+export LC_ALL
+
+include /usr/share/quilt/quilt.make
+
+# debhelper compatability version moved to debian/compat file
+
+debdir		:= `pwd`/debian
+debtmp		:= $(debdir)/tmp
+alldocs          = debian/README.Debian \
+	debian/README.source \
+	policy/dictionaries-common.checklist
+
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp: $(QUILT_STAMPFN)
+	dh_testdir
+
+	autoconf
+	./configure
+	$(MAKE)
+
+	touch build-stamp
+
+clean: clean-patched unpatch
+clean-patched:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp install-stamp configure
+	rm -rf autom4te.cache/             # Strange cache dir by autoconf?
+
+	[ ! -f Makefile ] || $(MAKE) distclean
+
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	$(MAKE) install DESTDIR=$(debtmp)
+	touch $(debtmp)/usr/share/dictionaries-common/elanguages
+	dh_movefiles -pdictionaries-common-dev
+	dh_movefiles -pdictionaries-common
+
+	touch install-stamp
+
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_install
+	dh_installdocs --all $(alldocs)
+	dh_installemacsen
+	dh_installman
+	dh_installchangelogs
+	dh_link
+	dh_lintian
+	dh_compress
+	dh_installdebconf
+	dh_fixperms
+	dh_installdeb
+	dh_perl -d scripts/system/*
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary-arch: build install
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install patch unpatch clean-patched

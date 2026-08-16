@@ -1,0 +1,42 @@
+Description: Fix fifth and sixth syscall argument in setsockopt
+ Also uses implicit space register selection in generic syscall code.
+From: John David Anglin <dave.anglin@bell.net>
+Bug-Debian: https://bugs.debian.org/944489
+Last-Update: 2019-11-10
+Forwarded: not-yet
+
+--- /dev/null
++++ b/parisc/__setsockopt.S
+@@ -0,0 +1,3 @@
++#include "syscalls.h"
++
++syscall5_weak(setsockopt, setsockopt, __libc_setsockopt);
+--- a/parisc/unified.S
++++ b/parisc/unified.S
+@@ -42,9 +42,9 @@ exit:
+ 	nop
+ 
+ __unified_syscall6:
+-	ldw -0x38(%sr0, %sp), %r21
++	ldw -0x38(%sp), %r21
+ __unified_syscall5:
+-	ldw -0x34(%sr0, %sp), %r22
++	ldw -0x34(%sp), %r22
+ __unified_syscall:
+ 	be,l 0x100(%sr2, %r0), %sr0, %r31
+ 	nop
+@@ -56,12 +56,12 @@ __error_unified_syscall:
+ 	copy %r2, %r23
+ 	bl __errno_location, %r2
+ 	copy %ret0, %r20
+-	stw %r20, 0(%sr0, %ret0)
++	stw %r20, 0(%ret0)
+ 	copy %r23, %r2
+ #else
+ 	ldil LP%errno, %r26
+ 	ldo  RP%errno(%r26), %r26
+-	stw  %ret0, 0(%r0, %r26)
++	stw  %ret0, 0(%r26)
+ #endif
+ 	ldi -1, %ret0
+ .Lnoerr:

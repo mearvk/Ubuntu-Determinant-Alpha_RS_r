@@ -1,0 +1,218 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content=
+"HTML Tidy for Linux/x86 (vers 1 September 2005), see www.w3.org" />
+<meta http-equiv="Content-Type" content=
+"text/html; charset=us-ascii" />
+<title>docbook2X: Performance analysis</title>
+<link rel="stylesheet" href="docbook2X.css" type="text/css" />
+<link rev="made" href="mailto:stevecheng@users.sourceforge.net" />
+<meta name="generator" content="DocBook XSL Stylesheets V1.68.1" />
+<meta name="description" content=
+"Discussion on conversion speed" />
+<link rel="start" href="docbook2X.html" title=
+"docbook2X: Documentation Table of Contents" />
+<link rel="up" href="docbook2X.html" title=
+"docbook2X: Documentation Table of Contents" />
+<link rel="prev" href="faq.html" title="docbook2X: FAQ" />
+<link rel="next" href="testing.html" title=
+"docbook2X: How docbook2X is tested" />
+</head>
+<body>
+<div class="navheader">
+<table width="100%" summary="Navigation header">
+<tr>
+<th colspan="3" align="center">Performance analysis</th>
+</tr>
+<tr>
+<td width="20%" align="left"><a accesskey="p" href=
+"faq.html">&lt;&lt; Previous</a>&nbsp;</td>
+<th width="60%" align="center">&nbsp;</th>
+<td width="20%" align="right">&nbsp;<a accesskey="n" href=
+"testing.html">Next &gt;&gt;</a></td>
+</tr>
+</table>
+<hr /></div>
+<div class="sect1" lang="en" xml:lang="en">
+<div class="titlepage">
+<div>
+<div>
+<h2 class="title"><a id="performance" name=
+"performance"></a>Performance analysis</h2>
+</div>
+</div>
+</div>
+<a id="id2540532" class="indexterm" name="id2540532"></a><a id=
+"id2540538" class="indexterm" name="id2540538"></a><a id=
+"id2540545" class="indexterm" name="id2540545"></a><a id=
+"id2540552" class="indexterm" name="id2540552"></a>
+<p>The performance of docbook2X, and most other DocBook
+tools<sup>[<a id="id2541170" href="#ftn.id2541170" name=
+"id2541170">2</a>]</sup> can be summed up in a short phrase:
+<span class="emphasis"><em>they are slow</em></span>.</p>
+<p>On a modern computer producing only a few man pages at a time,
+with the right software &mdash; namely, libxslt as the XSLT
+processor &mdash; the DocBook tools are fast enough. But their
+slowness becomes a hindrance for generating hundreds or even
+thousands of man pages at a time.</p>
+<p>The author of docbook2X encounters this problem whenever he
+tries to do automated tests of the docbook2X package. Presented
+below are some actual benchmarks, and possible approaches to
+efficient DocBook to man pages conversion.</p>
+<div class="table"><a id="id2541215" name="id2541215"></a>
+<p class="title"><b>Table&nbsp;1.&nbsp;docbook2X running times on
+2157 <code class="sgmltag-element">refentry</code>
+documents</b></p>
+<table summary=
+"docbook2X running times on 2157  refentry documents" border="1">
+<colgroup>
+<col />
+<col />
+<col /></colgroup>
+<thead>
+<tr>
+<th>Step</th>
+<th>Time for all pages</th>
+<th>Avg. time per page</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DocBook to Man-XML</td>
+<td>519.61&#8199;s</td>
+<td>0.24&#8199;s</td>
+</tr>
+<tr>
+<td>Man-XML to man-pages</td>
+<td>383.04&#8199;s</td>
+<td>0.18&#8199;s</td>
+</tr>
+<tr>
+<td>roff character mapping</td>
+<td>6.72&#8199;s</td>
+<td>0.0031&#8199;s</td>
+</tr>
+<tr>
+<td>Total</td>
+<td>909.37&#8199;s</td>
+<td>0.42&#8199;s</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The above benchmark was run on 2157 documents coming from the
+<a href="http://www.catb.org/~esr/doclifter/" target=
+"_top">doclifter</a> man-page-to-DocBook conversion tool. The man
+pages come from the section 1 man pages installed in the
+author&rsquo;s Linux system. The XML files total 44.484 MiB, and on
+average are 20.6KiB long.</p>
+<p>The results were obtained using the test script in <code class=
+"filename">test/mass/test.pl</code>, using the default man-page
+conversion options. The test script employs the obvious
+optimizations, such as only loading once the XSLT processor, the
+man-pages stylesheet, <span><strong class=
+"command">db2x_manxml</strong></span> and <span><strong class=
+"command">utf8trans</strong></span>.</p>
+<p>Unfortunately, there does not seem to be obvious ways that the
+performance can be improved, short of re-implementing the
+tranformation program in a tight programming language such as
+C.</p>
+<p>Some notes on possible bottlenecks:</p>
+<div class="itemizedlist">
+<ul>
+<li>
+<p>Character mapping by <span><strong class=
+"command">utf8trans</strong></span> is very fast compared to the
+other stages of the transformation. Even loading
+<span><strong class="command">utf8trans</strong></span> separately
+for each document only doubles the running time of the character
+mapping stage.</p>
+</li>
+<li>
+<p>Even though the XSLT processor is written in C, XSLT processing
+is still comparatively slow. It takes double the time of the Perl
+script<sup>[<a id="id2541397" href="#ftn.id2541397" name=
+"id2541397">3</a>]</sup> <span><strong class=
+"command">db2x_manxml</strong></span>, even though the XSLT portion
+and the Perl portion are processing documents of around the same
+size<sup>[<a id="id2541414" href="#ftn.id2541414" name=
+"id2541414">4</a>]</sup> (DocBook <code class=
+"sgmltag-element">refentry</code> documents and Man-XML
+documents).</p>
+<p>In fact, profiling the stylesheets shows that a significant
+amount of time is spent on the localization templates, in
+particular the complex XPath navigation used there. An obvious
+optimization is to use XSLT keys for the same functionality.</p>
+<p>However, when that is implemented, the author found that the
+time used for <span class="emphasis"><em>setting up
+keys</em></span> dwarfs the time savings from avoiding the complex
+XPath navigation. It adds an extra 10s to the processing time for
+the 2157 documents. Upon closer examination of the libxslt source
+code, XSLT keys are seen to be implemented rather inefficiently:
+<span class="emphasis"><em>each</em></span> key pattern <em class=
+"replaceable"><code>x</code></em> causes the entire input document
+to be traversed once by evaluating the XPath <code class=
+"literal">//<em class="replaceable"><code>x</code></em></code>!</p>
+</li>
+<li>
+<p>Perhaps a C-based XSLT processor written with the best
+performance in mind (libxslt is not particularly the most
+efficiently coded) may be able to achieve better conversion times,
+without losing all the nice advantages of XSLT-based tranformation.
+Or failing that, one can look into efficient, stream-based
+transformations (<a href="http://stx.sourceforge.net/" target=
+"_top">STX</a>).</p>
+</li>
+</ul>
+</div>
+<div class="footnotes"><br />
+<hr width="100" align="left" />
+<div class="footnote">
+<p><sup>[<a id="ftn.id2541170" href="#id2541170" name=
+"ftn.id2541170">2</a>]</sup> with the notable exception of the
+<a href="http://packages.debian.org/unstable/text/docbook-to-man"
+target="_top">docbook-to-man tool</a> based on the
+<span><strong class="command">instant</strong></span> stream
+processor (but this tool has many correctness problems)</p>
+</div>
+<div class="footnote">
+<p><sup>[<a id="ftn.id2541397" href="#id2541397" name=
+"ftn.id2541397">3</a>]</sup> From preliminary estimates, the
+Pure-XSLT solution takes only slightly longer at this stage:
+.22&#8199;s per page</p>
+</div>
+<div class="footnote">
+<p><sup>[<a id="ftn.id2541414" href="#id2541414" name=
+"ftn.id2541414">4</a>]</sup> Of course, conceptually, DocBook
+processing is more complicated. So these timings also give us an
+estimate of the cost of DocBook&rsquo;s complexity: twice the cost
+over a simpler document type, which is actually not too bad.</p>
+</div>
+</div>
+</div>
+<div class="navfooter">
+<hr />
+<table width="100%" summary="Navigation footer">
+<tr>
+<td width="40%" align="left"><a accesskey="p" href=
+"faq.html">&lt;&lt; Previous</a>&nbsp;</td>
+<td width="20%" align="center">&nbsp;</td>
+<td width="40%" align="right">&nbsp;<a accesskey="n" href=
+"testing.html">Next &gt;&gt;</a></td>
+</tr>
+<tr>
+<td width="40%" align="left" valign="top">FAQ&nbsp;</td>
+<td width="20%" align="center"><a accesskey="h" href=
+"docbook2X.html">Table of Contents</a></td>
+<td width="40%" align="right" valign="top">&nbsp;How docbook2X is
+tested</td>
+</tr>
+</table>
+</div>
+<p class="footer-homepage"><a href=
+"http://docbook2x.sourceforge.net/" title=
+"docbook2X: Home page">docbook2X home page</a></p>
+</body>
+</html>

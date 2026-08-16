@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+# rules file for docbook5-xml
+
+
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/default.mk
+
+PACKAGE := $(DEB_SOURCE)
+version := $(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@
+
+override_dh_installchangelogs:
+	dh_installchangelogs ChangeLog.upstream
+
+override_dh_installdocs:
+	dh_installdocs -X.xml
+
+execute_after_dh_install:
+	dh_installxmlcatalogs
+
+execute_after_dh_link:
+	find $(CURDIR)/debian/$(PACKAGE) -type l -follow >/dev/null # exits 1 on broken links
+
+
+get-orig-source:
+	set -ex ; \
+	TMPDIR=$(PACKAGE)-${version}.orig ; \
+	mkdir -p "$$TMPDIR" ; \
+	touch "$$TMPDIR"/ChangeLog.upstream ; \
+	for db in 5.0 ; do \
+		dbxzip=docbook-$${db}.zip ; \
+		mkdir -p "$$TMPDIR"/docbook-$${db} ; \
+		wget -P "$$TMPDIR" http://www.docbook.org/xml/$${db}/"$$dbxzip" ; \
+		unzip -d "$$TMPDIR" "$$TMPDIR"/"$$dbxzip" ; \
+		rm -f "$$TMPDIR"/"$$dbxzip" ; \
+		[ -f "$$TMPDIR"/docbook-$${db}/ChangeLog ] && \
+		    cat "$$TMPDIR"/docbook-$${db}/ChangeLog >> "$$TMPDIR"/ChangeLog.upstream ; \
+	done ; \
+	find "$$TMPDIR" -type f ! -perm 644 -exec chmod 644 "{}" ";" ; \
+	GZIP=-9 tar -czf $(CURDIR)/$(PACKAGE)_${version}.orig.tar.gz "$$TMPDIR" ; \
+	rm -rf "$$TMPDIR"
+
+
+.PHONY: get-orig-source

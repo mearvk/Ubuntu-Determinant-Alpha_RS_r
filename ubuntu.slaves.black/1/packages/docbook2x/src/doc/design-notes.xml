@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<sect1 id="design-notes">
+<sect1info>
+<abstract role="texinfo-node">
+  <para>Author’s notes on the grand scheme of docbook2X</para>
+</abstract>
+</sect1info>
+<title>Design notes</title>
+
+<indexterm><primary>design</primary></indexterm>
+<indexterm><primary>history</primary></indexterm>
+
+<para>
+Lessons learned:
+
+  <itemizedlist>
+  
+    <listitem>
+<indexterm><primary>stream processing</primary></indexterm>
+<indexterm><primary>tree processing</primary></indexterm>
+      <para>
+      Think four times before doing stream-based XML processing, even though it
+      appears to be more efficient than tree-based.
+      Stream-based processing is usually more difficult.
+      </para>
+      
+      <para>
+      But if you have to do stream-based processing, make sure to use robust,
+      fairly scaleable tools like <classname>XML::Templates</classname>, 
+      <emphasis>not</emphasis> <command>sgmlspl</command>.  Of course it cannot 
+      be as pleasant as tree-based XML processing, but examine 
+      &db2x_manxml; and &db2x_texixml;.
+      </para>
+    </listitem>
+    
+    <listitem>
+      <para>
+      Do not use <classname>XML::DOM</classname> directly for stylesheets.
+      Your “stylesheet” would become seriously unmanageable.
+      Its also extremely slow for anything but trivial documents.
+      </para>
+
+      <para>
+      At least take a look at some of the XPath modules out there.
+      Better yet, see if your solution really cannot use XSLT.
+      A C/C++-based implementation of XSLT can be fast enough
+      for many tasks.
+      </para>
+    </listitem>
+    
+    <listitem>
+<indexterm><primary>XSLT extensions</primary></indexterm>
+      <para>
+      Avoid XSLT extensions whenever possible.  I don't think there is
+      anything wrong with them intrinsically, but it is a headache
+      to have to compile your own XSLT processor. (libxslt is written 
+      in C, and the extensions must be compiled-in and cannot be loaded
+      dynamically at runtime.)  Not to mention there seems to be a thousand
+      different set-ups for different XSLT processors.
+      </para>
+    </listitem>
+    
+    <listitem>
+<indexterm><primary>Perl</primary></indexterm>
+      <para>
+      Perl is not as good at XML as it’s hyped to be.  
+      </para>
+
+      <para>
+      SAX comes from the Java world, and its port to Perl
+      (with all the object-orientedness, and without adopting Perl idioms)
+      is awkward to use.
+      </para>
+
+      <para>
+      Another problem is that Perl SAX does not seem to be well-maintained.
+      The implementations have various bugs; while they can be worked around,
+      they have been around for such a long time that it does not inspire
+      confidence that the Perl XML modules are reliable software.
+      </para>
+
+      <para>  
+      It also seems that no one else has seriously used Perl SAX
+      for robust applications.  It seems to be unnecessarily hard to 
+      certain tasks such as displaying error diagnostics on its
+      input, processing large documents with complicated structure.
+      </para>
+    </listitem>
+    
+    <listitem>
+<indexterm><primary>Man-XML</primary></indexterm>
+<indexterm><primary>Texi-XML</primary></indexterm>
+      <para>
+      Do not be afraid to use XML intermediate formats 
+      (e.g. Man-XML and Texi-XML) for converting to other
+      markup languages, implemented with a scripting language.
+      The syntax rules for these formats are made for 
+      authoring by hand, not machine generation; hence a conversion
+      using tools designed for XML-to-XML conversion, 
+      requires jumping through hoops. 
+      </para>
+    
+      <para>
+      You might think that we could, instead, make a separate module 
+      that abstracts all this complexity
+      from the rest of the conversion program.  For example,
+      there is nothing stopping a XSLT processor from serializing
+      the output document as a text document obeying the syntax
+      rules for man pages or Texinfo documents.
+      </para>
+
+      <para>
+      Theoretically you would get the same result,
+      but it is much harder to implement.  It is far easier to write plain 
+      text manipulation code in a scripting language than in Java or C or XSLT.
+      Also, if the intermediate format is hidden in a Java class or 
+      C API, output errors are harder to see.
+      Whereas with the intermediate-format approach, we can
+      visually examine the textual output of the XSLT processor and fix
+      the Perl script as we go along.
+      </para>
+
+      <para>
+      Some XSLT processors support scripting to go beyond XSLT
+      functionality, but they are usually not portable, and not 
+      always easy to use.
+      Therefore, opt to do two-pass processing, with a standalone
+      script as the second stage.  (The first stage using XSLT.)
+      </para>
+
+      <para id="xslt-extensions-move" xreflabel="Design notes: the
+      elimination of XSLT extensions">
+      Finally, another advantage of using intermediate XML formats
+      processed by a Perl script is that we can often eliminate the
+      use of XSLT extensions.  In particular, all the way back when XSLT 
+      stylesheets first went into docbook2X, the extensions related to
+      Texinfo node handling could have been easily moved to the Perl script,
+      but I didn't realize it!  I feel stupid now. 
+      </para>
+
+      <para>
+      If I had known this in the very beginning, it would have saved 
+      a lot of development time, and docbook2X would be much more 
+      advanced by now.
+      </para>
+
+      <para>
+      Note that even the man-pages stylesheet from the DocBook XSL
+      distribution essentially does two-pass processing
+      just the same as the docbook2X solution.  That stylesheet
+      had formerly used one-pass processing, and its authors 
+      probably finally realized what a mess that was.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+      Design the XML intermediate format to be easy to use from the standpoint
+      of the conversion tool, and similar to how XML document types work in
+      general.  e.g. abstract the paragraphs of a document, rather than their 
+      paragraph <emphasis>breaks</emphasis>
+      (the latter is typical of traditional markup languages, but not of XML).
+      </para>
+    
+    </listitem>
+    
+    <listitem>
+      <para>
+      I am quite impressed by some of the things that people make XSLT 1.0 do.
+      Things that I thought were impossible, or at least unworkable
+      without using “real” scripting language. 
+      (&db2x_manxml; and &db2x_texixml; fall in the
+      category of things that can be done in XSLT 1.0 but inelegantly.)
+      </para>
+    </listitem>
+    
+    <listitem>
+      <para>
+      Internationalize as soon as possible.  
+      That is much easier than adding it in later.
+      </para>
+      
+      <para>
+      Same advice for build system.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        I would suggest against using build systems based
+        on Makefiles or any form of automake.
+        Of course it is inertia that prevents people from
+        switching to better build systems.  But also
+        consider that while Makefile-based build systems 
+        can do many of the things newer build systems are capable
+        of, they often require too many fragile hacks.  Developing
+        these hacks take too much time that would be better
+        spent developing the program itself.
+      </para>
+
+      <para>
+        Alas, better build systems such as scons were not available
+        when docbook2X was at an earlier stage.  It’s too late
+        to switch now.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+      Writing good documentation takes skill.  This manual has
+      has been revised substantially at least four times
+      <footnote><para>
+      This number is probably inflated because of the so many design 
+      mistakes in the process.</para></footnote>, with the author
+      consciously trying to condense information each time.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Table processing in the pure-XSLT man-pages conversion
+        is convoluted — it goes through HTML(!) tables as an intermediary.
+        That is the same way that the DocBook XSL stylesheets implement
+        it (due to Michael Smith), and I copied the code there
+        almost verbatim.  I did it this way to save myself time and energy
+        re-implementing tables conversion <emphasis>again</emphasis>.
+      </para>
+
+      <para>
+        And Michael Smith says that going through HTML is better,
+        because some varieties of DocBook allow the HTML table model
+        in addition to the CALS table model.  (I am not convinced
+        that this is such a good idea, but anyway.)
+        Then HTML tables in DocBook can be translated to man pages
+        too without much more effort.
+      </para>
+
+      <para>
+        Is this inefficient? Probably.  But that’s what you get
+        if you insist on using pure XSLT.  The Perl implementation
+        of docbook2X.
+        already supported tables conversion for two years prior.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        The design of &utf8trans; is not the best.
+        It was chosen to simplify implementations while being efficient.
+        A more general design, while still retaining efficiency, is possible, 
+        which I describe below.  However, unfortunately,
+        at this point changing &utf8trans;
+        will be too disruptive to users with little gain in functionality.
+      </para>
+
+      <para>
+        Instead of working with characters, we should work with byte strings.
+        This means that, if all input and output is in UTF-8,
+        with no escape sequences, then UTF-8 decoding or encoding
+        is not necessary at all.  Indeed the program becomes agnostic
+        to the character set used.  Of course,
+        multi-character matches become possible.
+      </para>
+      
+      <para>
+        The translation map will be an unordered list of key-value pairs.
+        The key and value are both arbitrary-length byte strings,
+        with an explicit length attached (so null bytes in the input
+        and output are retained).
+      </para>
+
+      <para>
+        The program would take the translation map, and transform the input file
+        by matching the start of input, seen as a sequence of bytes, 
+        against the keys in the translation map, greedily.
+        (Since the matching is greedy, the translation keys do not
+        need to be restricted to be prefix-free.)
+        Once the longest (in byte length) matching key is found, 
+        the corresponding value (another byte string) is substituted
+        in the output, and processing repeats (until the input is finished).
+        If, on the other hand, no match is found, the next byte
+        in the input file is copied as-is, and processing repeats 
+        at the next byte of input.
+      </para>
+
+      <para>
+        Since bytes are 8 bits and the key strings are typically
+        very short (up to 3 
+        bytes for a Unicode BMP character encoded in UTF-8),
+        this algorithm can be implemented with radix search.
+        It would be competitive, in both execution time and space,
+        with character codepoint hashing and sparse multi-level
+        arrays, the primary techniques for implementing
+        Unicode <emphasis>character</emphasis> translation.
+        (&utf8trans; is implemented using sparse multi-level arrays.)
+      </para>
+
+      <para>
+        One could even try to generalize the radix searching further,
+        so that keys can include wildcard characters, for example.
+        Taken to the extremes, the design would end up being
+        a regular expressions processor optimized for matching
+        many strings with common prefixes.
+      </para>
+
+    </listitem>
+
+    
+  </itemizedlist>
+  
+</para>
+
+</sect1>
+

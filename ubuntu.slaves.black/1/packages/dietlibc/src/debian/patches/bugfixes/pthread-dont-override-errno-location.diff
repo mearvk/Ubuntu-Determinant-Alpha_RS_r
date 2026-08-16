@@ -1,0 +1,37 @@
+Description: Don't override errno_location in libpthread if TLS is enabled
+ If TLS is enabled, errno is already thread-safe. Don't override
+ errno_location in that case, otherwise the errno external code sees is not
+ the same as the errno syscalls see (that call __errno_location directly).
+Author: Christian Seiler <christian@iwakd.de>
+Bug-Debian: https://bugs.debian.org/850276
+Last-Update: 2017-01-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/libpthread/pthread_internal.c
++++ b/libpthread/pthread_internal.c
+@@ -155,11 +155,14 @@ static void kill_all_threads(int sig,int
+ }
+ 
+ 
++/* If thread local storage is enabled, we don't need this. */
++#ifndef WANT_TLS
+ /* thread errno location */
+ int *__errno_location() {
+   _pthread_descr td=__thread_self();
+   return &(td->errno);
+ }
++#endif
+ 
+ /* exit a thread */
+ static void __pthread_exit(void*retval) {
+--- a/libpthread/thread_internal.h
++++ b/libpthread/thread_internal.h
+@@ -43,7 +43,7 @@ struct _pthread_descr_struct {
+   struct _pthread_fastlock lock;
+   struct _pthread_fastlock wlock;
+ 
+-  /* errno handling */
++  /* errno handling - not used if WANT_TLS is defined */
+   int errno;
+ 
+   /* thread exit handling */

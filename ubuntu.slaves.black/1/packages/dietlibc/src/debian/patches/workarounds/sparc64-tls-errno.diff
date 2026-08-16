@@ -1,0 +1,61 @@
+Description: sparc64: Work around compiler bug
+ Work around sparc64 gcc6 bug that mis-optimizes TLS variable access
+ to errno in certain situations.
+ .
+ When errno is accessed multiple times in a function, the relative
+ offset of the variable to the thread pointer may be stored on the
+ stack in some cases (because loading it from the stack takes only one
+ instruction, whereas loading it from scratch takes 2-4).
+ Unfortunately, in some cases the compiler will only generate 32 bit
+ loads/stores (and not 64 bit), and while the offset is usually much
+ smaller than 2^31, it is negative, and the load instruction the
+ compiler generates does not sign-extend. This causes the compiler to
+ load (tls-base + 2^31 - offset) instead of (tls-base - offset),
+ resulting in a segfault.
+ .
+ The precise bug has not been tracked down so far, because in most
+ cases the compiler will either re-use another register or indeed
+ generate 64 bit loads/stores, making debugging the issue quite tricky.
+ .
+ This patch replaces errno with a define to (*__errno_location()),
+ which circumvents this issue. But as this is slightly slower and
+ typically produces larger code, only enable it on sparc64.
+ .
+ As soon as the compiler bug is tracked down further, this workaround
+ should be removed.
+Author: Christian Seiler <christian@iwakd.de>
+Forwarded: no
+ Shouldn't be forwarded, as it only works around the errno case, but
+ not other cases of TLS variables.
+Last-Update: 2016-05-29
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/include/errno.h
++++ b/include/errno.h
+@@ -704,7 +704,11 @@
+ 
+ __BEGIN_DECLS
+ 
++#if !defined(__dietlibc_errno__) && (defined(__sparcv9) || defined(__sparc64__) || (defined(__sparc__) && defined(__arch64__)))
++#define errno (*__errno_location())
++#else
+ #include <errno_definition.h>
++#endif
+ 
+ extern int *__errno_location(void);
+ 
+--- a/lib/errno.c
++++ b/lib/errno.c
+@@ -1,3 +1,4 @@
+ #define extern
++#define __dietlibc_errno__
+ 
+ #include "errno_definition.h"
+--- a/lib/errno_location.c
++++ b/lib/errno_location.c
+@@ -1,3 +1,5 @@
++#define __dietlibc_errno__
++
+ #include <sys/tls.h>
+ #include <threads.h>
+ #include <errno.h>

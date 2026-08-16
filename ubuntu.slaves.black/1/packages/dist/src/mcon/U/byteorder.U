@@ -1,0 +1,68 @@
+?RCS:
+?RCS: Copyright (c) 1991-1997, 2004-2006, 2012 Raphael Manfredi
+?RCS:
+?RCS: You may redistribute only under the terms of the Artistic License,
+?RCS: as specified in the README file that comes with the distribution.
+?RCS: You may reuse parts of this distribution only within the terms of
+?RCS: that same Artistic License; a copy of which may be found at the root
+?RCS: of the source tree for dist 4.0.
+?RCS:
+?MAKE:byteorder: cat contains echo n c Myread Oldconfig Loc +cc +ccflags rm_try _o
+?MAKE:	-pick add $@ %<
+?S:byteorder:
+?S:	This variable holds the byte order. In the following, larger digits
+?S:	indicate more significance.  The variable byteorder is either 4321
+?S:	on a big-endian machine, or 1234 on a little-endian one.
+?S:	cannot figure it out.
+?S:.
+?C:BYTEORDER:
+?C:	This symbol holds the hexadecimal constant defined in byteorder,
+?C:	i.e. 1234 for little-endian or 4321 for big-ending.
+?C:.
+?H:#define BYTEORDER 0x$byteorder	/* large digits for MSB */
+?H:.
+?T:order
+: check for ordering of bytes in a word
+?X:
+?X: An idea from Guido Draheim <Guido.Draheim@gmx.de> checking the endianness
+?X: without actually executing code, which allows cross-compiling.
+?X:
+echo " "
+$echo $n "Checking integer byte-ordering...$c" >&4
+$cat >try.c <<'EOCP'
+short ascii_be[] = { 0x4249, 0x4765, 0x6E44, 0x6961, 0x6E53, 0x7953, 0 };
+short ascii_le[] = { 0x694C, 0x5454, 0x656C, 0x6E45, 0x6944, 0x6E61, 0 };
+short ebcdic_be[] = { 0xC2C9, 0xC785, 0x95C4, 0x8981, 0x95E2, 0xA8E2, 0 };
+short ebcdic_le[] = { 0x89D3, 0xE3E3, 0x8593, 0x95C5, 0x89C4, 0x9581, 0 };
+EOCP
+order=''
+if $cc -c $ccflags try.c >/dev/null 2>&1; then
+	if $contains BIGenDianSyS try$_o >/dev/null 2>&1; then
+		order=4321
+	elif $contains LiTTleEnDian try$_o >/dev/null 2>&1; then
+		order=1234
+	else
+		$echo $n " wild guessing$c" >&4
+		order=4321
+	fi
+fi
+case "$order" in
+'')
+	echo " cannot compute it." >&4
+	rp="Are integers stored in big-endian format?"
+	case "$byteorder" in
+	1234) dflt=n;;
+	*) dflt=y;;
+	esac
+	. ./myread
+	case "$ans" in
+	y*) order=4321;;
+	*)	order=1234;;
+	esac
+	;;
+1234) echo " little-endian." >&4;;
+4321) echo " big-endian." >&4;;
+esac
+byteorder=$order
+$rm_try
+

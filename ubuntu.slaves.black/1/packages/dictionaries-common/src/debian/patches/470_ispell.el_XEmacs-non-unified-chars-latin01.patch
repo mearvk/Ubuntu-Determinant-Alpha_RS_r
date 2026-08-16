@@ -1,0 +1,51 @@
+Author: Agustin Martin Domingo <agmartin@debian.org>
+Description: Work around iso-8859-{1,15} charset unification problems in XEmacs. Very hackish!
+
+Redefine ispell-get-coding-system function in ispell.el so if emacs
+buffer-file-coding-system is set to iso-8859-15 and ispell-coding-system is selected as
+iso-8859-1, this last is set to iso-8859-15. This should work around the iso-8859-{1,15}
+emacs unification problem. 
+
+This in practice means do not re-encode in this case. Do nothing with utf-8 buffers.
+
+Index: dictionaries-common/support/emacsen/ispell.el
+===================================================================
+--- dictionaries-common.orig/support/emacsen/ispell.el	2014-10-14 18:27:20.503523639 +0200
++++ dictionaries-common/support/emacsen/ispell.el	2014-10-14 18:27:20.499523647 +0200
+@@ -1661,6 +1661,36 @@
+   (nth 7 (or (assoc ispell-current-dictionary ispell-local-dictionary-alist)
+ 	     (assoc ispell-current-dictionary ispell-dictionary-alist))))
+ 
++;;; Redefine this function. We do not overwrite previous definition just
++;;; to make patches cleaner
++(setq debian-xemacs-last-coding-message nil)
++(defun ispell-get-coding-system ()
++  (let* ((ispell-dict-encoding
++	  (nth 7 (or (assoc ispell-current-dictionary ispell-local-dictionary-alist)
++		     (assoc ispell-current-dictionary ispell-dictionary-alist))))
++	 (emacs-buffer-encoding (ispell-get-mime-charset))
++	 (return-coding
++	  (if (and (featurep 'xemacs)
++		   (string-equal emacs-buffer-encoding "iso-8859-15")
++		   (string-equal ispell-dict-encoding "iso-8859-1"))
++	      emacs-buffer-encoding
++	    ispell-dict-encoding)))
++    ;; Write some debugging code if asked so
++    (when (and (boundp 'debian-dict-common-debug)
++	       debian-dict-common-debug)
++      (let ((tmp-debug-string
++	     (format "- codings: bfcs: %s, ebcs: %s, idcs: %s"
++		     (if (boundp 'buffer-file-coding-system)
++			 buffer-file-coding-system
++		       "unbound")
++		     emacs-buffer-encoding
++		     return-coding)))
++	(unless (string-equal tmp-debug-string debian-xemacs-last-coding-message)
++	  (message "%s" tmp-debug-string)
++	  (setq debian-xemacs-last-coding-message tmp-debug-string))))
++    ;; and return coding-system value
++    return-coding))
++
+ 
+ (defvar ispell-pdict-modified-p nil
+   "Non-nil means personal dictionary has modifications to be saved.")

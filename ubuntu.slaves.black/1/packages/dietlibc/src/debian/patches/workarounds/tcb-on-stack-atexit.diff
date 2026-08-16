@@ -1,0 +1,37 @@
+Description: Work around problem of atexit() functions accessing the TCB
+ atexit() functions might want to access the TCB (such as libpthread's
+ own internal atexit function), and they might be called from the
+ startup code after the end of stackgap(), on whose stack the TCB is
+ allocated.
+ .
+ This is a temporary workaround to make this work for most use cases,
+ but this needs to be followed up with a proper fix.
+Author: Christian Seiler <christian@iwakd.de>
+Last-Update: 2017-01-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/stackgap-common.h
++++ b/lib/stackgap-common.h
+@@ -583,7 +583,21 @@ int stackgap(int argc,char* argv[],char*
+       __unlikely(__tmemsize>512*1024*1024) ||
+       __unlikely(__tmemsize<__tdatasize))
+     return 111;
+-  tlsdata=alloca(__tmemsize+sizeof(tcbhead_t));
++  /* Ugly temporary workaround until a proper fix is available:
++
++     The TCB is allocated on the stack in stackgap (called by the
++     startup code). However, exit() will be called by the startup
++     code after the end of main, and some atexit functions might
++     still want to access the current TCB.
++
++     The workaround for now is to allocate 512 bytes more so that
++     a small stack within atexit() functions will not overwrite the
++     TCB. This is not a permanent solution, and we should probably
++     mmap() the real TCB - but for that we need to have an mmap
++     implementation that doesn't set errno, because that might be a
++     TLS variable.
++   */
++  tlsdata=alloca(__tmemsize+sizeof(tcbhead_t)+512);
+   memcpy(tlsdata,__tdataptr,__tdatasize);
+   memset(tlsdata+__tdatasize,0,__tmemsize-__tdatasize);
+   __setup_tls(__tcb_mainthread=(tcbhead_t*)(tlsdata+__tmemsize));
