@@ -14,7 +14,7 @@ Owner of Miramax Films UK & US United States and Settlement - NO GODZILLA
 
 # Ubuntu Determinant Alpha RS — Galactic Cherry Marvell Edition 98
 
-A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, the White Ethics Installer Grade, and Dave — the system's kernel-adjacent AI intelligence.
+A custom Linux kernel (5.15.204) with extensions for extended port addressing, heuristic security monitoring, graded privilege systems, extended permission classes, USB dynamic RAM expansion, hierarchical arena memory allocation, immutable filesystem branding, terminal chat, cron callbacks, per-user kernel objects, CPU boost designation, the White Ethics Installer Grade, and Dave — the system's kernel-adjacent AI intelligence.
 
 **Edition:** Galactic Cherry Marvell  
 **Version:** 98  
@@ -27,42 +27,71 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 
 ## Table of Contents
 
+**Networking & Ports**
+
 1. [Extended Port Range (30 Quintillion)](#extended-port-range)
 2. [Port 64444 Multiplexer (EPMP)](#epmp---extended-port-multiplexing-protocol)
 3. [Heuristic Port Monitor (HPM)](#heuristic-port-monitor)
+
+**Privilege & Permissions**
+
 4. [sudo_gate — Graded Privilege System](#sudo_gate--graded-privilege-system)
 5. [Extended Permission Classes (Trusted & Genius)](#extended-permission-classes)
-6. [USB Dynamic RAM Expansion](#usb-dynamic-ram-expansion)
-7. [USB Hardware-Direct DMA Optimization](#usb-hardware-direct-dma-optimization)
-8. [System Accounts & nnet Identity](#system-accounts--nnet-identity)
-9. [NEGAMANE — Immutable Filesystem Brand](#negamane--immutable-filesystem-brand)
-10. [Terminal Chat System](#terminal-chat-system)
-11. [Cron Callback Extension](#cron-callback-extension)
-12. [Per-User Kernel Objects (Memory Grain)](#per-user-kernel-objects-memory-grain)
-13. [CPU Boost Designation](#cpu-boost-designation)
-14. [White Ethics Installer Grade](#white-ethics-installer-grade)
-15. [ClamAV — Protected Antivirus](#clamav--protected-antivirus)
-16. [chkrootkit — Rootkit Detection](#chkrootkit--rootkit-detection)
-17. [rkhunter — Rootkit Hunter](#rkhunter--rootkit-hunter)
-18. [MySQL — Protected Database](#mysql--protected-database)
-19. [Postfix — Mail Transfer Agent](#postfix--mail-transfer-agent)
-20. [Dovecot — IMAP/POP3 Server](#dovecot--imappop3-server)
-21. [Chromium Browser — Open Source](#chromium-browser--open-source)
-22. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
-23. [Certificates](#certificates)
-24. [OpenJDK 28 — Secure JVM](#openjdk-28--secure-jvm)
-25. [Secure JVM: XML Configuration Reader](#secure-jvm-xml-configuration-reader)
-26. [Secure JVM: ClassLoadGuard](#secure-jvm-classloadguard)
-27. [Secure JVM: Integrity Guardian](#secure-jvm-integrity-guardian)
-28. [Secure JVM: Pause-Frame Inspector](#secure-jvm-pause-frame-inspector)
-29. [Secure JVM: Observer Grade Circuit](#secure-jvm-observer-grade-circuit)
-30. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
-31. [Secure JVM: System Codex](#secure-jvm-system-codex)
-32. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
-33. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
-34. [Secure JVM: INT Loading Structure](#secure-jvm-int-loading-structure)
-35. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
-36. [Arena Pool — Hierarchical Memory Allocation](#arena-pool--hierarchical-memory-allocation)
+
+**Memory Management**
+
+6. [Arena Pool — Hierarchical Memory Allocation](#arena-pool--hierarchical-memory-allocation)
+7. [USB Dynamic RAM Expansion](#usb-dynamic-ram-expansion)
+8. [USB Hardware-Direct DMA Optimization](#usb-hardware-direct-dma-optimization)
+9. [Per-User Kernel Objects (Memory Grain)](#per-user-kernel-objects-memory-grain)
+
+**System Identity & Filesystem**
+
+10. [System Accounts & nnet Identity](#system-accounts--nnet-identity)
+11. [NEGAMANE — Immutable Filesystem Brand](#negamane--immutable-filesystem-brand)
+12. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
+
+**System Services**
+
+13. [Terminal Chat System](#terminal-chat-system)
+14. [Cron Callback Extension](#cron-callback-extension)
+15. [CPU Boost Designation](#cpu-boost-designation)
+16. [White Ethics Installer Grade](#white-ethics-installer-grade)
+
+**Security**
+
+17. [ClamAV — Protected Antivirus](#clamav--protected-antivirus)
+18. [chkrootkit — Rootkit Detection](#chkrootkit--rootkit-detection)
+19. [rkhunter — Rootkit Hunter](#rkhunter--rootkit-hunter)
+
+**Infrastructure Services**
+
+20. [MySQL — Protected Database](#mysql--protected-database)
+21. [Postfix — Mail Transfer Agent](#postfix--mail-transfer-agent)
+22. [Dovecot — IMAP/POP3 Server](#dovecot--imappop3-server)
+23. [Chromium Browser — Open Source](#chromium-browser--open-source)
+
+**Intelligence**
+
+24. [Dave — System Intelligence (AI)](#dave--system-intelligence-ai)
+
+**Certificates & Ethics**
+
+25. [Certificates](#certificates)
+
+**Secure JVM (OpenJDK 28)**
+
+26. [OpenJDK 28 — Secure JVM](#openjdk-28--secure-jvm)
+27. [Secure JVM: XML Configuration Reader](#secure-jvm-xml-configuration-reader)
+28. [Secure JVM: ClassLoadGuard](#secure-jvm-classloadguard)
+29. [Secure JVM: Integrity Guardian](#secure-jvm-integrity-guardian)
+30. [Secure JVM: Pause-Frame Inspector](#secure-jvm-pause-frame-inspector)
+31. [Secure JVM: Observer Grade Circuit](#secure-jvm-observer-grade-circuit)
+32. [Secure JVM: Resource Loader](#secure-jvm-resource-loader)
+33. [Secure JVM: System Codex](#secure-jvm-system-codex)
+34. [Secure JVM: MySQL Bridge](#secure-jvm-mysql-bridge)
+35. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
+36. [Secure JVM: INT Loading Structure](#secure-jvm-int-loading-structure)
 
 ---
 
@@ -349,6 +378,193 @@ fs/namei.c                      - Modified (hook before DAC)
 
 ---
 
+## Arena Pool — Hierarchical Memory Allocation
+
+Per-process 300 MB arena with binary halving cascade and logarithmic decay tiers. Provides safe `arena_malloc()`/`arena_free()` from a pre-mapped virtual address space with guard pages, canary words, and double-free detection.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         ARENA: 300 MB                            │
+│                                                                 │
+│  ┌──────────────────────────┬────────────────┬────┬───┬──┬─┐   │
+│  │  Tier 1: 150 MB          │ Tier 2: 75 MB  │ T3 │T4 │T5│…│   │
+│  │  (primary hot)           │ (overflow)     │50M │33M│22│…│   │
+│  │                          │                │    │   │  │ │   │
+│  │  Allocations land here   │ Spill at 80%   │ Logarithmic  │   │
+│  │  first (via priority)    │ occupancy      │ decay (2/3)  │   │
+│  └──────────────────────────┴────────────────┴────┴───┴──┴─┘   │
+│       ▲                            ▲              ▲             │
+│       │ Guard page (4 KB)          │              │             │
+│       └────────────────────────────┘──────────────┘             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Tier Table (Logarithmic Decay: base 2/3)
+
+| Tier | Size (MB) | Cumulative | Role |
+|------|-----------|-----------|------|
+| 1 | 150.000 | 150 MB | Primary hot working set |
+| 2 | 75.000 | 225 MB | Warm overflow (spill at 80%) |
+| 3 | 50.000 | 275 MB | Soft target 1 |
+| 4 | 33.333 | 308 MB* | Soft target 2 |
+| 5 | 22.222 | 330 MB* | Virtual (USB-backed) |
+| 6 | 14.815 | 345 MB* | Decay brush |
+| 7 | 9.877 | 355 MB* | Savings tail |
+| 8 | 6.584 | 362 MB* | Savings tail |
+
+*Tiers beyond 300 MB are virtual — backed by USB swap or secondary mmap.
+
+### Allocation Priority: (4, 3, 1, 2) → Soft → (5, 6, ...)
+
+```
+Request arrives
+    │
+    ├── Try Tier 4 (33 MB) — smallest, most aggressively reused
+    ├── Try Tier 3 (50 MB) — second choice
+    ├── Try Tier 1 (150 MB) — fallback to primary
+    ├── Try Tier 2 (75 MB) — last resort before soft concern
+    │
+    ▼ (all full)
+SOFT CONCERN MODE:
+    • Log pressure event
+    • Trigger compaction pass
+    • Try Tier 5, 6, 7, ... (decay tiers)
+    • If still unsatisfied → extend arena (USB backing)
+```
+
+### Front-Load (Zero-Fault Startup)
+
+New processes receive 1/8 of the arena (37.5 MB) pre-faulted:
+- All pages touched at creation → TLB warm, no page faults
+- CPU Boost designated processes always get pre-faulted upfront
+- After upfront consumed, growth follows: (2, 3, 1, 2) sequence
+
+### Safety Guarantees
+
+| Protection | Mechanism |
+|-----------|-----------|
+| Bounds checking | Every pointer validated: A₀ ≤ ptr < A₀ + arena_size |
+| Guard pages | 4 KB PROT_NONE between tier regions (SIGSEGV on overflow) |
+| Canary words | 8-byte sentinel before (0xDEADC0DEBEEFCAFE) and after allocation |
+| Double-free | Block header state flag (ALLOCATED / FREE) checked before free |
+| Thread safety | Spinlock on allocation path, per-tier free lists |
+| Grid alignment | Cache-line aligned (64 bytes) — satisfies Integrity Guardian 1:1/1:2 |
+| Intensification tracking | Falling decay memory detects and throttles pressure-driving processes |
+
+### Intensification Concern — Falling Decay Memory (Clear-in-3)
+
+Tracks processes that drive further memory pressure beyond normal allocation. Uses a falling decay score that clears automatically in 3 intervals if the process goes quiet.
+
+**Mechanism:** Each intensification event increments a score (0–255). Every 10 seconds, the score decays by × 2/3 (integer division). With the clear threshold at 3, any typical score clears to zero within 3 decay intervals if no further pressure occurs:
+
+```
+Score 10:   10 → 6 → 4 → 2 (CLEAR at interval 3)
+Score  8:    8 → 5 → 3 → 2 (CLEAR at interval 3)
+Score  5:    5 → 3 → 2 → 1 (CLEAR at interval 2)
+Score  3:    3 → 2 → 1 → 0 (CLEAR at interval 1)
+```
+
+**Scaled Response:**
+
+| Score | Level | Response |
+|-------|-------|----------|
+| 0-2 | CLEAR | Normal allocation, no concern |
+| 3-7 | WATCH | Allocations logged, soft priority reduction |
+| 8-15 | CONCERN | New allocations from decay tiers only |
+| 16-31 | THROTTLE | Allocations rate-limited (yield between calls) |
+| 32+ | RESTRICT | Hard deny from primary tiers, decay-only service |
+
+**Intensification Triggers:**
+
+| Event | Weight | Cause |
+|-------|--------|-------|
+| Soft concern | +1 | Tier 1 exceeds 80% occupancy |
+| Tier exhaustion | +2 | All priority-order tiers (4,3,1,2) full |
+| Hard denial | +3 | All tiers including decay are full |
+| Fork pressure | +5 | Fork/exec inherits parent's high-pressure pool |
+
+**Design principle:** The system is proportional. A process that briefly bursts and goes quiet clears in 30 seconds (3 × 10s). A process that continuously drives pressure accumulates score and faces escalating restriction. The system rewards quiescence and penalizes sustained abuse.
+
+```bash
+# View intensification state in proc
+cat /proc/arena_pool/status    # Shows per-arena intensity level and score
+```
+
+### Savings Brush
+
+Tiers with < 50% occupancy contribute to "savings" — memory that can be:
+1. Released to kernel via `madvise(MADV_DONTNEED)`
+2. Offered to USB swap prefetch
+3. Reported to Dave as available headroom
+
+Brush threshold: `⌈log₃/₂(active_tiers)⌉` — engages at tier 5+.
+
+### Module Parameters
+
+```bash
+modprobe arena_pool default_arena_mb=300 max_arenas=256
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `default_arena_mb` | 300 | Arena size per process (16–4096 MB) |
+| `max_arenas` | 256 | Maximum concurrent arenas system-wide |
+
+### Usage
+
+```bash
+# Load the module
+modprobe arena_pool
+
+# View status
+cat /proc/arena_pool/status
+
+# Processes auto-enrolled via JVM Memory Proxy:
+java -memory-guard -Xguard:arena=300m ./myprogram.bin
+```
+
+### Integration
+
+| Component | How It Uses Arena Pool |
+|-----------|-----------------------|
+| JVM Memory Proxy | Configurable via `-Xguard:arena=SIZE`; native child processes allocated from arena |
+| USB Dynamic RAM | Decay tiers 5+ spill to USB swap (priority -5) when physical RAM full |
+| Per-User Kernel Objects | Each user_ko gets a scaled arena (Grain 1: 4 MB, Grain 3: 64 MB) |
+| CPU Boost | Boosted processes get pre-faulted upfront at fork time |
+| Dave | Monitors tier occupancy, predicts pressure 30s ahead, suggests compaction |
+| Integrity Guardian | Verifies allocations remain 1:1 or 1:2 grid-aligned within each tier |
+
+### Mathematical Summary
+
+```
+Arena:           A = 300 MB
+Primary:         P = A/2 = 150 MB
+Overflow:        O = A/4 = 75 MB
+Decay(n):        D(n) = O × (2/3)^(n-2),  n ≥ 3
+Convergence:     Σ D(n) for n=3..∞ = 150 MB
+Total capacity:  A + virtual extension = 375 MB theoretical
+Front-load:      F = A/8 = 37.5 MB
+Brush threshold: B = ⌈log₃/₂(N)⌉
+Priority order:  (4, 3, 1, 2) → soft → (5, 6, 7, ...) → extend
+```
+
+### Files
+
+```
+mm/arena_pool.h                    - Internal header (structures, constants)
+mm/arena_pool.c                    - Kernel module (~450 lines)
+mm/Kconfig                         - CONFIG_ARENA_POOL
+mm/Makefile                        - Build entry
+include/linux/arena_pool.h         - Public API header
+TECH.md                            - Full mathematical specification
+```
+
+Admin: `/proc/arena_pool/status`
+
+---
+
 ## USB Dynamic RAM Expansion
 
 Automatically detects USB mass storage on hotplug and creates a swap pagefile for dynamic RAM expansion. Keeps remote server costs down by using USB 3.0+ storage as overflow memory.
@@ -493,6 +709,52 @@ drivers/usb/storage/Makefile       - Build entry
 
 ---
 
+## Per-User Kernel Objects (Memory Grain)
+
+Allows users to load personal kernel objects according to a 3-tier memory grain model.
+
+### Memory Grains
+
+| Grain | Name | Who Can Load | Secure Boot | Max Size |
+|-------|------|-------------|-------------|----------|
+| **1** | User Space | Any user | Not affected | 4 MB |
+| **2** | Safety Space | Sudo rank 1+ | Not affected | 16 MB |
+| **3** | Kernel Space | Sudo rank 4+ | Standard verification | 64 MB |
+
+### Usage
+
+```bash
+user_ko load my_widget.ko --grain=1           # Any user
+sudo user_ko load metrics.ko --grain=2        # Sudo rank 1+
+sudo user_ko load driver.ko --grain=3         # Sudo rank 4+
+user_ko list                                   # Show loaded modules
+cat /proc/user_ko/status                       # System status
+```
+
+### Program Install Grain Claims
+
+```bash
+install --grain=1 my_tool          # User space (anyone)
+sudo install --grain=2 my_service  # Safety space (rank 1+)
+sudo install --grain=3 my_driver   # Kernel space (rank 4+)
+```
+
+### Key Points
+
+- **Grain 1-2 do NOT trigger secure boot verification** — loaded via sandbox path
+- **Users at sudo rank 1-8 are trusted** — grain is organizational, not adversarial
+- Safe boot does not prevent personal module loading
+
+### Files
+
+```
+kernel/user_ko.c   - Kernel module (~450 lines)
+```
+
+Admin: `/proc/user_ko/{status, modules}`
+
+---
+
 ## System Accounts & nnet Identity
 
 ### Accounts
@@ -615,6 +877,269 @@ tools/negamane/negamane        - Userspace command
 
 ---
 
+## Parallel Copy/Move (pcopy/pmove)
+
+Hardware-aware parallel file copy and move operations with **dynamic assignment** of PCIe lanes and NVMe parallelization. The engine considers overall processor usage, total number of files being copied, and relative device speed constants to judge the optimal number of CPU cores and PCIe lanes for transfer optimization.
+
+Standard `cp`/`mv` operates sequentially — pcopy/pmove dispatches multiple files across multiple channels simultaneously, dynamically scaled to current system conditions.
+
+### Theory of Operation
+
+```
+Standard cp:    read → write → read → write → ... (1 stream, 1 queue)
+pcopy/pmove:    ┌─ Channel 0: file_a → NVMe SQ 0 ─┐
+                ├─ Channel 1: file_b → NVMe SQ 1 ─┤  ALL PARALLEL
+                ├─ Channel 2: file_c → NVMe SQ 2 ─┤  (hardware DMA)
+                └─ Channel N: file_d → NVMe SQ N ─┘
+```
+
+**Dynamic Channel Formula:**
+```
+channels = min(
+    cpu_cores_available_at_current_load,
+    hw_queues_on_device,
+    files_in_batch,
+    device_speed_ceiling / per_channel_throughput,
+    pcie_lanes × lane_bandwidth / chunk_throughput
+)
+```
+
+The engine dynamically adjusts based on five constraints — the tightest bottleneck determines parallelism.
+
+### Device Class Speed Constants
+
+Relative speed constants for each storage device class. These represent the practical throughput ceiling and determine how many CPU cores and PCIe lanes are useful:
+
+| Device Class | Speed (MB/s) | Min Channels | Max Channels | Optimal Chunk |
+|-------------|-------------|-------------|-------------|--------------|
+| IDE HDD | 80 | 1 | 1 | 512 KB |
+| SATA HDD | 150 | 1 | 2 | 1 MB |
+| SAS HDD (10K/15K) | 200 | 1 | 2 | 1 MB |
+| SATA SSD | 550 | 1 | 4 | 4 MB |
+| NVMe Gen3 x4 | 3,500 | 2 | 16 | 4 MB |
+| NVMe Gen4 x4 | 7,000 | 4 | 32 | 16 MB |
+| NVMe Gen5 x4 | 14,000 | 8 | 64 | 16 MB |
+| USB 2.0 | 35 | 1 | 1 | 256 KB |
+| USB 3.0 / 3.1 Gen1 | 400 | 1 | 2 | 2 MB |
+| USB 3.1 Gen2 | 900 | 1 | 4 | 4 MB |
+| USB4 / Thunderbolt 3 | 3,000 | 2 | 8 | 8 MB |
+| NFS over 1GbE | 110 | 1 | 2 | 1 MB |
+| NFS over 10GbE | 1,100 | 2 | 8 | 4 MB |
+
+The optimizer will not assign more parallelism than the device can absorb. An HDD gets 1-2 channels (more would just increase seek contention). NVMe Gen5 can use up to 64 channels.
+
+### CPU Load-Aware Dynamic Assignment
+
+The engine scales channels inversely with system CPU load:
+
+| System CPU Load | Core Allocation | Rationale |
+|----------------|----------------|-----------|
+| < 25% (idle) | 80% of cores | System has headroom, use it |
+| < 50% (moderate) | 50% of cores | Share fairly with other work |
+| < 75% (heavy) | 25% of cores | Preserve responsiveness |
+| > 90% (critical) | ~1-2 cores only | System stressed, be minimal |
+
+Priority flags override this policy:
+- `--high-priority` / `PCOPY_F_HIGH_PRIORITY`: Use up to 90% of cores regardless of load
+- `--low-priority` / `PCOPY_F_LOW_PRIORITY`: Cap at 15% even when idle
+
+### Dynamic PCIe Lane Assignment
+
+The engine computes how many PCIe lanes are effectively utilized:
+
+```
+needed_bandwidth = assigned_channels × per_channel_throughput
+assigned_lanes = needed_bandwidth / bandwidth_per_lane
+```
+
+If the device has x4 lanes but only 2 channels are needed (e.g., SATA SSD), only ~x1-x2 equivalent bandwidth is consumed. The remaining lanes are available for other devices.
+
+### Throttle Reasons
+
+When the optimizer reduces parallelism below maximum, it reports why:
+
+| Reason | Code | Meaning |
+|--------|------|---------|
+| none | 0 | Operating at full device potential |
+| cpu_load | 1 | Reduced channels due to high CPU pressure |
+| device_limit | 2 | Device can't absorb more parallelism (speed ceiling) |
+| file_count | 3 | Fewer files than potential channels |
+| pcie_bandwidth | 4 | PCIe bus is the bottleneck |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Userspace: pcopy / pmove CLI                               │
+│  Collects files, detects hardware via ioctl, dispatches     │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ ioctl(/dev/pcopy)
+┌───────────────────────────┴─────────────────────────────────┐
+│  Kernel: pcopy.c / pmove.c                                  │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Hardware Detection                                     │ │
+│  │  • NVMe HW queue count (blk-mq nr_hw_queues)         │ │
+│  │  • PCIe gen + lanes (PCI_EXP_LNKSTA register)        │ │
+│  │  • Online CPU count                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Parallel Engine                                        │ │
+│  │  • Bounded workqueue (WQ_UNBOUND, max_active=channels)│ │
+│  │  • Per-file work items with splice zero-copy           │ │
+│  │  • Completion-based synchronization                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │ Move Strategy                                          │ │
+│  │  • Same-fs: atomic rename (vfs_rename, zero-copy)     │ │
+│  │  • Cross-device: splice copy + unlink source           │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### PCIe Bandwidth Awareness
+
+| PCIe Gen | Bandwidth/Lane | x4 Total | Chunk Size |
+|----------|---------------|----------|------------|
+| Gen 1 | 250 MB/s | 1 GB/s | 1 MB |
+| Gen 2 | 500 MB/s | 2 GB/s | 4 MB |
+| Gen 3 | 985 MB/s | ~4 GB/s | 4 MB |
+| Gen 4 | 1969 MB/s | ~7.8 GB/s | 16 MB |
+| Gen 5 | 3938 MB/s | ~15.7 GB/s | 16 MB |
+
+Chunk size auto-tunes based on detected bandwidth. Devices with ≤2 hardware queues are capped at 2 MB chunks.
+
+### Performance Comparison
+
+```
+Example: Copying 100 files (1 GB each) on NVMe Gen4 x4
+
+Standard cp (sequential):
+  1 file at a time → ~3.5 GB/s effective → ~29 seconds
+
+pcopy (8 channels, 8 CPUs, 8 NVMe SQs):
+  8 files at a time → ~7 GB/s effective → ~14 seconds
+  (Saturates PCIe Gen4 x4 bandwidth)
+```
+
+### Usage (Userspace Tools)
+
+```bash
+# Parallel copy (auto-detect channels)
+pcopy *.log /backup/logs/
+
+# Force 8 channels, sync after each file
+pcopy -j 8 -s data/ /mnt/backup/
+
+# Parallel move with preserved permissions
+pmove -p old/ new/
+
+# Show hardware detection
+pcopy --status
+
+# Dry run (plan without executing)
+pcopy -n large_dir/ /mnt/ssd/
+
+# Verbose per-file progress
+pcopy -v -p project/ /backup/project/
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-j N` | Force N parallel channels (default: auto-detect) |
+| `-c SIZE` | Chunk size in KB (default: auto-tune) |
+| `-s` | Sync (fsync) after each file |
+| `-p` | Preserve permissions and timestamps |
+| `-f` | Force overwrite existing files |
+| `-v` | Verbose output (per-file progress) |
+| `-n` | Dry run (show what would be done) |
+| `--status` | Show NVMe/PCIe/CPU detection and exit |
+
+### Kernel Module Interface
+
+```bash
+# Load the module
+modprobe pcopy
+
+# Hardware status
+cat /proc/pcopy/status
+
+# Configure channels (0 = auto)
+echo "channels=8" > /proc/pcopy/config
+
+# Configure chunk size (in KB)
+echo "chunk=4096" > /proc/pcopy/config
+```
+
+### ioctl Interface (/dev/pcopy)
+
+| Command | Direction | Purpose |
+|---------|-----------|---------|
+| `PCOPY_IOC_COPY` | User → Kernel | Execute parallel copy batch |
+| `PCOPY_IOC_MOVE` | User → Kernel | Execute parallel move batch |
+| `PCOPY_IOC_STATUS` | Kernel → User | Return hardware detection |
+| `PCOPY_IOC_CANCEL` | User → Kernel | Cancel active operation |
+
+### Batch Request Flags
+
+| Flag | Effect |
+|------|--------|
+| `PCOPY_F_SYNC` | fsync after each file |
+| `PCOPY_F_PRESERVE` | Preserve permissions/timestamps |
+| `PCOPY_F_OVERWRITE` | Overwrite existing destinations |
+| `PCOPY_F_MOVE` | Move mode (copy + unlink source) |
+| `PCOPY_F_CROSS_DEVICE` | Allow cross-device move (copy fallback) |
+| `PCOPY_F_VERBOSE` | Track per-file progress |
+
+### Kernel Module — pcopy.c
+
+The copy engine. Handles both copy and move operations. Exposes `/proc/pcopy/`, `/dev/pcopy`.
+
+- Detects NVMe hardware queues via `bdev_get_queue()` → `nr_hw_queues`
+- Detects PCIe gen/lanes via `pcie_capability_read_word()` → `PCI_EXP_LNKSTA`
+- Dispatches work via bounded `alloc_workqueue()` with `max_active = channels`
+- Copy engine uses `do_splice_direct()` for zero-copy page cache transfers
+- Move uses `do_renameat2()` for same-fs atomic rename, fallback to splice+unlink
+
+### Kernel Module — pmove.c
+
+Dedicated move engine with independent telemetry and abort capability. Same hardware detection, separate `/dev/pmove` ioctl namespace.
+
+- Attempts atomic `do_renameat2()` first (instant, zero data copy)
+- Falls back to splice-based data migration on cross-device boundary (`-EXDEV`)
+- Unlinks source only after successful data transfer
+- `PMOVE_F_FORCE_COPY` flag bypasses rename attempt (useful for testing)
+
+### Installation
+
+```bash
+# Kernel modules (built with kernel)
+modprobe pcopy
+modprobe pmove
+
+# Userspace tools
+cd tools/pcopy && make && sudo make install
+# Installs: /usr/local/bin/pcopy, /usr/local/bin/pmove (symlink)
+```
+
+### Files
+
+```
+fs/pcopy/pcopy.c               - Kernel module: parallel copy/move engine (~550 lines)
+fs/pcopy/pcopy.h               - Header (structures, ioctl definitions)
+fs/pcopy/Kconfig               - CONFIG_PCOPY
+fs/pcopy/Makefile              - Kernel build entry
+fs/pmove/pmove.c               - Kernel module: dedicated parallel move engine (~345 lines)
+fs/pmove/pmove.h               - Header (structures, ioctl definitions)
+fs/pmove/Kconfig               - CONFIG_PCOPY (pmove variant)
+fs/pmove/Makefile              - Kernel build entry
+tools/pcopy/pcopy.c            - Userspace CLI tool (~400 lines)
+tools/pcopy/Makefile           - Build/install (produces pcopy + pmove symlink)
+```
+
+---
+
 ## Terminal Chat System
 
 Local messaging between system users with persistent groups.
@@ -683,52 +1208,6 @@ tools/cronie/                    - Full cronie source (from github.com/cronie-cr
 tools/cronie/src/cron_callback.c - Callback extension
 tools/cronie/src/cron_callback.h - API header
 ```
-
----
-
-## Per-User Kernel Objects (Memory Grain)
-
-Allows users to load personal kernel objects according to a 3-tier memory grain model.
-
-### Memory Grains
-
-| Grain | Name | Who Can Load | Secure Boot | Max Size |
-|-------|------|-------------|-------------|----------|
-| **1** | User Space | Any user | Not affected | 4 MB |
-| **2** | Safety Space | Sudo rank 1+ | Not affected | 16 MB |
-| **3** | Kernel Space | Sudo rank 4+ | Standard verification | 64 MB |
-
-### Usage
-
-```bash
-user_ko load my_widget.ko --grain=1           # Any user
-sudo user_ko load metrics.ko --grain=2        # Sudo rank 1+
-sudo user_ko load driver.ko --grain=3         # Sudo rank 4+
-user_ko list                                   # Show loaded modules
-cat /proc/user_ko/status                       # System status
-```
-
-### Program Install Grain Claims
-
-```bash
-install --grain=1 my_tool          # User space (anyone)
-sudo install --grain=2 my_service  # Safety space (rank 1+)
-sudo install --grain=3 my_driver   # Kernel space (rank 4+)
-```
-
-### Key Points
-
-- **Grain 1-2 do NOT trigger secure boot verification** — loaded via sandbox path
-- **Users at sudo rank 1-8 are trusted** — grain is organizational, not adversarial
-- Safe boot does not prevent personal module loading
-
-### Files
-
-```
-kernel/user_ko.c   - Kernel module (~450 lines)
-```
-
-Admin: `/proc/user_ko/{status, modules}`
 
 ---
 
@@ -2564,456 +3043,6 @@ Admin: `/proc/jvm-intloader/status`
 
 ---
 
-## Parallel Copy/Move (pcopy/pmove)
-
-Hardware-aware parallel file copy and move operations with **dynamic assignment** of PCIe lanes and NVMe parallelization. The engine considers overall processor usage, total number of files being copied, and relative device speed constants to judge the optimal number of CPU cores and PCIe lanes for transfer optimization.
-
-Standard `cp`/`mv` operates sequentially — pcopy/pmove dispatches multiple files across multiple channels simultaneously, dynamically scaled to current system conditions.
-
-### Theory of Operation
-
-```
-Standard cp:    read → write → read → write → ... (1 stream, 1 queue)
-pcopy/pmove:    ┌─ Channel 0: file_a → NVMe SQ 0 ─┐
-                ├─ Channel 1: file_b → NVMe SQ 1 ─┤  ALL PARALLEL
-                ├─ Channel 2: file_c → NVMe SQ 2 ─┤  (hardware DMA)
-                └─ Channel N: file_d → NVMe SQ N ─┘
-```
-
-**Dynamic Channel Formula:**
-```
-channels = min(
-    cpu_cores_available_at_current_load,
-    hw_queues_on_device,
-    files_in_batch,
-    device_speed_ceiling / per_channel_throughput,
-    pcie_lanes × lane_bandwidth / chunk_throughput
-)
-```
-
-The engine dynamically adjusts based on five constraints — the tightest bottleneck determines parallelism.
-
-### Device Class Speed Constants
-
-Relative speed constants for each storage device class. These represent the practical throughput ceiling and determine how many CPU cores and PCIe lanes are useful:
-
-| Device Class | Speed (MB/s) | Min Channels | Max Channels | Optimal Chunk |
-|-------------|-------------|-------------|-------------|--------------|
-| IDE HDD | 80 | 1 | 1 | 512 KB |
-| SATA HDD | 150 | 1 | 2 | 1 MB |
-| SAS HDD (10K/15K) | 200 | 1 | 2 | 1 MB |
-| SATA SSD | 550 | 1 | 4 | 4 MB |
-| NVMe Gen3 x4 | 3,500 | 2 | 16 | 4 MB |
-| NVMe Gen4 x4 | 7,000 | 4 | 32 | 16 MB |
-| NVMe Gen5 x4 | 14,000 | 8 | 64 | 16 MB |
-| USB 2.0 | 35 | 1 | 1 | 256 KB |
-| USB 3.0 / 3.1 Gen1 | 400 | 1 | 2 | 2 MB |
-| USB 3.1 Gen2 | 900 | 1 | 4 | 4 MB |
-| USB4 / Thunderbolt 3 | 3,000 | 2 | 8 | 8 MB |
-| NFS over 1GbE | 110 | 1 | 2 | 1 MB |
-| NFS over 10GbE | 1,100 | 2 | 8 | 4 MB |
-
-The optimizer will not assign more parallelism than the device can absorb. An HDD gets 1-2 channels (more would just increase seek contention). NVMe Gen5 can use up to 64 channels.
-
-### CPU Load-Aware Dynamic Assignment
-
-The engine scales channels inversely with system CPU load:
-
-| System CPU Load | Core Allocation | Rationale |
-|----------------|----------------|-----------|
-| < 25% (idle) | 80% of cores | System has headroom, use it |
-| < 50% (moderate) | 50% of cores | Share fairly with other work |
-| < 75% (heavy) | 25% of cores | Preserve responsiveness |
-| > 90% (critical) | ~1-2 cores only | System stressed, be minimal |
-
-Priority flags override this policy:
-- `--high-priority` / `PCOPY_F_HIGH_PRIORITY`: Use up to 90% of cores regardless of load
-- `--low-priority` / `PCOPY_F_LOW_PRIORITY`: Cap at 15% even when idle
-
-### Dynamic PCIe Lane Assignment
-
-The engine computes how many PCIe lanes are effectively utilized:
-
-```
-needed_bandwidth = assigned_channels × per_channel_throughput
-assigned_lanes = needed_bandwidth / bandwidth_per_lane
-```
-
-If the device has x4 lanes but only 2 channels are needed (e.g., SATA SSD), only ~x1-x2 equivalent bandwidth is consumed. The remaining lanes are available for other devices.
-
-### Throttle Reasons
-
-When the optimizer reduces parallelism below maximum, it reports why:
-
-| Reason | Code | Meaning |
-|--------|------|---------|
-| none | 0 | Operating at full device potential |
-| cpu_load | 1 | Reduced channels due to high CPU pressure |
-| device_limit | 2 | Device can't absorb more parallelism (speed ceiling) |
-| file_count | 3 | Fewer files than potential channels |
-| pcie_bandwidth | 4 | PCIe bus is the bottleneck |
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Userspace: pcopy / pmove CLI                               │
-│  Collects files, detects hardware via ioctl, dispatches     │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ ioctl(/dev/pcopy)
-┌───────────────────────────┴─────────────────────────────────┐
-│  Kernel: pcopy.c / pmove.c                                  │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ Hardware Detection                                     │ │
-│  │  • NVMe HW queue count (blk-mq nr_hw_queues)         │ │
-│  │  • PCIe gen + lanes (PCI_EXP_LNKSTA register)        │ │
-│  │  • Online CPU count                                    │ │
-│  └────────────────────────────────────────────────────────┘ │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ Parallel Engine                                        │ │
-│  │  • Bounded workqueue (WQ_UNBOUND, max_active=channels)│ │
-│  │  • Per-file work items with splice zero-copy           │ │
-│  │  • Completion-based synchronization                    │ │
-│  └────────────────────────────────────────────────────────┘ │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ Move Strategy                                          │ │
-│  │  • Same-fs: atomic rename (vfs_rename, zero-copy)     │ │
-│  │  • Cross-device: splice copy + unlink source           │ │
-│  └────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### PCIe Bandwidth Awareness
-
-| PCIe Gen | Bandwidth/Lane | x4 Total | Chunk Size |
-|----------|---------------|----------|------------|
-| Gen 1 | 250 MB/s | 1 GB/s | 1 MB |
-| Gen 2 | 500 MB/s | 2 GB/s | 4 MB |
-| Gen 3 | 985 MB/s | ~4 GB/s | 4 MB |
-| Gen 4 | 1969 MB/s | ~7.8 GB/s | 16 MB |
-| Gen 5 | 3938 MB/s | ~15.7 GB/s | 16 MB |
-
-Chunk size auto-tunes based on detected bandwidth. Devices with ≤2 hardware queues are capped at 2 MB chunks.
-
-### Performance Comparison
-
-```
-Example: Copying 100 files (1 GB each) on NVMe Gen4 x4
-
-Standard cp (sequential):
-  1 file at a time → ~3.5 GB/s effective → ~29 seconds
-
-pcopy (8 channels, 8 CPUs, 8 NVMe SQs):
-  8 files at a time → ~7 GB/s effective → ~14 seconds
-  (Saturates PCIe Gen4 x4 bandwidth)
-```
-
-### Usage (Userspace Tools)
-
-```bash
-# Parallel copy (auto-detect channels)
-pcopy *.log /backup/logs/
-
-# Force 8 channels, sync after each file
-pcopy -j 8 -s data/ /mnt/backup/
-
-# Parallel move with preserved permissions
-pmove -p old/ new/
-
-# Show hardware detection
-pcopy --status
-
-# Dry run (plan without executing)
-pcopy -n large_dir/ /mnt/ssd/
-
-# Verbose per-file progress
-pcopy -v -p project/ /backup/project/
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `-j N` | Force N parallel channels (default: auto-detect) |
-| `-c SIZE` | Chunk size in KB (default: auto-tune) |
-| `-s` | Sync (fsync) after each file |
-| `-p` | Preserve permissions and timestamps |
-| `-f` | Force overwrite existing files |
-| `-v` | Verbose output (per-file progress) |
-| `-n` | Dry run (show what would be done) |
-| `--status` | Show NVMe/PCIe/CPU detection and exit |
-
-### Kernel Module Interface
-
-```bash
-# Load the module
-modprobe pcopy
-
-# Hardware status
-cat /proc/pcopy/status
-
-# Configure channels (0 = auto)
-echo "channels=8" > /proc/pcopy/config
-
-# Configure chunk size (in KB)
-echo "chunk=4096" > /proc/pcopy/config
-```
-
-### ioctl Interface (/dev/pcopy)
-
-| Command | Direction | Purpose |
-|---------|-----------|---------|
-| `PCOPY_IOC_COPY` | User → Kernel | Execute parallel copy batch |
-| `PCOPY_IOC_MOVE` | User → Kernel | Execute parallel move batch |
-| `PCOPY_IOC_STATUS` | Kernel → User | Return hardware detection |
-| `PCOPY_IOC_CANCEL` | User → Kernel | Cancel active operation |
-
-### Batch Request Flags
-
-| Flag | Effect |
-|------|--------|
-| `PCOPY_F_SYNC` | fsync after each file |
-| `PCOPY_F_PRESERVE` | Preserve permissions/timestamps |
-| `PCOPY_F_OVERWRITE` | Overwrite existing destinations |
-| `PCOPY_F_MOVE` | Move mode (copy + unlink source) |
-| `PCOPY_F_CROSS_DEVICE` | Allow cross-device move (copy fallback) |
-| `PCOPY_F_VERBOSE` | Track per-file progress |
-
-### Kernel Module — pcopy.c
-
-The copy engine. Handles both copy and move operations. Exposes `/proc/pcopy/`, `/dev/pcopy`.
-
-- Detects NVMe hardware queues via `bdev_get_queue()` → `nr_hw_queues`
-- Detects PCIe gen/lanes via `pcie_capability_read_word()` → `PCI_EXP_LNKSTA`
-- Dispatches work via bounded `alloc_workqueue()` with `max_active = channels`
-- Copy engine uses `do_splice_direct()` for zero-copy page cache transfers
-- Move uses `do_renameat2()` for same-fs atomic rename, fallback to splice+unlink
-
-### Kernel Module — pmove.c
-
-Dedicated move engine with independent telemetry and abort capability. Same hardware detection, separate `/dev/pmove` ioctl namespace.
-
-- Attempts atomic `do_renameat2()` first (instant, zero data copy)
-- Falls back to splice-based data migration on cross-device boundary (`-EXDEV`)
-- Unlinks source only after successful data transfer
-- `PMOVE_F_FORCE_COPY` flag bypasses rename attempt (useful for testing)
-
-### Installation
-
-```bash
-# Kernel modules (built with kernel)
-modprobe pcopy
-modprobe pmove
-
-# Userspace tools
-cd tools/pcopy && make && sudo make install
-# Installs: /usr/local/bin/pcopy, /usr/local/bin/pmove (symlink)
-```
-
-### Files
-
-```
-fs/pcopy/pcopy.c               - Kernel module: parallel copy/move engine (~550 lines)
-fs/pcopy/pcopy.h               - Header (structures, ioctl definitions)
-fs/pcopy/Kconfig               - CONFIG_PCOPY
-fs/pcopy/Makefile              - Kernel build entry
-fs/pmove/pmove.c               - Kernel module: dedicated parallel move engine (~345 lines)
-fs/pmove/pmove.h               - Header (structures, ioctl definitions)
-fs/pmove/Kconfig               - CONFIG_PCOPY (pmove variant)
-fs/pmove/Makefile              - Kernel build entry
-tools/pcopy/pcopy.c            - Userspace CLI tool (~400 lines)
-tools/pcopy/Makefile           - Build/install (produces pcopy + pmove symlink)
-```
-
----
-
-## Arena Pool — Hierarchical Memory Allocation
-
-Per-process 300 MB arena with binary halving cascade and logarithmic decay tiers. Provides safe `arena_malloc()`/`arena_free()` from a pre-mapped virtual address space with guard pages, canary words, and double-free detection.
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         ARENA: 300 MB                            │
-│                                                                 │
-│  ┌──────────────────────────┬────────────────┬────┬───┬──┬─┐   │
-│  │  Tier 1: 150 MB          │ Tier 2: 75 MB  │ T3 │T4 │T5│…│   │
-│  │  (primary hot)           │ (overflow)     │50M │33M│22│…│   │
-│  │                          │                │    │   │  │ │   │
-│  │  Allocations land here   │ Spill at 80%   │ Logarithmic  │   │
-│  │  first (via priority)    │ occupancy      │ decay (2/3)  │   │
-│  └──────────────────────────┴────────────────┴────┴───┴──┴─┘   │
-│       ▲                            ▲              ▲             │
-│       │ Guard page (4 KB)          │              │             │
-│       └────────────────────────────┘──────────────┘             │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Tier Table (Logarithmic Decay: base 2/3)
-
-| Tier | Size (MB) | Cumulative | Role |
-|------|-----------|-----------|------|
-| 1 | 150.000 | 150 MB | Primary hot working set |
-| 2 | 75.000 | 225 MB | Warm overflow (spill at 80%) |
-| 3 | 50.000 | 275 MB | Soft target 1 |
-| 4 | 33.333 | 308 MB* | Soft target 2 |
-| 5 | 22.222 | 330 MB* | Virtual (USB-backed) |
-| 6 | 14.815 | 345 MB* | Decay brush |
-| 7 | 9.877 | 355 MB* | Savings tail |
-| 8 | 6.584 | 362 MB* | Savings tail |
-
-*Tiers beyond 300 MB are virtual — backed by USB swap or secondary mmap.
-
-### Allocation Priority: (4, 3, 1, 2) → Soft → (5, 6, ...)
-
-```
-Request arrives
-    │
-    ├── Try Tier 4 (33 MB) — smallest, most aggressively reused
-    ├── Try Tier 3 (50 MB) — second choice
-    ├── Try Tier 1 (150 MB) — fallback to primary
-    ├── Try Tier 2 (75 MB) — last resort before soft concern
-    │
-    ▼ (all full)
-SOFT CONCERN MODE:
-    • Log pressure event
-    • Trigger compaction pass
-    • Try Tier 5, 6, 7, ... (decay tiers)
-    • If still unsatisfied → extend arena (USB backing)
-```
-
-### Front-Load (Zero-Fault Startup)
-
-New processes receive 1/8 of the arena (37.5 MB) pre-faulted:
-- All pages touched at creation → TLB warm, no page faults
-- CPU Boost designated processes always get pre-faulted upfront
-- After upfront consumed, growth follows: (2, 3, 1, 2) sequence
-
-### Safety Guarantees
-
-| Protection | Mechanism |
-|-----------|-----------|
-| Bounds checking | Every pointer validated: A₀ ≤ ptr < A₀ + arena_size |
-| Guard pages | 4 KB PROT_NONE between tier regions (SIGSEGV on overflow) |
-| Canary words | 8-byte sentinel before (0xDEADC0DEBEEFCAFE) and after allocation |
-| Double-free | Block header state flag (ALLOCATED / FREE) checked before free |
-| Thread safety | Spinlock on allocation path, per-tier free lists |
-| Grid alignment | Cache-line aligned (64 bytes) — satisfies Integrity Guardian 1:1/1:2 |
-| Intensification tracking | Falling decay memory detects and throttles pressure-driving processes |
-
-### Intensification Concern — Falling Decay Memory (Clear-in-3)
-
-Tracks processes that drive further memory pressure beyond normal allocation. Uses a falling decay score that clears automatically in 3 intervals if the process goes quiet.
-
-**Mechanism:** Each intensification event increments a score (0–255). Every 10 seconds, the score decays by × 2/3 (integer division). With the clear threshold at 3, any typical score clears to zero within 3 decay intervals if no further pressure occurs:
-
-```
-Score 10:   10 → 6 → 4 → 2 (CLEAR at interval 3)
-Score  8:    8 → 5 → 3 → 2 (CLEAR at interval 3)
-Score  5:    5 → 3 → 2 → 1 (CLEAR at interval 2)
-Score  3:    3 → 2 → 1 → 0 (CLEAR at interval 1)
-```
-
-**Scaled Response:**
-
-| Score | Level | Response |
-|-------|-------|----------|
-| 0-2 | CLEAR | Normal allocation, no concern |
-| 3-7 | WATCH | Allocations logged, soft priority reduction |
-| 8-15 | CONCERN | New allocations from decay tiers only |
-| 16-31 | THROTTLE | Allocations rate-limited (yield between calls) |
-| 32+ | RESTRICT | Hard deny from primary tiers, decay-only service |
-
-**Intensification Triggers:**
-
-| Event | Weight | Cause |
-|-------|--------|-------|
-| Soft concern | +1 | Tier 1 exceeds 80% occupancy |
-| Tier exhaustion | +2 | All priority-order tiers (4,3,1,2) full |
-| Hard denial | +3 | All tiers including decay are full |
-| Fork pressure | +5 | Fork/exec inherits parent's high-pressure pool |
-
-**Design principle:** The system is proportional. A process that briefly bursts and goes quiet clears in 30 seconds (3 × 10s). A process that continuously drives pressure accumulates score and faces escalating restriction. The system rewards quiescence and penalizes sustained abuse.
-
-```bash
-# View intensification state in proc
-cat /proc/arena_pool/status    # Shows per-arena intensity level and score
-```
-
-### Savings Brush
-
-Tiers with < 50% occupancy contribute to "savings" — memory that can be:
-1. Released to kernel via `madvise(MADV_DONTNEED)`
-2. Offered to USB swap prefetch
-3. Reported to Dave as available headroom
-
-Brush threshold: `⌈log₃/₂(active_tiers)⌉` — engages at tier 5+.
-
-### Module Parameters
-
-```bash
-modprobe arena_pool default_arena_mb=300 max_arenas=256
-```
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `default_arena_mb` | 300 | Arena size per process (16–4096 MB) |
-| `max_arenas` | 256 | Maximum concurrent arenas system-wide |
-
-### Usage
-
-```bash
-# Load the module
-modprobe arena_pool
-
-# View status
-cat /proc/arena_pool/status
-
-# Processes auto-enrolled via JVM Memory Proxy:
-java -memory-guard -Xguard:arena=300m ./myprogram.bin
-```
-
-### Integration
-
-| Component | How It Uses Arena Pool |
-|-----------|-----------------------|
-| JVM Memory Proxy | Configurable via `-Xguard:arena=SIZE`; native child processes allocated from arena |
-| USB Dynamic RAM | Decay tiers 5+ spill to USB swap (priority -5) when physical RAM full |
-| Per-User Kernel Objects | Each user_ko gets a scaled arena (Grain 1: 4 MB, Grain 3: 64 MB) |
-| CPU Boost | Boosted processes get pre-faulted upfront at fork time |
-| Dave | Monitors tier occupancy, predicts pressure 30s ahead, suggests compaction |
-| Integrity Guardian | Verifies allocations remain 1:1 or 1:2 grid-aligned within each tier |
-
-### Mathematical Summary
-
-```
-Arena:           A = 300 MB
-Primary:         P = A/2 = 150 MB
-Overflow:        O = A/4 = 75 MB
-Decay(n):        D(n) = O × (2/3)^(n-2),  n ≥ 3
-Convergence:     Σ D(n) for n=3..∞ = 150 MB
-Total capacity:  A + virtual extension = 375 MB theoretical
-Front-load:      F = A/8 = 37.5 MB
-Brush threshold: B = ⌈log₃/₂(N)⌉
-Priority order:  (4, 3, 1, 2) → soft → (5, 6, 7, ...) → extend
-```
-
-### Files
-
-```
-mm/arena_pool.h                    - Internal header (structures, constants)
-mm/arena_pool.c                    - Kernel module (~450 lines)
-mm/Kconfig                         - CONFIG_ARENA_POOL
-mm/Makefile                        - Build entry
-include/linux/arena_pool.h         - Public API header
-TECH.md                            - Full mathematical specification
-```
-
-Admin: `/proc/arena_pool/status`
-
----
-
 ## Build Configuration
 
 Enable all extensions in your kernel `.config`:
@@ -3443,6 +3472,7 @@ modules/fiduciary/documents/            - SQL documents (minister facts, legal b
 
 | Date | Change |
 |------|--------|
+| 2026-08-15 | README reorganized: Memory Management grouped (Arena Pool, USB RAM, DMA, Per-User KO); pcopy/pmove moved to Filesystem; ToC categorized |
 | 2026-08-15 | Added Arena Pool: Intensification Concern — Falling Decay Memory (Clear-in-3) |
 | 2026-08-12 | Listed as Dead by Max Rupplin is Jack Rupplin |
 | 2026-08-12 | Added Secure JVM: INT Loading Structure (4-tier inferrer & orderer) |
