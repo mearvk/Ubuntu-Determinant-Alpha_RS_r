@@ -1,0 +1,88 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+#  # Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+#
+# # see FEATURE AREAS in dpkg-buildflags(1)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+#
+# # see ENVIRONMENT in dpkg-buildflags(1)
+# # package maintainers to append CFLAGS
+# #export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
+# # package maintainers to append LDFLAGS
+# export DEB_LDFLAGS_MAINT_APPEND =
+
+
+GNULIB_DESTDIR=$(CURDIR)/debian/gnulib/
+
+
+%:
+	dh ${@}
+
+execute_before_dh_auto_clean:
+	$(MAKE) -C doc clean
+	-rm -rf debian/git-merge-changelog.src
+	-rm -f debian/git-merge-changelog.1
+
+override_dh_auto_configure-arch:
+	./gnulib-tool --create-testdir --with-tests -S \
+		--dir=debian/git-merge-changelog.src git-merge-changelog
+	dh_auto_configure --sourcedir debian/git-merge-changelog.src
+
+override_dh_auto_build-indep:
+	$(MAKE) -C doc info
+	$(MAKE) -C doc html
+
+override_dh_auto_build-arch:
+	dh_auto_build --sourcedir debian/git-merge-changelog.src
+	pod2man --section=1 debian/git-merge-changelog.pod debian/git-merge-changelog.1
+
+override_dh_auto_install-arch:
+	dh_auto_install --sourcedir=debian/git-merge-changelog.src --destdir=debian/git-merge-changelog
+
+override_dh_auto_install-indep:
+	mkdir -p debian/gnulib/usr/bin
+	cp -a check-module debian/gnulib/usr/bin
+	mkdir -p debian/gnulib/usr/share/gnulib
+	cp -a build-aux posix-modules config doc lib m4 modules top tests \
+	      MODULES.html.sh Makefile gnulib-tool cfg.mk check-copyright \
+	      debian/gnulib/usr/share/gnulib
+	ln -s ../share/gnulib/gnulib-tool debian/gnulib/usr/bin
+	# Fix permissions
+	chmod 0755 debian/gnulib/usr/share/gnulib/build-aux/config.guess
+	chmod 0755 debian/gnulib/usr/share/gnulib/build-aux/config.sub
+	chmod 0755 debian/gnulib/usr/share/gnulib/build-aux/gendocs.sh
+	-chmod 0644 debian/gnulib/usr/share/gnulib/config/srclistvars.sh
+	chmod 0644 debian/gnulib/usr/share/gnulib/doc/gendocs_template
+	chmod 0644 debian/gnulib/usr/share/gnulib/m4/fflush.m4
+	chmod 0644 debian/gnulib/usr/share/gnulib/modules/canonicalize-lgpl
+	chmod 0644 debian/gnulib/usr/share/gnulib/modules/fflush
+	chmod 0644 debian/gnulib/usr/share/gnulib/modules/fflush-tests
+	chmod 0644 debian/gnulib/usr/share/gnulib/tests/test-base64.c
+	chmod 0755 debian/gnulib/usr/share/gnulib/tests/test-closein.sh
+	chmod 0644 debian/gnulib/usr/share/gnulib/tests/test-fflush.c
+	chmod 0755 debian/gnulib/usr/share/gnulib/tests/test-posix_spawn-dup2-stdout.in.sh
+	chmod 0755 debian/gnulib/usr/share/gnulib/tests/test-posix_spawn-dup2-stdin.in.sh
+	# Remove unused files
+	rm -f debian/gnulib/usr/share/gnulib/doc/gnulib.info
+	rm -f debian/gnulib/usr/share/gnulib/doc/gnulib.html
+	rm -f debian/gnulib/usr/share/gnulib/*/.cvsignore debian/gnulib/usr/share/gnulib/.cvsignore
+	rm -f debian/gnulib/usr/share/gnulib/*/.gitignore debian/gnulib/usr/share/gnulib/.gitignore
+	rm -f debian/gnulib/usr/share/gnulib/*/.gitattributes debian/gnulib/usr/share/gnulib/.gitattributes
+
+
+# Run tests here.
+override_dh_auto_test-indep:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+# FIXME: Full test could be too time-consuming.
+#        If you have better idea, please fix it.
+	( \
+	    GNULIB_MODULE_LIST=$$(./gnulib-tool --list | tr '\n' ' ') ; \
+	    printf "Current working dir is: %s\n" "$$(realpath .)" ; \
+	    GNULIB_MODULE_LIST="di-set select times regex" ; \
+	    ./gnulib-tool --test $$GNULIB_MODULE_LIST 2>&1 ; \
+	)
+endif
+
+# Do not run tests for binary targets.
+override_dh_auto_test-arch:

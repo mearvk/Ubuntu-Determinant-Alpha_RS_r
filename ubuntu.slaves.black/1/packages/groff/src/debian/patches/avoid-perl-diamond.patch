@@ -1,0 +1,764 @@
+From 281658fb3e335f99f036b424b4baa8fce58f589b Mon Sep 17 00:00:00 2001
+From: Colin Watson <cjwatson@debian.org>
+Date: Thu, 28 Feb 2019 19:37:30 +0000
+Subject: Avoid Perl's unsafe "<>" operator
+
+The "<>" operator is implemented using the two-argument form of "open",
+which interprets magic such as pipe characters, allowing execution of
+arbitrary commands which is unlikely to be expected.  Perl >= 5.22 has a
+"<<>>" operator which avoids this, but also forbids the use of "-" to
+mean the standard input, which is a facility that the affected groff
+programs document.
+
+ARGV::readonly would probably also fix this, but I fundamentally dislike
+the approach of escaping data in preparation for a language facility to
+unescape it, especially when the required escaping is as non-obvious as
+it is here.  (For the same reason, I prefer to use subprocess invocation
+facilities that allow passing the argument list as a list rather than as
+a string to be interpreted by the shell.)  So I've abandoned this
+dubious convenience and changed the affected programs to iterate over
+command-line arguments manually using the three-argument form of open.
+
+This change involves an extra level of indentation, so it's a little
+awkward to review.  It consists of changing this form:
+
+  while (<>) {  # or foreach, which is similar but less efficient
+    ...
+  }
+
+... into this:
+
+  unshift @ARGV, '-' unless @ARGV;
+  foreach my $filename (@ARGV) {
+    my $input;
+    if ($filename eq '-') {
+      $input = \*STDIN;
+    } elsif (not open $input, '<', $filename) {
+      warn $!;
+      next;
+    }
+    while (<$input>) {
+      ...
+    }
+  }
+
+Local variations: glilypond doesn't need the initial unshift since
+that's already handled in contrib/glilypond/args.pl; gropdf declares
+$input in a slightly different way since it's also used in the LoadAhead
+function.
+
+Bug: https://savannah.gnu.org/bugs/?55557
+Bug-Debian: https://bugs.debian.org/920269
+Forwarded: https://lists.gnu.org/archive/html/groff/2019-01/msg00037.html
+Last-Update: 2019-02-28
+
+Patch-Name: avoid-perl-diamond.patch
+---
+ contrib/glilypond/glilypond.pl | 128 +++++++++++-----------
+ contrib/gperl/gperl.pl         | 188 +++++++++++++++++----------------
+ contrib/gpinyin/gpinyin.pl     |  88 ++++++++-------
+ src/devices/gropdf/gropdf.pl   |  99 +++++++++--------
+ tmac/hyphenex.pl               |  86 ++++++++-------
+ 5 files changed, 318 insertions(+), 271 deletions(-)
+
+diff --git a/contrib/glilypond/glilypond.pl b/contrib/glilypond/glilypond.pl
+index 868801b2..f2a76158 100755
+--- a/contrib/glilypond/glilypond.pl
++++ b/contrib/glilypond/glilypond.pl
+@@ -565,73 +565,81 @@ our $Read =
+     ); # end definition %lilypond_args
+ 
+ 
+- LILYPOND: foreach (<>) {
+-    chomp;
+-    my $line = $_;
++ LILYPOND: foreach my $filename (@ARGV) {
++    my $input;
++    if ($filename eq '-') {
++      $input = \*STDIN;
++    } elsif (not open $input, '<', $filename) {
++      warn $!;
++      next;
++    }
++    while (<$input>) {
++      chomp;
++      my $line = $_;
+ 
+ 
+-    # now the lines with '.lilypond ...'
++      # now the lines with '.lilypond ...'
+ 
+-    if ( /
+-	   ^
+-	   [.']
+-	   \s*
+-	   lilypond
+-	   (
+-	     .*
+-	   )
+-	   $
+-	 /x ) { # .lilypond ...
+-      my $args = $1;
+-      $args =~ s/
+-		  ^
+-		  \s*
+-		//x;
+-      $args =~ s/
+-		  \s*
+-		  $
+-		//x;
+-      $args =~ s/
+-		  ^
+-		  (
+-		    \S*
+-		  )
+-		  \s*
+-		//x;
+-      my $arg1 = $1; # 'start', 'end' or 'include'
+-      $args =~ s/["'`]//g;
+-      my $arg2 = $args; # file argument for '.lilypond include'
+-
+-      if ( exists $lilypond_args{$arg1} ) {
+-	$lilypond_args{$arg1}->($arg2);
+-	next;
+-      } else {
+-	# not a suitable argument of '.lilypond'
+-	$stderr->print( "Unknown command: '$arg1' '$arg2':  '$line'" );
+-      }
+-
+-      next LILYPOND;
+-    } # end if for .lilypond
++      if ( /
++	     ^
++	     [.']
++	     \s*
++	     lilypond
++	     (
++	       .*
++	     )
++	     $
++	   /x ) { # .lilypond ...
++	my $args = $1;
++	$args =~ s/
++		    ^
++		    \s*
++		  //x;
++	$args =~ s/
++		    \s*
++		    $
++		  //x;
++	$args =~ s/
++		    ^
++		    (
++		      \S*
++		    )
++		    \s*
++		  //x;
++	my $arg1 = $1; # 'start', 'end' or 'include'
++	$args =~ s/["'`]//g;
++	my $arg2 = $args; # file argument for '.lilypond include'
++
++	if ( exists $lilypond_args{$arg1} ) {
++	  $lilypond_args{$arg1}->($arg2);
++	  next;
++	} else {
++	  # not a suitable argument of '.lilypond'
++	  $stderr->print( "Unknown command: '$arg1' '$arg2':  '$line'" );
++	}
+ 
++	next LILYPOND;
++      } # end if for .lilypond
+ 
+-    if ( $lilypond_mode ) { # do lilypond-mode
+-      # see '.lilypond start'
+-      $ly->print( $line );
+-      next LILYPOND;
+-    } # do lilypond-mode
+ 
+-    # unknown line without lilypond
+-    unless ( /
+-	       ^
+-	       [.']
+-	       \s*
+-	       lilypond
+-	     /x ) { # not a '.lilypond' line
+-      $out->print($line);
+-      next LILYPOND;
+-    }
++      if ( $lilypond_mode ) { # do lilypond-mode
++	# see '.lilypond start'
++	$ly->print( $line );
++	next LILYPOND;
++      } # do lilypond-mode
+ 
+-  } # end foreach <>
++      # unknown line without lilypond
++      unless ( /
++		 ^
++		 [.']
++		 \s*
++		 lilypond
++	       /x ) { # not a '.lilypond' line
++	$out->print($line);
++	next LILYPOND;
++      }
++    } # end while <$input>
++  } # end foreach $filename
+ } # end Read
+ 
+ 
+diff --git a/contrib/gperl/gperl.pl b/contrib/gperl/gperl.pl
+index fdb93fff..6eb2f13b 100755
+--- a/contrib/gperl/gperl.pl
++++ b/contrib/gperl/gperl.pl
+@@ -132,114 +132,124 @@ my $out_file;
+ 
+ my $perl_mode = 0;
+ 
+-foreach (<>) {
+-  chomp;
+-  s/\s+$//;
+-  my $line = $_;
+-  my $is_dot_Perl = $line =~ /^[.']\s*Perl(|\s+.*)$/;
+-
+-  unless ( $is_dot_Perl ) {	# not a '.Perl' line
+-    if ( $perl_mode ) {		# is running in Perl mode
+-      print OUT $line;
+-    } else {			# normal line, not Perl-related
+-      print $line;
+-    }
++unshift @ARGV, '-' unless @ARGV;
++foreach my $filename (@ARGV) {
++  my $input;
++  if ($filename eq '-') {
++    $input = \*STDIN;
++  } elsif (not open $input, '<', $filename) {
++    warn $!;
+     next;
+   }
+-
+-
+-  ##########
+-  # now the line is a '.Perl' line
+-
+-  my $args = $line;
+-  $args =~ s/\s+$//;	# remove final spaces
+-  $args =~ s/^[.']\s*Perl\s*//;	# omit .Perl part, leave the arguments
+-
+-  my @args = split /\s+/, $args;
+-
+-  ##########
+-  # start Perl mode
+-  if ( @args == 0 || @args == 1 && $args[0] eq 'start' ) {
+-    # For '.Perl' no args or first arg 'start' means opening 'Perl' mode.
+-    # Everything else means an ending command.
+-    if ( $perl_mode ) {
+-      # '.Perl' was started twice, ignore
+-      print STDERR q('.Perl' starter was run several times);
+-      next;
+-    } else {	# new Perl start
+-      $perl_mode = 1;
+-      open OUT, '>', $out_file;
++  while (<$input>) {
++    chomp;
++    s/\s+$//;
++    my $line = $_;
++    my $is_dot_Perl = $line =~ /^[.']\s*Perl(|\s+.*)$/;
++
++    unless ( $is_dot_Perl ) {	# not a '.Perl' line
++      if ( $perl_mode ) {		# is running in Perl mode
++        print OUT $line;
++      } else {			# normal line, not Perl-related
++        print $line;
++      }
+       next;
+     }
+-  }
+ 
+-  ##########
+-  # now the line must be a Perl ending line (stop)
+ 
+-  unless ( $perl_mode ) {
+-    print STDERR 'gperl: there was a Perl ending without being in ' .
+-      'Perl mode:';
+-    print STDERR '    ' . $line;
+-    next;
+-  }
++    ##########
++    # now the line is a '.Perl' line
++
++    my $args = $line;
++    $args =~ s/\s+$//;	# remove final spaces
++    $args =~ s/^[.']\s*Perl\s*//;	# omit .Perl part, leave the arguments
++
++    my @args = split /\s+/, $args;
++
++    ##########
++    # start Perl mode
++    if ( @args == 0 || @args == 1 && $args[0] eq 'start' ) {
++      # For '.Perl' no args or first arg 'start' means opening 'Perl' mode.
++      # Everything else means an ending command.
++      if ( $perl_mode ) {
++        # '.Perl' was started twice, ignore
++        print STDERR q('.Perl' starter was run several times);
++        next;
++      } else {	# new Perl start
++        $perl_mode = 1;
++        open OUT, '>', $out_file;
++        next;
++      }
++    }
+ 
+-  $perl_mode = 0;	# 'Perl' stop calling is correct
+-  close OUT;		# close the storing of 'Perl' commands
++    ##########
++    # now the line must be a Perl ending line (stop)
+ 
+-  ##########
+-  # run this 'Perl' part, later on about storage of the result
+-  # array stores prints with \n
+-  my @print_res = `perl $out_file`;
++    unless ( $perl_mode ) {
++      print STDERR 'gperl: there was a Perl ending without being in ' .
++        'Perl mode:';
++      print STDERR '    ' . $line;
++      next;
++    }
+ 
+-  # remove 'stop' arg if exists
+-  shift @args if ( $args[0] eq 'stop' );
++    $perl_mode = 0;	# 'Perl' stop calling is correct
++    close OUT;		# close the storing of 'Perl' commands
+ 
+-  if ( @args == 0 ) {
+-    # no args for saving, so @print_res doesn't matter
+-    next;
+-  }
++    ##########
++    # run this 'Perl' part, later on about storage of the result
++    # array stores prints with \n
++    my @print_res = `perl $out_file`;
+ 
+-  my @var_names = ();
+-  my @mode_names = ();
++    # remove 'stop' arg if exists
++    shift @args if ( $args[0] eq 'stop' );
+ 
+-  my $mode = '.ds';
+-  for ( @args ) {
+-    if ( /^\.?ds$/ ) {
+-      $mode = '.ds';
++    if ( @args == 0 ) {
++      # no args for saving, so @print_res doesn't matter
+       next;
+     }
+-    if ( /^\.?nr$/ ) {
+-      $mode = '.nr';
+-      next;
++
++    my @var_names = ();
++    my @mode_names = ();
++
++    my $mode = '.ds';
++    for ( @args ) {
++      if ( /^\.?ds$/ ) {
++        $mode = '.ds';
++        next;
++      }
++      if ( /^\.?nr$/ ) {
++        $mode = '.nr';
++        next;
++      }
++      push @mode_names, $mode;
++      push @var_names, $_;
+     }
+-    push @mode_names, $mode;
+-    push @var_names, $_;
+-  }
+ 
+-  my $n_res = @print_res;
+-  my $n_vars = @var_names;
++    my $n_res = @print_res;
++    my $n_vars = @var_names;
+ 
+-  if ( $n_vars < $n_res ) {
+-    print STDERR 'gperl: not enough variables for Perl part: ' .
+-      $n_vars . ' variables for ' . $n_res . ' output lines.';
+-  } elsif ( $n_vars > $n_res ) {
+-    print STDERR 'gperl: too many variablenames for Perl part: ' .
+-      $n_vars . ' variables for ' . $n_res . ' output lines.';
+-  }
+-  if ( $n_vars < $n_res ) {
+-    print STDERR 'gperl: not enough variables for Perl part: ' .
+-      $n_vars . ' variables for ' . $n_res . ' output lines.';
+-  }
++    if ( $n_vars < $n_res ) {
++      print STDERR 'gperl: not enough variables for Perl part: ' .
++        $n_vars . ' variables for ' . $n_res . ' output lines.';
++    } elsif ( $n_vars > $n_res ) {
++      print STDERR 'gperl: too many variablenames for Perl part: ' .
++        $n_vars . ' variables for ' . $n_res . ' output lines.';
++    }
++    if ( $n_vars < $n_res ) {
++      print STDERR 'gperl: not enough variables for Perl part: ' .
++        $n_vars . ' variables for ' . $n_res . ' output lines.';
++    }
+ 
+-  my $n_min = $n_res;
+-  $n_min = $n_vars if ( $n_vars < $n_res );
+-  exit unless ( $n_min );
+-  $n_min -= 1; # for starting with 0
++    my $n_min = $n_res;
++    $n_min = $n_vars if ( $n_vars < $n_res );
++    exit unless ( $n_min );
++    $n_min -= 1; # for starting with 0
+ 
+-  for my $i ( 0..$n_min ) {
+-    my $value = $print_res[$i];
+-    chomp $value;
+-    print $mode_names[$i] . ' ' . $var_names[$i] . ' ' . $value;
++    for my $i ( 0..$n_min ) {
++      my $value = $print_res[$i];
++      chomp $value;
++      print $mode_names[$i] . ' ' . $var_names[$i] . ' ' . $value;
++    }
+   }
+ }
+ 
+diff --git a/contrib/gpinyin/gpinyin.pl b/contrib/gpinyin/gpinyin.pl
+index e4bb5a31..57414f33 100755
+--- a/contrib/gpinyin/gpinyin.pl
++++ b/contrib/gpinyin/gpinyin.pl
+@@ -126,53 +126,63 @@ my @output_t =	# troff
+    '.el \\{\\',
+   );
+ 
+-foreach (<>) {	# get line from input
+-  chomp;
+-  s/\s+$//;		# remove final spaces
+-# &err('gpinyin: ' . $_);
+-
+-  my $line = $_;	# with starting blanks
+-
+-  # .pinyin start or begin line
+-  if ( $line =~ /^[.']\s*pinyin\s+(start|begin)$/ ) {
+-    if ( $pinyin_mode ) {
+-      # '.pinyin' was started twice, ignore
+-      &err( q['.pinyin' starter was run several times] );
+-    } else {	# new pinyin start
+-      $pinyin_mode = 1;
+-    }
++unshift @ARGV, '-' unless @ARGV;
++foreach my $filename (@ARGV) {
++  my $input;
++  if ($filename eq '-') {
++    $input = \*STDIN;
++  } elsif (not open $input, '<', $filename) {
++    warn $!;
+     next;
+   }
++  while (<$input>) {
++    chomp;
++    s/\s+$//;		# remove final spaces
++#   &err('gpinyin: ' . $_);
++
++    my $line = $_;	# with starting blanks
++
++    # .pinyin start or begin line
++    if ( $line =~ /^[.']\s*pinyin\s+(start|begin)$/ ) {
++      if ( $pinyin_mode ) {
++        # '.pinyin' was started twice, ignore
++        &err( q['.pinyin' starter was run several times] );
++      } else {	# new pinyin start
++        $pinyin_mode = 1;
++      }
++      next;
++    }
+ 
+-  # .pinyin stop or end line
+-  if ( $line =~ /^[.']\s*pinyin\s+(stop|end)$/ ) {
+-    if ( $pinyin_mode ) {		# normal stop
+-      $pinyin_mode = 0;
+-      &finish_pinyin_mode( \@output_n, \@output_t );
+-    } else {	# ignore
+-      &err( 'gpinyin: there was a .pinyin stop without ' .
+-	'being in pinyin mode' );
++    # .pinyin stop or end line
++    if ( $line =~ /^[.']\s*pinyin\s+(stop|end)$/ ) {
++      if ( $pinyin_mode ) {		# normal stop
++        $pinyin_mode = 0;
++        &finish_pinyin_mode( \@output_n, \@output_t );
++      } else {	# ignore
++        &err( 'gpinyin: there was a .pinyin stop without ' .
++          'being in pinyin mode' );
++      }
++      next;
+     }
+-    next;
+-  }
+ 
+-  # now not a .pinyin line
++    # now not a .pinyin line
+ 
+ 
+-  if ( $pinyin_mode ) {	# within Pinyin
+-    my $starting_blanks = '';
+-    $starting_blanks = $1 if ( s/^(s+)// );	# handle starting spaces
++    if ( $pinyin_mode ) {	# within Pinyin
++      my $starting_blanks = '';
++      $starting_blanks = $1 if ( s/^(s+)// );	# handle starting spaces
+ 
+-    my %outline = &handle_line($starting_blanks, $line);
+-#&err('gpinyin outline n: ' . $outline{'n'} );
+-#&err('gpinyin outline t: ' . $outline{'t'} );
+-    push @output_n, $outline{'n'};
+-    push @output_t, $outline{'t'};
+-  } else {	# normal roff line, not within Pinyin
+-    print $line;
+-  }
+-  next;
+-}	# end of input line
++      my %outline = &handle_line($starting_blanks, $line);
++#     &err('gpinyin outline n: ' . $outline{'n'} );
++#     &err('gpinyin outline t: ' . $outline{'t'} );
++      push @output_n, $outline{'n'};
++      push @output_t, $outline{'t'};
++    } else {	# normal roff line, not within Pinyin
++      print $line;
++    }
++    next;
++  }	# end of input line
++}
+ 
+ 
+ ########################################################################
+diff --git a/src/devices/gropdf/gropdf.pl b/src/devices/gropdf/gropdf.pl
+index 9b624c33..a8b1dbe0 100644
+--- a/src/devices/gropdf/gropdf.pl
++++ b/src/devices/gropdf/gropdf.pl
+@@ -61,6 +61,7 @@ my @obj;	# Array of PDF objects
+ my $objct=0;	# Count of Objects
+ my $fct=0;	# Output count
+ my %fnt;	# Used fonts
++our $input;	# Current input filehandle
+ my $lct=0;	# Input Line Count
+ my $src_name='';
+ my %env;	# Current environment
+@@ -288,56 +289,64 @@ my %info=('Creator' => "(groff version $cfg{GROFF_VERSION})",
+ 				'ModDate' => "($dt)",
+ 				'CreationDate' => "($dt)");
+ 
+-while (<>)
+-{
+-    chomp;
+-    s/\r$//;
+-    $lct++;
++unshift @ARGV, '-' unless @ARGV;
++foreach my $filename (@ARGV) {
++    local $input;
++    if ($filename eq '-') {
++	$input = \*STDIN;
++    } elsif (not open $input, '<', $filename) {
++	warn $!;
++	next;
++    }
++    while (<$input>) {
++	chomp;
++	s/\r$//;
++	$lct++;
+ 
+-    do 	# The ahead buffer behaves like 'ungetc'
+-    {{
+-	if (scalar(@ahead))
+-	{
+-	    $_=shift(@ahead);
+-	}
++	do 	# The ahead buffer behaves like 'ungetc'
++	{{
++	    if (scalar(@ahead))
++	    {
++		$_=shift(@ahead);
++	    }
+ 
+ 
+-	my $cmd=substr($_,0,1);
+-	next if $cmd eq '#';	# just a comment
+-	my $lin=substr($_,1);
++	    my $cmd=substr($_,0,1);
++	    next if $cmd eq '#';	# just a comment
++	    my $lin=substr($_,1);
+ 
+-	while ($cmd eq 'w')
+-	{
+-	    $cmd=substr($lin,0,1);
+-	    $lin=substr($lin,1);
+-	    $w_flg=1 if $gotT;
+-	}
++	    while ($cmd eq 'w')
++	    {
++		$cmd=substr($lin,0,1);
++		$lin=substr($lin,1);
++		$w_flg=1 if $gotT;
++	    }
+ 
+-	$lin=~s/^\s+//;
++	    $lin=~s/^\s+//;
+ #		$lin=~s/\s#.*?$//;	# remove comment
+-	$stream.="\% $_\n" if $debug;
+-
+-	do_x($lin),next if ($cmd eq 'x');
+-	next if $suppress;
+-	do_p($lin),next if ($cmd eq 'p');
+-	do_f($lin),next if ($cmd eq 'f');
+-	do_s($lin),next if ($cmd eq 's');
+-	do_m($lin),next if ($cmd eq 'm');
+-	do_D($lin),next if ($cmd eq 'D');
+-	do_V($lin),next if ($cmd eq 'V');
+-	do_v($lin),next if ($cmd eq 'v');
+-	do_t($lin),next if ($cmd eq 't');
+-	do_u($lin),next if ($cmd eq 'u');
+-	do_C($lin),next if ($cmd eq 'C');
+-	do_c($lin),next if ($cmd eq 'c');
+-	do_N($lin),next if ($cmd eq 'N');
+-	do_h($lin),next if ($cmd eq 'h');
+-	do_H($lin),next if ($cmd eq 'H');
+-	do_n($lin),next if ($cmd eq 'n');
+-
+-	my $tmp=scalar(@ahead);
+-    }} until scalar(@ahead) == 0;
+-
++	    $stream.="\% $_\n" if $debug;
++
++	    do_x($lin),next if ($cmd eq 'x');
++	    next if $suppress;
++	    do_p($lin),next if ($cmd eq 'p');
++	    do_f($lin),next if ($cmd eq 'f');
++	    do_s($lin),next if ($cmd eq 's');
++	    do_m($lin),next if ($cmd eq 'm');
++	    do_D($lin),next if ($cmd eq 'D');
++	    do_V($lin),next if ($cmd eq 'V');
++	    do_v($lin),next if ($cmd eq 'v');
++	    do_t($lin),next if ($cmd eq 't');
++	    do_u($lin),next if ($cmd eq 'u');
++	    do_C($lin),next if ($cmd eq 'C');
++	    do_c($lin),next if ($cmd eq 'c');
++	    do_N($lin),next if ($cmd eq 'N');
++	    do_h($lin),next if ($cmd eq 'h');
++	    do_H($lin),next if ($cmd eq 'H');
++	    do_n($lin),next if ($cmd eq 'n');
++
++	    my $tmp=scalar(@ahead);
++	}} until scalar(@ahead) == 0;
++    }
+ }
+ 
+ exit 0 if $lct==0;
+@@ -3248,7 +3257,7 @@ sub  LoadAhead
+ 
+     foreach my $j (1..$no)
+     {
+-	my $lin=<>;
++	my $lin=<$input>;
+ 	chomp($lin);
+ 	$lin=~s/\r$//;
+ 	$lct++;
+diff --git a/tmac/hyphenex.pl b/tmac/hyphenex.pl
+index fba3e8d6..aee5845b 100644
+--- a/tmac/hyphenex.pl
++++ b/tmac/hyphenex.pl
+@@ -31,47 +31,57 @@ print "% for corrections and omissions.\n";
+ print "\n";
+ print "\\hyphenation{\n";
+ 
+-while (<>) {
+-  # retain only lines starting with \1 ... \6 or \tabalign
+-  next if not (m/^\\[123456]/ || m/^\\tabalign/);
+-  # remove final newline
+-  chop;
+-  # remove all TeX commands except \1 ... \6
+-  s/\\[^123456\s{]+//g;
+-  # remove all paired { ... }
+-  1 while s/{(.*?)}/\1/g;
+-  # skip lines which now have only whitespace before '&'
+-  next if m/^\s*&/;
+-  # remove comments
+-  s/%.*//;
+-  # remove trailing whitespace
+-  s/\s*$//;
+-  # remove trailing '*' (used as a marker in the document)
+-  s/\*$//;
+-  # split at whitespace
+-  @field = split(' ');
+-  if ($field[0] eq "\\1" || $field[0] eq "\\4") {
+-    print "  $field[2]\n";
++unshift @ARGV, '-' unless @ARGV;
++foreach my $filename (@ARGV) {
++  my $input;
++  if ($filename eq '-') {
++    $input = \*STDIN;
++  } elsif (not open $input, '<', $filename) {
++    warn $!;
++    next;
+   }
+-  elsif ($field[0] eq "\\2" || $field[0] eq "\\5") {
+-    print "  $field[2]\n";
+-    # handle multiple suffixes separated by commata
+-    @suffix_list = split(/,/, "$field[3]");
+-    foreach $suffix (@suffix_list) {
+-      print "  $field[2]$suffix\n";
++  while (<$input>) {
++    # retain only lines starting with \1 ... \6 or \tabalign
++    next if not (m/^\\[123456]/ || m/^\\tabalign/);
++    # remove final newline
++    chop;
++    # remove all TeX commands except \1 ... \6
++    s/\\[^123456\s{]+//g;
++    # remove all paired { ... }
++    1 while s/{(.*?)}/\1/g;
++    # skip lines which now have only whitespace before '&'
++    next if m/^\s*&/;
++    # remove comments
++    s/%.*//;
++    # remove trailing whitespace
++    s/\s*$//;
++    # remove trailing '*' (used as a marker in the document)
++    s/\*$//;
++    # split at whitespace
++    @field = split(' ');
++    if ($field[0] eq "\\1" || $field[0] eq "\\4") {
++      print "  $field[2]\n";
+     }
+-  }
+-  elsif ($field[0] eq "\\3" || $field[0] eq "\\6") {
+-    # handle multiple suffixes separated by commata
+-    @suffix_list = split(/,/, "$field[3],$field[4]");
+-    foreach $suffix (@suffix_list) {
+-      print "  $field[2]$suffix\n";
++    elsif ($field[0] eq "\\2" || $field[0] eq "\\5") {
++      print "  $field[2]\n";
++      # handle multiple suffixes separated by commata
++      @suffix_list = split(/,/, "$field[3]");
++      foreach $suffix (@suffix_list) {
++        print "  $field[2]$suffix\n";
++      }
++    }
++    elsif ($field[0] eq "\\3" || $field[0] eq "\\6") {
++      # handle multiple suffixes separated by commata
++      @suffix_list = split(/,/, "$field[3],$field[4]");
++      foreach $suffix (@suffix_list) {
++        print "  $field[2]$suffix\n";
++      }
++    }
++    else {
++      # for '&', split at '&' with trailing whitespace
++      @field = split(/&\s*/);
++      print "  $field[1]\n";
+     }
+-  }
+-  else {
+-    # for '&', split at '&' with trailing whitespace
+-    @field = split(/&\s*/);
+-    print "  $field[1]\n";
+   }
+ }
+ 

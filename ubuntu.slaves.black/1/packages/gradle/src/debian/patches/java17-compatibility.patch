@@ -1,0 +1,28 @@
+Description: Fix SourcepathIgnoringInvocationHandler on Java 9
+ Use the method provided by the proxy API instead of
+ trying to look up the same method on the delegate's
+ class. It is unclear why this was done in the first place.
+ Trying to access the method from the delegate lead to
+ illegal access exceptions on certain JDKs.
+ .
+ This patch can be removed after upgrading to Gradle 4.8
+Author: Stefan Oehme <stefan@gradle.com>
+Origin: upstream, https://github.com/gradle/gradle/commit/f6fd43e1
+--- a/subprojects/language-java/src/main/java/org/gradle/api/internal/tasks/compile/reflect/SourcepathIgnoringInvocationHandler.java
++++ b/subprojects/language-java/src/main/java/org/gradle/api/internal/tasks/compile/reflect/SourcepathIgnoringInvocationHandler.java
+@@ -37,7 +37,6 @@
+     @Override
+     @SuppressWarnings("unchecked")
+     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+-        Method m = proxied.getClass().getMethod(method.getName(), method.getParameterTypes());
+         if (method.getName().equals(HAS_LOCATION_METHOD)) {
+             // There is currently a requirement in the JDK9 javac implementation
+             // that when javac is invoked with an explicitly empty sourcepath
+@@ -62,6 +61,6 @@
+                 ((Set<JavaFileObject.Kind>) args[2]).remove(JavaFileObject.Kind.SOURCE);
+             }
+         }
+-        return m.invoke(proxied, args);
++        return method.invoke(proxied, args);
+     }
+ }

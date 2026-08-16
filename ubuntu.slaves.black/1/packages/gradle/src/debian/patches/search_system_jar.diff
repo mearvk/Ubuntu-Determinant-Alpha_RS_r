@@ -1,0 +1,41 @@
+From: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Date: Sun, 12 Nov 2017 01:04:50 +0100
+Subject: search_system_jar
+
+Gradle searches its own directory for Java libraries ignoring /usr/share/java/.
+Somehow Gradle even fails to locate its home directory which is
+/usr/share/gradle/. This patch fixes these issues, and the large amount of
+symlinks in the binary packages may be possible to remove. Maintaining so many
+symlinks is too error prone.
+---
+ .../internal/installation/CurrentGradleInstallationLocator.java   | 8 +-------
+ .../java/org/gradle/internal/installation/GradleInstallation.java | 1 +
+ 2 files changed, 2 insertions(+), 7 deletions(-)
+
+--- a/subprojects/core-api/src/main/java/org/gradle/internal/installation/CurrentGradleInstallationLocator.java
++++ b/subprojects/core-api/src/main/java/org/gradle/internal/installation/CurrentGradleInstallationLocator.java
+@@ -51,13 +51,7 @@
+     }
+ 
+     private static File findDistDir(Class<?> clazz) {
+-        File codeSource = ClasspathUtil.getClasspathForClass(clazz);
+-        if (codeSource.isFile()) {
+-            return determineDistRootDir(codeSource);
+-        } else {
+-            // Loaded from a classes dir - assume we're running from the ide or tests
+-            return null;
+-        }
++        return new File("/usr/share/gradle");
+     }
+ 
+     /**
+--- a/subprojects/core-api/src/main/java/org/gradle/internal/installation/GradleInstallation.java
++++ b/subprojects/core-api/src/main/java/org/gradle/internal/installation/GradleInstallation.java
+@@ -49,6 +49,7 @@
+     private static List<File> findLibDirs(File dir) {
+         List<File> libDirAndSubdirs = new ArrayList<File>();
+         collectWithSubdirectories(new File(dir, "lib"), libDirAndSubdirs);
++        libDirAndSubdirs.add(new File("/usr/share/java"));
+         return libDirAndSubdirs;
+     }
+ 

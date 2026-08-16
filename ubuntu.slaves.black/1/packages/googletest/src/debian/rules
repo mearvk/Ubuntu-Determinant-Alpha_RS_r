@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+CXXFLAGS += -fPIC
+
+conditional_cmake_flags =
+
+ifeq ($(DEB_HOST_ARCH),alpha)
+conditional_cmake_flags = -Ddebian_exclude_gmock-matchers_test=TRUE
+else ifeq ($(DEB_HOST_ARCH),armel)
+conditional_cmake_flags = -Ddebian_exclude_gmock-matchers_test=TRUE
+else ifeq ($(DEB_HOST_ARCH),hppa)
+CXXFLAGS += -mlong-calls
+else ifeq ($(DEB_HOST_ARCH),hurd-i386)
+conditional_cmake_flags = -Ddebian_exclude_gmock-matchers_test=TRUE
+else ifeq ($(DEB_HOST_ARCH), mips)
+CXXFLAGS += -mxgot -g1
+else ifeq ($(DEB_HOST_ARCH), mips64el)
+CXXFLAGS += -mxgot
+else ifeq ($(DEB_HOST_ARCH), mipsel)
+CXXFLAGS += -mxgot -g1
+conditional_cmake_flags = -Ddebian_exclude_gmock-matchers_test=TRUE
+else ifeq ($(DEB_HOST_ARCH), sh4)
+CXXFLAGS += -g1
+conditional_cmake_flags = -Ddebian_exclude_gmock-matchers_test=TRUE
+endif
+
+export CXXFLAGS
+
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure --buildsystem=cmake -- -Dgmock_build_tests=ON -Dgtest_build_tests=ON $(conditional_cmake_flags)
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cd obj-* && ctest || (cat Testing/Temporary/LastTest.log; exit 1)
+endif
+
+override_dh_prep-indep:
+	dh_prep
+	find googletest -iname autom4te.cache -o -iname __pycache__ -type d | xargs rm -rf
+	find googletest -iname LICENSE -o -iname .gitignore -o -iname '*.pyc' | xargs rm -f
+	find googletest -iname '*.py' | xargs chmod -x
+	rm -rf googletest/*/msvc
+
+override_dh_prep-arch:
+	dh_prep
+	cp googlemock/scripts/generator/gmock_gen.py googlemock/scripts/generator/gmock_gen
+
+override_dh_install:
+	dh_install
+	find debian -iname '*.py' -print0 | xargs -0 chmod -x
+
+override_dh_clean:
+	dh_clean
+	rm -f test/*.pyc

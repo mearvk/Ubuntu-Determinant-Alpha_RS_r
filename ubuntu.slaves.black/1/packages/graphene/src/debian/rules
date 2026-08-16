@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+CONFFLAGS = \
+	-Dintrospection=enabled \
+	$(NULL)
+
+ifneq (,$(filter libgraphene-doc,$(shell dh_listpackages)))
+  CONFFLAGS+=-Dgtk_doc=true
+else
+  CONFFLAGS+=-Dgtk_doc=false
+endif
+
+# https://github.com/ebassi/graphene/issues/97
+# https://github.com/ebassi/graphene/issues/215
+ifneq (,$(filter $(DEB_HOST_ARCH),armhf))
+CONFFLAGS +=  -Darm_neon=false
+endif
+
+# As of 2021, Debian's i386 baseline has no MMX or SSE
+ifneq (,$(filter $(DEB_HOST_ARCH_CPU),i386))
+CONFFLAGS += -Dsse2=false
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CONFFLAGS)

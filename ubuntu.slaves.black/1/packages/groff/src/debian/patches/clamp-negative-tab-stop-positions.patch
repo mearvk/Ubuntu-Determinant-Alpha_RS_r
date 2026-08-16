@@ -1,0 +1,74 @@
+From 0c048e31d8ca2f23d799dc97789a6591e05c8a5b Mon Sep 17 00:00:00 2001
+From: "G. Branden Robinson" <g.branden.robinson@gmail.com>
+Date: Sat, 11 Sep 2021 07:02:07 +1000
+Subject: [troff]: Clamp negative tab stop positions to 0.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+...instead of throwing an assertion failure.
+
+* src/roff/troff/env.cpp (tab_stops::distance_to_next_tab): Replace
+  `assert` with clamping logic, ensuring that `lastpos` can never be
+  negative.  While negative tab stop positions don't make much sense
+  (they result in zero horizontal motion), user input like `.ta T -5`
+  should never provoke an assertion failure.
+
+  (set_tabs): Throw range warning in additional scenario, viz., if a
+  repeating tab offset is negative.
+
+Fixes <https://bugs.debian.org/990406>.  Thanks to наб for the report.
+
+Also wrap nearby long source lines.
+
+Origin: backport, https://git.savannah.gnu.org/cgit/groff.git/commit/?id=6692653f7cae4116d4e70318f71b3d0808f2261f
+Bug-Debian: https://bugs.debian.org/990406
+Last-Update: 2021-12-26
+
+Patch-Name: clamp-negative-tab-stop-positions.patch
+---
+ src/roff/troff/env.cpp | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/src/roff/troff/env.cpp b/src/roff/troff/env.cpp
+index c11d2dfc..a5c57e8b 100644
+--- a/src/roff/troff/env.cpp
++++ b/src/roff/troff/env.cpp
+@@ -2595,7 +2595,8 @@ tab_type tab_stops::distance_to_next_tab(hunits curpos, hunits *distance)
+   return distance_to_next_tab(curpos, distance, &nextpos);
+ }
+ 
+-tab_type tab_stops::distance_to_next_tab(hunits curpos, hunits *distance,
++tab_type tab_stops::distance_to_next_tab(hunits curpos,
++					 hunits *distance,
+ 					 hunits *nextpos)
+ {
+   hunits lastpos = 0;
+@@ -2611,14 +2612,16 @@ tab_type tab_stops::distance_to_next_tab(hunits curpos, hunits *distance,
+     return TAB_NONE;
+   hunits base = lastpos;
+   for (;;) {
+-    for (tem = repeated_list; tem && tem->pos + base <= curpos; tem = tem->next)
++    for (tem = repeated_list; tem && tem->pos + base <= curpos;
++	 tem = tem->next)
+       lastpos = tem->pos;
+     if (tem) {
+       *distance = tem->pos + base - curpos;
+       *nextpos  = tem->pos + base;
+       return tem->type;
+     }
+-    assert(lastpos > 0);
++    if (lastpos < 0)
++      lastpos = 0;
+     base += lastpos;
+   }
+   return TAB_NONE;
+@@ -2780,7 +2783,7 @@ void set_tabs()
+     else if (tok.ch() == 'L') {
+       tok.next();
+     }
+-    if (pos <= prev_pos && !first)
++    if (pos <= prev_pos && (!first || repeated))
+       warning(WARN_RANGE,
+ 	      "positions of tab stops must be strictly increasing");
+     else {

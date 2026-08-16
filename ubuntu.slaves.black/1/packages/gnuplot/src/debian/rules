@@ -1,0 +1,113 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+
+# Tell compiler where should find lua headers
+export DEB_CFLAGS_MAINT_APPEND = -I/usr/include/lua5.1
+
+# Force the use of qt5
+export QT_SELECT=qt5
+
+# Qt insists on using -fPIC
+export DEB_CXXFLAGS_MAINT_APPEND = -fPIC
+
+# For reproducible builds
+export FORCE_SOURCE_DATE = 1
+
+BUILDDIR_NOX = $(CURDIR)/debian/build-nox
+BUILDDIR_X11 = $(CURDIR)/debian/build-x11
+BUILDDIR_QT = $(CURDIR)/debian/build-qt
+MANPNOX = $(CURDIR)/debian/gnuplot-nox/usr/share/man/man1/gnuplot-nox.1
+
+conf_opts += \
+	--prefix=/usr \
+	--mandir=\$${prefix}/share/man \
+	--libexecdir=\$${prefix}/lib/gnuplot \
+	--datadir=\$${prefix}/share/gnuplot \
+	--with-gihdir=\$${prefix}/share/gnuplot \
+	--without-lasergnu \
+	--with-png \
+	--with-gd \
+	--without-lisp-files \
+	--without-linux-vga \
+	--with-bitmap-terminals \
+	--with-readline=bsd \
+	--with-texdir=./usr/local/share/texmf/tex
+
+ifneq (,$(filter $(DEB_HOST_ARCH), mips mips64el powerpc mipsel))
+	conf_opts += --without-lua
+endif
+
+override_dh_auto_configure:
+	mkdir -p $(BUILDDIR_NOX)
+	cd $(BUILDDIR_NOX); CONFIG_SHELL=/bin/sh ./../../configure $(conf_opts) --with-qt=no --without-x --disable-wxwidgets
+	mkdir -p $(BUILDDIR_X11)
+	cd $(BUILDDIR_X11); CONFIG_SHELL=/bin/sh ../../configure $(conf_opts) --with-qt=no --with-tutorial
+	mkdir -p $(BUILDDIR_QT)
+	cd $(BUILDDIR_QT); CONFIG_SHELL=/bin/sh ../../configure $(conf_opts)  --enable-qt
+
+override_dh_auto_build-arch:
+	dh_auto_build -a -- -C $(BUILDDIR_NOX)/src
+	dh_auto_build -a -- -C $(BUILDDIR_X11) pkglibexecdir='$$(libexecdir)'
+	dh_auto_build -a -- -C $(BUILDDIR_QT) pkglibexecdir='$$(libexecdir)'
+
+override_dh_auto_build-indep:
+	cd $(BUILDDIR_X11)/docs; $(MAKE) pdf; $(MAKE) ps; $(MAKE) html; $(MAKE) info; ls
+	cd $(BUILDDIR_X11)/tutorial; $(MAKE) pdf; $(MAKE) ps; ls
+	sed -i '/<ADDRESS>/,/<\/ADDRESS>/{//!d}' $(BUILDDIR_X11)/docs/htmldocs/index.html
+	sed -i '/<ADDRESS>/,/<\/ADDRESS>/{//!d}' $(BUILDDIR_X11)/docs/htmldocs/figures.html
+	rm -f $(BUILDDIR_X11)/docs/htmldocs/internals.pl
+	rm -f $(BUILDDIR_X11)/docs/htmldocs/labels.pl
+	rm -f $(BUILDDIR_X11)/docs/htmldocs/images.log
+	rm -f $(BUILDDIR_X11)/docs/htmldocs/WARNINGS
+	rm -f $(BUILDDIR_X11)/docs/gpcard.ps
+
+override_dh_auto_install:
+	$(MAKE) -C $(BUILDDIR_NOX) install DESTDIR=$(CURDIR)/debian/tmp/NOX/ \
+		pkglibexecdir='$$(libexecdir)'
+	mv $(CURDIR)/debian/tmp/NOX/usr/bin/gnuplot $(CURDIR)/debian/tmp/NOX/usr/bin/gnuplot-nox
+	mv $(CURDIR)/debian/tmp/NOX/usr/share/man/man1/gnuplot.1 $(CURDIR)/debian/tmp/NOX/usr/share/man/man1/gnuplot-nox.1
+	mv $(CURDIR)/debian/tmp/NOX/usr/share/gnuplot/gnuplot.gih $(CURDIR)/debian/tmp/NOX/usr/share/gnuplot/gnuplot-nox.gih
+	$(MAKE) -C $(BUILDDIR_X11) install DESTDIR=$(CURDIR)/debian/tmp/X11/ \
+		pkglibexecdir='$$(libexecdir)'
+	mv $(CURDIR)/debian/tmp/X11/usr/bin/gnuplot $(CURDIR)/debian/tmp/X11/usr/bin/gnuplot-x11
+	mv $(CURDIR)/debian/tmp/X11/usr/share/man/man1/gnuplot.1 $(CURDIR)/debian/tmp/X11/usr/share/man/man1/gnuplot-x11.1
+	mv $(CURDIR)/debian/tmp/X11/usr/share/gnuplot/gnuplot.gih $(CURDIR)/debian/tmp/X11/usr/share/gnuplot/gnuplot-x11.gih
+	$(MAKE) -C $(BUILDDIR_QT) install DESTDIR=$(CURDIR)/debian/tmp/QT/ \
+		pkglibexecdir='$$(libexecdir)'
+	mv $(CURDIR)/debian/tmp/QT/usr/bin/gnuplot $(CURDIR)/debian/tmp/QT/usr/bin/gnuplot-qt
+	mv $(CURDIR)/debian/tmp/QT/usr/share/man/man1/gnuplot.1 $(CURDIR)/debian/tmp/QT/usr/share/man/man1/gnuplot-qt.1
+	mv $(CURDIR)/debian/tmp/QT/usr/share/gnuplot/gnuplot.gih $(CURDIR)/debian/tmp/QT/usr/share/gnuplot/gnuplot-qt.gih
+	rm -f $(CURDIR)/../demo/Makefile
+	rm -f $(CURDIR)/../demo/plugin/Makefile
+	rm -f $(BUILDDIR_X11)/demo/Makefil*
+	rm -f $(BUILDDIR_X11)/demo/plugin/Makefil*
+
+execute_after_dh_installman:
+	rm -rf $(CURDIR)/debian/tmp/X11/usr/local
+	rm -rf $(CURDIR)/debian/tmp/NOX/usr/local
+	rm -rf $(CURDIR)/debian/tmp/X11/usr/share
+	rm -rf $(CURDIR)/debian/tmp/NOX/usr/share
+
+override_dh_installinfo:
+	dh_installinfo -pgnuplot-doc $(BUILDDIR_X11)/docs/gnuplot.info
+
+override_installchangelogs:
+	dh_installchangelogs -pgnuplot-doc ChangeLog
+
+execute_after_dh_installman-arch:
+	# Fix manpage for nox-version. (Closes: #744218)
+	sed -i 's/\[X11 options\] //g' $(MANPNOX)
+	sed -i 's/plotting program/plotting program (no-X version)/g' $(MANPNOX)
+	sed -i '/SH\ X11\ OPTIONS/,/command line\./ d' $(MANPNOX)
+
+execute_after_dh_auto_clean:
+	rm -rf $(BUILDDIR_NOX)
+	rm -rf $(BUILDDIR_X11)
+	rm -rf $(BUILDDIR_QT)
+
+override_dh_compress-indep:
+	dh_compress -i -Xexamples -Xtutorial -Xhtmldocs -X.dvi -X.pdf -X.ps

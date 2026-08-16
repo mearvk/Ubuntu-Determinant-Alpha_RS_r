@@ -1,0 +1,124 @@
+Description: Remove code of asciidoctor-gradle-plugin
+Author: Komal Sukhani <komaldsukhani@gmail.com> 
+Forwarded: not-needed
+--- a/gradle/docs.gradle
++++ b/gradle/docs.gradle
+@@ -17,24 +17,10 @@
+  *  under the License.
+  */
+ task doc(dependsOn: ['javadocAll', 'groovydocAll', 'docGDK']) {
+-    if (JavaVersion.current().java7Compatible) {
+-        dependsOn 'asciidocAll', 'assembleAsciidoc'
+-    }
+     ext.footer = 'Copyright &copy; 2003-2019 The Apache Software Foundation. All rights reserved.'
+     ext.title = "Groovy ${groovyVersion}"
+ }
+ 
+-if (JavaVersion.current().java7Compatible) {
+-    task assembleAsciidoc(type: Copy, dependsOn: 'asciidocAll') {
+-        subprojects {
+-            from project.asciidoctor
+-        }
+-        into "$buildDir/asciidoc"
+-    }
+-
+-    task asciidocAll(dependsOn: 'asciidoctor')
+-}
+-
+ def javadocSpec = {
+     maxMemory = javaDoc_mx
+     project.configure(options) {
+@@ -126,73 +112,10 @@
+ 
+ task docGDK {
+ //    ext.extraDocGDKclasses = []
+-    dependsOn([project(':groovy-groovydoc'), project(':groovy-docgenerator')]*.classes)
+     // TODO don't hard-code these
+-    dependsOn([project(':groovy-sql'), project(':groovy-xml'), project(':groovy-swing')]*.classes)
+-    if(JavaVersion.current().isJava7Compatible()) {
+-        dependsOn([project(':groovy-nio')]*.classes)
+-    }
+-    dependsOn docProjectVersionInfo
+     ext.destinationDir = "$buildDir/html/groovy-jdk"
+     inputs.files sourceSets.main.runtimeClasspath + configurations.tools
+     outputs.dir destinationDir
+-    doLast { task ->
+-        try {
+-            ant {
+-                java(classname: 'org.codehaus.groovy.tools.DocGenerator',
+-                     fork: 'true',
+-                     failonerror: 'true',
+-                     classpath: (sourceSets.main.runtimeClasspath + configurations.tools + groovydocAll.groovyClasspath).asPath,
+-                     errorproperty: 'edr',
+-                     outputproperty: 'odr') {
+-                    arg(value: '-title')
+-                    arg(value: 'Groovy JDK enhancements')
+-                    arg(value: '-link')
+-                    arg(value: 'groovy,org.codehaus.groovy=http://docs.groovy-lang.org/latest/html/gapi/')
+-                    arg(value: '-link')
+-                    arg(value: 'java,org.xml,javax,org.w3c=http://docs.oracle.com/javase/7/docs/api/')
+-                    // either package name if in core or fully qualified path otherwise
+-                    arg(value: 'org.codehaus.groovy.runtime.DefaultGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.DefaultGroovyStaticMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.DateGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.EncodingGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.IOGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.ProcessGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.ResourceGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.SocketGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.runtime.StringGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.vmplugin.v5.PluginDefaultGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.vmplugin.v6.PluginDefaultGroovyMethods')
+-                    arg(value: 'org.codehaus.groovy.vmplugin.v6.PluginStaticGroovyMethods')
+-                    // TODO don't hard-code these
+-                    arg(value: 'subprojects/groovy-sql/src/main/java/org/codehaus/groovy/runtime/SqlGroovyMethods.java')
+-                    arg(value: 'subprojects/groovy-swing/src/main/java/org/codehaus/groovy/runtime/SwingGroovyMethods.java')
+-                    arg(value: 'subprojects/groovy-xml/src/main/java/org/codehaus/groovy/runtime/XmlGroovyMethods.java')
+-                    if(JavaVersion.current().isJava7Compatible()) {
+-                        arg(value: 'subprojects/groovy-nio/src/main/java/org/codehaus/groovy/runtime/NioGroovyMethods.java')
+-                    }
+-                    arg(value: 'subprojects/groovy-jsr223/src/main/java/org/codehaus/groovy/jsr223/ScriptExtensions.java')
+-                    arg(value: 'subprojects/groovy-jsr223/src/main/java/org/codehaus/groovy/jsr223/ScriptStaticExtensions.java')
+-                }
+-            }
+-        } finally {
+-            if (ant.properties.odr) {
+-                logger.info 'Out: ' + ant.properties.odr
+-            }
+-            if (ant.properties.edr) {
+-                logger.error 'Err: ' + ant.properties.edr
+-            }
+-        }
+-        copy {
+-            into task.destinationDir
+-            from 'src/tools/org/codehaus/groovy/tools/groovy.ico', 'src/tools/org/codehaus/groovy/tools/stylesheet.css'
+-        }
+-    }
+-}
+-
+-// apply javadoc fix tool to generated javadocs - ensures no vulnerability even on old JDK versions
+-allprojects {
+-    apply plugin: 'javadocHotfix'
+ }
+ 
+ if (JavaVersion.current().isJava7Compatible()) {
+--- a/build.gradle
++++ b/build.gradle
+@@ -67,7 +67,6 @@
+ apply from: 'gradle/filter.gradle'
+ apply from: 'gradle/indy.gradle'
+ apply from: 'gradle/publish.gradle'
+-apply plugin: 'javadocHotfix'
+ 
+ File javaHome = new File(System.getProperty('java.home'))
+ logger.lifecycle "Using Java from $javaHome (version ${System.getProperty('java.version')})"
+@@ -92,9 +91,6 @@
+ 
+     apply plugin: 'groovy'
+     apply from: "${rootProject.projectDir}/gradle/indy.gradle"
+-    if (JavaVersion.current().java7Compatible) {
+-        apply from: "${rootProject.projectDir}/gradle/asciidoctor.gradle"
+-    }
+ }
+ 
+ // todo: use the conventional "resources" directory for classpath resources

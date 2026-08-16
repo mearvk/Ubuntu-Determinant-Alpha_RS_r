@@ -1,0 +1,216 @@
+Description: Fixes the compatibility with the recent versions of Guava.
+ Source level must be 1.8 or higher to use the updated predicates in Guava.
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/subprojects/model-core/model-core.gradle
++++ b/subprojects/model-core/model-core.gradle
+@@ -19,7 +19,7 @@
+  */
+ apply plugin: 'java-library'
+ 
+-sourceCompatibility = javaVersion.java9Compatible ? 1.6 : 1.5
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     api project(':baseServices')
+--- a/subprojects/base-services-groovy/src/main/java/org/gradle/groovy/scripts/internal/AstUtils.java
++++ b/subprojects/base-services-groovy/src/main/java/org/gradle/groovy/scripts/internal/AstUtils.java
+@@ -16,7 +16,7 @@
+ 
+ package org.gradle.groovy.scripts.internal;
+ 
+-import com.google.common.base.Predicate;
++import java.util.function.Predicate;
+ import org.codehaus.groovy.ast.ClassHelper;
+ import org.codehaus.groovy.ast.ClassNode;
+ import org.codehaus.groovy.ast.GroovyCodeVisitor;
+@@ -191,7 +191,7 @@
+     @Nullable
+     public static ScriptBlock detectScriptBlock(Statement statement, Predicate<? super ScriptBlock> predicate) {
+         ScriptBlock scriptBlock = detectScriptBlock(statement);
+-        if (scriptBlock != null && predicate.apply(scriptBlock)) {
++        if (scriptBlock != null && predicate.test(scriptBlock)) {
+             return scriptBlock;
+         } else {
+             return null;
+@@ -201,7 +201,7 @@
+     @Nullable
+     public static ScriptBlock detectScriptBlock(Statement statement, final Collection<String> names) {
+         return detectScriptBlock(statement, new Predicate<ScriptBlock>() {
+-            public boolean apply(ScriptBlock input) {
++            public boolean test(ScriptBlock input) {
+                 return names.contains(input.getName());
+             }
+         });
+--- a/subprojects/reporting/reporting.gradle
++++ b/subprojects/reporting/reporting.gradle
+@@ -1,6 +1,6 @@
+ apply plugin: 'javascript-base'
+ 
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ configurations {
+     reports
+--- a/subprojects/dependency-management/src/main/java/org/gradle/api/internal/artifacts/ivyservice/resolveengine/graph/builder/DependencyGraphBuilder.java
++++ b/subprojects/dependency-management/src/main/java/org/gradle/api/internal/artifacts/ivyservice/resolveengine/graph/builder/DependencyGraphBuilder.java
+@@ -15,7 +15,7 @@
+  */
+ package org.gradle.api.internal.artifacts.ivyservice.resolveengine.graph.builder;
+ 
+-import com.google.common.base.Predicate;
++import java.util.function.Predicate;
+ import com.google.common.base.Predicates;
+ import com.google.common.collect.Lists;
+ import com.google.common.collect.Maps;
+@@ -202,7 +202,7 @@
+ 
+             if (allSelectorsAgreeWith(moduleSelectors, version, new Predicate<SelectorState>() {
+                 @Override
+-                public boolean apply(@Nullable SelectorState input) {
++                public boolean test(@Nullable SelectorState input) {
+                     return !selectedBy.contains(input);
+                 }
+             })) {
+@@ -375,7 +375,7 @@
+     private static boolean allSelectorsAgreeWith(Collection<SelectorState> allSelectors, String version, Predicate<SelectorState> filter) {
+         boolean atLeastOneAgrees = false;
+         for (SelectorState selectorState : allSelectors) {
+-            if (filter.apply(selectorState)) {
++            if (filter.test(selectorState)) {
+                 ResolvedVersionConstraint versionConstraint = selectorState.getVersionConstraint();
+                 if (versionConstraint != null) {
+                     VersionSelector candidateSelector = versionConstraint.getPreferredSelector();
+--- a/subprojects/plugin-use/plugin-use.gradle
++++ b/subprojects/plugin-use/plugin-use.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ dependencies {
+     compile project(":core")
+     compile project(":dependencyManagement")
+--- a/subprojects/platform-base/platform-base.gradle
++++ b/subprojects/platform-base/platform-base.gradle
+@@ -1,4 +1,4 @@
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     compile libraries.groovy
+--- a/subprojects/diagnostics/diagnostics.gradle
++++ b/subprojects/diagnostics/diagnostics.gradle
+@@ -15,7 +15,7 @@
+  */
+ apply plugin: 'java-library'
+ 
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     api libraries.groovy
+--- a/subprojects/testing-base/testing-base.gradle
++++ b/subprojects/testing-base/testing-base.gradle
+@@ -14,7 +14,7 @@
+  * limitations under the License.
+  */
+ // Test execution
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     compile project(':core')
+--- a/subprojects/platform-jvm/platform-jvm.gradle
++++ b/subprojects/platform-jvm/platform-jvm.gradle
+@@ -1,4 +1,4 @@
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     compile project(":platformBase")
+--- a/subprojects/language-java/language-java.gradle
++++ b/subprojects/language-java/language-java.gradle
+@@ -1,5 +1,5 @@
+ // Compiler daemon
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     compile libraries.groovy
+--- a/subprojects/language-scala/language-scala.gradle
++++ b/subprojects/language-scala/language-scala.gradle
+@@ -1,6 +1,6 @@
+ 
+ // Compiler daemon
+-sourceCompatibility = 1.6
++sourceCompatibility = 1.8
+ 
+ dependencies {
+     compile project(":core")
+--- a/subprojects/ide/ide.gradle
++++ b/subprojects/ide/ide.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ sourceSets.main.java.srcDirs = []
+ sourceSets.main.groovy.srcDirs = ['src/main/java', 'src/main/groovy']
+ 
+--- a/subprojects/javascript/javascript.gradle
++++ b/subprojects/javascript/javascript.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ dependencies {
+     compile libraries.groovy
+ 
+--- a/subprojects/jacoco/jacoco.gradle
++++ b/subprojects/jacoco/jacoco.gradle
+@@ -15,6 +15,7 @@
+  */
+ 
+ 
++sourceCompatibility = 1.8
+ 
+ dependencies {
+ 	compile libraries.groovy
+--- a/subprojects/maven/maven.gradle
++++ b/subprojects/maven/maven.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ dependencies {
+     compile libraries.groovy
+ 
+--- a/subprojects/language-native/language-native.gradle
++++ b/subprojects/language-native/language-native.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ dependencies {
+     compile project(':core')
+     compile project(':platformNative')
+--- a/subprojects/signing/signing.gradle
++++ b/subprojects/signing/signing.gradle
+@@ -14,6 +14,8 @@
+  * limitations under the License.
+  */
+ 
++sourceCompatibility = 1.8
++
+ dependencies {
+     compile libraries.groovy
+ 

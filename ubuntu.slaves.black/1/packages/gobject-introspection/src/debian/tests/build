@@ -1,0 +1,61 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libgirepository, to verify
+# that the headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# Author: Martin Pitt <martin.pitt@ubuntu.com>
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > gitest.c
+#include <string.h>
+#include <girepository.h>
+
+int main()
+{
+    GIRepository *repository;
+    GList *versions, *i;
+    gboolean found;
+
+#if !defined(GLIB_VERSION_2_36)
+    g_type_init();
+#endif
+
+    repository = g_irepository_get_default ();
+    g_assert(repository != NULL);
+
+    /* we depend on gir-gtk-3.0, so this should be present */
+    found = FALSE;
+    versions = g_irepository_enumerate_versions (repository, "Gtk");
+    for (i = g_list_first (versions); i != NULL; i = g_list_next (i))
+        if (strcmp ((gchar*) i->data, "3.0") == 0)
+           found = TRUE;
+    g_assert (found);
+
+    /* gir-gtk-3.0 should pull in dependencies */
+    found = FALSE;
+    versions = g_irepository_enumerate_versions (repository, "GLib");
+    for (i = g_list_first (versions); i != NULL; i = g_list_next (i))
+        if (strcmp ((gchar*) i->data, "2.0") == 0)
+           found = TRUE;
+    g_assert (found);
+
+    return 0;
+}
+EOF
+
+"${CROSS_COMPILE}gcc" -o gitest gitest.c -Wall -Werror $("${CROSS_COMPILE}pkg-config" --cflags --libs gobject-introspection-1.0)
+echo "build: OK"
+[ -x gitest ]
+echo -n "run: "
+./gitest || { echo "FAIL"; exit 1; }
+echo "OK"

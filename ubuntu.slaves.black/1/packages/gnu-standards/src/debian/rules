@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+# Modified 2000 Ben Pfaff for gnu-standards.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+DOCUMENTS = standards.texi maintain.texi
+
+# Ensure texlive respects SOURCE_DATE_EPOCH
+export FORCE_SOURCE_DATE=1
+
+build: build-stamp
+build-arch: build
+build-indep: build
+build-stamp:
+	dh_testdir
+	for d in $(DOCUMENTS); do					\
+		base="`echo $$d | sed -e 's/\.texi//;'`";		\
+		makeinfo $$d;						\
+		makeinfo $$d --html --no-split --number-sections -o $$base.html; \
+		texi2dvi $$d;						\
+		texi2pdf $$d;						\
+		makeinfo --no-headers --no-split $$d -o $$base.text;	\
+	done
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+	rm -f *.aux *.cp *.cps *.dvi *.fn *.ky *.log *.pg *.toc *.tp *.vr
+	rm -f *.html *.info* *.pdf *.text
+	dh_clean
+
+# Build architecture-independent files here.
+binary-indep: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdocs
+	dh_installinfo
+	dh_installchangelogs ChangeLog
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary

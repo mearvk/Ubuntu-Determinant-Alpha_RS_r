@@ -1,0 +1,59 @@
+Description: Honour SOURCE_DATE_EPOCH
+ Get date from the environment variable SOURCE_DATE_EPOCH (when set),
+ to build output timestamps.
+ See https://reproducible-builds.org/specs/source-date-epoch/
+Author: Alexis Bienvenüe <pado@passoire.fr>
+
+Index: gnuplot/term/post.trm
+===================================================================
+--- gnuplot.orig/term/post.trm
++++ gnuplot/term/post.trm
+@@ -1670,15 +1670,45 @@ end\n\
+     int i;
+     time_t now;
+     char *timedate;
+-
++    char *source_date_epoch;
++    unsigned long long epoch;
++    char *endptr;
++ 
+     ps_common_uses_fonts = uses_fonts;
+     ps_common_xoff = xoff;
+     ps_common_yoff = yoff;
+ 
+     ps_page = 0;
+ 
+-    time(&now);
+-    timedate=asctime(localtime(&now));
++    /* get source date from environment variable SOURCE_DATE_EPOCH, if set.
++       See https://reproducible-builds.org/specs/source-date-epoch/ */
++    source_date_epoch = getenv("SOURCE_DATE_EPOCH");
++    if (source_date_epoch) {
++      errno = 0;
++      epoch = strtoull(source_date_epoch, &endptr, 10);
++      if ((errno == ERANGE && (epoch == ULLONG_MAX || epoch == 0))
++          || (errno != 0 && epoch == 0)) {
++        fprintf(stderr, "Environment variable $SOURCE_DATE_EPOCH: strtoull: %s\n", strerror(errno));
++        exit(EXIT_FAILURE);
++      }
++      if (endptr == source_date_epoch) {
++        fprintf(stderr, "Environment variable $SOURCE_DATE_EPOCH: No digits were found: %s\n", endptr);
++        exit(EXIT_FAILURE);
++      }
++      if (*endptr != '\0') {
++        fprintf(stderr, "Environment variable $SOURCE_DATE_EPOCH: Trailing garbage: %s\n", endptr);
++        exit(EXIT_FAILURE);
++      }
++      if (epoch > ULONG_MAX) {
++        fprintf(stderr, "Environment variable $SOURCE_DATE_EPOCH: value must be smaller than or equal to: %lu but was found to be: %llu \n", ULONG_MAX, epoch);
++        exit(EXIT_FAILURE);
++      }
++      now = epoch;
++      timedate=asctime(gmtime(&now));
++    } else {
++      time(&now);
++      timedate=asctime(localtime(&now));
++    }
+     timedate[strlen(timedate)-1]='\0';
+ 
+ #ifdef PSLATEX_DRIVER

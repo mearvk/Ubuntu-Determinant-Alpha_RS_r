@@ -1,0 +1,61 @@
+From: Markus Koschany <apo@debian.org>
+Date: Sun, 12 Nov 2017 21:15:25 +0100
+Subject: 34 disable code quality
+
+Disable checkstyle and codenarc tasks during build Gradle failed to build on
+amd64 due to an apparent upstream bug. As extra comment, the issue is not
+present when gradle is built with Oracle JDK.
+
+Bug-Debian: https://bugs.debian.org/719415
+Bug-Upstream: https://issues.gradle.org/browse/GRADLE-2858
+Forwarded: not-needed
+---
+ build.gradle                                                        | 2 --
+ buildSrc/build.gradle                                               | 6 +-----
+ .../main/groovy/org/gradle/plugins/classycle/ClassyclePlugin.groovy | 1 -
+ subprojects/core/core.gradle                                        | 2 --
+ subprojects/docs/docs.gradle                                        | 6 +-----
+ 5 files changed, 2 insertions(+), 15 deletions(-)
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -223,7 +223,6 @@
+         apply from: "$rootDir/gradle/publish.gradle"
+     }
+ 
+-    apply from: "$rootDir/gradle/codeQuality.gradle"
+ }
+ 
+ configurations {
+--- a/buildSrc/build.gradle
++++ b/buildSrc/build.gradle
+@@ -58,8 +58,6 @@
+ apply from: '../gradle/dependencies.gradle'
+ apply from: '../gradle/classycle.gradle'
+ 
+-if (!isCiServer || (isCiServer && Boolean.getBoolean('enableCodeQuality'))) {
+-    apply from: '../gradle/codeQuality.gradle'
+-}
++
+ 
+ apply from: "../gradle/ciReporting.gradle"
+--- a/buildSrc/src/main/groovy/org/gradle/plugins/classycle/ClassyclePlugin.groovy
++++ b/buildSrc/src/main/groovy/org/gradle/plugins/classycle/ClassyclePlugin.groovy
+@@ -48,7 +48,6 @@
+             } as Action<Classycle>)
+             classycleTask.dependsOn(taskName)
+             project.tasks.getByPath('check').dependsOn(taskName)
+-            project.tasks.getByPath('codeQuality').dependsOn(taskName)
+         }
+     }
+ }
+--- a/subprojects/core/core.gradle
++++ b/subprojects/core/core.gradle
+@@ -14,7 +14,6 @@
+  * limitations under the License.
+  */
+ apply plugin: 'java-library'
+-apply from: "$rootDir/gradle/taskProperties.gradle"
+ 
+ sourceCompatibility = javaVersion.java9Compatible ? 1.6 : 1.5
+ 

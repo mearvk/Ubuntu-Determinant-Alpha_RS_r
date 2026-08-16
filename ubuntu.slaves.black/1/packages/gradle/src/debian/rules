@@ -1,0 +1,98 @@
+#!/usr/bin/make -f
+
+GRADLE_TASKS = assemble startScripts
+GRADLE_EXCLUDED_PROJECTS = distributions \
+                           internalTesting \
+                           internalIntegTesting \
+                           internalPerformanceTesting \
+                           integTest \
+                           performance \
+                           smokeTest \
+                           soak
+export GRADLE_VERSION = $(shell cat version.txt)
+
+# For building Gradle 4 using Gradle 3
+GRADLE_COMPAT_BUILDSRC_SOURCE = \
+  subprojects/core-api/src/main/java/org/gradle/api/file/Directory.java \
+  subprojects/core-api/src/main/java/org/gradle/api/file/DirectoryProperty.java \
+  subprojects/core-api/src/main/java/org/gradle/api/file/FileSystemLocation.java \
+  subprojects/core-api/src/main/java/org/gradle/api/file/RegularFile.java \
+  subprojects/core-api/src/main/java/org/gradle/api/file/RegularFileProperty.java \
+  subprojects/core-api/src/main/java/org/gradle/api/NonNullApi.java \
+  subprojects/core-api/src/main/java/org/gradle/api/provider/Property.java \
+  subprojects/core-api/src/main/java/org/gradle/api/provider/Provider.java \
+  subprojects/core/src/main/java/org/gradle/api/internal/file/TaskFileVarFactory.java \
+
+# Only for debug purpose
+# export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005
+
+# Under fakeroot Gradle will show error while creating /root/.gradle, hence
+# specifying the Gradle home location.
+GRADLE_FLAGS = --project-prop finalRelease=true --offline --stacktrace \
+               --gradle-user-home debian/.gradlehome --no-daemon \
+               -Dgradle-debian-helper.hook.enabled=false \
+               $(patsubst %,-x :%:assemble,$(GRADLE_EXCLUDED_PROJECTS))
+
+# Support for DEB_BUILD_OPTIONS parallel=n
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMTHREADS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	GRADLE_FLAGS += --parallel --max-workers=$(NUMTHREADS)
+endif
+
+%:
+	dh $@ --with maven_repo_helper,javahelper
+
+debian/gradle.1: debian/gradle.pod
+	touch -d@$(SOURCE_DATE_EPOCH) $<
+	pod2man --errors=stderr --utf8 -r "Gradle $(GRADLE_VERSION)" -c "Gradle Command Line Manual" $< > $@
+
+debian/gradle.pod: debian/gradle.pod.in
+	sed '/@GENERATED@/,$$d' $< > $@
+	# process items: `-?`, `-h`, `--help`:: → =item `-?`, `-h`, `--help`
+	# process bold: `-?` → B<-?>
+	# remove empty line markers
+	# drop text from links: https://gradle.com/build-scans[...]
+	# drop underscores from documentation links
+	# replace documentation links by UPPERCASE LABELS
+	# ... but not those where the link is in a middle of a sentence
+	# ... since otherwise it breaks the sentence structure
+	# ... so just make it *bold* instead
+	# move parethesed option "(comments)" outside of the bold parts
+	# cut off everything after and including the [[daemon_cli]] section
+	# cut off the introduction
+	sed \
+		-e 's/\(.*\):: *$$/\n=item \1\n/' \
+		-e 's/`\([^`]*\)`/B<\1>/g' \
+		-e 's/^+$$//g' \
+		-e 's/\(https:[^[]*\)[[][^]]*\]/L<\1>/g' \
+		-e '/<<sec:[^>]*>>/y/_/ /' \
+		-e 's/\([Tt]he\) <<sec:\([^>]*\)>>/\1 documentation section B<\U\2\E>/g' \
+		-e 's/<<sec:\([^>]*\)>>/the documentation section B<\U\1\E>/g' \
+		-e '/<<[^>]*>>/y/_/ /' \
+		-e 's/<<.[^,]*,\([^>]*\)>>/B<\1>/g' \
+		-e 's/\([Tt]he\) <<\([^>]*\)>>/\1 documentation section B<\U\2\E>/g' \
+		-e 's/<<\([^>]*\)>>/the documentation section B<\U\1\E>/g' \
+		-e 's/ (\([^)]*\))>/> (\1)/g' \
+		-e '/^\[\[.*]]$$/d' \
+		-e 's/GRADLE OPTS/GRADLE_OPTS/g' \
+		-e 's/^=== \(.*\)$$/=back\n\n=head1 \U\1\n\n/g' \
+		-e '0,/The command-line options available/d' \
+		subprojects/docs/src/docs/userguide/commandLine.adoc >> $@
+	sed '0,/@GENERATED@/d' $< >> $@
+
+override_dh_auto_build: debian/gradle.1
+	$(RM) gradle.properties # Some properties here breaks the latest JVM
+	mkdir --parents buildSrc/src/main/java/tmp # Symlinks are for building Gradle 4 using Gradle 3
+	ln --symbolic --force --target-directory=buildSrc/src/main/java/tmp/ $(patsubst %,../../../../../%,$(GRADLE_COMPAT_BUILDSRC_SOURCE))
+	gradle $(GRADLE_TASKS) $(GRADLE_FLAGS)
+
+override_dh_auto_clean:
+	dh_auto_clean
+	find . -wholename .*build/generated-resources | xargs echo | sed -e 's^build/generated-resources^build^g' | xargs rm -Rf
+
+# since gradle build-depends on itself, a way to generate a deb from upstream
+# binary distribution is provided with this target. With the resulting .deb,
+# gradle can be rebuilt from source.
+bootstrap:
+	cd $(dir $(firstword $(MAKEFILE_LIST)))../ && \
+	./debian/bootstrap.sh

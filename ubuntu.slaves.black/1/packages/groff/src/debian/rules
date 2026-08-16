@@ -1,0 +1,116 @@
+#! /usr/bin/make -f
+%:
+	dh $@ --builddirectory=debian/build
+
+export DH_OPTIONS
+
+export LC_ALL := C.UTF-8
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export DEB_CPPFLAGS_MAINT_APPEND := -D_FILE_OFFSET_BITS=64
+export DEB_CFLAGS_MAINT_APPEND := -Wall
+export DEB_CXXFLAGS_MAINT_APPEND := -Wall -std=gnu++98
+
+# Based loosely on /usr/share/dpkg/buildflags.mk, but we need to do this
+# ourselves in order to get flags for both build and host architectures.
+# Compare https://bugs.debian.org/644412.
+
+export_envvar := \
+	DEB_BUILD_MAINT_OPTIONS="$(DEB_BUILD_MAINT_OPTIONS)" \
+	DEB_CPPFLAGS_MAINT_APPEND="$(DEB_CPPFLAGS_MAINT_APPEND)" \
+	DEB_CFLAGS_MAINT_APPEND="$(DEB_CFLAGS_MAINT_APPEND)" \
+	DEB_CXXFLAGS_MAINT_APPEND="$(DEB_CXXFLAGS_MAINT_APPEND)"
+
+buildflags := YACC='bison -y' PSPRINT=lpr PAGE=A4
+buildflags_native := $(buildflags)
+buildflags += $(shell $(export_envvar) dpkg-buildflags --export=cmdline)
+buildflags_native += $(shell \
+	DEB_HOST_ARCH="$(DEB_BUILD_ARCH)" $(export_envvar) \
+	dpkg-buildflags --export=cmdline)
+buildflags_native += DEB_HOST_GNU_TYPE=$(DEB_BUILD_GNU_TYPE)
+buildflags_native += env -u CONFIG_SITE
+
+export UPSTREAM_VERSION := $(shell \
+	sed 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/' \
+	.tarball-version)
+datadir  = usr/share/groff/$(UPSTREAM_VERSION)
+
+gbtmp = debian/groff-base
+gtmp  = debian/groff
+
+include /usr/share/dpkg/architecture.mk
+
+confflags = \
+	--libdir=\$${prefix}/lib --with-appresdir=/etc/X11/app-defaults \
+	BASH_PROG=/bin/bash GREP=/bin/grep
+
+override_dh_autoreconf:
+	dh_autoreconf autoreconf -- -f -i -I m4
+
+override_dh_auto_configure:
+	-rm -f config.log config.cache
+	$(buildflags) dh_auto_configure -- $(confflags)
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	$(buildflags_native) dh_auto_configure \
+		--builddirectory=debian/build-native -- \
+		$(confflags) --with-doc=no
+endif
+	# Work around an unfortunate interaction between the
+	# non-recursive-gnulib-prefix-hack module and out-of-tree builds.
+	mkdir -p debian/build/lib
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	mkdir -p debian/build-native/lib
+endif
+
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+  cross :=
+else
+  native_tmp := $(CURDIR)/debian/build-native
+  cross := \
+	GROFFBIN=$(native_tmp)/groff \
+	GROFF_BIN_PATH=$(native_tmp)
+endif
+
+override_dh_auto_build:
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	dh_auto_build --builddirectory=debian/build-native -- \
+		extratmacdirs=/usr/share/groff/tmac \
+		docdir=\$${prefix}/share/doc/groff-base
+endif
+	GROFF_NO_SGR=1 dh_auto_build --builddirectory=debian/build -- \
+		extratmacdirs=/usr/share/groff/tmac \
+		docdir=\$${prefix}/share/doc/groff-base $(cross)
+	GROFF_NO_SGR=1 $(MAKE) -C debian/build $(cross) \
+		doc/meintro.txt doc/meref.txt doc/pic.txt
+
+override_dh_auto_install:
+	dh_auto_install -- \
+		docdir=\$${prefix}/share/doc/groff-base \
+		INSTALL_INFO=:
+
+override_dh_install:
+	dh_install
+	# Debian additions to *.local
+	cat debian/mandoc.local >> $(gbtmp)/etc/groff/man.local
+	cat debian/mandoc.local >> $(gbtmp)/etc/groff/mdoc.local
+	# Scripts should be executable
+	chmod +x $(gbtmp)/$(datadir)/font/devps/generate/afmname \
+		 $(gbtmp)/$(datadir)/font/devps/generate/symbol.sed
+	chmod +x $(gtmp)/$(datadir)/font/devdvi/generate/CompileFonts \
+		 $(gtmp)/$(datadir)/font/devlj4/generate/special.awk
+	# Debian Policy 10.4 specifies the #! line for Perl scripts
+	grep -rlZ '#! */usr/bin/env perl' $(gbtmp) $(gtmp) | \
+		xargs -0r sed -i 's,\(#! *\)/usr/bin/env perl,\1/usr/bin/perl,'
+
+override_dh_installdocs:
+	dh_installdocs -pgroff-base
+	dh_installdocs -pgroff -Xcopyright --link-doc=groff-base
+
+override_dh_installchangelogs:
+	dh_installchangelogs -pgroff-base
+
+override_dh_compress:
+	dh_compress -X.mom
+
+override_dh_missing:
+	dh_missing --fail-missing
