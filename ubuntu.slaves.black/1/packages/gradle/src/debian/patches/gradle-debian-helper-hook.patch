@@ -1,0 +1,42 @@
+Description: Adds a hook in MavenResolver to resolve the artifacts from the system repository
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/subprojects/dependency-management/src/main/java/org/gradle/api/internal/artifacts/repositories/resolver/MavenResolver.java
++++ b/subprojects/dependency-management/src/main/java/org/gradle/api/internal/artifacts/repositories/resolver/MavenResolver.java
+@@ -122,6 +122,36 @@
+     }
+ 
+     protected void doResolveComponentMetaData(ModuleComponentIdentifier moduleComponentIdentifier, ComponentOverrideMetadata prescribedMetaData, BuildableModuleComponentMetaDataResolveResult result) {
++        if (getRoot().toString().contains("/usr/share/maven-repo") && !"false".equals(System.getProperty("gradle-debian-helper.hook.enabled"))) {
++            // Debian system repository detected, call the gradle-debian-helper
++            // hook if available to rewrite the dependencies on the fly
++            try {
++                Class resolverHookClass = Class.forName("org.debian.gradle.plugin.MavenResolverHook");
++                Object hook = resolverHookClass.getMethod("getInstance").invoke(null);
++                java.lang.reflect.Method rewrite = resolverHookClass.getMethod("rewrite", String.class, String.class, String.class, String.class, String.class);
++
++                String groupId = moduleComponentIdentifier.getGroup();
++                String artifactId = moduleComponentIdentifier.getModule();
++                String version = moduleComponentIdentifier.getVersion();
++                String classifier = null;
++                String type = "jar";
++                if (!prescribedMetaData.getArtifacts().isEmpty()) {
++                    IvyArtifactName ivyArtifactName = prescribedMetaData.getArtifacts().iterator().next();
++                    classifier = ivyArtifactName.getClassifier();
++                    type = ivyArtifactName.getType();
++                }
++                java.util.Map<String, String> dependency = (java.util.Map<String, String>) rewrite.invoke(hook, groupId, artifactId, version, type, classifier);
++                if (dependency != null) {
++                    moduleComponentIdentifier = new DefaultModuleComponentIdentifier(dependency.get("groupId"), dependency.get("artifactId"), dependency.get("version"));
++                    prescribedMetaData = new org.gradle.internal.component.model.DefaultComponentOverrideMetadata();
++                    prescribedMetaData.getArtifacts().add(new DefaultIvyArtifactName(dependency.get("artifactId"), dependency.get("type"), dependency.get("type"), dependency.get("classifier")));
++                }
++            } catch (Throwable t) {
++                System.out.println("\tCouldn't resolve system dependency:");
++                t.printStackTrace();
++            }
++        }
++
+         if (isIncomplete(moduleComponentIdentifier)) {
+             result.missing();
+             return;

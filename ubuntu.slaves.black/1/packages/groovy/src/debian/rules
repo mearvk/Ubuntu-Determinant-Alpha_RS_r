@@ -1,0 +1,87 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+
+export LC_ALL=en_US.UTF-8
+
+VERSION := $(shell echo $(DEB_VERSION_UPSTREAM) | sed 's/+dfsg//')
+MAVEN_REPO_URL := https://repo1.maven.org/maven2
+MODULES := docgenerator servlet ant groovydoc xml swing sql jmx test console groovysh json testng jsr223 templates bsf nio
+
+%:
+	dh $@ --buildsystem=gradle --no-parallel
+
+override_dh_auto_clean:
+	dh_auto_clean
+	find . -wholename .*target/tmp | xargs echo | sed -e 's^target/tmp^target^g' | xargs rm -Rf
+	rm -Rf .java
+	mh_clean
+
+override_dh_auto_build:
+	dh_auto_build -- --project-prop finalRelease=true dist -x :grooidjar
+	unzip target/distributions/apache-groovy-binary-*.zip -d target/distributions/bin
+	unzip target/distributions/apache-groovy-docs-*.zip -d target/distributions/doc
+	# check if AntBuilder is in groovy-all.jar
+	jar -tf target/libs/groovy-all-$(VERSION).jar | grep AntBuilder
+
+override_dh_auto_install:
+	-rm -f target/libs/groovy-all-*-indy.jar
+	dh_auto_install
+	# embeddable groovy-all jar with indy feature is not installed through maven
+	dh_install \
+		target/distributions/bin/groovy-$(VERSION)/embeddable/groovy-all-$(VERSION)-indy.jar \
+		usr/share/groovy/embeddable
+	# groovy core
+	mh_installpom -o -pgroovy debian/poms/groovy.pom
+	mh_installjar -pgroovy -l debian/poms/groovy.pom target/libs/groovy-$(VERSION).jar
+	# groovy-all
+	mh_installpom -o -pgroovy debian/poms/groovy-all.pom
+	mh_installjar -pgroovy -l debian/poms/groovy-all.pom \
+		target/distributions/bin/groovy-$(VERSION)/embeddable/groovy-all-$(VERSION).jar
+	# all the remaining groovy modules
+	for MOD in $(MODULES); do \
+	   mh_installpom -o -pgroovy debian/poms/groovy-$$MOD.pom; \
+	   mh_installjar -pgroovy debian/poms/groovy-$$MOD.pom \
+	      subprojects/groovy-$$MOD/target/libs/groovy-$$MOD-$(VERSION).jar; \
+	done
+	# check if AntBuilder is still in groovy-all.jar
+	jar -tf debian/groovy/usr/share/java/groovy-all-$(VERSION).jar | grep AntBuilder
+
+override_dh_installman:
+	dh_installman
+	mv debian/groovy/usr/share/man/man1/* debian/groovy/usr/share/groovy/man/man1/
+	rm -rf debian/groovy/usr/share/man
+
+override_dh_install:
+	dh_install
+	# fix zero-byte-file-in-doc-directory lintian warning
+	-rm -f debian/groovy-doc/usr/share/doc/groovy/gapi/groovy.ico
+
+override_dh_compress:
+	dh_compress
+	for cmd in groovy groovyc grape; do \
+		dh_compress usr/share/groovy/man/man1/$$cmd.1; \
+	done
+
+override_dh_link:
+	dh_link
+	dh_link usr/share/java/groovy-all.jar usr/share/groovy/embeddable/groovy-all-$(VERSION).jar
+	dh_link usr/share/java/groovy.jar     usr/share/groovy/lib/groovy-$(VERSION).jar
+	for MOD in $(MODULES); do \
+		dh_link usr/share/maven-repo/org/codehaus/groovy/groovy-$$MOD/$(VERSION)/groovy-$$MOD-$(VERSION).jar \
+			usr/share/groovy/lib/groovy-$$MOD.jar; \
+	done
+
+get-orig-pom:
+	test '! -d maven' && mkdir -p maven
+	# groovy core pom
+	curl $(MAVEN_REPO_URL)/org/codehaus/groovy/groovy/$(VERSION)/groovy-$(VERSION).pom \
+		--output debian/poms/groovy.pom
+	# groovy-all pom
+	curl $(MAVEN_REPO_URL)/org/codehaus/groovy/groovy-all/$(VERSION)/groovy-all-$(VERSION).pom \
+		--output debian/poms/groovy-all.pom
+	# all the remaining groovy modules
+	for MOD in $(MODULES); do \
+		curl $(MAVEN_REPO_URL)/org/codehaus/groovy/groovy-$$MOD/$(VERSION)/groovy-$$MOD-$(VERSION).pom \
+			--output debian/poms/groovy-$$MOD.pom; \
+	done

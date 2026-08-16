@@ -1,0 +1,85 @@
+From: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Date: Sun, 12 Nov 2017 21:04:50 +0100
+Subject: _scala_zinc
+
+No Zinc Compiler (https://github.com/typesafehub/zinc) in Debian. Zinc depends
+on SBT compiler and SBT is not yet in Debian See SBT ITP :
+https://bugs.debian.org/639910
+
+Forwarded: not-needed
+---
+ subprojects/language-scala/language-scala.gradle                   | 4 ++--
+ .../scala/internal/toolchain/DefaultScalaToolProvider.java         | 7 +------
+ .../org/gradle/api/internal/tasks/scala/ScalaCompilerFactory.java  | 6 ++----
+ .../main/java/org/gradle/api/plugins/scala/ScalaBasePlugin.java    | 6 +-----
+ 4 files changed, 6 insertions(+), 17 deletions(-)
+
+--- a/subprojects/language-scala/language-scala.gradle
++++ b/subprojects/language-scala/language-scala.gradle
+@@ -7,8 +7,6 @@
+     compile project(":platformJvm")
+     compile project(":languageJava")
+     compile project(":languageJvm")
+-
+-    compileOnly libraries.zinc
+ }
+ 
+ strictCompile()
+@@ -16,3 +14,5 @@
+ useTestFixtures(project: ":languageJvm", sourceSet: 'testFixtures')
+ useTestFixtures(project: ":platformBase")
+ useTestFixtures(project: ":launcher")
++
++sourceSets.main.java { exclude "**/ZincScalaCompiler*.java" }
+--- a/subprojects/language-scala/src/main/java/org/gradle/language/scala/internal/toolchain/DefaultScalaToolProvider.java
++++ b/subprojects/language-scala/src/main/java/org/gradle/language/scala/internal/toolchain/DefaultScalaToolProvider.java
+@@ -21,7 +21,6 @@
+ import org.gradle.api.internal.tasks.scala.DaemonScalaCompiler;
+ import org.gradle.api.internal.tasks.scala.NormalizingScalaCompiler;
+ import org.gradle.api.internal.tasks.scala.ScalaJavaJointCompileSpec;
+-import org.gradle.api.internal.tasks.scala.ZincScalaCompiler;
+ import org.gradle.language.base.internal.compile.CompileSpec;
+ import org.gradle.language.base.internal.compile.Compiler;
+ import org.gradle.platform.base.internal.toolchain.ToolProvider;
+@@ -52,11 +51,7 @@
+     @Override
+     @SuppressWarnings("unchecked")
+     public <T extends CompileSpec> org.gradle.language.base.internal.compile.Compiler<T> newCompiler(Class<T> spec) {
+-        if (ScalaJavaJointCompileSpec.class.isAssignableFrom(spec)) {
+-            Compiler<ScalaJavaJointCompileSpec> scalaCompiler = new ZincScalaCompiler(resolvedScalaClasspath, resolvedZincClasspath, gradleUserHomeDir);
+-            return (Compiler<T>) new NormalizingScalaCompiler(new DaemonScalaCompiler<ScalaJavaJointCompileSpec>(daemonWorkingDir, scalaCompiler, workerDaemonFactory, resolvedZincClasspath, fileResolver));
+-        }
+-        throw new IllegalArgumentException(String.format("Cannot create Compiler for unsupported CompileSpec type '%s'", spec.getSimpleName()));
++        throw new org.gradle.api.GradleException("Gradle in Debian does not support Zinc compiler.");
+     }
+ 
+     @Override
+--- a/subprojects/scala/src/main/java/org/gradle/api/internal/tasks/scala/ScalaCompilerFactory.java
++++ b/subprojects/scala/src/main/java/org/gradle/api/internal/tasks/scala/ScalaCompilerFactory.java
+@@ -49,9 +49,7 @@
+         Set<File> zincClasspathFiles = zincClasspath.getFiles();
+ 
+         // currently, we leave it to ZincScalaCompiler to also compile the Java code
+-        Compiler<ScalaJavaJointCompileSpec> scalaCompiler = new DaemonScalaCompiler<ScalaJavaJointCompileSpec>(
+-            daemonWorkingDir, new ZincScalaCompiler(scalaClasspathFiles, zincClasspathFiles, gradleUserHomeDir),
+-            workerDaemonFactory, zincClasspathFiles, fileResolver);
+-        return new NormalizingScalaCompiler(scalaCompiler);
++        Compiler<ScalaJavaJointCompileSpec> scalaCompiler = null;
++        throw new org.gradle.api.GradleException("Gradle in Debian does not support Zinc compiler.");
+     }
+ }
+--- a/subprojects/scala/src/main/java/org/gradle/api/plugins/scala/ScalaBasePlugin.java
++++ b/subprojects/scala/src/main/java/org/gradle/api/plugins/scala/ScalaBasePlugin.java
+@@ -155,11 +155,7 @@
+                 compile.getConventionMapping().map("zincClasspath", new Callable<Configuration>() {
+                     @Override
+                     public Configuration call() throws Exception {
+-                        Configuration config = project.getConfigurations().getAt(ZINC_CONFIGURATION_NAME);
+-                        if (config.getDependencies().isEmpty()) {
+-                            project.getDependencies().add("zinc", "com.typesafe.zinc:zinc:" + DefaultScalaToolProvider.DEFAULT_ZINC_VERSION);
+-                        }
+-                        return config;
++                        return null;
+                     }
+                 });
+             }

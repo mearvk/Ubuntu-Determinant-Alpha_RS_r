@@ -1,0 +1,53 @@
+#!/bin/sh
+# Copyright 2019 Simon McVittie
+# SPDX-License-Identifier: MIT
+# (see "License: Expat" in debian/copyright)
+
+set -e
+exec 2>&1
+set -u
+set -x
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cd "$AUTOPKGTEST_TMP"
+
+echo "1..1"
+
+cat > simple.c <<'EOF'
+#include <graphene.h>
+
+int main (void)
+{
+    graphene_triangle_t *tri = graphene_triangle_alloc();
+    graphene_triangle_free(tri);
+    return 0;
+}
+EOF
+
+cat > gobject.c <<'EOF'
+#include <stdio.h>
+
+#include <glib-object.h>
+#include <graphene-gobject.h>
+
+int main (void)
+{
+    printf ("%s\n", g_type_name (GRAPHENE_TYPE_TRIANGLE));
+    return 0;
+}
+EOF
+
+# We don't exercise static linking because graphene is not available
+# as a static library.
+
+${CROSS_COMPILE}gcc -o simple simple.c $(${CROSS_COMPILE}pkg-config --cflags --libs graphene-1.0)
+test -x simple
+./simple
+${CROSS_COMPILE}gcc -o gobject gobject.c $(${CROSS_COMPILE}pkg-config --cflags --libs graphene-gobject-1.0)
+test -x gobject
+./gobject

@@ -1,0 +1,39 @@
+From e7aaffaae683404c7e167f1c8ef8582eab567aea Mon Sep 17 00:00:00 2001
+From: Colin Watson <cjwatson@debian.org>
+Date: Thu, 2 Jan 2014 13:13:22 +0000
+Subject: Display more helpful output when failing to load a device
+
+If the device is known to be one of the devices in the groff binary package
+rather than groff-base, refer the user to that.
+
+Forwarded: not-needed
+Last-Update: 2018-03-05
+
+Patch-Name: load-desc-failure.patch
+---
+ src/roff/groff/groff.cpp | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/roff/groff/groff.cpp b/src/roff/groff/groff.cpp
+index a3815bf3..bfb01d9c 100644
+--- a/src/roff/groff/groff.cpp
++++ b/src/roff/groff/groff.cpp
+@@ -340,8 +340,16 @@ int main(int argc, char **argv)
+     commands[PIC_INDEX].append_arg("-U");
+   }
+   font::set_unknown_desc_command_handler(handle_unknown_desc_command);
+-  if (!font::load_desc())
+-    fatal("invalid device '%1'", device);
++  if (!font::load_desc()) {
++    if (strcmp(device, "X100") == 0 || strcmp(device, "X100-12") == 0 ||
++	strcmp(device, "X75") == 0 || strcmp(device, "X75-12") == 0 ||
++	strcmp(device, "dvi") == 0 || strcmp(device, "html") == 0 ||
++	strcmp(device, "lbp") == 0 || strcmp(device, "lj4") == 0)
++      fatal("invalid device '%1' (try installing the 'groff' package?)",
++	    device);
++    else
++      fatal("invalid device '%1'", device);
++  }
+   if (!postdriver)
+     fatal("no 'postpro' command in DESC file for device '%1'", device);
+   if (predriver && !zflag) {
