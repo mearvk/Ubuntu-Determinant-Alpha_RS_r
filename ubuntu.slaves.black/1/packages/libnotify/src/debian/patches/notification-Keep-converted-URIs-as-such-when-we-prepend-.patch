@@ -1,0 +1,48 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Fri, 22 Apr 2022 02:15:18 +0200
+Subject: notification: Keep converted URIs as such when we prepend a path
+
+Origin: https://gitlab.gnome.org/GNOME/libnotify/-/commit/f9c1cf1
+
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/libnotify/+bug/1802483
+---
+ libnotify/notification.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/libnotify/notification.c b/libnotify/notification.c
+index fe7476b..97f5f99 100644
+--- a/libnotify/notification.c
++++ b/libnotify/notification.c
+@@ -536,14 +536,18 @@ try_prepend_path (const char *base_path,
+ {
+         gchar *path_filename;
+         gchar *path_ret;
++        gboolean was_uri;
+ 
+         if (!path || *path == '\0')
+                 return NULL;
+ 
++        was_uri = TRUE;
+         path_ret = NULL;
+         path_filename = g_filename_from_uri (base_path, NULL, NULL);
+ 
+         if (path_filename == NULL) {
++                was_uri = FALSE;
++
+                 if (base_path && base_path[0] == G_DIR_SEPARATOR) {
+                         path_filename = g_strdup (base_path);
+                 } else {
+@@ -571,6 +575,13 @@ try_prepend_path (const char *base_path,
+                 g_debug ("Nothing found at %s", path_ret);
+                 g_free (path_ret);
+                 path_ret = NULL;
++        } else if (was_uri) {
++                gchar *uri = g_filename_to_uri (path_ret, NULL, NULL);
++
++                if (uri != NULL) {
++                        g_free (path_ret);
++                        path_ret = uri;
++                }
+         }
+ 
+         g_free (path_filename);

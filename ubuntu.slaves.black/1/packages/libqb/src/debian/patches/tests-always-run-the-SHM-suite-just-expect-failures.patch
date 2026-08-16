@@ -1,0 +1,103 @@
+From: =?utf-8?q?Ferenc_W=C3=A1gner?= <wferi@debian.org>
+Date: Tue, 13 Mar 2018 10:58:18 +0100
+Subject: tests: always run the SHM suite, just expect failures
+
+---
+ tests/check_common.h |  9 +++++++++
+ tests/check_ipc.c    | 50 +++++++++++++++++++++++++-------------------------
+ 2 files changed, 34 insertions(+), 25 deletions(-)
+
+diff --git a/tests/check_common.h b/tests/check_common.h
+index 5f1f536..2347648 100644
+--- a/tests/check_common.h
++++ b/tests/check_common.h
+@@ -66,4 +66,13 @@
+ /* add_tcase(<dest-suite>, <testcase-tmp-storage>, <function>[, <timeout>]) */
+ #define add_tcase(...)	add_tcase_select(VA_ARGS_CNT(__VA_ARGS__))(__VA_ARGS__)
+ 
++/* expected failure (the timeout argument is mandatory here) */
++#define add_tcase_xfail(suite, tcase, func, timeout)	\
++	do { \
++		(tcase) = tcase_create(STRINGIFY(func) + sizeof("test")); \
++		tcase_add_exit_test((tcase), func, 1); \
++		tcase_set_timeout((tcase), (timeout)); \
++		suite_add_tcase((suite), (tcase)); \
++	} while (0)
++
+ #endif
+diff --git a/tests/check_ipc.c b/tests/check_ipc.c
+index e8f81f3..1960b74 100644
+--- a/tests/check_ipc.c
++++ b/tests/check_ipc.c
+@@ -2277,26 +2277,33 @@ make_shm_suite(void)
+ 	TCase *tc;
+ 	Suite *s = suite_create("shm");
+ 
+-	add_tcase(s, tc, test_ipc_txrx_shm_getauth, 7);
+-	add_tcase(s, tc, test_ipc_txrx_shm_timeout, 28);
+-	add_tcase(s, tc, test_ipc_server_fail_shm, 7);
+-	add_tcase(s, tc, test_ipc_txrx_shm_block, 7);
+-	add_tcase(s, tc, test_ipc_txrx_shm_tmo, 7);
+-	add_tcase(s, tc, test_ipc_fc_shm, 7);
+-	add_tcase(s, tc, test_ipc_dispatch_shm, 15);
+-	add_tcase(s, tc, test_ipc_stress_test_shm, 15);
+-	add_tcase(s, tc, test_ipc_bulk_events_shm, 15);
+-	add_tcase(s, tc, test_ipc_exit_shm, 6);
+-	add_tcase(s, tc, test_ipc_event_on_created_shm, 9);
+-	add_tcase(s, tc, test_ipc_service_ref_count_shm, 9);
+-	add_tcase(s, tc, test_ipc_server_perms, 7);
+-	add_tcase(s, tc, test_ipc_stress_connections_shm, 3600 /* ? */);
+-	add_tcase(s, tc, test_ipc_dispatch_shm_native_prio_dlock, 15);
++#undef  add_cond_tcase
++#ifdef DISABLE_IPC_SHM
++#define add_cond_tcase(func, timeout) add_tcase_xfail(s, tc, func, timeout)
++#else
++#define add_cond_tcase(func, timeout) add_tcase(s, tc, func, timeout)
++#endif
++
++	add_cond_tcase(test_ipc_txrx_shm_getauth, 7);
++	add_cond_tcase(test_ipc_txrx_shm_timeout, 28);
++	add_cond_tcase(test_ipc_server_fail_shm, 7);
++	add_cond_tcase(test_ipc_txrx_shm_block, 7);
++	add_cond_tcase(test_ipc_txrx_shm_tmo, 7);
++	add_cond_tcase(test_ipc_fc_shm, 7);
++	add_cond_tcase(test_ipc_dispatch_shm, 15);
++	add_cond_tcase(test_ipc_stress_test_shm, 15);
++	add_cond_tcase(test_ipc_bulk_events_shm, 15);
++	add_cond_tcase(test_ipc_exit_shm, 6);
++	add_cond_tcase(test_ipc_event_on_created_shm, 9);
++	add_cond_tcase(test_ipc_service_ref_count_shm, 9);
++	add_cond_tcase(test_ipc_server_perms, 7);
++	add_cond_tcase(test_ipc_stress_connections_shm, 3600 /* ? */);
++	add_cond_tcase(test_ipc_dispatch_shm_native_prio_dlock, 15);
+ #if HAVE_GLIB
+-	add_tcase(s, tc, test_ipc_dispatch_shm_glib_prio_dlock, 15);
++	add_cond_tcase(test_ipc_dispatch_shm_glib_prio_dlock, 15);
+ #endif
+ #ifdef HAVE_FAILURE_INJECTION
+-	add_tcase(s, tc, test_ipcc_truncate_when_unlink_fails_shm, 8);
++	add_cond_tcase(test_ipcc_truncate_when_unlink_fails_shm, 8);
+ #endif
+ 
+ 	return s;
+@@ -2341,19 +2348,12 @@ main(void)
+ 	int32_t number_failed;
+ 	SRunner *sr;
+ 	Suite *s;
+-	int32_t do_shm_tests = QB_TRUE;
+ 
+ 	set_ipc_name("ipc_test");
+-#ifdef DISABLE_IPC_SHM
+-	do_shm_tests = QB_FALSE;
+-#endif /* DISABLE_IPC_SHM */
+ 
+ 	s = make_soc_suite();
+ 	sr = srunner_create(s);
+-
+-	if (do_shm_tests) {
+-		srunner_add_suite(sr, make_shm_suite());
+-	}
++	srunner_add_suite(sr, make_shm_suite());
+ 
+ 	qb_log_init("check", LOG_USER, LOG_EMERG);
+ 	atexit(qb_log_fini);

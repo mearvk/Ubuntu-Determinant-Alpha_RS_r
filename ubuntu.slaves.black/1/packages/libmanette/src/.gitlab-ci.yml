@@ -1,0 +1,76 @@
+include: https://gitlab.gnome.org/GNOME/citemplates/raw/master/flatpak/flatpak_ci_initiative.yml
+
+stages:
+  - pre
+  - build
+  - publish
+
+variables:
+  FLATPAK_BUILD_DIR: app
+  SHARED_MESON_ARGS: >-
+    --buildtype=release
+    -Ddemos=false
+
+lint:
+  stage: pre
+  script:
+    - tools/check-api-visibility.sh
+
+dependencies:
+  image: registry.gitlab.gnome.org/gnome/gnome-runtime-images/gnome:master
+  stage: pre
+  tags:
+    - flatpak
+  variables:
+    MANIFEST_PATH: demos/manette-test/org.gnome.Manette.Test.json
+    FLATPAK_MODULE: libmanette
+  script:
+    - flatpak-builder --user --disable-rofiles-fuse --stop-at=${FLATPAK_MODULE} ${FLATPAK_BUILD_DIR} ${MANIFEST_PATH}
+  artifacts:
+    paths:
+      - ${FLATPAK_BUILD_DIR}
+
+unit-tests:
+  image: registry.gitlab.gnome.org/gnome/gnome-runtime-images/gnome:master
+  stage: build
+  dependencies:
+    - dependencies
+  tags:
+    - flatpak
+  variables:
+    MESON_ARGS: >-
+      -Dgudev=disabled
+  script:
+    - flatpak build ${FLATPAK_BUILD_DIR} meson --prefix=/app ${SHARED_MESON_ARGS} ${MESON_ARGS} _build
+    - flatpak build ${FLATPAK_BUILD_DIR} ninja -C _build test
+
+gudev:
+  image: fedora:32
+  stage: build
+  before_script:
+    - dnf install -y gcc glib2-devel gobject-introspection-devel libevdev-devel libgudev-devel meson vala
+  script:
+    - meson _build
+    - ninja -C _build
+    - ninja -C _build test
+
+doc:
+  image: registry.gitlab.gnome.org/gnome/gnome-runtime-images/gnome:master
+  stage: build
+  dependencies:
+    - dependencies
+  tags:
+    - flatpak
+  variables:
+    MESON_ARGS: >-
+      -Dbuild-tests=false
+      -Ddoc=true
+      -Dgudev=disabled
+      -Dintrospection=false
+  script:
+    - flatpak build ${FLATPAK_BUILD_DIR} meson --prefix=/app ${SHARED_MESON_ARGS} ${MESON_ARGS} _build
+    - flatpak build ${FLATPAK_BUILD_DIR} ninja -C _build manette-doc
+    - mv _build/doc/html/ _doc/
+  artifacts:
+    paths:
+      - _doc

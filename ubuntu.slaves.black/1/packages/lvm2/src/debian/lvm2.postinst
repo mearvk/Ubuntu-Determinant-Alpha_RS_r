@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+        # For init-scripts
+        mkdir -m 0700 -p /run/lvm
+        vgcfgbackup >/dev/null 2>&1 || :
+        invoke-rc.d lvm2 start || :
+        if [ -x /usr/sbin/update-initramfs ]; then
+            update-initramfs -u
+        fi
+        if dpkg --compare-versions "$2" lt "2.02.133~"; then
+            deb-systemd-helper purge lvm2-activation-early.service lvm2-activation.service >/dev/null
+            deb-systemd-helper unmask lvm2-activation-early.service lvm2-activation.service >/dev/null
+        fi
+        if dpkg --compare-versions "$2" lt "2.03.02-3~"; then
+            deb-systemd-helper purge lvm2-lvmetad.socket >/dev/null
+            deb-systemd-helper unmask lvm2-lvmetad.socket >/dev/null
+            update-rc.d -f lvm2-lvmetad remove
+        fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+built_binaries := $(shell dh_listpackages)
+
+# Explicitly disable this plugin which defaults to enabled
+# unless we're on linux architectures.
+ifeq (linux,$(DEB_HOST_ARCH_OS))
+SYSPROF = -Dsysprof=enabled
+else
+SYSPROF = -Dsysprof=disabled
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dauto_features=enabled \
+		-Dautobahn=disabled \
+		-Dgtk_doc=true \
+		-Dinstalled_tests=true \
+		$(SYSPROF)
+
+# TODO: Reduce the multiplier, and/or extend individual tests' timeouts
+# instead, when we have a better idea of how long they take on various
+# architectures
+override_dh_auto_test-arch:
+	dh_auto_test -- --timeout-multiplier 5
+
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+override_dh_fixperms:
+	dh_fixperms -Xusr/libexec/installed-tests
+ifneq ($(filter %-tests,$(built_binaries)),)
+	chmod --changes u=rw,og=r debian/*-tests/usr/libexec/installed-tests/libsoup*/*.so
+	chmod --recursive --changes a+rX,u+w,og-w debian/*-tests/usr/libexec/installed-tests
+endif

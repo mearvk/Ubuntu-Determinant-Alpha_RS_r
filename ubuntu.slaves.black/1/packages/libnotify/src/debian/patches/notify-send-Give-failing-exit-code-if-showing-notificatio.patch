@@ -1,0 +1,56 @@
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 12 May 2020 10:12:26 -0400
+Subject: notify-send: Give failing exit code if showing notification fails
+
+Right now notify-send will quietly return a successful exit status
+even if showing the notification fails.
+
+This commit changes the behavior to instead fail on failure.
+
+https://gitlab.gnome.org/GNOME/libnotify/-/merge_requests/13
+
+Origin: https://gitlab.gnome.org/GNOME/libnotify/-/commit/a228f1e
+Bug-Ubuntu: https://pad.lv/1970647
+---
+ tools/notify-send.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/tools/notify-send.c b/tools/notify-send.c
+index 67e0b03..52fa46a 100644
+--- a/tools/notify-send.c
++++ b/tools/notify-send.c
+@@ -132,7 +132,7 @@ main (int argc, char *argv[])
+         static char       **n_text = NULL;
+         static char       **hints = NULL;
+         static gboolean     do_version = FALSE;
+-        static gboolean     hint_error = FALSE;
++        static gboolean     hint_error = FALSE, show_error = FALSE;
+         static glong        expire_timeout = NOTIFY_EXPIRES_DEFAULT;
+         GOptionContext     *opt_ctx;
+         NotifyNotification *notify;
+@@ -274,12 +274,22 @@ main (int argc, char *argv[])
+                 }
+         }
+ 
+-        if (!hint_error)
+-                notify_notification_show (notify, NULL);
++        if (!hint_error) {
++                retval = notify_notification_show (notify, &error);
++
++                if (!retval) {
++                        fprintf (stderr, "%s\n", error->message);
++                        g_error_free (error);
++                        show_error = TRUE;
++                }
++        }
+ 
+         g_object_unref (G_OBJECT (notify));
+ 
+         notify_uninit ();
+ 
+-        exit (hint_error);
++        if (hint_error || show_error)
++                exit (1);
++
++        return 0;
+ }

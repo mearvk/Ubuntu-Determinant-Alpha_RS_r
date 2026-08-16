@@ -1,0 +1,77 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Mon, 27 Dec 2021 18:09:35 +0000
+Subject: test-utils: Save Apache server root during initialization
+
+By the time we want to use it during teardown, it is no longer safe to
+call g_test_build_filename(), because some GTest state is discarded
+at the end of g_test_run() (see glib#2563). As a result, the command
+that should shut down the server fails, the server continues to run, and
+its port is unavailable for the next test-case.
+
+This should mostly resolve
+<https://gitlab.gnome.org/GNOME/libsoup/-/issues/175>.
+
+Signed-off-by: Simon McVittie <smcv@debian.org>
+---
+ tests/test-utils.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/tests/test-utils.c b/tests/test-utils.c
+index 64f09ad..cd580d2 100644
+--- a/tests/test-utils.c
++++ b/tests/test-utils.c
+@@ -9,6 +9,7 @@
+ 
+ #ifdef HAVE_APACHE
+ static gboolean apache_running;
++static char *server_root = NULL;
+ #endif
+ 
+ static SoupLogger *logger;
+@@ -150,7 +151,7 @@ static gboolean
+ apache_cmd (const char *cmd)
+ {
+ 	GPtrArray *argv;
+-	char *server_root, *cwd, *pid_file;
++	char *cwd, *pid_file;
+ #ifdef HAVE_APACHE_2_4
+ 	char *default_runtime_dir;
+ #endif
+@@ -159,7 +160,10 @@ apache_cmd (const char *cmd)
+ 	GString *str;
+ 	guint i;
+ 
+-	server_root = soup_test_build_filename_abs (G_TEST_BUILT, "", NULL);
++	if (server_root == NULL) {
++		g_test_message ("Server root not initialized");
++		return FALSE;
++	}
+ 
+ 	cwd = g_get_current_dir ();
+ #ifdef HAVE_APACHE_2_4
+@@ -202,7 +206,6 @@ apache_cmd (const char *cmd)
+ 	if (ok)
+ 		ok = (status == 0);
+ 
+-	g_free (server_root);
+ 	g_free (cwd);
+ 	g_free (pid_file);
+ #ifdef HAVE_APACHE_2_4
+@@ -222,6 +225,8 @@ apache_init (void)
+ 	if (g_getenv ("SOUP_TESTS_ALREADY_RUNNING_APACHE"))
+ 		return;
+ 
++	server_root = soup_test_build_filename_abs (G_TEST_BUILT, "", NULL);
++
+ 	if (!apache_cmd ("start")) {
+ 		g_printerr ("Could not start apache\n");
+ 		exit (1);
+@@ -249,6 +254,8 @@ apache_cleanup (void)
+ 		while (kill (pid, 0) == 0)
+ 			g_usleep (100);
+ 	}
++
++	g_clear_pointer (&server_root, g_free);
+ }
+ 
+ #endif /* HAVE_APACHE */

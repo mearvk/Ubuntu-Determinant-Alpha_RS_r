@@ -1,0 +1,185 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Wed, 11 Mar 2020 09:37:32 +0000
+Subject: tests: Skip tests if unable to start Apache
+
+This is a workaround for Apache not always being able to bind to its
+hard-coded ports, which happens often enough to be a problem for Debian
+QA infrastructure, but not often enough to be able to debug it.
+
+Mitigates: GNOME/libsoup#175
+Forwarded: https://gitlab.gnome.org/GNOME/libsoup/-/merge_requests/119
+---
+ tests/pull-api-test.c   | 10 +++++++---
+ tests/test-utils.c      | 26 ++++++++++++++++++++++----
+ tests/test-utils.h      | 12 +++++++++---
+ tests/xmlrpc-old-test.c | 10 +++++++++-
+ tests/xmlrpc-test.c     | 10 +++++++++-
+ 5 files changed, 56 insertions(+), 12 deletions(-)
+
+diff --git a/tests/pull-api-test.c b/tests/pull-api-test.c
+index 5550378..a4fb904 100644
+--- a/tests/pull-api-test.c
++++ b/tests/pull-api-test.c
+@@ -511,11 +511,13 @@ main (int argc, char **argv)
+ 	int ret;
+ 
+ 	test_init (argc, argv, NULL);
+-	apache_init ();
+ 
+ 	base_uri = "http://127.0.0.1:47524/";
++
+ #ifdef HAVE_APACHE
+-	get_correct_response (base_uri);
++	if (apache_init ()) {
++		get_correct_response (base_uri);
++	}
+ #endif
+ 
+ 	g_test_add_data_func ("/pull-api/async/fast", base_uri, do_fast_async_test);
+@@ -525,7 +527,9 @@ main (int argc, char **argv)
+ 	ret = g_test_run ();
+ 
+ #ifdef HAVE_APACHE
+-	soup_buffer_free (correct_response);
++	if (correct_response != NULL) {
++		soup_buffer_free (correct_response);
++	}
+ #endif
+ 
+ 	test_cleanup ();
+diff --git a/tests/test-utils.c b/tests/test-utils.c
+index cd580d2..9a247e7 100644
+--- a/tests/test-utils.c
++++ b/tests/test-utils.c
+@@ -147,6 +147,20 @@ have_curl(void) {
+ 
+ #ifdef HAVE_APACHE
+ 
++gboolean
++check_apache (void)
++{
++	if (g_getenv ("SOUP_TESTS_ALREADY_RUNNING_APACHE"))
++		return TRUE;
++
++	if (!apache_running) {
++		g_test_skip ("Failed to start apache");
++		return FALSE;
++	}
++
++	return TRUE;
++}
++
+ static gboolean
+ apache_cmd (const char *cmd)
+ {
+@@ -217,21 +231,25 @@ apache_cmd (const char *cmd)
+ 	return ok;
+ }
+ 
+-void
++gboolean
+ apache_init (void)
+ {
+ 	/* Set this environment variable if you are already running a
+ 	 * suitably-configured Apache server */
+ 	if (g_getenv ("SOUP_TESTS_ALREADY_RUNNING_APACHE"))
+-		return;
++		return TRUE;
+ 
+ 	server_root = soup_test_build_filename_abs (G_TEST_BUILT, "", NULL);
+ 
+ 	if (!apache_cmd ("start")) {
+ 		g_printerr ("Could not start apache\n");
+-		exit (1);
++		apache_running = FALSE;
+ 	}
+-	apache_running = TRUE;
++	else {
++		apache_running = TRUE;
++	}
++
++	return apache_running;
+ }
+ 
+ void
+diff --git a/tests/test-utils.h b/tests/test-utils.h
+index 4477edc..8ea5201 100644
+--- a/tests/test-utils.h
++++ b/tests/test-utils.h
+@@ -29,11 +29,17 @@ void debug_printf (int level, const char *format, ...) G_GNUC_PRINTF (2, 3);
+ 	} G_STMT_END
+ 
+ #ifdef HAVE_APACHE
+-void apache_init    (void);
++gboolean apache_init (void);
+ void apache_cleanup (void);
+-#define SOUP_TEST_SKIP_IF_NO_APACHE
++gboolean check_apache (void);
++#define SOUP_TEST_SKIP_IF_NO_APACHE				\
++	G_STMT_START {						\
++		if (!check_apache ()) {				\
++			return;					\
++		}						\
++	} G_STMT_END
+ #else
+-#define apache_init()
++#define apache_init() FALSE
+ #define apache_cleanup()
+ #define SOUP_TEST_SKIP_IF_NO_APACHE				\
+ 	G_STMT_START {						\
+diff --git a/tests/xmlrpc-old-test.c b/tests/xmlrpc-old-test.c
+index ab7b34d..28a744d 100644
+--- a/tests/xmlrpc-old-test.c
++++ b/tests/xmlrpc-old-test.c
+@@ -15,7 +15,12 @@ static const char *uri = NULL;
+ static gboolean server_test = FALSE;
+ 
+ #ifdef HAVE_PHP_XMLRPC
+-#define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER
++#define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER				\
++	G_STMT_START {							\
++		if (uri == default_uri) {				\
++			SOUP_TEST_SKIP_IF_NO_APACHE;			\
++		}							\
++	} G_STMT_END
+ #else
+ #define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER				\
+ 	G_STMT_START {							\
+@@ -23,6 +28,9 @@ static gboolean server_test = FALSE;
+ 			g_test_skip ("php-xmlrpc is not available");	\
+ 			return;						\
+ 		}							\
++		if (uri == default_uri) {				\
++			SOUP_TEST_SKIP_IF_NO_APACHE;			\
++		}							\
+ 	} G_STMT_END
+ #endif
+ 
+diff --git a/tests/xmlrpc-test.c b/tests/xmlrpc-test.c
+index 8b1f9da..839f54b 100644
+--- a/tests/xmlrpc-test.c
++++ b/tests/xmlrpc-test.c
+@@ -12,7 +12,12 @@ static const char *uri = NULL;
+ static gboolean server_test = FALSE;
+ 
+ #ifdef HAVE_PHP_XMLRPC
+-#define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER
++#define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER				\
++	G_STMT_START {							\
++		if (uri == default_uri) {				\
++			SOUP_TEST_SKIP_IF_NO_APACHE;			\
++		}							\
++	} G_STMT_END
+ #else
+ #define SOUP_TEST_SKIP_IF_NO_XMLRPC_SERVER				\
+ 	G_STMT_START {							\
+@@ -20,6 +25,9 @@ static gboolean server_test = FALSE;
+ 			g_test_skip ("php-xmlrpc is not available");	\
+ 			return;						\
+ 		}							\
++		if (uri == default_uri) {				\
++			SOUP_TEST_SKIP_IF_NO_APACHE;			\
++		}							\
+ 	} G_STMT_END
+ #endif
+ 

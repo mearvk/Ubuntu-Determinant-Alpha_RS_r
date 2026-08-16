@@ -1,0 +1,172 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+#export DH_VERBOSE = 1
+
+DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
+DEB_CFLAGS_MAINT_STRIP = -O2
+
+include /usr/share/dpkg/default.mk
+
+VERSION_DEBIAN := $(shell echo "$(DEB_VERSION)" | sed -e 's,^[^-]*-,,')
+
+DEVMAPPER_ABINAME = 1.02.1
+DEVMAPPER_VERSION_PLAIN = $(shell awk '{print $$1}' VERSION_DM)
+DEVMAPPER_VERSION = 2:$(DEVMAPPER_VERSION_PLAIN)
+DEVMAPPER_VERSION_DEBIAN = $(DEVMAPPER_VERSION)-$(VERSION_DEBIAN)
+DEVMAPPER_VERSION_FILE = $(DEVMAPPER_VERSION_PLAIN)-$(VERSION_DEBIAN)
+
+GENCONTROL_ARGS = -Vdevmapper:Version=$(DEVMAPPER_VERSION_DEBIAN)
+
+ifeq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+CFLAGS_OPT_DEB = -O2
+CFLAGS_OPT_UDEB = -Os
+endif
+
+define CONFARGS.deb
+	--libdir=/lib/$(DEB_HOST_MULTIARCH)
+	--sbindir=/sbin
+	--with-usrlibdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+	--with-optimisation="$(CFLAGS_OPT_DEB)"
+	--with-cache=internal
+	--with-device-uid=0
+	--with-device-gid=6
+	--with-device-mode=0660
+	--with-default-pid-dir=/run
+	--with-default-run-dir=/run/lvm
+	--with-default-locking-dir=/run/lock/lvm
+	--with-thin=internal
+	--with-thin-check=/usr/sbin/thin_check
+	--with-thin-dump=/usr/sbin/thin_dump
+	--with-thin-repair=/usr/sbin/thin_repair
+	--with-udev-prefix=/
+	--enable-applib
+	--enable-blkid_wiping
+	--enable-cmdlib
+	--enable-dmeventd
+	--enable-editline
+	--enable-lvmlockd-dlm
+	--enable-lvmlockd-sanlock
+	--enable-lvmpolld
+	--enable-notify-dbus
+	--enable-pkgconfig
+	--enable-udev_rules
+	--enable-udev_sync
+	--disable-readline
+endef
+
+define CONFARGS.deb_all
+	--sbindir=/sbin
+	--enable-dbus-service
+	--disable-readline
+	--disable-selinux
+endef
+
+define CONFARGS.udeb
+	--libdir=/lib
+	--sbindir=/sbin
+	--with-usrlibdir=/usr/lib
+	--with-optimisation="$(CFLAGS_OPT_UDEB)"
+	--with-lvm1=none
+	--with-pool=none
+	--disable-readline
+	--disable-selinux
+	--enable-udev_rules
+	--enable-udev_sync
+endef
+
+BUILDS :=
+ifneq ($(filter lvm2,$(shell dh_listpackages)),)
+BUILDS += deb
+endif
+ifneq ($(filter lvm2-udeb,$(shell dh_listpackages)),)
+BUILDS += udeb
+endif
+ifneq ($(filter lvm2-dbusd,$(shell dh_listpackages)),)
+BUILDS += deb_all
+endif
+
+%:
+	dh $@ --parallel
+
+override_dh_auto_configure: $(patsubst %,dh_auto_configure.%,$(BUILDS))
+override_dh_auto_build:     $(patsubst %,dh_auto_build.%,$(BUILDS))
+override_dh_auto_install:   $(patsubst %,dh_auto_install.%,$(BUILDS))
+
+dh_auto_configure.%:
+	mkdir -p debian/build/build_$*
+	cp -al $(filter-out debian, $(wildcard * .[^.]*)) debian/build/build_$*/
+	dh_auto_configure --sourcedirectory=debian/build/build_$* -- $(strip $(CONFARGS.$*))
+	cp po/lvm2.po po/lvm2.pot
+
+dh_auto_build.%:
+	dh_auto_build --sourcedirectory=debian/build/build_$* -- \
+		LIB_VERSION_DM=$(DEVMAPPER_ABINAME)
+
+dh_auto_install.%:
+	dh_auto_install --sourcedirectory=debian/build/build_$* \
+		--destdir=debian/build/install_$* -- \
+		install \
+		install_systemd_generators \
+		install_systemd_units \
+		install_tmpfiles_configuration \
+		LIB_VERSION_DM=$(DEVMAPPER_ABINAME)
+
+override_dh_auto_clean:
+	rm -rf debian/build
+	rm -f po/lvm2.pot
+
+override_dh_gencontrol:
+	dh_gencontrol \
+		-pdmsetup \
+		-pdmsetup-udeb \
+		-pdmeventd \
+		-plibdevmapper-dev \
+		-plibdevmapper$(DEVMAPPER_ABINAME) \
+		-plibdevmapper$(DEVMAPPER_ABINAME)-udeb \
+		-plibdevmapper-event$(DEVMAPPER_ABINAME) \
+		-- -v$(DEVMAPPER_VERSION_DEBIAN) $(GENCONTROL_ARGS)
+	dh_gencontrol --remaining-packages \
+		-- $(GENCONTROL_ARGS)
+
+override_dh_install:
+ifneq ($(filter lvm2-udeb,$(shell dh_listpackages)),)
+	dh_install --sourcedir=debian/build/install_udeb \
+		-pdmsetup-udeb \
+		-plibdevmapper$(DEVMAPPER_ABINAME)-udeb \
+		-plvm2-udeb
+endif
+	dh_install --sourcedir=debian/build/install_deb_all \
+		-plvm2-dbusd
+	dh_install --sourcedir=debian/build/install_deb \
+		--remaining-packages
+
+override_dh_installchangelogs:
+	dh_installchangelogs -pdmeventd WHATS_NEW_DM
+	dh_installchangelogs -plvm2 WHATS_NEW
+	dh_installchangelogs --remaining-packages
+
+override_dh_installinit:
+	dh_installinit -plvm2 --no-start
+	dh_installinit -plvm2 --restart-after-upgrade --name lvm2-lvmpolld
+
+override_dh_makeshlibs:
+	dh_makeshlibs -plibdevmapper$(DEVMAPPER_ABINAME) \
+		--add-udeb 'libdevmapper$(DEVMAPPER_ABINAME)-udeb' \
+	       	"-Vlibdevmapper$(DEVMAPPER_ABINAME) (>= $(DEVMAPPER_VERSION))" \
+		-- "-v$(DEVMAPPER_VERSION_DEBIAN)" -c2
+	dh_makeshlibs -plibdevmapper-event$(DEVMAPPER_ABINAME) \
+		"-Vlibdevmapper-event$(DEVMAPPER_ABINAME) (>= $(DEVMAPPER_VERSION))" \
+		-- "-v$(DEVMAPPER_VERSION_DEBIAN)" -c2
+	dh_makeshlibs --remaining-packages -V \
+		-- -c2
+
+override_dh_installsystemd:
+	dh_installsystemd -plvm2 --no-restart-after-upgrade --no-stop-on-upgrade \
+		blk-availability.service \
+		lvm2-monitor.service
+	dh_installsystemd -plvm2 \
+		lvm2-lvmpolld.socket
+	dh_installsystemd --remaining-packages
+
+.NOTPARALLEL:

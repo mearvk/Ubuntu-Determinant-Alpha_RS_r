@@ -1,0 +1,28 @@
+#!/bin/sh -ex
+
+DEB_HOST_GNU_TYPE=$(dpkg-architecture -q DEB_HOST_GNU_TYPE)
+CC=$DEB_HOST_GNU_TYPE-gcc
+PKG_CONFIG=$DEB_HOST_GNU_TYPE-pkg-config
+
+cd examples
+# the os_base.h in-tree header includes inttypes.h for the examples
+ln -sf /usr/include/inttypes.h os_base.h # -f to enable repeated runs
+$CC $($PKG_CONFIG --cflags libqb) \
+    -o ipcserver ipcserver.c \
+    $($PKG_CONFIG --libs libqb)
+$CC $($PKG_CONFIG --cflags libqb) \
+    -o ipcclient ipcclient.c \
+    $($PKG_CONFIG --libs libqb)
+
+OUT="${AUTOPKGTEST_ARTIFACTS:-.}/out.txt"
+ERR="${AUTOPKGTEST_ARTIFACTS:-.}/err.txt"
+
+./ipcserver >"$OUT" 2>"$ERR" &
+pid="$!"
+sleep 1 # give ipcserver ample chance to start up fully
+( echo this is a test; echo q ) | ./ipcclient
+sleep 1 # give ipcserver ample chance to clean up fully
+kill "$pid"
+
+cat "$ERR"
+fgrep 'this is a test' "$ERR"

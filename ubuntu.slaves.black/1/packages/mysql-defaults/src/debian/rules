@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+ifeq (Ubuntu,$(shell dpkg-vendor --derives-from Ubuntu && echo Ubuntu))
+default-mysql-client-core	 = mysql-client-core-8.0
+default-mysql-client		 = mysql-client-8.0
+default-mysql-server-core	 = mysql-server-core-8.0
+default-mysql-server		 = mysql-server-8.0
+default-libmysqlclient-dev	 = libmysqlclient-dev
+default-libmysqld-dev		 = n/a
+export DH_OPTIONS := $(DH_OPTIONS) -Ndefault-libmysqld-dev
+else
+default-mysql-client-core	 = mariadb-client-core-10.6
+default-mysql-client		 = mariadb-client-10.6
+default-mysql-server-core	 = mariadb-server-core-10.6
+default-mysql-server		 = mariadb-server-10.6
+default-libmysqlclient-dev	 = libmariadb-dev-compat
+default-libmysqld-dev		 = libmariadbd-dev
+endif
+
+%:
+	dh $@
+
+override_dh_gencontrol:
+	dh_gencontrol -pmysql-common -- -v5.8+$(DEB_VERSION)
+	dh_gencontrol -Nmysql-common -- \
+		-Vdefault:mysql-client-core=$(default-mysql-client-core) \
+		-Vdefault:mysql-client=$(default-mysql-client) \
+		-Vdefault:mysql-server-core=$(default-mysql-server-core) \
+		-Vdefault:mysql-server=$(default-mysql-server) \
+		-Vdefault:libmysqlclient-dev=$(default-libmysqlclient-dev) \
+		-Vdefault:libmysqld-dev=$(default-libmysqld-dev)

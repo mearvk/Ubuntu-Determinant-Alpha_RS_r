@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -e
+set -u
+
+count=0
+any_failed=0
+silent=0
+glob=""
+
+for arg in $@; do
+    if [ "x$arg" = "x-s" ]; then
+        silent=1
+    elif [ "x$arg" != "x" ]; then
+        glob="$arg"
+    fi
+done
+
+for duck in *$glob*.duck; do
+    count=$(( count + 1 ))
+    out=$(echo $duck | sed -e 's/\.duck$/.out/')
+    page=$(echo $duck | sed -e 's/\.duck$/.page/')
+    error=$(echo $duck | sed -e 's/\.duck$/.error/')
+    fail=""
+    if [ -f "$page" ]; then
+        python3 runtest.py "$duck" > "$out" || fail="exit status $?"
+        if ! cmp "$out" "$page" >&2; then
+            fail="${fail:+${fail}, }unexpected output"
+            diff -u "$out" "$page" >&2 || :
+        fi
+    elif [ -f "$error" ]; then
+        status=0
+        python3 runtest.py "$duck" > "$out" || :
+        if ! cmp "$out" "$error" >&2; then
+            fail="unexpected error message"
+            diff -u "$out" "$error" >&2 || :
+        fi
+    else
+        fail="neither $page nor $error exists"
+    fi
+    if [ -z "$fail" ]; then
+        if [ $silent = 0 ]; then
+            echo "ok $count - $duck"
+        fi
+    else
+        any_failed=1
+        echo "not ok $count - $duck: $fail"
+    fi
+done
+
+echo "1..$count"
+
+if [ "$any_failed" = 0 ]; then
+    echo "# All tests successful"
+else
+    echo "# At least one test failed"
+fi
+
+exit $any_failed

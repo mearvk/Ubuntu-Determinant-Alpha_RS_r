@@ -1,0 +1,49 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Fri, 22 Apr 2022 01:01:56 +0200
+Subject: notification: Do not duplicate calls on parse functions
+
+Origin: https://gitlab.gnome.org/GNOME/libnotify/-/commit/997e2e3
+
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/libnotify/+bug/1802483
+---
+ libnotify/notification.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/libnotify/notification.c b/libnotify/notification.c
+index b8e38ef..fe7476b 100644
+--- a/libnotify/notification.c
++++ b/libnotify/notification.c
+@@ -1033,24 +1033,24 @@ maybe_parse_snap_hint_value (NotifyNotification *notification,
+                              const gchar *key,
+                              GVariant    *value)
+ {
++        StringParserFunc parse_func = NULL;
++
+         if (!notification->priv->snap_path)
+                 return value;
+ 
+         if (g_strcmp0 (key, "desktop-entry") == 0) {
+-                value = get_parsed_variant (notification,
+-                                            key,
+-                                            value,
+-                                            try_prepend_snap_desktop);
++                parse_func = try_prepend_snap_desktop;
+         } else if (g_strcmp0 (key, "image-path") == 0 ||
+                    g_strcmp0 (key, "image_path") == 0 ||
+                    g_strcmp0 (key, "sound-file") == 0) {
+-                value = get_parsed_variant (notification,
+-                                            key,
+-                                            value,
+-                                            try_prepend_snap);
++                parse_func = try_prepend_snap;
++        }
++
++        if (parse_func == NULL) {
++                return value;
+         }
+ 
+-        return value;
++        return get_parsed_variant (notification, key, value, parse_func);
+ }
+ 
+ /**

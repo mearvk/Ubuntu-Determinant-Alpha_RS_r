@@ -1,0 +1,61 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libsoup, to verify that
+# the headers and pkg-config file are installed correctly
+# (C) 2012 Canonical Ltd.
+# (C) 2018-2019 Simon McVittie
+# Authors: Martin Pitt, Simon McVittie
+
+set -eux
+
+WORKDIR=$(mktemp -d)
+export XDG_RUNTIME_DIR="$WORKDIR"
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > gnome.c
+#include <libsoup/soup-gnome.h>
+
+int main(void)
+{
+    g_assert_cmpuint (SOUP_TYPE_PROXY_RESOLVER_GNOME, !=, G_TYPE_INVALID);
+    return 0;
+}
+EOF
+cat <<EOF > soup.c
+#include <libsoup/soup.h>
+
+int main(void)
+{
+    g_assert_true (soup_check_version(2, 60, 0));
+    return 0;
+}
+EOF
+
+cflags=
+
+case "${0}" in
+    (*libsoup-gnome*)
+        cflags=-Wno-deprecated-declarations
+        code=gnome.c
+        lib=libsoup-gnome-2.4
+        ;;
+
+    (*)
+        code=soup.c
+        lib=libsoup-2.4
+        ;;
+esac
+
+# Deliberately word-splitting pkg-config's output, and $cflags:
+# shellcheck disable=SC2046
+${CROSS_COMPILE}gcc $cflags -o "${lib}-test" "${code}" $(${CROSS_COMPILE}pkg-config --cflags --libs "$lib")
+echo "build ($lib): OK"
+[ -x "${lib}-test" ]
+dbus-run-session -- xvfb-run -a "./${lib}-test"
+echo "run ($lib): OK"

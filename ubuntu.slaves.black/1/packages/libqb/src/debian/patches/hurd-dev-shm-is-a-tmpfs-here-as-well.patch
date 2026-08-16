@@ -1,0 +1,48 @@
+From: =?utf-8?q?Ferenc_W=C3=A1gner?= <wferi@debian.org>
+Date: Thu, 12 Oct 2017 15:13:25 +0200
+Subject: hurd: /dev/shm is a tmpfs here as well
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Ferenc Wágner <wferi@debian.org>
+---
+ lib/ipc_setup.c | 4 ++--
+ lib/unix.c      | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/lib/ipc_setup.c b/lib/ipc_setup.c
+index c144a5e..b042b57 100644
+--- a/lib/ipc_setup.c
++++ b/lib/ipc_setup.c
+@@ -656,7 +656,7 @@ handle_new_connection(struct qb_ipcs_service *s,
+ 
+ 	memset(&response, 0, sizeof(response));
+ 
+-#if defined(QB_LINUX) || defined(QB_CYGWIN)
++#if defined(QB_LINUX) || defined(QB_CYGWIN) || defined(QB_GNU)
+ 	desc_len = snprintf(c->description, CONNECTION_DESCRIPTION - sizeof suffix,
+ 			    "/dev/shm/qb-%d-%d-%d-XXXXXX", s->pid, ugp->pid, c->setup.u.us.sock);
+ 	if (desc_len < 0) {
+@@ -917,7 +917,7 @@ retry_accept:
+ 
+ void remove_tempdir(const char *name)
+ {
+-#if defined(QB_LINUX) || defined(QB_CYGWIN)
++#if defined(QB_LINUX) || defined(QB_CYGWIN) || defined(QB_GNU)
+ 	char dirname[PATH_MAX];
+ 	char *slash = strrchr(name, '/');
+ 
+diff --git a/lib/unix.c b/lib/unix.c
+index 2fb53d0..05a92b2 100644
+--- a/lib/unix.c
++++ b/lib/unix.c
+@@ -85,7 +85,7 @@ qb_sys_mmap_file_open(char *path, const char *file, size_t bytes,
+ 	if (is_absolute) {
+ 		(void)strlcpy(path, file, PATH_MAX);
+ 	} else {
+-#if defined(QB_LINUX) || defined(QB_CYGWIN)
++#if defined(QB_LINUX) || defined(QB_CYGWIN) || defined(QB_GNU)
+ 		/* This is only now called when talking to an old libqb
+ 		   where we need to add qb- to the name */
+ 		snprintf(path, PATH_MAX, "/dev/shm/qb-%s", file);

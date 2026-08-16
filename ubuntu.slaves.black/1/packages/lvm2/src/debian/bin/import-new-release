@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euE
+set -o pipefail
+
+PACKAGE=lvm2
+VERSION=$1
+
+error() {
+  echo "$@" >&2
+  exit 1
+}
+
+TMP=
+clean_on_exit() {
+  for path in "${TMP}"; do
+    test -z "${path}" || rm -rf "${path}"
+  done
+}
+trap clean_on_exit EXIT INT TERM
+TMP="$(mktemp -d --suffix=.lvm2.orig)"
+
+(
+  cd $TMP
+  curl --fail -O https://sourceware.org/pub/lvm2/LVM2.${VERSION}.tgz
+  curl --fail -O https://sourceware.org/pub/lvm2/LVM2.${VERSION}.tgz.asc
+  gpg --verify LVM2.${VERSION}.tgz.asc
+  gunzip -c LVM2.${VERSION}.tgz | xz > lvm2_${VERSION}.orig.tar.xz
+)
+
+pristine-lfs commit ${TMP}/lvm2_${VERSION}.orig.tar.xz
+
+git clone -b upstream . ${TMP}/upstream
+
+(
+  cd ${TMP}/upstream
+  git rm -rfq .
+  tar --strip-components=1 -xaf ${TMP}/lvm2_${VERSION}.orig.tar.xz
+  git add -A
+  git commit -m "Import lvm2_${VERSION}.orig.tar"
+  git tag upstream/${VERSION}
+  git push origin refs/heads/upstream refs/tags/upstream/${VERSION}
+)
+
+git merge --no-ff --no-commit -m "Import ${VERSION}" upstream/${VERSION} || :
+dch -v ${VERSION}-1 "New upstream release."
+git add debian/changelog

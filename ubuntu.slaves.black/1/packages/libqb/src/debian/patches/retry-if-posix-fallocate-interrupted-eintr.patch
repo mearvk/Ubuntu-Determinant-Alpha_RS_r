@@ -1,0 +1,52 @@
+Description: Retry a few times if posix_fallocate fails with EINTR
+ Pacemaker sometimes returns errors during posix_fallocate that can cause a crash.
+ The function will be retried up to five times to help avoid the crash.
+Author: Jakub Jankowski <shasta@toxcorp.com>
+Origin: upstream, https://github.com/ClusterLabs/libqb/pull/453/commits/2e259c9d6e13968665678745f1e774bc4ccf8806
+Bug: https://github.com/ClusterLabs/libqb/issues/451
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/libqb/+bug/1978955
+Bug-SUSE: https://www.suse.com/support/kb/doc/?id=000020566
+Last-Update: 2022-06-17
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/lib/unix.c
++++ b/lib/unix.c
+@@ -81,6 +81,9 @@
+ 	int32_t i;
+ #endif
+ 	char *is_absolute = strchr(file, '/');
++#ifdef HAVE_POSIX_FALLOCATE
++	int32_t fallocate_retry = 5;
++#endif
+ 
+ 	if (is_absolute) {
+ 		(void)strlcpy(path, file, PATH_MAX);
+@@ -121,12 +124,22 @@
+ 	}
+ #endif
+ #ifdef HAVE_POSIX_FALLOCATE
+-	if ((res = posix_fallocate(fd, 0, bytes)) != 0) {
+-		errno = res;
+-		res = -1 * res;
+-		qb_util_perror(LOG_ERR, "couldn't allocate file %s", path);
+-		goto unlink_exit;
+-	}
++    /* posix_fallocate(3) can be interrupted by a signal,
++       so retry few times before giving up */
++    do {
++		fallocate_retry--;
++		res = posix_fallocate(fd, 0, bytes);
++		if (res == EINTR) {
++			qb_util_log(LOG_DEBUG, "got EINTR trying to allocate file %s, retrying...", path);
++			continue;
++		} else if (res != 0) {
++			errno = res;
++			res = -1 * res;
++			qb_util_perror(LOG_ERR, "couldn't allocate file %s", path);
++			goto unlink_exit;
++		}
++		break;
++	} while (fallocate_retry > 0);
+ #else
+ 	if (file_flags & O_CREAT) {
+ 		long page_size = sysconf(_SC_PAGESIZE);

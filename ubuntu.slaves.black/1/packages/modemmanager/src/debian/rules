@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+export DPKG_GENSYMBOLS_CHECK_LEVEL=4
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+#always exclude any data from version control systems
+DH_ALWAYS_EXCLUDE=.svn:.git:.bzr
+
+%:
+	dh $@ --with gir --buildsystem=meson --without autoreconf
+
+override_dh_auto_clean:
+	rm -f gtk-doc.make m4/gtk-doc.m4
+	dh_auto_clean
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dgtk_doc=true \
+		-Dpolkit=permissive \
+		-Dqrtr=false \
+		-Dsystemd_suspend_resume=true \
+		-Dsystemdsystemunitdir=/lib/systemd/system \
+		-Dvapi=true
+
+override_dh_install:
+	rmdir $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/ModemManager/fcc-unlock.d
+	find $(CURDIR)/debian/tmp/ -name \*.a -exec rm {} \;
+	find $(CURDIR)/debian/tmp/ -name \*.la -exec rm {} \;
+	dh_install

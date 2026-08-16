@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cd "$AUTOPKGTEST_TMP"
+
+cat <<EOF > libmanette.c
+#include <libmanette.h>
+int
+main (int    argc,
+      char **argv)
+{
+  ManetteMonitor *monitor = NULL;
+
+  monitor = manette_monitor_new ();
+
+  return 0;
+}
+
+EOF
+
+${CROSS_COMPILE}gcc -o libmanette libmanette.c $(${CROSS_COMPILE}pkg-config --cflags --libs manette-0.2)
+echo "build ok"
+[ -x libmanette ]
+./libmanette
+echo "starts ok"

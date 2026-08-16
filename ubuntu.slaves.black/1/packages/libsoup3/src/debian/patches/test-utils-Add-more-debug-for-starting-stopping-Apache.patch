@@ -1,0 +1,66 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Wed, 16 Mar 2022 12:01:53 +0000
+Subject: test-utils: Add more debug for starting/stopping Apache
+
+---
+ tests/test-utils.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/tests/test-utils.c b/tests/test-utils.c
+index 04423d1..361a801 100644
+--- a/tests/test-utils.c
++++ b/tests/test-utils.c
+@@ -238,10 +238,12 @@ apache_cmd (const char *cmd)
+ void
+ apache_init (void)
+ {
++	g_test_message ("[%f] enter %s", g_get_monotonic_time () / 1e6, G_STRFUNC);
++
+ 	/* Set this environment variable if you are already running a
+ 	 * suitably-configured Apache server */
+ 	if (g_getenv ("SOUP_TESTS_ALREADY_RUNNING_APACHE"))
+-		return;
++		goto out;
+ 
+ 	server_root = soup_test_build_filename_abs (G_TEST_BUILT, "", NULL);
+ 
+@@ -250,6 +252,9 @@ apache_init (void)
+ 		exit (1);
+ 	}
+ 	apache_running = TRUE;
++
++out:
++	g_test_message ("[%f] leave %s", g_get_monotonic_time () / 1e6, G_STRFUNC);
+ }
+ 
+ void
+@@ -258,14 +263,18 @@ apache_cleanup (void)
+ 	pid_t pid;
+ 	char *contents;
+ 
++	g_test_message ("[%f] enter %s", g_get_monotonic_time () / 1e6, G_STRFUNC);
++
+ 	if (g_file_get_contents ("httpd.pid", &contents, NULL, NULL)) {
+ 		pid = strtoul (contents, NULL, 10);
+ 		g_free (contents);
+ 	} else
+ 		pid = 0;
+ 
+-	if (!apache_cmd ("graceful-stop"))
+-		return;
++	if (!apache_cmd ("graceful-stop")) {
++		g_printerr ("Could not stop Apache\n");
++		goto out;
++	}
+ 	apache_running = FALSE;
+ 
+ 	if (pid) {
+@@ -279,6 +288,8 @@ apache_cleanup (void)
+ 	}
+ 
+ 	g_clear_pointer (&server_root, g_free);
++out:
++	g_test_message ("[%f] leave %s", g_get_monotonic_time () / 1e6, G_STRFUNC);
+ }
+ 
+ #endif /* HAVE_APACHE */

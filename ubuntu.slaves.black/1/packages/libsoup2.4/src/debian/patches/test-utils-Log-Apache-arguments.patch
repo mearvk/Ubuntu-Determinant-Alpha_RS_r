@@ -1,0 +1,51 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Mon, 27 Dec 2021 16:24:55 +0000
+Subject: test-utils: Log Apache arguments
+
+This helped to diagnose a use-after-free bug in the unit tests.
+
+Signed-off-by: Simon McVittie <smcv@debian.org>
+---
+ tests/test-utils.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/tests/test-utils.c b/tests/test-utils.c
+index 923394d..64f09ad 100644
+--- a/tests/test-utils.c
++++ b/tests/test-utils.c
+@@ -156,6 +156,8 @@ apache_cmd (const char *cmd)
+ #endif
+ 	int status;
+ 	gboolean ok;
++	GString *str;
++	guint i;
+ 
+ 	server_root = soup_test_build_filename_abs (G_TEST_BUILT, "", NULL);
+ 
+@@ -183,6 +185,18 @@ apache_cmd (const char *cmd)
+ 	g_ptr_array_add (argv, (char *)cmd);
+ 	g_ptr_array_add (argv, NULL);
+ 
++	str = g_string_new ("Apache command:");
++
++	for (i = 0; i < argv->len - 1; i++) {
++		char *escaped = g_shell_quote (argv->pdata[i]);
++		g_string_append_c (str, ' ');
++		g_string_append (str, escaped);
++		g_free (escaped);
++	}
++
++	g_test_message ("%s", str->str);
++	g_string_free (str, TRUE);
++
+ 	ok = g_spawn_sync (cwd, (char **)argv->pdata, NULL, 0, NULL, NULL,
+ 			   NULL, NULL, &status, NULL);
+ 	if (ok)
+@@ -196,6 +210,7 @@ apache_cmd (const char *cmd)
+ #endif
+ 	g_ptr_array_free (argv, TRUE);
+ 
++	g_test_message (ok ? "-> success" : "-> failed");
+ 	return ok;
+ }
+ 

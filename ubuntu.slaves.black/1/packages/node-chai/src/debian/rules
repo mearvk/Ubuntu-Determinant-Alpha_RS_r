@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+WEBPACK=NODE_PATH='/usr/share/nodejs:/usr/lib/nodejs' webpack --verbose
+CHAI_SRC=$(shell find lib -name "*.js" -type f | LC_ALL=C sort)
+
+%:
+	dh $@
+
+chai.js: index.js $(CHAI_SRC)
+	$(WEBPACK)  --config debian/webpack.config.js
+
+override_dh_auto_build:
+	cd loupe && sh -e ../debian/nodejs/loupe/build
+	$(MAKE) chai.js
+	terser -o chai.min.js chai.js
+	cd fclone && sh -e ../debian/nodejs/fclone/build
+
+override_dh_auto_install:
+	dh_auto_install --buildsystem=nodejs
+	rm -rf debian/tmp/usr/share/nodejs/chai/dist
+
+override_dh_installchangelogs:
+	dh_installchangelogs -k History.md

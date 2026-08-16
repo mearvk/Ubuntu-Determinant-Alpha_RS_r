@@ -1,0 +1,55 @@
+From: =?utf-8?b?Ik1hcmNvIFRyZXZpc2FuIChUcmV2acOxbyki?= <mail@3v1n0.net>
+Date: Thu, 21 Apr 2022 18:29:55 +0200
+Subject: notification: Do not prepend SNAP prefix when is already present
+
+We used to just add it again, to eventually figure out that the file
+did not exists, but may not work properly in some scenarios.
+
+Also always fill the path_filename when using a file-name only, as that
+may be refer to something under the SNAP path, and in such case we want
+to try check if that exists before giving up.
+
+Origin: https://gitlab.gnome.org/GNOME/libnotify/-/commit/c4d5ea8
+
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/libnotify/+bug/1802483
+---
+ libnotify/notification.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/libnotify/notification.c b/libnotify/notification.c
+index c4f9be5..8259691 100644
+--- a/libnotify/notification.c
++++ b/libnotify/notification.c
+@@ -443,16 +443,27 @@ try_prepend_path (const char *base_path,
+                         path_filename = g_strdup (base_path);
+                 } else {
+                         path_filename = realpath (base_path, NULL);
++
++                        if (path_filename == NULL) {
++                                /* File path is not existing, but let's check
++                                 * if it's under the base path before giving up
++                                 */
++                                path_filename = g_strdup (base_path);
++                        }
+                 }
+         }
+ 
+-        g_debug ("Trying to look at file '%s' in the '%s' prefix.",
+-                 base_path,
+-                 path);
+-
+-        path_ret = g_build_filename (path, path_filename, NULL);
++        if (g_str_has_prefix (path_filename, path)) {
++                path_ret = g_strdup (path_filename);
++        } else {
++                g_debug ("Trying to look at file '%s' in the '%s' prefix.",
++                         base_path,
++                         path);
++                path_ret = g_build_filename (path, path_filename, NULL);
++        }
+ 
+         if (!g_file_test (path_ret, G_FILE_TEST_EXISTS)) {
++                g_debug ("Nothing found at %s", path_ret);
+                 g_free (path_ret);
+                 path_ret = NULL;
+         }

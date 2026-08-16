@@ -1,0 +1,50 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libnotify, to verify that
+# the headers and pkg-config file are installed correctly
+# (C) 2013 Vibhav Pant
+# Author: Vibhav Pant <vibhavp@ubuntu.com>
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > libnotify_test.c
+#include <libnotify/notify.h>
+#include <assert.h>
+
+int main(void)
+{
+	NotifyNotification *notify;
+	GError *error = NULL;
+
+	assert(notify_init("autopkgtest") == TRUE);
+	assert(notify_is_initted() == TRUE);
+
+	notify = notify_notification_new("autopkgtest",
+					 "Testing libnotify",
+					 NULL);
+	notify_notification_set_urgency(notify, NOTIFY_URGENCY_NORMAL);
+
+	notify_notification_set_timeout(notify, 500);
+	notify_notification_show(notify, &error);
+	notify_uninit();
+	return 0;
+}
+EOF
+
+# deliberately word-splitting pkg-config output:
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -o libnotify_test libnotify_test.c \
+$("${CROSS_COMPILE}pkg-config" --cflags --libs libnotify) -Wall -Werror
+echo "build: OK"
+[ -x libnotify_test ]
+dbus-run-session -- xvfb-run ./libnotify_test
+echo "run: OK"

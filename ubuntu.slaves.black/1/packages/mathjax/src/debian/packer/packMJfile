@@ -1,0 +1,56 @@
+#! /usr/bin/perl
+
+#  Compresses a MathJax file and reports the new size and savings.
+#  You need to have yuicompressor in order for this to work
+#  
+#  Usage:  packMJfile src-file dest-file
+
+use Cwd;
+use FindBin;
+
+$bindir = $FindBin::Bin;
+
+$JAVA = "java";
+$SED = "sed";
+$YUICOMPRESSOR = "/usr/share/yui-compressor/yui-compressor.jar";
+
+$YUIFILTER = "$bindir/yuiFilter";
+$src = shift; $dst = shift;
+
+
+if ($src =~ m!/config/(local/local|default)\.js$!) {
+  print "============================================\n";
+  print "Copying: $src\n";
+  system("cp '$src' '$dst'");
+  exit;
+}
+
+print "============================================\n";
+print "Compressing: $src\n";
+print "--------------------------------------------";
+# The sed command uncomments the 'MathJax.isPacked = true;' from MathJax.js
+system("cat '$src' | $SED \"s\/^.*\\/\\/ \\(MathJax.isPacked = true;\\).*$\/\\1\/\" | $JAVA -jar '$YUICOMPRESSOR' -v -o '$dst' --type js 2>&1 | $YUIFILTER");
+
+open(MJX,"<", $dst);
+@lines = <MJX>;
+close(MJX);
+$compressed = join("",@lines);
+
+$template = "$bindir/template.js";
+
+open(MJX,"<",$template);
+@lines = <MJX>;
+close(MJX);
+$lines = join("",@lines);
+
+$dstname = $dst; $dstname =~ s!.*/(dpvc-)?MathJax!/MathJax!;
+$cwd = getcwd; $dstname =~ s/\Q$cwd\E/\/MathJax/;
+$lines =~ s/%%%NAME%%%/$dstname/;
+$lines =~ s/%%%DATA%%%/$compressed/;
+
+
+open(MJX,">",$dst);
+print MJX $lines;
+close(MJX);
+
+1;

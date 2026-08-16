@@ -1,0 +1,433 @@
+#! /usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# version number of the defaults package
+include /usr/share/dpkg/pkg-info.mk
+
+VMAJOR	:= $(shell echo $(DEB_VERSION) | awk -F. '{print $$1}')
+VMINOR	:= $(shell echo $(DEB_VERSION) | awk -F. '{print $$2}' | sed -e 's/\([0-9]*\).*/\1/')
+REL_EXT	:= $(shell echo $(DEB_VERSION) | sed -e 's/^$(VMAJOR)\.$(VMINOR)//')
+
+# llvm-defaults 0.1 is the first version for 2.7.
+REL_NO_27	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.2 is the first version for 2.8.
+REL_NO_28	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.7 is the first version for 2.9.
+REL_NO_29	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.9 is the first version for 3.0.
+REL_NO_30	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.10 is the first version for 3.1.
+REL_NO_31	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.16 is the first version for 3.2.
+REL_NO_32	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.21 is the first version for 3.3.
+REL_NO_33	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.22 is the first version for 3.4.
+REL_NO_34	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.24 is the first version for 3.5.
+REL_NO_35	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.27 is the first version for 3.6.
+REL_NO_36	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults (not in debian) is the first version for 3.7.
+REL_NO_37	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.34 is the first version for 3.8.
+REL_NO_38	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults (not in debian) is the first version for 3.9.
+REL_NO_39	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.37 is the first version for 4.0.
+REL_NO_40	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.41 is the first version for 5.0.
+REL_NO_50	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.41 is the first version for 6.0.
+REL_NO_60	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.44 is the first version for 7.0.
+REL_NO_70	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.48 is the first version for 8.0.
+REL_NO_80	:= $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.49 is the first version for 9.0.
+REL_NO_90   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.50 is the first version for 10.
+REL_NO_100   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.51 is the first version for 11.
+REL_NO_110   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.52 is the first version for 12.
+REL_NO_120   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.53 is the first version for 13.
+REL_NO_130   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+# llvm-defaults 0.53 is the first version for 14.
+REL_NO_140   := $(shell expr $(VMINOR) - 0)$(REL_EXT)
+
+
+# minimum required version
+
+REQV            := (>= 14~)
+
+CURRENT_VERSION := 14.0
+
+# architecture dependent variables
+include /usr/share/dpkg/architecture.mk
+
+# complete version number, including the release
+CV_LLVM		:= 1:$(CURRENT_VERSION)-$(REL_NO_140)
+
+distribution := $(shell lsb_release -is)
+all_packages   := llvm llvm-runtime llvm-dev clang clang-tools libclang-cpp-dev libclang1 libclang-dev clang-format clang-tidy clangd python3-clang libomp5 libomp-dev libc++1 libc++-dev libc++abi1 libc++abi-dev libllvm-ocaml-dev
+no_packages    :=
+
+EXTRA_SUPPORTED=amd64 arm64 armel armhf i386 ppc64el kfreebsd-amd64 kfreebsd-i386 s390 s390x sparc alpha hppa m68k powerpcspe ppc64 sh4 sparc64 x32
+ifneq (,$(filter $(DEB_HOST_ARCH),$(EXTRA_SUPPORTED)))
+    all_packages += lldb liblldb-dev python3-lldb
+else
+    no_packages += lldb liblldb-dev python3-lldb
+endif
+
+LLD_SUPPORTED=amd64 arm64 armel armhf i386 mips mipsel mips64el ppc64el kfreebsd-amd64 kfreebsd-i386 s390 sparc alpha hppa m68k powerpcspe ppc64 sh4 sparc64 x32
+ifneq (,$(filter $(DEB_HOST_ARCH),$(LLD_SUPPORTED)))
+    all_packages += lld
+else
+    no_packages += lld
+endif
+
+
+packages := $(filter-out $(no_packages), $(all_packages))
+
+# derived version number (without release)
+V_LLVM  := $(shell echo $(CV_LLVM) | sed 's/^[0-9]*://' | sed 's/-[^-]*$$//')
+
+# number for the package name
+PV_LLVM := $(shell echo $(V_LLVM) | awk -F. '{printf "%d", $$1}')
+
+OS_NAME := Linux
+
+ifeq ($(DEB_HOST_ARCH),hurd-i386)
+    OS_NAME	:= Hurd
+endif
+
+ifneq (,$(filter $(DEB_HOST_ARCH),kfreebsd-i386 kfreebsd-amd64))
+    OS_NAME	:= kFreeBSD
+endif
+
+README:
+	m4 -DPACKAGES="$(packages)" \
+	   -DOS_NAME=$(OS_NAME) \
+	   -DDEB_ARCH=$(DEB_HOST_ARCH) \
+	   -DPV_LLVM=$(PV_LLVM) \
+	   debian/README.Debian.m4 > debian/README.Debian.tmp2
+	uniq debian/README.Debian.tmp2 > debian/README.Debian.tmp
+	rm -f debian/README.Debian.tmp2
+	[ -e debian/README.Debian ] \
+	  && cmp -s debian/README.Debian debian/README.Debian.tmp \
+	  && rm -f debian/README.Debian.tmp && exit 0; \
+	  mv debian/README.Debian.tmp debian/README.Debian
+.PHONY: README
+
+substvars:
+	( \
+	  echo 'version:llvm=$(CV_LLVM)'; \
+	  echo 'pv:llvm=$(PV_LLVM)'; \
+	  echo 'reqv:llvm=$(REQV)'; \
+	) > debian/substvars.local
+.PHONY: substvars
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp:
+	dh_testdir
+	touch build-stamp
+
+clean:
+	dh_testdir
+	rm -f *-stamp
+	rm -f debian/substvars.local
+	dh_clean
+
+install: build README substvars
+	dh_testdir
+	dh_prep
+
+	for p in $(packages); do \
+	  cp -l debian/substvars.local debian/$$p.substvars; \
+	done
+
+	: # llvm
+	dh_installdirs -pllvm \
+		usr/bin usr/share/man/man1
+	for bin in \
+		bugpoint llc llvm-ar llvm-as llvm-bcanalyzer llvm-config \
+		llvm-cov llvm-diff llvm-dis llvm-dwarfdump llvm-extract \
+		llvm-link llvm-mc llvm-nm llvm-objdump \
+		llvm-ranlib llvm-rtdyld llvm-size llvm-tblgen llvm-profdata \
+		llvm-symbolizer dsymutil llvm-PerfectShuffle llvm-c-test llvm-cat \
+		llvm-cfi-verify llvm-cvtres llvm-cxxdump llvm-cxxfilt llvm-dlltool \
+		llvm-dwp llvm-exegesis llvm-lib llvm-lto llvm-lto2 llvm-mca llvm-modextract \
+		llvm-mt llvm-objcopy llvm-opt-report llvm-pdbutil llvm-rc llvm-readelf \
+		llvm-readobj llvm-split llvm-stress llvm-strings llvm-strip llvm-undname \
+		llvm-xray sanstats opt \
+		; do \
+		dh_link -pllvm \
+			/usr/lib/llvm-$(PV_LLVM)/bin/$$bin \
+			/usr/bin/$$bin ; \
+	done
+	for bin in \
+		yaml2obj obj2yaml verify-uselistorder \
+		; do \
+		dh_link -pllvm \
+			/usr/lib/llvm-$(PV_LLVM)/bin/$$bin \
+			/usr/bin/$$bin ; \
+	done
+# To know if there is a manpage or not
+# for f in $L; do if test -f /usr/share/man/man1/$f-7.1.gz; then echo $f; fi; done|tr "\n" " "
+	for man in \
+		llvm-ranlib llvm-dwarfdump \
+		llvm-objdump llvm-rtdyld llvm-size llvm-mc \
+		; do \
+		dh_link -pllvm \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		clang; do \
+		dh_link -pclang \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		clang-apply-replacements clang-check clang-query \
+		scan-build scan-view sancov; do \
+		dh_link -pclang-tools \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		clang-format clang-format-diff; do \
+		dh_link -pclang-format \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		clangd; do \
+		dh_link -pclangd \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		clang-tidy; do \
+		dh_link -pclang-tidy \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		lldb; do \
+		dh_link -plldb \
+			/usr/share/man/man1/$$man-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	for man in \
+		ld.lld lld; do \
+		dh_link -plld \
+			/usr/share/man/man1/ld.lld-$(PV_LLVM).1.gz \
+			/usr/share/man/man1/$$man.1.gz ; \
+	done
+
+	: # llvm-runtime
+	dh_installdirs -pllvm-runtime \
+		usr/bin usr/share/man/man1
+	dh_link -pllvm-runtime \
+		/usr/lib/llvm-$(PV_LLVM)/bin/lli /usr/bin/lli
+	dh_link -pllvm-runtime \
+	  /usr/share/man/man1/lli-$(PV_LLVM).1.gz /usr/share/man/man1/lli.1.gz
+
+	: # llvm-dev
+	dh_installdirs -pllvm-dev \
+		/usr/include \
+		/usr/share/vim/addons/syntax/ \
+		/usr/lib
+	dh_link -pllvm-dev \
+		/usr/lib/llvm-$(PV_LLVM)/include/llvm /usr/include/llvm \
+		/usr/lib/llvm-$(PV_LLVM)/include/llvm-c /usr/include/llvm-c \
+		/usr/share/vim/addons/syntax/llvm-$(PV_LLVM).vim /usr/share/vim/addons/syntax/llvm.vim \
+		/usr/share/vim/addons/syntax/tablegen-$(PV_LLVM).vim /usr/share/vim/addons/syntax/tablegen.vim \
+		/usr/share/emacs/site-lisp/llvm-$(PV_LLVM) /usr/share/emacs/site-lisp/llvm
+
+	for lib in \
+		libLTO.so LLVMgold.so; do \
+		dh_link -pllvm-dev \
+		/usr/lib/llvm-$(PV_LLVM)/lib/$$lib /usr/lib/$$lib; \
+	done
+
+	: # liblldb-dev
+	dh_installdirs -pliblldb-dev \
+		/usr/include \
+		/usr/lib
+	dh_link -pliblldb-dev \
+		/usr/lib/llvm-$(PV_LLVM)/include/lldb /usr/include/lldb \
+
+	for lib in \
+		liblldb.so; do \
+		dh_link -pliblldb-dev \
+		/usr/lib/llvm-$(PV_LLVM)/lib/$$lib /usr/lib/$$lib; \
+	done
+
+
+	: libllvm-ocaml-dev
+	dh_installdirs -plibllvm-ocaml-dev \
+		/usr/lib/ocaml/METAS
+	dh_link -plibllvm-ocaml-dev \
+		/usr/lib/ocaml/META.llvm /usr/lib/ocaml/METAS/META.llvm
+
+#  clang
+
+	dh_installdirs -pclang \
+		usr/bin usr/share/man/man1
+	for bin in \
+		clang clang++ \
+		; do \
+		dh_link -pclang \
+			/usr/lib/llvm-$(PV_LLVM)/bin/$$bin \
+			/usr/bin/$$bin ; \
+	done
+
+# clang-tools
+	dh_installdirs -pclang-tools \
+		usr/bin usr/share/man/man1
+	for bin in \
+		clang-check c-index-test \
+		clang-apply-replacements clang-query sancov; do \
+		dh_link -pclang-tools \
+			/usr/lib/llvm-$(PV_LLVM)/bin/$$bin \
+			/usr/bin/$$bin ; \
+	done
+
+# clang-tidy
+	for bin in \
+		clang-tidy \
+		; do \
+		dh_link -pclang-tidy \
+			/usr/lib/llvm-$(PV_LLVM)/bin/$$bin \
+			/usr/bin/$$bin ; \
+	done
+	dh_link -pclang-tidy \
+		/usr/bin/run-clang-tidy-$(PV_LLVM).py  \
+		/usr/bin/run-clang-tidy
+	dh_link -pclang-tidy \
+		/usr/bin/clang-tidy-diff-$(PV_LLVM).py  \
+		/usr/bin/clang-tidy-diff
+
+#  clang-format
+	dh_link -pclang-format \
+		/usr/bin/clang-format-$(PV_LLVM) \
+		/usr/bin/clang-format
+	dh_link -pclang-format \
+		/usr/bin/clang-format-diff-$(PV_LLVM) \
+		/usr/bin/clang-format-diff
+	dh_link -pclang-format \
+		/usr/bin/git-clang-format-$(PV_LLVM) \
+		/usr/bin/git-clang-format
+	dh_link -pclang-format \
+		/usr/share/vim/addons/syntax/clang-format-$(PV_LLVM).py \
+		/usr/share/vim/addons/syntax/clang-format.py
+	dh_link -pclang-format \
+		/usr/share/emacs/site-lisp/clang-format-$(PV_LLVM) \
+		/usr/share/emacs/site-lisp/clang-format
+
+#  clangd
+	dh_link -pclangd \
+			/usr/bin/clangd-$(PV_LLVM) \
+			/usr/bin/clangd
+
+#  clang-tools
+	dh_link -pclang-tools \
+			/usr/bin/scan-build-$(PV_LLVM) \
+			/usr/bin/scan-build
+	dh_link -pclang-tools \
+			/usr/bin/scan-view-$(PV_LLVM) \
+			/usr/bin/scan-view
+
+#  clang
+	dh_link -pclang \
+			/usr/bin/asan_symbolize-$(PV_LLVM) \
+			/usr/bin/asan_symbolize
+
+#  lldb
+	dh_link -plldb \
+			/usr/bin/lldb-$(PV_LLVM) \
+			/usr/bin/lldb
+	dh_link -plldb \
+			/usr/bin/lldb-argdumper-$(PV_LLVM) \
+			/usr/bin/lldb-argdumper
+	dh_link -plldb \
+			/usr/bin/lldb-server-$(PV_LLVM) \
+			/usr/bin/lldb-server
+
+#  lld
+	dh_link -plld \
+			/usr/bin/lld-$(PV_LLVM) \
+			/usr/bin/lld
+	dh_link -plld \
+			/usr/bin/ld.lld-$(PV_LLVM) \
+			/usr/bin/ld.lld
+	dh_link -plld \
+			/usr/bin/lld-link-$(PV_LLVM) \
+			/usr/bin/lld-link
+	dh_link -plld \
+			/usr/bin/wasm-ld-$(PV_LLVM) \
+			/usr/bin/wasm-ld
+
+
+nopkgs := $(foreach p, $(no_packages),-N$(p))
+
+binary-indep: build install
+	# nothing to do
+
+binary-arch: build install
+	dh_testdir
+
+	dh_lintian
+	dh_installchangelogs -a $(nopkgs)
+	dh_installdocs -a $(nopkgs) debian/README.Debian
+
+	dh_compress -a $(nopkgs) -X README.Debian
+	dh_fixperms -a $(nopkgs)
+	dh_installdeb -a $(nopkgs)
+
+	for p in $(packages) ; do \
+	  dh_gencontrol -p$$p -- -v$(CV_LLVM) ; \
+	done
+
+	dh_md5sums -a $(nopkgs)
+	dh_builddeb -a $(nopkgs)
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install
