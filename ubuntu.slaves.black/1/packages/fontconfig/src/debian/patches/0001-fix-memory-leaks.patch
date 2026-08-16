@@ -1,0 +1,43 @@
+From 61573ad5f7c4dd0860d613d99d0086433240eb75 Mon Sep 17 00:00:00 2001
+From: Akira TAGOH <akira@tagoh.org>
+Date: Wed, 19 Feb 2020 17:05:20 +0900
+Subject: [PATCH] Fix memory leaks
+
+---
+ src/fcfreetype.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/fcfreetype.c b/src/fcfreetype.c
+index 5ebef09..9c2ae83 100644
+--- a/src/fcfreetype.c
++++ b/src/fcfreetype.c
+@@ -2200,6 +2200,17 @@ bail2:
+     FcCharSetDestroy (cs);
+ bail1:
+     FcPatternDestroy (pat);
++    if (master)
++    {
++#ifdef HAVE_FT_DONE_MM_VAR
++	if (face->glyph)
++	    FT_Done_MM_Var (face->glyph->library, master);
++#else
++	free (master);
++#endif
++    }
++    if (!nm_share && name_mapping)
++	free (name_mapping);
+     if (foundry_)
+ 	free (foundry_);
+ bail0:
+@@ -2360,6 +2371,8 @@ bail:
+     if (face)
+ 	FT_Done_Face (face);
+     FT_Done_FreeType (ftLibrary);
++    if (nm)
++	free (nm);
+ 
+     return ret;
+ }
+-- 
+2.24.1
+

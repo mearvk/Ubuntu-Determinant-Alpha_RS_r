@@ -1,0 +1,35 @@
+From e2f9f28aed1470a07c33a57940d68b6a3cbe235b Mon Sep 17 00:00:00 2001
+From: Akira TAGOH <akira@tagoh.org>
+Date: Fri, 26 Jul 2019 04:59:54 +0000
+Subject: [PATCH] Fix a memory leak in FcFreeTypeQuery*()
+
+Fixes https://gitlab.freedesktop.org/fontconfig/fontconfig/issues/170
+---
+ src/fcfreetype.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/fcfreetype.c b/src/fcfreetype.c
+index bc1ab3f..28fa8ac 100644
+--- a/src/fcfreetype.c
++++ b/src/fcfreetype.c
+@@ -2121,9 +2121,14 @@ FcFreeTypeQueryFaceInternal (const FT_Face  face,
+ 	free (foundry_);
+ 
+     if (master)
+-      {
+-	/* TODO: How to free master?! */
+-      }
++    {
++#ifdef HAVE_FT_DONE_MM_VAR
++	if (face->glyph)
++	    FT_Done_MM_Var (face->glyph->library, master);
++#else
++	free (master);
++#endif
++    }
+ 
+     return pat;
+ 
+-- 
+2.24.1
+
