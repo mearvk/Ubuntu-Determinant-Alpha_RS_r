@@ -1,0 +1,95 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# frangemont-apt-hook — APT integration for frangemont-postmail-ps
+#
+# Called by APT via:
+#   /etc/apt/apt.conf.d/98frangemont-pre  (DPkg::Pre-Invoke)
+#   /etc/apt/apt.conf.d/99frangemont-post (DPkg::Post-Invoke)
+#
+# This script communicates with the running daemon via Unix socket.
+# If the daemon is not running, it falls back to one-shot scan mode.
+#
+# Copyright (C) 2026 MEARVK LLC
+
+SOCKET="/run/frangemont-postmail-ps.sock"
+DAEMON="/usr/local/sbin/frangemont-postmail-ps"
+DPKG_LOG="/var/log/dpkg.log"
+
+# ─── Send command to daemon via socket ────────────────────────────────────────
+
+send_command() {
+    local cmd="$1"
+    if [ -S "$SOCKET" ]; then
+        echo "$cmd" | socat - UNIX-CONNECT:"$SOCKET" 2>/dev/null
+        return $?
+    fi
+    return 1
+}
+
+# ─── Stage 2: Pre-Install (At-Rest Scan) ─────────────────────────────────────
+
+do_pre() {
+    # Try daemon first
+    if send_command "SCAN-ATREST"; then
+        return 0
+    fi
+
+    # Fallback: run one-shot scan
+    if [ -x "$DAEMON" ]; then
+        "$DAEMON" --scan-atrest
+    fi
+}
+
+# ─── Stage 4: Post-Install (Mandatory) ───────────────────────────────────────
+
+do_post() {
+    # Determine which packages were just installed/upgraded
+    # by reading the dpkg log tail
+    local now
+    now=$(date '+%Y-%m-%d %H:%M')
+
+    # Find packages processed in the last 2 minutes
+    local packages
+    packages=$(grep "^${now}" "$DPKG_LOG" 2>/dev/null | \
+               grep -E " install | upgrade " | \
+               awk '{print $4}' | cut -d: -f1 | sort -u)
+
+    if [ -z "$packages" ]; then
+        # Try broader window (last 5 minutes)
+        local recent
+        recent=$(date -d '5 minutes ago' '+%Y-%m-%d %H:%M' 2>/dev/null || date '+%Y-%m-%d %H:%M')
+        packages=$(tail -100 "$DPKG_LOG" 2>/dev/null | \
+                   grep -E " install | upgrade " | \
+                   awk '{print $4}' | cut -d: -f1 | sort -u)
+    fi
+
+    # Scan each package
+    for pkg in $packages; do
+        if send_command "SCAN-POSTINSTALL $pkg"; then
+            continue
+        fi
+
+        # Fallback: one-shot
+        if [ -x "$DAEMON" ]; then
+            "$DAEMON" --scan-postinstall "$pkg"
+        fi
+    done
+}
+
+# ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+    pre)
+        do_pre
+        ;;
+    post)
+        do_post
+        ;;
+    *)
+        echo "Usage: frangemont-apt-hook {pre|post}"
+        exit 1
+        ;;
+esac
+
+exit 0
