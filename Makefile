@@ -56,6 +56,7 @@ PREFIX        := /usr
         tools-rebate-certificates tools-rebate-certificates-install \
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
+        tools-xgcc tools-xgcc-install \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -335,6 +336,8 @@ tools:
 		echo "  Building accounts..."; $(MAKE) -C $(TOOLS_DIR)/accounts; fi
 	@if [ -d "$(TOOLS_DIR)/psych-id" ]; then \
 		echo "  Building psych-id..."; $(MAKE) -C $(TOOLS_DIR)/psych-id; fi
+	@if [ -d "tools/xgcc" ]; then \
+		echo "  Building xgcc (interpreter)..."; $(MAKE) -C tools/xgcc; fi
 
 tools-install:
 	@echo "=== Installing core tools to rootfs ==="
@@ -350,12 +353,14 @@ tools-install:
 		$(MAKE) -C $(TOOLS_DIR)/accounts install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
 	@if [ -d "$(TOOLS_DIR)/psych-id" ]; then \
 		$(MAKE) -C $(TOOLS_DIR)/psych-id install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
+	@if [ -d "tools/xgcc" ]; then \
+		$(MAKE) -C tools/xgcc install DESTDIR=$(abspath $(ROOTFS_DIR)); fi
 
 # ==============================================================================
 # Tools - Extended (autotools/cmake-based, longer builds)
 # ==============================================================================
 
-tools-all: tools tools-drm tools-tandem-equals tools-palladium-grooves tools-palladium-grooves-iv tools-rebate-certificates tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter
+tools-all: tools tools-drm tools-tandem-equals tools-palladium-grooves tools-palladium-grooves-iv tools-rebate-certificates tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter tools-xgcc
 
 # DRM (Deferred Remove) - undo-capable file deletion
 tools-drm:
@@ -585,8 +590,18 @@ tools-rkhunter-install:
 		echo "  ✓ rkhunter installed to /usr/local/bin/"; \
 	fi
 
+# xgcc — Metal-Thin C/C++ Source Interpreter
+tools-xgcc:
+	@echo "=== Building xgcc (interpreter) ==="
+	@$(MAKE) -C tools/xgcc
+
+tools-xgcc-install:
+	@echo "=== Installing xgcc ==="
+	@$(MAKE) -C tools/xgcc install DESTDIR=$(abspath $(ROOTFS_DIR))
+	@echo "  ✓ xgcc + xgcc-user installed to /usr/local/bin/"
+
 # Full tools install (all)
-tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-palladium-grooves-install tools-palladium-grooves-iv-install tools-rebate-certificates-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install
+tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-palladium-grooves-install tools-palladium-grooves-iv-install tools-rebate-certificates-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install tools-xgcc-install
 
 # ==============================================================================
 # Desktop Environment (MATE + LightDM + Red Cherry Theme)
