@@ -1,0 +1,77 @@
+DIFF := diff -u
+
+.PHONY: all test clean
+
+all: unittest unittest_string
+
+unittest: parseargs.o unittest.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -linih
+
+unittest_string: parseargs.o unittest_string.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -linih
+
+test: test_multi.txt test_multi_max_line.txt test_single.txt \
+		test_disallow_inline_comments.txt test_stop_on_first_error.txt \
+		test_handler_lineno.txt test_string.txt test_heap.txt \
+		test_heap_max_line.txt test_heap_realloc.txt \
+		test_heap_realloc_max_line.txt test_heap_string.txt \
+		test_allow_no_value.txt
+	$(DIFF) baseline_multi.txt test_multi.txt
+	$(DIFF) baseline_multi_max_line.txt test_multi_max_line.txt
+	$(DIFF) baseline_single.txt test_single.txt
+	$(DIFF) baseline_disallow_inline_comments.txt test_disallow_inline_comments.txt
+	$(DIFF) baseline_stop_on_first_error.txt test_stop_on_first_error.txt
+	$(DIFF) baseline_handler_lineno.txt test_handler_lineno.txt
+	$(DIFF) baseline_string.txt test_string.txt
+	$(DIFF) baseline_heap.txt test_heap.txt
+	$(DIFF) baseline_heap_max_line.txt test_heap_max_line.txt
+	$(DIFF) baseline_heap_realloc.txt test_heap_realloc.txt
+	$(DIFF) baseline_heap_realloc_max_line.txt test_heap_realloc_max_line.txt
+	$(DIFF) baseline_heap_string.txt test_heap_string.txt
+#	$(DIFF) baseline_call_handler_on_new_section.txt test_call_handler_on_new_section.txt
+	$(DIFF) baseline_allow_no_value.txt test_allow_no_value.txt
+
+test_multi.txt: unittest
+	./unittest > $@
+
+test_multi_max_line.txt: unittest
+	./unittest --ini_max_line 20 > $@
+
+test_single.txt: unittest
+	./unittest --ini_allow_multiline 0 > $@
+
+test_disallow_inline_comments.txt: unittest
+	./unittest --ini_allow_inline_comments 0 > $@
+
+test_stop_on_first_error.txt: unittest
+	./unittest --ini_stop_on_first_error 1 > $@
+
+test_handler_lineno.txt: unittest
+	./unittest --ini_handler_lineno 1 > $@
+
+test_string.txt: unittest_string
+	./unittest_string --ini_max_line 20 > $@
+
+test_heap.txt: unittest
+	./unittest --ini_use_stack 0 > $@
+
+test_heap_max_line.txt: unittest
+	./unittest --ini_use_stack 0 --ini_max_line 20 --ini_initial_alloc 20 > $@
+
+test_heap_realloc.txt: unittest
+	./unittest --ini_use_stack 0 --ini_allow_realloc 1 --ini_initial_alloc 5 > $@
+
+test_heap_realloc_max_line.txt: unittest
+	./unittest --ini_use_stack 0 --ini_max_line 20 --ini_allow_realloc 1 --ini_initial_alloc 5 > $@
+
+test_heap_string.txt: unittest_string
+	./unittest_string --ini_use_stack 0 --ini_max_line 20 --ini_initial_alloc 20 > $@
+
+#test_call_handler_on_new_section.txt: unittest
+#	./unittest --ini_call_handler_on_new_section 1 > $@
+
+test_allow_no_value.txt: unittest
+	./unittest --ini_allow_no_value 1 > $@
+
+clean:
+	rm -rf *.o unittest unittest_string test_*.txt

@@ -1,0 +1,96 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Correct Thumb function bound computation in the symbolizer
+Forwarded: yes
+Applied-Upstream: https://github.com/abseil/abseil-cpp/commit/1ae9b71c474628d60eb251a3f62967fe64151bb2
+
+On 32-bit ARM, all functions are aligned to multiples of two bytes, and
+the lowest-order bit in a function’s address is ignored by the CPU when
+computing branch targets. That bit is still present in instructions and
+ELF symbol tables, though; it’s repurposed to indicate whether the
+function contains ARM or Thumb code. If the symbolizer doesn’t ignore
+that bit, it will believe Thumb functions have boundaries that are off
+by one byte, so instruct the symbolizer to null out the lowest-order bit
+after retrieving it from the symbol table.
+
+The author works at Google. Upstream applied this patch as Piper
+revision 369254082 and exported it to GitHub; the Applied-Upstream URL
+above points to the exported commit.
+
+--- a/absl/debugging/symbolize_elf.inc
++++ b/absl/debugging/symbolize_elf.inc
+@@ -701,6 +701,16 @@
+       const char *start_address =
+           ComputeOffset(original_start_address, relocation);
+ 
++#ifdef __arm__
++      // ARM functions are always aligned to multiples of two bytes; the
++      // lowest-order bit in start_address is ignored by the CPU and indicates
++      // whether the function contains ARM (0) or Thumb (1) code. We don't care
++      // about what encoding is being used; we just want the real start address
++      // of the function.
++      start_address = reinterpret_cast<const char *>(
++          reinterpret_cast<uintptr_t>(start_address) & ~1);
++#endif
++
+       if (deref_function_descriptor_pointer &&
+           InSection(original_start_address, opd)) {
+         // The opd section is mapped into memory.  Just dereference
+--- a/absl/debugging/symbolize_test.cc
++++ b/absl/debugging/symbolize_test.cc
+@@ -477,6 +477,46 @@
+ #endif
+ }
+ 
++#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
++// Test that we correctly identify bounds of Thumb functions on ARM.
++//
++// Thumb functions have the lowest-order bit set in their addresses in the ELF
++// symbol table. This requires some extra logic to properly compute function
++// bounds. To test this logic, nudge a Thumb function right up against an ARM
++// function and try to symbolize the ARM function.
++//
++// A naive implementation will simply use the Thumb function's entry point as
++// written in the symbol table and will therefore treat the Thumb function as
++// extending one byte further in the instruction stream than it actually does.
++// When asked to symbolize the start of the ARM function, it will identify an
++// overlap between the Thumb and ARM functions, and it will return the name of
++// the Thumb function.
++//
++// A correct implementation, on the other hand, will null out the lowest-order
++// bit in the Thumb function's entry point. It will correctly compute the end of
++// the Thumb function, it will find no overlap between the Thumb and ARM
++// functions, and it will return the name of the ARM function.
++
++__attribute__((target("thumb"))) int ArmThumbOverlapThumb(int x) {
++  return x * x * x;
++}
++
++__attribute__((target("arm"))) int ArmThumbOverlapArm(int x) {
++  return x * x * x;
++}
++
++void ABSL_ATTRIBUTE_NOINLINE TestArmThumbOverlap() {
++#if defined(ABSL_HAVE_ATTRIBUTE_NOINLINE)
++  const char *symbol = TrySymbolize((void *)&ArmThumbOverlapArm);
++  ABSL_RAW_CHECK(symbol != nullptr, "TestArmThumbOverlap failed");
++  ABSL_RAW_CHECK(strcmp("ArmThumbOverlapArm()", symbol) == 0,
++                 "TestArmThumbOverlap failed");
++  std::cout << "TestArmThumbOverlap passed" << std::endl;
++#endif
++}
++
++#endif  // defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
++
+ #elif defined(_WIN32)
+ #if !defined(ABSL_CONSUME_DLL)
+ 
+@@ -551,6 +591,9 @@
+   TestWithPCInsideInlineFunction();
+   TestWithPCInsideNonInlineFunction();
+   TestWithReturnAddress();
++#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
++  TestArmThumbOverlap();
++#endif
+ #endif
+ 
+   return RUN_ALL_TESTS();

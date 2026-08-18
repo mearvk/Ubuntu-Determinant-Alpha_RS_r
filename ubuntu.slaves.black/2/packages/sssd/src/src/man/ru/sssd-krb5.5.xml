@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-krb5</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-krb5</refname>
+        <refpurpose>Поставщик данных Kerberos SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки внутреннего
+сервера проверки подлинности Kerberos 5 для <citerefentry>
+<refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  Подробные сведения о синтаксисе доступны в разделе
+<quote>ФОРМАТ ФАЙЛА</quote> справочной страницы <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Внутренний сервер проверки подлинности Kerberos 5 содержит поставщиков
+данных для проверки подлинности (auth) и смены пароля (chpass). Для
+корректной работы его необходимо использовать совместно с поставщиком данных
+идентификации (например, id_provider = ldap). Некоторые данные, которые
+требуются внутреннему серверу проверки подлинности Kerberos 5, должны
+предоставляться поставщиком данных идентификации (например, имя участника
+Kerberos пользователя (UPN)). В конфигурации поставщика данных идентификации
+должна быть запись с указанием UPN. Сведения о том, как выполнить такую
+настройку, доступны на справочной странице соответствующего поставщика
+данных идентификации.
+        </para>
+        <para>
+            Этот внутренний сервер также предоставляет возможность управления доступом
+на основе файла .k5login в домашнем каталоге пользователя. Дополнительные
+сведения доступны на справочной странице <citerefentry>
+<refentrytitle>k5login</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>. Обратите внимание, что пользователю будет отказано в
+доступе, если файл .k5login пуст. Чтобы активировать эту возможность,
+укажите «access_provider = krb5» в конфигурации SSSD.
+        </para>
+        <para>
+            Если на внутреннем сервере идентификации недоступен UPN,
+<command>sssd</command> создаст UPN в формате
+<replaceable>username</replaceable>@<replaceable>krb5_realm</replaceable>.
+        </para>
+
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>ПАРАМЕТРЫ КОНФИГУРАЦИИ</title>
+        <para>
+            Если в домене SSSD используется модуль проверки подлинности krb5, необходимо
+использовать следующие параметры. Сведения о конфигурации домена SSSD
+доступны на справочной странице <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>, в разделе <quote>РАЗДЕЛЫ ДОМЕНА</quote>. <variablelist>
+                <varlistentry>
+                    <term>krb5_server, krb5_backup_server (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список IP-адресов или имён узлов серверов Kerberos, к
+которым SSSD следует подключаться в порядке приоритета. Дополнительные
+сведения об отработке отказа и избыточности сервера доступны в разделе
+<quote>ОТРАБОТКА ОТКАЗА</quote>. После адресов или имён узлов можно
+(необязательно) добавить номер порта (предварив его двоеточием). Если у
+параметра пустое значение, будет включено обнаружение служб — дополнительные
+сведения доступны в разделе <quote>ОБНАРУЖЕНИЕ СЛУЖБ</quote>.
+                        </para>
+                        <para>
+                            При использовании обнаружения служб для серверов KDC или kpasswd SSSD
+сначала выполняет поиск записей DNS, в которых в качестве протокола указан
+_udp. Если такие записи не удаётся найти, SSSD выполняет поиск записей DNS,
+в которых в качестве протокола указан _tcp.
+                        </para>
+                        <para>
+                            В предыдущих версиях SSSD этот параметр назывался
+<quote>krb5_kdcip</quote>. Это устаревшее имя всё ещё распознаётся, но
+пользователям рекомендуется перейти на использование
+<quote>krb5_server</quote> в файлах конфигурации.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_realm (строка)</term>
+                    <listitem>
+                        <para>
+                            Имя области Kerberos. Этот параметр является обязательным и должен быть
+указан.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_kpasswd, krb5_backup_kpasswd (строка)</term>
+                    <listitem>
+                        <para>
+                            Если на KDC не запущена служба смены паролей, здесь можно задать
+альтернативные серверы. После адресов или имён узлов можно добавить
+необязательный номер порта (предварив его двоеточием).
+                        </para>
+                        <para>
+                            Дополнительные сведения об отработке отказа и избыточности сервера доступны
+в разделе <quote>ОТРАБОТКА ОТКАЗА</quote>. ПРИМЕЧАНИЕ: даже если список
+серверов kpasswd будет исчерпан, внутренний сервер не перейдёт в автономный
+режим работы, если всё ещё возможна проверка подлинности с помощью KDC.
+                        </para>
+                        <para>
+                            По умолчанию: использовать KDC
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_ccachedir (строка)</term>
+                    <listitem>
+                        <para>
+                            Каталог для хранения кэшей учётных данных. Здесь также можно использовать
+все последовательности замещения krb5_ccname_template, за исключением %d и
+%P. Каталог создаётся как закрытый, его владельцем является пользователь,
+права доступа — 0700.
+                        </para>
+                        <para>
+                            По умолчанию: /tmp
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_ccname_template (строка)</term>
+                    <listitem>
+                        <para>
+                            Расположение кэша учётных данных пользователя. В настоящее время
+поддерживаются три типа кэша учётных данных: <quote>FILE</quote>,
+<quote>DIR</quote> и <quote>KEYRING:persistent</quote>. Кэш можно указать
+либо как <replaceable>TYPE:RESIDUAL</replaceable>, либо как абсолютный путь,
+что предполагает тип <quote>FILE</quote>. В шаблоне заменяются следующие
+последовательности: <variablelist>
+                                <varlistentry>
+                                    <term>%u</term>
+                                    <listitem><para>имя для входа</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%U</term>
+                                    <listitem><para>UID для входа</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%p</term>
+                                    <listitem><para>имя участника</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%r</term>
+                                    <listitem><para>имя области</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%h</term>
+                                    <listitem><para>домашний каталог</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%d</term>
+                                    <listitem><para>значение krb5_ccachedir
+                                              </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%P</term>
+                                    <listitem><para>идентификатор процесса клиента SSSD</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%%</term>
+                                    <listitem><para>литерал «%»</para>
+                                    </listitem>
+                                </varlistentry>
+                            </variablelist> Если шаблон
+заканчивается на «XXXXXX», для безопасного создания уникального имени файла
+используется mkstemp(3).
+                        </para>
+                        <para>
+                            Если используются типы KEYRING, единственным поддерживаемым механизмом
+является <quote>KEYRING:persistent:%U</quote>, то есть использование набора
+ключей ядра Linux для хранения учётных данных на основе разделения по
+UID. Этот вариант также является рекомендуемым, так как этот способ
+обеспечивает наибольшую безопасность и предсказуемость.
+                        </para>
+                        <para>
+                            Источником стандартного значения имени кэша учётных данных является профиль,
+который хранится в общесистемном файле конфигурации krb5.conf в разделе
+[libdefaults]. Имя параметра — default_ccache_name. Дополнительные сведения
+о формате расширения, определённом krb5.conf, доступны в абзаце о расширении
+параметров (PARAMETER EXPANSION) krb5.conf(5).
+                        </para>
+                        <para>
+                          ПРИМЕЧАНИЕ: обратите внимание, что в шаблоне расширения ccache libkrb5 из
+<citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> используются другие
+последовательности расширения, чем в SSSD.
+                        </para>
+                        <para>
+                            По умолчанию: (из libkrb5)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_keytab (строка)</term>
+                    <listitem>
+                        <para>
+                            Расположение таблицы ключей, которую следует использовать при проверке
+учётных данных, полученных от KDC.
+                        </para>
+                        <para>
+                            По умолчанию: системная таблица ключей, обычно
+<filename>/etc/krb5.keytab</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_store_password_if_offline (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Сохранять пароль пользователя, если поставщик не в сети, и использовать его
+для запроса TGT, когда поставщик снова появляется в сети.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: эта возможность доступна только в Linux. Пароли, сохранённые
+таким образом, хранятся как простой текст в наборе ключей ядра и
+потенциально доступны пользователю root (потребуются некоторые усилия).
+                        </para>
+                        <para>
+                            По умолчанию: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_fast (строка)</term>
+                    <listitem>
+                        <para>
+                            Включает защищённое туннелирование гибкой проверки подлинности (FAST) для
+предварительной проверки подлинности Kerberos. Поддерживаются следующие
+параметры:
+                        </para>
+                        <para>
+                            <emphasis>never</emphasis> — никогда не использовать FAST. Это равнозначно
+тому варианту, когда значение этого параметра вообще не указано.
+                        </para>
+                        <para>
+                            <emphasis>try</emphasis> — пытаться использовать FAST. Если сервер не
+поддерживает FAST, проверка подлинности будет продолжена без него.
+                        </para>
+                        <para>
+                            <emphasis>demand</emphasis> — требовать использования FAST. Проверка
+подлинности будет неудачной, если сервер не требует использования FAST.
+                        </para>
+                        <para>
+                            По умолчанию: не задано, то есть FAST не используется.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: для использования FAST необходима таблица ключей.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: SSSD поддерживает FAST только для MIT Kerberos версии 1.8 и
+выше. Если SSSD используется с более ранней версией MIT Kerberos,
+использование этого параметра является ошибкой конфигурации.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_fast_principal (строка)</term>
+                    <listitem>
+                        <para>
+                            Указывает участник-сервер, который следует использовать для FAST.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_kdcinfo (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Позволяет указать, следует ли SSSD сообщать библиотекам, какую область и
+какие KDC нужно использовать. Этот параметр включён по умолчанию. Если
+отключить его, потребуется настроить библиотеку Kerberos с помощью файла
+конфигурации <citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+                        </para>
+                        <para>
+                            Дополнительные сведения о модуле локатора доступны на справочной странице
+<citerefentry> <refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.
+                        </para>
+                        <para>
+                            По умолчанию: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_kdcinfo_lookahead (строка)</term>
+                    <listitem>
+                        <para>
+                            Когда параметр krb5_use_kdcinfo установлен в значение «true», можно
+ограничить количество серверов, которые передаются <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>. Это может быть полезно, когда с
+помощью записи SRV обнаруживается слишком много серверов.
+                        </para>
+                        <para>
+                            Параметр krb5_kdcinfo_lookahead содержит два числа, разделённых
+двоеточием. Первое число представляет количество используемых основных
+серверов, а второе — количество резервных серверов.
+                        </para>
+                        <para>
+                            Например, <emphasis>10:0</emphasis> означает, что <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> будут переданы 10 основных
+серверов, но ни одного резервного сервера.
+                        </para>
+                        <para>
+                            По умолчанию: 3:1
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_enterprise_principal (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Позволяет указать, следует ли обрабатывать участника-пользователя как
+участника-предприятие. Дополнительные сведения об участниках-предприятиях
+доступны в разделе 5 RFC 6806.
+                        </para>
+
+                        <para>
+                            По умолчанию: false (поставщик данных AD: true)
+                        </para>
+                        <para>
+                            Поставщик данных IPA установит этот параметр в значение «true», если
+определит, что сервер может обрабатывать участников-предприятия, и если этот
+параметр не задан в явном виде в файле конфигурации.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_subdomain_realm (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Указывает использовать области поддоменов для проверки подлинности
+пользователей из доверенных доменов. Этот параметр можно установить в
+значение «true», если участники-предприятия используются с upnSuffixes,
+неизвестными KDC родительского домена. Если этот параметр установлен в
+значение «true», SSSD будет пытаться отправить запрос напрямую KDC того
+доверенного домена, из которого пришёл пользователь.
+                        </para>
+
+                        <para>
+                            По умолчанию: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_map_user (строка)</term>
+                    <listitem>
+                        <para>
+                             Перечень сопоставлений указывается в виде разделённого запятыми списка пар
+<quote>username:primary</quote>, где <quote>username</quote> — имя
+пользователя UNIX, а <quote>primary</quote> — часть пользователя в записи
+участника Kerberos. Это сопоставление задействуется, когда для проверки
+подлинности пользователя используется <quote>auth_provider = krb5</quote>.
+                        </para>
+
+                        <para>
+                             пример: <programlisting>
+krb5_realm = REALM
+krb5_map_user = joe:juser,dick:richard
+</programlisting>
+                        </para>
+                        <para>
+                             <quote>joe</quote> и <quote>dick</quote> — имена пользователей UNIX, а
+<quote>juser</quote> и <quote>richard</quote> — основные части участников
+Kerberos. Для пользователей <quote>joe</quote> и <quote>dick</quote> SSSD
+попытается выполнить kinit как, соответственно, <quote>juser@REALM</quote> и
+<quote>richard@REALM</quote>.
+                        </para>
+
+                        <para>
+                            По умолчанию: не задано
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/krb5_options.xml" />
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <refsect1 id='example'>
+        <title>ПРИМЕР</title>
+        <para>
+            В следующем примере предполагается, что конфигурация SSSD корректна и что
+FOO — один из доменов в разделе <replaceable>[sssd]</replaceable>. В примере
+показана только конфигурация проверки подлинности Kerberos; он не включает
+какого-либо поставщика данных идентификации.
+        </para>
+        <para>
+<programlisting>
+[domain/FOO]
+auth_provider = krb5
+krb5_server = 192.168.1.1
+krb5_realm = EXAMPLE.COM
+</programlisting>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

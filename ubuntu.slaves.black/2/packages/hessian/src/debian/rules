@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+export CLASSPATH=/usr/share/java/servlet-api-3.1.jar
+
+DEB_UPSTREAM_VERSION := $(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^-]+).*,\1,p')
+
+%:
+	dh $@ --with javahelper
+
+override_jh_build:
+	jh_build --javacopts=-g hessian.jar com
+
+override_dh_auto_install:
+	mh_install -plibhessian-java
+
+override_dh_auto_clean:
+	mh_clean
+
+get-orig-source:
+	cd $(dir $(firstword $(MAKEFILE_LIST)))../ && \
+	uscan --force-download --download-current-version --no-symlink
+
+get-orig-pom:
+	wget http://central.maven.org/maven2/com/caucho/hessian/$(DEB_UPSTREAM_VERSION)/hessian-$(DEB_UPSTREAM_VERSION).pom -O debian/pom.xml

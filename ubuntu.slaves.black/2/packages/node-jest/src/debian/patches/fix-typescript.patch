@@ -1,0 +1,530 @@
+Description: various workaround for typescript definitions
+Author: Yadd <yadd@debian.org>
+Forwarded: not-needed
+Last-Update: 2022-02-10
+
+--- a/packages/babel-jest/src/loadBabelConfig.ts
++++ b/packages/babel-jest/src/loadBabelConfig.ts
+@@ -6,4 +6,5 @@
+  */
+ 
+ // this is a separate file so it can be mocked in tests
++// @ts-ignore
+ export {loadPartialConfig, loadPartialConfigAsync} from '@babel/core';
+--- a/packages/expect/src/jestMatchersObject.ts
++++ b/packages/expect/src/jestMatchersObject.ts
+@@ -99,6 +99,7 @@
+         configurable: true,
+         enumerable: true,
+         value: (...sample: [unknown, ...Array<unknown>]) =>
++// @ts-ignore
+           new CustomMatcher(false, ...sample),
+         writable: true,
+       });
+@@ -106,6 +107,7 @@
+         configurable: true,
+         enumerable: true,
+         value: (...sample: [unknown, ...Array<unknown>]) =>
++// @ts-ignore
+           new CustomMatcher(true, ...sample),
+         writable: true,
+       });
+--- a/packages/jest-circus/src/formatNodeAssertErrors.ts
++++ b/packages/jest-circus/src/formatNodeAssertErrors.ts
+@@ -14,6 +14,7 @@
+   printExpected,
+   printReceived,
+ } from 'jest-matcher-utils';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ interface AssertionErrorWithStack extends AssertionError {
+--- a/packages/jest-circus/src/types.ts
++++ b/packages/jest-circus/src/types.ts
+@@ -7,6 +7,7 @@
+ 
+ // Used as type
+ import type {Circus} from '@jest/types';
++// @ts-ignore
+ import expect = require('expect');
+ 
+ export const STATE_SYM = Symbol(
+--- a/packages/jest-circus/src/utils.ts
++++ b/packages/jest-circus/src/utils.ts
+@@ -14,6 +14,7 @@
+ import type {AssertionResult, Status} from '@jest/test-result';
+ import type {Circus, Global} from '@jest/types';
+ import {ErrorWithStack, convertDescriptorToString, formatTime} from 'jest-util';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ import {ROOT_DESCRIBE_BLOCK_NAME, getState} from './state';
+ 
+--- a/packages/jest-cli/src/cli/index.ts
++++ b/packages/jest-cli/src/cli/index.ts
+@@ -55,6 +55,7 @@
+ 
+   const rawArgv: Config.Argv | Array<string> =
+     maybeArgv || process.argv.slice(2);
++// @ts-ignore
+   const argv: Config.Argv = yargs(rawArgv)
+     .usage(args.usage)
+     .version(version)
+--- a/packages/jest-config/src/Deprecated.ts
++++ b/packages/jest-config/src/Deprecated.ts
+@@ -7,6 +7,7 @@
+ 
+ import chalk = require('chalk');
+ import type {DeprecatedOptions} from 'jest-validate';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ const format = (value: unknown) => prettyFormat(value, {min: true});
+--- a/packages/jest-config/src/ValidConfig.ts
++++ b/packages/jest-config/src/ValidConfig.ts
+@@ -8,6 +8,7 @@
+ import type {Config} from '@jest/types';
+ import {replacePathSepForRegex} from 'jest-regex-util';
+ import {multipleValidOptions} from 'jest-validate';
++// @ts-ignore
+ import {DEFAULT_OPTIONS as PRETTY_FORMAT_DEFAULTS} from 'pretty-format';
+ import {NODE_MODULES} from './constants';
+ 
+--- a/packages/jest-config/src/readConfigFileAndSetRootDir.ts
++++ b/packages/jest-config/src/readConfigFileAndSetRootDir.ts
+@@ -35,6 +35,7 @@
+       configObject = await loadTSConfigFile(configPath);
+     } else if (isJSON) {
+       const fileContent = fs.readFileSync(configPath, 'utf8');
++// @ts-ignore
+       configObject = parseJson(stripJsonComments(fileContent), configPath);
+     } else {
+       configObject = await requireOrImportModule<any>(configPath);
+--- a/packages/jest-core/src/TestScheduler.ts
++++ b/packages/jest-core/src/TestScheduler.ts
+@@ -267,6 +267,7 @@
+ 
+             await testRunner.runTests(
+               tests,
++// @ts-ignore
+               watcher,
+               undefined,
+               undefined,
+@@ -278,6 +279,7 @@
+           } else {
+             await testRunner.runTests(
+               tests,
++// @ts-ignore
+               watcher,
+               onTestFileStart,
+               onResult,
+--- a/packages/jest-core/src/TestWatcher.ts
++++ b/packages/jest-core/src/TestWatcher.ts
+@@ -11,7 +11,8 @@
+   interrupted: boolean;
+ };
+ 
+-export default class TestWatcher extends emittery<{change: State}> {
++// @ts-ignore
++export default class TestWatcher extends emittery {
+   state: State;
+   private _isWatchMode: boolean;
+ 
+@@ -23,6 +24,7 @@
+ 
+   async setState(state: State): Promise<void> {
+     Object.assign(this.state, state);
++// @ts-ignore
+     await this.emit('change', this.state);
+   }
+ 
+--- a/packages/jest-core/src/collectHandles.ts
++++ b/packages/jest-core/src/collectHandles.ts
+@@ -40,7 +40,7 @@
+ 
+ const alwaysActive = () => true;
+ 
+-// @ts-expect-error: doesn't exist in v10 typings
++// @ts-ignore
+ const hasWeakRef = typeof WeakRef === 'function';
+ 
+ const asyncSleep = promisify(setTimeout);
+@@ -97,13 +97,13 @@
+           // Timer that supports hasRef (Node v11+)
+           if ('hasRef' in resource) {
+             if (hasWeakRef) {
+-              // @ts-expect-error: doesn't exist in v10 typings
++              // @ts-ignore
+               const ref = new WeakRef(resource);
+               isActive = () => {
+                 return ref.deref()?.hasRef() ?? false;
+               };
+             } else {
+-              // @ts-expect-error: doesn't exist in v10 typings
++              // @ts-ignore
+               isActive = resource.hasRef.bind(resource);
+             }
+           } else {
+--- a/packages/jest-core/src/runGlobalHook.ts
++++ b/packages/jest-core/src/runGlobalHook.ts
+@@ -9,6 +9,7 @@
+ import type {Test} from '@jest/test-result';
+ import {createScriptTransformer} from '@jest/transform';
+ import type {Config} from '@jest/types';
++// @ts-ignore
+ import prettyFormat from 'pretty-format';
+ 
+ export default async function runGlobalHook({
+--- a/packages/jest-diff/src/index.ts
++++ b/packages/jest-diff/src/index.ts
+@@ -8,9 +8,11 @@
+ import chalk = require('chalk');
+ import {getType} from 'jest-get-type';
+ import {
++// @ts-ignore
+   format as prettyFormat,
+   plugins as prettyFormatPlugins,
+ } from 'pretty-format';
++// @ts-ignore
+ import type {PrettyFormatOptions} from 'pretty-format';
+ import {DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT, Diff} from './cleanupSemantic';
+ import {NO_DIFF_MESSAGE, SIMILAR_MESSAGE} from './constants';
+--- a/packages/jest-diff/src/normalizeDiffOptions.ts
++++ b/packages/jest-diff/src/normalizeDiffOptions.ts
+@@ -6,6 +6,7 @@
+  */
+ 
+ import chalk = require('chalk');
++// @ts-ignore
+ import type {CompareKeys} from 'pretty-format';
+ import type {DiffOptions, DiffOptionsNormalized} from './types';
+ 
+--- a/packages/jest-diff/src/types.ts
++++ b/packages/jest-diff/src/types.ts
+@@ -4,6 +4,7 @@
+  * This source code is licensed under the MIT license found in the
+  * LICENSE file in the root directory of this source tree.
+  */
++// @ts-ignore
+ import type {CompareKeys} from 'pretty-format';
+ 
+ export type DiffOptionsColor = (arg: string) => string; // subset of Chalk type
+--- a/packages/jest-each/src/table/array.ts
++++ b/packages/jest-each/src/table/array.ts
+@@ -8,6 +8,7 @@
+ 
+ import * as util from 'util';
+ import type {Global} from '@jest/types';
++// @ts-ignore
+ import {format as pretty} from 'pretty-format';
+ import type {EachTests} from '../bind';
+ import type {Templates} from './interpolation';
+--- a/packages/jest-each/src/table/interpolation.ts
++++ b/packages/jest-each/src/table/interpolation.ts
+@@ -7,6 +7,7 @@
+  */
+ 
+ import {isPrimitive} from 'jest-get-type';
++// @ts-ignore
+ import {format as pretty} from 'pretty-format';
+ 
+ export type Template = Record<string, unknown>;
+--- a/packages/jest-each/src/validation.ts
++++ b/packages/jest-each/src/validation.ts
+@@ -8,6 +8,7 @@
+ 
+ import chalk = require('chalk');
+ import type {Global} from '@jest/types';
++// @ts-ignore
+ import {format as pretty} from 'pretty-format';
+ 
+ type TemplateData = Global.TemplateData;
+--- a/packages/jest-globals/src/index.ts
++++ b/packages/jest-globals/src/index.ts
+@@ -7,6 +7,7 @@
+ 
+ import type {Jest} from '@jest/environment';
+ import type {Global} from '@jest/types';
++// @ts-ignore
+ import importedExpect = require('expect');
+ 
+ export declare const jest: Jest;
+--- a/packages/jest-haste-map/src/HasteFS.ts
++++ b/packages/jest-haste-map/src/HasteFS.ts
+@@ -60,6 +60,7 @@
+   }
+ 
+   *getAbsoluteFileIterator(): Iterable<Config.Path> {
++// @ts-ignore
+     for (const file of this.getFileIterator()) {
+       yield fastPath.resolve(this._rootDir, file);
+     }
+@@ -70,6 +71,7 @@
+       pattern = new RegExp(pattern);
+     }
+     const files = [];
++// @ts-ignore
+     for (const file of this.getAbsoluteFileIterator()) {
+       if (pattern.test(file)) {
+         files.push(file);
+@@ -85,6 +87,7 @@
+     const files = new Set<string>();
+     const matcher = globsToMatcher(globs);
+ 
++// @ts-ignore
+     for (const file of this.getAbsoluteFileIterator()) {
+       const filePath = root ? fastPath.relative(root, file) : file;
+       if (matcher(replacePathSepForGlob(filePath))) {
+--- a/packages/jest-haste-map/src/ModuleMap.ts
++++ b/packages/jest-haste-map/src/ModuleMap.ts
+@@ -184,6 +184,7 @@
+     const previousSet = relativePathSet;
+     const duplicates = new Map();
+ 
++// @ts-ignore
+     for (const [relativePath, type] of previousSet) {
+       const duplicatePath = fastPath.resolve(this._raw.rootDir, relativePath);
+       duplicates.set(duplicatePath, type);
+--- a/packages/jest-haste-map/src/crawlers/watchman.ts
++++ b/packages/jest-haste-map/src/crawlers/watchman.ts
+@@ -274,6 +274,7 @@
+     throw clientError;
+   }
+ 
++// @ts-ignore
+   for (const [watchRoot, response] of results) {
+     const fsRoot = normalizePathSep(watchRoot);
+     const relativeFsRoot = fastPath.relative(rootDir, fsRoot);
+--- a/packages/jest-haste-map/src/index.ts
++++ b/packages/jest-haste-map/src/index.ts
+@@ -676,11 +676,13 @@
+       filesToProcess = changedFiles;
+     }
+ 
++// @ts-ignore
+     for (const [relativeFilePath, fileMetadata] of removedFiles) {
+       this._recoverDuplicates(hasteMap, relativeFilePath, fileMetadata[H.ID]);
+     }
+ 
+     const promises = [];
++// @ts-ignore
+     for (const relativeFilePath of filesToProcess.keys()) {
+       if (
+         this._options.skipPackageJson &&
+--- a/packages/jest-jasmine2/src/expectationResultFactory.ts
++++ b/packages/jest-jasmine2/src/expectationResultFactory.ts
+@@ -6,6 +6,7 @@
+  */
+ 
+ import type {FailedAssertion} from '@jest/test-result';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ function messageFormatter({error, message, passed}: Options) {
+--- a/packages/jest-jasmine2/src/isError.ts
++++ b/packages/jest-jasmine2/src/isError.ts
+@@ -5,6 +5,7 @@
+  * LICENSE file in the root directory of this source tree.
+  */
+ 
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ export default function isError(
+--- a/packages/jest-jasmine2/src/types.ts
++++ b/packages/jest-jasmine2/src/types.ts
+@@ -7,6 +7,7 @@
+ 
+ import type {AssertionError} from 'assert';
+ import type {Config} from '@jest/types';
++// @ts-ignore
+ import expect = require('expect');
+ import type CallTracker from './jasmine/CallTracker';
+ import type Env from './jasmine/Env';
+--- a/packages/jest-leak-detector/src/index.ts
++++ b/packages/jest-leak-detector/src/index.ts
+@@ -11,6 +11,7 @@
+ import {setFlagsFromString} from 'v8';
+ import {runInNewContext} from 'vm';
+ import {isPrimitive} from 'jest-get-type';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ const tick = promisify(setImmediate);
+--- a/packages/jest-matcher-utils/src/index.ts
++++ b/packages/jest-matcher-utils/src/index.ts
+@@ -14,12 +14,14 @@
+   DIFF_INSERT,
+   Diff,
+   DiffOptions as ImportDiffOptions,
++// @ts-ignore
+   diff as diffDefault,
+   diffStringsRaw,
+   diffStringsUnified,
+ } from 'jest-diff';
+ import {getType, isPrimitive} from 'jest-get-type';
+ import {
++// @ts-ignore
+   format as prettyFormat,
+   plugins as prettyFormatPlugins,
+ } from 'pretty-format';
+--- a/packages/jest-message-util/src/index.ts
++++ b/packages/jest-message-util/src/index.ts
+@@ -14,6 +14,7 @@
+ import slash = require('slash');
+ import StackUtils = require('stack-utils');
+ import type {Config, TestResult} from '@jest/types';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ import type {Frame} from './types';
+ 
+--- a/packages/jest-mock/src/index.ts
++++ b/packages/jest-mock/src/index.ts
+@@ -653,6 +653,7 @@
+               const mockImpl = mockConfig.specificMockImpls.length
+                 ? mockConfig.specificMockImpls.shift()
+                 : mockConfig.mockImpl;
++// @ts-ignore
+               return mockImpl && mockImpl.apply(this, arguments);
+             }
+ 
+@@ -663,10 +664,12 @@
+               specificMockImpl = mockConfig.mockImpl;
+             }
+             if (specificMockImpl) {
++// @ts-ignore
+               return specificMockImpl.apply(this, arguments);
+             }
+             // Otherwise use prototype implementation
+             if (f._protoImpl) {
++// @ts-ignore
+               return f._protoImpl.apply(this, arguments);
+             }
+ 
+--- a/packages/jest-reporters/src/CoverageReporter.ts
++++ b/packages/jest-reporters/src/CoverageReporter.ts
+@@ -456,6 +456,7 @@
+           const converter = v8toIstanbul(
+             res.url,
+             fileTransform?.wrapperLength ?? 0,
++// @ts-ignore
+             fileTransform && sourcemapContent
+               ? {
+                   originalSource: fileTransform.originalCode,
+--- a/packages/jest-resolve/src/defaultResolver.ts
++++ b/packages/jest-resolve/src/defaultResolver.ts
+@@ -11,6 +11,7 @@
+ import {
+   Options as ResolveExportsOptions,
+   resolve as resolveExports,
++// @ts-ignore
+ } from 'resolve.exports';
+ import type {Config} from '@jest/types';
+ import {
+--- a/packages/jest-runner/src/index.ts
++++ b/packages/jest-runner/src/index.ts
+@@ -49,6 +49,7 @@
+ export default class TestRunner {
+   private readonly _globalConfig: Config.GlobalConfig;
+   private readonly _context: TestRunnerContext;
++// @ts-ignore
+   private readonly eventEmitter = new Emittery<TestEvents>();
+   readonly __PRIVATE_UNSTABLE_API_supportsEventEmitters__: boolean = true;
+ 
+@@ -224,7 +225,9 @@
+       });
+ 
+     const onInterrupt = new Promise((_, reject) => {
++// @ts-ignore
+       watcher.on('change', state => {
++// @ts-ignore
+         if (state.interrupted) {
+           reject(new CancelRun());
+         }
+@@ -272,6 +275,7 @@
+     eventName: Name,
+     listener: (eventData: TestEvents[Name]) => void | Promise<void>,
+   ): Emittery.UnsubscribeFn {
++// @ts-ignore
+     return this.eventEmitter.on(eventName, listener);
+   }
+ }
+--- a/packages/jest-runner/src/types.ts
++++ b/packages/jest-runner/src/types.ts
+@@ -5,6 +5,7 @@
+  * LICENSE file in the root directory of this source tree.
+  */
+ 
++// @ts-ignore
+ import Emittery = require('emittery');
+ import type {JestEnvironment} from '@jest/environment';
+ import type {
+@@ -54,7 +55,7 @@
+ 
+ // TODO: Should live in `@jest/core` or `jest-watcher`
+ type WatcherState = {interrupted: boolean};
+-export interface TestWatcher extends Emittery<{change: WatcherState}> {
++export interface TestWatcher extends Emittery {
+   state: WatcherState;
+   setState(state: WatcherState): void;
+   isInterrupted(): boolean;
+--- a/packages/jest-runtime/src/index.ts
++++ b/packages/jest-runtime/src/index.ts
+@@ -5,6 +5,7 @@
+  * LICENSE file in the root directory of this source tree.
+  */
+ 
++// @ts-ignore
+ import * as nativeModule from 'module';
+ import * as path from 'path';
+ import {URL, fileURLToPath, pathToFileURL} from 'url';
+--- a/packages/jest-snapshot/src/printSnapshot.ts
++++ b/packages/jest-snapshot/src/printSnapshot.ts
+@@ -34,6 +34,7 @@
+   getLabelPrinter,
+   matcherHint,
+ } from 'jest-matcher-utils';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ import {
+   aBackground2,
+--- a/packages/jest-snapshot/src/utils.ts
++++ b/packages/jest-snapshot/src/utils.ts
+@@ -12,6 +12,7 @@
+ import type {Config} from '@jest/types';
+ import {
+   OptionsReceived as PrettyFormatOptions,
++// @ts-ignore
+   format as prettyFormat,
+ } from 'pretty-format';
+ import {getSerializers} from './plugins';
+--- a/packages/jest-test-result/src/types.ts
++++ b/packages/jest-test-result/src/types.ts
+@@ -10,6 +10,7 @@
+ import type {ConsoleBuffer} from '@jest/console';
+ import type {Config, TestResult, TransformTypes} from '@jest/types';
+ import type {FS as HasteFS, ModuleMap} from 'jest-haste-map';
++// @ts-ignore
+ import type Resolver from 'jest-resolve';
+ 
+ export interface RuntimeTransformResult extends TransformTypes.TransformResult {
+--- a/packages/jest-validate/src/utils.ts
++++ b/packages/jest-validate/src/utils.ts
+@@ -7,6 +7,7 @@
+ 
+ import chalk = require('chalk');
+ import leven from 'leven';
++// @ts-ignore
+ import {format as prettyFormat} from 'pretty-format';
+ 
+ const BULLET: string = chalk.bold('\u25cf');
+--- a/packages/jest-worker/src/workers/NodeThreadsWorker.ts
++++ b/packages/jest-worker/src/workers/NodeThreadsWorker.ts
+@@ -61,7 +61,7 @@
+   initialize(): void {
+     this._worker = new Worker(path.resolve(__dirname, './threadChild.js'), {
+       eval: false,
+-      // @ts-expect-error: added in newer versions
++      // @ts-ignore
+       resourceLimits: this._options.resourceLimits,
+       stderr: true,
+       stdout: true,

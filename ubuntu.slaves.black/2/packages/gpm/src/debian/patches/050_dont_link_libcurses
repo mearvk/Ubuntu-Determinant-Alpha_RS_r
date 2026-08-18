@@ -1,0 +1,72 @@
+Description: Don't link against libcurses
+
+--- a/configure.ac.footer
++++ b/configure.ac.footer
+@@ -67,7 +67,7 @@
+ fi
+ 
+ # Header-checks
+-AC_CHECK_HEADERS(syslog.h linux/input.h linux/joystick.h ncurses.h ncurses/curses.h curses.h term.h)
++AC_CHECK_HEADERS(syslog.h linux/input.h linux/joystick.h)
+ AC_CHECK_HEADERS(sys/sysmacros.h linux/major.h linux/tty.h)
+ 
+ # Required headers
+@@ -86,16 +86,7 @@
+ AC_ARG_WITH(curses,
+ [  --without-curses        disable curses support even if curses found])
+ 
+-CURSES_OBJS=
+-
+-case $with_curses in
+-No|no|N|n) : ;;
+-        *) if   test ${ac_cv_header_ncurses_h} = yes || 
+-                test ${ac_cv_header_ncurses_curses_h} = yes ||
+-                test ${ac_cv_header_curses_h} = yes ; then
+-        CURSES_OBJS=lib/libcurses.o ; fi ;;
+-esac
+-
++CURSES_OBJS=lib/libcurses.o
+ 
+ ITZ_CHECK_TYPE(__u32,linux/types.h)
+ if test ${itz_cv_type___u32} = yes || test ${ac_cv_type___u32} = yes ; then
+@@ -112,6 +103,7 @@
+ AC_CHECK_FUNCS(vsyslog syslog)
+ AC_FUNC_ALLOCA
+ 
++if false; then		# we actually don't want -lcurses
+ case $with_curses in
+ No|no|N|n) SHARED_LIBS=-lc ;;
+ *)
+@@ -132,6 +133,7 @@
+     SHARED_LIBS="$LIBS $TERMLIBS -lc"
+     LIBS="$LIBS $SAVELIBS" ;;
+ esac    
++fi
+ 
+ GPMXTERM=
+ AC_SUBST(GPMXTERM)
+--- a/src/lib/libcurses.c
++++ b/src/lib/libcurses.c
+@@ -29,6 +29,7 @@
+ 
+ #include "headers/gpmInt.h"
+ 
++#if 0	/* hack - we do not want to depend on libcurses headers */
+ #ifdef HAVE_NCURSES_H
+ #include <ncurses.h>
+ #else
+@@ -40,8 +41,13 @@
+ #endif /* HAVE_CURSES_H */
+ #endif /* HAVE_NCURSES_CURSES_H */
+ #endif /* HAVE_NCURSES_H */
+-
++#else
++typedef struct _WINDOW WINDOW;
++extern int wgetch(WINDOW *) __attribute__((weak));
++extern WINDOW *stdscr __attribute__((weak));
++#define getch() wgetch(stdscr)
+ #define GET(win) ((win) ? wgetch(win) : getch())
++#endif
+ 
+ int Gpm_Wgetch(WINDOW *win)
+ {

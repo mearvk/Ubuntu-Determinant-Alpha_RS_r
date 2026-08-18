@@ -1,0 +1,289 @@
+<refsect1 id='idmap'>
+    <title>ID-MAPPNING</title>
+    <para>
+        ID-mappningsfunktionen låter SSSD fungera som en klient till Active
+Directory utan att kräva att administratörer utökar användarattribut till
+att stödja POSIX-attribut för användar- och gruppidentifierare.
+    </para>
+    <para>
+        OBSERVERA: När ID-mappning aktiveras ignoreras attributen uidNumber och
+gidNumber.  Detta är för att undvika möjligheten av konflikt mellan
+automatiskt tilldelade och manuellt tilldelade värden.  Om du behöver
+använda manuellt tilldelade värden måste ALLA värden tilldelas manuellt.
+    </para>
+    <para>
+        Observera att byte av ID-mappnings relaterade konfigurationsalternativ
+kommer få användar- och grupp-ID:n att ändras.  För närvarande stödjer inte
+SSSD byte av ID:n, så SSSD-databasen måste tas bort.  Eftersom cachade
+lösenord också lagras i databasen skall databasen bara tas bort när
+autentiseringsservrarna kan nås, annars kan användare låsas ute.  För att
+cacha lösenordet måste en autentisering göras.  Det är inte tillräckligt att
+använda <citerefentry> <refentrytitle>sss_cache</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> för att ta bort databasen, istället
+består processen av:
+            <itemizedlist>
+                <listitem>
+                    <para>
+                        Se till att fjärrservrarna är nåbara
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Stoppa tjänsten SSSD
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Ta bort databasen
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Starta tjänsten SSSD
+                    </para>
+                </listitem>
+            </itemizedlist>
+        Dessutom,  eftersom ändringen av ID:n kan göra det nödvändigt att justera
+andra systemegenskaper såsom ägare av filer och kataloger, är det lämpligt
+att planera i förväg och testa konfigurationen av ID-översättningar
+noggrant.
+    </para>
+
+    <refsect2 id='idmap_algorithm'>
+        <title>Översättningsalgoritm</title>
+        <para>
+            Active Directory tillhandahåller ett objectSID för varje användar- och
+gruppobjekt i katalogen.  Detta objectSID kan delas upp i komponenter som
+representerar Active Directorys domänidentitet och den relativa
+identifieraren (RID) till användar- eller gruppobjektet.
+        </para>
+        <para>
+            SSSD ID-översättningsalgoritmen tar ett intervall av tillgängliga AID:er och
+delar upp det i lika stora komponentavsnitt – kallade ”skivor” (”slices”)
+–.  Varje skiva representerar utrymmet som är tillgängligt för en Active
+Directory-domän.
+        </para>
+        <para>
+            När en användar- eller gruppost för en viss domän påträffas för första
+gången allokerar SSSD en av de tillgängliga skivorna för den domänen.  För
+att göra denna skivtilldelning upprepbar på olika klientmaskiner väljer vi
+skivan baserat på följande algoritm:
+        </para>
+        <para>
+            SID-strängen skickas genom algoritmen murmurhash3 för att konvertera den
+till ett 32-bitars hash-värde.  Vi tar sedan modulo på detta värde med det
+totala antalet tillgängliga skivor och väljer den skivan.
+        </para>
+        <para>
+            OBSERVERA: Det är möjligt att träffa på kollisioner i hash:en och den
+påföljande moduloberäkningen.  I dessa situationer kommer vi välja nästa
+tillgängliga skiva, men det är kanske inte möjligt att reproducera exakt
+samma uppsättning av skivor på andra maskiner (eftersom ordningen som de
+påträffas kommer avgöra deras skiva).  I den här situationen rekommenderas
+det att antingen byta till att använda explicita POSIX-attribut i Active
+Directory (avaktivera ID-mappningen) eller konfigurera en standarddomän för
+att garantera att åtminstone en alltid är konsistent.  Se
+<quote>Konfiguration</quote> för detaljer.
+        </para>
+    </refsect2>
+
+    <refsect2 id='idmap_config'>
+        <title>Konfiguration</title>
+        <para>
+            Minimikonfiguration (i avsnittet <quote>[domain/DOMÄNNAMN]</quote>):
+        </para>
+        <para>
+<programlisting>
+ldap_id_mapping = True
+ldap_schema = ad
+</programlisting>
+        </para>
+        <para>
+            Standardkonfigurationen resulterar i konfiguration av 10 000 skivor, som var
+och en kan innehålla upp till 200 000 ID:n, med början på 200 000 och upp
+till 2 000 200 000.  Detta bör vara tillräckligt för de flesta
+installationer.
+        </para>
+        <refsect3 id='idmap_advanced_config'>
+            <title>Avancerad konfiguration</title>
+            <variablelist>
+                <varlistentry>
+                    <term>ldap_idmap_range_min (heltal)</term>
+                    <listitem>
+                        <para>
+                            Specifies the lower (inclusive) bound of the range of POSIX IDs to use for
+mapping Active Directory user and group SIDs. It is the first POSIX ID which
+can be used for the mapping.
+                        </para>
+                        <para>
+                            OBSERVERA: Detta alternativ är inte detsamma som <quote>min_id</quote>
+eftersom <quote>min_id</quote> fungerar som ett filter av utmatade
+begäranden till denna domän, medan detta alternativ styr intervallet av
+ID-tilldelningen.  Detta är en subtil distinktion, men det allmänna goda
+rådet skulle vara att ha <quote>min_id</quote> mindre än eller lika med
+<quote>ldap_idmap_range_min</quote>
+                        </para>
+                        <para>
+                            Standard: 200000
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_range_max (heltal)</term>
+                    <listitem>
+                        <para>
+                            Specifies the upper (exclusive) bound of the range of POSIX IDs to use for
+mapping Active Directory user and group SIDs. It is the first POSIX ID which
+cannot be used for the mapping anymore, i.e. one larger than the last one
+which can be used for the mapping.
+                        </para>
+                        <para>
+                            OBSERVERA: Detta alternativ är inte detsamma som <quote>max_id</quote>
+eftersom <quote>max_id</quote> fungerar som ett filter av utmatade
+begäranden till denna domän, medan detta alternativ styr intervallet av
+ID-tilldelningen.  Detta är en subtil distinktion, men det allmänna goda
+rådet skulle vara att ha <quote>max_id</quote> större än eller lika med
+<quote>ldap_idmap_range_max</quote>
+                        </para>
+                        <para>
+                            Standard: 2000200000
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_range_size (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger antalet ID:n som är tillgängliga för varje skiva.  Om storleken på
+intervallet inte delas jämnt mellan min- och maxvärdena kommer den skapa så
+många fullständiga skivor den kan.
+                        </para>
+                        <para>
+                            OBSERVERA: Värdet på detta alternativ måste vara åtminstone så stort som den
+högsta RID som planeras användas i Active Directory-servern.
+Användaruppslagningar och inloggningar kommer misslyckas för eventuella
+användare vars RID är större än detta värde.
+                        </para>
+                        <para>
+                            Till exempel, om den senaste tillagda Active Directory-användaren har
+objectSid=S-1-5-21-2153326666-2176343378-3404031434-1107, måste
+<quote>ldap_idmap_range_size</quote> vara åtminstone 1108 eftersom
+intervallstorleken är lika med maximal SID minus minimal SID plus ett
+(t.ex. 1108 = 1107 - 0 + 1).
+                        </para>
+                        <para>
+                            Det är viktigt att planera i förväg för framtida expansioner, eftersom
+ändring av detta värde skulle resultera i att ändra alla ID-översättningar
+på systemet, vilket skulle leda till användare med andra lokala ID:n än de
+tidigare hade.
+                        </para>
+                        <para>
+                            Standard: 200000
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_default_domain_sid (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange domän-SID:n för standarddomänen.  Detta kommer garantera att denna
+domän alltid kommer tilldelas till skiva noll i ID-översättningen, och
+undviker murmurhash-algoritmen som beskrivs ovan.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_default_domain (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange namnet på standarddomänen.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_autorid_compat (boolean)</term>
+                    <listitem>
+                        <para>
+                            Ändrar beteendet på ID-översättningsalgoritmen till att bete sig mer likt
+winbind:s <quote>idmap_autorid</quote>-algoritm.
+                        </para>
+                        <para>
+                            När detta alternativ konfigureras kommer domäner allokeras med början med
+skiva noll och ökar monatomärt med varje ytterligare domän.
+                        </para>
+                        <para>
+                            OBSERVERA: Denna algoritm är inte deterministisk (den beror på ordningen som
+användare och grupper efterfrågas).  Om detta läge krävs för kompatibilitet
+med maskiner som kör winbind rekommenderas det att även använda alternativet
+<quote>ldap_idmap_default_domain_sid</quote> för att garantera att
+åtminstone en domän är konsekvent allokerat till skiva noll.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>ldap_idmap_helper_table_size (heltal)</term>
+                    <listitem>
+                        <para>
+                          Maximalt antal sekundära skivor som provas när mappningen från UNIX id till
+SID utförs.
+                        </para>
+                        <para>
+                          Observera: ytterligare sekundära skivor kan genereras när en SID översätts
+till UNIX-id och RID-delen av SID:n är utanför intervallet för sekundära
+skivor som genererats hittills.  Om värdet på ldap_idmap_helper_table_size
+är lika med 0 genereras inga ytterligare sekundära skivor.
+                        </para>
+                        <para>
+                            Standard: 10
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </refsect3>
+    </refsect2>
+
+    <refsect2 id='well_known_sids'>
+        <title>Välkända SID:er</title>
+        <para>
+            SSSD stödjer uppslagning av namnen på välkända SID:er, d.v.s. SID:er med en
+speciell hårdkodad betydelse.  Eftersom de allmänna användarna och grupperna
+relaterade till dessa välkända SID:er inte har någon motsvarighet i en
+Linux-/UNIX-miljö är inga POSIX-ID:n tillgängliga för dessa objekt.
+        </para>
+        <para>
+            SID-namnrymden är organiserad i auktoriteter som kan ses som olika domäner.
+Auktoriteterna för välkända SID:er är
+            <itemizedlist>
+                <listitem><para>Null-auktoritet</para></listitem>
+                <listitem><para>Världsauktoritet</para></listitem>
+                <listitem><para>Lokal auktoritet</para></listitem>
+                <listitem><para>Skaparauktoritet</para></listitem>
+                <listitem><para>NT-auktoritet</para></listitem>
+                <listitem><para>Inbyggd</para></listitem>
+            </itemizedlist>
+            Den versala versionen av dessa namn används som domännamn när det
+fullständigt kvalificerade namnet på en välkänd SID returneras.
+        </para>
+        <para>
+            Eftersom några verktyg tillåter att man ändrar SID-baserad
+åtkomststyrningsinformation med hjälp av ett namn istället för att använda
+SID:en direkt stödjer SSSD uppslagning av SID:en med detta namn också.  För
+att undvika kollisioner kan bara de fullständigt kvalificerade namnen
+användas för att slå upp välkända SID:er.  Som ett resultat skall
+domännamnen <quote>NULL AUTHORITY</quote>, <quote>WORLD AUTHORITY</quote>,
+<quote> LOCAL AUTHORITY</quote>, <quote>CREATOR AUTHORITY</quote>, <quote>NT
+AUTHORITY</quote> och <quote>BUILTIN</quote> inte användas som domännamn i
+<filename>sssd.conf</filename>.
+        </para>
+    </refsect2>
+
+</refsect1>

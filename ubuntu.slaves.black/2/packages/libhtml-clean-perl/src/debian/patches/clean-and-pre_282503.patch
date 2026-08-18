@@ -1,0 +1,46 @@
+Description: Added documentation (and a warning) explaining why HTML::Clean does
+ not properly handle preformatted areas
+Origin: vendor
+Bug: https://rt.cpan.org/NoAuth/Bug.html?id=6772
+Bug-Debian: https://bugs.debian.org/282503
+Author: Gunnar Wolf <gwolf@debian.org>
+Reviewed-by: gregor herrmann <gregoa@debian.org>
+Last-Update: 2019-12-22
+
+--- a/lib/HTML/Clean.pm
++++ b/lib/HTML/Clean.pm
+@@ -365,6 +365,16 @@ The following options are recognized:
+ 
+ =back
+ 
++Please note that if your HTML includes preformatted regions (this means, if
++it includes <pre>...</pre>, we do not suggest removing whitespace, as it will
++alter the rendered defaults.
++
++HTML::Clean will print out a warning if it finds a preformatted region and is
++requested to strip whitespace. In order to prevent this, specify that you don't
++want to strip whitespace - i.e.
++
++  $h->strip( {whitespace => 0} );
++
+ =cut
+ 
+ use vars qw/
+@@ -425,6 +435,17 @@ sub strip {
+   }
+ 
+   if ($do_whitespace) {
++    if ($$h =~ /<pre/i) {
++      warn << 'EOF'
++Warning: Stripping whitespace will affect preformatted region\'s layout
++You have a <pre> region in your HTML, which depends on the whitespace not
++being modified. You requested to strip the whitespace - The rendered results
++will be affected.
++
++Hint: Use $h->strip({whitespace => 0}); instead.
++EOF
++    }
++
+     $$h =~ s,[\r\n]+,\n,sg; # Carriage/LF -> LF
+     $$h =~ s,\s+\n,\n,sg;   # empty line
+     $$h =~ s,\n\s+<,\n<,sg; # space before tag

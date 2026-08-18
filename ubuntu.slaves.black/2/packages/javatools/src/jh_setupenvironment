@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_setupenvironment - Prepares a build environment to compile an eclipse feature.
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_setupenvironment> [S<I<debhelper options>>] [B<--pde-build-dir=>I<dir>] [S<I<copy [...]>>]
+
+=head1 DESCRIPTION
+
+jh_setupenvironment is a javahelper program that handles creating
+an environment for building an eclipse feature. It does not setup
+an orbit dir (use jh_generateorbitdir for that). It will copy files
+specified in debian/eclipse.environment as well as those given on
+command line into the environment dir. If no files are given per
+command line and the environment file is not present (or is empty),
+it will default to "org.eclipse.*"
+
+=head1 FILES
+
+=over 4
+
+=item debian/eclipse.environment
+
+List of file- and directory glob patterns to copy into the build
+environment.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--pde-build-dir=>I<dir>
+
+Specifies where the environment should be or is placed.
+
+=item B<--clean>
+
+If passed, jh_setupenvironment will clean up the build environment.
+When cleaning jh_setupenvironment will not record itself in the
+debhelper log to avoid confusing dh, when it has to use the log
+to trace where it was.
+
+=back
+
+=cut
+
+my $builddir = undef;
+my $clean = '';
+
+init(options => {
+    'pde-build-dir=s' => \$builddir,
+    'clean' => sub { $clean = 1 },
+});
+
+$clean = 0 unless(defined($clean) and $clean ne q{});
+$builddir = 'debian/.eclipse-build' unless(defined($builddir));
+
+# do not write to the log if we are cleaning.
+inhibit_log() if($clean);
+
+if($clean){
+    doit('rm', '-fr', $builddir);
+    # We no longer create this file, but clean it up for now in case people have "dirty" build
+    # directories.
+    rm_files('debian/orbitdeps.debhelper');
+} else{
+    my $bfile = 'debian/eclipse.environment';
+    if( -f $bfile){
+        push(@ARGV, filearray($bfile));
+    }
+    push(@ARGV, 'org.eclipse.*') unless(scalar(@ARGV) > 0);
+    install_dir($builddir);
+    complex_doit('cp -far ' . join(' ', @ARGV) . " $builddir");
+}
+
+exit(0);
+
+=head1 EXAMPLE
+
+  jh_setupenvironment org.eclipse.* debian/*.properties
+
+Will clone all files and folders starting with "org.eclipse." and all
+property files in the debian-folder and put them into the environment.
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2010 by Niels Thykier
+
+This tool is free software; you may redistribute it and/or modify
+it under the terms of GNU GPL 2.
+
+=cut

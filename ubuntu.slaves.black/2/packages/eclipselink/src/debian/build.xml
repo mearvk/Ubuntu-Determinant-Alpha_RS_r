@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="../" name="build-eclipselink" default="jar">
+  <property file="debian/build.properties"/>
+  
+  <path id="classpath">
+    <fileset dir="/" includesfile="${dir.debian}/classpath-debian"/>
+  </path>
+
+  <target name="init">
+    <mkdir dir="${dir.build}/classes"/>
+    <mkdir dir="${dir.build}/jpql"/>
+    <mkdir dir="${dir.build}/modelgen"/>
+  </target>
+
+  <target name="clean">
+    <delete dir="${dir.build}"/>
+  </target>
+
+  <target name="compile" depends="init">
+    <javac
+	srcdir="${dir.src}"
+	destdir="${dir.build}/classes"
+	classpathref="classpath"
+	debug="${debug}"
+	release="${release}"
+	excludesfile="${dir.debian}/excludesfiles/build"
+	includeantruntime="false">
+      <include name="org/eclipse/persistence/**"/>
+      <include name="commonj/**"/>
+    </javac>
+    <copy todir="${dir.build}/classes">
+      <fileset dir=".">
+	<include name="*.html"/>
+	<include name="org/**"/>
+	<include name="OSGI-INF/**"/>
+	<exclude name="**/*.java"/>
+      </fileset>
+    </copy>
+     <javac
+	srcdir="${dir.src}"
+	destdir="${dir.build}/jpql"
+	debug="${debug}"
+	release="${release}"
+	includeantruntime="false">
+      <include name="org/eclipse/persistence/jpa/jpql/**"/>
+    </javac>
+     <copy todir="${dir.build}/jpql">
+      <fileset dir=".">
+	<include name="*.html"/>
+	<include name="org/eclipse/persistence/jpa/jpql/*.properties"/>
+	<exclude name="**/*.java"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="jar" depends="compile">
+    <jar
+	destfile="${dir.build}/eclipselink.jar"
+	basedir="${dir.build}/classes">
+      <service type="javax.persistence.spi.PersistenceProvider"
+	       provider="org.eclipse.persistence.jpa.PersistenceProvider"/>
+    </jar>
+    <jar
+	destfile="${dir.build}/org.eclipse.persistence.jpa.jpql.jar"
+	basedir="${dir.build}/jpql">
+    </jar>
+    <jar
+	destfile="${dir.build}/org.eclipse.persistence.jpa.modelgen.processor.jar"
+	basedir="${dir.build}/modelgen">
+      <fileset dir=".">
+        <include name="*.html"/>
+      </fileset>
+      <service type="javax.annotation.processing.Processor"
+               provider="org.eclipse.persistence.internal.jpa.modelgen.CanonicalModelProcessor"/>
+    </jar>
+  </target>
+
+</project>

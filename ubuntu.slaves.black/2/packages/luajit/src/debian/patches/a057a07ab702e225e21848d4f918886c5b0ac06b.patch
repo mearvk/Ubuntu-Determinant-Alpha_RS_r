@@ -1,0 +1,979 @@
+From a057a07ab702e225e21848d4f918886c5b0ac06b Mon Sep 17 00:00:00 2001
+From: Mike Pall <mike>
+Date: Wed, 7 Jun 2017 23:56:54 +0200
+Subject: [PATCH] MIPS64: Add soft-float support to JIT compiler backend.
+
+Contributed by Djordje Kovacevic and Stefan Pejic from RT-RK.com.
+Sponsored by Cisco Systems, Inc.
+---
+ src/lj_arch.h      |   4 +-
+ src/lj_asm.c       |   8 +-
+ src/lj_asm_mips.h  | 217 +++++++++++++++++++++++++++++++++++++++++++----------
+ src/lj_crecord.c   |   4 +-
+ src/lj_emit_mips.h |   2 +
+ src/lj_ffrecord.c  |   2 +-
+ src/lj_ircall.h    |  43 +++++++----
+ src/lj_iropt.h     |   2 +-
+ src/lj_jit.h       |   4 +-
+ src/lj_obj.h       |   3 +
+ src/lj_opt_split.c |   2 +-
+ src/lj_snap.c      |  21 +++---
+ src/vm_mips64.dasc |  49 ++++++++++++
+ 13 files changed, 286 insertions(+), 75 deletions(-)
+
+diff --git a/src/lj_arch.h b/src/lj_arch.h
+index c8d7138e..b7705642 100644
+--- a/src/lj_arch.h
++++ b/src/lj_arch.h
+@@ -337,9 +337,6 @@
+ #define LJ_ARCH_BITS		32
+ #define LJ_TARGET_MIPS32	1
+ #else
+-#if LJ_ABI_SOFTFP || !LJ_ARCH_HASFPU
+-#define LJ_ARCH_NOJIT		1	/* NYI */
+-#endif
+ #define LJ_ARCH_BITS		64
+ #define LJ_TARGET_MIPS64	1
+ #define LJ_TARGET_GC64		1
+@@ -512,6 +509,7 @@
+ #define LJ_ABI_SOFTFP		0
+ #endif
+ #define LJ_SOFTFP		(!LJ_ARCH_HASFPU)
++#define LJ_SOFTFP32		(LJ_SOFTFP && LJ_32)
+ 
+ #if LJ_ARCH_ENDIAN == LUAJIT_BE
+ #define LJ_LE			0
+diff --git a/src/lj_asm.c b/src/lj_asm.c
+index c2cf5a95..bed2268e 100644
+--- a/src/lj_asm.c
++++ b/src/lj_asm.c
+@@ -338,7 +338,7 @@ static Reg ra_rematk(ASMState *as, IRRef ref)
+   ra_modified(as, r);
+   ir->r = RID_INIT;  /* Do not keep any hint. */
+   RA_DBGX((as, "remat     $i $r", ir, r));
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+   if (ir->o == IR_KNUM) {
+     emit_loadk64(as, r, ir);
+   } else
+@@ -1305,7 +1305,7 @@ static void asm_call(ASMState *as, IRIns *ir)
+   asm_gencall(as, ci, args);
+ }
+ 
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+ static void asm_fppow(ASMState *as, IRIns *ir, IRRef lref, IRRef rref)
+ {
+   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_pow];
+@@ -1652,10 +1652,10 @@ static void asm_ir(ASMState *as, IRIns *ir)
+   case IR_MUL: asm_mul(as, ir); break;
+   case IR_MOD: asm_mod(as, ir); break;
+   case IR_NEG: asm_neg(as, ir); break;
+-#if LJ_SOFTFP
++#if LJ_SOFTFP32
+   case IR_DIV: case IR_POW: case IR_ABS:
+   case IR_ATAN2: case IR_LDEXP: case IR_FPMATH: case IR_TOBIT:
+-    lua_assert(0);  /* Unused for LJ_SOFTFP. */
++    lua_assert(0);  /* Unused for LJ_SOFTFP32. */
+     break;
+ #else
+   case IR_DIV: asm_div(as, ir); break;
+diff --git a/src/lj_asm_mips.h b/src/lj_asm_mips.h
+index 05af3d09..1406a873 100644
+--- a/src/lj_asm_mips.h
++++ b/src/lj_asm_mips.h
+@@ -290,7 +290,7 @@ static void asm_gencall(ASMState *as, const CCallInfo *ci, IRRef *args)
+ 	  {
+ 	    ra_leftov(as, gpr, ref);
+ 	    gpr++;
+-#if LJ_64
++#if LJ_64 && !LJ_SOFTFP
+ 	    fpr++;
+ #endif
+ 	  }
+@@ -301,7 +301,7 @@ static void asm_gencall(ASMState *as, const CCallInfo *ci, IRRef *args)
+ 	  emit_spstore(as, ir, r, ofs);
+ 	  ofs += irt_isnum(ir->t) ? 8 : 4;
+ #else
+-	  emit_spstore(as, ir, r, ofs + ((LJ_BE && (LJ_SOFTFP || r < RID_MAX_GPR) && !irt_is64(ir->t)) ? 4 : 0));
++	  emit_spstore(as, ir, r, ofs + ((LJ_BE && !irt_isfp(ir->t) && !irt_is64(ir->t)) ? 4 : 0));
+ 	  ofs += 8;
+ #endif
+ 	}
+@@ -312,7 +312,7 @@ static void asm_gencall(ASMState *as, const CCallInfo *ci, IRRef *args)
+ #endif
+       if (gpr <= REGARG_LASTGPR) {
+ 	gpr++;
+-#if LJ_64
++#if LJ_64 && !LJ_SOFTFP
+ 	fpr++;
+ #endif
+       } else {
+@@ -461,12 +461,36 @@ static void asm_tobit(ASMState *as, IRIns *ir)
+   emit_tg(as, MIPSI_MFC1, dest, tmp);
+   emit_fgh(as, MIPSI_ADD_D, tmp, left, right);
+ }
++#elif LJ_64  /* && LJ_SOFTFP */
++static void asm_tointg(ASMState *as, IRIns *ir, Reg r)
++{
++  /* The modified regs must match with the *.dasc implementation. */
++  RegSet drop = RID2RSET(REGARG_FIRSTGPR)|RID2RSET(RID_RET)|RID2RSET(RID_RET+1)|
++		RID2RSET(RID_R1)|RID2RSET(RID_R12);
++  if (ra_hasreg(ir->r)) rset_clear(drop, ir->r);
++  ra_evictset(as, drop);
++  /* Return values are in RID_RET (converted value) and RID_RET+1 (status). */
++  ra_destreg(as, ir, RID_RET);
++  asm_guard(as, MIPSI_BNE, RID_RET+1, RID_ZERO);
++  emit_call(as, (void *)lj_ir_callinfo[IRCALL_lj_vm_tointg].func, 0);
++  if (r == RID_NONE)
++    ra_leftov(as, REGARG_FIRSTGPR, ir->op1);
++  else if (r != REGARG_FIRSTGPR)
++    emit_move(as, REGARG_FIRSTGPR, r);
++}
++
++static void asm_tobit(ASMState *as, IRIns *ir)
++{
++  Reg dest = ra_dest(as, ir, RSET_GPR);
++  emit_dta(as, MIPSI_SLL, dest, dest, 0);
++  asm_callid(as, ir, IRCALL_lj_vm_tobit);
++}
+ #endif
+ 
+ static void asm_conv(ASMState *as, IRIns *ir)
+ {
+   IRType st = (IRType)(ir->op2 & IRCONV_SRCMASK);
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+   int stfp = (st == IRT_NUM || st == IRT_FLOAT);
+ #endif
+ #if LJ_64
+@@ -477,12 +501,13 @@ static void asm_conv(ASMState *as, IRIns *ir)
+   lua_assert(!(irt_isint64(ir->t) ||
+ 	       (st == IRT_I64 || st == IRT_U64))); /* Handled by SPLIT. */
+ #endif
+-#if LJ_32 && LJ_SOFTFP
++#if LJ_SOFTFP32
+   /* FP conversions are handled by SPLIT. */
+   lua_assert(!irt_isfp(ir->t) && !(st == IRT_NUM || st == IRT_FLOAT));
+   /* Can't check for same types: SPLIT uses CONV int.int + BXOR for sfp NEG. */
+ #else
+   lua_assert(irt_type(ir->t) != st);
++#if !LJ_SOFTFP
+   if (irt_isfp(ir->t)) {
+     Reg dest = ra_dest(as, ir, RSET_FPR);
+     if (stfp) {  /* FP to FP conversion. */
+@@ -608,6 +633,42 @@ static void asm_conv(ASMState *as, IRIns *ir)
+       }
+     }
+   } else
++#else
++  if (irt_isfp(ir->t)) {
++#if LJ_64 && LJ_HASFFI
++    if (stfp) {  /* FP to FP conversion. */
++      asm_callid(as, ir, irt_isnum(ir->t) ? IRCALL_softfp_f2d :
++					    IRCALL_softfp_d2f);
++    } else {  /* Integer to FP conversion. */
++      IRCallID cid = ((IRT_IS64 >> st) & 1) ?
++	(irt_isnum(ir->t) ?
++	 (st == IRT_I64 ? IRCALL_fp64_l2d : IRCALL_fp64_ul2d) :
++	 (st == IRT_I64 ? IRCALL_fp64_l2f : IRCALL_fp64_ul2f)) :
++	(irt_isnum(ir->t) ?
++	 (st == IRT_INT ? IRCALL_softfp_i2d : IRCALL_softfp_ui2d) :
++	 (st == IRT_INT ? IRCALL_softfp_i2f : IRCALL_softfp_ui2f));
++      asm_callid(as, ir, cid);
++    }
++#else
++    asm_callid(as, ir, IRCALL_softfp_i2d);
++#endif
++  } else if (stfp) {  /* FP to integer conversion. */
++    if (irt_isguard(ir->t)) {
++      /* Checked conversions are only supported from number to int. */
++      lua_assert(irt_isint(ir->t) && st == IRT_NUM);
++      asm_tointg(as, ir, RID_NONE);
++    } else {
++      IRCallID cid = irt_is64(ir->t) ?
++	((st == IRT_NUM) ?
++	 (irt_isi64(ir->t) ? IRCALL_fp64_d2l : IRCALL_fp64_d2ul) :
++	 (irt_isi64(ir->t) ? IRCALL_fp64_f2l : IRCALL_fp64_f2ul)) :
++	((st == IRT_NUM) ?
++	 (irt_isint(ir->t) ? IRCALL_softfp_d2i : IRCALL_softfp_d2ui) :
++	 (irt_isint(ir->t) ? IRCALL_softfp_f2i : IRCALL_softfp_f2ui));
++      asm_callid(as, ir, cid);
++    }
++  } else
++#endif
+ #endif
+   {
+     Reg dest = ra_dest(as, ir, RSET_GPR);
+@@ -665,7 +726,7 @@ static void asm_strto(ASMState *as, IRIns *ir)
+   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_lj_strscan_num];
+   IRRef args[2];
+   int32_t ofs = 0;
+-#if LJ_SOFTFP
++#if LJ_SOFTFP32
+   ra_evictset(as, RSET_SCRATCH);
+   if (ra_used(ir)) {
+     if (ra_hasspill(ir->s) && ra_hasspill((ir+1)->s) &&
+@@ -806,7 +867,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+   MCLabel l_end, l_loop, l_next;
+ 
+   rset_clear(allow, tab);
+-#if LJ_32 && LJ_SOFTFP
++#if LJ_SOFTFP32
+   if (!isk) {
+     key = ra_alloc1(as, refkey, allow);
+     rset_clear(allow, key);
+@@ -826,7 +887,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+     }
+   }
+ #else
+-  if (irt_isnum(kt)) {
++  if (!LJ_SOFTFP && irt_isnum(kt)) {
+     key = ra_alloc1(as, refkey, RSET_FPR);
+     tmpnum = ra_scratch(as, rset_exclude(RSET_FPR, key));
+   } else if (!irt_ispri(kt)) {
+@@ -882,6 +943,9 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+     emit_dta(as, MIPSI_DSRA32, tmp1, tmp1, 15);
+     emit_tg(as, MIPSI_DMTC1, tmp1, tmpnum);
+     emit_tsi(as, MIPSI_LD, tmp1, dest, (int32_t)offsetof(Node, key.u64));
++  } else if (LJ_SOFTFP && irt_isnum(kt)) {
++    emit_branch(as, MIPSI_BEQ, tmp1, key, l_end);
++    emit_tsi(as, MIPSI_LD, tmp1, dest, (int32_t)offsetof(Node, key.u64));
+   } else if (irt_isaddr(kt)) {
+     Reg refk = tmp2;
+     if (isk) {
+@@ -960,7 +1024,7 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+       emit_dta(as, MIPSI_ROTR, dest, tmp1, (-HASH_ROT1)&31);
+       if (irt_isnum(kt)) {
+ 	emit_dst(as, MIPSI_ADDU, tmp1, tmp1, tmp1);
+-	emit_dta(as, MIPSI_DSRA32, tmp1, tmp1, 0);
++	emit_dta(as, MIPSI_DSRA32, tmp1, LJ_SOFTFP ? key : tmp1, 0);
+ 	emit_dta(as, MIPSI_SLL, tmp2, LJ_SOFTFP ? key : tmp1, 0);
+ #if !LJ_SOFTFP
+ 	emit_tg(as, MIPSI_DMFC1, tmp1, key);
+@@ -1123,7 +1187,7 @@ static MIPSIns asm_fxloadins(IRIns *ir)
+   case IRT_U8: return MIPSI_LBU;
+   case IRT_I16: return MIPSI_LH;
+   case IRT_U16: return MIPSI_LHU;
+-  case IRT_NUM: lua_assert(!LJ_SOFTFP); return MIPSI_LDC1;
++  case IRT_NUM: lua_assert(!LJ_SOFTFP32); if (!LJ_SOFTFP) return MIPSI_LDC1;
+   case IRT_FLOAT: if (!LJ_SOFTFP) return MIPSI_LWC1;
+   default: return (LJ_64 && irt_is64(ir->t)) ? MIPSI_LD : MIPSI_LW;
+   }
+@@ -1134,7 +1198,7 @@ static MIPSIns asm_fxstoreins(IRIns *ir)
+   switch (irt_type(ir->t)) {
+   case IRT_I8: case IRT_U8: return MIPSI_SB;
+   case IRT_I16: case IRT_U16: return MIPSI_SH;
+-  case IRT_NUM: lua_assert(!LJ_SOFTFP); return MIPSI_SDC1;
++  case IRT_NUM: lua_assert(!LJ_SOFTFP32); if (!LJ_SOFTFP) return MIPSI_SDC1;
+   case IRT_FLOAT: if (!LJ_SOFTFP) return MIPSI_SWC1;
+   default: return (LJ_64 && irt_is64(ir->t)) ? MIPSI_SD : MIPSI_SW;
+   }
+@@ -1199,7 +1263,7 @@ static void asm_xstore_(ASMState *as, IRIns *ir, int32_t ofs)
+ 
+ static void asm_ahuvload(ASMState *as, IRIns *ir)
+ {
+-  int hiop = (LJ_32 && LJ_SOFTFP && (ir+1)->o == IR_HIOP);
++  int hiop = (LJ_SOFTFP32 && (ir+1)->o == IR_HIOP);
+   Reg dest = RID_NONE, type = RID_TMP, idx;
+   RegSet allow = RSET_GPR;
+   int32_t ofs = 0;
+@@ -1212,7 +1276,7 @@ static void asm_ahuvload(ASMState *as, IRIns *ir)
+     }
+   }
+   if (ra_used(ir)) {
+-    lua_assert((LJ_SOFTFP ? 0 : irt_isnum(ir->t)) ||
++    lua_assert((LJ_SOFTFP32 ? 0 : irt_isnum(ir->t)) ||
+ 	       irt_isint(ir->t) || irt_isaddr(ir->t));
+     dest = ra_dest(as, ir, (!LJ_SOFTFP && irt_isnum(t)) ? RSET_FPR : allow);
+     rset_clear(allow, dest);
+@@ -1261,10 +1325,10 @@ static void asm_ahustore(ASMState *as, IRIns *ir)
+   int32_t ofs = 0;
+   if (ir->r == RID_SINK)
+     return;
+-  if (!LJ_SOFTFP && irt_isnum(ir->t)) {
+-    src = ra_alloc1(as, ir->op2, RSET_FPR);
++  if (!LJ_SOFTFP32 && irt_isnum(ir->t)) {
++    src = ra_alloc1(as, ir->op2, LJ_SOFTFP ? RSET_GPR : RSET_FPR);
+     idx = asm_fuseahuref(as, ir->op1, &ofs, allow);
+-    emit_hsi(as, MIPSI_SDC1, src, idx, ofs);
++    emit_hsi(as, LJ_SOFTFP ? MIPSI_SD : MIPSI_SDC1, src, idx, ofs);
+   } else {
+ #if LJ_32
+     if (!irt_ispri(ir->t)) {
+@@ -1312,7 +1376,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
+   IRType1 t = ir->t;
+ #if LJ_32
+   int32_t ofs = 8*((int32_t)ir->op1-1) + ((ir->op2 & IRSLOAD_FRAME) ? 4 : 0);
+-  int hiop = (LJ_32 && LJ_SOFTFP && (ir+1)->o == IR_HIOP);
++  int hiop = (LJ_SOFTFP32 && (ir+1)->o == IR_HIOP);
+   if (hiop)
+     t.irt = IRT_NUM;
+ #else
+@@ -1320,7 +1384,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
+ #endif
+   lua_assert(!(ir->op2 & IRSLOAD_PARENT));  /* Handled by asm_head_side(). */
+   lua_assert(irt_isguard(ir->t) || !(ir->op2 & IRSLOAD_TYPECHECK));
+-#if LJ_32 && LJ_SOFTFP
++#if LJ_SOFTFP32
+   lua_assert(!(ir->op2 & IRSLOAD_CONVERT));  /* Handled by LJ_SOFTFP SPLIT. */
+   if (hiop && ra_used(ir+1)) {
+     type = ra_dest(as, ir+1, allow);
+@@ -1328,29 +1392,44 @@ static void asm_sload(ASMState *as, IRIns *ir)
+   }
+ #else
+   if ((ir->op2 & IRSLOAD_CONVERT) && irt_isguard(t) && irt_isint(t)) {
+-    dest = ra_scratch(as, RSET_FPR);
++    dest = ra_scratch(as, LJ_SOFTFP ? allow : RSET_FPR);
+     asm_tointg(as, ir, dest);
+     t.irt = IRT_NUM;  /* Continue with a regular number type check. */
+   } else
+ #endif
+   if (ra_used(ir)) {
+-    lua_assert((LJ_SOFTFP ? 0 : irt_isnum(ir->t)) ||
++    lua_assert((LJ_SOFTFP32 ? 0 : irt_isnum(ir->t)) ||
+ 	       irt_isint(ir->t) || irt_isaddr(ir->t));
+     dest = ra_dest(as, ir, (!LJ_SOFTFP && irt_isnum(t)) ? RSET_FPR : allow);
+     rset_clear(allow, dest);
+     base = ra_alloc1(as, REF_BASE, allow);
+     rset_clear(allow, base);
+-    if (!LJ_SOFTFP && (ir->op2 & IRSLOAD_CONVERT)) {
++    if (!LJ_SOFTFP32 && (ir->op2 & IRSLOAD_CONVERT)) {
+       if (irt_isint(t)) {
+-	Reg tmp = ra_scratch(as, RSET_FPR);
++	Reg tmp = ra_scratch(as, LJ_SOFTFP ? RSET_GPR : RSET_FPR);
++#if LJ_SOFTFP
++	ra_evictset(as, rset_exclude(RSET_SCRATCH, dest));
++	ra_destreg(as, ir, RID_RET);
++	emit_call(as, (void *)lj_ir_callinfo[IRCALL_softfp_d2i].func, 0);
++	if (tmp != REGARG_FIRSTGPR)
++	  emit_move(as, REGARG_FIRSTGPR, tmp);
++#else
+ 	emit_tg(as, MIPSI_MFC1, dest, tmp);
+ 	emit_fg(as, MIPSI_TRUNC_W_D, tmp, tmp);
++#endif
+ 	dest = tmp;
+ 	t.irt = IRT_NUM;  /* Check for original type. */
+       } else {
+ 	Reg tmp = ra_scratch(as, RSET_GPR);
++#if LJ_SOFTFP
++	ra_evictset(as, rset_exclude(RSET_SCRATCH, dest));
++	ra_destreg(as, ir, RID_RET);
++	emit_call(as, (void *)lj_ir_callinfo[IRCALL_softfp_i2d].func, 0);
++	emit_dta(as, MIPSI_SLL, REGARG_FIRSTGPR, tmp, 0);
++#else
+ 	emit_fg(as, MIPSI_CVT_D_W, dest, dest);
+ 	emit_tg(as, MIPSI_MTC1, tmp, dest);
++#endif
+ 	dest = tmp;
+ 	t.irt = IRT_INT;  /* Check for original type. */
+       }
+@@ -1399,7 +1478,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
+       if (irt_isnum(t)) {
+ 	asm_guard(as, MIPSI_BEQ, RID_TMP, RID_ZERO);
+ 	emit_tsi(as, MIPSI_SLTIU, RID_TMP, RID_TMP, (int32_t)LJ_TISNUM);
+-	if (ra_hasreg(dest))
++	if (!LJ_SOFTFP && ra_hasreg(dest))
+ 	  emit_hsi(as, MIPSI_LDC1, dest, base, ofs);
+       } else {
+ 	asm_guard(as, MIPSI_BNE, RID_TMP,
+@@ -1409,7 +1488,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
+     }
+     emit_tsi(as, MIPSI_LD, type, base, ofs);
+   } else if (ra_hasreg(dest)) {
+-    if (irt_isnum(t))
++    if (!LJ_SOFTFP && irt_isnum(t))
+       emit_hsi(as, MIPSI_LDC1, dest, base, ofs);
+     else
+       emit_tsi(as, irt_isint(t) ? MIPSI_LW : MIPSI_LD, dest, base,
+@@ -1548,26 +1627,40 @@ static void asm_fpunary(ASMState *as, IRIns *ir, MIPSIns mi)
+   Reg left = ra_hintalloc(as, ir->op1, dest, RSET_FPR);
+   emit_fg(as, mi, dest, left);
+ }
++#endif
+ 
++#if !LJ_SOFTFP32
+ static void asm_fpmath(ASMState *as, IRIns *ir)
+ {
+   if (ir->op2 == IRFPM_EXP2 && asm_fpjoin_pow(as, ir))
+     return;
++#if !LJ_SOFTFP
+   if (ir->op2 <= IRFPM_TRUNC)
+     asm_callround(as, ir, IRCALL_lj_vm_floor + ir->op2);
+   else if (ir->op2 == IRFPM_SQRT)
+     asm_fpunary(as, ir, MIPSI_SQRT_D);
+   else
++#endif
+     asm_callid(as, ir, IRCALL_lj_vm_floor + ir->op2);
+ }
+ #endif
+ 
++#if !LJ_SOFTFP
++#define asm_fpadd(as, ir)	asm_fparith(as, ir, MIPSI_ADD_D)
++#define asm_fpsub(as, ir)	asm_fparith(as, ir, MIPSI_SUB_D)
++#define asm_fpmul(as, ir)	asm_fparith(as, ir, MIPSI_MUL_D)
++#elif LJ_64  /* && LJ_SOFTFP */
++#define asm_fpadd(as, ir)	asm_callid(as, ir, IRCALL_softfp_add)
++#define asm_fpsub(as, ir)	asm_callid(as, ir, IRCALL_softfp_sub)
++#define asm_fpmul(as, ir)	asm_callid(as, ir, IRCALL_softfp_mul)
++#endif
++
+ static void asm_add(ASMState *as, IRIns *ir)
+ {
+   IRType1 t = ir->t;
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+   if (irt_isnum(t)) {
+-    asm_fparith(as, ir, MIPSI_ADD_D);
++    asm_fpadd(as, ir);
+   } else
+ #endif
+   {
+@@ -1589,9 +1682,9 @@ static void asm_add(ASMState *as, IRIns *ir)
+ 
+ static void asm_sub(ASMState *as, IRIns *ir)
+ {
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+   if (irt_isnum(ir->t)) {
+-    asm_fparith(as, ir, MIPSI_SUB_D);
++    asm_fpsub(as, ir);
+   } else
+ #endif
+   {
+@@ -1605,9 +1698,9 @@ static void asm_sub(ASMState *as, IRIns *ir)
+ 
+ static void asm_mul(ASMState *as, IRIns *ir)
+ {
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+   if (irt_isnum(ir->t)) {
+-    asm_fparith(as, ir, MIPSI_MUL_D);
++    asm_fpmul(as, ir);
+   } else
+ #endif
+   {
+@@ -1634,7 +1727,7 @@ static void asm_mod(ASMState *as, IRIns *ir)
+     asm_callid(as, ir, IRCALL_lj_vm_modi);
+ }
+ 
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+ static void asm_pow(ASMState *as, IRIns *ir)
+ {
+ #if LJ_64 && LJ_HASFFI
+@@ -1654,7 +1747,11 @@ static void asm_div(ASMState *as, IRIns *ir)
+ 					  IRCALL_lj_carith_divu64);
+   else
+ #endif
++#if !LJ_SOFTFP
+     asm_fparith(as, ir, MIPSI_DIV_D);
++#else
++  asm_callid(as, ir, IRCALL_softfp_div);
++#endif
+ }
+ #endif
+ 
+@@ -1664,6 +1761,13 @@ static void asm_neg(ASMState *as, IRIns *ir)
+   if (irt_isnum(ir->t)) {
+     asm_fpunary(as, ir, MIPSI_NEG_D);
+   } else
++#elif LJ_64  /* && LJ_SOFTFP */
++  if (irt_isnum(ir->t)) {
++    Reg dest = ra_dest(as, ir, RSET_GPR);
++    Reg left = ra_hintalloc(as, ir->op1, dest, RSET_GPR);
++    emit_dst(as, MIPSI_XOR, dest, left,
++	    ra_allock(as, 0x8000000000000000ll, rset_exclude(RSET_GPR, dest)));
++  } else
+ #endif
+   {
+     Reg dest = ra_dest(as, ir, RSET_GPR);
+@@ -1673,7 +1777,17 @@ static void asm_neg(ASMState *as, IRIns *ir)
+   }
+ }
+ 
++#if !LJ_SOFTFP
+ #define asm_abs(as, ir)		asm_fpunary(as, ir, MIPSI_ABS_D)
++#elif LJ_64   /* && LJ_SOFTFP */
++static void asm_abs(ASMState *as, IRIns *ir)
++{
++  Reg dest = ra_dest(as, ir, RSET_GPR);
++  Reg left = ra_alloc1(as, ir->op1, RSET_GPR);
++  emit_tsml(as, MIPSI_DEXTM, dest, left, 30, 0);
++}
++#endif
++
+ #define asm_atan2(as, ir)	asm_callid(as, ir, IRCALL_atan2)
+ #define asm_ldexp(as, ir)	asm_callid(as, ir, IRCALL_ldexp)
+ 
+@@ -1918,15 +2032,21 @@ static void asm_bror(ASMState *as, IRIns *ir)
+   }
+ }
+ 
+-#if LJ_32 && LJ_SOFTFP
++#if LJ_SOFTFP
+ static void asm_sfpmin_max(ASMState *as, IRIns *ir)
+ {
+   CCallInfo ci = lj_ir_callinfo[(IROp)ir->o == IR_MIN ? IRCALL_lj_vm_sfmin : IRCALL_lj_vm_sfmax];
++#if LJ_64
++  IRRef args[2];
++  args[0] = ir->op1;
++  args[1] = ir->op2;
++#else
+   IRRef args[4];
+   args[0^LJ_BE] = ir->op1;
+   args[1^LJ_BE] = (ir+1)->op1;
+   args[2^LJ_BE] = ir->op2;
+   args[3^LJ_BE] = (ir+1)->op2;
++#endif
+   asm_setupresult(as, ir, &ci);
+   emit_call(as, (void *)ci.func, 0);
+   ci.func = NULL;
+@@ -1936,7 +2056,10 @@ static void asm_sfpmin_max(ASMState *as, IRIns *ir)
+ 
+ static void asm_min_max(ASMState *as, IRIns *ir, int ismax)
+ {
+-  if (!LJ_SOFTFP && irt_isnum(ir->t)) {
++  if (!LJ_SOFTFP32 && irt_isnum(ir->t)) {
++#if LJ_SOFTFP
++    asm_sfpmin_max(as, ir);
++#else
+     Reg dest = ra_dest(as, ir, RSET_FPR);
+     Reg right, left = ra_alloc2(as, ir, RSET_FPR);
+     right = (left >> 8); left &= 255;
+@@ -1947,6 +2070,7 @@ static void asm_min_max(ASMState *as, IRIns *ir, int ismax)
+       if (dest != right) emit_fg(as, MIPSI_MOV_D, dest, right);
+     }
+     emit_fgh(as, MIPSI_C_OLT_D, 0, ismax ? left : right, ismax ? right : left);
++#endif
+   } else {
+     Reg dest = ra_dest(as, ir, RSET_GPR);
+     Reg right, left = ra_alloc2(as, ir, RSET_GPR);
+@@ -1967,18 +2091,24 @@ static void asm_min_max(ASMState *as, IRIns *ir, int ismax)
+ 
+ /* -- Comparisons --------------------------------------------------------- */
+ 
+-#if LJ_32 && LJ_SOFTFP
++#if LJ_SOFTFP
+ /* SFP comparisons. */
+ static void asm_sfpcomp(ASMState *as, IRIns *ir)
+ {
+   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_softfp_cmp];
+   RegSet drop = RSET_SCRATCH;
+   Reg r;
++#if LJ_64
++  IRRef args[2];
++  args[0] = ir->op1;
++  args[1] = ir->op2;
++#else
+   IRRef args[4];
+   args[LJ_LE ? 0 : 1] = ir->op1; args[LJ_LE ? 1 : 0] = (ir+1)->op1;
+   args[LJ_LE ? 2 : 3] = ir->op2; args[LJ_LE ? 3 : 2] = (ir+1)->op2;
++#endif
+ 
+-  for (r = REGARG_FIRSTGPR; r <= REGARG_FIRSTGPR+3; r++) {
++  for (r = REGARG_FIRSTGPR; r <= REGARG_FIRSTGPR+(LJ_64?1:3); r++) {
+     if (!rset_test(as->freeset, r) &&
+ 	regcost_ref(as->cost[r]) == args[r-REGARG_FIRSTGPR])
+       rset_clear(drop, r);
+@@ -2032,11 +2162,15 @@ static void asm_comp(ASMState *as, IRIns *ir)
+ {
+   /* ORDER IR: LT GE LE GT  ULT UGE ULE UGT. */
+   IROp op = ir->o;
+-  if (!LJ_SOFTFP && irt_isnum(ir->t)) {
++  if (!LJ_SOFTFP32 && irt_isnum(ir->t)) {
++#if LJ_SOFTFP
++    asm_sfpcomp(as, ir);
++#else
+     Reg right, left = ra_alloc2(as, ir, RSET_FPR);
+     right = (left >> 8); left &= 255;
+     asm_guard(as, (op&1) ? MIPSI_BC1T : MIPSI_BC1F, 0, 0);
+     emit_fgh(as, MIPSI_C_OLT_D + ((op&3) ^ ((op>>2)&1)), 0, left, right);
++#endif
+   } else {
+     Reg right, left = ra_alloc1(as, ir->op1, RSET_GPR);
+     if (op == IR_ABC) op = IR_UGT;
+@@ -2068,9 +2202,13 @@ static void asm_equal(ASMState *as, IRIns *ir)
+   Reg right, left = ra_alloc2(as, ir, (!LJ_SOFTFP && irt_isnum(ir->t)) ?
+ 				       RSET_FPR : RSET_GPR);
+   right = (left >> 8); left &= 255;
+-  if (!LJ_SOFTFP && irt_isnum(ir->t)) {
++  if (!LJ_SOFTFP32 && irt_isnum(ir->t)) {
++#if LJ_SOFTFP
++    asm_sfpcomp(as, ir);
++#else
+     asm_guard(as, (ir->o & 1) ? MIPSI_BC1T : MIPSI_BC1F, 0, 0);
+     emit_fgh(as, MIPSI_C_EQ_D, 0, left, right);
++#endif
+   } else {
+     asm_guard(as, (ir->o & 1) ? MIPSI_BEQ : MIPSI_BNE, left, right);
+   }
+@@ -2263,7 +2401,7 @@ static void asm_stack_restore(ASMState *as, SnapShot *snap)
+     if ((sn & SNAP_NORESTORE))
+       continue;
+     if (irt_isnum(ir->t)) {
+-#if LJ_SOFTFP
++#if LJ_SOFTFP32
+       Reg tmp;
+       RegSet allow = rset_exclude(RSET_GPR, RID_BASE);
+       lua_assert(irref_isk(ref));  /* LJ_SOFTFP: must be a number constant. */
+@@ -2272,6 +2410,9 @@ static void asm_stack_restore(ASMState *as, SnapShot *snap)
+       if (rset_test(as->freeset, tmp+1)) allow = RID2RSET(tmp+1);
+       tmp = ra_allock(as, (int32_t)ir_knum(ir)->u32.hi, allow);
+       emit_tsi(as, MIPSI_SW, tmp, RID_BASE, ofs+(LJ_BE?0:4));
++#elif LJ_SOFTFP  /* && LJ_64 */
++      Reg src = ra_alloc1(as, ref, rset_exclude(RSET_GPR, RID_BASE));
++      emit_tsi(as, MIPSI_SD, src, RID_BASE, ofs);
+ #else
+       Reg src = ra_alloc1(as, ref, RSET_FPR);
+       emit_hsi(as, MIPSI_SDC1, src, RID_BASE, ofs);
+diff --git a/src/lj_crecord.c b/src/lj_crecord.c
+index e32ae23e..fd59e281 100644
+--- a/src/lj_crecord.c
++++ b/src/lj_crecord.c
+@@ -212,7 +212,7 @@ static void crec_copy_emit(jit_State *J, CRecMemList *ml, MSize mlp,
+     ml[i].trval = emitir(IRT(IR_XLOAD, ml[i].tp), trsptr, 0);
+     ml[i].trofs = trofs;
+     i++;
+-    rwin += (LJ_SOFTFP && ml[i].tp == IRT_NUM) ? 2 : 1;
++    rwin += (LJ_SOFTFP32 && ml[i].tp == IRT_NUM) ? 2 : 1;
+     if (rwin >= CREC_COPY_REGWIN || i >= mlp) {  /* Flush buffered stores. */
+       rwin = 0;
+       for ( ; j < i; j++) {
+@@ -1130,7 +1130,7 @@ static TRef crec_call_args(jit_State *J, RecordFFData *rd,
+ 	else
+ 	  tr = emitconv(tr, IRT_INT, d->size==1 ? IRT_I8 : IRT_I16,IRCONV_SEXT);
+       }
+-    } else if (LJ_SOFTFP && ctype_isfp(d->info) && d->size > 4) {
++    } else if (LJ_SOFTFP32 && ctype_isfp(d->info) && d->size > 4) {
+       lj_needsplit(J);
+     }
+ #if LJ_TARGET_X86
+diff --git a/src/lj_emit_mips.h b/src/lj_emit_mips.h
+index 8a9ee24d..bb6593ae 100644
+--- a/src/lj_emit_mips.h
++++ b/src/lj_emit_mips.h
+@@ -12,6 +12,8 @@ static intptr_t get_k64val(IRIns *ir)
+     return (intptr_t)ir_kgc(ir);
+   } else if (ir->o == IR_KPTR || ir->o == IR_KKPTR) {
+     return (intptr_t)ir_kptr(ir);
++  } else if (LJ_SOFTFP && ir->o == IR_KNUM) {
++    return (intptr_t)ir_knum(ir)->u64;
+   } else {
+     lua_assert(ir->o == IR_KINT || ir->o == IR_KNULL);
+     return ir->i;  /* Sign-extended. */
+diff --git a/src/lj_ffrecord.c b/src/lj_ffrecord.c
+index dfdee2db..849d7a27 100644
+--- a/src/lj_ffrecord.c
++++ b/src/lj_ffrecord.c
+@@ -1012,7 +1012,7 @@ static void LJ_FASTCALL recff_string_format(jit_State *J, RecordFFData *rd)
+     handle_num:
+       tra = lj_ir_tonum(J, tra);
+       tr = lj_ir_call(J, id, tr, trsf, tra);
+-      if (LJ_SOFTFP) lj_needsplit(J);
++      if (LJ_SOFTFP32) lj_needsplit(J);
+       break;
+     case STRFMT_STR:
+       if (!tref_isstr(tra)) {
+diff --git a/src/lj_ircall.h b/src/lj_ircall.h
+index 973c36e6..73120065 100644
+--- a/src/lj_ircall.h
++++ b/src/lj_ircall.h
+@@ -51,7 +51,7 @@ typedef struct CCallInfo {
+ #define CCI_XARGS(ci)		(((ci)->flags >> CCI_XARGS_SHIFT) & 3)
+ #define CCI_XA			(1u << CCI_XARGS_SHIFT)
+ 
+-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
++#if LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)
+ #define CCI_XNARGS(ci)		(CCI_NARGS((ci)) + CCI_XARGS((ci)))
+ #else
+ #define CCI_XNARGS(ci)		CCI_NARGS((ci))
+@@ -78,13 +78,19 @@ typedef struct CCallInfo {
+ #define IRCALLCOND_SOFTFP_FFI(x)	NULL
+ #endif
+ 
+-#if LJ_SOFTFP && LJ_TARGET_MIPS32
++#if LJ_SOFTFP && LJ_TARGET_MIPS
+ #define IRCALLCOND_SOFTFP_MIPS(x)	x
+ #else
+ #define IRCALLCOND_SOFTFP_MIPS(x)	NULL
+ #endif
+ 
+-#define LJ_NEED_FP64	(LJ_TARGET_ARM || LJ_TARGET_PPC || LJ_TARGET_MIPS32)
++#if LJ_SOFTFP && LJ_TARGET_MIPS64
++#define IRCALLCOND_SOFTFP_MIPS64(x)	x
++#else
++#define IRCALLCOND_SOFTFP_MIPS64(x)	NULL
++#endif
++
++#define LJ_NEED_FP64	(LJ_TARGET_ARM || LJ_TARGET_PPC || LJ_TARGET_MIPS)
+ 
+ #if LJ_HASFFI && (LJ_SOFTFP || LJ_NEED_FP64)
+ #define IRCALLCOND_FP64_FFI(x)		x
+@@ -112,6 +118,14 @@ typedef struct CCallInfo {
+ #define XA2_FP		0
+ #endif
+ 
++#if LJ_SOFTFP32
++#define XA_FP32		CCI_XA
++#define XA2_FP32	(CCI_XA+CCI_XA)
++#else
++#define XA_FP32		0
++#define XA2_FP32	0
++#endif
++
+ #if LJ_32
+ #define XA_64		CCI_XA
+ #define XA2_64		(CCI_XA+CCI_XA)
+@@ -181,20 +195,21 @@ typedef struct CCallInfo {
+   _(ANY,	pow,			2,   N, NUM, XA2_FP) \
+   _(ANY,	atan2,			2,   N, NUM, XA2_FP) \
+   _(ANY,	ldexp,			2,   N, NUM, XA_FP) \
+-  _(SOFTFP,	lj_vm_tobit,		2,   N, INT, 0) \
+-  _(SOFTFP,	softfp_add,		4,   N, NUM, 0) \
+-  _(SOFTFP,	softfp_sub,		4,   N, NUM, 0) \
+-  _(SOFTFP,	softfp_mul,		4,   N, NUM, 0) \
+-  _(SOFTFP,	softfp_div,		4,   N, NUM, 0) \
+-  _(SOFTFP,	softfp_cmp,		4,   N, NIL, 0) \
++  _(SOFTFP,	lj_vm_tobit,		1,   N, INT, XA_FP32) \
++  _(SOFTFP,	softfp_add,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP,	softfp_sub,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP,	softfp_mul,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP,	softfp_div,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP,	softfp_cmp,		2,   N, NIL, XA2_FP32) \
+   _(SOFTFP,	softfp_i2d,		1,   N, NUM, 0) \
+-  _(SOFTFP,	softfp_d2i,		2,   N, INT, 0) \
+-  _(SOFTFP_MIPS, lj_vm_sfmin,		4,   N, NUM, 0) \
+-  _(SOFTFP_MIPS, lj_vm_sfmax,		4,   N, NUM, 0) \
++  _(SOFTFP,	softfp_d2i,		1,   N, INT, XA_FP32) \
++  _(SOFTFP_MIPS, lj_vm_sfmin,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP_MIPS, lj_vm_sfmax,		2,   N, NUM, XA2_FP32) \
++  _(SOFTFP_MIPS64, lj_vm_tointg,	1,   N, INT, 0) \
+   _(SOFTFP_FFI,	softfp_ui2d,		1,   N, NUM, 0) \
+   _(SOFTFP_FFI,	softfp_f2d,		1,   N, NUM, 0) \
+-  _(SOFTFP_FFI,	softfp_d2ui,		2,   N, INT, 0) \
+-  _(SOFTFP_FFI,	softfp_d2f,		2,   N, FLOAT, 0) \
++  _(SOFTFP_FFI,	softfp_d2ui,		1,   N, INT, XA_FP32) \
++  _(SOFTFP_FFI,	softfp_d2f,		1,   N, FLOAT, XA_FP32) \
+   _(SOFTFP_FFI,	softfp_i2f,		1,   N, FLOAT, 0) \
+   _(SOFTFP_FFI,	softfp_ui2f,		1,   N, FLOAT, 0) \
+   _(SOFTFP_FFI,	softfp_f2i,		1,   N, INT, 0) \
+diff --git a/src/lj_iropt.h b/src/lj_iropt.h
+index 73aef0ef..a59ba3f4 100644
+--- a/src/lj_iropt.h
++++ b/src/lj_iropt.h
+@@ -150,7 +150,7 @@ LJ_FUNC IRType lj_opt_narrow_forl(jit_State *J, cTValue *forbase);
+ /* Optimization passes. */
+ LJ_FUNC void lj_opt_dce(jit_State *J);
+ LJ_FUNC int lj_opt_loop(jit_State *J);
+-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
++#if LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)
+ LJ_FUNC void lj_opt_split(jit_State *J);
+ #else
+ #define lj_opt_split(J)		UNUSED(J)
+diff --git a/src/lj_jit.h b/src/lj_jit.h
+index 2fa8efc4..f37e7927 100644
+--- a/src/lj_jit.h
++++ b/src/lj_jit.h
+@@ -374,7 +374,7 @@ enum {
+   ((TValue *)(((intptr_t)&J->ksimd[2*(n)] + 15) & ~(intptr_t)15))
+ 
+ /* Set/reset flag to activate the SPLIT pass for the current trace. */
+-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
++#if LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)
+ #define lj_needsplit(J)		(J->needsplit = 1)
+ #define lj_resetsplit(J)	(J->needsplit = 0)
+ #else
+@@ -437,7 +437,7 @@ typedef struct jit_State {
+   MSize sizesnapmap;	/* Size of temp. snapshot map buffer. */
+ 
+   PostProc postproc;	/* Required post-processing after execution. */
+-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
++#if LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)
+   uint8_t needsplit;	/* Need SPLIT pass. */
+ #endif
+   uint8_t retryrec;	/* Retry recording. */
+diff --git a/src/lj_obj.h b/src/lj_obj.h
+index 52372c3e..c7e47422 100644
+--- a/src/lj_obj.h
++++ b/src/lj_obj.h
+@@ -924,6 +924,9 @@ static LJ_AINLINE void copyTV(lua_State *L, TValue *o1, const TValue *o2)
+ 
+ #if LJ_SOFTFP
+ LJ_ASMF int32_t lj_vm_tobit(double x);
++#if LJ_TARGET_MIPS64
++LJ_ASMF int32_t lj_vm_tointg(double x);
++#endif
+ #endif
+ 
+ static LJ_AINLINE int32_t lj_num2bit(lua_Number n)
+diff --git a/src/lj_opt_split.c b/src/lj_opt_split.c
+index fc935204..79ac3cce 100644
+--- a/src/lj_opt_split.c
++++ b/src/lj_opt_split.c
+@@ -8,7 +8,7 @@
+ 
+ #include "lj_obj.h"
+ 
+-#if LJ_HASJIT && (LJ_SOFTFP || (LJ_32 && LJ_HASFFI))
++#if LJ_HASJIT && (LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI))
+ 
+ #include "lj_err.h"
+ #include "lj_buf.h"
+diff --git a/src/lj_snap.c b/src/lj_snap.c
+index bb063c2b..44fa379f 100644
+--- a/src/lj_snap.c
++++ b/src/lj_snap.c
+@@ -93,7 +93,7 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
+ 	    (ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
+ 	  sn |= SNAP_NORESTORE;
+       }
+-      if (LJ_SOFTFP && irt_isnum(ir->t))
++      if (LJ_SOFTFP32 && irt_isnum(ir->t))
+ 	sn |= SNAP_SOFTFPNUM;
+       map[n++] = sn;
+     }
+@@ -374,7 +374,7 @@ IRIns *lj_snap_regspmap(GCtrace *T, SnapNo snapno, IRIns *ir)
+ 	  break;
+ 	}
+       }
+-    } else if (LJ_SOFTFP && ir->o == IR_HIOP) {
++    } else if (LJ_SOFTFP32 && ir->o == IR_HIOP) {
+       ref++;
+     } else if (ir->o == IR_PVAL) {
+       ref = ir->op1 + REF_BIAS;
+@@ -486,7 +486,7 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
+     } else {
+       IRType t = irt_type(ir->t);
+       uint32_t mode = IRSLOAD_INHERIT|IRSLOAD_PARENT;
+-      if (LJ_SOFTFP && (sn & SNAP_SOFTFPNUM)) t = IRT_NUM;
++      if (LJ_SOFTFP32 && (sn & SNAP_SOFTFPNUM)) t = IRT_NUM;
+       if (ir->o == IR_SLOAD) mode |= (ir->op2 & IRSLOAD_READONLY);
+       tr = emitir_raw(IRT(IR_SLOAD, t), s, mode);
+     }
+@@ -520,7 +520,7 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
+ 	    if (irs->r == RID_SINK && snap_sunk_store(T, ir, irs)) {
+ 	      if (snap_pref(J, T, map, nent, seen, irs->op2) == 0)
+ 		snap_pref(J, T, map, nent, seen, T->ir[irs->op2].op1);
+-	      else if ((LJ_SOFTFP || (LJ_32 && LJ_HASFFI)) &&
++	      else if ((LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)) &&
+ 		       irs+1 < irlast && (irs+1)->o == IR_HIOP)
+ 		snap_pref(J, T, map, nent, seen, (irs+1)->op2);
+ 	    }
+@@ -579,10 +579,10 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
+ 		lua_assert(irc->o == IR_CONV && irc->op2 == IRCONV_NUM_INT);
+ 		val = snap_pref(J, T, map, nent, seen, irc->op1);
+ 		val = emitir(IRTN(IR_CONV), val, IRCONV_NUM_INT);
+-	      } else if ((LJ_SOFTFP || (LJ_32 && LJ_HASFFI)) &&
++	      } else if ((LJ_SOFTFP32 || (LJ_32 && LJ_HASFFI)) &&
+ 			 irs+1 < irlast && (irs+1)->o == IR_HIOP) {
+ 		IRType t = IRT_I64;
+-		if (LJ_SOFTFP && irt_type((irs+1)->t) == IRT_SOFTFP)
++		if (LJ_SOFTFP32 && irt_type((irs+1)->t) == IRT_SOFTFP)
+ 		  t = IRT_NUM;
+ 		lj_needsplit(J);
+ 		if (irref_isk(irs->op2) && irref_isk((irs+1)->op2)) {
+@@ -635,7 +635,7 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
+     int32_t *sps = &ex->spill[regsp_spill(rs)];
+     if (irt_isinteger(t)) {
+       setintV(o, *sps);
+-#if !LJ_SOFTFP
++#if !LJ_SOFTFP32
+     } else if (irt_isnum(t)) {
+       o->u64 = *(uint64_t *)sps;
+ #endif
+@@ -660,6 +660,9 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
+ #if !LJ_SOFTFP
+     } else if (irt_isnum(t)) {
+       setnumV(o, ex->fpr[r-RID_MIN_FPR]);
++#elif LJ_64  /* && LJ_SOFTFP */
++    } else if (irt_isnum(t)) {
++      o->u64 = ex->gpr[r-RID_MIN_GPR];
+ #endif
+ #if LJ_64 && !LJ_GC64
+     } else if (irt_is64(t)) {
+@@ -813,7 +816,7 @@ static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
+ 	  val = lj_tab_set(J->L, t, &tmp);
+ 	  /* NOBARRIER: The table is new (marked white). */
+ 	  snap_restoreval(J, T, ex, snapno, rfilt, irs->op2, val);
+-	  if (LJ_SOFTFP && irs+1 < T->ir + T->nins && (irs+1)->o == IR_HIOP) {
++	  if (LJ_SOFTFP32 && irs+1 < T->ir + T->nins && (irs+1)->o == IR_HIOP) {
+ 	    snap_restoreval(J, T, ex, snapno, rfilt, (irs+1)->op2, &tmp);
+ 	    val->u32.hi = tmp.u32.lo;
+ 	  }
+@@ -874,7 +877,7 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
+ 	continue;
+       }
+       snap_restoreval(J, T, ex, snapno, rfilt, ref, o);
+-      if (LJ_SOFTFP && (sn & SNAP_SOFTFPNUM) && tvisint(o)) {
++      if (LJ_SOFTFP32 && (sn & SNAP_SOFTFPNUM) && tvisint(o)) {
+ 	TValue tmp;
+ 	snap_restoreval(J, T, ex, snapno, rfilt, ref+1, &tmp);
+ 	o->u32.hi = tmp.u32.lo;
+diff --git a/src/vm_mips64.dasc b/src/vm_mips64.dasc
+index c06270a0..75b38dee 100644
+--- a/src/vm_mips64.dasc
++++ b/src/vm_mips64.dasc
+@@ -1980,6 +1980,38 @@ static void build_subroutines(BuildCtx *ctx)
+   |1:
+   |  jr ra
+   |.  move CRET1, r0
++  |
++  |// FP number to int conversion with a check for soft-float.
++  |// Modifies CARG1, CRET1, CRET2, TMP0, AT.
++  |->vm_tointg:
++  |.if JIT
++  |  dsll CRET2, CARG1, 1
++  |  beqz CRET2, >2
++  |.  li TMP0, 1076
++  |  dsrl AT, CRET2, 53
++  |  dsubu TMP0, TMP0, AT
++  |  sltiu AT, TMP0, 54
++  |  beqz AT, >1
++  |.  dextm CRET2, CRET2, 0, 20
++  |  dinsu CRET2, AT, 21, 21
++  |  slt AT, CARG1, r0
++  |  dsrlv CRET1, CRET2, TMP0
++  |  dsubu CARG1, r0, CRET1
++  |  movn CRET1, CARG1, AT
++  |  li CARG1, 64
++  |  subu TMP0, CARG1, TMP0
++  |  dsllv CRET2, CRET2, TMP0	// Integer check.
++  |  sextw AT, CRET1
++  |  xor AT, CRET1, AT		// Range check.
++  |  jr ra
++  |.  movz CRET2, AT, CRET2
++  |1:
++  |  jr ra
++  |.  li CRET2, 1
++  |2:
++  |  jr ra
++  |.  move CRET1, r0
++  |.endif
+   |.endif
+   |
+   |.macro .ffunc_bit, name
+@@ -2665,6 +2697,23 @@ static void build_subroutines(BuildCtx *ctx)
+   |.  li CRET1, 0
+   |.endif
+   |
++  |.macro sfmin_max, name, intins
++  |->vm_sf .. name:
++  |.if JIT and not FPU
++  |  move TMP2, ra
++  |  bal ->vm_sfcmpolt
++  |.  nop
++  |  move ra, TMP2
++  |  move TMP0, CRET1
++  |  move CRET1, CARG1
++  |  jr ra
++  |.  intins CRET1, CARG2, TMP0
++  |.endif
++  |.endmacro
++  |
++  |  sfmin_max min, movz
++  |  sfmin_max max, movn
++  |
+   |//-----------------------------------------------------------------------
+   |//-- Miscellaneous functions --------------------------------------------
+   |//-----------------------------------------------------------------------

@@ -1,0 +1,64 @@
+#!/bin/sh
+# vim:set sw=4 sts=4 et:
+# Copyright 2021 Simon McVittie
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+set -eux
+
+WORKDIR="$(mktemp -d)"
+trap 'cd /; rm -fr "$WORKDIR"' EXIT
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+CC="${CROSS_COMPILE}gcc"
+PKG_CONFIG="${CROSS_COMPILE}pkg-config"
+
+cd "$WORKDIR"
+
+cat > test.c <<EOF
+#include <crypt.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main (int argc, char **argv) {
+  char *salt;
+
+  salt = crypt_gensalt_ra(NULL, 0, NULL, 0);
+
+  if (salt == NULL) {
+      perror("crypt_gensalt_ra");
+      return 1;
+    }
+
+  free(salt);
+  return 0;
+}
+EOF
+
+# Deliberately word-splitting pkg-config's output:
+# shellcheck disable=SC2046
+"$CC" -o test-crypt test.c $("$PKG_CONFIG" --cflags --libs libcrypt)
+./test-crypt
+
+# shellcheck disable=SC2046
+"$CC" -o test-crypt-static -static test.c $("$PKG_CONFIG" --static --cflags --libs libcrypt)
+./test-crypt-static
+
+# shellcheck disable=SC2046
+"$CC" -o test-xcrypt test.c $("$PKG_CONFIG" --cflags --libs libxcrypt)
+./test-xcrypt
+
+# shellcheck disable=SC2046
+"$CC" -o test-xcrypt-static -static test.c $("$PKG_CONFIG" --static --cflags --libs libxcrypt)
+./test-xcrypt-static
+
+"$CC" -o test-dynamic test.c -lcrypt
+./test-dynamic
+
+"$CC" -o test-static -static test.c -lcrypt
+./test-static
+

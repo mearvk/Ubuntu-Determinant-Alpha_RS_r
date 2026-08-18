@@ -1,0 +1,36 @@
+#!/bin/sh
+
+set -e
+
+man -P cat idn2_free
+echo "PASS: man"
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+
+touch $WORKDIR/config.h
+for f in tests/test-register.c tests/test-strerror.c; do
+    gcc -D'_GL_ATTRIBUTE_FORMAT_PRINTF_STANDARD(x,y)=' -I$WORKDIR -o $WORKDIR/foo $f `pkg-config --cflags --libs libidn2` 2>/dev/null
+    $WORKDIR/foo 2> /dev/null
+    echo PASS: $f
+done
+
+cd $WORKDIR
+cat <<EOF > libidn2test.c
+#include <idn2.h>
+
+int main(void)
+{
+  if (!idn2_check_version (IDN2_VERSION))
+    return 1;
+
+  return 0;
+}
+EOF
+
+gcc -o libidn2test libidn2test.c `pkg-config --cflags --libs libidn2`
+echo "PASS: gcc"
+
+[ -x libidn2test ]
+./libidn2test
+echo "PASS: run"

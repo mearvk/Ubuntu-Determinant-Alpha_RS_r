@@ -1,0 +1,60 @@
+#!/bin/bash
+
+set -ux
+
+# Some simple tests of the initramfs network configuration.
+
+# The basic idea is to make an image that has /sbin/init overwritten
+# to just gather some data and shutdown again and boot it in qemu
+# system emulation (not KVM, so it can be run in the autopkgtest
+# architecture without hoping nested kvm works).  Currently it only
+# sets up qemu user networking which limits our ability to be
+# clever. In the long run we should set up a tun and a bridge and
+# specify the mac address of the NICs in the emuilated system and run
+# dnsmasq on it so we test ipv6 and can control which ips which nics
+# get and so on -- but this is still better than nothing.
+
+# Also the current qemu command lines only work on intel. That should
+# be fixed too :)
+
+arch=$(dpkg --print-architecture)
+[ $arch = amd64 ] || [ $arch = i386 ] || exit 0
+
+
+./debian/tests/prep-image image.img
+ret=$?
+if [ $ret -eq 100 ]; then
+        # This indicates that a rootfs was not found (maybe very early
+        # in development for this cycle?), skip in this case.
+        exit 0
+elif [ $ret -ne 0 ]; then
+        exit $ret
+fi
+set -e
+
+basecmdline="root=UUID=$(cat image.img-uuid) rw console=ttyS0"
+
+mkinitramfs -o myinitrd
+
+nicslot=5
+nicname=ens$nicslot
+kernel=$(echo /boot/vmlinu*-"$(uname -r)")
+
+run () {
+    ./debian/tests/run-image kernel=$kernel initrd=myinitrd \
+                             image=image.img cmdline="$basecmdline ${1-}" \
+                             output=result nicslot=$nicslot
+}
+
+run ""
+./debian/tests/check-results result has_no_ipv4_addr $nicname
+
+run "ip=dhcp"
+./debian/tests/check-results result has_an_ipv4_addr $nicname
+
+run "ip=:::::$nicname:dhcp"
+./debian/tests/check-results result has_an_ipv4_addr $nicname
+
+run "ip=10.0.2.100::10.0.2.2:255.0.0.0::$nicname:"
+./debian/tests/check-results result has_ipv4_addr $nicname 10.0.2.100
+

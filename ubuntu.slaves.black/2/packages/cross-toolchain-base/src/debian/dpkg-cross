@@ -1,0 +1,1458 @@
+#!/usr/bin/perl -I debian
+
+use POSIX;
+use POSIX qw(:errno_h :signal_h);
+use POSIX qw( locale_h);
+use Locale::gettext;
+use IO::Handle;
+use File::Basename;
+use Text::Wrap;
+use Debian::DpkgCross;
+use strict;
+use warnings;
+use vars qw($verbose $str @removedeps $package %builds $arch $exclude
+@keepdeps $dpkg_statfile $progname $debname $anyway $cross2cross $crosstype
+$crossdir $crosslib $crosslib64 $crosslib32 $crosslibhf $crosslibn32 
+$crosslibo32 $crosslibsf $crosslibx32 $crossinc $data $len
+$retval $dpkg_cmd $mode $pkg @exlist $conffile $removedeps $keepdeps
+$DPKGCROSSVERSION $keep_temp $msg $multiarchpackage $multiarch 
+$multiarchtriplet $multiarchconv);
+
+setlocale(LC_MESSAGES, "");
+textdomain("dpkg-cross");
+
+=pod
+
+=head1 Name
+
+dpkg-cross - manage libraries for cross compiling
+
+=cut
+
+=head1 Copyright and Licence
+
+ Copyright (C) 1997-2000  Roman Hodek <roman@hodek.net>
+ Copyright (C) 2000-2002  Colin Watson <cjwatson@debian.org>
+ Copyright (C) 2002-2004  David Schleef <ds@schleef.org>
+ Copyright (C) 2004  Nikita Youshchenko <yoush@cs.msu.su>
+ Copyright (C) 2004  Raphael Bossek <bossekr@debian.org>
+ Copyright (c) 2007-2011  Neil Williams <codehelp@debian.org>
+ Copyright (c) 2011  Wookey <wookey@debian.org>
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+=cut
+
+=head1 SYNOPSIS
+
+ dpkg-cross [OPTIONS] [--install|-i] <files...>
+ dpkg-cross [OPTIONS] [--build|-b] <files...>
+ dpkg-cross [OPTIONS] [--remove|--purge|-r] <packages...>
+ dpkg-cross [OPTIONS] [--status|-s] <packages...>
+ dpkg-cross [OPTIONS] [--list|-l] <packages...>
+ dpkg-cross [OPTIONS] [--list-files|-L] <packages...>
+ dpkg-cross [OPTIONS] [--query|-Q] <pkgpath>
+ dpkg-cross [OPTIONS] [--update|-u] <pkgpath>
+ 
+ OPTIONS: [ -v | --verbose ] [ -q | --quiet ] 
+ { [ -a | --arch ] architecture } { [ -X | --exclude ] PACKAGE } 
+ [ -A | --convert-anyway ] [ -M | --convert-multiarch ]  [ -k | --keep-temp ] 
+ 
+=cut
+
+=head1 DESCRIPTION
+
+dpkg-cross is a tool to install and manage libraries and header files
+for cross compiling. dpkg-cross converts native Debian packages for the
+target architecture to cross compiling support packages that can be
+installed on any architecture, but in different paths to avoid
+conflicts. It then calls dpkg to install the converted package. The
+conversion step alone can be done with the --build option. Other
+options are wrappers around corresponding dpkg functionality.
+
+dpkg-cross is intended to make it easier for you to keep your cross
+compiling libraries up-to-date, as it works directly on Debian
+packages. It saves you copying the libs and headers from a machine
+with your target  architecture, or extracting them via
+dpkg-deb --fsys-tarfile. 
+
+dpkg-cross also collects and install the .shlibs files in -dev packages,
+which are needed by dpkg-shlibdeps.
+
+=cut
+
+=head1 CMAKE
+
+CMake cross-building support is experimental!
+
+CMake requires a little support from dpkg-cross to cross-build. The
+included cmake support file is an example for Linux kernels.  Use:
+
+ rm CMakeCache.txt
+ cmake -DCMAKE_TOOLCHAIN_FILE=/etc/dpkg-cross/cmake/CMakeCross.txt
+
+The  main changes involve setting PKG_CONFIG_LIBDIR within CMake an
+setting the include directories to locate the cross libraries installed
+by dpkg-cross e.g.
+
+ #Make pkg-config look in the right place
+ SET(ENV{PKG_CONFIG_LIBDIR} ${CMAKE_FIND_ROOT_PATH}/lib/pkgconfig/)
+ ELSE (CMAKE_CROSSCOMPILING)
+
+Packages using cmake may need some tweaks to debian/rules, e.g.
+
+ ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+ export CC=$(DEB_HOST_GNU_TYPE)-gcc
+ export CXX=$(DEB_HOST_GNU_TYPE)-g++
+ export CMAKE_TOOLCHAIN_FILE=/etc/dpkg-cross/cmake/CMakeCross.txt
+ else
+ export CC=gcc
+ export CXX=g++
+ endif
+
+=cut
+
+=head1 OPTIONS
+
+dpkg-cross follows the usual GNU command line syntax, with long options
+starting with two dashes ('-').
+
+ -h|--help
+
+Show summary of options.
+
+ -v|--verbose
+
+Be more verbose.
+
+ -q|--quiet
+
+Be more quiet.
+
+ -a|--arch architecture
+
+Install for architecture architecture.
+
+ -i|--install
+
+Install Debian packages (.deb) named on the command line. Only files in
+the directories /lib, /usr/lib and /usr/include are extracted, since
+only they can be relevant for cross compiling. In the lib directories,
+also no subdirectories are extracted.
+
+ -A|--convert-anyway
+
+Convert Debian package even if it does not provide any files useful for
+cross-compile environment.
+
+ -M|--convert-multiarch
+
+Convert package even if it is a multiarch package. If the package is
+not a multiarch package, processing continues as normal.
+
+ -X|--exclude PACKAGE
+
+Removes the specified package from the dependencies of the current
+package. Typically used to drop dependencies on packages that are not
+required within a cross-build environment, e.g. packages containing
+only executables or architecture independent files.
+
+dpkg-cross can only check the current package and information about a
+dependency is not available (for that, use xapt). By default, 
+dpkg-cross converts all dependencies to specify the cross version of
+the dependency package.
+
+If you know that a particular dependency should not be converted (it
+provides no useful files or is architecture  independent), that
+dependency can be excluded and dpkg-cross will remove that package from
+the dependency information of the cross package. -X has replaced the use
+of keepdeps and removedeps in /etc/dpkg-cross/cross-compile.
+
+-X|--exclude PACKAGE needs to be repeated for each package to be excluded.
+
+ -k|--keep-temp
+
+Keep the built and installed package instead of deleting it.
+Requires --install.
+
+ -b|--build
+
+Just build the converted Debian package, but do not install it with dpkg.
+
+ -r|--remove
+
+Remove the cross compiling packages named on the command line.
+
+ -s|--status
+
+Print status of the named packages.
+
+ -l|--list
+
+Print short version of status of named packages or package name patterns.
+
+ -L|--list-files
+
+List files belonging to the named packages.
+
+ -u|--update
+
+Update current cross-installation with Debian packages found in/under
+the paths given as arguments. Will check all packages there if they are
+installed already as cross-compiling packages and if they are really
+updates. Those packages will be installed as with -i.
+
+ -Q|--query
+
+Much like --update, but just prints available update packages and does
+not install them.
+
+=cut
+
+=head1 FILES
+
+/etc/dpkg-cross/cross-compile defines the default_arch for dpkg-cross:
+
+The default architecture for dpkg-cross is normally set by debconf. 
+To change the system-wide value, use:
+
+ $ sudo dpkg-reconfigure dpkg-cross
+
+Alternatively, the default can be overridden on a per-user basis using
+the optional file in $HOME/.dpkg-cross/
+
+=cut
+
+$dpkg_statfile = "/var/lib/dpkg/status";
+&read_config;
+$arch = &get_architecture;
+$DPKGCROSSVERSION = &get_version;
+$progname = basename($0);
+
+# packages to omit in dependencies
+@removedeps = (); #&get_removedeps;
+@keepdeps = ();   #&get_keepdeps;
+
+sub usageversion {
+	warn sprintf(_g("
+dpkg-cross version %s
+
+Usage:
+ dpkg-cross [OPTIONS] [--install|-i] <files...>
+ dpkg-cross [OPTIONS] [--build|-b] <files...>
+ dpkg-cross [OPTIONS] [--remove|--purge|-r] <packages...>
+ dpkg-cross [OPTIONS] [--status|-s] <packages...>
+ dpkg-cross [OPTIONS] [--list|-l] <packages...>
+ dpkg-cross [OPTIONS] [--list-files|-L] <packages...>
+ dpkg-cross [OPTIONS] [--query|-Q] <pkgpath>
+ dpkg-cross [OPTIONS] [--update|-u] <pkgpath>
+
+Commands:
+ -?|-h|--help|--version: print this message.
+
+Options:
+ -a|--arch ARCH:         set architecture (default: defined in configuration file)
+ -v|--verbose:           be verbose
+ -q|--quiet:             be quiet
+ -A|--convert-anyway:    convert package even if it does not provide any
+                         development files
+ -M|--convert-multiarch: convert package even if it is a multiarch package
+ -X|--exclude PACKAGE:   Exclude this package from the dependency list of the
+                         built package.
+ -k|--keep-temp:         Keep the temporary archives when installing.
+
+dpkg-cross installs or removes libraries and include files for
+cross-compiling Debian packages. It reads /etc/dpkg-cross/cross-compile
+to determine the base directory of the cross compiler installation, and
+works in the subdirectories lib and include there.
+
+"), $DPKGCROSSVERSION)
+        || die "$progname: failed to write usage: $!\n";
+}
+
+$verbose = 1;
+$anyway = 0;
+$exclude = 0;
+$keep_temp = 0;
+@exlist=();
+%builds=();
+$cross2cross = 1;
+while( @ARGV ) {
+	$_= shift( @ARGV );
+	last if m/^--$/;
+	if (!/^-/) {
+		unshift(@ARGV,$_);
+		last;
+	} elsif (/^(-\?|-h|--help|--version)$/) {
+		&usageversion();
+		exit( 0 );
+	} elsif (/^(-v|--verbose)$/) {
+		$verbose = 2;
+	} elsif (/^(-q|--quiet)$/) {
+		$verbose = 0;
+	} elsif (/^(-k|--keep-temp)$/) {
+		$keep_temp = 1;
+	} elsif (/^(-i|--install)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "install";
+	} elsif (/^(-r|--remove|--purge)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "remove";
+	} elsif (/^(-s|--status)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "status";
+	} elsif (/^(-l|--list)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "list";
+	} elsif (/^(-L|--listfiles)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "listfiles";
+	} elsif (/^(-b|--build)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "build";
+	} elsif (/^(-Q|--query)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "query";
+	} elsif (/^(-u|--update)$/) {
+		die sprintf(_g("%s: Only one action can be specified!\n"), $progname) if $mode;
+		$mode = "update";
+	} elsif (/^(-a|--arch$)/) {
+		$arch = shift(@ARGV);
+		die sprintf(_g("%s: --arch needs an argument.\n"), $progname) if (!($arch));
+	} elsif (/^(-X|--exclude)$/) {
+		$pkg = shift (@ARGV);
+		die sprintf(_g("%s: --exclude needs an argument.\n"), $progname) if ($pkg =~ /^\-/);
+		push @removedeps, $pkg;
+	} elsif (/^(-A|--convert-anyway)$/) {
+		$anyway = 1;
+	} elsif (/^(-M|--convert-multiarch)$/) {
+		$multiarchconv = 1;
+	} else {
+		die sprintf (_g("%s: Unknown option %s.\n"), $progname, $_);
+	}
+}
+
+if (!defined($mode) || (!@ARGV && $mode ne "list")) {
+	die sprintf(_g("%s: Too few arguments.\n"), $progname);
+}
+
+if (not defined ($arch)) {
+	die sprintf(_g("%s: No default architecture has been set.\n"), $progname);
+}
+
+if (!&check_arch($arch)) {
+	die sprintf(_g("%s: Unrecognised architecture: %s\n"), $progname, $arch);
+}
+&setup;
+
+$retval = 0;
+
+if ($mode eq "query" || $mode eq "update") {
+	my %update_list = get_update_list( @ARGV );
+	if (!%update_list) {
+		printf _g("No updates available.\n");
+		exit 0;
+	}
+	if ($mode eq "query") {
+		printf _g("Available updates:\n");
+		foreach (sort keys %update_list) {
+			$msg = sprintf(_g("%s (from %s to %s)\n"),
+				$_, $update_list{$_}->{'Oldver'}, $update_list{$_}->{'Newver'});
+			print wrap('','',$msg);
+		}
+	} else {
+		$mode = "install";
+		@ARGV = ();
+		foreach (sort keys %update_list) {
+			push( @ARGV, $update_list{$_}->{'Path'} );
+		}
+	}
+}
+
+if ($mode eq "status") {
+	$dpkg_cmd = "--status";
+} elsif ($mode eq "list") {
+	unshift( @ARGV, "*" ) if !@ARGV; # list all packages if no arg given
+	$dpkg_cmd = "--list";
+} elsif ($mode eq "listfiles") {
+	$dpkg_cmd = "--listfiles";
+} elsif ($mode eq "remove") {
+	$dpkg_cmd = "--purge";
+} elsif ($mode eq "install") {
+	my( @debs, $deb );
+	printf (_g("Converting packages:\n")) if $verbose >= 2;
+	&check_exclude(@ARGV);
+	foreach $package ( keys %builds) {
+		$deb = &sub_build( $package, "/tmp" );
+		if ($deb) {
+			push( @debs, "/tmp/$deb" );
+		} else {
+			$retval = 1;
+		}
+	}
+	if (@debs) {
+		printf (_g("Installing converted packages with dpkg\n")) if $verbose >= 2;
+		open( PIPE, "LC_ALL=C dpkg -i @debs 2>&1 |" );
+		while( <PIPE> ) {
+			if ($verbose == 1 && /^Unpacking (replacement )?(\S+)/) {
+				printf (_g("Unpacking %s\n"), $2);
+				next;
+			}
+			print if ($verbose >= 1 && /^Setting up/) ||
+					 $verbose >= 2 ||
+						!/^(\(Reading\sdatabase|
+						Selecting\spreviously\sdeselected\spackage|
+						Unpacking|
+						Preparing\sto\sreplace|
+						 Setting\sup)/xi;
+		}
+		close( PIPE );
+		if ($?) {
+			warn sprintf (_g("dpkg -i failed.\n"));
+			$retval = 1;
+		}
+		if ($keep_temp == 0) {
+			printf (_g("Removing tmp packages\n")) if $verbose >= 2;
+			if (unlink( @debs ) != @debs) {
+				warn sprintf(_g("Removing %s failed: %s\n"), @debs, $!);
+				$retval = 1;
+			}
+		}
+	}
+} elsif ($mode eq "build") {
+	&check_exclude(@ARGV);
+	foreach $package ( keys %builds ) {
+		printf (_g("Trying to build: %s\n"), $package) if ($verbose >= 2);
+		$retval = 1 if !sub_build( $package, "." );
+	}
+}
+
+if ($dpkg_cmd) {
+	my $cmdline = "dpkg $dpkg_cmd " .
+		join( " ", map( rewrite_pkg_name($_), @ARGV ));
+	printf (_g("Calling %s\n"), $cmdline) if $verbose >= 2;
+	system( $cmdline );
+	$retval = $? >> 8;
+}
+exit $retval;
+
+sub sub_build {
+	my $package = shift(@_);
+	my $debpath = shift(@_);
+
+	# first of all, check if the file exists
+	if (not -r $package) {
+		warn sprintf (_g("%s: cannot access %s: %s\n"), $progname, $package, $!);
+		return "";
+	}
+
+	printf (_g("Going to convert %s\n"), $package) if $verbose >= 2;
+	my $nofailmsg = 0;
+
+	# set the umask (it may be bad by default)
+	umask(0022);
+
+	my $tmpdir = &create_tmpdir('dpkg-cross');
+	if (!$tmpdir) {
+		warn sprintf(_g("%s: failed to create temporary directory: %s\n"), $progname, $!);
+		return "";
+	}
+	my ($src, $dst) = ("$tmpdir/src", "$tmpdir/dst");
+	if (!(mkdir("$tmpdir/src") && mkdir("$tmpdir/dst"))) {
+		warn sprintf(_g("%s: failed to prepare temporary directory: %s\n"), $progname, $!);
+		system("rm -rf $tmpdir");
+		return "";
+	}
+
+	# remove tmp files on C-c
+	$SIG{'INT'} = sub {
+		printf (_g("Removing tmp files...\n")) if $verbose >= 2;
+		system "rm -rf $tmpdir";
+		die sprintf(_g("Interrupted.\n"));
+	};
+
+	printf (_g("Extracting %s\n"), $package) if $verbose >= 2;
+
+	# extract package to $src
+	if (system("dpkg --extract $package $src && dpkg --control $package $src/DEBIAN") != 0) {
+		goto fail;
+	}
+
+	printf (_g("Extracting information from control file\n")) if $verbose >= 2;
+
+	# extract useful information from control file
+	if (!(open(CONTROL, "$src/DEBIAN/control"))) {
+		warn sprintf(_g("%s: cannot open package control file: %s\n"), $progname, $!);
+		goto fail;
+	}
+	my $field;
+	my %control;
+	while (<CONTROL>) {
+		chomp;
+		if (/^ /) {
+			if (defined($field)) {
+				$control{$field} .= ("\n" . $_);
+			}
+		} elsif (/^(\S+):\s*(.*)$/i) {
+			$field = lc($1);
+			$control{$field} = $2;
+		}
+	}
+	close(CONTROL);
+
+	if (defined ($control{'multi-arch'})) {
+		if ($multiarchconv) {
+			# Carry on and process file anyway if --convert-multiarch given
+			warn sprintf(_g("%s: Multi-Arch package detected; processing anyway as --convert-multiarch specified.\n"), $progname);
+			$multiarchpackage=1;
+		} else {
+			my $output = basename ($package);
+			warn sprintf(_g("%s: Skipping Multi-Arch package '%s'.\n"), $progname, $output);
+			if (not -f $output) {
+				open(CP, "$package");
+				my @cp=<CP>;
+				close (CP);
+				open (CP, ">$output");
+				print CP @cp;
+				close (CP);
+			}
+			exit 0;
+		}
+	}
+	# check for existence of required fields
+	for $field (qw(package version architecture)) {
+		if (!defined($control{$field})) {
+			warn sprintf(_g("%s: required field \'%s\' missing in control file\n"), $progname, $field);
+			goto fail;
+		}
+	}
+	# check for package already processed by dpkg-cross, or created by
+	# cross-gcc compilation
+	if (($control{"architecture"} eq "all") && (
+		($control{"description"} =~ /generated by dpkg-cross/) ||
+		($control{"description"} =~ /contains files for.*cross-compile/)
+		)) {
+		warn sprintf(_g("%s: %s already looks like a cross-compile package\n"), $progname, $package);
+		goto fail;
+	}
+
+	# check package architecture
+	my $control_arch = $control{"architecture"};
+	if (($control_arch ne $arch) and 
+		($control_arch ne "all")) {
+		warn sprintf(_g("%s: %s has wrong architecture (%s)\n"), $progname, $package, $control_arch);
+		goto fail;
+	}
+
+	# prepare destination filename
+	my $evers = $control{"version"};
+	$evers =~ s/^\d+://;		 # strip epoch for filename
+	$debname = $control{"package"} . "-" . $arch . "-cross_" . $evers . "_all.deb";
+
+	# now ready to start preparing destination package
+
+	printf _g("Creating destination package tree\n") if $verbose >= 2;
+
+	my $objects = 0; # Number of objects (files and symlinks) in the converted package
+
+	# Helper: create directory tree if it does not exist.
+	sub ensure_dir {
+		my $dir = $_[0];
+		while ($dir =~ m:/:g) {
+			next if (length($`) == 0);
+			next if -d $`;
+			if (! mkdir($`)) {
+				$msg = sprintf(_g("%s: failed to create %s: %s\n"), $progname, $`, $!);
+				warn ($msg);
+				return 0;
+			}
+		}
+		return 1;
+	}
+
+	# Helper: link a file
+	sub link_file {
+		my ($from, $to) = @_;
+		ensure_dir($to) or return 0;
+		if (! link($from, $to)) {
+			$msg = sprintf(_g("%s: failed to link %s to %s: %s"), $progname, $from, $to, $!);
+			warn ($msg);
+			return 0;
+		}
+		return 1;
+	}
+
+	# Helper: detect ldscript
+	# Assumes that any *.so* file in library directory that is not ELF is
+	# ldscript
+	sub is_ldscript {
+		my $file = $_[0];
+		if (! open( FILE, $file )) {
+			$msg = sprintf(_g("%s: failed to open: %s\n"), $progname, $file, $!);
+			warn ($msg);
+			return 0;
+		}
+		$len = sysread( FILE, $data, 4 );
+		close( FILE );
+		return 0 if ($len != 4);
+		return 0 if ($data =~ /^.ELF$/);
+		return 1;
+	}
+
+	# Helper: fix ldscript.
+	# Map all ocurances of /lib, /usr/lib, and (/usr)/lib<something> 
+	#    to corresponding  $crosslib<something>
+	# FIXME!: remove all this repetition.
+	# Uses global $multiarch regexp modifier
+	sub fix_ldscript {
+		my ($from, $to) = @_;
+		ensure_dir($to) or return 0;
+		if (! open(FROM, $from)) {
+			$msg = sprintf(_g("%s: failed to open %s: %s"), $progname, $from, $!);
+			warn ($msg);
+			return 0;
+		}
+		if (! open(TO, ">$to")) {
+			$msg = sprintf(_g("%s: failed to open %s for writing: %s"), $progname, $to, $!);
+			warn ($msg);
+			close(FROM);
+			return 0;
+		}
+		while (<FROM>) {
+			if ($multiarch =~ m/mips(isa)?64.*-linux.*-gnuabi64.*/) {
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld\.so\.1:$1$crosslib64/ld.so.1:g;
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld-linux-mipsn8\.so\.1:$1$crosslib64/ld-linux-mipsn8\.so\.1:g;
+			} elsif ($multiarch =~ m/^mips(isa)?64.*-linux.*-gnuabin32.*/) {
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld\.so\.1:$1$crosslibn32/ld.so.1:g;
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld-linux-mipsn8\.so\.1:$1$crosslibn32/ld-linux-mipsn8\.so\.1:g;
+			} elsif ($multiarch =~ m/^mips(isa32)?.*-linux.*-gnu.*/) {
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld\.so\.1:$1$crosslib/ld\.so\.1:g;
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld-linux-mipsn8\.so\.1:$1$crosslib/ld-linux-mipsn8\.so\.1:g;
+			} elsif ($multiarchtriplet eq "sparc64-linux-gnu") {
+				s:(^|[^-\w/])(/usr)?/lib/${multiarch}ld-linux\.so\.2:$1$crosslib64/ld-linux.so.2:g;
+			}
+			s:(^|[^-\w/])(/usr)?/lib/$multiarch:$1$crosslib/:g;
+			unless ($multiarch) {
+				s:(^|[^-\w/])(/usr)?/lib32/:$1$crosslib32/:g;
+				s:(^|[^-\w/])(/usr)?/lib64/:$1$crosslib64/:g;
+				s:(^|[^-\w/])(/usr)?/libhf/:$1$crosslibhf/:g;
+				s:(^|[^-\w/])(/usr)?/libn32/:$1$crosslibn32/:g;
+				s:(^|[^-\w/])(/usr)?/libo32/:$1$crosslibo32/:g;
+				s:(^|[^-\w/])(/usr)?/libsf/:$1$crosslibsf/:g;
+				s:(^|[^-\w/])(/usr)?/libx32/:$1$crosslibx32/:g;
+			}
+			# Even though libc is multiarch, it ships non-multiarch loaders.
+			s:(^|[^-\w/])/lib(/ld[^/ ]*\.so):$1$crosslib$2:g;
+			s:(^|[^-\w/])/lib32(/ld[^/ ]*\.so):$1$crosslib32$2:g;
+			s:(^|[^-\w/])/lib64(/ld[^/ ]*\.so):$1$crosslib64$2:g;
+			s:(^|[^-\w/])/libx32(/ld[^/ ]*\.so):$1$crosslibx32$2:g;
+			print TO;
+		}
+		close(FROM);
+		close(TO);
+		return 1;
+	}
+
+	# Helper: fix .la file:
+	# - set libdir to $crosslib
+	# - change dependency_libs:
+	#   - remove any -L (because dpkg-cross never allows any libraries
+	#     outside $crosslib)
+	#   - replace any references to .la files to files in $crosslib
+	# To make this work both for $crosslib and $crosslib64, one of those is passed
+	# as 3rd argumengt
+	# Also adapted to work for $crosslib32
+	sub fix_la_file {
+		my ($from, $to, $crosslib) = @_;
+		ensure_dir($to) or return 0;
+		if (! open(FROM, $from)) {
+			$msg = sprintf(_g("%s: failed to open %s: %s\n"), $progname, $from, $!);
+			warn ($msg);
+			return 0;
+		}
+		if (! open(TO, ">$to")) {
+			$msg = sprintf(_g("%s: failed to open %s for writing: %s"), $progname, $to, $!);
+			warn ($msg);
+			close(FROM);
+			return 0;
+		}
+		while (<FROM>) {
+			if (/^libdir=/) {
+				print TO "libdir=\'$crosslib\'\n";
+			} elsif (/^dependency_libs='(.*)'$/ or /^dependency_libs=(.*)/) {
+				my $deplibs = $1;
+				$deplibs =~ s/( )?-L\S+//g;
+				$deplibs =~ s:\S+/([\w\.\-]+\.la)( |$):$crosslib/$1$2:g;
+				print TO "dependency_libs='$deplibs'\n";
+			} else {
+				print TO;
+			}
+		}
+		close(FROM);
+		close(TO);
+		return 1;
+	}
+
+	# Helper: fixup pkgconfig file
+	# Set prefix and exec_prefix to $crossdir, libdir to $crosslib, includedir to $crossinc
+	sub fix_pc_file {
+		my ($from, $to) = @_;
+		ensure_dir($to) or return 0;
+		if (! open(FROM, $from)) {
+			$msg = sprintf(_g("%s: failed to open %s: %s\n"), $progname, $from, $!);
+			warn ($msg);
+			return 0;
+		}
+		if (! open(TO, ">$to")) {
+			$msg = sprintf(_g("%s: failed to open %s for writing: %s"), $progname, $to, $!);
+			warn ($msg);
+			close(FROM);
+			return 0;
+		}
+		# 
+		my $orig_prefix = '/usr';
+		while (<FROM>) {
+			# fix for #483076
+			if ((m:^prefix="/usr(.*)"$:) or (m:^prefix=/usr(.*)$:)) {
+			        print TO "prefix=${crossdir}${1}\n";
+			        $orig_prefix = "/usr${1}";
+			} elsif (/^exec_prefix=/) {
+				print TO "exec_prefix=\${prefix}\n";
+			} elsif (/^libdir=/) {
+				if ($crosslib eq "$crossdir/lib") {
+					print TO "libdir=\${exec_prefix}/lib\n";
+				} else {
+					print TO "libdir=$crosslib\n";
+				}
+			# preserve original prefix for datarootdir entries
+			} elsif (/^datarootdir="\$\{prefix}(.*)"$/ or /^datarootdir=\$\{prefix}(.*)$/) {
+			    print TO "datarootdir=${orig_prefix}${1}\n";
+			# preserve original (build arch) prefix for ${exec_prefix}/bin entries 
+			# (e.g. orbit_idl). 
+			} elsif (m:\$\{exec_prefix}/bin:) {
+				s:\$\{exec_prefix}/bin:${orig_prefix}/bin:;
+				print TO;
+			} elsif (/^includedir=/) {
+				my $inc = ($crossinc eq "$crossdir/include") ? "\${prefix}/include" : $crossinc;
+				s:\$\{(exec_)?prefix}/include:$inc:;
+				print TO "includedir=$inc\n";
+			} elsif (m#^Cflags:.*(-I/usr/include)#) {
+				# dpkg-cross unconditionally moves /usr/include to /usr/$host/include
+				# adapt pc file to match See bug #697695
+				s:-I/usr/include:-I/usr/$crosstype/include:;
+				print TO;
+			} else {
+				print TO;
+			}
+		}
+		close(FROM);
+		close(TO);
+		return 1;
+	}
+	# Helper: fix shlibs file
+	# - arch-qualify dependencies
+	sub fix_shlibs($$) {
+		my ($from, $to) = @_;
+		ensure_dir($to) or return 0;
+		if (! open(FROM, $from)) {
+			$msg = sprintf(_g("%s: failed to open %s: %s\n"), $progname, $from, $!);
+			warn ($msg);
+			return 0;
+		}
+		if (! open(TO, ">$to")) {
+			$msg = sprintf(_g("%s: failed to open %s for writing: %s\n"), $progname, $to, $!);
+			warn ($msg);
+			close(FROM);
+			return 0;
+		}
+		while (<FROM>) {
+			if (m/^#/) {
+				print TO;
+			} elsif (m/((?:\S+:\s*)?\S+\s+\S+\s+)(.*)/) {
+				print TO ($1 . join(",", map { s/\S+/$&:$arch/; $_; } split(/,/, $2)) . "\n");
+			} else {
+				print TO;
+			}
+		}
+		close(FROM);
+		close(TO);
+		return 1;
+	}
+	my $config = &get_config;
+	$crosstype = `CC="" dpkg-architecture -f -a$arch -qDEB_HOST_GNU_TYPE 2> /dev/null`;
+	chomp ($crosstype);
+	$multiarchtriplet = `CC="" dpkg-architecture -f -a$arch -qDEB_HOST_MULTIARCH 2> /dev/null`;
+	chomp ($multiarchtriplet);
+	# FIXME!: remove all this repetition (do we really need all these config vars?)
+	$crossinc = $$config{'crossinc'};
+	$crossdir = $$config{'crossdir'};
+	$crosslib = $$config{'crosslib'};
+	$crosslib64 = $$config{'crosslib64'};
+	$crosslib32 = $$config{'crosslib32'};
+	$crosslibhf = $$config{'crosslibhf'};
+	$crosslibn32 = $$config{'crosslibn32'};
+	$crosslibo32 = $$config{'crosslibo32'};
+	$crosslibsf = $$config{'crosslibsf'};
+	$crosslibx32 = $$config{'crosslibx32'};
+	# add extra regexp component for multiarch packages
+	if ($multiarchpackage) { $multiarch="\Q$multiarchtriplet/\E" } else {$multiarch=""};
+
+	# Now process regular files ...
+	open(PIPE, "find $src/ -type f -print |") or goto fail;
+	while(<PIPE>) {
+		chomp;
+		s/^$src//;
+		/^DEBIAN/ && next;
+		# if we have library, or header, files on multiarch paths, 
+		# treat deb like a multiarch package
+		if (m:^((/usr)?/lib/|/usr/include/)\Q$multiarchtriplet/\E:) { 
+			$multiarch="\Q$multiarchtriplet/\E"
+			}
+		# special support for generated cache data
+		if (m:(/etc/dpkg-cross/cross-config.d/($arch)?/.*):) {
+			&ensure_dir("$dst$1");
+			if (! open(FROM, "$src$_")) {
+				$msg = sprintf(_g("%s: failed to open %s: %s\n"), $progname, "$src$_", $!);
+				warn ($msg);
+				return 0;
+			}
+			if (! open(TO, ">$dst$1")) {
+				$msg = sprintf(_g("%s: failed to open %s for writing: %s"), $progname, "$dst$1", $!);
+				warn ($msg);
+				close(FROM);
+				return 0;
+			}
+			while (<FROM>) {
+				print TO;
+			}
+			close(FROM);
+			close(TO);
+		} elsif (m:^/usr(/share/.*/.*\.cmake)$:) {
+			&ensure_dir("$dst/$crossdir/$1");
+			if (! open(FROM, "$src$_")) {
+				$msg = sprintf(_g("%s: failed to open %s: %s\n"), $progname, "$src$_",  $!);
+				warn ($msg);
+				return 0;
+			}
+			if (! open(TO, ">$dst/$crossdir/$1")) {
+				$msg = sprintf(_g("%s: failed to open %s for writing: %s"), $progname, "$dst$1", $!);
+				warn ($msg);
+				close(FROM);
+				return 0;
+			}
+			while (<FROM>) {
+				print TO;
+			}
+			close(FROM);
+			close(TO);
+		} elsif (m:^/usr/include/($multiarch)?:) {
+			# regular file under /usr/include/ or /usr/include/<triplet>
+			link_file("$src$_", "$dst$crossinc/$'") or goto fail;
+		# FIXME!: We should be able to do better than all this repetitive code!
+		} elsif (m:^/usr/(lib/)$multiarch(.*\.([hH]|[hH][hH]|[hH][pP][pP]))$:) {
+			# regular .h, .hh, or .hpp file under /usr/lib or /usr/lib/<triplet>
+			link_file("$src$_", "$dst$crossdir/$1/$2") or goto fail;
+		} elsif (m:^/usr/lib/$multiarch([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/lib or /usr/lib/<triplet>
+			link_file("$src$_", "$dst$crosslib/$1") or goto fail;
+		} elsif (m:^/usr/lib64/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/lib64
+			link_file("$src$_", "$dst$crosslib64/$1") or goto fail;
+		} elsif (m:^/usr/lib32/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/lib32
+			link_file("$src$_", "$dst$crosslib32/$1") or goto fail;
+		} elsif ((m:^/emul/ia32-linux/usr/lib/([^/]+\.[ao])$:)) {
+			# regular .a or .o file under /emul/ia32-linux/ for #463588
+			link_file("$src$_", "$dst$crosslib32/$1") or goto fail;
+		} elsif (m:^/usr/libhf/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/libhf
+			link_file("$src$_", "$dst$crosslibhf/$1") or goto fail;
+		} elsif (m:^/usr/libn32/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/libn32
+			link_file("$src$_", "$dst$crosslibn32/$1") or goto fail;
+		} elsif (m:^/usr/libo32/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/libo32
+			link_file("$src$_", "$dst$crosslibo32/$1") or goto fail;
+		} elsif (m:^/usr/libsf/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/libsf
+			link_file("$src$_", "$dst$crosslibsf/$1") or goto fail;
+		} elsif (m:^/usr/libx32/([^/]+\.[ao])$:) {
+			# regular .a or .o file under /usr/libx32
+			link_file("$src$_", "$dst$crosslibx32/$1") or goto fail;
+		} elsif (m:^(/usr)?/lib/($multiarch)?([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /lib, /usr/lib, /lib/<triplet>, /usr/lib/<triplet>
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslib/$3") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslib/$3") or goto fail;
+			}
+		} elsif (m:^/usr/\w+-\w+(-\w+(-\w+)?)?/(lib|include)/:) {
+			# regular file under /usr/<host>/lib or include
+			if ($cross2cross) {
+				link_file("$src$_", "$dst$_");
+			} else {
+				next;
+			}
+		} elsif (m:^(/usr)?/lib64/($multiarch)?([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /lib64, /usr/lib64, /lib64/<triplet>, /usr/lib64/<triplet>
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslib64/$3") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslib64/$3") or goto fail;
+			}
+		} elsif (m:^(/usr)?/lib32/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /lib32, /usr/lib32
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslib32/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslib32/$2") or goto fail;
+			}
+		} elsif ((m:^/emul/ia32-linux/usr/lib/([^/]+\.so[^/]*)$:)) {
+			# regular .so* file under /emul/ia32-linux/usr/lib
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslib32/$1") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslib32/$1") or goto fail;
+			}
+		} elsif (m:^(/usr)?/libhf/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /libhf, /usr/libhf
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslibhf/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslibhf/$2") or goto fail;
+			}
+		} elsif (m:^(/usr)?/libn32/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /libn32, /usr/libn32
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslibn32/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslibn32/$2") or goto fail;
+			}
+		} elsif (m:^(/usr)?/libo32/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /libo32, /usr/libo32
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslibo32/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslibo32/$2") or goto fail;
+			}
+		} elsif (m:^(/usr)?/libsf/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /libsf, /usr/libsf
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslibsf/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslibsf/$2") or goto fail;
+			}
+		} elsif (m:^(/usr)?/libx32/([^/]+\.so[^/]*)$:) {
+			# regular .so* file under /libx32, /usr/libx32
+			if (is_ldscript("$src$_")) {
+				fix_ldscript("$src$_", "$dst$crosslibx32/$2") or goto fail;
+			} else {
+				link_file("$src$_", "$dst$crosslibx32/$2") or goto fail;
+			}
+		} elsif (m:^/usr/lib/$multiarch([^/]+\.la)$:) {
+			# regular .la file under /usr/lib
+			fix_la_file("$src$_", "$dst$crosslib/$1", $crosslib) or goto fail;
+		} elsif (m:^/usr/lib64/([^/]+\.la)$:) {
+			# regular .la file under /usr/lib64
+			fix_la_file("$src$_", "$dst$crosslib64/$1", $crosslib64) or goto fail;
+		} elsif (m:^/usr/lib32/([^/]+\.la)$:) {
+			# regular .la file under /usr/lib32
+			fix_la_file("$src$_", "$dst$crosslib32/$1", $crosslib32) or goto fail;
+		} elsif ((m:^/emul/ia32-linux/usr/lib/([^/]+\.la)$:)) {
+			# regular .la file under /emul-ia32-linux/usr/lib/
+			fix_la_file("$src$_", "$dst$crosslib32/$1", $crosslib32) or goto fail;
+		} elsif (m:/usr/lib/$multiarch(pkgconfig/[^/]+.pc)$:) {
+			# regular .pc file in /usr/lib/pkgconfig
+			fix_pc_file("$src$_", "$dst$crosslib/$1") or goto fail;
+			# not for lib64: I don't know if there is any rationale
+		} elsif (m:/usr/(share/pkgconfig/[^/]+.pc)$:) {
+			# regular .pc file in /usr/share/pkgconfig
+			fix_pc_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} elsif (m:^/usr/(src/.*):) {
+			# any files under /usr/src/
+			link_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} elsif (m:^/usr/(lib/debug/.*):) {
+			# any files under /usr/lib/debug
+			link_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} elsif (m:^/usr/(share/fonts/.*):) {
+			# any files under /usr/share/fonts/
+			link_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} elsif (m:^/usr/(lib/.*/tclConfig.sh):) {
+			# the tcl cross-configure script
+			link_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} elsif (m:^/usr/(lib/perl/\d+\.\d+\.\d/(Config.pm|Config_heavy.pl)):) {
+			# the perl cross-configure scripts
+			link_file("$src$_", "$dst$crossdir/$1") or goto fail;
+		} else {
+			# everything else
+			next;
+		}
+
+		$objects++;
+	}
+	close(PIPE);
+
+	# Helper: create shortest relative symlink
+	sub create_relative {
+		my ($from, $to) = @_;
+		# First remove common prefix from $from and $to
+		while (1) {
+			$from =~ m:^(/[^/]+): or last;
+			my ($p1, $s1) = ($1, $');
+			$to =~ m:^(/[^/]+): or last;
+			my ($p2, $s2) = ($1, $');
+			last if ($p1 ne $p2);
+			($from, $to) = ($s1, $s2);
+		}
+		# Now $from one more slashes than "../"'s should be added before $to
+		# Example: /usr/lib/a/b -> /usr/lib/c
+		# After loop: $from is "/a/b", $to is "/c"
+		# $from has 2 slashes, so one "../" should be added before $to
+		# Result is: /usr/lib/a/b -> ../c
+		$from =~ s:[^/]::g;	# remove all but slashes
+		$from =~ s:^/::;	# remove first slash (at least one slash always exists)
+		$from =~ s:/:../:g;	# replace each of other slashes with ../
+		$to =~ s:^/::;		# remove leading slash from $to
+		return $from . $to;
+	}
+
+	# ... next process symlinks.
+	open(PIPE, "find $src/ -type l -print |") or goto fail;
+	while(<PIPE>) {
+		chomp;
+		s/^$src//;
+		# Ignore any symlinks not under /usr or /lib or /lib64 (or /emul/ia32-linux)
+		m:^/(usr|lib|lib64|emul/ia32-linux): or next;
+		next if (m:^/usr/\w+-\w+(-\w+(-\w+)?)?/: && !$cross2cross);
+		# Find out (absolute) symlink destination
+		my $lv = readlink("$src$_");
+		if ($lv ne "." && $lv =~ m:^[^/]:) {
+			m:^(.*)/[^/]*$:;
+			$lv = "$1/$lv";
+		}
+		# Ignore any symlinks pointing outside /usr and /lib and /lib64 (or /emul/ia32-linux)
+		$lv =~ m:^/(usr|lib|lib64|emul/ia32-linux): or next;
+
+		# Calculate corresponding DESTINATION path
+		$lv = convert_path($multiarch,$lv);
+
+		# Check if destination object exists.
+		# FIXME: this code is not correct for the case of symlink chains.
+		#        If converting symlink chains will be ever needed, this
+		#        should be rewritten
+		if (! -e "$dst$lv") {
+			# Non-existing destination allowed only if it is .so link,
+			# or if both source and destination is under /usr/src
+			next unless (/.*\.so$/ or
+					(m:/usr/src/: and $lv =~ m:/usr/:));
+		}
+
+		# Calculate corresponding SOURCE path
+		$_ = convert_path($multiarch,$_);
+
+		# Skip links that are going to point to themselves
+		next if ($lv eq $_);
+		
+		# skip /usr/$(multiarch)/lib/ld.so.1 for mips n32 and 64.
+ 		# their ld.so.1 should be in lib32 and lib64.
+		next if ($multiarch =~ m/^mips(isa)?64/ && $_ =~ m:lib/ld\.so\.1$:);
+		next if ($multiarch =~ m/^mips(isa)?64/ && $_ =~ m:lib/ld-linux-mipsn8\.so\.1$:);
+		next if ($multiarchtriplet eq "sparc64-linux-gnu" && $_ =~ m:lib/ld-linux\.so\.2$:);
+		
+		# skip links to private modules and plugins that are not
+		# useful or packaged in the -cross package, basically anything
+		# in a directory beneath /usr/lib/. See #499292
+		# except pkgconfig symlinks, see #506956
+		next if (($lv =~ m:$crosslib/.*/:) and ($lv !~ m:$crosslib/pkgconfig/:));
+		$lv =~ m:$crosslib/(.*)$:;
+		# Translators, retain the -> to indicate the direction of the link.
+		printf (_g("Creating symlink %s -> %s\n"), $_, $1) if ($verbose >= 2);
+
+		# Skip if destination already exists - for the case if a symlink maps
+		# to same destination as a regular file
+		next if (-e "$dst$_");
+
+		# Previous line seems not to catch situation when "$dst$_" is a symlink
+		# pointing to non-existant (external to the package being created) file
+		unlink("$dst$_");
+
+		# Create a relative link
+		my $relative = create_relative($_, $lv);
+		ensure_dir("$dst$_") or goto fail;
+		if (! symlink($relative, "$dst$_")) {
+			$msg = sprintf(_g("%s: failed to create symlink %s -> %s: %s\n"), $progname, "$dst$_", $relative, $!);
+			warn ($msg);
+			goto fail;
+		}
+		$objects++;
+	}
+	close(PIPE);
+
+	# At this point, $dst should be ready, and $objects should contain number
+	# or files and symlinks under $dst
+	if ($objects == 0) {
+		if ($anyway) {
+			$msg = sprintf(_g("package %s doesn't provide any useful files, but processing it anyway as requested\n"), $control{"package"});
+			print wrap('','',"$progname: $msg") if ($verbose >= 1);
+		} else {
+			$msg = sprintf(_g("package %s doesn't provide any useful files. Skipping.\n"), $control{"package"});
+			warn ("$progname: $msg");
+			$nofailmsg = 1;
+			goto fail;
+		}
+	}
+
+	# Create README in /usr/share/doc/ ...
+	my $docpath = "/usr/share/doc/" . $control{"package"} . "-$arch-cross";
+	my $docfile = "$docpath/README";
+	printf (_g("Creating %s\n"), $docfile) if $verbose >= 2;
+	ensure_dir("$dst$docfile") or goto fail;
+	if (! open(DOC, ">$dst$docfile")) {
+		$msg = sprintf(_g("%s: failed to open %s for writing: %s\n"), $progname, "$dst$docfile", $!);
+		warn ($msg);
+		goto fail;
+	}
+	print DOC "Package " . $control{"package"} .
+			"-$arch-cross is a part of the cross-compiling environment \n" .
+			"for $arch target. It was created from " . $control{"package"} .
+			" package using the dpkg-cross tool.\n\nTo get more information about " .
+			$control{"package"} . " or dpkg-cross packages,\n" .
+			"please install those and read the provided documentation.\n";
+	close(DOC);
+
+	if (! mkdir("$dst/DEBIAN")) {
+		$msg = sprintf(_g("%s: failed to create %s/DEBIAN: %s\n"), $progname, $dst, $!);
+		warn ($msg);
+		goto fail;
+	}
+
+	# Link the shlibs file
+	if (-f "$src/DEBIAN/shlibs") {
+		print "Installing shlibs file\n" if $verbose >= 2;
+		link_file("$src/DEBIAN/shlibs", "$dst/DEBIAN/shlibs");
+		# FIXME: not enabling in this copy. needed?
+		#fix_shlibs("$src/DEBIAN/shlibs", "$dst/DEBIAN/shlibs");
+	}
+
+	# Create the control file.
+	print "Creating control file\n" if $verbose >= 2;
+	if (! open(CONTROL, ">$dst/DEBIAN/control")) {
+		$msg = sprintf(_g("%s: failed to open %s/DEBIAN/control for writing: %s\n"), $progname, $dst, $!);
+		warn ($msg);
+		goto fail;
+	}
+
+	print CONTROL "Package: " . $control{"package"} . "-$arch-cross\n";
+	print CONTROL "Version: " . $control{"version"} . "\n";
+	print CONTROL "Section: " . $control{"section"} . "\n";
+	print CONTROL "Priority: optional\n";
+	print CONTROL "Architecture: all\n";
+	print CONTROL "Multi-Arch: foreign\n";
+
+	if (defined($control{"maintainer"})) {
+		print CONTROL "Maintainer: " . $control{"maintainer"} . "\n";
+	}
+	if (defined($control{"source"})) {
+		print CONTROL "Source: " . $control{"source"} . "\n";
+	} else {
+		print CONTROL "Source: " . $control{"package"} . "\n";
+	}
+
+	# Turn Pre-Depends into Depends
+	if (defined($control{"pre-depends"})) {
+		if (defined($control{"depends"})) {
+			$control{"depends"} = $control{"pre-depends"} . ", " . $control{"depends"};
+		} else {
+			$control{"depends"} = $control{"pre-depends"};
+		}
+	}
+
+	# Rewrite dependency fields
+	# Make 'provides' field to exist always to all $package-$arch-dcv1
+	# but create no dependencies on dcv1 - see #514249
+	my $prov = (exists $control{"provides"}) ? $control{"provides"}: "";
+	my $rewritten = rewrite_dependencies($prov);
+	my $joiner = (length($rewritten) > 0) ? ", " : "";
+	$rewritten .= $joiner.$control{"package"} ."-$arch-dcv1";
+	print CONTROL ucfirst("provides") . ": $rewritten\n";
+	for $field (qw(depends conflicts replaces)) {
+		next if not defined $control{$field};
+		my $rewritten = rewrite_dependencies($control{$field});
+		if (length($rewritten) > 0) {
+			# Capitalize first letter of field name
+			print CONTROL ucfirst($field) . ": " . $rewritten . "\n";
+		}
+	}
+
+	# Output modified description
+	if (defined($control{"description"})) {
+		$control{"description"} =~ /(.*)/; # match first line
+		print CONTROL "Description: $1 (for cross-compiling)\n";
+		print CONTROL " This package was generated by dpkg-cross for cross compiling.\n .$'\n";
+	} else {
+		print CONTROL "Description: " . $control{"package"} . " for cross-compiling\n";
+		print CONTROL " This package was generated by dpkg-cross for cross compiling.\n" .
+			" .\n Source package " . $control{"package"} . " provided no description.\n"
+	}
+
+	close(CONTROL);
+
+	# Create md5sums file
+	printf (_g("Creating md5sums file\n")) if $verbose >= 2;
+	# Code shamelessly stolen from dh_md5sums
+	system("cd $dst && find . -type f ! -regex '.*/DEBIAN/.*' -printf '%P\\0' | xargs -r0 md5sum > $dst/DEBIAN/md5sums");
+
+	# Find out if fakeroot is needed and if it is available
+	my $wrapper = "";
+	if (geteuid() != 0) {
+		$wrapper = "/usr/bin/fakeroot";
+		if (! -x $wrapper) {
+			$msg = sprintf(_g("%s: %s is not available, package files will not be owned by root\n"), $progname, $wrapper);
+			warn ($msg);
+			$wrapper = "";
+		}
+	}
+
+	# Build the .deb
+	printf (_g("Building %s\n"), $debname) if $verbose == 1;
+	if (system( "$wrapper dpkg-deb -b $dst $debpath")) {
+		$msg = sprintf (_g("%s: building package with dpkg-deb -b failed.\n"), $progname);
+		warn ($msg);
+		goto fail;
+	}
+
+	$SIG{'INT'} = 'DEFAULT';
+	system "rm -rf $tmpdir";
+	return $debname;
+
+fail:
+	system("rm -rf $tmpdir");
+	$SIG{'INT'} = 'DEFAULT';
+	warn sprintf(_g("%s: conversion of %s failed.\n"), $progname, $package) unless $nofailmsg;
+	return "";
+}
+
+sub get_update_list {
+	my( %installed, %available, %av_path, $pkg, %update_list, $cnt );
+	local( *F );
+
+	if ($verbose >= 2) {
+		printf (_g("Determining installed packages "));
+		STDOUT->flush();
+	}
+	open( F, "<$dpkg_statfile" ) or die sprintf(_g("Can't open %s: %s"), $dpkg_statfile, $!);
+	%installed = parse_pkg_list();
+	if ($verbose >= 2) {
+		$cnt = %installed;
+		$cnt = $cnt+0;
+		printf (ngettext("(%d package)\n", "(%d packages)\n", $cnt), $cnt);
+	}
+
+	foreach (@_) {
+		scan_available( \%available, \%av_path, $_ );
+	}
+
+	foreach $pkg (keys %installed) {
+		if (exists($available{$pkg}) &&
+			version_less_p( $installed{$pkg}, $available{$pkg} )) {
+			$update_list{$pkg}->{'Path'} = $av_path{$pkg};
+			$update_list{$pkg}->{'Oldver'} = $installed{$pkg};
+			$update_list{$pkg}->{'Newver'} = $available{$pkg};
+		}
+	}
+	return %update_list;
+}
+
+sub scan_available {
+	my $av_ref = shift;
+	my $path_ref = shift;
+	my $pkgpath = shift;
+	my( @pkglist, %available, $file, $pkg, $cnt );
+
+	if ($verbose >= 2) {
+		printf (_g("Scanning .deb files under %s "), $pkgpath);
+		STDOUT->flush();
+	}
+	@pkglist = `find $pkgpath -type f -a -name '*.deb' -print`;
+	die sprintf(_g("find command returned error status %s\n"), $?) if $?;
+	if (!@pkglist) {
+		printf (_g("No .deb files found under %s\n"), $pkgpath) if $verbose >= 1;
+		return;
+	}
+	chomp @pkglist;
+	$cnt = 0;
+	foreach $file (@pkglist) {
+		open( F, "dpkg --field $file |" )
+			or die sprintf (_g("Can't run dpkg --field %s: %s\n"), $file, $!);
+		if (%available = parse_pkg_list(1)) {
+			$pkg = (keys %available)[0];
+			$av_ref->{$pkg} = $available{$pkg};
+			$path_ref->{$pkg} = $file;
+			++$cnt;
+		}
+	}
+	printf(ngettext("(%d package)\n", "(%d packages)\n", $cnt), $cnt)
+		if ($verbose >= 2);
+}
+
+sub parse_pkg_list {
+	my $avail_pkg = shift;
+	my( $name, $version, %result );
+	local($/) = ""; # read in paragraph mode
+
+	while( <F> ) {
+		/^Package:\s*(\S+)\s*$/mi || next; $name = $1;
+		if ($avail_pkg) {
+			# available package: check architecture
+			/^Architecture:\s*(\S+)\s*$/mi || next;
+			next if $1 ne $arch;
+		} else {
+			# package from status file: check if installed at all, and
+			# if cross-compiling package; strip suffix from name
+			next if /^Status:.*\s+(\S+)\s*$/mi && $1 ne 'installed';
+			next if $name !~ /-$arch-cross$/;
+			$name =~ s/-$arch-cross$//;
+		}
+		/^Version:\s*(\S+)\s*$/mi || next; $version = $1;
+		$result{$name} = $version;
+	}
+	close( F ) or die sprintf(_g("Error status from dpkg\n"));;
+	return %result;
+}
+
+sub version_less_p {
+	my $vers1 = shift;
+	my $vers2 = shift;
+
+	system( "dpkg --compare-versions $vers1 '<<' $vers2" );
+	return $? == 0;
+}
+
+sub rewrite_dependencies {
+	my $str = shift;
+
+	my @list = map( rewrite_alternatives($_), split( /\s*,\s*/, $str));
+	# remove empty elements
+	@list = map { $_ ? ( $_ ) : () } @list;
+	return join(", ", @list );
+}
+
+sub rewrite_alternatives {
+	my $str = shift;
+
+	my @list = map( rewrite_item($_), split( /\s*\|\s*/, $str ));
+	# if any of the alternatives became empty (because of @removedeps),
+	# the complete dependency should be removed
+	@list = ();
+	for my $item (split( /\s*\|\s*/, $str )) {
+		$item = rewrite_item($item);
+		return () if not $item;
+		push @list, $item
+	}
+	return join( " | ", @list );
+}
+
+sub rewrite_item {
+	my $str = shift;
+	$str =~ /^([^ (]+)/;
+	my $name = $1;
+	return () if grep { $_ eq $name } @removedeps;
+	return $str if grep { $_ eq $name } @keepdeps;
+	if ($name =~ /^([^:]*):(.*)/) {
+		my $replacement = "$1-$2-cross";
+		$str =~ s/^[^ (]+/$replacement/;
+	} else {
+		$str =~ s/^([^ (]+)/$name-$arch-cross/;
+	}
+	return $str;
+}
+
+sub check_exclude {
+	foreach $package ( @ARGV ) {
+		if ($package =~ /^\-X/) {
+			$exclude = 1;
+			next;
+		}
+		if (($exclude == 1) && ($package !~ /^\-/) && (!defined $builds{$package})) {
+			push @removedeps, $package;
+			next;
+		}
+		$builds{"$package"}++;
+	}
+	$str = join(' ', @removedeps);
+	$msg = sprintf (_g("Excluding: %s\n"), $str);
+	print wrap('','', $msg) if ($verbose >= 2);
+}
+
+=head1 Conversion process
+
+There is no safe way for dpkg-cross to mangle certain files in -dev
+packages, particularly files in F</usr/share> or to determine precisely
+which of these files could be parsed and which cannot. Special
+cases do not help - dpkg-cross already has too many of those.
+
+It is not safe to leave files in the package nor is it safe to move
+files into arbitrary locations when there is no reliable and
+standardised way to determine the usefulness of a particular kind of
+file. Package specific config scripts cannot be supported and even
+build-system specific ones are not necessarily going to work without a
+lot of ongoing maintenance.
+
+Therefore, C<dpkg-cross> is very restrictive on which files are
+retained in the -cross package.
+
+=head2 Files to be converted
+
+All files in
+
+ /usr/include/*
+
+Also /usr/src and /usr/lib are searched for includes - files with
+.h, .hh, .hpp extensions (case insensitive).
+
+Library files - *.so* and *.a and *.o files from /lib and /usr/lib 
+(and all the multilib eqivalents (lib64, lib32, libo32, libhf, libx32 etc).
+Other library files are not copied.  *.la files in
+library directories are also copied, and library and paths are
+modified there. Same for /usr/lib/pkgconfig/*.pc files.
+
+Symlinks are copied (and modified appropriately) if their
+destination is copied. Also, symlinks to non-existing shared libraries
+are copied (this is common case for libdevel packages)
+
+Directories are created only to hold some files or symlinks.
+No empty directories are copied.
+
+=head1 Multiarch behaviour
+
+By default <dpkg-cross> does nothing with packages from Debian which already
+support Multi-Arch - the package is simply copied to the current work
+directory, if it does not already exist. Any package containing a Multi-Arch: 
+field in DEBIAN/control is skipped in this manner.
+
+--convert-multiarch can be specified to instead force the generation of a 
+-<arch>-cross package with the files moved into the conventional 
+dpkg-cross locations.
+
+The Multiarch spec ensures that multiarch packages will only be
+available from Debian mirrors once dpkg itself is capable of installing
+the packages and installing a Multiarch package means being able to
+install a 32bit multiarch package alongside a 64bit multiarch package.
+Installing an armel multiarch package alongside an x86 multiarch
+package is no different to 32bit vs 64bit. (What changes is how the
+multiarch package itself handles the header files and pkg-config
+files.)
+
+=cut

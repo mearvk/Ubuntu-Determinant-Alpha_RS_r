@@ -1,0 +1,118 @@
+#
+# Makefile.in	Makefile for the liblockfile package
+#
+
+MAJOR		= 1
+SOVER		= 1.0
+NFSVER		= 0.1
+
+CFLAGS		= @CFLAGS@ -I.
+LDFLAGS		= @LDFLAGS@
+CC		= @CC@
+
+prefix		= $(DESTDIR)@prefix@
+exec_prefix	= @exec_prefix@
+bindir		= @bindir@
+libdir		= @libdir@
+mandir		= @mandir@
+nfslockdir	= @nfslockdir@
+includedir	= @includedir@
+datarootdir	= @datarootdir@
+MAILGROUP	= @MAILGROUP@
+
+VERSION		= $(shell sed -ne "1s/^liblockfile (\(.*\))/\1/p" < Changelog)
+
+all:		@TARGETS@
+install:	@INSTALL_TARGETS@
+
+static:		liblockfile.a dotlockfile
+shared:		liblockfile.so liblockfile.a dotlockfile
+nfslib:		nfslock.so.$(NFSVER)
+
+liblockfile.a:	lockfile.o
+		$(AR) rv liblockfile.a lockfile.o
+
+liblockfile.so: solockfile.o
+		$(CC) $(LDFLAGS) -fPIC -shared -Wl,-soname,liblockfile.so.1 \
+			-o liblockfile.so solockfile.o -lc
+
+nfslock.so.$(NFSVER):	nfslock.o
+		$(CC) $(LDFLAGS) -fPIC -shared -Wl,-soname,nfslock.so.0 \
+			-o nfslock.so.$(NFSVER) nfslock.o
+
+dotlockfile:	dotlockfile.o dlockfile.o
+		$(CC) $(LDFLAGS) -o dotlockfile dotlockfile.o dlockfile.o
+
+dotlockfile.o:	dotlockfile.c
+		$(CC) $(CFLAGS) -DLOCKPROG=\"$(bindir)/dotlockfile\" \
+			-c dotlockfile.c
+
+lockfile.o:	lockfile.c
+		$(CC) $(CFLAGS) -DLIB -DLOCKPROG=\"$(bindir)/dotlockfile\" \
+			-DSTATIC -c lockfile.c
+
+solockfile.o:	lockfile.c
+		$(CC) $(CFLAGS) -DLIB -DLOCKPROG=\"$(bindir)/dotlockfile\" \
+			-c lockfile.c -o solockfile.o
+
+dlockfile.o:	lockfile.c
+		$(CC) $(CFLAGS) -DLOCKPROG=\"$(bindir)/dotlockfile\" \
+			-c lockfile.c -o dlockfile.o
+
+install_static:	static install_common
+		install -d -m 755 -g root -p $(libdir)
+		install -m 644 liblockfile.a $(libdir)
+
+install_shared:	shared install_static install_common
+		install -d -m 755 -g root -p $(libdir)
+		install -m 755 liblockfile.so \
+			$(libdir)/liblockfile.so.$(SOVER)
+		ln -s liblockfile.so.$(SOVER) $(libdir)/liblockfile.so.$(MAJOR)
+		ln -s liblockfile.so.$(SOVER) $(libdir)/liblockfile.so
+		if test "$(DESTDIR)" = ""; then @LDCONFIG@; fi
+
+install_common:
+		install -d -m 755 -g root -p $(includedir)
+		install -d -m 755 -g root -p $(bindir)
+		install -d -m 755 -g root -p $(mandir)/man1
+		install -d -m 755 -g root -p $(mandir)/man3
+		install -m 644 lockfile.h maillock.h $(includedir)
+		if [ "$(MAILGROUP)" != "" ]; then\
+		  install -g $(MAILGROUP) -m 2755 dotlockfile $(bindir);\
+		else \
+		  install -g root -m 755 dotlockfile $(bindir); \
+		fi
+		install -m 644 *.1 $(mandir)/man1
+		install -m 644 *.3 $(mandir)/man3
+
+install_nfslib:	nfslib
+		install -d -m 755 -g root -p $(nfslockdir)
+		install -m 755 nfslock.so.$(NFSVER) $(nfslockdir)
+		if test "$(DESTDIR)" = ""; then @LDCONFIG@; fi
+
+test:		test-stamp
+		@:
+
+test-stamp:	dotlockfile
+		./run-tests.sh
+		touch test-stamp
+
+tar:		tarball
+		@:
+
+tarball:	clean
+		(tar --xform "s/^liblockfile/liblockfile-$(VERSION)/" \
+			--exclude Makefile --exclude autoconf.h --exclude maillock.h \
+			--exclude config.cache --exclude config.log --exclude config.status \
+			--exclude autom4te.cache \
+			--exclude-vcs --exclude-vcs-ignores \
+			-C .. -czf ../liblockfile-$(VERSION).tar.gz liblockfile )
+
+clean:
+		rm -f *.a *.o *.so *.so.* dotlockfile test-stamp
+
+distclean:	clean
+		rm -f Makefile autoconf.h maillock.h \
+			config.cache config.log config.status; \
+		rm -rf autom4te.cache
+

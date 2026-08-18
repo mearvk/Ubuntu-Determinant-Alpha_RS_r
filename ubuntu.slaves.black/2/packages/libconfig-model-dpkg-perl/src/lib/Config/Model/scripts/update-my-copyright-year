@@ -1,0 +1,29 @@
+doc: update the copyright years that match $DEBFULLNAME
+
+app: dpkg-copyright
+
+--- code
+my @l = localtime;
+my $year = $l[5]+1900;
+my $oldyear = $year - 1;
+my $name = $ENV{DEBFULLNAME};
+
+# $root is provided by App::Cme::Command::run
+foreach my $file_node ($root->fetch_element('Files')->fetch_all) {
+    my $cop = $file_node->fetch_element_value('Copyright');
+
+    # append current year
+    $cop =~ s/(\d+),?\s+$name/$1, $year, $name/g;
+
+    # suppress duplicate current year (for idempotency)
+    $cop =~ s/$year, $year/$year/g;
+
+    # create ranges with new year when needed
+    $cop =~ s/-$oldyear,\s*$year,?\s+$name/-$year, $name/g;
+    $cop =~ s/$oldyear,\s*$year,?\s+$name/$oldyear-$year, $name/g;
+
+    $file_node->store_element_value(Copyright => $cop);
+}
+---
+
+commit: updated copyright year of $DEBFULLNAME

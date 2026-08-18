@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export DISTSETUPOPTS="--install-layout=deb"
+
+PY3V := $(shell py3versions -vr)
+
+%:
+	dh $@  --with autoreconf,python3
+
+override_dh_auto_build:
+	dh_auto_build -- V=1
+
+override_dh_auto_install:
+	dh_auto_install
+	for pv in $(PY3V); do \
+	  PYTHON=python$${pv} PYTHON_CONFIG=python$${pv}-config dh_auto_configure -- --enable-python-bindings; \
+	  cd bindings/python; \
+	  make clean; \
+	  make install DESTDIR="$(CURDIR)/debian/tmp"; \
+	  cd "$(CURDIR)"; \
+	done
+
+# Force a dependency on libbabeltrace1 (>= 1.5.3-2~) to handle
+# the merge of the ctf sub-library. Otherwise, packages built
+# against a merged libabeltrace that link on ctf but installed
+# on an older system will not pull libbabeltrace-ctf1.
+override_dh_makeshlibs:
+	dh_makeshlibs -V 'libbabeltrace1 (>= 1.5.3-2~)'

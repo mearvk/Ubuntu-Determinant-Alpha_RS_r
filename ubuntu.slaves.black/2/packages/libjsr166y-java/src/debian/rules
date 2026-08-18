@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+%:
+	dh $@ --with javahelper
+
+override_jh_build:
+	jh_build jsr166y.jar src/jsr166y
+	mkdir -p javadoc/jsr166y javadoc/extra166y
+	cp -a debian/_jh_build.javadoc/api javadoc/jsr166y
+	CLASSPATH=jsr166y.jar jh_build extra166y.jar src/extra166y
+	cp -a debian/_jh_build.javadoc/api javadoc/extra166y
+	rm -rf javadoc/extra166y/api/jsr166y
+
+override_jh_installlibs:
+	mh_installpoms -plibjsr166y-java
+	mh_installjar -plibjsr166y-java -l debian/jsr166y.pom jsr166y.jar
+	mh_installjar -plibjsr166y-java -l debian/extra166y.pom extra166y.jar
+
+override_jh_installjavadoc:
+
+override_dh_installdocs:
+	dh_installdocs
+	jh_installjavadoc -plibjsr166y-java-doc \
+		javadoc/jsr166y usr/share/doc/libjsr166y-java/jsr166y
+	jh_installjavadoc -plibjsr166y-java-doc \
+		javadoc/extra166y usr/share/doc/libjsr166y-java/extra166y
+
+override_dh_auto_clean:
+	dh_auto_clean
+	mh_clean
+	rm -rf javadoc
+
+get-orig-source:
+	# uscan was not used because upstream doesn't provide an
+	# URL useful for scanning new versions, also this is
+	# the reason why this package doesn't ship a watch file
+	cd $(dir $(firstword $(MAKEFILE_LIST)))../ && \
+	./debian/orig-tar.sh

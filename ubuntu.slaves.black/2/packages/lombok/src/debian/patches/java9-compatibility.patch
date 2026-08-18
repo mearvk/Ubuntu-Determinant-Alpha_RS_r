@@ -1,0 +1,62 @@
+Description: Fixes the incompatibilities with Java 9:
+ * Upstream compiles PackageName.java against the JDK 6 API which isn't available
+   in Debian. The public field JCCompilationUnit.ui was replaced in JDK 9 and this
+   patch uses the equivalent getPackageName() method instead which is available
+   since JDK 6 at least.
+ * JavacAST.java accesses the multipleErrors field of com.sun.tools.javac.util.Log
+   but it was removed in JDK 9. The patch uses reflection to access the field instead.
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/src/utils/lombok/javac/PackageName.java
++++ b/src/utils/lombok/javac/PackageName.java
+@@ -32,15 +32,6 @@
+ 
+ // Supports JDK6-9
+ public class PackageName {
+-	private static final Method packageNameMethod = getPackageNameMethod();
+-	
+-	private static Method getPackageNameMethod() {
+-		try {
+-			return Permit.getMethod(JCCompilationUnit.class, "getPackageName");
+-		} catch (Exception e) {
+-			return null;
+-		}
+-	}
+ 	
+ 	public static String getPackageName(JCCompilationUnit cu) {
+ 		JCTree t = getPackageNode(cu);
+@@ -48,10 +39,7 @@
+ 	}
+ 	
+ 	public static JCTree getPackageNode(JCCompilationUnit cu) {
+-		if (packageNameMethod != null) try {
+-			Object pkg = packageNameMethod.invoke(cu);
+-			return (pkg instanceof JCFieldAccess || pkg instanceof JCIdent) ? (JCTree) pkg : null;
+-		} catch (Exception e) {}
+-		return cu.pid instanceof JCFieldAccess || cu.pid instanceof JCIdent ? cu.pid : null;
++		Object pkg = cu.getPackageName();
++		return (pkg instanceof JCFieldAccess || pkg instanceof JCIdent) ? (JCTree) pkg : null;
+ 	}
+ }
+--- a/src/core/lombok/javac/JavacAST.java
++++ b/src/core/lombok/javac/JavacAST.java
+@@ -595,13 +595,16 @@
+ 		}
+ 
+ 		@Override void error1(DiagnosticPosition pos, String message) {
+-			boolean prev = log.multipleErrors;
+-			log.multipleErrors = true;
++			try {
++			Field multipleErrorsField = log.getClass().getField("multipleErrors");
++			boolean prev = multipleErrorsField.getBoolean(log);
++			multipleErrorsField.setBoolean(log, true);
+ 			try {
+ 				log.error(pos, "proc.messager", message);
+ 			} finally {
+-				log.multipleErrors = prev;
++				multipleErrorsField.setBoolean(log, prev);
+ 			}
++			} catch (Throwable t) {}
+ 		}
+ 
+ 		@Override void warning1(DiagnosticPosition pos, String message) {

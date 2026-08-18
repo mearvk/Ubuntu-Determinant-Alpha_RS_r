@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/ant.mk
+
+PACKAGE              := $(DEB_SOURCE_PACKAGE)
+VERSION              := $(DEB_UPSTREAM_VERSION)
+JAVA_HOME            := /usr/lib/jvm/default-java
+DEB_JARS             := xercesImpl
+DEB_ANT_BUILD_TARGET := jar jar-xni doc
+DEB_ANT_BUILDFILE    := build.xml
+DEB_ANT_ARGS         := -Dname=$(PACKAGE) -Dversion=$(VERSION)
+API_DOCS             := build/doc/api
+
+get-orig-source:
+	uscan --download-version $(VERSION) --force-download --rename
+
+binary-post-install/lib$(PACKAGE)-java::
+	mh_installpoms -plib$(PACKAGE)-java
+	mh_installjar -plib$(PACKAGE)-java -l --usj-version=$(VERSION) pom.xml build/lib/$(PACKAGE).jar
+	mh_installjar -plib$(PACKAGE)-java -l --usj-version=$(VERSION) debian/nekohtml-xni.pom build/lib/$(PACKAGE)Xni.jar
+
+binary-post-install/lib$(PACKAGE)-java-doc::
+	dh_install -plib$(PACKAGE)-java-doc doc usr/share/doc/lib$(PACKAGE)-java
+	dh_install -plib$(PACKAGE)-java-doc $(API_DOCS) usr/share/doc/lib$(PACKAGE)-java
+
+clean::
+	mh_clean
+	-rm -rf debian/tmp
+

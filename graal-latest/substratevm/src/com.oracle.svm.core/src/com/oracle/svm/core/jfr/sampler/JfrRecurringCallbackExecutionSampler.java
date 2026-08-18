@@ -1,0 +1,221 @@
+/*
+ * Copyright (c) 2022, 2022, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.jfr.sampler;
+
+import static com.oracle.svm.guest.staging.core.graal.KnownIntrinsics.readCallerStackPointer;
+import static com.oracle.svm.guest.staging.core.graal.KnownIntrinsics.readReturnAddress;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.graalvm.nativeimage.CurrentIsolate;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.IsolateThread;
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.Platforms;
+import org.graalvm.nativeimage.Threading;
+import org.graalvm.nativeimage.c.function.CodePointer;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.word.Pointer;
+
+import com.oracle.svm.shared.BuildPhaseProvider;
+import com.oracle.svm.shared.NeverInline;
+import com.oracle.svm.shared.Uninterruptible;
+import com.oracle.svm.shared.feature.AutomaticallyRegisteredFeature;
+import com.oracle.svm.core.feature.InternalFeature;
+import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
+import com.oracle.svm.core.jfr.JfrExecutionSamplerSupported;
+import com.oracle.svm.core.jfr.JfrFeature;
+import com.oracle.svm.core.jfr.SubstrateJVM;
+import com.oracle.svm.core.thread.RecurringCallbackSupport;
+import com.oracle.svm.core.thread.RecurringCallbackSupport.RecurringCallbackTimer;
+import com.oracle.svm.core.thread.ThreadListenerSupport;
+import com.oracle.svm.core.thread.VMOperation;
+import com.oracle.svm.core.thread.VMThreads;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.AllAccess;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.SingleLayer;
+import com.oracle.svm.shared.singletons.traits.SingletonLayeredInstallationKind.InitialLayerOnly;
+import com.oracle.svm.shared.singletons.traits.SingletonTraits;
+import com.oracle.svm.shared.util.TimeUtils;
+import com.oracle.svm.shared.util.VMError;
+
+import jdk.graal.compiler.api.replacements.Fold;
+
+@SingletonTraits(access = AllAccess.class, layeredCallbacks = SingleLayer.class, layeredInstallationKind = InitialLayerOnly.class)
+public final class JfrRecurringCallbackExecutionSampler extends AbstractJfrExecutionSampler {
+    private static final ExecutionSampleCallback CALLBACK = new ExecutionSampleCallback();
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    JfrRecurringCallbackExecutionSampler() {
+    }
+
+    @Fold
+    public static boolean isPresent() {
+        VMError.guarantee(BuildPhaseProvider.isSetupFinished(), "JfrRecurringCallbackExecutionSampler.isPresent() must not be called too early");
+        if (ImageSingletons.contains(JfrExecutionSampler.class)) {
+            JfrExecutionSampler sampler = ImageSingletons.lookup(JfrExecutionSampler.class);
+            return sampler instanceof JfrRecurringCallbackExecutionSampler;
+        }
+        return false;
+    }
+
+    @Override
+    protected void startSampling() {
+        assert VMOperation.isInProgressAtSafepoint();
+
+        SubstrateJVM.getSamplerBufferPool().adjustBufferCount();
+
+        for (IsolateThread thread = VMThreads.firstThread(); thread.isNonNull(); thread = VMThreads.nextThread(thread)) {
+            RecurringCallbackTimer timer = createRecurringCallbackTimer();
+            if (timer != null) {
+                install(thread, timer);
+            }
+        }
+    }
+
+    @Override
+    protected void updateInterval() {
+        assert VMOperation.isInProgressAtSafepoint();
+
+        for (IsolateThread thread = VMThreads.firstThread(); thread.isNonNull(); thread = VMThreads.nextThread(thread)) {
+            uninstall(thread);
+
+            RecurringCallbackTimer timer = createRecurringCallbackTimer();
+            if (timer != null) {
+                install(thread, timer);
+            }
+        }
+    }
+
+    @Override
+    protected void stopSampling() {
+        assert VMOperation.isInProgressAtSafepoint();
+
+        for (IsolateThread thread = VMThreads.firstThread(); thread.isNonNull(); thread = VMThreads.nextThread(thread)) {
+            uninstall(thread);
+        }
+    }
+
+    private RecurringCallbackTimer createRecurringCallbackTimer() {
+        assert VMOperation.isInProgressAtSafepoint();
+
+        if (newIntervalMillis > 0) {
+            return RecurringCallbackSupport.createCallbackTimer(TimeUtils.millisToNanos(newIntervalMillis), CALLBACK);
+        }
+        return null;
+    }
+
+    @Uninterruptible(reason = "Prevent VM operations that modify the recurring callbacks.")
+    private static void install(IsolateThread thread, RecurringCallbackTimer callbackTimer) {
+        assert thread == CurrentIsolate.getCurrentThread() || VMOperation.isInProgressAtSafepoint();
+
+        if (ExecutionSamplerInstallation.isAllowed(thread)) {
+            Threading.RecurringCallback currentCallback = RecurringCallbackSupport.getCallback(thread);
+            if (currentCallback == null) {
+                ExecutionSamplerInstallation.installed(thread);
+                RecurringCallbackSupport.installCallback(thread, callbackTimer);
+            }
+        }
+    }
+
+    @Override
+    @Uninterruptible(reason = "Prevent VM operations that modify the recurring callbacks.")
+    protected void uninstall(IsolateThread thread) {
+        assert thread == CurrentIsolate.getCurrentThread() || VMOperation.isInProgressAtSafepoint();
+
+        if (ExecutionSamplerInstallation.isInstalled(thread)) {
+            Threading.RecurringCallback currentCallback = RecurringCallbackSupport.getCallback(thread);
+            if (currentCallback == CALLBACK) {
+                RecurringCallbackSupport.uninstallCallback(thread);
+            }
+            ExecutionSamplerInstallation.uninstalled(thread);
+        }
+    }
+
+    @Override
+    public void beforeThreadRun() {
+        RecurringCallbackTimer callback = RecurringCallbackSupport.createUninitializedCallbackTimer();
+        beforeThreadRun0(callback);
+    }
+
+    /**
+     * To prevent races, only {@link Uninterruptible} code may be executed from that point on.
+     * Otherwise, {@link #isSampling} or other sampling-related status values could change at any
+     * time.
+     * <p>
+     * Note that even though all executed code is uninterruptible, the value of
+     * {@link #newIntervalMillis} can change at any time. If the value changes after it was read
+     * below, we might temporarily register a recurring callback with an outdated interval. This is
+     * fine because the recurring callback will be replaced by the VM operation that is triggered by
+     * {@link AbstractJfrExecutionSampler#update}.
+     */
+    @Uninterruptible(reason = "Prevent VM operations that modify the execution sampler or the recurring callbacks.")
+    private void beforeThreadRun0(RecurringCallbackTimer callback) {
+        if (isSampling()) {
+            SubstrateJVM.getSamplerBufferPool().adjustBufferCount();
+
+            /* Initialize and install the callback now that we are in uninterruptible code. */
+            callback.initialize(TimeUtils.millisToNanos(newIntervalMillis), CALLBACK);
+            install(CurrentIsolate.getCurrentThread(), callback);
+        }
+    }
+
+    private static final class ExecutionSampleCallback implements Threading.RecurringCallback {
+        @Override
+        @NeverInline("Starting a stack walk in the caller frame")
+        @Uninterruptible(reason = "Avoid interference with the application.")
+        public void run(Threading.RecurringCallbackAccess access) {
+            Pointer sp = readCallerStackPointer();
+            CodePointer ip = readReturnAddress();
+            boolean sampled = tryUninterruptibleStackWalk(ip, sp, false);
+            if (sampled) {
+                SubstrateJVM.getThreadRepo().registerMountedVThread();
+            }
+        }
+    }
+}
+
+@AutomaticallyRegisteredFeature
+class JfrRecurringCallbackExecutionSamplerFeature implements InternalFeature {
+    @Override
+    public boolean isInConfiguration(IsInConfigurationAccess access) {
+        return ImageLayerBuildingSupport.firstImageBuild();
+    }
+
+    @Override
+    public List<Class<? extends Feature>> getRequiredFeatures() {
+        return Collections.singletonList(JfrFeature.class);
+    }
+
+    @Override
+    public void duringSetup(DuringSetupAccess access) {
+        if (JfrExecutionSamplerSupported.isSupported() && !ImageSingletons.contains(JfrExecutionSampler.class)) {
+            JfrRecurringCallbackExecutionSampler sampler = new JfrRecurringCallbackExecutionSampler();
+            ImageSingletons.add(JfrExecutionSampler.class, sampler);
+
+            ThreadListenerSupport.get().register(sampler);
+        }
+    }
+}

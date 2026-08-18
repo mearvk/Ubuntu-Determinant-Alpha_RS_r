@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+# output every command that modifies files on the build system.
+#export DH_VERBOSE = 1
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# Use libbsd for a system copy of the BSD functions, instead of upstream's
+# embedded compats.c coming from the oconfigure project.
+# Also see https://github.com/kristapsdz/oconfigure/issues/19
+CFLAGS += $(shell pkg-config --cflags libbsd-overlay)
+LDFLAGS += $(shell pkg-config --libs libbsd-overlay)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	CFLAGS="${CFLAGS}" \
+	./configure \
+		PREFIX=/usr \
+		MANDIR="/usr/share/man" \
+		LIBDIR=/usr/lib/${DEB_HOST_MULTIARCH} \
+		CPPFLAGS="${CPPFLAGS}" \
+		LDFLAGS="${LDFLAGS}"
+
+override_dh_auto_test:
+	make regress
+
+override_dh_auto_clean:
+	echo > Makefile.configure
+	dh_auto_clean

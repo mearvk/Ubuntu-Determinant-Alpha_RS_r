@@ -1,0 +1,260 @@
+#!/usr/bin/env perl
+use strictures 2;
+
+use GitLab::API::v4::Config;
+use GitLab::API::v4::Constants qw( :all );
+use GitLab::API::v4;
+use JSON;
+use Log::Any qw( $log );
+use Log::Any::Adapter::Screen;
+use Log::Any::Adapter;
+use Pod::Usage qw( pod2usage );
+use Try::Tiny;
+
+if (!@ARGV) {
+    print "USAGE: gitlab-api-v4 help\n";
+    exit 0;
+}
+
+my $config = GitLab::API::v4::Config->new();
+
+$config->get_options(
+    'a|all'       => \my $all,
+    'p|pretty'    => \my $pretty,
+    'c|canonical' => \my $canonical,
+
+    'h|help'    => \my $help,
+    'v|verbose' => \my $verbose,
+    'q|quiet'   => \my $quiet,
+);
+
+if ($help or (@ARGV and $ARGV[0] eq 'help')) {
+    pod2usage( -verbose => 2 );
+    exit 0;
+}
+
+if (@ARGV and $ARGV[0] eq 'configure') {
+    $config->configure();
+    exit 0;
+}
+
+my $min_level = 'info';
+$min_level = 'trace' if $verbose;
+$min_level = 'error' if $quiet;
+
+Log::Any::Adapter->set(
+    'Screen',
+    min_level => $min_level,
+    stderr    => 1,
+);
+
+my $method = shift @ARGV;
+die "ERROR: No API method specified.\n" if !$method;
+my $orig_method = $method;
+$method =~ s{-}{_}g;
+
+die "ERROR: Unknown API method \"$orig_method\".\n"
+    if !GitLab::API::v4->can( $method );
+
+my @args;
+while (@ARGV and $ARGV[0] !~ m{:}) {
+    my $arg = shift @ARGV;
+    next if $arg eq '--';
+
+    push @args, $arg;
+}
+
+my $aliases = {
+    access_level => {
+        guest     => $GITLAB_ACCESS_LEVEL_GUEST,
+        reporter  => $GITLAB_ACCESS_LEVEL_REPORTER,
+        developer => $GITLAB_ACCESS_LEVEL_DEVELOPER,
+        master    => $GITLAB_ACCESS_LEVEL_MASTER,
+        owner     => $GITLAB_ACCESS_LEVEL_OWNER,
+    },
+};
+
+my $params = {};
+while (@ARGV) {
+    my $arg = shift @ARGV;
+    next if $arg eq '--';
+
+    if ($arg =~ m{^([^:]+):(.*)$}) {
+        my ($key, $value) = ($1, $2);
+
+        $key =~ s{-}{_}g;
+
+        if ($aliases->{$key} and exists $aliases->{$key}->{$value}) {
+            $value = $aliases->{$key}->{$value};
+        }
+
+        $params->{$key} = $value;
+    }
+    else {
+        die "ERROR: Invalid API parameter \"$arg\".\n";
+    }
+}
+
+# Make sure we don't leak tokens in the logs.
+my $debug_config = { %{ $config->args() } };
+$debug_config->{private_token} = 'xxxx' if $debug_config->{private_token};
+$debug_config->{access_token} = 'xxxx' if $debug_config->{access_token};
+
+$log->debug('config: ' . encode_json($debug_config));
+$log->debug("method: $method");
+$log->debug('arguments: ' . encode_json(\@args));
+$log->debug('params: ' . encode_json($params));
+
+my $api = GitLab::API::v4->new( $config->args() );
+
+if ($all) {
+    unshift @args, $method;
+    $method = 'paginator';
+}
+
+my $data = $api->$method(
+    @args,
+    %$params ? $params : (),
+);
+
+$data = $data->all() if $all;
+
+binmode STDOUT, ':utf8';
+my $json = JSON->new->allow_nonref();
+$json->pretty() if $pretty;
+$json->canonical() if $canonical;
+print $json->encode( $data );
+
+__END__
+
+=encoding utf8
+
+=head1 NAME
+
+gitlab-api-v4 - Command line interface to the GitLab API v4.
+
+=head1 SYNOPSIS
+
+    # Generally:
+    gitlab-api-v4 [<options>] <method> [<arg> ...] [<param>:<value> ...]
+    
+    # List all groups:
+    gitlab-api-v4 groups
+    
+    # List information about a project:
+    gitlab-api-v4 project <project_id>
+    
+    # Create an admin user:
+    gitlab-api-v4 create-user \
+        username:foo \
+        password:xxxxxxxx \
+        email:user@example.com \
+        "name:Foo Smith" \
+        admin:1
+
+=head1 CONFIGURING
+
+You may configure this module with environment variables, command line options,
+and a configuration file.  To setup the configuration file run:
+
+    gitlab-api-v4 configure
+
+This will ask several interactive questions to help you configure this script.
+The information, which may include GitLab authentication tokens, is stored in
+C<~/.gitlab-api-v4.json>.
+
+Read more at L<GitLab::API::v4::Config>.
+
+=head1 OPTIONS
+
+=head2 url
+
+    --url=<url>
+
+Sets L<GitLab::API::v4/url>.
+
+=head2 access-token
+
+    --access-token=<token>
+
+Sets L<GitLab::API::v4/access_token>.
+
+=head2 private-token
+
+    --private-token=<token>
+
+Sets L<GitLab::API::v4/private_token>.
+
+=head2 retries
+
+    --retries=<count>
+
+Sets L<GitLab::API::v4/retries>.
+
+=head2 all
+
+    --all
+    -a
+
+Retrieves all results when the results would normally be paged.
+See L<GitLab::API::v4::Paginator/all> for details.
+
+=head2 pretty
+
+    --pretty
+    -p
+
+Enables the L<JSON/pretty> feature.
+
+=head2 canonical
+
+    --canonical
+    -c
+
+Enables the L<JSON/canonical> feature.
+
+=head1 API METHOD
+
+    <method>
+
+The API method to call - one of the methods documented in
+L<GitLab::API::v4/API METHODS>.
+
+=head1 API ARGUMENTS
+
+    <arg> ...
+
+Any arguments that the L</API METHOD> requires.
+
+=head1 API PARAMETERS
+
+    <param>:<value> ...
+
+Any parameters that the L</API METHOD> accepts.
+
+=head2 access-level
+
+    access-level:guest
+    access-level:reporter
+    access-level:developer
+    access-level:master
+    access-level:owner
+
+There are mappings setup for the various C<access-level> parameters
+so that you can, for example, specify C<access-level:guest> and it
+will be automatically converted to C<access-level:10>.
+
+=head1 SUPPORT
+
+See L<GitLab::API::v4/SUPPORT>.
+
+=head1 AUTHORS
+
+See L<GitLab::API::v4/AUTHORS>.
+
+=head1 COPYRIGHT AND LICENSE
+
+See L<GitLab::API::v4/COPYRIGHT AND LICENSE>.
+
+=cut
+

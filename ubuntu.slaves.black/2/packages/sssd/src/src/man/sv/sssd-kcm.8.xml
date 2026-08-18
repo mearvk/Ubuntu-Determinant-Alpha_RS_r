@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-kcm</refentrytitle>
+        <manvolnum>8</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-kcm</refname>
+        <refpurpose>SSSD Kerberos cache-hanterare</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av SSSD:s Kerberos
+cache-hanterare (KCM).  KCM är en process som lagrar, spårar och hanterar
+Kerberoskreditiv-cachar.  Det kommer från projektet Heimdal Kerberos, fast
+biblioteket MIT Kerberos tillhandahåller även stöd för klientsidan (mer
+detaljer om det nedan) av KCM-kreditiv-cachen.
+        </para>
+        <para>
+            I en uppsättning där Kerberos cachar hanteras av KCM är Kerberosbiblioteket
+(typiskt använt via ett program, som t.ex., <citerefentry>
+<refentrytitle>kinit</refentrytitle><manvolnum>1</manvolnum>
+</citerefentry>, en <quote>”KCM-klient"</quote> och KCMdemonen refereras
+till som en <quote>”KCM-server"</quote>.  Klienten och servern kommunicerar
+via ett UNIX-uttag.
+        </para>
+        <para>
+            KCM-servern håller reda på ägaren till varje kreditiv-cache och utför
+åtkomstkontroller baserat på AID:t och GID:t på KCM-klienten.
+Root-användaren har åtkomst till alla kreditiv-cachar.
+        </para>
+        <para>
+            KCM-kreditiv-cachen har flera intressanta egenskaper:
+            <itemizedlist>
+                <listitem>
+                    <para>
+                        eftersom processen kör i användarrymden är den föremål för AID-namnrymder,
+till skillnad mot kärnans nyckelring
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        till skillnad mot kärnans nyckelringsbaserade cache, som delas mellan alla
+behållare, är KCM-servern en separat process vars ingångspunkt är ett
+UNIX-uttag
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        SSSD-implementationen sparar ccache:rna i en databas, vanligen placerad i
+<replaceable>/var/lib/sss/secrets</replaceable>, vilket gör att ccache:rna
+kan överleva att KCM-servern eller hela maskinen startas om.
+                    </para>
+                </listitem>
+            </itemizedlist>
+            Detta gör att systemet kan använda en samlingsmedveten kreditiv-cache, och
+ändå dela kreditivcachen mellan några eller inga behållare genom
+bindmontering av uttaget.
+        </para>
+        <para>
+            KCM-standardklientens tidsgräns för inaktivitet är 5 minuter, detta ger mer
+tid för användarinteraktion med kommandoradsverktyg såsom kinit.
+        </para>
+    </refsect1>
+
+    <refsect1 id='usage'>
+        <title>ATT ANVÄNDA KCM-KREDITIV-CACHEN</title>
+        <para>
+            För att använda KCM-kreditiv-cachen måste den väljas som
+standardkreditivtypen i <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.  Kreditiv-cachens namn skall bara vara <quote>KCM:</quote>
+utan några mallexpansioner.  Till exempel: <programlisting>
+[libdefaults]
+    default_ccache_name = KCM:
+            </programlisting>
+        </para>
+        <para>
+            Se därefter till att Kerberos-klientbiblioteken och KCM-servern är överens
+om sökvägen till UNIX-uttaget.  Som standard använder båda samma sökväg
+<replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>.  För att
+konfigurera Kerberos-biblioteket, ändra dess alternativ
+<quote>kcm_socket</quote> som beskrivs i manualsidan <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Se slutligen till att SSSD KCM-servern kan kontaktas.  KCM-tjänsten är
+normalt uttagsaktiverad av <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry>.  Till skillnad mot andra SSSD-tjänster kan den inte startas
+genom att lägga till strängen <quote>kcm</quote> till direktivet
+<quote>service</quote>.  <programlisting>
+systemctl start sssd-kcm.socket
+systemctl enable sssd-kcm.socket
+            </programlisting>
+Observera att din distribution kanske redan konfigurerar enheterna åt dig.
+        </para>
+    </refsect1>
+
+    <refsect1 id='storage'>
+        <title>KREDITIV-CACHE-LAGRINGEN</title>
+        <para>
+            Kreditiv-cachen lagras i en databas, snarlikt hur SSSD cachar användar-
+eller grupposter.  Databasen finns normalt i
+<quote>/var/lib/sss/secrets</quote>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='debugging'>
+        <title>ATT FÅ TAG I FELSÖKNINGSLOGGAR</title>
+        <para>
+            Tjänsten sssd-kcm är normalt uttagsaktiverad av <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry>. För att skapa felsökningsloggar, lägg till följande
+antingen direkt till filen <filename>/etc/sssd/sssd.conf</filename> eller
+som en konfigurationssnutt till katalogen
+<filename>/etc/sssd/conf.d/</filename>: <programlisting>
+[kcm]
+debug_level = 10
+            </programlisting> Starta sedan om tjänsten sssd-kcm: <programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting> Kör slutligen det användningsfall som inte
+fungerar.  KCM-loggarna kommer skapas i
+<filename>/var/log/sssd/sssd_kcm.log</filename>. Det rekommenderas att
+avaktivera felsökningsloggarna när man inte längre behöver informationen
+aktiverad eftersom tjänsten sssd-kcm kan skapa en ganska stor mängd
+felsökningsinformation.
+        </para>
+        <para>
+            Observera att konfigurationssnuttar för närvarande endast behandlas om
+huvudkonfigurationsfilen på <filename>/etc/sssd/sssd.conf</filename> över
+huvud taget finns.
+        </para>
+    </refsect1>
+
+    <refsect1 id='renewals' condition="enable_kcm_renewal">
+        <title>FÖRNYELSER</title>
+        <para>
+            Tjänsten sssd-kcm kan konfigureras till att försöka göra TGT-förnyelser med
+förnybara TGT:er lagrade i KCM-ccachen. Förnyelseförsök görs bara när halva
+biljettens livstid har uppnåtts. KCM-förnyelser konfigureras när följande
+alternativ sätts i sektionen [kcm]: <programlisting>
+tgt_renewal = true
+krb5_renew_interval = 60m
+            </programlisting>
+        </para>
+        <para>
+            SSSD kan även ärva krb5-alternativ för förnyelser från en befintlig domän.
+        </para>
+            <programlisting>
+tgt_renewal = true
+tgt_renewal_inherit = domännamn
+            </programlisting>
+        <para>
+            Följande krb5-alternativ kan konfigureras i sektionen [kcm] för att styra
+förnyelsebeteendet, dessa alternativ beskrivs i detalj nedan <programlisting>
+krb5_renew_interval
+krb5_renew_lifetime
+krb5_lifetime
+krb5_validate
+krb5_canonicalize
+krb5_auth_timeout
+            </programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>
+            Tjänsten KCM är konfigurerad i sektionen <quote>kcm</quote> av filen
+sssd.conf. Observera att eftersom tjänsten KCM typiskt är uttagsaktiverad är
+det tillräckligt att bara starta om tjänsten <quote>sssd-kcm</quote> efter
+att ha ändrat flaggorna i sektionen <quote>kcm</quote> av sssd.conf:
+<programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting>
+        </para>
+        <para>
+            Tjänsten KCM konfigureras i <quote>kcm</quote> För en detaljeras
+syntaxreferens, se avsnittet <quote>FILFORMAT</quote> i manualsidan
+<citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            De allmänna alternativen för tjänsten SSSD såsom <quote>debug_level</quote>
+eller <quote>fd_limit</quote> accepteras av tjänsten kcm.  Se manualsidan
+<citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för en fullständig lista.  Dessutom
+finns det några KCM-specifika alternativ också.
+        </para>
+        <variablelist>
+            <varlistentry>
+                <term>socket_path (sträng)</term>
+                <listitem>
+                    <para>
+                        Uttaget tjänsten KCM kommer lyssna på.
+                    </para>
+                    <para>
+                        Standard: <replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>
+                    </para>
+                    <para>
+                        <phrase condition="have_systemd"> Observera: på plattformar där systemd
+stödjs skrivs uttagssökvägen över av den som definieras i enhetsfilen
+sssd-kcm.socket. </phrase>
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccaches (heltal)</term>
+                <listitem>
+                    <para>
+                        Hur många kreditivcacher KCM-databasen tillåter för alla användare.
+                    </para>
+                    <para>
+                        Standard: 0 (obegränsad, endast kvot per AID upprätthålls)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_uid_ccaches (heltal)</term>
+                <listitem>
+                    <para>
+                        Hur många kreditiv-cachningar KCM-databasen tillåter per AID.  Detta är
+ekvivalent med <quote>med hur många huvudmän man kan kinit:a</quote>.
+                    </para>
+                    <para>
+                        Standard: 64
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccache_size (heltal)</term>
+                <listitem>
+                    <para>
+                        Hor stor kan en kreditivcach vara per ccache. Varje tjänsteärende räknas in
+i denna kvot.
+                    </para>
+                    <para>
+                        Standard: 65536
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal (bool)</term>
+                <listitem>
+                    <para>
+                        Aktiverar TGT-förnyelsefunktionalitet.
+                    </para>
+                    <para>
+                        Standard: False (Automatiska förnyelser avaktiverade)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal_inherit (sträng)</term>
+                <listitem>
+                    <para>
+                        Domän att ärva krb5_*-alternativ ifrån, att användas med TGT-förnyelser.
+                    </para>
+                    <para>
+                        Standard: NULL
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+        <xi:include condition="enable_kcm_renewal" xmlns:xi="http://www.w3.org/2001/XInclude" href="include/krb5_options.xml" />
+    </refsect1>
+
+    <refsect1 id='see_also'>
+        <title>SE ÄVEN</title>
+        <para>
+            <citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</manvolnum>
+</citerefentry>, <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>,
+        </para>
+    </refsect1>
+</refentry>
+</reference>

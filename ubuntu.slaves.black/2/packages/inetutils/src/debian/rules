@@ -1,0 +1,116 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CFLAGS_MAINT_PREPEND = -Wall
+
+include /usr/share/dpkg/default.mk
+
+# Override default upstream setuid mode, as they rejected this change.
+SUIDMODE = "-m 4755"
+
+# Set proper Provides
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+  syslogd_provides = linux-kernel-log-daemon
+  confflags += --with-path-procnet-dev=/proc/net/dev
+endif
+ifeq ($(DEB_HOST_ARCH_OS),hurd)
+  tools_provides = net-tools
+endif
+
+D = $(CURDIR)/debian/tmp
+M = $(CURDIR)/debian/local/man
+mandir = usr/share/man
+man1dir = $(mandir)/man1
+man5dir = $(mandir)/man5
+man8dir = $(mandir)/man8
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	[ ! -f Makefile ] || dh_auto_clean
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+	  $(confflags) \
+	  --disable-rpath \
+	  --libexecdir=\$${prefix}/sbin \
+	  --runstatedir=/run \
+	  --disable-rcp \
+	  --disable-rexec \
+	  --disable-rexecd \
+	  --disable-rlogin \
+	  --disable-rlogind \
+	  --disable-rsh \
+	  --disable-rshd \
+	  --disable-tftp \
+	  --disable-tftpd \
+	  --disable-uucpd \
+	  --disable-whois \
+	  --without-idn \
+	  --with-path-login=/bin/login \
+	  --with-krb5 \
+	  --with-wrap \
+	  --with-pam
+
+override_dh_auto_install:
+	dh_auto_install -- SUIDMODE=$(SUIDMODE)
+	
+	# Create man page directories
+	mkdir -p $(D)/$(man1dir)
+	mkdir -p $(D)/$(man5dir)
+	mkdir -p $(D)/$(man8dir)
+	
+	# Move ping to /bin
+	mkdir -p $(D)/bin
+	mv $(D)/usr/bin/ping $(D)/bin/
+	
+	# Rename ifconfig to not break existing systems using net-tools
+	mv $(D)/usr/bin/ifconfig $(D)/usr/bin/inetutils-ifconfig
+	cp $(M)/ifconfig.1 $(D)/$(man1dir)/inetutils-ifconfig.1
+	
+	# Rename tools not break with Essential:yes packages
+	mv $(D)/usr/bin/dnsdomainname $(D)/usr/bin/inetutils-dnsdomainname
+	mv $(D)/usr/bin/hostname $(D)/usr/bin/inetutils-hostname
+	mv $(D)/usr/bin/logger $(D)/usr/bin/inetutils-logger
+	cp $(M)/dnsdomainname.1 $(D)/$(man1dir)/inetutils-dnsdomainname.1
+	cp $(M)/hostname.1 $(D)/$(man1dir)/inetutils-hostname.1
+	cp $(M)/logger.1 $(D)/$(man1dir)/inetutils-logger.1
+	
+	# Rename inetd to be able to coexist with not purged netkit-inetd
+	mv $(D)/usr/sbin/inetd $(D)/usr/sbin/inetutils-inetd
+	cp $(M)/inetd.8 $(D)/$(man8dir)/inetutils-inetd.8
+	
+	# Needed to enable alternatives
+	mv $(D)/usr/bin/telnet $(D)/usr/bin/inetutils-telnet
+	cp $(M)/telnet.1 $(D)/$(man1dir)/inetutils-telnet.1
+	mv $(D)/usr/bin/ftp $(D)/usr/bin/inetutils-ftp
+	cp $(M)/ftp.1 $(D)/$(man1dir)/inetutils-ftp.1
+	cp $(M)/netrc.5 $(D)/$(man5dir)/inetutils-netrc.5
+	mv $(D)/usr/bin/talk $(D)/usr/bin/inetutils-talk
+	cp $(M)/talk.1 $(D)/$(man1dir)/inetutils-talk.1
+	mv $(D)/usr/bin/traceroute $(D)/usr/bin/inetutils-traceroute
+	cp $(M)/traceroute.1 $(D)/$(man1dir)/inetutils-traceroute.1
+
+override_dh_install:
+	dh_install -a
+	# Install ping6 only if built
+	if [ -x $(D)/usr/bin/ping6 ]; then \
+	  dh_install -p inetutils-ping /usr/bin/ping6 /bin; \
+	fi
+
+override_dh_installdocs:
+	dh_installdocs -a -A NEWS AUTHORS THANKS
+
+override_dh_installpam:
+	dh_installpam -pinetutils-ftpd --name ftp
+
+override_dh_fixperms:
+	# pings and traceroute are setuid
+	dh_fixperms -a -Xbin/ping -Xbin/ping6 -Xusr/bin/inetutils-traceroute
+
+override_dh_gencontrol:
+	dh_gencontrol -a -pinetutils-syslogd -- \
+	  -Vsyslogd:Provides="$(syslogd_provides)"
+	dh_gencontrol -a -Ninetutils-syslogd -- \
+	  -Vtools:Provides="$(tools_provides)"

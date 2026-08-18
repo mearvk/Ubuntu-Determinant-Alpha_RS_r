@@ -1,0 +1,142 @@
+/*
+ * Copyright (c) 2017, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.jni.access;
+
+import java.util.function.Function;
+
+import org.graalvm.collections.EconomicMap;
+import org.graalvm.collections.MapCursor;
+import org.graalvm.collections.UnmodifiableMapCursor;
+import org.graalvm.nativeimage.Platform.HOSTED_ONLY;
+import org.graalvm.nativeimage.Platforms;
+
+import com.oracle.svm.configure.ClassNameSupport;
+import com.oracle.svm.guest.staging.util.ImageHeapMap;
+import com.oracle.svm.shared.util.VMError;
+
+/**
+ * Information on a class that can be looked up and accessed via JNI.
+ */
+public final class JNIAccessibleClass implements PreservableJNIElement {
+    private final Class<?> classObject;
+    private EconomicMap<JNIAccessibleMethodDescriptor, JNIAccessibleMethod> methods;
+    private EconomicMap<CharSequence, JNIAccessibleField> fields;
+    private boolean preserved;
+
+    @Platforms(HOSTED_ONLY.class)
+    public JNIAccessibleClass(Class<?> clazz, boolean preserved) {
+        assert clazz != null;
+        this.classObject = clazz;
+        this.preserved = preserved;
+    }
+
+    @Platforms(HOSTED_ONLY.class)
+    JNIAccessibleClass() {
+        /* For negative queries */
+        this.classObject = null;
+    }
+
+    public boolean isNegative() {
+        return classObject == null;
+    }
+
+    public Class<?> getClassObject() {
+        return classObject;
+    }
+
+    public UnmodifiableMapCursor<CharSequence, JNIAccessibleField> getFields() {
+        return (fields != null) ? fields.getEntries() : EconomicMap.emptyCursor();
+    }
+
+    public JNIAccessibleField getField(CharSequence name) {
+        return (fields != null) ? fields.get(name) : null;
+    }
+
+    @Platforms(HOSTED_ONLY.class)
+    public void addOrUpdateField(String name, boolean updatedPreserved, Function<String, JNIAccessibleField> mappingFunction) {
+        if (fields == null) {
+            fields = ImageHeapMap.createNonLayeredMap(JNIReflectionDictionary.WRAPPED_CSTRING_EQUIVALENCE);
+            JNIReflectionDictionary.currentLayer().rescanFieldsField(this);
+        }
+        JNIAccessibleField existing = fields.get(name);
+        if (existing == null) {
+            fields.put(name, mappingFunction.apply(name));
+        } else if (!updatedPreserved) {
+            existing.setNotPreserved();
+        }
+    }
+
+    @Platforms(HOSTED_ONLY.class)
+    public void addOrUpdateMethod(JNIAccessibleMethodDescriptor descriptor, boolean updatedPreserved, Function<JNIAccessibleMethodDescriptor, JNIAccessibleMethod> mappingFunction) {
+        if (methods == null) {
+            methods = ImageHeapMap.createNonLayeredMap();
+            JNIReflectionDictionary.currentLayer().rescanMethodsField(this);
+        }
+        JNIAccessibleMethod existing = methods.get(descriptor);
+        if (existing == null) {
+            methods.put(descriptor, mappingFunction.apply(descriptor));
+        } else if (!updatedPreserved) {
+            existing.setNotPreserved();
+        }
+    }
+
+    public MapCursor<JNIAccessibleMethodDescriptor, JNIAccessibleMethod> getMethods() {
+        return (methods != null) ? methods.getEntries() : EconomicMap.emptyCursor();
+    }
+
+    public JNIAccessibleMethod getMethod(JNIAccessibleMethodDescriptor descriptor) {
+        if (methods == null) {
+            return null;
+        }
+        JNIAccessibleMethod method = methods.get(descriptor);
+        if (method == null) {
+            /*
+             * Negative method queries match any return type and are stored with only parameter
+             * types in their signature.
+             */
+            String signatureWithoutReturnType = descriptor.getSignatureWithoutReturnType();
+            if (signatureWithoutReturnType != null) {
+                /* We only need to perform the lookup on valid signatures */
+                method = methods.get(new JNIAccessibleMethodDescriptor(descriptor.getNameConvertToString(), signatureWithoutReturnType));
+                VMError.guarantee(method == null || method.isNegative(), "Only negative queries should have a signature without return type");
+            }
+        }
+        return method;
+    }
+
+    String getJNIName() {
+        return ClassNameSupport.reflectionNameToJNIName(classObject.getName());
+    }
+
+    @Override
+    public boolean isPreserved() {
+        return preserved;
+    }
+
+    @Override
+    public void setNotPreserved() {
+        preserved = false;
+    }
+}

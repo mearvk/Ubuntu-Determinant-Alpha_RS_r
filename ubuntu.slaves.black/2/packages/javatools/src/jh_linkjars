@@ -1,0 +1,190 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_linkjars - populate folders with symlinks to jar files
+
+=cut
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_linkjars> [S<I<debhelper options>>]
+
+B<jh_linkjars> [S<I<debhelper options>>] I<directory>
+
+=head1 DESCRIPTION
+
+If upstream ship convenience copies of third-party jar files which
+have been removed (see L<jh_repack(1)>), but the build system refers
+to that directory, B<jh_linkjars> can be used to populate the directory
+with symlinks to the packaged jars in /usr/share/java.
+
+It is called either with a directory on the command line or by
+specifying one target directory per line in the file debian/linkjars.
+
+B<jh_linkjars> will scan all of the (installed) build-dependencies and
+create a symlink to every jar which is installed by those packages in
+the target directory.
+
+B<jh_linkjars> can be called with -u to remove all the symlinks in the
+clean target.  This is done automatically by L<jh_clean(1)>.
+
+=head1 FILES
+
+=over 4
+
+=item F<debian/linkjars>
+
+List of directories to populate; one directory per line.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-t>, B<--transitive>
+
+Transitively link jar files (i.e. also include indirect dependencies in the target directory).
+
+=item B<-u>, B<--unlink>
+
+Remove all files/links in the target directories that B<jh_linkjars> created
+(or would have created).
+
+=back
+
+Beyond the above, B<jh_linkjars> also accepts the shared
+debhelper options documented in L<debhelper(7)>.
+
+=cut
+
+my ($UNLINK_JARS, $TRANSITIVE, @TARGET_DIRS, @JARS);
+
+init(options => {
+    'transitive|t' => \$TRANSITIVE,
+    'unlink|u'     => \$UNLINK_JARS,
+});
+
+sub parse_deps_fields {
+    my ($field) = @_;
+    my @packages;
+    $field =~ s/^\s*+,?//;
+    $field =~ s/,?\s*+$//;
+    $field =~ s/\r?\n/,/g;
+    $field =~ s/,(?:\s*,)++\s*+/,/g;
+    for my $clause (split(m/\s*+[,|]\s*+/, $field)) {
+        next if $clause =~ m/^\s*$/;
+        # Drop everything after [, ( or <.
+        $clause =~ s/\s*+[[<(].*$//;
+        push(@packages, $clause);
+    }
+    return @packages;
+}
+
+sub parse_dpkg_L {
+    my ($output) = @_;
+    my @lines;
+    for my $line (split(qr/\n/, $output)) {
+        $line =~ s/\s++$//;
+        if ($line =~ m{^/usr/share/java/.+\.jar$}) {
+            push(@lines, $line);
+        }
+    }
+    return @lines;
+}
+
+sub find_jars {
+    my $source = sourcepackage();
+    my $bd = `grep-dctrl --no-field-names --show-field Build-Depends,Build-Depends-Indep -F source "${source}" debian/control`;
+    error_exitcode("grep-dctrl --no-field-names --show-field Build-Depends,Build-Depends-Indep -F source \"${source}\" debian/control")
+        if $?;
+    my @packages = parse_deps_fields($bd);
+    my %seen = map { $_ => 1 } @packages;
+    my @all_jars;
+    while (@packages) {
+        my $pkg = pop(@packages);
+        # Skip debhelper-compat because it is a virtual package #933715
+        next if $pkg eq 'debhelper-compat';
+        my $dpkg_output = `dpkg -L "$pkg"`;
+        error_exitcode("dpkg -L \"$pkg\"") if $?;
+        my @jars = parse_dpkg_L($dpkg_output);
+        push(@all_jars, @jars);
+        if (@jars and $TRANSITIVE) {
+            my $raw_deps = `dpkg -s "$pkg" | sed -n '/^Depends:/s/.*: //p'`;
+            error_exitcode("dpkg -s \"$pkg\" | sed -n '/^Depends:/s/.*: //p'") if $?;
+            my @deps = grep { not exists($seen{$_}) } parse_deps_fields($raw_deps);
+            $seen{$_} = 1 for @deps;
+            push(@packages, @deps);
+        }
+    }
+    return @all_jars;
+}
+
+#function findjars()
+#{
+#	pkg="$1"
+#	if [ -z "$pkg" ]; then
+#		pkg="$(sed -n '/^Source:/s/.*: //p' < debian/control)"
+#		BDS=$(grep-dctrl --no-field-names --show-field Build-Depends,Build-Depends-Indep -F source "$pkg" debian/control | tr , ' ' | sed 's/([^)]*)//g')
+#	else
+#		BDS=$(dpkg -s "$pkg" | sed -n 's/([^)]*)//g;s/,/ /g;/^Depends:/s/.*: //p')
+#	fi
+#
+#	JARS=""
+#	for d in $BDS; do
+#		j="$(dpkg -L $d | grep "^/usr/share/java/.*\.jar$")"
+#		k=""
+#		if [ -n "$j" ] &&  [ `getarg t transitive` ]; then
+#			k=$(findjars "$d")
+#		fi
+#		JARS="$JARS $j $k"
+#	done
+#	echo $JARS
+#}
+
+if (@ARGV) {
+    @TARGET_DIRS = $ARGV[0];
+} elsif ( -f 'debian/linkjars') {
+    @TARGET_DIRS = filearray('debian/linkjars');
+}
+
+# Stop here if there is nothing to do.
+exit(0) if not @TARGET_DIRS;
+
+@JARS = find_jars();
+
+if ($UNLINK_JARS) {
+    my @basenames = map { basename($_) } @JARS;
+    for my $target_dir (@TARGET_DIRS) {
+        rm_files(map {"${target_dir}/$_"} @basenames);
+    }
+} else {
+    install_dir(@TARGET_DIRS);
+    for my $target_dir (@TARGET_DIRS) {
+        for my $jar (@JARS) {
+            my $basename = basename($jar);
+            verbose_print("Adding link for $jar to ${target_dir}");
+            rm_files("${target_dir}/${basename}");
+            make_symlink_raw_target($jar, "${target_dir}/${basename}");
+        }
+    }
+}
+
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=cut

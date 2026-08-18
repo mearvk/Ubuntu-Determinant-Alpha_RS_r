@@ -1,0 +1,140 @@
+# This is included by jh_* and contains common functions
+#
+# - argument parsing
+# - package selection
+#
+
+JAVATOOLS_VERSION=%JAVATOOLS_VERSION%
+
+parseargs()
+{
+   ARGC=0
+   ARGV=()
+   debhelper=
+   while [ -n "$1" ]; do
+      ignore=no
+      arg="$1"
+      if [ "-O" = "${arg:0:2}" ] ; then
+         arg="${arg:2}"
+         ignore=yes
+      fi
+      if [ "-V" = "$arg" ] || [ "--version" = "$arg" ]; then
+         echo "Javahelper Version $JAVATOOLS_VERSION"
+         exit 0
+      elif [ "-h" = "$arg" ] || [ "--help" = "$arg" ]; then
+         syntax
+      elif [ "--with" = "$arg" ]; then
+         debhelper=true
+         shift
+      elif [ "-" = "${arg:1:1}" ]; then
+      # long opt
+         optn="`sed 's/^--\([^=]*\)\(=.*\)*$/\1/;s/-/_/g' <<< $arg`"
+         if [ -z "$optn" ] || ! echo $ARGS | sed 's/-/_/g' | grep $optn >/dev/null; then
+	     if [ -z "$debhelper" -a "$ignore" != "yes" ]; then
+		 echo "Invalid option: $optn"
+		 syntax
+	     fi
+         fi
+         optv="`echo $arg | sed -n 's/^[^=]*=\(.*\)$/\1/p'`"
+         if [ -z "$optv" ]; then
+            optv=true
+         fi
+         optname="opt_$optn"
+         if [ -n "${!optname}" ]; then
+            export opt_$optn="${!optname} $optv"
+         else
+            export opt_$optn="$optv"
+         fi
+      elif [ "-" = "${arg:0:1}" ]; then
+      # short opt
+         optn="${arg:1:1}"
+         if [ -z "$optn" ] || ! echo $ARGS | grep $optn >/dev/null; then
+	     if [ -z "$debhelper" -a "$ignore" != "yes" ]; then
+		 echo "Invalid option: $optn"
+		 syntax
+	     fi
+         fi
+         optv="${arg:2}"
+         if [ -z "$optv" ]; then
+            optv=true
+         fi
+         optname="opt_$optn"
+         if [ -n "${!optname}" ]; then
+            export opt_$optn="${!optname} $optv"
+         else
+            export opt_$optn="$optv"
+         fi
+      else
+      # not-opt arg
+         ARGV[$ARGC]="$arg"
+         ARGC=$(( $ARGC + 1 ))
+      fi
+      shift
+   done
+
+   # treat DH_VERBOSE being set as a -v flag
+   if [ -n "$DH_VERBOSE" ]; then
+      export opt_v="true"
+   fi
+
+   export ARGC
+   export ARGV
+}
+
+findpackages()
+{
+   if [ -n "$opt_p" ]; then
+      echo $opt_p
+   elif [ -n "$opt_package" ]; then
+      echo $opt_package
+   elif [ -n "$opt_i" ] || [ -n "$opt_indep" ]; then
+      egrep '^(Package|Architecture)' debian/control | grep -B1 'Architecture: all'|sed -n '/^Package:/s/^[^:]*: *//p'
+   elif [ -n "$opt_a" ] || [ -n "$opt_arch" ] || [ -n "$opt_s" ] || [ -n "$opt_same_arch" ]; then
+      egrep '^(Package|Architecture)' debian/control | grep -v 'Architecture: all' | grep -B1 Architecture|sed -n '/^Package:/s/^[^:]*: *//p'
+   else
+      sed -n '/^Package:/s/^[^:]*: *//p' debian/control
+   fi
+}
+
+firstpackage()
+{
+   findpackages | head -n1
+}
+
+getarg()
+{
+   while [ -n "$1" ]; do
+      optn="`sed 's/-/_/g' <<< opt_$1`"
+      if [ -n "${!optn}" ]; then
+         echo ${!optn}
+      fi
+      shift
+   done
+}
+
+# extractline <manifestfile> <key>
+extractline()
+{
+   count=`wc -l < "$1"`
+   inkey=
+   value=
+   i=1
+   while (( $i <= $count ));
+   do
+      line="`head -n$i "$1" | tail -n1 | sed -e 's/\r//'`"
+      if [ -n "$inkey" ]; then
+         if [ "${line:0:1}" == " " ]; then
+            value="$value${line:1}"
+         else
+            break
+         fi
+      else
+         if echo "$line" | grep "^$2:" > /dev/null; then
+            inkey=true
+            value="`sed 's/^[^:]*: *//' <<< $line`"
+         fi
+      fi
+      i=$(( $i + 1 ))
+   done
+   echo $value
+}

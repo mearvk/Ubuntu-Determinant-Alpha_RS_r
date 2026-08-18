@@ -1,0 +1,111 @@
+From ac60a850d5ce22ae21e3746f72a9ebb2623d17f8 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Sat, 20 Jul 2019 21:21:01 +0200
+Subject: [PATCH libaio 22/28] harness: Add fallback code for filesystems not
+ supporting O_DIRECT
+
+When running the harness on a filesystem such as a tmpfs, which do not
+support O_DIRECT, fallback to calls without the flag.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+[JEM: change from duplicating the open call to using F_SETFL]
+[JEM: 18 and 21 require O_DIRECT-skip if not present]
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/17.t | 11 +++++++++--
+ harness/cases/18.t |  2 ++
+ harness/cases/19.t | 10 ++++++++--
+ harness/cases/21.t |  5 ++++-
+ 4 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/harness/cases/17.t b/harness/cases/17.t
+index 38ada4d..b4b6660 100644
+--- a/harness/cases/17.t
++++ b/harness/cases/17.t
+@@ -119,7 +119,7 @@ void prune(io_context_t io_ctx, int max_ios, int getevents_type)
+ 
+ void run_test(int max_ios, int getevents_type)
+ {
+-	int fd, ret;
++	int fd, ret, flags;
+ 	long i, to_submit;
+ 	struct iocb **iocb_sub;
+ 	io_context_t io_ctx;
+@@ -137,9 +137,16 @@ void run_test(int max_ios, int getevents_type)
+ 	events = calloc(max_ios, sizeof(*events));
+ 
+ 	unlink(filename);
+-	fd = open(filename, O_CREAT | O_RDWR | O_DIRECT, 0644);
++	fd = open(filename, O_CREAT | O_RDWR, 0644);
+ 	assert(fd >= 0);
+ 
++	/*
++	 * Use O_DIRECT if it's available.  If it's not, the test code
++	 * will still operate correctly, just potentially slower.
++	 */
++	flags = fcntl(fd, F_GETFL, 0);
++	fcntl(fd, F_SETFL, flags | O_DIRECT);
++
+ 	ret = ftruncate(fd, max_ios * io_size);
+ 	assert(!ret);
+ 
+diff --git a/harness/cases/18.t b/harness/cases/18.t
+index daa1d26..e8dbcd1 100644
+--- a/harness/cases/18.t
++++ b/harness/cases/18.t
+@@ -53,6 +53,8 @@ aio_worker(void *ptr)
+ 	assert(buffer != NULL);
+ 
+ 	fd = open(FILENAME, O_DIRECT|O_RDONLY);
++	if (fd < 0 && errno == EINVAL)
++		exit(3); /* skip this test, O_DIRECT is unavailable */
+ 	assert(fd >= 0);
+ 
+ 	for (i = 0; i < 1000; i++) {
+diff --git a/harness/cases/19.t b/harness/cases/19.t
+index 5c3e0d6..ba1c620 100644
+--- a/harness/cases/19.t
++++ b/harness/cases/19.t
+@@ -38,15 +38,21 @@ struct aio_ring {
+ int
+ open_temp_file(void)
+ {
+-	int fd;
++	int fd, flags;
+ 	char template[sizeof(TEMPLATE)];
+ 
+ 	strncpy(template, TEMPLATE, sizeof(template));
+-	fd = mkostemp(template, O_DIRECT);
++	fd = mkstemp(template);
+ 	if (fd < 0) {
+ 		perror("mkstemp");
+ 		exit(1);
+ 	}
++	/*
++	 * O_DIRECT is desirable, but not required for this test.
++	 */
++	flags = fcntl(F_GETFL, 0);
++	fcntl(F_SETFL, flags | O_DIRECT);
++
+ 	unlink(template);
+ 	return fd;
+ }
+diff --git a/harness/cases/21.t b/harness/cases/21.t
+index fe33a9d..ba988ed 100644
+--- a/harness/cases/21.t
++++ b/harness/cases/21.t
+@@ -92,7 +92,10 @@ test_main()
+ 	 */
+ 	flags = fcntl(fd, F_GETFL);
+ 	ret = fcntl(fd, F_SETFL, flags | O_DIRECT);
+-	if (ret != 0) {
++	if (ret < 0) {
++		/* SKIP this test if O_DIRECT is not available on this fs */
++		if (errno == EINVAL)
++			return 3;
+ 		perror("fcntl");
+ 		return 1;
+ 	}
+-- 
+2.26.0.292.g33ef6b2f38
+

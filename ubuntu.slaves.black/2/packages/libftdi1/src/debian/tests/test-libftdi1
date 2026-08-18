@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+
+CFLAGS="-O2 -Wall -Itests $(pkg-config --cflags libftdi1)"
+LDFLAGS="$(pkg-config --libs libftdi1) -lboost_unit_test_framework"
+
+c++ $CFLAGS -o $WORKDIR/basic.o -c test/basic.cpp
+c++ $CFLAGS -o $WORKDIR/baudrate.o -c test/baudrate.cpp
+c++ -o $WORKDIR/test-libftdi1 $WORKDIR/baudrate.o $WORKDIR/basic.o $LDFLAGS
+
+echo "build: OK"
+[ -x $WORKDIR/test-libftdi1 ]
+$WORKDIR/test-libftdi1 2>&1
+echo "run: OK"

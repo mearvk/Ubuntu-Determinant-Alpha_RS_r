@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2008 Rafael Laboissiere <rafael@debian.org>
+
+include /usr/share/dpkg/pkg-info.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+export AUTOMAKE = automake --foreign --add-missing
+SAVE_FILES = Makefile src/Makefile ann2fig/Makefile sample/Makefile test/Makefile
+
+%:
+	dh $@
+
+override_dh_autoreconf:
+	# Save upstream Makefiles
+	for f in $(SAVE_FILES) ; do 					\
+		if [ ! -f $$f-orig ] ; then mv $$f $$f-orig ; fi	\
+	done
+	dh_autoreconf
+
+override_dh_clean:
+	# Restore upstream Makefiles
+	for f in $(SAVE_FILES) ; do 				\
+		if [ -f $$f-orig ] ; then mv $$f-orig $$f ; fi	\
+	done
+	dh_clean
+
+override_dh_installman: debian/ann2fig.1 debian/ann_sample.1 debian/ann_test.1
+	dh_installman
+
+%.1: %.pod
+	pod2man --center="User Commands" --release="ANN $(DEB_VERSION_UPSTREAM)" $< > $@
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	( cd test ;				\
+	  ./ann_test < test1.in > /dev/null 	\
+	  ./ann_test < test2.in > /dev/null )
+endif
+	dh_auto_test
+
+override_dh_compress:
+	dh_compress -X.pdf

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sss_override</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sss_override</refname>
+        <refpurpose>skapa lokala åsidosättanden av användar- och gruppattribut</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>sss_override</command> <arg
+choice='plain'><replaceable>KOMMANDO</replaceable></arg> <arg choice='opt'>
+<replaceable>flaggor</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            <command>sss_override</command> gör det möjligt att skapa en klientsidevy
+och tillåter att man ändrar valda värden på specifika användare och
+grupper.  Denna ändring gäller endast på den lokala maskinen.
+        </para>
+        <para>
+            Data om åsidosättanden lagras i SSSD-cachen.  Om cachen raderas förloras
+alla lokala åsidosättanden.  Observera att efter det första åsidosättandet
+har skapats med något av följande kommandon <emphasis>user-add</emphasis>,
+<emphasis>group-add</emphasis>, <emphasis>user-import</emphasis> eller
+<emphasis>group-import</emphasis> behöver SSSD startas om för att det skall
+få effekt.  <emphasis>sss_override</emphasis> skriver ett meddelande när en
+omstart behövs.
+        </para>
+        <para>
+            <emphasis>OBSERVERA:</emphasis> alternativen som ges i denna manualsida
+fungerar endast med <quote>id_provider</quote> <quote>ldap</quote> och
+<quote>AD</quote>. IPA-åsidosättanden kan hanteras centralt på IPA-servern.
+        </para>
+    </refsect1>
+
+    <refsect1 id='commands'>
+        <title>TILLGÄNGLIGA KOMMANDON</title>
+        <para>
+            Argumentet <emphasis>NAMN</emphasis> är namnet på originalobjektet i alla
+kommandon.  Det är inte möjligt att åsidosätta <emphasis>uid</emphasis>
+eller <emphasis>gid</emphasis> till 0.
+        </para>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>user-add</option> <emphasis>NAMN</emphasis>
+<optional><option>-n,--name</option> NAMN</optional>
+<optional><option>-u,--uid</option> AID</optional>
+<optional><option>-g,--gid</option> GID</optional>
+<optional><option>-h,--home</option> HEM</optional>
+<optional><option>-s,--shell</option> SKAL</optional>
+<optional><option>-c,--gecos</option> GECOS</optional>
+<optional><option>-x,--certificate</option> BASE64-KODAT
+CERTIFIKAT</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Åsidosätt attribut på en användare.  Var medveten om att anropa detta
+kommando kommer ersätta eventuella tidigare åsidosättanden för (den
+NAMNgivna) användaren.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-del</option> <emphasis>NAMN</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Ta bort användaråsidosättanden.  Var dock medveten om att åsidosatta
+attribut kan returneras från minnescachen.  Se SSSD-alternativet
+<emphasis>memcache_timeout</emphasis> för fler detaljer.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-find</option> <optional><option>-d,--domain</option>
+DOMÄN</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Lista alla användare med satta åsidosättanden.  Om parametern
+<emphasis>DOMÄN</emphasis> är satt listas endast användare från den domänen.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-show</option> <emphasis>NAMN</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Visa användaråsidosättanden.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-import</option> <emphasis>FIL</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Importera användaråsidosättanden från <emphasis>FIL</emphasis>.
+Dataformatet liknar den vanliga passwd-filen.  Formatet är:
+                    </para>
+                    <para>
+                        ursprungligt_namn:namn:aid:gid:gecos:hem:skal:bas64-kodat_certifikat
+                    </para>
+                    <para>
+                        där ursprungligt_namn är användarens originalnamn vars attribut skall
+åsidosättas.  Resten av fälten motsvarar nya värden.  Man kan utelämna ett
+värde helt enkelt genom att lämna motsvarande fält tomt.
+                    </para>
+                    <para>
+                        Exempel:
+                    </para>
+                    <para>
+                        kwalker:fantomen::::::
+                    </para>
+                    <para>
+                        kwalker@bangalla.com::501:501:Fantomen:/home/bangalla:/bin/bash:
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-export</option> <emphasis>FIL</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Exportera alla åsidosatta attribut och spara dem i
+<emphasis>FIL</emphasis>.  Se <emphasis>user-import</emphasis> för
+dataformatet.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-add</option> <emphasis>NAMN</emphasis>
+<optional><option>-n,--name</option> NAMN</optional>
+<optional><option>-g,--gid</option> GID</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Åsidosätt attribut på en grupp.  Var medveten om att anropa detta kommando
+kommer ersätta eventuella tidigare åsidosättanden för (den NAMNgivna)
+gruppen.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-del</option> <emphasis>NAMN</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Ta bort gruppåsidosättanden.  Var dock medveten om att åsidosatta attribut
+kan returneras från minnescachen.  Se SSSD-alternativet
+<emphasis>memcache_timeout</emphasis> för fler detaljer.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-find</option> <optional><option>-d,--domain</option>
+DOMÄN</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Lista alla grupper med satta åsidosättanden.  Om parametern
+<emphasis>DOMÄN</emphasis> är satt listas endast grupper från den domänen.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-show</option> <emphasis>NAMN</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Visa gruppåsidosättanden.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>grupp-import</option> <emphasis>FIL</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Importera gruppåsidosättanden från <emphasis>FIL</emphasis>.  Dataformatet
+liknar den vanliga group-filen.  Formatet är:
+                    </para>
+                    <para>
+                        ursprungligt_namn:namn:gid
+                    </para>
+                    <para>
+                        där ursprungligt_namn är gruppens originalnamn vars attribut skall
+åsidosättas.  Resten av fälten motsvarar nya värden.  Man kan utelämna ett
+värde helt enkelt genom att lämna motsvarande fält tomt.
+                    </para>
+                    <para>
+                        Exempel:
+                    </para>
+                    <para>
+                        admin:administratorer:
+                    </para>
+                    <para>
+                        Domain Users:Users:501
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-export</option> <emphasis>FIL</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Exportera alla åsidosatta attribut och spara dem i
+<emphasis>FIL</emphasis>.  Se <emphasis>group-import</emphasis> för
+dataformatet.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>GEMENSAMMA FLAGGOR</title>
+        <para>
+            Dessa flaggor är tillgängliga med alla kommandon.
+        </para>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>--debug</option> <replaceable>NIVÅ</replaceable>
+                </term>
+                <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/debug_levels_tools.xml" />
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

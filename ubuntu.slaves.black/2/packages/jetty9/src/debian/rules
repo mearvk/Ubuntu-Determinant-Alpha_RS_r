@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME := /usr/lib/jvm/default-java
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	rm -Rf debian/maven-repo/org/eclipse/jetty
+	dh_auto_build -- install -DskipTests --projects !jetty-distribution
+	dh_auto_build -- package -DskipTests --projects jetty-distribution
+
+override_dh_auto_install:
+	dh_auto_install
+	rm -Rf debian/libjetty9-java/usr/share/maven-repo/org/eclipse/jetty/jetty-distribution/
+	rm -Rf debian/libjetty9-java/usr/share/maven-repo/org/eclipse/jetty/jetty-home/
+
+override_dh_link:
+	VERSION=$(shell grep '<version>' pom.xml | head -1 | tail -1 | sed -e 's/.*<version>\(.*\)<\/version>.*/\1/') \
+	dh_link
+
+override_dh_installchangelogs:
+	dh_installchangelogs VERSION.txt

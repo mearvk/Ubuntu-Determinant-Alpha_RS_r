@@ -1,0 +1,170 @@
+NAME
+
+    Net::DNS::Resolver::Programmable - programmable DNS resolver class for
+    offline emulation of DNS
+
+SYNOPSIS
+
+        use Net::DNS::Resolver::Programmable;
+        use Net::DNS::RR;
+        
+        my $resolver = Net::DNS::Resolver::Programmable->new(
+            records         => {
+                'example.com'     => [
+                    Net::DNS::RR->new('example.com.     NS  ns.example.org.'),
+                    Net::DNS::RR->new('example.com.     A   192.168.0.1')
+                ],
+                'ns.example.org'  => [
+                    Net::DNS::RR->new('ns.example.org.  A   192.168.1.1')
+                ]
+            },
+            
+            resolver_code   => sub {
+                my ($domain, $rr_type, $class) = @_;
+                ...
+                return ($result, $aa, @rrs);
+            }
+        );
+
+DESCRIPTION
+
+    Net::DNS::Resolver::Programmable is a Net::DNS::Resolver descendant
+    class that allows a virtual DNS to be emulated instead of querying the
+    real DNS. A set of static DNS records may be supplied, or arbitrary
+    code may be specified as a means for retrieving DNS records, or even
+    generating them on the fly.
+
+ Constructor
+
+    The following constructor is provided:
+
+    new(%options): returns Net::DNS::Resolver::Programmable
+
+      Creates a new programmed DNS resolver object.
+
+      %options is a list of key/value pairs representing any of the
+      following options:
+
+      records
+
+	A reference to a hash of arrays containing a static set of
+	Net::DNS::RR objects. The hash entries must be indexed by fully
+	qualified domain names (lower-case, without any trailing dots), and
+	the entries themselves must be arrays of the RR objects pertaining
+	to these domain names. For example:
+
+            records => {
+                'example.com'     => [
+                    Net::DNS::RR->new('example.com.     NS  ns.example.org.'),
+                    Net::DNS::RR->new('example.com.     A   192.168.0.1')
+                ],
+                'www.example.com' => [
+                    Net::DNS::RR->new('www.example.com. A   192.168.0.2')
+                ],
+                'ns.example.org'  => [
+                    Net::DNS::RR->new('ns.example.org.  A   192.168.1.1')
+                ]
+            }
+
+	If this option is specified, the resolver retrieves requested RRs
+	from this data structure.
+
+      resolver_code
+
+	A code reference used as a call-back for dynamically retrieving
+	requested RRs.
+
+	The code must take the following query parameters as arguments: the
+	domain, RR type, and class.
+
+	It must return a list composed of: the response's RCODE (by name,
+	as returned by Net::DNS::Header->rcode), the aa (authoritative
+	answer) flag (boolean, use undef if you don't care), and the
+	Net::DNS::RR answer objects. If an error string is returned instead
+	of a valid RCODE, a Net::DNS::Packet object is not constructed but
+	an error condition for the resolver is signaled instead.
+
+	For example:
+
+            resolver_code => sub {
+                my ($domain, $rr_type, $class) = @_;
+                ...
+                return ($result, $aa, @rrs);
+            }
+
+	If both this and the records option are specified, then statically
+	programmed records are used in addition to any that are returned by
+	the configured resolver code.
+
+      defnames
+
+      dnsrch
+
+      domain
+
+      searchlist
+
+      debug
+
+	These Net::DNS::Resolver options are also meaningful with
+	Net::DNS::Resolver::Programmable. See Net::DNS::Resolver for their
+	descriptions.
+
+ Instance methods
+
+    The following instance methods of Net::DNS::Resolver are also supported
+    by Net::DNS::Resolver::Programmable:
+
+    search: returns Net::DNS::Packet
+
+    query: returns Net::DNS::Packet
+
+    send: returns Net::DNS::Packet
+
+      Performs an offline DNS query, using the statically programmed DNS
+      RRs and/or the configured dynamic resolver code. See the "new"
+      constructor's records and resolver_code options. See the descriptions
+      of search, query, and send for details about the calling syntax of
+      these methods.
+
+    print
+
+    string: returns string
+
+    searchlist: returns list of string
+
+    defnames: returns boolean
+
+    dnsrch: returns boolean
+
+    debug: returns boolean
+
+    errorstring: returns string
+
+    answerfrom: returns string
+
+    answersize: returns integer
+
+      See "METHODS" in Net::DNS::Resolver.
+
+    Currently the following methods of Net::DNS::Resolver are not
+    supported: axfr, axfr_start, axfr_next, nameservers, port, srcport,
+    srcaddr, bgsend, bgread, bgisready, tsig, retrans, retry, recurse,
+    usevc, tcp_timeout, udp_timeout, persistent_tcp, persistent_udp, igntc,
+    dnssec, cdflag, udppacketsize. The effects of using these on
+    Net::DNS::Resolver::Programmable objects are undefined.
+
+SEE ALSO
+
+    Net::DNS::Resolver
+
+    For availability, support, and license information, see the README file
+    included with Net::DNS::Resolver::Programmable.
+
+AUTHORS
+
+    David Precious (BIGPRESH) <davidp@preshweb.co.uk> took on
+    maintainership in July 2017
+
+    Original author Julian Mehnle <julian@mehnle.net>
+

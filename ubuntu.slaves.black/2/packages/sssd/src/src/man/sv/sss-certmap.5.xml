@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sss-certmap</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sss-certmap</refname>
+        <refpurpose>SSSD:s certifikatmatchnings- och -mappningsregler</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Manualsidan beskriver reglerna som kan användas av SSSD och andra
+komponenter för att matcha X.509-certifikat och koppla dem till konton.
+        </para>
+        <para>
+            Varje regel har fyra komponenter, en <quote>prioritet</quote>, en
+<quote>matchningsregel</quote>, en <quote>mappningsregel</quote> och en
+<quote>domänlista</quote>.  Alla komponenter är frivilliga.  En saknad
+<quote>prioritet</quote> kommer lägga till regeln med den lägsta
+prioriteten.  Standard-<quote>matchningsregeln</quote> kommer matcha
+certifikat med digitalSignature-nyckelanvändning och
+clientAuth-utökadnyckelanvändning.  Om <quote>mappningsregeln</quote> är tom
+kommer certifikaten sökas efter i attributet userCertificate som DER-kodade
+binärer.  Om inga domäner anges kommer endast den lokala domänen sökas.
+        </para>
+    </refsect1>
+
+    <refsect1 id='components'>
+        <title>REGELKOMPONENTER</title>
+    <refsect2 id='priority'>
+        <title>PRIORITET</title>
+        <para>
+            Reglerna bearbetas i prioritetsordning där ”0” (noll) indikerar den högsta
+prioriteten.  Ju högre talet är desto lägre är prioriteten.  Ett saknat
+värde indikerar den lägsta prioriteten.  Regelbearbetningen stoppas när en
+regel som matchar hittas och inga ytterligare regler kontrolleras.
+        </para>
+        <para>
+            Internt behandlas prioriteten som teckenlösa 32-bitars heltal, att använda
+ett prioritetsvärde större än 4294967295 kommer orsaka ett fel.
+        </para>
+        <para>
+            Om flera regler har samma prioritet och bara en av de relaterade
+matchningsreglerna gäller kommer denna regel att väljas. Om det finns flera
+regler med samma prioritet som matchar väljs en men vilken av den är
+odefinierat. För att undvika detta beteende, använd antingen olika
+prioriteter eller gör matchningsregeln mer specifik, t.ex. genom att använda
+olika &lt;ISSUER&gt;-mönster.
+        </para>
+    </refsect2>
+    <refsect2 id='match'>
+        <title>MATCHNINGSREGEL</title>
+        <para>
+            Matchningsregeln används för att välja ett certifikat som
+översättningsregeln skall tillämpas på.  Det använder ett system liknande
+det som används av alternativet <quote>pkinit_cert_match</quote> i MIT
+Kerberos.  Det består av ett nyckelord omgivet av ”&lt;” och ”&gt;” som
+identifierar en specifik del av certifikatet och ett mönster som skall
+finnas för att regeln skall matcha.  Flera nyckelord/mönster-par  kan
+antingen sammanfogas med ”&amp;&amp;” (och) eller ”&#124;&#124;” (eller).
+        </para>
+        <para>
+            De tillgängliga alternativen är: <variablelist>
+                <varlistentry>
+                    <term>&lt;SUBJECT&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Med denna kan en del eller hela certifikatets subject-namn matchas.  För
+matchningen används POSIX syntax för utökade reguljära uttryck, se regex(7)
+för detaljer.
+                    </para>
+                    <para>
+                        För matchningen konverteras subject-namnet lagrat i certifikatet i DER-kodad
+ASN.1 till en sträng i enlighet med RFC 4514.  Detta betyder att den mest
+specifika namnkomponenten kommer först.  Observera att inte alla möjliga
+attributnamn täcks av RFC 4514.  De inkluderade namnen är ”CN”, ”L”, ”ST”,
+”O”, ”OU”, ”C”, ”STREET”, ”DC” och ”UID”. Andra attributnamn kan visas olika
+på olika plattformar och av olika verktyg. För att undvika förvirring är det
+bäst att dessa attributnamn inte används eller täcks av ett lämpligt
+reguljärt uttryck.
+                    </para>
+                    <para>
+                        Exempel: &lt;SUBJECT&gt;.*,DC=MIN,DC=DOMÄN
+                    </para>
+                    <para>
+                        Observera att tecknen ”^.[$()|*+?{\” har en särskild betydelse i reguljära
+uttryck och måste skyddas med hjälp av tecknet ”\” så att de kan matchas som
+vanliga tecken.
+                    </para>
+                    <para>
+                        Exempel: &lt;SUBJECT&gt;^CN=.* \(Admin\),DC=MIN,DC=DOMÄN$
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;ISSUER&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Med denna kan en del eller hela certifikatets issuer-namn matchas.  Alla
+kommentarer för &lt;SUBJECT&gt; är tillämpliga här också.
+                    </para>
+                    <para>
+                        Exempel: &lt;ISSUER&gt;^CN=Min-CA,DC=MIN,DC=DOMÄN$
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;KU&gt;nyckelanvändning</term>
+                    <listitem>
+                    <para>
+                        Detta alternativ kan användas för att specificera vilka
+nyckelanvändningsvärden certifikatet skall ha.  Följande värden kan användas
+i en kommaseparerad lista:
+                        <itemizedlist>
+                            <listitem><para>digitalSignature</para></listitem>
+                            <listitem><para>nonRepudiation</para></listitem>
+                            <listitem><para>keyEncipherment</para></listitem>
+                            <listitem><para>dataEncipherment</para></listitem>
+                            <listitem><para>keyAgreement</para></listitem>
+                            <listitem><para>keyCertSign</para></listitem>
+                            <listitem><para>cRLSign</para></listitem>
+                            <listitem><para>encipherOnly</para></listitem>
+                            <listitem><para>decipherOnly</para></listitem>
+                        </itemizedlist>
+                    </para>
+                    <para>
+                        Ett numeriskt värde i intervallet hos ett 32-bitars teckenlöst heltal kan
+användas också för att täcka speciella användningsfall.
+                    </para>
+                    <para>
+                        Exempel: &lt;KU&gt;digitalSignature,keyEncipherment
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;EKU&gt;utökad-nyckel-användning</term>
+                    <listitem>
+                    <para>
+                        Detta alternativ kan användas för att specificera vilka
+utökade-nyckel-användningsvärden certifikatet skall ha.  Följande värden kan
+användas i en kommaseparerad lista:
+                        <itemizedlist>
+                            <listitem><para>serverAuth</para></listitem>
+                            <listitem><para>clientAuth</para></listitem>
+                            <listitem><para>codeSigning</para></listitem>
+                            <listitem><para>emailProtection</para></listitem>
+                            <listitem><para>timeStamping</para></listitem>
+                            <listitem><para>OCSPSigning</para></listitem>
+                            <listitem><para>KPClientAuth</para></listitem>
+                            <listitem><para>pkinit</para></listitem>
+                            <listitem><para>msScLogin</para></listitem>
+                        </itemizedlist>
+                    </para>
+                    <para>
+                        Användningar av utökade nycklar som inte listas ovanför kan specificeras med
+sina OID:er i punktad decimal notation.
+                    </para>
+                    <para>
+                        Exempel: &lt;EKU&gt;clientAuth,1.3.6.1.5.2.3.4
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        För att vara kompatibel med användningen av MIT Kerberos kommer detta
+alternativ matcha Kerberos-huvudmän i PKINIT eller AD NT-Principal SAN som
+&lt;SAN:Principal&gt; gör.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN&gt;.*@MITT\.RIKE
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:Principal&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha Kerberos-huvudmännen i PKINIT eller AD NT Principal SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:Principal&gt;.*@MITT\.RIKE
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:ntPrincipalName&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha Kerberos-huvudmän från AD NT Principal SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:ntPrincipalName&gt;.*@MITT.AD.RIKE
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:pkinit&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha Kerberos-huvudmän från PKINIT SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:ntPrincipalName&gt;.*@MITT\.PKINIT\.RIKE
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:dotted-decimal-oid&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Ta värdet från otherName SAN-komponenten som anges av OID:n i punktad
+decimal notation, tolka den som en sträng och försök att matcha den mot det
+reguljära uttrycket.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:1.2.3.4&gt;test
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:otherName&gt;base64-sträng</term>
+                    <listitem>
+                    <para>
+                        Gör en binär matchning med den base64-kodade klicken mot alla otherName
+SAN-komponenter.  Med detta alternativ är det möjligt att matcha mot
+anpassade otherName-komponenter med speciella kodningar som inte kan
+hanteras som strängar.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:otherName&gt;MTIz
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:rfc822Name&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på rfc822Name SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:rfc822Name&gt;.*@epost\.domän
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:dNSName&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på dNSName SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:dNSName&gt;.*\.min\.dns\.domän
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:x400Address&gt;base64-sträng</term>
+                    <listitem>
+                    <para>
+                        Matcha binärt värdet på x400Address SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:x400Address&gt;MTIz
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:directoryName&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på directoryName SAN.  Samma kommentarer som gavs för
+&lt;ISSUER&gt; och &lt;SUBJECT&gt; gäller här också.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:directoryName&gt;.*,DC=com
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:ediPartyName&gt;base64-sträng</term>
+                    <listitem>
+                    <para>
+                        Matcha binärt värdet på ediPartyName SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:ediPartyName&gt;MTIz
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:uniformResourceIdentifier&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på uniformResourceIdentifier SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:uniformResourceIdentifier&gt;URN:.*
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:iPAddress&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på iPAddress SAN.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:iPAddress&gt;192\.168\..*
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>&lt;SAN:registeredID&gt;reguljärt-uttryck</term>
+                    <listitem>
+                    <para>
+                        Matcha värdet på registeredID SAN som punktad decimal sträng.
+                    </para>
+                    <para>
+                        Exempel: &lt;SAN:registeredID&gt;1\.2\.3\..*
+                    </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+    </refsect2>
+    <refsect2 id='map'>
+        <title>MAPPNINGSREGEL</title>
+        <para>
+            Mappningsregeln används för att koppla ett certifikat med ett eller flera
+konton.  Ett smartkort med certifikat och den matchande privata nyckeln kan
+då användas för autentisering som ett av dessa konton.
+        </para>
+        <para>
+            För närvarande stödjer SSSD egentligen bara LDAP för att slå upp
+användarinformation (undantaget är proxy-leverantören som inte är relevant
+här.  På grund av detta är mappningsregeln baserad på syntaxen för
+LDAP-sökfilter med mallar för att lägga till certifikatinnehåll till
+filtret.  Det antas att filtret endast kommer innehålla de specifika data
+som behövs för mappningen och att anroparen kommer bädda in dem i ett annat
+filter för att göra den egentliga sökningen.  Därför skall filtersträngen
+börja och sluta med ”(” respektive ”)”.
+        </para>
+        <para>
+            I allmänhet rekommenderas det att använda attribut från certifikatet och
+lägga till dem till speciella attribut till LDAP-användarobjektet.
+T.ex. kan attributet ”altSecurityIdentities” i AD eller attributet
+”ipaCertMapData” i IPA användas.
+        </para>
+        <para>
+            Detta bör hellre användas än att läsa användarspecifik data från
+certifikatet som t.ex. en e-postadress och söka efter den i LDAP-servern.
+Anledningen är att användarspecifika data i LDAP kan ändras av olika
+anledningar vilket skulle göra sönder mappningen.  Å andra sidan skulle det
+vara svårt att bryta mappningen avsiktligt för en specifik användare.
+        </para>
+        <para>
+            Mallarna för att lägga till certifikatdata till sökfiltret baseras på
+formateringssträngar i Python-stil.  De består av ett nyckelord i
+krullparenteser med en valfri underkomponentspecificerare separerad av en
+”.” eller ett valfritt konverterings-/formateringsalternativ separerat av
+ett ”!”.  Tillåtna värden är: <variablelist>
+                <varlistentry>
+                    <term>{issuer_dn[!((ad|ad_x500)|ad_ldap|nss_x500|(nss|nss_ldap))]}</term>
+                    <listitem>
+                    <para>
+                        Mallen kommer lägga till den fullständiga utgivar-DN:en konverterad till en
+sträng enligt RFC 4514.  Om X.500-ordning (mest specifik RDN kommer sist)
+skall ett alternativ med prefixet ”_x500” användas.
+                    </para>
+                    <para>
+                        Konverteringsalternativen som börjar med ”ad_” kommer använda attribut som
+de används av AD, t.ex. ”S” istället för ”ST”.
+                    </para>
+                    <para>
+                        Konverteringsalternativen som börjar med ”nss_” kommer använda attributnamn
+som de används av NSS.
+                    </para>
+                    <para>
+                        Standard för konverteringsalternativ är ”nss”, d.v.s. attributnamn enligt
+NSS och LDAP/RFC 4514-ordning.
+                    </para>
+                    <para>
+                        Exempel:
+(ipacertmapdata=X509:&lt;I&gt;{issuer_dn!ad}&lt;S&gt;{subject_dn!ad})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_dn[!((ad|ad_x500)|ad_ldap|nss_x500|(nss|nss_ldap))]}</term>
+                    <listitem>
+                    <para>
+                        Mallen kommer lägga till den fullständiga subjekt-DN:en konverterad till en
+sträng enligt RFC 4514.  Om X.500-ordning (mest specifik RDN kommer sist)
+skall ett alternativ med prefixet ”_x500” användas.
+                    </para>
+                    <para>
+                        Konverteringsalternativen som börjar med ”ad_” kommer använda attribut som
+de används av AD, t.ex. ”S” istället för ”ST”.
+                    </para>
+                    <para>
+                        Konverteringsalternativen som börjar med ”nss_” kommer använda attributnamn
+som de används av NSS.
+                    </para>
+                    <para>
+                        Standard för konverteringsalternativ är ”nss”, d.v.s. attributnamn enligt
+NSS och LDAP/RFC 4514-ordning.
+                    </para>
+                    <para>
+                        Exempel:
+(ipacertmapdata=X509:&lt;I&gt;{issuer_dn!nss_x500}&lt;S&gt;{subject_dn!nss_x500})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{cert[!(bin|base64)]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till hela det DER-kodade certifikatet som än sträng
+till sökfiltret.  Beroende på konverteringsalternativen konverteras antingen
+certifikatet till en hex-sekvens med styrtecken ”\xx” eller till base64.
+Hex-strängen med styrtecken är standard och kan t.ex. användas med
+LDAP-attributet ”userCertificate;binary”.
+                    </para>
+                    <para>
+                        Exempel: (userCertificate;binary={cert!bin})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_principal[.short_name]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till Kerberos-huvudmannen som hämtas antingen från
+den SAN som används av pkinit eller den som används av AD.  Komponenten
+”short_name” representerar första delen av huvudmannen före tecknet ”@”.
+                    </para>
+                    <para>
+                        Exempel:
+(|(userPrincipal={subject_principal})(samAccountName={subject_principal.short_name}))
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_pkinit_principal[.short_name]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till Kerberos-huvudmannen som hämtas från den SAN
+som används av pkinit.  Komponenten ”short_name” representerar första delen
+av huvudmannen före tecknet ”@”.
+                    </para>
+                    <para>
+                        Exempel:
+(|(userPrincipal={subject_pkinit_principal})(uid={subject_pkinit_principal.short_name}))
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_nt_principal[.short_name]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till Kerberos-huvudmannen som hämtas från den SAN
+som används av AD.  Komponenten ”short_name” representerar första delen av
+huvudmannen före tecknet ”@”.
+                    </para>
+                    <para>
+                        Exempel:
+(|(userPrincipalName={subject_nt_principal})(samAccountName={subject_nt_principal.short_name}))
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_rfc822_name[.short_name]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till strängen som lagras i komponenten rfc822Name i
+SAN:en, normalt en e-postadress.  Komponenten ”short_name” representerar
+första delen av huvudmannen före tecknet ”@”.
+                    </para>
+                    <para>
+                        Exempel:
+(|(mail={subject_rfc822_name})(uid={subject_rfc822_name.short_name}))
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_dns_name[.short_name]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till strängen som lagras i komponenten dNSName i
+SAN:en, normalt ett fullständigt kvalificerat värdnamn.  Komponenten
+”short_name” representerar första delen av huvudmannen före det första
+”.”-tecknet.
+                    </para>
+                    <para>
+                        Exempel: (|(fqdn={subject_dns_name})(host={subject_dns_name.short_name}))
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_uri}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till strängen som lagras i komponenten
+uniformResourceIdentifier i SAN:en.
+                    </para>
+                    <para>
+                        Exempel: (uri={subject_uri})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_ip_address}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till strängen som lagras i komponenten iPAddress i
+SAN:en.
+                    </para>
+                    <para>
+                        Exempel: (ip={subject_ip_address})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_x400_address}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till värdet som lagras i komponenten x400Address i
+SAN:en som en hex-sekvens med styrtecken.
+                    </para>
+                    <para>
+                        Exempel: (attr:binary={subject_x400_address})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_directory_name[!((ad|ad_x500)|ad_ldap|nss_x500|(nss|nss_ldap))]}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till DN-strängen för värdet som lagras i komponenten
+directoryName i SAN:en.
+                    </para>
+                    <para>
+                        Exempel: (orig_dn={subject_directory_name})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_ediparty_name}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till värdet som lagras i komponenten ediPartyName i
+SAN:en som en hex-sekvens med styrtecken.
+                    </para>
+                    <para>
+                        Exempel: (attr:binary={subject_ediparty_name})
+                    </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>{subject_registered_id}</term>
+                    <listitem>
+                    <para>
+                        Denna mall kommer lägga till OID:n som lagras i komponenten registeredID i
+SAN:en som en punktad decimal sträng.
+                    </para>
+                    <para>
+                        Exempel: (oid={subject_registered_id})
+                    </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+    </refsect2>
+    <refsect2 id='domains'>
+        <title>DOMÄNLISTA</title>
+        <para>
+            Om domänlistan inte är tom söks användare mappade till ett givet certifikat
+inte bara i den lokala domänen utan i de listade domänerna också förutsatt
+att de är kända av SSSD.  Domäner som SSSD inte känner till kommer
+ignoreras.
+        </para>
+    </refsect2>
+    </refsect1>
+</refentry>
+</reference>

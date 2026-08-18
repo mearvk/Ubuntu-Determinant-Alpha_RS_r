@@ -1,0 +1,167 @@
+jack-audio-connection-kit (1:0.124.1+20140122git5013bed0-1) unstable; urgency=low
+
+   RELEASE NOTES from Paul Davis:
+   ------------------------------
+
+   One of the "minor" bug fixes will make a huge difference for some users: if
+   a particular JACK client crashes only the misbehaving client will be
+   "zombified" - other clients will continue functioning normally (after a
+   short delay). If you are developing JACK applications, this can make a huge
+   difference to your day-to-day experience of JACK 1. The Metadata API
+
+   It is now possible to define arbitrary metadata to be associated with any
+   JACK port or JACK client. This API lays the groundwork for more useful
+   naming of ports and clients (particularly those associated with hardware),
+   as well as many other features that developers have talked about in a JACK
+   context for several years. The full docs on the API can be found here and
+   there is also a man page for jack_property, which is the primary command
+   line tool for setting, removing and changing metadata. A short tutorial on
+   using the Metadata API is available.
+
+
+   Builtin MIDI hardware I/O (on Linux)
+
+   For years, we have known that the performance of the -X seq and -X raw
+   options to the ALSA backend have left much to be desired. For that reason,
+   most users have been instructed to use a2jmidid (typically with the -e flag
+   to tell it use external (hardware) MIDI devices). Although a2jmidid
+   provided good MIDI I/O, it has two problems:
+
+   Requires starting an addition program in order to get MIDI I/O via hardware working
+   Adds latency to the MIDI I/O "through" or "monitor" signal pathway
+
+   This release of JACK 1 sees the transformation of a2jmidid into a "slave"
+   driver that can be started as a part of JACK, much like the old -X seq and
+   -X raw options. This not only removes the need to start a separate program,
+   but also reduces the "through" or "monitoring" latency of MIDI I/O by 1
+   JACK period.
+
+   The canonical way to invoke this new internal MIDI driver is with -X
+   alsa_midi, which will create JACK ports for all MIDI devices (and other
+   MIDI applications) known to ALSA at the time that JACK starts up. Note that
+   the new internal driver does not currently notice the arrival or departure
+   of MIDI hardware or applications, but future improvements will correct
+   this.
+
+   In addition, the old -X seq and -X raw implementations have been removed.
+   However, using -X seq will be interpreted as a request to use the new
+   internal MIDI driver, and so is formally equivalent to using -X alsa_midi.
+   Note that -X seq is an argument to the ALSA backend, and so comes after the
+   backend specification; by contrast, -X alsa_midi is a server argument, and
+   must come before the backend specification.
+
+   It is worth noting that the server argument -X alsa_midi can be used with
+   any Linux-based backend (ALSA, OSS, Dummy, Netjack) to get the ALSA MIDI
+   bridge functional.
+
+
+   Builtin Internal Client for using additional ALSA devices
+
+   Older versions of JACK have come with the tools alsa_in and alsa_out which
+   can be used to add additional ALSA supported audio devices to a running
+   JACK setup. These tools work quite well, but:
+
+       Fons Adriennsen developed significantly better versions known as
+       zita-a2j and zita-j2a that use his own resampler. these tools are (like
+       the rest of the JACK tools) separate programs that the user must start
+       up after the server is running
+
+   To address these two points, the zita-a2j/zita-j2a code has been merged
+   into the tools part of JACK as a pair of internal clients ("zalsa_in" and
+   "zalsa_out") that can be specified on the command line. So for example,
+   this JACK command line:
+
+       jackd ... -I "USB Mic:zalsa_in/-dhw:USB,-r44100,-n2,-p512" ...
+
+   will create an internal client called "USB Mic" that represents the ALSA
+   device "hw:USB" using the ZITA alsa/jack bridge code, running at 44100kHz,
+   with 2 periods of size 512. If you do not specify the period size or sample
+   rate, then the values in use by the backend will be adopted. Audio being
+   captured or played back via devices added to JACK in this way will be
+   resampled with substantial accuracy and quality.
+
+   Note that the -I argument has been present in JACK 2 for sometime, but the
+   new JACK1 implementation extends the semantics of its argument by allowing
+   the user to specify a client name as well as arguments for the internal
+   client code.
+
+   Both internal clients (zalsa_in and zalsa_out) will accept the -h argument
+   to show their possible arguments: jackd -I zalsa_in/-h -d alsa (the final
+   -d alsa is required by JACK but not used in this case). The arguments will
+   match those of the standalone zita-a2j and zita-j2a (external) clients.
+
+   Since this new "multiple device" capability is implemented using JACK
+   internal clients, you can remove a given device by just unloading the
+   client using the long-existing but rarely used jack_unload command.
+   Similarly, if you wanted to add a device to a running server after it has
+   started, jack_load can be used for that.
+
+   It is worth noting that these internal clients can be used with any
+   Linux-based backend (ALSA, FFADO, OSS, Dummy, Netjack) to add additional
+   ALSA-support devices to an instance of JACK.
+
+
+   Syntactic Sugar Version
+
+   To make the addition of extra audio devices to an instance of JACK even
+   easier, JACK 1 also features the new -A option which takes almost nothing
+   more than an ALSA card name (e.g. "SB", "DSP", "Codec", "HDMI" and many
+   others) and makes the device available for playback or capture or both.
+   Adding %p or %c to the card name limits the direction of audio flow.
+
+   This option does nothing more than translate its argument into an equivalent use of -I, so for example:
+
+    -A SB
+
+   is equivalent to using both of these arguments:
+
+    -I SB/zalsa_in/-dhw:SB
+    -I SB/zalsa_out/-dhw:SB
+
+   As with -I, the -A argument may be used multiple times to add as many
+   devices as you want. -A is simple but not very powerful - if you need to
+   provide more options (e.g. to adjust I/O latency values), then you must use
+   the -I argument instead.
+
+   Finally, note that these internal clients are theoretically compatible with
+   JACK 2, and should work with that implementation of JACK once JACK 2 has a
+   working internal client loading mechanism restored.  
+
+ -- Adrian Knoth <adi@drcomp.erfurt.thur.de>  Wed, 22 Jan 2014 22:17:27 +0100
+
+jack-audio-connection-kit (1.9.4+svn3842-1) unstable; urgency=low
+
+   /etc/init.d/jackd has been removed.
+
+   Former jackd packages provided an initscript to start jackd at
+   boottime, however, this mode is discouraged by upstream and was
+   therefore dropped in jack-audio-connection-kit-0.116.2+svn3592-2.
+
+   See #565117 (and #527642) for more information.
+
+ -- Adrian Knoth <adi@drcomp.erfurt.thur.de>  Thu, 14 Jan 2010 12:06:57 +0100
+
+jack-audio-connection-kit (0.118+svn3796-1) unstable; urgency=low
+
+   Upstream has replaced -L by -r, so in order to disable realtime mode,
+   specify -r or --no-realtime now. The reason is to have the same
+   commandline args for jackd1 and jackd2, but -L was already in use
+   by jackd2. 
+
+ -- Adrian Knoth <adi@drcomp.erfurt.thur.de>  Wed, 18 Nov 2009 10:16:27 +0100
+
+jack-audio-connection-kit (0.116.2+svn3592-3) unstable; urgency=low
+
+   The default operation mode for jackd is now realtime mode, upstream has
+   changed the semantics.
+
+   It's no longer necessary to specify -R or --realtime.
+
+   If you just run jackd without POSIX realtime priorities (use
+   'dpkg-reconfigure -phigh jackd' to enable or disable, ulimit -r -l to
+   check), then jackd will complain. If so, use -L to disable realtime mode.
+
+   IOW: If you don't want to run jackd with realtime priorities, you would now
+   have to provide -L, whereas the formerly optional -R is now the default.
+
+ -- Adrian Knoth <adi@drcomp.erfurt.thur.de>  Tue, 11 Aug 2009 14:53:02 +0200

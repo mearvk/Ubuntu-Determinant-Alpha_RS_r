@@ -1,0 +1,60 @@
+Description: Use db2pdf (not db2ps and ps2pdf)
+ The db2ps and ps2pdf chain adds an architecture-specific diff.
+Author: Didier Raboud <odyx@debian.org>
+Bug-Debian: https://bugs.debian.org/744821
+Last-Update: 2019-08-16
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/configure.ac
++++ b/configure.ac
+@@ -124,17 +124,11 @@
+ AC_ISC_POSIX
+ AC_PROG_INSTALL
+ 
+-AC_PATH_PROG(DB2PS, db2ps)
+-if test x${DB2PS} = x ; then
+-  AC_MSG_WARN([PostScript documentation cannot be generated!])
+-fi
+-AC_SUBST(DB2PS)
+-AC_PATH_PROG(PS2PDF, ps2pdf)
+-if test x${PS2PDF} = x ; then
++AC_PATH_PROG(DB2PDF, db2pdf)
++if test x${DB2PDF} = x ; then
+   AC_MSG_WARN([PDF documentation cannot be generated!])
+ fi
+-AC_SUBST(PS2PDF)
+-
++AC_SUBST(DB2PS)
+ 
+ dnl conditional building
+ 
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -88,14 +88,11 @@
+ libtool: $(LIBTOOL_DEPS)
+ 	$(SHELL) ./config.status --recheck
+ 
+-doc: ijs_spec.ps ijs_spec.pdf
++doc: ijs_spec.pdf
+ 
+-# We don't use db2pdf because it can't handle embedded .eps
+-ijs_spec.ps: ijs_spec.sgml
+-	$(DB2PS) ijs_spec.sgml
+-
+-ijs_spec.pdf: ijs_spec.ps
+-	$(PS2PDF) ijs_spec.ps
++# We use db2pdf because it can handle embedded .eps
++ijs_spec.pdf: ijs_spec.sgml
++	$(DB2PDF) ijs_spec.sgml
+ 
+ # Note that ijs_spec.pdf is included in the dist list above,
+ # so the 'doc' target needs to be build for 'make dist' to work.
+@@ -113,7 +110,7 @@
+ 	config.sub \
+ 	ltmain.sh
+ 
+-CLEANFILES = gmon.out core ijs_spec.log ijs_spec.tex ijs_spec.aux ijs_spec.ps ijs_spec.pdf
++CLEANFILES = gmon.out core ijs_spec.log ijs_spec.tex ijs_spec.aux ijs_spec.pdf
+ DISTCLEANFILES = config.cache config.log config.status
+ # ijs.pc ijs.pc.in ijs.m4 ijs.h
+ MAINTAINERCLEANFILES = INSTALL aclocal.m4 config.h.in configure Makefile.in stamp-h.in $(CLEANSCRIPTS)

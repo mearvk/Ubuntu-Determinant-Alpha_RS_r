@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+htmldoc-common_source := $(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W htmldoc-common)
+lcdf-typetools_source := $(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W lcdf-typetools)
+poppler-data_source   := $(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W poppler-data)
+
+%:
+	dh $@ --buildsystem=maven --with javahelper
+
+override_dh_auto_configure:
+	# replace what we delete in repacking. never used ...
+	mkdir -p pdfbox/src/main/resources/org/apache/pdfbox/resources/cmap/
+	find /usr/share/poppler/cMap -type f -print0 | xargs -r0 cp -n -t pdfbox/src/main/resources/org/apache/pdfbox/resources/cmap/
+	dh_auto_configure
+
+override_dh_auto_build:
+	# work around downloading adobe file
+	mkdir -p pdfbox/target/classes/org/apache/pdfbox/resources/cmap
+	cp pdfbox/src/main/resources/org/apache/pdfbox/resources/cmap/* pdfbox/target/classes/org/apache/pdfbox/resources/cmap/
+
+	mkdir -p pdfbox/target/classes/org/apache/pdfbox/resources/afm
+	cp /usr/share/htmldoc/fonts/*.afm pdfbox/target/classes/org/apache/pdfbox/resources/afm/
+	cp /usr/share/aglfn/glyphlist.txt pdfbox/target/classes/org/apache/pdfbox/resources
+
+	dh_auto_build
+
+override_dh_installchangelogs:
+	dh_installchangelogs $(CURDIR)/RELEASE-NOTES.txt
+
+override_dh_gencontrol:
+	dh_gencontrol -- "-Vmisc:Built-Using=$(htmldoc-common_source)$(lcdf-typetools_source)$(poppler-data_source)"

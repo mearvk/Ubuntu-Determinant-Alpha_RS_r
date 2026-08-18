@@ -1,0 +1,42 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+# Remove cached files
+rm -rf /var/cache/jetty9/*
+
+case "$1" in
+    remove)
+        rmdir --ignore-fail-on-non-empty \
+            /var/lib/jetty9/webapps/root \
+            /var/lib/jetty9/webapps \
+            /var/lib/jetty9 || true
+
+        if [ -d "/var/cache/jetty9" ] ; then
+            rm -rf /var/cache/jetty9
+        fi
+    ;;
+
+    purge)
+        # Remove log files (don't remove everything under /var/lib/jetty
+        # because there might be user-installed webapps)
+        rm -rf /var/log/jetty9
+        if [ -d "/var/lib/jetty9" ] ; then
+            rmdir --ignore-fail-on-non-empty /var/lib/jetty9 || true
+        fi
+        rmdir --ignore-fail-on-non-empty /etc/jetty9/start.d /etc/jetty9 || true
+
+        # clean up /etc/authbind after conffiles have been removed
+        rmdir --ignore-fail-on-non-empty /etc/authbind/byuid /etc/authbind || true
+    ;;
+
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # Nothing to do here
+    ;;
+
+    *)
+        echo "$0 called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac

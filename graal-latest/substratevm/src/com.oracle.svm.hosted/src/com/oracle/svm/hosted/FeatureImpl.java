@@ -1,0 +1,1275 @@
+/*
+ * Copyright (c) 2013, 2025, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.hosted;
+
+import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import com.oracle.svm.core.image.ImageHeapLayoutInfo;
+import org.graalvm.collections.EconomicSet;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.dynamicaccess.AccessCondition;
+import org.graalvm.nativeimage.dynamicaccess.ForeignAccess;
+import org.graalvm.nativeimage.dynamicaccess.JNIAccess;
+import org.graalvm.nativeimage.dynamicaccess.ReflectiveAccess;
+import org.graalvm.nativeimage.dynamicaccess.ResourceAccess;
+import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.Feature.DuringAnalysisAccess;
+import org.graalvm.nativeimage.hosted.FieldValueTransformer;
+import org.graalvm.nativeimage.impl.RuntimeReflectionSupport;
+
+import com.oracle.graal.pointsto.BigBang;
+import com.oracle.graal.pointsto.ObjectScanner.ScanReason;
+import com.oracle.graal.pointsto.constraints.UnsupportedFeatureException;
+import com.oracle.graal.pointsto.heap.ImageHeapConstant;
+import com.oracle.graal.pointsto.heap.ImageHeapScanner;
+import com.oracle.graal.pointsto.infrastructure.SubstitutionProcessor;
+import com.oracle.graal.pointsto.meta.AnalysisElement;
+import com.oracle.graal.pointsto.meta.AnalysisElement.ElementNotification;
+import com.oracle.graal.pointsto.meta.AnalysisElement.MethodOverrideReachableNotification;
+import com.oracle.graal.pointsto.meta.AnalysisElement.SubtypeReachableNotification;
+import com.oracle.graal.pointsto.meta.AnalysisField;
+import com.oracle.graal.pointsto.meta.AnalysisMetaAccess;
+import com.oracle.graal.pointsto.meta.AnalysisMethod;
+import com.oracle.graal.pointsto.meta.AnalysisType;
+import com.oracle.graal.pointsto.meta.AnalysisUniverse;
+import com.oracle.graal.pointsto.meta.ObjectReachableCallback;
+import com.oracle.graal.pointsto.util.AnalysisError;
+import com.oracle.svm.common.meta.MethodVariant;
+import com.oracle.svm.core.LinkerInvocation;
+import com.oracle.svm.core.annotate.Delete;
+import com.oracle.svm.core.feature.InternalFeature;
+import com.oracle.svm.core.feature.JVMCIFeatureAccess;
+import com.oracle.svm.core.graal.meta.RuntimeConfiguration;
+import com.oracle.svm.core.meta.SharedField;
+import com.oracle.svm.core.meta.SharedMethod;
+import com.oracle.svm.core.meta.SharedType;
+import com.oracle.svm.core.util.UserError;
+import com.oracle.svm.guest.staging.layered.LayeredFieldValueTransformer;
+import com.oracle.svm.hosted.ameta.FieldValueInterceptionSupport;
+import com.oracle.svm.hosted.analysis.Inflation;
+import com.oracle.svm.hosted.bootstrap.BootstrapMethodConfiguration;
+import com.oracle.svm.hosted.c.NativeLibraries;
+import com.oracle.svm.hosted.code.CompileQueue.CompileTask;
+import com.oracle.svm.hosted.dynamicaccess.JVMCIJNIAccessImpl;
+import com.oracle.svm.hosted.dynamicaccess.JVMCIReflectiveAccessImpl;
+import com.oracle.svm.hosted.image.AbstractImage;
+import com.oracle.svm.hosted.image.AbstractImage.NativeImageKind;
+import com.oracle.svm.hosted.image.NativeImageCodeCache;
+import com.oracle.svm.hosted.image.NativeImageHeap;
+import com.oracle.svm.hosted.meta.HostedField;
+import com.oracle.svm.hosted.meta.HostedMetaAccess;
+import com.oracle.svm.hosted.meta.HostedMethod;
+import com.oracle.svm.hosted.meta.HostedType;
+import com.oracle.svm.hosted.meta.HostedUniverse;
+import com.oracle.svm.hosted.option.HostedOptionProvider;
+import com.oracle.svm.hosted.reflect.ReflectionDataBuilder;
+import com.oracle.svm.shared.util.ReflectionUtil;
+import com.oracle.svm.shared.util.VMError;
+import com.oracle.svm.util.GuestAnnotationAccess;
+import com.oracle.svm.util.GuestAccess;
+import com.oracle.svm.util.JVMCIFieldValueTransformer;
+import com.oracle.svm.util.OriginalFieldProvider;
+import com.oracle.svm.util.dynamicaccess.JVMCIJNIAccess;
+import com.oracle.svm.util.dynamicaccess.JVMCIReflectiveAccess;
+import com.oracle.svm.util.dynamicaccess.JVMCIResourceAccess;
+import com.oracle.svm.util.dynamicaccess.JVMCIRuntimeReflection;
+
+import jdk.graal.compiler.debug.Assertions;
+import jdk.graal.compiler.debug.DebugContext;
+import jdk.graal.compiler.phases.util.Providers;
+import jdk.internal.vm.annotation.Stable;
+import jdk.vm.ci.meta.JavaConstant;
+import jdk.vm.ci.meta.MetaAccessProvider;
+import jdk.vm.ci.meta.ModifiersProvider;
+import jdk.vm.ci.meta.ResolvedJavaField;
+import jdk.vm.ci.meta.ResolvedJavaMethod;
+import jdk.vm.ci.meta.ResolvedJavaType;
+
+@SuppressWarnings("deprecation")
+public class FeatureImpl {
+
+    public abstract static class FeatureAccessImpl implements InternalFeature.InternalFeatureAccess {
+
+        protected final FeatureHandler featureHandler;
+        protected final ImageClassLoader imageClassLoader;
+        protected final DebugContext debugContext;
+
+        FeatureAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, DebugContext debugContext) {
+            this.featureHandler = featureHandler;
+            this.imageClassLoader = imageClassLoader;
+            this.debugContext = debugContext;
+        }
+
+        public ImageClassLoader getImageClassLoader() {
+            return imageClassLoader;
+        }
+
+        @Override
+        public Class<?> findClassByName(String className) {
+            return imageClassLoader.findClass(className).get();
+        }
+
+        public FeatureHandler getFeatureHandler() {
+            return featureHandler;
+        }
+
+        public DebugContext getDebugContext() {
+            return debugContext;
+        }
+
+        @Override
+        public List<Path> getApplicationClassPath() {
+            return imageClassLoader.applicationClassPath();
+        }
+
+        @Override
+        public List<Path> getApplicationModulePath() {
+            return imageClassLoader.applicationModulePath();
+        }
+
+        @Override
+        public ClassLoader getApplicationClassLoader() {
+            return imageClassLoader.getClassLoader();
+        }
+    }
+
+    abstract static class RegistrationAccessBase extends FeatureAccessImpl {
+        private final MetaAccessProvider metaAccess;
+
+        RegistrationAccessBase(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, MetaAccessProvider metaAccess, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.metaAccess = metaAccess;
+        }
+
+        @Override
+        public ResolvedJavaType findTypeByName(String className) {
+            Class<?> clazz = findClassByName(className);
+            if (clazz == null) {
+                return null;
+            }
+            return getMetaAccess().lookupJavaType(clazz);
+        }
+
+        @Override
+        public MetaAccessProvider getMetaAccess() {
+            return metaAccess;
+        }
+    }
+
+    public static class IsInConfigurationAccessImpl extends RegistrationAccessBase implements Feature.IsInConfigurationAccess, JVMCIFeatureAccess.IsInConfigurationAccess {
+
+        IsInConfigurationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, MetaAccessProvider metaAccess, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, metaAccess, debugContext);
+        }
+    }
+
+    public static class OnRegistrationAccessImpl extends RegistrationAccessBase implements Feature.OnRegistrationAccess, JVMCIFeatureAccess.OnRegistrationAccess {
+
+        OnRegistrationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, MetaAccessProvider metaAccess, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, metaAccess, debugContext);
+        }
+    }
+
+    public static class AfterRegistrationAccessImpl extends RegistrationAccessBase implements Feature.AfterRegistrationAccess, JVMCIFeatureAccess.AfterRegistrationAccess {
+        private MainEntryPoint mainEntryPoint;
+
+        public AfterRegistrationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, MetaAccessProvider metaAccess,
+                        MainEntryPoint mainEntryPoint,
+                        DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, metaAccess, debugContext);
+            this.mainEntryPoint = mainEntryPoint;
+        }
+
+        public void setMainEntryPoint(MainEntryPoint mainEntryPoint) {
+            this.mainEntryPoint = mainEntryPoint;
+        }
+
+        public MainEntryPoint getMainEntryPoint() {
+            return mainEntryPoint;
+        }
+
+        @Override
+        public ReflectiveAccess getReflectiveAccess() {
+            return ReflectiveAccessImpl.singleton();
+        }
+
+        @Override
+        public JVMCIReflectiveAccess getJVMCIReflectiveAccess() {
+            return JVMCIReflectiveAccessImpl.singleton();
+        }
+
+        @Override
+        public ResourceAccess getResourceAccess() {
+            return ResourceAccessImpl.singleton();
+        }
+
+        @Override
+        public JVMCIResourceAccess getJVMCIResourceAccess() {
+            return ResourceAccessImpl.singleton();
+        }
+
+        @Override
+        public JNIAccess getJNIAccess() {
+            return JNIAccessImpl.singleton();
+        }
+
+        @Override
+        public JVMCIJNIAccess getJVMCIJNIAccess() {
+            return JVMCIJNIAccessImpl.singleton();
+        }
+
+        @Override
+        public ForeignAccess getForeignAccess() {
+            return ForeignAccessImpl.singleton();
+        }
+
+        @Override
+        public Object getJVMCIForeignAccess() {
+            throw VMError.unimplemented("JVMCI foreign access is not implemented yet.");
+        }
+    }
+
+    abstract static class AnalysisAccessBase extends FeatureAccessImpl {
+
+        protected final Inflation bb;
+
+        AnalysisAccessBase(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.bb = bb;
+        }
+
+        public BigBang getBigBang() {
+            return bb;
+        }
+
+        public AnalysisUniverse getUniverse() {
+            return bb.getUniverse();
+        }
+
+        @Override
+        public AnalysisMetaAccess getMetaAccess() {
+            return bb.getMetaAccess();
+        }
+
+        @Override
+        public AnalysisType findTypeByName(String className) {
+            Class<?> clazz = findClassByName(className);
+            if (clazz == null) {
+                return null;
+            }
+            try {
+                return getMetaAccess().lookupJavaType(clazz);
+            } catch (AnalysisError.TypeNotFoundError e) {
+                // Type not found during analysis
+                return null;
+            }
+        }
+
+        public List<AnalysisType> findSubtypes(AnalysisType baseClass) {
+            return imageClassLoader.guestTypes.findSubtypes(baseClass, false).stream().map(t -> getMetaAccess().getUniverse().lookup(t)).toList();
+        }
+
+        protected AnalysisType asAnalysisType(ResolvedJavaType type) {
+            return type instanceof AnalysisType aType ? aType : getUniverse().lookup(type);
+        }
+
+        protected AnalysisField asAnalysisField(ResolvedJavaField field) {
+            return field instanceof AnalysisField aField ? aField : getUniverse().lookup(field);
+        }
+
+        protected AnalysisMethod asAnalysisMethod(ResolvedJavaMethod method) {
+            return method instanceof AnalysisMethod aMethod ? aMethod : getUniverse().lookup(method);
+        }
+
+        public boolean isReachable(Class<?> clazz) {
+            return isReachable(getMetaAccess().lookupJavaType(clazz));
+        }
+
+        public boolean isReachable(ResolvedJavaType type) {
+            return asAnalysisType(type).isReachable();
+        }
+
+        public boolean isReachable(AnalysisType type) {
+            return type.isReachable();
+        }
+
+        public boolean isReachable(Field field) {
+            return isReachable(getMetaAccess().lookupJavaField(field));
+        }
+
+        public boolean isReachable(ResolvedJavaField field) {
+            return asAnalysisField(field).isAccessed();
+        }
+
+        public boolean isReachable(AnalysisField field) {
+            return field.isAccessed();
+        }
+
+        public boolean isReachable(Executable method) {
+            return isReachable(getMetaAccess().lookupJavaMethod(method));
+        }
+
+        public boolean isReachable(ResolvedJavaMethod method) {
+            return asAnalysisMethod(method).isReachable();
+        }
+
+        public boolean isReachable(AnalysisMethod method) {
+            return method.isReachable();
+        }
+
+        public Set<Class<?>> reachableSubtypes(Class<?> baseClass) {
+            return reachableSubtypes(getMetaAccess().lookupJavaType(baseClass)).toHashSet().stream()
+                            .map(AnalysisType::getJavaClass).collect(Collectors.toCollection(HashSet::new));
+        }
+
+        EconomicSet<AnalysisType> reachableSubtypes(AnalysisType baseType) {
+            return AnalysisUniverse.reachableSubtypes(baseType);
+        }
+
+        public Set<ResolvedJavaType> reachableSubtypes(ResolvedJavaType baseType) {
+            return new LinkedHashSet<>(reachableSubtypes(asAnalysisType(baseType)).toHashSet());
+        }
+
+        public Set<Executable> reachableMethodOverrides(Executable baseMethod) {
+            return reachableMethodOverrides(getMetaAccess().lookupJavaMethod(baseMethod)).stream()
+                            .map(AnalysisMethod::getJavaMethod)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
+
+        Set<AnalysisMethod> reachableMethodOverrides(AnalysisMethod baseMethod) {
+            return baseMethod.collectMethodImplementations(true);
+        }
+
+        public Set<ResolvedJavaMethod> reachableMethodOverrides(ResolvedJavaMethod baseMethod) {
+            return new LinkedHashSet<>(reachableMethodOverrides(asAnalysisMethod(baseMethod)));
+        }
+
+        public void rescanObject(Object obj, ScanReason reason) {
+            getUniverse().getHeapScanner().rescanObject(obj, reason);
+        }
+
+        public void rescanField(Object receiver, Field field, ScanReason reason) {
+            rescanField(receiver, getMetaAccess().getWrapped().lookupJavaField(field), reason);
+        }
+
+        public void rescanField(Object receiver, ResolvedJavaField field, ScanReason reason) {
+            VMError.guarantee(GuestAccess.get().owns(field),
+                            "The ResolvedJavaField %s must be the original field. Use OriginalFieldProvider.getOriginalField() to retrieve it.", field);
+            getUniverse().getHeapScanner().rescanField(receiver, field, reason);
+        }
+
+        public void rescanRoot(Field field, ScanReason reason) {
+            getUniverse().getHeapScanner().rescanRoot(getMetaAccess().getWrapped().lookupJavaField(field), reason);
+        }
+
+        public void rescanRoot(ResolvedJavaField field, ScanReason reason) {
+            VMError.guarantee(GuestAccess.get().owns(field),
+                            "The ResolvedJavaField %s must be the original field. Use OriginalFieldProvider.getOriginalField() to retrieve it.", field);
+            getUniverse().getHeapScanner().rescanRoot(field, reason);
+        }
+
+        public Field findField(String declaringClassName, String fieldName) {
+            return findField(imageClassLoader.findClassOrFail(declaringClassName), fieldName);
+        }
+
+        public Field findField(Class<?> declaringClass, String fieldName) {
+            return ReflectionUtil.lookupField(declaringClass, fieldName);
+        }
+
+        public void ensureInitialized(String className) {
+            try {
+                imageClassLoader.guestTypes.typeForName(className).initialize();
+            } catch (ClassNotFoundException e) {
+                throw VMError.shouldNotReachHere(e);
+            }
+        }
+    }
+
+    public static class DuringSetupAccessImpl extends AnalysisAccessBase implements Feature.DuringSetupAccess, JVMCIFeatureAccess.DuringSetupAccess {
+
+        public DuringSetupAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, debugContext);
+        }
+
+        @Override
+        public void registerObjectReplacer(Function<Object, Object> replacer) {
+            getUniverse().registerObjectReplacer(replacer);
+        }
+
+        @Override
+        public void registerJVMCIObjectReplacer(Function<JavaConstant, JavaConstant> replacer) {
+            // TODO GR-72473: make the object replacer pipeline consume JavaConstant directly.
+            getUniverse().registerObjectReplacer(object -> {
+                JavaConstant replacement = Objects.requireNonNull(replacer.apply(bb.getSnippetReflectionProvider().forObject(object)));
+                return bb.getSnippetReflectionProvider().asObject(Object.class, replacement);
+            });
+        }
+
+        /**
+         * Register an object replacer which may return an ImageHeapConstant. Note only one replacer
+         * can be triggered for a given object; otherwise an error will be thrown. Too, if the
+         * object should not be replaced then {@code null} should be returned.
+         */
+        public void registerObjectToConstantReplacer(Function<Object, ImageHeapConstant> replacer) {
+            getUniverse().registerObjectToConstantReplacer(replacer);
+        }
+
+        /**
+         * Register a callback which will execute once for each analysis type created. Note this
+         * callback runs when the created AnalysisType is already visible within the analysis
+         * universe.
+         */
+        public void registerOnTypeCreatedCallback(Consumer<AnalysisType> callback) {
+            getUniverse().registerOnTypeCreatedCallback(callback);
+        }
+
+        /**
+         * Register a callback that is executed when an object of the specified type or any of its
+         * subtypes is marked as reachable. The callback is executed before the object is added to
+         * the shadow heap. A callback may throw an {@link UnsupportedFeatureException} to reject an
+         * object based on specific validation rules. This will stop the image build and report how
+         * the object was reached.
+         *
+         * @since 24.0
+         */
+        public <T> void registerObjectReachableCallback(Class<T> clazz, ObjectReachableCallback<T> callback) {
+            getMetaAccess().lookupJavaType(clazz).registerObjectReachableCallback(callback);
+        }
+
+        @Override
+        public <T> void registerObjectReachabilityHandler(Consumer<T> callback, Class<T> clazz) {
+            ObjectReachableCallback<T> wrapper = (_, obj, _) -> callback.accept(obj);
+            getMetaAccess().lookupJavaType(clazz).registerObjectReachableCallback(wrapper);
+        }
+
+        @Override
+        public void registerObjectReachabilityHandler(Consumer<JavaConstant> callback, ResolvedJavaType type) {
+            // TODO GR-73228: make the object reachability pipeline pass JavaConstant directly.
+            ObjectReachableCallback<Object> wrapper = (_, obj, _) -> callback.accept(bb.getSnippetReflectionProvider().forObject(obj));
+            asAnalysisType(type).registerObjectReachableCallback(wrapper);
+        }
+
+        public void registerSubstitutionProcessor(SubstitutionProcessor substitution) {
+            getUniverse().registerFeatureSubstitution(substitution);
+        }
+
+        public void registerNativeSubstitutionProcessor(SubstitutionProcessor substitution) {
+            getUniverse().registerFeatureNativeSubstitution(substitution);
+        }
+
+        /**
+         * Registers a listener that is notified for every class that is identified as reachable by
+         * the analysis. The newly discovered class is passed as a parameter to the listener.
+         * <p>
+         * The listener is called during the analysis, at similar times as
+         * {@link Feature#duringAnalysis}. The first argument is a {@link DuringAnalysisAccess
+         * access} object that allows to query the analysis state. If the handler performs changes
+         * the analysis universe, e.g., makes new types or methods reachable, it needs to call
+         * {@link DuringAnalysisAccess#requireAnalysisIteration()} to trigger a new iteration of the
+         * analysis.
+         *
+         * @since 19.0
+         */
+        public void registerClassReachabilityListener(BiConsumer<DuringAnalysisAccess, Class<?>> listener) {
+            getHostVM().registerClassReachabilityListener(listener);
+        }
+
+        /**
+         * Registers a method that is allowed to be executed at build time if called as the
+         * bootstrap method for an invokedynamic, in which case each call site outputted will be
+         * constant-folded. Other bootstrap methods will be executed at run time by default,
+         * creating the call site at run time.
+         *
+         * @since 25.1
+         */
+        public void registerBuildTimeIndyIncludeList(Executable method) {
+            BootstrapMethodConfiguration.singleton().addBuildTimeIndy(getUniverse().getOriginalMetaAccess().lookupJavaMethod(method));
+        }
+
+        /**
+         * Registers a method that is allowed to be executed at build time if called as the
+         * bootstrap method for a constantdynamic, in which case each call site outputted will be
+         * constant-folded. Other bootstrap methods will be executed at run time by default,
+         * creating the call site at run time.
+         *
+         * @since 25.1
+         */
+        public void registerBuildTimeCondyIncludeList(Executable method) {
+            BootstrapMethodConfiguration.singleton().addBuildTimeCondy(getUniverse().getOriginalMetaAccess().lookupJavaMethod(method));
+        }
+
+        public SVMHost getHostVM() {
+            return bb.getHostVM();
+        }
+    }
+
+    public static class BeforeAnalysisAccessImpl extends AnalysisAccessBase implements Feature.BeforeAnalysisAccess, JVMCIFeatureAccess.BeforeAnalysisAccess {
+
+        private final NativeLibraries nativeLibraries;
+        private final ReflectionDataBuilder reflectionData;
+        private final Map<Consumer<DuringAnalysisAccess>, ElementNotification> reachabilityNotifications = new ConcurrentHashMap<>();
+        private final Map<Consumer<JVMCIFeatureAccess.DuringAnalysisAccess>, Consumer<DuringAnalysisAccess>> jvmciReachabilityAdapters = new ConcurrentHashMap<>();
+
+        public BeforeAnalysisAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, NativeLibraries nativeLibraries,
+                        DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, debugContext);
+            this.nativeLibraries = nativeLibraries;
+            this.reflectionData = (ReflectionDataBuilder) ImageSingletons.lookup(RuntimeReflectionSupport.class);
+        }
+
+        public NativeLibraries getNativeLibraries() {
+            return nativeLibraries;
+        }
+
+        @Override
+        public void registerAsUsed(Class<?> clazz) {
+            registerAsUsed(getMetaAccess().lookupJavaType(clazz), "registered from Feature API");
+        }
+
+        public void registerAsUsed(Class<?> clazz, Object reason) {
+            registerAsUsed(getMetaAccess().lookupJavaType(clazz), reason);
+        }
+
+        @Override
+        public void registerAsUsed(ResolvedJavaType type) {
+            registerAsUsed(asAnalysisType(type), "registered from JVMCI Feature API");
+        }
+
+        public void registerAsUsed(AnalysisType aType, Object reason) {
+            aType.registerAsReachable(reason);
+        }
+
+        @Override
+        public void registerAsInHeap(Class<?> clazz) {
+            registerAsInHeap(getMetaAccess().lookupJavaType(clazz), "registered from Feature API");
+        }
+
+        public void registerAsInHeap(Class<?> clazz, Object reason) {
+            registerAsInHeap(getMetaAccess().lookupJavaType(clazz), reason);
+        }
+
+        @Override
+        public void registerAsInHeap(ResolvedJavaType type) {
+            registerAsInHeap(asAnalysisType(type), "registered from JVMCI Feature API");
+        }
+
+        public void registerAsInHeap(AnalysisType aType, Object reason) {
+            aType.registerAsInstantiated(reason);
+        }
+
+        @Override
+        public void registerAsUnsafeAllocated(Class<?> clazz) {
+            registerAsUnsafeAllocated(getMetaAccess().lookupJavaType(clazz), false);
+        }
+
+        @Override
+        public void registerAsUnsafeAllocated(ResolvedJavaType type) {
+            registerAsUnsafeAllocated(asAnalysisType(type), false);
+        }
+
+        public void registerAsUnsafeAllocated(AnalysisType aType, boolean preserved) {
+            if (aType.isAbstract()) {
+                throw UserError.abort("Cannot register an abstract class as instantiated: " + aType.toJavaName(true));
+            }
+            reflectionData.registerUnsafeAllocation(AccessCondition.unconditional(), preserved, aType);
+        }
+
+        @Override
+        public void registerAsAccessed(Field field) {
+            registerAsAccessed(getMetaAccess().lookupJavaField(field), "registered from Feature API");
+        }
+
+        @Override
+        public void registerAsAccessed(ResolvedJavaField field) {
+            registerAsAccessed(asAnalysisField(field), "registered from JVMCI Feature API");
+        }
+
+        public void registerAsAccessed(AnalysisField aField, Object reason) {
+            aField.registerAsAccessed(reason);
+        }
+
+        public void registerAsRead(Field field, Object reason) {
+            registerAsRead(getMetaAccess().lookupJavaField(field), reason);
+        }
+
+        public void registerAsRead(AnalysisField aField, Object reason) {
+            aField.registerAsRead(reason);
+        }
+
+        @Override
+        public void registerAsUnsafeAccessed(Field field) {
+            registerAsUnsafeAccessed(getMetaAccess().lookupJavaField(field), "registered from Feature API");
+        }
+
+        @Override
+        public void registerAsUnsafeAccessed(ResolvedJavaField field) {
+            AnalysisField aField = field instanceof AnalysisField af ? af : getUniverse().lookup(field);
+            registerAsUnsafeAccessed(aField, "registered from Feature API");
+        }
+
+        public void registerAsUnsafeAccessed(Field field, Object reason) {
+            registerAsUnsafeAccessed(getMetaAccess().lookupJavaField(field), reason);
+        }
+
+        public boolean registerAsUnsafeAccessed(AnalysisField aField, Object reason) {
+            assert !GuestAnnotationAccess.isAnnotationPresent(aField, Delete.class);
+            return aField.registerAsUnsafeAccessed(reason);
+        }
+
+        public void registerAsRoot(Executable method, boolean invokeSpecial, String reason, MethodVariant.MethodVariantKey... otherRoots) {
+            bb.addRootMethod(method, invokeSpecial, reason, otherRoots);
+        }
+
+        public void registerAsRoot(AnalysisMethod aMethod, boolean invokeSpecial, String reason, MethodVariant.MethodVariantKey... otherRoots) {
+            bb.addRootMethod(aMethod, invokeSpecial, reason, otherRoots);
+        }
+
+        public void registerAsRoot(AnalysisMethod aMethod, boolean invokeSpecial, ScanReason reason, MethodVariant.MethodVariantKey... otherRoots) {
+            bb.addRootMethod(aMethod, invokeSpecial, reason, otherRoots);
+        }
+
+        public void registerUnsafeFieldsRecomputed(Class<?> clazz) {
+            getMetaAccess().lookupJavaType(clazz).registerUnsafeFieldsRecomputed();
+        }
+
+        public SVMHost getHostVM() {
+            return bb.getHostVM();
+        }
+
+        public void registerHierarchyForReflectiveInstantiation(Class<?> c, GuestTypes guestTypes) {
+            ResolvedJavaType type = guestTypes.getGuestAccess().lookupType(c);
+            guestTypes.findSubtypes(type, false).stream().filter(t -> !t.isAbstract()).forEach(JVMCIRuntimeReflection::registerForReflectiveInstantiation);
+        }
+
+        @Override
+        public void registerReachabilityHandler(Consumer<DuringAnalysisAccess> callback, Object... elements) {
+            /*
+             * All callback->notification pairs are tracked by the reachabilityNotifications map to
+             * prevent registering the same callback multiple times. The notifications are also
+             * tracked by each AnalysisElement, i.e., each trigger, and are removed as soon as they
+             * are notified.
+             */
+            ElementNotification notification = reachabilityNotifications.computeIfAbsent(callback, ElementNotification::new);
+
+            if (notification.isNotified()) {
+                /* Already notified from an earlier registration, nothing to do. */
+                return;
+            }
+
+            for (Object trigger : elements) {
+                AnalysisElement analysisElement = switch (trigger) {
+                    case Class<?> clazz -> getMetaAccess().lookupJavaType(clazz);
+                    case Field field -> getMetaAccess().lookupJavaField(field);
+                    case Executable executable -> getMetaAccess().lookupJavaMethod(executable);
+                    case ResolvedJavaType type -> asAnalysisType(type);
+                    case ResolvedJavaField field -> asAnalysisField(field);
+                    case ResolvedJavaMethod method -> asAnalysisMethod(method);
+                    case AnalysisElement ae -> ae;
+                    default -> throw UserError.abort("'registerReachabilityHandler' called with an element that is not a Class, Field, Executable, or JVMCI metadata element: %s",
+                                    trigger.getClass().getTypeName());
+                };
+
+                analysisElement.registerReachabilityNotification(notification);
+                if (analysisElement.isTriggered()) {
+                    /*
+                     * Element already triggered, just notify the callback. At this point we could
+                     * just notify the callback and bail out, but, for debugging, it may be useful
+                     * to execute the notification for each trigger. Note that although the
+                     * notification can be shared between multiple triggers the notification
+                     * mechanism ensures that the callback itself is only executed once.
+                     */
+                    analysisElement.notifyReachabilityCallback(getUniverse(), notification);
+                }
+            }
+        }
+
+        @Override
+        public void registerJVMCIReachabilityHandler(Consumer<JVMCIFeatureAccess.DuringAnalysisAccess> callback, ModifiersProvider... elements) {
+            Consumer<DuringAnalysisAccess> adapter = jvmciReachabilityAdapters.computeIfAbsent(callback,
+                            c -> access -> c.accept((JVMCIFeatureAccess.DuringAnalysisAccess) access));
+            registerReachabilityHandler(adapter, (Object[]) elements);
+        }
+
+        @Override
+        public void registerMethodOverrideReachabilityHandler(BiConsumer<DuringAnalysisAccess, Executable> callback, Executable baseMethod) {
+            AnalysisMethod baseAnalysisMethod = getMetaAccess().lookupJavaMethod(baseMethod);
+            MethodOverrideReachableNotification notification = new MethodOverrideReachableNotification(callback);
+            baseAnalysisMethod.registerOverrideReachabilityNotification(notification);
+
+            /*
+             * Notify for already reachable overrides. When a new override becomes reachable all
+             * installed reachability callbacks in the supertypes declaring the method are
+             * triggered.
+             */
+            for (AnalysisMethod override : reachableMethodOverrides(baseAnalysisMethod)) {
+                notification.notifyCallback(getUniverse(), override);
+            }
+        }
+
+        @Override
+        public void registerMethodOverrideReachabilityHandler(BiConsumer<JVMCIFeatureAccess.DuringAnalysisAccess, ResolvedJavaMethod> callback, ResolvedJavaMethod baseMethod) {
+            AnalysisMethod baseAnalysisMethod = asAnalysisMethod(baseMethod);
+            // TODO GR-76812: make the notification payload expose JVMCI metadata directly.
+            MethodOverrideReachableNotification notification = new MethodOverrideReachableNotification((access, executable) -> callback.accept((JVMCIFeatureAccess.DuringAnalysisAccess) access,
+                            getMetaAccess().lookupJavaMethod(executable)));
+            baseAnalysisMethod.registerOverrideReachabilityNotification(notification);
+
+            for (AnalysisMethod override : reachableMethodOverrides(baseAnalysisMethod)) {
+                notification.notifyCallback(getUniverse(), override);
+            }
+        }
+
+        @Override
+        public void registerSubtypeReachabilityHandler(BiConsumer<DuringAnalysisAccess, Class<?>> callback, Class<?> baseClass) {
+            AnalysisType baseType = getMetaAccess().lookupJavaType(baseClass);
+            SubtypeReachableNotification notification = new SubtypeReachableNotification(callback);
+            baseType.registerSubtypeReachabilityNotification(notification);
+
+            /*
+             * Notify for already reachable subtypes. When a new type becomes reachable all
+             * installed reachability callbacks in the supertypes are triggered.
+             */
+            for (AnalysisType subtype : reachableSubtypes(baseType)) {
+                notification.notifyCallback(getUniverse(), subtype);
+            }
+        }
+
+        @Override
+        public void registerSubtypeReachabilityHandler(BiConsumer<JVMCIFeatureAccess.DuringAnalysisAccess, ResolvedJavaType> callback, ResolvedJavaType baseType) {
+            AnalysisType baseAnalysisType = asAnalysisType(baseType);
+            // TODO GR-76812: make the notification payload expose JVMCI metadata directly.
+            SubtypeReachableNotification notification = new SubtypeReachableNotification((access, clazz) -> callback.accept((JVMCIFeatureAccess.DuringAnalysisAccess) access,
+                            getMetaAccess().lookupJavaType(clazz)));
+            baseAnalysisType.registerSubtypeReachabilityNotification(notification);
+
+            for (AnalysisType subtype : reachableSubtypes(baseAnalysisType)) {
+                notification.notifyCallback(getUniverse(), subtype);
+            }
+        }
+
+        @Override
+        public void registerClassInitializerReachabilityHandler(Consumer<DuringAnalysisAccess> callback, Class<?> clazz) {
+            /*
+             * In our current static analysis implementations, there is no difference between the
+             * reachability of a class and the reachability of its class initializer.
+             */
+            registerReachabilityHandler(callback, clazz);
+        }
+
+        @Override
+        public void registerClassInitializerReachabilityHandler(Consumer<JVMCIFeatureAccess.DuringAnalysisAccess> callback, ResolvedJavaType type) {
+            registerJVMCIReachabilityHandler(callback, type);
+        }
+
+        @Override
+        public void registerFieldValueTransformer(Field field, FieldValueTransformer transformer) {
+            FieldValueInterceptionSupport.singleton().registerLegacyFieldValueTransformer(field, transformer);
+        }
+
+        /**
+         * Registers a field value transformer for the provided field. See the JavaDoc of
+         * {@link FieldValueTransformer} for details.
+         *
+         * @param field This should be the <em>original</em> (Host VM) field. See
+         *            {@link OriginalFieldProvider#getOriginalField}.
+         * @param transformer the transformer that should be applied
+         */
+        @Override
+        public void registerFieldValueTransformer(ResolvedJavaField field, JVMCIFieldValueTransformer transformer) {
+            VMError.guarantee(!(field instanceof OriginalFieldProvider),
+                            "The ResolvedJavaField %s must be the original (Host VM) field. You can use OriginalFieldProvider.getOriginalField() to retrieve that", field);
+            FieldValueInterceptionSupport.singleton().registerFieldValueTransformer(field, transformer);
+        }
+
+        /**
+         * Registers a {@link LayeredFieldValueTransformer} for a field whose value may be carried
+         * forward from an initial layer and updated by an extension layer. Unlike
+         * {@link #registerFieldValueTransformer(Field, FieldValueTransformer)}, the transformer is
+         * represented as an image-layer-aware JVMCI transformer so that updatable prior-layer field
+         * values can be tracked and patched when a later layer supplies a replacement value.
+         *
+         * @param field the field whose value should be transformed
+         * @param transformer the layered transformer instance to apply to the field
+         */
+        public void registerLayeredFieldValueTransformer(Field field, LayeredFieldValueTransformer<?> transformer) {
+            FieldValueInterceptionSupport.singleton().registerLayeredFieldValueTransformer(getMetaAccess().lookupJavaField(field), transformer);
+        }
+
+        /**
+         * Registers a method as having an analysis-opaque return value. This designation limits the
+         * type-flow analysis performed on the method's return value.
+         */
+        public void registerOpaqueMethodReturn(Method method) {
+            AnalysisMethod aMethod = bb.getMetaAccess().lookupJavaMethod(method);
+            VMError.guarantee(aMethod.getAllMethodVariants().size() == 1, "Opaque method return called for method with >1 method variants: %s ", method);
+            aMethod.setOpaqueReturn();
+        }
+
+        /**
+         * Calling this method allows a given {@link Stable} {@code field} to be folded before
+         * analysis, which may improve analysis precision and allow more classes to be initialized
+         * via simulation. Users of this method are <b>required to somehow initialize the field
+         * before analysis</b>, ideally next to the call to {@code allowStableFieldFolding} or at
+         * least write a comment there to explain how the {@code field} is initialized. Trying to
+         * fold such a {@link Stable} field which still has a default value by the time the analysis
+         * is started results in a <b>build failure</b>, because if the initialization occurs later,
+         * the folding might result in a non-deterministic behavior, as the field will get folded
+         * before/during analysis only in some builds when the initialization happened fast enough,
+         * resulting in unstable number of reachable methods and unstable decisions of the
+         * simulation of class initializers.
+         *
+         * @see SVMHost#allowStableFieldFoldingBeforeAnalysis
+         */
+        public void allowStableFieldFoldingBeforeAnalysis(Field field) {
+            allowStableFieldFoldingBeforeAnalysis(getMetaAccess().lookupJavaField(field));
+        }
+
+        public void allowStableFieldFoldingBeforeAnalysis(ResolvedJavaField field) {
+            getHostVM().allowStableFieldFoldingBeforeAnalysis(field instanceof AnalysisField analysisField ? analysisField : getUniverse().lookup(field));
+        }
+    }
+
+    public static class DuringAnalysisAccessImpl extends BeforeAnalysisAccessImpl implements Feature.DuringAnalysisAccess, JVMCIFeatureAccess.DuringAnalysisAccess {
+
+        private boolean requireAnalysisIteration;
+
+        public DuringAnalysisAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, NativeLibraries nativeLibraries, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, nativeLibraries, debugContext);
+        }
+
+        @Override
+        public void requireAnalysisIteration() {
+            requireAnalysisIteration = true;
+        }
+
+        public boolean getAndResetRequireAnalysisIteration() {
+            boolean result = requireAnalysisIteration;
+            requireAnalysisIteration = false;
+            return result;
+        }
+
+    }
+
+    public static class ConcurrentAnalysisAccessImpl extends DuringAnalysisAccessImpl {
+
+        public ConcurrentAnalysisAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, NativeLibraries nativeLibraries, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, nativeLibraries, debugContext);
+        }
+
+        @Override
+        public void requireAnalysisIteration() {
+            if (bb.executorIsStarted()) {
+                throw VMError.shouldNotReachHere("Calling DuringAnalysisAccessImpl.requireAnalysisIteration() is not necessary when running the reachability handlers concurrently during analysis.");
+            }
+            /*
+             * While it may seem wrong that the concurrent analysis accessor can request an
+             * additional analysis iteration this is necessary because the concurrent reachability
+             * callbacks can be forced to run synchronously in the single-threaded "during analysis"
+             * phase when elements are marked as reachable from Feature.duringAnalysis hooks.
+             */
+            super.requireAnalysisIteration();
+        }
+
+    }
+
+    public static class AfterAnalysisAccessImpl extends AnalysisAccessBase implements Feature.AfterAnalysisAccess, JVMCIFeatureAccess.AfterAnalysisAccess {
+        public AfterAnalysisAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, debugContext);
+        }
+    }
+
+    public static class OnAnalysisExitAccessImpl extends AnalysisAccessBase implements Feature.OnAnalysisExitAccess, JVMCIFeatureAccess.OnAnalysisExitAccess {
+        public OnAnalysisExitAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, Inflation bb, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, bb, debugContext);
+        }
+    }
+
+    public abstract static class HostedFeatureAccessImpl extends FeatureAccessImpl {
+
+        HostedFeatureAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+        }
+
+        @Override
+        public abstract HostedMetaAccess getMetaAccess();
+
+        @Override
+        public HostedType findTypeByName(String className) {
+            Class<?> clazz = findClassByName(className);
+            if (clazz == null) {
+                return null;
+            }
+            try {
+                return getMetaAccess().lookupJavaType(clazz);
+            } catch (AnalysisError.TypeNotFoundError e) {
+                // Type not found during analysis
+                return null;
+            }
+        }
+    }
+
+    public static class BeforeUniverseBuildingAccessImpl extends HostedFeatureAccessImpl implements Feature.BeforeUniverseBuildingAccess, JVMCIFeatureAccess.BeforeUniverseBuildingAccess {
+        protected final HostedMetaAccess hMetaAccess;
+
+        BeforeUniverseBuildingAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, DebugContext debugContext, HostedMetaAccess hMetaAccess) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.hMetaAccess = hMetaAccess;
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return hMetaAccess;
+        }
+    }
+
+    public static class CompilationAccessImpl extends HostedFeatureAccessImpl implements Feature.CompilationAccess, JVMCIFeatureAccess.CompilationAccess {
+
+        protected final AnalysisUniverse aUniverse;
+        protected final HostedUniverse hUniverse;
+        protected final NativeImageHeap heap;
+        protected final RuntimeConfiguration runtimeConfiguration;
+        protected final NativeLibraries nativeLibraries;
+
+        CompilationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, AnalysisUniverse aUniverse, HostedUniverse hUniverse, NativeImageHeap heap, DebugContext debugContext,
+                        RuntimeConfiguration runtimeConfiguration, NativeLibraries nativeLibraries) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.aUniverse = aUniverse;
+            this.hUniverse = hUniverse;
+            this.heap = heap;
+            this.runtimeConfiguration = runtimeConfiguration;
+            this.nativeLibraries = nativeLibraries;
+        }
+
+        public NativeLibraries getNativeLibraries() {
+            return nativeLibraries;
+        }
+
+        @Override
+        public long objectFieldOffset(Field field) {
+            return objectFieldOffset(getMetaAccess().lookupJavaField(field));
+        }
+
+        @Override
+        public long objectFieldOffset(ResolvedJavaField field) {
+            return objectFieldOffset(field instanceof HostedField hField ? hField : hUniverse.lookup(field));
+        }
+
+        public long objectFieldOffset(HostedField hField) {
+            int result = hField.getLocation();
+            assert result > 0 : Assertions.errorMessage(hField, hField.getLocation());
+            return result;
+        }
+
+        @Override
+        public void registerAsImmutable(Object object) {
+            heap.registerAsImmutable(object);
+        }
+
+        @Override
+        public void registerAsImmutable(JavaConstant object) {
+            heap.registerAsImmutable(hUniverse.getSnippetReflection().asObject(Object.class, object));
+        }
+
+        @Override
+        public void registerAsImmutable(Object root, Predicate<Object> includeObject) {
+            heap.registerAsImmutable(root, includeObject);
+        }
+
+        @Override
+        @SuppressWarnings("overloads")
+        public void registerAsImmutable(JavaConstant root, Predicate<JavaConstant> includeObject) {
+            heap.registerAsImmutable(hUniverse.getSnippetReflection().asObject(Object.class, root),
+                            object -> includeObject.test(hUniverse.getSnippetReflection().forObject(object)));
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return (HostedMetaAccess) getProviders().getMetaAccess();
+        }
+
+        public RuntimeConfiguration getRuntimeConfiguration() {
+            return runtimeConfiguration;
+        }
+
+        public Providers getProviders() {
+            return runtimeConfiguration.getProviders();
+        }
+
+        public HostedUniverse getUniverse() {
+            return hUniverse;
+        }
+
+        public Collection<? extends SharedType> getTypes() {
+            return hUniverse.getTypes();
+        }
+
+        public Collection<? extends SharedField> getFields() {
+            return hUniverse.getFields();
+        }
+
+        public Collection<? extends SharedMethod> getMethods() {
+            return hUniverse.getMethods();
+        }
+
+        public ImageHeapScanner getHeapScanner() {
+            return aUniverse.getHeapScanner();
+        }
+    }
+
+    public static class BeforeCompilationAccessImpl extends CompilationAccessImpl implements Feature.BeforeCompilationAccess, JVMCIFeatureAccess.BeforeCompilationAccess {
+
+        public BeforeCompilationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, AnalysisUniverse aUniverse, HostedUniverse hUniverse,
+                        NativeImageHeap heap, DebugContext debugContext, RuntimeConfiguration runtimeConfiguration, NativeLibraries nativeLibraries) {
+            super(featureHandler, imageClassLoader, aUniverse, hUniverse, heap, debugContext, runtimeConfiguration, nativeLibraries);
+        }
+
+    }
+
+    public static class AfterCompilationAccessImpl extends CompilationAccessImpl implements Feature.AfterCompilationAccess, JVMCIFeatureAccess.AfterCompilationAccess {
+        private final Map<HostedMethod, CompileTask> compilations;
+        private final NativeImageCodeCache codeCache;
+
+        public AfterCompilationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, AnalysisUniverse aUniverse, HostedUniverse hUniverse,
+                        Map<HostedMethod, CompileTask> compilations, NativeImageCodeCache codeCache, NativeImageHeap heap, DebugContext debugContext,
+                        RuntimeConfiguration runtimeConfiguration, NativeLibraries nativeLibraries) {
+            super(featureHandler, imageClassLoader, aUniverse, hUniverse, heap, debugContext, runtimeConfiguration, nativeLibraries);
+            this.compilations = compilations;
+            this.codeCache = codeCache;
+        }
+
+        public Collection<CompileTask> getCompilationTasks() {
+            return compilations.values();
+        }
+
+        public Map<HostedMethod, CompileTask> getCompilations() {
+            return compilations;
+        }
+
+        public NativeImageCodeCache getCodeCache() {
+            return codeCache;
+        }
+
+        public NativeImageHeap getHeap() {
+            return heap;
+        }
+    }
+
+    public static class BeforeHeapLayoutAccessImpl extends CompilationAccessImpl implements Feature.BeforeHeapLayoutAccess, JVMCIFeatureAccess.BeforeHeapLayoutAccess {
+        public BeforeHeapLayoutAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, AnalysisUniverse aUniverse, HostedUniverse hUniverse, NativeImageHeap heap,
+                        DebugContext debugContext, RuntimeConfiguration runtimeConfiguration, NativeLibraries nativeLibraries) {
+            super(featureHandler, imageClassLoader, aUniverse, hUniverse, heap, debugContext, runtimeConfiguration, nativeLibraries);
+        }
+    }
+
+    public static class AfterHeapLayoutAccessImpl extends HostedFeatureAccessImpl implements Feature.AfterHeapLayoutAccess, JVMCIFeatureAccess.AfterHeapLayoutAccess {
+        protected final HostedMetaAccess hMetaAccess;
+        protected final NativeImageHeap heap;
+        protected final ImageHeapLayoutInfo heapLayout;
+
+        public AfterHeapLayoutAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, NativeImageHeap heap, ImageHeapLayoutInfo heapLayout, HostedMetaAccess hMetaAccess,
+                        DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.heap = heap;
+            this.hMetaAccess = hMetaAccess;
+            this.heapLayout = heapLayout;
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return hMetaAccess;
+        }
+
+        public NativeImageHeap getHeap() {
+            return heap;
+        }
+
+        public ImageHeapLayoutInfo getHeapLayout() {
+            return heapLayout;
+        }
+    }
+
+    public static class BeforeImageWriteAccessImpl extends HostedFeatureAccessImpl implements Feature.BeforeImageWriteAccess, JVMCIFeatureAccess.BeforeImageWriteAccess {
+        private List<Function<LinkerInvocation, LinkerInvocation>> linkerInvocationTransformers = null;
+
+        protected final String imageName;
+        protected final AbstractImage image;
+        protected final RuntimeConfiguration runtimeConfig;
+        protected final AnalysisUniverse aUniverse;
+        protected final HostedUniverse hUniverse;
+        protected final HostedOptionProvider optionProvider;
+        protected final HostedMetaAccess hMetaAccess;
+
+        BeforeImageWriteAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, String imageName, AbstractImage image, RuntimeConfiguration runtimeConfig,
+                        AnalysisUniverse aUniverse, HostedUniverse hUniverse, HostedOptionProvider optionProvider, HostedMetaAccess hMetaAccess, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.imageName = imageName;
+            this.image = image;
+            this.runtimeConfig = runtimeConfig;
+            this.aUniverse = aUniverse;
+            this.hUniverse = hUniverse;
+            this.optionProvider = optionProvider;
+            this.hMetaAccess = hMetaAccess;
+        }
+
+        public String getImageName() {
+            return imageName;
+        }
+
+        public AbstractImage getImage() {
+            return image;
+        }
+
+        public String getOutputFilename() {
+            return image.getImageKind().getOutputFilename(imageName);
+        }
+
+        public RuntimeConfiguration getRuntimeConfiguration() {
+            return runtimeConfig;
+        }
+
+        public HostedUniverse getHostedUniverse() {
+            return hUniverse;
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return hMetaAccess;
+        }
+
+        public Iterable<Function<LinkerInvocation, LinkerInvocation>> getLinkerInvocationTransformers() {
+            if (linkerInvocationTransformers == null) {
+                return Collections.emptyList();
+            }
+            return linkerInvocationTransformers;
+        }
+
+        public void registerLinkerInvocationTransformer(Function<LinkerInvocation, LinkerInvocation> transformer) {
+            if (linkerInvocationTransformers == null) {
+                linkerInvocationTransformers = new ArrayList<>();
+            }
+            linkerInvocationTransformers.add(transformer);
+        }
+    }
+
+    public static class AfterAbstractImageCreationAccessImpl extends HostedFeatureAccessImpl implements InternalFeature.AfterAbstractImageCreationAccess {
+        protected final AbstractImage abstractImage;
+        protected final RuntimeConfiguration runtimeConfiguration;
+        private final HostedMetaAccess hMetaAccess;
+        protected final ImageHeapLayoutInfo heapLayout;
+
+        AfterAbstractImageCreationAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, HostedMetaAccess hMetaAccess, DebugContext debugContext, AbstractImage abstractImage,
+                        ImageHeapLayoutInfo heapLayout, RuntimeConfiguration runtimeConfiguration) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.abstractImage = abstractImage;
+            this.runtimeConfiguration = runtimeConfiguration;
+            this.hMetaAccess = hMetaAccess;
+            this.heapLayout = heapLayout;
+        }
+
+        public AbstractImage getImage() {
+            return abstractImage;
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return hMetaAccess;
+        }
+
+        public ImageHeapLayoutInfo getHeapLayout() {
+            return heapLayout;
+        }
+
+        public RuntimeConfiguration getRuntimeConfiguration() {
+            return runtimeConfiguration;
+        }
+    }
+
+    public static class AfterImageWriteAccessImpl extends HostedFeatureAccessImpl implements Feature.AfterImageWriteAccess, JVMCIFeatureAccess.AfterImageWriteAccess {
+        private final HostedUniverse hUniverse;
+        protected final LinkerInvocation linkerInvocation;
+        protected final Path tempDirectory;
+        protected final NativeImageKind imageKind;
+        private final HostedMetaAccess hMetaAccess;
+
+        AfterImageWriteAccessImpl(FeatureHandler featureHandler, ImageClassLoader imageClassLoader, HostedUniverse hUniverse, LinkerInvocation linkerInvocation, Path tempDirectory,
+                        NativeImageKind imageKind, HostedMetaAccess hMetaAccess, DebugContext debugContext) {
+            super(featureHandler, imageClassLoader, debugContext);
+            this.hUniverse = hUniverse;
+            this.linkerInvocation = linkerInvocation;
+            this.tempDirectory = tempDirectory;
+            this.imageKind = imageKind;
+            this.hMetaAccess = hMetaAccess;
+        }
+
+        public HostedUniverse getUniverse() {
+            return hUniverse;
+        }
+
+        @Override
+        public Path getImagePath() {
+            if (linkerInvocation == null) {
+                /* Some backends might not use native-linking */
+                return null;
+            }
+            return linkerInvocation.getOutputFile();
+        }
+
+        public Path getTempDirectory() {
+            return tempDirectory;
+        }
+
+        public NativeImageKind getImageKind() {
+            return imageKind;
+        }
+
+        public List<String> getImageSymbols(boolean onlyGlobal) {
+            return linkerInvocation.getImageSymbols(onlyGlobal);
+        }
+
+        @Override
+        public HostedMetaAccess getMetaAccess() {
+            return hMetaAccess;
+        }
+    }
+}

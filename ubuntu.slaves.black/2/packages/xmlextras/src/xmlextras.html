@@ -1,0 +1,292 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Xml Extras (WebFX)</title>
+<script type="text/javascript" src="local/webfxlayout.js"></script>
+</head>
+<body>
+<!-- WebFX Layout Include -->
+<script type="text/javascript">
+
+var articleMenu= new WebFXMenu;
+articleMenu.left  = 384;
+articleMenu.top   = 86;
+articleMenu.width = 140;
+articleMenu.add(new WebFXMenuItem("Xml Extras", "xmlextras.html"));
+articleMenu.add(new WebFXMenuItem("Usage", "usage.html"));
+articleMenu.add(new WebFXMenuItem("Demo", "demo.html"));
+articleMenu.add(new WebFXMenuSeparator);
+articleMenu.add(new WebFXMenuItem("Download", "/download/xmlextras.zip"));
+webfxMenuBar.add(new WebFXMenuButton("Article Menu", null, null, articleMenu));
+
+webfxLayout.writeTitle("Xml Extras");
+webfxLayout.writeMenu();
+webfxLayout.writeDesignedByEdger();
+
+</script>
+<div class="webfx-main-body">
+<!-- end WebFX Layout Includes -->
+
+<div class="license">
+	Licensed under the <a href="http://webfx.eae.net/license/asl2">Apache Software License 2.0</a>
+	<p>
+		This component may be obtained, modified and distributed free of charge for personal as
+		well as commercial use. Please see the license for the complete terms and  exact wording.
+	</p>
+</div>
+
+<p>
+	<span class="date">(2006-05-29)</span> Changed license to Apache Software License 2.0.<br />
+</p>
+
+<h2>Introduction</h2>
+
+<p>The usage of XML is everywhere. The usage of XML inside the browser has been
+around for a while but not until lately has it been possible to get this to
+work in a satisfactory way in more than one browser. A while back Mozilla added
+support for creating MS compatible XML classes scriptable from JavaScript.</p>
+
+<p>This script creates a common interface for Mozilla and IE and also extends the
+Mozilla classes a little to make them behave even more like the Microsoft interfaces.</p>
+
+<h2>XML in IE</h2>
+
+<p>In IE there are two useful ActiveX objects that are marked as safe for scripting.
+These objects use the MSXML XML parser and are created like this:</p>
+
+<pre>
+var xmlDocument = new ActiveXObject("MsXml2.XmlDom");
+var xmlHttp = new ActiveXObject("MsXml2.XmlHttp");
+</pre>
+
+<p>The first object is an XML document that allows you to add new nodes to, using
+standard DOM1 Core methods. There are also a few extra methods provided by this
+object that allows you to load (get) an XML document from a file or from a string.</p>
+
+<p>The second of these objects allows you to post an XML document to the server and the
+reply from the server is sent back to the XML HTTP request object. This allows you to
+post XML data to the server without leaving the current page.</p>
+
+<h2>XML in Mozilla</h2>
+
+<p>Mozilla uses <a href="http://www.w3.org">W3C</a> compatible technologies whenever there
+is one. In the case of creating an XML document there happens to be a standard way to do
+this that was
+introduced in <a href="http://www.w3.org/TR/2000/REC-DOM-Level-2-Core-20001113/">DOM Level 2</a>.
+This uses the <code>createDocument</code> method of the <code>DOMImplementation</code>
+interface.</p>
+
+<pre>
+document.implementation.createDocument(sNameSpaceUri, sQualifiedName, oDoctype);
+// in the simplest case it can be used as below
+document.implementation.createDocument("", "", null);
+</pre>
+
+<p>This creates an <code>XmlDocument</code> and one can use any DOM (level 1, 2 and 3)
+methods supported by Mozilla. Mozilla also decided to add the method <code>load</code>
+that allows you to load an XML document from a file (to be compatible with MS).</p>
+
+<p>Mozilla also has support for XML http request objects. In this case Mozilla tried to
+implement as much as possible of the MS equivalent object but since this is not part of
+any W3C standard a special JS contructor is provided. Below is the code to create
+an XML http request object.</p>
+
+<pre>
+new XMLHttpRequest();
+</pre>
+
+<h2>Implementation</h2>
+
+<p>The implementation creates two factory classes, called <code>XmlDocument</code>
+and <code>XmlHttp</code>. Both these classes have a static method (class method,
+shared method) called <code>create</code> that creates an instance object of the
+right type.</p>
+
+<pre>
+var xmlDoc  = XmlDocument.create();
+var xmlHttp = XmlHttp.create();
+</pre>
+
+<h3>XmlHttp</h3>
+
+<pre>
+// XmlHttp factory
+function XmlHttp() {}
+
+XmlHttp.create = function () {
+   try {
+      if (window.XMLHttpRequest) {
+         var req = new XMLHttpRequest();
+
+         // some older versions of Moz did not support the readyState property
+         // and the onreadystate event so we patch it!
+         if (req.readyState == null) {
+            req.readyState = 1;
+            req.addEventListener("load", function () {
+               req.readyState = 4;
+               if (typeof req.onreadystatechange == "function")
+                  req.onreadystatechange();
+            }, false);
+         }
+
+         return req;
+      }
+      if (window.ActiveXObject) {
+         return new ActiveXObject(getControlPrefix() + ".XmlHttp");
+      }
+   }
+   catch (ex) {}
+   // fell through
+   throw new Error("Your browser does not support XmlHttp objects");
+};
+</pre>
+
+<p>If one removes the extra handling of the <code>onreadystate</code> event for Mozilla
+the static method <code>create</code> just checks the support of the browser and uses
+the supported mechanism to create an instance of the desired object. If the current
+version of Mozilla does not support the <code>readyState</code> property we know that it
+does not support the <code>onreadystate</code> event so we listen to the <code>onload</code>
+event and once that occurs we call the custom event handler (if provided).</p>
+
+<h3>XmlDocument</h3>
+
+<pre>
+// XmlDocument factory
+function XmlDocument() {}
+
+XmlDocument.create = function () {
+   try {
+      // DOM2
+      if (document.implementation && document.implementation.createDocument) {
+         var doc = document.implementation.createDocument("", "", null);
+
+         // some versions of Moz do not support the readyState property
+         // and the onreadystate event so we patch it!
+         if (doc.readyState == null) {
+            doc.readyState = 1;
+            doc.addEventListener("load", function () {
+               doc.readyState = 4;
+               if (typeof doc.onreadystatechange == "function")
+                  doc.onreadystatechange();
+            }, false);
+         }
+
+         return doc;
+      }
+      if (window.ActiveXObject)
+         return new ActiveXObject(getControlPrefix() + ".XmlDom");
+   }
+   catch (ex) {}
+   throw new Error("Your browser does not support XmlDocument objects");
+};
+</pre>
+
+<p>In this case the same extra handling to support <code>onreadystatechange</code>
+is added but except for this the <code>create</code> method should be fairly straight
+forward.</p>
+
+<h3>getControlPrefix</h3>
+
+<p>Different versions of IE and Windows has different version of the MSXML parser installed
+and therefore we have created a litte helper function that checks which control prefix works
+in the user's version of IE. This function tries to create both the <code>"XmlHttp"</code>
+and <code>"XmlDom"</code> ActiveX objects and once it finds a prefix that works it stores that
+so that it does not have to try that again. If no valid control prefix is found an exception is
+thrown. The version independent control prefix is "MSXML2" and that is what is tried first.
+After that a few other prefixes are tested.</p>
+
+<pre>
+function getControlPrefix() {
+   if (getControlPrefix.prefix)
+      return getControlPrefix.prefix;
+
+   var prefixes = ["MSXML2", "Microsoft", "MSXML", "MSXML3"];
+   var o, o2;
+   for (var i = 0; i &lt; prefixes.length; i++) {
+      try {
+         // try to create the objects
+         o = new ActiveXObject(prefixes[i] + ".XmlHttp");
+         o2 = new ActiveXObject(prefixes[i] + ".XmlDom");
+         return getControlPrefix.prefix = prefixes[i];
+      }
+      catch (ex) {};
+   }
+
+   throw new Error("Could not find an installed XML parser");
+}
+</pre>
+
+<h3>Extending Mozilla</h3>
+
+<p>For a general article about extending the Mozilla DOM see the
+<a href="/dhtml/ieemu/ieemu.html">IE Emu articles</a>.</p>
+
+<p>We would like to be able to use the <code>loadXML</code> method on the <code>XmlDocument</code>
+that takes a string and parses that as XML. The Mozilla version of <code>XmlDocument</code> does not
+support that natively so we extend the prototype of the <code>Document</code> to support this. To
+parse an XML string in Mozilla one can use the built in <code>DOMParser</code> object.</p>
+
+<p>To load the document with an XML string we first parse the string and after that we remove all
+the nodes of the original tree and inserts all of the nodes from the document we got from the parsed
+string.</p>
+
+<pre>
+Document.prototype.loadXML = function (s) {
+
+   // parse the string to a new doc
+   var doc2 = (new DOMParser()).parseFromString(s, "text/xml");
+
+   // remove all initial children
+   while (this.hasChildNodes())
+      this.removeChild(this.lastChild);
+
+   // insert and import nodes
+   for (var i = 0; i < doc2.childNodes.length; i++) {
+      this.appendChild(this.importNode(doc2.childNodes[i], true));
+   }
+};
+</pre>
+
+<p>There is one more important feature that the Mozilla native version of the XML document is
+missing and that is a a way to serialize the DOM tree to an XML string. Fortunately the Mozilla
+developers have realized this and provided a class that can do this easily (even if creating a
+serializer using JS is fairly easy). This is done by using a class called
+<code>XMLSerializer</code>. In IE the XML document has a property called
+<code>xml</code> that returns the DOM tree serialized to an XML string so we define a setter
+on the <code>Document.prototype</code> that returns this.</p>
+
+<pre>
+Document.prototype.__defineGetter__("xml", function () {
+   return (new XMLSerializer()).serializeToString(this);
+});
+</pre>
+
+<h2>Documentation</h2>
+
+<p>The best documentation for the XmlDocument is probably the
+<a href="http://www.w3.org/DOM/">W3C DOM</a> level 1, 2 and 3 but MS
+has an easier to read documentation at
+<a href="http://msdn.microsoft.com/library/default.asp?url=/library/en-us/xmlsdk30/htm/xmobjxmlhttprequest.asp">MSDN</a>.
+Mozilla.org has a <a href="http://www.mozilla.org/xmlextras/">project page</a>
+covering the extra XML features it provides.</p>
+
+
+
+
+<p>
+<a href="xmlextras.html">Xml Extras</a><br />
+<a href="usage.html">Usage</a><br />
+<a href="demo.html">Demo</a><br />
+<a href="/download/xmlextras.zip">Download</a>
+</p>
+
+<p class="author">Author: Erik Arvidsson</p>
+
+<!-- end webfx-main-body -->
+</div>
+
+</body>
+</html>

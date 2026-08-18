@@ -1,0 +1,46 @@
+From: Markus Koschany <apo@debian.org>
+Date: Sat, 5 Dec 2020 02:05:44 +0100
+Subject: java11
+
+Ugly workaround for removed sun.reflect.Reflection class. Fixes FTBFS with
+OpenJDK 11 though...
+
+Bug-Debian: https://bugs.debian.org/912296
+Forwarded: no
+---
+ src/main/java/org/jboss/modules/JDKSpecific.java | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/src/main/java/org/jboss/modules/JDKSpecific.java b/src/main/java/org/jboss/modules/JDKSpecific.java
+index 565e0e9..33a7596 100644
+--- a/src/main/java/org/jboss/modules/JDKSpecific.java
++++ b/src/main/java/org/jboss/modules/JDKSpecific.java
+@@ -38,7 +38,6 @@ import java.util.Set;
+ import java.util.function.Predicate;
+ import java.util.jar.JarFile;
+ 
+-import sun.reflect.Reflection;
+ 
+ /**
+  * JDK-specific classes which are replaced for different JDK major versions.  This one is for Java 8 only.
+@@ -86,9 +85,9 @@ final class JDKSpecific {
+         int offset = 0;
+         try {
+             //noinspection deprecation
+-            result = Reflection.getCallerClass(1) == JDKSpecific.class || Reflection.getCallerClass(2) == JDKSpecific.class;
++            result = false;
+             //noinspection deprecation
+-            offset = Reflection.getCallerClass(1) == Reflection.class ? 2 : 1;
++            offset = 0;
+ 
+         } catch (Throwable ignored) {}
+         hasGetCallerClass = result;
+@@ -121,7 +120,7 @@ final class JDKSpecific {
+         // 1 == immediate caller in jboss-modules
+         // 2 == user caller
+         if (hasGetCallerClass) {
+-            return Reflection.getCallerClass(2 + callerOffset);
++            return null;
+         } else {
+             return hack.getClassContext()[2 + callerOffset];
+         }

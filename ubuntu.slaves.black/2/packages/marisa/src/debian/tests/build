@@ -1,0 +1,42 @@
+#!/bin/sh
+set -e
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+  CXX="$DEB_HOST_GNU_TYPE-g++"
+  PKGCONFIG="$DEB_HOST_GNU_TYPE-pkg-config"
+else
+  CXX=g++
+  PKGCONFIG=pkg-config
+fi
+
+echo "=== build ==="
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+cat <<__EOF__ > marisatest.cpp
+#include <iostream>
+#include <marisa.h>
+
+int main() {
+    marisa::Keyset keyset;
+    keyset.push_back("a");
+    keyset.push_back("app");
+    keyset.push_back("apple");
+
+    marisa::Trie trie;
+    trie.build(keyset);
+
+    marisa::Agent agent;
+    agent.set_query("apple");
+    while (trie.common_prefix_search(agent)) {
+        std::cout.write(agent.key().ptr(), agent.key().length());
+        std::cout << ": " << agent.key().id() << std::endl;
+    }
+    return 0;
+}
+__EOF__
+
+"$CXX" -o marisatest marisatest.cpp `"$PKGCONFIG" --cflags --libs marisa`
+echo "build: OK"
+[ -x marisatest ] && ./marisatest
+echo "run: OK"

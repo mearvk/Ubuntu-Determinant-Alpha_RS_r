@@ -1,0 +1,117 @@
+Here are some tips to test this module without building debian package:
+
+* test all:
+
+  prove -l t/
+  perl -Ilib t/*.t
+
+* single test
+
+  prove -l t/debian-dpkg.t
+  perl -Ilib t/debian-dpkg.t
+
+* pick test case for t/model_test.t
+
+model_test can be quite long to execute as it runs several test cases
+(in fact one for every example file located in t/model_test.d/*-examples)
+
+Syntax is:
+
+  perl -Ilib t/model_test.t <flag> <group> <example>
+
+flag can be:
+- t: add more verbose trace on STDOUT
+- l: print logs configured in ~/.log4config-model
+- e: print stack trace when exceptions are thrown
+
+To find group and example, run 
+  perl -Ilib t/model_tests.t |grep 'Beginning subtest'
+
+Each subtest name can be used as group and example (example can be a pattern).
+
+For instance:
+
+$ perl -Ilib t/model_tests.t x dpkg-copyright oar   
+ok 1 - compiled
+# Beginning dpkg-copyright test (t/model_tests.d/dpkg-copyright-test-conf.pl)
+# dpkg-copyright uses Dpkg::Copyright model on file copyright
+# Beginning subtest dpkg-copyright oar
+ok 2 - Copied dpkg-copyright example oar
+not ok 3 - Read configuration and created instance with init() method with warning check 
+#   Failed test 'Read configuration and created instance with init() method with warning check '
+#   at /usr/share/perl5/Config/Model/Tester.pm line 156.
+# found warning: Warning in 'Format' value 'http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/': Format does not match the recommended URL for DEP-5
+# found warning: Warning in 'Files:"sources/extra/orpheus/modules/lua-signal/lsignal.c" License short_name' value 'MIT': There are many versions of the MIT license. Please use Expat instead, when it matches. See L<Debian copyright format|https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification> and L<wikipedia|https://en.wikipedia.org/wiki/MIT_License#Various_versions>for details.
+# expected to find warning: (?^:use Expat)
+ok 4 - Ran dump_tree (no warning check)
+ok 5 - Dumped dpkg-copyright config tree in full mode
+ok 6 - Dumped dpkg-copyright config tree in custom mode
+ok 7 - first check 'Files:"sources/extra/orpheus/modules/lua-signal/lsignal.c" License short_name' value
+ok 8 - dpkg-copyright write back done
+ok 9 - Created instance dpkg-copyright-test-oar-w
+ok 10 - Dumped second dpkg-copyright config tree in custom mode
+ok 11 - compare original dpkg-copyright custom data with 2nd instance custom data
+ok 12 - check that original dpkg-copyright file was not clobbered
+# End of subtest dpkg-copyright oar
+# Beginning subtest dpkg-copyright moarvm-from-scratch
+# starting test without original config data, i.e. from scratch
+ok 13 - Copied dpkg-copyright example moarvm-from-scratch
+ok 14 - Read configuration and created instance with init() method without warning check
+# updating config with in t/scanner/examples/moarvm.in quiet 1
+ok 15 - updated configuration
+ok 16 - Ran dump_tree (no warning check)
+ok 17 - Dumped dpkg-copyright config tree in full mode
+ok 18 - Dumped dpkg-copyright config tree in custom mode
+ok 19 - first check 'License:BSD-2-clause text' value with regexp
+ok 20 - first check 'License:ISC text' value with regexp
+ok 21 - dpkg-copyright write back done
+ok 22 - check that debian/copyright does not match regexp (?^:\n\nLicense: BSD-2-clause\n\n)
+ok 23 - Created instance dpkg-copyright-test-moarvm-from-scratch-w
+ok 24 - Dumped second dpkg-copyright config tree in custom mode
+ok 25 - compare original dpkg-copyright custom data with 2nd instance custom data
+ok 26 - check that original dpkg-copyright file was not clobbered
+ok 27 - second check 'Files:"3rdparty/dyncall/*" License full_license' value
+# End of subtest dpkg-copyright moarvm-from-scratch
+# End of dpkg-copyright test
+ok 28 - test memory cycle
+1..28
+# Looks like you failed 1 test of 28.
+
+The 'x' flag is ignored. The above command runs 2 subtests that match
+'oar': 'oar' and 'moarvm'.
+
+A pattern must be used to run only 'oar' subtest':
+
+$ perl -Ilib t/model_tests.t x dpkg-copyright '\boar\b'
+ok 1 - compiled
+# Beginning dpkg-copyright test (t/model_tests.d/dpkg-copyright-test-conf.pl)
+# dpkg-copyright uses Dpkg::Copyright model on file copyright
+# Beginning subtest dpkg-copyright oar
+ok 2 - Copied dpkg-copyright example oar
+not ok 3 - Read configuration and created instance with init() method with warning check 
+#   Failed test 'Read configuration and created instance with init() method with warning check '
+#   at /usr/share/perl5/Config/Model/Tester.pm line 156.
+# found warning: Warning in 'Format' value 'http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/': Format does not match the recommended URL for DEP-5
+# found warning: Warning in 'Files:"sources/extra/orpheus/modules/lua-signal/lsignal.c" License short_name' value 'MIT': There are many versions of the MIT license. Please use Expat instead, when it matches. See L<Debian copyright format|https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification> and L<wikipedia|https://en.wikipedia.org/wiki/MIT_License#Various_versions>for details.
+# expected to find warning: (?^:use Expat)
+ok 4 - Ran dump_tree (no warning check)
+ok 5 - Dumped dpkg-copyright config tree in full mode
+ok 6 - Dumped dpkg-copyright config tree in custom mode
+ok 7 - first check 'Files:"sources/extra/orpheus/modules/lua-signal/lsignal.c" License short_name' value
+ok 8 - dpkg-copyright write back done
+ok 9 - Created instance dpkg-copyright-test-oar-w
+ok 10 - Dumped second dpkg-copyright config tree in custom mode
+ok 11 - compare original dpkg-copyright custom data with 2nd instance custom data
+ok 12 - check that original dpkg-copyright file was not clobbered
+# End of subtest dpkg-copyright oar
+# End of dpkg-copyright test
+ok 13 - test memory cycle
+1..13
+# Looks like you failed 1 test of 13.
+
+
+You can run a whole group by omitting the subtest name:
+
+ $ perl -Ilib t/model_tests.t x dpkg-control
+
+

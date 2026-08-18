@@ -1,0 +1,46 @@
+From: Gordon Ball <gordon@chronitis.net>
+Date: Tue, 2 Nov 2021 17:17:59 +0100
+Subject: test_paths: skip tests which assume non-system python
+
+See https://github.com/jupyter/jupyter_core/issues/208
+
+---
+ jupyter_core/tests/test_paths.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/jupyter_core/tests/test_paths.py b/jupyter_core/tests/test_paths.py
+index 685e16a..88ceb4c 100644
+--- a/jupyter_core/tests/test_paths.py
++++ b/jupyter_core/tests/test_paths.py
+@@ -19,7 +19,7 @@ from jupyter_core import paths
+ from jupyter_core.paths import (
+     jupyter_config_dir, jupyter_data_dir, jupyter_runtime_dir,
+     jupyter_path, jupyter_config_path, ENV_JUPYTER_PATH,
+-    secure_write, is_hidden, is_file_hidden
++    secure_write, is_hidden, is_file_hidden, SYSTEM_JUPYTER_PATH,
+ )
+ 
+ from .mocking import darwin, linux
+@@ -195,6 +195,7 @@ def test_jupyter_path():
+     assert path[0] == jupyter_data_dir()
+     assert path[-2:] == system_path
+ 
++@pytest.mark.skipif(set(ENV_JUPYTER_PATH) < set(SYSTEM_JUPYTER_PATH), reason="assumes non-system python")
+ def test_jupyter_path_user_site():
+     with no_config_env, patch.object(site, 'ENABLE_USER_SITE', True):
+         path = jupyter_path()
+@@ -208,12 +209,14 @@ def test_jupyter_path_user_site():
+     for p,v in zip(path, values):
+         assert p == v
+ 
++@pytest.mark.skipif(set(ENV_JUPYTER_PATH) < set(SYSTEM_JUPYTER_PATH), reason="assumes non-system python")
+ def test_jupyter_path_no_user_site():
+     with no_config_env, patch.object(site, 'ENABLE_USER_SITE', False):
+         path = jupyter_path()
+     assert path[0] == jupyter_data_dir()
+     assert path[1] == paths.ENV_JUPYTER_PATH[0]
+ 
++@pytest.mark.skipif(set(ENV_JUPYTER_PATH) < set(SYSTEM_JUPYTER_PATH), reason="assumes non-system python")
+ def test_jupyter_path_prefer_env():
+     with prefer_env:
+         path = jupyter_path()

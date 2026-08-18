@@ -1,0 +1,43 @@
+Description: iPXE fails to handle DHCPNACK's
+ iPXE does not handle DHCPNACK's. If iPXE gets a DHCPNACK it will
+ not re-attempt to DHCPDISCOVER, which causes iPXE to fail to PXE
+ boot on situations where there are multiple DHCP servers are
+ offering an IP.
+Author: Blake Rouse <blake.rouse@canonical.com>
+Forwarded: https://github.com/ipxe/ipxe/pull/66
+Bug: https://bugs.launchpad.net/bugs/1707999
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/ipxe/+bug/1707999
+
+Index: ipxe-1.0.0+git-20161027.b991c67+really20150424.a25a16d/src/net/udp/dhcp.c
+===================================================================
+--- ipxe-1.0.0+git-20161027.b991c67+really20150424.a25a16d.orig/src/net/udp/dhcp.c	2017-10-12 16:38:21.527631622 -0400
++++ ipxe-1.0.0+git-20161027.b991c67+really20150424.a25a16d/src/net/udp/dhcp.c	2017-10-12 16:38:21.523631288 -0400
+@@ -523,9 +523,18 @@
+ 		DBGC ( dhcp, " for %s", inet_ntoa ( ip ) );
+ 	DBGC ( dhcp, "\n" );
+ 
+-	/* Filter out unacceptable responses */
++	/* Filter out invalid port */
+ 	if ( peer->sin_port != htons ( BOOTPS_PORT ) )
+ 		return;
++
++	/* Handle DHCPNAK */
++	if ( msgtype /* BOOTP */ && ( msgtype == DHCPNAK ) ) {
++		/* Go back to discover, again. */
++		dhcp_set_state ( dhcp, &dhcp_state_discover );
++		return;
++	}
++
++	/* Filter out unacceptable responses */
+ 	if ( msgtype /* BOOTP */ && ( msgtype != DHCPACK ) )
+ 		return;
+ 	if ( server_id.s_addr != dhcp->server.s_addr )
+@@ -907,7 +916,7 @@
+ 	/* Initialise DHCP packet structure */
+ 	memset ( dhcppkt, 0, sizeof ( *dhcppkt ) );
+ 	dhcppkt_init ( dhcppkt, data, max_len );
+-	
++
+ 	/* Set DHCP_MESSAGE_TYPE option */
+ 	if ( ( rc = dhcppkt_store ( dhcppkt, DHCP_MESSAGE_TYPE,
+ 				    &msgtype, sizeof ( msgtype ) ) ) != 0 )

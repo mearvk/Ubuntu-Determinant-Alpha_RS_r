@@ -1,0 +1,113 @@
+Description: Compatibility with JDOM 1.x API
+Forwarded: no
+Author: Damien Raude-Morvan <drazzib@debian.org>
+Last-Update: 2009-09-27
+--- a/src/main/java/freemarker/ext/jdom/NodeListModel.java
++++ b/src/main/java/freemarker/ext/jdom/NodeListModel.java
+@@ -696,7 +696,7 @@
+                 else if ("data".equals(localName))
+                     attr = new Attribute("data", pi.getData());
+                 else
+-                    attr = new Attribute(localName, pi.getValue(localName));
++                    attr = new Attribute(localName, pi.getPseudoAttributeValue(localName));
+             } else if (node instanceof DocType) {
+                 DocType doctype = (DocType)node;
+                 if ("publicId".equals(localName))
+@@ -806,17 +806,17 @@
+     private static final Element getParent(Object node)
+     {
+         if (node instanceof Element)
+-            return((Element)node).getParent();
++            return((Element)node).getParentElement();
+         else if (node instanceof Attribute)
+             return((Attribute)node).getParent();
+         else if (node instanceof Text)
+-            return((Text)node).getParent();
++            return((Text)node).getParentElement();
+         else if (node instanceof ProcessingInstruction)
+-            return((ProcessingInstruction)node).getParent();
++            return((ProcessingInstruction)node).getParentElement();
+         else if (node instanceof Comment)
+-            return((Comment)node).getParent();
++            return((Comment)node).getParentElement();
+         else if (node instanceof EntityRef)
+-            return((EntityRef)node).getParent();
++            return((EntityRef)node).getParentElement();
+         else
+             // With 2.1 semantics it  makes more sense to just return a null and let the core 
+             // throw an InvalidReferenceException and the template writer can use ?exists etcetera. (JR)
+@@ -840,7 +840,7 @@
+             LinkedList list = new LinkedList();
+             do {
+                 list.addFirst(parent);
+-                parent = parent.getParent();
++                parent = parent.getParentElement();
+             }
+             while (parent != null);
+             return list;
+@@ -856,7 +856,7 @@
+             list.addFirst(node);
+             do {
+                 list.addFirst(parent);
+-                parent = parent.getParent();
++                parent = parent.getParentElement();
+             }
+             while (parent != null);
+             return list;
+@@ -915,7 +915,7 @@
+                 Element parent = ((Attribute)node).getParent();
+                 doc = parent == null ? null : parent.getDocument();
+             } else if (node instanceof Text) {
+-                Element parent = ((Text)node).getParent();
++                Element parent = ((Text)node).getParentElement();
+                 doc = parent == null ? null : parent.getDocument();
+             } else if (node instanceof Document)
+                 doc = (Document)node;
+--- a/src/main/java/freemarker/ext/xml/_JdomNavigator.java
++++ b/src/main/java/freemarker/ext/xml/_JdomNavigator.java
+@@ -133,7 +133,7 @@
+                 result.add(new Attribute("data", pi.getData()));
+             }
+             else {
+-                result.add(new Attribute(localName, pi.getValue(localName)));
++                result.add(new Attribute(localName, pi.getPseudoAttributeValue(localName)));
+             }
+         } else if (node instanceof DocType) {
+             DocType doctype = (DocType)node;
+@@ -170,22 +170,22 @@
+ 
+     Object getParent(Object node) {
+         if (node instanceof Element) {
+-            return((Element)node).getParent();
++            return((Element)node).getParentElement();
+         }
+         if (node instanceof Attribute) {
+             return((Attribute)node).getParent();
+         }
+         if (node instanceof Text) {
+-            return((Text)node).getParent();
++            return((Text)node).getParentElement();
+         }
+         if (node instanceof ProcessingInstruction) {
+-            return((ProcessingInstruction)node).getParent();
++            return((ProcessingInstruction)node).getParentElement();
+         }
+         if (node instanceof Comment) {
+-            return((Comment)node).getParent();
++            return((Comment)node).getParentElement();
+         }
+         if (node instanceof EntityRef) {
+-            return((EntityRef)node).getParent();
++            return((EntityRef)node).getParentElement();
+         }
+         return null;
+     }
+@@ -199,7 +199,7 @@
+             return parent == null ? null : parent.getDocument();
+         } 
+         else if (node instanceof Text) {
+-            Element parent = ((Text)node).getParent();
++            Element parent = ((Text)node).getParentElement();
+             return parent == null ? null : parent.getDocument();
+         } 
+         else if (node instanceof Document)

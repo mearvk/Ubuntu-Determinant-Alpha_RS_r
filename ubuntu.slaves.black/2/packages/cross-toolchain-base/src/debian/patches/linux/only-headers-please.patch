@@ -1,0 +1,102 @@
+Index: linux-source-3.2/scripts/package/builddeb
+===================================================================
+--- linux-source-3.2.orig/scripts/package/builddeb	2012-03-12 20:22:49.000000000 +0000
++++ linux-source-3.2/scripts/package/builddeb	2012-03-14 12:43:06.255964626 +0000
+@@ -101,32 +101,6 @@
+ 	mkdir -p "$tmpdir/usr/lib/uml/modules/$version" "$tmpdir/usr/bin"
+ fi
+ 
+-# Build and install the kernel
+-if [ "$ARCH" = "um" ] ; then
+-	$MAKE linux
+-	cp System.map "$tmpdir/usr/lib/uml/modules/$version/System.map"
+-	cp .config "$tmpdir/usr/share/doc/$packagename/config"
+-	gzip "$tmpdir/usr/share/doc/$packagename/config"
+-	cp $KBUILD_IMAGE "$tmpdir/usr/bin/linux-$version"
+-else 
+-	cp System.map "$tmpdir/boot/System.map-$version"
+-	cp .config "$tmpdir/boot/config-$version"
+-	# Not all arches include the boot path in KBUILD_IMAGE
+-	if [ -e $KBUILD_IMAGE ]; then
+-		cp $KBUILD_IMAGE "$tmpdir/boot/vmlinuz-$version"
+-	else
+-		cp arch/$ARCH/boot/$KBUILD_IMAGE "$tmpdir/boot/vmlinuz-$version"
+-	fi
+-fi
+-
+-if grep -q '^CONFIG_MODULES=y' .config ; then
+-	INSTALL_MOD_PATH="$tmpdir" make KBUILD_SRC= modules_install
+-	if [ "$ARCH" = "um" ] ; then
+-		mv "$tmpdir/lib/modules/$version"/* "$tmpdir/usr/lib/uml/modules/$version/"
+-		rmdir "$tmpdir/lib/modules/$version"
+-	fi
+-fi
+-
+ make headers_check
+ make headers_install INSTALL_HDR_PATH="$libc_headers_dir/usr"
+ 
+@@ -237,45 +211,6 @@
+ 
+ fi
+ 
+-# Build header package
+-(cd $srctree; find . -name Makefile -o -name Kconfig\* -o -name \*.pl > "$objtree/debian/hdrsrcfiles")
+-(cd $srctree; find arch/$SRCARCH/include include scripts -type f >> "$objtree/debian/hdrsrcfiles")
+-(cd $objtree; find .config Module.symvers include scripts -type f >> "$objtree/debian/hdrobjfiles")
+-destdir=$kernel_headers_dir/usr/src/linux-headers-$version
+-mkdir -p "$destdir"
+-(cd $srctree; tar -c -f - -T "$objtree/debian/hdrsrcfiles") | (cd $destdir; tar -xf -)
+-(cd $objtree; tar -c -f - -T "$objtree/debian/hdrobjfiles") | (cd $destdir; tar -xf -)
+-rm -f "$objtree/debian/hdrsrcfiles" "$objtree/debian/hdrobjfiles"
+-arch=$(dpkg --print-architecture)
+-
+-cat <<EOF >> debian/control
+-
+-Package: $kernel_headers_packagename
+-Provides: linux-headers, linux-headers-2.6
+-Architecture: $arch
+-Description: Linux kernel headers for $KERNELRELEASE on $arch
+- This package provides kernel header files for $KERNELRELEASE on $arch
+- .
+- This is useful for people who need to build external modules
+-EOF
+-
+-create_package "$kernel_headers_packagename" "$kernel_headers_dir"
+-
+-# Do we have firmware? Move it out of the way and build it into a package.
+-if [ -e "$tmpdir/lib/firmware" ]; then
+-	mv "$tmpdir/lib/firmware" "$fwdir/lib/"
+-
+-	cat <<EOF >> debian/control
+-
+-Package: $fwpackagename
+-Architecture: all
+-Description: Linux kernel firmware, version $version
+- This package contains firmware from the Linux kernel, version $version.
+-EOF
+-
+-	create_package "$fwpackagename" "$fwdir"
+-fi
+-
+ cat <<EOF >> debian/control
+ 
+ Package: $libc_headers_packagename
+@@ -288,6 +223,5 @@
+ EOF
+ 
+ create_package "$libc_headers_packagename" "$libc_headers_dir"
+-create_package "$packagename" "$tmpdir"
+ 
+ exit 0
+Index: linux-source-3.2/scripts/package/Makefile
+===================================================================
+--- linux-source-3.2.orig/scripts/package/Makefile	2012-03-12 20:22:49.000000000 +0000
++++ linux-source-3.2/scripts/package/Makefile	2012-03-14 12:42:35.007964039 +0000
+@@ -96,7 +96,6 @@
+ 		$(srctree)/scripts/package/builddeb
+ 
+ deb-pkg: FORCE
+-	$(MAKE) KBUILD_SRC=
+ 	$(call cmd,builddeb)
+ 
+ clean-dirs += $(objtree)/debian/

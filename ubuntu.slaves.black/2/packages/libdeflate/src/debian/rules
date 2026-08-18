@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+
+export LC_ALL=C.UTF-8
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
+%:
+	dh $@
+
+ifeq (,$(filter cross,$(DEB_BUILD_PROFILES)))
+PROFILING_FLAG = -fprofile-use
+else
+PROFILING_FLAG =
+endif
+
+override_dh_auto_build:
+ifeq (,$(filter cross,$(DEB_BUILD_PROFILES)))
+	dh_auto_build -- CFLAGS="$(shell dpkg-buildflags --get CFLAGS) -fprofile-generate" \
+		LDFLAGS="$(shell dpkg-buildflags --get LDFLAGS) -fprofile-generate"\
+		CPPFLAGS="$(shell dpkg-buildflags --get CPPFLAGS)"\
+		V=1 PREFIX=/usr DESTDIR=$(CURDIR)/debian/tmp \
+		all test_programs
+	for level in $(shell seq 1 12); do \
+		./benchmark -$${level} ./lib/deflate_compress.c > /dev/null; \
+	done
+endif
+	dh_auto_build -- CFLAGS="$(shell dpkg-buildflags --get CFLAGS) $(PROFILING_FLAG)" \
+		LDFLAGS="$(shell dpkg-buildflags --get LDFLAGS) $(PROFILING_FLAG)"\
+		CPPFLAGS="$(shell dpkg-buildflags --get CPPFLAGS)"\
+		V=1 PREFIX=/usr DESTDIR=$(CURDIR)/debian/tmp \
+		all test_programs
+
+override_dh_auto_install:
+	dh_auto_build -- CFLAGS="$(shell dpkg-buildflags --get CFLAGS) $(PROFILING_FLAG)" \
+		LDFLAGS="$(shell dpkg-buildflags --get LDFLAGS) $(PROFILING_FLAG)"\
+		CPPFLAGS="$(shell dpkg-buildflags --get CPPFLAGS)"\
+		V=1 PREFIX=/usr DESTDIR=$(CURDIR)/debian/tmp \
+		install
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	dh_auto_test -- V=1
+	# SMOKEDATA=$(CURDIR)/README.md WRAPPER= tools/run_tests.sh \
+	# 	  -checksum_benchmarks -windows -android -mips \
+	# 	  -static_analysis -native -valgrind
+	# SMOKEDATA=$(CURDIR)/README.md WRAPPER= sh tools/exec_tests.sh
+endif
+
+override_dh_install:
+	dh_install
+	d-shlibmove --commit \
+		    --multiarch \
+		    --devunversioned \
+		    --exclude-la \
+		    --movedev "debian/tmp/usr/lib/pkgconfig/*.pc" usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig \
+		    debian/tmp/usr/lib/*.so

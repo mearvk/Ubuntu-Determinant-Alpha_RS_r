@@ -1,0 +1,239 @@
+From 9ac68db819bce7b9546bc4bf1c44f82ca910fa31 Mon Sep 17 00:00:00 2001
+From: Tatu Saloranta <tatu.saloranta@iki.fi>
+Date: Wed, 20 Dec 2017 16:50:14 -0800
+Subject: [PATCH] Backport all known security fixes from 2.x that were missing, related to public CVEs.
+
+---
+
+upstream link: https://github.com/FasterXML/jackson-1/commit/9ac68db819bce7b9546bc4bf1c44f82ca910fa31
+
+diff --git a/src/java/org/codehaus/jackson/type/JavaType.java b/src/java/org/codehaus/jackson/type/JavaType.java
+index 3b216491..871bca4b 100644
+--- a/src/java/org/codehaus/jackson/type/JavaType.java
++++ b/src/java/org/codehaus/jackson/type/JavaType.java
+@@ -479,6 +479,11 @@ public abstract class JavaType
+     /**********************************************************
+      */
+ 
++    // since 1.9.14: needed by one of the patches
++    public final boolean isTypeOrSubTypeOf(Class<?> clz) {
++        return (_class == clz) || clz.isAssignableFrom(_class);
++    }
++
+     protected void _assertSubclass(Class<?> subclass, Class<?> superClass)
+     {
+         if (!_class.isAssignableFrom(subclass)) {
+diff --git a/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java b/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
+index b8c0c180..ffeadb12 100644
+--- a/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
++++ b/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
+@@ -9,6 +9,7 @@ import org.codehaus.jackson.map.deser.impl.CreatorProperty;
+ import org.codehaus.jackson.map.deser.std.StdKeyDeserializers;
+ import org.codehaus.jackson.map.deser.std.ThrowableDeserializer;
+ import org.codehaus.jackson.map.introspect.*;
++import org.codehaus.jackson.map.jsontype.impl.SubTypeValidator;
+ import org.codehaus.jackson.map.type.*;
+ import org.codehaus.jackson.map.util.ArrayBuilders;
+ import org.codehaus.jackson.map.util.ClassUtil;
+@@ -31,37 +32,6 @@ public class BeanDeserializerFactory
+      */
+     private final static Class<?>[] INIT_CAUSE_PARAMS = new Class<?>[] { Throwable.class };
+ 
+-    /**
+-     * Set of well-known "nasty classes", deserialization of which is considered dangerous
+-     * and should (and is) prevented by default.
+-     *
+-     * @since 1.9.13-atlassian-2
+-     */
+-    protected final static Set<String> DEFAULT_NO_DESER_CLASS_NAMES;
+-
+-    static
+-    {
+-        Set<String> s = new HashSet<String>();
+-        // Courtesy of [https://github.com/kantega/notsoserial]:
+-        // (and wrt [databind#1599]
+-        s.add("org.apache.commons.collections.functors.InvokerTransformer");
+-        s.add("org.apache.commons.collections.functors.InstantiateTransformer");
+-        s.add("org.apache.commons.collections4.functors.InvokerTransformer");
+-        s.add("org.apache.commons.collections4.functors.InstantiateTransformer");
+-        s.add("org.codehaus.groovy.runtime.ConvertedClosure");
+-        s.add("org.codehaus.groovy.runtime.MethodClosure");
+-        s.add("org.springframework.beans.factory.ObjectFactory");
+-        s.add("com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl");
+-        DEFAULT_NO_DESER_CLASS_NAMES = Collections.unmodifiableSet(s);
+-    }
+-
+-    /**
+-     * Set of class names of types that are never to be deserialized.
+-     *
+-     * @since 1.9.13-atlassian-2
+-     */
+-    protected Set<String> _cfgIllegalClassNames = DEFAULT_NO_DESER_CLASS_NAMES;
+-
+     /*
+     /**********************************************************
+     /* Config class implementation
+@@ -265,6 +235,12 @@ public class BeanDeserializerFactory
+      */
+     protected final Config _factoryConfig;
+ 
++    /**
++     *
++     * @since 1.9.14
++     */
++    protected SubTypeValidator _subtypeValidator = SubTypeValidator.instance();
++
+     @Deprecated
+     public BeanDeserializerFactory() {
+         this(null);
+@@ -1507,18 +1483,13 @@ public class BeanDeserializerFactory
+     }
+ 
+     /**
+-     * @since 2.8.9
++     * @since 1.9.14
+      */
+-    protected void checkIllegalTypes(JavaType type)
+-            throws JsonMappingException
++    protected void checkIllegalTypes(JavaType type) throws JsonMappingException
+     {
+         // There are certain nasty classes that could cause problems, mostly
+         // via default typing -- catch them here.
+-        String full = type.getRawClass().getName();
+-
+-        if (_cfgIllegalClassNames.contains(full))
+-        {
+-            throw new JsonMappingException("Illegal type (" + full + ") to deserialize: prevented for security reasons");
+-        }
++        _subtypeValidator.validateSubType(type);
++        //throw new JsonMappingException("Illegal type (" + full + ") to deserialize: prevented for security reasons");
+     }
+ }
+diff --git a/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/ClassNameIdResolver.java b/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/ClassNameIdResolver.java
+index c9fd65e1..c9a00011 100644
+--- a/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/ClassNameIdResolver.java
++++ b/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/ClassNameIdResolver.java
+@@ -46,8 +46,16 @@ public class ClassNameIdResolver
+          *    to do translation when necessary
+          */
+         if (id.indexOf('<') > 0) {
+-            JavaType t = TypeFactory.fromCanonical(id);
+             // note: may want to try combining with specialization (esp for EnumMap)
++            // 17-Aug-2017, tatu: As per [databind#1735] need to ensure assignment
++            //    compatibility -- needed later anyway, and not doing so may open
++            //    security issues.
++            JavaType t = _typeFactory.constructFromCanonical(id);
++            if (!t.isTypeOrSubTypeOf(_baseType.getRawClass())) {
++                // Probably cleaner to have a method in `TypeFactory` but can't add in patch
++                throw new IllegalArgumentException(String.format(
++                        "Class %s not subtype of %s", t.getRawClass().getName(), _baseType));
++            }
+             return t;
+         }
+         try {
+diff --git a/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/SubTypeValidator.java b/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/SubTypeValidator.java
+new file mode 100644
+index 00000000..865c20e7
+--- /dev/null
++++ b/src/mapper/java/org/codehaus/jackson/map/jsontype/impl/SubTypeValidator.java
+@@ -0,0 +1,97 @@
++package org.codehaus.jackson.map.jsontype.impl;
++
++import java.util.Collections;
++import java.util.HashSet;
++import java.util.Set;
++
++import org.codehaus.jackson.map.JsonMappingException;
++import org.codehaus.jackson.type.JavaType;
++
++/**
++ * Helper class used to encapsulate rules that determine subtypes that
++ * are invalid to use, even with default typing, mostly due to security
++ * concerns.
++ * Used by <code>BeanDeserializerFactory</code>
++ *
++ * @since 1.9.14
++ */
++public class SubTypeValidator
++{
++    protected final static String PREFIX_STRING = "org.springframework.";
++    /**
++     * Set of well-known "nasty classes", deserialization of which is considered dangerous
++     * and should (and is) prevented by default.
++     */
++    protected final static Set<String> DEFAULT_NO_DESER_CLASS_NAMES;
++    static {
++        Set<String> s = new HashSet<String>();
++        // Courtesy of [https://github.com/kantega/notsoserial]:
++        // (and wrt [databind#1599])
++        s.add("org.apache.commons.collections.functors.InvokerTransformer");
++        s.add("org.apache.commons.collections.functors.InstantiateTransformer");
++        s.add("org.apache.commons.collections4.functors.InvokerTransformer");
++        s.add("org.apache.commons.collections4.functors.InstantiateTransformer");
++        s.add("org.codehaus.groovy.runtime.ConvertedClosure");
++        s.add("org.codehaus.groovy.runtime.MethodClosure");
++        s.add("org.springframework.beans.factory.ObjectFactory");
++        s.add("com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl");
++        s.add("org.apache.xalan.xsltc.trax.TemplatesImpl");
++        // [databind#1680]: may or may not be problem, take no chance
++        s.add("com.sun.rowset.JdbcRowSetImpl");
++        // [databind#1737]; JDK provided
++        s.add("java.util.logging.FileHandler");
++        s.add("java.rmi.server.UnicastRemoteObject");
++        // [databind#1737]; 3rd party
++//s.add("org.springframework.aop.support.AbstractBeanFactoryPointcutAdvisor"); // deprecated by [databind#1855]
++        s.add("org.springframework.beans.factory.config.PropertyPathFactoryBean");
++        s.add("com.mchange.v2.c3p0.JndiRefForwardingDataSource");
++        s.add("com.mchange.v2.c3p0.WrapperConnectionPoolDataSource");
++        // [databind#1855]: more 3rd party
++        s.add("org.apache.tomcat.dbcp.dbcp2.BasicDataSource");
++        s.add("com.sun.org.apache.bcel.internal.util.ClassLoader");
++        DEFAULT_NO_DESER_CLASS_NAMES = Collections.unmodifiableSet(s);
++    }
++
++    /**
++     * Set of class names of types that are never to be deserialized.
++     */
++    protected Set<String> _cfgIllegalClassNames = DEFAULT_NO_DESER_CLASS_NAMES;
++
++    private final static SubTypeValidator instance = new SubTypeValidator();
++
++    protected SubTypeValidator() { }
++
++    public static SubTypeValidator instance() { return instance; }
++
++    public void validateSubType(JavaType type) throws JsonMappingException
++    {
++        // There are certain nasty classes that could cause problems, mostly
++        // via default typing -- catch them here.
++        final Class<?> raw = type.getRawClass();
++        String full = raw.getName();
++
++        main_check:
++        do {
++            if (_cfgIllegalClassNames.contains(full)) {
++                break;
++            }
++
++            // 18-Dec-2017, tatu: As per [databind#1855], need bit more sophisticated handling
++            //    for some Spring framework types
++            if (full.startsWith(PREFIX_STRING)) {
++                for (Class<?> cls = raw; cls != Object.class; cls = cls.getSuperclass()) {
++                    String name = cls.getSimpleName();
++                    // looking for "AbstractBeanFactoryPointcutAdvisor" but no point to allow any is there?
++                    if ("AbstractPointcutAdvisor".equals(name)
++                            // ditto  for "FileSystemXmlApplicationContext": block all ApplicationContexts
++                            || "AbstractApplicationContext".equals(name)) {
++                        break main_check;
++                    }
++                }
++            }
++            return;
++        } while (false);
++
++        throw new JsonMappingException("Illegal type (" + full + ") to deserialize: prevented for security reasons");
++    }
++}
+-- 
+2.20.1
+

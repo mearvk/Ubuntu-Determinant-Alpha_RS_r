@@ -1,0 +1,34 @@
+diff --git a/contrib/s390/dfltcc.h b/contrib/s390/dfltcc.h
+index e4447dd..bf41272 100644
+--- a/contrib/s390/dfltcc.h
++++ b/contrib/s390/dfltcc.h
+@@ -51,5 +51,9 @@ int ZLIB_INTERNAL dfltcc_inflate_disable OF((z_streamp strm));
+     do { \
+         if (dfltcc_was_inflate_used((strm))) return -(1L << 16); \
+     } while (0)
++#define INFLATE_SYNC_POINT_HOOK(strm) \
++    do { \
++        if (dfltcc_was_inflate_used((strm))) return Z_STREAM_ERROR; \
++    } while (0)
+ 
+ #endif
+diff --git a/inflate.c b/inflate.c
+index 2b7d564..c9d6ae2 100644
+--- a/inflate.c
++++ b/inflate.c
+@@ -100,6 +100,7 @@
+ #define INFLATE_NEED_CHECKSUM(strm) 1
+ #define INFLATE_NEED_UPDATEWINDOW(strm) 1
+ #define INFLATE_MARK_HOOK(strm) do {} while (0)
++#define INFLATE_SYNC_POINT_HOOK(strm) do {} while (0)
+ #endif
+ 
+ #ifdef MAKEFIXED
+@@ -1491,6 +1492,7 @@ z_streamp strm;
+     struct inflate_state FAR *state;
+ 
+     if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
++    INFLATE_SYNC_POINT_HOOK(strm);
+     state = (struct inflate_state FAR *)strm->state;
+     return state->mode == STORED && state->bits == 0;
+ }

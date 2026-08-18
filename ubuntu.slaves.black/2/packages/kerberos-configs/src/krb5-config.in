@@ -1,0 +1,180 @@
+#!/usr/bin/perl -w
+use strict;
+#
+# This package doesn't depend on perl, so make sure that everything done in
+# this script can be done with perl-base.  In particular, using any Perl
+# modules other than the Debconf modules and the basic pragmata probably isn't
+# valid.  (Some Perl modules do ship with perl-base, but there is no guarantee
+# that set won't change.)
+use Debconf::Client::ConfModule ':all';
+
+our $guess;
+our $guess_good = 0;
+# The realm_map is a hash that has true results if the config file
+# contains a particular realm. 
+our %realm_map;
+
+# The domain_map maps a DNS domain name to a realm.
+# Entries prefixed with . will map subdomains
+our %domain_map;
+
+our $no_dns = ! -x "/usr/bin/host";
+# subroutines
+sub host_srv($) {
+  my $h = shift;
+    return 1 if  `host -t srv "_kerberos._tcp.$h" 2>/dev/null`
+    =~ /has srv record/i;
+        return 1 if  `host -t srv "_kerberos._udp.$h" 2>/dev/null`
+    =~ /has srv record/i;
+    return undef;
+}
+
+sub admin_srv($) {
+    my ($realm) = @_;
+    my $record = `host -t srv _kerberos-adm._tcp.\Q$realm\E 2>/dev/null`;
+    if ($record =~ /has srv record.* (\S+)\.\s*$/i) {
+        return $1;
+    } else {
+        return;
+    }
+}
+
+sub host_txt($) {
+  my $fqdn = shift;
+  my $res = `host -t txt "_kerberos.$fqdn" 2>/dev/null`;
+  if ($res =~ /"(.*)"($|\Z)/m) {
+    return $1;
+  } else {return undef;}
+}
+
+sub fqdn_not_done($) {
+  my $fqdn = shift;
+  my @labels = split(/\./, $fqdn);
+  return undef unless $#labels >= 1;
+# Any special casing for things that should require 3 labels goes here
+  return 1;
+}
+
+sub fqdn_up($) {
+  my $fqdn = shift;
+  $fqdn =~ s/^[^\.]+\.//;
+  return $fqdn;
+}
+sub read_config($);
+  
+version("2.0") or die "Failed to start debconf\n";
+settitle("krb5-config/title");
+
+readconf:  {
+  if (get("krb5-config/read_conf") eq "true") {
+    read_config( "/etc/krb5.conf");
+  }
+}
+
+	$guess = get('krb5-config/default_realm') unless $guess;
+
+unless ($guess ||$no_dns) {
+  # try Kerberos txt records
+  my $fqdn = `hostname --fqdn 2>/dev/null`;
+  chomp $fqdn;
+  while (fqdn_not_done($fqdn)  and  !$guess) {
+    my $txt = host_txt($fqdn);
+    $guess = $txt if $txt;
+    $fqdn = fqdn_up($fqdn);
+      }
+}
+
+unless ($guess) {
+$guess = `dnsdomainname 2>/dev/null`;
+       $guess = uc($guess);
+chomp $guess;
+if (exists $domain_map{$guess} ) {
+  $guess = $domain_map{$guess};
+} else {
+  map {my $a = uc($_);
+    $guess = $domain_map{$_}
+	 if $guess =~ /\Q$a\E$/; }
+	   grep( /^\./, keys( %domain_map));
+}
+}
+
+if ($guess) {
+  if ($no_dns) {
+    #We'll have host in postinst, so wait until then
+    exit(0);
+  }
+  if ($realm_map{$guess}) {
+    $guess_good = 1;
+  }
+  if (host_srv($guess)) {
+    $guess_good = 1;
+}
+}
+
+if ($guess) {
+  chomp $guess;
+  set("krb5-config/default_realm", $guess);
+}
+if ($guess_good) {
+  input('medium', 'krb5-config/default_realm');
+} else {
+  input('critical','krb5-config/default_realm');
+}
+go();
+$guess = get('krb5-config/default_realm');
+my $add_srv_guess = get("krb5-config/add_servers_realm");
+if ($add_srv_guess &&($add_srv_guess ne $guess)) {
+  reset("krb5-config/add_servers");
+  reset("krb5-config/kerberos_servers");
+  reset("krb5-config/admin_server");
+}
+# We currently don't support touching realm stanzas if they are
+# already present.
+if (!$realm_map{$guess}) {
+  if (host_srv($guess)) {
+    subst('krb5-config/add_servers','dns',
+    scalar(	  metaget('krb5-config/found_dns', 'Extended_description')));
+  } else {
+    subst('krb5-config/add_servers','dns',
+    scalar(	  metaget('krb5-config/no_dns','Extended_description')));
+    set('krb5-config/add_servers','true') unless $add_srv_guess eq $guess;
+  }
+  input('low','krb5-config/add_servers');
+  # A consequence of setting add_servers_realm here is that if you
+  # change the realm to one for which servers are already in
+  # krb5.conf, and then later change back to the add_servers_realm
+  # then your add_servers setting is preserved. This behavior does not
+  # violate any constraints on correct operation, although later we
+  # may decide it is incorrect.  If so, move the following set outside
+  # the !realm_map block and rewrite this comment.
+  set("krb5-config/add_servers_realm", $guess);
+  go();
+  my $ret = get('krb5-config/add_servers');
+  if ($ret eq 'true') {
+    subst('krb5-config/kerberos_servers','realm', $guess);
+    subst('krb5-config/admin_server', 'realm', $guess);
+    input('high','krb5-config/kerberos_servers');
+
+    # Prompt for the admin server.  If we can guess it from a SRV record and
+    # we don't already have one set (from a previous debconf run), or if we do
+    # have one set but it matches our guess, this prompt should be medium so
+    # that we just trust SRV by default.  Otherwise, it's high.
+    #
+    # This is only necessary because libkadm5clnt (at least for MIT) doesn't
+    # honor SRV records.  Otherwise, we could just leave the admin server
+    # unset and everything would work in the presence of SRV records.
+    my $admin_default = get('krb5-config/admin_server');
+    my $admin = admin_srv($guess);
+    if (!$admin_default && $admin) {
+        set('krb5-config/admin_server', $admin);
+        input('medium', 'krb5-config/admin_server');
+    } elsif ($admin_default && $admin && $admin_default eq $admin) {
+        input('medium', 'krb5-config/admin_server');
+    } else {
+        input('high', 'krb5-config/admin_server');
+    }
+    go();
+  }
+}
+
+set('krb5-config/read_conf','false');

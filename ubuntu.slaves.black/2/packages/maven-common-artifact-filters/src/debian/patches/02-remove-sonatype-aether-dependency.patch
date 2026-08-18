@@ -1,0 +1,61 @@
+Description: Removes the dependency on the old Sonatype Aether
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/pom.xml
++++ b/pom.xml
+@@ -70,6 +70,20 @@
+         </plugin>
+       </plugins>
+     </pluginManagement>
++    <plugins>
++      <plugin>
++        <groupId>org.apache.maven.plugins</groupId>
++        <artifactId>maven-compiler-plugin</artifactId>
++        <configuration>
++          <excludes>
++            <exclude>**/Sonatype*</exclude>
++          </excludes>
++          <testExcludes>
++            <testExclude>**/Sonatype*</testExclude>
++          </testExcludes>
++         </configuration>
++      </plugin>
++    </plugins>
+   </build>
+ 
+   <dependencies>
+--- a/src/main/java/org/apache/maven/shared/artifact/filter/collection/ArtifactTransitivityFilter.java
++++ b/src/main/java/org/apache/maven/shared/artifact/filter/collection/ArtifactTransitivityFilter.java
+@@ -102,30 +102,8 @@
+                     // don't want to pollute method signature with ReflectionExceptions
+                     throw new RuntimeException( e.getMessage(), e );
+                 }
+-            }
+-            else
+-            {
+-                try
+-                {
+-                    @SuppressWarnings( "unchecked" ) List<org.sonatype.aether.graph.Dependency> dependencies =
+-                        (List<org.sonatype.aether.graph.Dependency>) Invoker.invoke( resolutionResult,
+-                                                                                     "getDependencies" );
+-
+-                    for ( org.sonatype.aether.graph.Dependency dependency : dependencies )
+-                    {
+-                        Artifact mavenArtifact = 
+-                                        (Artifact) Invoker.invoke( RepositoryUtils.class, "toArtifact",
+-                                                                    org.sonatype.aether.artifact.Artifact.class,
+-                                                                    dependency.getArtifact() );
+-
+-                        transitiveArtifacts.add( mavenArtifact.getDependencyConflictId() );
+-                    }
+-                }
+-                catch ( IllegalAccessException | InvocationTargetException | NoSuchMethodException e )
+-                {
+-                    // don't want to pollute method signature with ReflectionExceptions
+-                    throw new RuntimeException( e.getMessage(), e );
+-                }
++            } else {
++                throw new RuntimeException("Unsupported Maven version");
+             }
+         }
+     }

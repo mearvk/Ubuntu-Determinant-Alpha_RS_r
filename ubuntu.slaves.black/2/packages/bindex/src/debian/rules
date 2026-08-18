@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+PACKAGE			:= $(shell dpkg-parsechangelog | sed -n 's/^Source: //p')
+VERSION			:= $(shell dpkg-parsechangelog | sed -n 's/^Version: //p' | sed -e 's/-[^-]*$$//' | sed -e 's/\+svn.*//')
+JAVA_HOME		:= /usr/lib/jvm/default-java/
+JAR_BASE		:= /usr/share/java
+export JH_JAR_EXTRA := NOTICE.txt LICENSE.txt about.html README
+export CLASSPATH :=/usr/share/ant/lib/ant.jar:$(JAR_BASE)/kxml2-min.jar:$(JAR_BASE)/org.osgi.service.obr.jar:$(JAR_BASE)/osgi.core.jar:$(JAR_BASE)/junit4.jar:$(JAR_BASE)/bnd.annotation.jar
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	mkdir -p dist
+	jh_build dist/bindex-$(VERSION).jar src
+	mv bnd.bnd bindex.bnd
+	bnd wrap --properties bindex.bnd --output bindex-$(VERSION).jar dist/bindex-$(VERSION).jar
+	mv bindex.bnd bnd.bnd
+
+override_dh_clean:
+	$(RM) -r dist
+	$(RM) bindex.bnd
+	$(RM) bindex-*.jar
+	dh_clean
+
+svnURL := http://www.osgi.org/svn/public/trunk/org.osgi.impl.bundle.bindex/
+svnRev := 101
+
+get-orig-source:
+	svn export -r $(svnRev) $(svnURL) $(PACKAGE)-$(VERSION).orig;
+	GZIP=-9 tar -czf ../$(PACKAGE)_$(VERSION).orig.tar.gz \
+		 --exclude 'jar/*' --exclude '.svn' \
+		 $(PACKAGE)-$(VERSION).orig;
+	rm -rf $(PACKAGE)-$(VERSION).orig;

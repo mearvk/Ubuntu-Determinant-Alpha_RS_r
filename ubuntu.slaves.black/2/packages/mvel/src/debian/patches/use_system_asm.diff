@@ -1,0 +1,124 @@
+Description: Use system ASM instead of bundled (stripped) one
+Author: Damien Raude-Morvan <drazzib@debian.org>
+Forwarded: no
+--- a/src/main/java/org/mvel2/optimizers/impl/asm/ASMAccessorOptimizer.java
++++ b/src/main/java/org/mvel2/optimizers/impl/asm/ASMAccessorOptimizer.java
+@@ -23,10 +23,10 @@ import org.mvel2.MVEL;
+ import org.mvel2.OptimizationFailure;
+ import org.mvel2.ParserContext;
+ import org.mvel2.PropertyAccessException;
+-import org.mvel2.asm.ClassWriter;
+-import org.mvel2.asm.Label;
+-import org.mvel2.asm.MethodVisitor;
+-import org.mvel2.asm.Opcodes;
++import org.objectweb.asm.ClassWriter;
++import org.objectweb.asm.Label;
++import org.objectweb.asm.MethodVisitor;
++import org.objectweb.asm.Opcodes;
+ import org.mvel2.ast.FunctionInstance;
+ import org.mvel2.ast.TypeDescriptor;
+ import org.mvel2.ast.WithNode;
+@@ -74,12 +74,12 @@ import static org.mvel2.DataConversion.c
+ import static org.mvel2.DataConversion.convert;
+ import static org.mvel2.MVEL.eval;
+ import static org.mvel2.MVEL.isAdvancedDebugging;
+-import static org.mvel2.asm.Opcodes.*;
+-import static org.mvel2.asm.Type.getConstructorDescriptor;
+-import static org.mvel2.asm.Type.getDescriptor;
+-import static org.mvel2.asm.Type.getInternalName;
+-import static org.mvel2.asm.Type.getMethodDescriptor;
+-import static org.mvel2.asm.Type.getType;
++import static org.objectweb.asm.Opcodes.*;
++import static org.objectweb.asm.Type.getConstructorDescriptor;
++import static org.objectweb.asm.Type.getDescriptor;
++import static org.objectweb.asm.Type.getInternalName;
++import static org.objectweb.asm.Type.getMethodDescriptor;
++import static org.objectweb.asm.Type.getType;
+ import static org.mvel2.ast.TypeDescriptor.getClassReference;
+ import static org.mvel2.integration.GlobalListenerFactory.hasGetListeners;
+ import static org.mvel2.integration.GlobalListenerFactory.notifyGetListeners;
+@@ -734,7 +734,7 @@ public class ASMAccessorOptimizer extend
+     if (clazz.isPrimitive()) {
+         mv.visitFieldInsn(GETSTATIC, toNonPrimitiveType(clazz).getName().replace(".", "/"), "TYPE", "Ljava/lang/Class;");
+     } else {
+-        mv.visitLdcInsn(org.mvel2.asm.Type.getType(clazz));
++        mv.visitLdcInsn(org.objectweb.asm.Type.getType(clazz));
+     }
+   }
+ 
+--- a/src/main/java/org/mvel2/optimizers/impl/asm/ProducesBytecode.java
++++ b/src/main/java/org/mvel2/optimizers/impl/asm/ProducesBytecode.java
+@@ -18,7 +18,7 @@
+ 
+ package org.mvel2.optimizers.impl.asm;
+ 
+-import org.mvel2.asm.MethodVisitor;
++import org.objectweb.asm.MethodVisitor;
+ import org.mvel2.integration.VariableResolverFactory;
+ 
+ /**
+--- a/src/test/java/org/mvel2/tests/core/res/SampleBeanAccessor.java
++++ b/src/test/java/org/mvel2/tests/core/res/SampleBeanAccessor.java
+@@ -1,9 +1,9 @@
+ package org.mvel2.tests.core.res;
+ 
+-import org.mvel2.asm.MethodVisitor;
++import org.objectweb.asm.MethodVisitor;
+ 
+-import static org.mvel2.asm.Opcodes.CHECKCAST;
+-import static org.mvel2.asm.Opcodes.INVOKEVIRTUAL;
++import static org.objectweb.asm.Opcodes.CHECKCAST;
++import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
+ 
+ import org.mvel2.integration.PropertyHandler;
+ import org.mvel2.integration.VariableResolverFactory;
+--- a/src/test/java/org/mvel2/tests/core/PropertyHandlerTests.java
++++ b/src/test/java/org/mvel2/tests/core/PropertyHandlerTests.java
+@@ -3,9 +3,9 @@ package org.mvel2.tests.core;
+ import junit.framework.TestCase;
+ import org.mvel2.MVEL;
+ import org.mvel2.PropertyAccessor;
+-import org.mvel2.asm.MethodVisitor;
++import org.objectweb.asm.MethodVisitor;
+ 
+-import static org.mvel2.asm.Opcodes.*;
++import static org.objectweb.asm.Opcodes.*;
+ 
+ import org.mvel2.integration.*;
+ import org.mvel2.optimizers.OptimizerFactory;
+@@ -416,4 +416,4 @@ public class PropertyHandlerTests extend
+     Serializable compiled = MVEL.compileExpression("prop");
+     assertEquals("Property", MVEL.executeExpression(compiled, new C()));
+   }
+-}
+\ No newline at end of file
++}
+--- a/src/main/java/org/mvel2/optimizers/OptimizerFactory.java
++++ b/src/main/java/org/mvel2/optimizers/OptimizerFactory.java
+@@ -43,9 +43,9 @@ public class OptimizerFactory {
+      */
+     try {
+       if (OptimizerFactory.class.getClassLoader() != null) {
+-          OptimizerFactory.class.getClassLoader().loadClass("org.mvel2.asm.ClassWriter");
++          OptimizerFactory.class.getClassLoader().loadClass("org.objectweb.asm.ClassWriter");
+       } else {
+-          ClassLoader.getSystemClassLoader().loadClass("org.mvel2.asm.ClassWriter");
++          ClassLoader.getSystemClassLoader().loadClass("org.objectweb.asm.ClassWriter");
+       }
+       accessorCompilers.put("ASM", new ASMAccessorOptimizer());
+     }
+--- a/pom.xml
++++ b/pom.xml
+@@ -244,6 +244,12 @@
+ 
+     <dependencies>
+         <dependency>
++            <groupId>org.ow2.asm</groupId>
++            <artifactId>asm</artifactId>
++            <version>debian</version>
++        </dependency>
++
++        <dependency>
+             <groupId>junit</groupId>
+             <artifactId>junit</artifactId>
+             <version>4.8.2</version>

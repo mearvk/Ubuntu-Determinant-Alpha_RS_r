@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+VERSION = $(shell dpkg-parsechangelog | sed -n 's,^Version: \(.*\)-.*,\1,p')
+
+export JAVA_HOME := /usr/lib/jvm/default-java
+
+D := /usr/share/java/
+export CLASSPATH := $(D)slf4j-api.jar:$(D)geronimo-jms_1.1_spec.jar:$(D)geronimo-jta-1.2-spec.jar:$(D)mockito-core.jar:$(D)hamcrest-all.jar
+
+# use this CP in order to get test output logging during the build
+# you will also need to install liblogback-java
+#export CLASSPATH := $(D)slf4j-api.jar:$(D)geronimo-jms_1.1_spec.jar:$(D)geronimo-jta-1.2-spec.jar:$(D)mockito-core.jar:$(D)logback-classic.jar:$(D)logback-core.jar
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	CLASSPATH=$(CLASSPATH) ant -Djar.version=$(VERSION)
+
+override_dh_auto_install:
+	mh_installpom -plibbtm-java -e$(VERSION) pom.xml
+	mh_installjar -plibbtm-java -l -e$(VERSION) pom.xml dist/btm-$(VERSION).jar
+
+override_dh_clean:
+	dh_clean
+	rm -rf $(CURDIR)/debian/.mh
+	rm -rf target/*
+	rm -f TESTS-TestSuites.xml
+	rm -f src/bitronix/tm/Version.java

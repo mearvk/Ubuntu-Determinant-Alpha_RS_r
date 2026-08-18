@@ -1,0 +1,412 @@
+/*
+ * Copyright (c) 2013, 2026, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * The Universal Permissive License (UPL), Version 1.0
+ *
+ * Subject to the condition set forth below, permission is hereby granted to any
+ * person obtaining a copy of this software, associated documentation and/or
+ * data (collectively the "Software"), free of charge and under any and all
+ * copyright rights in the Software, and any and all patent rights owned or
+ * freely licensable by each licensor hereunder covering either (i) the
+ * unmodified Software as contributed to or provided by such licensor, or (ii)
+ * the Larger Works (as defined below), to deal in both
+ *
+ * (a) the Software, and
+ *
+ * (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+ * one is included with the Software each a "Larger Work" to which the Software
+ * is contributed by such licensors),
+ *
+ * without restriction, including without limitation the rights to copy, create
+ * derivative works of, display, perform, and distribute the Software and make,
+ * use, sell, offer for sale, import, export, have made, and have sold the
+ * Software and the Larger Work(s), and to sublicense the foregoing rights on
+ * either these or other terms.
+ *
+ * This license is subject to the following condition:
+ *
+ * The above copyright notice and either this complete permission notice or at a
+ * minimum a reference to the UPL must be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+package com.oracle.truffle.api;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+
+/**
+ * Directives that influence the optimizations of the host compiler. These operations affect how the
+ * Truffle interpreter is itself compiled.
+ *
+ * @since 21.0
+ */
+public final class HostCompilerDirectives {
+
+    /**
+     * This object is a placeholder for the static methods that implement compiler directives, and
+     * cannot be constructed.
+     *
+     * @since 21.0
+     */
+    private HostCompilerDirectives() {
+    }
+
+    /**
+     *
+     * Indicates whether a branch is executed only in the interpreter. In addition to
+     * {@link CompilerDirectives#inInterpreter()}, this method instructs the host compiler to treat
+     * the positive branch as frequently executed code of high importance. Branches protected by
+     * this method should be treated as if they were runtime compiled code paths, even if they may
+     * never actually be compiled. This means that slow-paths must be protected using either
+     * {@link CompilerDirectives#transferToInterpreterAndInvalidate()} or {@link TruffleBoundary}.
+     * <p>
+     * A common use case for this directive is in counting condition profiles, where counters must
+     * be protected by {@link CompilerDirectives#inInterpreter()} but also need to be optimized as
+     * fast-path by the host compiler. Without this directive, the host compiler may treat the
+     * branch as a slow-path branch.
+     *
+     * @return {@code true} if executed in the interpreter, {@code false} in compiled code.
+     * @since 23.0
+     */
+    public static boolean inInterpreterFastPath() {
+        /*
+         * Within guest compilations this returns false.
+         */
+        return true;
+    }
+
+    /**
+     * Marks a switch statement within a loop as a candidate for threaded switch optimization.
+     * Threaded switch replicates the switch statement at the end of each case, improving branch
+     * prediction at the processor level.
+     *
+     * Usage example:
+     *
+     * <pre>
+     * while (cond) {
+     *   input = inlinedNextOpcode();
+     *   switch (markThreadedSwitch(input)) {
+     *     case op1: { body1; }
+     *     case op2: { body2; }
+     *   }
+     * }
+     * </pre>
+     *
+     * The compiler recognizes the code blocks from the loop header up to the switch and duplicates
+     * them into each case that continues the while loop. This effectively transforms the structure
+     * as follows:
+     *
+     * <pre>
+     * if (cond) {
+     *   input = inlinedNextOpcode();
+     *   switch (markThreadedSwitch(input)) {
+     *     case op1: {
+     *         body1;
+     *         if (cond) {
+     *           input = inlinedNextOpcode();
+     *           switch (markThreadedSwitch(input)) // go to matching case of outer switch
+     *         }
+     *     }
+     *     case op2: {
+     *         body2;
+     *         if (cond) {
+     *           input = inlinedNextOpcode();
+     *           switch (markThreadedSwitch(input)) // go to matching case of outer switch
+     *         }
+     *     }
+     *   }
+     * }
+     * </pre>
+     *
+     * When additional statements follow the switch block within a loop, the compiler may trigger an
+     * optimization to duplicate these statements into each case block. If this duplication does not
+     * occur, the compiler can still identify the loop as a candidate for threaded switch
+     * optimization and apply relevant optimizations to minimize overhead in the loop header, such
+     * as postponing register spilling from the loop header to cases with actual register pressure,
+     * even at the cost of code bloat. However, due to the presence of these tail statements, the
+     * loop has only one back edge, which effectively disables threading.
+     *
+     * The compiler may also reject candidates for threaded switch optimization if the identified
+     * code blocks, after inlining, contain complex control flow or operations beyond memory reads.
+     * To log decisions related to threaded switch optimization, use the Graal option
+     * {@code TraceThreadedSwitchOptimization}.
+     *
+     * @since 25.1
+     */
+    public static int markThreadedSwitch(int input) {
+        return input;
+    }
+
+    /**
+     * Marks a method that is an implementation of a Truffle interpreter, and which should receive
+     * additional optimization budget.
+     * <p>
+     * This annotation is used to annotate the root method of a bytecode interpreter, and it hints
+     * the compiler to invest extra effort into optimizing such methods. Language implementers are
+     * advised to inspect the IR of the interpreter when using this.
+     *
+     * @since 21.0
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+    public @interface BytecodeInterpreterSwitch {
+    }
+
+    /**
+     * Marks a method that is called from a Truffle interpreter, but is not called frequently and is
+     * not important for interpreter performance.
+     * <p>
+     * This annotation is used to annotate methods that are called from a bytecode interpreter, but
+     * should generally not be inlined into the body of the bytecode interpreter. Language
+     * implementers are advised to inspect the IR of the interpreter when using this.
+     *
+     * @see BytecodeInterpreterSwitch to annotate the root method of a bytecode interpreter
+     *
+     * @deprecated use is no longer needed. boundaries for {@link BytecodeInterpreterSwitch} are
+     *             mostly determined automatically. To migrate remove all usages.
+     * @since 21.0
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+    @Deprecated(since = "22.2")
+    public @interface BytecodeInterpreterSwitchBoundary {
+    }
+
+    /**
+     * Hints to Truffle host inlining that a particular method is partial evaluatable, but it would
+     * be a good place for a cutoff when performing host inlining. A host compiler may use this
+     * information as a hint to take trade-offs optimizing the code. Good examples of cutoffs are:
+     * <ul>
+     * <li>Methods related to instrumentation or tracing. Instrumentation and tracing are typically
+     * not critical for interpreter performance.
+     * <li>Methods raising guest language exceptions. Such paths must often partially evaluate for
+     * good peak performance, but are not a priority to optimize during interpreter execution.
+     * <li>Methods related to Truffle interoperability behavior. Such paths are typically only used
+     * exceptionally, as the vast majority of code is likely non-interop code.
+     * <li>Methods that are very complex and would only deny other more important methods to be
+     * inlined.
+     * </ul>
+     * If a method is already annotated with {@link TruffleBoundary} or is dominated by a call to
+     * {@link CompilerDirectives#transferToInterpreterAndInvalidate() transferToInterpreter()} then
+     * this method has no effect, as any path that is not designed for partial evaluation is already
+     * considered a slow-path in hosted inlining.
+     * <p>
+     * This annotation may be used to tune Truffle hosted inlining decisions. It is useful in cases
+     * where the host inliner did not have enough budget to exhaustively inline the entire partial
+     * evaluatable fast-path. In such a case it might be worthwhile to annotate rarely executed
+     * methods with {@link InliningCutoff} to reduce their priority to make room for more important
+     * methods.
+     * <p>
+     * For more details on host inlining see the <a href=
+     * "https://github.com/oracle/graal/blob/master/truffle/docs/HostCompilation.md">documentation</a>
+     *
+     * @since 22.3
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+    public @interface InliningCutoff {
+    }
+
+    /**
+     * Marks a method as a candidate for Truffle host inlining. The host compiler may use this
+     * information to guide inlining and optimization decisions.
+     * <p>
+     * Annotated methods must be designed for partial evaluation. This annotation should not be
+     * applied to arbitrary Java code or third-party libraries, as doing so may cause severe
+     * performance degradation.
+     * <p>
+     * Typical examples include {@code execute} methods of cached nodes. The Truffle DSL
+     * automatically applies this annotation to every generated execute method. It is recommended to
+     * be used for manually written {@code execute} methods as well.
+     * <p>
+     * For more details, see the
+     * <a href="https://github.com/oracle/graal/blob/master/truffle/docs/HostCompilation.md">
+     * Truffle host compilation documentation</a>.
+     *
+     * @since 25.1
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+    public @interface InliningRoot {
+    }
+
+    /**
+     * Annotates a method that serves as a Truffle interpreter bytecode handler, that is, a method
+     * implements the complete semantics of a single bytecode instruction.
+     * <p>
+     * For more details, see the <a href=
+     * "https://github.com/oracle/graal/blob/master/truffle/docs/OneCompilationPerBytecodeHandler.md">
+     * One Compilation per Bytecode Handler documentation</a>.
+     *
+     * @since 25.1
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface BytecodeInterpreterHandler {
+        /**
+         * The handled bytecode's opcodes.
+         */
+        int[] value();
+
+        /**
+         * Indicates whether to enable tail call threading at the end of this handler. If
+         * {@code false}, the threading will terminate, and control will return to the switch-loop
+         * after this handler is executed. Alternatively, omitting the
+         * {@link BytecodeInterpreterHandler} annotation will cause control to return to the
+         * switch-loop before this handler is executed.
+         */
+        boolean threading() default true;
+
+        /**
+         * Indicates whether host safepoint should be inserted in the stub correspond to this
+         * handler.
+         */
+        boolean safepoint() default true;
+    }
+
+    /**
+     * Configuration for all bytecode interpreter handler arguments, including the receiver. Must be
+     * used in conjunction with {@link BytecodeInterpreterSwitch}.
+     *
+     * @see BytecodeInterpreterHandler
+     * @since 25.1
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface BytecodeInterpreterHandlerConfig {
+        /**
+         * Configuration for a bytecode interpreter handler argument.
+         *
+         * @see BytecodeInterpreterHandler
+         * @since 25.1
+         */
+        @Retention(RetentionPolicy.RUNTIME)
+        @Target(ElementType.METHOD)
+        public @interface Argument {
+            enum ExpansionKind {
+                /**
+                 * No expansion.
+                 */
+                NONE,
+
+                /**
+                 * The argument is expanded into its subfields in addition to the original argument.
+                 */
+                MATERIALIZED,
+
+                /**
+                 * The argument is expanded into its subfields without the original argument.
+                 */
+                VIRTUAL,
+            }
+
+            /**
+             * Configuration for an expanded field.
+             *
+             * @since 25.1
+             */
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.METHOD)
+            public @interface Field {
+                /**
+                 * Name of the field.
+                 */
+                String name();
+
+                /**
+                 * Indicates that this field is always non-null. A null check will be placed before
+                 * the call site and before threading dispatch. This property is irrelevant for
+                 * primitive fields.
+                 */
+                boolean nonNull() default true;
+            }
+
+            /**
+             * Indicates that this argument will be updated with the return value of the handler. The
+             * interpreter must store the handler result directly back to the logical local represented
+             * by this argument. Threaded handler stubs rely on that direct store shape to keep the
+             * local consistent when an exception unwinds before the normal return-value update path
+             * runs.
+             */
+            boolean returnValue() default false;
+
+            /**
+             * Indicates that this argument will be expanded in a Truffle interpreter bytecode
+             * handler stub if its expansion kind is not {@link ExpansionKind#NONE}.
+             */
+            ExpansionKind expand() default ExpansionKind.NONE;
+
+            /**
+             * Indicates the fields to be expanded of this argument if its expansion kind is
+             * {@link ExpansionKind#MATERIALIZED}.
+             */
+            Field[] fields() default {};
+
+            /**
+             * Indicates that this argument is always non-null. A null check will be placed before
+             * the call site and before threading dispatch. This property is irrelevant for
+             * primitive arguments.
+             */
+            boolean nonNull() default true;
+        }
+
+        /**
+         * The maximum unsigned value of the opcode. This is relevant for
+         * {@link BytecodeInterpreterHandler} when tail call threading is enabled, and is used to
+         * construct a handler table.
+         */
+        int maximumOperationCode();
+
+        /**
+         * Configuration for each method argument. For non-static methods, the first element
+         * corresponds to the receiver.
+         */
+        Argument[] arguments();
+
+        /**
+         * Indicates that the annotated method implements a secondary partition of a bytecode
+         * interpreter switch.
+         * <p>
+         * A secondary switch is expected to be inlined into a primary
+         * {@link BytecodeInterpreterSwitch} method during host compilation. Its handler
+         * configuration is retained so that handler calls originating from the inlined secondary
+         * switch can be mapped to the primary switch's handler stubs.
+         * <p>
+         * When compiled as a separate method, however, handler calls in a secondary switch are not
+         * outlined. In particular, a deoptimization target may invoke the separately compiled
+         * secondary switch without first passing through host inlining. Keeping its handler calls
+         * ordinary prevents such execution from entering threaded handler stubs without the
+         * primary switch's exception and state-management paths.
+         *
+         * @return {@code true} if the annotated method is a secondary switch partition whose
+         *         handler calls must not be outlined when the method is compiled separately
+         */
+        boolean secondarySwitch() default false;
+    }
+
+    /**
+     * Annotates a method that fetches the next opcode. The annotated method must be side-effect
+     * free, must not throw for valid interpreter state, and share the same signature with
+     * {@link BytecodeInterpreterHandler}-annotated methods in the same enclosing class. It will be
+     * inlined into Truffle interpreter bytecode handler stubs to enable tail call threading.
+     *
+     * @since 25.1
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.METHOD})
+    public @interface BytecodeInterpreterFetchOpcode {
+    }
+}

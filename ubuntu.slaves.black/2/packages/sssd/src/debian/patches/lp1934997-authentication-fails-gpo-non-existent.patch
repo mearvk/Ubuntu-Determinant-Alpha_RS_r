@@ -1,0 +1,169 @@
+From: Alexey Sheplyakov <asheplyakov@altlinux.org>
+Date: Thu, 2 Aug 2018 16:16:44 +0000
+Subject: ad: gpo: ignore GPO if SecEdit/GptTmpl.inf is missing
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+This makes it possible to use sssd's group policy based access control with
+samba4 domain controllers `out of the box`. The problem is caused by
+
+1) group policy based control denies access (to all users) if
+   `${GPO_GUID}/Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf`
+   file is missing.
+2) The `Default Domain Policy` and the `Default Domain Controller Policy`
+   GPOs created by samba4 list the Security Protocol Extension CSE GUID
+   {827D319E-6EAC-11D2-A4EA-00C04F79F83A} in their `gPCMachineExtensionNames`,
+   however there are no .../SecEdit/GptTmpl.inf files in the sysvol.
+
+According to the section 3.2.5 of [MS-GPSM] current sssd's behavior is
+correct. However Windows GPO client (at least the one in Windows 2008 r2)
+just skips such broken GPOs. This patch makes sssd behave in the same way,
+and makes setting up samba4 based AD domain less painful.
+
+Reviewed-by: Alexey Tikhonov <atikhono@redhat.com>
+Reviewed-by: Pavel Březina <pbrezina@redhat.com>
+
+Origin: upstream, https://github.com/SSSD/sssd/commit/81d67a592315740d13e48b9a29e29baa8cc35638
+Bug: https://github.com/SSSD/sssd/issues/5716
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/sssd/+bug/1934997
+Bug-Fedora: https://bugzilla.redhat.com/show_bug.cgi?id=1839805
+Applied-Upstream: 2.7.0
+---
+ Makefile.am                     |  1 +
+ src/providers/ad/ad_gpo.c       |  2 +-
+ src/providers/ad/ad_gpo_child.c | 63 +++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 59 insertions(+), 7 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index a82c332..8affc58 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -4589,6 +4589,7 @@ gpo_child_SOURCES = \
+     src/util/atomic_io.c \
+     src/util/util.c \
+     src/util/util_ext.c \
++    src/util/util_errors.c \
+     src/util/signal.c \
+     src/util/sss_chain_id.c
+ gpo_child_CFLAGS = \
+diff --git a/src/providers/ad/ad_gpo.c b/src/providers/ad/ad_gpo.c
+index fa8727d..4b7bbf1 100644
+--- a/src/providers/ad/ad_gpo.c
++++ b/src/providers/ad/ad_gpo.c
+@@ -2766,7 +2766,7 @@ ad_gpo_cse_done(struct tevent_req *subreq)
+      */
+     ret = ad_gpo_store_policy_settings(state->host_domain,
+                                        cse_filtered_gpo->policy_filename);
+-    if (ret != EOK) {
++    if (ret != EOK && ret != ENOENT) {
+         DEBUG(SSSDBG_OP_FAILURE,
+               "ad_gpo_store_policy_settings failed: [%d](%s)\n",
+               ret, sss_strerror(ret));
+diff --git a/src/providers/ad/ad_gpo_child.c b/src/providers/ad/ad_gpo_child.c
+index f9e9cb0..4c676d6 100644
+--- a/src/providers/ad/ad_gpo_child.c
++++ b/src/providers/ad/ad_gpo_child.c
+@@ -387,6 +387,38 @@ static errno_t gpo_cache_store_file(const char *smb_path,
+     return ret;
+ }
+ 
++static errno_t
++gpo_cache_remove_file(const char *smb_path,
++                      const char *smb_cse_suffix)
++{
++    errno_t ret = EOK;
++    char *filename = NULL;
++
++    filename = talloc_asprintf(NULL, GPO_CACHE_PATH"%s%s", smb_path,
++                                                           smb_cse_suffix);
++    if (filename == NULL) {
++        DEBUG(SSSDBG_CRIT_FAILURE, "talloc_asprintf failed.\n");
++        ret = ENOMEM;
++        goto done;
++    }
++
++    ret = unlink(filename);
++    if (ret != 0) {
++        if (errno != ENOENT) {
++            ret = errno;
++            DEBUG(SSSDBG_CRIT_FAILURE, "failed to unlink %s [%d]: %s\n",
++                                       filename, ret, sss_strerror(ret));
++            goto done;
++        }
++    }
++
++    ret = EOK;
++
++done:
++    talloc_free(filename);
++    return ret;
++}
++
+ static errno_t
+ parse_ini_file_with_libini(struct ini_cfgobj *ini_config,
+                            int *_gpt_version)
+@@ -528,7 +560,8 @@ copy_smb_file_to_gpo_cache(SMBCCTX *smbc_ctx,
+                            const char *smb_server,
+                            const char *smb_share,
+                            const char *smb_path,
+-                           const char *smb_cse_suffix)
++                           const char *smb_cse_suffix,
++                           bool optional)
+ {
+     char *smb_uri = NULL;
+     char *gpt_main_folder = NULL;
+@@ -588,8 +621,25 @@ copy_smb_file_to_gpo_cache(SMBCCTX *smbc_ctx,
+ 
+         if (file == NULL) {
+             ret = errno;
+-            DEBUG(SSSDBG_CRIT_FAILURE, "smbc_getFunctionOpen failed [%d][%s]\n",
+-                  ret, strerror(ret));
++            if (optional && ret == ENOENT) {
++                DEBUG(SSSDBG_TRACE_FUNC,
++                      "%s does not exist in sysvol, purging cached copy\n",
++                      smb_uri);
++                /* It looks like Windows clients treat missing GPO files as
++                 * empty. To make sure we do not use old and now invalid
++                 * content an potentially exising old file will be removed. */
++                ret = gpo_cache_remove_file(smb_path, smb_cse_suffix);
++                if (ret != EOK && ret != ENOENT) {
++                    DEBUG(SSSDBG_CRIT_FAILURE,
++                          "failed to purge stale cached %s\n", smb_uri);
++                    goto done;
++                }
++                ret = EOK;
++            } else {
++                DEBUG(SSSDBG_CRIT_FAILURE,
++                      "smbc_getFunctionOpen failed [%d][%s]\n",
++                      ret, strerror(ret));
++            }
+             goto done;
+         }
+     }
+@@ -683,7 +733,7 @@ perform_smb_operations(int cached_gpt_version,
+ 
+     /* download ini file */
+     ret = copy_smb_file_to_gpo_cache(smbc_ctx, smb_server, smb_share, smb_path,
+-                                     GPT_INI);
++                                     GPT_INI, false);
+     if (ret != EOK) {
+         DEBUG(SSSDBG_CRIT_FAILURE,
+               "copy_smb_file_to_gpo_cache failed [%d][%s]\n",
+@@ -703,13 +753,14 @@ perform_smb_operations(int cached_gpt_version,
+     if (sysvol_gpt_version > cached_gpt_version) {
+         /* download policy file */
+         ret = copy_smb_file_to_gpo_cache(smbc_ctx, smb_server, smb_share,
+-                                         smb_path, smb_cse_suffix);
+-        if (ret != EOK) {
++                                         smb_path, smb_cse_suffix, true);
++        if (ret != EOK && ret != ENOENT) {
+             DEBUG(SSSDBG_CRIT_FAILURE,
+                   "copy_smb_file_to_gpo_cache failed [%d][%s]\n",
+                   ret, strerror(ret));
+             goto done;
+         }
++        ret = EOK;
+     }
+ 
+     *_sysvol_gpt_version = sysvol_gpt_version;

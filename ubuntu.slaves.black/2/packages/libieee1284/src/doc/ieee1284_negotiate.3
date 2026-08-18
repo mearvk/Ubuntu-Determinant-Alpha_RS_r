@@ -1,0 +1,119 @@
+.\"     Title: ieee1284_negotiation
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Functions
+.\"    Source: 
+.\"
+.TH "IEEE1284_NEGOTIATION" "3" "09/18/2007" "" "Functions"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+ieee1284_negotiate, ieee1284_terminate \- IEEE 1284 negotiation
+.SH "SYNOPSIS"
+.sp
+.ft B
+.nf
+#include <ieee1284.h>
+.fi
+.ft
+.HP 23
+.BI "int ieee1284_negotiate(struct\ parport\ *" "port" ", int\ " "mode" ");"
+.HP 24
+.BI "void ieee1284_terminate(struct\ parport\ *" "port" ");"
+.SH "DESCRIPTION"
+.PP
+These functions are for negotiating to and terminating from IEEE 1284 data transfer modes. The default mode is called compatibility mode, or in other words normal printer protocol. It is a host\-to\-peripheral mode only. There are special modes that allow peripheral\-to\-host transfer as well, which may be negotiated to using
+\fBieee1284_negotiate\fR. IEEE 1284 negotiation is a process by which the host requests a transfer mode and the peripheral accepts or rejects it. An IEEE 1284\-compliant device will require a successful negotiation to a particular mode before it is used for data transfer (but simpler devices may not if they only speak one transfer mode).
+.PP
+To terminate the special mode and go back to compatilibity mode use
+\fBieee1284_terminate\fR.
+.PP
+These functions act on the parallel port associated with
+\fIport\fR, which must be claimed.
+.PP
+With a device strictly complying to IEEE 1284 you will need to call
+\fBieee1284_terminate\fR
+in between any two calls to
+\fBieee1284_negotiate\fR
+for modes other than
+\fBM1284_COMPAT\fR.
+.SH "AVAILABLE MODES"
+.SS "Uni\-directional modes"
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_COMPAT\fR: Compatibility mode. Normal printer protocol. This is not a negotiated mode, but is the default mode in absence of negotiation.
+\fBieee1284_negotiate(port, M1284_COMPAT)\fR
+is equivalent to
+\fBieee1284_terminate(port)\fR. This host\-to\-peripheral mode is used for sending data to printers, and is historically the mode that has been used for that before IEEE 1284.
+.RE
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_NIBBLE\fR: Nibble mode. This peripheral\-to\-host mode uses the status lines to read data from the peripheral four bits at a time.
+.RE
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_BYTE\fR: Byte mode. This peripheral\-to\-host mode uses the data lines in reverse mode to read data from the peripheral a byte at a time.
+.RE
+.SS "Bi\-directional modes"
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_ECP\fR: ECP mode. On entry to ECP mode it is a host\-to\-peripheral (i.e. forward) mode, but it may be set to reverse mode using
+\fBieee1284_ecp_fwd_to_rev\fR(3). It is common for PC hardware to provide assistance with this mode by the use of a FIFO which the host (or, in reverse mode, the peripheral) may fill, so that the hardware can do the handshaking itself.
+.RE
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_EPP\fR: EPP mode. In this bi\-directional mode the direction of data transfer is signalled at each byte.
+.RE
+.SS "Mode variations"
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_FLAG_DEVICEID\fR: Device ID retrieval. This flag may be combined with a nibble, byte, or ECP mode to notify the device that it should send its IEEE 1284 Device ID when asked for data.
+.RE
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_BECP\fR: Bounded ECP is a modification to ECP that makes it more robust at the point that the direction is changed. (Unfortunately it is not yet implemented in the Linux kernel driver.)
+.RE
+.RS 4
+\h'-04'\(bu\h'+03'\fBM1284_ECPRLE\fR: ECP with run length encoding. In this mode, consecutive data bytes of the same value may be transferred in only a few cycles.
+.RE
+.SH "RETURN VALUE"
+.PP
+\fBE1284_OK\fR
+.RS 4
+The negotiation was successful.
+.RE
+.PP
+\fBE1284_NOTAVAIL\fR
+.RS 4
+Negotiation is not available with this port type.
+.RE
+.PP
+\fBE1284_REJECTED\fR
+.RS 4
+Negotiation was rejected by the peripheral.
+.RE
+.PP
+\fBE1284_NEGFAILED\fR
+.RS 4
+Negotiation failed for some reason. Perhaps the device is not IEEE 1284 compliant.
+.RE
+.PP
+\fBE1284_SYS\fR
+.RS 4
+A system error occured during negotiation.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid (for instance, perhaps the
+\fIport\fR
+is not claimed).
+.RE
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

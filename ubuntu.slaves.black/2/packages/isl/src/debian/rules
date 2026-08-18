@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+p = libisl23
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_auto_configure:
+	PYTHON=python3 \
+	$(shell dpkg-buildflags --export=configure) \
+	  dh_auto_configure -v -- \
+		--disable-silent-rules \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_install:
+	dh_install
+	mkdir -p debian/$(p)/usr/share/gdb/auto-load/usr/lib/$(DEB_HOST_MULTIARCH)
+	mv debian/$(p)/usr/lib/*/*-gdb.py debian/$(p)/usr/share/gdb/auto-load/usr/lib/$(DEB_HOST_MULTIARCH)/
+
+override_dh_auto_install:
+	dh_auto_install --
+	sed -i -e 's,/.*/,,' debian/tmp/usr/include/isl/stdint.h
+
+override_dh_installdocs:
+	dh_installdocs -p$(p)
+	dh_installdocs -N$(p) --link-doc=$(p)
+
+override_dh_clean:
+	dh_clean
+	rm -f isl-uninstalled.sh *.pc *.pc.in gitversion.h include/isl/stdint.h interface/Makefile config.log config.status

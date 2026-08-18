@@ -1,0 +1,214 @@
+/*
+ * Copyright (c) 2021, 2021, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.genscavenge;
+
+import org.graalvm.word.UnsignedWord;
+import org.graalvm.word.impl.Word;
+
+import com.oracle.svm.core.heap.GCCause;
+import com.oracle.svm.shared.util.UnsignedUtils;
+
+/** A port of HotSpot's SerialGC size policy. */
+final class ProportionateSpacesPolicy extends AbstractCollectionPolicy {
+
+    /*
+     * Constants that can be made options if desirable. These are -XX options in HotSpot, refer to
+     * their descriptions for details. The values are HotSpot defaults unless labeled otherwise.
+     *
+     * Don't change these values individually without carefully going over their occurrences in
+     * HotSpot source code, there are dependencies between them that are not handled in our code.
+     */
+    static final int MIN_HEAP_FREE_RATIO = 40;
+    static final int MAX_HEAP_FREE_RATIO = 70;
+    static final boolean SHRINK_HEAP_IN_STEPS = true;
+    static final int SURVIVOR_RATIO = 8;
+    static final int TARGET_SURVIVOR_RATIO = 50;
+
+    private boolean oldSizeExceededInPreviousCollection;
+    private int shrinkFactor;
+
+    ProportionateSpacesPolicy() {
+        super(NEW_RATIO, HeapParameters.getMaxSurvivorSpaces());
+    }
+
+    @Override
+    public String getName() {
+        return "proportionate";
+    }
+
+    @Override
+    public boolean shouldCollectCompletely(boolean followingIncrementalCollection, boolean forcedCompleteCollection) {
+        guaranteeSizeParametersInitialized();
+
+        boolean collectYoungSeparately = shouldCollectYoungGenSeparately(false);
+        if (forcedCompleteCollection && !collectYoungSeparately) {
+            return true;
+        }
+        if (!followingIncrementalCollection && collectYoungSeparately) {
+            // Note that for non-ParallelGC, HotSpot resets the default of ScavengeBeforeFullGC to
+            // false, see GCArguments::initialize.
+            return false;
+        }
+        if (followingIncrementalCollection && oldSizeExceededInPreviousCollection) {
+            /*
+             * We promoted objects to the old generation beyond its current capacity to avoid a
+             * promotion failure, but due to the chunked nature of our heap, we should still be
+             * within the maximum heap size. Follow up with a full collection during which we either
+             * reclaim enough space or expand the old generation.
+             */
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void onCollectionBegin(boolean completeCollection, long beginNanoTime) {
+    }
+
+    @Override
+    public void onCollectionEnd(boolean completeCollection, GCCause cause) {
+        UnsignedWord oldLive = GCImpl.getAccounting().getOldGenerationAfterChunkBytes();
+        oldSizeExceededInPreviousCollection = oldLive.aboveThan(sizes.getOldSize());
+
+        boolean resizeOldOnlyForPromotions = !completeCollection;
+        computeNewOldGenSize(resizeOldOnlyForPromotions);
+        computeNewYoungGenSize();
+        adjustDesiredTenuringThreshold();
+    }
+
+    private void adjustDesiredTenuringThreshold() { // DefNewGeneration::adjust_desired_tenuring_threshold
+        // Set the desired survivor size to half the real survivor space
+        UnsignedWord desiredSurvivorSize = UnsignedUtils.fromDouble(UnsignedUtils.toDouble(sizes.getSurvivorSize()) * TARGET_SURVIVOR_RATIO / 100);
+
+        // AgeTable::compute_tenuring_threshold
+        YoungGeneration youngGen = HeapImpl.getHeapImpl().getYoungGeneration();
+        UnsignedWord total = Word.zero();
+        int age = 1;
+        while (age <= HeapParameters.getMaxSurvivorSpaces()) {
+            Space space = youngGen.getSurvivorFromSpaceAt(age - 1);
+            total = total.add(space.getChunkBytes());
+            if (total.aboveThan(desiredSurvivorSize)) {
+                break;
+            }
+            age++;
+        }
+
+        tenuringThreshold = Math.min(age, HeapParameters.getMaxSurvivorSpaces());
+    }
+
+    private void computeNewOldGenSize(boolean resizeOnlyForPromotions) { // TenuredGeneration::compute_new_size_inner
+        UnsignedWord capacityAtPrologue = sizes.getOldSize();
+        UnsignedWord usedAfterGc = GCImpl.getAccounting().getOldGenerationAfterChunkBytes();
+        if (sizes.getOldSize().belowThan(usedAfterGc)) {
+            sizes.setOldSize(usedAfterGc);
+        }
+        if (resizeOnlyForPromotions) {
+            return;
+        }
+
+        int currentShrinkFactor = shrinkFactor;
+        shrinkFactor = 0;
+
+        double minimumFreePercentage = MIN_HEAP_FREE_RATIO / 100.0;
+        double maximumUsedPercentage = 1 - minimumFreePercentage;
+
+        UnsignedWord minimumDesiredCapacity = UnsignedUtils.fromDouble(UnsignedUtils.toDouble(usedAfterGc) / maximumUsedPercentage);
+        minimumDesiredCapacity = UnsignedUtils.max(minimumDesiredCapacity, sizes.getInitialOldSize());
+
+        if (sizes.getOldSize().belowThan(minimumDesiredCapacity)) {
+            sizes.setOldSize(alignUp(minimumDesiredCapacity));
+            return;
+        }
+
+        UnsignedWord maxShrinkBytes = sizes.getOldSize().subtract(minimumDesiredCapacity);
+        UnsignedWord shrinkBytes = Word.zero();
+        if (MAX_HEAP_FREE_RATIO < 100) {
+            double maximumFreePercentage = MAX_HEAP_FREE_RATIO / 100.0;
+            double minimumUsedPercentage = 1 - maximumFreePercentage;
+            UnsignedWord maximumDesiredCapacity = UnsignedUtils.fromDouble(UnsignedUtils.toDouble(usedAfterGc) / minimumUsedPercentage);
+            maximumDesiredCapacity = UnsignedUtils.max(maximumDesiredCapacity, sizes.getInitialOldSize());
+            assert minimumDesiredCapacity.belowOrEqual(maximumDesiredCapacity);
+
+            if (sizes.getOldSize().aboveThan(maximumDesiredCapacity)) {
+                shrinkBytes = sizes.getOldSize().subtract(maximumDesiredCapacity);
+                if (SHRINK_HEAP_IN_STEPS) {
+                    /*
+                     * We don't want to shrink all the way back to initSize if people call
+                     * System.gc(), because some programs do that between "phases" and then we'd
+                     * just have to grow the heap up again for the next phase. So we damp the
+                     * shrinking: 0% on the first call, 10% on the second call, 40% on the third
+                     * call, and 100% by the fourth call. But if we recompute size without
+                     * shrinking, it goes back to 0%.
+                     */
+                    shrinkBytes = shrinkBytes.unsignedDivide(100).multiply(currentShrinkFactor);
+                    if (currentShrinkFactor == 0) {
+                        shrinkFactor = 10;
+                    } else {
+                        shrinkFactor = Math.min(currentShrinkFactor * 4, 100);
+                    }
+                }
+                assert shrinkBytes.belowOrEqual(maxShrinkBytes);
+            }
+        }
+
+        if (sizes.getOldSize().aboveThan(capacityAtPrologue)) {
+            /*
+             * We might have expanded for promotions, in which case we might want to take back that
+             * expansion if there's room after GC. That keeps us from stretching the heap with
+             * promotions when there's plenty of room.
+             */
+            UnsignedWord expansionForPromotion = sizes.getOldSize().subtract(capacityAtPrologue);
+            expansionForPromotion = UnsignedUtils.min(expansionForPromotion, maxShrinkBytes);
+            shrinkBytes = UnsignedUtils.max(shrinkBytes, expansionForPromotion);
+        }
+
+        if (shrinkBytes.aboveThan(MIN_HEAP_FREE_RATIO)) {
+            sizes.setOldSize(sizes.getOldSize().subtract(shrinkBytes));
+        }
+    }
+
+    private void computeNewYoungGenSize() { // DefNewGeneration::compute_new_size
+        UnsignedWord desiredNewSize = sizes.getOldSize().unsignedDivide(NEW_RATIO);
+        desiredNewSize = UnsignedUtils.clamp(desiredNewSize, sizes.getInitialYoungSize(), sizes.getMaxYoungSize());
+
+        // DefNewGeneration::compute_space_boundaries
+        UnsignedWord newSurvivorSize = computeSurvivorSize(desiredNewSize);
+        sizes.setSurvivorSize(newSurvivorSize);
+
+        UnsignedWord desiredEdenSize = Word.zero();
+        if (desiredNewSize.aboveThan(newSurvivorSize.multiply(2))) {
+            desiredEdenSize = desiredNewSize.subtract(newSurvivorSize.multiply(2));
+        }
+        UnsignedWord newEdenSize = minSpaceSize(alignDown(desiredEdenSize));
+        sizes.setEdenSize(newEdenSize);
+        assert newEdenSize.aboveThan(0) && newSurvivorSize.belowOrEqual(newEdenSize);
+    }
+
+    private UnsignedWord computeSurvivorSize(UnsignedWord genSize) { // DefNewGeneration::compute_survivor_size
+        UnsignedWord targetSurvivorSize = minSpaceSize(alignDown(genSize.unsignedDivide(SURVIVOR_RATIO)));
+        // Note that maxSurvivorSize is 0 when survivor spaces are disabled.
+        return UnsignedUtils.min(targetSurvivorSize, sizes.getMaxSurvivorSize());
+    }
+}

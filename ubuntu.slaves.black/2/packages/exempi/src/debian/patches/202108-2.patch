@@ -1,0 +1,90 @@
+Backport of:
+
+From 16e53564ae6c2689387479c04770f492075d5b7b Mon Sep 17 00:00:00 2001
+From: Gabriele Mondada <gmondada@recolive.com>
+Date: Mon, 30 Aug 2021 10:11:18 +0200
+Subject: fix not fully implemented kXMPFiles_OpenOnlyXMP flag (#24)
+
+---
+ XMPFiles/source/FileHandlers/MPEG4_Handler.cpp | 66 +++++++++++++-------------
+ 1 file changed, 34 insertions(+), 32 deletions(-)
+
+--- a/XMPFiles/source/FileHandlers/MPEG4_Handler.cpp
++++ b/XMPFiles/source/FileHandlers/MPEG4_Handler.cpp
+@@ -2191,44 +2191,43 @@ void MPEG4_MetaHandler::ProcessXMP()
+ 
+ 	// Import the non-XMP items. Do the imports in reverse priority order, last import wins!
+ 
+-	MOOV_Manager::BoxInfo mvhdInfo;
+-	MOOV_Manager::BoxRef  mvhdRef = this->moovMgr.GetBox ( "moov/mvhd", &mvhdInfo );
+-	bool mvhdFound = ((mvhdRef != 0) && (mvhdInfo.contentSize != 0));
+-
+-	MOOV_Manager::BoxInfo udtaInfo;
+-	MOOV_Manager::BoxRef  udtaRef = this->moovMgr.GetBox ( "moov/udta", &udtaInfo );
+-	std::vector<MOOV_Manager::BoxInfo> cprtBoxes;
+-
+-	if ( udtaRef != 0 ) {
+-		for ( XMP_Uns32 i = 0; i < udtaInfo.childCount; ++i ) {
+-			MOOV_Manager::BoxInfo currInfo;
+-			MOOV_Manager::BoxRef  currRef = this->moovMgr.GetNthChild ( udtaRef, i, &currInfo );
+-			if ( currRef == 0 ) break;	// Sanity check, should not happen.
+-			if ( currInfo.boxType != ISOMedia::k_cprt ) continue;
+-			cprtBoxes.push_back ( currInfo );
++	if ( !xmpOnly ) {
++		MOOV_Manager::BoxInfo mvhdInfo;
++		MOOV_Manager::BoxRef  mvhdRef = this->moovMgr.GetBox ( "moov/mvhd", &mvhdInfo );
++		bool mvhdFound = ((mvhdRef != 0) && (mvhdInfo.contentSize != 0));
++
++		MOOV_Manager::BoxInfo udtaInfo;
++		MOOV_Manager::BoxRef  udtaRef = this->moovMgr.GetBox ( "moov/udta", &udtaInfo );
++		std::vector<MOOV_Manager::BoxInfo> cprtBoxes;
++		if ( udtaRef != 0 ) {
++			for ( XMP_Uns32 i = 0; i < udtaInfo.childCount; ++i ) {
++				MOOV_Manager::BoxInfo currInfo;
++				MOOV_Manager::BoxRef  currRef = this->moovMgr.GetNthChild ( udtaRef, i, &currInfo );
++				if ( currRef == 0 ) break;	// Sanity check, should not happen.
++				if ( currInfo.boxType != ISOMedia::k_cprt ) continue;
++				cprtBoxes.push_back ( currInfo );
++			}
+ 		}
+-	}
+-	bool cprtFound = (! cprtBoxes.empty());
++		bool cprtFound = (! cprtBoxes.empty());
+ 
+-	bool tradQTFound = this->tradQTMgr.ParseCachedBoxes ( this->moovMgr );
+-	bool tmcdFound = this->ParseTimecodeTrack();
++		bool tradQTFound = this->tradQTMgr.ParseCachedBoxes ( this->moovMgr );
+ 
+-	if ( this->fileMode == MOOV_Manager::kFileIsNormalISO ) {
++		bool tmcdFound = this->ParseTimecodeTrack();
+ 
+-		if ( mvhdFound )   this->containsXMP |= ImportMVHDItems ( mvhdInfo, &this->xmpObj );
+-		if ( cprtFound )   this->containsXMP |= ImportISOCopyrights ( cprtBoxes, &this->xmpObj );
+-		if ( tmcdFound )   this->containsXMP |= ImportTimecodeItems ( this->tmcdInfo, this->tradQTMgr, &this->xmpObj );
+-	} else {	// This is a QuickTime file, either traditional or modern.
+-
+-		if ( mvhdFound )   this->containsXMP |= ImportMVHDItems ( mvhdInfo, &this->xmpObj );
+-		if ( cprtFound )   this->containsXMP |= ImportISOCopyrights ( cprtBoxes, &this->xmpObj );
+-		if ( tmcdFound | tradQTFound ) {
+-			// Some of the timecode items are in the .../udta/©... set but handled by ImportTimecodeItems.
+-			this->containsXMP |= ImportTimecodeItems ( this->tmcdInfo, this->tradQTMgr, &this->xmpObj );
++		if ( this->fileMode == MOOV_Manager::kFileIsNormalISO ) {
++			if ( mvhdFound )   this->containsXMP |= ImportMVHDItems ( mvhdInfo, &this->xmpObj );
++			if ( cprtFound )   this->containsXMP |= ImportISOCopyrights ( cprtBoxes, &this->xmpObj );
++			if ( tmcdFound )   this->containsXMP |= ImportTimecodeItems ( this->tmcdInfo, this->tradQTMgr, &this->xmpObj );
++		} else {	// This is a QuickTime file, either traditional or modern.
++
++			if ( mvhdFound )   this->containsXMP |= ImportMVHDItems ( mvhdInfo, &this->xmpObj );
++			if ( cprtFound )   this->containsXMP |= ImportISOCopyrights ( cprtBoxes, &this->xmpObj );
++			if ( tmcdFound | tradQTFound ) {
++				// Some of the timecode items are in the .../udta/... set but handled by ImportTimecodeItems.
++				this->containsXMP |= ImportTimecodeItems ( this->tmcdInfo, this->tradQTMgr, &this->xmpObj );
++			}
++			this->containsXMP |= ImportCr8rItems ( this->moovMgr, &this->xmpObj );
+ 		}
+-
+-		this->containsXMP |= ImportCr8rItems ( this->moovMgr, &this->xmpObj );
+-
+ 	}
+ 
+ }	// MPEG4_MetaHandler::ProcessXMP

@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+# generate plaintext documentation from upstream html
+DOCS = README.md index.html
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+DOCS += index.txt
+endif
+
+%:
+	dh $@
+
+# build minified browser library
+# * include source-map
+# * include pre-compressed gzip and brotli files
+%.min.js: %.js
+	uglifyjs --compress --mangle \
+		--source-map "base='$(CURDIR)',url='$*.min.js.map'" \
+		--output $@ \
+		-- $<
+	pigz --force --keep -11 -- $@ $*.min.js.map
+	brotli --force --keep --best --suffix=.brotli -- $@ $*.min.js.map
+
+%.txt: %.html
+	pandoc --from html --to plain --output $@ $<
+
+test/%.coffee:
+	coffee $@
+
+override_dh_auto_build: backbone.min.js $(DOCS)
+
+override_dh_auto_test: $(wildcard test/*.coffee)
+#	xvfs-run -a phantomjs test/vendor/runner.js test/index.html?noglobals=true
+
+# install core documentation with all binary packages
+override_dh_installdocs:
+	dh_installdocs --all -- $(DOCS)
+
+override_dh_gencontrol:
+	dh_gencontrol -- -V"types:Version=$(shell jq --raw-output .version < Xtypes/package.json)~$(DEB_VERSION)"

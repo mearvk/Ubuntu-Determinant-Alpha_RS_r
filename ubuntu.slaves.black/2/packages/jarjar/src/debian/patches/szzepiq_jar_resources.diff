@@ -1,0 +1,160 @@
+Description: Create patch from fork at <URL:https://github.com/szczepiq/jarjar>.
+ which resolve the issue with jarjar not updating the fully qualified class names
+ in the jar's resources.
+ For instance, with this patch jarjar is able to replace classname (based on requested
+ rules) in META-INF/plexus/components.xml files.
+Source: https://github.com/szczepiq/jarjar
+Author: Szczepan Faber
+Author: Damien Raude-Morvan <drazzib@debian.org>
+Last-Update: 2013-01-08
+--- a/src/main/com/tonicsystems/jarjar/MainProcessor.java
++++ b/src/main/com/tonicsystems/jarjar/MainProcessor.java
+@@ -16,6 +16,8 @@
+ 
+ package com.tonicsystems.jarjar;
+ 
++import com.tonicsystems.jarjar.resource.DefaultLineRewriter;
++import com.tonicsystems.jarjar.resource.ResourceRewriter;
+ import com.tonicsystems.jarjar.util.*;
+ import java.io.File;
+ import java.io.IOException;
+@@ -54,6 +56,7 @@
+         processors.add(new ZapProcessor(zapList));
+         processors.add(new JarTransformerChain(new RemappingClassTransformer[]{ new RemappingClassTransformer(pr) }));
+         processors.add(new ResourceProcessor(pr));
++        processors.add(new ResourceRewriter(new DefaultLineRewriter(ruleList), verbose));
+         chain = new JarProcessorChain(processors.toArray(new JarProcessor[processors.size()]));
+     }
+ 
+--- /dev/null
++++ b/src/main/com/tonicsystems/jarjar/resource/DefaultLineRewriter.java
+@@ -0,0 +1,34 @@
++package com.tonicsystems.jarjar.resource;
++
++import com.tonicsystems.jarjar.Rule;
++import com.tonicsystems.jarjar.util.EntryStruct;
++
++import java.util.LinkedList;
++import java.util.List;
++
++/**
++ * by Szczepan Faber, created at: 9/11/12
++ */
++public class DefaultLineRewriter implements LineRewriter {
++    private final List<MatchableRule> rules = new LinkedList<MatchableRule>();
++
++    public DefaultLineRewriter(List<Rule> ruleList) {
++        for (Rule rule : ruleList) {
++            rules.add(new MatchableRule(rule));
++        }
++    }
++
++    public boolean accepts(EntryStruct struct) {
++        return !struct.name.endsWith(".class") && !struct.name.endsWith(".java") && !struct.name.endsWith("MANIFEST.MF");
++    }
++
++    public String replaceLine(String line) {
++        for (MatchableRule rule : rules) {
++            String replacement = rule.replace(line);
++            if (!replacement.equals(line)) {
++                return replacement;
++            }
++        }
++        return line;
++    }
++}
+--- /dev/null
++++ b/src/main/com/tonicsystems/jarjar/resource/LineRewriter.java
+@@ -0,0 +1,14 @@
++package com.tonicsystems.jarjar.resource;
++
++import com.tonicsystems.jarjar.util.EntryStruct;
++
++/**
++ * by Szczepan Faber, created at: 9/11/12
++ */
++public interface LineRewriter {
++
++    boolean accepts(EntryStruct struct);
++
++    String replaceLine(String line);
++
++}
+--- /dev/null
++++ b/src/main/com/tonicsystems/jarjar/resource/MatchableRule.java
+@@ -0,0 +1,31 @@
++package com.tonicsystems.jarjar.resource;
++
++import com.tonicsystems.jarjar.Rule;
++
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++/**
++ * by Szczepan Faber, created at: 9/11/12
++ */
++public class MatchableRule {
++
++    private final String pattern;
++    private final String replacement;
++
++    public MatchableRule(Rule rule) {
++        this(rule.getPattern(), rule.getResult());
++    }
++
++    public MatchableRule(String pattern, String replacement) {
++        this.pattern = pattern;
++        this.replacement = replacement;
++    }
++
++    public String replace(String input) {
++        String p = pattern.replaceAll("\\.", "\\\\.").replaceAll("\\*\\*", "([\\\\w\\\\d_\\\\\\$]*)");
++        String replacement = this.replacement.replaceAll("@1","\\$1");
++        Matcher m = Pattern.compile(p).matcher(input);
++        return m.replaceAll(replacement);
++    }
++}
+\ No newline at end of file
+--- /dev/null
++++ b/src/main/com/tonicsystems/jarjar/resource/ResourceRewriter.java
+@@ -0,0 +1,40 @@
++package com.tonicsystems.jarjar.resource;
++
++import com.tonicsystems.jarjar.util.EntryStruct;
++import com.tonicsystems.jarjar.util.JarProcessor;
++
++import java.io.*;
++
++/**
++ * by Szczepan Faber, created at: 9/11/12
++ */
++public class ResourceRewriter implements JarProcessor {
++
++    private final LineRewriter input;
++    private final boolean verbose;
++
++    public ResourceRewriter(LineRewriter input, boolean verbose) {
++        this.input = input;
++        this.verbose = verbose;
++    }
++
++    public boolean process(EntryStruct struct) throws IOException {
++        if (input.accepts(struct)) {
++            BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(struct.data)));
++            ByteArrayOutputStream out = new ByteArrayOutputStream();
++            PrintStream printer = new PrintStream(out);
++            String line;
++            while((line = reader.readLine()) != null) {
++                String replacement = input.replaceLine(line);
++                if (!replacement.equals(line) && verbose) {
++                    System.out.println("Updating file: " + struct.name + ". Replacement: " + replacement);
++                }
++                printer.println(replacement);
++            }
++            reader.close();
++            printer.close();
++            struct.data = out.toByteArray();
++        }
++        return true;
++    }
++}

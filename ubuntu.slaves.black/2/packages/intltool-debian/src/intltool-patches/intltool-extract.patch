@@ -1,0 +1,247 @@
+Index: intltool-extract.in.in
+===================================================================
+RCS file: /cvs/gnome/intltool/intltool-extract.in.in,v
+retrieving revision 1.71
+diff -u -r1.71 intltool-extract.in.in
+--- intltool-extract.in.in	23 May 2006 21:08:36 -0000	1.71
++++ intltool-extract.in.in	10 Jul 2006 20:35:58 -0000
+@@ -636,31 +636,132 @@
+ sub type_rfc822deb {
+     ### For rfc822-style Debian configuration files ###
+ 
+-    my $lineno = 1;
++    my $templateNr = 1001;
+     my $type = '';
+-    while ($input =~ /\G(.*?)(^|\n)(_+)([^:]+):[ \t]*(.*?)(?=\n\S|$)/sg)
++    while ($input =~ /\G(.*?)(^|\n)(_+)([^:\s]+)(:[ \t]*)(.*?)(?=\n[\S\n]|$)/sg)
+     {
+-        my ($pre, $newline, $underscore, $tag, $text) = ($1, $2, $3, $4, $5);
+-        while ($pre =~ m/\n/g)
+-        {
+-            $lineno ++;
++        my ($pre, $newline, $underscore, $tag, $space, $text) = ($1, $2, $3, $4, $5, $6);
++        if ($pre =~ m/\n\n/) {
++            while ($pre =~ m/\n\n/g)
++            {
++                $templateNr += 1000;
++            }
++            $templateNr = sprintf("%d", $templateNr / 1000) * 1000 + 1;
+         }
+-        $lineno += length($newline);
+         my @str_list = rfc822deb_split(length($underscore), $text);
++        #   Dirty hack for po-debconf until a better solution is found.
++        if (defined($ENV{INTLTOOL_DEBIAN_TYPE}) && $ENV{INTLTOOL_DEBIAN_TYPE} eq 'po-debconf') {
++                while($pre =~ m/^(Type:\s*\S+)/mig)
++                {
++                        #  This variable has to be persistent because several
++                        #  fields may be translated in a single template
++                        $type = $1;
++                }
++                $tag = $type . "\n" . $tag if length($type);
++        }
++        #  Process pseudo-comments
++        my $usercomment = '';
++        while($pre =~ s/(^|\n)#(.*)$//)
++        {
++            $usercomment = "\n" . $2 . $usercomment;
++        }
++        my @tfields = ();
++        my @pocomments = ();
++        if ($usercomment =~ m/^flag:/m)
++        {
++            #  There is an implicit #flag:comment:* if comments are found before
++            #  any directive.
++            $usercomment = "\nflag:comment:*".$usercomment
++                unless $usercomment =~ m/^\nflag:/s;
++            my @c = split (/\nflag:/, $usercomment);
++            #  The first field may be null
++            shift (@c) if ($c[0] =~ m/^\s*$/s);
++            for (@c)
++            {
++                if (s/^comment(!?):(\S+)(?=\n|$)//s)
++                {
++                    rfc822deb_parse_spec($2, $1, 1+$#str_list, '', $_, \@pocomments);
++                }
++                elsif (s/^translate(!?):(\S+)(?=\n|$)//s)
++                {
++                    rfc822deb_parse_spec($2, $1, 1+$#str_list, 0, 1, \@tfields);
++                }
++                elsif (s/^partial(?=\n|$)//s)
++                {
++                    # This command is ignored by intltool-extract
++                }
++                else
++                {
++                    die "Unknown directive: $_\n\nAborting!\n";
++                }
++            }
++            $usercomment =~ s/(^|\n)flag:[^\n]*(\n|$)//sg;
++            $usercomment = "\n".$usercomment
++                if ($usercomment !~ m/^\n/s && $usercomment =~ m/\S/);
++        }
++        #  By default, print all msgids
++        rfc822deb_parse_spec('*', '', 1+$#str_list, 0, 1, \@tfields)
++            if $#tfields == -1;
++        #  By default, print comments before all msgids
++        rfc822deb_parse_spec('*', '', 1+$#str_list, '', $usercomment, \@pocomments)
++            if $#pocomments == -1;
++        my $cnt = 0;
+         for my $str (@str_list)
+         {
++            $cnt++;
+             $strcount++;
++            next if (exists($tfields[$cnt]) && $tfields[$cnt] != 1);
+             $messages{$str} = [];
+-            $loc{$str} = $lineno;
+-            $count{$str} = $strcount;
+-            my $usercomment = '';
+-            while($pre =~ s/(^|\n)#([^\n]*)$//s)
+-            {
+-                $usercomment = "\n" . $2 . $usercomment;
++            $count{$str} = $strcount unless defined $count{$str};
++            if (defined $comments{$str}) {
++                $comments{$str} .= "\n";
++            } else {
++                $comments{$str} = "";
+             }
+-            $comments{$str} = $tag . $usercomment;
++            $comments{$str} .= $tag . $pocomments[$cnt];
++            $comments{$str} .= "\nxgettext:no-c-format" if $str =~ /%/;
++            push (@{$loc{$str}}, $templateNr);
++        }
++        $templateNr++;
++    }
++    # Note: this adjustment for $offsetlines is not mandatory within
++    # type_rfc822deb but is kept here as an example for other types,
++    # if original line numbers are to be preserved.
++    while (my ($str, $comm) = each %comments) {
++            my $temp = $comm;
++            my $offsetlines = 1 + ($temp =~ s/\n//g);
++            map { $_ -= $offsetlines } @{$loc{$str}};
++    }
++}
++
++sub rfc822deb_parse_spec {
++    my $spec = shift;
++    my $negate = shift;
++    my $len = shift;
++    my $notfound = shift;
++    my $found = shift;
++    my $ref = shift;
++    $spec = ','.$spec.',';
++    #  Replace '*' by all values
++    my $all = '1-'.$len;
++    $spec =~ s/\*/$all/g;
++    #  Expand ranges
++    $spec =~ s/(\d+)-(\d+)/join(",", ($1..$2))/eg;
++    if ($#{$ref} == -1)
++    {
++        push (@{$ref}, $notfound);
++        for my $cnt (1..$len)
++        {
++            $ref->[$cnt] = $notfound;
++        }
++    }
++    for my $cnt (1..$len)
++    {
++        if ($spec =~ m/,$cnt,/ && !$negate) {
++            $ref->[$cnt] .= $found;
++        } elsif ($spec !~ m/,$cnt,/ && $negate) {
++            $ref->[$cnt] .= $found;
+         }
+-        $lineno += ($text =~ s/\n//g);
+     }
+ }
+ 
+@@ -677,7 +778,16 @@
+     my $type = shift;
+     my $text = shift;
+     $text =~ s/^[ \t]//mg;
+-    return (split(/, */, $text, 0)) if $type ne 1;
++    if ($type ne 1)
++    {
++        my @values = ();
++        for my $value (split(/(?<!\\), */, $text, 0))
++        {
++            $value =~ s/\\,/,/g;
++            push @values, $value;
++        }
++        return @values;
++    }
+     return ($text) if $text !~ /\n/;
+ 
+     $text =~ s/([^\n]*)\n//;
+@@ -799,6 +909,10 @@
+ }
+ 
+ sub msg_write {
++    for my $msg (keys %comments) {
++        $comments{$msg} =~ s,^,// ,mg;
++        $comments{$msg} .= "\n";
++    }
+     my @msgids;
+     if (%count)
+     {
+@@ -810,43 +924,26 @@
+     }
+     for my $message (@msgids)
+     {
+-	my $offsetlines = 1;
+-	$offsetlines++ if $message =~ /%/;
+-	if (defined ($comments{$message}))
+-	{
+-		while ($comments{$message} =~ m/\n/g)
+-		{
+-		    $offsetlines++;
+-		}
+-	}
+-	print OUT "# ".($loc{$message} - $offsetlines).  " \"$FILE\"\n"
+-	        if defined $loc{$message};
+-   	print OUT "/* ".$comments{$message}." */\n"
+-                if defined $comments{$message};
+-   	print OUT "/* xgettext:no-c-format */\n" if $message =~ /%/;
++        my $text = "";
++        $text .= $comments{$message}
++            if defined $comments{$message};
+         
+-    	my @lines = split (/\n/, $message, -1);
+-    	for (my $n = 0; $n < @lines; $n++)
+-	{
+-            if ($n == 0)
+-            {
+- 		print OUT "char *s = N_(\""; 
+-            }
+-            else
+-            {  
+-                print OUT "             \""; 
+-            }
+-
+-            print OUT escape($lines[$n]);
+-
+-            if ($n < @lines - 1)
+-            {
+-                print OUT "\\n\"\n"; 
+-            }
+-            else
+-            {
+-                print OUT "\");\n";  
+-	    }
++        my @lines = split (/\n/, $message, -1);
++        for (my $n = 0; $n < @lines; $n++)
++        {
++            $text .= $n == 0 ?
++                "char *s = N_(\"" :
++                "             \""; 
++            $text .= escape($lines[$n]);
++            $text .= $n < @lines - 1 ?  "\\n\"\n" : "\");\n";  
++        }
++        if (defined $loc{$message})
++        {
++            map {print OUT "# ".$_." \"$FILE\"\n$text"} @{$loc{$message}};
++        }
++        else
++        {
++            print OUT $text;
+         }
+     }
+ }

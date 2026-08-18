@@ -1,0 +1,299 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_build - compile java sources in the absence of a (useful) upstream build system
+
+=cut
+
+use strict;
+use warnings;
+use Cwd qw(realpath);
+use List::Util qw(any);
+
+# Value to pass to -source/-target by default
+use constant DEFAULT_JAVA_RELEASE => '1.7';
+
+use Debian::Debhelper::Dh_Lib;
+use Debian::Javahelper::Java qw(write_manifest_fd);
+use Debian::Javahelper::Manifest qw(MAIN_SECTION);
+
+
+=head1 SYNOPSIS
+
+B<jh_build> [S<I<debhelper options>>]
+
+B<jh_build> [S<I<debhelper options>>] S<I<jarfile>> S<I<source>> [... S<I<source>>]
+
+=head1 DESCRIPTION
+
+
+
+=head1 FILES
+
+=over 4
+
+=item debian/javabuild
+
+A file consisting of each build to perform.  One build per line
+where each line consists of:
+
+I<jarfile> I<source> [... I<source>]
+
+Where I<jarfile> is the name of the jar file to be built and I<source> is
+a source file or directory containing source files.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--main=>I<main-class>
+
+Set the B<Main-Class> attribute in the manifest of the generated jar file(s) to I<main-class>.
+This makes B<java -jar I<generated-jar-file>> run that class.
+
+=item B<--java-home=>I<home>
+
+Use I<home> as B<JAVA_HOME> (overrides the B<JAVA_HOME> environment variable).
+
+=item B<-J>, B<--javadoc>, B<--no-javadoc>
+
+Whether or not to build javadoc for the jar files.  The default is to
+generate javadoc along with the jar files.
+
+=item B<--javacopts=>I<options>
+
+Pass I<options> to javac (when invoking javac).  The I<options> value
+is a space-separate list of options (remember to quote the argument to avoid the shell
+interpreting the value).
+
+=item B<--javadoc-opts=>I<options>
+
+Pass I<options> to javadoc (when invoking javadoc).  The I<options> value
+is a space-separate list of options (remember to quote the argument to avoid the shell
+interpreting the value).
+
+=item B<--clean>
+
+If passed, B<jh_build> will clean up after itself.  This is called by
+L<jh_clean(1)> and using L<jh_clean(1)> is recommended over calling
+B<jh_build> with B<--clean> directly.
+
+=back
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item B<JAVA_HOME>
+
+If set (and B<--java-home> is omitted), it determines the location of the java home
+for finding the L<javac(1)> compiler, L<javadoc(1)> compiler and the L<jar(1)> utility.
+
+If the environment variable is unset and B<--java-home> is omitted, then the default
+java home is F</usr/lib/jvm/default-java>
+
+=item CLASSPATH
+
+If set, this is the classpath used during compilation of the source code.
+
+=item JH_JAR_EXTRA
+
+A space separated list of extra files or directories to include in the generated jar file(s).
+
+Can be omitted if no extra files need to be included.
+
+=back
+
+=cut
+
+my $JAVA_HOME = defined $ENV{'JAVA_HOME'} ? $ENV{'JAVA_HOME'} : '';
+my $CLASSPATH_ORIG = defined $ENV{'CLASSPATH'} ? $ENV{'CLASSPATH'} : '';
+my $CLASSPATH = $CLASSPATH_ORIG;
+my @JH_JAR_EXTRA;
+my $build_javadoc = 1;
+my (@javac_opts, @javadoc_opts, $main_class, $do_clean);
+my (@JAVAC, @JAVADOC, @JAR, @builds);
+
+$CLASSPATH =~ tr/:/ /;
+@JH_JAR_EXTRA = split(' ', $ENV{'JH_JAR_EXTRA'}) if defined $ENV{'JH_JAR_EXTRA'};
+
+# Work around #926542.
+if (any { $_ eq '-N' } @ARGV) {
+    warning(q{Use of -N as --no-javadoc is deprecated as it clashes with debhelper's -N option});
+    warning('Please migrate to --no-javadoc as soon as possible');
+    warning(q{If you wanted debhelper's --no-package option, then please use -N<pkg> (without a space)});
+    $build_javadoc = 0;
+    @ARGV = grep { $_ ne '-N' } @ARGV;  ## no critic
+}
+
+init(options => {
+	'main|m=s' => \$main_class,
+	'java-home|j=s'  => \$JAVA_HOME,
+	'javadoc|J' => $build_javadoc,
+	'no-javadoc' => sub { $build_javadoc = 0; },
+	'clean' => \$do_clean,
+	# Space-separated list of options
+	'javacopts=s' => sub { @javac_opts = split(' ', $_[1])},
+	'javadoc-opts=s' => sub { @javadoc_opts = split(' ', $_[1])},
+});
+
+if ($do_clean) {
+	my @files;
+	complex_doit('rm -fr debian/_jh_manifest* debian/_jh_build*');
+	if (-f 'debian/javabuild') {
+		@files = map { $_->[0] } filedoublearray('debian/javabuild');
+		rm_files(@files);
+	}
+	exit(0);
+}
+
+sub _has_java_option {
+	my ($opt_ref, $option_name) = @_;
+	for my $arg (@{$opt_ref}) {
+		return 1 if $arg eq $option_name;
+	}
+	return 0;
+}
+
+sub _default_java_option {
+	my ($opt_ref, $option_name, $default_value) = @_;
+	return if _has_java_option($opt_ref, $option_name);
+	if (defined($default_value)) {
+		# -source <version>
+		push(@{$opt_ref}, $option_name, $default_value);
+	} else {
+		# -notimestamp
+		push(@{$opt_ref}, $option_name);
+	}
+	return;
+}
+
+# Use ISO8859-1 as the default encoding to avoid unmappable character errors
+_default_java_option(\@javac_opts, '-encoding', 'ISO8859-1');
+_default_java_option(\@javadoc_opts, '-encoding', 'ISO8859-1');
+
+if (not _has_java_option(\@javac_opts, '--release') and not _has_java_option(\@javac_opts, '-source')) {
+	# If neither --release nor -source is set, then set -source (and -target if also absent)
+	if (not _has_java_option(\@javac_opts, '-target')) {
+		push(@javac_opts, '-source', DEFAULT_JAVA_RELEASE, '-target', DEFAULT_JAVA_RELEASE);
+	} else {
+		push(@javac_opts, '-source', DEFAULT_JAVA_RELEASE);
+	}
+}
+
+if (not _has_java_option(\@javadoc_opts, '--release')) {
+	_default_java_option(\@javadoc_opts, '-source', DEFAULT_JAVA_RELEASE);
+}
+
+_default_java_option(\@javadoc_opts, '-notimestamp');
+_default_java_option(\@javadoc_opts, '-Xdoclint:none');
+
+
+sub do_build {
+	my ($jarfile, @sources) = @_;
+	my (@srcdirs, @srcfiles);
+	my $basename = basename($jarfile);
+	my $ext = $basename;
+	$ext =~ s/[.]jar$//;
+
+	for my $source (@sources) {
+		if (-f $source) {
+			push(@srcfiles, $source);
+		} elsif (-d _) {
+			push(@srcdirs, $source);
+		} else {
+			warning("Ignoring $source because it does not exist");
+		}
+	}
+	rm_files("debian/_jh_manifest.${ext}");
+	if ($main_class or defined($CLASSPATH)) {
+		my $manifest = Debian::Javahelper::Manifest->new;
+		my $main_section = $manifest->get_section(MAIN_SECTION);
+		if (defined($CLASSPATH)) {
+			$main_section->set_value('Class-Path', $CLASSPATH);
+		}
+		if ($main_class) {
+			$main_section->set_value('Main-Class', $main_class);
+			$main_section->set_value('Debian-Java-Home', $JAVA_HOME);
+		}
+		open(my $fd, '>', "debian/_jh_manifest.$ext") or error("open(debian/_jh_manifest.$ext) failed: $!");
+		write_manifest_fd($manifest, $fd, "debian/_jh_manifest.$ext");
+		close($fd) or error("close(debian/_jh_manifest.$ext) failed: $!");
+	}
+
+	install_dir("debian/_jh_build.$ext");
+
+	if (@srcdirs) {
+		my $dirs_escaped = escape_shell(@srcdirs);
+		my $files_escaped = escape_shell(@srcfiles);
+		complex_doit(qq{find $dirs_escaped -name '*.java' -and -type f -print0 | xargs -s 512000 -0 @JAVAC -g -cp ${CLASSPATH_ORIG}:debian/_jh_build.$ext -d debian/_jh_build.$ext @javac_opts $files_escaped});
+		if ($build_javadoc) {
+			complex_doit(qq{find $dirs_escaped -name '*.java' -and -type f -print0 | xargs -s 512000 -0 @JAVADOC -classpath ${CLASSPATH_ORIG}:debian/_jh_build.$ext -d debian/_jh_build.javadoc/api -quiet @javadoc_opts $files_escaped});
+		}
+
+	} elsif (@srcfiles) {
+		doit(@JAVAC, '-g', '-cp', "${CLASSPATH_ORIG}:_jh_build.$ext", '-d', "debian/_jh_build.$ext", @javac_opts, @srcfiles);
+		if ($build_javadoc) {
+			doit(@JAVADOC, '-classpath', "${CLASSPATH_ORIG}:_jh_build.$ext", '-d', 'debian/_jh_build.javadoc/api', '-quiet', @javadoc_opts, @srcfiles);
+		}
+	} else {
+		return;
+	}
+
+	# dirname gets it wrong when $jarfile does not contain a slash (returning the basename instead).
+	my $dir = index($jarfile, '/') > -1 ? dirname($jarfile) : '.';
+	my $resolved_dir = realpath($dir) // error("Cannot resolve $dir: $!");
+	my $jarpath = "${resolved_dir}/${basename}";
+	complex_doit(qq{cd debian/_jh_build.$ext && @JAR cfm "$jarpath" ../_jh_manifest.$ext *});
+	doit(@JAR, 'uf', $jarpath, @JH_JAR_EXTRA) if @JH_JAR_EXTRA;
+	return;
+}
+
+# By default, jh_build does nothing without a debian/javabuild file or explicit arguments.
+# PROMISE: DH NOOP WITHOUT pkgfile(javabuild)
+
+if (@ARGV) {
+	push(@builds, [@ARGV]);
+} elsif (-f 'debian/javabuild') {
+	# We have to manually handle globs as the first argument is not
+	# a glob but the desired path for the generated jar file.
+	for my $build_request (filedoublearray('debian/javabuild')) {
+		my ($jar_file, @source_globs) = @{$build_request};
+		my @sources = glob_expand(['.'], \&glob_expand_error_handler_reject, @source_globs);
+		push(@builds, [$jar_file, @sources]);
+	}
+}
+
+if (@builds) {
+	if (not $JAVA_HOME) {
+		$JAVA_HOME = '/usr/lib/jvm/default-java' if -d '/usr/lib/jvm/default-java';
+	}
+	if (not $JAVA_HOME) {
+		error('Cannot find any JAVA_HOME: aborting');
+	}
+	@JAVAC = ("${JAVA_HOME}/bin/javac");
+	@JAVADOC = ("${JAVA_HOME}/bin/javadoc", '-locale', 'en_US');
+	@JAR = ("${JAVA_HOME}/bin/jar");
+	for my $build (@builds) {
+		do_build(@{$build});
+	}
+}
+
+=head1 EXAMPLE
+
+  jh_build foo.jar src/java/main
+
+Will generate B<foo.jar> from compiling all the java files in F<src/java/main>
+and generate a javadoc from it.
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=cut

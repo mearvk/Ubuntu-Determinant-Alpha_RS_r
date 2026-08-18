@@ -1,0 +1,145 @@
+#!/usr/bin/make -f
+
+JSBASE:=/usr/share/javascript
+COMP:=notebook/static/components
+
+export PYBUILD_AFTER_INSTALL=rm -rf '{destdir}/{install_dir}/notebook/static/components' ; cp -r notebook/static/components '{destdir}/{install_dir}/notebook/static/' ; rm -rf '{destdir}/{install_dir}/notebook/tests'
+export LC_ALL=C.UTF-8
+# selenium tests require extra dependencies
+# test_notebookapp_integration tries to invoke jupyter-notebook which isn't in the PATH when this runs
+export PYBUILD_TEST_ARGS=--ignore=notebook/tests/selenium -k 'not notebookapp_integration'
+
+
+%:
+	dh $@ --with=python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_configure:
+	mv debian/missing-sources/@jupyterlab .
+	mv debian/missing-sources/@types .
+	mv debian/missing-sources/klona .
+	mv debian/missing-sources/parse-srcset .
+	mv debian/missing-sources/sanitize-html .
+
+	#backbone
+	mkdir -p $(COMP)/backbone
+	ln -s $(JSBASE)/backbone/backbone.min.js $(COMP)/backbone/backbone-min.js
+
+	#bootstrap
+	mkdir -p $(COMP)/bootstrap
+	ln -s $(JSBASE)/bootstrap $(COMP)/bootstrap/dist
+	ln -s $(JSBASE)/bootstrap/less $(COMP)/bootstrap/
+
+	#bootstrap-tour
+	mkdir -p $(COMP)/bootstrap-tour/build/js
+	mkdir -p $(COMP)/bootstrap-tour/build/css
+	ln -s $(JSBASE)/bootstrap-tour/bootstrap-tour.min.js $(COMP)/bootstrap-tour/build/js/
+	ln -s $(JSBASE)/bootstrap-tour/bootstrap-tour.min.css $(COMP)/bootstrap-tour/build/css/
+
+	#codemirror
+	ln -s $(JSBASE)/codemirror $(COMP)/
+
+	#es6-promise
+	mkdir -p $(COMP)/es6-promise
+	ln -s $(JSBASE)/es6-promise/es6-promise.min.js $(COMP)/es6-promise/promise.min.js
+	ln -s $(JSBASE)/es6-promise/es6-promise.js $(COMP)/es6-promise/promise.js
+	ln -s $(JSBASE)/es6-promise/es6-promise.min.js $(COMP)/es6-promise/es6-promise.min.js
+	ln -s $(JSBASE)/es6-promise/es6-promise.js $(COMP)/es6-promise/es6-promise.js
+
+	#jed
+	ln -s $(JSBASE)/jed $(COMP)/
+
+	#jquery
+	ln -s $(JSBASE)/jquery $(COMP)/
+
+	#jquery-typeahead
+	mkdir -p $(COMP)/jquery-typeahead
+	ln -s $(JSBASE)/jquery-typeahead $(COMP)/jquery-typeahead/dist
+
+	#jquery-ui
+	mkdir -p $(COMP)/jquery-ui/themes/smoothness
+	ln -s $(JSBASE)/jquery-ui/jquery-ui.min.js $(COMP)/jquery-ui/
+	ln -s $(JSBASE)/jquery-ui/themes/base/jquery-ui.min.css $(COMP)/jquery-ui/themes/smoothness/
+	ln -s $(JSBASE)/jquery-ui/themes/base/images $(COMP)/jquery-ui/themes/smoothness/
+
+	#marked
+	mkdir -p $(COMP)/marked/lib
+	ln -s $(JSBASE)/marked/marked.umd.js $(COMP)/marked/lib/marked.js
+
+	#mathjax
+	ln -s $(JSBASE)/mathjax $(COMP)/MathJax
+
+	#moment
+	mkdir -p $(COMP)/moment/min
+	ln -s $(JSBASE)/moment/moment.js $(COMP)/moment/
+	ln -s $(JSBASE)/moment/moment-with-locales.js $(COMP)/moment/
+	ln -s $(JSBASE)/moment/moment-with-locales.min.js $(COMP)/moment/min/moment-with-locales.js
+
+	#requirejs
+	ln -s $(JSBASE)/requirejs $(COMP)/
+
+	#requirejs-plugins
+	cp -r debian/missing-sources/requirejs-plugins $(COMP)/
+
+	#requirejs-text
+	mkdir -p $(COMP)/requirejs-text
+	ln -s $(JSBASE)/requirejs/text.js $(COMP)/requirejs-text/
+
+	#xterm.js
+	mkdir -p $(COMP)/xterm.js $(COMP)/xterm.js-css $(COMP)/xterm.js-fit
+	ln -s $(JSBASE)/xterm/xterm.js $(COMP)/xterm.js/index.js
+	ln -s $(JSBASE)/xterm/xterm.css $(COMP)/xterm.js-css/index.css
+	ln -s $(JSBASE)/xterm/addons/fit/fit.js $(COMP)/xterm.js-fit/index.js
+
+	#text-encoding
+	mkdir -p $(COMP)/text-encoding/lib
+	ln -s $(JSBASE)/text-encoding/encoding.js $(COMP)/text-encoding/lib/
+
+	#underscore
+	mkdir -p $(COMP)/underscore
+	ln -s $(JSBASE)/underscore/underscore.min.js $(COMP)/underscore/underscore-min.js
+
+	#font-awesome
+	ln -s /usr/share/fonts-font-awesome $(COMP)/font-awesome
+
+    #react
+	mkdir -p $(COMP)/react
+	# copy these files, since there isn't a libjs-react, which means we'd pull in the dependencies
+	# of a full nodejs environment
+	cp /usr/share/nodejs/react/umd/react.production.min.js $(COMP)/react/react.production.min.js
+	cp /usr/share/nodejs/react-dom/umd/react-dom.production.min.js $(COMP)/react/react-dom.production.min.js
+
+	#create-react-class
+	mkdir -p $(COMP)/create-react-class
+	cd debian/missing-sources/create-react-class && NODE_ENV=production webpack
+	cp debian/missing-sources/create-react-class/dist/create-react-class.min.js $(COMP)/create-react-class/index.js
+
+	dh_auto_configure
+	dh_auto_configure --buildsystem nodejs
+
+	# d/nodejs/component_links doesn't work for components containing @ in the name
+	mkdir @jupyterlab/apputils/node_modules/@types
+	ln -s ../../../sanitize-html @jupyterlab/apputils/node_modules/sanitize-html
+	ln -s ../../../@types/sanitize-html @jupyterlab/apputils/node_modules/@types/sanitize-html
+
+	# for some reason webpack tries to resolve nodejs builtin buffer to a broken relative path
+	# when transforming postcss
+	ln -s node_modules/buffer buffer
+
+override_dh_auto_build:
+	dh_auto_build --buildsystem nodejs
+	webpack
+	dh_auto_build
+ifeq (,$(filter nodoc,$(DEB_BUILD_PROFILES)))
+	PYTHONPATH=. http_proxy='127.0.0.9' https_proxy='127.0.0.9' python3 -m sphinx -N -bhtml docs/source/ build/html
+endif
+
+override_dh_auto_clean:
+	dh_auto_clean
+	$(RM) notebook/static/*/js/main.*.js
+	$(RM) notebook/static/*/js/main.*.js.map
+
+override_dh_installchangelogs:
+	dh_installchangelogs -k CHANGELOG.md
+
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable

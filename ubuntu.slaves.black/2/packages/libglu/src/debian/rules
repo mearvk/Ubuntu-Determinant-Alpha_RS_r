@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+override_dh_clean:
+	for file in debian/*.in; do rm -f $${file%%.in}; done
+	dh_clean
+
+override_dh_install:
+	for file in debian/*.in; \
+	do \
+		sed -e"s,\$${DEB_HOST_MULTIARCH},$(DEB_HOST_MULTIARCH),g" \
+			$${file} > $${file%%.in}; \
+	done
+
+	# purge .la files
+	find debian/tmp/ -name '*.la' -exec rm '{}' ';'
+
+	dh_install
+
+%:
+	dh $@ --builddirectory=build/ \
+		--buildsystem=meson
+
+gentarball: SOURCE=libglu
+gentarball: UV=$(shell dpkg-parsechangelog|awk '/^Version:/ {print $$2}'|sed 's/-.*$$//')
+gentarball:
+	git archive --format=tar upstream-unstable --prefix=$(SOURCE)-$(UV)/ | gzip -9 > ../$(SOURCE)_$(UV).orig.tar.gz

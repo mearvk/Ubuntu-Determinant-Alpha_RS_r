@@ -1,0 +1,173 @@
+Index: jformatstring-0.10~20131207/build.xml
+===================================================================
+--- jformatstring-0.10~20131207.orig/build.xml	2013-12-09 08:44:03.355428356 +0800
++++ jformatstring-0.10~20131207/build.xml	2013-12-09 08:50:41.975425237 +0800
+@@ -5,13 +5,7 @@
+ 
+ 	<property file="build.properties" />
+ 
+-	<property name="anttask.jar" value="${findbugs.home}/lib/findbugs-ant.jar" />
+-
+-	<path id="compileClasspath">
+-		<fileset dir="lib" />
+-	</path>
+-
+-	<target name="build" depends="clean,jarFile,findbugs" />
++	<target name="build" depends="clean,jarFile" />
+ 
+ 	<target name="classes">
+ 		<mkdir dir="build/classes" />
+@@ -20,9 +14,9 @@
+ 			<src path="src/java" />
+ 			<src path="src/junit" />
+ 			<classpath>
++                <pathelement path="/usr/share/java/junit4.jar"/>
+ 				<pathelement location="build/classes" />
+ 			</classpath>
+-			<classpath refid="compileClasspath" />
+ 		</javac>
+ 	</target>
+ 
+@@ -37,42 +31,35 @@
+ 		</jar>
+ 	</target>
+ 
++    <property name="junit.dir" value="build/junit" />
++    <target name="test" depends="classes">
++        <echo>Running JUnit test cases for jformatstring...</echo>
++        <delete dir="${junit.dir}"/>
++        <mkdir dir="${junit.dir}"/>
++        <junit
++            fork="yes"
++            printsummary="true"
++            haltonfailure="true"
++            haltonerror="true">
++            <classpath>
++                <pathelement path="build/classes"/>
++                <pathelement path="/usr/share/java/junit4.jar"/>
++            </classpath>
++            <formatter type="xml"/>
++            <!-- junit needs fileset to point to .java files (not .class) -->
++            <batchtest todir="${junit.dir}">
++                <fileset dir="src/junit">
++                    <include name="**/*Test.java"/>
++                    <include name="**/Test*.java"/>
++                </fileset>
++            </batchtest>
++        </junit>
++    </target>
+ 
+ 	<target name="clean">
+ 		<delete dir="build/classes" />
+ 	</target>
+ 
+-
+-	<target name="findbugs" depends="classes" if="findbugs.home">
+-		<echo>FB home ${findbugs.home}</echo>
+-		<echo>FB ant ${anttask.jar}</echo>
+-		<taskdef resource="edu/umd/cs/findbugs/anttask/tasks.properties"
+-			classpath="${anttask.jar}" />
+-		<findbugs home="${findbugs.home}" output="xml:withMessages"
+-			projectName="jFormatString" chooseVisitors="+CheckExpectedWarnings"
+-			outputFile="build/bugs.xml">
+-			<class location="build/classes/" />
+-			<sourcePath path="src/java" />
+-			<sourcePath path="src/junit" />
+-		</findbugs>
+-
+-
+-
+-		<taskdef name="filterBugs" classname="edu.umd.cs.findbugs.anttask.FilterBugsTask"
+-			classpath="${anttask.jar}" />
+-		<taskdef name="printBugs"
+-			classname="edu.umd.cs.findbugs.anttask.ConvertXmlToTextTask"
+-			classpath="${anttask.jar}" />
+-		<filterBugs home="${findbugs.home}" priority="1"
+-			bugPattern="FB" inputFile="build/bugs.xml" outputFile="build/unexpected.xml">
+-		</filterBugs>
+-		<printBugs home="${findbugs.home}" inputFile="build/unexpected.xml"
+-			format="text">
+-		</printBugs>
+-
+-
+-	</target>
+-
+ </project>
+ 
+ <!-- vim:set ts=4: -->
+Index: jformatstring-0.10~20131207/src/junit/edu/umd/cs/findbugs/formatStringChecker/FormatterRuntimeTest.java
+===================================================================
+--- jformatstring-0.10~20131207.orig/src/junit/edu/umd/cs/findbugs/formatStringChecker/FormatterRuntimeTest.java	2013-12-09 08:30:37.751434000 +0800
++++ jformatstring-0.10~20131207/src/junit/edu/umd/cs/findbugs/formatStringChecker/FormatterRuntimeTest.java	2013-12-06 22:59:53.870953000 +0800
+@@ -33,13 +33,9 @@
+ 
+ import org.junit.Test;
+ 
+-import edu.umd.cs.findbugs.annotations.ExpectWarning;
+-import edu.umd.cs.findbugs.annotations.NoWarning;
+-
+ public class FormatterRuntimeTest {
+ 
+ 	@Test
+-	@NoWarning("FS")
+ 	public void shouldWork() {
+ 		System.out.println(String.format("%d%n%d", 42, (short) 42));
+ 		System.out.println(String.format("%d%n", new BigInteger("42")));
+@@ -48,35 +44,29 @@
+ 	}
+ 
+ 	@Test(expected = IllegalFormatConversionException.class)
+-	@ExpectWarning("FS")
+ 	public void stringWhereIntegerExpected() {
+ 		System.out.println(String.format("%d", "test"));
+ 	}
+ 
+ 	@Test(expected = MissingFormatArgumentException.class)
+-	@ExpectWarning("FS")
+ 	public void notEnoughParameters() {
+ 		System.out.println(String.format("%s%s", "test"));
+ 	}
+ 
+-	@ExpectWarning("VA_FORMAT_STRING_BAD_CONVERSION_FROM_ARRAY")
+ 	public void passingAnArray() {
+ 		System.out.println(System.out.printf("%s", new int[] { 42, 17 }));
+ 	}
+ 
+-	@ExpectWarning("FS")
+ 	public void passingAnIntToABoolean() {
+ 		System.out.println(System.out.printf("%b", 0));
+ 	}
+ 
+ 	@Test(expected = UnknownFormatConversionException.class)
+-	@ExpectWarning("FS")
+ 	public void formatDateWithY() {
+ 		System.out.println(String.format("%Y", new Date()));
+ 	}
+ 
+ 	@Test
+-	@NoWarning("FS")
+ 	public void testBug1874856FalsePositive() {
+ 		// None of these should yield warnings
+ 		Calendar c = new GregorianCalendar(1993, 4, 23);
+@@ -95,7 +85,6 @@
+ 	}
+ 
+ 	@Test(expected = MissingFormatArgumentException.class)
+-	@ExpectWarning("FS")
+ 	public void testBug1874856TruePositive() {
+ 		Calendar c = new GregorianCalendar(1993, 4, 23);
+ 		// Actually, this one should generate a warning
+@@ -107,13 +96,11 @@
+ 	}
+ 
+ 	@Test(expected = IllegalFormatConversionException.class)
+-	@ExpectWarning("FS")
+ 	public void testDateMismatch() {
+ 		System.out.printf("%tY\n", "2008");
+ 	}
+ 
+ 	@Test
+-	@ExpectWarning("FS")
+ 	public void testSqlDates() {
+ 		Calendar c = new GregorianCalendar(1993, 4, 23, 12, 34, 56);
+ 		java.sql.Date date = new java.sql.Date(c.getTimeInMillis());

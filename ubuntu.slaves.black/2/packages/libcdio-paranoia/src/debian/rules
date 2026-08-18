@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
+LIBCDEV=$(shell grep-status -F Status install -a -F Provides libc-dev -s Package | sed -ne 's/^Package:[[:space:]]*//p' | head -1) | libc-dev
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure --
+		--disable-silent-rules \
+		--disable-cddb \
+		--disable-vcd-info
+
+override_dh_auto_test:
+	TZ=UTC dh_auto_test
+
+override_dh_shlibdeps:
+	dh_shlibdeps -L libcdio_cdda1 -L libcdio_paranoia1 -l debian/tmp/usr/lib
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vlibcdev="$(LIBCDEV)"

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd_krb5_locator_plugin</refname>
+        <refpurpose>Kerberos lokaliseringsinsticksmodul</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Kerberos lokaliseringsinsticksmodul
+<command>sssd_krb5_locator_plugin</command> används av libkrb5 för att hitta
+KDC:er för ett givet Kerberos-rike.  SSSD tillhandahåller en sådan
+insticksmodul för att styra alla Kerberos-klienter på ett system till en
+ensam KDC.  I allmänhet skall det inte ha någon betydelse vilken KDC en
+klientprocess pratar med.  Men det finns fall, t.ex. efter en
+lösenordsändring, då inte alla KDC:er är i samma tillstånd för att den nya
+datan måste spridas först.  För att undvika oväntade autentiseringsfel och
+kanske även kontolåsningar kan det vara bra att prata med en enskild KDC så
+länge som möjligt.
+        </para>
+        <para>
+            libkrb5 kommer söka efter lokaliseringsinsticksmodulen i underkatalogen
+libkrb5 till Kerberos katalog för insticksmoduler, se plugin_base_dir i
+<citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för detaljer. Insticksmodulen kan
+endast avaktiveras genom att ta bort filen med insticksmodulen. Det finns
+ingen möjlighet att avaktivera den i Kerberos konfiguration. Men
+miljövariabeln SSSD_KRB5_LOCATOR_DISABLE kan användas för att avaktivera
+insticksmodulen för individuella kommandon.  Alternativt kan
+SSSD-alternativet krb5_use_kdcinfo=False användas för att inte generera de
+data som behövs av insticksmodulen.  Med denna anropas fortfarande
+insticksmodulen men den tillhandahåller inga data till anroparen så att
+libkrb5 kan falla tillbaka på andra metoder som är definierade i krb5.conf.
+        </para>
+        <para>
+            Insticksmodulen läser information om KDC:erna för ett givet rike från en fil
+som heter <filename>kdcinfo.RIKE</filename>.  Filen skall innehålla ett
+eller flera DNS-namn eller IP-adresser antingen i punktad decimal
+IPv4-notation eller den hexadecimala IPv6-notationen.  Ett frivilligt
+portnummer kan läggas till på slutet separerat av ett kolon, IPv6-adressen
+måste inneslutas i hakparenteser i detta fall som vanligt.  Giltiga poster
+är:
+            <itemizedlist>
+                <listitem><para>kdc.example.com</para></listitem>
+                <listitem><para>kdc.example.com:321</para></listitem>
+                <listitem><para>1.2.3.4</para></listitem>
+                <listitem><para>5.6.7.8:99</para></listitem>
+                <listitem><para>2001:db8:85a3::8a2e:370:7334</para></listitem>
+                <listitem><para>[2001:db8:85a3::8a2e:370:7334]:321</para></listitem>
+            </itemizedlist>
+            SSSD:s krb5-autentiseringsleverantör som också används av IPA- och
+AD-leverantörerna lägger till adresser till den aktuella KDC- eller
+domänkontrollern SSSD använder till denna fil.
+        </para>
+        <para>
+            I miljöer med KDC:er som endast är för läsning och för läsning och skrivning
+där klienter förväntas använda instanser endast för läsning för allmänna
+operationer och endast KDC:n för läsning och skrivning för
+konfigurationsändringar som lösenordsändringar används även en
+<filename>kpasswdinfo.RIKE</filename> för att identifiera KDC:er för läsning
+och skrivning. Om denna fil finns för det givna riket kommer innehållet
+användas av insticksmodulen för att svara på begäranden om en kpasswd- eller
+kadmin-server eller om huvud-KDC:n specifik för MIT Kerberos. Om adressen
+innehåller ett portnummer kommer standard-KDC-porten 88 användas för det
+senare.
+        </para>
+    </refsect1>
+
+    <refsect1 id='notes'>
+        <title>NOTER</title>
+        <para>
+            Inte alla Kerberosimplementationer stödjer användningen av
+insticksmoduler. Om <command>sssd_krb5_locator_plugin</command> inte är
+tillgänglig på ditt system måste du redigera /etc/krb5.conf för att avspegla
+din Kerberosuppsättning.
+        </para>
+        <para>
+            Om miljövariabeln SSSD_KRB5_LOCATOR_DEBUG är satt till något värde kommer
+felsökningsmeddelanden skrivas till standard fel.
+        </para>
+        <para>
+            Om miljövariabeln SSSD_KRB5_LOCATOR_DISABLE är satt till något värde
+avaktiveras insticksmodulen och kommer bara returnera KRB5_PLUGIN_NO_HANDLE
+till anroparen.
+        </para>
+        <para>
+            Om miljövariabeln SSSD_KRB5_LOCATOR_IGNORE_DNS_FAILURES är satt till något
+värde kommer insticksmodulen försöka slå upp alla DNS-namn i filen kdcinfo.
+Som standard returneras KRB5_PLUGIN_NO_HANDLE till anroparen omedelbart vid
+den första misslyckade DNS-uppslagningen.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

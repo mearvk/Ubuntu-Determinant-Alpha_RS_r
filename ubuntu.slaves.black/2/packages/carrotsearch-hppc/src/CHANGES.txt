@@ -1,0 +1,488 @@
+
+[0.7.2]
+
+Released on October 25th, 2016
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=12632
+
+** Other changes
+
+   PR #5: OSGi descriptors in JAR manifests, bundle packaging. (Guillaume 
+          Delafosse)
+
+
+[0.7.1]
+Released on May 7th, 2015
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=12628
+
+** New features
+
+HPPC-159: Add .visualizeKeyDistribution(int characters) to maps and sets
+
+** Bug fixes
+
+HPPC-156: forEach iterators spin loop endlessly on *HashSet and *ScatterSet. 
+
+HPPC-158: *ScatterMap.from should shadow *HashMap.from with proper covariant.
+
+HPPC-155: *ScatterSet.from should shadow *HashSet.from with proper covariant.
+
+
+[0.7.0] 
+Released on May 5th, 2015
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=12421
+
+** API-breaking changes
+
+HPPC-117: A summary of API changes resulting from other issues.
+
+          * (HPPC-118) Direct generic buffers are declared Object[].
+          Should not affect runtime code (Object[] casts were required 
+          anyway).
+
+          * (HPPC-106) Guava adapters dropped. Copy to your own code
+          from previous HPPC release if required.
+
+          * 1.7 compatibility only. static factories removed, use diamonds.
+          T.newInstanceWithCapacity(*)     -> removed, use new T<>(*)
+          T.newInstanceWithExpectedSize(*) -> removed, use new T<>(*)
+          T.newInstance(*)                 -> removed, use new T<>(*)
+          T.from(container)                -> removed, use new T<>(container)
+          
+          * EmptyArrays has been removed. Empty arrays are now a static
+            constant in each *ArrayList.
+            
+          * (HPPC-97) Removed allocated[] fields from hash containers. If
+          you used explicit loops utilizing allocated[] you should rewrite
+          them to use cursors or other form of iteration instead (it will
+          be simpler than taking care of the empty slot marker).
+          
+          * (HPPC-146) Removed DoubleLinkedIntSet.
+
+          * (HPPC-115) Hash containers now, by default, use a random internal
+          mixing seed to reorder entries (so the order of keys is not 
+          constant from execution to execution). See detailed HPPC-115 entry
+          below.
+
+          * (HPPC-121) Renamed methods:
+          T.removeFirstOccurrences -> T.removeFirst
+          T.removeLastOccurrences  -> T.removeLast
+          T.removeAllOccurrences   -> T.removeAll(type)
+          
+          * (HPPC-123) Dropped MurmurHash3 class entirely.
+          
+          * (HPPC-125) The semantics of how equals works has changed (a container
+          can be equal only if the comparison's target is of the same
+          class and contains the same entries.
+          
+          * (HPPC-129) ArraySizingStrategy#round() method has been removed
+          completely.
+
+          * (HPPC-130) removeAll(KTypeLookupContainer) had an incorrect 
+          generic signature of:
+            public int removeAll(final KTypeLookupContainer<? extends KType> c)
+          now corrected to:
+            public int removeAll(final KTypeLookupContainer<? super KType> c)
+          (for primitive types this does not apply).
+
+          * (HPPC-131) retainAll(KTypeLookupContainer) had an incorrect 
+          generic signature of:
+            public int retainAll(final KTypeLookupContainer<? extends KType> c)
+          now corrected to:
+            public int retainAll(final KTypeLookupContainer<? super KType> c)
+          (for primitive types this does not apply).
+          
+          * (HPPC-133) KTypeContainer.toArray(Class<T>) now accepts any array
+          component type; runtime checks will throw ArrayStoreException if not
+          compatible.
+          
+          * (HPPC-135) KTypeVTypeAssociativeContainer#removeAll had an incorrect 
+          generic signature of:
+            public int removeAll(KTypeContainer<? extends KType> container)
+          now corrected to:
+            public int removeAll(KTypeContainer<? super KType> container)
+            
+          * (HPPC-116): Dropped methods that required a memory write (lset, lget, 
+          lkey) and replaced them with methods that take a logical "index" of a
+          key:
+            int indexOf(KType);
+            boolean indexExists(int index);
+            VType indexGet(int index);
+            VType indexReplace(int index, VType newValue);
+            void indexInsert(int index, KType key, VType value);
+          So, for example:
+            int index;
+            if ((index = map.indexOf(key)) >= 0) {
+              // key exists, do something with the value.
+              doSomething(map.indexGet(index));
+            } else {
+              // Insert the new key-value pair.
+              map.indexInsert(index, key, newValue);
+            }
+            
+          * (HPPC-141): Dropped mutable type wrappers.
+          
+          * (HPPC-144): Several less-frequently used classes have been moved to 
+          a separate JAR file. See full description of HPPC-144 below.
+          
+          * (HPPC-145): Removed any "Open" infix from all classes:
+          KTypeOpenHashSet -> KTypeHashSet
+          KTypeVTypeOpenHashMap -> KTypeVTypeHashMap
+          
+          * (HPPC-152) XorShiftRandom has been removed and replaced with a
+          simpler, int-only PRNG XorShift128+ (XorShift128P). 
+
+** New features
+
+HPPC-150: Make the default key mixing strategy globally configurable (via 
+          "hppc.bitmixer" sysprop). This property allows switching from
+          random bit mixer strategy to any of the following:
+          - random 
+              the default strategy. Varies bit mixer per instance. 
+          - deterministic 
+              the default strategy in HPPC up to v. 0.6.x. Varies bit
+              mixer depending on hash container size.
+          - none
+              No bit mixing is used (hash sets/maps become scatter sets/ maps).
+
+          This is a last-resort, discouraged, property. Your code should not 
+          rely on hash map/set ordering. Your code should use scatter maps when
+          speed is of absolute importance and there are guarantees that keys
+          won't be copied around to other associative containers.
+
+HPPC-145: Removed any "Open" infix from all classes. 
+
+HPPC-144: Moved certain esoteric key/value containers to a separate JAR. This
+          JAR has an identical dependency as main HPPC jar, but is declared with
+          an "esoteric" classifier. The following containers are included
+          in the set of "esoteric" ones:
+          * all associative containers with Byte* keys
+          * all associative containers with Float* keys
+          * all associative containers with Double* keys
+          
+          Byte-keyed containers are very infrequent (just create a plain array 
+          for values). Hash containers keyed by a floating-point type are odd
+          and may lead to confusion. The problem is how the "key" should be 
+          normalized from fixed-bit representation and then internally compared.
+          If fp normalization is applied (like Double.doubleToLongBits) then 
+          the value one puts in a set or a map may be different from the value 
+          later retrieved while iterating over the set of keys. On the other 
+          hand, if one takes raw floating point values (for example 
+          Double.doubleToRawLongBits) then there are awkward side-effects 
+          (like various types of NaNs can be stored as separate keys, for 
+          example).
+          
+          All floating-point "esoterics" use proper normalization, but it is 
+          strongly advised to manually apply the floating point-fixed-point 
+          conversion (normalization) in the target code and just use
+          a corresponding fixed-point associative container for storing 
+          normalized values.  
+
+HPPC-143: Added KTypeScatterSet and KTypeVTypeScatterMap. These classes are
+          specializations of KTypeHashSet and KTypeVTypeHashMap with
+          a simpler bit distribution function and no bit mixers. They are
+          useful for key existence checks or counting but should not be 
+          propagated across containers.
+
+HPPC-134: Set and Map's removeAll() should pick the best removal strategy.
+
+HPPC-139: Added release() to the API (clears and releases internal buffers).
+
+HPPC-116: Drop methods that require memory write (lset, lget, lkey) and replace
+          them with methods that take a logical "index" of a key.
+
+HPPC-115: Provide better guard against key clustering leading to 
+          exponential times.
+
+HPPC-97:  Use unallocated slot marker key instead of an explicit 
+          allocation table for hash containers. This should result in memory
+          savings and even speedups resulting from fewer memory accesses.
+
+HPPC-112: ensureCapacity(elements) added to all containers.
+
+HPPC-113: Clean up the definition of "capacity" vs. buffer size. Initial
+          capacity is now the number of elements that can be stored without
+          hash container rehash.
+          
+          A few methods have been removed or renamed because the meaning of
+          "capacity" and presizing for the given number of expected elements
+          is now equivalent. See API changes.
+
+HPPC-114: Buffer resizing and allocation should be throwing non-assertion 
+          mode exceptions. This is an unchecked exception. It will also
+          leave the data structure in a consistent state.
+
+** Bug fixes
+
+HPPC-135: KTypeVTypeAssociativeContainer#removeAll had an incorrect generic 
+          signature.
+
+HPPC-133: KTypeContainer.toArray(Class) can return incorrect array type.
+
+HPPC-131: retainAll(KTypeLookupContainer) had an incorrect generic 
+          signature.
+
+HPPC-130: removeAll(KTypeLookupContainer) had an incorrect generic 
+          signature.
+
+HPPC-115: Hash containers now, by default, use a random internal
+          mixing seed to reorder entries. This is done to prevent a potential
+          (but likely!) case of exponential costs of merging keys from two
+          or more containers. If you desperately need non-permuted order,
+          use an explicit constructor and pass HashOrderMixing.none()
+          as the mixing strategy. Carefully weigh the risk of stalling your
+          program with data-related deadlocks; this is only useful if you're 
+          using hash container as a scatter table (without merging it with
+          anything else). 
+          
+          You can also provide your own strategy to get predictable hash
+          key ordering. Just make sure the mix seed is different from container
+          to container (for example by using a thread local increment 
+          counter or something like that).
+
+** Other changes
+
+HPPC-152: Remove XorShiftRandom (add a simpler RPRG: XorShift128+).
+
+HPPC-149: Recognize tests.seed as the initialization seed for randomized 
+          key mix strategies.
+
+HPPC-102: Use Arrays.copyOf instead of new[]+System.arraycopy() for resizing 
+          arrays.
+
+HPPC-141: Dropped mutable type wrappers (*Holder). 
+
+HPPC-128: The preprocessor (intrinsics, preprocessor) is now deployed as part 
+          of the official release.
+
+HPPC-138: Move Intrinsics class to the generator project. Add forbidden-API 
+          checks to ensure intrinsics are replaced.
+
+HPPC-137: An overhaul of intrinsics (equality comparisons, no vtype/ ktype 
+          distinction, etc.)
+
+HPPC-129: ArraySizingStrategy#round() method has been removed completely.
+
+HPPC-125: The equals method should not return true when comparing against
+          subclasses of the current object. This can be very misleading, 
+          especially when the subclass has a different implementation of
+          key comparisons, etc. 
+
+HPPC-123: Dropped MurmurHash3 class entirely.
+
+HPPC-121: Rename remove{All|First|Last}Occurrence(s) to 
+          remove{All|First|Last}(key).
+
+HPPC-146: Removed IntDoubleLinkedSet.
+
+HPPC-120: Rework entry shifting routine to be less hairy.
+
+HPPC-106: Drop Guava adapter (and dependency).
+
+HPPC-118: Buffers for generic classes are now declared as Object[] and not as
+          generic type array. This prevents problems with compiler-injected
+          casts (it does not matter for the erased type but matters in user
+          code).
+
+HPPC-105: Cleanup project structure and IDE integration.
+
+HPPC-109: Moved @author tags to NOTICE.txt.
+
+
+[0.6.1]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=12420
+
+** New features
+
+HPPC-96: Identity hash maps with primitive backing storage arrays for values.
+
+
+[0.6.0]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=11820
+
+** API-breaking changes
+
+HPPC-82: Expose resizeAt and lastSlot to subclasses (sets, maps).
+
+HPPC-94: Drop support for Java 1.5 (backcompat build).
+
+** Bug fixes
+
+HPPC-93: NaN keys are not treated correctly in hash sets/ maps.
+
+HPPC-80: Practical deadlock on populating a set/ map with an iterator 
+         over another map (storage-size dependent rehash).
+
+HPPC-81: Improvements to near-the-limit collection sizes and resize strategies.
+
+** New features
+
+HPPC-85: addTo and putOrAdd pulled up to ObjectIntMap interface.
+
+HPPC-91: Added newInstanceWithExpectedSize methods to 
+         KTypeOpenHashSet and KTypeVTypeOpenHashMap (no buffer resizing for a given
+         number of elements). [shaunkalley]
+
+HPPC-88: added get(key,defaultValue) to somehow support custom default values
+         and potential read-only concurrent containsKey/get conditionals.
+
+** Changes in functionality
+
+** Other changes
+
+HPPC-79: javadocs generated with 1.7 (and 1.8) look crappy.
+
+
+[0.5.5]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=12120
+
+** New features
+** Other changes
+** API-breaking changes
+** Bug fixes
+
+
+[0.5.4]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=11927
+
+** New features
+
+HPPC-91: Added newInstanceWithExpectedSize methods to 
+         KTypeOpenHashSet and KTypeVTypeOpenHashMap (no buffer resizing for a given
+         number of elements). [shaunkalley]
+
+
+[0.5.3]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=11833
+
+** New features
+
+HPPC-88: added get(key,defaultValue) to somehow support custom default values
+         and potential read-only concurrent containsKey/get conditionals.
+
+
+[0.5.2]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=11832
+
+** Bug fixes
+
+HPPC-84: hashCode calculated incorrectly for sets/ maps
+
+
+[0.5.1]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=11828
+
+** API-breaking changes
+
+HPPC-82: Expose resizeAt and lastSlot to subclasses (sets, maps).
+
+** Bug fixes
+
+HPPC-80: Practical deadlock on populating a set/ map with an iterator 
+         over another map (storage-size dependent rehash).
+
+HPPC-81: Improvements to near-the-limit collection sizes and resize strategies.
+
+** New features
+
+** Changes in functionality
+
+** Other changes
+
+HPPC-79: javadocs generated with 1.7 (and 1.8) look crappy.
+
+
+[0.5.0]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=10321
+
+** API-breaking changes:
+
+HPPC-66: allow retrieving key instances by key-equality from Object*Map versions of 
+         hash maps. Renamed lget in KTypeOpenHashSet to lkey for consistency. 
+         So, the methods accessing last found key in sets and maps are: 
+         lget (maps, accesses last value), lset (maps, accesses last value), 
+         lkey (maps, sets, accesses last key), lslot (both, slot index).
+
+HPPC-68: Lifted final markers on public methods
+
+** New features
+
+HPPC-63: a jdk15-compatible artifact is being published to Maven Central now.
+
+HPPC-66: allow retrieving key instances by key-equality from Object*Map versions of 
+         hash maps and hash sets.
+
+HPPC-69: added toString to cursors.
+
+HPPC-77: BitSet should use hotspot intrinsics (popcnt mostly)
+
+** Bug fixes
+
+HPPC-65: putOrAdd uses == for comparing object keys instead of equality
+
+HPPC-72: XorShiftRandom always returns a zero. [Sergey Peretyatko] 
+         This class was used only in benchmarks and tests so unless
+         you're using it directly you're not affected.
+         
+HPPC-73: get, contains and any other method may block indefinitely with 
+         high load factors and full storage array capacity
+
+HPPC-74: Load factor is not used in KTypeOpenHashSet
+
+HPPC-75: put or add may leave the internal state of the hash containers 
+         inconsistent on OOM conditions
+
+** Other
+
+Added newInstance() to BitSet and IntDoubleLinkedSet for consistency.
+
+
+[0.4.1]
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=10322
+
+** New features
+
+HPPC-63: a jdk15-compatible artifact is being published to Maven Central now.
+
+** Bug fixes
+
+HPPC-65: putOrAdd uses == for comparing object keys instead of equality
+
+
+[0.4.0] 
+http://issues.carrot2.org/secure/ReleaseNote.jspa?projectId=10070&version=10210
+
+** API-breaking changes:
+
+HPPC-60: Cleaned up the code of all iterators (including some name/scope changes
+         of iterator classes, so if you relied on these, things may break).
+
+HPPC-59: keySet() renamed to keys() on associative containers. 
+
+HPPC-46: toArray() on object types must return actual T[], not Object[]
+
+HPPC-52: Dropped custom hash functions and comparators from associative containers
+         for speed reasons.
+
+** New features
+
+HPPC-61: Cleaned up Maven structure: parent aggregator and submodules.
+
+HPPC-57: Added a view of values to associative containers (values() method).
+
+HPPC-49: Added support for XorShift random.
+
+HPPC-34: Added support for Cloneable.
+
+HPPC-51: Replace double hashing in open hash map/set to linear probing and a good 
+         hashing function to ensure random distribution of elements
+
+HPPC-47: Changed the implementation of MurmurHash to MurmurHash3, impl.
+         borrowed from Sebastiano Vigna's fastutil library. [ASL]
+
+** Bug fixes
+
+HPPC-46: toArray() on object types must return actual T[], not Object[]
+
+** Other
+
+HPPC-58: Better integration with Eclipse, new template->code generation.

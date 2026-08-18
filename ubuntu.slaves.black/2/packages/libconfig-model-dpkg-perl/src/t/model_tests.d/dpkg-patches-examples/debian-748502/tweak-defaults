@@ -1,0 +1,53 @@
+Description:Tweak defaults values for Debian
+ Debian needs some default values slightly different
+ from upstream
+Forwarded:NA
+Author:dod
+--- a/lib/Config/Model/models/LCDd/server.pl
++++ b/lib/Config/Model/models/LCDd/server.pl
+@@ -115,7 +115,27 @@
+       },
+       'DriverPath',
+       {
+-        'default' => 'server/drivers/',
++        compute => {
++            formula => 'my $triplet = `/usr/bin/dpkg-architecture -qDEB_HOST_MULTIARCH`;
++warn "cannot run dpkg-architecture" unless $triplet ;
++chomp $triplet;
++"/usr/lib/$triplet/lcdproc/";',
++            allow_override => 1,
++            use_eval => 1
++        },
++        warn_unless => {
++            'dir' => {
++                code => ' defined $_ ? -d : 1' ,
++                msg => 'missing DriverPath dir',
++                fix => 'my $triplet = `/usr/bin/dpkg-architecture -qDEB_HOST_MULTIARCH`;
++warn "cannot run dpkg-architecture" unless $triplet ;
++chomp $triplet;
++my $res = "/usr/lib/$triplet/lcdproc/";
++$_ = $res;
++',
++             }
++        },
++        #'default' => 'server/drivers/',
+         'description' => 'Where can we find the driver modules ?
+ IMPORTANT: Make sure to change this setting to reflect your
+            specific setup! Otherwise LCDd won\'t be able to find
+@@ -196,7 +216,7 @@
+       {
+         'description' => 'Should we report to syslog instead of stderr ? ',
+         'type' => 'leaf',
+-        'upstream_default' => 'no',
++        'default' => 'yes',
+         'value_type' => 'boolean',
+         'write_as' => [
+           'no',
+@@ -253,7 +273,6 @@
+       },
+       'User',
+       {
+-        'default' => 'nobody',
+         'description' => 'User to run as.  LCDd will drop its root privileges, if any,
+ and run as this user instead.',
+         'type' => 'leaf',

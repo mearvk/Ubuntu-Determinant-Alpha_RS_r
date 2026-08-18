@@ -1,0 +1,46 @@
+#!/bin/sh
+# autopkgtest check: Check if 'trietool' utility works properly
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+cat <<EOF > thaidict.abm
+[0x0e01,0x0e5b]
+EOF
+
+trietool thaidict add "แดง" 4
+trietool thaidict add "เขียว" 2
+trietool thaidict add "น้ำเงิน" 1
+trietool thaidict add "เหลือง" 6
+trietool thaidict add "ขาว" 7
+trietool thaidict add "ดำ" 0
+
+echo "dict preparation: OK"
+
+RES=$(trietool thaidict query "แดง")
+[ $RES -eq 4 ]
+RES=$(trietool thaidict query "เขียว")
+[ $RES -eq 2 ]
+RES=$(trietool thaidict query "น้ำเงิน")
+[ $RES -eq 1 ]
+RES=$(trietool thaidict query "เหลือง")
+[ $RES -eq 6 ]
+RES=$(trietool thaidict query "ขาว")
+[ $RES -eq 7 ]
+RES=$(trietool thaidict query "ดำ")
+[ $RES -eq 0 ]
+
+echo "dict query: OK"
+
+N=$(trietool thaidict list | wc -l)
+[ $N -eq 6 ]
+
+trietool thaidict delete "ดำ"
+
+N=$(trietool thaidict list | wc -l)
+[ $N -eq 5 ]
+
+echo "dict delete & list: OK"
+

@@ -1,0 +1,38 @@
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Sun, 14 Feb 2016 11:14:12 -0500
+Subject: avoid linker errors when cross-building for win32
+
+Without this fix, we see the following problem when trying to link the
+assuan library on win32:
+
+libtool: link: /usr/bin/i686-w64-mingw32-nm -B  .libs/libassuan_la-assuan.o .libs/libassuan_la-context.o .libs/libassuan_la-system.o .libs/libassuan_la-debug.o .libs/libassuan_la-conversion.o .libs/libassuan_la-sysutils.o .libs/libassuan_la-client.o .libs/libassuan_la-server.o .libs/libassuan_la-assuan-error.o .libs/libassuan_la-assuan-buffer.o .libs/libassuan_la-assuan-handler.o .libs/libassuan_la-assuan-inquire.o .libs/libassuan_la-assuan-listen.o .libs/libassuan_la-assuan-pipe-server.o .libs/libassuan_la-assuan-socket-server.o .libs/libassuan_la-assuan-pipe-connect.o .libs/libassuan_la-assuan-socket-connect.o .libs/libassuan_la-assuan-uds.o .libs/libassuan_la-assuan-logging.o .libs/libassuan_la-assuan-socket.o .libs/libassuan_la-system-w32.o .libs/libassuan_la-assuan-io.o .libs/putc_unlocked.o .libs/memrchr.o .libs/stpcpy.o .libs/setenv.o   | sed -n -e 's/^.*[	 ]\([ABCDGIRSTW][ABCDGIRSTW]*\)[	 ][	 ]*_\([_A-Za-z][_A-Za-z0-9]*\)$/\1 _\2 \2/p' | sed '/ __gnu_lto/d' | /bin/sed -e '/^[BCDGRS][ ]/s/.*[ ]\([^ ]*\)/\1 DATA/;s/^.*[ ]__nm__\([^ ]*\)[ ][^ ]*/\1 DATA/;/^I[ ]/d;/^[AITW][ ]/s/.* //' | sort | uniq > .libs/libassuan.exp
+libtool: link: if test "x`/bin/sed 1q .libs/libassuan.def`" = xEXPORTS; then cp .libs/libassuan.def .libs/libassuan-0.dll.def; else echo EXPORTS > .libs/libassuan-0.dll.def; cat .libs/libassuan.def >> .libs/libassuan-0.dll.def; fi
+libtool: link:  i686-w64-mingw32-gcc -shared .libs/libassuan-0.dll.def  .libs/libassuan_la-assuan.o .libs/libassuan_la-context.o .libs/libassuan_la-system.o .libs/libassuan_la-debug.o .libs/libassuan_la-conversion.o .libs/libassuan_la-sysutils.o .libs/libassuan_la-client.o .libs/libassuan_la-server.o .libs/libassuan_la-assuan-error.o .libs/libassuan_la-assuan-buffer.o .libs/libassuan_la-assuan-handler.o .libs/libassuan_la-assuan-inquire.o .libs/libassuan_la-assuan-listen.o .libs/libassuan_la-assuan-pipe-server.o .libs/libassuan_la-assuan-socket-server.o .libs/libassuan_la-assuan-pipe-connect.o .libs/libassuan_la-assuan-socket-connect.o .libs/libassuan_la-assuan-uds.o .libs/libassuan_la-assuan-logging.o .libs/libassuan_la-assuan-socket.o .libs/libassuan_la-system-w32.o .libs/libassuan_la-assuan-io.o .libs/putc_unlocked.o .libs/memrchr.o .libs/stpcpy.o .libs/setenv.o   -lws2_32 -L/usr/share/win32/lib /usr/share/win32/lib/libgpg-error.dll.a  -Os -Wl,.libs/versioninfo.o -static-libgcc -Wl,--no-insert-timestamp   -o .libs/libassuan-0.dll -Wl,--enable-auto-image-base -Xlinker --out-implib -Xlinker .libs/libassuan.dll.a
+/usr/bin/i686-w64-mingw32-ld: .libs/libassuan-0.dll.def:5: syntax error
+/usr/bin/i686-w64-mingw32-ld:.libs/libassuan-0.dll.def: file format not recognized; treating as linker script
+/usr/bin/i686-w64-mingw32-ld:.libs/libassuan-0.dll.def:2: syntax error
+collect2: error: ld returned 1 exit status
+Makefile:566: recipe for target 'libassuan.la' failed
+make[5]: *** [libassuan.la] Error 1
+make[5]: Leaving directory '/home/dkg/src/pkg-gnupg/libassuan/build-win32/src'
+---
+ src/libassuan.def | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/libassuan.def b/src/libassuan.def
+index ed9ceaf..7d47ba6 100644
+--- a/src/libassuan.def
++++ b/src/libassuan.def
+@@ -1,3 +1,4 @@
++EXPORTS
+ ; assuan.def - List of symbols to export.
+ ; Copyright (C) 2005, 2009 g10 Code GmbH
+ ;
+@@ -18,7 +19,6 @@
+ ; SPDX-License-Identifier: LGPL-2.1+
+ 
+ 
+-EXPORTS
+     assuan_accept			@1
+     assuan_begin_confidential		@2
+     assuan_close_input_fd		@3

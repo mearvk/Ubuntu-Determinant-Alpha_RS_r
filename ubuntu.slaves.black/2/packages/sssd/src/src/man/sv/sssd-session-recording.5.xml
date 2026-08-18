@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-session-recording</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-session-recording</refname>
+        <refpurpose>Konfigurera sessionsinspelning med SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver hur man konfigurerar <citerefentry>
+<refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum> </citerefentry>
+att fungera med <citerefentry>
+<refentrytitle>tlog-rec-session</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>, en del av paketet tlog, för att implementera inspelning av
+användarsessioner på en textterminal.  För en detaljerad referens till
+konfigurationssyntaxen, se avsnittet <quote>FILE FORMAT</quote> av
+manualsidan <citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            SSSD kan sättas upp för att möjliggöra inspelning av allting specifika
+användare ser eller skriver under sina sessioner på en textterminal.  T.ex.,
+när användare loggar in på konsolen, eller via SSH.  SSSD själv spelar inte
+in någonting, men ser till att tlog-rec-session startas när användaren
+loggar in, så att den kan spela in enligt sin konfiguration.
+        </para>
+        <para>
+            För användare med sessionsinspelning aktiverad ersätter SSSD användarens
+skal med tlog-rec-session i NSS-svar, och lägger till en variabel som anger
+det ursprungliga skalet till användarens miljö när PAM sätter upp
+sessionen.  På detta sätt kan tlog-rec-session startas istället för
+användarens skal, och veta vilket faktiskt skal som skall startas när den
+satt upp inspelningen.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+            <para>
+                Dessa alternativ kan användas för att konfigurera sessionsinspelning.
+            </para>
+            <variablelist>
+                <varlistentry>
+                    <term>scope (sträng)</term>
+                    <listitem>
+                        <para>
+                            En av följande strängar anger utsträckningen för inspelning av sessioner:
+<variablelist>
+                                <varlistentry>
+                                    <term>”none”</term>
+                                    <listitem>
+                                        <para>
+                                            Inga användare spelas in.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>”some”</term>
+                                    <listitem>
+                                        <para>
+                                            Användare/grupper angivna i alternativen <replaceable>users</replaceable>
+och <replaceable>groups</replaceable> spelas in.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>”all”</term>
+                                    <listitem>
+                                        <para>
+                                            Alla användare spelas in.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                            </variablelist>
+                        </para>
+                        <para>
+                            Standard: ”none”
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>users (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista över användare vilka skall ha inspelning av
+sessioner aktiverat. Matchar användarnamn som de returneras av
+NSS. D.v.s. efter eventuellt utbyte av mellanslag, ändring av skiftläge,
+etc.
+                        </para>
+                        <para>
+                            Standard: Tomt. Matchar inte några användare.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>groups (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista över gruppmedlemmar vilka skall ha inspelning av
+sessioner aktiverat. Matchar gruppnamn som de returneras av
+NSS. D.v.s. efter eventuellt utbyte av mellanslag, ändring av skiftläge,
+etc.
+                        </para>
+                        <para>
+                            OBSERVERA: att använda detta alternativ (ha det satt till något) har en
+betydande prestandakostnad, ty varje begäran som inte cachas för en
+användare måste hämtas och matchas mot grupperna användaren är en medlem i.
+                        </para>
+                        <para>
+                            Standard: Tom. Matchar inga grupper.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>exclude_users (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av användare att undanta från inspelning, endast
+tillämpligt med ”scope=all”.
+                        </para>
+                        <para>
+                            Standard: Tomt. Inga användare uteslutna.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>exclude_groups (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av grupper vars medlemmar skall undantas från
+inspelning. Endast tillämpligt med ”scope=all”.
+                        </para>
+                        <para>
+                            OBSERVERA: att använda detta alternativ (ha det satt till något) har en
+betydande prestandakostnad, ty varje begäran som inte cachas för en
+användare måste hämtas och matchas mot grupperna användaren är en medlem i.
+                        </para>
+                        <para>
+                            Standard: Tom. Inga grupper uteslutna.
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+    </refsect1>
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande snutt från sssd.conf gör det möjligt att spela in sessioner för
+användarna ”konsult1” och ”konsult2” och gruppen ”studenter”.
+        </para>
+        <para>
+<programlisting>
+[session_recording]
+scope = some
+users = konsult1,konsult2
+groups = studenter
+</programlisting>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

@@ -1,0 +1,39 @@
+#!/bin/sh -e
+
+if [ "$1" = "configure" ]; then
+    # create the keystone group
+    if ! getent group keystone > /dev/null 2>&1
+    then
+        addgroup --system keystone >/dev/null || true
+    fi
+
+    # create the keystone user to avoid running keystone as root
+    if ! getent passwd keystone > /dev/null 2>&1
+    then
+        adduser --quiet \
+                --system \
+                --home /var/lib/keystone \
+                --no-create-home \
+                --ingroup keystone \
+                --shell /bin/false \
+                keystone || true
+    fi
+
+    if [ "$(id -gn keystone)"  = "nogroup" ]
+    then
+        usermod -g keystone keystone
+    fi
+
+    # change the permissions on key directories
+    chown keystone:adm /var/log/keystone
+    chmod 0750 /var/log/keystone
+
+    find /etc/keystone -exec chown keystone:keystone "{}" +
+    find /etc/keystone -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+    chmod 0700 /etc/keystone/fernet-keys
+
+    find /var/lib/keystone -exec chown keystone:keystone "{}" +
+    find /var/lib/keystone -type f -exec chmod 0640 "{}" + -o -type d -exec chmod 0750 "{}" +
+fi
+
+#DEBHELPER#

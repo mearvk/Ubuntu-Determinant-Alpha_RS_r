@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# prep-image $IMAGE preps an image for the tests. Specifically it:
+#
+# 1. downloads a cloud image rootfs
+# 2. creates an image containing a single partition at $IMAGE,
+# 3. writes the UUID of the partition to $IMAGE-uuid,
+# 4. extracts the rootfs to the image, and
+# 5. overwrites /sbin/init with a script that gathers some data to
+#    /result and shuts the machine down
+
+set -eux
+IMAGE="$1"
+series=$(lsb_release -sc)
+url=http://cloud-images.ubuntu.com/$series/current/$series-server-cloudimg-$(dpkg --print-architecture)-root.tar.xz
+filename=$(basename "$url")
+mkdir -p images
+if [ ! -f images/"$filename" ]; then
+        status=$(curl --silent --write-out "%{http_code}\n" --output images/"$filename" "$url")
+        if [ "$status" = 404 ]; then
+                exit 100
+        fi
+fi
+rm -f "$IMAGE" "${IMAGE}-uuid"
+truncate -s 2G "$IMAGE"
+parted --script --align optimal "$IMAGE" -- mklabel gpt mkpart primary ext4 1MiB -2048s
+dev="$(losetup -Pf --show "$IMAGE")"
+partprobe
+mke2fs -q "${dev}p1"
+blkid --output=value "${dev}p1" | head -n1 > "${IMAGE}-uuid"
+mkdir -p mnt
+mount "${dev}p1" mnt
+tar --xattrs-include=* -C mnt -xf images/"$filename"
+rm -f mnt/sbin/init
+cat > mnt/sbin/init << \EOF
+#!/bin/sh
+set -x
+rm -rf /result
+mkdir /result
+# Run twice, once for the logs, once for the test harness
+ip addr
+ip link
+for file in /run/net-*.conf /run/net6-*.conf; do
+  [ -f $file ] || continue;
+  cat $file
+  cp $file /result
+done
+ip -json addr > /result/addr.json
+ip -json link > /result/link.json
+ps aux | tee /result/ps.txt
+sync
+exec /lib/systemd/systemd-shutdown poweroff
+EOF
+chmod u+x mnt/sbin/init
+umount mnt
+losetup -d "$dev"

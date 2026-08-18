@@ -1,0 +1,93 @@
+INTRODUCTION
+
+  MUNGE (MUNGE Uid 'N' Gid Emporium) is an authentication service for
+  creating and validating user credentials.  It is designed to be highly
+  scalable for use in an HPC cluster environment.  It provides a portable
+  API for encoding the user's identity into a tamper-proof credential
+  that can be obtained by an untrusted client and forwarded by untrusted
+  intermediaries within a security realm.  Clients within this realm can
+  create and validate credentials without the use of root privileges,
+  reserved ports, or platform-specific methods.
+
+
+RATIONALE
+
+  The need for MUNGE arose out of the HPC cluster environment.  Consider the
+  scenario in which a local daemon running on a login node receives a client
+  request and forwards it on to remote daemons running on compute nodes within
+  the cluster.  Since the user has already logged on to the login node, the
+  local daemon just needs a reliable means of ascertaining the UID and GID
+  of the client process.  Furthermore, the remote daemons need a mechanism to
+  ensure the forwarded authentication data has not been subsequently altered.
+
+  A common solution to this problem is to use Unix domain sockets to
+  determine the identity of the local client, and then forward this
+  information on to remote hosts via trusted rsh connections.  But this
+  presents several new problems.  First, there is no portable API for
+  determining the identity of a client over a Unix domain socket.  Second,
+  rsh connections must originate from a reserved port; the limited number
+  of reserved ports available on a given host directly limits scalability.
+  Third, root privileges are required in order to bind to a reserved port.
+  Finally, the remote daemons have no means of determining whether the
+  client identity is authentic.  MUNGE solves all of these problems.
+
+
+USAGE
+
+  A process creates a credential by requesting one from the local
+  MUNGE service, either via the munge_encode() C library call or the
+  munge executable.  The encoded credential contains the UID and GID of
+  the originating process.  This process sends the credential to another
+  process within the security realm as a means of proving its identity.
+  The receiving process validates the credential with the use of its local
+  MUNGE service, either via the munge_decode() C library call or the unmunge
+  executable.  The decoded credential provides the receiving process with a
+  reliable means of ascertaining the UID and GID of the originating process.
+  This information can be used for accounting or access control decisions.
+
+
+DETAILS
+
+  The contents of the credential (including any optional payload data) are
+  encrypted with a key shared by all munged daemons within the security realm.
+  The integrity of the credential is ensured by a message authentication
+  code (MAC).  The credential is valid for a limited time defined by its
+  time-to-live (TTL); this presumes clocks within a security realm are
+  in sync.  Unexpired credentials are tracked by the local munged daemon in
+  order to prevent replay attacks on a given host.  Decoding of a credential
+  can be restricted to a particular user and/or group ID.  The payload data
+  can be used for purposes such as embedding the destination's address to
+  ensure the credential is only valid on a specific host.  The internal
+  format of the credential is encoded in a platform-independent manner.
+  And the credential itself is base64 encoded to allow it to be transmitted
+  over virtually any transport.
+
+
+LICENSE
+
+  MUNGE is free software: you can redistribute it and/or modify it under
+  the terms of the GNU General Public License as published by the Free
+  Software Foundation, either version 3 of the License, or (at your option)
+  any later version.
+
+  Additionally for the MUNGE library (libmunge), you can redistribute it
+  and/or modify it under the terms of the GNU Lesser General Public License
+  as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version.
+
+
+KEYS
+
+  Releases are signed with the following GPG key:
+
+  pub   rsa4096/0x3B7ECB2B30DE0871 2011-10-01 [SC]
+        Key fingerprint = A441 880C 3D4C 7C36 C5DD  41E1 3B7E CB2B 30DE 0871
+  uid                   [ultimate] Chris Dunlap <chris.m.dunlap@gmail.com>
+  uid                   [ultimate] Chris Dunlap <cdunlap@llnl.gov>
+  uid                   [ultimate] Chris Dunlap <dun@imsa.edu>
+  sub   rsa4096/0x48A5CADDECA74B8A 2011-10-01 [E]
+
+
+HOMEPAGE
+
+  https://dun.github.io/munge/

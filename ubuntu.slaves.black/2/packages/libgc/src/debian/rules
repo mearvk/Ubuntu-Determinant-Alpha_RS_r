@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_BUILD_ARCH ?=$(shell dpkg --print-architecture)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+LDFLAGS += -pthread
+
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+ATOMIC_BUILTIN_ARCHS = alpha amd64 arm64 armel armhf hppa hurd-i386 i386 ia64 kfreebsd-amd64 kfreebsd-i386 mips64el mipsel powerpc ppc64 ppc64el riscv64 s390x x32
+endif
+
+%:
+	dh $@ --with pkgkde_symbolshelper,autoreconf
+
+override_dh_auto_configure:
+	[ ! -d libatomic_ops-1.2 ] || mv libatomic_ops-1.2 libatomic_ops-1.2.bak
+	./configure \
+		$(CONFIG_OPTS) \
+		--enable-cplusplus \
+		--enable-static \
+		--enable-docs \
+		--disable-dependency-tracking \
+		--with-tags=CXX \
+		--prefix=/usr \
+		--mandir=\$${prefix}/share/man \
+		--sysconfdir=/etc \
+		--localstatedir=/var/lib \
+		--datadir=\$${prefix}/share/doc \
+		--host=$(DEB_HOST_GNU_TYPE) \
+		--build=$(DEB_BUILD_GNU_TYPE) \
+		--libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
+		$(if $(filter $(DEB_HOST_ARCH),$(ATOMIC_BUILTIN_ARCHS)),--with-libatomic-ops=none)
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	$(MAKE) check
+endif
+
+override_dh_install:
+	install -D doc/gc.man debian/tmp/usr/share/man/man3/gc_malloc.3
+	dh_install
+	rm debian/libgc-dev/usr/share/doc/libgc1/README.environment
+
+override_dh_auto_clean:
+	[ -d libatomic_ops-1.2 ] || [ ! -d libatomic_ops-1.2.bak ] || mv libatomic_ops-1.2.bak libatomic_ops-1.2
+	dh_auto_clean
+	rm -rf autom4te.cache libatomic_ops atomic_ops_sysdeps.S atomic_ops.c
+
+override_dh_installchangelogs:
+	dh_installchangelogs ChangeLog
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vatomic:Depends=$$(grep -q '[-]latomic_ops' debian/libgc-dev/usr/lib/*/pkgconfig/*.pc && echo libatomic-ops-dev)

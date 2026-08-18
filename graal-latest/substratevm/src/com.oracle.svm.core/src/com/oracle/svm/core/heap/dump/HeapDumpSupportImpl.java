@@ -1,0 +1,236 @@
+/*
+ * Copyright (c) 2023, 2023, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.heap.dump;
+
+import static com.oracle.svm.guest.staging.core.heap.RestrictHeapAccess.Access.NO_ALLOCATION;
+
+import java.io.IOException;
+
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.Platforms;
+import org.graalvm.nativeimage.StackValue;
+import org.graalvm.nativeimage.c.struct.RawField;
+import org.graalvm.nativeimage.c.struct.RawStructure;
+import org.graalvm.nativeimage.c.struct.SizeOf;
+import org.graalvm.word.Pointer;
+import org.graalvm.word.impl.Word;
+
+import com.oracle.svm.guest.staging.core.UnmanagedMemoryUtil;
+import com.oracle.svm.core.VMInspectionOptions;
+import com.oracle.svm.guest.staging.core.c.struct.PinnedObjectField;
+import com.oracle.svm.core.heap.GCCause;
+import com.oracle.svm.core.heap.Heap;
+import com.oracle.svm.guest.staging.core.heap.RestrictHeapAccess;
+import com.oracle.svm.core.heap.VMOperationInfos;
+import com.oracle.svm.core.heap.dump.HeapDumpWriter.HeapDumpError;
+import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
+import com.oracle.svm.core.locks.VMMutex;
+import com.oracle.svm.guest.staging.log.Log;
+import com.oracle.svm.guest.staging.core.memory.UntrackedNullableNativeMemory;
+import com.oracle.svm.core.os.RawFileOperationSupport;
+import com.oracle.svm.core.os.RawFileOperationSupport.FileCreationMode;
+import com.oracle.svm.core.os.RawFileOperationSupport.RawFileDescriptor;
+import com.oracle.svm.core.os.RawFileOperationSupport.RawFilePath;
+import com.oracle.svm.core.thread.NativeVMOperation;
+import com.oracle.svm.core.thread.NativeVMOperationData;
+import com.oracle.svm.core.thread.VMOperation;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.AllAccess;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.SingleLayer;
+import com.oracle.svm.shared.singletons.traits.SingletonLayeredInstallationKind.InitialLayerOnly;
+import com.oracle.svm.shared.singletons.traits.SingletonTraits;
+import com.oracle.svm.shared.util.TimeUtils;
+import com.oracle.svm.shared.util.VMError;
+
+@SingletonTraits(access = AllAccess.class, layeredCallbacks = SingleLayer.class, layeredInstallationKind = InitialLayerOnly.class)
+public class HeapDumpSupportImpl extends HeapDumping {
+    private final HeapDumpWriter writer;
+    private final HeapDumpOperation heapDumpOperation;
+    private final VMMutex outOfMemoryHeapDumpMutex = new VMMutex("outOfMemoryHeapDump");
+
+    private RawFilePath outOfMemoryHeapDumpPath;
+    private String outOfMemoryHeapDumpPathText;
+    private boolean outOfMemoryHeapDumpAttempted;
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    public HeapDumpSupportImpl() {
+        this.writer = new HeapDumpWriter();
+        this.heapDumpOperation = new HeapDumpOperation();
+    }
+
+    @Override
+    public void initializeDumpHeapOnOutOfMemoryError() {
+        assert outOfMemoryHeapDumpPath.isNull();
+        String defaultFilename = getDefaultHeapDumpFilename("OOME");
+        String heapDumpPath = getHeapDumpPath(defaultFilename);
+        outOfMemoryHeapDumpPathText = heapDumpPath;
+        outOfMemoryHeapDumpPath = getFileSupport().allocatePath(heapDumpPath);
+    }
+
+    @Override
+    public void teardownDumpHeapOnOutOfMemoryError() {
+        UntrackedNullableNativeMemory.free(outOfMemoryHeapDumpPath);
+        outOfMemoryHeapDumpPath = Word.nullPointer();
+        outOfMemoryHeapDumpPathText = null;
+    }
+
+    @Override
+    @RestrictHeapAccess(access = NO_ALLOCATION, reason = "OutOfMemoryError heap dumping must not allocate.")
+    public void dumpHeapOnOutOfMemoryError() {
+        /*
+         * Try exactly once to create an out-of-memory heap dump. If another thread triggers an
+         * OutOfMemoryError while heap dumping is in progress, it needs to wait until heap dumping
+         * finishes.
+         */
+        outOfMemoryHeapDumpMutex.lock();
+        try {
+            if (!outOfMemoryHeapDumpAttempted) {
+                dumpHeapOnOutOfMemoryError0();
+                outOfMemoryHeapDumpAttempted = true;
+            }
+        } finally {
+            outOfMemoryHeapDumpMutex.unlock();
+        }
+    }
+
+    private void dumpHeapOnOutOfMemoryError0() {
+        RawFilePath path = outOfMemoryHeapDumpPath;
+        if (path.isNull()) {
+            Log.log().string("Out-of-memory heap dumping failed because the heap dump file path could not be allocated.").newline();
+            return;
+        }
+
+        RawFileDescriptor fd = getFileSupport().create(path, FileCreationMode.CREATE_OR_REPLACE, RawFileOperationSupport.FileAccessMode.READ_WRITE);
+        if (!getFileSupport().isValid(fd)) {
+            Log.log().string("Out-of-memory heap dumping failed because the heap dump file could not be created: ").string(outOfMemoryHeapDumpPathText).newline();
+            return;
+        }
+
+        try {
+            Log.log().string("Dumping heap to ").string(outOfMemoryHeapDumpPathText).string(" ...").newline();
+            long start = System.nanoTime();
+            HeapDumpError error = dumpHeap(fd, false);
+            if (error == null) {
+                long fileSize = getFileSupport().size(fd);
+                long elapsedMs = TimeUtils.millisSinceNanos(start);
+                long seconds = elapsedMs / TimeUtils.millisPerSecond;
+                long ms = elapsedMs % TimeUtils.millisPerSecond;
+                Log.log().string("Heap dump file created [").signed(fileSize).string(" bytes in ").signed(seconds).character('.').signed(ms).string(" secs]").newline();
+            } else {
+                Log.log().string("Out-of-memory heap dumping failed: ").string(error.getMessage()).newline();
+            }
+        } finally {
+            getFileSupport().close(fd);
+        }
+    }
+
+    @Override
+    public void dumpHeap(String filename, boolean gcBefore, boolean overwrite) throws IOException {
+        if (!RawFileOperationSupport.isPresent() || (ImageLayerBuildingSupport.buildingImageLayer() && !HeapDumpMetadata.isLayeredMetadataAvailable())) {
+            throw new UnsupportedOperationException(VMInspectionOptions.getHeapDumpNotSupportedMessage());
+        }
+
+        FileCreationMode creationMode = overwrite ? FileCreationMode.CREATE_OR_REPLACE : FileCreationMode.CREATE;
+        RawFileDescriptor fd = getFileSupport().create(filename, creationMode, RawFileOperationSupport.FileAccessMode.READ_WRITE);
+        if (!getFileSupport().isValid(fd)) {
+            throw new IOException("Could not create the heap dump file: " + filename);
+        }
+
+        try {
+            writeHeapTo(fd, gcBefore);
+        } finally {
+            getFileSupport().close(fd);
+        }
+    }
+
+    private HeapDumpError dumpHeap(RawFileDescriptor fd, boolean gcBefore) {
+        int size = SizeOf.get(HeapDumpVMOperationData.class);
+        HeapDumpVMOperationData data = StackValue.get(size);
+        UnmanagedMemoryUtil.fill((Pointer) data, Word.unsigned(size), (byte) 0);
+        data.setGCBefore(gcBefore);
+        data.setRawFileDescriptor(fd);
+        heapDumpOperation.enqueue(data);
+        return data.getError();
+    }
+
+    public void writeHeapTo(RawFileDescriptor fd, boolean gcBefore) throws IOException {
+        HeapDumpError error = dumpHeap(fd, gcBefore);
+        if (error != null) {
+            throw new IOException("Heap dumping failed: " + error.getMessage() + ".");
+        }
+    }
+
+    static RawFileOperationSupport getFileSupport() {
+        return RawFileOperationSupport.bigEndian();
+    }
+
+    @RawStructure
+    private interface HeapDumpVMOperationData extends NativeVMOperationData {
+        @RawField
+        boolean getGCBefore();
+
+        @RawField
+        void setGCBefore(boolean value);
+
+        @RawField
+        RawFileDescriptor getRawFileDescriptor();
+
+        @RawField
+        void setRawFileDescriptor(RawFileDescriptor fd);
+
+        @RawField
+        @PinnedObjectField
+        HeapDumpError getError();
+
+        @RawField
+        @PinnedObjectField
+        void setError(HeapDumpError value);
+    }
+
+    private class HeapDumpOperation extends NativeVMOperation {
+        @Platforms(Platform.HOSTED_ONLY.class)
+        HeapDumpOperation() {
+            super(VMOperationInfos.get(HeapDumpOperation.class, "Write heap dump", VMOperation.SystemEffect.SAFEPOINT));
+        }
+
+        @Override
+        protected void operate(NativeVMOperationData d) {
+            HeapDumpVMOperationData data = (HeapDumpVMOperationData) d;
+            if (data.getGCBefore()) {
+                Heap.getHeap().getGC().collectCompletely(GCCause.HeapDump);
+            }
+            dumpHeap(data);
+        }
+
+        @RestrictHeapAccess(access = NO_ALLOCATION, reason = "Heap dumping must not allocate.")
+        private void dumpHeap(HeapDumpVMOperationData data) {
+            try {
+                HeapDumpError error = writer.dumpHeap(data.getRawFileDescriptor());
+                data.setError(error);
+            } catch (Throwable e) {
+                throw VMError.shouldNotReachHere(e);
+            }
+        }
+    }
+}

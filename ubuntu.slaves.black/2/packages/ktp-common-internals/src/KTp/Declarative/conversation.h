@@ -1,0 +1,113 @@
+/*
+    Copyright (C) 2011  Lasath Fernando <kde@lasath.org>
+    Copyright (C) 2016  Martin Klapetek <mklapetek@kde.org>
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+
+#ifndef CONVERSATION_H
+#define CONVERSATION_H
+
+#include <QObject>
+#include <QIcon>
+#include <TelepathyQt/Account>
+#include <TelepathyQt/TextChannel>
+
+#include <KPeople/PersonData>
+
+#include "messages-model.h"
+
+class MessagesModel;
+class Conversation : public QObject
+{
+    Q_OBJECT
+
+    Q_PROPERTY(MessagesModel *messages READ messages CONSTANT)
+    Q_PROPERTY(bool valid READ isValid NOTIFY validityChanged)
+    Q_PROPERTY(QString title READ title NOTIFY titleChanged)
+    Q_PROPERTY(QIcon presenceIcon READ presenceIcon NOTIFY presenceIconChanged)
+    Q_PROPERTY(QIcon avatar READ avatar NOTIFY avatarChanged)
+    Q_PROPERTY(Tp::Account *account READ accountObject CONSTANT)
+    Q_PROPERTY(KTp::ContactPtr targetContact READ targetContact CONSTANT)
+    Q_PROPERTY(KPeople::PersonData *personData READ personData CONSTANT)
+    Q_PROPERTY(bool hasUnreadMessages READ hasUnreadMessages NOTIFY unreadMessagesChanged)
+    Q_PROPERTY(bool isContactTyping READ isContactTyping NOTIFY contactTypingChanged)
+    Q_PROPERTY(bool canSendMessages READ canSendMessages NOTIFY canSendMessagesChanged)
+
+public:
+    Conversation(const Tp::TextChannelPtr &channel, const Tp::AccountPtr &account, QObject *parent = nullptr);
+    Conversation(const QString &contactId, const Tp::AccountPtr &account, QObject *parent = nullptr);
+    ~Conversation() override;
+
+    void setTextChannel(const Tp::TextChannelPtr &channel);
+    Tp::TextChannelPtr textChannel() const;
+
+    /**
+     * Useful for offline history retrieving (as there's no text channel when offline)
+     */
+    void setContactData(const QString &contactId, const QString &contactAlias);
+
+    MessagesModel* messages() const;
+    QString title() const;
+    QIcon presenceIcon() const;
+    QIcon avatar() const;
+
+    /**
+     * Target contact of this conversation. May be null if conversation is a group chat.
+     */
+    KTp::ContactPtr targetContact() const;
+    Tp::AccountPtr account() const;
+    Tp::Account* accountObject() const;
+
+    KPeople::PersonData* personData() const;
+
+    bool isValid() const;
+
+    bool hasUnreadMessages() const;
+
+    bool isContactTyping() const;
+    bool canSendMessages() const;
+
+Q_SIGNALS:
+    void validityChanged(bool isValid);
+    void avatarChanged();
+    void titleChanged();
+    void presenceIconChanged();
+    void conversationCloseRequested();
+    void unreadMessagesChanged();
+    void lastMessageChanged();
+    void contactTypingChanged();
+    void canSendMessagesChanged();
+
+public Q_SLOTS:
+    void delegateToProperClient();
+    void requestClose();
+    void updateTextChanged(const QString &message);
+
+private Q_SLOTS:
+    void onChannelInvalidated(Tp::DBusProxy *proxy, const QString &errorName, const QString &errorMessage);
+    void onAccountConnectionChanged(const Tp::ConnectionPtr &connection);
+    void onCreateChannelFinished(Tp::PendingOperation *op);
+    void onChatPausedTimerExpired();
+
+private:
+    class ConversationPrivate;
+    ConversationPrivate *d;
+};
+
+Q_DECLARE_METATYPE(Conversation*)
+
+#endif // CONVERSATION_H

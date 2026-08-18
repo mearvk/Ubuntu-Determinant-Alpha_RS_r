@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+set -u
+
+cd "${AUTOPKGTEST_TMP:-"${ADTTMP}"}"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CC="$DEB_HOST_GNU_TYPE-gcc"
+    PKGCONFIG="$DEB_HOST_GNU_TYPE-pkg-config"
+else
+    CC=gcc
+    PKGCONFIG=pkg-config
+fi
+
+cat > trivial.c <<'EOF'
+#include <stdio.h>
+
+#include <libdaemon/daemon.h>
+
+int main (int argc, char **argv)
+{
+    printf("%s\n", daemon_ident_from_argv0(argv[0]));
+}
+EOF
+
+${CC} -o trivial trivial.c $(${PKGCONFIG} --cflags --libs libdaemon)
+test -x trivial
+./trivial
+echo "# everything seems OK"

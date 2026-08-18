@@ -1,0 +1,176 @@
+#!/usr/bin/make -f
+
+DOPACKAGES := $(shell dh_listpackages)
+BUILD_TARGETS :=
+
+ifneq ($(filter libcrypt1,$(DOPACKAGES)),)
+BUILD_DEB1 := 1
+BUILD_DEV_VER := 1
+BUILD_TARGETS += build-deb1/.stamp
+endif
+ifneq ($(filter libcrypt2,$(DOPACKAGES)),)
+BUILD_DEB2 := 1
+BUILD_DEV_VER := 2
+BUILD_TARGETS += build-deb2/.stamp
+endif
+ifneq ($(filter libcrypt1-udeb,$(DOPACKAGES)),)
+BUILD_UDEB := 1
+BUILD_TARGETS += build-udeb/.stamp
+endif
+
+ifeq ($(filter noudeb, $(DEB_BUILD_PROFILES)), noudeb)
+BUILD_UDEB :=
+NO_PACKAGE := --no-package=libcrypt1-udeb
+endif
+
+D   := $(CURDIR)/debian/libcrypt1
+DD  := $(CURDIR)/debian/libcrypt-dev
+D2  := $(CURDIR)/debian/libcrypt2
+DU  := $(CURDIR)/debian/libcrypt1-udeb
+DS  := $(CURDIR)/debian/libxcrypt-source
+
+CONFFLAGS = --disable-werror --prefix=/usr \
+  --disable-xcrypt-compat-files --enable-obsolete-api=glibc
+CONFFLAGS_deb  = $(CONFFLAGS) \
+  $(shell DEB_BUILD_MAINT_OPTIONS="hardening=+bindnow" \
+    dpkg-buildflags --export=configure || true) \
+  --libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+CONFFLAGS_udeb = $(CONFFLAGS) \
+  $(subst -O2,-Os -fomit-frame-pointer,$(shell DEB_BUILD_MAINT_OPTIONS="hardening=-all" \
+    dpkg-buildflags --export=configure || true)) \
+  --libdir=/usr/lib
+
+##############################################################################
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+UPSTREAM_VERSION := $(shell dpkg-parsechangelog -S Version | sed -e 's/.*://' -e 's/[+-].*//')
+
+SOURCE_DATE_EPOCH ?= $(shell dpkg-parsechangelog -STimestamp)
+
+##############################################################################
+%:
+	dh $@ --reload-all-buildenv-variables $(NO_PACKAGE)
+
+override_dh_clean:
+	rm -rf build-deb* build-udeb*
+	dh_clean debian/copyright
+
+build-deb1/config.status:
+	dh_auto_configure --builddir=build-deb1 -- $(CONFFLAGS_deb)
+	sh debian/patch_libtool build-deb1
+
+build-deb2/config.status:
+	dh_auto_configure --builddir=build-deb2 -- $(subst api=glibc,api=no,$(CONFFLAGS_deb))
+
+build-udeb/config.status:
+	dh_auto_configure --builddir=build-udeb -- $(CONFFLAGS_udeb)
+	sh debian/patch_libtool build-udeb
+
+override_dh_auto_configure:
+
+build-deb1/.stamp: build-deb1/config.status
+	dh_auto_build --builddir=build-deb1
+	touch $@
+
+build-deb2/.stamp: build-deb2/config.status
+	dh_auto_build --builddir=build-deb2
+	touch $@
+
+build-udeb/.stamp: build-udeb/config.status
+	dh_auto_build --builddir=build-udeb
+	touch $@
+
+override_dh_auto_build: $(BUILD_TARGETS)
+
+override_dh_auto_test:
+ifdef BUILD_DEB1
+	dh_auto_test --builddir=build-deb1
+else
+ifdef BUILD_DEB2
+	dh_auto_test --builddir=build-deb2
+endif
+endif
+
+override_dh_auto_install:
+ifdef BUILD_DEB1
+	cd build-deb1/ && \
+	$(MAKE) install DESTDIR=$D
+
+	# Move the shared library back to /lib/ because this is where the
+	# libc6 package used to install it (see #953562 for details).
+	mkdir -p $D/lib/$(DEB_HOST_MULTIARCH)
+	mv $D/usr/lib/$(DEB_HOST_MULTIARCH)/libcrypt.so.1* $D/lib/$(DEB_HOST_MULTIARCH)/
+ifeq ($(DEB_HOST_ARCH), alpha)
+	ln -sf /lib/$(DEB_HOST_MULTIARCH)/libcrypt.so.1.1 $D/usr/lib/$(DEB_HOST_MULTIARCH)/libcrypt.so
+else
+	ln -sf /lib/$(DEB_HOST_MULTIARCH)/libcrypt.so.1 $D/usr/lib/$(DEB_HOST_MULTIARCH)/libcrypt.so
+endif
+ifeq ($(BUILD_DEV_VER), 1)
+	dh_movefiles -plibcrypt-dev --sourcedir=debian/libcrypt1/
+else
+	cd $D && echo $(shell sed -re 's#^/##' $(CURDIR)/debian/libcrypt-dev.files) | xargs echo rm -rf
+endif
+	rm $D/usr/lib/*/*.la
+	rmdir --parents --ignore-fail-on-non-empty \
+		$$(find $D -type d -empty) $$(find $(DD) -type d -empty)
+endif
+
+ifdef BUILD_DEB2
+	cd build-deb2/ && \
+	$(MAKE) install DESTDIR=$(D2)
+
+ifeq ($(BUILD_DEV_VER), 2)
+	dh_movefiles -plibcrypt-dev --sourcedir=debian/libcrypt2/
+else
+	cd $(D2) && echo $(shell sed -re 's#^/##' $(CURDIR)/debian/libcrypt-dev.files) | xargs echo rm -rf
+endif
+	rm $(D2)/usr/lib/*/*.la
+	rmdir --parents --ignore-fail-on-non-empty \
+		$$(find $(D2) -type d -empty) $$(find $(DD) -type d -empty)
+endif
+
+ifdef BUILD_UDEB
+	cd build-udeb/ && \
+	$(MAKE) install-exec DESTDIR=$(DU)
+	rm $(DU)/usr/lib/*.a $(DU)/usr/lib/*.la $(DU)/usr/lib/*.so
+endif
+
+	mkdir -p $(DS)/usr/src/libxcrypt/
+	find * -print0 | \
+	egrep --null-data --invert-match '^(INSTALL$$|Makefile\.in$$|build-|aclocal\.m4$$|autom4te\.cache(/|$$)|config\.h\.in$$|configure$$|m4/config\.guess$$|m4/config\.sub$$|debian/($$|\.|libcrypt[12]?(|-dev|-udeb)(/|$$)|libxcrypt-source(/|$$)|autoreconf\.|copyright$$|debhelper-build-stamp$$|files$$|patches(/|$$)|.+\.debhelper\.log$$|.+\.substvars$$))' | \
+	LC_ALL=C sort -z | \
+	tar cf - \
+		--no-recursion --null --files-from=- \
+		--clamp-mtime --mtime "@$(SOURCE_DATE_EPOCH)" \
+		--mode=go=rX,u+rw,a-s \
+		--owner=root --group=root --numeric-owner \
+		| tar xf - -C $(DS)/usr/src/libxcrypt/
+
+override_dh_installdocs:
+	cat debian/copyright.in LICENSING > debian/copyright
+	dh_installdocs -plibcrypt-dev --link-doc=libcrypt$(BUILD_DEV_VER)
+ifdef BUILD_DEB1
+	dh_installdocs -plibcrypt1
+endif
+ifdef BUILD_DEB2
+	dh_installdocs -plibcrypt2
+endif
+	dh_installdocs -plibxcrypt-source
+
+override_dh_installchangelogs:
+	dh_installchangelogs -XChangeLog NEWS
+
+override_dh_makeshlibs:
+ifdef BUILD_DEB1
+	dh_makeshlibs -plibcrypt1 -- -c4
+endif
+ifdef BUILD_DEB2
+	dh_makeshlibs -plibcrypt2 -- -c4
+endif
+
+override_dh_shlibdeps:
+	dh_shlibdeps -- --warnings=7
+
+override_dh_gencontrol:
+	dh_gencontrol $@ -- -VLIBPKG=libcrypt$(BUILD_DEV_VER)
+

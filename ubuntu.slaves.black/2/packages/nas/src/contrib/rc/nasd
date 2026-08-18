@@ -1,0 +1,66 @@
+# $Id: nasd 228 2006-11-27 19:36:11Z jon $
+# $NCDId: @(#)sound.sh,v 1.1 1994/04/27 23:48:56 greg Exp $
+#
+# Set these up for your system
+AUDIOSERVER=localhost:0 
+export AUDIOSERVER
+PIDFILE=/var/tmp/aupid
+AU=/usr/X11R6/bin/nasd
+AUOPTIONS="-aa"
+
+# Set these up, and uncomment their calls below if you want
+# a sound to be played at startup and shutdown
+
+# AUPLAY=/usr/X11R6/bin/auplay
+# UPSOUND=/var/local/sounds/TOSSTING.WAV
+# DOWNSOUND=/var/local/sounds/VOYSTING.WAV
+
+start ()
+{
+	echo "Starting nasd"
+	$AU $AUOPTIONS &
+	AUPID=$!
+	umask 077
+	rm -f $PIDFILE
+	echo $AUPID > $PIDFILE
+	/bin/chmod 700 $PIDFILE
+	#
+	#	Whip it into the Real Time class - doesn't hurt us & gives it
+	#	CPU when it does need it.
+	#
+	# if [ -x /usr/bin/priocntl ]
+	# then
+	#	priocntl -c RT -s -i pid $AUPID
+	# fi
+	# $AUPLAY $UPSOUND &
+}
+
+stop()
+{
+	# $AUPLAY $DOWNSOUND
+	echo "Stopping nasd"
+	kill -15 `cat $PIDFILE`
+}
+
+au_reset()
+{
+	echo "Resetting nasd"
+	kill -1 `cat $PIDFILE`
+}
+
+case $1 in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+reset)
+	au_reset
+	;;
+*)
+	echo "Usage: $0 start|stop|reset"
+	;;
+esac
+
+exit 0

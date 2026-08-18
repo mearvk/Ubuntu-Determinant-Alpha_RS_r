@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sss_ssh_authorizedkeys</refentrytitle>
+        <manvolnum>1</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sss_ssh_authorizedkeys</refname>
+        <refpurpose>получить авторизованные ключи OpenSSH</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>sss_ssh_authorizedkeys</command> <arg choice='opt'>
+<replaceable>options</replaceable> </arg> <arg
+choice='plain'><replaceable>USER</replaceable></arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            <command>sss_ssh_authorizedkeys</command> получает открытые ключи SSH для
+пользователя<replaceable>USER</replaceable> и выводит их в формате
+authorized_keys OpenSSH (дополнительные сведения доступны в разделе
+<quote>ФОРМАТ ФАЙЛА AUTHORIZED_KEYS</quote> справочной страницы
+<citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry>).
+        </para>
+        <para>
+            <citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> можно настроить на использование
+<command>sss_ssh_authorizedkeys</command> для проверки подлинности
+пользователей по открытым ключам, если программа собрана с поддержкой
+параметра <quote>AuthorizedKeysCommand</quote>. Дополнительные сведения об
+этом параметре доступны на справочной странице <citerefentry>
+<refentrytitle>sshd_config</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>.
+        </para>
+        <para>
+            Если параметр <quote>AuthorizedKeysCommand</quote> поддерживается,
+<citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> можно настроить на его
+использование, поместив следующие инструкции в <citerefentry>
+<refentrytitle>sshd_config</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>: <programlisting>
+  AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+  AuthorizedKeysCommandUser nobody
+</programlisting>
+        </para>
+
+    <refsect2 id='cert_keys'>
+        <title>КЛЮЧИ ИЗ СЕРТИФИКАТОВ</title>
+        <para>
+            Помимо открытых ключей SSH для пользователя <replaceable>USER</replaceable>,
+<command>sss_ssh_authorizedkeys</command> может также возвращать открытые
+ключи SSH, производные от открытого ключа сертификата X.509.
+        </para>
+        <para>
+            Чтобы включить эту возможность, необходимо установить параметр
+<quote>ssh_use_certificate_keys</quote> в значение «true» (по умолчанию) в
+разделе [ssh] файла <filename>sssd.conf</filename>. Если запись пользователя
+содержит сертификаты (подробные сведения доступны в описании параметра
+<quote>ldap_user_certificate</quote> на справочной странице
+<citerefentry><refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>) или имеется сертификат в записи
+переопределения для пользователя (подробные сведения доступны на справочной
+странице<citerefentry><refentrytitle>sss_override</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> или
+<citerefentry><refentrytitle>sssd-ipa</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>) и этот сертификат действителен, то
+SSSD извлечёт открытый ключ из сертификата и преобразует его в формат,
+ожидаемый sshd.
+        </para>
+        <para>
+            Помимо <quote>ssh_use_certificate_keys</quote>, параметры
+            <itemizedlist>
+                <listitem><para>ca_db</para></listitem>
+                <listitem><para>p11_child_timeout</para></listitem>
+                <listitem><para>certificate_verification</para></listitem>
+            </itemizedlist>
+            могут использоваться для управления способом проверки сертификатов
+(подробные сведения доступны на справочной странице
+<citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>).
+        </para>
+        <para>
+            Проверка действительности — то преимущество, которое даёт использование
+сертификатов X.509 вместо непосредственно ключей SSH; это позволяет лучше
+управлять временем жизни ключей. Когда клиент SSH настроен на использование
+закрытых ключей со смарт-карты с помощью общей библиотеки PKCS#11 (подробные
+сведения доступны на справочной странице
+<citerefentry><refentrytitle>ssh</refentrytitle>
+<manvolnum>1</manvolnum></citerefentry>), может раздражать то, что проверка
+подлинности продолжает работать даже в случае истечения срока действия
+соответствующего сертификата X.509 на смарт-карте, так как ни
+<command>ssh</command>, ни <command>sshd</command> не принимают сертификат
+во внимание.
+        </para>
+        <para>
+            Следует отметить, что производный открытый ключ SSH можно добавить в
+файл<filename>authorized_keys</filename> пользователя для обхода проверки
+действительности сертификата, если это позволяет конфигурация
+<command>sshd</command>.
+        </para>
+    </refsect2>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ОПЦИИ</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>-d</option>,<option>--domain</option>
+<replaceable>DOMAIN</replaceable>
+                </term>
+                <listitem>
+                    <para>
+                        Искать открытые ключи пользователя в домене SSSD
+<replaceable>DOMAIN</replaceable>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/param_help.xml" />
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='exit_status'>
+        <title>СОСТОЯНИЕ ВЫХОДА</title>
+        <para>
+            В случае успеха возвращается значение состояния выхода «0». В ином случае
+возвращается «1».
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

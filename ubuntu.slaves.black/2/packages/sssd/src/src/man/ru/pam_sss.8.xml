@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+                href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>pam_sss</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>pam_sss</refname>
+        <refpurpose>модуль PAM для SSSD</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>pam_sss.so</command> <arg choice='opt'>
+<replaceable>quiet</replaceable> </arg> <arg choice='opt'>
+<replaceable>forward_pass</replaceable> </arg> <arg choice='opt'>
+<replaceable>use_first_pass</replaceable> </arg> <arg choice='opt'>
+<replaceable>use_authtok</replaceable> </arg> <arg choice='opt'>
+<replaceable>retry=N</replaceable> </arg> <arg choice='opt'>
+<replaceable>ignore_unknown_user</replaceable> </arg> <arg choice='opt'>
+<replaceable>ignore_authinfo_unavail</replaceable> </arg> <arg choice='opt'>
+<replaceable>domains=X</replaceable> </arg> <arg choice='opt'>
+<replaceable>allow_missing_name</replaceable> </arg> <arg choice='opt'>
+<replaceable>prompt_always</replaceable> </arg> <arg choice='opt'>
+<replaceable>try_cert_auth</replaceable> </arg> <arg choice='opt'>
+<replaceable>require_cert_auth</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para><command>pam_sss.so</command> — это интерфейс PAM к сервису SSSD. Ошибки и
+результаты записываются в журнал посредством <command>syslog(3)</command> с
+LOG_AUTHPRIV.</para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ОПЦИИ</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>quiet</option>
+                </term>
+                <listitem>
+                    <para>Подавлять сообщения журнала для неизвестных пользователей.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>forward_pass</option>
+                </term>
+                <listitem>
+                    <para>Если параметр <option>forward_pass</option> задан, введённый пароль будет
+помещён в стек для использования другими модулями PAM.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>use_first_pass</option>
+                </term>
+                <listitem>
+                    <para>Использование аргумента use_first_pass позволяет указать модулю
+принудительно использовать пароль ранее добавленного в стек модуля и никогда
+не запрашивать его у пользователя — если пароль недоступен или некорректен,
+пользователю будет отказано в доступе.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>use_authtok</option>
+                </term>
+                <listitem>
+                    <para>Если этот параметр задан, при смене пароля модуль установит в качестве
+нового пароля тот пароль, который предоставлен ранее добавленным в стек
+модулем обработки паролей.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>retry=N</option>
+                </term>
+                <listitem>
+                    <para>Если этот параметр задан, в случае неудачной проверки подлинности у
+пользователя будет N раз запрашиваться пароль. Значение по умолчанию — 0.</para>
+                    <para>Обратите внимание, что этот параметр может не работать ожидаемым образом,
+если приложение, которое вызывает PAM, самостоятельно обрабатывает диалог с
+пользователем. Типичный пример: <command>sshd</command> с
+<option>PasswordAuthentication</option>.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>ignore_unknown_user</option>
+                </term>
+                <listitem>
+                    <para>Если этот параметр указан и пользователь не существует, модуль PAM вернёт
+PAM_IGNORE. В результате платформа PAM игнорирует этот модуль.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>ignore_authinfo_unavail</option>
+                </term>
+                <listitem>
+                    <para>
+                    Позволяет указать, что модуль PAM должен вернуть PAM_IGNORE, если ему не
+удаётся связаться с сервисом SSSD. В результате платформа PAM игнорирует
+этот модуль.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>domains</option>
+                </term>
+                <listitem>
+                    <para>
+                        Позволяет администратору ограничить перечень доменов, в которых может
+проходить проверку подлинности определённая служба PAM. Формат: разделённый
+запятыми список имён доменов SSSD, в том виде, в котором они указаны в файле
+sssd.conf.
+                    </para>
+                    <para>
+                        ПРИМЕЧАНИЕ: при использовании для службы, которая запущена не от имени
+пользователя root (например, для веб-сервера), этот параметр необходимо
+использовать совместно с параметрами <quote>pam_trusted_users</quote> и
+<quote>pam_public_domains</quote>. Дополнительные сведения об этих двух
+параметрах ответчика PAM доступны на справочной странице <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>allow_missing_name</option>
+                </term>
+                <listitem>
+                    <para>
+                        Основная задача этого параметра — разрешить SSSD определять имя пользователя
+на основе дополнительной информации (например, сертификата со смарт-карты).
+                    </para>
+                    <para>
+                        В настоящее время используется диспетчерами входа, которые могут отслеживать
+события карты на устройстве чтения смарт-карт. При вставке смарт-карты
+диспетчер входа вызовет стек PAM, который включает строку наподобие
+<programlisting>
+auth sufficient pam_sss.so allow_missing_name
+                        </programlisting> В этом случае SSSD попытается
+определить имя пользователя на основе содержимого смарт-карты, потом вернёт
+его pam_sss, который затем поместит его в стек PAM.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>prompt_always</option>
+                </term>
+                <listitem>
+                    <para>
+                        Всегда запрашивать учётные данные у пользователя. Если этот параметр
+включён, учётные данные, запрошенные другими модулями PAM (обычно это
+пароль), будут игнорироваться и pam_sss будет запрашивать учётные данные
+снова. В зависимости от ответа предварительной проверки подлинности,
+полученного от SSSD, pam_sss может запросить пароль, PIN-код смарт-карты или
+другие учётные данные.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>try_cert_auth</option>
+                </term>
+                <listitem>
+                    <para>
+                        Пытаться применить проверку подлинности на основе сертификата, то есть
+проверку подлинности с помощью смарт-карты или аналогичных устройств. Если
+смарт-карта доступна и для службы разрешена проверка подлинности по
+смарт-карте, у пользователя будет запрошен PIN-код, после чего проверка
+подлинности на основе сертификата будет продолжена
+                    </para>
+                    <para>
+                        Если смарт-карта недоступна или для текущей службы не разрешена проверка
+подлинности на основе сертификата, возвращается PAM_AUTHINFO_UNAVAIL.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>require_cert_auth</option>
+                </term>
+                <listitem>
+                    <para>
+                        Выполнять проверку подлинности на основе сертификата, то есть проверку
+подлинности с помощью смарт-карты или аналогичных устройств. Если
+смарт-карта недоступна, пользователю будет предложено вставить её. SSSD
+будет ожидать вставки смарт-карты до истечения тайм-аута, определённого
+параметром p11_wait_for_card_timeout, подробные сведения доступны на
+справочной странице <citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>.
+                    </para>
+                    <para>
+                        Если смарт-карта недоступна по истечении тайм-аута или для текущей службы не
+разрешена проверка подлинности на основе сертификата, возвращается
+PAM_AUTHINFO_UNAVAIL.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='module_types_provides'>
+        <title>ПРЕДОСТАВЛЯЕМЫЕ ТИПЫ МОДУЛЕЙ</title>
+        <para>Предоставляются все типы модулей (<option>account</option>,
+<option>auth</option>, <option>password</option> и
+<option>session</option>).
+        </para>
+        <para>Если ответчик PAM SSSD не запущен (например, когда недоступен сокет
+ответчика PAM), pam_sss вернёт PAM_USER_UNKNOWN при вызове в качестве модуля
+<option>account</option>, чтобы избежать проблем с пользователями из других
+источников во время управления доступом.</para>
+    </refsect1>
+
+    <refsect1 id="return_values">
+        <title>ВОЗВРАЩАЕМЫЕ ЗНАЧЕНИЯ</title>
+        <variablelist>
+            <varlistentry>
+                <term>PAM_SUCCESS</term>
+                <listitem>
+                    <para>
+                        Операция PAM успешно завершена.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_USER_UNKNOWN</term>
+                <listitem>
+                    <para>
+                        Пользователь неизвестен службе проверки подлинности или не запущен ответчик
+PAM SSSD.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTH_ERR</term>
+                <listitem>
+                    <para>
+                        Сбой при проверке подлинности. Кроме того, может быть возвращено в случае
+проблемы с получением сертификата.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_PERM_DENIED</term>
+                <listitem>
+                    <para>
+                        Доступ запрещён. В журнале SSSD могут быть дополнительные сведения об этой
+ошибке.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_IGNORE</term>
+                <listitem>
+                    <para>
+                        Смотрите описание параметров <option>ignore_unknown_user</option> и
+<option>ignore_authinfo_unavail</option>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHTOK_ERR</term>
+                <listitem>
+                    <para>
+                        Не удалось получить новый маркер проверки подлинности. Кроме того, может
+быть возвращено, когда пользователь проходит проверку подлинности с помощью
+сертификатов и доступно несколько сертификатов, но установленная версия GDM
+не поддерживает выбор из нескольких сертификатов.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHINFO_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Не удалось получить доступ к данным проверки подлинности. Это может быть
+связано со сбоем сети или оборудования.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_BUF_ERR</term>
+                <listitem>
+                    <para>
+                        Произошла ошибка памяти. Кроме того, может быть возвращено в том случае,
+если заданы параметры use_first_pass или use_authtok, но не был найден
+пароль, предоставленный ранее добавленным в стек модулем PAM.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SYSTEM_ERR</term>
+                <listitem>
+                    <para>
+                        Произошла системная ошибка. В журнале SSSD могут быть дополнительные
+сведения об этой ошибке.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_ERR</term>
+                <listitem>
+                    <para>
+                        Не удалось задать учётные данные пользователя.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_INSUFFICIENT</term>
+                <listitem>
+                    <para>
+                        Приложение не располагает учётными данными, достаточными для проверки
+подлинности пользователя. Например, отсутствует PIN-код при проверке
+подлинности по смарт-карте или отсутствует фактор при двухфакторной проверке
+подлинности.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SERVICE_ERR</term>
+                <listitem>
+                    <para>
+                        Ошибка в модуле службы.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_NEW_AUTHTOK_REQD</term>
+                <listitem>
+                    <para>
+                        Срок действия маркера проверки подлинности пользователя истёк.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_ACCT_EXPIRED</term>
+                <listitem>
+                    <para>
+                        Срок действия учётной записи пользователя истёк.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SESSION_ERR</term>
+                <listitem>
+                    <para>
+                        Не удалось получить правила профилей рабочего стола IPA или информацию о
+пользователе.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Не удалось получить учётные данные пользователя Kerberos.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_NO_MODULE_DATA</term>
+                <listitem>
+                    <para>
+                        Kerberos не был найден способ проверки подлинности. Это могло произойти,
+если для записи пользователя назначена смарт-карта, но на клиенте недоступен
+модуль pkint.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CONV_ERR</term>
+                <listitem>
+                    <para>
+                       Сбой обмена данными.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHTOK_LOCK_BUSY</term>
+                <listitem>
+                    <para>
+                       Нет доступных KDC, которые подходят для смены пароля.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_ABORT</term>
+                <listitem>
+                    <para>
+                       Неизвестный вызов PAM.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_MODULE_UNKNOWN</term>
+                <listitem>
+                    <para>
+                       Неподдерживаемое задание или команда PAM.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_BAD_ITEM</term>
+                <listitem>
+                    <para>
+                       Модулю проверки подлинности не удалось обработать учётные данные со
+смарт-карты.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='files'>
+        <title>ФАЙЛЫ</title>
+        <para>Когда не удаётся выполнить сброс пароля от имени пользователя root из-за
+того, что соответствующий поставщик SSSD не поддерживает сброс пароля, может
+быть показано отдельное сообщение. Это сообщение может, например, содержать
+инструкции по сбросу пароля.</para>
+
+        <para>Это сообщение читается из файла
+<filename>pam_sss_pw_reset_message.LOC</filename>, где LOC обозначает строку
+локали, возвращённую <citerefentry>
+<refentrytitle>setlocale</refentrytitle><manvolnum>3</manvolnum>
+</citerefentry>. Если такого файла нет, отображается содержимое
+<filename>pam_sss_pw_reset_message.txt</filename>. Владельцем файлов должен
+быть пользователь root, при этом права на чтение и запись могут быть только
+у пользователя root, а у всех остальных пользователей должны быть права
+только на чтение.</para>
+
+        <para>Поиск этих файлов выполняется в каталоге
+<filename>/etc/sssd/customize/DOMAIN_NAME/</filename>. Если соответствующего
+файла нет, будет показано общее сообщение.</para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

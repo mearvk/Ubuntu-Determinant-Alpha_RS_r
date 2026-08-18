@@ -1,0 +1,81 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+# detect if build targets experimental suite (or is a draft)
+DEB_SUITE_EXP = $(filter experimental% UNRELEASED,$(DEB_DISTRIBUTION))
+
+# GNU LibreJS 5.0 compatible license string
+# * See <https://www.gnu.org/software/librejs/free-your-javascript.html>
+LICENSE = // @license magnet:?xt=urn:btih:87f119ba0b429ba17a44b4bffcab33165ebdacc0&dn=freebsd.txt BSD-2-Clause
+
+# generate documentation unless nodoc requested
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+DOCS = README.html README.txt
+MANPAGES = debian-man/uglifyjs.terser.1
+endif
+
+# generate manpage with help2man from --help option of Node.js script
+_mkman = NODE_PATH=lib \
+ help2man $(patsubst %,--name %,$3) --no-info --output $2 $1 \
+ || { NODE_PATH=lib $1 --help; false; }
+
+override_dh_auto_build: \
+ debian/js/bundle.js.gz $(DOCS) $(MANPAGES)
+
+# rename executable to avoid namespace clash
+debian-man/uglifyjs.terser:
+	mkdir --parents $(dir $@)
+	cp --force bin/uglifyjs $@
+
+# build manpage
+debian-man/uglifyjs.terser.1: %.1: %
+	$(call _mkman, $<, $@, \
+		JavaScript parser and mangler/compressor and beautifier toolkit)
+
+# * don't fail on experimental builds
+# * trick testsuite into not using mochallel
+override_dh_auto_test:
+	NODE_PATH=lib TRAVIS=1 node test/run-tests.js \
+		$(if $(DEB_SUITE_EXP),|| true)
+
+# install core documentation with all binary packages
+override_dh_installdocs:
+	dh_installdocs -- $(DOCS)
+
+# build browser and test libraries
+debian/js/%.js:
+	mkdir --parents dist
+	rollup --no-esModule -c
+	cd dist && TERSER_NO_BUNDLE=1 ../bin/uglifyjsnobundle \
+		--mangle --compress \
+		--source-map 'content=bundle.js.map,includeSources=true' \
+		--output bundle.min.js \
+		-- bundle.js
+	mkdir --parents debian/js
+	install --mode a=r,u+w -D --target-directory debian/js \
+		-- dist/*
+	rm -rf dist
+	mkdir --parents dist
+	rollup --no-esModule -c --input=main.tests.js
+	cd dist && TERSER_NO_BUNDLE=1 ../bin/uglifyjsnobundle \
+		--mangle --compress \
+		--source-map 'content=bundle.js.map,includeSources=true' \
+		--output bundle.min.js \
+		-- bundle.js
+
+# pre-compress for browser use
+%.gz: %
+	pigz --force --keep -11 -- $<
+	brotli --force --keep --best -- $<
+
+%.html: %.md
+	cmark-gfm $< > $@
+
+%.txt: %.md
+	cmark-gfm --to plaintext $< > $@
+
+%:
+	dh $@
+
+.SECONDARY:

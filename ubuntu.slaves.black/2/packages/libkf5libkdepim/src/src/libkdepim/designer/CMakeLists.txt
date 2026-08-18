@@ -1,0 +1,19 @@
+include(ECMAddQtDesignerPlugin)
+ecm_qtdesignerplugin_widget(KPIM::KCheckComboBox
+    INCLUDE_FILE "Libkdepim/KCheckComboBox"
+    TOOLTIP "Combobox with checkable items (KDE-PIM)"
+    WHATSTHIS "A combobox that allows the user to check the items in the drop down menu"
+    GROUP "Input (KDE-PIM)"
+    )
+
+ecm_add_qtdesignerplugin(kdepimwidgets
+    NAME KDEPimWidgets
+    OUTPUT_NAME kdepimwidgets
+    WIDGETS
+    KPIM::KCheckComboBox
+    LINK_LIBRARIES
+    KF5::Libkdepim
+    KF5::Completion
+    INSTALL_DESTINATION "${KDE_INSTALL_QTPLUGINDIR}/designer"
+    COMPONENT Devel
+    )

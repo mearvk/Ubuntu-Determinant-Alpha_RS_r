@@ -1,0 +1,379 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_manifest - Adds or/and modifies manifests for jars
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Cwd();
+use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+use Debian::Debhelper::Dh_Lib;
+
+use Debian::Javahelper::Java qw(parse_manifest_fd write_manifest_fd);
+use Debian::Javahelper::Manifest qw(MAIN_SECTION);
+
+=head1 SYNOPSIS
+
+B<jh_manifest>  [S<I<debhelper options>>]  [S<I<options>>]  I<jar1> ... I<jarN>
+
+B<jh_manifest>  [S<I<debhelper options>>]  [S<I<options>>]
+
+=head1 DESCRIPTION
+
+Javahelper tool to add or update manifests in a jar file. It can be
+used in two modes. If passed jar files, it will only process these jar
+files. Otherwise it will update all jar files in the packages it acts
+on.
+
+When processing a package, the L<debhelper(7)> exclude option will
+make B<jh_manifest> ignore matching jar files.
+
+=head1 FILES
+
+=over 4
+
+=item debian/I<package>.manifest (or debian/manifest)
+
+This file consist of a list of jar files and values to add to their
+manifests. Values in this file will take precedence over values in the
+original manifest (and command line arguments over values in this
+file).
+
+It is allowed to list a link in this file instead of an actual jar
+file, provided that the link can be resolved when B<jh_manifest>
+processes it.
+
+If a jar file is listed here cannot be found, B<jh_manifest> will
+print a warning, unless the jar file has been excluded.
+
+As of javahelper >= 0.32, you may add comments in this file. If the
+line starts with a "#" it is completely ignored.
+
+This file is ignored if B<jh_manifest> is passed jar files via command
+line.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-c> I<classpath>, B<--classpath=>I<classpath>
+
+Sets the Class-Path attribute of all processed jar files to
+I<classpath>.
+
+If not passed, then the CLASSPATH environment variable will be used in
+the given jar file do not have a Class-Path attribute.
+
+=item B<-m> I<class>, B<--main=>I<class>
+
+Sets the Main-Class attribute to I<class> in all processed jar files.
+
+=item B<--javaopts=>I<options>
+
+Sets the Debian-Java-Parameters to I<options> in all processed jar
+files. This attribute is used by jarwrapper to start java with extra
+options (e.g. to make more memory available).
+
+=item B<-j> I</path/to/java/home>, B<--java-home=>I</path/to/java/home>
+
+Sets the Debian-Java-Home attribute to I</path/to/java/home> in all
+processed jars. This attribute is used by jarwrapper to determine
+which JVM to use.
+
+=back
+
+=cut
+
+my $cp = '';
+my $mcl = '';
+my $jvm = '';
+my $jopt = '';
+my $envcp = 0;
+
+init(options => {
+    'javaopts=s' => \$jopt,
+    'java-home|j=s' => \$jvm,
+    'main|m=s' => \$mcl,
+    'classpath|c=s' => \$cp,
+    'version|V' => sub { print STDERR "Version has been removed - please stop using it\n"; exit(0) },
+     });
+
+if(!$cp && ($ENV{'CLASSPATH'}//q{}) ne q{}){
+    $cp = $ENV{'CLASSPATH'};
+    $cp =~ s/:/ /go;
+    $envcp = 1;
+}
+
+if(@ARGV){
+    my $pkg = $dh{FIRSTPACKAGE};
+    my $dir = tmpdir($pkg);
+    verbose_print('Assuming targets exists due to --no-act') if $dh{NO_ACT};
+    foreach my $jar (@ARGV){
+        my $orig = $jar;
+        my $target = $jar;
+        my $link = 0;
+        # Look for it in $dir if it does not exist directly.
+        unless (-f $target) {
+            # strip any leading / or ./ - it looks better and it
+            # does not accidentally install a system install jar instead.
+            $target =~ s@^\.?/+@@og;
+            # Bail unless $dir/$target exists
+            error("$target: $!") unless -f "$dir/$target";
+            $target = "$dir/$target";
+        }
+        if ( -l $jar ){
+            # Follow links
+            my $dest = Cwd::abs_path($target);
+            error("Cannot resolve link $target: $!") unless $dest;
+            $target = $dest;
+            $link = 1;
+        }
+        # no-act implies others tools are in no-act mode as well
+        error("Cannot update $jar: it does not exist.")
+            unless -f $jar || !$dh{NO_ACT};
+        if ($link){
+            verbose_print("Updating symlinked $target (via $orig)");
+        } else {
+            verbose_print("Updating $target");
+        }
+        update_jar($target, undef) unless $dh{NO_ACT};
+    }
+    inhibit_log();
+    # behave like the old jh_manifest.
+    exit(0);
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+    my $man = pkgfile($package, 'manifest');
+    my $dir = tmpdir($package);
+    my $manifests = {};
+    my $files = {};
+    my @links = ();
+    my $find_cmd="find $dir ";
+    my $fulldir = Cwd::abs_path($dir);
+    # skip if it does not exist.
+    if( ! -d $dir ){
+        verbose_print("Skipping $package - $dir does not exist (or is not a dir).");
+        next;
+    }
+    $manifests = parse_package_file($man) if($man);
+    if (defined($dh{EXCLUDE_FIND}) && $dh{EXCLUDE_FIND} ne q{}){
+        $find_cmd .= qq{ '!' \\( $dh{EXCLUDE_FIND} \\) -a };
+    }
+    $find_cmd .= q{ -name '*.jar'};
+    verbose_print($find_cmd);
+    open(my $jarfiles, '-|', $find_cmd);
+    while( my $jar = <$jarfiles> ) {
+         chomp($jar);
+         if( -l $jar ) {
+             $jar =~ s@^\Q$dir\E/*@@;
+             verbose_print("Found symlink $jar");
+             push(@links, $jar);
+         } else {
+             $jar = Cwd::abs_path($jar);
+             $jar =~ s@^\Q$fulldir\E/*@@;
+             verbose_print("Found $jar");
+             $files->{$jar} = 1;
+         }
+    }
+    close($jarfiles);
+    # check the links first.
+    foreach my $link (@links) {
+        my $path = Cwd::abs_path("$dir/$link");
+        my $manifest = $manifests->{$link};
+        my $lp = $path;
+        next unless(defined($manifest));
+        error("Cannot modify $link - it is a broken symlink or not possible to resolve,")
+            unless( defined($path) && -e $path );
+        $lp =~ s@^\Q$fulldir\E/*@@;
+        error("Conflicting manifests for $link (link) and $path,") if(exists($manifests->{$lp}));
+        delete($files->{$lp});
+        delete($manifests->{$link});
+        verbose_print("Updating symlinked $path (using manifest for $link)");
+        update_jar("$path", $manifest) unless $dh{NO_ACT};
+    }
+    foreach my $jar (keys(%$files)){
+        my $lp = $jar;
+        my $manifest;
+        $lp =~ s@^\Q$fulldir\E/*@@;
+        $manifest = $manifests->{$lp};
+        delete($manifests->{$lp});
+        update_jar("$dir/$lp", $manifest) unless $dh{NO_ACT};
+    }
+    if (keys(%$manifests) && !$dh{NO_ACT}) {
+        # skip this with no-act, since other tools might be running in no-act
+        # mode as well, so this might be a lot of false-positives.
+        my $count = 0;
+        foreach my $unused (keys(%$manifests)){
+            unless(excludefile($unused)){
+                warning("No jar in $package matching $unused.");
+                $count++;
+            } else {
+                verbose_print("Ignoring unused entry for $unused in $package.");
+            }
+        }
+        # Fail if there is at least one unignored unused manifest.
+        exit 1 if $count;
+    }
+}
+
+exit(0);
+
+sub parse_package_file{
+    my $pkgfile = shift;
+    my $manifests = {};
+    my @jars;
+    my @man;
+    my $inlen = 0;
+    open(my $file, '<', $pkgfile);
+    while( my $line = <$file> ){
+        chomp($line);
+        next if($line =~ m/^#/o);
+        if($line =~ m/^ \s(\s*) /ox){
+            error("Manifest data not attached to a jar in $pkgfile") unless(@jars);
+            $inlen = length($1) unless($inlen);
+            $line = substr($line, 1 + $inlen);
+            push(@man, $line);
+            next;
+        }
+        if(@man){
+            my $mlines = join("\n", @man);
+            my $manifest;
+            open(my $mfd, '<', \$mlines);
+            $manifest = parse_manifest_fd($mfd, $pkgfile);
+            close($mfd);
+            foreach my $j (@jars){
+                error("Two manifests for $j in $pkgfile,") if(exists($manifests->{$j}));
+                $manifests->{$j} = $manifest;
+            }
+            @man = ();
+            @jars = ();
+        }
+        next if($line eq q{});
+        if($line =~ m/\.jar:$/o){
+            $line =~ s@^/*@@o;
+            $line =~ s@//+@/@og;
+            $line =~ s/:$//o;
+            push(@jars, $line);
+            next;
+        }
+        print STDERR "Syntax error in $pkgfile ($line) - perhaps you are missing a \":\"?\n" if($line !~ m/:$/o);
+        error("Unknown line in $pkgfile ($line),");
+    }
+    if(@man){
+        my $mlines = join("\n", @man);
+        my $manifest;
+        open(my $mfd, '<', \$mlines);
+        $manifest = parse_manifest_fd($mfd, $pkgfile);
+        close($mfd);
+        foreach my $j (@jars){
+            $manifests->{$j} = $manifest;
+        }
+    }
+    close($file);
+    return $manifests;
+}
+
+sub update_jar{
+    my $jar = shift;
+    my $merge = shift;
+    my $zip = Archive::Zip->new();
+    my $con;
+    my $manifest;
+    my $stat;
+    my $dirty = 0;
+    my $main;
+    my $new_manifest = 0;
+    # stringify or $zip will make a call back that fails.
+    $zip->read( "$jar" ) == AZ_OK or error("Could not read $jar: $!");
+
+    if(defined($zip->memberNamed( 'META-INF/MANIFEST.MF' ))) {
+        ($con, $stat) = $zip->contents( 'META-INF/MANIFEST.MF' );
+        verbose_print("Reading manifest from $jar");
+        open(my $fd, '<', \$con);
+        $manifest = parse_manifest_fd($fd, $jar);
+        close($fd);
+    } else {
+        verbose_print("$jar does not have a manifest.");
+        $manifest = Debian::Javahelper::Manifest->new();
+        $new_manifest = 1;
+    }
+    if(defined($merge)){
+        $manifest->merge($merge);
+        $dirty = 1;
+    }
+    $main = $manifest->get_section(MAIN_SECTION, 1);
+    if($cp && (!$envcp || ($main->get_value('Class-Path')//q{}) eq q{})){
+        $main->set_value('Class-Path', $cp);
+        $dirty = 1;
+    }
+    if($mcl){
+        $main->set_value('Main-Class', $mcl);
+        $dirty = 1;
+    }
+    if($jvm){
+        $main->set_value('Debian-Java-Home', $jvm);
+        $dirty = 1;
+    }
+    if($jopt){
+        $main->set_value('Debian-Java-Parameters', $jopt);
+        $dirty = 1;
+    }
+    if($dirty){
+        my $var;
+        my $mem;
+        open(my $fd, '>', \$var);
+        write_manifest_fd($manifest, $fd, $jar);
+        close($fd);
+        verbose_print("Updating manifest in $jar");
+        $zip->removeMember( 'META-INF/MANIFEST.MF' ) unless($new_manifest);
+        $mem = $zip->addString($var, 'META-INF/MANIFEST.MF');
+        $mem->desiredCompressionMethod(COMPRESSION_DEFLATED);
+        # This on the other hand may fail.
+        $zip->overwrite() == AZ_OK or error("Writing modified jar ($jar) failed: $!");
+    } else {
+        verbose_print("No update of $jar required.");
+    }
+    1;
+}
+
+=head1 EXAMPLES
+
+An example debian/manifest file:
+
+ # use the symlink so we do not have to update with the next upstream release.
+ usr/share/java/my.jar:
+  Class-Path: dep1.jar dep2.jar
+  Main-Class: some.awesome.Class
+ usr/share/java/dep2.jar:
+  Class-Path: dep1.jar
+
+
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2010 by Niels Thykier
+
+This tool is free software; you may redistribute it and/or modify
+it under the terms of GNU GPL 2.
+
+=cut
+

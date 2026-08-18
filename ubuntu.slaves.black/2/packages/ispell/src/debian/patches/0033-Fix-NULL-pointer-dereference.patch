@@ -1,0 +1,49 @@
+From: Robert Luberda <robert@debian.org>
+Date: Tue, 17 Mar 2015 08:02:21 +0100
+Subject: 0033 Fix NULL pointer dereference
+
+Fix crash occurring on hash tables built without prior call
+to munchlist caused by dereferencing NULL pointer in lookup()
+function in case last not-NULL entry has MOREVARIANTS flag set.
+
+Bug-Debian: https://bugs.debian.org/561089
+---
+ correct.c | 4 ++--
+ lookup.c  | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/correct.c b/correct.c
+index 1dc3e0d..a6f7695 100644
+--- a/correct.c
++++ b/correct.c
+@@ -1539,7 +1539,7 @@ static void save_root_cap (word, pattern, prestrip, preadd, sufstrip, sufadd,
+ 		return;
+ 		}
+ 	    }
+-	while (dent->flagfield & MOREVARIANTS)
++	while ((dent->flagfield & MOREVARIANTS) && dent->next != NULL)
+ 	    {
+ 	    dent = dent->next;
+ 	    if (captype (dent->flagfield) == FOLLOWCASE
+@@ -1580,7 +1580,7 @@ static void save_root_cap (word, pattern, prestrip, preadd, sufstrip, sufadd,
+     len = icharlen (p);
+     if (dent->flagfield & MOREVARIANTS)
+ 	dent = dent->next;	/* Skip place-holder entry */
+-    for (  ;  ;  )
++    for (  ; dent != NULL ;  )
+ 	{
+ 	if (flagsareok (dent))
+ 	    {
+diff --git a/lookup.c b/lookup.c
+index 52ab1b0..47a3905 100644
+--- a/lookup.c
++++ b/lookup.c
+@@ -515,7 +515,7 @@ struct dent * lookup (s, dotree)
+ 	if (s1  &&  s1[0] == schar[0]
+ 	  &&  strcmp ((char *) s1 + 1, (char *) schar + 1) == 0)
+ 	    return dp;
+-	while (dp->flagfield & MOREVARIANTS)	/* Skip variations */
++	while ((dp->flagfield & MOREVARIANTS) && dp->next != NULL)	/* Skip variations */
+ 	    dp = dp->next;
+ 	}
+     if (dotree)

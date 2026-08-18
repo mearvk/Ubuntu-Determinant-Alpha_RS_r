@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# makesrcpkg - make a src distribution
+#
+# Jon Trulson - 6/20/99
+#
+# $Id: makesrcpkg 133 2004-06-20 23:27:10Z jon $
+#
+##############################################################################
+# set -x
+
+# a little test...
+
+if [ ! -d lib -o ! -d server -o ! -f RELEASE ]
+then	# assume we're not in the top level...
+	echo "You must be in the top level build directory to run this."
+	exit 1
+fi
+
+VERSION=`cat RELEASE |cut -d' ' -f5`
+
+NASVER="nas-$VERSION"
+
+ARCFILE="${NASVER}.src.tar"
+
+#exit 1
+
+rm -f ${ARCFILE}.gz
+rm -rf $NASVER
+echo Arcive name: $ARCFILE
+
+FILELIST="./config/filelist"
+
+mkdir $NASVER 2>/dev/null
+
+cat $FILELIST |cpio -pdvumL $NASVER/
+
+if [ -f CHANGES ]
+then
+    cp CHANGES $NASVER/
+    echo "### CHANGES file added."
+fi
+
+
+find $NASVER -type f -exec chmod 644 {} \;
+find $NASVER -type d -exec chmod 755 {} \;
+chmod 755 config/makesrcpkg
+
+chmod 755 $NASVER/config/configure
+chmod 755 $NASVER/config/ltmain.sh
+chmod 755 $NASVER/config/config.guess
+chmod 755 $NASVER/config/config.sub
+chmod 755 $NASVER/config/install-sh
+
+
+tar cvf ${ARCFILE} $NASVER
+gzip -v $ARCFILE
+rm -rf $NASVER
+
+set -x 
+cp -f ${ARCFILE}.gz $HOME/tx/nas/
+chmod 644 $HOME/tx/nas/${ARCFILE}.gz
+
+exit
+	
+

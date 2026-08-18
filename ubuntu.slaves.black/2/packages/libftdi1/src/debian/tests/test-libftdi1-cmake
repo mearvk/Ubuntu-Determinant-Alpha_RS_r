@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+
+cat << EOF > $WORKDIR/CMakeLists.txt
+cmake_minimum_required(VERSION 3.16)
+project(test)
+find_package(LibFTDI1)
+
+message(STATUS "Include directories: " \${LIBFTDI_INCLUDE_DIRS})
+message(STATUS "Link directories: " \${LIBFTDI_LIBRARY_DIRS})
+message(STATUS "Libraries: " \${LIBFTDI_LIBRARIES})
+
+add_library(imp_ftdi INTERFACE IMPORTED)
+set_target_properties(imp_ftdi
+     PROPERTIES
+     INTERFACE_INCLUDE_DIRECTORIES "\${LIBFTDI_INCLUDE_DIRS}"
+     INTERFACE_LINK_DIRECTORIES "\${LIBFTDI_LIBRARY_DIRS}"
+     INTERFACE_LINK_LIBRARIES "\${LIBFTDI_LIBRARIES}"
+     )
+
+add_executable(test-libftdi1-cmake basic.cpp baudrate.cpp)
+include_directories("\${LIBFTDI_INCLUDE_DIRS}")
+target_link_libraries(test-libftdi1-cmake PRIVATE imp_ftdi boost_unit_test_framework)
+EOF
+
+cp test/basic.cpp test/baudrate.cpp $WORKDIR
+cd $WORKDIR
+cmake .
+make VERBOSE=1
+
+echo "build: OK"
+[ -x $WORKDIR/test-libftdi1-cmake ]
+$WORKDIR/test-libftdi1-cmake 2>&1
+echo "run: OK"

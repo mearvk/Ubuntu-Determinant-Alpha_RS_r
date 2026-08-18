@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	gulp build
+	# Provide empty files for plugins for backwards compatibility since
+	# they are now included with the main jquery.flot.js file
+	mkdir plugins
+	cd source && for f in jquery.flot.*.js; do \
+		echo "Provide dummy file for $$f" ; \
+		touch ../plugins/$${f%%.js}.min.js ../plugins/$$f; \
+	done
+	cd dist/es5 && for f in *.js; do \
+		echo "Minify dist/es5/$$f"; \
+		uglifyjs --source-map -o $${f%%.js}.min.js $$f; \
+	done
+
+override_dh_auto_clean:
+	dh_auto_clean
+	$(RM) -r plugins
+
+get-orig-source:
+	OUTDIR=$$PWD ; \
+	MAKEFILE=`echo $(MAKEFILE_LIST) | awk '{ print $$1 }'` ; \
+	FILE=`readlink -f $$MAKEFILE` ; \
+	DIR=`dirname $$FILE` ; \
+	cd $$DIR/.. ; \
+	TMP=`mktemp -d` ; \
+	if ! USCAN=`uscan --destdir $$TMP` ; then exit 1 ; fi ; \
+	VERSION=`echo $$USCAN | sed -n 's/.*Newer version (\(.*\)) available.*/\1/p'` ; \
+	cd $$TMP ; \
+	tar xzf flot-$$VERSION.tar.gz ; \
+	cd flot-$$VERSION; \
+	rm -f Makefile ; \
+	rm -f *.min.js  ; \
+	rm -f jquery.js ; \
+	rm -f excanvas.js ; \
+	rm -f jquery.flot.navigate.js ; \
+	rm -f jquery.flot.resize.js ; \
+	rm -f jquery.flot.js ; \
+	rm -f .travis.yml ; \
+	rm -f .gitignore ; \
+	rm -rf examples/shared ; \
+	cd .. ; \
+	tar c flot-$$VERSION | gzip -9 > flot_$$VERSION+dfsg.orig.tar.gz ; \
+	rm -rf flot-$$VERSION ; \
+	mv flot_$$VERSION+dfsg.orig.tar.gz $$OUTDIR ; \
+	cd $$OUTDIR ; \
+	rm -rf $$TMP ; \
+	echo Saved file at flot_$$VERSION+dfsg.orig.tar.gz

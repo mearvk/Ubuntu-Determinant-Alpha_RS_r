@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-ifp</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-ifp</refname>
+        <refpurpose>SSSD InfoPipe-respondent</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av InfoPipe-respondenten till
+<citerefentry> <refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  För en detaljerad referens om syntaxen, se avsnittet
+<quote>FILFORMAT</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            InfoPipe-respondenten tillhandahåller ett publikt D-Bus-gränssnitt åtkomligt
+över systembussen.  Gränssnittet låter användaren att fråga efter
+information om fjärranvändare och -grupper över systembussen.
+        </para>
+
+    <refsect2 id='valid_certificate'>
+        <title>HITTA MED GILTIGT CERTIFIKAT</title>
+        <para>
+            Följande alternativ kan användas för att styra hur certifikat valideras när
+API:et FindByValidCertificate() används:
+            <itemizedlist>
+                <listitem><para>ca_db</para></listitem>
+                <listitem><para>p11_child_timeout</para></listitem>
+                <listitem><para>certificate_verification</para></listitem>
+            </itemizedlist>
+            För fler detaljer om alternativet, se
+<citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>.
+        </para>
+    </refsect2>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+            <para>
+                Dessa alternativ kan användas för att konfigurera InfoPipe-respondenten.
+            </para>
+            <variablelist>
+                <varlistentry>
+                    <term>allowed_uids (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger den kommaseparerade listan av AID-värden eller användarnamn som
+tillåts använda InfoPipe-respondenten.  Användarnamn slås upp till AID:er
+vid uppstart.
+                        </para>
+                        <para>
+                            Lokalt användarnamn krävs, d.v.s. åtkomligt via tjänsten
+<quote>files</quote> i <filename>nsswitch.conf</filename>.
+                        </para>
+                        <para>
+                            Standard: 0 (endast root-användaren tillåts komma åt InfoPipe-respondenten)
+                        </para>
+                        <para>
+                            Observera att även om AID 0 används som standard kommer det att skrivas över
+av detta alternativ.  Om du fortfarande vill tillåta root-användaren att
+komma åt InfoPipe-respondenten, vilket man typiskt vill, måste du lägga till
+även 0 i listan av tillåtna AID:er.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>user_attributes (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger den kommaseparerade listan över vit- eller svartlistade attribut.
+                        </para>
+                        <para>
+                            Som standard tillåter bara InfoPipe-respondenten att standarduppsättningen
+av POSIX-attribut begärs.  Denna uppsättning är densamma som returneras av
+<citerefentry> <refentrytitle>getpwnam</refentrytitle>
+<manvolnum>3</manvolnum> </citerefentry> och inkluderar: <variablelist>
+                                <varlistentry>
+                                    <term>name</term>
+                                    <listitem><para>användarens inloggningsnamn</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>uidNumber</term>
+                                    <listitem><para>användar-ID</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>gidNumber</term>
+                                    <listitem><para>primär grupps ID</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>gecos</term>
+                                    <listitem><para>användarinformation, normalt fullständigt namn</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>homeDirectory</term>
+                                    <listitem><para>hemkatalog</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>loginShell</term>
+                                    <listitem><para>användarens skal</para></listitem>
+                                </varlistentry>
+                            </variablelist>
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat attribut till denna uppsättning
+genom att använda <quote>+attrnamn</quote> eller uttryckligen ta bort ett
+attribut genom att använda <quote>-attrnamn</quote>.  Till exempel, för att
+tillåta <quote>telephoneNumber</quote> men neka <quote>loginShell</quote>
+skulle man använda följande konfiguration: <programlisting>
+user_attributes = +telephoneNumber, -loginShell
+                        </programlisting>
+                        </para>
+                        <para>
+                            Standard: inte satt.  Endast standarduppsättningen av POSIX-attribut är
+tillåtna.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>wildcard_limit (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger en övre gräns på antalet poster som hämtas under en uppslagning med
+jokertecken som åsidosätter gränsen anroparen tillhandahåller.
+                        </para>
+                        <para>
+                            Standard: 0 (låt anroparen sätta en övre gräns)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

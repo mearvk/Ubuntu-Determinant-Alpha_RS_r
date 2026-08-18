@@ -1,0 +1,55 @@
+ecm_install_icons(
+    ICONS
+        128-apps-telepathy-kde.png
+        16-actions-im-groupwise.png
+        16-actions-im-irc.png
+        16-actions-im-local-xmpp.png
+        16-apps-telepathy-kde.png
+        22-actions-im-aim.png
+        22-actions-im-facebook.png
+        22-actions-im-gadugadu.png
+        22-actions-im-google-talk.png
+        22-actions-im-groupwise.png
+        22-actions-im-icq.png
+        22-actions-im-jabber.png
+        22-actions-im-local-xmpp.png
+        22-actions-im-msn.png
+        22-actions-im-qq.png
+        22-actions-im-skype.png
+        22-actions-im-yahoo.png
+        22-actions-show-offline.png
+        22-actions-sort-name.png
+        22-actions-sort-presence.png
+        22-apps-telepathy-kde.png
+        32-actions-im-aim.png
+        32-actions-im-facebook.png
+        32-actions-im-gadugadu.png
+        32-actions-im-google-talk.png
+        32-actions-im-groupwise.png
+        32-actions-im-icq.png
+        32-actions-im-irc.png
+        32-actions-im-jabber.png
+        32-actions-im-local-xmpp.png
+        32-actions-im-msn.png
+        32-actions-im-qq.png
+        32-actions-im-skype.png
+        32-actions-im-yahoo.png
+        32-apps-telepathy-kde.png
+        48-actions-im-aim.png
+        48-actions-im-facebook.png
+        48-actions-im-gadugadu.png
+        48-actions-im-google-talk.png
+        48-actions-im-groupwise.png
+        48-actions-im-icq.png
+        48-actions-im-jabber.png
+        48-actions-im-local-xmpp.png
+        48-actions-im-msn.png
+        48-actions-im-qq.png
+        48-actions-im-skype.png
+        48-actions-im-yahoo.png
+        48-apps-telepathy-kde.png
+        64-apps-telepathy-kde.png
+        sc-apps-telepathy-kde.svgz
+    DESTINATION ${KDE_INSTALL_ICONDIR}
+    THEME hicolor
+)

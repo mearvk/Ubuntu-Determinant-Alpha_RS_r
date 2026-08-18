@@ -1,0 +1,158 @@
+Description: Restore support for DNS names longer than 63 characters
+ Fix a regression that breaks DNS lookups when the given URL is 64+ characters.
+Author: Bart Van Assche <bvanassche@acm.org>
+Origin: upstream, https://github.com/net-snmp/net-snmp/commit/d420ff6cd3a3bd8ae469fc2d6a0bafd523280794
+Bug: https://github.com/net-snmp/net-snmp/issues/476
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/net-snmp/+bug/1998461
+Last-Update: 2023-01-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/snmplib/transports/snmpIPBaseDomain.c
++++ b/snmplib/transports/snmpIPBaseDomain.c
+@@ -49,7 +49,7 @@
+                 cp[0] = '\0';
+                 cp++;
+             } else {
+-                goto invalid;
++                goto err;
+             }
+         } else if (*cp != '@' && (*cp != ':' || cp[1] == ':')) {
+             addrstr = cp;
+@@ -69,14 +69,17 @@
+             *cp++ = '\0';
+             portstr = cp;
+             if (!netsnmp_isnumber(cp))
+-                goto invalid;
++                goto err;
+         } else if (cp && *cp) {
+-            goto invalid;
++            goto err;
+         }
+     }
+ 
+-    if (addrstr)
+-        strlcpy(ep_str->addr, addrstr, sizeof(ep_str->addr));
++    if (addrstr) {
++        ep_str->addr = strdup(addrstr);
++        if (!ep_str->addr)
++            goto err;
++    }
+     if (iface)
+         strlcpy(ep_str->iface, iface, sizeof(ep_str->iface));
+     if (portstr) {
+@@ -84,13 +87,15 @@
+         if (port <= 0xffff)
+             strlcpy(ep_str->port, portstr, sizeof(ep_str->port));
+         else
+-            goto invalid;
++            goto err;
+     }
+ 
+     free(dup);
+     return 1;
+ 
+-invalid:
++err:
++    free(ep_str->addr);
++    ep_str->addr = NULL;
+     free(dup);
+     return 0;
+ }
+--- a/include/net-snmp/library/snmpIPBaseDomain.h
++++ b/include/net-snmp/library/snmpIPBaseDomain.h
+@@ -30,7 +30,7 @@
+  *   means "bind to any port".
+  */
+ struct netsnmp_ep_str {
+-    char     addr[64];
++    char     *addr;
+     char     iface[16];
+     char     port[6];
+ };
+--- a/snmplib/transports/snmpIPv4BaseDomain.c
++++ b/snmplib/transports/snmpIPv4BaseDomain.c
+@@ -105,17 +105,18 @@
+         addr->sin_port = htons(atoi(ep_str.port));
+     if (ep_str.iface[0])
+         strlcpy(ep->iface, ep_str.iface, sizeof(ep->iface));
+-    if (strcmp(ep_str.addr, "255.255.255.255") == 0) {
++    if (ep_str.addr && strcmp(ep_str.addr, "255.255.255.255") == 0) {
+         /*
+          * The explicit broadcast address hack
+          */
+         DEBUGMSGTL(("netsnmp_sockaddr_in", "Explicit UDP broadcast\n"));
+         addr->sin_addr.s_addr = INADDR_NONE;
+-    } else if (strcmp(ep_str.addr, "") != 0) {
++    } else if (ep_str.addr && strcmp(ep_str.addr, "") != 0) {
+         ret = netsnmp_gethostbyname_v4(ep_str.addr, &addr->sin_addr.s_addr);
+         if (ret < 0) {
+             DEBUGMSGTL(("netsnmp_sockaddr_in",
+                         "couldn't resolve hostname \"%s\"\n", ep_str.addr));
++            free(ep_str.addr);
+             return 0;
+         }
+         DEBUGMSGTL(("netsnmp_sockaddr_in",
+@@ -128,6 +129,7 @@
+ 
+     DEBUGMSGTL(("netsnmp_sockaddr_in", "return { AF_INET, %s:%hu }\n",
+                 inet_ntoa(addr->sin_addr), ntohs(addr->sin_port)));
++    free(ep_str.addr);
+     return 1;
+ }
+ 
+--- a/snmplib/transports/snmpIPv6BaseDomain.c
++++ b/snmplib/transports/snmpIPv6BaseDomain.c
+@@ -299,7 +299,7 @@
+         addr->sin6_port = htons(atoi(ep_str.port));
+     if (ep_str.iface[0])
+         strlcpy(ep->iface, ep_str.iface, sizeof(ep->iface));
+-    if (ep_str.addr[0]) {
++    if (ep_str.addr && ep_str.addr[0]) {
+         char *scope_id;
+ 
+         scope_id = strchr(ep_str.addr, '%');
+@@ -313,6 +313,7 @@
+             !netsnmp_resolve_v6_hostname(&addr->sin6_addr, ep_str.addr)) {
+             DEBUGMSGTL(("netsnmp_sockaddr_in6", "failed to parse %s\n",
+                         ep_str.addr));
++            free(ep_str.addr);
+             return 0;
+         }
+     }
+@@ -321,6 +322,7 @@
+                 inet_ntop(AF_INET6, &addr->sin6_addr, debug_addr,
+                           sizeof(debug_addr)), (int)addr->sin6_scope_id,
+                 ntohs(addr->sin6_port)));
++    free(ep_str.addr);
+     return 1;
+ }
+ 
+--- a/testing/fulltests/unit-tests/T022netsnmp_parse_ep_str_clib.c
++++ b/testing/fulltests/unit-tests/T022netsnmp_parse_ep_str_clib.c
+@@ -5,7 +5,7 @@
+ struct one_test_data {
+     const char *in;
+     int res;
+-    struct netsnmp_ep_str expected;
++    struct { const char *addr; const char *iface; const char *port; } expected;
+ };
+ 
+ static struct one_test_data test_data[] = {
+@@ -44,7 +44,8 @@
+         res = netsnmp_parse_ep_str(&ep_str, p->in);
+         OKF(res == p->res, ("%s: return value %d <> %d", p->in, res, p->res));
+         if (res && p->res) {
+-            OKF(strcmp(ep_str.addr,  p->expected.addr)  == 0,
++            OKF((!ep_str.addr && !p->expected.addr[0]) ||
++                strcmp(ep_str.addr,  p->expected.addr)  == 0,
+                 ("%s: network address %s <> %s", p->in, ep_str.addr,
+                  p->expected.addr));
+             OKF(strcmp(ep_str.iface, p->expected.iface) == 0,
+@@ -53,6 +54,7 @@
+             OKF(strcmp(ep_str.port, p->expected.port) == 0,
+                 ("%s: port %s <> %s", p->in, ep_str.port, p->expected.port));
+         }
++        free(ep_str.addr);
+     }
+ }
+ 

@@ -1,0 +1,108 @@
+#! /usr/bin/perl -w
+#
+# This package doesn't depend on perl, so make sure that everything done in
+# this script can be done with perl-base.  In particular, using any Perl
+# modules other than the Debconf modules and the basic pragmata probably isn't
+# valid.  (Some Perl modules do ship with perl-base, but there is no guarantee
+# that set won't change.)
+
+use strict;
+use Debconf::Client::ConfModule ':all';
+
+my $fix_etypes = 0;
+
+if ($ARGV[0] eq 'configure' || $ARGV[0] eq 'reconfigure') {
+    version('2.0') or die "Failed to start debconf\n";
+    set ('krb5-config/read_conf', 'true');
+    my $defrealm = get ('krb5-config/default_realm');
+
+    # We should not manage krb5.conf if it is a symlink.  If people would
+    # rather us manage if a symlink but writable please open a bug.
+    exit(0) if -l "/etc/krb5.conf";
+    unless (-f "/etc/krb5.conf" ) {
+        system ('cp', '/usr/share/kerberos-configs/krb5.conf.template',
+                '/etc/krb5.conf') == 0
+            or die "Unable to create /etc/krb5.conf: $!\n";
+    }
+    if ($ARGV[1]) {
+        my $version = $ARGV[1];
+        system ('dpkg', '--compare-versions', $version, 'lt', '1.6');
+        if ($? == 0) {
+            $fix_etypes = 1;
+        }
+    }
+    open(CONF, "/etc/krb5.conf") or die "Unable to open krb5.conf: $!\n";
+    open (OUT, ">/etc/krb5.conf.dpkg-new")
+        or die "Unable too open temporary config: $!";
+
+    # The following loop allows any settings read from debconf to be placed
+    # into krb5.conf file.  These settings should have been seeded from the
+    # config script so we should not lose user changes.  We also look to see
+    # if the default realm is mentioned in the realms section to know if we
+    # need to add it later.
+    my $defrealm_in_conf = 0;
+    my $changed_defrealm = 0;
+    while (<CONF>) {
+        if (/^\s*\[libdefaults\]/i ... /^\s*\[(?!libdefaults)/i) {
+            next if /^\s*[\#;]/;
+            if ($defrealm && /\bdefault_realm\s*=\s*(\S+)/) {
+                if ($1 ne $defrealm) {
+                    $changed_defrealm = 1;
+                    s/default_realm(\s*)=(.*)$/default_realm$1= $defrealm/i;
+                }
+            }
+            if ($fix_etypes) {
+                s/^\s*default_tgs_enctypes = des3-hmac-sha1 des-cbc-crc des-cbc-md5/\#$&/;
+                s/^\s*default_tkt_enctypes = des3-hmac-sha1 des-cbc-crc des-cbc-md5/\#$&/;
+                s/^\s*permitted_enctypes = des3-hmac-sha1 des-cbc-crc des-cbc-md5/\#$&/;
+            }
+        }
+        if (/^\s*\[realms\]/i ... /^\s*\[(?!realms)/i) {
+            if (/^\s*$defrealm\s*=\s*\{/) {
+                $defrealm_in_conf = 1;
+            }
+        }
+    } continue {
+        print OUT;
+    }
+    close OUT or die "Unable to close output: $!,";
+    rename ("/etc/krb5.conf.dpkg-new", "/etc/krb5.conf")
+        or die "Unable to rename file: $!, stopped";
+    my $add_servers = get ("krb5-config/add_servers");
+  realm_config: {
+        if (($add_servers eq "true") and !$defrealm_in_conf) {
+            my $servers = get ('krb5-config/kerberos_servers');
+            reset ('krb5-config/kerberos_servers');
+            last realm_config unless $servers;
+            my @servers = split (' ', $servers);
+            my $admin = get ('krb5-config/admin_server');
+            reset ('krb5-config/admin_server');
+            local $/; # scoped for realm config section
+            open (CONF, "/etc/krb5.conf")
+                or die "Unable to open krb5.conf: $!, stopped";
+            $_ = <CONF>;
+            my $text = "\t$defrealm = {\n";
+            map { $text .= "\t\tkdc = $_\n" } @servers;
+            $text .= "\t\tadmin_server = $admin\n" if $admin;
+	    $text .=  "\t}";
+            s/\[realms\]/[realms]\n$text/;
+            open (OUT, ">/etc/krb5.conf.dpkg-new")
+                or die "Unable to open output: $!, stopped";
+            print OUT $_;
+            close OUT or die "Unable to close output: $!, stopped";
+            rename ("/etc/krb5.conf.dpkg-new", "/etc/krb5.conf")
+                or die "Unable to rename config file into place: $!, stopped";
+        }
+    }
+}
+
+
+# Run any additional debhelper commands.
+open(CMD, "| sh")
+    or die "Unable to run debhelper commands: $!\n";
+print CMD "set -e\nset -- " . join (" ", @ARGV) . "\n";
+print CMD <<'eof';
+#DEBHELPER#
+eof
+close CMD;
+exit $?>>8;

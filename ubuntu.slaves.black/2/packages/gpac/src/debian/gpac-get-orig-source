@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -e
+
+# Script used to generate the orig source tarball for gpac.
+
+mkdir -p "$(pwd)"/get-orig-source
+pushd get-orig-source >/dev/null
+
+GIT_REPO_URL="https://github.com/gpac/gpac"
+CLONE_DIR="gpac-git"
+
+[ -d "${CLONE_DIR}" ] || git clone "${GIT_REPO_URL}" "${CLONE_DIR}" 1>/dev/null 2>&1
+pushd "${CLONE_DIR}" >/dev/null
+VERSION="$(git describe | sed -e 's/v\(.*\)/\1/')"
+popd >/dev/null
+
+# Remove temp files and other cruft from source tarball
+# The find command snippet here was taken from debhelper's dh_clean command
+# with some modification to delete more unneeded files.
+echo "Removing temp files and other cruft from source tarball" 1>/dev/null 2>&1
+find "${CLONE_DIR}" \
+  \( \
+    \( -type f -a \
+      \( -name '#*#' -o -name '.*~' -o -name '*~' -o -name DEADJOE \
+         -o -name '*.orig' -o -name '*.rej' -o -name '*.bak' \
+         -o -name '.*.orig' -o -name .*.rej -o -name '.SUMS' \
+         -o -name TAGS -o \( -path '*/.deps/*' -a -name '*.P' \) \
+         -o -name config.status -o -name config.cache -o -name config.log \
+      \) -exec rm -f "{}" \; \
+    \) -o \
+    \( -type d -a \
+      \( -name autom4te.cache -o -name .svn \
+      \) -prune -exec rm -rf "{}" \; \
+    \) \
+  \)
+
+# Make ./configure executable
+chmod 755 "${CLONE_DIR}"/configure
+
+# Remove empty directories
+echo "Removing empty directories" 1>/dev/null 2>&1
+find "${CLONE_DIR}" -type d -empty -delete
+
+mv "${CLONE_DIR}" "gpac-${VERSION}"
+XZ_OPT=-9fqzv tar --exclude-vcs -cJf "gpac_${VERSION}.orig.tar.xz" \
+  "gpac-${VERSION}/"
+rm -rf "gpac-${VERSION}/"
+
+echo "--upstream-version ${VERSION} $(pwd)/gpac_${VERSION}.orig.tar.xz"
+
+popd >/dev/null
+

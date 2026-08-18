@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+
+POM_VERSION          := 2.3.23
+MAVEN_REPO           := http://repo1.maven.org/maven2/
+
+JAVA_HOME            := /usr/lib/jvm/default-java
+
+%:
+	dh $@ --buildsystem=ivy --with maven_repo_helper
+
+override_dh_auto_build:
+	dh_auto_build -- -Divy.default.ivy.user.dir=$(shell pwd)/.ivy -Dtitlebar.found=true \
+	                 -DTODAY= -DDSTAMP= -DTSTAMP= -DtimestampNice= -DtimestampInVersion= \
+	                 javacc jar javadoc
+
+override_dh_auto_clean:
+	rm -Rf build .ivy
+
+get-orig-pom:
+	wget --user-agent="Mozilla/5.0" -O debian/pom.xml $(MAVEN_REPO)/org/freemarker/freemarker/$(POM_VERSION)/freemarker-$(POM_VERSION).pom
+	perl -p -i -e 's/<version>$(POM_VERSION)/<version>$(DEB_UPSTREAM_VERSION)/' debian/pom.xml

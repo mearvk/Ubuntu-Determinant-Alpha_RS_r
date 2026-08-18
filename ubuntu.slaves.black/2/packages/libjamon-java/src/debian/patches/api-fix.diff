@@ -1,0 +1,40 @@
+This patch fixes several API ubdates in Java 1.6 and Tomcat 6.
+The package can be built with Java 1.6 with this patch.
+--- a/src/java/com/jamonapi/proxy/JAMonDataSource.java
++++ b/src/java/com/jamonapi/proxy/JAMonDataSource.java
+@@ -45,9 +45,15 @@
+ 
+     public Connection getConnection(String userName, String passWord) throws SQLException {
+         return MonProxyFactory.monitor(realDataSource.getConnection(userName, passWord));
++    }
++
++    public <T> T unwrap(Class<T> iface) throws SQLException {
++	return null;
+     }
+     
+-    
++    public boolean isWrapperFor(Class<?> iface) throws SQLException {
++	return false;
++    }
+ 
+     public int getLoginTimeout() throws SQLException {
+         return realDataSource.getLoginTimeout();
+--- a/src/java/com/jamontomcat/JAMonTomcat4Valve.java
++++ b/src/java/com/jamontomcat/JAMonTomcat4Valve.java
+@@ -56,14 +56,13 @@
+      * test xml - read property
+      */
+ 
+-    public void invoke(Request request, Response response, ValveContext valveContext) throws IOException, ServletException {
++    public void invoke(org.apache.catalina.connector.Request request, org.apache.catalina.connector.Response response) throws IOException, ServletException {
+      HttpMon httpMon=null;
+      try {
+          httpMon=httpMonFactory.start(request, response);
+ 
+          // tomcat 4/5
+-         if (valveContext!=null)
+-           valveContext.invokeNext(request, response);
++         this.getNext().invoke(request, response);
+   
+      } catch (Throwable e) {
+           httpMon.throwException(e);

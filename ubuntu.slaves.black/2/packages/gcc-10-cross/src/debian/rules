@@ -1,0 +1,661 @@
+#!/usr/bin/make -f
+
+, := ,
+space := $(EMPTY) $(EMPTY)
+
+NJOBS =
+# Support parallel=<n> in DEB_BUILD_OPTIONS (see #209008)
+ifneq (,$(filter parallel=%,$(subst $(,), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(,),$(space),$(DEB_BUILD_OPTIONS))))
+endif
+
+vendor := $(shell if dpkg-vendor --derives-from Ubuntu; then echo Ubuntu; else echo Debian; fi)
+distrelease := $(shell lsb_release -cs)
+
+GCC_VER := $(shell dpkg-parsechangelog |egrep ^Source:|cut -f2 -d' '|cut -f2 -d'-')
+
+ifeq ($(GCC_VER),9)
+  MIN_VER_GCC      := 9.3.0-10~
+  PPA_VER_GCC      := 9.3.0-10~
+endif
+
+ifeq ($(GCC_VER),10)
+  MIN_VER_GCC      := 10.5.0-1~
+  PPA_VER_GCC      := 10.5.0-1~
+endif
+
+ifndef MIN_VER_GCC
+  MIN_VER_GCC      := ${GCC_VER}.0.1-0~
+  #MIN_VER_GCC      := ${GCC_VER}-20160225-0~
+endif
+
+DEB_NAME_ACT     := $(shell dpkg-parsechangelog| sed -n 's/-*//; s/^Source: \(.*\)/\1/p')
+DEB_SVER_ACT     := $(shell dpkg-parsechangelog| sed -n 's/-*//; s/^Version: \(.*\)/\1/p')
+DEB_VER_ACT      := $(shell /bin/sh debian/new_cross_version.sh $(if $(filter $(DEB_NAME_ACT), gcc-10-cross),arm64,ppc64))
+CROSS_EXT       := cross$(DEB_VER_ACT)
+
+VER_GCC        := $(shell dpkg-parsechangelog -l/usr/src/gcc-${GCC_VER}/debian/changelog | awk '/^Version:/ {print $$2}' | sed 's/-[^-]*$$//')
+GCC_DIR        := /usr/src/gcc-${GCC_VER}
+GCC_TARBALL := $(wildcard $(GCC_DIR)/gcc-*.xz)
+VER_BINUTILS   := 2.35.2-2
+MIN_VER_BINUTILS   := 2.35.2-2
+VER_ISL      := 0.22.1-1~
+MIN_VER_GLIBC   := 2.31
+
+DEB_VER_GCC    := $(shell dpkg-parsechangelog -l${GCC_DIR}/debian/changelog | egrep '^Version:' | cut -f 2 -d ' ')
+
+CROSS_BIARCH_armhf:=armel
+CROSS_BIARCH_armel:=armhf
+CROSS_BIARCH_powerpc:=ppc64
+CROSS_BIARCH_s390x:=s390
+
+HOST_ARCHS_alpha = amd64 i386 x32
+# FIXME: adding amd64 in HOST_ARCHS_amd64 hard codes the indep build
+# to amd64 buildds ...
+HOST_ARCHS_amd64 = amd64 arm64 i386 ppc64el x32
+HOST_ARCHS_armhf = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_armel = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_arm64 = amd64 i386 x32 ppc64el
+HOST_ARCHS_hppa = amd64 i386 x32
+HOST_ARCHS_i386 = amd64 arm64 ppc64el x32
+HOST_ARCHS_m68k = amd64 i386 x32
+HOST_ARCHS_mipsel = amd64 i386 x32
+HOST_ARCHS_mipsn32 = amd64 i386 x32
+HOST_ARCHS_mipsn32el = amd64 i386 x32
+HOST_ARCHS_mips64 = amd64 i386 x32
+HOST_ARCHS_mips64el = amd64 i386 x32
+HOST_ARCHS_mipsr6 = amd64 i386 x32
+HOST_ARCHS_mipsr6el = amd64 i386 x32
+HOST_ARCHS_mipsn32r6 = amd64 i386 x32
+HOST_ARCHS_mipsn32r6el = amd64 i386 x32
+HOST_ARCHS_mips64r6 = amd64 i386 x32
+HOST_ARCHS_mips64r6el = amd64 i386 x32
+HOST_ARCHS_powerpc = amd64 i386 x32 ppc64el
+HOST_ARCHS_ppc64 = amd64 i386 x32
+HOST_ARCHS_ppc64el = amd64 i386 x32 ppc64 arm64
+HOST_ARCHS_riscv64 = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_s390x = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_sh4 = amd64 i386 x32
+HOST_ARCHS_sparc64 = amd64 i386 x32
+HOST_ARCHS_x32 = amd64 arm64 i386 ppc64el
+
+HOST_GNU_TYPE    := $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+HOST_ARCH        := $(shell dpkg-architecture -qDEB_HOST_ARCH)
+stamp            := stamp-dir/
+
+ifeq (,$(CROSS_ARCHS))
+  ifeq ($(DEB_NAME_ACT),gcc-10-cross)
+    ifneq (,$(filter $(HOST_ARCH),amd64 i386 x32))
+      CROSS_ARCHS  = amd64
+      CROSS_ARCHS  += s390x ppc64el arm64 armhf armel \
+	$(if $(filter $(vendor), Ubuntu), powerpc) \
+        $(if $(filter $(HOST_ARCH), amd64 x32), i386)
+    else ifeq ($(HOST_ARCH),arm64)
+      CROSS_ARCHS = amd64 armel armhf i386 ppc64el s390x
+    else ifeq ($(HOST_ARCH),ppc64)
+      CROSS_ARCHS = ppc64el
+    else ifeq ($(HOST_ARCH),ppc64el)
+      CROSS_ARCHS = amd64 i386 $(if $(filter $(vendor), Ubuntu), powerpc) \
+	armel armhf arm64 s390x
+    else
+      CROSS_ARCHS =
+    endif
+    GCC_PORTS_BUILD=
+  else ifeq ($(DEB_NAME_ACT),gcc-10-cross-mipsen)
+    ifneq (,$(filter $(HOST_ARCH),amd64 i386 x32))
+      CROSS_ARCHS  ?= mipsel mips64el mips64 \
+        mipsr6 mipsr6el mips64r6 mips64r6el
+      # n32: mipsn32 mipsn32el mipsn32r6 mipsn32r6el
+      # have problem on ada
+    endif
+    GCC_PORTS_BUILD=-mipsen
+  else # -ports package
+    ifneq (,$(filter $(HOST_ARCH),amd64 i386 x32))
+      CROSS_ARCHS  ?= alpha hppa m68k ppc64 riscv64 sh4 sparc64 \
+		$(if $(filter $(vendor), Ubuntu),, powerpc) \
+		$(if $(filter $(HOST_ARCH), amd64 i386), x32)
+    else ifeq ($(HOST_ARCH),arm64)
+      CROSS_ARCHS = x32 riscv64
+    else ifeq ($(HOST_ARCH),ppc64el)
+      CROSS_ARCHS = x32 riscv64 $(if $(filter $(vendor), Ubuntu),, powerpc)
+    else
+      CROSS_ARCHS =
+    endif
+    GCC_PORTS_BUILD=-ports
+  endif
+endif
+
+CROSS_ARCH       = $(subst .,,$(suffix $@))
+KERNEL_ARCH      = $(KERNEL_ARCH_$(CROSS_ARCH))
+CROSS_BIARCH     = $(CROSS_BIARCH_$(CROSS_ARCH))
+_gnu_type        = $(shell dpkg-architecture -a$(1) -qDEB_HOST_GNU_TYPE -f)
+_pkg_gnu_type    = $(shell dpkg-architecture -a$(1) -qDEB_HOST_GNU_TYPE -f | tr _ -)
+CROSS_GNU_TYPE   = $(call _gnu_type,${CROSS_ARCH})
+HOST_ARCHS       = $(HOST_ARCH_$(CROSS_ARCH))
+ADA_HOST_ARCHS   = $(HOST_ARCH_$(CROSS_ARCH))
+ADA64_HOST_ARCHS = $(filter-out i386,$(HOST_ARCH_$(CROSS_ARCH)))
+
+ARM32_MULTILIBS :=
+ifeq ($(vendor),Ubuntu)
+  ifneq (,$(filter $(distrelease), precise trusty xenial bionic focal groovy hirsute))
+    ARM32_MULTILIBS := yes
+  endif
+endif
+
+ifeq ($(vendor),Debian)
+  skip_dbg_packages = yes
+  skip_arm32ml_packages = yes
+else ifeq ($(vendor),Ubuntu)
+  ifeq (,$(filter $(distrelease), precise trusty xenial bionic focal groovy hirsute))
+    skip_arm32ml_packages = yes
+  endif
+endif
+
+libgcc_source := $(shell apt-cache show --no-all-versions libgcc-s1-arm64-cross | awk '/^Source:/ { print $$2 }')
+#ifneq ($(DEB_NAME_ACT),$(libgcc_source))
+#  skip_common_packages = yes
+#endif
+
+BINUTILS_BUILD_DEPS = $(foreach a,$(CROSS_ARCHS),binutils-$(call _pkg_gnu_type,$(a)) (>= $(MIN_VER_BINUTILS)) [$(HOST_ARCHS_$(a))]$(,))
+GLIBC_BUILD_DEPS = $(foreach a,$(CROSS_ARCHS),libc6$(if $(filter $(a),alpha ia64),.1)-dev-$(a)-cross (>= $(MIN_VER_GLIBC)) [$(HOST_ARCHS_$(a))]$(,))
+LINUX_BUILD_DEPS = $(foreach a,$(CROSS_ARCHS),linux-libc-dev-$(a)-cross [$(HOST_ARCHS_$(a))]$(,))
+
+# build multilib cross compilers
+ifeq ($(ARM32_MULTILIBS),yes)
+  ifneq (,$(filter armel, $(CROSS_ARCHS)))
+    EXTRA_BUILD_DEPS += libc6-dev-armhf-cross [$(HOST_ARCHS_armel)],
+    ifeq ($(skip_common_packages),yes)
+      GCC_BUILD_DEPS += libhfgcc-s1-armel-cross [$(HOST_ARCHS_armel)],
+    endif
+  endif
+
+  ifneq (,$(filter armhf, $(CROSS_ARCHS)))
+    EXTRA_BUILD_DEPS += libc6-dev-armel-cross [$(HOST_ARCHS_armhf)],
+    ifeq ($(skip_common_packages),yes)
+      GCC_BUILD_DEPS += libsfgcc-s1-armhf-cross [$(HOST_ARCHS_armhf)],
+    endif
+  endif
+endif
+
+ifneq (,$(filter amd64, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-i386-amd64-cross [$(HOST_ARCHS_amd64)],
+  EXTRA_BUILD_DEPS += libc6-dev-x32-amd64-cross [$(HOST_ARCHS_amd64)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-amd64-cross [$(HOST_ARCHS_amd64)],
+    GCC_BUILD_DEPS += libx32gcc-s1-amd64-cross [$(HOST_ARCHS_amd64)],
+  endif
+endif
+
+ifneq (,$(filter i386, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-amd64-i386-cross [$(HOST_ARCHS_i386)],
+  EXTRA_BUILD_DEPS += libc6-dev-x32-i386-cross [$(HOST_ARCHS_i386)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-i386-cross [$(HOST_ARCHS_i386)],
+    GCC_BUILD_DEPS += libx32gcc-s1-i386-cross [$(HOST_ARCHS_i386)],
+  endif
+endif
+
+ifneq (,$(filter x32, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-i386-x32-cross [$(HOST_ARCHS_x32)],
+  EXTRA_BUILD_DEPS += libc6-dev-amd64-x32-cross [$(HOST_ARCHS_x32)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-x32-cross [$(HOST_ARCHS_x32)],
+    GCC_BUILD_DEPS += lib64gcc-s1-x32-cross [$(HOST_ARCHS_x32)],
+  endif
+endif
+
+ifneq (,$(filter ppc64, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-powerpc-ppc64-cross [$(HOST_ARCHS_ppc64)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-ppc64-cross [$(HOST_ARCHS_ppc64)],
+  endif
+endif
+
+ifneq (,$(filter s390x, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-s390-s390x-cross [$(HOST_ARCHS_s390x)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-s390x-cross [$(HOST_ARCHS_s390x)],
+  endif
+endif
+
+ifneq (,$(filter sparc64, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-sparc-sparc64-cross [$(HOST_ARCHS_sparc64)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-sparc64-cross [$(HOST_ARCHS_sparc64)],
+  endif
+endif
+
+ifneq (,$(filter powerpc, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-ppc64-powerpc-cross [$(HOST_ARCHS_powerpc)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-powerpc-cross [$(HOST_ARCHS_powerpc)],
+  endif
+endif
+
+ifneq (,$(filter mips, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mips-cross [$(HOST_ARCHS_mips)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mips-cross [$(HOST_ARCHS_mips)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-mips-cross [$(HOST_ARCHS_mips)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mips-cross [$(HOST_ARCHS_mips)],
+  endif
+endif
+
+ifneq (,$(filter mipsel, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsel-cross [$(HOST_ARCHS_mipsel)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mipsel-cross [$(HOST_ARCHS_mipsel)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsel-cross [$(HOST_ARCHS_mipsel)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mipsel-cross [$(HOST_ARCHS_mipsel)],
+  endif
+endif
+
+ifneq (,$(filter mipsn32, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mipsn32-cross [$(HOST_ARCHS_mipsn32)],
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsn32-cross [$(HOST_ARCHS_mipsn32)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mipsn32-cross [$(HOST_ARCHS_mipsn32)],
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsn32-cross [$(HOST_ARCHS_mipsn32)],
+  endif
+endif
+
+ifneq (,$(filter mipsn32el, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mipsn32el-cross [$(HOST_ARCHS_mipsn32el)],
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsn32el-cross [$(HOST_ARCHS_mipsn32el)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mipsn32el-cross [$(HOST_ARCHS_mipsn32el)],
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsn32el-cross [$(HOST_ARCHS_mipsn32el)],
+  endif
+endif
+
+ifneq (,$(filter mips64, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mips64-cross [$(HOST_ARCHS_mips64)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mips64-cross [$(HOST_ARCHS_mips64)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mips64-cross [$(HOST_ARCHS_mips64)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mips64-cross [$(HOST_ARCHS_mips64)],
+  endif
+endif
+
+ifneq (,$(filter mips64el, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mips64el-cross [$(HOST_ARCHS_mips64el)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mips64el-cross [$(HOST_ARCHS_mips64el)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mips64el-cross [$(HOST_ARCHS_mips64el)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mips64el-cross [$(HOST_ARCHS_mips64el)],
+  endif
+endif
+
+ifneq (,$(filter mipsr6, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsr6-cross [$(HOST_ARCHS_mipsr6)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mipsr6-cross [$(HOST_ARCHS_mipsr6)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsr6-cross [$(HOST_ARCHS_mipsr6)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mipsr6-cross [$(HOST_ARCHS_mipsr6)],
+  endif
+endif
+
+ifneq (,$(filter mipsr6el, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsr6el-cross [$(HOST_ARCHS_mipsr6el)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mipsr6el-cross [$(HOST_ARCHS_mipsr6el)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsr6el-cross [$(HOST_ARCHS_mipsr6el)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mipsr6el-cross [$(HOST_ARCHS_mipsr6el)],
+  endif
+endif
+
+ifneq (,$(filter mipsn32r6, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mipsn32r6-cross [$(HOST_ARCHS_mipsn32r6)],
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsn32r6-cross [$(HOST_ARCHS_mipsn32r6)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mipsn32r6-cross [$(HOST_ARCHS_mipsn32r6)],
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsn32r6-cross [$(HOST_ARCHS_mipsn32r6)],
+  endif
+endif
+
+ifneq (,$(filter mipsn32r6el, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mipsn32r6el-cross [$(HOST_ARCHS_mipsn32r6el)],
+  EXTRA_BUILD_DEPS += libc6-dev-mips64-mipsn32r6el-cross [$(HOST_ARCHS_mipsn32r6el)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mipsn32r6el-cross [$(HOST_ARCHS_mipsn32r6el)],
+    GCC_BUILD_DEPS += lib64gcc-s1-mipsn32r6el-cross [$(HOST_ARCHS_mipsn32r6el)],
+  endif
+endif
+
+ifneq (,$(filter mips64r6, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mips64r6-cross [$(HOST_ARCHS_mips64r6)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mips64r6-cross [$(HOST_ARCHS_mips64r6)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mips64r6-cross [$(HOST_ARCHS_mips64r6)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mips64r6-cross [$(HOST_ARCHS_mips64r6)],
+  endif
+endif
+
+ifneq (,$(filter mips64r6el, $(CROSS_ARCHS)))
+  EXTRA_BUILD_DEPS += libc6-dev-mips32-mips64r6el-cross [$(HOST_ARCHS_mips64r6el)],
+  EXTRA_BUILD_DEPS += libc6-dev-mipsn32-mips64r6el-cross [$(HOST_ARCHS_mips64r6el)],
+  ifeq ($(skip_common_packages),yes)
+    GCC_BUILD_DEPS += lib32gcc-s1-mips64r6el-cross [$(HOST_ARCHS_mips64r6el)],
+    GCC_BUILD_DEPS += libn32gcc-s1-mips64r6el-cross [$(HOST_ARCHS_mips64r6el)],
+  endif
+endif
+
+PHOBOS_ARCHS = amd64 armel armhf arm64 i386 x32 kfreebsd-amd64 kfreebsd-i386 \
+	hppa riscv64 s390x \
+	mips mips64 mipsel mips64el mipsn32 mipsn32el \
+	mipsr6 mipsr6el mipsn32r6 mipsn32r6el mips64r6 mips64r6el
+
+PHOBOS_DEP = libgphobos-GCC_VER-dev-CROSS_ARCH-cross (= $${gcc:Version}),
+# FIXME: Set correctly ...
+PHOBOS_ML_DEP = libgphobos-GCC_VER-dev-CROSS_ARCH-cross (= $${gcc:Version}),
+
+
+info:
+	@echo "Package name:             ${DEB_NAME_ACT} ${DEB_VER_ACT}"
+	@echo
+	@echo "GCC ${GCC_VER} version:          ${VER_GCC}     	${DEB_VER_GCC}"
+	@echo
+	@echo "Target architecture:      ${CROSS_ARCH}"
+	@echo "Target GNU type:          ${CROSS_GNU_TYPE}"
+	@echo "Host architecture:        ${HOST_ARCH}"
+	@echo "Host GNU type:            ${HOST_GNU_TYPE}"
+	@echo "skips (debug/common/armml): $(skip_dbg_packages)/$(skip_common_packages)/$(skip_arm32ml_packages)"
+
+$(stamp)init-gcc:
+	@echo START $@
+	mkdir -p gcc
+	set -ex; \
+	cd gcc ; \
+	ln -sf $(GCC_TARBALL) $(notdir $(GCC_TARBALL)) ;\
+	cp -a  $(GCC_DIR)/debian/ . ; \
+	if [ -n "$$(grep -v '^\#' $(CURDIR)/debian/patches/gcc/series)" ]; then \
+	  QUILT_PATCHES=$(CURDIR)/debian/patches/gcc quilt push --quiltrc /dev/null -a ; \
+	fi
+#	set -ex; \
+#	if dpkg --compare-versions $(DEB_VER_GCC) lt 10.1.0-1; then \
+#	  cd gcc; \
+#	  patch -p1 < ../debian/patches/gcc/updates.diff; \
+#	fi
+	touch $@
+
+$(stamp)build-gcc.%: $(stamp)init-gcc
+	@echo START $@
+	@if [ "$(HOST_ARCH)" = "$(CROSS_ARCH)" ] && [ "X$(dbp_flag)" = X-B ]; then \
+	  echo "Skipping binary-arch build for $(CROSS_ARCH)"; \
+	else \
+	  set -x; \
+	  echo ${CROSS_ARCH} >gcc/debian/target; \
+	  cd gcc && \
+	    WITH_SYSROOT=/ \
+	    PKG_IGNORE_CURRENTLY_BUILDING=1 \
+	    BACKPORT=false \
+	    WITHOUT_LANG="hppa64 jit nvptx" \
+	    $(if $(filter $(HOST_ARCH),$(CROSS_ARCH)),FORCE_CROSS_LAYOUT=yes WITH_BOOTSTRAP=off) \
+	    GCC_PORTS_BUILD=$(GCC_PORTS_BUILD) \
+	    dpkg-buildpackage $(if $(filter $(HOST_ARCH),$(CROSS_ARCH)),$(subst -b,-A,$(dbp_flag)),$(dbp_flag)) -uc -us -d; \
+	fi
+	touch $@
+
+clean:
+	rm -rf gcc tmp-*
+	rm -f  *.*deb *.changes *.buildinfo debian/files
+	rm -rf $(stamp)
+	mkdir $(stamp)
+	dh_clean
+
+
+$(stamp)repack-%:
+	@umask 022; \
+	if [ -z "$(TARGET_ARCH)" ]; then \
+	  echo >&2 "repack: macro TARGET_ARCH not set"; \
+	  exit 1; \
+	fi; \
+	t_arch=$(TARGET_ARCH); \
+	t_gnu_type=$(call _gnu_type,$(TARGET_ARCH)); \
+	deb=$*; \
+	pkgname=`echo $$deb | cut -d'_' -f1`; \
+	tmp=tmp-$$pkgname; \
+	if [ "$(skip_dbg_packages)" = yes ]; then \
+	  case $$deb in *-dbg*) exit 0; esac; \
+	fi; \
+	echo "repack $$pkgname ($$deb) ..."; \
+	rm -rf $$tmp; \
+	mkdir -p $$tmp; \
+	dpkg-deb -x $$deb $$tmp; \
+	dpkg-deb -e $$deb $$tmp/DEBIAN; \
+	sed -i -e's/^Source:.*/Source: $(DEB_NAME_ACT) ($(DEB_SVER_ACT))/' \
+	  -e "/^Depends:/s/$(DEB_VER_GCC)/$(DEB_VER_GCC)$(CROSS_EXT)/g" \
+	  -e "/^Recommends:/s/$(DEB_VER_GCC)/$(DEB_VER_GCC)$(CROSS_EXT)/g" \
+	  -e "/^Suggests:/s/$(DEB_VER_GCC)/$(DEB_VER_GCC)$(CROSS_EXT)/g" \
+	  -e "/^Version:/s/$(DEB_VER_GCC)/$(DEB_VER_GCC)$(CROSS_EXT)/" \
+	  $$tmp/DEBIAN/control ; \
+	sed -i -e "/^Depends:/s/\(libgnat-[0-9]*\) (>= $(DEB_VER_GCC)$(CROSS_EXT))/\1 (>= $(VER_GCC))/g" \
+	  $$tmp/DEBIAN/control ; \
+	sed -i -e "/^Depends:/s/\(libgnat-util[0-9]*\) (>= $(DEB_VER_GCC)$(CROSS_EXT))/\1 (>= $(VER_GCC))/g" \
+	  $$tmp/DEBIAN/control ; \
+	case $$pkgname in \
+	  gcc-$(GCC_VER)-$${t_gnu_type}) \
+	    sed -i -e '/Depends/s/\(libcc1[^,]*\)$(CROSS_EXT)/\1/' \
+	      $$tmp/DEBIAN/control;; \
+	  *-cross) \
+	    sed -i -e '/^Depends:/s/\(-base *( *\)=\([^)]*\)cross[^)]*)/\1>=\2)/' \
+	      $$tmp/DEBIAN/control;; \
+	esac; \
+	install -d -m 755 $$tmp/usr/share/lintian/overrides; \
+	if [ -e debian/overrides/$$pkgname ]; then \
+	  cp debian/overrides/$$pkgname $$tmp/usr/share/lintian/overrides/; \
+	fi; \
+	case "$$pkgname" in \
+	  gcc-$(GCC_VER)-cross-base*) \
+	    echo "$$pkgname binary: wrong-name-for-changelog-of-native-package" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname \
+	    ;; \
+	  gcc-$(GCC_VER)-*-base) \
+	    echo "$$pkgname binary: wrong-name-for-changelog-of-native-package" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname \
+	    ;; \
+	  gcc-$(GCC_VER)-multilib) \
+	    echo "$$pkgname binary: binary-from-other-architecture" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname \
+	    ;; \
+	  gccgo-$(GCC_VER)*) \
+	    echo "$$pkgname binary: binary-from-other-architecture" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: non-standard-dir-in-usr" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    ;; \
+	  *-multilib-*) \
+	    ;; \
+	  cpp-*|g++-*|gcc-*|gccgo-*|gdc-*|gfortran-*|gobjc*|gm2-*|gnat-$(GCC_VER)-sjlj-*) \
+	    echo "$$pkgname binary: binary-from-other-architecture" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname \
+	    ;; \
+	  gnat-$(GCC_VER)-*) \
+	    echo "$$pkgname binary: binary-from-other-architecture" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: non-standard-dir-in-usr" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    ;; \
+	  *-dev-$${t_arch}-cross) \
+	    echo "$$pkgname binary: arch-independent-package-contains-binary-or-object" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: non-standard-dir-in-usr" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    ;; \
+	  *-dbg-$${t_arch}-cross) \
+	    echo "$$pkgname binary: arch-independent-package-contains-binary-or-object" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: debug-package-should-be-named-dbg" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: non-standard-dir-in-usr" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    ;; \
+	  *-pic-$${t_arch}-cross) \
+	    echo "$$pkgname binary: arch-independent-package-contains-binary-or-object" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    ;; \
+	  *-$${t_arch}-cross) \
+	    echo "$$pkgname binary: arch-independent-package-contains-binary-or-object" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: non-standard-dir-in-usr" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: shlibs-declares-dependency-on-other-package" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: postinst-has-useless-call-to-ldconfig" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    echo "$$pkgname binary: postrm-has-useless-call-to-ldconfig" \
+	      >> $$tmp/usr/share/lintian/overrides/$$pkgname; \
+	    case "$$pkgname" in \
+	      lib*gphobos*) \
+	        echo "$$pkgname binary: embedded-library" \
+	          >> $$tmp/usr/share/lintian/overrides/$$pkgname;; \
+	      *-hppa-cross) \
+	        echo "$$pkgname binary: binary-compiled-with-profiling-enabled" \
+	          >> $$tmp/usr/share/lintian/overrides/$$pkgname;; \
+	    esac; \
+	    ;; \
+	esac; \
+	if [ -e $$tmp/usr/share/doc/gcc-${GCC_VER}-$${t_gnu_type}-base/changelog.Debian.gz ]; then \
+	  mv $$tmp/usr/share/doc/gcc-${GCC_VER}-$${t_gnu_type}-base/changelog.Debian.gz \
+	     $$tmp/usr/share/doc/gcc-${GCC_VER}-$${t_gnu_type}-base/changelog.Debian.gcc-${GCC_VER}.gz; \
+	  gzip -c9n debian/changelog \
+	    > $$tmp/usr/share/doc/gcc-${GCC_VER}-$${t_gnu_type}-base/changelog.Debian.gz;\
+	fi ; \
+	rm -f $$tmp/DEBIAN/md5sums; \
+	(cd $$tmp && find usr -type f | LC_ALL=C sort | xargs -r md5sum >>DEBIAN/md5sums); \
+	find $$tmp/DEBIAN -name md5sums -empty | xargs -r rm -f; \
+	newdeb=`echo $$deb|sed -e "s/\(.*\)_\(.*\)_\(.*\)/\1_\2$(CROSS_EXT)_\3/g"`; \
+	NO_PKG_MANGLE=1 dpkg-deb -b $$tmp ../$$newdeb; \
+	rm -rf $$tmp
+	touch $@
+
+$(stamp)repack-debs-arch: $(stamp)build
+	@echo START $@
+	dh_testroot
+	$(MAKE) $(NJOBS) -f debian/rules TARGET_ARCH=$(HOST_ARCH) \
+		$(addprefix $(stamp)repack-,$(wildcard *_$(HOST_ARCH).deb))
+	$(MAKE) $(NJOBS) -f debian/rules TARGET_ARCH=$(HOST_ARCH) \
+		$(addprefix $(stamp)repack-,$(wildcard *$(DEB_VER_GCC)_$(HOST_ARCH).ddeb))
+	rm -f *$(DEB_VER_GCC)_$(HOST_ARCH).ddeb
+	if [ -f ../gcc-$(GCC_VER)-$(call _gnu_type,$(HOST_ARCH))-dbgsym_${DEB_VER_GCC}$(CROSS_EXT)_$(HOST_ARCH).ddeb ]; then mv -f ../*.ddeb . ; fi
+	touch $@
+
+$(stamp)repack-debs-indep: $(stamp)build
+	@echo START $@
+	dh_testroot
+	set -e; \
+	$(foreach arch,$(CROSS_ARCHS), \
+	  $(MAKE) $(NJOBS) -f debian/rules TARGET_ARCH=$(arch) \
+		$(addprefix $(stamp)repack-,$(wildcard *-$(arch)-cross_*_all.deb)); \
+	)
+	$(MAKE) $(NJOBS) -f debian/rules TARGET_ARCH=$(HOST_ARCH) \
+		$(addprefix $(stamp)repack-,$(wildcard gcc-$(GCC_VER)-cross-base$(GCC_PORTS_BUILD)_*_all.deb))
+	touch $@
+
+build: $(stamp)build
+$(stamp)build: $(foreach arch,$(CROSS_ARCHS),$(addsuffix .$(arch),$(stamp)build-gcc))
+	@echo START $@
+	touch $@
+
+build: dbp_flag = -b
+build-arch: dbp_flag = -B
+build-indep: dbp_flag = -b
+
+build-arch: $(stamp)build
+build-indep: $(stamp)build
+
+binary: binary-arch binary-indep
+binary-arch:  build-arch $(stamp)build $(stamp)repack-debs-arch $(stamp)mangle-debian-files-arch
+binary-indep: build-indep $(stamp)build $(stamp)repack-debs-indep $(stamp)mangle-debian-files-indep
+
+define generate_debian_files
+	touch debian/files
+	for deb in $1; do \
+	  [ -f "$$deb" ] || continue; \
+	  pkg=`basename $$deb`; \
+	  if [ "$(skip_dbg_packages)" = yes ]; then \
+	    case $$pkg in *-dbg*) continue; esac; \
+	  fi; \
+	  if [ "$(skip_arm32ml_packages)" = yes ] && grep -q "^$$pkg$$" debian/packages.arm32ml; then \
+	    continue; \
+	  fi; \
+	  if [ "$(skip_common_packages)" = yes ] && grep -q "^$$pkg$$" debian/packages.common; then \
+	    continue; \
+	  fi; \
+	  echo -n "$$pkg " >>debian/files; \
+	  dpkg-deb -I $$deb | grep Section  | cut -d ' ' -f 3 | tr "\n" ' ' >>debian/files; \
+	  dpkg-deb -I $$deb | grep Priority | cut -d ' ' -f 3 | tr -d "\n" >>debian/files; \
+	  echo "" >>debian/files; \
+	done
+endef
+
+$(stamp)mangle-debian-files-arch: build $(stamp)repack-debs-arch $(stamp)debian-files-base
+	@echo START $@
+	$(call generate_debian_files, *_$(HOST_ARCH).deb)
+	sed -i -e "s/${DEB_VER_GCC}_/${DEB_VER_GCC}$(CROSS_EXT)_/g" debian/files
+	touch $@
+
+$(stamp)mangle-debian-files-indep: $(stamp)repack-debs-indep $(stamp)debian-files-base
+	@echo START $@
+	$(call generate_debian_files, *_all.deb)
+	sed -i -e "s/${DEB_VER_GCC}_/${DEB_VER_GCC}$(CROSS_EXT)_/g" debian/files
+	touch $@
+
+$(stamp)debian-files-base:
+	@echo START $@
+	rm -f debian/files
+	touch $@
+
+
+control:
+	sed -e "s/MIN_VER_GCC/${MIN_VER_GCC}/g" \
+	    -e "s/GCC_BUILD_DEPS/$(GCC_BUILD_DEPS)/g" \
+	    -e "s/BINUTILS_BUILD_DEPS/$(BINUTILS_BUILD_DEPS)/g" \
+	    -e "s/GLIBC_BUILD_DEPS/$(GLIBC_BUILD_DEPS)/g" \
+	    -e "s/EXTRA_BUILD_DEPS/${EXTRA_BUILD_DEPS}/g" \
+	    -e "s/LINUX_BUILD_DEPS/$(LINUX_BUILD_DEPS)/g" \
+	    -e "s/GCC_VER/${GCC_VER}/g" \
+	    -e "s/MIN_VER_BINUTILS/${MIN_VER_BINUTILS}/g" \
+	    -e "s/VER_BINUTILS/${VER_BINUTILS}/g" \
+	    -e "s/VER_ISL/${VER_ISL}/g" \
+	    -e "s/GCC_PORTS_BUILD/$(GCC_PORTS_BUILD)/g" \
+	    $(CURDIR)/debian/control.source.in >$(CURDIR)/debian/control
+
+	$(foreach a,$(CROSS_ARCHS), \
+	  sed \
+	    -e 's/PHOBOS_DEP/$(if $(filter $(a),$(PHOBOS_ARCHS)),${PHOBOS_DEP})/g' \
+	    -e 's/PHOBOS_ML_DEP/$(if $(filter $(a),$(PHOBOS_ARCHS)),${PHOBOS_ML_DEP})/g' \
+	    -e 's/CROSS_ARCH/$(a)/g' \
+	    -e 's/CROSS_GNU_TYPE/$(call _pkg_gnu_type,$(a))/g' \
+	    -e 's/MIN_VER_GCC/${MIN_VER_GCC}/g' \
+	    -e 's/GCC_VER/${GCC_VER}/g' \
+	    -e 's/MIN_VER_BINUTILS/${MIN_VER_BINUTILS}/g' \
+	    -e 's/@host_archs@/$(filter-out $(a),$(HOST_ARCHS_$(a)))/g' \
+	    -e 's/@ada_host_archs@/$(filter-out $(a),$(HOST_ARCHS_$(a)))/g' \
+	    -e 's/@ada64_host_archs@/$(filter-out $(a),$(filter-out XXXi386,$(HOST_ARCHS_$(a))))/g' \
+	    $(CURDIR)/debian/control.arch.in >>$(CURDIR)/debian/control; )
+
+	python3 debian/remove-unbuilt \
+	  $(if $(filter yes,$(skip_dbg_packages)), --skip-dbg-packages) \
+	  $(if $(filter yes,$(skip_arm32ml_packages)), --skip-arm32ml-packages) \
+	  $(if $(filter yes,$(skip_common_packages)), --skip-common-packages) \
+	  debian/control debian/packages.invalid debian/packages.arm32ml debian/packages.common \
+	  > debian/control.new && mv debian/control.new debian/control
+
+sort-pkgfiles:
+	for i in packages.arm32ml packages.common packages.invalid; do \
+	  LC_ALL=C sort -u debian/$$i > debian/$$i.tmp; \
+	  mv -f debian/$$i.tmp debian/$$i; \
+	done
+
+.PRECIOUS: $(stamp)init-dirs \
+	$(stamp)init-gcc \
+	$(stamp)build \
+	$(stamp)build-gcc.% \
+	$(stamp)debian-files-base \
+	$(stamp)repack-debs-arch \
+	$(stamp)repack-debs-indep \
+	$(stamp)repack-debs-indep.% \
+	$(stamp)mangle-debian-files-arch
+	$(stamp)mangle-debian-files-indep \
+	build build-arch build-indep binary binary-arch binary-indep

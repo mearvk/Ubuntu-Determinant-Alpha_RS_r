@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+UPSTREAM_GIT = git://github.com/tzuryby/jquery.hotkeys.git
+DEBVERS         ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION         ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//')
+DEBFLAVOR       ?= $(shell dpkg-parsechangelog | grep -E ^Distribution: | cut -d" " -f2)
+DEBPKGNAME      ?= $(shell dpkg-parsechangelog | grep -E ^Source: | cut -d" " -f2)
+GIT_TAG         ?= $(shell echo '$(VERSION)' | sed -e 's/~/_/')
+MANIFEST_EXCLUDE_STANDARD ?= $(DEBPKGNAME)
+DEBIAN_BRANCH   ?= $(shell cat debian/gbp.conf | grep debian-branch | cut -d'=' -f2 | awk '{print $1}')
+
+%:
+	dh $@
+
+fetch-upstream-remote:  
+	git remote add upstream $(UPSTREAM_GIT) || true
+	git fetch upstream
+
+override_dh_builddeb:
+	dh_builddeb -- -Zxz -z9
+
+gen-orig-xz:
+	if [ ! -f ../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ] ; then \
+		git archive --prefix=$(DEBPKGNAME)-$(GIT_TAG)/ $(GIT_TAG) | xz >../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ; \
+	fi
+	[ ! -e ../build-area ] && mkdir ../build-area || true
+	[ ! -e ../build-area/$(DEBPKGNAME)_$(VERSION).orig.tar.xz ] && cp ../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ../build-area

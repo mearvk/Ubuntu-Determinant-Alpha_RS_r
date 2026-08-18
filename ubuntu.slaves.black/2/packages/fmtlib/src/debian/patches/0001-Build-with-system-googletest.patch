@@ -1,0 +1,45 @@
+From: Shengjing Zhu <zhsj@debian.org>
+Date: Mon, 21 Jun 2021 22:51:36 +0800
+Subject: Build with system googletest
+
+Forwarded: not-needed
+---
+ test/CMakeLists.txt | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 7ed8d5f..25f2434 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -1,10 +1,11 @@
+-add_subdirectory(gtest)
++set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
++add_subdirectory(/usr/src/googletest/ ${CMAKE_BINARY_DIR}/googletest-build EXCLUDE_FROM_ALL)
+ 
+ set(TEST_MAIN_SRC test-main.cc gtest-extra.cc gtest-extra.h util.cc)
+ add_library(test-main STATIC ${TEST_MAIN_SRC})
+ target_include_directories(test-main PUBLIC
+   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+-target_link_libraries(test-main gtest)
++target_link_libraries(test-main gtest gmock)
+ 
+ include(CheckCXXCompilerFlag)
+ 
+@@ -33,7 +34,7 @@ function(add_fmt_test name)
+   set(sources ${name}.cc ${ADD_FMT_TEST_UNPARSED_ARGUMENTS})
+   if (ADD_FMT_TEST_HEADER_ONLY)
+     set(sources ${sources} ${TEST_MAIN_SRC} ../src/os.cc)
+-    set(libs gtest fmt-header-only)
++    set(libs gtest gmock fmt-header-only)
+     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+       set(PEDANTIC_COMPILE_FLAGS ${PEDANTIC_COMPILE_FLAGS} -Wno-weak-vtables)
+     endif ()
+@@ -124,7 +125,7 @@ if (NOT MSVC_STATIC_RUNTIME)
+     posix-mock-test.cc ../src/format.cc ${TEST_MAIN_SRC})
+   target_include_directories(
+     posix-mock-test PRIVATE ${PROJECT_SOURCE_DIR}/include)
+-  target_link_libraries(posix-mock-test gtest)
++  target_link_libraries(posix-mock-test gtest gmock)
+   if (FMT_PEDANTIC)
+     target_compile_options(posix-mock-test PRIVATE ${PEDANTIC_COMPILE_FLAGS})
+   endif ()

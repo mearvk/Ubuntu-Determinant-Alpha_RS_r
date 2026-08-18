@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_exec - make jar files in PATH executable
+
+=cut
+
+use strict;
+use warnings;
+use Cwd qw(realpath);
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_exec> [S<I<debhelper options>>]
+
+=head1 DESCRIPTION
+
+B<jh_exec> will scan package directories for jars in the paths,
+or symlinks to jar from the paths, and ensure that they have been set
+executable if necessary.
+
+Note that executable jar files requires L<jarwrapper(1)>.  Please see
+the tutorials in /usr/share/doc/javahelper for more information.
+
+=head1 OPTIONS
+
+B<jh_exec> accepts the shared debhelper options documented in L<debhelper(7)>.
+
+=cut
+
+init();
+
+# Define PATH_DIRS next to the NOOP promise as they should be in sync.
+use constant PATH_DIRS => qw(bin usr/bin usr/games);
+# PROMISE: DH NOOP WITHOUT tmp(bin) tmp(usr/bin) tmp(usr/games)
+
+my @chmod_paths;
+foreach my $package (@{$dh{DOPACKAGES}}) {
+   my $tmpdir = tmpdir($package);
+   for my $path_dir (PATH_DIRS) {
+      my $dir = "${tmpdir}/${path_dir}";
+      next if not -d $dir;
+      opendir(my $dirfd, $dir) or error("opendir($dir) failed: $!");
+      for my $file (readdir($dirfd)) {
+         next if $file eq '.' or $file eq '..';
+         my $path = "${dir}/${file}";
+         # Must be a (symlink to a) file.
+         next if not -f $path;
+         # Resolve as we want to work on the file (and not the symlink)
+         my $resolved = realpath($path) // error("Cannot resolve $path: $!");
+         # Only work on .jar files.
+         next if $resolved !~ m{[.]jar$};
+         push(@chmod_paths, $resolved);
+      }
+      closedir($dirfd) or error("closedir($dir) failed: $!");
+   }
+}
+xargs(\@chmod_paths, 'chmod', '+x') if @chmod_paths;
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=cut

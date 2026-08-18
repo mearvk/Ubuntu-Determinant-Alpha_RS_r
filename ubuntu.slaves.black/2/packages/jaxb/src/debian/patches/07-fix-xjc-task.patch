@@ -1,0 +1,35 @@
+Description: Fix XJC ant task to work without fork
+Origin, backport, https://github.com/javaee/jaxb-v2/pull/1170/commits/dad8495f19078cb05302132f83dafda5b3dfa98b
+Bug: https://github.com/javaee/jaxb-v2/issues/1144
+Bug-Debian: https://bugs.debian.org/882525
+--- a/jaxb-ri/xjc/src/main/java/com/sun/tools/xjc/XJCBase.java
++++ b/jaxb-ri/xjc/src/main/java/com/sun/tools/xjc/XJCBase.java
+@@ -667,13 +667,15 @@
+             return;
+         }
+ 
+-        boolean ok = false;
+         try {
+             if (getFork()) {
+                 setupCommand();
+                 setupForkCommand("com.sun.tools.xjc.XJCFacade");
+                 int status = run(getCommandline().getCommandline());
+-                ok = (status == 0);
++                if (status != 0) {
++                    log("Command invoked: " + "xjc" + getCommandline().toString());
++                    throw new BuildException("xjc" + " failed", getLocation());
++                }
+             } else {
+                 if (getCommandline().getVmCommand().size() > 1) {
+                     log("JVM args ignored when same JVM is used.", Project.MSG_WARN);
+@@ -726,10 +728,6 @@
+                     }
+                 }
+             }
+-            if (!ok) {
+-                log("Command invoked: " + "xjc" + getCommandline().toString());
+-                throw new BuildException("xjc" + " failed", getLocation());
+-            }
+         } catch (BuildException e) {
+             log("failure in the XJC task. Use the Ant -verbose switch for more details");
+             if (failonerror)

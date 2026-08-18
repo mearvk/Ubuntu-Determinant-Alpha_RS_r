@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+
+# generate documentation unless nodoc requested
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+DOCS = README.html README.txt
+CHANGELOGS = History.html History.txt
+endif
+
+GRUNT = grunt --no-color
+
+%:
+	dh $@
+
+%.html: %.md
+	pandoc --from gfm-raw_html --to html --standalone --output $@ $<
+
+%.txt: %.md
+	pandoc --from gfm-raw_html --to plain --output $@ $<
+
+# optimize JavaScript for browser use
+# * include source-map
+%.min.js: %.js
+	uglifyjs --compress --mangle \
+		--source-map "url='$*.min.map'" \
+		--output $@ \
+		-- $<
+
+# pre-compress for browser use
+%.gz: %
+	pigz --force --keep -11 -- $<
+	brotli --force --keep --best --suffix=.brotli -- $<
+
+dist/qunit.js:
+	$(GRUNT) concat:src-js concat:src-css
+
+override_dh_auto_build: $(DOCS) $(CHANGELOGS) dist/qunit.min.js.gz
+
+override_dh_auto_test:
+	$(GRUNT) test-on-node
+
+override_dh_installdocs:
+	dh_installdocs --all -- $(DOCS)
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- $(CHANGELOGS)
+
+override_dh_clean:
+	dh_clean -- $(DOCS) $(CHANGELOGS)
+
+.SECONDARY:

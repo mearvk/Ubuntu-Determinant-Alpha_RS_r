@@ -1,0 +1,55 @@
+---
+class:
+  __order:
+    - Sshd
+    - Sshd::MatchElement
+  Sshd:
+    include:
+      - Sshd::MatchElement
+    rw_config:
+      backend: OpenSsh::Sshd
+      config_dir: /etc/ssh
+      file: sshd_config
+      os_config_dir:
+        darwin: /etc
+    element:
+      __skip_order: 1
+      Match:
+        type: list
+        cargo:
+          type: node
+          config_class_name: Sshd::MatchBlock
+      PerSourceNetBlockSize: &uniline
+        value_type: uniline
+      PerSourceMaxStartups: *uniline
+  Sshd::MatchElement:
+    element:
+      __skip_order: 1
+      AuthorizedKeysFile2:
+        description: This parameter is now ignored by Ssh
+        status: deprecated
+        type: list
+        cargo:
+          type: leaf
+          value_type: uniline
+      AuthorizedKeysFile:
+        migrate_values_from: "- AuthorizedKeysFile2"
+      ChallengeResponseAuthentication:
+        status: deprecated
+        type: leaf
+        value_type: boolean
+      KbdInteractiveAuthentication:
+        migrate_from:
+          variables:
+            old: "- ChallengeResponseAuthentication"
+          formula: "$old"
+      KeyRegenerationInterval: &deprecated
+        status: deprecated
+        type: leaf
+        value_type: uniline
+      # deprecated with Ssh protocol V1
+      Protocol: *deprecated
+      RDomain: *deprecated
+      RSAAuthentication: *deprecated
+      RhostsRSAAuthentication: *deprecated
+      UsePrivilegeSeparation: *deprecated

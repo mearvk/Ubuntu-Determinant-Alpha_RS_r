@@ -1,0 +1,188 @@
+# this makefile is used to automate building of dictionaries
+# based on affix files etc...
+
+# if you need to adapt this Makefile for another language,
+# all you should have to do is change these variables.
+# if you need to change anything else, please submit it back
+# to the project so other people can benefit
+
+# The version will automatically be read in from the VERSION file
+VERSION=$(shell cat VERSION)
+VERSION_ASPELL=$(shell cat ../VERSION.aspell)
+
+# Only set these if the user has not overridden them in the language Makefile
+LANG_FAKE?=$(LANG)
+REGION_FAKE?=$(REGION)
+
+.PHONY: all clean clean-myspell clean-ispell clean-aspell clean-autocorr ispell myspell aspell count check wordlist autocorr
+
+
+TARGETS_MYSPELL=myspell/wordlist.$(CHARSET) myspell/pack-$(LANG)-$(REGION)-$(VERSION).zip myspell/$(LANG)_$(REGION).zip myspell/$(LANG)_$(REGION).dic myspell/spell.txt myspell/VERSION_$(LANG)_$(REGION).txt myspell/install.js myspell/spell-$(LANG)-$(REGION).xpi myspell/$(LANG)-$(REGION).dic myspell/$(LANG)-$(REGION).aff myspell/README-$(LANG)-$(REGION).txt
+
+TARGETS_ISPELL=ispell/$(LANGNAMELOW).hash ispell/$(LANGNAMELOW)-ispell-$(VERSION).tar.bz2 ispell/wordlist.$(CHARSET) ispell/wordlist.$(CHARSET).cnt ispell/wordlist.$(CHARSET).stat
+
+TARGET_ASPELL=aspell/wordlist.$(CHARSET) aspell/$(LANG).rws aspell/aspell-$(LANG)-$(VERSION_ASPELL)-$(VERSION).tar.bz2 aspell/proc aspell/configure aspell/$(LANG).cwl aspell/info aspell/Makefile aspell/Makefile.pre aspell/$(LANG).* aspell/*.alias aspell/COPYING aspell/README aspell/aspell-$(LANG)-$(VERSION_ASPELL)-$(VERSION)
+
+TARGET_AUTOCORR=acor/acor_$(LANG)-$(REGION).dat*
+
+TARGET_WORDLISTS=wordlists/wordlist.$(CHARSET) $(WORDLIST.CHARSET)
+
+all: myspell aspell wordlist acor
+
+clean: clean-myspell clean-ispell clean-aspell clean-wordlists clean-acor
+
+# Statistics
+
+count: wordlists/wordlist.$(CHARSET) $(WORDLIST.IN)
+	@echo "Comments removed"
+	@for f in $^; do \
+		echo -n "$$f	"; \
+    	egrep -v "^#" $$f | sort --unique | wc -l; \
+    done
+	@echo
+	@echo "Comments and words with whitespace removed"
+	@for f in $^; do \
+		echo -n "$$f	"; \
+    	egrep -v "(^#| )" $$f | sort --unique | wc -l; \
+    done
+	@echo
+	@echo "Comments removed words with whitespace split"
+	@for f in $^; do \
+		echo -n "$$f	"; \
+    	egrep -v "^#" $$f | tr " " "\n" | sort --unique | wc -l; \
+    done
+
+# Checks
+
+check: wordlists/wordlist.$(CHARSET)
+	@echo First line is existing TRY sequence.  Second line is new TRY sequence.
+	@egrep "^TRY" myspell/$(LANG)_$(REGION).aff | sed "s/TRY //g"
+	@LC_ALL=en_US.utf8 LANG=en_US.utf8 LANGUAGE=en_US.utf8 ../../src/wordlist/letter-frequency.py -i $^ -len_US
+
+
+# General
+
+WORDLIST.CHARSET=$(patsubst %.in, %.$(CHARSET), $(WORDLIST.IN))
+
+%.$(CHARSET): %.in
+	iconv -f utf-8 -t $(CHARSET) < $< >$@
+
+wordlists/wordlist.$(CHARSET): $(WORDLIST.CHARSET)
+	cat $^ | egrep -v "^#|^$$" | sort --unique > $@
+
+wordlists/wordlist-$(LANG)-$(VERSION).zip: $(WORDLIST.IN) wordlists/wordlist.$(CHARSET)
+	zip -j $@ $^
+
+wordlist: wordlists/wordlist-$(LANG)-$(VERSION).zip
+
+clean-wordlists:
+	rm -rf $(TARGET_WORDLISTS)
+
+# MySpell rules
+
+clean-myspell:
+	rm -f $(TARGETS_MYSPELL)
+
+# make myspell will make the required zip files
+myspell: myspell/myspell-$(LANG)_$(REGION)-$(VERSION).zip myspell/myspell-pack-$(LANG)-$(REGION)-$(VERSION).zip myspell/spell-$(LANG)-$(REGION)-$(VERSION).xpi
+
+# this is a package that is usable for offline installation
+myspell/myspell-pack-$(LANG)-$(REGION)-$(VERSION).zip: myspell/myspell-$(LANG)_$(REGION)-$(VERSION).zip myspell/spell.txt
+	zip -j $@ $^
+
+# we autogenerate the index file...
+myspell/spell.txt:
+	echo '$(LANG_FAKE),$(REGION_FAKE),$(LANG_FAKE)_$(REGION_FAKE),$(LANGNAME) ($(REGIONNAME)),myspell-$(LANG)_$(REGION)-$(VERSION).zip' >$@
+
+# this is the standard myspell package
+myspell/myspell-$(LANG)_$(REGION)-$(VERSION).zip: myspell/$(LANG)_$(REGION).dic myspell/$(LANG)_$(REGION).aff myspell/README_$(LANG)_$(REGION).txt myspell/VERSION_$(LANG)_$(REGION).txt
+	zip -j $@ $^
+
+# make sure the VERSION file name doesn't conflict with other packages
+myspell/VERSION_$(LANG)_$(REGION).txt: VERSION
+	cp -p $^ $@
+
+# myspell/ispell don't like the header, or words with spaces in them
+myspell/wordlist.$(CHARSET): wordlists/wordlist.$(CHARSET)
+	egrep -v '(^#| )' <$< >$@
+
+
+# this does the work of converting a wordlist into a myspell dictionary
+# it can take a while
+# the munch utility is located under the dict/utils project
+myspell/$(LANG)_$(REGION).dic: myspell/wordlist.$(CHARSET) myspell/$(LANG)_$(REGION).aff ../utils/munch
+	../utils/munch myspell/wordlist.$(CHARSET) myspell/$(LANG)_$(REGION).aff >$@
+
+# The following are for building a Mozilla XPI of the spellchecker
+# Customise the install.js
+myspell/install.js: ../utils/install.js.in
+	sed "s/{LANG}/$(LANG)/; s/{REGION}/$(REGION)/; s/{LANGNAME}/$(LANGNAME)/; s/{REGIONNAME}/$(REGIONNAME)/; s/{VERSION}/$(VERSION)/" < $< > $@
+
+myspell/README-$(LANG)-$(REGION).txt: myspell/README_$(LANG)_$(REGION).txt
+	cp $^ $@
+
+myspell/$(LANG)-$(REGION).dic: myspell/$(LANG)_$(REGION).dic
+	cp $^ $@
+
+myspell/$(LANG)-$(REGION).aff: myspell/$(LANG)_$(REGION).aff
+	cp $^ $@
+
+myspell/spell-$(LANG)-$(REGION)-$(VERSION).xpi: myspell/$(LANG)-$(REGION).aff myspell/$(LANG)-$(REGION).dic myspell/README-$(LANG)-$(REGION).txt myspell/install.js
+	zip -j $@ $^
+
+# Ispell Rules
+
+clean-ispell:
+	rm -f $(TARGETS_ISPELL)
+
+ispell/$(LANGNAMELOW).hash: ispell/wordlist.$(CHARSET) ispell/$(LANGNAMELOW).aff
+	buildhash $^ $@
+
+ispell/$(LANGNAMELOW)-ispell-$(VERSION).tar.bz2: ispell/$(LANGNAMELOW).hash ispell/$(LANGNAMELOW).aff ispell/README
+	tar cvjf $@ $^
+
+ispell: ispell/$(LANGNAMELOW)-ispell-$(VERSION).tar.bz2
+
+ispell/wordlist.$(CHARSET): wordlists/wordlist.$(CHARSET)
+	egrep -v '(^#| )' <$< >$@
+
+# Aspell Rules
+
+aspell: aspell/aspell-$(LANG)-$(VERSION_ASPELL)-$(VERSION).tar.bz2
+
+clean-aspell:
+	rm -rf $(TARGET_ASPELL)
+
+aspell/$(LANG).cwl: aspell/wordlist.$(CHARSET)
+	(export LC_COLLATE=C; cat $< | sort -u | word-list-compress compress > $@)
+
+aspell/proc: ../utils/proc
+	cp -p $< $@
+
+aspell/configure: ../utils/configure
+	cp -p $< $@
+
+aspell/wordlist.$(CHARSET): wordlists/wordlist.$(CHARSET)
+	cat $< | egrep -v '(^#| |\.|-$$|[0-9]|/|=$$)' | LC_COLLATE=C sort --unique >$@
+
+aspell/aspell-$(LANG)-$(VERSION_ASPELL)-$(VERSION).tar.bz2: aspell/$(LANG).cwl aspell/configure aspell/Makefile.pre aspell/Copyright
+	cd aspell; ./configure; make dist && make distcheck && rm -rf aspell-$(LANG)-$(VERSION_ASPELL)-$(VERSION)
+
+aspell/info: aspell/info.in ../VERSION.aspell VERSION
+	sed "s/{VERSION}/$(VERSION_ASPELL)\-$(VERSION)/" < $< > $@
+
+aspell/Makefile.pre: aspell/proc aspell/info
+	(cd aspell; export LC_COLLATE=C; ./proc create)
+
+# Autocorrect rules
+
+# Naming format for OpenOffice.org 2
+acor/acor_$(LANG)-$(REGION).dat: acor/DocumentList.csv acor/SentenceExceptList.csv acor/WordExceptList.csv
+	(cd acor; ../../utils/csv2acor.py $(@F))
+
+acor: acor/acor_$(LANG)-$(REGION).dat
+
+autocorrect: acor
+
+clean-acor: 
+	rm -rf $(TARGET_AUTOCORR)

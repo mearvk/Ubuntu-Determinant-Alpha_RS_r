@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+PKGNAME=$(shell grep "^Package: " debian/control | head -1 | cut -f 2 -d\ )
+PKG=$(shell pwd)/debian/$(PKGNAME)
+LOCALEDIR=$(PKG)/usr/share/locale-langpack
+
+build: 
+	dh_testdir
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean
+	rm -f debian/postinst
+
+binary-arch:
+
+binary-indep:
+	dh_testdir
+	dh_testroot
+	
+	mkdir -p $(LOCALEDIR)
+	cd data; \
+	  find -type d -exec mkdir -p "$(LOCALEDIR)/{}" \; ; \
+	  find -type f -name "*.po" -exec sh -c "N='{}'; msgfmt -o $(LOCALEDIR)/\$${N%.po}.mo \$$N" \; ; \
+	
+	cd debian/upgrade-notes; for f in `ls`; do \
+	    [ -e ../postinst ] || echo -e "#!/bin/sh -e\n\
+[ \"\$$1\" = configure ] || exit 0\n\
+[ -d /var/lib/update-notifier/user.d ] || exit 0\n\n" > ../postinst; \
+	    echo -e "if dpkg --compare-versions \"\$$2\" lt-nl \"$$f\"; then\n \
+		cat <<EOF > /var/lib/update-notifier/user.d/language-pack-en_$$f;" >> ../postinst; \
+	    cat $$f >> ../postinst; \
+	    echo 'EOF' >> ../postinst; \
+	    echo 'fi' >> ../postinst; \
+	done
+
+	[ ! -e data/extra.tar ] || tar -C $(PKG) -xf data/extra.tar
+	
+	dh_installdocs -i
+	dh_installchangelogs -i
+	dh_compress -i
+	dh_fixperms -i
+	dh_installdeb -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i -- -Z xz
+
+binary: binary-arch binary-indep
+
+.PHONY: build build-arch build-indep clean binary-indep binary-arch binary
+

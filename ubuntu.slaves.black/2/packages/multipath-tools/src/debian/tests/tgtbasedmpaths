@@ -1,0 +1,205 @@
+#!/bin/sh
+# autopkgtest check: tgt and open-iscsi based mpath operations
+# The test is intentionally extra verbose to have rich log and to stress
+# some of the code paths in and around multipath on top of the actual IO test.
+# (C) 2016 Canonical Ltd.
+# Author: Christian Ehrhardt <christian.ehrhardt@canonical.com>
+
+# Tests the creation and usage of a tgt target and lun on localhost
+set -uxe
+
+targetname="iqn.2016-11.foo.com:target.iscsi"
+cwd=$(pwd)
+testdir="/mnt/tgtmpathtest"
+localhost="127.0.0.1"
+portal="${localhost}:3260"
+maxpaths=4
+backfn="backingfile"
+expectwwid="60000000000000000e00000000010001"
+testdisk="/dev/disk/by-id/wwn-0x${expectwwid}"
+bglog="$AUTOPKGTEST_ARTIFACTS/test-background.log"
+fioprep="$AUTOPKGTEST_ARTIFACTS/path-change-prep.fio"
+fiovrfy="$AUTOPKGTEST_ARTIFACTS/path-change-check.fio"
+
+# Restart tgtd to make sure modules are all loaded
+service tgt restart || echo "Failed to restart tgt" >&2
+
+# prep SINGLE test file
+truncate --size 100M ${backfn}
+
+# create target
+tgtadm --lld iscsi --op new --mode target --tid 1 -T "${targetname}"
+# allow all to bind the target
+tgtadm --lld iscsi --op bind --mode target --tid 1 -I ALL
+# set backing file
+tgtadm --lld iscsi --op new --mode logicalunit --tid 1 --lun 1 -b "${cwd}/${backfn}"
+
+# scan for targets (locally)
+iscsiadm --mode discovery --type sendtargets --portal ${localhost}
+
+# login
+echo "login #1"
+iscsiadm --mode node --targetname "${targetname}" --portal ${portal} --login
+# duplicate this session (always 1)
+for i in $(seq 2 ${maxpaths})
+do
+    echo "extra login #${i}"
+    iscsiadm --mode session -r 1 --op new
+done
+
+udevadm settle
+sleep 5         # sleep a bit to allow device to be created.
+
+# status summary
+echo "Status after initial setup"
+tgtadm --lld iscsi --mode target --op show
+tgtadm --lld iscsi --op show --mode conn --tid 1
+iscsiadm --mode session -P 1
+lsscsi -liv
+multipath -v3 -ll
+dmsetup table
+
+echo "Test WWN should now point to DM"
+readlink "${testdisk}" | grep dm
+
+# create FS on the mpathed device
+mkfs.ext4 -F "${testdisk}"
+udevadm settle
+sleep 3s
+mkdir -p ${testdir}
+mount "${testdisk}" ${testdir}
+
+# based on /usr/share/doc/fio/examples/surface-scan.fio
+cat << EOF > ${fioprep}
+; writes 512 byte verification blocks until the disk is full,
+; then verifies written data
+[global]
+directory=${testdir}
+thread=1
+bs=64k
+direct=1
+ioengine=sync
+verify=meta
+verify_pattern=0xaa555aa5
+verify_interval=512
+
+[write-phase]
+filename=datafile.tmp   ; or use a full disk, for example /dev/sda
+rw=write
+fill_device=1
+do_verify=0
+EOF
+
+cat << EOF > ${fiovrfy}
+; verifies written data
+[global]
+directory=${testdir}
+thread=1
+bs=64k
+direct=1
+ioengine=sync
+verify=meta
+verify_pattern=0xaa555aa5
+verify_interval=512
+
+[verify-phase]
+stonewall
+create_serialize=0
+filename=datafile.tmp
+rw=read
+do_verify=1
+runtime=180
+time_based
+EOF
+
+# IO Bench with verify
+# prep files
+fio --max-jobs=4 "${fioprep}"
+
+# while verify is running unplud/plug paths as well as restart the daemon
+# Note - we run in a clean env, so we just assume each new session is an increment
+# Even with other multipath/scsi devices on the system this is true, jutst no
+# other iscsi logins are allowed - since the test runs under isolation-machine
+# that should be safe.
+# That way we can directly call IDs without huge logic on the session IDs
+echo "Starting the path changes in background"
+(
+    iscsiadm --mode session
+    sleep 10s
+    date +'MP report (expect 4) %H:%M:%S.%N'
+    multipath -ll
+    date +'UN-plug path 1 %H:%M:%S.%N'
+    iscsiadm --mode session -r 1 -u
+    iscsiadm --mode session
+    sleep 10s
+    date +'MP report (expect 3) %H:%M:%S.%N'
+    multipath -ll
+    date +'UN-plug path 2 %H:%M:%S.%N'
+    iscsiadm --mode session -r 2 -u
+    iscsiadm --mode session
+    sleep 10s
+    date +'MP report (expect 2) %H:%M:%S.%N'
+    multipath -ll
+    date +'UN-plug path 3 %H:%M:%S.%N'
+    iscsiadm --mode session -r 3 -u
+    iscsiadm --mode session
+    sleep 10s
+    date +'MP report (expect 1) %H:%M:%S.%N'
+    multipath -ll
+    date +'Add paths 5/6/7/8 %H:%M:%S.%N'
+    iscsiadm --mode session -r 4 --op new
+    iscsiadm --mode session -r 4 --op new
+    iscsiadm --mode session -r 4 --op new
+    iscsiadm --mode session -r 4 --op new
+    iscsiadm --mode session
+    sleep 10s
+    date +'MP report (expect 5) %H:%M:%S.%N'
+    multipath -ll
+    date +'UN-plug multiple paths 4/7/8 %H:%M:%S.%N'
+    iscsiadm --mode session -r 4 -u
+    iscsiadm --mode session -r 7 -u
+    iscsiadm --mode session -r 8 -u
+    iscsiadm --mode session
+    sleep 10s
+    date +'Restart multipath daemon %H:%M:%S.%N'
+    systemctl restart multipathd
+    sleep 10s
+    date +'Final background report (expect 2) %H:%M:%S.%N'
+    multipath -ll
+) > "${bglog}" 2>&1 &
+
+# test I/O with verification of actual content
+# on any I/O error or verification of read data it would fail
+date +'Pre FIO %H:%M:%S.%N'
+fio --max-jobs=4 "${fiovrfy}"
+date +'Post FIO %H:%M:%S.%N'
+
+echo "FIO verify test with changing paths - OK"
+
+echo "Report log of background activity"
+cat "${bglog}"
+
+sync
+umount "${testdisk}"
+
+# report stats - might be useful if checked across various tests that misbehave
+echo "Final stats"
+iscsiadm --mode session --stats
+journalctl --no-pager -u multipathd
+
+echo "Check final path status"
+multipath -ll
+# ensure we have one active and one running path
+diskc=$(multipath -ll | grep --count 'status=')
+diska=$(multipath -ll | grep --count 'status=active')
+diske=$(multipath -ll | grep --count 'status=enabled')
+if [ "${diskc}" -ne "2" -o "${diska}" -ne "1" -o "${diske}" -ne "1" ]; then
+    echo "Error: Not the expected count of active/enabled disks"
+    exit 1
+else
+    echo "OK"
+fi
+
+# logout and target delete should work even after all of this
+iscsiadm --mode node --targetname "${targetname}" --portal "${portal}" --logout
+tgtadm --lld iscsi --op delete --mode logicalunit --tid 1 --lun 1

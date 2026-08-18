@@ -1,0 +1,627 @@
+Packaging Java with Javatools
+=============================
+
+Javatools replaces the existing jarwrapper package and also contains
+programs to help packagers in creating packages for Java programs and
+libraries.
+
+Packaging tools
+---------------
+
+The javahelper package consists of several small programs which make
+packaging Java programs and libraries easier. They are generally
+designed to work in the same fashion as the debhelper programs, but
+start with the `jh_` prefix.
+
+All of the programs have their command line arguments documented in
+manpages.
+
+jh_build
+--------
+
+Many Java programs and libraries are distributed without sane build
+systems. `jh_build` provides a simple interface for building Java
+source code into Jars, including setting the appropriate entries in
+the manifest.
+
+In almost all cases all that needs to be done to call `jh_build` is to
+set `JAVA_HOME` and `CLASSPATH` and then call `jh_build` with the name of
+the jar and the directory containing the source.
+
+    JAVA_HOME=/usr/lib/jvm/default-java
+    CLASSPATH=/usr/share/java/esd.jar:/usr/share/java/jsch.jar
+    jh_build weirdx.jar src
+
+
+This command will compile all the Java files under src, set the
+classpath in the manifest and build it all into weirdx.jar.
+
+A couple of other options are worth mentioning. If this jar contains
+an application rather than a library then the -m or --main option can
+be used to set the Main-Class attribute in the manifest which will
+allow the resulting jar file to be be executed
+
+Alternatively, you may provide a debian/javabuild file containing one
+jar per line, each jar name followed by a list of source files or
+directories. In this case you can call `jh_build` with no jar or source
+and it will build those jars. The jars will then be removed by
+`jh_build --clean`.
+
+`jh_build` also provides a --clean parameter which should be called in
+the clean target of debian/rules. It is called for you by `jh_clean`
+
+`jh_build` will also create javadoc, but only for the last jar built in
+each package. It can be installed automatically using
+`jh_installjavadoc` (see below).
+
+jh_installlibs
+--------------
+
+For library packages Debian Java policy currently requires that the
+libraries be installed to /usr/share/java in a versioned format and
+with an unversioned symlink. `jh_installlibs` will take a jar and
+correctly install it.
+
+As with debhelper programs, this can either take a jar as a parameter,
+or read a list of jars from a file in the Debian directory. It also
+follows the -p, -i and -a semantics of debhelper for selecting which
+packages to install the jar to. When operating on a package,
+`jh_installlibs` will read the list of library jars from
+debian/package.jlibs or debian/jlibs.
+
+The jlibs file is a list of jars to install, one per line, and works
+exactly the same as listing them on the command line. Each jar is
+installed to debian/$package/usr/share/java/ in the appropriate
+versioned and unversioned forms.
+
+If the jars built by upstream already contain the version number, this
+will be stripped before installing. `jh_installlibs` will also try to
+strip the upstream version number of any dfsg suffix. Other
+version-mangling options or explicit version numbers can also be
+provided.
+
+jh_depends
+----------
+
+`jh_depends` works like `dpkg-shlibdeps`, but for jar files. For each jar
+in the package it takes the jars on which it depends and finds the
+packages to which they belong. These are included in the debhelper
+substvars as ${java:Depends}. The control file can then just list that
+variable which is filled in automatically.
+
+This is done by reading the Class-Path attribute from the manifest of
+each jar. Jar files should include this attribute to prevent
+applications which use them from needing a full recursive classpath in
+their startup scripts and to prevent unneccessary transitions when the
+library changes its dependencies. If the package is not built with
+`jh_build` and the upstream build system does not set it correctly then
+`jh_manifest` or `jh_classpath` can be used to fix this.
+
+If the application uses executable jars (see Runtime support below)
+then `jh_depends` will also add the appropriate depends on jarwrapper
+and the correct Java runtime.
+
+As of version 0.32, `jh_depends` also checks installed javadocs for
+links to system installed javadocs. It will use this to populate the
+${java:Recommends} variable, which can be used for the doc package.
+
+Note that both substvars are always created even if they are empty,
+like debhelper does with ${misc:Depends}.
+
+jh_manifest
+-----------
+
+Many upstream build systems do not set the Class-Path attribute in the
+jars they create. This leads to several unwanted problems, such as
+expanding the classpath which applications have to use and introducing
+unneccessary transitions. They also may not set the Main-Class
+attribute. Both of these are required for running jars with the -jar
+parameter.
+
+`jh_manifest` can fix the manifest files of jars. It can either read
+from a manifest file in the Debian directory or run in a mode which
+updates all the jars with the `CLASSPATH` environment variable.
+
+The manifest files can either be debian/package.manifest or
+debian/manifest. The format of this file is a list of jars and
+indented below each one a list of manifest elements to set:
+
+    usr/share/weirdx/weirdx.jar:
+     Main-Class: com.jcraft.weirdx.WeirdX
+     Debian-Java-Home: /usr/lib/jvm/default-java
+
+Note: Prior to javahelper 0.32 (0.33 if you used cdbs), `jh_manifest` would
+be run before `jh_installlibs`.  In these versions the jars were usually
+referred to by their location in the build directories rather than their
+install location.
+
+jh_classpath
+------------
+
+If you are just setting the classpath then this command is simpler
+than `jh_manifest`. `jh_classpath` can either take jars on the command
+line with the classpath specified on the command line or in the
+`CLASSPATH` environment variable.
+
+Alternatively, it can read classpaths from a debian/classpath or
+debian/package.classpath file. This should be one jar per line
+specifying the jar followed by it's space-separated classpath:
+
+    usr/share/java/bar.jar /usr/share/java/quux.jar
+    usr/share/java/foo.jar /usr/share/java/bar.jar /usr/share/java/baz.jar
+
+Note: Prior to javahelper 0.32 (0.33 if you used cdbs), `jh_classpath` would
+be run before `jh_installlibs`.  In these versions the jars were usually
+referred to by their location in the build directories rather than their
+install location.
+
+jh_exec
+-------
+
+The Runtime support section below describes running executable jars
+directly. `jh_exec` will scan package directories for jars in the paths,
+or symlinks to jar from the paths, and ensure that they have been set
+executable if necessary.
+
+jh_installjavadoc
+-----------------
+
+If you have javadoc which has been built by your build system, then
+`jh_installjavadoc` will install it in the correct location and register
+it with doc-base for you. Either run `jh_installjavadoc` with the
+directory containing the javadoc as a parameter, or it will read
+debian/javadoc or debian/$package.javadoc which should contain a single
+path to the javadoc for that package.
+
+If you have used `jh_build` that will automatically have created
+javadoc.  To install that put the string "internal" in the javadoc
+file and it will be installed.
+
+The second parameter, or the second string on the line in the javadoc
+file, can be used to override the install location, for example, so
+that a -doc package can install to /usr/share/doc/$library/api.
+
+jh_linkjars
+-----------
+
+If upstream ship convenience copies of third-party jar files which
+have been removed (see `jh_repack` below), but the build system refers
+to that directory, `jh_linkjars` can be used to populate the directory
+with symlinks to the packaged jars in /usr/share/java.
+
+It is called either with a directory on the command line or by
+specifying one target directory per line in the file debian/linkjars.
+
+`jh_linkjars` will scan all of the (installed) build-dependencies and
+create a symlink to every jar which is installed by those packages in
+the target directory.
+
+`jh_linkjars` can be called with -u to remove all the symlinks in the
+clean target.  This is done automatically by `jh_clean`.
+
+jh_clean
+--------
+
+`jh_clean` removes any files which have been created during the build by
+other `jh_` commands, such as `jh_build` and `jh_linkjars`
+
+jh_makepkg
+----------
+
+`jh_makepkg` will create template Debian packages for Java programs and
+libraries similar to `dh-make`. It should be run in the source directory
+and it will create the orig.tar.gz and most of the files in the Debian
+directory, which need only small changes neccessary to build the
+package.
+
+Note that `jh_makepkg` doesn't support packages using the Maven
+build system. Please use `mh_make` intead.
+
+jh_repack
+---------
+
+`jh_repack` provides functionality to help clean your upstream tarball
+of prebuilt jars, classfiles and javadoc. If you want to do this
+whenever you download a new version you can use `jh_repack` as a uscan
+helper. Just put `jh_repack` as the command at the end of the uscan
+line. E.g.
+
+    version=3
+    http://www.matthew.ath.cx/projects/salliere/ (?:.*/)?salliere-?_?([\d+\.]+|\d+)\.(tar.*|tgz|zip|gz|bz2|) debian jh_repack
+
+Alternatively you can run it by hand:
+
+    jh_repack --upstream-version <version> <tarball>
+
+`jh_repack` will remove any .class files, any .jar files, the whole
+directory tree containing javadoc and any empty directories as a
+result of the above.
+
+java-propose-classpath
+----------------------
+
+Some upstreams have complicated classpaths which may not be obvious to
+the packager when using `jh_manifest` to set the Class-Path attribute.
+`java-propose-classpath` will unpack a jar and look at the symbols
+imported to the class files, then scan all the jars in
+/usr/share/java. This should not be run in the build since it is slow,
+and there may be ambiguities that the packager must resolve. It is
+still very useful for the packager as most of the time it will get it
+right automatically.
+
+To avoid bloating the recursive build-deps of packages,
+`java-propose-classpath` is in a separate package to javahelper. It
+should not be on any package's build-depends.
+
+jh_installeclipse
+-----------------
+
+`jh_installeclipse` will install eclipse features built by eclipse's
+pde-build script. It supports most of debhelpers normal
+options. Features can either be put in the $package.eh-install or be
+given per command-line. By default `jh_installeclipse` expects
+pde-build to have been run from debian/.eclipse-build; if you decide
+to run it from another directory, you should use --pde-build-dir to
+tell `jh_installeclipse` where pde-build was run from.
+
+`jh_installeclipse` knows where pde-build dumps its output, so only the
+name of the feature should be given. It supports file globbing both in
+the files and per command-line (though in the latter case your shell
+may attempt to expand the globs if they are not properly escaped or
+quoted).
+
+Due two the way the underlying build system works; orbit dependencies
+will be embedded directly into the installation. `jh_installeclipse`
+will replace any orbit dependencies imported by
+`jh_generateorbitdir`. If you add/import orbit dependencies yourself
+through other means, you must replace them yourselves after running
+`jh_installeclipse`.
+
+Finally, `jh_installeclipse` will output a ${orbit:Depends} variable
+if it replaces any orbit dependency for that package.
+
+jh_generateorbitdir
+-------------------
+
+`jh_generateorbitdir` is an javahelper program that handles creation
+of an orbit dependency dir. This directory has to be populated with
+non-eclipse jar files. However, eclipse refers to these jars by their
+"symbolic name". `jh_generateorbitdir` can extract this name from the
+jar's manifest (provided it has the OSGi metadata) and create a
+symlink to it.
+
+`jh_generateorbitdir` will replace regular files with symlinks if they
+are present in the orbit dir and clash with the name of one of the
+orbit jars. If an orbit jar name clashes with a symlink in the orbit
+dir, then `jh_generateorbitdir` will assume that the given jar has
+already been symlinked and skip it.
+
+`jh_generateorbitdir` will also check the default installation for jar
+files on Debian systems (at the time of writing /usr/share/java), if
+it cannot find the jar in the current dir.
+
+If present, `jh_generateorbitdir` will read debian/eclipse.orbitdeps and
+add the jar files listed in it to the list of orbit dependencies.
+
+jh_setupenvironment
+-------------------
+
+`jh_setupenvironment` is a javahelper program that handles creating an
+environment for building an eclipse feature. It does not setup an
+orbit dir (use `jh_generateorbitdir` for that). It will copy files
+specified in debian/eclipse.environment as well as those given on
+command line into the environment dir. If no files are given per
+command line and the environment file is not present (or is empty), it
+will default to org.eclipse.*
+
+jh_compilefeatures
+------------------
+
+`jh_compilefeatures` handles compilation of eclipse features. It will
+read debian/eclipse.features as a list of features to compile and
+their dependencies. The first item on a line is the id of the feature
+and the remaining are either ids of previously compiled features or
+features installed on the system (identified by the folder they are
+installed in).
+
+By default `jh_compilefeatures` will set the source and the target
+version of the class files to 1.5. This can be overriden by explicitly
+changing the build options (see man `jh_compilefeatures` for more
+information).
+
+java-vars.mk
+------------
+
+You can include /usr/share/javahelper/java-vars.mk in your
+debian/rules to get the following variables defined:
+
+ * `JAVA_HOME`
+
+   If you have not already set it, will default to the default JDK for
+   the architecture (you must depend on default-jdk or -headless if
+   you are not overriding this).  To override this set `JAVA_HOME`
+   _before_ including java-vars.mk
+
+ * `JAVA_ARCH`
+
+   The JVM version of the build architecture (eg ppc not powerpc)
+
+ * `JRE_HOME`
+
+   If `$JAVA_HOME/jre` exists then that, otherwise `$JAVA_HOME`
+
+ * `JVM_CLIENT_DIR` and `JVM_SERVER_DIR`
+
+   Set if the respective types of JVM are installed.
+
+If you need the Java architecture in a non-make context then you can
+use /usr/share/javahelper/java-arch.sh instead.
+
+Runtime support
+===============
+
+Javatools also provides some runtime support. Unlike compiled
+programs, or purely interpreted programs with hash-bang lines, Java
+programs cannot be directly executed. Many upstreams expect them to be
+run using java -jar jarname or java classname. This is not generally
+acceptible in systems which expect to just be able to run the command
+or launch it from a menu. As a result, many packagers are writing
+wrapper scripts which just call java with the correct classpath, jar
+and main class.
+
+jarwrapper
+----------
+
+There is an alternative to wrapper scripts, however. The binfmt_misc
+kernel module allows the kernel to call out to a program in userspace
+to execute specific types of file. jarwrapper registers itself as a
+handler for executable jars. This is done by reading values from the
+manifest file.
+
+In order for executable jars to work the following attributes must or
+may be defined in the manifest. These attributes can be set using
+`jh_build` and `jh_manifest`.
+
+ * Main-Class: The name of the class to be run when the application
+   starts. (REQUIRED)
+
+ * Class-Path: The path to all the jar files on which this jar
+   depends. (REQUIRED unless empty)
+
+ * Debian-Java-Home: A Debian-specific property if this application
+   depends on a specific runtime. Specify the path to the runtime
+   which should be used. Multiple space-separated paths may be given
+   if any of the runtimes will work. (OPTIONAL)
+
+ * Debian-Java-Parameters: A Debian-specific property if this
+   application needs extra options to the JVM. (OPTIONAL)
+
+Java Architecture
+-----------------
+
+If you need to know the JVM architecture name at runtime (for example
+to put libjvm.so on the `LD_LIBRARY_PATH`) then jarwrapper also provides
+/usr/share/jarwrapper/java-arch.sh which will either print the current
+one or convert a debian arch name to a JVM arch name.
+
+Putting it together
+===================
+
+This section shows the debian packaging generated by `jh_makepkg` for
+an application and a library using `jh_build`.
+
+Sample Library Packaging
+------------------------
+
+debian/control
+
+    Source: jsch
+    Section: java
+    Priority: optional
+    Maintainer: Matthew Johnson <mjj29@debian.org>
+    Build-Depends: debhelper (>= 7), javahelper, default-jdk, libzlib-java
+    Standards-Version: 3.9.1
+    Homepage: http://www.jcraft.com/jsch/
+
+    Package: libjsch-java
+    Architecture: all
+    Depends: ${java:Depends}, ${misc:Depends}
+    Description: Java secure channel
+     JSch is a pure Java implementation of SSH2. JSch allows you to
+     connect to an sshd server and use port forwarding, X11 forwarding,
+     file transfer, etc., and you can integrate its functionality
+     into your own Java programs. JSch is licensed under a BSD style
+     license.
+
+
+debian/rules
+
+    #!/usr/bin/make -f
+
+    export JAVA_HOME=/usr/lib/jvm/default-java
+    export CLASSPATH=/usr/share/java/zlib.jar
+
+    build: build-stamp
+    build-stamp:
+        dh_testdir
+        jh_build jsch.jar src
+        touch $@
+
+    clean:
+        dh_testdir
+        dh_testroot
+        jh_build --clean
+        dh_clean
+        rm -f build-stamp jsch.jar
+
+    install: build
+        dh_testdir
+        dh_testroot
+        dh_prep
+        dh_installdirs
+
+    binary-arch: build install
+        # Java packages are arch: all, nothing to do here
+
+    binary-indep: build install
+        # Create the package here
+        dh_testdir
+        dh_testroot
+        dh_prep
+        dh_install -i
+        jh_installjavadoc -i
+        dh_installdocs -i
+        dh_installchangelogs -i
+        jh_installlibs -i
+        jh_depends -i
+        dh_compress -i
+        dh_fixperms -i
+        dh_installdeb -i
+        dh_gencontrol -i
+        dh_md5sums -i
+        dh_builddeb -i
+
+    binary: binary-indep binary-arch
+    .PHONY: build clean binary-indep binary-arch binary install
+
+
+debian/libjsch-java.jlibs
+
+    jsch.jar
+
+debian/libjsch-java.javadoc
+
+    internal
+
+Sample Application Packaging
+----------------------------
+
+debian/control
+
+    Source: salliere
+    Section: misc
+    Priority: optional
+    Maintainer: Matthew Johnson <mjj29@debian.org>
+    Build-Depends: debhelper (>= 7), default-jdk,
+                   libmatthew-debug-java, libcsv-java,
+                   libitext-java, javahelper
+    Standards-Version: 3.9.1
+
+    Package: salliere
+    Architecture: all
+    Depends: ${java:Depends}, ${misc:Depends}
+    Description: Short Description
+     Long Description
+
+
+debian/rules
+
+    #!/usr/bin/make -f
+    export JAVA_HOME=/usr/lib/jvm/default-java
+    export CLASSPATH=/usr/share/java/csv.jar:/usr/share/java/debug-disable.jar:/usr/share/java/itext.jar
+
+    build: build-stamp
+    build-stamp:
+        dh_testdir
+        # Build the package
+        jh_build salliere.jar src
+        touch $@
+
+    clean:
+        dh_testdir
+        dh_testroot
+        rm -f build-stamp salliere.jar
+        jh_build --clean
+        dh_clean
+
+    install: build
+        dh_testdir
+        dh_testroot
+        dh_prep
+        dh_installdirs
+
+    binary-arch: build install
+        # Java packages are arch: all, nothing to do here
+
+    binary-indep: build install
+        # Create the package here
+        dh_testdir
+        dh_testroot
+        dh_prep
+        dh_install -i
+        dh_installdocs -i
+        dh_installchangelogs -i
+        jh_manifest -i
+        dh_link -i
+        jh_exec -i
+        jh_depends -i
+        dh_compress -i
+        dh_fixperms -i
+        dh_installdeb -i
+        dh_gencontrol -i
+        dh_md5sums -i
+        dh_builddeb -i
+
+    binary: binary-indep binary-arch
+    .PHONY: build clean binary-indep binary-arch binary install
+
+
+debian/salliere.install
+
+    salliere.jar usr/share/salliere
+
+
+debian/salliere.links
+
+    usr/share/salliere/salliere.jar usr/bin/salliere.jar
+
+Using javahelper with CDBS
+--------------------------
+
+Javahelper 0.18 introduces a CDBS class for javahelper. It runs all
+the `jh_` commands after `dh_install*` and `dh_link` and has options
+for running `jh_build` under the build target.
+
+The `jh_` commands are invoked once per package. You can pass options to
+all the invocations using the `JH_EXEC_ARGS`, `JH_INSTALLLIBS_ARGS`,
+`JH_MANIFEST_ARGS` and `JH_DEPENDS_ARGS` variables.
+
+To invoke `jh_build` you must either set `JH_BUILD_JAR` and
+`JH_BUILD_SOURCE` and `JAVA_HOME` or have a debian/javabuild file and
+set `JAVA_HOME`.  Optionally you can also set `CLASSPATH` and
+`JH_BUILD_ARGS`.
+
+Please note: you _MUST_ include javahelper.mk before ant.mk.
+
+The above debian/rules can be rewritten with CDBS as follows:
+
+    #!/usr/bin/make -f
+    export JAVA_HOME=/usr/lib/jvm/default-java
+    export CLASSPATH=/usr/share/java/csv.jar:/usr/share/java/debug-disable.jar:/usr/share/java/itext.jar
+    JH_BUILD_JAR=salliere.jar
+    JH_BUILD_SRC=src
+
+    include /usr/share/cdbs/1/class/javahelper.mk
+
+Using javahelper with dh
+------------------------
+
+Javahelper 0.20 introduces a dh extension for javahelper. It runs all
+the `jh_` commands after `dh_install*` and `dh_link` and also runs
+`jh_build` if you have a debian/javabuild file.
+
+The above debian/rules can be rewritten with dh 7 as follows:
+
+debian/javabuild
+
+    salliere.jar src
+
+debian/rules
+
+    #!/usr/bin/make -f
+
+    export JAVA_HOME=/usr/lib/jvm/default-java
+    export CLASSPATH=/usr/share/java/csv.jar:/usr/share/java/debug-disable.jar:/usr/share/java/itext.jar
+
+    %:
+        dh $@ --with javahelper

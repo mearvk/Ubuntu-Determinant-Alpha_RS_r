@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	ant docs build -Dant.java.version=1.8
+
+	# prepare findbugs.1
+	help2man -h "-help"   -v "-version" -n "Static Java Code Analyzer" ./bin/fb       -o debian/fb.1
+	help2man -h "-textui" -v "-version" -n "Static Java Code Analyzer" ./bin/findbugs -o debian/findbugs.1
+
+override_dh_auto_install:
+	dh_auto_install
+
+	chmod -x $(CURDIR)/bin/findbugs.ico
+
+	mkdir -p $(CURDIR)/debian/findbugs/usr/bin
+
+	dh_install --sourcedir=$(CURDIR)
+	dh_link
+
+override_dh_auto_clean:
+	rm -f $(CURDIR)/debian/findbugs.1 $(CURDIR)/debian/fb.1
+	rm -f lib/*.jar
+	rm -rf classesEclipse/
+	rm -f src/doc/allBugDescriptions.html src/doc/bugDescriptions.html src/doc/bugDescriptions_??.html
+	dh_auto_clean
+
+override_dh_auto_test:
+	ant test -Dant.java.version=1.8
+	dh_auto_test

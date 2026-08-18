@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_installlibs - installs jar files in usr/share/java of a package
+
+=cut
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_installlibs> [S<I<debhelper options>>]
+
+B<jh_installlibs> [S<I<debhelper options>>] [B<-p>I<package>] [B<--classpath=>I<cp>] [S<I<jar [...]>>]
+
+=head1 DESCRIPTION
+
+For library packages Debian Java policy currently requires that the
+libraries be installed to /usr/share/java in a versioned format and
+with an unversioned symlink. B<jh_installlibs> will take a jar and
+correctly install it.
+
+As with debhelper programs, this can either take a jar as a parameter,
+or read a list of jars from a file in the Debian directory. It also
+follows the -p, -i and -a semantics of debhelper for selecting which
+packages to install the jar to. When operating on a package,
+B<jh_installlibs> will read the list of library jars from
+F<debian/I<package>.jlibs> or F<debian/jlibs>.
+
+The F<jlibs> file is a list of jars to install, one per line, and works
+exactly the same as listing them on the command line. Each jar is
+installed to debian/I<package>/usr/share/java/ in the appropriate
+versioned and unversioned forms.
+
+If the jars built by upstream already contain the version number, this
+will be stripped before installing. B<jh_installlibs> will also try to
+strip the upstream version number of any ds or dfsg suffix. Other
+version-mangling options or explicit version numbers can also be
+provided.
+
+=head1 FILES
+
+=over 4
+
+=item F<debian/I<package>.jlibs>, F<debian/jlibs>
+
+The F<jlibs> file is a list of jars to install, one per line, and works
+exactly the same as listing them on the command line. Each jar is
+installed to debian/I<package>/usr/share/java/ in the appropriate
+versioned and unversioned forms.
+
+Note that unlike most other debhelper commands,
+B<jh_installlibs> will use F<debian/jlibs> as a fallback
+configuration file for I<all> packages that it acts on.  Other
+debhelper commands usually only apply this fallback to the
+"main package".
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--no-mangle>
+
+Do not try to sanitize the upstream version number.
+
+=item B<--upstream-version=>I<version>
+
+Use I<version> as the upstream version.  This option implies B<--no-mangle>
+
+=item B<--version-strip=>I<regex>
+
+Use I<regex> instead of the built-in rules for sanitizing the upstream
+version number.
+
+This option is ignored when B<--no-mangle> is passed (or implied by another
+option).
+
+=back
+
+Beyond the above, B<jh_classpath> also accepts the shared
+debhelper options documented in L<debhelper(7)>.
+
+=cut
+
+my ($UPSTREAM_VERSION, $NO_MANGLE);
+# Strip ds and dfsg in various forms by default.
+my $VERSION_STRIP = '[\.+~-](?:ds|dfsg)[0-9]*$';
+init(options => {
+    'upstream-version=s' => \$UPSTREAM_VERSION,
+    'no-mangle'          => \$NO_MANGLE,
+    'version-strip=s'    => \$VERSION_STRIP,
+});
+
+# Explicitly defined upstream version
+if (defined($UPSTREAM_VERSION)) {
+    $NO_MANGLE = 1;
+} else {
+    # For the side effect of setting $dh{VERSION}
+    isnative($dh{MAINPACKAGE});
+    my $full_version = $dh{'VERSION'};
+    # Strip epoch
+    $full_version =~ s/^\d+://;
+    # Strip debian revision
+    $full_version =~ s/-[^-]+$//;
+    if (not $NO_MANGLE) {
+        $full_version =~ s/$VERSION_STRIP//;
+    }
+    $UPSTREAM_VERSION = $full_version;
+}
+
+sub process_jars {
+    my ($tmpdir, @jars) = @_;
+    for my $jar (@jars) {
+        my $basename = basename($jar);
+
+        # Strip trailing -<VERSION>.jar or .jar
+        $basename =~ s/(?:-\Q${UPSTREAM_VERSION}\E)?[.]jar$//;
+
+        install_dir("${tmpdir}/usr/share/java");
+        install_file($jar, "${tmpdir}/usr/share/java/${basename}-${UPSTREAM_VERSION}.jar");
+        rm_files("${tmpdir}/usr/share/java/${basename}.jar");
+        make_symlink_raw_target("${basename}-${UPSTREAM_VERSION}.jar", "${tmpdir}/usr/share/java/${basename}.jar");
+    }
+}
+
+if (@ARGV) {
+    my $tmpdir = tmpdir($dh{FIRSTPACKAGE});
+    process_jars($tmpdir, @ARGV);
+    exit(0);
+}
+
+# read debian/$package.jlibs
+foreach my $package (@{$dh{DOPACKAGES}}) {
+    my $pkgfile = pkgfile($package, 'jlibs');
+    if (not $pkgfile and -f 'debian/jlibs') {
+        $pkgfile = 'debian/jlibs';
+    }
+    next if not $pkgfile;
+    my @jars = filearray($pkgfile, ['.']);
+    my $tmpdir = tmpdir($package);
+    process_jars($tmpdir, @jars);
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=cut
+

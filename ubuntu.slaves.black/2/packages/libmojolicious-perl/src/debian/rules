@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+RESOURCES=$(CURDIR)/blib/lib/Mojolicious/resources/public/mojo
+
+PACKAGE = $(shell dh_listpackages)
+TMP     = $(CURDIR)/debian/$(PACKAGE)
+
+%:
+	dh $@
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	ln -sv /usr/share/javascript/highlight.js/highlight.min.js            $(RESOURCES)/highlight.js/highlight.min.js
+	mkdir $(RESOURCES)/jquery
+	ln -sv /usr/share/javascript/jquery/jquery.js                         $(RESOURCES)/jquery
+	mkdir $(RESOURCES)/bootstrap
+	ln -sv /usr/share/javascript/bootstrap4/js/bootstrap.min.js           $(RESOURCES)/bootstrap/bootstrap.js
+	ln -sv /usr/share/javascript/bootstrap4/css/bootstrap.min.css         $(RESOURCES)/bootstrap/bootstrap.css
+
+	dh_auto_test
+
+	$(RM) -v  $(RESOURCES)/highlight.js/highlight.min.js
+	$(RM) -vr $(RESOURCES)/jquery
+	$(RM) -vr $(RESOURCES)/bootstrap
+endif
+
+override_dh_auto_install:
+	dh_auto_install
+	# remove duplicated documentation additionally installed outside usr/share/doc
+	$(RM) -v  $(TMP)/usr/share/perl5/Mojolicious/Guides.pod
+	$(RM) -vr $(TMP)/usr/share/perl5/Mojolicious/Guides/
+
+override_dh_installexamples:
+	dh_installexamples
+	find $(TMP)/usr/share/doc/$(PACKAGE)/examples -type f -print0 | \
+		xargs -r0 sed -i -e '1s|^#!/usr/bin/env perl|#!/usr/bin/perl|'
+
+override_dh_strip_nondeterminism:
+	chmod +w $(TMP)/usr/share/perl5/Mojolicious/resources/public/mojo/*.png
+	dh_strip_nondeterminism

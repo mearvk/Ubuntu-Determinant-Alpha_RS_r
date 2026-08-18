@@ -1,0 +1,42 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libdatrie, to verify that
+# the headers and pkg-config file are installed correctly
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > libdatrietest.c
+#include <datrie/trie.h>
+#include <assert.h>
+
+int main (int argc, char *argv[])
+{
+  AlphaMap* m = alpha_map_new();
+  assert (m != 0);
+  assert (alpha_map_add_range (m, 0x0061, 0x007a) == 0);
+
+  Trie* t = trie_new (m);
+  assert (t != 0);
+
+  alpha_map_free (m);
+  trie_free (t);
+
+  return 0;
+}
+EOF
+
+${CROSS_COMPILE}gcc -o libdatrietest libdatrietest.c \
+    $(${CROSS_COMPILE}pkg-config --cflags --libs datrie-0.2)
+echo "build: OK"
+[ -x libdatrietest ]
+./libdatrietest
+echo "run: OK"

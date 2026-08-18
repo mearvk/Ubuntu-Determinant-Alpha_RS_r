@@ -1,0 +1,58 @@
+#!/bin/sh -e
+### BEGIN INIT INFO
+# Provides:          atm
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# X-Start-Before:    networking
+# X-Stop-After:      networking
+# Default-Start:     S
+# Default-Stop:      
+# Short-Description: Start/stop the atm daemon(s).
+### END INIT INFO
+
+DAEMON='/sbin/atmarpd'
+PIDFILE='/run/atmarpd.pid'
+DEFAULTS='/etc/default/atm'
+
+test -f $DAEMON || exit 0
+
+. /lib/lsb/init-functions
+
+OPTIONS='-l syslog'
+START_DAEMON='yes'
+
+[ -r "$DEFAULTS" ] && . "$DEFAULTS"
+
+if [ "$START_DAEMON" != "yes" -a "$1" != "stop" ]; then
+	echo "Edit /etc/default/atm to start atmarpd."
+	exit 0
+fi
+
+sendsigs_omit() {
+	local omitdir=/run/sendsigs.omit.d
+	[ -d $omitdir ] || return 0
+	ln -sf $PIDFILE $omitdir/atmarpd
+}
+
+case "$1" in
+start)  echo -n "Starting ATM ARP Daemon: "
+        start-stop-daemon --start --quiet --background --make-pidfile \
+                --pidfile $PIDFILE --exec $DAEMON -- $OPTIONS
+        echo "atmarpd."
+        sendsigs_omit
+        ;;
+stop)   echo -n "Stopping ATM ARP Daemon: "
+        start-stop-daemon --stop --quiet --oknodo \
+                --pidfile $PIDFILE --name atmarpd
+        rm -f $PIDFILE
+        echo "atmarpd."
+        ;;
+restart|force-reload)
+        $0 stop
+        $0 start
+        ;;
+*)      echo "Usage: /etc/init.d/atm start|stop|restart|force-reload"
+        exit 2
+        ;;
+esac
+exit 0

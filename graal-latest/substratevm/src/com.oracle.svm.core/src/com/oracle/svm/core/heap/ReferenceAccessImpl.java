@@ -1,0 +1,126 @@
+/*
+ * Copyright (c) 2018, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.heap;
+
+import com.oracle.svm.core.config.ObjectLayout;
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.Platforms;
+import org.graalvm.word.Pointer;
+import org.graalvm.word.UnsignedWord;
+import org.graalvm.word.impl.Word;
+
+import com.oracle.svm.shared.AlwaysInline;
+import com.oracle.svm.shared.Uninterruptible;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.AllAccess;
+import com.oracle.svm.shared.singletons.traits.BuiltinTraits.NoLayeredCallbacks;
+import com.oracle.svm.shared.singletons.traits.SingletonLayeredInstallationKind.Duplicable;
+import com.oracle.svm.shared.singletons.traits.SingletonTraits;
+
+import jdk.graal.compiler.api.replacements.Fold;
+import jdk.graal.compiler.core.common.CompressEncoding;
+import org.graalvm.word.impl.BarrieredAccess;
+import org.graalvm.word.impl.ObjectAccess;
+
+@SingletonTraits(access = AllAccess.class, layeredCallbacks = NoLayeredCallbacks.class, layeredInstallationKind = Duplicable.class)
+public class ReferenceAccessImpl implements ReferenceAccess {
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    protected ReferenceAccessImpl() {
+    }
+
+    @Override
+    @AlwaysInline("Performance")
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public Word readObjectAsUntrackedPointer(Pointer p, boolean compressed) {
+        Object obj = readObjectAt(p, compressed);
+        return Word.objectToUntrackedWord(obj);
+    }
+
+    @Override
+    @AlwaysInline("Performance")
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public Object readObjectAt(Pointer p, boolean compressed) {
+        Word w = (Word) p;
+        if (compressed) {
+            return ObjectAccess.readObject(Word.nullPointer(), p);
+        } else {
+            return w.readObject(0);
+        }
+    }
+
+    @Override
+    @AlwaysInline("Performance")
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public void writeObjectAt(Pointer p, Object value, boolean compressed) {
+        Word w = (Word) p;
+        if (compressed) {
+            ObjectAccess.writeObject(Word.nullPointer(), p, value);
+        } else {
+            // this overload has no uncompression semantics
+            w.writeObject(0, value);
+        }
+    }
+
+    @Override
+    @AlwaysInline("Performance")
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public void writeObjectBarrieredAt(Object object, UnsignedWord offsetInObject, Object value, boolean compressed) {
+        assert compressed : "Heap object must contain only compressed references";
+        BarrieredAccess.writeObject(object, offsetInObject, value);
+    }
+
+    @Override
+    public native UnsignedWord getCompressedRepresentation(Object obj);
+
+    @Override
+    public native Object uncompressReference(UnsignedWord ref);
+
+    @Override
+    @AlwaysInline("Performance")
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public CompressEncoding getCompressEncoding() {
+        return ImageSingletons.lookup(CompressEncoding.class);
+    }
+
+    @Fold
+    @Override
+    public UnsignedWord getMaxAddressSpaceSize() {
+        int referenceSize = ObjectLayout.singleton().getReferenceSize();
+        if (referenceSize == Integer.BYTES) {
+            int compressionShift = ReferenceAccess.singleton().getCompressEncoding().getShift();
+            return Word.unsigned(1L << (referenceSize * Byte.SIZE)).shiftLeft(compressionShift);
+        }
+        assert referenceSize == Long.BYTES;
+        // Assume that 48 bit is the maximum address space that can be used.
+        return Word.unsigned((1L << 48) - 1);
+    }
+
+    @Fold
+    @Override
+    public int getCompressionShift() {
+        return getCompressEncoding().getShift();
+    }
+}

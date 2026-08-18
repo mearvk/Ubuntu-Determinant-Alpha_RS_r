@@ -1,0 +1,94 @@
+Description: Let Perl access EngineID
+Author: Net-SNMP Packaging Team <pkg-net-snmp-devel@lists.alioth.debian.org>
+Reviewed-by: Craig Small <csmall@debian.org>
+Last-Update: 2019-02-07
+--- a/perl/SNMP/SNMP.pm
++++ b/perl/SNMP/SNMP.pm
+@@ -1245,6 +1245,16 @@
+    return(wantarray() ? @res : $res[0]);
+ }
+ 
++sub get_sec_engine_id {
++   my $this = shift;
++   return SNMP::_get_sec_engine_id($this);
++}
++
++sub get_context_engine_id {
++   my $this = shift;
++   return SNMP::_get_context_engine_id($this);
++}
++
+ package SNMP::TrapSession;
+ @SNMP::TrapSession::ISA = ('SNMP::Session');
+ 
+@@ -2047,6 +2057,17 @@
+ 
+ =back
+ 
++=item $sess->get_sec_engine_id
++
++Returns the security engine ID for the current session, whether probed
++or provided by the client, in hex format suitable for the SecEngineId
++parameter when creating a session in the future. Returns undef if we have not
++had not had any contact with the remote agent yet.
++
++=item $sess->get_context_engine_id
++
++Like get_sec_engine_id, but for the context engine ID (ContextEngineId).
++
+ =back
+ 
+ =head1 SNMP::TrapSession
+--- a/perl/SNMP/SNMP.xs
++++ b/perl/SNMP/SNMP.xs
+@@ -4714,6 +4714,50 @@
+ 
+ 
+ char *
++snmp_get_sec_engine_id(sess_ref)
++        SV *	sess_ref
++	CODE:
++	{
++           RETVAL = NULL;
++           if (SvROK(sess_ref)) {
++              SV **sess_ptr_sv = hv_fetch((HV*)SvRV(sess_ref), "SessPtr", 7, 1);
++	      SnmpSession *ss = (SnmpSession *)SvIV((SV*)SvRV(*sess_ptr_sv));
++              if (ss->securityEngineIDLen > 0) {
++                 binary_to_hex(ss->securityEngineID,
++                               ss->securityEngineIDLen,
++                               &RETVAL);
++              }
++           }
++	}
++	OUTPUT:
++        RETVAL
++        CLEANUP:
++        netsnmp_free(RETVAL);
++
++
++char *
++snmp_get_context_engine_id(sess_ref)
++        SV *	sess_ref
++	CODE:
++	{
++           RETVAL = NULL;
++           if (SvROK(sess_ref)) {
++              SV **sess_ptr_sv = hv_fetch((HV*)SvRV(sess_ref), "SessPtr", 7, 1);
++	      SnmpSession *ss = (SnmpSession *)SvIV((SV*)SvRV(*sess_ptr_sv));
++              if (ss->contextEngineIDLen > 0) {
++                 binary_to_hex(ss->contextEngineID,
++                               ss->contextEngineIDLen,
++                               &RETVAL);
++              }
++           }
++	}
++	OUTPUT:
++        RETVAL
++        CLEANUP:
++        netsnmp_free(RETVAL);
++
++
++char *
+ snmp_get_type(tag, best_guess)
+ 	char *		tag
+         int             best_guess

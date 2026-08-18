@@ -1,0 +1,78 @@
+#!/bin/sh
+
+PREREQS="udev"
+
+prereqs() { echo "$PREREQS"; }
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+if [ ! -x /sbin/multipath ]; then
+	exit 0
+fi
+
+. /usr/share/initramfs-tools/hook-functions
+
+add_bindings()
+{
+  mkdir -p $DESTDIR/etc/multipath
+
+  if [ -r /etc/multipath/bindings ]; then
+      cp /etc/multipath/bindings $DESTDIR/etc/multipath/
+  fi
+
+  if [ -r /etc/multipath/wwids ]; then
+      cp /etc/multipath/wwids $DESTDIR/etc/multipath/
+  fi
+}
+
+add_wwids()
+{
+  if [ -r /etc/multipath/wwids ]; then
+      mkdir -p $DESTDIR/etc/multipath
+      cp /etc/multipath/wwids $DESTDIR/etc/multipath
+  fi
+}
+
+add_udev_rules()
+{
+  for rules in 60-multipath.rules 56-dm-mpath.rules; do
+    if [ -e /lib/udev/rules.d/$rules ]; then
+      cp -p /lib/udev/rules.d/$rules $DESTDIR/lib/udev/rules.d/
+    fi
+  done
+}
+
+copy_exec /sbin/multipath 		/sbin
+copy_exec /sbin/kpartx    		/sbin
+copy_exec /sbin/dmsetup			/sbin
+copy_exec /lib/udev/kpartx_id		/lib/udev
+mkdir -p $DESTDIR/lib/multipath/
+for x in /lib/multipath/*; do
+    copy_exec $x /lib/multipath/
+done
+copy_exec /usr/bin/partx
+add_udev_rules
+
+copy_exec /sbin/multipathd 		/sbin
+# multipathd requires libgcc_s.so.1 (not handled by copy_exec() as it's dlopen()'ed).
+# hack: find libgcc_s.so.1 via ldconfig cache (dpkg-architecture pulls lots of deps).
+for x in $(ldconfig --print-cache | grep -o '/lib/.*/libgcc_s\.so\.1'); do
+    copy_exec $x $(dirname $x)
+done
+
+# multipathd requires /run/multipathd.pid
+mkdir -p $DESTDIR/run
+
+[ -r /etc/multipath.conf ] && cp /etc/multipath.conf $DESTDIR/etc/
+add_bindings
+add_wwids
+
+for x in dm-multipath dm-service-time dm-round-robin dm-queue-length; do
+	manual_add_modules ${x}
+done
+

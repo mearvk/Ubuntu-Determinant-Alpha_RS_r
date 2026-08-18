@@ -1,0 +1,78 @@
+<h1>60 Second guide to Multiverse</h1>
+
+Multiverse is a Software Transansactional Memory (STM) implementation and meant as an alternative to traditional lock
+based concurrency control. If you have worked with databases before, STM should feel familiar because
+both share one very important concept: transactions. Mutuable state that needs be accessed transactionally should be stored
+in transactional references (comparible to the atomic references from java.util.concurrent.atomic package).
+</p>
+
+Underneath you can see a small example of an Account with 2 mutable fields: balance and lastUpdate. These 2 fields
+        will be updated atomically in the incBalance method using a transaction.
+<pre>
+
+    import org.multiverse.api.references.*;
+    import static org.multiverse.api.StmUtils.*;
+
+    public class Account{
+
+        private final TxnRef&lt;Date&gt; lastUpdate;
+        private final TxnInteger balance = newTxnInteger();
+
+        public Account(int balance){
+            this.lastUpdate = newTxnRef&lt;Date&gt;(new Date());
+            this.balance = newTxnInteger(balance);
+        }
+
+        public void incBalance(final int amount, final Date date){
+            atomic(new Runnable(){
+                public void run(){
+                    balance.inc(amount);
+                    lastUpdate.set(date);
+
+                    if(balance.get()<&lt;0){
+                        throw new IllegalStateException("Not enough money");
+                    }
+                }
+            });
+        }
+    }
+</pre>
+The transactional behavior of the incBalance method gives us:
+<ol>
+    <li><b>failure atomicity:</b> all writes will commit or none will commit. In this case it could happen that
+        money is withdrawn and the balance becomes negative. At the end this will be detected, but the changes are
+        already made. The STM will make sure that these changes will never be committed.
+    </li>
+    <li><b>isolation: </b> all reads and writes are thread-safe and are isolated from
+        other transaction. A txn automatically gets a Oracle version of the SERIALIZABLE isolation level.
+        You don't need to deal with lower isolation levels like READ_UNCOMMITTED, READ_COMMITTED or
+        REPEATABLE_READ.
+    </li>
+    <li><b>no deadlocks</b> between transactions because deadlocks are prevented by Multiverse.
+</ol>
+
+<h2>Composing transactional methods</h2>
+
+Transactional methods can also be composed in new transactional methods, e.g.
+
+<pre>
+    public static void transfer(final Account from, final Account to, final int amount){
+        atomic(new Runnable(){
+            public void run(){
+                Date date = new Date();
+
+                from.incBalance(-amount, date);
+                to.incBalance(amount, date);
+             }
+        });
+    }
+</pre>
+    With lock based concurrency control this is dangerous to do since you can quickly run into a deadlock (e.g. when
+        2 threads are transferring money from 2 accounts in the opposite direction). But with STM, deadlocks
+        will be prevented and transactions retried automatically.
+
+<p/>
+This example only scratches the surface of Multiverse, but just having transactional methods can be
+a very big step forward in a lot of cases. For more advanced features and in-depth documention, the
+<a href="manual.html">manual</a> or <a href="documentationoverview.html">documentation overview</a>
+are the best places to get started.

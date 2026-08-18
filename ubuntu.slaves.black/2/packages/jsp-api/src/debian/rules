@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=maven
+
+override_dh_auto_build:
+	dh_auto_build -- -f api/pom.xml package -DskipTests
+
+override_dh_auto_test:
+	dh_auto_test -- -f api/pom.xml test
+
+override_dh_auto_install:
+	dh_auto_install -- -f api/pom.xml
+
+	# Install the old javax.servlet.jsp:jsp-api artifacts
+	mh_installpom -plibjsp-api-java --no-parent --set-version=2.2 --rules=debian/maven.rules.compat api/pom.xml
+	rm -Rf debian/libjsp-api-java/usr/share/maven-repo/javax/servlet/jsp/jsp-api/2.2/
+	dh_link -plibjsp-api-java /usr/share/java/jsp-api.jar usr/share/maven-repo/javax/servlet/jsp/jsp-api/debian/jsp-api-debian.jar
+
+	# Install the old 2.3 artifacts
+	mh_installpom -plibjsp-api-java --no-parent --set-version=2.3 api/pom.xml
+	dh_link -plibjsp-api-java /usr/share/java/jsp-api.jar  usr/share/java/jsp-api-2.3.jar
+	dh_link -plibjsp-api-java /usr/share/java/jsp-api.jar  usr/share/maven-repo/javax/servlet/jsp/javax.servlet.jsp-api/2.3/javax.servlet.jsp-api-2.3.jar
+	sed -i 's/<scope>provided/<scope>compile/' debian/libjsp-api-java/usr/share/maven-repo/javax/servlet/jsp/javax.servlet.jsp-api/2.3/javax.servlet.jsp-api-2.3.pom
+
+override_dh_auto_clean:
+	dh_auto_clean -- -f api/pom.xml

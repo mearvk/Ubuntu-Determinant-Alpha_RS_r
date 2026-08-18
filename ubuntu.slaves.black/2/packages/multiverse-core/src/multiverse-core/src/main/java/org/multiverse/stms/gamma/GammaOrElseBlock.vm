@@ -1,0 +1,60 @@
+package org.multiverse.stms.gamma;
+
+import org.multiverse.api.*;
+import org.multiverse.api.callables.*;
+import org.multiverse.api.exceptions.*;
+import static org.multiverse.api.TxnThreadLocal.*;
+
+public class GammaOrElseBlock implements OrElseBlock{
+
+#foreach($callable in $callables)
+
+    @Override
+    public ${callable.typeParameter} ${callable.type} execute(${callable.name}${callable.typeParameter} either, ${callable.name}${callable.typeParameter} orelse){
+        try{
+#if(${callable.type} eq 'void')
+            executeChecked(either,orelse);
+            return;
+#else
+            return executeChecked(either,orelse);
+#end
+        }catch(RuntimeException e){
+            throw e;
+        }catch(Exception e){
+            throw new InvisibleCheckedException(e);
+        }
+    }
+
+    @Override
+    public ${callable.typeParameter} ${callable.type} executeChecked(${callable.name}${callable.typeParameter} either, ${callable.name}${callable.typeParameter} orelse)throws Exception{
+        if(either == null){
+            throw new NullPointerException("either callable can't be null");
+        }
+
+        if(orelse == null){
+            throw new NullPointerException("orelse callable can't be null");
+        }
+
+        Txn txn = getThreadLocalTxn();
+        if(txn == null){
+            throw new TxnMandatoryException("No txn is found, but one is required for the orelse");
+        }
+
+        try{
+#if(${callable.type} eq 'void')
+            either.call(txn);
+            return;
+#else
+            return either.call(txn);
+#end
+        }catch(RetryError retry){
+#if(${callable.type} eq 'void')
+            orelse.call(txn);
+            return;
+#else
+            return orelse.call(txn);
+#end
+        }
+    }
+#end
+}

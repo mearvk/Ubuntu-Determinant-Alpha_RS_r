@@ -1,0 +1,79 @@
+Description: OpenJDK fails to compile commons-discovery 0.5
+ This works around the compiler problem by adding the type
+ parameters to the calls instead of letting the compiler infer them.
+Author: Denis Lila <dlila at redhat dot com>
+Origin: https://issues.apache.org/jira/secure/attachment/12481130/ojdk-javac-workaround.patch
+Bug: https://issues.apache.org/jira/browse/DISCOVERY-18
+Bug-RedHat: https://bugzilla.redhat.com/show_bug.cgi?id=706066
+Applied-Upstream: 0.6
+Index: b/src/java/org/apache/commons/discovery/tools/DiscoverClass.java
+===================================================================
+--- a/src/java/org/apache/commons/discovery/tools/DiscoverClass.java
++++ b/src/java/org/apache/commons/discovery/tools/DiscoverClass.java
+@@ -185,7 +185,7 @@
+      *            the resulting class does not implement (or extend) the SPI.
+      */
+     public <T, S extends T> Class<S> find(Class<T> spiClass) throws DiscoveryException {
+-        return find(getClassLoaders(spiClass),
++        return DiscoverClass.<T, S>find(getClassLoaders(spiClass),
+                     new SPInterface<T>(spiClass),
+                     nullProperties,
+                     (DefaultClassHolder<T>) null);
+@@ -204,7 +204,7 @@
+      *            the resulting class does not implement (or extend) the SPI.
+      */
+     public <T, S extends T> Class<S> find(Class<T> spiClass, Properties properties) throws DiscoveryException {
+-        return find(getClassLoaders(spiClass),
++        return DiscoverClass.<T, S>find(getClassLoaders(spiClass),
+                     new SPInterface<T>(spiClass),
+                     new PropertiesHolder(properties),
+                     (DefaultClassHolder<T>) null);
+@@ -223,7 +223,7 @@
+      *            the resulting class does not implement (or extend) the SPI.
+      */
+     public <T, S extends T> Class<S> find(Class<T> spiClass, String defaultImpl) throws DiscoveryException {
+-        return find(getClassLoaders(spiClass),
++        return DiscoverClass.<T, S>find(getClassLoaders(spiClass),
+                     new SPInterface<T>(spiClass),
+                     nullProperties,
+                     new DefaultClassHolder<T>(defaultImpl));
+@@ -244,7 +244,7 @@
+      */
+     public <T, S extends T> Class<S> find(Class<T> spiClass, Properties properties, String defaultImpl)
+             throws DiscoveryException {
+-        return find(getClassLoaders(spiClass),
++        return DiscoverClass.<T, S>find(getClassLoaders(spiClass),
+                     new SPInterface<T>(spiClass),
+                     new PropertiesHolder(properties),
+                     new DefaultClassHolder<T>(defaultImpl));
+@@ -265,7 +265,7 @@
+      */
+     public <T, S extends T> Class<S> find(Class<T> spiClass, String propertiesFileName, String defaultImpl)
+             throws DiscoveryException {
+-        return find(getClassLoaders(spiClass),
++        return DiscoverClass.<T, S>find(getClassLoaders(spiClass),
+                     new SPInterface<T>(spiClass),
+                     new PropertiesHolder(propertiesFileName),
+                     new DefaultClassHolder<T>(defaultImpl));
+@@ -517,7 +517,7 @@
+                IllegalAccessException,
+                NoSuchMethodException,
+                InvocationTargetException {
+-        return spi.newInstance(find(loaders, spi, properties, defaultImpl));
++        return spi.newInstance(DiscoverClass.<T, T>find(loaders, spi, properties, defaultImpl));
+     }
+ 
+     /**
+Index: b/src/java/org/apache/commons/discovery/tools/Service.java
+===================================================================
+--- a/src/java/org/apache/commons/discovery/tools/Service.java
++++ b/src/java/org/apache/commons/discovery/tools/Service.java
+@@ -63,7 +63,7 @@
+      * @return Enumeration of class instances ({@code S})
+      */
+     public static <T, S extends T> Enumeration<S> providers(Class<T> spiClass) {
+-        return providers(new SPInterface<T>(spiClass), null);
++        return Service.<T, S>providers(new SPInterface<T>(spiClass), null);
+     }
+ 
+     /**

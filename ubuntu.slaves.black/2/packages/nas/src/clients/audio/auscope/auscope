@@ -1,0 +1,1404 @@
+#!/usr/bin/perl -- # -*-Perl-*-
+#
+# $Id: auscope 9 1999-07-08 00:51:49Z jon $
+# $NCDId: @(#)auscope,v 1.21 1996/08/01 21:08:26 greg Exp $
+#
+# Copyright 1994 Network Computing Devices, Inc.
+#
+# Permission to use, copy, modify, distribute, and sell this software and
+# its documentation for any purpose is hereby granted without fee, provided
+# that the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation, and that the name Network Computing Devices, Inc. not be
+# used in advertising or publicity pertaining to distribution of this
+# software without specific, written prior permission.
+#
+# THIS SOFTWARE IS PROVIDED `AS-IS'.  NETWORK COMPUTING DEVICES, INC.,
+# DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING WITHOUT
+# LIMITATION ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE, OR NONINFRINGEMENT.  IN NO EVENT SHALL NETWORK
+# COMPUTING DEVICES, INC., BE LIABLE FOR ANY DAMAGES WHATSOEVER, INCLUDING
+# SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF USE, DATA,
+# OR PROFITS, EVEN IF ADVISED OF THE POSSIBILITY THEREOF, AND REGARDLESS OF
+# WHETHER IN AN ACTION IN CONTRACT, TORT OR NEGLIGENCE, ARISING OUT OF OR IN
+# CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Author:	Greg Renda <greg@ncd.com>
+# 		Network Computing Devices, Inc.
+# 		350 North Bernardo Ave.
+# 		Mountain View, CA  94043
+
+require "getopts.pl";
+require "sys/socket.ph";
+
+$disableTimestamp = !defined($t = eval 'require "syscall.ph"');
+print "Warning: time stamping disabled due to $@" if $disableTimestamp;
+
+@errorStrings = ('Success', 'BadRequest', 'BadValue', 'BadDevice', 'BadBucket', 
+		 'BadFlow', 'BadElement', 'BadMatch', 'BadAccess', 'BadAlloc', 
+		 'BadConnection', 'BadIDChoice', 'BadName', 'BadLength', 
+		 'BadImplementation');
+@transferStateStrings = ('Ready', 'Pending', 'End');
+@notifyKindStrings = ('LowWater', 'HighWater', 'State');
+@stateStrings = ('Stop', 'Start', 'Pause', 'Any');
+@reasonStrings = ('User', 'Underrun', 'Overrun', 'EOF', 'Watermark', 'Hardware',
+		  'Any');
+@closeDownModeStrings = ('Destroy', 'RetainPermanent', 'RetainTemporary');
+@eventStrings = ('Error', 'Reply', 'ElementNotifyEvent', 'GrabNotifyEvent',
+		 'MonitorNotifyEvent');
+@formatStrings = ('*Invalid*', 'ULAW8', 'LinearUnsigned8', 'LinearSigned8',
+		  'LinearSigned16MSB', 'LinearUnsigned16MSB',
+		  'LinearSigned16LSB', 'LinearUnsigned16LSB');
+@elementTypeStrings = ('ImportClient', 'ImportDevice', 'ImportBucket', 
+		       'ImportWaveForm', 'ImportRadio', 'Bundle', 
+		       'MultiplyConstant', 'AddConstant', 'Sum', 
+		       'ExportClient', 'ExportDevice', 'ExportBucket', 
+		       'ExportRadio', 'ExportMonitor');
+@waveFormStrings = ('Square', 'Sine', 'Saw', 'Constant');
+@actionStrings = ('ChangeState', 'SendNotify', 'Noop');
+@kindStrings = ('Other', 'PhysicalInput', 'PhysicalOutput', 'Bucket', 'Radio');
+@useStrings = ('Import', 'Export', 'Exclusive');
+@accessStrings = ('Import', 'Export', 'Destroy', 'List');
+@stringTypeStrings = ('*Invalid*', 'Latin1', 'CompoundText');
+@locationStrings = ('Left', 'Center', 'Right', 'Top', 'Middle', 'Bottom',
+		    'Back', 'Front', 'Internal', 'External');
+@inputModeStrings = ('None', 'Line-In', 'Microphone');
+@outputModeStrings = ('Speaker', 'Headphone', 'Line-Out');
+@requestStrings = ('invalid', 'ListDevices', 'GetDeviceAttributes',
+		   'SetDeviceAttributes', 'CreateBucket', 'DestroyBucket', 
+		   'ListBuckets', 'GetBucketAttributes', 'SetBucketAttributes', 
+		   'CreateRadio', 'DestroyRadio', 'ListRadios',
+		   'GetRadioAttributes', 'SetRadioAttributes', 'CreateFlow',
+		   'DestroyFlow', 'GetFlowAttributes', 'SetFlowAttributes',
+		   'GetElements', 'SetElements', 'GetElementStates',
+		   'SetElementStates', 'GetElementParameters',
+		   'SetElementParameters', 'WriteElement', 'ReadElement',
+		   'GrabComponent', 'UngrabComponent', 'SendEvent', 
+		   'GetAllowedUsers', 'SetAllowedUsers', 'ListExtensions', 
+		   'QueryExtension', 'GetCloseDownMode', 'SetCloseDownMode', 
+		   'KillClient', 'GetServerTime', 'NoOperation');
+
+%attribMasks = ('id', 0, 'kind', 1, 'use', 2, 'format', 3, 'numTracks', 4,
+	      'access', 5, 'description', 6, 'minSampleRate', 16,
+	      'maxSampleRate', 17, 'location', 18, 'gain', 19, 'lineMode', 20,
+	      'children', 21, 'sampleRate', 16, 'numSamples', 17);
+
+for (keys(%attribMasks))
+{
+    @attribStrings[$attribMasks{$_}] = $_;
+    $attribMasks{$_} = 1 << $attribMasks{$_};
+}
+
+$NAS_BASE_PORT = 8000;
+$MAX_READ_SIZE = 2048;
+
+$hostByteOrder = (unpack("C", pack("S", 1)))[0] == 1 ? 'l' : 'B';
+$hostname = '';
+$inport = $NAS_BASE_PORT + 1;
+$outport = $NAS_BASE_PORT;
+$verbosity = 0;
+$maxLabel = 30;
+$requestIndent = 0;
+$replyIndent = 20;
+$indent = 8;
+
+&Getopts('h:i:v:o:');
+
+$hostname = $opt_h if $opt_h;
+$inport = $opt_i + $NAS_BASE_PORT if $opt_i;
+$outport = $opt_o + $NAS_BASE_PORT if $opt_o;
+$verbosity = $opt_v if $opt_v;
+
+# networking hoo-haw
+$sockaddr = 'S n a4 x8';
+($name, $aliases, $proto) = getprotobyname('tcp');
+($name, $aliases, $port) = getservbyport($inport, 'tcp');
+$socketName = pack($sockaddr, &AF_INET, $inport, "\0\0\0\0");
+select(CLIENT); $| = 1; select(stdout);
+socket(S, &AF_INET, &SOCK_STREAM, $proto) || die "socket: $!\n";
+setsockopt(S,  &SOL_SOCKET, &SO_REUSEADDR, 1);
+bind(S, $socketName) || die "bind: $!\n";
+listen(S, 5) || die "listen: $!\n";
+select(S); $| = 1; select(stdout);
+
+while (1)
+{
+    $sequence = 0;
+
+    # wait for initial connection
+    ($addr = accept(CLIENT, S)) || die "accept: $!\n";
+
+    # connect to server
+    ($name, $aliases, $type, $len, $hostaddr) = gethostbyname($hostname);
+    $hostaddr = pack('C4', split('\.', $hostname)) if !$name;
+    $sockName = pack($sockaddr, &AF_INET, $outport, $hostaddr);
+    socket(SERVER, &AF_INET, &SOCK_STREAM, $proto) || die "socket: $!\n";
+    connect(SERVER, $sockName) || die "connect: $!\n";
+    select(SERVER); $| = 1; select(STDOUT);
+
+    $rin = '';
+    vec($rin, fileno(CLIENT), 1) = 1;
+    vec($rin, fileno(SERVER), 1) = 1;
+
+    $clientbuf = '';
+    $serverbuf = '';
+
+    &waitClient(12, 'connectionSetupPrefix');
+
+    while(1)
+    {
+	$doSelect = 1;
+
+	if ($clientBytesNeeded && length($clientbuf) >= $clientBytesNeeded)
+	{
+	    $bytesUsed = $clientBytesNeeded;
+	    &$processClient(@clientArgs);
+	    print SERVER substr($clientbuf, 0, $bytesUsed);
+	    substr($clientbuf, 0, $bytesUsed) = '';
+	    $doSelect = 0;
+	}
+
+	if ($serverBytesNeeded && length($serverbuf) >= $serverBytesNeeded)
+	{
+	    $bytesUsed = $serverBytesNeeded;
+	    &$processServer(@serverArgs);
+	    print CLIENT substr($serverbuf, 0, $bytesUsed);
+	    substr($serverbuf, 0, $bytesUsed) = '';
+	    $doSelect = 0;
+	}
+
+	if ($doSelect)
+	{
+	    select($rout=$rin, undef, undef, undef);
+
+	    $timeStamp = &getTimestamp;
+
+	    if (vec($rout, fileno(CLIENT), 1))
+	    {
+		$bytesRead = read(CLIENT, $buf, $MAX_READ_SIZE);
+
+		if (!$bytesRead)
+		{
+		    $ind = $requestIndent;
+		    &leftJustify($timeStamp, "CLIENT", "EOF");
+		    last;
+		}
+
+		$clientbuf = $clientbuf.$buf;
+
+		if ($verbosity > 0)
+		{
+		    print "$timeStamp: CLIENT --> $bytesRead bytes\n";
+		    &showBytes($buf);
+		}
+	    }
+
+	    if (vec($rout, fileno(SERVER), 1))
+	    {
+		$bytesRead = read(SERVER, $buf, $MAX_READ_SIZE);
+
+		if (!$bytesRead)
+		{
+		    $ind = $replyIndent;
+		    &leftJustify($timeStamp, "SERVER", "EOF");
+		    last;
+		}
+
+		$serverbuf = $serverbuf.$buf;
+
+		if ($verbosity > 0)
+		{
+		    print "$timeStamp: $bytesRead bytes <-- SERVER\n";
+		    &showBytes($buf);
+		}
+	    }
+	}
+    }
+
+    close(CLIENT);
+    close(SERVER);
+    print "-" x 10, "\n";
+}
+
+#
+# Utility subroutines
+#
+
+sub setTimestamp
+{
+    local($startSecs, $startUsecs);
+    return if $disableTimestamp;
+
+    $tv = pack("LL", 0, 0);
+    syscall(&SYS_gettimeofday, $tv, 0);
+    ($startSecs, $startUsecs) = unpack("LL", $tv);
+    $startTime = $startSecs + $startUsecs / 1000000;
+}
+
+sub getTimestamp
+{
+    local($t1, $t2);
+
+    return " " if $disableTimestamp;
+
+    syscall(&SYS_gettimeofday, $tv, 0);
+    ($t1, $t2) = unpack("LL", $tv);
+    sprintf("%6.2f", ($t1 + $t2 / 1000000) - $startTime);
+}
+
+sub leftJustify
+{
+    local($left, $label, @args) = @_;
+    local($n);
+
+    print $left, " " x $ind;
+    $n = $maxLabel - length(left) - 2;
+    printf "%$n"."s: ", $label;
+    printf @args;
+    print "\n";
+ }
+
+sub pr
+{
+    local($label, @args) = @_;
+    local($colon) = $label ne '' ? ':' : ' ';
+
+    print " " x $ind;
+    printf "%$maxLabel"."s$colon ", $label;
+    printf @args;
+    print "\n";
+}
+
+sub waitClient
+{
+    ($clientBytesNeeded, $processClient, @clientArgs) = @_;
+}
+
+sub waitServer
+{
+    ($serverBytesNeeded, $processServer, @serverArgs) = @_;
+}
+
+sub showBytes
+{
+    local($buf) = @_;
+    local($n, $l, $p, $s);
+
+    $n = length($buf);
+
+    while ($n > 0)
+    {
+	$l = ($n > 16 ? 16 : $n) << 1;
+	$p = unpack("H$l", $buf);
+	$l >>= 1;
+	$s = unpack("a$l", $buf);
+	$p =~ s/(..)/$1 /g;
+	$s =~ tr/\040-\176/./c;
+	printf "%-48s $s\n",$p;
+	substr($buf, 0, $l) = '';
+	$n -= $l;
+    }
+}
+
+sub swaps
+{
+    if ($swap)
+    {
+	local($i, $a, $b);
+
+	for ($i = 0; $i < @_; $i++)
+	{
+	    ($a, $b) = unpack("CC", pack("S", $_[$i]));
+	    $_[$i] = unpack("S", pack("CC", $b, $a));
+	}
+    }
+}
+
+sub swapl
+{
+    if ($swap)
+    {
+	local($i, $a, $b, $c, $d);
+
+	for ($i = 0; $i < @_; $i++)
+	{
+	    ($a, $b, $c, $d) = unpack("CCCC", pack("L", $_[$i]));
+	    $_[$i] = unpack("L", pack("CCCC", $d, $c, $b, $a));
+	}
+    }
+}
+
+sub pad4
+{
+    local($n) = @_;
+
+    ($n + 3) & ~3;
+}
+
+sub showFixed
+{
+    local($v) = @_;
+
+    sprintf("%g", ($v >> 16) + ($v & 0xffff) / 65536);
+}
+
+sub waitRequestOrReply
+{
+    &waitClient(4, 'genericRequest');
+    &waitServer(32, 'genericReply');
+}
+
+sub genericRequest
+{
+    local($type, $data, $len) = unpack("CCS", $clientbuf);
+    local($request);
+
+    $ind = $requestIndent;
+
+    &swaps($len);
+
+    $len = ($len << 2) - 4;
+    $request = $requestStrings[$type];
+    $sequence++;
+    print "\n";
+    &leftJustify($timeStamp, "REQUEST", "$request ($type)");
+    &pr("sequence", $sequence);
+    $len ? &waitClient($len, $request, $data) : &$request($data);
+}
+
+sub genericReply
+{
+    local($reply) = @_;
+    local($type, $sequence, $len) = unpack("CxSL", $serverbuf);
+    local($r) = $type == 1 ? $reply : $eventStrings[$type];
+    
+    $ind = $replyIndent;
+
+    &swaps($sequence);
+    &swapl($len);
+
+    print "\n";
+    &leftJustify($timeStamp, "REPLY", $r);
+    &pr("sequence", $sequence);
+
+    $type == 1 && $len ?
+	&waitServer($len << 2, $r, substr($serverbuf, 0, 32)) : &$r($serverbuf);
+}
+
+sub waitReply
+{
+    local($reply) = @_;
+
+    &waitServer(32, 'genericReply', $reply);
+}
+
+#
+# Protocol parsing subroutines
+#
+
+sub showParameters
+{
+    local($n) = @_;
+    local($i, $oldN, @p);
+    local($flow, $elementNum, $numParameters) = unpack("x$n LC2", $_[1]);
+
+    $ind += $indent;
+    $oldN = $n;
+    $n += 8;
+
+    @p = unpack("x$n L$numParameters", $_[1]);
+    $n += $numParameters << 2;
+
+    &swapl($flow, @p);
+    &pr("flow", "0x%x", $flow);
+    &pr("element-num", $elementNum);
+    &pr("parameters", "($numParameters)");
+
+    for (@p)
+    {
+	&pr("", "0x%08x", $_);
+    }
+
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub showAction
+{
+    local($n) = @_;
+    local($i, $oldN);
+    local($flow, $elementNum, $triggerState, $triggerPrevState, $triggerReason,
+	  $action, $newState) = unpack("x$n LC6", $_[1]);
+
+    $ind += $indent;
+    $oldN = $n;
+    $n += 12;
+
+    &swapl($flow);
+    $triggerState = $#stateStrings if $triggerState == 255;
+    $triggerPrevState = $#stateStrings if $triggerPrevState == 255;
+    $triggerReason = $#reasonStrings if $triggerReason == 255;
+
+    &pr("trigger-state", $stateStrings[$triggerState]);
+    &pr("trigger-prev-state", $stateStrings[$triggerPrevState]);
+    &pr("trigger-reason", $reasonStrings[$triggerReason]);
+    &pr("action", $actionStrings[$action]);
+
+    if ($actionStrings[$action] eq 'ChangeState')
+    {
+	$elementNum = 'All' if $elementNum == 255;
+	&pr("flow", "0x%x", $flow);
+	&pr("element-num", $elementNum);
+	&pr("new-state", $stateStrings[$newState]);
+    }
+
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub showElementState
+{
+    local($n) = @_;
+    local($dontShowState) = $_[2];
+    local($oldN);
+    local($flow, $elementNum, $state) = unpack("x$n LCC", $_[1]);
+
+    $ind += $indent;
+    &swapl($flow);
+    $oldN = $n;
+    $n += 8;
+
+    $elementNum = 'All' if $elementNum == 255;
+    &pr("flow", "0x%x", $flow);
+    &pr("element-num", $elementNum);
+    &pr("state", $stateStrings[$state]) if !$dontShowState;
+   
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub showElement
+{
+    local($n) = @_;
+    local($oldN, $typeString, $numActions, $extra);
+    local($type) = unpack("x$n S", $_[1]);
+    local($i) = $_[2];
+
+    $ind += $indent;
+    &swaps($type);
+    $oldN = $n;
+    $n += 2;
+    $numActions = 0;
+    $extra = 0;
+
+    &pr("num", $i);
+    $typeString = $elementTypeStrings[$type];
+    &pr("type", $typeString);
+
+    if ($typeString eq 'ImportClient')
+    {
+	local($sampleRate, $format, $numTracks, $discard, $maxSamples,
+	      $lowWaterMark, $na) = unpack("x$n SCCCxLLL", $_[1]);
+
+	&swaps($sampleRate);
+	&swapl($maxSamples, $lowWaterMark, $na);
+	$numActions = $na;
+
+	&pr("sample-rate", $sampleRate);
+	&pr("format", $formatStrings[$format]);
+	&pr("tracks", $numTracks);
+	&pr("discard", $discard ? "True" : "False");
+	&pr("max-samples", $maxSamples);
+	&pr("low-water-mark", $lowWaterMark);
+    }
+    elsif ($typeString eq 'ImportDevice')
+    {
+	local($sampleRate, $numSamples, $device, $na) =
+	    unpack("x$n SL3", $_[1]);
+
+	&swaps($sampleRate);
+	&swapl($numSamples, $device, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("sample-rate", $sampleRate);
+	&pr("num-samples", $numSamples);
+	&pr("device", "0x%x", $device);
+    }
+    elsif ($typeString eq 'ImportBucket')
+    {
+	local($sampleRate, $numSamples, $bucket, $offset, $na) =
+	    unpack("x$n SL4", $_[1]);
+
+	&swaps($sampleRate);
+	&swapl($numSamples, $bucket, $offset, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("sample-rate", $sampleRate);
+	&pr("num-samples", $numSamples);
+	&pr("offset", $offset);
+	&pr("bucket", "0x%x", $bucket);
+    }
+    elsif ($typeString eq 'ImportWaveForm')
+    {
+	local($sampleRate, $numSamples, $waveForm, $frequency, $na) =
+	    unpack("x$n SLCx3LL", $_[1]);
+
+	&swaps($sampleRate);
+	&swapl($numSamples, $frequency, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("sample-rate", $sampleRate);
+	&pr("num-samples", $numSamples);
+	&pr("waveform", $waveFormStrings[$waveForm]);
+	&pr("frequency", $frequency);
+    }
+    elsif ($typeString eq 'Bundle')
+    {
+	local($numInputs) = unpack("x$n S", $_[1]);
+	local($z, $elementNum, $track);
+
+	&swaps($numInputs);
+	$z = $n + 22;
+	$extra = $numInputs << 2;
+	&pr("inputs", "($numInputs)");
+
+	while ($numInputs--)
+	{
+	    ($elementNum, $track) = unpack("x$z CC", $_[1]);
+	    &pr("element-num", $elementNum);
+	    &pr("track", $track);
+	    $z += 4;
+	}
+    }
+    elsif ($typeString eq 'MultiplyConstant')
+    {
+	local($input, $constant) = unpack("x$n SL", $_[1]);
+
+	&swaps($input);
+	&swapl($constant);
+
+	&pr("input", $input);
+	&pr("constant", &showFixed($constant));
+    }
+    elsif ($typeString eq 'AddConstant')
+    {
+	local($input, $constant) = unpack("x$n SL", $_[1]);
+
+	&swaps($input);
+	&swapl($constant);
+
+	&pr("input", $input);
+	&pr("constant", &showFixed($constant));
+    }
+    elsif ($typeString eq 'Sum')
+    {
+	local($numInputs) = unpack("x$n S", $_[1]);
+	local(@inputs, $z);
+
+	&swaps($numInputs);
+	$z = $n + 22;
+	@inputs = unpack("x$z S$numInputs", $_[1]);
+	&pr("inputs", "($numInputs)");
+	for (@inputs)
+	{
+	    &swaps($_);
+	    &pr("", $_);
+	}
+
+	$extra = &pad4($numInputs << 1);
+    }
+    elsif ($typeString eq 'ExportClient')
+    {
+	local($sampleRate, $input, $format, $numTracks, $discard, $maxSamples,
+	      $highWaterMark, $na) =
+	    unpack("x$n S2 xx C3 x L3", $_[1]);
+
+	&swaps($sampleRate, $input);
+	&swapl($maxSamples, $highWaterMark, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("input", $input);
+	&pr("sample-rate", $sampleRate);
+	&pr("format", $formatStrings[$format]);
+	&pr("tracks", $numTracks);
+	&pr("discard", $discard ? "True" : "False");
+	&pr("max-samples", $maxSamples);
+	&pr("high-water-mark", $highWaterMark);
+    }
+    elsif ($typeString eq 'ExportDevice')
+    {
+	local($sampleRate, $input, $numSamples, $device, $na) =
+	    unpack("x$n S2 xx L3", $_[1]);
+
+	&swaps($sampleRate, $input);
+	&swapl($numSamples, $device, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("input", $input);
+	&pr("sample-rate", $sampleRate);
+	&pr("num-samples", $numSamples);
+	&pr("device", "0x%x", $device);
+    }
+    elsif ($typeString eq 'ExportBucket')
+    {
+	local($input, $numSamples, $bucket, $offset, $na) =
+	    unpack("x$n S L4", $_[1]);
+
+	&swaps($input);
+	&swapl($numSamples, $bucket, $offset, $na);
+	$numSamples = 'Unlimited' if !$numSamples;
+	$numActions = $na;
+
+	&pr("input", $input);
+	&pr("num-samples", $numSamples);
+	&pr("offset", $offset);
+	&pr("bucket", "0x%x", $bucket);
+    }
+    elsif ($typeString eq 'ExportMonitor')
+    {
+	local($eventRate, $input, $format, $numTracks) =
+	    unpack("x$n S2 xx C2", $_[1]);
+
+	&swaps($eventRate, $input);
+
+	&pr("input", $input);
+	&pr("event-rate", $eventRate);
+	&pr("format", $formatStrings[$format]);
+    }
+
+    $n += 22;
+
+    if ($numActions)
+    {
+	&pr("actions", "($numActions)");
+
+	while($numActions--)
+	{
+	    print "\n";
+	    $n += &showAction($n, $_[1]);
+	}
+    }
+
+    $n += $extra;
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub showBucket
+{
+    local($n) = @_;
+    local($i, $oldN, $desc, $z);
+    local($valueMask, $changeMask, $id, $kind, $use, $format, $numTracks,
+	  $access, $stringType, $stringLen, $sampleRate, $numSamples) =
+	      unpack("x$n L3 C4 L CxxxL SxxL", $_[1]);
+
+    $ind += $indent;
+    $oldN = $n;
+    $n += 36;
+
+    &swapl($valueMask, $changeMask, $id, $access, $stringLen, $numSamples);
+    &swaps($sampleRate);
+
+    if ($valueMask & $attribMasks{'description'})
+    {
+	($desc) = unpack("x$n A$stringLen", $_[1]);
+	$n += &pad4($stringLen);
+    }
+
+    &pr("id", "0x%x", $id) if $valueMask & $attribMasks{'id'};
+    &pr("kind", $kindStrings[$kind]) if $valueMask & $attribMasks{'kind'};
+
+    if ($valueMask & $attribMasks{'use'})
+    {
+	for ($z = '', $i = 0; $use && $i < 8; $i++, $use >>= 1)
+	{
+	    $z = $z."$useStrings[$i] " if $use & 1;
+	}
+	&pr("use", $z);
+    }
+
+    &pr("format", $formatStrings[$format])
+	if $valueMask & $attribMasks{'format'};
+    &pr("tracks", $numTracks) if $valueMask & $attribMasks{'numTracks'};
+
+    if ($valueMask & $attribMasks{'access'})
+    {
+	for ($z = '', $i = 0; $access && $i < 8; $i++, $access >>= 1)
+	{
+	    $z = $z."$accessStrings[$i] " if $access & 1;
+	}
+	&pr("access", $z);
+    }
+
+    if ($valueMask & $attribMasks{'description'})
+    {
+	&pr("string-type", $stringTypeStrings[$stringType]);
+	&pr("description", "\"$desc\"");
+    }
+
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub showDevice
+{
+    local($n) = @_;
+    local($dontShowChangable) = $_[2];
+    local($i, $oldN, $desc, @children, $z);
+    local($valueMask, $changeMask, $id, $kind, $use, $format, $numTracks,
+	  $access, $stringType, $stringLen, $location, $gain, $minSampleRate,
+	  $maxSampleRate, $lineMode, $numChildren) =
+	      unpack("x$n L3 C4 L CxxxL L2 S2 C2", $_[1]);
+
+    $ind += $indent;
+    $oldN = $n;
+    $n += 44;
+
+    &swapl($valueMask, $stringLen);
+
+    if ($valueMask & $attribMasks{'description'})
+    {
+	($desc) = unpack("x$n A$stringLen", $_[1]);
+	$n += &pad4($stringLen);
+    }
+
+    if ($valueMask & $attribMasks{'children'})
+    {
+	@children = unpack("x$n L$numChildren", $_[1]);
+	$n += $numChildren << 2;
+    }
+
+    &swapl($changeMask, $id, $access, $location, $gain, @children);
+    &swaps($minSampleRate, $maxSampleRate);
+
+    &pr("id", "0x%x", $id) if $valueMask & $attribMasks{'id'};
+
+    if (!$dontShowChangable && $changeMask)
+    {
+	for ($z = '', $i = 0; $changeMask && $i < 32; $i++, $changeMask >>= 1)
+	{
+	    $z = $z."$attribStrings[$i] " if $changeMask & 1;
+	}
+	&pr("changeable", $z);
+    }
+
+    if ($valueMask & $attribMasks{'kind'})
+    {
+	&pr("kind", $kindStrings[$kind]);
+	$deviceType{$id} = $kindStrings[$kind];
+    }
+
+    if ($valueMask & $attribMasks{'use'})
+    {
+	for ($z = '', $i = 0; $use && $i < 8; $i++, $use >>= 1)
+	{
+	    $z = $z."$useStrings[$i] " if $use & 1;
+	}
+	&pr("use", $z);
+    }
+
+    &pr("format", $formatStrings[$format])
+	if $valueMask & $attribMasks{'format'};
+    &pr("tracks", $numTracks) if $valueMask & $attribMasks{'numTracks'};
+
+    if ($valueMask & $attribMasks{'access'})
+    {
+	for ($z = '', $i = 0; $access && $i < 8; $i++, $access >>= 1)
+	{
+	    $z = $z."$accessStrings[$i] " if $access & 1;
+	}
+	&pr("access", $z);
+    }
+
+    if ($valueMask & $attribMasks{'description'})
+    {
+	&pr("string-type", $stringTypeStrings[$stringType]);
+	&pr("description", "\"$desc\"");
+    }
+
+    if ($valueMask & $attribMasks{'location'})
+    {
+	for ($z = '', $i = 0; $location && $i < 32; $i++, $location >>= 1)
+	{
+	    $z = $z."$locationStrings[$i] " if $location & 1;
+	}
+	&pr("location", $z);
+    }
+
+    &pr("minimum-sample-rate", $minSampleRate)
+	if $valueMask & $attribMasks{'minSampleRate'};
+    &pr("maximum-sample-rate", $maxSampleRate)
+	if $valueMask & $attribMasks{'maxSampleRate'};
+    &pr("gain", "%s%%", &showFixed($gain))
+	if $valueMask & $attribMasks{'gain'};
+
+    if ($valueMask & $attribMasks{'lineMode'})
+    {
+	if ($deviceType{$id} eq 'PhysicalInput')
+	{
+	    $z = $inputModeStrings[$lineMode];
+	}
+	else
+	{
+	    for ($z = '', $i = 0; $lineMode && $i < 8; $i++, $lineMode >>= 1)
+	    {
+		$z = $z."$outputModeStrings[$i] " if $lineMode & 1;
+	    }
+	}
+
+	&pr("line-mode", $z);
+    }
+
+    if ($valueMask & $attribMasks{'children'})
+    {
+	if ($numChildren)
+	{
+	    $z = '';
+	    for (@children)
+	    {
+		$z = $z.sprintf("0x%x ", $_);
+	    }
+	    &pr("children", $z);
+	}
+    }
+
+    $ind -= $indent;
+    $n - $oldN;
+}
+
+sub connectionSetupPrefix
+{
+    local($clientByteOrder, $majorVersion, $minorVersion, $authProtoLen,
+	  $authStringLen) = unpack("axSSSSxx", $clientbuf);
+
+    $ind = $requestIndent;
+
+    $swap = $hostByteOrder ne $clientByteOrder;
+    &swaps($majorVersion, $minorVersion);
+
+    &setTimestamp;
+    $timeStamp = &getTimestamp;
+
+    &leftJustify($timeStamp, "REQUEST", "Connection");
+    &pr("byte-order", "%s first", $clientByteOrder eq 'B' ? "MSB" : "LSB");
+    &pr("major-version", "0x%04x", $majorVersion);
+    &pr("minor-version", "0x%04x", $minorVersion);
+    &pr("auth-proto-len", $authProtoLen);
+    &pr("auth-string-len", $authStringLen);
+
+    &waitServer(8, 'connectionReplyPrefix');
+}
+
+sub connectionReplyPrefix
+{
+    local($success, $lengthReason, $majorVersion, $minorVersion, $len) =
+	unpack("C2 S3", $serverbuf);
+    local($n);
+    $ind = $replyIndent;
+
+    &swaps($majorVersion, $minorVersion, $len);
+
+    $len <<= 2;
+    &leftJustify($timeStamp, "REPLY", "Connection");
+    &pr("success", $success);
+    &pr("protocol-major-version", "0x%04x", $majorVersion);
+    &pr("protocol-minor-version", "0x%04x", $minorVersion);
+    &pr("length-in-bytes", $len);
+
+    &waitServer($len, 'connectionReply');
+}
+
+sub connectionReply
+{
+    local($release, $ridBase, $ridMask, $minSampleRate, $maxSampleRate,
+	  $nbytesVendor, $maxRequestSize, $maxTracks, $numFormats,
+	  $numElementTypes, $numWaveForms, $numActions, $numDevices,
+	  $numBuckets, $numRadios) = unpack("L3 S4 C8", $serverbuf);
+    local($n, $data, @a);
+
+    $ind = $replyIndent;
+
+    $n = 28;
+    &swapl($release, $ridBase, $ridMask);
+    &swaps($minSampleRate, $maxSampleRate, $nbytesVendor, $maxRequestSize);
+
+    &pr("release-number", $release);
+    &pr("resource-id-base", "0x%08x", $ridBase);
+    &pr("resource-id-mask", "0x%08x", $ridMask);
+    &pr("minimum-sample-rate", $minSampleRate);
+    &pr("maximum-sample-rate", $maxSampleRate);
+    &pr("maximum-request-length", $maxRequestSize);
+    &pr("maximum-tracks", $maxTracks);
+
+    ($data) = unpack("x$n A$nbytesVendor", $serverbuf);
+    $n += &pad4($nbytesVendor);
+    &pr("vendor", "\"$data\"");
+
+    &pr("formats", "($numFormats)");
+    @a = unpack("x$n C$numFormats", $serverbuf);
+    $n += &pad4($numFormats);
+    for (@a)
+    {
+	&pr("", $formatStrings[$_]);
+    }
+
+    &pr("element-types", "($numElementTypes)");
+    @a = unpack("x$n C$numElementTypes", $serverbuf);
+    $n += &pad4($numElementTypes);
+    for (@a)
+    {
+	&pr("", $elementTypeStrings[$_]);
+    }
+
+    &pr("waveforms", "($numWaveForms)");
+    @a = unpack("x$n C$numWaveForms", $serverbuf);
+    $n += &pad4($numWaveForms);
+    for (@a)
+    {
+	&pr("", $waveFormStrings[$_]);
+    }
+
+    &pr("actions", "($numActions)");
+    @a = unpack("x$n C$numActions", $serverbuf);
+    $n += &pad4($numActions);
+    for (@a)
+    {
+	&pr("", $actionStrings[$_]);
+    }
+
+    &pr("devices", "($numDevices)");
+    while($numDevices--)
+    {
+	print "\n";
+	$n += &showDevice($n, $serverbuf);
+    }
+
+    &pr("buckets", "($numBuckets)");
+    while($numBuckets--)
+    {
+	$n += &showBucket($n, $serverbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+#
+# Requests and Replies
+#
+sub ListDevices			# 1
+{
+    &showDevice(0, $clientbuf, 1);
+    &waitReply('ListDevicesReply');
+}
+
+sub ListDevicesReply
+{
+    local($rbuf) = @_;
+    local($numDevices) = unpack("x8 L", $rbuf);
+    local($n);
+
+    &swapl($numDevices);
+    $n = 0;
+
+    &pr("devices", "($numDevices)");
+
+    while($numDevices--)
+    {
+	print "\n";
+	$n += &showDevice($n, $serverbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub GetDeviceAttributes		# 2
+{
+    local($device) = unpack("L", $clientbuf);
+
+    &swapl($device);
+    &pr("device", "0x%x", $device);
+    &waitReply('GetDeviceAttributesReply');
+}
+
+sub GetDeviceAttributesReply
+{
+    &showDevice(0, $serverbuf);
+    &waitRequestOrReply;
+}
+
+sub SetDeviceAttributes		# 3
+{
+    local($device) = unpack("L", $clientbuf);
+
+    &swapl($device);
+    &pr("device", "0x%x", $device);
+
+    &showDevice(4, $clientbuf, 1);
+    &waitRequestOrReply;
+}
+
+sub CreateBucket		# 4
+{
+    &showBucket(4, $clientbuf);
+    &waitRequestOrReply;
+}
+
+sub DestroyBucket		# 5
+{
+    local($bucket) = unpack("L", $clientbuf);
+
+    &swapl($bucket);
+    &pr("bucket", "0x%x", $bucket);
+    &waitRequestOrReply;
+}
+
+sub ListBuckets			# 6
+{
+    &showBucket(0, $clientbuf);
+    &waitReply('ListBucketsReply');
+}
+
+sub ListBucketsReply
+{
+    local($rbuf) = @_;
+    local($numBuckets) = unpack("x8 L", $rbuf);
+    local($n);
+
+    &swapl($numBuckets);
+    $n = 0;
+
+    &pr("buckets", "($numBuckets)");
+
+    while($numBuckets--)
+    {
+	$n += &showBucket($n, $serverbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub GetBucketAttributes		# 7
+{
+    local($bucket) = unpack("L", $clientbuf);
+
+    &swapl($bucket);
+    &pr("bucket", "0x%x", $bucket);
+    &waitReply('GetBucketAttributesReply');
+}
+
+sub GetBucketAttributesReply
+{
+    &showBucket(0, $serverbuf);
+    &waitRequestOrReply;
+}
+
+sub CreateFlow			# 14
+{
+    local($flow) = unpack("L", $clientbuf);
+    
+    &swapl($flow);
+    &pr("flow", "0x%x", $flow);
+    &waitRequestOrReply;
+}
+
+sub DestroyFlow			# 15
+{
+    local($flow) = unpack("L", $clientbuf);
+    
+    &swapl($flow);
+    &pr("flow", "0x%x", $flow);
+    &waitRequestOrReply;
+}
+
+sub GetElements			# 18
+{
+    local($flow) = unpack("L", $clientbuf);
+    
+    &swapl($flow);
+    &pr("flow", "0x%x", $flow);
+    &waitReply('GetElementsReply');
+}
+
+sub GetElementsReply
+{
+    local($rbuf) = @_;
+    local($clocked, $flow, $numElements) = unpack("x C x6 LL", $rbuf);
+    local($n, $i) = (0, 0);
+
+    &swapl($flow, $numElements);
+    &pr("flow", "0x%x", $flow);
+    &pr("clocked: ", $clocked ? "True" : "False");
+    &pr("elements", "($numElements)");
+
+    while($numElements--)
+    {
+	print "\n";
+	$n += &showElement($n, $serverbuf, $i++);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub SetElements			# 19
+{
+    local($clocked) = @_;
+    local($flow, $numElements) = unpack("LL", $clientbuf);
+    local($n, $i) = (8, 0);
+
+    &swapl($flow, $numElements);
+    &pr("flow", "0x%x", $flow);
+    &pr("clocked", $clocked ? "True" : "False");
+    &pr("elements", "($numElements)");
+
+    while($numElements--)
+    {
+	print "\n";
+	$n += &showElement($n, $clientbuf, $i++);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub GetElementStates		# 20
+{
+    local($numStates) = unpack("L", $clientbuf);
+    local($n) = 4;
+
+    &swapl($numStates);
+
+    &pr("states", "($numStates)");
+
+    while ($numStates--)
+    {
+	$n += &showElementState($n, $clientbuf, 1);
+    }
+
+    &waitReply('GetElementStatesReply');
+}
+
+sub GetElementStatesReply
+{
+    local($rbuf) = @_;
+    local($numStates) = unpack("x8 L", $rbuf);
+    local($n);
+
+    &swapl($numStates);
+    $n = 0;
+
+    &pr("states", "($numStates)");
+
+    while($numStates--)
+    {
+	$n += &showElementState($n, $serverbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub SetElementStates		# 21
+{
+    local($numStates) = unpack("L", $clientbuf);
+    local($n) = 4;
+
+    &swapl($numStates);
+
+    &pr("states", "($numStates)");
+
+    while ($numStates--)
+    {
+	$n += &showElementState($n, $clientbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub SetElementParameters	# 23
+{
+    local($numParameters) = unpack("L", $clientbuf);
+    local($n) = 4;
+
+    &swapl($numParameters);
+    &pr("parameters", "($numParameters)");
+
+    while ($numParameters--)
+    {
+	$n += &showParameters($n, $clientbuf);
+    }
+
+    &waitRequestOrReply;
+}
+
+sub WriteElement		# 24
+{
+    local($elementNum) = @_;
+    local($flow, $numBytes, $state) = unpack("LLC", $clientbuf);
+
+    &swapl($flow, $numBytes);
+    &pr("flow", "0x%x", $flow);
+    &pr("element-num", $elementNum);
+    &pr("num-bytes", $numBytes);
+    &pr("state", $transferStateStrings[$state]);
+
+    &waitRequestOrReply;
+}
+
+sub ReadElement			# 25
+{
+    local($elementNum) = @_;
+    local($flow, $numBytes) = unpack("LLC", $clientbuf);
+
+    &swapl($flow, $numBytes);
+    &pr("flow", "0x%x", $flow);
+    &pr("num-bytes", $numBytes);
+
+    &waitReply('ReadElementReply');
+}
+
+sub ReadElementReply
+{
+    local($rbuf) = @_;
+    local($numBytes) = unpack("x8 L", $rbuf);
+
+    &swapl($numBytes);
+    &pr("num-bytes", $numBytes);
+
+    &waitRequestOrReply;
+}
+
+sub GetCloseDownMode		# 33
+{
+    &waitReply('GetCloseDownModeReply');
+}
+
+sub GetCloseDownModeReply
+{
+    local($rbuf) = @_;
+    local($mode) = unpack("xC", $rbuf);
+    &pr("mode", $closeDownModeStrings[$mode]);
+    &waitRequestOrReply;
+}
+
+sub SetCloseDownMode		# 34
+{
+    local($mode) = @_;
+
+    &pr("mode", $closeDownModeStrings[$mode]);
+    &waitRequestOrReply;
+}
+
+sub KillClient			# 35
+{
+    local($id) = unpack("L", $clientbuf);
+    
+    &swapl($id);
+    &pr("id", "0x%x", $id);
+    &waitRequestOrReply;
+}
+
+sub GetServerTime		# 36
+{
+    &waitReply('GetServerTimeReply');
+}
+
+sub GetServerTimeReply
+{
+    local($rbuf) = @_;
+    local($time) = unpack("x8L", $rbuf);
+
+    &swapl($time);
+    &pr("time", "0x%08x", $time);
+    &waitRequestOrReply;
+}
+
+sub NoOperation			# 37
+{
+    &waitRequestOrReply;
+}
+
+#
+# Events
+#
+sub ElementNotifyEvent
+{
+    local($time, $flow, $elementNum, $kind, $prevState, $currentState, $reason,
+	  $numBytes) = unpack("x4 LL S5 xx L", $serverbuf);
+
+    &swaps($elementNum, $kind, $prevState, $currentState, $reason);
+    &swapl($time, $flow, $numBytes);
+
+    &pr("time", "0x%x", $time);
+    &pr("flow", "0x%x", $flow);
+    &pr("element-num", $elementNum);
+    &pr("kind", $notifyKindStrings[$kind]);
+    &pr("prev-state", $stateStrings[$prevState]);
+    &pr("current-state", $stateStrings[$currentState]);
+    &pr("reason", $reasonStrings[$reason]);
+    &pr("num-bytes", $numBytes)	if $reasonStrings[$reason] !~ /User|EOF/;
+}
+
+sub MonitorNotifyEvent
+{
+    local($time, $flow, $elementNum, $format, $numTracks, $count, $numFields) =
+	  unpack("x4 LL S CCSS", $serverbuf);
+    local($n);
+
+    &swaps($elementNum, $count, $numFields);
+    &swapl($time, $flow);
+
+    &pr("time", "0x%x", $time);
+    &pr("flow", "0x%x", $flow);
+    &pr("element-num", $elementNum);
+    &pr("format", $formatStrings[$format]);
+    &pr("tracks", $numTracks);
+    &pr("count", $count);
+    &pr("fields", "($numFields)");
+
+    $n = 20;
+
+    if ($formatStrings[$format] =~ /LinearSigned16MSB|LinearSigned16LSB/)
+    {
+	local($sw, $saveSwap, $i, @f);
+
+	$sw = (($formatStrings[$format] eq 'LinearSigned16MSB' &&
+		$hostByteOrder eq 'l') ||
+	       ($formatStrings[$format] eq 'LinearSigned16LSB' &&
+		$hostByteOrder eq 'B'));
+
+	$saveSwap = $swap;
+	$swap = $sw;
+
+	for ($i = 0; $i < $numFields; $i++)
+	{
+	    @f = unpack("x$n s$numTracks", $serverbuf);
+	    &swaps(@f);
+	    for (@f)
+	    {
+		$_ = unpack("s", pack("S", $_));	# sign extend
+	    }
+	    &pr($i, join(' ', @f));
+	    $n += $numTracks << 1;
+	}
+
+	$swap = $saveSwap; 
+    }
+}
+
+sub Error
+{
+    local($error, $time, $id, $minor, $major) =
+	unpack("x C xx LL SC", $serverbuf);
+
+    &swaps($minor);
+    &swapl($time, $id);
+
+    &pr("time", "0x%x", $time);
+    &pr("id", "0x%x", $id);
+    &pr("error", $errorStrings[$error]);
+    &pr("major opcode", "$requestStrings[$major] ($major)");
+    &pr("minor opcode", $minor);
+}

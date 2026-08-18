@@ -1,0 +1,62 @@
+#!/bin/sh
+set -e
+
+# autopkgtest check: Build and run the example minitar program against
+# libarchive, to verify that the headers and pkg-config file are installed
+# correctly and minitar works as expected.
+# Author: Benjamin Drung <bdrung@ubuntu.com>
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+flags="$("${CROSS_COMPILE}pkg-config" --cflags --libs libarchive)"
+# shellcheck disable=2086  # there may be more than one word in $flags
+"${CROSS_COMPILE}gcc" -O2 -g -Wno-unused-result -o minitar examples/minitar/minitar.c $flags
+
+# Create different tarballs
+echo "Deadbeaf" > foo
+echo "Compressing foo.tar..."
+./minitar -cf foo.tar foo
+echo "Compressing foo.tar.gz..."
+./minitar -czf foo.tar.gz foo
+echo "Compressing foo.tar.bz2..."
+./minitar -cyf foo.tar.bz2 foo
+
+# Test tarballs for correct mime type
+echo "Testing mime type of foo.tar..."
+filetype="$(file -b --mime-type foo.tar)"
+test "$filetype" = "application/x-tar"
+echo "Testing mime type of foo.tar.gz..."
+filetype="$(file -b --mime-type foo.tar.gz)"
+test "$filetype" = "application/gzip"
+echo "Testing mime type of foo.tar.bz2..."
+filetype="$(file -b --mime-type foo.tar.bz2)"
+test "$filetype" = "application/x-bzip2"
+
+# Test untar, too, for extracting.
+# shellcheck disable=2086  # there may be more than one word in $flags
+"${CROSS_COMPILE}gcc" -O2 -g -Wno-unused-result -o untar examples/untar.c $flags
+
+# Extract tarballs and compare content
+mv foo foo.orig
+echo "Extracting foo.tar..."
+./minitar -xf foo.tar
+cmp foo foo.orig
+rm foo
+./untar -xf foo.tar
+cmp foo foo.orig
+rm foo foo.tar
+echo "Extracting foo.tar.gz..."
+./minitar -xf foo.tar.gz
+cmp foo foo.orig
+rm foo foo.tar.gz
+echo "Extracting foo.tar.bz2..."
+./minitar -xf foo.tar.bz2
+cmp foo foo.orig
+rm foo foo.tar.bz2
+
+# Clean-up
+rm foo.orig minitar untar

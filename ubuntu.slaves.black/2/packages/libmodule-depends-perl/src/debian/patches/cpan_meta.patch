@@ -1,0 +1,218 @@
+Description: Support META.json additionally to META.yml; add support for test_requires; use CPAN::META.
+Origin: vendor
+Bug: https://rt.cpan.org/Ticket/Display.html?id=64017
+ https://rt.cpan.org/Ticket/Display.html?id=64016
+Bug-Debian: https://bugs.debian.org/541159
+ http://bugs.debian.org/541164
+ http://bugs.debian.org/541165
+Forwarded: yes
+Author: Ryan Niebur <ryan@debian.org>
+ gregor herrmann <gregoa@debian.org>
+ intrigeri <intrigeri@debian.org>
+Reviewed-by: gregor herrmann <gregoa@debian.org>
+Last-Update: 2012-06-10
+
+diff --git a/lib/Module/Depends.pm b/lib/Module/Depends.pm
+index aa3fd9b..984b6d4 100644
+--- a/lib/Module/Depends.pm
++++ b/lib/Module/Depends.pm
+@@ -1,9 +1,9 @@
+ use strict;
+ package Module::Depends;
+-use Parse::CPAN::Meta;
++use CPAN::Meta;
+ use Cwd qw( getcwd );
+ use base qw( Class::Accessor::Chained );
+-__PACKAGE__->mk_accessors(qw( dist_dir debug libs requires configure_requires build_requires error ));
++__PACKAGE__->mk_accessors(qw( dist_dir debug libs requires configure_requires build_requires test_requires error ));
+ our $VERSION = '0.16';
+ 
+ =head1 NAME
+@@ -12,7 +12,6 @@ Module::Depends - identify the dependencies of a distribution
+ 
+ =head1 SYNOPSIS
+ 
+- use YAML;
+  use Module::Depends;
+  my $deps = Module::Depends->new->dist_dir( '.' )->find_modules;
+  print "Our dependencies:\n", Dump $deps->requires;
+@@ -42,6 +41,7 @@ sub new {
+         libs           => [],
+         requires       => {},
+         build_requires => {},
++        test_requires  => {},
+         configure_requires => {},
+         error          => '',
+     });
+@@ -53,7 +53,7 @@ Path where the distribution has been extracted to.
+ 
+ =head2 find_modules
+ 
+-scan the C<dist_dir> to populate C<libs>, C<requires>, and C<build_requires>
++scan the C<dist_dir> to populate C<libs>, C<requires>, C<configure_requires>, C<test_requires>, and C<build_requires>
+ 
+ =cut
+ 
+@@ -75,14 +75,17 @@ sub find_modules {
+ sub _find_modules {
+     my $self = shift;
+ 
+-    my ($file) = grep { -e $_ } qw( MYMETA.yml META.yml );
++    my ($file) = grep { -e $_ } qw( MYMETA.json MYMETA.yml META.json META.yml );
+     if ($file) {
+-        my $meta = ( Parse::CPAN::Meta::LoadFile( $file ) )[0];
+-        $self->requires( $meta->{requires} );
+-        $self->build_requires( $meta->{build_requires} );
++        my $meta = CPAN::Meta->load_file( $file );
++        my $prereqs = $meta->effective_prereqs();
++        $self->requires( $prereqs->requirements_for( 'runtime', 'requires' )->as_string_hash() );
++        $self->build_requires( $prereqs->requirements_for( 'build', 'requires' )->as_string_hash() );
++        $self->configure_requires( $prereqs->requirements_for( 'configure', 'requires' )->as_string_hash() );
++        $self->test_requires( $prereqs->requirements_for( 'test', 'requires' )->as_string_hash() );
+     }
+     else {
+-        $self->error( "No META.yml found in ". $self->dist_dir );
++        $self->error( "No {MY,}META.{json,yml} found in ". $self->dist_dir );
+     }
+     return $self;
+ }
+diff --git a/lib/Module/Depends/Intrusive.pm b/lib/Module/Depends/Intrusive.pm
+index ae240b9..6d57287 100644
+--- a/lib/Module/Depends/Intrusive.pm
++++ b/lib/Module/Depends/Intrusive.pm
+@@ -33,6 +33,8 @@ sub _find_modules {
+         my %args =  @_;
+         $self->requires( $args{requires} || {} );
+         $self->build_requires( $args{build_requires} || {} );
++        $self->test_requires( $args{test_requires} || {} );
++        $self->configure_requires( $args{configure_requires} || {} );
+         bless {}, "Module::Depends::Intrusive::Fake::Module::Build";
+     };
+     local *Module::Build::subclass = sub { 'Module::Build' };
+@@ -41,6 +43,7 @@ sub _find_modules {
+     my $WriteMakefile = sub {
+         my %args = @_;
+         $self->requires( $args{PREREQ_PM} || {} );
++        $self->build_requires ( $args{BUILD_REQUIRES} || {} );
+         1;
+     };
+     local *main::WriteMakefile;
+@@ -63,7 +66,7 @@ sub _find_modules {
+       all_from auto_install AUTOLOAD build_requires check_nmake include
+       include_deps installdirs Makefile makemaker_args Meta name no_index
+       requires WriteAll clean_files can_cc sign cc_inc_paths cc_files
+-      cc_optimize_flags author license
++      cc_optimize_flags author license test_requires
+ 
+     );
+     local *inc::Module::Install::AUTOLOAD = sub { 1 };
+@@ -80,6 +83,10 @@ sub _find_modules {
+         my %deps = (@_ == 1 ? ( $_[0] => 0 ) : @_);
+         $self->configure_requires->{ $_ } = $deps{ $_ } for keys %deps;
+     };
++    local *inc::Module::Install::test_requires = sub {
++        my %deps = (@_ == 1 ? ( $_[0] => 0 ) : @_);
++        $self->test_requires->{ $_ } = $deps{ $_ } for keys %deps;
++    };
+ 
+     my $file = File::Spec->catfile( getcwd(), $pl );
+     eval {
+diff --git a/t/depends.t b/t/depends.t
+index 423df2d..f7e93a6 100644
+--- a/t/depends.t
++++ b/t/depends.t
+@@ -1,7 +1,7 @@
+ #!perl
+ use strict;
+ use warnings;
+-use Test::More tests => 20;
++use Test::More tests => 21;
+ my $class = 'Module::Depends::Intrusive';
+ require_ok("Module::Depends");
+ require_ok($class);
+@@ -68,6 +68,10 @@ my $distant = Module::Depends->new->dist_dir('t/with-yaml')->find_modules;
+ is_deeply( $distant->requires, $our_requires,
+     "got our own requires, non-intrusively, from a distance" );
+ 
++my $json = Module::Depends->new->dist_dir('t/with-json')->find_modules;
++is_deeply( $json->requires, $our_requires,
++    "got our own requires, non-intrusively, from a distance" );
++
+ my $inline_mm = $class->new->dist_dir('t/inline-makemaker')->find_modules;
+ is_deeply(
+     $inline_mm->requires,
+diff --git a/t/with-json/META.json b/t/with-json/META.json
+new file mode 100644
+index 0000000..5253ffa
+--- /dev/null
++++ b/t/with-json/META.json
+@@ -0,0 +1,56 @@
++{
++   "abstract" : "identify the dependencies of a distribution",
++   "author" : [
++      "unknown"
++   ],
++   "dynamic_config" : 1,
++   "generated_by" : "Module::Build version 0.2608, CPAN::Meta::Converter version 2.110930",
++   "license" : [
++      "perl_5"
++   ],
++   "meta-spec" : {
++      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
++      "version" : "2"
++   },
++   "name" : "Module-Depends",
++   "prereqs" : {
++      "build" : {
++         "requires" : {
++            "Test::More" : 0
++         }
++      },
++      "test" : {
++         "requires" : {
++            "Test::Fatal" : 0
++         }
++      },
++      "runtime" : {
++         "requires" : {
++            "Class::Accessor::Chained" : 0,
++            "File::Spec" : 0,
++            "File::chdir" : 0,
++            "YAML" : 0
++         }
++      }
++   },
++   "provides" : {
++      "Module::Depends" : {
++         "file" : "lib/Module/Depends.pm",
++         "version" : "0.06"
++      },
++      "Module::Depends::Intrusive" : {
++         "file" : "lib/Module/Depends/Intrusive.pm",
++         "version" : 0
++      },
++      "Module::Depends::Intrusive::Fake::Module::Build" : {
++         "file" : "lib/Module/Depends/Intrusive.pm",
++         "version" : 0
++      },
++      "main" : {
++         "file" : "lib/Module/Depends/Intrusive.pm",
++         "version" : 0
++      }
++   },
++   "release_status" : "stable",
++   "version" : "0.06"
++}
+diff --git a/t/with-yaml/META.yml b/t/with-yaml/META.yml
+index ce1faa9..024e7b2 100644
+--- a/t/with-yaml/META.yml
++++ b/t/with-yaml/META.yml
+@@ -11,6 +11,8 @@ requires:
+   YAML: 0
+ build_requires:
+   Test::More: 0
++configure_requires:
++  Test::Fatal: 0
+ provides:
+   Module::Depends:
+     file: lib/Module/Depends.pm

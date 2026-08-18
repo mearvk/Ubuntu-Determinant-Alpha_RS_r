@@ -1,0 +1,447 @@
+// GPars - Groovy Parallel Systems
+//
+// Copyright © 2008-2013  The original author or authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import org.apache.tools.ant.taskdefs.Javadoc
+
+//  Author: Václav Pech
+//  Author: Russel Winder
+//  Author: Dierk König
+//  Author: Hans Dockter
+//  Author: Rene Groeschke
+//  Author: Hamlet D'Arcy - Updated OSGi configuration
+
+final signingPropertiesAreSet = {
+    project.hasProperty('signing.keyId') && project.hasProperty('signing.password') && project.hasProperty('signing.secretKeyRingFile')
+}
+
+apply plugin: 'groovy'
+apply plugin: 'maven'
+apply plugin: 'osgi'
+if (signingPropertiesAreSet()) {
+    apply plugin: 'signing'
+}
+
+//apply plugin: 'codenarc'
+
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+
+defaultTasks 'test'
+
+archivesBaseName = 'gpars'
+group = 'org.codehaus.gpars'
+version = '1.2.1'
+
+sourceCompatibility = 6
+targetCompatibility = 6
+
+def theVendor = 'gpars.org'
+def theTitle = 'GPars: Groovy Parallel Systems'
+
+// We are not building the pdf guides at this moment due to missing dependencies
+/*
+apply {
+    from 'gradle/docs.gradle'
+    from 'gradle/docsDependencies.gradle'
+}
+*/
+
+task copyDSLDefinitions(type: Copy) {
+    into "$buildDir/classes/main"
+    from(sourceSets.main.allSource) {
+        include('**/*.gdsl')
+    }
+}
+
+jar {
+    manifest {
+        name = 'gpars'
+        version = this.version
+        symbolicName = 'gpars.org'
+        instruction 'Bundle-Vendor', theVendor
+        instruction 'Bundle-Description', group
+        instruction 'Bundle-DocURL', 'http://gpars.codehaus.org'
+        instruction 'Built-By', System.properties.'user.name'
+        instruction 'Extension-Name', archivesBaseName
+        instruction 'Specification-Title', theTitle
+        instruction 'Specification-Version', version
+        instruction 'Specification-Vendor', theVendor
+        instruction 'Implementation-Title', theTitle
+        instruction 'Implementation-Version', version
+        instruction 'Implementation-Vendor', theVendor
+        instruction 'provider', theVendor
+        instruction 'Export-Package', "*;version=${version}"
+        instruction 'Import-Package', '*;resolution:=optional'
+        instruction '-removeheaders', 'Bnd-LastModified'
+    }
+}
+
+jar.dependsOn copyDSLDefinitions
+
+repositories {
+    if (project.hasProperty('gpars_useMavenLocal') && gpars_useMavenLocal) {
+        mavenLocal()
+    }
+    mavenCentral()
+    //maven {
+    //url 'http://download.java.net/maven/2'
+    //url 'http://oss.sonatype.org/content/repositories/snapshots' // For Spock SNAPSHOT artefacts.
+    //}
+}
+
+configurations {
+    deployerJars
+    docs
+    cover
+}
+
+// NB If hasProperty is evaluated at the top level of the script, the method associated with the Project
+// instance is called, and everything works as expected.  When executed without qualification in the context
+// of the dependencies Closure then the hasProperties associated with the DependencyHandler instance is
+// called -- and so the test appears to fail unexpectedly as the properties are not defined in that context.
+// We must therefore be explicit about evaluating the hasProperty of the Project instance.  Thanks to
+// Ladislav Thon for pointing this out on the Gradle Developer email list.  The only question is why the
+// symbol look up works correctly without qualification.
+
+dependencies {
+    compile group: 'org.codehaus.groovy', name: 'groovy-all', version: project.hasProperty('gpars_groovyVersion') ? gpars_groovyVersion : '2.1.9'
+    compile 'org.codehaus.jsr166-mirror:jsr166y:1.7.0'
+    compile('org.multiverse:multiverse-core:0.7.0') { transitive = false }
+    compile group: 'org.jboss.netty', name: 'netty', version: project.hasProperty('gpars_nettyVersion') ? gpars_nettyVersion : '3.2.9.Final'
+    compile 'org.codehaus.jcsp:jcsp:1.1-rc5'
+    testCompile group: 'junit', name: 'junit', version: project.hasProperty('gpars_junitVersion') ? gpars_junitVersion : '4.11'
+    testCompile group: 'org.spockframework', name: 'spock-core', version: project.hasProperty('gpars_spockVersion') ? gpars_spockVersion : '0.7-groovy-2.0'
+    testCompile 'com.google.code.gson:gson:2.2.2'
+    testCompile 'com.google.guava:guava:14.0.1'
+    testCompile fileTree(dir: 'lib', include: '*.jar')
+    //  Manually load up the required dependencies for grailsDoc to avoid pulling in everything needed for
+    //  Grails, including all the SpringRoo stuff.
+    docs group: 'org.codehaus.groovy', name: 'groovy-all', version: project.hasProperty('gpars_groovyVersion') ? gpars_groovyVersion : '2.0.8'
+    docs 'org.yaml:snakeyaml:1.12'
+    docs 'commons-lang:commons-lang:2.6'
+    /* Disabling the build of pdf guides due to missing dependencies
+    docs project.ext.grailsDocs
+    docs project.ext.radeox
+    docs project.ext.lowagieItext
+    docs project.ext.xhtmlRenderer
+    */
+    docs 'commons-logging:commons-logging:1.1.1'
+    deployerJars "org.apache.maven.wagon:wagon-http-lightweight:2.4"
+    cover 'net.sourceforge.cobertura:cobertura:1.9.4.1'
+    testRuntime 'net.sourceforge.cobertura:cobertura:1.9.4.1'
+}
+
+task runBenchmarks(type: JavaExec) {
+    def gcArg = "-XX:+UseParallelGC"
+
+    // On Windows, calling the JVM with extended params requires multiple levels of quoting
+    if (System.getProperty('os.name').matches(".*Windows.*")) {
+        gcArg = '"""-XX:+UseParallelGC"""'
+    }
+    description = 'Runs benchmarks measuring the throughput and latency of actors in GPars'
+    main = 'groovyx.gpars.benchmark.caliper.BenchmarkRunner'
+    classpath = sourceSets.test.runtimeClasspath
+    args = ["-Jgc=${gcArg}", '-Jxms=-Xms512M', '-Jxmx=-Xmx1024M', '-Jserver=-server']
+}
+
+//  To get the details of the "unchecked" issues.
+compileGroovy.options.compilerArgs = ['-Xlint']
+
+[compileGroovy, compileTestGroovy]*.groovyOptions*.fork(memoryInitialSize: '128M', memoryMaximumSize: '512M')
+
+gradle.taskGraph.whenReady { taskGraph ->
+    if (taskGraph.hasTask(":release") && version.contains("SNAPSHOT")) {
+        throw (new StopExecutionException("You should not release a snapshot version! We're Stopping the build!"))
+    }
+    if (taskGraph.hasTask(':test') && taskGraph.hasTask(':withCoverage')) {
+        new Coverage(this).setup()
+    }
+}
+
+task release(dependsOn: ['build', 'zipSamples', 'zipJavaDemo', 'zipDist', 'zipGuide']) << {
+    println 'We release now'
+}
+
+task withCoverage { // only here such that it can be put on the command line for enabling coverage
+    description = 'Prepare the test task to use code coverage if needed.'
+}
+
+test {
+    forkEvery = 600
+    maxParallelForks = hasProperty('gpars_maxTestForks') ? gpars_maxTestForks : 1
+    exclude '**/integration/**/*.*'
+}
+
+task integrationTest(type: Test, dependsOn: 'test') {
+    include '**/integration/**/*.*'
+}
+
+// codenarc configuration
+tasks.withType(CodeNarc).all { codeNarcTask ->
+    codeNarcTask.configFile = file('./config/codenarc/codenarc.groovy')
+    codeNarcTask.ignoreFailures = true
+}
+
+if (signingPropertiesAreSet()) {
+    signing {
+        sign configurations.archives
+    }
+}
+
+//build.dependsOn integrationTest
+
+gradle.taskGraph.whenReady { taskGraph ->
+    if (taskGraph.hasTask(uploadArchives)) {
+        if (!(project.hasProperty('codehausUsername') && project.hasProperty('codehausPassword'))) {
+            throw new RuntimeException('Must define both codehausUsername and codehausPassword to upload archives.')
+        }
+        if (!signingPropertiesAreSet()) {
+            throw new RuntimeException('Must define signing.keyId, signing.password, and signing.secretKeyRingFile to upload signed archives.')
+        }
+        project.ext.deployer = uploadArchives.repositories.mavenDeployer {
+            uniqueVersion = false
+            configuration = configurations.deployerJars
+            repository(url: 'https://dav.codehaus.org/repository/gpars/') {
+                authentication(userName: codehausUsername, password: codehausPassword)
+            }
+            snapshotRepository(url: 'https://dav.codehaus.org/snapshots.repository/gpars/') {
+                authentication(userName: codehausUsername, password: codehausPassword)
+            }
+            pom.project {
+                name 'GPars'
+                description 'The Groovy and Java high-level concurrency library offering actors, dataflow, CSP, agents, parallel collections, fork/join and more'
+                url 'http://gpars.codehaus.org'
+                inceptionYear '2009'
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution 'repo'
+                    }
+                }
+            }
+            // In the future Gradle will allow to use dynamic props for dependencies to deal with optionals
+            pom.whenConfigured { pom ->
+                // dependency is a native Maven dependency object (With properties artifactId, groupId, ...)
+                pom.dependencies.each { dependency ->
+                    if (dependency.artifactId in ['netty', 'jcsp', 'multiverse', 'groovy-all']) {
+                        dependency.optional = true
+                    }
+                }
+                // Remove test dependencies from all poms
+                pom.dependencies.removeAll(pom.dependencies.findAll { it.scope == 'test' })
+            }
+        }
+    }
+}
+
+
+def titleForDocumentation = archivesBaseName + ' ' + version
+def copyrightString = 'Copyright &#169; 2008&#8211;2013  V&#225;clav Pech.  All Rights Reserved.'
+def packageTitle = group
+
+javadoc {
+    options.overview('overview.html')
+    options.showAll()
+    options.encoding('UTF-8')
+    options.setUse(true)
+    options.author(true)
+    options.version(true)
+    options.windowTitle(titleForDocumentation)
+    options.docTitle(titleForDocumentation)
+    options.footer(copyrightString)
+
+    doFirst {
+        javadoc.title = titleForDocumentation
+        javadoc.options.docTitle = javadoc.title
+    }
+}
+
+if (JavaVersion.current().isJava8Compatible()) {
+    allprojects {
+        //noinspection SpellCheckingInspection
+        tasks.withType(Javadoc) {
+            // disable the crazy super-strict doclint tool in Java 8
+            //noinspection SpellCheckingInspection
+            options.addStringOption('Xdoclint:none', '-quiet')
+        }
+    }
+}
+
+groovydoc {
+    dependsOn(classes)
+    includePrivate = true
+    use = true
+    windowTitle = packageTitle
+    docTitle = packageTitle
+    header = packageTitle
+    footer = copyrightString
+    include 'groovyx/gpars/**'
+    overview = new File('overview.html')
+}
+
+// Only build javadocs as documentation
+//task documentation(dependsOn: ['javadoc', 'groovydoc', 'buildGuide', 'pdfGuide'], description: 'Create the API documentation.')
+task documentation(dependsOn: ['javadoc', 'groovydoc'], description: 'Create the API documentation.')
+
+task zipDoc(type: Jar, dependsOn: 'documentation') {
+    classifier = 'javadoc'
+    from docsDir
+}
+
+task zipSrc(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives(zipSrc)
+    archives(zipDoc)
+}
+
+task zipSamples(type: Zip) {
+    appendix = 'samples'
+    from sourceSets.test.allSource.matching {
+        include 'groovyx/gpars/samples/**'
+    }
+}
+
+task zipJavaDemo(type: Zip) {
+    appendix = 'mvn-java-demo'
+    from('java-demo') {
+        include 'src/**'
+        include 'pom.xml'
+    }
+}
+
+task zipDist(type: Zip) {
+    from jar.outputs.files
+    //from(runtimeClasspath) {
+    from(sourceSets.main.runtimeClasspath.asPath) {
+        include('jsr166*', 'netty*', 'multiverse*')
+    }
+    from('licenses') {
+        include '*'
+        into 'licenses'
+    }
+    from('src/main/resources/META-INF/') {
+        include('LICENSE.txt', 'NOTICE.txt')
+    }
+    appendix = 'all'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.11'
+}
+
+task demo(type: DemoTask, dependsOn: 'compileGroovy') {
+    excludedDemos = [
+            'DemoPotentialDeadlock',                      // may deadlock (on purpose)
+            'DemoNonDeterministicDeadlockWithDataflows',  // may deadlock (on purpose)
+            'DemoDeadLock',                               // deadlock (on purpose)
+            'DemoRemote',                                 // doesn't work in an automated environment
+            'DemoSwing',                                  // maybe we don't want these to run on the CI ..
+            'DemoSwingMashup',                            // but they can be run locally
+            'DemoSwingCollectionProcessing',
+            'DemoSwingActors',
+            'DemoSwingDataflowOperators',
+            'DemoSwingFancyDataflow',                     // Shows UI
+            'DemoSwingDataflowProgress',                  // Shows UI
+            'DataflowDemo4',                              // Never stops
+            'DemoWebPageProcessing',                      // Never stops
+            'DemoWebPageProcessingWithCaching',           // Never stops
+            'DemoMapReduce',                              // Relies on internet connection
+            'DemoNumbers',                                //Never stops
+            'FibonacciV1',                                //Never stops
+            'FibonacciV2',                                //Never stops
+            'DemoSieveEratosthenesCSP',                   //Never stops
+            'DemoSieveEratosthenesTheGoWay',              //Never stops
+            'DemoSieveEratosthenesTheGoWayWithOperators', //Never stops
+            'DemoThreading',                              //Never stops
+            'DemoProducerConsumer1',                      //Never stops
+            'DemoPhysicalCalculations',                   //Needs user input
+            'DemoFibonacci1',                             //Needs classes from its source folder
+            'DemoFibonacci1WithSynchronousChannels',      //Needs classes from its source folder
+            'DemoFibonacci2',                             //Needs classes from its source folder
+            'DemoFibonacci2WithSynchronousChannels',      //Needs classes from its source folder
+            'DemoNumbers',                                //Needs classes from its source folder
+            'DemoNumbersWithSynchronousChannels',         //Needs classes from its source folder
+            'DemoActor_4_4',                              //Specifies absolute paths
+            'RunReset',                                   //Starts UI
+            'DemoSwingMergeSort',                         //Starts UI
+            'DemoVisualForkJoinMergeSort',                //Starts UI
+            'DemoStm',                                    //Stm
+            'DemoDirectStm',                              //Stm
+            'DemoRetry',                                  //Stm
+            'DemoCustomBlocks',                           //Stm
+            'DemoLifeWithDataflowOperators',              //Interacts with the user
+            'DemoSwingLifeWithDataflowOperators',         //Interacts with the user
+            'DemoSwingLifeWithActors',                    //Interacts with the user
+            'DemoSwingLifeWithActiveObjects',             //Interacts with the user
+            'DemoSwingLifeWithAsyncFunctions',            //Interacts with the user
+            'DemoReplyCompileStatic',                     //Weird compile static issue
+            'DemoFibonacciWithSingleOperatorCompileStatic',                     //Weird compile static issue
+    ]
+
+    classpath = sourceSets.main.runtimeClasspath
+
+    demoFiles = sourceSets.test.allGroovy.matching {
+        include '**/*Demo*.groovy'
+        exclude excludedDemos.collect { name -> "**/${name}.groovy".toString() }
+    }
+}
+
+idea {
+    module {
+        excludeDirs += file('gradle/') // Gradle directory including the wrapper subdirectory.
+        excludeDirs += file('.settings/') // Eclipse settings directory.
+        excludeDirs += file('bin') // Eclipse compilation directory.
+        excludeDirs += file('out') // IDEA compilation directory.
+        excludeDirs += file('build') // Gradle compilation directory.
+        excludeDirs += file('docs') // Jon's book directory
+        excludeDirs += file('java-demo') // A separate module of a pure-java gpars usage
+    }
+    project {
+        jdkName '1.7'
+        languageLevel 'JDK_1_6'
+        ipr {
+            withXml { provider ->
+                def node = provider.asNode()
+                def vcsConfig = node.component.find { it.'@name' == 'VcsDirectoryMappings' }
+                vcsConfig.mapping[0].'@vcs' = 'Git'
+
+                //Copy the inspection profiles as well as the spell-checker's dictionaries from the default project file
+                def inspectionConfig = provider.asNode().component.find {
+                    it.'@name' == 'InspectionProjectProfileManager'
+                }
+                if (inspectionConfig) node.remove(inspectionConfig)
+                def dictionaryConfig = provider.asNode().component.find { it.'@name' == 'ProjectDictionaryState' }
+                if (dictionaryConfig) node.remove(dictionaryConfig)
+
+                new File('GPars_CI_only.ipr').withReader { reader ->
+                    def project = new XmlParser().parse(reader)
+                    def inspections = project.component.find { it.'@name' == 'InspectionProjectProfileManager' }
+                    node.append(inspections)
+                    def dictionaries = project.component.find { it.'@name' == 'ProjectDictionaryState' }
+                    node.append(dictionaries)
+                }
+
+                def gradleSettings = node.appendNode('component', [name: 'GradleSettings'])
+                gradleSettings.appendNode('option', [name: 'SDK_HOME', value: gradle.gradleHomeDir.absolutePath])
+            }
+        }
+    }
+}

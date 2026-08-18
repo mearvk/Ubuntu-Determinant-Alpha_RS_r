@@ -1,0 +1,26 @@
+From 6924f83cb21f75e1c892d8f469500e12f1a3f5a7 Mon Sep 17 00:00:00 2001
+From: RingsC <hom.lee@hotmail.com>
+Date: Sun, 13 Oct 2019 23:11:23 +0800
+Subject: [PATCH] use SYS_openat when available
+
+some architecture like AArch64 may not have the open syscall, but have
+openat syscall. so check and use SYS_openat if SYS_openat available if
+SYS_open is not supported at init_thp_state.
+---
+ src/pages.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/pages.c b/src/pages.c
+index 13de27a0..75c8dd9d 100644
+--- a/src/pages.c
++++ b/src/pages.c
+@@ -563,6 +563,9 @@ init_thp_state(void) {
+ #if defined(JEMALLOC_USE_SYSCALL) && defined(SYS_open)
+ 	int fd = (int)syscall(SYS_open,
+ 	    "/sys/kernel/mm/transparent_hugepage/enabled", O_RDONLY);
++#elif defined(JEMALLOC_USE_SYSCALL) && defined(SYS_openat)
++	int fd = (int)syscall(SYS_openat,
++		    AT_FDCWD, "/sys/kernel/mm/transparent_hugepage/enabled", O_RDONLY);
+ #else
+ 	int fd = open("/sys/kernel/mm/transparent_hugepage/enabled", O_RDONLY);
+ #endif

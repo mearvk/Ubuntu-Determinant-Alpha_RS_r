@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Сторінки підручника SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-kcm</refentrytitle>
+        <manvolnum>8</manvolnum>
+        <refmiscinfo class="manual">Формати файлів та правила</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-kcm</refname>
+        <refpurpose>Керування кешем Kerberos SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИС</title>
+        <para>
+            На цій сторінці підручника описано налаштування засобу керування кешем
+Kerberos SSSD (Kerberos Cache Manager або KCM). KCM є процесом, який
+зберігає, стежить і керує кешем реєстраційних даних Kerberos. Ідея створення
+засобу походить із проєкту Heimdal Kerberos, хоча у бібліотеці Kerberos MIT
+також надається підтримка з боку клієнта для кешу реєстраційних даних KCM
+(докладніше про це нижче).
+        </para>
+        <para>
+            У конфігураціях, де кешем Kerberos керує KCM, бібліотека Kerberos (типово
+використовується за допомогою якоїсь програми, наприклад <citerefentry>
+<refentrytitle>kinit</refentrytitle><manvolnum>1</manvolnum>
+</citerefentry>) є <quote>клієнтом KCM</quote>, а фонова служба KCM
+вважається <quote>сервером KCM</quote>. Клієнт і сервер обмінюються даними
+за допомогою сокета UNIX.
+        </para>
+        <para>
+            Сервер KCM стежити за кожним власником кешу реєстраційних даних і виконує
+перевірку прав доступу на основі UID і GID клієнта KCM. Користувач root має
+доступ до усіх кешів реєстраційних даних.
+        </para>
+        <para>
+            Кеш реєстраційних даних KCM має декілька цікавих властивостей:
+            <itemizedlist>
+                <listitem>
+                    <para>
+                        оскільки процес виконується у просторі користувача, він підлягає обмеженням
+за простором назв UID, на відміну від набору ключів ядра
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        на відміну від кешу на основі наборів ключів ядра, який є спільним для усіх
+контейнерів, сервер KCM є окремим процесом, чия точка входу є сокетом UNIX
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        реалізація у SSSD зберігає дані ccache у базі даних, файл якої типово
+називається <replaceable>/var/lib/sss/secrets</replaceable>. За допомогою
+цього файла ccache зберігаються протягом періодів перезапуску сервера KCM
+або перезавантаження комп'ютера.
+                    </para>
+                </listitem>
+            </itemizedlist>
+            Це надає змогу системі використовувати кеш реєстраційних даних із
+врахуванням збірок, одночасно надаючи спільний доступ до кешу реєстраційних
+даних для декількох контейнерів або без контейнерів взагалі шляхом
+прив'язування-монтування сокета.
+        </para>
+        <para>
+            Час очікування на дії типового клієнта KCM дорівнює 5 хвилин, таке значення
+надає більшу часу на взаємодію користувача із інструментами командного
+рядка, зокрема kinit.
+        </para>
+    </refsect1>
+
+    <refsect1 id='usage'>
+        <title>КОРИСТУВАННЯ КЕШЕМ РЕЄСТРАЦІЙНИХ ДАНИХ KCM</title>
+        <para>
+            Для використання кешу реєстраційних даних KCM його слід вибрати стандартним
+типом реєстраційних даних у <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>. Назвою кешу реєстраційних даних має бути лише
+<quote>KCM:</quote> без будь-яких розширень шаблонами. Приклад: <programlisting>
+[libdefaults]
+    default_ccache_name = KCM:
+            </programlisting>
+        </para>
+        <para>
+            Далі, слід визначити однаковий шлях до сокета UNIX для клієнтських бібліотек
+Kerberos і сервера KCM. Типово, у обох випадках використовується однаковий
+шлях <replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>. Для
+налаштовування бібліотеки Kerberos змініть значення її параметра
+<quote>kcm_socket</quote>, як це описано на сторінці підручника
+<citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Нарешті, переконайтеся, що з сервером KCM SSSD можна встановити
+зв'язок. Типово, служба KCM вмикається за допомогою сокета з <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry>. На відміну від інших служб SSSD, її не можна запустити
+додаванням рядка <quote>kcm</quote> до інструкції <quote>service</quote>.
+<programlisting>
+systemctl start sssd-kcm.socket
+systemctl enable sssd-kcm.socket
+            </programlisting> Будь ласка, зауважте, що
+відповідні налаштування модулів вже могло бути виконано засобами вашого
+дистрибутива.
+        </para>
+    </refsect1>
+
+    <refsect1 id='storage'>
+        <title>СХОВИЩЕ КЕШУ РЕЄСТРАЦІЙНИХ ДАНИХ</title>
+        <para>
+            Кеші реєстраційних даних зберігаються у базі даних, дуже подібно до кешів
+записів користувачів і груп SSSD. Типово, база даних зберігається у
+<quote>/var/lib/sss/secrets</quote>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='debugging'>
+        <title>ОТРИМАННЯ ДІАГНОСТИЧНОГО ЖУРНАЛУ</title>
+        <para>
+            Типово, служба sssd-kcm активує крізь сокет <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry>. Для створення діагностичних журналів додайте вказані нижче
+рядки або безпосередньо до файла <filename>/etc/sssd/sssd.conf</filename>,
+або як фрагмент налаштувань до каталогу
+<filename>/etc/sssd/conf.d/</filename>: <programlisting>
+[kcm]
+debug_level = 10
+            </programlisting> Далі, перезапустіть службу sssd-kcm: <programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting> Нарешті, виконайте дії, які не призводять до
+бажаних для вас наслідків. Журнал KCM буде записано до
+<filename>/var/log/sssd/sssd_kcm.log</filename>. Рекомендуємо вимкнути
+ведення діагностичного журналу, якщо вам не потрібні діагностичні дані,
+оскільки служба sssd-kcm може породжувати доволі великий обсяг діагностичних
+даних.
+        </para>
+        <para>
+            Будь ласка, зауважте, що у поточній версії фрагменти налаштувань буде
+оброблено, лише якщо взагалі існує основний файл налаштувань
+<filename>/etc/sssd/sssd.conf</filename>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='renewals' condition="enable_kcm_renewal">
+        <title>ПОНОВЛЕННЯ</title>
+        <para>
+            Службу sssd-kcm можна налаштувати на спробу поновлення TGT для поновлюваних
+TGT, які зберігаються у ccache KCM. Спроби поновлення виконуватимуться при
+досягненні половини строку дії квитка. Поновлення KCM налаштовуються при
+встановленні таких параметрів у розділі [kcm]: <programlisting>
+tgt_renewal = true
+krb5_renew_interval = 60m
+            </programlisting>
+        </para>
+        <para>
+            Крім того, SSSD може успадковувати параметри krb5 для поновлень з наявного
+домену.
+        </para>
+            <programlisting>
+tgt_renewal = true
+tgt_renewal_inherit = domain-name
+            </programlisting>
+        <para>
+            Вказані нижче параметри krb5 можна налаштувати у розділі [kcm] для керування
+поведінкою під час поновлення. Ці параметри докладно описано нижче
+<programlisting>
+krb5_renew_interval
+krb5_renew_lifetime
+krb5_lifetime
+krb5_validate
+krb5_canonicalize
+krb5_auth_timeout
+            </programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ПАРАМЕТРИ НАЛАШТУВАННЯ</title>
+        <para>
+            Налаштовування служби KCM виконується за допомогою розділу
+<quote>kcm</quote> файла sssd.conf. Будь ласка, зауважте, що оскільки
+активація служби KCM, зазвичай, відбувається за допомогою сокетів, після
+внесення змін до розділу <quote>kcm</quote> файла sssd.conf достатньо
+перезапустити службу <quote>sssd-kcm</quote>: <programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting>
+        </para>
+        <para>
+            Налаштування служби KCM виконують за допомогою <quote>kcm</quote>. Докладний
+опис синтаксичних конструкцій налаштувань наведено у розділі <quote>ФОРМАТ
+ФАЙЛА</quote> сторінки підручника щодо <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Службі kcm можна передавати типові параметри служби SSSD, зокрема
+<quote>debug_level</quote> та <quote>fd_limit</quote> Із повним списком
+параметрів можна ознайомитися на сторінці підручника <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. Крім того, передбачено декілька специфічних для KCM
+параметрів.
+        </para>
+        <variablelist>
+            <varlistentry>
+                <term>socket_path (рядок)</term>
+                <listitem>
+                    <para>
+                        Сокет, на якому очікуватиме на з'єднання служба KCM.
+                    </para>
+                    <para>
+                        Типове значення:
+<replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>
+                    </para>
+                    <para>
+                        <phrase condition="have_systemd"> Зауваження: на платформах, де передбачено
+підтримку systemd, шлях до сокета буде перезаписано шляхом, який визначено у
+файлі модуля sssd-kcm.socket.  </phrase>
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccaches (ціле число)</term>
+                <listitem>
+                    <para>
+                        Скільки кешів реєстраційних може мати даних база даних KCM для усіх
+користувачів.
+                    </para>
+                    <para>
+                        Типове значення: 0 (без обмежень, застосовується лише квота на кількість
+кешів на UID)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_uid_ccaches (ціле число)</term>
+                <listitem>
+                    <para>
+                        Скільки кешів реєстраційних може мати даних база даних KCM для окремого
+UID. Еквівалент значення <quote>кількість реєстраційних даних, які можна
+ініціювати за допомогою kinit</quote>.
+                    </para>
+                    <para>
+                        Типове значення: 64
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccache_size (ціле число)</term>
+                <listitem>
+                    <para>
+                        Наскільки великим може бути кеш реєстраційних даних окремого ccache. Ця
+квота обчислюється для усіх квитків служб разом.
+                    </para>
+                    <para>
+                        Типове значення: 65536
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal (булеве значення)</term>
+                <listitem>
+                    <para>
+                        Вмикає функціональні можливості поновлень TGT.
+                    </para>
+                    <para>
+                        Типове значення: False (автоматичні поновлення вимкнено)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal_inherit (рядок)</term>
+                <listitem>
+                    <para>
+                        Домен, з якого слід успадковувати параметри krb5_*, для використання із
+поновленнями TGT.
+                    </para>
+                    <para>
+                        Типове значення: NULL
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+        <xi:include condition="enable_kcm_renewal" xmlns:xi="http://www.w3.org/2001/XInclude" href="include/krb5_options.xml" />
+    </refsect1>
+
+    <refsect1 id='see_also'>
+        <title>ТАКОЖ ПЕРЕГЛЯНЬТЕ</title>
+        <para>
+            <citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</manvolnum>
+</citerefentry>, <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>,
+        </para>
+    </refsect1>
+</refentry>
+</reference>

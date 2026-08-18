@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+%:
+	dh $@ --buildsystem=eclipse_bundles --with javahelper
+
+override_dh_auto_build-arch:
+	cd features/org.eclipse.equinox.executable.feature/library/gtk && ./build.sh -os linux -arch $(DEB_HOST_GNU_CPU)
+
+override_dh_gencontrol-indep:
+	# Use the bundle versions as package versions
+	awk 'system("dh_gencontrol -p"$$4" -- -v"$$2"+eclipse$(DEB_VERSION)")' debian/bundles.properties
+
+override_dh_gencontrol-arch:
+	dh_gencontrol -plibequinox-executable-jni -- -v$(shell xmlstarlet sel -t -v '//feature/@version' features/org.eclipse.equinox.executable.feature/feature.xml | sed 's/.qualifier//')+eclipse$(DEB_VERSION)
+
+override_jh_classpath:
+	jh_classpath -plibeclipse-osgi-java          --classpath=/usr/share/java/osgi.annotation.jar   usr/share/java/eclipse-osgi.jar
+	jh_classpath -plibeclipse-osgi-util-java     --classpath=/usr/share/java/eclipse-osgi.jar      usr/share/java/eclipse-osgi-util.jar
+	jh_classpath -plibeclipse-osgi-services-java --classpath=/usr/share/java/eclipse-osgi-util.jar usr/share/java/eclipse-osgi-services.jar
+	jh_classpath -plibeclipse-osgi-compatibility-state-java   --classpath=/usr/share/java/eclipse-osgi.jar usr/share/java/eclipse-osgi-compatibility-state.jar

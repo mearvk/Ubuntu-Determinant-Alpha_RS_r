@@ -1,0 +1,192 @@
+/*
+    SPDX-FileCopyrightText: 2018 Volker Krause <vkrause@kde.org>
+    SPDX-FileCopyrightText: 2018 Luca Beltrame <lbeltrame@kde.org>
+
+    SPDX-License-Identifier: LGPL-2.0-or-later
+*/
+
+#include <KItinerary/BusTrip>
+#include <KItinerary/Flight>
+#include <KItinerary/Organization>
+#include <KItinerary/Place>
+#include <KItinerary/Reservation>
+#include <KItinerary/TrainTrip>
+#include <KItinerary/Ticket>
+
+#include <KItinerary/JsonLdDocument>
+
+#include <QDebug>
+#include <QQmlComponent>
+#include <QQmlContext>
+#include <QQmlEngine>
+#include <QObject>
+#include <QTest>
+
+using namespace KItinerary;
+
+class DatatypesTest : public QObject
+{
+    Q_OBJECT
+private Q_SLOTS:
+    void testValueTypeSemantics()
+    {
+        Airport airport;
+        airport.setName(QStringLiteral("Berlin Tegel"));
+        {
+            auto ap2 = airport;
+            QCOMPARE(ap2.name(), QLatin1String("Berlin Tegel"));
+            ap2.setIataCode(QStringLiteral("TXL"));
+            QVERIFY(airport.iataCode().isEmpty());
+        }
+        Place place = airport; // assignment to base class works, but cannot be reversed
+        QCOMPARE(place.name(), QLatin1String("Berlin Tegel"));
+        place.setName(QStringLiteral("London Heathrow")); // changing a value degenerated to its base class will detach but not slice
+        QCOMPARE(place.name(), QLatin1String("London Heathrow"));
+        QCOMPARE(JsonLdDocument::readProperty(place, "className").toString(), QLatin1String("Place")); // className is not polymorphic
+
+        QVERIFY(!airport.geo().isValid());
+        QCOMPARE(JsonLdDocument::readProperty(airport, "className").toString(), QLatin1String("Airport"));
+        QCOMPARE(JsonLdDocument::readProperty(airport, "name").toString(), QLatin1String("Berlin Tegel"));
+
+        // detach on base properties must not slice
+        FlightReservation res;
+        QCOMPARE(JsonLdDocument::readProperty(res, "className").toString(), QLatin1String("FlightReservation"));
+        res.setAirplaneSeat(QStringLiteral("10E"));
+        QCOMPARE(res.airplaneSeat(), QLatin1String("10E"));
+        auto res2 = res;
+        QCOMPARE(res2.airplaneSeat(), QLatin1String("10E"));
+        res2.setReservationNumber(QStringLiteral("XXX007"));
+        QCOMPARE(res2.airplaneSeat(), QLatin1String("10E"));
+
+        // changing default-created properties should not leak
+        Flight flight;
+        QCOMPARE(JsonLdDocument::readProperty(flight, "className").toString(), QLatin1String("Flight"));
+        QVariant v = flight;
+        QVERIFY(v.canConvert<Flight>());
+        JsonLdDocument::writeProperty(v, "departureAirport", airport);
+        QCOMPARE(v.value<Flight>().departureAirport().name(), QLatin1String("Berlin Tegel"));
+
+        // make sure all meta types are generated
+        TrainTrip tt;
+        QCOMPARE(JsonLdDocument::readProperty(tt, "className").toString(), QLatin1String("TrainTrip"));
+        BusTrip bus;
+        QCOMPARE(JsonLdDocument::readProperty(bus, "className").toString(), QLatin1String("BusTrip"));
+
+        Ticket ticket;
+        QCOMPARE(JsonLdDocument::readProperty(ticket.ticketedSeat(), "className").toString(), QLatin1String("Seat"));
+
+        Organization org;
+        org.setName(QStringLiteral("JR East"));
+        org.setEmail(QStringLiteral("nowhere@nowhere.com"));
+        org.setTelephone(QStringLiteral("+55-1234-345"));
+        org.setUrl(QUrl(QStringLiteral("http://www.jreast.co.jp/e/")));
+        QCOMPARE(JsonLdDocument::readProperty(org, "className").toString(), QLatin1String("Organization"));
+        QCOMPARE(org.name(), QLatin1String("JR East"));
+        QCOMPARE(org.email(), QLatin1String("nowhere@nowhere.com"));
+        QCOMPARE(org.telephone(), QLatin1String("+55-1234-345"));
+        QCOMPARE(org.url(), QUrl(QLatin1String("http://www.jreast.co.jp/e/")));
+
+        tt.setProvider(org);
+        flight.setProvider(org);
+        res.setProvider(org);
+        bus.setProvider(org);
+        QCOMPARE(tt.provider().name(), QLatin1String("JR East"));
+        QCOMPARE(tt.provider().email(), QLatin1String("nowhere@nowhere.com"));
+        QCOMPARE(flight.provider().name(), QLatin1String("JR East"));
+        QCOMPARE(flight.provider().email(), QLatin1String("nowhere@nowhere.com"));
+        QCOMPARE(res.provider().name(), QLatin1String("JR East"));
+        QCOMPARE(res.provider().email(), QLatin1String("nowhere@nowhere.com"));
+        QCOMPARE(bus.provider().name(), QLatin1String("JR East"));
+        QCOMPARE(bus.provider().email(), QLatin1String("nowhere@nowhere.com"));
+
+        Airline airline;
+        airline.setIataCode(QStringLiteral("LH"));
+        flight.setAirline(airline);
+        QCOMPARE(flight.airline().iataCode(), QLatin1String("LH"));
+        {
+            const auto flight2 = flight;
+            QCOMPARE(flight2.airline().iataCode(), QLatin1String("LH"));
+            QCOMPARE(JsonLdDocument::readProperty(flight.airline(), "className").toString(), QLatin1String("Airline"));
+            QCOMPARE(JsonLdDocument::readProperty(flight.airline(), "iataCode").toString(), QLatin1String("LH"));
+        }
+    }
+
+    void testQmlCompatibility()
+    {
+        // one variant and one typed property
+        FlightReservation res;
+        Flight flight;
+        Airport airport;
+        airport.setName(QStringLiteral("Berlin Tegel"));
+        flight.setDepartureAirport(airport);
+        res.setReservationFor(flight);
+
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("_res"), res);
+        QQmlComponent component(&engine);
+        component.setData("import QtQml 2.2\nQtObject { Component.onCompleted: console.log(_res.reservationFor.departureAirport.name); }", QUrl());
+        if (component.status() == QQmlComponent::Error) {
+            qWarning() << component.errorString();
+        }
+        QCOMPARE(component.status(), QQmlComponent::Ready);
+        auto obj = component.create();
+        QVERIFY(obj);
+    }
+
+    void testUpCastHelper()
+    {
+        Place p;
+        FoodEstablishment r;
+        Airport a;
+        a.setName(QStringLiteral("Berlin Tegel"));
+        a.setIataCode(QStringLiteral("TXL"));
+
+        QVERIFY(JsonLd::canConvert<Place>(a));
+        QVERIFY(JsonLd::canConvert<Airport>(a));
+        QVERIFY(!JsonLd::canConvert<FoodEstablishment>(a));
+        QVERIFY(!JsonLd::canConvert<Airport>(p));
+
+        p = JsonLd::convert<Place>(a);
+        QCOMPARE(p.name(), QLatin1String("Berlin Tegel"));
+    }
+
+    void testCompare()
+    {
+        Place p1;
+        Place p2; // base type
+        QCOMPARE(p1, p2);
+        QCOMPARE(p1, p1);
+        p1.setName(QStringLiteral("Berlin"));
+        QVERIFY(!(p1 == p2));
+        QVERIFY(p1 != p2);
+        QCOMPARE(p1, p1);
+        p2.setName(QStringLiteral("Berlin"));
+        QCOMPARE(p1, p2);
+
+        GeoCoordinates coord1;
+        GeoCoordinates coord2; // primitive types
+        QCOMPARE(coord1, coord2);
+        QCOMPARE(coord1, coord1);
+        coord1 = { 52.5, 13.8 };
+        QVERIFY(!(coord1 == coord2));
+
+        p1.setGeo(coord1);
+        p2.setGeo({52.5, 13.8});
+        QCOMPARE(p1, p2);
+
+        Airport a1;
+        Airport a2; // polymorphic types
+        a1.setIataCode(QStringLiteral("TXL"));
+        a2.setIataCode(QStringLiteral("TXL"));
+        QCOMPARE(a1, a2);
+        a1.setName(QStringLiteral("Berlin Tegel"));
+        QVERIFY(a1 != a2);
+        a2.setName(QStringLiteral("Berlin Tegel"));
+        QCOMPARE(a1, a2);
+        QCOMPARE(a1, a1);
+    }
+};
+
+QTEST_GUILESS_MAIN(DatatypesTest)
+
+#include "datatypestest.moc"

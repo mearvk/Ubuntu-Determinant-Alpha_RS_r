@@ -1,0 +1,253 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2005 by Matthias Urlichs <smurf@smurf.noris.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of Version 2 of the GNU General Public License as
+# published by the Free Software Foundation. See the file COPYING.txt
+# or (on Debian systems) /usr/share/common-licenses/GPL-2 for details.
+
+"""\
+This test script grabs a number of interesting key maps from
+keymapper.fakemaps, generates a decision tree, saves that in an
+in-memory file, and then runs each key map against the file's
+interpreter to see if the correct map is returned.
+"""
+
+from __future__ import print_function
+
+from keymapper.parse.maps import EmptyMapError, MapInputError
+from keymapper.tree import Tree, gen_report
+import keymapper.tree
+from keymapper.file import FileReporter
+from keymapper.graph import GraphReporter
+from keymapper.script import Script
+from keymapper.fakequery import FakeQuery
+from keymapper.parse.linux import parse_file as parse_linux
+from keymapper.parse.linux import FileProblem, add_dir
+
+import io
+import sys
+from optparse import OptionParser
+
+# from subprocess import Popen, PIPE
+
+if sys.version_info[0] >= 3:
+    # Force encoding to UTF-8 even in non-UTF-8 locales.
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.detach(), encoding="UTF-8", line_buffering=True
+    )
+    sys.stderr = io.TextIOWrapper(
+        sys.stderr.detach(), encoding="UTF-8", line_buffering=True
+    )
+else:
+    import codecs
+
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr)
+
+parser = OptionParser(usage="%prog list...", version="%prog 0.1")
+parser.remove_option("-h")
+# parser.remove_option("--help")
+parser.add_option("-?", "--help", action="help", help="show this help text")
+parser.add_option(
+    "-v", "--verbose", action="count", dest="verbose", help="be more verbose"
+)
+parser.add_option(
+    "-m",
+    "--minlen",
+    action="store",
+    dest="minlen",
+    type="int",
+    default=30,
+    help="Too-short Keymaps are skipped (default: 30 entries)",
+)
+parser.add_option(
+    "-g",
+    "--graph",
+    action="store_const",
+    dest="format",
+    const="graphviz",
+    help="generate a hopefully-nice-looking .dot file",
+)
+parser.add_option(
+    "--maps",
+    action="store_const",
+    dest="format",
+    const="mapdump",
+    help="print the to-be-processed keymaps",
+)
+parser.add_option(
+    "-i",
+    "--installer",
+    action="store_const",
+    dest="iformat",
+    const="d-i",
+    help="Input files are in d-i map form",
+)
+parser.add_option(
+    "-I",
+    "--inc",
+    "--include",
+    action="append",
+    dest="dirs",
+    help="add a directory to the search path",
+)
+parser.add_option(
+    "-o",
+    "--output",
+    action="store",
+    dest="filename",
+    help="output file (default: stdout)",
+)
+parser.add_option(
+    "-f",
+    "--filter",
+    action="store",
+    dest="filter",
+    help="Include only the branches leading to these keymaps",
+)
+parser.add_option(
+    "-u",
+    "--useonly",
+    action="store",
+    dest="useonly",
+    help="Start generating the tree based only on these keymaps",
+)
+parser.add_option(
+    "-s", "--skip", action="store", dest="skip", help="keymaps to skip"
+)
+parser.add_option(
+    "-t",
+    "--test",
+    action="store_true",
+    dest="test",
+    help="Test the generated maps",
+)
+parser.add_option(
+    "--interactive",
+    action="store_true",
+    dest="interactive",
+    help="Ask user to choose among indistinguishable keymaps",
+)
+parser.add_option(
+    "--no-altgr",
+    action="store_false",
+    dest="altgr",
+    help="Do not consider AltGr keys",
+    default=True,
+)
+
+(opts, args) = parser.parse_args()
+if not args:
+    parser.error("no arguments supplied")
+    sys.exit(1)
+if opts.test and opts.format:
+    parser.error("You can only test scripts")
+    sys.exit(1)
+if opts.test and not opts.filename:
+    parser.error("You can only test scripts if you write them to a file")
+    sys.exit(1)
+
+t = Tree()
+
+keymapper.tree.trace = opts.verbose
+keymapper.tree.interactive = opts.interactive
+
+if opts.dirs:
+    for d in opts.dirs:
+        add_dir(d)
+
+if opts.filename:
+    out = io.open(opts.filename, "w", encoding="utf-8")
+else:
+    out = sys.stdout
+
+known = {}
+for f in args:
+    for l in open(f):
+        comment = l.find("#")
+        if comment > -1:
+            l = l[:comment]
+        l = l.strip()
+        if l == "":
+            continue
+        name = l.split()
+        if opts.iformat == "d-i":
+            name = name[1]
+        else:
+            name = name[0]
+        if opts.useonly and name not in opts.useonly.split(","):
+            continue
+        if opts.skip and name in opts.skip.split(","):
+            continue
+        if name in known:
+            continue
+        known[name] = 1
+
+        # 		code = codecs.getreader(code)
+        # 		pipe = Popen(("loadkeys","-q","-M",name), stdout=PIPE).stdout
+        # 		pipe = code(pipe)
+
+        try:
+            if opts.verbose:
+                print("Parsing:", name)
+            # 			map = parse_map(name,pipe,opts.altgr)
+            map = parse_linux(name, opts.altgr)
+        except EmptyMapError:
+            print("Map '%s' skipped: empty" % name, file=sys.stderr)
+        except MapInputError as exc:
+            n, l, p = exc.args
+            print(
+                "Map '%s' skipped: data format error at %d:%d" % (n, l, p),
+                file=sys.stderr,
+            )
+        except UnicodeDecodeError:
+            print("Map '%s' skipped: codec error" % name, file=sys.stderr)
+        except FileProblem as e:
+            print("... skipped '%s'" % e.args, file=sys.stderr)
+        else:
+            if opts.minlen > len(map):
+                print(
+                    "... skipped '%s': only %d keys" % (map, len(map)),
+                    file=sys.stderr,
+                )
+                continue
+
+            if opts.format == "mapdump":
+                print(map.dump(), file=out)
+            else:
+                t.add(map)
+
+if opts.format == "mapdump":
+    sys.exit(0)
+
+l = ()
+if opts.filter:
+    l = opts.filter.split(",")
+t.gen_tree(*l)
+
+if opts.format == "graphviz":
+    gen_report(t, GraphReporter(out))
+else:
+    gen_report(t, FileReporter(out))
+
+if opts.test:
+    buf = codecs.getreader("utf-8")(open(opts.filename))
+    err = 0
+    for i in range(0, 3):
+        for k in t:
+            buf.seek(0, 0)
+            print("Testing keymap %s" % (k.dump(),))
+            s = Script(buf, FakeQuery(k))
+            name = s.run()
+            if name != k.name:
+                print("SCRIPT ERROR: %s != %s" % (name, k.name))
+                err += 1
+            else:
+                print("... OK.")
+            print()
+    if err:
+        print("There are problems!", file=sys.stderr)
+        sys.exit(1)
+# done!

@@ -1,0 +1,55 @@
+Author:		Dan Bungert <daniel.bungert@canonical.com>
+Last-Update:	20201-02-18
+Description:	Return non-zero when test failures are seen
+Bug-Ubuntu:	https://bugs.launchpad.net/bugs/1915866
+Forwarded:	yes, https://github.com/ndevilla/iniparser/pull/130 https://salsa.debian.org/carnil/iniparser/-/merge_requests/1
+
+Index: iniparser-4.1/test/make-tests.sh
+===================================================================
+--- iniparser-4.1.orig/test/make-tests.sh
++++ iniparser-4.1/test/make-tests.sh
+@@ -18,7 +18,7 @@ echo '
+ 
+ '
+ 
+-cat $FILES | grep '^void Test' | 
++cat $FILES | grep '^void Test' |
+     sed -e 's/(.*$//' \
+         -e 's/$/(CuTest*);/' \
+         -e 's/^/extern /'
+@@ -26,13 +26,14 @@ cat $FILES | grep '^void Test' |
+ echo \
+ '
+ 
+-void RunAllTests(void) 
++int RunAllTests(void)
+ {
+     CuString *output = CuStringNew();
+     CuSuite* suite = CuSuiteNew();
++    int ret = 0;
+ 
+ '
+-cat $FILES | grep '^void Test' | 
++cat $FILES | grep '^void Test' |
+     sed -e 's/^void //' \
+         -e 's/(.*$//' \
+         -e 's/^/    SUITE_ADD_TEST(suite, /' \
+@@ -42,15 +43,16 @@ echo \
+ '
+     CuSuiteRun(suite);
+     CuSuiteSummary(suite, output);
++    if (suite->failCount > 0) ret = 1;
+     CuSuiteDetails(suite, output);
+     printf("%s\n", output->buffer);
+     CuStringDelete(output);
+     CuSuiteDelete(suite);
++    return ret;
+ }
+ 
+ int main(void)
+ {
+-    RunAllTests();
+-    return 0;
++    return RunAllTests();
+ }
+ '

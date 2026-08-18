@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/architecture.mk
+
+WRAPPER_TARGETS:=mpg123-oss mpg123-nas mpg123-jack mpg123-openal mpg123-portaudio
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	WRAPPER_TARGETS += mpg123-alsa
+endif
+ifneq ($(DEB_HOST_ARCH_OS),hurd)
+	WRAPPER_TARGETS += mpg123-pulse
+endif
+
+CONF_i386:=--with-cpu=x86_dither
+CONF_arm:=--with-cpu=generic_fpu
+
+mpg123-%: debian/mpg123-wrapper.in
+	dh_testdir
+	o=`echo $@ | sed -e 's/^mpg123-\([^-]\+\).*/\1/'`; \
+	sed -e "s/@OUTPUT@/$$o/g" < debian/mpg123-wrapper.in > $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-static=no \
+		--enable-shared \
+		--enable-lfs-alias \
+		$(CONF_$(DEB_HOST_ARCH_CPU))
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f $(WRAPPER_TARGETS)
+
+override_dh_auto_install: $(WRAPPER_TARGETS)
+	dh_auto_install
+
+	mv $(CURDIR)/debian/tmp/usr/bin/mpg123 \
+	   $(CURDIR)/debian/tmp/usr/bin/mpg123.bin
+	mv $(CURDIR)/debian/tmp/usr/share/man/man1/mpg123.1 \
+	   $(CURDIR)/debian/tmp/usr/share/man/man1/mpg123.bin.1
+	install $(WRAPPER_TARGETS) $(CURDIR)/debian/tmp/usr/bin/
+	for i in $(WRAPPER_TARGETS); do \
+		install debian/mpg123-wrapper.1 \
+		        $(CURDIR)/debian/tmp/usr/share/man/man1/$$i.1; \
+	done
+
+override_dh_installchangelogs:
+	dh_installchangelogs -pmpg123 NEWS
+	dh_installchangelogs -plibmpg123-dev NEWS.libmpg123
+	dh_installchangelogs --remaining-packages
+
+%:
+	dh $@

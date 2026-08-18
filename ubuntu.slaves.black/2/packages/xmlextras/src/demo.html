@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Xml Extras Demo</title>
+<style type="text/css">
+
+html, body {
+	border:		0;
+}
+
+body {
+	background: ButtonFace;
+	font:		MessageBox;
+	font:		Message-Box;
+}
+
+form {
+	padding:	0;
+	margin:		0;
+}
+
+fieldset fieldset {
+	margin:	5px;
+}
+
+button {
+	margin-left:	5px;
+}
+
+textarea {
+	width:	100%;
+	height:	200px;
+}
+
+#out {
+	background:		White;
+	color:			Black;
+	border:			1px Solid ThreeDDarkShadow;
+	padding:		3px;
+	margin-top:		5px;
+	font-family:	Verdana;
+}
+
+#srcTextContainer {
+	display:	none;
+}
+</style>
+<style type="text/css">
+
+
+
+.element {
+	color:			blue;
+	padding-left:	16px;
+}
+
+.elementname {
+	color:	DarkRed;	
+}
+
+.attribname {
+	color:	red;
+}
+
+.attribvalue {
+	color:	blue;
+}
+
+.text {
+	color:			WindowText;
+	padding-left:	16px;
+}
+
+.cdata-content {
+	color:			WindowText;
+	font-family:	Courier New;
+	white-space:	pre;
+	display:		block;
+	border-left:	1px solid Gray;
+	padding-left:	16px;
+}
+
+.comment {
+	color:			blue;
+	padding-left:	16px;
+}
+
+.doctype {
+	color:			blue;
+	padding-left:	16px;
+}
+
+.comment-content {
+	white-space:	pre;
+	font-family:	Courier New;
+	color:			Gray;
+	display:		block;
+}
+
+</style>
+<script type="text/javascript" src="xmlextras.js"></script>
+<script type="text/javascript">
+//<![CDATA[
+
+var progressText = "Loading...";
+
+function loadXmlFile(sUri, bAsync, sOutFormat) {
+	var done = function () {
+		try {
+			switch (sOutFormat) {
+				case "plainText":
+					document.getElementById("out").innerHTML = stripHtml(xmlHttp.responseText);
+					break;
+				case "xmlText":
+					document.getElementById("out").innerHTML = stripHtml(xmlHttp.responseXML.xml);
+					break;
+				case "xmlTree":
+					document.getElementById("out").innerHTML = createXmlTree(xmlHttp.responseXML, 0);
+					break;
+			}
+		}
+		catch (exc) {
+			document.getElementById("out").innerHTML = "An error occured <br/>" +
+				"Message: " + exc.message + "<br/>" +
+				"File: " + exc.fileName + "<br/>" +
+				"Line: " + exc.lineNumber + "<br/>" +
+				"Name: " + exc.name;
+		}
+	};
+	
+	var xmlHttp = XmlHttp.create();
+	xmlHttp.open("GET", sUri, bAsync);
+	if (bAsync) {
+		xmlHttp.onreadystatechange = function () {
+			if (xmlHttp.readyState == 4)
+				done();
+		}
+		document.getElementById("out").innerHTML = progressText;
+	}
+	xmlHttp.send(null);
+	if (!bAsync) {
+		done();
+	}
+}
+
+function loadXmlText(sText, sOutFormat) {
+	var xmlDoc = XmlDocument.create();
+	xmlDoc.loadXML(sText);
+	try {
+		switch (sOutFormat) {
+			case "plainText":
+				document.getElementById("out").innerHTML = "Not valid for XmlDocument";
+				break;
+			case "xmlText":
+				document.getElementById("out").innerHTML = stripHtml(xmlDoc.xml);
+				break;
+			case "xmlTree":
+				document.getElementById("out").innerHTML = createXmlTree(xmlDoc, 0);
+				break;
+		}
+	}
+	catch (exc) {
+		document.getElementById("out").innerHTML = "An error occured <br/>" +
+			exc.message;
+	}
+}
+
+// this function takes an xml node and returns an html string that displays that node
+// the indent argument is used to describe what depth the node is at so that
+// the html code can create a nice indention
+function createXmlTree(node, indent) {
+
+	if (node == null)
+		return "";
+	var str = "";
+	
+	switch (node.nodeType) {
+		case 1:	// Element
+			str += "<div class='element'>&lt;<span class='elementname'>" + node.nodeName + "</span>";
+			
+			var attrs = node.attributes;
+			for (var i = 0; i < attrs.length; i++)
+				str += createXmlAttribute(attrs[i]);
+			
+			if (!node.hasChildNodes())
+				return str + "/&gt;</div>";
+			
+			str += "&gt;<br />";
+			
+			var cs = node.childNodes;
+			for (var i = 0; i < cs.length; i++)
+				str += createXmlTree(cs[i], indent + 3);
+			
+			str += "&lt;/<span class='elementname'>" + node.nodeName + "</span>&gt;</div>";
+			break;
+	
+		case 9:	// Document
+			var cs = node.childNodes;
+			for (var i = 0; i < cs.length; i++)
+				str += createXmlTree(cs[i], indent);
+			break;
+	
+		case 3:	// Text
+			if (!/^\s*$/.test(node.nodeValue))
+				str += "<span class='text'>" + node.nodeValue + "</span><br />";
+			break;
+	
+		case 7:	// ProcessInstruction
+			str += "&lt;?" + node.nodeName;
+		
+			var attrs = node.attributes;
+			for (var i = 0; i < attrs.length; i++)
+				str += createXmlAttribute(attrs[i]);
+			
+			str+= "?&gt;<br />"
+			break;
+	
+		case 4:	// CDATA
+			str = "<div class='cdata'>&lt;![CDATA[<span class='cdata-content'>" + 
+				node.nodeValue +
+			"</span>]" + "]></div>";
+			break;
+			
+		case 8:	// Comment
+			str = "<div class='comment'>&lt;!--<span class='comment-content'>" + 
+				node.nodeValue +
+			"</span>--></div>";
+			break;
+		
+		case 10:
+				str = "<div class='doctype'>&lt;!DOCTYPE " + node.name;
+				if (node.publicId) {
+					str += " PUBLIC \"" + node.publicId + "\"";
+					if (node.systemId) 
+						str += " \"" + node.systemId + "\"";
+				}
+				else if (node.systemId) {
+					str += " SYSTEM \"" + node.systemId + "\"";
+				}
+				str += "&gt;</div>";
+				
+				// TODO: Handle custom DOCTYPE declarations (ELEMENT, ATTRIBUTE, ENTITY)
+				
+				break;
+		
+		default:
+			//alert(node.nodeType + "\n" + node.nodeValue);
+			inspect(node);
+	}
+	
+	return str;
+}
+
+function createXmlAttribute(a) {
+	return " <span class='attribname'>" + a.nodeName + "</span><span class='attribvalue'>=\"" + a.nodeValue + "\"</span>";
+}
+
+function stripHtml(s) {
+	return s.replace(/\&/g, "&amp;").replace(/\</g, "&lt;").replace(/\>/g, "&gt;").replace(/\t/g, "&nbsp;&nbsp;&nbsp;").replace(/\n/g, "<br />");
+}
+
+function alertXml(src) {
+	var xmlHttp = XmlHttp.create();
+	xmlHttp.open("GET", src, false);
+	xmlHttp.send(null);
+	alert(xmlHttp.responseXML.xml);
+}
+
+function doLoad() {
+	var f = document.getElementById("xmlForm");
+	var bAsync = f.async[1].checked;
+	var select = document.getElementById("src");
+	var value = select.value;
+	
+	if (value == "url") {
+		var sUri = select.options[select.selectedIndex].text;
+
+		if (f.outFormat[0].checked)
+			loadXmlFile(sUri, bAsync, "plainText");
+		else if (f.outFormat[1].checked)
+			loadXmlFile(sUri, bAsync, "xmlText");
+		if (f.outFormat[2].checked)
+			loadXmlFile(sUri, bAsync, "xmlTree");
+	}
+	else {
+		var sText = document.getElementById("srcText").value;
+
+		if (f.outFormat[0].checked)
+			loadXmlText(sText, "plainText");
+		else if (f.outFormat[1].checked)
+			loadXmlText(sText, "xmlText");
+		if (f.outFormat[2].checked)
+			loadXmlText(sText, "xmlTree");
+	}
+}
+
+function inspect(obj) {
+	var str = "";
+	for (var k in obj)
+		str += "obj." + k + " = " + obj[k] + "\n";
+	window.alert(str);
+}
+
+function updateSrcUI() {
+	var value = document.getElementById("src").value;
+	var srcTextContainer = document.getElementById("srcTextContainer");
+	
+	srcTextContainer.style.display = value == "text" ? "block" : "none";
+}
+
+//]]>
+</script>
+</head>
+<body>
+
+<form id="xmlForm" onsubmit="return false" action="">
+<fieldset>
+<legend>Source</legend>
+
+<select id="src" onchange="updateSrcUI()">
+	<option value="url">tree.xml</option>
+	<option value="url">marquee-binding.xml</option>
+	<option value="url">buddy.xml</option>
+	<option value="url">demo.html</option>
+	<option value="text">Input text...</option>
+</select>
+
+<button onclick="doLoad()">Load</button>
+
+<div id="srcTextContainer">
+	<label for="srcText">XML Source Text:</label> <br/>
+	<textarea id="srcText" rows="" cols=""></textarea>
+</div>
+
+</fieldset>
+
+<fieldset>
+<legend>Options</legend>
+
+<fieldset>
+<legend>Load Style</legend>
+<label for="async0"><input type="radio" id="async0" name="async" value="sync" /> Synchronous</label><br/>
+<label for="async1"><input type="radio" name="async"  id="async1" value="async" checked="checked" /> Asynchronous</label>
+</fieldset>
+
+<fieldset>
+<legend>Output format</legend>
+<label for="outFormat0"><input type="radio" name="outFormat" id="outFormat0" value="plainText" /> Plain Text</label><br/>
+<label for="outFormat1"><input type="radio" name="outFormat" id="outFormat1" value="xmlText" /> XML Text</label><br/>
+<label for="outFormat2"><input type="radio" name="outFormat" id="outFormat2" value="xmlTree" checked="checked" /> XML Tree</label>
+</fieldset>
+
+</fieldset>
+
+</form>
+
+<div id="out">&nbsp;</div>
+
+
+</body>
+</html>

@@ -1,0 +1,348 @@
+#!/bin/sh
+###############################################################################
+# $Id: munge.init.in 627 2006-09-26 23:17:05Z dun $
+###############################################################################
+# Copyright (C) 2002-2006 The Regents of the University of California.
+# Produced at Lawrence Livermore National Laboratory.
+# Written by Chris Dunlap <cdunlap@llnl.gov>.
+# UCRL-CODE-155910.
+###############################################################################
+# chkconfig:      345 40 60
+###############################################################################
+### BEGIN INIT INFO
+# Provides:       munge
+# Required-Start: $remote_fs $time
+# Required-Stop:  $remote_fs $time
+# Should-Start:   $named $syslog
+# Should-Stop:    $named $syslog
+# Default-Start:  2 3 4 5
+# Default-Stop:   0 1 6
+# Short-Description:    Start/Stop the MUNGE authentication service.
+# Description:    Start/Stop the MUNGE authentication service.
+### END INIT INFO
+###############################################################################
+
+unset DESC DAEMON CONFIG OPTIONS PIDFILE NICE USER SIGHUP_RELOAD
+
+prefix="/usr"
+exec_prefix="${prefix}"
+sbindir="${exec_prefix}/sbin"
+sysconfdir="/etc"
+localstatedir="/var"
+
+DESC="MUNGE"
+DAEMON="$sbindir/munged"
+#CONFIG=#_NOT_SUPPORTED_#
+#OPTIONS=
+PIDFILE="/run/munge/munged.pid"
+#NICE=
+USER="munge"
+#SIGHUP_RELOAD=#_NOT_SUPPORTED_#
+
+###############################################################################
+
+PATH=/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin
+DAEMON_NAME="`basename \"$DAEMON\"`"
+SERVICE_NAME="`basename \"$0\" .init`"
+SIGTERM_TIMEOUT="3"
+
+# Read configuration defaults to override variables:
+#   $CONFIG, $OPTIONS, $PIDFILE, $USER, $NICE, $SIGHUP_RELOAD
+##
+if [ -f /etc/default/munge ] ; then
+  . /etc/default/munge
+fi
+
+if [ -f /lib/lsb/init-functions ] ; then
+  . /lib/lsb/init-functions
+fi
+
+# Exit if the package has been removed.
+##
+[ -x "$DAEMON" ] || exit 0                      # program not installed
+
+# Exit if the configuration has been removed.
+##
+[ -z "$CONFIG" -o -r "$CONFIG" ] || exit 6      # program not configured
+
+###############################################################################
+
+service_init ()
+{
+# Initialize the environment.
+#
+# Note that the shell positional parameters must be preserved when calling
+#   this function in order for SuSE to initialize its environment properly.
+##
+  STATUS=0
+  [ -n "$SIGHUP_RELOAD" -a "$SIGHUP_RELOAD" != 0 ] \
+    && RELOAD=1 || unset RELOAD
+  expr -- "$NICE" : '[0-9]*$' >/dev/null 2>&1 && NICE="+$NICE"
+  [ "`id | sed 's/^uid=\([0-9]*\).*/\1/'`" -ne 0 ] && unset USER
+
+}
+
+check_key ()
+{
+# Exit if the munge.key does not exist
+#
+if [ ! -f /etc/munge/munge.key ] ; then
+  echo Not starting munge \(no keys found\). Please run /usr/sbin/mungekey
+  exit 0
+fi
+}
+
+service_fini ()
+{
+# Return the exit status.
+##
+  exit $STATUS
+}
+
+service_start ()
+{
+# Start the service.
+# Required by LSB.
+#
+# According to LSB, running "start" on a service already running should be
+#   considered successful.
+##
+  PIDDIR=`dirname "$PIDFILE"`
+  if [ ! -d "$PIDDIR" ]; then
+    mkdir -m 755 -p "$PIDDIR"
+    [ -n "$USER" ] && chown "$USER" "$PIDDIR"
+  fi
+  log_daemon_msg "Starting $DESC" "$DAEMON_NAME"
+  if $0 status >/dev/null 2>&1; then
+    STATUS=0
+  else
+    ERROR=`start-stop-daemon --start --quiet \
+      ${NICE:+"--nicelevel"} ${NICE:+"$NICE"} \
+      ${USER:+"--chuid"} ${USER:+"$USER"} \
+      ${PIDFILE:+"--pidfile"} ${PIDFILE:+"$PIDFILE"} \
+      --exec "$DAEMON" -- $OPTIONS 2>&1`
+    STATUS=$?
+  fi
+  log_end_msg $STATUS
+  [ $STATUS -ne 0 -a -n "$ERROR" ] && echo "$ERROR"
+}
+
+service_stop ()
+{
+# Stop the service.
+# Required by LSB.
+#
+# According to LSB, running "stop" on a service already stopped or not running
+#   should be considered successful.
+##
+  log_daemon_msg "Stopping $DESC" "$DAEMON_NAME"
+  if ! $0 status >/dev/null 2>&1; then
+    STATUS=0
+  else
+    start-stop-daemon --stop --quiet \
+      ${PIDFILE:+"--pidfile"} ${PIDFILE:+"$PIDFILE"} \
+      --name "$DAEMON_NAME" ${SIGTERM_TIMEOUT:+"--retry"} \
+      ${SIGTERM_TIMEOUT:+"$SIGTERM_TIMEOUT"} >/dev/null 2>&1
+    STATUS=$?
+  fi
+  log_end_msg $STATUS
+}
+
+service_restart ()
+{
+# Stop and restart the service if it is already running;
+#   otherwise, start the service.
+# Required by LSB.
+#
+# According to LSB, running "restart" on a service already stopped or not
+#   running should be considered successful.
+##
+  if $0 status >/dev/null 2>&1; then
+    $0 stop && $0 start
+  else
+    $0 start
+  fi
+  STATUS=$?
+}
+
+service_try_restart ()
+{
+# Restart the service if it is already running.
+# Optional for LSB.  Also known as "condrestart" by RedHat.
+#
+# According to LSB, running "try-restart" on a service already stopped or not
+#   running should be considered successful.
+##
+   $0 status >/dev/null 2>&1 && $0 restart || :
+   STATUS=$?
+}
+
+service_reload ()
+{
+# Reload the configuration without stopping and restarting the service.
+# Optional for LSB.
+##
+  [ -z "$RELOAD" ] && STATUS=3          # unimplemented feature
+
+  log_daemon_msg "Reloading $DESC" "$DAEMON_NAME"
+  if [ -n "$RELOAD" ]; then
+    start-stop-daemon --stop --quiet --signal HUP \
+      ${PIDFILE:+"--pidfile"} ${PIDFILE:+"$PIDFILE"} \
+      --name "$DAEMON_NAME" >/dev/null 2>&1
+    STATUS=$?
+  fi
+  log_end_msg $STATUS
+}
+
+service_force_reload ()
+{
+# Reload the configuration if the service supports this;
+#   otherwise, restart the service if it is already running.
+# Required by LSB.
+#
+# According to LSB, running "force-reload" on a service already stopped or
+#   not running should be considered successful.
+##
+  if [ -n "$RELOAD" ]; then
+    $0 reload
+  else
+    $0 try-restart
+  fi
+
+  STATUS=$?
+}
+
+service_status ()
+{
+# Print the current status of the service.
+# Required by LSB.
+##
+  pids=`query_pids "$DAEMON" "$PIDFILE"`
+  rc=$?
+  if [ $rc -eq 0 -a -n "$pids" ]; then
+    echo "$DAEMON_NAME (pid $pids) is running"
+    STATUS=0
+  elif [ $rc -ne 0 ]; then
+    echo "$DAEMON_NAME is stopped"
+    STATUS=3                        # program is not running
+  else
+    echo "$DAEMON_NAME status is unknown"
+    STATUS=4                        # program status unknown
+  fi
+}
+
+query_pids ()
+{
+# Writes the matching PIDs to stdout.
+# Returns 0 on success (ie, pids found).
+##
+  PROCNAME="$1"
+  PIDFILE="$2"
+
+  if query_exec pgrep; then
+    pids=`pgrep -d ' ' -x "\`basename \"$PROCNAME\"\`" 2>/dev/null`
+    rc=$?
+  elif query_exec pidof; then
+    pids=`pidof -o $$ -x "$PROCNAME" 2>/dev/null`
+    rc=$?
+  else
+    pids=`(ps awx -o pid -o command || ps -e -f -o pid -o args) 2>/dev/null \
+      | tail +2 | egrep "( |/)$PROCNAME( |$)" | grep -v egrep \
+      | sed 's/ *\([0-9]*\).*/\1/' | sort -n | tr '\012' ' '`
+    [ -n "$pids" ] && rc=0 || rc=1
+  fi
+
+  unset pids_running
+  if [ -n "$pids" -a -r "$PIDFILE" ]; then
+    read pid_line < "$PIDFILE"
+    for pid in $pid_line; do
+      expr -- "$pid" : '[0-9]*$' >/dev/null 2>&1 \
+        && expr -- " $pids " : ".* $pid .*" >/dev/null 2>&1 \
+        && pids_running="$pids_running $pid"
+    done
+    [ -n "$pids_running" ] && pids=$pids_running
+  fi
+
+  echo $pids
+  return $rc
+}
+
+query_exec ()
+{
+# Returns 0 if EXECNAME is an executable file within the PATH.
+##
+  EXECNAME="$1"
+  rc=1
+
+  IFS_BAK="$IFS"
+  IFS=:
+  for dir in $PATH; do
+    [ -x "$dir/$EXECNAME" ] || continue
+    rc=0
+    break
+  done
+  IFS="$IFS_BAK"
+  return $rc
+}
+
+signal_process ()
+{
+# Returns 0 on success, 1 if kill failed, 2 if PROCNAME is not running.
+##
+  PROCNAME="$1"
+  SIGNUM="$2"
+
+  pids=`query_pids "$DAEMON" "$PIDFILE"`
+  [ $? -ne 0 -o -z "$pids" ] && return 2
+
+  kill ${SIGNUM:+"-$SIGNUM"} $pids >/dev/null 2>&1
+  [ $? -ne 0 ] && return 1
+  [ -n "$SIGNUM" ] && return 0
+
+  pids=`query_pids "$DAEMON" "$PIDFILE"`
+  [ $? -ne 0 -o -z "$pids" ] && return 0
+  [ -z "$SIGTERM_TIMEOUT" ] && return 1
+
+  sleep "$SIGTERM_TIMEOUT"
+  kill -KILL $pids >/dev/null 2>&1
+  pids=`query_pids "$DAEMON" "$PIDFILE"`
+  [ $? -ne 0 -o -z "$pids" ] && return 0
+  return 1
+}
+
+###############################################################################
+
+service_init "$@"
+
+case "$1" in
+  start)
+    check_key
+    service_start
+    ;;
+  stop)
+    service_stop
+    ;;
+  restart)
+    check_key
+    service_restart
+    ;;
+  try-restart|condrestart)
+    service_try_restart
+    ;;
+  reload)
+    service_reload
+    ;;
+  force-reload)
+    service_force_reload
+    ;;
+  status)
+    service_status
+    ;;
+  *)
+    COMMANDS="start|stop|restart|try-restart|reload|force-reload|status"
+    echo "Usage: `basename \"$0\"` ($COMMANDS)" >&2
+    exit 2                              # invalid or excess argument(s)
+    ;;
+esac
+
+service_fini

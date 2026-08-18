@@ -1,0 +1,39 @@
+# This sed script replaces "extra commentary" field of a .TH man macro
+# with the string "_RELEASE_"
+#
+# $NCDId: @(#)mungeman,v 1.1 1994/08/15 21:23:56 greg Exp $
+#
+
+# look for lines beginning with .TH
+/^\.TH/{
+:loop
+    # copy pattern space to holding space
+    h
+    # replace pattern space with first quoted string
+    s/[^"]*\("[^"*]*"\).*/\1/
+    # munge the quoted string if there was a substitution
+    t munge
+    # otherwise there are no more quoted strings
+    b next
+:munge
+    # replace spaces with _SSS_
+    s/ /_SSS_/g
+    # replace double quotes with _QQQ_
+    s/"/_QQQ_/g
+    # append the hold space to the pattern space
+    G
+    # \1 gets the pattern space before the append (the munged quoted string)
+    # \2 gets all the stuff up to the quoted string
+    # \3 gets all the stuff after the quoted string
+    # so this replaces the quoted string with the munged quoted string
+    s/\(.*\)\n\([^"]*\)"[^"*]*"\(.*\)/\2\1\3/
+    # use t instead of a b so the 't munge' line above will work
+    t loop
+:next
+    # restore all the double quotes
+    s/_QQQ_/"/g
+    # replace the third arg with "_RELEASE_"
+    s/  *[^ ]*/ "_RELEASE_"/3
+    # restore the spaces
+    s/_SSS_/ /g
+}

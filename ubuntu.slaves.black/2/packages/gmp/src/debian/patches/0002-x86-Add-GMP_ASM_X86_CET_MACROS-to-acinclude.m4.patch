@@ -1,0 +1,148 @@
+From a35cacb4edfea2fb6217256591d8024110aa140b Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Tue, 28 Jan 2020 14:55:55 -0800
+Subject: [PATCH 02/13] x86: Add GMP_ASM_X86_CET_MACROS to acinclude.m4
+
+Add GMP_ASM_X86_CET_MACROS to acinclude.m4 to define
+
+1. X86_ENDBR.  Defined as endbr32/endbr64 if CET is enabled.
+2. X86_NOTRACK.  Defined as notrack prefix if CET is enabled.
+3. X86_GNU_PROPERTY.  Add a .note.gnu.property section to mark Intel
+CET support if needed.
+
+and use it in configure.ac.
+
+	* acinclude.m4 (GMP_ASM_X86_CET_MACROS): New.
+	* configure.ac: Use GMP_ASM_X86_CET_MACROS for x86 targets.
+---
+ acinclude.m4 | 101 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ configure.ac |   1 +
+ 2 files changed, 102 insertions(+)
+
+diff --git a/acinclude.m4 b/acinclude.m4
+index 86175ce42..1048311df 100644
+--- a/acinclude.m4
++++ b/acinclude.m4
+@@ -3136,6 +3136,107 @@ GMP_DEFINE_RAW(["define(<HAVE_SHARED_THUNKS>,<$gmp_cv_asm_sparc_shared_thunks>)"
+ ])
+ 
+ 
++dnl  GMP_ASM_X86_CET_MACROS(ABI)
++dnl  ------------
++dnl  Define
++dnl  1. X86_ENDBR for endbr32/endbr64.
++dnl  2. X86_NOTRACK for notrack prefix.
++dnl  3. X86_GNU_PROPERTY to add a .note.gnu.property section to mark
++dnl  Intel CET support if needed.
++dnl	.section ".note.gnu.property", "a"
++dnl	.p2align POINTER-ALIGN
++dnl	.long 1f - 0f
++dnl	.long 4f - 1f
++dnl	.long 5
++dnl 0:
++dnl	.asciz "GNU"
++dnl 1:
++dnl	.p2align POINTER-ALIGN
++dnl	.long 0xc0000002
++dnl	.long 3f - 2f
++dnl 2:
++dnl	.long 3
++dnl 3:
++dnl	.p2align POINTER-ALIGN
++dnl 4:
++AC_DEFUN([GMP_ASM_X86_CET_MACROS],[
++dnl AC_REQUIRE([AC_PROG_CC]) GMP uses something else
++AC_CACHE_CHECK([if Intel CET is enabled],
++  gmp_cv_asm_x86_intel_cet, [dnl
++  cat > conftest.c <<EOF
++#ifndef __CET__
++#error Intel CET is not enabled
++#endif
++EOF
++  if AC_TRY_COMMAND([${CC} $CFLAGS $CPPFLAGS
++                     -S -o conftest.s conftest.c >/dev/null])
++  then
++    gmp_cv_asm_x86_intel_cet=yes
++  else
++    gmp_cv_asm_x86_intel_cet=no
++  fi
++  rm -f conftest*])
++  if test "$gmp_cv_asm_x86_intel_cet" = yes; then
++    case $1 in
++    32)
++      endbr=endbr32
++      p2align=2
++      ;;
++    64)
++      endbr=endbr64
++      p2align=3
++      ;;
++    x32)
++      endbr=endbr64
++      p2align=2
++      ;;
++    esac
++    AC_CACHE_CHECK([if .note.gnu.property section is needed],
++      gmp_cv_asm_x86_gnu_property, [dnl
++      cat > conftest.c <<EOF
++#if !defined __ELF__ || !defined __CET__
++#error GNU property is not needed
++#endif
++EOF
++      if AC_TRY_COMMAND([${CC} $CFLAGS $CPPFLAGS
++			-S -o conftest.s conftest.c >/dev/null])
++      then
++	gmp_cv_asm_x86_gnu_property=yes
++      else
++	gmp_cv_asm_x86_gnu_property=no
++      fi
++      rm -f conftest*])
++    echo ["define(<X86_ENDBR>,<$endbr>)"] >> $gmp_tmpconfigm4
++    echo ["define(<X86_NOTRACK>,<notrack>)"] >> $gmp_tmpconfigm4
++  else
++    gmp_cv_asm_x86_gnu_property=no
++    echo ["define(<X86_ENDBR>,<>)"] >> $gmp_tmpconfigm4
++    echo ["define(<X86_NOTRACK>,<>)"] >> $gmp_tmpconfigm4
++  fi
++  if test "$gmp_cv_asm_x86_gnu_property" = yes; then
++    echo ["define(<X86_GNU_PROPERTY>, <
++	.section \".note.gnu.property\", \"a\"
++	.p2align $p2align
++	.long 1f - 0f
++	.long 4f - 1f
++	.long 5
++0:
++	.asciz \"GNU\"
++1:
++	.p2align $p2align
++	.long 0xc0000002
++	.long 3f - 2f
++2:
++	.long 3
++3:
++	.p2align $p2align
++4:>)"] >> $gmp_tmpconfigm4
++  else
++    echo ["define(<X86_GNU_PROPERTY>,<>)"] >> $gmp_tmpconfigm4
++  fi
++])
++
++
+ dnl  GMP_C_ATTRIBUTE_CONST
+ dnl  ---------------------
+ 
+diff --git a/configure.ac b/configure.ac
+index e1ffc8a04..9ff5fe0b6 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3812,6 +3812,7 @@ yes
+ 	  esac
+           ;;
+       esac
++      GMP_ASM_X86_CET_MACROS($ABI)
+       ;;
+   esac
+ fi
+-- 
+2.27.0
+

@@ -1,0 +1,30 @@
+#!/bin/sh
+# Simply call all files named 'test_*' in the same directory as this file.
+# Record their exit code as pass or fail.  exit 1 if any failed.
+my_dir=$(dirname "$0")
+
+npass=0
+nfail=0
+for test_file in "${my_dir}/test_"*; do
+   [ -f "$test_file" -a -x "$test_file" ] || continue
+   echo "executing $test_file" 1>&2
+   "$test_file"
+   ret=$?
+   if [ $ret -eq 0 ]; then
+       npass=$(($npass+1))
+   else
+       nfail=$(($nfail+1))
+       fails="${fails:+${fails} }${test_file}"
+   fi
+done
+
+if [ $nfail -ne 0 ]; then
+   echo "Passed $npass tests. Failed $nfail tests: ${fails}." 1>&2
+   exit 1
+elif [ $npass -eq 0 ]; then
+   echo "No tests executed?" 1>&2
+else
+   echo "Passed $npass tests. Failed 0 tests." 1>&2
+fi
+
+exit 0

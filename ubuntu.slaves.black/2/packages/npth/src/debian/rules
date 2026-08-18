@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory=build -- --enable-static
+
+override_dh_auto_build-arch:
+	dh_auto_build --builddirectory=build
+
+override_dh_auto_install-arch:
+	dh_auto_install --builddirectory=build
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V
+
+### "arch-independent" Windows builds: ###
+
+WIN_FLAGS=LDFLAGS="-Xlinker --no-insert-timestamp" \
+    CFLAGS="-g -Os -fdebug-prefix-map=$(shell pwd)=." CPPFLAGS=
+
+override_dh_auto_build-indep:
+	for cpu in i686 x86_64; do \
+	 mkdir -p build-$$cpu-w64-mingw32 && \
+	 cd build-$$cpu-w64-mingw32 && $(WIN_FLAGS) ../configure \
+	    --prefix=/usr/$$cpu-w64-mingw32 \
+	    --with-prefix=/usr/$$cpu-w64-mingw32 \
+	    --with-libgpg-error-prefix=/usr/$$cpu-w64-mingw32 \
+	    --enable-static \
+	    --host $$cpu-w64-mingw32 && \
+	  $(WIN_FLAGS) $(MAKE) \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+
+override_dh_auto_install-indep:
+	for cpu in i686 x86_64; do \
+	  cd build-$$cpu-w64-mingw32 && \
+	  $(MAKE) install DESTDIR=$(shell pwd)/debian/tmp \
+	  || exit 1 ; \
+	  cd .. ; \
+	done

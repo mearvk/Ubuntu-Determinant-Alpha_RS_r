@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+VERSION   := 1.2.17
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	dh_auto_build -- jar javadoc -Djavamail.jar=/usr/share/java/javax.mail.jar
+
+	cat debian/log4j.bnd | sed s/VERSION/$(VERSION)/ > debian/.log4j-versioned.bnd
+	java -jar /usr/share/java/bnd.jar wrap --properties debian/.log4j-versioned.bnd dist/lib/log4j-$(VERSION).jar
+	java -jar /usr/share/java/bnd.jar wrap --properties debian/.log4j-versioned.bnd \
+		--classpath /usr/share/java/javax.mail.jar \
+		--output log4j.jar dist/lib/log4j-$(VERSION).jar
+	rm debian/.log4j-versioned.bnd dist/lib/log4j-$(VERSION).jar
+	mv log4j.jar dist/lib/log4j-$(VERSION).jar
+
+	rm dist/lib/log4j-*-sources.jar

@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
+lib := usr/lib/$(DEB_HOST_MULTIARCH)
+
+%:
+	dh $@
+
+override_dh_update_autotools_config:
+	./autogen.sh
+	dh_update_autotools_config
+
+override_dh_auto_configure:
+	dh_auto_configure -- --without-curses
+
+override_dh_auto_build:
+	# for gpm_has_mouse_control
+	dh_auto_build -Dcontrib/control
+	dh_auto_build
+
+override_dh_auto_clean:
+	# for gpm_has_mouse_control
+	if [ -d contrib/control ]; then dh_auto_clean -Dcontrib/control; fi
+
+	# Needs to be removed before dh_auto_clean is called, so
+	# adding to debian/clean does not suffice.
+	rm -f Makefile
+
+	dh_auto_clean
+
+checkpo:
+	debconf-updatepo
+	@for i in debian/po/*.po; do \
+	  echo -n "Checking: $$i "; \
+	  msgfmt -o /dev/null -c --statistics $$i; \
+	done
+
+override_dh_auto_install:
+	mkdir -p debian/libgpm2/$(lib)
+
+	mkdir -p debian/libgpm-dev/$(lib)
+	ln -s libgpm.so.2 debian/libgpm-dev/$(lib)/libgpm.so
+
+override_dh_installsystemd:
+	# Restart or not is handled via debconf in postinst
+	dh_installsystemd --no-restart-on-upgrade
+
+override_dh_installinit:
+	# Restart or not is handled via debconf in postinst
+	dh_installinit --no-stop-on-upgrade

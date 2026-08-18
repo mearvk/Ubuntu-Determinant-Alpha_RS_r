@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildtools.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+bindnow
+export LINKFLAGS += $(LDFLAGS)
+export CC
+export PKGCONFIG = $(PKG_CONFIG)
+
+WAF = python3 ./waf
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	$(WAF) configure \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--default-lv2-path='~/.lv2:/usr/lib/$(DEB_HOST_MULTIARCH)/lv2:/usr/lib/lv2:/usr/local/lib/lv2' \
+		--strict \
+		--dyn-manifest
+
+override_dh_auto_build:
+	$(WAF)
+
+override_dh_auto_install:
+	$(WAF) install -f --destdir=$(CURDIR)/debian/tmp
+
+override_dh_auto_clean:
+	$(WAF) clean || true
+	find -name "*.pyc" -delete
+	rm -rf build .waf*
+	dh_auto_clean
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS

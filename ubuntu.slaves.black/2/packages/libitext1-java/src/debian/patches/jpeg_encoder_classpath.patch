@@ -1,0 +1,53 @@
+--- a/com/lowagie/text/pdf/PdfGraphics2D.java
++++ b/com/lowagie/text/pdf/PdfGraphics2D.java
+@@ -99,6 +99,12 @@
+ import java.util.Iterator;
+ import java.awt.font.TextAttribute;
+ 
++//For Gnu-Classpath compatibility
++
++import javax.imageio.*;
++import javax.imageio.metadata.*;
++import javax.imageio.plugins.jpeg.JPEGImageWriteParam;
++
+ public class PdfGraphics2D extends Graphics2D {
+     
+     private static final int FILL = 1;
+@@ -173,12 +179,12 @@
+         super();
+         dg2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+         setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+-        try {
++        /*try {
+             Class.forName("com.sun.image.codec.jpeg.JPEGCodec");
+         }
+         catch (Throwable t) {
+             convertImagesToJPEG = false;
+-        }
++        }*/
+         this.convertImagesToJPEG = convertImagesToJPEG;
+         this.jpegQuality = quality;
+         this.onlyShapes = onlyShapes;
+@@ -1266,10 +1272,18 @@
+                 g3.dispose();
+                 
+                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
+-                com.sun.image.codec.jpeg.JPEGImageEncoder encoder = com.sun.image.codec.jpeg.JPEGCodec.createJPEGEncoder(baos);
+-                com.sun.image.codec.jpeg.JPEGEncodeParam param = com.sun.image.codec.jpeg.JPEGCodec.getDefaultJPEGEncodeParam(scaled);
+-                param.setQuality(jpegQuality, true);
+-                encoder.encode(scaled, param);
++                //com.sun.image.codec.jpeg.JPEGImageEncoder encoder = com.sun.image.codec.jpeg.JPEGCodec.createJPEGEncoder(baos);
++                //com.sun.image.codec.jpeg.JPEGEncodeParam param = com.sun.image.codec.jpeg.JPEGCodec.getDefaultJPEGEncodeParam(scaled);
++                ImageWriter encoder = (ImageWriter)ImageIO.getImageWritersByFormatName("JPEG").next();
++                JPEGImageWriteParam param = new JPEGImageWriteParam(null);
++                
++                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
++                param.setCompressionQuality(jpegQuality);
++                encoder.setOutput(baos);
++                encoder.write((IIOMetadata) null, new IIOImage(scaled,null,null), param);
++
++                //param.setQuality(jpegQuality, true);
++                //encoder.encode(scaled, param);
+                 scaled.flush();
+                 scaled = null;
+                 image = com.lowagie.text.Image.getInstance(baos.toByteArray());

@@ -1,0 +1,105 @@
+Notes on building/releasing Commons Parent
+==========================================
+
+These recipes should work.
+Other recipes may suit other tastes!
+This is the short form of "Releasing Commons Components"
+http://commons.apache.org/releases/index.html
+
+To perform the license release audit, a.k.a. "RAT check", run.
+
+mvn apache-rat:check
+
+Building for local repo:
+-----------------------
+
+mvn -N install
+
+Snapshot deployment:
+-------------------
+
+mvn deploy
+
+Preparing for release candidate:
+-------------------------------
+- Check for updates to plugins and dependencies.
+- Ensure NOTICE has correct year.
+- Ensure changes.xml is up to date; generate RELEASE-NOTES using non-SNAPSHOT version:
+  mvn changes:announcement-generate -Prelease-notes -Dchanges.version=nn
+- Ensure pom.xml header comment agrees with changes for this release
+- Regenerate CONTRIBUTING.md:
+  mvn commons:contributing-md
+- Regenerate README.md:
+  mvn commons:readme-md
+- Commit all changes to SVN
+
+Creating release candidate tag:
+------------------------------
+- Checkout trunk in clean workspace:
+  svn co https://svn.apache.org/repos/asf/commons/proper/commons-parent/trunk commons-parent-<NN>-RC1
+- cd commons-parent-<NN>-RC1
+- Edit version in pom.xml to remove SNAPSHOT suffix
+- Edit three SCM URLs to point to the future (non-RC) tag:
+    <connection>scm:svn:http://svn.apache.org/repos/asf/commons/proper/commons-parent/tags/commons-parent-<NN></connection>
+    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/commons/proper/commons-parent/tags/commons-parent-<NN></developerConnection>
+    <url>http://svn.apache.org/viewvc/commons/proper/commons-parent/tags/commons-parent-<NN></url>
+- Create tag in SVN from the updated workspace:
+  svn cp . https://svn.apache.org/repos/asf/commons/proper/commons-parent/tags/commons-parent-<NN>-RC1 -m"Create <NN> RC1 tag"
+  (this ensures the trunk never sees the different URLs or released version)
+
+Test build of tag:
+-----------------
+- mvn deploy -Duser.name=ASF-login-name -Prelease -Ptest-deploy
+- Check the contents of target/deploy/org/apache/commons/commons-parent/<NN>
+  - should contain commons-parent-<NN>.pom, commons-parent-<NN>-site.xml and sigs/hashes
+  - also -src.tar.gz, -src.zip and sigs/hashes
+
+Deploy RC to Nexus:
+------------------
+- Set up passwords in settings.xml (https://wiki.apache.org/commons/UsingNexus)
+- Same command as above, but omitting -Ptest-deploy profile:
+- mvn package deploy -Dassembly.attach=false -Duser.name=ASF-login-name -Prelease
+
+Tidy and close Nexus staging area:
+---------------------------------
+- Login to Nexus: https://repository.apache.org/index.html
+- Open "Staging Repositories", find the correct "Open" entry (check Summary tab in bottom panel)
+- The message "No CLM data recorded" appears to be benign
+- Open the bottom "Content" tab and navigate to the files
+- Delete *.asc.md5 and *.asc.sha1 if present
+- Checkout https://dist.apache.org/repos/dist/dev/commons/commons-parent
+- Download the -src archives, their sigs and hashes, then delete them from Nexus.
+- Commit the dist/dev/ folder
+
+Close the staging area - Description: "Apache Commons Parent <NN> RC1"
+Screen does not auto-refresh - you need to press refresh
+
+Send round the release vote(lazy)
+--------------------------------
+
+Promote the Nexus staging area
+------------------------------
+Assuming the vote passes, login to Nexus and use the "Release" function
+[If there was a problem identified, Drop the repo instead and start again]
+
+Copy the RC Tag to final tag:
+  URL=https://svn.apache.org/repos/asf/commons/proper/commons-parent/
+  svn cp "$URL/tags/commons-parent-37-RC1" "$URL/tags/commons-parent-37" -m "Release commons-parent 37 based on RC1"
+
+Publish the source files to 
+https://dist.apache.org/repos/dist/release/commons/commons-parent
+
+Update site documentation
+-------------------------
+Please check that the site documentation is up to date 
+See:
+https://svn.apache.org/repos/asf/commons/cms-site/trunk/content/xdoc/commons-parent-pom.xml
+This will need updating if any new features / profiles etc are added.
+It does not list plugin or dependency versions.
+However at the least please update the version details and URL at the start of the page.
+
+
+Prepare next Release Cycle
+--------------------------
+Modify pom.xml with next SNAPSHOT version, remove second last history comment
+Add next release tag in src/changes/changes.xml and commit changes to trunk

@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+
+echo "=== tools ==="
+
+KEYDAT="debian/tests/keyset.dat"
+KEYDIC="$AUTOPKGTEST_TMP/keyset.dic"
+
+marisa-build < $KEYDAT > $KEYDIC 2> /dev/null
+
+# Found first, not found second
+marisa-lookup $KEYDIC <<__EOD__
+日本語
+にほんご
+__EOD__
+
+# Result: "赤城" (maybe)
+marisa-reverse-lookup $KEYDIC <<__EOD__
+3
+__EOD__
+
+# Result: "榛名" and "雷"
+marisa-common-prefix-search $KEYDIC <<__EOD__
+榛名山
+雷電
+__EOD__
+
+# Result: "日本人" and "日本語"
+marisa-predictive-search $KEYDIC -n 2 <<__EOD__
+日本
+__EOD__
+
+marisa-benchmark $KEYDAT
+
+marisa-dump $KEYDIC 2> /dev/null | head -3
+

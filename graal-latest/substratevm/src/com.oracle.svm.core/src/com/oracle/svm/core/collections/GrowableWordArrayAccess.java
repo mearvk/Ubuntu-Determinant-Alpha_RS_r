@@ -1,0 +1,139 @@
+/*
+ * Copyright (c) 2023, 2023, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.collections;
+
+import org.graalvm.nativeimage.c.type.WordPointer;
+import org.graalvm.word.Pointer;
+import org.graalvm.word.impl.Word;
+
+import com.oracle.svm.core.SubstrateTarget;
+import com.oracle.svm.guest.staging.core.UnmanagedMemoryUtil;
+import com.oracle.svm.core.memory.NullableNativeMemory;
+import com.oracle.svm.core.nmt.NmtCategory;
+
+public class GrowableWordArrayAccess {
+    private static final int INITIAL_CAPACITY = 10;
+
+    public static void initialize(GrowableWordArray array) {
+        array.setSize(0);
+        array.setCapacity(0);
+        array.setData(Word.nullPointer());
+    }
+
+    public static void set(GrowableWordArray array, int i, Word value) {
+        assert i >= 0 && i < array.getSize();
+        array.getData().addressOf(i).write(value);
+    }
+
+    public static Word get(GrowableWordArray array, int i) {
+        assert i >= 0 && i < array.getSize();
+        return array.getData().addressOf(i).read();
+    }
+
+    public static boolean add(GrowableWordArray array, Word element, NmtCategory nmtCategory) {
+        if (array.getSize() == array.getCapacity() && !grow(array, nmtCategory)) {
+            return false;
+        }
+
+        array.getData().addressOf(array.getSize()).write(element);
+        array.setSize(array.getSize() + 1);
+        return true;
+    }
+
+    public static void freeData(GrowableWordArray array) {
+        if (array.isNonNull()) {
+            NullableNativeMemory.free(array.getData());
+            array.setData(Word.nullPointer());
+            array.setSize(0);
+            array.setCapacity(0);
+        }
+    }
+
+    private static boolean grow(GrowableWordArray array, NmtCategory nmtCategory) {
+        int newCapacity = computeNewCapacity(array);
+        if (newCapacity < 0) {
+            /* Overflow. */
+            return false;
+        }
+
+        assert newCapacity >= INITIAL_CAPACITY;
+        WordPointer oldData = array.getData();
+        int wordSize = SubstrateTarget.getWordSize();
+        WordPointer newData = NullableNativeMemory.malloc(Word.unsigned(newCapacity).multiply(wordSize), nmtCategory);
+        if (newData.isNull()) {
+            return false;
+        }
+
+        UnmanagedMemoryUtil.copyForward((Pointer) oldData, (Pointer) newData, Word.unsigned(array.getSize()).multiply(wordSize));
+        NullableNativeMemory.free(oldData);
+
+        array.setData(newData);
+        array.setCapacity(newCapacity);
+        return true;
+    }
+
+    private static int computeNewCapacity(GrowableWordArray array) {
+        int oldCapacity = array.getCapacity();
+        if (oldCapacity == 0) {
+            return INITIAL_CAPACITY;
+        } else {
+            return oldCapacity * 2;
+        }
+    }
+
+    public static void qsort(GrowableWordArray array, int low, int high, Comparator c) {
+        if (low < high) {
+            int pivotIndex = partition(array, low, high, c);
+            qsort(array, low, pivotIndex - 1, c);
+            qsort(array, pivotIndex + 1, high, c);
+        }
+    }
+
+    private static int partition(GrowableWordArray array, int low, int high, Comparator c) {
+        Word pivot = get(array, high);
+        int i = low - 1;
+        for (int j = low; j < high; j++) {
+            if (c.compare(get(array, j), pivot) <= 0) {
+                i++;
+                // Swap i and j
+                Word temp = get(array, i);
+                set(array, i, get(array, j));
+                set(array, j, temp);
+            }
+        }
+        // Swap the pivot with i+1
+        Word temp = get(array, i + 1);
+        set(array, i + 1, get(array, high));
+        set(array, high, temp);
+
+        // Return the partition index
+        return i + 1;
+    }
+
+    @FunctionalInterface
+    public interface Comparator {
+        int compare(Word a, Word b);
+    }
+}

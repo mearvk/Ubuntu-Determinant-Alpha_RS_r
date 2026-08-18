@@ -1,0 +1,1 @@
+useNewPatchModule=true

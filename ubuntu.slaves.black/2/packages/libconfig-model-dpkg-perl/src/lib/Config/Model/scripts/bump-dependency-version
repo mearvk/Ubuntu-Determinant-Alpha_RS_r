@@ -1,0 +1,25 @@
+doc: update required version of a dependency and commit the change
+doc: parameters: pkg, version
+doc: pkg can be a Perl regular expression to change related dependencies in one call
+doc: example:
+doc:   cme run bump-dependency-version -arg pkg=libconfig-model-perl -arg version=2.101
+doc:   cme run bump-dependency-version -arg 'pkg=libuv1.*' -arg version=1.18.0
+app: dpkg-control
+
+---var
+$var{change_it} = qq{
+  s/^
+    ($args{pkg})       # $1 package
+    \\s*(\\([^)]+\\))? # $2 dep version (may be)
+    \\s*(.*)           # $3 whatever's left
+  /
+    (\$3 ? qq!\$1 (>= $args{version}) \$3! : qq!\$1 (>= $args{version})!)
+  /xe
+}
+---
+
+load: ! source Build-Depends:=~"$change_it"
+load: ! source Build-Depends-Indep:=~"$change_it"
+load: ! binary:~ Depends:=~"$change_it"
+
+commit: control: depends on $pkg >= $version

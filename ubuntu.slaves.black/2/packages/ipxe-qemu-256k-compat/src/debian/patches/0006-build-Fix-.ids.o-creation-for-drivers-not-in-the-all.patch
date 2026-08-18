@@ -1,0 +1,58 @@
+From 25d6c80498b98a9b41ca1fec50cd2038f6f17547 Mon Sep 17 00:00:00 2001
+From: Michael Brown <mcb30@ipxe.org>
+Date: Mon, 1 Jun 2015 16:50:56 +0100
+Subject: [PATCH] [build] Fix .ids.o creation for drivers not in the
+ all-drivers build
+
+Commit dc19e63 ("[build] Construct all-drivers list based on driver
+class") accidentally excluded the USB bus drivers from the list of
+files parsed in order to create PCI 3.0 device ID lists.
+
+Fix by returning $(DRIVERS) to its previous definition as a list of
+all driver files, and use only $(DRIVERS_ipxe) to contain the
+filtered list containing only those drivers which we want to include
+in the "all-drivers" build.
+
+Reported-by: Mary-Ann Johnson <MaryAnn.Johnson@displaylink.com>
+Signed-off-by: Michael Brown <mcb30@ipxe.org>
+
+Fixes an FTBFS in Artful
+
+Forwarded: no (backport)
+Origin: https://git.ipxe.org/ipxe.git/commit/25d6c80498b98a9b41ca1fec50cd2038f6f17547
+Last-Update: 2017-08-29
+---
+ src/Makefile.housekeeping | 3 +--
+ src/util/parserom.pl      | 1 +
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/Makefile.housekeeping b/src/Makefile.housekeeping
+index be9ad7c..03800c8 100644
+--- a/src/Makefile.housekeeping
++++ b/src/Makefile.housekeeping
+@@ -949,9 +949,8 @@ CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
+ 
+ # Select drivers to be included in the all-drivers build
+ #
+-DRIVERS		= $(DRIVERS_net) $(DRIVERS_infiniband) \
++DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
+ 		  $(DRIVERS_xen) $(DRIVERS_hyperv)
+-DRIVERS_ipxe	= $(DRIVERS)
+ 
+ # Analyse a target name (e.g. "bin/dfe538--prism2_pci.rom.tmp") and
+ # derive the variables:
+diff --git a/src/util/parserom.pl b/src/util/parserom.pl
+index 2c59f48..28df606 100755
+--- a/src/util/parserom.pl
++++ b/src/util/parserom.pl
+@@ -162,6 +162,7 @@ sub print_make_rules {
+         print "# NIC\t\n";
+         print "# NIC\tfamily\t$state->{family}\n";
+         print "DRIVERS_$state->{driver_class} += $state->{driver_name}\n";
++        print "DRIVERS += $state->{driver_name}\n";
+         print "\n";
+         $state->{'is_header_printed'} = 1;
+     }
+-- 
+2.7.4
+

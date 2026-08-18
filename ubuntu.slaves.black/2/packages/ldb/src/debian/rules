@@ -1,0 +1,76 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+CFLAGS += -Wall
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+CFLAGS += -O0
+else
+CFLAGS += -O2
+endif
+
+LDFLAGS += -Wl,--as-needed
+
+DESTDIR=$(CURDIR)/debian/tmp
+
+include /usr/share/dpkg/architecture.mk
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_configure:
+	CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CPPFLAGS="$(CPPFLAGS)" \
+		./configure --prefix=/usr --disable-rpath-install \
+		--builtin-libraries=ccan,replace,tdb_compat \
+		--bundled-libraries=NONE,pytevent \
+		--minimum-library-version="$(shell ./debian/autodeps.py --minimum-library-version)" \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--with-modulesdir=/usr/lib/$(DEB_HOST_MULTIARCH)/ldb/modules
+
+get-packaged-orig-source:
+	./debian/build-orig.sh
+
+override_dh_auto_clean:
+	[ ! -f Makefile ] || $(MAKE) distclean
+	# Waf should be doing this; see
+	# https://bugzilla.samba.org/show_bug.cgi?id=8854
+	rm -f .lock-wscript
+	# Waf should be doing this; see
+	# https://bugzilla.samba.org/show_bug.cgi?id=8855
+	find . -name __pycache__ -o -name "*.pyc" -exec rm -rf {} \;
+
+override_dh_auto_build:
+	$(MAKE) all
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+	$(MAKE) test
+endif
+
+override_dh_install:
+	DEB_PY3_INCDIR=$(shell python3-config --includes | sed 's,^-I\([^ ]*\).*,\1,') \
+		dh_install
+
+override_dh_auto_install:
+	DESTDIR=$(DESTDIR) $(MAKE) install
+	rm $(DESTDIR)/usr/lib/python*/dist-packages/_tevent*.so
+	rm $(DESTDIR)/usr/lib/python*/dist-packages/tevent.py
+	ar cr libldb.a bin/default/common/*.o
+	mv libldb.a $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_makeshlibs:
+	DEB_PY3_EXTENSION_SUFFIX=$(shell python3-config --extension-suffix | tr '_' '-') \
+	  DEB_PY3_EXTENSION_UPCASE=$(shell python3-config --extension-suffix | sed 's/\.so$$//' | tr 'a-z-' 'A-Z_') \
+	  debian/python3-ldb.symbols.in > debian/python3-ldb.symbols
+	dh_makeshlibs -Xldb. -ppython3-ldb -- -c4
+	rm debian/python3-ldb.symbols
+	dh_makeshlibs -X/usr/lib/$(DEB_HOST_MULTIARCH)/ldb -plibldb2 -- -c4

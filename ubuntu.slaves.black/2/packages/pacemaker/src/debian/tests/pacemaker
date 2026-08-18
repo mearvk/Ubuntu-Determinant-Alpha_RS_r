@@ -1,0 +1,19 @@
+#!/bin/sh
+
+set -e
+
+OUTPUT="${AUTOPKGTEST_ARTIFACTS:-.}/crm_mon.txt"
+
+journalctl -u corosync | fgrep 'knet_handle_new failed: File name too long' && {
+    journalctl -u corosync
+    echo 'This is expected in unprivileged containers, skipping the test.'
+    echo 'Avoid by sysctl -w net.core.{r,w}mem_max=8388608 (KNET_RING_RCVBUFF) before dropping privileges.'
+    exit 77
+}
+
+# Wait more than dc-deadtime (20s by default)
+sleep 25
+
+crm_mon -1 >"$OUTPUT"
+cat "$OUTPUT"
+fgrep -q "Online: [ $(uname -n) ]" "$OUTPUT"

@@ -1,0 +1,86 @@
+From b4c841aea501341fb1d7e62fa4f25a57ed990134 Mon Sep 17 00:00:00 2001
+From: Pawel Niegowski <pniegowski@atlassian.com>
+Date: Fri, 21 Apr 2017 14:47:42 +0200
+Subject: [PATCH] fix deserialization
+
+---
+
+Upstream link: https://github.com/FasterXML/jackson-1/commit/b4c841aea501341fb1d7e62fa4f25a57ed990134
+
+ .../map/deser/BeanDeserializerFactory.java    | 48 +++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java b/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
+index 620c9dce..b8c0c180 100644
+--- a/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
++++ b/src/mapper/java/org/codehaus/jackson/map/deser/BeanDeserializerFactory.java
+@@ -31,6 +31,37 @@ public class BeanDeserializerFactory
+      */
+     private final static Class<?>[] INIT_CAUSE_PARAMS = new Class<?>[] { Throwable.class };
+ 
++    /**
++     * Set of well-known "nasty classes", deserialization of which is considered dangerous
++     * and should (and is) prevented by default.
++     *
++     * @since 1.9.13-atlassian-2
++     */
++    protected final static Set<String> DEFAULT_NO_DESER_CLASS_NAMES;
++
++    static
++    {
++        Set<String> s = new HashSet<String>();
++        // Courtesy of [https://github.com/kantega/notsoserial]:
++        // (and wrt [databind#1599]
++        s.add("org.apache.commons.collections.functors.InvokerTransformer");
++        s.add("org.apache.commons.collections.functors.InstantiateTransformer");
++        s.add("org.apache.commons.collections4.functors.InvokerTransformer");
++        s.add("org.apache.commons.collections4.functors.InstantiateTransformer");
++        s.add("org.codehaus.groovy.runtime.ConvertedClosure");
++        s.add("org.codehaus.groovy.runtime.MethodClosure");
++        s.add("org.springframework.beans.factory.ObjectFactory");
++        s.add("com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl");
++        DEFAULT_NO_DESER_CLASS_NAMES = Collections.unmodifiableSet(s);
++    }
++
++    /**
++     * Set of class names of types that are never to be deserialized.
++     *
++     * @since 1.9.13-atlassian-2
++     */
++    protected Set<String> _cfgIllegalClassNames = DEFAULT_NO_DESER_CLASS_NAMES;
++
+     /*
+     /**********************************************************
+     /* Config class implementation
+@@ -632,6 +663,7 @@ public class BeanDeserializerFactory
+         if (!isPotentialBeanType(type.getRawClass())) {
+             return null;
+         }
++        checkIllegalTypes(type);
+         // Use generic bean introspection to build deserializer
+         return buildBeanDeserializer(config, type, beanDesc, property);
+     }
+@@ -1473,4 +1505,20 @@ public class BeanDeserializerFactory
+         }
+         return status;
+     }
++
++    /**
++     * @since 2.8.9
++     */
++    protected void checkIllegalTypes(JavaType type)
++            throws JsonMappingException
++    {
++        // There are certain nasty classes that could cause problems, mostly
++        // via default typing -- catch them here.
++        String full = type.getRawClass().getName();
++
++        if (_cfgIllegalClassNames.contains(full))
++        {
++            throw new JsonMappingException("Illegal type (" + full + ") to deserialize: prevented for security reasons");
++        }
++    }
+ }
+-- 
+2.20.1
+

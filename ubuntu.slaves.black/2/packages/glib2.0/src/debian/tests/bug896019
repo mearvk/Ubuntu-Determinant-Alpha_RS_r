@@ -1,0 +1,170 @@
+#!/bin/bash
+
+set -e
+
+. debian/tests/lib.sh
+cd "$AUTOPKGTEST_TMP"
+
+biarch=
+
+getopt_temp="help"
+getopt_temp="$getopt_temp,biarch"
+
+getopt_temp="$(getopt -o '' --long "$getopt_temp" -n "$me" -- "$@")"
+eval "set -- $getopt_temp"
+
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+        (--biarch)
+            biarch=yes
+            shift
+            ;;
+
+        (--)
+            shift
+            break
+            ;;
+
+        (-*)
+            warning "Unknown option: $1"
+            usage 2
+            ;;
+
+        (*)
+            break
+            ;;
+    esac
+done
+
+system_arch="${DEB_HOST_ARCH:-"$(dpkg --print-architecture)"}"
+multiarch="${DEB_HOST_MULTIARCH:-"$(dpkg-architecture -a"$system_arch" -qDEB_HOST_MULTIARCH)"}"
+foreign_arch=
+foreign_multiarch=
+
+if [ -n "$biarch" ]; then
+    case "$system_arch" in
+        (amd64)
+            foreign_arch="i386"
+            foreign_multiarch="i386-linux-gnu"
+            ;;
+        (arm64)
+            foreign_arch="armhf"
+            foreign_multiarch="arm-linux-gnueabihf"
+            ;;
+        (*)
+            echo "1..0 # SKIP - no secondary architecture" >&7
+            exit 77
+    esac
+fi
+
+if [ -n "$foreign_arch" ]; then
+    require dpkg --add-architecture "$foreign_arch"
+    require_apt "$foreign_arch"
+fi
+
+if [ -n "$foreign_arch" ]; then
+    multiarchs=("$multiarch" "$foreign_multiarch")
+else
+    multiarchs=("$multiarch")
+fi
+
+require_apt_stretch
+
+package=libglib2.0-0
+old_version=2.50.3-2+deb9u2
+soname=libglib-2.0.so.0
+other_sonames=(libgio-2.0.so.0 libgmodule-2.0.so.0 libgobject-2.0.so.0 libgthread-2.0.so.0)
+tail=5000.3
+
+if ! new_version=$(dpkg-query -W -f '${Version}' "$package:$system_arch"); then
+    echo "1..0 # SKIP - unable to get version of $package:$system_arch" >&7
+    exit 77
+fi
+
+if ! apt-get download "$package=$old_version"; then
+    echo "1..0 # SKIP - unable to download $package=$old_version" >&7
+    exit 77
+fi
+
+if [ -n "$foreign_arch" ] && ! apt-get download "$package:$foreign_arch=$old_version"; then
+    echo "1..0 # SKIP - unable to download $package:$foreign_arch=$old_version" >&7
+    exit 77
+fi
+
+if [ -n "$foreign_arch" ]; then
+    require apt-get -y install --reinstall "$package=$new_version" "$package:$foreign_arch=$new_version"
+    good_foreign_realpath="$(readlink -f "/usr/lib/$foreign_multiarch/$soname")"
+else
+    require apt-get -y install --reinstall "$package=$new_version"
+    good_foreign_realpath=
+fi
+
+good_realpath="$(readlink -f "/usr/lib/$multiarch/$soname")"
+
+# Pretend the version from stretch got stuck on the system somehow.
+# (This is the wrong way to use dpkg-deb, never do this in production.)
+require dpkg-deb --vextract "${package}_${old_version}_${system_arch}.deb" .
+
+if [ -n "$foreign_arch" ]; then
+    require dpkg-deb --vextract "${package}_${old_version}_${foreign_arch}.deb" .
+fi
+
+for ma in "${multiarchs[@]}"; do
+    cp -a ./lib/"$ma"/"$soname" /lib/"$ma"/
+    cp -a ./lib/"$ma"/"$soname".* /lib/"$ma"/
+
+    for other in "${other_sonames[@]}"; do
+        cp -a ./usr/lib/"$ma"/"$other" /usr/lib/"$ma"/
+        cp -a ./usr/lib/"$ma"/"$other".* /usr/lib/"$ma"/
+    done
+done
+
+assert_succeeds ldconfig --verbose
+
+for ma in "${multiarchs[@]}"; do
+    echo "Status before reinstalling $package"
+    assert_succeeds ls -il "/lib/$ma/$soname"
+    assert_succeeds ls -il "/lib/$ma/$soname".*
+    assert_succeeds ls -il "/lib/$ma/$soname.$tail"
+    assert_succeeds ls -il "/usr/lib/$ma/$soname"
+    assert_succeeds ls -il "/usr/lib/$ma/$soname".*
+done
+
+for other in "$soname" "${other_sonames[@]}"; do
+    echo "Running 'true' with $other preloaded to see what we get..."
+    env LD_DEBUG=libs LD_PRELOAD="$other" true || true
+done
+
+if [ -n "$foreign_arch" ]; then
+    assert_succeeds apt-get -y install --reinstall "$package:$system_arch=$new_version" "$package:$foreign_arch=$new_version"
+else
+    assert_succeeds apt-get -y install --reinstall "$package:$system_arch=$new_version"
+fi
+
+for ma in "${multiarchs[@]}"; do
+    if [ "/usr/lib/$ma" -ef "/lib/$ma" ]; then
+        echo "Merged-/usr system"
+        assert_status 1 test "/usr/lib/$ma/$soname" -ef "/usr/lib/$ma/$soname.$tail"
+    else
+        echo "Non-merged-/usr system"
+        assert_succeeds ls -il "/lib/$ma/removed-by-upgrade-bug896019/"
+        assert_status 1 test -e "/lib/$ma/$soname.$tail"
+        assert_status 1 test -e "/lib/$ma/$soname"
+        assert_succeeds test -e "/usr/lib/$ma/$soname"
+    fi
+done
+
+assert_succeeds test "/usr/lib/$multiarch/$soname" -ef "$good_realpath"
+
+if [ -n "$foreign_arch" ]; then
+    assert_succeeds test "/usr/lib/$foreign_multiarch/$soname" -ef "$good_foreign_realpath"
+fi
+
+for other in "$soname" "${other_sonames[@]}"; do
+    env LD_DEBUG=libs LD_PRELOAD="$other" true
+done
+
+finish
+
+# vim:set sw=4 sts=4 et:

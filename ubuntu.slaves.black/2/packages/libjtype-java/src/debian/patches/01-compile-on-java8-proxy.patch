@@ -1,0 +1,263 @@
+Description: Use guava's dynamic proxy solution to allow compilation on Java 8
+Author: Chris West <git@goeswhere.com>
+Bug: https://github.com/markhobson/jtype/pull/3
+Bug-Debian: https://bugs.debian.org/751526
+--- a/src/main/java/com/googlecode/jtype/DefaultTypeVariable.java
++++ b/src/main/java/com/googlecode/jtype/DefaultTypeVariable.java
+@@ -34,7 +34,7 @@
+  *            the type of generic declaration that declared the type variable
+  * @see TypeVariable
+  */
+-class DefaultTypeVariable<D extends GenericDeclaration> implements TypeVariable<D>, Serializable
++class DefaultTypeVariable<D extends GenericDeclaration> implements Type, Serializable
+ {
+ 	// constants --------------------------------------------------------------
+ 	
+@@ -154,16 +154,7 @@
+ 			&& name.equals(typeVariable.getName())
+ 			&& Arrays.equals(bounds, typeVariable.getBounds());
+ 	}
+-	
+-	/**
+-	 * {@inheritDoc}
+-	 */
+-	@Override
+-	public String toString()
+-	{
+-		return TypeUtils.toString(this);
+-	}
+-	
++
+ 	// private methods --------------------------------------------------------
+ 	
+ 	private static boolean isValidFirstBound(Type bound)
+--- a/src/main/java/com/googlecode/jtype/Types.java
++++ b/src/main/java/com/googlecode/jtype/Types.java
+@@ -17,10 +17,15 @@
+ 
+ import static com.googlecode.jtype.Utils.checkNotNull;
+ 
++import java.io.Serializable;
+ import java.lang.reflect.GenericArrayType;
+ import java.lang.reflect.GenericDeclaration;
+ import java.lang.reflect.MalformedParameterizedTypeException;
++import java.lang.reflect.InvocationHandler;
++import java.lang.reflect.InvocationTargetException;
+ import java.lang.reflect.ParameterizedType;
++import java.lang.reflect.Method;
++import java.lang.reflect.Proxy;
+ import java.lang.reflect.Type;
+ import java.lang.reflect.TypeVariable;
+ import java.lang.reflect.WildcardType;
+@@ -76,7 +81,10 @@
+ 	public static <D extends GenericDeclaration> TypeVariable<D> typeVariable(D declaration, String name,
+ 		Type... bounds)
+ 	{
+-		return new DefaultTypeVariable<D>(declaration, name, bounds);
++		return (TypeVariable<D>) Proxy.newProxyInstance(
++				Types.class.getClassLoader(),
++				new Class[]{TypeVariable.class},
++				new TypeVariableInvocationHandler(new DefaultTypeVariable<D>(declaration, name, bounds)));
+ 	}
+ 	
+ 	/**
+@@ -347,4 +355,40 @@
+ 		
+ 		return wildcardType(upperBounds, lowerBounds);
+ 	}
++
++	private static class TypeVariableInvocationHandler implements InvocationHandler, Serializable {
++		private static final Map<String, Method> typeVariableMethods = new HashMap<String, Method>();
++		static {
++			for (Method method : DefaultTypeVariable.class.getMethods()) {
++				if (method.getDeclaringClass().equals(DefaultTypeVariable.class)) {
++					typeVariableMethods.put(method.getName(), method);
++				}
++			}
++		}
++
++		private final DefaultTypeVariable<?> typeVariable;
++
++		public TypeVariableInvocationHandler(DefaultTypeVariable<?> typeVariable) {
++			this.typeVariable = typeVariable;
++		}
++
++		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
++			String methodName = method.getName();
++
++			if ("toString".equals(methodName)) {
++				return TypeUtils.toString((Type) proxy);
++			}
++
++			Method typeVariableMethod = typeVariableMethods.get(methodName);
++			if (typeVariableMethod == null) {
++				throw new UnsupportedOperationException(methodName);
++			} else {
++				try {
++					return typeVariableMethod.invoke(typeVariable, args);
++				} catch (InvocationTargetException e) {
++					throw e.getCause();
++				}
++			}
++		}
++	}
+ }
+--- a/src/test/java/com/googlecode/jtype/DefaultTypeVariableTest.java
++++ b/src/test/java/com/googlecode/jtype/DefaultTypeVariableTest.java
+@@ -61,7 +61,7 @@
+ 	{
+ 		try
+ 		{
+-			new DefaultTypeVariable<Constructor<?>>(null, "T", new Type[] {Number.class});
++			Types.<Constructor<?>>typeVariable(null, "T", new Type[] {Number.class});
+ 		}
+ 		catch (NullPointerException exception)
+ 		{
+@@ -76,7 +76,7 @@
+ 	{
+ 		try
+ 		{
+-			new DefaultTypeVariable<Constructor<?>>(constructor, null, new Type[] {Number.class});
++			Types.<Constructor<?>>typeVariable(constructor, null, new Type[] {Number.class});
+ 		}
+ 		catch (NullPointerException exception)
+ 		{
+@@ -173,7 +173,7 @@
+ 	@Test
+ 	public void constructorWithNullBounds()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T", null);
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T", null);
+ 		
+ 		assertEquals(constructor, typeVariable.getGenericDeclaration());
+ 		assertEquals("T", typeVariable.getName());
+@@ -183,7 +183,7 @@
+ 	@Test
+ 	public void constructorWithEmptyBounds()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[0]);
+ 		
+ 		assertEquals(constructor, typeVariable.getGenericDeclaration());
+@@ -194,10 +194,10 @@
+ 	@Test
+ 	public void hashCodeTest()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable1 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable1 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+-		TypeVariable<Constructor<?>> typeVariable2 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable2 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+ 		assertEquals(typeVariable1.hashCode(), typeVariable2.hashCode());
+@@ -206,10 +206,10 @@
+ 	@Test
+ 	public void equalsWhenEqual()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable1 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable1 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+-		TypeVariable<Constructor<?>> typeVariable2 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable2 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+ 		assertEquals(typeVariable1, typeVariable2);
+@@ -218,7 +218,7 @@
+ 	@Test
+ 	public void equalsWithDifferentClass()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T", null);
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T", null);
+ 		
+ 		assertFalse(typeVariable.equals(new Object()));
+ 	}
+@@ -226,12 +226,12 @@
+ 	@Test
+ 	public void equalsWithDifferentDeclarations() throws NoSuchMethodException
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable1 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable1 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class});
+ 		
+ 		Method method = getClass().getDeclaredMethod("equalsWithDifferentDeclarations");
+ 		
+-		TypeVariable<Method> typeVariable2 = new DefaultTypeVariable<Method>(method, "T", new Type[] {Number.class});
++		TypeVariable<Method> typeVariable2 = Types.<Method>typeVariable(method, "T", new Type[] {Number.class});
+ 		
+ 		assertFalse(typeVariable1.equals(typeVariable2));
+ 	}
+@@ -239,10 +239,10 @@
+ 	@Test
+ 	public void equalsWithDifferentNames()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable1 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable1 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class});
+ 		
+-		TypeVariable<Constructor<?>> typeVariable2 = new DefaultTypeVariable<Constructor<?>>(constructor, "U",
++		TypeVariable<Constructor<?>> typeVariable2 = Types.<Constructor<?>>typeVariable(constructor, "U",
+ 			new Type[] {Number.class});
+ 		
+ 		assertFalse(typeVariable1.equals(typeVariable2));
+@@ -251,10 +251,10 @@
+ 	@Test
+ 	public void equalsWithDifferentBounds()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable1 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable1 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class});
+ 		
+-		TypeVariable<Constructor<?>> typeVariable2 = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable2 = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Integer.class});
+ 		
+ 		assertFalse(typeVariable1.equals(typeVariable2));
+@@ -263,7 +263,7 @@
+ 	@Test
+ 	public void toStringWithNoBounds()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T", null);
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T", null);
+ 		
+ 		assertEquals("T", typeVariable.toString());
+ 	}
+@@ -271,7 +271,7 @@
+ 	@Test
+ 	public void toStringWithSingleBound()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class});
+ 		
+ 		assertEquals("T extends java.lang.Number", typeVariable.toString());
+@@ -280,7 +280,7 @@
+ 	@Test
+ 	public void toStringWithMultipleBounds()
+ 	{
+-		TypeVariable<Constructor<?>> typeVariable = new DefaultTypeVariable<Constructor<?>>(constructor, "T",
++		TypeVariable<Constructor<?>> typeVariable = Types.<Constructor<?>>typeVariable(constructor, "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+ 		assertEquals("T extends java.lang.Number & java.lang.Comparable", typeVariable.toString());
+@@ -289,7 +289,7 @@
+ 	@Test
+ 	public void serializable() throws IOException, ClassNotFoundException
+ 	{
+-		TypeVariable<Class<?>> type = new DefaultTypeVariable<Class<?>>(getClass(), "T",
++		TypeVariable<Class<?>> type = Types.<Class<?>>typeVariable(getClass(), "T",
+ 			new Type[] {Number.class, Comparable.class});
+ 		
+ 		assertSerializable(type);
+@@ -299,7 +299,7 @@
+ 	
+ 	private static <D extends GenericDeclaration> void assertConstructor(D declaration, String name, Type... bounds)
+ 	{
+-		TypeVariable<D> typeVariable = new DefaultTypeVariable<D>(declaration, name, bounds);
++		TypeVariable<D> typeVariable = Types.<D>typeVariable(declaration, name, bounds);
+ 		
+ 		assertEquals("Generic declaration", declaration, typeVariable.getGenericDeclaration());
+ 		assertEquals("Name", name, typeVariable.getName());

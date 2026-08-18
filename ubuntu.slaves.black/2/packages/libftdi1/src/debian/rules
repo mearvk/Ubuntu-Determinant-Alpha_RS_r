@@ -1,0 +1,49 @@
+#!/usr/bin/make -f
+%:
+	dh $@ --with python3
+
+# Force C++ standard to c++11 to prepare for the GCC 6 transition
+export DEB_CXXFLAGS_MAINT_PREPEND=-std=c++11 
+
+# Available python versions
+PY3VERS = $(shell py3versions -v -r debian/control)
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory=build-main -- \
+		-DBUILD_TESTS=ON \
+		-DDOCUMENTATION:BOOL=ON \
+		-DEXAMPLES:BOOL=ON \
+		-DFTDIPP:BOOL=ON \
+		-DFTDI_EEPROM:BOOL=ON \
+		-DPYTHON_BINDINGS:BOOL=OFF
+	for v in $(PY3VERS) ; do \
+		dh_auto_configure --builddirectory=build-python$$v -- \
+			-DBUILD_TESTS=OFF \
+			-DDOCUMENTATION:BOOL=OFF \
+			-DEXAMPLES:BOOL=OFF \
+			-DFTDIPP:BOOL=ON \
+			-DFTDI_EEPROM:BOOL=OFF \
+			-DPYTHON_BINDINGS:BOOL=ON \
+			-DLINK_PYTHON_LIBRARY:BOOL=OFF \
+			; \
+	done
+
+override_dh_auto_build:
+	dh_auto_build --builddirectory=build-main
+	for v in $(PY3VERS) ; do \
+		dh_auto_build --builddirectory=build-python$$v ; \
+	done
+
+override_dh_auto_install:
+	dh_auto_install --builddirectory=build-main
+	for v in $(PY3VERS) ; do \
+		dh_auto_install --builddirectory=build-python$$v ; \
+		python$$v -c "from distutils import sysconfig; import os; destdir='$(CURDIR)/debian/tmp'; libdir=sysconfig.get_python_lib(); ext=sysconfig.get_config_var('EXT_SUFFIX'); os.rename(os.path.join(destdir + libdir, '_ftdi1.so'), os.path.join(destdir + libdir, '_ftdi1' + ext))" ; \
+	done
+
+override_dh_auto_test:
+	dh_auto_test --builddirectory=build-main
+
+override_dh_auto_clean:
+	rm -fr $(CURDIR)/build-*
+	dh_auto_clean

@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+CURVER=$(shell dpkg-parsechangelog | grep ^Version | cut -d\  -f2 | cut -d- -f1)
+UPVER=$(shell echo $(CURVER) | cut -d+ -f1)
+
+%:
+	dh $@ --with maven_repo_helper
+
+override_dh_auto_build:
+	dh_auto_build -- build_jar
+
+override_dh_auto_clean:
+	dh_clean dist/*
+
+get-orig-source:
+	uscan --verbose \
+		--download-version $(UPVER) \
+		--force-download \
+		--destdir .
+	unzip -d kxml2-$(CURVER) kxml2-src-$(UPVER).zip
+	find kxml2-$(CURVER) \( -name "*.class" -o -name "*.jar" \) -delete
+	tar cf kxml2_$(CURVER).orig.tar kxml2-$(CURVER)
+	gzip -9 kxml2_$(CURVER).orig.tar
+	rm -vrf kxml2-$(CURVER) kxml2-src-$(UPVER).zip

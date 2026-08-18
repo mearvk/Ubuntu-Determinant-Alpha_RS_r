@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_HARDENING=1
+
+%:
+	dh $@
+
+override_dh_auto_build-arch:
+	mkdir -p openssl-dynamic/target/native-build/src
+	cp -Rvp openssl-dynamic/src/main/native-package/* openssl-dynamic/target/native-build/
+	cp -Rvp openssl-dynamic/src/main/c/* openssl-dynamic/target/native-build/src/
+	cp -Rvp debian/native-build/* openssl-dynamic/target/native-build/
+	cd openssl-dynamic/target/native-build/ ; autoreconf --force --install -I m4 ; ./configure ; make
+
+	# copy the native library to the location expected by the unit tests
+	mkdir -p openssl-dynamic/target/test-classes/META-INF/native/debian
+	cp openssl-dynamic/target/native-build/.libs/libnetty-tcnative.so openssl-dynamic/target/test-classes/META-INF/native/debian/libnetty_tcnative.so
+
+override_dh_auto_test-arch:
+
+override_dh_auto_test-indep: override_dh_auto_build-arch
+	# ensure the native library is built before running the tests, otherwise the build fails with dpkg-buildpackage -A
+	dh_auto_test -i
+
+override_dh_auto_install-arch:
+	mv openssl-dynamic/target/native-build/.libs/libnetty-tcnative-@VERSION@.so openssl-dynamic/target/native-build/.libs/libnetty-tcnative.so
+	dh_install -p libnetty-tcnative-jni openssl-dynamic/target/native-build/.libs/libnetty-tcnative.so usr/lib/${DEB_HOST_MULTIARCH}/jni

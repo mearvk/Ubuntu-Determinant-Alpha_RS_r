@@ -1,0 +1,780 @@
+Description: Restores the remapping adapters removed from ASM 7.1 to preserve the backward compatibility
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- /dev/null
++++ b/asm-commons/src/main/java/org/objectweb/asm/commons/RemappingAnnotationAdapter.java
+@@ -0,0 +1,85 @@
++// ASM: a very small and fast Java bytecode manipulation framework
++// Copyright (c) 2000-2011 INRIA, France Telecom
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. Neither the name of the copyright holders nor the names of its
++//    contributors may be used to endorse or promote products derived from
++//    this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++// THE POSSIBILITY OF SUCH DAMAGE.
++
++package org.objectweb.asm.commons;
++
++import org.objectweb.asm.AnnotationVisitor;
++import org.objectweb.asm.Opcodes;
++
++/**
++ * An {@link AnnotationVisitor} adapter for type remapping.
++ *
++ * @deprecated use {@link AnnotationRemapper} instead.
++ * @author Eugene Kuleshov
++ */
++@Deprecated
++public class RemappingAnnotationAdapter extends AnnotationVisitor {
++
++  protected final Remapper remapper;
++
++  public RemappingAnnotationAdapter(
++      final AnnotationVisitor annotationVisitor, final Remapper remapper) {
++    this(Opcodes.ASM6, annotationVisitor, remapper);
++  }
++
++  protected RemappingAnnotationAdapter(
++      final int api, final AnnotationVisitor annotationVisitor, final Remapper remapper) {
++    super(api, annotationVisitor);
++    this.remapper = remapper;
++  }
++
++  @Override
++  public void visit(final String name, final Object value) {
++    av.visit(name, remapper.mapValue(value));
++  }
++
++  @Override
++  public void visitEnum(final String name, final String descriptor, final String value) {
++    av.visitEnum(name, remapper.mapDesc(descriptor), value);
++  }
++
++  @Override
++  public AnnotationVisitor visitAnnotation(final String name, final String descriptor) {
++    AnnotationVisitor annotationVisitor = av.visitAnnotation(name, remapper.mapDesc(descriptor));
++    return annotationVisitor == null
++        ? null
++        : (annotationVisitor == av
++            ? this
++            : new RemappingAnnotationAdapter(annotationVisitor, remapper));
++  }
++
++  @Override
++  public AnnotationVisitor visitArray(final String name) {
++    AnnotationVisitor annotationVisitor = av.visitArray(name);
++    return annotationVisitor == null
++        ? null
++        : (annotationVisitor == av
++            ? this
++            : new RemappingAnnotationAdapter(annotationVisitor, remapper));
++  }
++}
+--- /dev/null
++++ b/asm-commons/src/main/java/org/objectweb/asm/commons/RemappingClassAdapter.java
+@@ -0,0 +1,167 @@
++// ASM: a very small and fast Java bytecode manipulation framework
++// Copyright (c) 2000-2011 INRIA, France Telecom
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. Neither the name of the copyright holders nor the names of its
++//    contributors may be used to endorse or promote products derived from
++//    this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++// THE POSSIBILITY OF SUCH DAMAGE.
++
++package org.objectweb.asm.commons;
++
++import org.objectweb.asm.AnnotationVisitor;
++import org.objectweb.asm.ClassVisitor;
++import org.objectweb.asm.FieldVisitor;
++import org.objectweb.asm.MethodVisitor;
++import org.objectweb.asm.ModuleVisitor;
++import org.objectweb.asm.Opcodes;
++import org.objectweb.asm.TypePath;
++
++/**
++ * A {@link ClassVisitor} for type remapping.
++ *
++ * @deprecated use {@link ClassRemapper} instead.
++ * @author Eugene Kuleshov
++ */
++@Deprecated
++public class RemappingClassAdapter extends ClassVisitor {
++
++  protected final Remapper remapper;
++
++  protected String className;
++
++  public RemappingClassAdapter(final ClassVisitor classVisitor, final Remapper remapper) {
++    this(Opcodes.ASM6, classVisitor, remapper);
++  }
++
++  protected RemappingClassAdapter(
++      final int api, final ClassVisitor classVisitor, final Remapper remapper) {
++    super(api, classVisitor);
++    this.remapper = remapper;
++  }
++
++  @Override
++  public void visit(
++      final int version,
++      final int access,
++      final String name,
++      final String signature,
++      final String superName,
++      final String[] interfaces) {
++    this.className = name;
++    super.visit(
++        version,
++        access,
++        remapper.mapType(name),
++        remapper.mapSignature(signature, false),
++        remapper.mapType(superName),
++        interfaces == null ? null : remapper.mapTypes(interfaces));
++  }
++
++  @Override
++  public ModuleVisitor visitModule(final String name, final int flags, final String version) {
++    throw new RuntimeException("RemappingClassAdapter is deprecated, use ClassRemapper instead");
++  }
++
++  @Override
++  public AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitAnnotation(remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null ? null : createRemappingAnnotationAdapter(annotationVisitor);
++  }
++
++  @Override
++  public AnnotationVisitor visitTypeAnnotation(
++      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitTypeAnnotation(typeRef, typePath, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null ? null : createRemappingAnnotationAdapter(annotationVisitor);
++  }
++
++  @Override
++  public FieldVisitor visitField(
++      final int access,
++      final String name,
++      final String descriptor,
++      final String signature,
++      final Object value) {
++    FieldVisitor fieldVisitor =
++        super.visitField(
++            access,
++            remapper.mapFieldName(className, name, descriptor),
++            remapper.mapDesc(descriptor),
++            remapper.mapSignature(signature, true),
++            remapper.mapValue(value));
++    return fieldVisitor == null ? null : createRemappingFieldAdapter(fieldVisitor);
++  }
++
++  @Override
++  public MethodVisitor visitMethod(
++      final int access,
++      final String name,
++      final String descriptor,
++      final String signature,
++      final String[] exceptions) {
++    String newDescriptor = remapper.mapMethodDesc(descriptor);
++    MethodVisitor methodVisitor =
++        super.visitMethod(
++            access,
++            remapper.mapMethodName(className, name, descriptor),
++            newDescriptor,
++            remapper.mapSignature(signature, false),
++            exceptions == null ? null : remapper.mapTypes(exceptions));
++    return methodVisitor == null
++        ? null
++        : createRemappingMethodAdapter(access, newDescriptor, methodVisitor);
++  }
++
++  @Override
++  public void visitInnerClass(
++      final String name, final String outerName, final String innerName, final int access) {
++    super.visitInnerClass(
++        remapper.mapType(name),
++        outerName == null ? null : remapper.mapType(outerName),
++        innerName,
++        access);
++  }
++
++  @Override
++  public void visitOuterClass(final String owner, final String name, final String descriptor) {
++    super.visitOuterClass(
++        remapper.mapType(owner),
++        name == null ? null : remapper.mapMethodName(owner, name, descriptor),
++        descriptor == null ? null : remapper.mapMethodDesc(descriptor));
++  }
++
++  protected FieldVisitor createRemappingFieldAdapter(final FieldVisitor fieldVisitor) {
++    return new RemappingFieldAdapter(fieldVisitor, remapper);
++  }
++
++  protected MethodVisitor createRemappingMethodAdapter(
++      final int access, final String newDescriptor, final MethodVisitor methodVisitior) {
++    return new RemappingMethodAdapter(access, newDescriptor, methodVisitior, remapper);
++  }
++
++  protected AnnotationVisitor createRemappingAnnotationAdapter(final AnnotationVisitor av) {
++    return new RemappingAnnotationAdapter(av, remapper);
++  }
++}
+--- /dev/null
++++ b/asm-commons/src/main/java/org/objectweb/asm/commons/RemappingFieldAdapter.java
+@@ -0,0 +1,74 @@
++// ASM: a very small and fast Java bytecode manipulation framework
++// Copyright (c) 2000-2011 INRIA, France Telecom
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. Neither the name of the copyright holders nor the names of its
++//    contributors may be used to endorse or promote products derived from
++//    this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++// THE POSSIBILITY OF SUCH DAMAGE.
++
++package org.objectweb.asm.commons;
++
++import org.objectweb.asm.AnnotationVisitor;
++import org.objectweb.asm.FieldVisitor;
++import org.objectweb.asm.Opcodes;
++import org.objectweb.asm.TypePath;
++
++/**
++ * A {@link FieldVisitor} adapter for type remapping.
++ *
++ * @deprecated use {@link FieldRemapper} instead.
++ * @author Eugene Kuleshov
++ */
++@Deprecated
++public class RemappingFieldAdapter extends FieldVisitor {
++
++  private final Remapper remapper;
++
++  public RemappingFieldAdapter(final FieldVisitor fieldVisitor, final Remapper remapper) {
++    this(Opcodes.ASM6, fieldVisitor, remapper);
++  }
++
++  protected RemappingFieldAdapter(
++      final int api, final FieldVisitor fieldVisitor, final Remapper remapper) {
++    super(api, fieldVisitor);
++    this.remapper = remapper;
++  }
++
++  @Override
++  public AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor = fv.visitAnnotation(remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? null
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public AnnotationVisitor visitTypeAnnotation(
++      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitTypeAnnotation(typeRef, typePath, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? null
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++}
+--- /dev/null
++++ b/asm-commons/src/main/java/org/objectweb/asm/commons/RemappingMethodAdapter.java
+@@ -0,0 +1,279 @@
++// ASM: a very small and fast Java bytecode manipulation framework
++// Copyright (c) 2000-2011 INRIA, France Telecom
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. Neither the name of the copyright holders nor the names of its
++//    contributors may be used to endorse or promote products derived from
++//    this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++// THE POSSIBILITY OF SUCH DAMAGE.
++
++package org.objectweb.asm.commons;
++
++import org.objectweb.asm.AnnotationVisitor;
++import org.objectweb.asm.Handle;
++import org.objectweb.asm.Label;
++import org.objectweb.asm.MethodVisitor;
++import org.objectweb.asm.Opcodes;
++import org.objectweb.asm.TypePath;
++
++/**
++ * A {@link LocalVariablesSorter} for type mapping.
++ *
++ * @deprecated use {@link MethodRemapper} instead.
++ * @author Eugene Kuleshov
++ */
++@Deprecated
++public class RemappingMethodAdapter extends LocalVariablesSorter {
++
++  protected final Remapper remapper;
++
++  public RemappingMethodAdapter(
++      final int access,
++      final String descriptor,
++      final MethodVisitor methodVisitor,
++      final Remapper remapper) {
++    this(Opcodes.ASM6, access, descriptor, methodVisitor, remapper);
++  }
++
++  protected RemappingMethodAdapter(
++      final int api,
++      final int access,
++      final String descriptor,
++      final MethodVisitor methodVisitor,
++      final Remapper remapper) {
++    super(api, access, descriptor, methodVisitor);
++    this.remapper = remapper;
++  }
++
++  @Override
++  public AnnotationVisitor visitAnnotationDefault() {
++    AnnotationVisitor annotationVisitor = super.visitAnnotationDefault();
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public AnnotationVisitor visitAnnotation(final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitAnnotation(remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public AnnotationVisitor visitTypeAnnotation(
++      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitTypeAnnotation(typeRef, typePath, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public AnnotationVisitor visitParameterAnnotation(
++      final int parameter, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitParameterAnnotation(parameter, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public void visitFrame(
++      final int type,
++      final int numLocal,
++      final Object[] local,
++      final int numStack,
++      final Object[] stack) {
++    super.visitFrame(
++        type, numLocal, remapEntries(numLocal, local), numStack, remapEntries(numStack, stack));
++  }
++
++  private Object[] remapEntries(final int numTypes, final Object[] entries) {
++    if (entries == null) {
++      return entries;
++    }
++    Object[] remappedEntries = null;
++    for (int i = 0; i < numTypes; ++i) {
++      if (entries[i] instanceof String) {
++        if (remappedEntries == null) {
++          remappedEntries = new Object[numTypes];
++          System.arraycopy(entries, 0, remappedEntries, 0, numTypes);
++        }
++        remappedEntries[i] = remapper.mapType((String) entries[i]);
++      }
++    }
++    return remappedEntries == null ? entries : remappedEntries;
++  }
++
++  @Override
++  public void visitFieldInsn(
++      final int opcode, final String owner, final String name, final String descriptor) {
++    super.visitFieldInsn(
++        opcode,
++        remapper.mapType(owner),
++        remapper.mapFieldName(owner, name, descriptor),
++        remapper.mapDesc(descriptor));
++  }
++
++  @Deprecated
++  @Override
++  public void visitMethodInsn(
++      final int opcode, final String owner, final String name, final String descriptor) {
++    if (api >= Opcodes.ASM5) {
++      super.visitMethodInsn(opcode, owner, name, descriptor);
++      return;
++    }
++    doVisitMethodInsn(opcode, owner, name, descriptor, opcode == Opcodes.INVOKEINTERFACE);
++  }
++
++  @Override
++  public void visitMethodInsn(
++      final int opcode,
++      final String owner,
++      final String name,
++      final String descriptor,
++      final boolean isInterface) {
++    if (api < Opcodes.ASM5) {
++      super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
++      return;
++    }
++    doVisitMethodInsn(opcode, owner, name, descriptor, isInterface);
++  }
++
++  private void doVisitMethodInsn(
++      final int opcode,
++      final String owner,
++      final String name,
++      final String descriptor,
++      final boolean isInterface) {
++    // Calling super.visitMethodInsn requires to call the correct version
++    // depending on this.api (otherwise infinite loops can occur). To
++    // simplify and to make it easier to automatically remove the backward
++    // compatibility code, we inline the code of the overridden method here.
++    // IMPORTANT: THIS ASSUMES THAT visitMethodInsn IS NOT OVERRIDDEN IN
++    // LocalVariableSorter.
++    if (mv != null) {
++      mv.visitMethodInsn(
++          opcode,
++          remapper.mapType(owner),
++          remapper.mapMethodName(owner, name, descriptor),
++          remapper.mapMethodDesc(descriptor),
++          isInterface);
++    }
++  }
++
++  @Override
++  public void visitInvokeDynamicInsn(
++      final String name,
++      final String descriptor,
++      final Handle bootstrapMethodHandle,
++      final Object... bootstrapMethodArguments) {
++    for (int i = 0; i < bootstrapMethodArguments.length; i++) {
++      bootstrapMethodArguments[i] = remapper.mapValue(bootstrapMethodArguments[i]);
++    }
++    super.visitInvokeDynamicInsn(
++        remapper.mapInvokeDynamicMethodName(name, descriptor),
++        remapper.mapMethodDesc(descriptor),
++        (Handle) remapper.mapValue(bootstrapMethodHandle),
++        bootstrapMethodArguments);
++  }
++
++  @Override
++  public void visitTypeInsn(final int opcode, final String type) {
++    super.visitTypeInsn(opcode, remapper.mapType(type));
++  }
++
++  @Override
++  public void visitLdcInsn(final Object value) {
++    super.visitLdcInsn(remapper.mapValue(value));
++  }
++
++  @Override
++  public void visitMultiANewArrayInsn(final String descriptor, final int numDimensions) {
++    super.visitMultiANewArrayInsn(remapper.mapDesc(descriptor), numDimensions);
++  }
++
++  @Override
++  public AnnotationVisitor visitInsnAnnotation(
++      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitInsnAnnotation(typeRef, typePath, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public void visitTryCatchBlock(
++      final Label start, final Label end, final Label handler, final String type) {
++    super.visitTryCatchBlock(start, end, handler, type == null ? null : remapper.mapType(type));
++  }
++
++  @Override
++  public AnnotationVisitor visitTryCatchAnnotation(
++      final int typeRef, final TypePath typePath, final String descriptor, final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitTryCatchAnnotation(typeRef, typePath, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++
++  @Override
++  public void visitLocalVariable(
++      final String name,
++      final String descriptor,
++      final String signature,
++      final Label start,
++      final Label end,
++      final int index) {
++    super.visitLocalVariable(
++        name,
++        remapper.mapDesc(descriptor),
++        remapper.mapSignature(signature, true),
++        start,
++        end,
++        index);
++  }
++
++  @Override
++  public AnnotationVisitor visitLocalVariableAnnotation(
++      final int typeRef,
++      final TypePath typePath,
++      final Label[] start,
++      final Label[] end,
++      final int[] index,
++      final String descriptor,
++      final boolean visible) {
++    AnnotationVisitor annotationVisitor =
++        super.visitLocalVariableAnnotation(
++            typeRef, typePath, start, end, index, remapper.mapDesc(descriptor), visible);
++    return annotationVisitor == null
++        ? annotationVisitor
++        : new RemappingAnnotationAdapter(annotationVisitor, remapper);
++  }
++}
+--- /dev/null
++++ b/asm-commons/src/main/java/org/objectweb/asm/commons/RemappingSignatureAdapter.java
+@@ -0,0 +1,157 @@
++// ASM: a very small and fast Java bytecode manipulation framework
++// Copyright (c) 2000-2011 INRIA, France Telecom
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without
++// modification, are permitted provided that the following conditions
++// are met:
++// 1. Redistributions of source code must retain the above copyright
++//    notice, this list of conditions and the following disclaimer.
++// 2. Redistributions in binary form must reproduce the above copyright
++//    notice, this list of conditions and the following disclaimer in the
++//    documentation and/or other materials provided with the distribution.
++// 3. Neither the name of the copyright holders nor the names of its
++//    contributors may be used to endorse or promote products derived from
++//    this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++// THE POSSIBILITY OF SUCH DAMAGE.
++
++package org.objectweb.asm.commons;
++
++import org.objectweb.asm.Opcodes;
++import org.objectweb.asm.signature.SignatureVisitor;
++
++/**
++ * A {@link SignatureVisitor} adapter for type mapping.
++ *
++ * @deprecated use {@link SignatureRemapper} instead.
++ * @author Eugene Kuleshov
++ */
++@Deprecated
++public class RemappingSignatureAdapter extends SignatureVisitor {
++
++  private final SignatureVisitor signatureVisitor;
++
++  private final Remapper remapper;
++
++  private String className;
++
++  public RemappingSignatureAdapter(
++      final SignatureVisitor signatureVisitor, final Remapper remapper) {
++    this(Opcodes.ASM6, signatureVisitor, remapper);
++  }
++
++  protected RemappingSignatureAdapter(
++      final int api, final SignatureVisitor signatureVisitor, final Remapper remapper) {
++    super(api);
++    this.signatureVisitor = signatureVisitor;
++    this.remapper = remapper;
++  }
++
++  @Override
++  public void visitClassType(final String name) {
++    className = name;
++    signatureVisitor.visitClassType(remapper.mapType(name));
++  }
++
++  @Override
++  public void visitInnerClassType(final String name) {
++    String remappedOuter = remapper.mapType(className) + '$';
++    className = className + '$' + name;
++    String remappedName = remapper.mapType(className);
++    int index =
++        remappedName.startsWith(remappedOuter)
++            ? remappedOuter.length()
++            : remappedName.lastIndexOf('$') + 1;
++    signatureVisitor.visitInnerClassType(remappedName.substring(index));
++  }
++
++  @Override
++  public void visitFormalTypeParameter(final String name) {
++    signatureVisitor.visitFormalTypeParameter(name);
++  }
++
++  @Override
++  public void visitTypeVariable(final String name) {
++    signatureVisitor.visitTypeVariable(name);
++  }
++
++  @Override
++  public SignatureVisitor visitArrayType() {
++    signatureVisitor.visitArrayType();
++    return this;
++  }
++
++  @Override
++  public void visitBaseType(final char descriptor) {
++    signatureVisitor.visitBaseType(descriptor);
++  }
++
++  @Override
++  public SignatureVisitor visitClassBound() {
++    signatureVisitor.visitClassBound();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitExceptionType() {
++    signatureVisitor.visitExceptionType();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitInterface() {
++    signatureVisitor.visitInterface();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitInterfaceBound() {
++    signatureVisitor.visitInterfaceBound();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitParameterType() {
++    signatureVisitor.visitParameterType();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitReturnType() {
++    signatureVisitor.visitReturnType();
++    return this;
++  }
++
++  @Override
++  public SignatureVisitor visitSuperclass() {
++    signatureVisitor.visitSuperclass();
++    return this;
++  }
++
++  @Override
++  public void visitTypeArgument() {
++    signatureVisitor.visitTypeArgument();
++  }
++
++  @Override
++  public SignatureVisitor visitTypeArgument(final char wildcard) {
++    signatureVisitor.visitTypeArgument(wildcard);
++    return this;
++  }
++
++  @Override
++  public void visitEnd() {
++    signatureVisitor.visitEnd();
++  }
++}

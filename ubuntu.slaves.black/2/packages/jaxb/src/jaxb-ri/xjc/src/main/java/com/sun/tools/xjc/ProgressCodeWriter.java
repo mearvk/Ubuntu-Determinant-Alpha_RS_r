@@ -1,0 +1,108 @@
+/*
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+ *
+ * Copyright (c) 1997-2017 Oracle and/or its affiliates. All rights reserved.
+ *
+ * The contents of this file are subject to the terms of either the GNU
+ * General Public License Version 2 only ("GPL") or the Common Development
+ * and Distribution License("CDDL") (collectively, the "License").  You
+ * may not use this file except in compliance with the License.  You can
+ * obtain a copy of the License at
+ * https://oss.oracle.com/licenses/CDDL+GPL-1.1
+ * or LICENSE.txt.  See the License for the specific
+ * language governing permissions and limitations under the License.
+ *
+ * When distributing the software, include this License Header Notice in each
+ * file and include the License file at LICENSE.txt.
+ *
+ * GPL Classpath Exception:
+ * Oracle designates this particular file as subject to the "Classpath"
+ * exception as provided by Oracle in the GPL Version 2 section of the License
+ * file that accompanied this code.
+ *
+ * Modifications:
+ * If applicable, add the following below the License Header, with the fields
+ * enclosed by brackets [] replaced by your own identifying information:
+ * "Portions Copyright [year] [name of copyright owner]"
+ *
+ * Contributor(s):
+ * If you wish your version of this file to be governed by only the CDDL or
+ * only the GPL Version 2, indicate your decision by adding "[Contributor]
+ * elects to include this software in this distribution under the [CDDL or GPL
+ * Version 2] license."  If you don't indicate a single choice of license, a
+ * recipient has the option to distribute your version of this file under
+ * either the CDDL, the GPL Version 2 or to extend the choice of license to
+ * its licensees as provided above.  However, if you add GPL Version 2 code
+ * and therefore, elected the GPL Version 2 license, then the option applies
+ * only if the new code is made subject to such option by the copyright
+ * holder.
+ */
+
+package com.sun.tools.xjc;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Writer;
+
+import com.sun.codemodel.CodeWriter;
+import com.sun.codemodel.JPackage;
+import com.sun.codemodel.writer.FilterCodeWriter;
+
+/**
+ * {@link CodeWriter} that reports progress to {@link XJCListener}.
+ */
+final class ProgressCodeWriter extends FilterCodeWriter {
+
+    private int current;
+    private final int totalFileCount;
+
+    public ProgressCodeWriter( CodeWriter output, XJCListener progress, int totalFileCount ) {
+        super(output);
+        this.progress = progress;
+        this.totalFileCount = totalFileCount;
+        if(progress==null)
+            throw new IllegalArgumentException();
+    }
+
+    private final XJCListener progress;
+
+    @Override
+    public Writer openSource(JPackage pkg, String fileName) throws IOException {
+        report(pkg,fileName);
+        return super.openSource(pkg, fileName);
+    }
+
+    @Override
+    public OutputStream openBinary(JPackage pkg, String fileName) throws IOException {
+        report(pkg,fileName);
+        return super.openBinary(pkg,fileName);
+    }
+
+    /**
+     * Report progress to {@link XJCListener}.
+     * @param pkg The package of file being written. Value of {@code null} means that file has no package.
+     * @param fileName The file name being written. Value can't be {@code null}.
+     */
+    private void report(final JPackage pkg, final String fileName) {
+        if (fileName == null) {
+            throw new IllegalArgumentException("File name is null");
+        }
+
+        final String pkgName;
+        final String fileNameOut;
+        if (pkg != null && (pkgName = pkg.name().replace('.', File.separatorChar)).length() > 0 ) {
+            final StringBuilder sb = new StringBuilder(fileName.length() + pkgName.length() + 1);
+            sb.append(pkgName);
+            sb.append(File.separatorChar);
+            sb.append(fileName);
+            fileNameOut = sb.toString();
+        } else {
+            fileNameOut = fileName;
+        }
+
+        if(progress.isCanceled())
+            throw new AbortException();
+        progress.generatedFile(fileNameOut, current++, totalFileCount);
+    }
+}

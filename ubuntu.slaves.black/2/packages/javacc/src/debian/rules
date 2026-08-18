@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^-]+).*,\1,p')
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	dh_auto_build -- jar update-bootstrap -Dversion=$(VERSION)
+	dh_auto_build -- clean
+	dh_auto_build -- jar
+	docbook-to-man debian/manpage.sgml >bin/javacc.1
+
+override_dh_auto_test:
+	dh_auto_build -- unittest
+
+get-orig-source:
+	uscan --download-current-version --force-download --rename --repack --compression xz

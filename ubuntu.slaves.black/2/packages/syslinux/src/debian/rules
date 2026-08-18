@@ -1,0 +1,70 @@
+#!/usr/bin/make -f
+
+SHELL := sh -e
+
+DATE = $(shell TZ=UTC0 date -d@$(SOURCE_DATE_EPOCH) +%Y%m%d)
+HEXDATE = $(shell printf '0x%08x' $(SOURCE_DATE_EPOCH))
+
+# required in patched mk/efi.mk makefile to link against the gnu-efi package
+export DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+unexport LDFLAGS
+
+%:
+	dh ${@}
+
+override_dh_auto_build-arch:
+	$(MAKE) bios DATE="$(DATE)" HEXDATE="$(HEXDATE)" PYTHON=python3
+
+override_dh_auto_install-arch:
+	$(MAKE) bios install INSTALLROOT=$(CURDIR)/debian/tmp
+
+override_dh_auto_build-indep:
+	$(MAKE) DATE="$(DATE)" HEXDATE="$(HEXDATE)" PYTHON=python3
+
+override_dh_auto_install-indep:
+	$(MAKE) install INSTALLROOT=$(CURDIR)/debian/tmp
+
+override_dh_auto_test:
+	# disabled
+
+override_dh_fixperms:
+	dh_fixperms
+	# the efi files do not exist when building only the arch dependent packages; ignore exit code of chmod
+	-chmod 0644 debian/*/usr/lib/*/efi*/*
+	-chmod 0644 debian/*/usr/lib/*/modules/efi*/*
+
+override_dh_install:
+	# put documentation files into debian/tmp, organize them in a suitable way
+	mkdir -p debian/tmp/usr/share/doc/syslinux-common
+	cp -aL README debian/tmp/usr/share/doc/syslinux-common/README.txt
+	cp -aL doc debian/tmp/usr/share/doc/syslinux-common/txt
+	cp -aL txt debian/tmp/usr/share/doc/syslinux-common/asciidoc
+	# rename the package specific documentation files
+	mv debian/tmp/usr/share/doc/syslinux-common/txt/logo debian/tmp/usr/share/doc/syslinux-common
+	set -e ; \
+		for docdir in syslinux extlinux isolinux pxelinux ; do \
+		mkdir -p debian/tmp/usr/share/doc/$${docdir} ; \
+		mv debian/tmp/usr/share/doc/syslinux-common/txt/$${docdir}.txt debian/tmp/usr/share/doc/$${docdir}/README.txt ; \
+		done
+	# keytab-lilo is not installed as it's part of the lilo package, also
+	# exclude the documentation from being installed
+	# separate LICENSE files are not needed, they are covered by
+	# debian/copyright
+	dh_install -X keytab-lilo.txt -X LICENSE
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+# avoid isohybrid.pl.1 man page to be interpreted as Polish
+override_dh_installman:
+	dh_installman --language=C
+
+override_dh_gencontrol-indep:
+	dh_gencontrol -- -Vbuilt:Using="$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W gnu-efi)"
+
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym

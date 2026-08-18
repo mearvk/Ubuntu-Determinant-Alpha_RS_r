@@ -1,0 +1,126 @@
+Description: Tweak defaults values for Debian
+ Debian needs some default value and a way to compute DriverPath
+ different from upstream.
+ .
+ Debian specific model snippets
+ are added in comments between {% and %}. This
+ model snippet is applied after the model generated
+ from LCDd.conf. Hence these snippets can override upstream
+ default value. For instance:
+ .
+ # {% upstream_default~ default=yes %}
+ #ReportToSyslog=yes
+ .
+ Generated model has upstream_default=yes. This value
+ is canceled by '  upstream_default~ ' and the default
+ value is set to yes.
+ .
+ DriverPath is more complex. The model snippets adds a way to test and
+ fix this system dependent value. The fix deletes the DriverPath value
+ and the compute instructions provide the actual path using Dpkg::Arch
+ to compute the lib triplet. This requires a runtime dependency on
+ libdpkg-perl.
+ .
+ Device is qute tricky. On Debian, lcdproc package is delivered with a
+ udev rules that creates a symlink from a rather unpredictable device
+ file (can be /dev/lcd0 or lcd1 or ...) to /dev/lcd-imon. The model
+ snippet added to Device ensure that the above symlink is used (if
+ found) or use /dev/lcd0 as a fallback (which may be wrong though)
+ .
+ Protocol value is chosen by running lsusb. If the device is
+ 15c2:0038, then Protocol default value is 1.
+Forwarded: NA
+Author: dod
+--- a/lcdproc/LCDd.conf
++++ b/lcdproc/LCDd.conf
+@@ -34,6 +34,19 @@
+ #            the driver modules and will thus not be able to
+ #            function properly.
+ # NOTE: Always place a slash as last character !
++# {%
++#   default~
++#   compute
++#     formula="use Dpkg::Arch qw/get_host_arch debarch_to_multiarch/;
++#              my $triplet = debarch_to_multiarch(get_host_arch());
++#              \"/usr/lib/$triplet/lcdproc/\";"
++#     use_eval=1
++#     allow_override=1 -
++#   warn_unless:dir
++#     code=" defined $_ ? -d : 1"
++#     msg="missing DriverPath dir"
++#     fix="$_ = undef;" -
++# %}
+ DriverPath=server/drivers/
+ 
+ # Tells the server to load the given drivers. Multiple lines can be given.
+@@ -64,10 +77,11 @@
+ #ReportLevel=3
+ 
+ # Should we report to syslog instead of stderr? [default: no; legal: yes, no]
++# {% upstream_default~ default=yes %}
+ #ReportToSyslog=yes
+ 
+ # User to run as.  LCDd will drop its root privileges and run as this user
+-# instead. [default: nobody]
++# instead. {% default~ %}
+ User=nobody
+ 
+ # The server will stay in the foreground if set to yes.
+@@ -681,6 +695,21 @@
+ [imon]
+ 
+ # select the device to use
++# {%
++#   default~
++#   compute
++#     formula="my $l = '/dev/lcd-imon'; -e $l ? $l : '/dev/lcd0';"
++#     use_eval=1
++#     allow_override=1 -
++#   warn_unless:use_lcd_imon
++#     code="my $l = '/dev/lcd-imon'; not -e $l or $_ eq $l ;"
++#     msg="imon device does not use /dev/lcd-imon link."
++#     fix="$_ = undef;" -
++#   warn_unless:found_device_file
++#     code="defined $_ ? -e : 1"
++#     msg="missing imon device file"
++#     fix="$_ = undef;" -
++# %}
+ Device=/dev/lcd0
+ 
+ # display dimensions
+@@ -699,6 +728,13 @@
+ # [legal: 0, 1; default: 0]
+ # Choose 0 for 15c2:ffdc device,
+ # Choose 1 for 15c2:0038 device
++#{%
++#   default~
++#   compute
++#     formula=" `lsusb -d 15c2:` =~ /:0038/ ;"
++#     use_eval=1
++#     allow_override=1 -
++# %}
+ Protocol=0
+ 
+ # Set the exit behavior [legal: 0-2; default: 1]
+@@ -708,6 +744,21 @@
+ #OnExit=2
+ 
+ # Select the output device to use [default: /dev/lcd0]
++# {%
++#   default~
++#   compute
++#     formula="my $l = '/dev/lcd-imon'; -e $l ? $l : '/dev/lcd0';"
++#     use_eval=1
++#     allow_override=1 -
++#   warn_unless:use_lcd_imon
++#     code="my $l = '/dev/lcd-imon'; not -e $l or $_ eq $l ;"
++#     msg="imon device does not use /dev/lcd-imon link."
++#     fix="$_ = undef;" -
++#   warn_unless:found_device_file
++#     code="defined $_ ? -e : 1"
++#     msg="missing imon device file"
++#     fix="$_ = undef;" -
++# %}
+ Device=/dev/lcd0
+ 
+ # Select the displays contrast [default: 200; legal: 0-1000]

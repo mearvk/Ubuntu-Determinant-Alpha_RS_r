@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+JAVA_HOME=/usr/lib/jvm/default-java
+
+VERSION=1.4.197
+
+%:
+	dh $@ --buildsystem=makefile --with javahelper
+
+override_dh_auto_build:
+	mkdir -p temp bin
+	JAVA_HOME=${JAVA_HOME} "${JAVA_HOME}/bin/javac" -sourcepath src/tools -d bin src/tools/org/h2/build/*.java
+	JAVA_HOME=${JAVA_HOME} "${JAVA_HOME}/bin/java" -Xmx256m -cp "bin:${JAVA_HOME}/lib/tools.jar:temp" org.h2.build.Build jar javadoc
+
+override_dh_auto_install:
+	dh_auto_install
+	mh_installpom -plibh2-java --set-version=$(VERSION) --has-package-version src/installer/pom-template.xml
+	mh_installjar -plibh2-java --set-version=$(VERSION) --java-lib src/installer/pom-template.xml bin/h2-$(VERSION).jar
+
+override_dh_installchangelogs:
+	dh_installchangelogs src/docsrc/html/changelog.html
+
+override_dh_auto_clean:
+	rm -rf temp bin docs/javadoc
+	find src -type f -exec sed -i 's/\/\/## Java/\/*## Java/g' {} \;
+	mh_clean
+	dh_auto_clean

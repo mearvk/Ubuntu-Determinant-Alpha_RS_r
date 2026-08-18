@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+VERSION		:= $(shell dpkg-parsechangelog | grep ^Version: | cut -d' ' -f2 | cut -d'-' -f1)
+UPSTREAM_VERSION := $(shell echo "$(VERSION)" | sed 's/+dfsg//')
+
+JAVA_HOME	:= /usr/lib/jvm/default-java
+ANT_ARGS	:= -propertyfile debian/ant.properties
+ANT		:= JAVA_HOME=$(JAVA_HOME) ant $(ANT_ARGS)
+
+%:
+	dh $@ --buildsystem=ant --with maven_repo_helper,javahelper
+
+override_dh_auto_build:
+	$(ANT) dist
+	cp debian/pom.xml core/build/jdom.javadoc.pom
+
+override_dh_auto_clean:
+	rm -Rf core/build
+	rm -Rf contrib/build
+	rm -Rf test/build test/tmp test/testOutput
+	rm -Rf dist-1.SNAPSHOT
+
+get-orig-pom:
+	wget -U '' -O debian/pom.xml http://repo1.maven.org/maven2/org/jdom/jdom/$(UPSTREAM_VERSION)/jdom-$(UPSTREAM_VERSION).pom

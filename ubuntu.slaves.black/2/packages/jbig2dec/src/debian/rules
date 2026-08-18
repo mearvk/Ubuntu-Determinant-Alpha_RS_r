@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+include /usr/share/cdbs/1/rules/autoreconf.mk
+include /usr/share/cdbs/1/class/autotools.mk
+include /usr/share/cdbs/1/rules/debhelper.mk
+
+stem = $(DEB_SOURCE_PACKAGE)
+lib = lib$(stem)
+major = 0
+pkg-lib = lib$(stem)$(major)
+pkg-dev = lib$(stem)$(major)-dev
+
+DEB_DH_AUTORECONF_ARGS += ./autogen.sh
+
+# Multiarch quirk (see also other uses of that variable in this file)
+DEB_CONFIGURE_EXTRA_FLAGS += --libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH)
+
+# avoid test_jbig2dec.py apparently relying on missing data files
+DEB_MAKE_CHECK_TARGET = check TESTS="test_sha1 test_huffman test_arith"
+
+DEB_INSTALL_MANPAGES_jbig2dec = debian/tmp/usr/share/man/man1/*
+
+DEB_SHLIBDEPS_LIBRARY_$(pkg-lib) = $(lib)
+DEB_DH_MAKESHLIBS_ARGS = -Pdebian/$(cdbs_curpkg)
+
+# Let d-shlibs resolve dependencies for and install library files
+binary-post-install/$(pkg-lib) binary-post-install/$(pkg-dev):: \
+ debian/stamp-local-shlibs-$(lib)
+debian/stamp-local-shlibs-$(lib): \
+ binary-install/$(pkg-lib) \
+ binary-install/$(pkg-dev)
+	d-shlibmove --commit \
+		--exclude-la \
+		--multiarch \
+		--movedev "debian/tmp/usr/include/*" usr/include/ \
+		--movedev "debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/*" \
+			usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/$(lib).so
+	touch $@
+clean::
+	rm -f debian/stamp-local-shlibs-$(lib)

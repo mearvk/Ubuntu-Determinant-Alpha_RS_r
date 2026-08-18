@@ -1,0 +1,40 @@
+#!/bin/sh
+set -e
+
+md5sums_shipped="
+92df549c82f58ea28b605e5045984e04  /etc/lirc/irexec.lircrc
+6447d4261e0b8a80beb4b94e80e3333a  /etc/lirc/lirc_options.conf #stretch, normalized
+c2a8478e9eda95eb4216414a7979acb5  /etc/lirc/lirc_options.conf #buster, normalized
+810233d6f1bb15b64468beb95e4c670e  /etc/lirc/lircd.conf
+eca53bdc53bd5edc63cf06a4cff16b0d  /etc/lirc/lircmd.conf
+"
+
+if dpkg --compare-versions "$2" lt-nl "0.10.1-6.3~"
+then
+	# * configuration files unknown to dpkg and identical to a known
+	#   shipped version can be deleted to avoid prompting when replacing
+	#   them with proper conffiles
+	# * we must not remove conffiles still known to dpkg as "(obsolete)",
+	#   otherwise dpkg will remember their deletion
+	conffiles="$(dpkg-query -f '${Conffiles}' -W lirc)"
+	for conffile in /etc/lirc/lircd.conf /etc/lirc/lircmd.conf /etc/lirc/irexec.lircrc /etc/lirc/lirc_options.conf
+	do
+		test -f "$conffile" || continue
+		if [ -n "$(echo "$conffiles" | grep " $conffile ")" ]
+		then
+			echo "Keeping conffile $conffile which is known to dpkg."
+			continue
+		fi
+		case "$md5sums_shipped" in
+			*"$(md5sum "$conffile")"*|*"$(sed 's%@DEB_HOST_MULTIARCH@%<DEB_HOST_MULTIARCH>%g' "$conffile" | md5sum | sed "s%-%$conffile%")"*)
+				echo "Removing unmodified configuration file $conffile which is unknown to dpkg."
+				rm "$conffile"
+				;;
+			*)
+				echo "Keeping modified configuration file $conffile which is unknown to dpkg."
+				;;
+		esac
+	done
+fi
+
+#DEBHELPER#

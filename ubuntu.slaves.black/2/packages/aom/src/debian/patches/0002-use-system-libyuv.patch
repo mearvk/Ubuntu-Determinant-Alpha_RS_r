@@ -1,0 +1,110 @@
+From: Boyuan Yang <byang@debian.org>
+Date: Sun, 5 Dec 2021 15:56:42 -0500
+Subject: use system libyuv
+
+---
+ CMakeLists.txt        | 16 ++++++----------
+ aom_dsp/butteraugli.c |  2 +-
+ apps/aomdec.c         |  2 +-
+ apps/aomenc.c         |  2 +-
+ test/test.cmake       |  6 +++---
+ 5 files changed, 12 insertions(+), 16 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bdc6ad9..d09275e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -417,11 +417,12 @@ if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
+ endif()
+ 
+ if(CONFIG_LIBYUV OR CONFIG_TUNE_BUTTERAUGLI)
+-  add_library(yuv OBJECT ${AOM_LIBYUV_SOURCES})
+-  if(NOT MSVC)
+-    target_compile_options(yuv PRIVATE -Wno-unused-parameter)
++  target_link_libraries(aom ${AOM_LIB_LINK_TYPE} yuv)
++  target_include_directories(aom PRIVATE ${CMAKE_INCLUDE_PATH}/libyuv)
++  if(BUILD_SHARED_LIBS)
++    target_link_libraries(aom_static ${AOM_LIB_LINK_TYPE} yuv)
++    target_include_directories(aom_static PRIVATE ${CMAKE_INCLUDE_PATH}/libyuv)
+   endif()
+-  include_directories("${AOM_ROOT}/third_party/libyuv/include")
+ endif()
+ 
+ if(CONFIG_AV1_ENCODER)
+@@ -538,11 +539,6 @@ if(CONFIG_AV1_ENCODER)
+       set_target_properties(aom_static PROPERTIES LINKER_LANGUAGE CXX)
+     endif()
+ 
+-    list(APPEND AOM_LIB_TARGETS yuv)
+-    target_sources(aom PRIVATE $<TARGET_OBJECTS:yuv>)
+-    if(BUILD_SHARED_LIBS)
+-      target_sources(aom_static PRIVATE $<TARGET_OBJECTS:yuv>)
+-    endif()
+   endif()
+ 
+   if(CONFIG_TUNE_VMAF)
+@@ -649,7 +645,7 @@ if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
+   if(CONFIG_LIBYUV)
+     # Add to existing targets.
+     foreach(aom_app ${AOM_APP_TARGETS})
+-      target_sources(${aom_app} PRIVATE $<TARGET_OBJECTS:yuv>)
++      target_link_libraries(${aom_app} ${AOM_LIB_LINK_TYPE} yuv)
+       set_property(TARGET ${aom_app} PROPERTY LINKER_LANGUAGE CXX)
+     endforeach()
+   endif()
+diff --git a/aom_dsp/butteraugli.c b/aom_dsp/butteraugli.c
+index 038efcd..b7754b2 100644
+--- a/aom_dsp/butteraugli.c
++++ b/aom_dsp/butteraugli.c
+@@ -14,7 +14,7 @@
+ 
+ #include "aom_dsp/butteraugli.h"
+ #include "aom_mem/aom_mem.h"
+-#include "third_party/libyuv/include/libyuv/convert_argb.h"
++#include <libyuv/convert_argb.h>
+ 
+ int aom_calc_butteraugli(const YV12_BUFFER_CONFIG *source,
+                          const YV12_BUFFER_CONFIG *distorted, int bit_depth,
+diff --git a/apps/aomdec.c b/apps/aomdec.c
+index 341c5bc..b527e92 100644
+--- a/apps/aomdec.c
++++ b/apps/aomdec.c
+@@ -44,7 +44,7 @@
+ #include "common/y4menc.h"
+ 
+ #if CONFIG_LIBYUV
+-#include "third_party/libyuv/include/libyuv/scale.h"
++#include <libyuv/scale.h>
+ #endif
+ 
+ static const char *exec_name;
+diff --git a/apps/aomenc.c b/apps/aomenc.c
+index 65a2684..b57a396 100644
+--- a/apps/aomenc.c
++++ b/apps/aomenc.c
+@@ -47,7 +47,7 @@
+ #include "stats/rate_hist.h"
+ 
+ #if CONFIG_LIBYUV
+-#include "third_party/libyuv/include/libyuv/scale.h"
++#include <libyuv/scale.h>
+ #endif
+ 
+ /* Swallow warnings about unused results of fread/fwrite */
+diff --git a/test/test.cmake b/test/test.cmake
+index 183aff2..98116bd 100644
+--- a/test/test.cmake
++++ b/test/test.cmake
+@@ -431,9 +431,9 @@ function(setup_aom_test_targets)
+ 
+   target_link_libraries(test_libaom ${AOM_LIB_LINK_TYPE} aom aom_gtest)
+ 
+-  if(CONFIG_LIBYUV)
+-    target_sources(test_libaom PRIVATE $<TARGET_OBJECTS:yuv>)
+-  endif()
++#  if(CONFIG_LIBYUV)
++#    target_sources(test_libaom PRIVATE $<TARGET_OBJECTS:yuv>)
++#  endif()
+   if(CONFIG_WEBM_IO)
+     target_sources(test_libaom PRIVATE $<TARGET_OBJECTS:webm>)
+   endif()

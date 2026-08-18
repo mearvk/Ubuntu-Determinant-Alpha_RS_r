@@ -1,0 +1,45 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Round a double multiplication before casting it to integer
+Forwarded: yes
+Applied-Upstream: https://github.com/abseil/abseil-cpp/commit/60be12ed9822078970f05f3c560324184302df6b
+
+The code
+
+    static_cast<int>(x * y)
+
+(for double x and y) performs a double multiplication into a temporary
+that, by standard, may have excess precision. The subsequent cast to int
+discards the excess precision. However, the cast may examine the excess
+precision during conversion, producing surprising results like
+
+    static_cast<int>(1.7 * 10) == 16
+
+on certain systems. Correct this case by explicitly rounding 1.7 * 10
+before casting it.
+
+The author works at Google. Upstream applied this patch as Piper
+revision 378922064 and exported it to GitHub; the Applied-Upstream URL
+above points to the exported commit.
+
+--- a/absl/random/mocking_bit_gen_test.cc
++++ b/absl/random/mocking_bit_gen_test.cc
+@@ -15,6 +15,7 @@
+ //
+ #include "absl/random/mocking_bit_gen.h"
+ 
++#include <cmath>
+ #include <numeric>
+ #include <random>
+ 
+@@ -328,8 +329,9 @@ TEST(BasicMocking, WillByDefaultWithArgs) {
+ 
+   absl::MockingBitGen gen;
+   ON_CALL(absl::MockPoisson<int>(), Call(gen, _))
+-      .WillByDefault(
+-          [](double lambda) { return static_cast<int>(lambda * 10); });
++      .WillByDefault([](double lambda) {
++        return static_cast<int>(std::rint(lambda * 10));
++      });
+   EXPECT_EQ(absl::Poisson<int>(gen, 1.7), 17);
+   EXPECT_EQ(absl::Poisson<int>(gen, 0.03), 0);
+ }

@@ -1,0 +1,74 @@
+Description: Add support for Hurd
+ Add support to configure.ac for GNU Hurd, per
+ https://www.gnu.org/software/hurd/hurd/porting/guidelines.html
+Author: Faidon Liambotis <paravoid@debian.org>
+Bug: #828871
+Forwarded: no
+Last-Update: 2021-01-10
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -676,6 +676,15 @@ case "${host}" in
+ 	AC_DEFINE([JEMALLOC_THREADED_INIT], [ ])
+ 	AC_DEFINE([JEMALLOC_USE_CXX_THROW], [ ])
+ 	;;
++  *-*-gnu*)
++	dnl syscall(2) and secure_getenv(3) are exposed by _GNU_SOURCE.
++	JE_APPEND_VS(CPPFLAGS, -D_GNU_SOURCE)
++	JE_APPEND_VS(CPPFLAGS, -DPATH_MAX=8192)
++	abi="elf"
++	AC_DEFINE([JEMALLOC_HAS_ALLOCA_H])
++	AC_DEFINE([JEMALLOC_THREADED_INIT], [ ])
++	AC_DEFINE([JEMALLOC_USE_CXX_THROW], [ ])
++	;;
+   *-*-netbsd*)
+ 	AC_MSG_CHECKING([ABI])
+         AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+@@ -1680,6 +1689,15 @@ dnl Check if we have dlsym support.
+   fi
+ fi
+ 
++dnl Check if pthread_getaffinity_np exists (does not on GNU Hurd)
++AC_CHECK_FUNC([pthread_getaffinity_np],
++              [have_pthread_getaffinity_np="1"],
++              [have_pthread_getaffinity_np="0"]
++             )
++if test "x$have_pthread_getaffinity_np" = "x1" ; then
++  AC_DEFINE([JEMALLOC_HAVE_PTHREAD_GETAFFINITY_NP], [ ])
++fi
++
+ JE_APPEND_VS(CPPFLAGS, -D_REENTRANT)
+ 
+ dnl Check whether clock_gettime(2) is in libc or librt.
+--- a/src/jemalloc.c
++++ b/src/jemalloc.c
+@@ -730,7 +730,8 @@ malloc_ncpus(void) {
+ 	SYSTEM_INFO si;
+ 	GetSystemInfo(&si);
+ 	result = si.dwNumberOfProcessors;
+-#elif defined(JEMALLOC_GLIBC_MALLOC_HOOK) && defined(CPU_COUNT)
++#elif defined(JEMALLOC_GLIBC_MALLOC_HOOK) && defined(CPU_COUNT) \
++      && defined(JEMALLOC_HAVE_PTHREAD_GETAFFINITY_NP)
+ 	/*
+ 	 * glibc >= 2.6 has the CPU_COUNT macro.
+ 	 *
+--- a/test/unit/tsd.c
++++ b/test/unit/tsd.c
+@@ -75,6 +75,9 @@ TEST_BEGIN(test_tsd_main_thread) {
+ TEST_END
+ 
+ TEST_BEGIN(test_tsd_sub_thread) {
++#ifdef __GNU__
++	test_skip("broken on Hurd");
++#else
+ 	thd_t thd;
+ 
+ 	data_cleanup_count = 0;
+@@ -86,6 +89,7 @@ TEST_BEGIN(test_tsd_sub_thread) {
+ 	 */
+ 	assert_x_ge(data_cleanup_count, 3,
+ 	    "Cleanup function should have executed multiple times.");
++#endif
+ }
+ TEST_END
+ 

@@ -1,0 +1,77 @@
+Description: The struct member 'delete' conflicts in C++ code
+ Upstream patch 
+Author: Dirk Eddelbuettel <edd@debian.org>
+Bug-Debian: https://bugs.debian.org/907119
+Origin: upstream, http://git.savannah.gnu.org/cgit/gsl.git/commit/?id=d9a747a9d2819899e436bb546edd61bfcab0558e
+Bug-Debian: https://bugs.debian.org/912341
+Last-Update: 2018-11-27
+
+--- gsl-2.5+dfsg.orig/filter/rmedian.c
++++ gsl-2.5+dfsg/filter/rmedian.c
+@@ -188,7 +188,7 @@ static int
+ rmedian_delete(void * vstate)
+ {
+   rmedian_state_t * state = (rmedian_state_t *) vstate;
+-  return (state->minmax_acc->delete)(state->minmax_state);
++  return (state->minmax_acc->delete_oldest)(state->minmax_state);
+ }
+ 
+ static int
+--- gsl-2.5+dfsg.orig/movstat/apply.c
++++ gsl-2.5+dfsg/movstat/apply.c
+@@ -91,7 +91,7 @@ gsl_movstat_apply_accum(const gsl_movsta
+           for (i = 0; i < H; ++i)
+             (accum->insert)(x1, w->state);
+         }
+-      else if (accum->delete == NULL) /* FIXME XXX */
++      else if (accum->delete_oldest == NULL) /* FIXME XXX */
+         {
+           /* save last K - 1 samples of x for later (needed for in-place input/output) */
+           int idx1 = GSL_MAX(n - J - H, 0);
+@@ -125,7 +125,7 @@ gsl_movstat_apply_accum(const gsl_movsta
+           int idx1 = GSL_MAX(n - J, 0);
+           int idx2 = n - 1;
+ 
+-          if (accum->delete == NULL)
++          if (accum->delete_oldest == NULL)
+             {
+               int wsize = n - GSL_MAX(n - J - H, 0); /* size of work array */
+ 
+@@ -154,7 +154,7 @@ gsl_movstat_apply_accum(const gsl_movsta
+                   if (i - H > 0)
+                     {
+                       /* delete oldest window sample as we move closer to edge */
+-                      (accum->delete)(w->state);
++                      (accum->delete_oldest)(w->state);
+                     }
+ 
+                   /* yi = acc_get [ work(i:K-2) ] */
+--- gsl-2.5+dfsg.orig/movstat/gsl_movstat.h
++++ gsl-2.5+dfsg/movstat/gsl_movstat.h
+@@ -43,19 +43,19 @@ typedef enum
+ } gsl_movstat_end_t;
+ 
+ /* accumulator struct
+- * size   - return number of bytes needed for accumulator with maximum of n elements
+- * init   - initialize accumulator state
+- * insert - insert a single sample into accumulator; if there are already n
+- *          samples in accumulator, oldest sample is overwritten
+- * delete - delete oldest sample from accumulator
+- * get    - return accumulated value
++ * size          - return number of bytes needed for accumulator with maximum of n elements
++ * init          - initialize accumulator state
++ * insert        - insert a single sample into accumulator; if there are already n
++ *                 samples in accumulator, oldest sample is overwritten
++ * delete_oldest - delete oldest sample from accumulator
++ * get           - return accumulated value
+  */
+ typedef struct
+ {
+   size_t (*size) (const size_t n);
+   int (*init) (const size_t n, void * vstate);
+   int (*insert) (const double x, void * vstate);
+-  int (*delete) (void * vstate);
++  int (*delete_oldest) (void * vstate);
+   int (*get) (void * params, double * result, const void * vstate);
+ } gsl_movstat_accum;
+ 

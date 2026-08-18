@@ -1,0 +1,47 @@
+Description: Hide internal symbols
+Author: Sebastian Ramacher <sramacher@debian.org>
+Last-Update: 2015-03-22
+
+--- libdvbpsi-1.2.0.orig/src/dvbpsi_private.h
++++ libdvbpsi-1.2.0/src/dvbpsi_private.h
+@@ -32,6 +32,14 @@
+ 
+ #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+ 
++#ifndef HIDDEN
++# if (defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__)
++#  define HIDDEN __attribute__((visibility("hidden")))
++# else
++#  define HIDDEN
++# endif
++#endif
++
+ /*****************************************************************************
+  * Error management
+  *
+@@ -40,7 +48,7 @@
+  *****************************************************************************/
+ 
+ #ifdef HAVE_VARIADIC_MACROS
+-void dvbpsi_message(dvbpsi_t *dvbpsi, const int level, const char *fmt, ...);
++HIDDEN void dvbpsi_message(dvbpsi_t *dvbpsi, const int level, const char *fmt, ...);
+ 
+ #  define dvbpsi_error(hnd, src, str, x...)                             \
+         dvbpsi_message(hnd, DVBPSI_MSG_ERROR, "libdvbpsi error (%s): " str, src, ##x)
+@@ -49,11 +57,13 @@ void dvbpsi_message(dvbpsi_t *dvbpsi, co
+ #  define dvbpsi_debug(hnd, src, str, x...)                                  \
+         dvbpsi_message(hnd, DVBPSI_MSG_DEBUG, "libdvbpsi debug (%s): " str, src, ##x)
+ #else
+-void dvbpsi_error(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
+-void dvbpsi_warning(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
+-void dvbpsi_debug(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
++HIDDEN void dvbpsi_error(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
++HIDDEN void dvbpsi_warning(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
++HIDDEN void dvbpsi_debug(dvbpsi_t *dvbpsi, const char *src, const char *fmt, ...);
+ #endif
+ 
++#undef HIDDEN
++
+ #else
+ #error "Multiple inclusions of dvbpsi_private.h"
+ #endif

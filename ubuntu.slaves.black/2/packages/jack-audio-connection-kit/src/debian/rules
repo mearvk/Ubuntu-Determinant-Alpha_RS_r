@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+ifneq (,$(filter stage1,$(DEB_BUILD_PROFILES)))
+export DH_OPTIONS = -Njackd1-firewire
+endif
+
+DEB_CONFIGURE_EXTRA_FLAGS := \
+	--enable-resize \
+	--enable-timestamps \
+	--disable-iec61883 \
+	--with-oldtrans \
+	--disable-ensure-mlock \
+	--enable-static=yes \
+
+ifneq (,$(filter doopt,$(DEB_BUILD_OPTIONS)))
+# do optimization for the different architectures
+  ifneq (,$(findstring i386,$(DEB_HOST_ARCH_CPU)))
+    DEB_CONFIGURE_EXTRA_FLAGS += --enable-optimize --enable-sse --enable-mmx -enable-dynsimd
+    OPTI_FLAGS := -D_REENTRANT -O3 -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops
+    DEB_CXXFLAGS_MAINT_APPEND += $(OPTI_FLAGS)
+    DEB_CFLAGS_MAINT_APPEND += $(OPTI_FLAGS)
+  endif
+endif
+
+ifneq (,$(filter amd64,$(DEB_HOST_ARCH_CPU)))
+DEB_CONFIGURE_EXTRA_FLAGS += --enable-dynsimd=yes
+DEB_CFLAGS_MAINT_APPEND += -m3dnow -msse
+endif
+
+%:
+	dh $@ --with bash-completion -Sautoconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(DEB_CONFIGURE_EXTRA_FLAGS)
+
+# this target fetches the FAQ from the JACK homepage
+.PHONY: faq
+faq:
+	dh_testdir
+	w3m -dump http://jackaudio.org/faq > debian/FAQ.dltmp
+	mv debian/FAQ.dltmp debian/FAQ
+	dch -a "debian/FAQ: updated from webpage"

@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+SHARED_PKG := libdatrie1
+SHLIB_VER := 0.2.0
+
+%:
+	dh $@
+
+override_dh_auto_build-indep:
+ifeq ($(filter nodoc,$(DEB_BUILD_OPTIONS)),)
+	dh_auto_build -- -C doc
+endif
+
+override_dh_auto_build-arch:
+	dh_auto_build -- -C datrie
+	dh_auto_build -- -C tools
+	dh_auto_build -- -C man
+
+# No test for doc
+override_dh_auto_test-indep:
+
+override_dh_auto_test-arch:
+	dh_auto_test -- -C tests
+
+# No upstream doc install, use dh 11 dh_installdocs directly instead
+override_dh_auto_install-indep:
+
+override_dh_link-indep:
+ifeq ($(filter nodoc,$(DEB_BUILD_OPTIONS)),)
+	dh_link -i
+endif
+
+override_dh_installdocs-indep:
+	dh_installdocs -plibdatrie-doc --doc-main-package=libdatrie1 -Xjquery.js
+
+override_dh_auto_install-arch:
+	$(MAKE) -C datrie install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) -C tools  install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) -C man    install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) install-am DESTDIR=$(CURDIR)/debian/tmp
+
+override_dh_installchangelogs-arch:
+	dh_installchangelogs -Nlibdatrie-dev -a
+
+override_dh_installdocs-arch:
+	dh_installdocs -plibdatrie-dev --link-doc=libdatrie1
+	dh_installdocs --remaining-packages -a
+
+override_dh_makeshlibs:
+	dh_makeshlibs -a -p$(SHARED_PKG) -V'$(SHARED_PKG) (>= $(SHLIB_VER))'

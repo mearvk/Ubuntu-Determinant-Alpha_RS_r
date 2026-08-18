@@ -1,0 +1,95 @@
+Description: Fixes the compatibility with Java 9
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/build.xml
++++ b/build.xml
+@@ -98,6 +98,7 @@
+       source="${source}"
+       target="${target}"
+       classpathref="classpath">
++      <exclude name="**/enum/**/*" />
+       <exclude name="**/old/**/*" />
+       <exclude name="**/bak/**"/>
+       <exclude name="**/org/apache/axis/components/net/JDK14*.java" unless="jdk14.jsse.present"/>
+@@ -373,6 +374,7 @@
+              source="${source}"
+              bottom="Copyright &#169; ${year} Apache Web Services Project. All Rights Reserved."
+              encoding="iso-8859-1"
++             excludepackagenames="org.apache.axis.enum"
+     />
+   </target>
+ 
+--- a/src/org/apache/axis/types/UnsignedInt.java
++++ b/src/org/apache/axis/types/UnsignedInt.java
+@@ -25,7 +25,7 @@
+  * @author Chris Haddad <chaddad@cobia.net>
+  * @see <a href="http://www.w3.org/TR/xmlschema-2/#unsignedInt">XML Schema 3.3.22</a>
+  */
+-public class UnsignedInt extends java.lang.Number implements java.lang.Comparable {
++public class UnsignedInt extends java.lang.Number implements java.lang.Comparable<UnsignedInt> {
+ 
+     protected Long lValue = new Long(0);
+ 
+@@ -105,9 +105,9 @@
+     }
+ 
+     // implement java.lang.comparable interface
+-    public int compareTo(Object obj) {
++    public int compareTo(UnsignedInt obj) {
+       if (lValue != null)
+-        return lValue.compareTo(obj);
++        return lValue.compareTo(obj.lValue);
+       else
+         if (equals(obj) == true)
+             return 0;  // null == null
+--- a/src/org/apache/axis/types/UnsignedLong.java
++++ b/src/org/apache/axis/types/UnsignedLong.java
+@@ -26,7 +26,7 @@
+  * @see <a href="http://www.w3.org/TR/xmlschema-2/#unsignedLong">XML Schema 3.3.21</a>
+  */
+ public class UnsignedLong extends java.lang.Number
+-        implements java.lang.Comparable {
++        implements java.lang.Comparable<UnsignedLong> {
+ 
+     protected BigInteger lValue = BigInteger.ZERO;
+     private static BigInteger MAX = new BigInteger("18446744073709551615"); // max unsigned long
+@@ -99,9 +99,9 @@
+     }
+ 
+     // implement java.lang.comparable interface
+-    public int compareTo(Object obj) {
++    public int compareTo(UnsignedLong obj) {
+         if (lValue != null)
+-            return lValue.compareTo(obj);
++            return lValue.compareTo(obj.lValue);
+         else if (equals(obj) == true)
+             return 0;  // null == null
+         else
+--- a/tools/org/apache/axis/tools/ant/foreach/ParamSet.java
++++ b/tools/org/apache/axis/tools/ant/foreach/ParamSet.java
+@@ -83,9 +83,9 @@
+         and then <item>s. The ordering of the buildfile is
+         not guaranteed. */
+         Vector values = new Vector();
+-        Enumeration enum = filesets.elements();
+-        while (enum.hasMoreElements()) {
+-            FileSet fileSet = (FileSet) enum.nextElement();
++        Enumeration enumeration = filesets.elements();
++        while (enumeration.hasMoreElements()) {
++            FileSet fileSet = (FileSet) enumeration.nextElement();
+             File base = fileSet.getDir(project);
+             DirectoryScanner scanner = fileSet.getDirectoryScanner(project);
+             if (TYPE_DIR != type) {
+@@ -103,9 +103,9 @@
+                 }
+             }
+         }
+-        enum = items.elements();
+-        while (enum.hasMoreElements()) {
+-            ParamItem item = (ParamItem) enum.nextElement();
++        enumeration = items.elements();
++        while (enumeration.hasMoreElements()) {
++            ParamItem item = (ParamItem) enumeration.nextElement();
+             values.addElement(item.getValue());
+         }
+         return values.elements();

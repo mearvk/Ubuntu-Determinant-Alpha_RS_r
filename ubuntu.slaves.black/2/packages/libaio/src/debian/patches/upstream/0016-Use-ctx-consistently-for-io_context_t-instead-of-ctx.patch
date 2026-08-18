@@ -1,0 +1,153 @@
+From e2175569737a2905d3c7a6e6ff664f0febcf5a28 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Sat, 20 Jul 2019 21:18:14 +0200
+Subject: [PATCH libaio 16/28] Use ctx consistently for io_context_t instead of
+ ctx_id
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ man/io_cancel.3     | 2 +-
+ man/io_getevents.3  | 8 ++++----
+ man/io_queue_run.3  | 2 +-
+ man/io_queue_wait.3 | 2 +-
+ man/io_submit.3     | 2 +-
+ src/compat-0_1.c    | 4 ++--
+ src/libaio.h        | 4 ++--
+ src/vsys_def.h      | 2 +-
+ 8 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/man/io_cancel.3 b/man/io_cancel.3
+index 3ca629b..8c6910e 100644
+--- a/man/io_cancel.3
++++ b/man/io_cancel.3
+@@ -46,7 +46,7 @@ If any of the data structures pointed to are invalid.
+ If
+ .I aio_context
+ specified by
+-.I ctx_id
++.I ctx
+ is invalid.
+ .TP
+ .B EAGAIN
+diff --git a/man/io_getevents.3 b/man/io_getevents.3
+index 6fbcc24..6ff686d 100644
+--- a/man/io_getevents.3
++++ b/man/io_getevents.3
+@@ -1,7 +1,7 @@
+ .\"/* io_getevents:
+ .\" *      Attempts to read at least min_nr events and up to nr events from
+-.\" *      the completion queue for the aio_context specified by ctx_id.  May
+-.\" *      fail with -EINVAL if ctx_id is invalid, if min_nr is out of range,
++.\" *      the completion queue for the aio_context specified by ctx.  May
++.\" *      fail with -EINVAL if ctx is invalid, if min_nr is out of range,
+ .\" *      if nr is out of range, if when is out of range.  May fail with
+ .\" *      -EFAULT if any of the memory specified to is invalid.  May return
+ .\" *      0 or < min_nr if no events are available and the timeout specified
+@@ -10,7 +10,7 @@
+ .\" *      will be updated if not NULL and the operation blocks.  Will fail
+ .\" *      with -ENOSYS if not implemented.
+ .\" */
+-.\"asmlinkage long sys_io_getevents(io_context_t ctx_id,
++.\"asmlinkage long sys_io_getevents(io_context_t ctx,
+ .\"                                 long min_nr,
+ .\"                                 long nr,
+ .\"                                 struct io_event *events,
+@@ -117,7 +117,7 @@ behaves the same as
+ .TP
+ .B EINVAL 
+ If
+-.I ctx_id
++.I ctx
+ is invalid, if
+ .I min_nr
+ is out of range, if
+diff --git a/man/io_queue_run.3 b/man/io_queue_run.3
+index 93e322b..2bb9701 100644
+--- a/man/io_queue_run.3
++++ b/man/io_queue_run.3
+@@ -16,7 +16,7 @@ io_queue_run \- Handle completed io requests
+ .BR io_queue_run ()
+ attempts to read all the events from
+ the completion queue for the aio_context specified by
+-.IR ctx_id .
++.IR ctx .
+ .SH "RETURN VALUES"
+ May return
+ .B 0
+diff --git a/man/io_queue_wait.3 b/man/io_queue_wait.3
+index ad5e7f4..1cf4f0b 100644
+--- a/man/io_queue_wait.3
++++ b/man/io_queue_wait.3
+@@ -15,7 +15,7 @@ io_queue_wait \- Wait for io requests to complete
+ .BR io_queue_wait ()
+ attempts to read an event from
+ the completion queue for the aio_context specified by
+-.IR ctx_id .
++.IR ctx .
+ .SH "RETURN VALUES"
+ May return
+ .B 0
+diff --git a/man/io_submit.3 b/man/io_submit.3
+index c0791ed..c15134f 100644
+--- a/man/io_submit.3
++++ b/man/io_submit.3
+@@ -1,7 +1,7 @@
+ .\"/* sys_io_submit:
+ .\" *      Queue the nr iocbs pointed to by iocbpp for processing.  Returns
+ .\" *      the number of iocbs queued.  May return -EINVAL if the aio_context
+-.\" *      specified by ctx_id is invalid, if nr is < 0, if the iocb at
++.\" *      specified by ctx is invalid, if nr is < 0, if the iocb at
+ .\" *      *iocbpp[0] is not properly initialized, if the operation specified
+ .\" *      is invalid for the file descriptor in the iocb.  May fail with
+ .\" *      -EFAULT if any of the data structures point to invalid data.  May
+diff --git a/src/compat-0_1.c b/src/compat-0_1.c
+index 136396f..722e107 100644
+--- a/src/compat-0_1.c
++++ b/src/compat-0_1.c
+@@ -49,14 +49,14 @@ int compat0_1_io_queue_wait(io_context_t ctx, struct timespec *when)
+ 
+ /* ABI change.  Provide backwards compatibility for this one. */
+ SYMVER(compat0_1_io_getevents, io_getevents, 0.1);
+-int compat0_1_io_getevents(io_context_t ctx_id, long nr,
++int compat0_1_io_getevents(io_context_t ctx, long nr,
+ 		       struct io_event *events,
+ 		       const struct timespec *const_timeout)
+ {
+ 	struct timespec timeout;
+ 	if (const_timeout)
+ 		timeout = *const_timeout;
+-	return io_getevents(ctx_id, 1, nr, events,
++	return io_getevents(ctx, 1, nr, events,
+ 			const_timeout ? &timeout : NULL);
+ }
+ 
+diff --git a/src/libaio.h b/src/libaio.h
+index 2bc24e0..8b33382 100644
+--- a/src/libaio.h
++++ b/src/libaio.h
+@@ -162,8 +162,8 @@ extern int io_setup(int maxevents, io_context_t *ctxp);
+ extern int io_destroy(io_context_t ctx);
+ extern int io_submit(io_context_t ctx, long nr, struct iocb *ios[]);
+ extern int io_cancel(io_context_t ctx, struct iocb *iocb, struct io_event *evt);
+-extern int io_getevents(io_context_t ctx_id, long min_nr, long nr, struct io_event *events, struct timespec *timeout);
+-extern int io_pgetevents(io_context_t ctx_id, long min_nr, long nr,
++extern int io_getevents(io_context_t ctx, long min_nr, long nr, struct io_event *events, struct timespec *timeout);
++extern int io_pgetevents(io_context_t ctx, long min_nr, long nr,
+ 		struct io_event *events, struct timespec *timeout,
+ 		sigset_t *sigmask);
+ 
+diff --git a/src/vsys_def.h b/src/vsys_def.h
+index 13d032e..dd711dc 100644
+--- a/src/vsys_def.h
++++ b/src/vsys_def.h
+@@ -20,5 +20,5 @@ extern int vsys_io_destroy(io_context_t ctx);
+ extern int vsys_io_submit(io_context_t ctx, long nr, struct iocb *iocbs[]);
+ extern int vsys_io_cancel(io_context_t ctx, struct iocb *iocb);
+ extern int vsys_io_wait(io_context_t ctx, struct iocb *iocb, const struct timespec *when);
+-extern int vsys_io_getevents(io_context_t ctx_id, long nr, struct io_event *events, const struct timespec *timeout);
++extern int vsys_io_getevents(io_context_t ctx, long nr, struct io_event *events, const struct timespec *timeout);
+ 
+-- 
+2.26.0.292.g33ef6b2f38
+

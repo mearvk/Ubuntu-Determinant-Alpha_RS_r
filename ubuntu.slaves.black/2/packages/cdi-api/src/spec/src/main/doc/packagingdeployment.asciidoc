@@ -1,0 +1,220 @@
+[[packaging_deployment]]
+
+== Packaging and deployment
+
+When an application is started, the container must perform _bean discovery_, detect definition errors and deployment problems and raise events that allow portable extensions to integrate with the deployment lifecycle.
+
+Bean discovery is the process of determining:
+
+* The bean archives that exist in the application, and the beans they contain
+* Which alternatives, interceptors and decorators are _enabled_ for each bean archive
+* The _ordering_ of enabled interceptors and decorators
+
+
+Additional beans may be registered programmatically with the container by the application or a portable extension after the automatic bean discovery completes. Portable extensions may even integrate with the process of building the +Bean+ object for a bean, to enhance the container's built-in functionality.
+
+[[bean_archive]]
+
+=== Bean archives
+
+Bean classes of enabled beans must be deployed in _bean archives_.
+
+A bean archive has a _bean discovery mode_ of +all+, +annotated+ or +none+. A bean archive which contains a +beans.xml+ file with no version has a default bean discovery mode of +all+. A bean archive which contains a +beans.xml+ file with version 1.1 (or later) must specify the +bean-discovey-mode+ attribute. The default value for the attribute is +annotated+.
+
+An archive which:
+
+* contains a +beans.xml+ file with the +bean-discovery-mode+ of +none+, or,
+* contains an extension and no +beans.xml+ file
+
+is not a bean archive.
+
+An _explicit bean archive_ is an archive which contains a +beans.xml+ file:
+
+* with a version number of +1.1+ (or later), with the +bean-discovery-mode+ of +all+, or,
+* with no version number, or,
+* that is an empty file.
+
+An _implicit bean archive_ is any other archive which contains one or more bean classes with a bean defining annotation as defined in <<bean_defining_annotations>>, or one or more session beans.
+
+When determining which archives are bean archives, the container must consider:
+
+* Library jars, EJB jars or application client jars
+* The +WEB-INF/classes+ directory of a war
+* Directories in the JVM classpath
+
+The container is not required to support application client jar bean archives.
+
+A Java EE container is required by the Java EE specification to support Java EE modules. Other containers may or may not provide support for war, EJB jar or rar bean archives.
+
+The +beans.xml+ file must be named:
+
+* +META-INF/beans.xml+ , or,
+* in a war,  +WEB-INF/beans.xml+  or +WEB-INF/classes/META-INF/beans.xml+. 
+
+If a war has a file named +beans.xml+ in both the +WEB-INF+ directory and in the +WEB-INF/classes/META-INF+ directory, then non-portable behavior results. Portable applications must have a +beans.xml+ file in only one of the +WEB-INF+ or the +WEB-INF/classes/META-INF+ directories.
+
+For compatibility with Contexts and Dependency 1.0, products must contain an option to cause an archive to be ignored by the container when no +beans.xml+ is present.
+
+The container searches for beans in all bean archives in the application classpath:
+
+* In an application deployed as an ear, the container searches every bean archive bundled with or referenced by the ear, including bean archives bundled with or referenced by wars, EJB jars and rars contained in the ear. The bean archives might be library jars, EJB jars or war +WEB-INF/classes+ directories.
+* In an application deployed as a war, the container searches every bean archive bundled with or referenced by the war. The bean archives might be library jars or the +WEB-INF/classes+ directory.
+* In an application deployed as an EJB jar, the container searches the EJB jar, if it is a bean archive, and every bean archive referenced by the EJB jar.
+* In an application deployed as a rar, the container searches every bean archive bundled with or referenced by the rar.
+* An embeddable EJB container searches each bean archive in the JVM classpath that is listed in the value of the embeddable container initialization property +javax.ejb.embeddable.modules+, or every bean archive in the JVM classpath if the property is not specified. The bean archives might be directories, library jars or EJB jars.
+
+If a bean class is deployed in two different bean archives, non-portable behavior results. Portable applications must deploy each bean class in no more than one bean archive.
+
+Explicit bean archives may contain classes which are not deployed as beans. For example a bean archive might contain message-driven beans.
+
+Implicit bean archives are likely to contain classes which are not deployed as beans.
+
+An extension may be deployed in any archive, including those that are not bean archives.
+
+[[initialization]]
+
+=== Application initialization lifecycle
+
+When an application is started, the container performs the following steps:
+
+* First, the container must search for service providers for the service +javax.enterprise.inject.spi.Extension+ defined in <<init_events>>, instantiate a single instance of each service provider, and search the service provider class for observer methods of initialization events.
+* Next, the container must fire an event of type +BeforeBeanDiscovery+, as defined in <<bbd>>.
+* Next, the container must perform type discovery, as defined in <<type_discovery_steps>>.
+* Next, the container must fire an event of type +AfterTypeDiscovery+, as defined in <<atd>>.
+* Next, the container must perform bean discovery, as defined in <<bean_discovery_steps>>.
+* Next, the container must fire an event of type +AfterBeanDiscovery+, as defined in <<abd>>, and abort initialization of the application if any observer registers a definition error.
+* Next, the container must detect deployment problems by validating bean dependencies and specialization and abort initialization of the application if any deployment problems exist, as defined in <<exceptions>>.
+* Next, the container must fire an event of type +AfterDeploymentValidation+, as defined in <<adv>>, and abort initialization of the application if any observer registers a deployment problem.
+* Finally, the container begins directing requests to the application.
+
+
+[[shutdown]]
+
+=== Application shutdown lifecycle
+
+When an application is stopped, the container performs the following steps:
+
+* First, the container must destroy all contexts.
+* Finally, the container must fire an event of type +BeforeShutdown+, as defined in <<bs>>.
+
+
+[[type_bean_discovery]]
+
+=== Type and Bean discovery
+
+The container automatically discovers managed beans (according to the rules of <<what_classes_are_beans>>) and session beans in bean archives and searches the bean classes for producer methods, producer fields, disposer methods and observer methods.
+
+[[type_discovery]]
+
+==== Type discovery
+
+First the container must discover types. The container discovers:
+
+* each Java class, interface (excluding the special kind of interface declaration _annotation type_) or enum deployed in an explicit bean archive, and
+* each Java class with a bean defining annotation in an implicit bean archive.
+* each session bean
+
+that is not excluded from discovery by an _exclude filter_ as defined in <<exclude_filters>>.
+
+Then, for every type discovered the container must create an +AnnotatedType+ representing the type and fire an event of type +ProcessAnnotatedType+, as defined in <<pat>>.
+
+If an extension calls +BeforeBeanDiscovery.addAnnotatedType()+ or +AfterTypeDiscovery.addAnnotatedType()+, the type passed must be added to the set of discovered types and the container must fire an event of type +ProcessSyntheticAnnotatedType+ for every type added, as defined in <<pat>>+
+
+[[exclude_filters]]
+
+==== Exclude filters
+
+Exclude filters are defined by +<exclude>+ elements in the +beans.xml+ for the bean archive as children of the +<scan>+ element. By default an exclude filter is active. If the exclude filter definition contains:
+
+* a child element named +<if-class-available>+ with a +name+ attribute, and the classloader for the bean archive can not load a class for that name, or
+* a child element named +<if-class-not-available>+ with a +name+ attribute, and the classloader for the bean archive can load a class for that name, or
+* a child element named +<if-system-property>+ with a +name+ attribute, and there is no system property defined for that name, or
+* a child element named +<if-system-property>+ with a +name+ attribute and a +value+ attribute, and there is no system property defined for that name with that value.
+
+then the filter is inactive.
+
+If the filter is active, and:
+
+* the fully qualified name of the type being discovered matches the value of the name attribute of the exclude filter, or
+* the package name of the type being discovered matches the value of the name attribute with a suffix ".*" of the exclude filter, or
+* the package name of the type being discovered starts with the value of the name attribute with a suffix ".**" of the exclude filter
+
+then we say that the type is excluded from discovery.
+
+For example, consider the follow +beans.xml+ file:
+
+[source, xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://xmlns.jcp.org/xml/ns/javaee">
+
+    <scan>
+        <exclude name="com.acme.rest.*" />
+
+        <exclude name="com.acme.faces.**">
+            <if-class-not-available name="javax.faces.context.FacesContext"/>
+        </exclude>
+
+        <exclude name="com.acme.verbose.*">
+            <if-system-property name="verbosity" value="low"/>
+        </exclude>
+
+        <exclude name="com.acme.ejb.**">
+            <if-class-available name="javax.enterprise.inject.Model"/>
+            <if-system-property name="exclude-ejbs"/>
+        </exclude>
+    </scan>
+
+</beans>
+----
+
+The first exclude filter will exclude all classes in +com.acme.rest+ package. The second exclude filter will exclude all classes in the +com.acme.faces+ package, and any subpackages, but only if JSF is not available. The third exclude filter will exclude all classes in the +com.acme.verbose+ package if the system property +verbosity+ has the value +low+. The fourth exclude filter will exclude all classes in the +com.acme.ejb+ package, and any subpackages if the system property +exclude-ejbs+ is set (with any value) and at the same time, the +javax.enterprise.inject.Model+ class is available to the classloader.
+
+
+[[bean_discovery]]
+
+==== Bean discovery
+
+For every type in the set of discovered types (as defined in <<type_discovery>>), the container must:
+
+* inspect the type metadata to determine if it is a bean or other Java EE component class supporting injection, and then
+* detect definition errors by validating the class and its metadata, and then
+* if the class is a managed bean, session bean, or other Java EE component class supporting injection, fire an event of type +ProcessInjectionPoint+ for each injection point in the class, as defined in <<pip>>, and then
+* if the class is a managed bean, session bean, or other Java EE component class supporting injection, fire an event of type +ProcessInjectionTarget+, as defined in <<pit>>, and then
+* determine which alternatives, interceptors and decorators are enabled, according to the rules defined in <<enablement>>, <<enabled_interceptors>> and <<enabled_decorators>>, and then
+* if the class is an enabled bean, interceptor or decorator, fire an event of type +ProcessBeanAttributes+, as defined in <<pba>>, and then
+* if the class is an enabled bean, interceptor or decorator and if +ProcessBeanAttributes.veto()+ wasn't called in previous step, fire an event which is a subtype of +ProcessBean+, as defined in <<pb>>.
+
+For each enabled bean, the container must search the class for producer methods and fields, as defined in <<producer_method>> and in <<producer_field>>, including resources, and for each producer:
+
+* if it is a producer method, fire an event of type +ProcessInjectionPoint+ for each injection point in the method parameters, as defined in <<pip>>, and then
+* fire an event of type +ProcessProducer+, as defined in <<pp>>, and then
+* if the producer method or field is enabled, fire an event of type +ProcessBeanAttributes+, as defined in <<pba>>, and then
+* if the producer method or field is enabled and if +ProcessBeanAttributes.veto()+ wasn't called in previous step, fire an event which is a subtype of +ProcessBean+, as defined in <<pb>>.
+
+For each enabled bean, the container must search for disposer methods as defined in <<disposer_method>>, and for each disposer method:
+
+* fire an event of type +ProcessInjectionPoint+ for each injection point in the method parameters, as defined in <<pip>>.
+
+For each enabled bean, the container must search the class for observer methods, and for each observer method:
+
+* fire an event of type +ProcessInjectionPoint+ for each injection point in the method parameters, as defined in <<pip>>, and then
+* fire an event of type +ProcessObserverMethod+, as defined in <<pom>>.
+
+Then, the container registers the +Bean+ and +ObserverMethod+ objects:
+
+* For each enabled bean that is not an interceptor or decorator, the container registers an instance of the +Bean+ interface defined in <<bean>>.
+* For each enabled interceptor, the container registers an instance of the +Interceptor+ interface defined in <<interceptor>>.
+* For each enabled decorator, the container registers an instance of the +Decorator+ interface defined in <<decorator>>.
+* For each observer method of every enabled bean, the container registers an instance of the +ObserverMethod+ interface defined in <<observer_method>>.
+
+[[el]]
+
+=== Integration with Unified EL
+
+The container must provide a Unified EL +ELResolver+ to the servlet engine and JSF implementation that resolves bean names using the rules of name resolution defined in <<name_resolution>> and resolving ambiguities according to <<ambig_names>>.
+
+* If a name used in an EL expression does not resolve to any bean, the +ELResolver+ must return a null value.
+* Otherwise, if a name used in an EL expression resolves to exactly one bean, the +ELResolver+ must return a contextual instance of the bean, as defined in <<contextual_instance>>.
+
+

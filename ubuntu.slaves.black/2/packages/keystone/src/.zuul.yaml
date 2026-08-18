@@ -1,0 +1,279 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- job:
+    name: keystone-dsvm-functional
+    parent: devstack-tempest
+    timeout: 4200
+    required-projects:
+      - openstack/devstack-gate
+      - openstack/keystone
+      - openstack/keystone-tempest-plugin
+    vars:
+      tox_envlist: all
+      tempest_test_regex: 'keystone_tempest_plugin'
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+
+- job:
+    name: keystone-dsvm-py3-functional
+    parent: keystone-dsvm-functional
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+        USE_PYTHON3: True
+
+- job:
+    name: keystone-dsvm-py3-functional-fips
+    parent: keystone-dsvm-py3-functional
+    nodeset: devstack-single-node-centos-8-stream
+    description: |
+      Functional testing for a FIPS enabled Centos 8 system
+    pre-run: playbooks/enable-fips.yaml
+
+- job:
+    name: keystone-dsvm-functional-federation-opensuse15
+    parent: keystone-dsvm-functional
+    nodeset: devstack-single-node-opensuse-15
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+      devstack_services:
+        keystone-saml2-federation: true
+        tls-proxy: false
+      devstack_plugins:
+        keystone: https://opendev.org/openstack/keystone
+      zuul_copy_output:
+        /etc/shibboleth: logs
+        /var/log/shibboleth: logs
+
+- job:
+    name: keystone-dsvm-py3-functional-federation-opensuse15
+    parent: keystone-dsvm-functional-federation-opensuse15
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+        USE_PYTHON3: True
+      zuul_copy_output:
+        /etc/shibboleth: logs
+        /var/log/shibboleth: logs
+
+- job:
+    name: keystone-dsvm-py3-functional-federation-opensuse15-k2k
+    parent: keystone-dsvm-py3-functional-federation-opensuse15
+    vars:
+      devstack_localrc:
+        IDP_ID: k2k
+
+- job:
+    name: keystone-dsvm-py3-functional-federation-ubuntu-focal
+    parent: keystone-dsvm-functional
+    nodeset: openstack-single-node-focal
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+        USE_PYTHON3: True
+      devstack_services:
+        keystone-saml2-federation: true
+        tls-proxy: false
+      devstack_plugins:
+        keystone: https://opendev.org/openstack/keystone
+      zuul_copy_output:
+        /etc/shibboleth: logs
+        /var/log/shibboleth: logs
+
+- job:
+    name: keystone-dsvm-py3-functional-federation-ubuntu-focal-k2k
+    parent: keystone-dsvm-py3-functional-federation-ubuntu-focal
+    vars:
+      devstack_localrc:
+        IDP_ID: k2k
+
+# This job will execute 'tox -e upgrade' from the OSA
+# repo specified in 'osa_test_repo'.
+- job:
+    name: openstack-ansible-keystone-rolling-upgrade
+    parent: openstack-ansible-cross-repo-functional
+    required-projects:
+      - name: openstack/openstack-ansible-os_keystone
+    vars:
+      tox_env: upgrade
+      osa_test_repo: openstack/openstack-ansible-os_keystone
+
+- job:
+    name: keystone-dsvm-ldap-domain-specific-driver
+    parent: devstack-tempest
+    vars:
+      devstack_localrc:
+        KEYSTONE_CLEAR_LDAP: 'yes'
+        LDAP_PASSWORD: 'nomoresecret'
+        USE_PYTHON3: True
+      devstack_services:
+        ldap: true
+
+# Experimental
+- job:
+    name: keystone-tox-patch_cover
+    parent: openstack-tox
+    description: |
+      Run test for keystone project.
+
+      Uses tox with the ``patch_cover`` environment.
+    vars:
+      tox_envlist: patch_cover
+
+# Experimental
+- job:
+    name: keystone-grenade-multinode
+    parent: grenade-multinode
+    required-projects:
+      - openstack/grenade
+      - openstack/keystone
+    vars:
+      devstack_plugins:
+        keystone: https://opendev.org/openstack/keystone
+      grenade_devstack_localrc:
+        shared:
+          MULTI_KEYSTONE: True
+
+# Experimental
+- job:
+    name: keystone-dsvm-functional-federation-centos7
+    parent: keystone-dsvm-functional
+    nodeset: devstack-single-node-centos-7
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+      devstack_services:
+        keystone-saml2-federation: true
+        tls-proxy: false
+      devstack_plugins:
+        keystone: https://opendev.org/openstack/keystone
+      zuul_copy_output:
+        /etc/shibboleth: logs
+
+# Experimental
+- job:
+    name: keystone-dsvm-functional-federation-ubuntu-xenial
+    parent: keystone-dsvm-functional
+    nodeset: openstack-single-node-xenial
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+      devstack_services:
+        keystone-saml2-federation: true
+        tls-proxy: false
+      devstack_plugins:
+        keystone: https://opendev.org/openstack/keystone
+      zuul_copy_output:
+        /etc/shibboleth: logs
+
+# Experimental
+- job:
+    name: keystone-dsvm-py35-functional-federation-ubuntu-xenial
+    parent: keystone-dsvm-functional-federation
+    vars:
+      devstack_localrc:
+        TEMPEST_PLUGINS: '/opt/stack/keystone-tempest-plugin'
+        USE_PYTHON3: True
+      zuul_copy_output:
+        /etc/shibboleth: logs
+
+# Experimental
+# Transitional rename
+- job:
+    name: keystone-dsvm-functional-federation
+    parent: keystone-dsvm-functional-federation-ubuntu-xenial
+
+# Experimental
+# Transitional rename
+- job:
+    name: keystone-dsvm-py35-functional-federation
+    parent: keystone-dsvm-py35-functional-federation-ubuntu-xenial
+
+- project:
+    templates:
+      - openstack-cover-jobs
+      - openstack-python3-xena-jobs
+      - publish-openstack-docs-pti
+      - periodic-stable-jobs
+      - check-requirements
+      - integrated-gate-py3
+      - release-notes-jobs-python3
+      - openstack-python3-xena-jobs-arm64
+    check:
+      jobs:
+        - keystone-dsvm-py3-functional:
+            irrelevant-files: &irrelevant-files
+              - ^.*\.rst$
+              - ^api-ref/.*$
+              - ^doc/.*$
+              - ^etc/.*$
+              - ^keystone/tests/unit/.*$
+              - ^releasenotes/.*$
+        - keystone-dsvm-py3-functional-fips:
+            voting: false
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-py3-functional-federation-ubuntu-focal:
+            voting: false
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-py3-functional-federation-ubuntu-focal-k2k:
+            irrelevant-files: *irrelevant-files
+        - keystoneclient-devstack-functional:
+            voting: false
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-ldap-domain-specific-driver:
+            voting: false
+            irrelevant-files: &tempest-irrelevant-files
+              - ^(test-|)requirements.txt$
+              - ^.*\.rst$
+              - ^api-ref/.*$
+              - ^doc/.*$
+              - ^etc/.*$
+              - ^keystone/tests/unit/.*$
+              - ^releasenotes/.*$
+              - ^setup.cfg$
+        - tempest-full-py3:
+            irrelevant-files: *tempest-irrelevant-files
+        - grenade:
+            irrelevant-files: *tempest-irrelevant-files
+        - tempest-ipv6-only:
+            irrelevant-files: *tempest-irrelevant-files
+        - keystone-protection-functional
+    gate:
+      jobs:
+        - keystone-dsvm-py3-functional:
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-py3-functional-federation-ubuntu-focal-k2k:
+            irrelevant-files: *irrelevant-files
+        - tempest-full-py3:
+            irrelevant-files: *tempest-irrelevant-files
+        - grenade:
+            irrelevant-files: *tempest-irrelevant-files
+        - tempest-ipv6-only:
+            irrelevant-files: *tempest-irrelevant-files
+        - keystone-protection-functional
+    experimental:
+      jobs:
+        - keystone-tox-patch_cover
+        - keystone-grenade-multinode:
+            irrelevant-files: *irrelevant-files
+        - openstack-ansible-keystone-rolling-upgrade:
+            irrelevant-files: *irrelevant-files
+        - tempest-pg-full:
+            irrelevant-files: *tempest-irrelevant-files
+        - keystone-dsvm-functional-federation-centos7:
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-functional-federation-ubuntu-xenial:
+            irrelevant-files: *irrelevant-files
+        - keystone-dsvm-py35-functional-federation-ubuntu-xenial:
+            irrelevant-files: *irrelevant-files

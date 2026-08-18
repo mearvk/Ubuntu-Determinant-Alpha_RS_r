@@ -1,0 +1,196 @@
+Description: Fixes Java 8 compatibility issues when built with later versions of the JDK
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/guava/src/com/google/common/io/LineReader.java
++++ b/guava/src/com/google/common/io/LineReader.java
+@@ -70,7 +70,7 @@
+   @CanIgnoreReturnValue // to skip a line
+   public String readLine() throws IOException {
+     while (lines.peek() == null) {
+-      cbuf.clear();
++      ((java.nio.Buffer) cbuf).clear();
+       // The default implementation of Reader#read(CharBuffer) allocates a
+       // temporary char[], so we call Reader#read(char[], int, int) instead.
+       int read = (reader != null) ? reader.read(buf, 0, buf.length) : readable.read(cbuf);
+--- a/guava/src/com/google/common/hash/AbstractByteHasher.java
++++ b/guava/src/com/google/common/hash/AbstractByteHasher.java
+@@ -54,7 +54,7 @@
+   protected void update(ByteBuffer b) {
+     if (b.hasArray()) {
+       update(b.array(), b.arrayOffset() + b.position(), b.remaining());
+-      b.position(b.limit());
++      ((java.nio.Buffer) b).position(b.limit());
+     } else {
+       for (int remaining = b.remaining(); remaining > 0; remaining--) {
+         update(b.get());
+@@ -67,7 +67,7 @@
+     try {
+       update(scratch.array(), 0, bytes);
+     } finally {
+-      scratch.clear();
++      ((java.nio.Buffer) scratch).clear();
+     }
+     return this;
+   }
+--- a/guava/src/com/google/common/hash/AbstractCompositeHashFunction.java
++++ b/guava/src/com/google/common/hash/AbstractCompositeHashFunction.java
+@@ -98,7 +98,7 @@
+       public Hasher putBytes(ByteBuffer bytes) {
+         int pos = bytes.position();
+         for (Hasher hasher : hashers) {
+-          bytes.position(pos);
++          ((java.nio.Buffer) bytes).position(pos);
+           hasher.putBytes(bytes);
+         }
+         return this;
+--- a/guava/src/com/google/common/hash/AbstractHasher.java
++++ b/guava/src/com/google/common/hash/AbstractHasher.java
+@@ -81,7 +81,7 @@
+   public Hasher putBytes(ByteBuffer b) {
+     if (b.hasArray()) {
+       putBytes(b.array(), b.arrayOffset() + b.position(), b.remaining());
+-      b.position(b.limit());
++      ((java.nio.Buffer) b).position(b.limit());
+     } else {
+       for (int remaining = b.remaining(); remaining > 0; remaining--) {
+         putByte(b.get());
+--- a/guava/src/com/google/common/hash/AbstractStreamingHasher.java
++++ b/guava/src/com/google/common/hash/AbstractStreamingHasher.java
+@@ -80,13 +80,13 @@
+    * <p>This implementation simply pads with zeros and delegates to {@link #process(ByteBuffer)}.
+    */
+   protected void processRemaining(ByteBuffer bb) {
+-    bb.position(bb.limit()); // move at the end
+-    bb.limit(chunkSize + 7); // get ready to pad with longs
++    ((java.nio.Buffer) bb).position(bb.limit()); // move at the end
++    ((java.nio.Buffer) bb).limit(chunkSize + 7); // get ready to pad with longs
+     while (bb.position() < chunkSize) {
+       bb.putLong(0);
+     }
+-    bb.limit(chunkSize);
+-    bb.flip();
++    ((java.nio.Buffer) bb).limit(chunkSize);
++    ((java.nio.Buffer) bb).flip();
+     process(bb);
+   }
+ 
+@@ -179,10 +179,10 @@
+   @Override
+   public final HashCode hash() {
+     munch();
+-    buffer.flip();
++    ((java.nio.Buffer) buffer).flip();
+     if (buffer.remaining() > 0) {
+       processRemaining(buffer);
+-      buffer.position(buffer.limit());
++      ((java.nio.Buffer) buffer).position(buffer.limit());
+     }
+     return makeHash();
+   }
+@@ -203,7 +203,7 @@
+   }
+ 
+   private void munch() {
+-    buffer.flip();
++    ((java.nio.Buffer) buffer).flip();
+     while (buffer.remaining() >= chunkSize) {
+       // we could limit the buffer to ensure process() does not read more than
+       // chunkSize number of bytes, but we trust the implementations
+--- a/guava/src/com/google/common/io/ByteStreams.java
++++ b/guava/src/com/google/common/io/ByteStreams.java
+@@ -179,11 +179,11 @@
+     ByteBuffer buf = ByteBuffer.wrap(createBuffer());
+     long total = 0;
+     while (from.read(buf) != -1) {
+-      buf.flip();
++      ((java.nio.Buffer) buf).flip();
+       while (buf.hasRemaining()) {
+         total += to.write(buf);
+       }
+-      buf.clear();
++      ((java.nio.Buffer) buf).clear();
+     }
+     return total;
+   }
+--- a/guava/src/com/google/common/io/CharStreams.java
++++ b/guava/src/com/google/common/io/CharStreams.java
+@@ -140,10 +140,10 @@
+       long total = 0;
+       CharBuffer buf = createBuffer();
+       while (from.read(buf) != -1) {
+-        buf.flip();
++        ((java.nio.Buffer) buf).flip();
+         to.append(buf);
+         total += buf.remaining();
+-        buf.clear();
++        ((java.nio.Buffer) buf).clear();
+       }
+       return total;
+     }
+@@ -343,7 +343,7 @@
+     CharBuffer buf = createBuffer();
+     while ((read = readable.read(buf)) != -1) {
+       total += read;
+-      buf.clear();
++      ((java.nio.Buffer) buf).clear();
+     }
+     return total;
+   }
+--- a/guava/src/com/google/common/io/ReaderInputStream.java
++++ b/guava/src/com/google/common/io/ReaderInputStream.java
+@@ -104,7 +104,7 @@
+     encoder.reset();
+ 
+     charBuffer = CharBuffer.allocate(bufferSize);
+-    charBuffer.flip();
++    ((java.nio.Buffer) charBuffer).flip();
+ 
+     byteBuffer = ByteBuffer.allocate(bufferSize);
+   }
+@@ -143,7 +143,7 @@
+           return (totalBytesRead > 0) ? totalBytesRead : -1;
+         }
+         draining = false;
+-        byteBuffer.clear();
++        ((java.nio.Buffer) byteBuffer).clear();
+       }
+ 
+       while (true) {
+@@ -189,8 +189,8 @@
+   private static CharBuffer grow(CharBuffer buf) {
+     char[] copy = Arrays.copyOf(buf.array(), buf.capacity() * 2);
+     CharBuffer bigger = CharBuffer.wrap(copy);
+-    bigger.position(buf.position());
+-    bigger.limit(buf.limit());
++    ((java.nio.Buffer) bigger).position(buf.position());
++    ((java.nio.Buffer) bigger).limit(buf.limit());
+     return bigger;
+   }
+ 
+@@ -207,7 +207,7 @@
+     if (availableCapacity(charBuffer) == 0) {
+       if (charBuffer.position() > 0) {
+         // (2) There is room in the buffer. Move existing bytes to the beginning.
+-        charBuffer.compact().flip();
++        ((java.nio.Buffer) charBuffer.compact()).flip();
+       } else {
+         // (3) Entire buffer is full, need bigger buffer.
+         charBuffer = grow(charBuffer);
+@@ -220,7 +220,7 @@
+     if (numChars == -1) {
+       endOfInput = true;
+     } else {
+-      charBuffer.limit(limit + numChars);
++      ((java.nio.Buffer) charBuffer).limit(limit + numChars);
+     }
+   }
+ 
+@@ -235,7 +235,7 @@
+    * overflow must be due to a small output buffer.
+    */
+   private void startDraining(boolean overflow) {
+-    byteBuffer.flip();
++    ((java.nio.Buffer) byteBuffer).flip();
+     if (overflow && byteBuffer.remaining() == 0) {
+       byteBuffer = ByteBuffer.allocate(byteBuffer.capacity() * 2);
+     } else {

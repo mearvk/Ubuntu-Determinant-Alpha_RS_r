@@ -1,0 +1,3207 @@
+multipath-tools (0.8.8-1ubuntu1.22.04.1) jammy-security; urgency=medium
+
+  * SECURITY UPDATE: symlink attack
+    - debian/patches/CVE-2022-41973.patch: use /run instead of /dev/shm in
+      .gitignore, Makefile.inc, libmultipath/defaults.h,
+      multipath/Makefile, multipath/multipath.rules.in,
+      multipath/tmpfiles.conf.in.
+    - debian/multipath-tools.install: install tmpfiles.d/multipath.conf.
+    - debian/rules: copy udev rule after build.
+    - CVE-2022-41973
+  * SECURITY UPDATE: authorization bypass
+    - debian/patches/CVE-2022-41974-pre1.patch: fix command completion in
+      interactive mode in multipathd/callbacks.c, multipathd/cli.c,
+      multipathd/cli_handlers.c, multipathd/main.c.
+    - debian/patches/CVE-2022-41974.patch: more robust command parsing in
+      multipathd/callbacks.c, multipathd/cli.c, multipathd/cli.h,
+      multipathd/cli_handlers.c, multipathd/uxlsnr.c.
+    - debian/patches/CVE-2022-41974-2.patch: fix command completion with
+      robust parser in multipathd/cli.c, multipathd/cli.h,
+      multipathd/uxlsnr.c.
+    - debian/patches/CVE-2022-41974-3.patch: add test for command parsing
+      in Makefile.inc, tests/Makefile, tests/cli.c, multipathd/cli.h,
+      multipathd/cli.c.
+    - debian/patches/CVE-2022-41974-4.patch: fix memory leak handling
+      invalid commands in multipathd/uxlsnr.c.
+    - CVE-2022-41974
+
+ -- Marc Deslauriers <marc.deslauriers@ubuntu.com>  Fri, 28 Oct 2022 14:43:41 -0400
+
+multipath-tools (0.8.8-1ubuntu1) jammy; urgency=medium
+
+  * Merge with Debian unstable (LP: #1946834, #1961136). Remaining changes:
+    - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+      default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      + init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      + d/rules: do not install local-top anymore.
+      + remove d/initramfs/local-top
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - multipath initramfs fixes for booting from multipathed devices:
+      + d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      + d/initramfs/hooks: install multipathd and required
+        directories.
+      + d/initramfs/hooks: copy multipath udev rules to initramfs
+      + d/initramfs/hooks: do not copy kpartx rules to initramfs
+      + d/initramfs/local-bottom: remember to stop multipathd.
+      + d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      + d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      + d/rules: install d/initramfs/local-bottom
+      + d/rules: install d/initramfs/local-premount
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      + d/initramfs/kpartx.hook
+      + d/kpartx-boot.postinst
+      + d/kpartx-boot.postrm
+      + d/control: Add kpartx-boot package for dmraid
+      + d/rules: Install kpartx initramfs hook
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - Don't build the multipath-tools binary package on i386; we only want
+      kpartx.
+  * Dropped changes:
+    - Use stable wwn-* names in autopkgtest that work with or without
+      friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+      [ Included in 0.8.8-1 ]
+    - debian/tests/tgtbasedmpaths: Add sleep to allow for device creation
+      [ Included in 0.8.8-1 ]
+    - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+      some more: since we stat() the loopback device node, we can't rely
+      on S_ISREG() tests to handle this case, and should look at the
+      device itself instead. (LP 1543430)
+      [ Applied upstream in 0.8.6 ]
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+      [ Applied upstream in 0.8.7 ]
+    - d/t/control: use allow-stderr for kpartx-file-loopback, the new
+      gdisks version displays warnings on stderr now.
+      [ Fixed in 0.8.8-1 ]
+  * Added changes:
+    - d/t/kpartx-file-loopback: silence kpartx messages to stderr
+    - d/rules: remove -Bsymbolic-functions from LDFLAGS
+
+ -- Athos Ribeiro <athos.ribeiro@canonical.com>  Mon, 21 Feb 2022 18:18:27 -0300
+
+multipath-tools (0.8.8-1) unstable; urgency=medium
+
+  [ Utkarsh Gupta ]
+  * [74952ce] d/t/kpartx-file-loopback: silence gdisk warnings on stderr
+  * [a3ad859] d/t/tgtbasedmpaths: Use stable wwn-* names in autopkgtest
+  * [7a22711] d/t/tgtbasedmpaths: Add sleep to allow for device creation
+
+  [ Ritesh Raj Sarraf ]
+  * [9169942] Add some documentation about LVM + DM-Multipath setup.
+    Thanks to Carlos Barros (Closes: 1001710)
+
+  [ Chris Hofstaedtler ]
+  * [7fcb8ba] New upstream version 0.8.8
+  * [e63a379] Refresh patches
+  * [4ab9ce2] Drop old dmsetup_env hack
+    dmsetup long supports DM_NAME and DM_UUID, and the other variables
+    are not used anymore.
+  * [2cd669e] Avoid installing libmpathvalid.so until users appear
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sun, 16 Jan 2022 22:57:28 +0000
+
+multipath-tools (0.8.5-2ubuntu3) jammy; urgency=medium
+
+  * No-change rebuild against liburcu8
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 08 Nov 2021 01:14:39 +0000
+
+multipath-tools (0.8.5-2ubuntu2) impish; urgency=medium
+
+  * Don't build the multipath-tools binary package on i386; we
+    only want kpartx.
+
+ -- Utkarsh Gupta <utkarsh.gupta@canonical.com>  Wed, 07 Jul 2021 14:49:31 +0530
+
+multipath-tools (0.8.5-2ubuntu1) impish; urgency=medium
+
+  * Merge with Debian unstable. Remaining changes:
+    - Use stable wwn-* names in autopkgtest that work with or without
+      friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+    - debian/tests/tgtbasedmpaths: Add sleep to allow for device creation
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - debian/test/control:
+      - use allow-stderr for kpartx-file-loopback, the new gdisks version
+        displays warnings on stderr now
+  * Dropped changes:
+    - [Undocumented] d/p/newer-jsonc.patch: drop this patch since this
+      was added in v0.8.4-2ubuntu1 as a delta but was incorporated in
+      Debian via v0.8.4-3 with a different name (jsonc-true.patch; cf:
+      https://bugs.debian.org/966597) and was never dropped from here
+      and we've been carrying this since then.
+      [Included in 0.8.4-3]
+    - Drop depends on udebs, such that they don't hold up any other udebs
+      in the archive, especially kernel udebs. Otherwise unused in Ubuntu.
+      [Dropped support for udebs]
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+      [Dropped support for udebs]
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+      [Dropped support for i386 & udebs]
+    - d/control: multipath-udeb: add sg3-udeb Depends
+      [Dropped support for udebs]
+    - d/kpartx.install: install all arch /lib* kpartx udev rules
+      [There's no "/lib*" anymore]
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+      [Upstream denied the patch; unneeded]
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+      [Changes aren't relevant anymore; dropped support for udebs]
+
+ -- Utkarsh Gupta <utkarsh.gupta@canonical.com>  Mon, 21 Jun 2021 23:06:33 +0530
+
+multipath-tools (0.8.5-2) unstable; urgency=medium
+
+  * [373f5c5] Fix bashism in script kpartx/kpartx_id.
+    Thanks to Julien Cristau (Closes: #987669)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 28 Apr 2021 22:40:55 +0530
+
+multipath-tools (0.8.5-1ubuntu6) hirsute; urgency=medium
+
+  * debian/test/control:
+    - use allow-stderr for kpartx-file-loopback, the new gdisks version
+      displays warnings on stderr now
+
+ -- Sebastien Bacher <seb128@debian.org>  Thu, 04 Mar 2021 12:20:20 +0100
+
+multipath-tools (0.8.5-1ubuntu5) hirsute; urgency=medium
+
+  * No-change rebuild to drop the udeb package.
+
+ -- Matthias Klose <doko@ubuntu.com>  Mon, 22 Feb 2021 10:35:31 +0100
+
+multipath-tools (0.8.5-1ubuntu4) hirsute; urgency=medium
+
+  * Drop depends on udebs, such that they don't hold up any other udebs in
+    the archive, especially kernel udebs. Otherwise unused in Ubuntu.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Mon, 08 Feb 2021 13:18:26 +0000
+
+multipath-tools (0.8.5-1ubuntu1) hirsute; urgency=low
+
+  * Merge from Debian unstable. Remaining changes:
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - d/control: multipath-udeb: add sg3-udeb Depends
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - debian/tests/tgtbasedmpaths:
+      - Add sleep to allow for device creation
+      - Use stable wwn-* names in autopkgtest that work with or without
+        friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Fri, 25 Dec 2020 22:51:36 +0100
+
+multipath-tools (0.8.5-1) unstable; urgency=medium
+
+  [ Ritesh Raj Sarraf ]
+  * [9e88f52] Add README.alua to docs section
+
+  [ Christian Ehrhardt ]
+  * [7860503] d/t/tgtbasedmpaths: reduce memory pressure avoiding OOM
+    triggered false positives
+
+  [ Chris Hofstaedtler ]
+  * [859ade1] Update upstream git (and our debian/watch) URL
+  * [bdc291a] New upstream version 0.8.5
+  * [83060d2] Rebase patches
+  * [cb467ba] multipath.rules: Avoid usrmerge paths (Closes: #973853)
+  * [61df246] kpartx: update package description (Closes: #690995)
+  * [3262269] Drop 0001-Blacklist-cciss-devices.patch.
+    Upstream has switched to an exclusive list of devices by default.
+    Only sd, dasd and nvme devices are seen by multipath now. This makes
+    the cciss exclusion obsolete.
+  * [602298a] Follow README.md rename
+  * [2018daf] Remove obsolete override for lintian tag
+    init.d-script-does-not-implement-optional-option
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Wed, 23 Dec 2020 23:53:53 +0000
+
+multipath-tools (0.8.4-4ubuntu2) groovy; urgency=medium
+
+  * Add README.alua to docs section
+
+ -- Rafael David Tinoco <rafaeldtinoco@ubuntu.com>  Fri, 11 Sep 2020 17:39:12 +0000
+
+multipath-tools (0.8.4-4ubuntu1) groovy; urgency=low
+
+  * Merge from Debian unstable.  Remaining changes:
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - d/control: multipath-udeb: add sg3-udeb Depends
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - debian/tests/tgtbasedmpaths:
+      - Add sleep to allow for device creation
+      - Use stable wwn-* names in autopkgtest that work with or without
+        friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+  * Dropped changes, superseeded by systemd switch to service script:
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make
+      sure that multipathd will be able to start.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Mon, 31 Aug 2020 00:12:32 +0200
+
+multipath-tools (0.8.4-4) unstable; urgency=medium
+
+  * [637efc8] Remove overly complicated INSTALL_PROGRAM setup.
+    Thanks to Simon McVittie <smcv@debian.org> (Closes: #968528)
+  * [d793f77] kpartx, multipath-tools: remove pre-oldstable upgrade code
+  * [aa2fab9] d/*: trim trailing whitespace
+  * [1657612] multipath-tools, multipath-tools-boot: update lintian overrides
+  * [825c1e2] debian/po/de.po: recode to UTF-8
+  * [ce008ac] Allow (partial) parallel builds
+  * [6383d2d] d/control: remove relationships satisfied in oldstable
+  * [bf0e585] d/control: remove version constraints satisfied in oldstable
+  * [67cff60] Declare debhelper compat version using debhelper-compat
+  * [6992798] Apply to-be-upstream patch for parallel builds.
+    Thanks to Christian Hesse <mail@eworm.de>
+  * [058d79f] Use to-be-upstream patch for json-c update
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sun, 30 Aug 2020 01:14:10 +0000
+
+multipath-tools (0.8.4-3ubuntu1) groovy; urgency=low
+
+  * Merge from Debian unstable.  Remaining changes:
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - d/control: multipath-udeb: add sg3-udeb Depends
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make
+      sure that multipathd will be able to start.
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - debian/tests/tgtbasedmpaths:
+      - Add sleep to allow for device creation
+      - Use stable wwn-* names in autopkgtest that work with or without
+        friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Mon, 17 Aug 2020 11:26:27 +0200
+
+multipath-tools (0.8.4-3) unstable; urgency=medium
+
+  * [c8c0700] Fix build with newer json-c.
+    Thanks to Gianfranco Costamagna <locutusofborg@debian.org> (Closes: #966597)
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Fri, 31 Jul 2020 09:31:38 +0000
+
+multipath-tools (0.8.4-2ubuntu1) groovy; urgency=low
+
+  * Merge from Debian unstable.  Remaining changes:
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - d/control: multipath-udeb: add sg3-udeb Depends
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make
+      sure that multipathd will be able to start.
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - debian/tests/tgtbasedmpaths:
+      - Add sleep to allow for device creation
+      - Use stable wwn-* names in autopkgtest that work with or without
+        friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+    - debian/patches/newer-jsonc.patch
+      - patch for newer json-c
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Fri, 31 Jul 2020 10:20:36 +0200
+
+multipath-tools (0.8.4-2) unstable; urgency=medium
+
+  * [b270b02] Fix FTBFS with gcc-10 (Closes: #957568)
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Wed, 22 Jul 2020 22:23:13 +0000
+
+multipath-tools (0.8.4-1ubuntu1) groovy; urgency=medium
+
+  * Merge with Debian unstable (LP: #1886693). Remaining changes:
+    - multipath initramfs fixes for booting from multipathed devices:
+      - d/initramfs/hooks: also copy wwids file on the installed
+        system to ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required
+        directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before
+        the call to resolve_device() in local_mount_root(), so the
+        by-uuid/ symlinks have a chance to be updated by the
+        multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to
+        assign names nor change /etc/multipath/bindings during
+        initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+    - d/control: multipath-udeb: add sg3-udeb Depends
+    - patches to multipath source:
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted files
+        some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the
+        device itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths by
+        default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - debian/multipath-tools.dm-mpath-lvm.udev: Adjust initramfs integration
+      for new udev rules
+    - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+      - init-top: take over loading modules (dm-multipath and SCSI device
+        handlers); move the missing dm-emc there (now scsi-dh-emc; see
+        BTS 567014).
+      - d/rules: do not install local-top anymore.
+      - remove d/initramfs/local-top
+    - d/control: Enable udebs on riscv64 to fix FTBFS.
+    - d/control, d/rules: i386 related fixes
+      - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+      - Fix debian/rules to not explode when building without udebs on i386.
+      - Don't build the multipath-tools binary package on i386; we only want
+        kpartx.
+    - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - d/p/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - d/multipath.conf: Install friendly names multipath.conf by default,
+      instead of generating it in every installer.
+    - d/rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make
+      sure that multipathd will be able to start.
+    - d/p/no-start-in-containers.patch: Do not attempt to start
+      multipath-tools in containers, should switch for on-demand udev/socket
+      based activation in the future. (LP 1823093)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to
+      change from the default selector and should be able to do so.
+      (LP 1673350)
+    - debian/initramfs/local-bottom: wait for the multipathd unix
+      socket to close, so to avoid multipathd.socket unit failure.
+      (LP 1682178)
+    - debian/tests/tgtbasedmpaths:
+      - Add sleep to allow for device creation
+      - Use stable wwn-* names in autopkgtest that work with or without
+        friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+
+ -- Rafael David Tinoco <rafaeldtinoco@ubuntu.com>  Wed, 08 Jul 2020 03:59:53 +0000
+
+multipath-tools (0.8.4-1) unstable; urgency=medium
+
+  * [f4b2af2] kpartx: use correct path to partx in udev rule (Closes: #959727)
+  * [30806f2] New upstream version 0.8.4 (Closes: #943383)
+  * [ad742ee] Update patch 0009-hardened-build-flags
+
+ -- Chris Hofstaedtler <zeha@debian.org>  Sun, 21 Jun 2020 16:23:30 +0000
+
+multipath-tools (0.8.3-1ubuntu2) focal; urgency=medium
+
+  * Enable udebs on riscv64 to fix FTBFS.
+
+ -- William Grant <wgrant@ubuntu.com>  Mon, 06 Apr 2020 18:17:20 +1000
+
+multipath-tools (0.8.3-1ubuntu1) focal; urgency=low
+
+  * Merge from Debian unstable.  Remaining changes:
+    - Stop producing udebs on i386 where we no longer have d-i or a kernel.
+    - Fix debian/rules to not explode when building without udebs on i386.
+    - Don't build the multipath-tools binary package on i386; we only want
+      kpartx.
+    - d/control:
+      - multipath-udeb: add sg3-udeb Depends
+    - d/rules: Move udev rules to priority 95, because rules that load modules
+      should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make sure
+      that multipathd will be able to start.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - patches to multipath source
+      - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted
+        files some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the device
+        itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths
+        by default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+   - multipath initramfs fixes for booting from multipathed devices
+      - d/initramfs/hooks: also copy wwids file on the installed system to
+        ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before the call to
+        resolve_device() in local_mount_root(), so the by-uuid/ symlinks have a
+        chance to be updated by the multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to assign names
+        nor change /etc/multipath/bindings during initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+   - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+     libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+     which is not available in the installer environment.
+     - d/p/disable-fexceptions-udeb.patch: conditionally disable -fexceptions
+       with CFLAGS_DISABLE_FEXCEPTIONS.
+     - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+   - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+     - init-top: take over loading modules (dm-multipath and SCSI device
+       handlers); move the missing dm-emc there (now scsi-dh-emc;
+       see BTS 567014).
+     - d/rules: do not install local-top anymore.
+     - remove d/initramfs/local-top
+    - Fixes typo in package description (availibility -> availability)
+      (LP 1231182)
+    - debian/initramfs/local-bottom: wait for the multipathd unix socket
+      to close, so to avoid multipathd.socket unit failure. (LP 1682178)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to change
+      from the default selector and should be able to do so. (LP 1673350)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - Install friendly names multipath.conf by default, instead of
+      generating it in every installer.
+    - Use stable wwn-* names in autopkgtest that work with or without
+      friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+    - Do not attempt to start multipath-tools in containers, should switch
+      for on-demand udev/socket based activation in the future. LP 1823093
+    - Adjust initramfs integration for new udev rules
+    - debian/tests/tgtbasedmpaths: Add sleep to allow for device creation
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch
+      [updated to match new upstream version]
+    - d/p/disable-fexceptions-udeb.patch: to match new upstream version
+      [updated to match new upstream version]
+    - d/p/enable-find-multipaths.patch: since upstream change c36f2f42 we need
+      to set yes to retain the Ubuntu behavior instead of 1 as we did before.
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch
+      [updated to match new upstream version]
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Thu, 13 Feb 2020 11:57:46 -0800
+
+multipath-tools (0.8.3-1) unstable; urgency=medium
+
+  * [6b91b76] New upstream version 0.8.3
+  * [bd42030] Refresh patches
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 08 Jan 2020 21:45:44 +0530
+
+multipath-tools (0.7.9-3ubuntu7) focal; urgency=medium
+
+  * Don't build the multipath-tools binary package on i386; we only want
+    kpartx.
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Tue, 07 Jan 2020 14:00:24 -0800
+
+multipath-tools (0.7.9-3ubuntu6) eoan; urgency=medium
+
+  * Fix debian/rules to not explode when building without udebs on i386.
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Wed, 09 Oct 2019 15:22:33 -0600
+
+multipath-tools (0.7.9-3ubuntu5) eoan; urgency=medium
+
+  * Stop producing udebs on i386 where we no longer have d-i or a kernel.
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Wed, 09 Oct 2019 14:09:21 -0600
+
+multipath-tools (0.7.9-3ubuntu4) eoan; urgency=medium
+
+  * Rebuild against new libjson-c4.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Sat, 29 Jun 2019 13:55:54 +0200
+
+multipath-tools (0.7.9-3ubuntu3) eoan; urgency=medium
+
+  * Revert "Ensure udebs have the same udev rules as installed
+    systems. LP: #1825189" for now. Udev rules get in the way at the
+    moment.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Tue, 21 May 2019 12:34:41 +0100
+
+multipath-tools (0.7.9-3ubuntu2) eoan; urgency=medium
+
+  * Ensure udebs have the same udev rules as installed systems. LP:
+    #1825189
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Tue, 21 May 2019 12:34:41 +0100
+
+multipath-tools (0.7.9-3ubuntu1) eoan; urgency=medium
+
+  * Merge from Debian. Remaining changes:
+    - d/control:
+      - multipath-udeb: add sg3-udeb Depends
+    - d/rules: Move udev rules to priority 95, because rules that load modules
+      should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make sure
+      that multipathd will be able to start.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - patches to multipath source
+      - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted
+        files some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the device
+        itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths
+        by default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+   - multipath initramfs fixes for booting from multipathed devices
+      - d/initramfs/hooks: also copy wwids file on the installed system to
+        ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before the call to
+        resolve_device() in local_mount_root(), so the by-uuid/ symlinks have a
+        chance to be updated by the multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to assign names
+        nor change /etc/multipath/bindings during initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+   - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+     libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+     which is not available in the installer environment.
+     - d/p/disable-fexceptions-udeb.patch: conditionally disable -fexceptions
+       with CFLAGS_DISABLE_FEXCEPTIONS.
+     - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+   - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+     - init-top: take over loading modules (dm-multipath and SCSI device
+       handlers); move the missing dm-emc there (now scsi-dh-emc;
+       see BTS 567014).
+     - d/rules: do not install local-top anymore.
+     - remove d/initramfs/local-top
+    - Fixes typo in package description (availibility -> availability)
+      (LP 1231182)
+    - debian/initramfs/local-bottom: wait for the multipathd unix socket
+      to close, so to avoid multipathd.socket unit failure. (LP 1682178)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to change
+      from the default selector and should be able to do so. (LP 1673350)
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+      finding loopback devices (LP 1747044)
+    - d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+      deleted message to stdout again, not stderr; to fix autopkgtest
+    - Install friendly names multipath.conf by default, instead of
+      generating it in every installer.
+    - Use stable wwn-* names in autopkgtest that work with or without
+      friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+    - Do not attempt to start multipath-tools in containers, should switch
+      for on-demand udev/socket based activation in the future. LP 1823093
+    - Adjust initramfs integration for new udev rules
+    - debian/tests/tgtbasedmpaths: Add sleep to allow for device creation
+  * Dropped changes:
+    - Install dm-parts.rule
+    - Fix /usr/lib/udev to be /lib/udev
+    - Move udev rules at position 11 to position 56
+    - Fix 11-dm-mpath.rules to check for DM_UDEV_RULES, not DM_UDEV_RULES_VSN
+    - d/rules: Run dh_clean from clean target
+    - Install 68-del-part-nodes.rules
+      [all above in Debian now]
+    - Import upstream commit to fix crash in multipathd
+      [part of the new upstream version]
+    - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      [new upstream sets umask before calling before uxsock_listen]
+    - d/control mark transition of file /etc/init.d/multipath-tools-boot
+      according to case #9 of https://wiki.debian.org/PackageTransition
+      [no more needed post 18.04]
+    - Apply fix from fedora to trigger change uevent on device creation,
+      this also ensures new devices are discovered automatically.
+      [upstream since 0.7.7]
+  * Added Changes:
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch
+      [updated to match new upstream version]
+    - d/p/disable-fexceptions-udeb.patch: to match new upstream version
+      [updated to match new upstream version]
+    - d/p/enable-find-multipaths.patch: since upstream change c36f2f42 we need
+      to set yes to retain the Ubuntu behavior instead of 1 as we did before.
+    - d/p/kpartx-Improve-finding-loopback-device-by-file.patch
+      [updated to match new upstream version]
+
+ -- Christian Ehrhardt <christian.ehrhardt@canonical.com>  Mon, 29 Apr 2019 16:14:26 +0200
+
+multipath-tools (0.7.9-3) unstable; urgency=medium
+
+  * [51a7724] Reliably extract the running systemd version
+    (Closes: #924860)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 18 Mar 2019 20:56:38 +0530
+
+multipath-tools (0.7.9-2) unstable; urgency=medium
+
+  * [c2f0c23] Enable proper cross build.
+    Thanks to Helmut Grohne (Closes: #916521)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Thu, 27 Dec 2018 19:54:40 +0530
+
+multipath-tools (0.7.9-1) unstable; urgency=medium
+
+  * [c3bbe11] Fix installation of incorrect file to del-part-nodes.rules.
+    Thanks to Jean-François Remy (Closes: #914158)
+  * [9421efd] Add filter config to exclude file .gitignore
+  * [16da907] New upstream version 0.7.9
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 20 Nov 2018 12:54:25 +0530
+
+multipath-tools (0.7.8-2) unstable; urgency=medium
+
+  * [8b8f73c] Update debian/gbp.conf
+  * Upload to Unstable
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 26 Oct 2018 19:20:27 +0530
+
+multipath-tools (0.7.8-1) experimental; urgency=medium
+
+  [ Ritesh Raj Sarraf ]
+  * [1dea65d] New upstream version 0.7.8 (Closes: #909926)
+  * [2d9b752] Refresh patches and drop some that are now applied upstream
+  * [63ac09f] Drop RADOS support
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 23 Oct 2018 19:45:00 +0530
+
+multipath-tools (0.7.7-3) unstable; urgency=medium
+
+  [ Chris Hofstaedtler ]
+  * [fc0938c] Synchronize loading of kernel modules
+    dm-round-robin is auto-loaded by the kernel if needed, but the
+    scsi_dh_* modules are not. They need to be loaded before setting
+    up the mappings. This makes sure all paths (initramfs, early and
+    late sysvinit and systemd) load the same modules. (Closes: #827407)
+  * [3d59bff] Add myself to Uploaders:
+  * [f78c116] Update Priority to be optional instead of deprecated extra
+  * [7543c5d] debian/tests/control: Fix Restrictions syntax
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 07 Oct 2018 20:50:13 +0530
+
+multipath-tools (0.7.7-2) unstable; urgency=medium
+
+  * [315dacd] Also include the wwids file
+  * [57d84ce] Update NEWS file about systemd integration
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 07 Oct 2018 20:20:57 +0530
+
+multipath-tools (0.7.7-1) unstable; urgency=medium
+
+  * [d4529eb] Switch packaging repository to Salsa (Closes: #899615)
+  * [d2c41ec] Use tracker as maintainer email address
+  * [1d49dfa] New upstream version 0.7.7
+  * [012281c] Refresh patches and drop one patch which is merged
+    upstream
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 12 Jun 2018 11:34:19 +0545
+
+multipath-tools (0.7.4-3) unstable; urgency=medium
+
+  [ Ritesh Raj Sarraf ]
+  * [a22d317] Make build reproducible.
+    Thanks to Chris Lamb (Closes: #885408)
+  * [f029a76] Add linux-initramfs-tool as a initramfs dependency
+    instead of initramfs-tools. This extends multipath to other
+    implementations like dracut.
+    Thanks to Thomas Lange (Closes: #887917)
+
+  [ Julian Andres Klode ]
+  * [1b595cb] Move dm-mpath rules from position 11 to position 56
+  * [6053243] Install dm-parts.rule
+  * [c1a1a53] Fix /usr/lib/udev to be /lib/udev
+  * [c80ab6e] Fix 11-dm-mpath.rules to check for DM_UDEV_RULES,
+    not DM_UDEV_RULES_VSN
+  * [75d7eff] d/rules: Run dh_clean from clean target
+  * [83c25f2] Install 68-del-part-nodes.rules
+  * [5136bc1] Import upstream commit to fix crash in multipathd
+  * (Closes: #886938)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 10 Feb 2018 11:23:20 +0530
+
+multipath-tools (0.7.4-2ubuntu8) disco; urgency=medium
+
+  * Do not attempt to start multipath-tools in containers, should switch
+    for on-demand udev/socket based activation in the future. LP: #1823093
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Mon, 15 Apr 2019 11:10:32 +0100
+
+multipath-tools (0.7.4-2ubuntu7) disco; urgency=medium
+
+  * Use stable wwn-* names in autopkgtest that work with or without
+    friendly names, as scsi-${DM_NAME} is not a stable symlink name.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Tue, 02 Apr 2019 13:22:51 +0100
+
+multipath-tools (0.7.4-2ubuntu6) disco; urgency=medium
+
+  * Install friendly names multipath.conf by default, instead of
+    generating it in every installer.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Wed, 20 Mar 2019 23:02:30 +0000
+
+multipath-tools (0.7.4-2ubuntu4) disco; urgency=medium
+
+  * No-change rebuild for readline soname change.
+
+ -- Matthias Klose <doko@ubuntu.com>  Mon, 14 Jan 2019 20:02:28 +0000
+
+multipath-tools (0.7.4-2ubuntu3) bionic; urgency=medium
+
+  * d/p/kpartx-print-loop-deleted-to-stdout-not-stderr.patch: Print loop
+    deleted message to stdout again, not stderr; to fix autopkgtest
+
+ -- Julian Andres Klode <juliank@ubuntu.com>  Mon, 05 Feb 2018 11:46:37 +0100
+
+multipath-tools (0.7.4-2ubuntu2) bionic; urgency=medium
+
+  * d/p/kpartx-Improve-finding-loopback-device-by-file.patch: Improve
+    finding loopback devices (LP: #1747044)
+
+ -- Julian Andres Klode <juliank@ubuntu.com>  Mon, 05 Feb 2018 10:06:19 +0100
+
+multipath-tools (0.7.4-2ubuntu1) bionic; urgency=medium
+
+  * Merge from Debian. (LP: #1710697, LP: #1711749) Remaining changes:
+    - d/control:
+      - multipath-udeb: add sg3-udeb Depends
+    - d/rules: Move udev rules to priority 95, because rules that load modules
+      should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make sure
+      that multipathd will be able to start.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - patches to multipath source
+      - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted
+        files some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the device
+        itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths
+        by default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+   - multipath initramfs fixes for booting from multipathed devices
+      - d/initramfs/hooks: also copy wwids file on the installed system to
+        ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required directories.
+      - d/initramfs/hooks: copy multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before the call to
+        resolve_device() in local_mount_root(), so the by-uuid/ symlinks have a
+        chance to be updated by the multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to assign names
+        nor change /etc/multipath/bindings during initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+   - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+     libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+     which is not available in the installer environment.
+     - d/p/disable-fexceptions-udeb.patch: conditionally disable -fexceptions
+       with CFLAGS_DISABLE_FEXCEPTIONS.
+     - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+   - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+     - init-top: take over loading modules (dm-multipath and SCSI device
+       handlers); move the missing dm-emc there (now scsi-dh-emc;
+       see BTS 567014).
+     - d/rules: do not install local-top anymore.
+     - remove d/initramfs/local-top
+    - Fixes typo in package description (availibility -> availability)
+      (LP 1231182)
+    - d/control mark transition of file /etc/init.d/multipath-tools-boot
+      according to case #9 of https://wiki.debian.org/PackageTransition
+    - debian/initramfs/local-bottom: wait for the multipathd unix socket
+      to close, so to avoid multipathd.socket unit failure. (LP 1682178)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to change
+      from the default selector and should be able to do so. (LP 1673350)
+  * Dropped changes:
+    - Remove partition device nodes of individual paths (for LVM on multipath)
+      on the new multipath-tools with udev property blacklisting (LP 1540401)
+      + Replaced by 68-del-part-nodes.rules
+      + known as "dm-mpath-lvm.rules", also dropped initramfs for that
+  * New changes:
+    - Install dm-parts.rule
+    - Fix /usr/lib/udev to be /lib/udev
+    - Move udev rules at position 11 to position 56
+    - Fix 11-dm-mpath.rules to check for DM_UDEV_RULES, not DM_UDEV_RULES_VSN
+    - d/rules: Run dh_clean from clean target
+    - Install 68-del-part-nodes.rules
+    - Import upstream commit to fix crash in multipathd
+    - Adjust initramfs integration for new udev rules
+    - Apply fix from fedora to trigger change uevent on device creation,
+      this also ensures new devices are discovered automatically.
+    - debian/tests/tgtbasedmpaths: Add sleep to allow for device creation
+    - d/patches: Add DEP-3 headers to our own patches
+
+ -- Julian Andres Klode <juliank@ubuntu.com>  Wed, 24 Jan 2018 10:57:46 +0100
+
+multipath-tools (0.7.4-2) unstable; urgency=medium
+
+  * Upload to Unstable
+  * [5559c5f] Make the package reproducible across builds.
+    Thanks to Chris Lamb (Closes: #885408)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 27 Dec 2017 11:20:03 +0530
+
+multipath-tools (0.7.4-1) experimental; urgency=medium
+
+  * [7ea01e0] Fix incorrect reference to bug number.
+    Thanks to Vincent McIntyre (Closes: 864192)
+  * [36701c1] Update debian/watch to scan git repository.
+    Thanks to Vincent McIntyre (Closes: #814363)
+  * [3117fa1] Fix some lintian warnings about manpages.
+    Thanks to Vincent McIntyre (Closes: 864476)
+  * [006b6c4] Update README.source about cleaning up crufts
+  * [bd8a736] New upstream version 0.7.4
+  * [543a5b6] Refresh patches. And drop some patches which are no more
+    relevant
+  * [19ae7bd] Update gbp.conf to include commit ids
+  * [afe413f] Add new patch to disable rados linkage in udeb
+  * [59f3173] Add pkg-config to build dependency
+  * [743559b] Add libjson-c to build dependency
+  * [a9f65c9] Update install list for multipath-tools package
+  * [a79309b] Drop obsolete build dependency
+  * [cc0d882] Drop old mips linker bug workaround. Shouldn't be needed
+    anymore
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 22 Dec 2017 11:49:58 +0530
+
+multipath-tools (0.6.4-5ubuntu1) artful; urgency=medium
+
+  * Merge from Debian. (LP: #1548303) Remaining changes:
+    - d/control:
+      - multipath-udeb: add sg3-udeb Depends
+    - d/rules: Move udev rules to priority 95, because rules that load modules
+      should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make sure
+      that multipathd will be able to start.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP 941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - patches to multipath source
+      - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted
+        files some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the device
+        itself instead. (LP 1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths
+        by default -- see the removed 'add_find-multipaths.patch' (LP 1463046)
+   - multipath initramfs fixes for booting from multipathed devices
+      - d/initramfs/hooks: also copy wwids file on the installed system to
+        ensure all paths come up on boot. (LP 1479929)
+      - d/initramfs/hooks: install multipathd and required directories.
+      - d/initramfs/hooks: copy dm-mpath-lvm & multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before the call to
+        resolve_device() in local_mount_root(), so the by-uuid/ symlinks have a
+        chance to be updated by the multipath udev rules (LP 1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to assign names
+        nor change /etc/multipath/bindings during initramfs (LP 1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+   - Disable -fexceptions on multipath-udeb (LP 1489379): the flag causes
+     libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+     which is not available in the installer environment.
+     - d/p/disable-fexceptions-udeb.patch: conditionally disable -fexceptions
+       with CFLAGS_DISABLE_FEXCEPTIONS.
+     - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+   - Remove partition device nodes of individual paths (for LVM on multipath)
+     on the new multipath-tools with udev property blacklisting (LP 1540401)
+     - d/multipath-tools.dm-mpath-lvm.udev: udev rule for that.
+     - d/initramfs/init-top: load the dm-multipath module for
+       'multipath -c'.
+     - d/initramfs/init-top: start multipathd before udev (required by
+       'multipath -u' in the udev rules)
+     - d/rules: install the udev rule (priority 56: after 55-scsi-sg3_id)
+     - d/rules: rename multipath-tools udev to dm-mpath-lvm
+     - d/multipath-tools.dm-mpath-lvm.udev: replace 'multipath -c' with
+       'multipath -u' which can read udev properties at PROGRAM-rule time
+       (when udev properties are not yet written to the udev database).
+   - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+     - init-top: take over loading modules (dm-multipath and SCSI device
+       handlers); move the missing dm-emc there (now scsi-dh-emc;
+       see BTS 567014).
+     - d/rules: do not install local-top anymore.
+     - remove d/initramfs/local-top
+    - Fixes typo in package description (availibility -> availability)
+      (LP 1231182)
+    - d/control mark transition of file /etc/init.d/multipath-tools-boot
+      according to case #9 of https://wiki.debian.org/PackageTransition
+    - debian/initramfs/local-bottom: wait for the multipathd unix socket
+      to close, so to avoid multipathd.socket unit failure. (LP 1682178)
+    - debian/initramfs/hooks: Add dm-queue-length: users may want to change
+      from the default selector and should be able to do so. (LP 1673350)
+  * Drop changes (in Debian now):
+    - d/control: Bump udev dependencies (in Debian)
+    - debian/initramfs/hooks:
+      - Remove old dm-emc module; it hasn't been in kernel since 2.6.27.
+    - d/tests/kpartx-file-loopback: add an autopkgtest to catch future cases
+      where uploads might break kpartx's loopback file handling.
+    - mark kpartx tests as isolation-machine to avoid issues in e.g. LXD
+      autopkgtest environments (LP 1644253)
+    - d/t/tgtbasedmpaths add Test using tgt and open-iscsi to excercise
+      multipath
+
+ -- Christian Ehrhardt <christian.ehrhardt@canonical.com>  Tue, 18 Jul 2017 14:12:53 +0200
+
+multipath-tools (0.6.4-5) unstable; urgency=medium
+
+  * Ship multipath udev rules (Closes: #858456)
+  * Define some priority for rules processing
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 25 Mar 2017 15:03:08 +0530
+
+multipath-tools (0.6.4-4) unstable; urgency=medium
+
+  [ Ritesh Raj Sarraf ]
+  * [65ba796] Fix path for udevadm, which now resides in /bin.
+    Thanks to Michael Biebl (Closes: #852586)
+  * [5291947] Drop non-existent dm-emc module and include
+    dm-round-robin, in initramfs.
+    Thanks to Allan Jacobsen (Closes: #855585)
+
+  [ Christian Ehrhardt ]
+  * [6159c78] debian/control: Bump to an updated udev dependency
+  * [8649315] debian/tests/kpartx-file-loopback: test kpartx
+  * [137dcc1] add Test using tgt and open-iscsi
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 20 Feb 2017 19:36:31 +0530
+
+multipath-tools (0.6.4-3ubuntu6) artful; urgency=medium
+
+  * Rebuild against new liburcu6.
+
+ -- Gianfranco Costamagna <locutusofborg@debian.org>  Tue, 18 Jul 2017 12:08:33 +0200
+
+multipath-tools (0.6.4-3ubuntu5) artful; urgency=medium
+
+  * No-change rebuild against latest liburcu
+
+ -- Jeremy Bicha <jbicha@ubuntu.com>  Sat, 15 Jul 2017 09:44:44 -0400
+
+multipath-tools (0.6.4-3ubuntu4) zesty; urgency=medium
+
+  * debian/initramfs/local-bottom: wait for the multipathd unix socket
+    to close, so to avoid multipathd.socket unit failure. (LP: #1682178)
+
+ -- Mauricio Faria de Oliveira <mauricfo@linux.vnet.ibm.com>  Wed, 12 Apr 2017 14:30:13 -0400
+
+multipath-tools (0.6.4-3ubuntu3) zesty; urgency=medium
+
+  * debian/initramfs/hooks, debian/initramfs/local-bottom:
+    Update hooks and local-bottom to use /run instead of /var/run as a path
+    for multipathd.pid in the initramfs. (LP: #1670811)
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Tue, 28 Mar 2017 21:20:22 -0400
+
+multipath-tools (0.6.4-3ubuntu2) zesty; urgency=medium
+
+  * debian/initramfs/hooks:
+    - Remove old dm-emc module; it hasn't been in kernel since 2.6.27.
+    - Add dm-queue-length: users may want to change from the default selector
+      and should be able to do so. (LP: #1673350)
+  * debian/patches/path_selector.patch, debian/patches/series: remove
+    path_selector.patch to get back to the "right" default selector of
+    service-time, which has been included in the kernel module packages for
+    a while now and has better throughput than round-robin. It's also the
+    default upstream. (LP: #1634161)
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Fri, 17 Mar 2017 09:37:36 -0400
+
+multipath-tools (0.6.4-3ubuntu1) zesty; urgency=medium
+
+  * Merge from Debian. (LP: #1621340, LP: #1645274) Remaining changes:
+    - d/control:
+      - Bump udev dependencies
+      - multipath-udeb: add sg3-udeb Depends
+    - d/rules: Move udev rules to priority 95, because rules that load modules
+      should be >90.
+    - d/multipath-tools.preinst: modprobe dm-multipath; This will make sure
+      that multipathd will be able to start.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP: #941874)
+      - d/initramfs/kpartx.hook
+      - d/kpartx-boot.postinst
+      - d/kpartx-boot.postrm
+      - d/control: Add kpartx-boot package for dmraid
+      - d/rules: Install kpartx initramfs hook
+      - d/kpartx.install: install all arch /lib* kpartx udev rules
+    - patches (some refreshed to new version) to multipath source
+      - d/p/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+      - d/p/path_selector.patch: switch the default path selector
+        back to round-robin while service-time isn't available to the installer
+        multipath-modules.
+      - d/p/kpartx_more_loopback_fixes.patch: fix loopback mounted
+        files some more: since we stat() the loopback device node, we can't rely
+        on S_ISREG() tests to handle this case, and should look at the device
+        itself instead. (LP: #1543430)
+      - d/p/enable-find-multipaths.patch: re-enable find_multipaths
+        by default -- see the removed 'add_find-multipaths.patch' (LP: #1463046)
+   - multipath initramfs fixes for booting from multipathed devices
+      - d/initramfs/hooks: also copy wwids file on the installed system to
+        ensure all paths come up on boot. (LP: #1479929)
+      - d/initramfs/hooks: install multipathd and required directories.
+      - d/initramfs/hooks: copy dm-mpath-lvm & multipath udev rules to initramfs
+      - d/initramfs/hooks: do not copy kpartx rules to initramfs
+      - d/initramfs/local-bottom: remember to stop multipathd.
+      - d/initramfs/local-premount: wait for udev to settle before the call to
+        resolve_device() in local_mount_root(), so the by-uuid/ symlinks have a
+        chance to be updated by the multipath udev rules (LP: #1503286).
+      - d/initramfs/local-premount: Run multipath with -B so not to assign names
+        nor change /etc/multipath/bindings during initramfs (LP: #1561103)
+      - d/rules: install d/initramfs/local-bottom
+      - d/rules: install d/initramfs/local-premount
+   - Remove partition device nodes of individual paths (for LVM on multipath)
+     (LP: #1540401)
+   - Disable -fexceptions on multipath-udeb (LP: #1489379): the flag causes
+     libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+     which is not available in the installer environment.
+     - d/p/disable-fexceptions-udeb.patch: conditionally disable -fexceptions
+       with CFLAGS_DISABLE_FEXCEPTIONS.
+     - d/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+   - d/tests/kpartx-file-loopback: add an autopkgtest to catch future cases
+     where uploads might break kpartx's loopback file handling.
+   - Remove partition device nodes of individual paths (for LVM on multipath)
+     on the new multipath-tools with udev property blacklisting (LP: #1540401)
+     - d/multipath-tools.dm-mpath-lvm.udev: udev rule for that.
+     - d/initramfs/init-top: load the dm-multipath module for
+       'multipath -c'.
+     - d/initramfs/init-top: start multipathd before udev (required by
+       'multipath -u' in the udev rules)
+     - d/rules: install the udev rule (priority 56: after 55-scsi-sg3_id)
+     - d/rules: rename multipath-tools udev to dm-mpath-lvm
+     - d/multipath-tools.dm-mpath-lvm.udev: replace 'multipath -c' with
+       'multipath -u' which can read udev properties at PROGRAM-rule time
+       (when udev properties are not yet written to the udev database).
+   - Remove d/initramfs/local-top (redundant with other initramfs scripts):
+     - init-top: take over loading modules (dm-multipath and SCSI device
+       handlers); move the missing dm-emc there (now scsi-dh-emc;
+       see BTS 567014).
+     - d/rules: do not install local-top anymore.
+     - remove d/initramfs/local-top
+    - Fixes typo in package description (availibility -> availability)
+      (LP: #1231182)
+  * Add changes:
+    - mark kpartx tests as isolation-machine to avoid issues in e.g. LXD
+      autopkgtest environments (LP: #1644253)
+    - d/t/tgtbasedmpaths add Test using tgt and open-iscsi to excercise
+      multipath
+    - d/control mark transition of file /etc/init.d/multipath-tools-boot
+      according to case #9 of https://wiki.debian.org/PackageTransition
+  * Drop changes:
+    - d/initramfs/local-top: wait for udev to settle before running
+      'multipath' in order to avoid race condition on device-mapper calls.
+      (file no more used)
+    - d/initramfs/local-top: remove '--timeout 10' which causes my
+      test system to not boot roughly 3 out of 4 times.
+      (file no more used)
+    - d/initramfs/local-top: run multipathd rather than a one-off call to
+      multipath so that new paths can be correctly added as detected while we're
+      still in the initramfs.
+      (file no more used)
+    - Call clean target before rebuilding with systemd support (in Debian)
+    - drop build-dep to dpkg-dev (>= 1.16.1~), libudev-dev"
+      (No more needed)
+    - Bump Standards-Version to 3.9.6 (in Debian)
+    - add / to LIB= of DEB_CFLAGS_MAINT_APPEND (in Debian)
+    - d/p/handle_spaces_in_rev_attr.patch: support IBM IPR devices and others
+      which may have only spaces for the rev attribute. (upstream)
+    - d/p/0015-shared-lock-for-udev.patch: (LP: #1431650) (upstream)
+    - d/p/0053-readonly-bindings_multipathd_prod.patch: support
+      -B to allow multipathd to handle cases where the bindings file is
+      read-only. (upstream)
+    - d/p/git-kpartx-support-spaces-in-dev-names-b407050a.patch: deal with
+      spaces in device names in kpartx too (LP: #1432062) (upstream)
+    - d/p/0001-multipath-tools-fix-dm-device-filtering.patch: Allow
+      filtering of DEV_UEVENT dev_type (LP: #1570093) (upstream)
+    - d/multipath-tools.postinst: handle upgrades from < 0.5.0 by migrating
+      from the old device names with device numbers to using letters for devices.
+      (no relevant upgrade path left)
+    - d/p/mpath_name_migration.patch: ship a multipath_migrate binary
+      to make translation from pre-0.5.0 device naming to the new scheme.
+      (no relevant upgrade path left)
+    - d/initramfs/hooks: use 95 not 60 for multipath rules priority (file not
+      shipped anymore, so no need to touch)
+
+ -- Christian Ehrhardt <christian.ehrhardt@canonical.com>  Fri, 27 Jan 2017 09:09:37 +0100
+
+multipath-tools (0.6.4-3) unstable; urgency=medium
+
+  * [3eecdba] Include libmpathcmd.so in the udeb package.
+    Thanks to Allan Jacobsen (Closes: #852431)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 25 Jan 2017 14:58:53 +0530
+
+multipath-tools (0.6.4-2) unstable; urgency=medium
+
+  * [98a45ae] Add a break against multipath-tools, which now doesn't
+    provide the file. Thanks to Andreas Beckmann (Closes: #850772)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 23 Jan 2017 13:31:59 +0530
+
+multipath-tools (0.6.4-1) unstable; urgency=medium
+
+  * [bb9b6bf] New upstream version 0.6.4
+  * [40f9200] Add patch to cross build from source.
+    Thanks to Helmut Grohne (Closes: #845746)
+  * [35c91d3] Refresh patches
+  * [fbe794c] Add lsb-base to Depends for multipath-tools-boot
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 09 Dec 2016 15:30:50 +0530
+
+multipath-tools (0.6.3-2) unstable; urgency=medium
+
+  * [6915af9] Add patch to disable linking to librados in udeb
+    (Closes: #840157)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 09 Oct 2016 14:39:08 +0530
+
+multipath-tools (0.6.3-1) unstable; urgency=medium
+
+  * [e562899] Update debian/gbp.conf for upstream tag
+  * [06f6fed] New upstream version 0.6.3
+  * [c064fd4] Refresh some patches
+  * [91d2497] Add librados-dev to build depends
+  * [fe064a4] Update Vcs url to cgit
+  * [03f2435] Add full versioned dependency on lsb-base. Thanks lintian
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 08 Oct 2016 23:46:04 +0530
+
+multipath-tools (0.6.2-2) unstable; urgency=medium
+
+  * Upload to Unstable
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Thu, 04 Aug 2016 17:34:29 +0530
+
+multipath-tools (0.6.2-1) experimental; urgency=medium
+
+  * [c1c5c8c] Fix manpage about updated kpartx output.
+    Thanks to Joey Hess (Closes: #796948)
+  * [622958b] Document behavior of aio-max-nr.
+    Thanks to Andrew Patterson (Closes: #827322)
+  * [91ae9e0] Switch back to using pristine-tar
+  * [0403d08] Imported Upstream version 0.6.2
+    (Closes: #829496, #830882, #831985)
+  * [2022378] Refresh patches and drop patches that are merged upstream
+  * [9bf63b9] Add liburcu-dev to build dependency
+  * [8e2db83] Update library install list
+  * [6adda96] Drop FAQ. Removed Upstream
+  * [10936fc] Bump Standards Version to 3.9.8
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 23 Jul 2016 14:15:18 +0530
+
+multipath-tools (0.6.1-3) unstable; urgency=medium
+
+  * Upload to Unstable
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 10 Jun 2016 13:10:18 +0530
+
+multipath-tools (0.6.1-2) experimental; urgency=medium
+
+  * [f59f6c1] Bump debhelper version to 9
+  * [7b3bc71] Drop -dbg package in favor of automatic dbgsym packages
+  * [c761232] Add patch to fix build failures with unit values on
+    some architectures
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 01 Jun 2016 17:07:27 +0530
+
+multipath-tools (0.6.1-1) experimental; urgency=medium
+
+  * New upstream release
+  * [80ec942] Refresh patches. And drop disable-blk-availability.patch
+    Fixed upstream
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 31 May 2016 17:15:04 +0530
+
+multipath-tools (0.5.0+git1.656f8865-9) unstable; urgency=medium
+
+  * [41dd269] Add remove condition in prerm script.
+    Thanks to Andreas Beckmann (Closes: #820031)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 05 Apr 2016 21:51:14 +0530
+
+multipath-tools (0.5.0+git1.656f8865-8) unstable; urgency=medium
+
+  * [ff52e14] Cleanup the breakage introduced in -6 build
+    (Closes: #818036, #818293)
+  * [2861458] Fix Vcs-Git URL
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Wed, 16 Mar 2016 14:58:20 +0530
+
+multipath-tools (0.5.0+git1.656f8865-7) unstable; urgency=medium
+
+  * [72c07f4] Fix kpartx depending of non-existent service.
+    Thanks to Michael Biebl (Closes: 818036)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 15 Mar 2016 13:35:08 +0530
+
+multipath-tools (0.5.0+git1.656f8865-6) unstable; urgency=medium
+
+  * [c791eeb] Restrict architecture to linux-any because
+    multipath-tools is a Linux only tool
+  * [a7baa90] Build binary independent deb package in respective target.
+    Thanks to Santiago Vila (Closes: #806082)
+  * [1d35c3c] Fix insecure URIs
+  * [bfc44fb] Install -boot init script in correct package
+  * [76cd8dc] Separate m-t-b's lintian overrides
+  * [715ff28] Add separate lintian overrides for m-t-b
+  * [7d81d4f] Call clean target before rebuilding with systemd support.
+    Thanks to Ryan Harper (Closes: #817940)
+  * [5156f96] Make build cleaner for reproducible builds.
+    Thanks to Santiago Vila
+  * Also close other bugs fixed by this release
+    (Closes: #814625, #817147)
+  * [9922d0a] Hand install multipath-tools-boot lintian override file
+  * [7664de3] Add comments to lintian overrides explaning the reason for
+    the overrides
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 12 Mar 2016 17:47:25 +0530
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu7) yakkety; urgency=medium
+
+  * No-change rebuild for readline soname change.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sat, 17 Sep 2016 12:06:37 +0000
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu6) yakkety; urgency=medium
+
+  * Fixes typo in package description (availibility -> availability)
+    (LP: #1231182)
+
+ -- Hans Joachim Desserud <ubuntu@desserud.org>  Sun, 04 Sep 2016 13:19:49 +0200
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu5) yakkety; urgency=medium
+
+  [ Dragan Stancevic ]
+  * d/p/0001-multipath-tools-fix-dm-device-filtering.patch :
+    multipath-tools: fix dm- device filtering
+   - Allow filtering of DEV_UEVENT dev_type
+   - Resolves LP: #1570093
+   - Proper patch included in the source package this time. Previous upload
+     only had the changelog entry.
+
+ -- Louis Bouchard <louis.bouchard@ubuntu.com>  Tue, 19 Jul 2016 14:17:14 +0200
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu4) yakkety; urgency=medium
+
+  [ Dragan Stancevic ]
+  * multipath-tools: fix dm- device filtering
+   - Allow filtering of DEV_UEVENT dev_type
+   - Resolves LP: #1570093
+
+ -- Louis Bouchard <louis.bouchard@ubuntu.com>  Mon, 18 Jul 2016 12:37:04 +0200
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu3) yakkety; urgency=medium
+
+  * Cherrypick from debian:
+   - Call clean target before rebuilding with systemd support
+   - Call systemd in debian/rules. Also adapt init service
+     aliasing.
+   - Should resolve LP: #1578638, LP: #1589526, LP: #1583563.
+ 
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Thu, 16 Jun 2016 11:53:33 +0300
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu2) xenial; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * Remove partition device nodes of individual paths (for LVM on multipath)
+    on the new multipath-tools with udev property blacklisting (LP: #1540401)
+    - debian/multipath-tools.dm-mpath-lvm.udev: replace 'multipath -c' with
+      'multipath -u' which can read udev properties at PROGRAM-rule time
+      (when udev properties are not yet written to the udev database).
+    - debian/initramfs/init-top: start multipathd before udev (required by
+      'multipath -u' in the udev rules)
+    - debian/initramfs/local-top: remove snippet to start multipathd.
+  * Remove debian/initramfs/local-top (redundant with other initramfs scripts):
+    - init-top: start multipathd.
+    - init-top: load modules (dm-multipath and SCSI device handlers); move the
+      missing dm-emc there (now scsi-dh-emc; see BTS 567014).
+    - local-premount: settle on udev events; and the extra call due to
+      multipath discovery in udev rules is no longer required with multipathd
+      in initramfs.
+    - debian/rules: do not install local-top anymore.
+  * debian/initramfs/local-premount: run multipath with -B so not to assign
+    names nor change /etc/multipath/bindings during initramfs (LP: #1561103)
+  * debian/patches/enable-find-multipaths.patch: re-enable find_multipaths
+    by default -- see the removed 'add_find-multipaths.patch' (LP: #1463046) 
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Mon, 04 Apr 2016 22:36:48 -0400
+
+multipath-tools (0.5.0+git1.656f8865-5ubuntu1) xenial; urgency=medium
+
+  * Merge from Debian. (LP: #1551952) (LP: #1540407)
+    Remaining changes:
+    - debian/control:
+      - Bump debhelper dependency to install udev rules to
+        /lib/udev/rules.d
+      - Bump udev dependencies as well
+    - debian/control:
+      - multipath-tools: add sg3-utils-dev Depends
+      - multipath-udeb: add sg3-udeb Depends
+    - debian/initramfs/hooks: use 95 not 60 for multipath rules priority
+    - debian/rules: Move udev rules to priority 95, because rules that load modules should be >90.
+    - debian/multipath-tools.preinst: modprobe dm-multipath.
+      This will make sure that multipathd will be able to start.
+    - debian/initramfs/local-top: wait for udev to settle before running
+      'multipath' in order to avoid race condition on device-mapper calls.
+    - debian/initramfs/local-top: remove '--timeout 10' which causes my
+      test system to not boot roughly 3 out of 4 times.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP: #941874)
+      - debian/initramfs/kpartx.hook
+      - debian/kpartx-boot.postinst
+      - debian/kpartx-boot.postrm
+      - debian/kpartx.install
+      - debian/control: Add kpartx-boot package for dmraid
+      - debian/rules: Install kpartx initramfs hook
+    - debian/patches/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+    - debian/patches/handle_spaces_in_rev_attr.patch: support IBM IPR devices
+      and others which may have only spaces for the rev attribute.
+    - debian/patches/path_selector.patch: switch the default path selector
+      back to round-robin while service-time isn't available to the installer
+      multipath-modules.
+    - debian/patches/0015-shared-lock-for-udev.patch: (LP: #1431650)
+    - debian/initramfs/hooks: also copy wwids file on the installed system to
+      ensure all paths come up on boot. (LP: #1479929)
+    - Disable -fexceptions on multipath-udeb (LP: #1489379): the flag causes
+      libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+      which is not available in the installer environment.
+      - debian/patches/disable-fexceptions-udeb.patch: conditionally disable
+        -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+      - debian/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+    - debian/patches/handle_spaces_in_rev_attr.patch: update patch to apply the
+      change to the right line (LP: #1492425)
+    - debian/initramfs/local-premount: wait for udev to settle before the call
+      to resolve_device() in local_mount_root(), so the by-uuid/ symlinks have
+      a chance to be updated by the multipath udev rules (LP: #1503286).
+    - debian/multipath-tools.postinst: handle upgrades from < 0.5.0 by migrating
+      from the old device names with device numbers to using letters for devices.
+    - debian/patches/mpath_name_migration.patch: ship a multipath_migrate binary
+      to make translation from pre-0.5.0 device naming to the new scheme.
+    - debian/initramfs/hooks: install multipathd and required directories.
+    - debian/initramfs/local-premount: reload all maps to make sure they're
+      indeed loaded and ready before we end premount.
+    - debian/initramfs/local-top: run multipathd rather than a one-off call to
+      multipath so that new paths can be correctly added as detected while we're
+      still in the initramfs.
+    - debian/initramfs/local-bottom: remember to stop multipathd.
+    - debian/rules: install debian/initramfs/local-bottom
+    - debian/patches/0053-readonly-bindings_multipathd_prod.patch: support -B to
+      allow multipathd to handle cases where the bindings file is read-only.
+      (LP: #1526984)
+    - debian/patches/git-kpartx-support-spaces-in-dev-names-b407050a.patch: deal
+      with spaces in device names in kpartx too (LP: #1432062)
+    - debian/tests/kpartx-file-loopback: add an autopkgtest to catch future cases
+      where uploads might break kpartx's loopback file handling.
+    - debian/patches/kpartx_more_loopback_fixes.patch: fix loopback mounted
+      files some more: since we stat() the loopback device node, we can't rely
+      on S_ISREG() tests to handle this case, and should look at the device
+      itself instead. (LP: #1543430)
+    - Remove partition device nodes of individual paths (for LVM on multipath)
+      (LP: #1540401)
+      - debian/multipath-tools.dm-mpath-lvm.udev: udev rule for that.
+      - debian/initramfs/hooks: copy the udev rule and partx to the initramfs.
+      - debian/initramfs/init-top: load the dm-multipath module for 'multipath -c'.
+      - debian/rules: install the udev rule (priority 56: after 55-scsi-sg3_id)
+    - debian/rules: don't ship 95-multipath.rules udev rules anymore; they are
+      not necessary with multipath-tools listening for udev events directly.
+  * Drop changes:
+    - debian/patches/series: Drop obsolete patches already included upstream
+      - debian/patches/ignore_devices_nodename_fail.patch
+      - debian/patches/skip_usb_devices.patch
+      - debian/patches/0014-kpartx-long-path.patch
+      - debian/patches/0052-readonly-bindings_multipathd.patch
+      - debian/patches/add_find-multipaths.patch
+      - debian/patches/dm-multipath-backlist-nvme-5c412e47.patch
+
+ -- Ryan Harper <ryan.harper@canonical.com>  Wed, 09 Mar 2016 10:21:26 -0600
+
+multipath-tools (0.5.0+git1.656f8865-5) unstable; urgency=medium
+
+  * [e91ac62] Fix build to properly generate the arch-independent
+    package. The previous upload had broken the sanboot setup, courtesy
+    missing device mapper support in the ramdisk
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 04 Mar 2016 19:11:45 +0530
+
+multipath-tools (0.5.0+git1.656f8865-4) unstable; urgency=medium
+
+  * Upload to Unstable
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 19 Jan 2016 17:17:06 +0530
+
+multipath-tools (0.5.0+git1.656f8865-3) experimental; urgency=medium
+
+  * [e2039e2] Build arch-independent packages in respective target
+    (Closes: #806082)
+  * [7c4b1b3] Refresh patches and annotate them
+  * [7bc7513] Disable multipath-tools-boot service, when under systemd.
+    Thanks to Felipe Sateler (Closes: #796631)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 28 Dec 2015 22:30:53 +0530
+
+multipath-tools (0.5.0+git1.656f8865-2) unstable; urgency=medium
+
+  * [84d75e9] Drop dependency on initscripts package.
+    Thanks to Michael Biebl (Closes: #804962)
+  * [058b16b] Integrate upstream multipathd.service in Debian.
+    Thanks to Michel Meyers (Closes: #805444)
+  * [ac05992] Fix build for arch independent targets (Closes: #806082)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 19 Dec 2015 14:38:52 +0530
+
+multipath-tools (0.5.0+git1.656f8865-1) unstable; urgency=medium
+
+  * [839e135] Add patch to disable systemd for udebs
+    Thanks Cyril Brulebois (Closes: #800014)
+  * [dddccc9] Let's now switch away from pristine-tar
+  * [e621b5a] Delete all dropped patches, mostly merged upstream
+  * [cf9d7f7] Refresh patches
+  * [1e12230] Make use of USE_SYSTEMD flag during builds
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 17 Oct 2015 13:23:14 +0530
+
+multipath-tools (0.5.0+git0.770e6d0d-3) unstable; urgency=medium
+
+  [ Benjamin Drung ]
+  * [af3f228] init: Fix stop failure when no root device is found
+
+  [ Ritesh Raj Sarraf ]
+  * Upload to Unstable
+  * [fd43c41] Drop udev rule to invoke multipath per path.
+    Thanks to Apollon Oikonomopoulos (Closes: #580972)
+  * [5ffc2f4] Add documentation to cover additional friendly names
+    scenarios. Thanks to Scott Moser (Closes: #788841)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Thu, 24 Sep 2015 21:48:55 +0530
+
+multipath-tools (0.5.0+git0.770e6d0d-2) experimental; urgency=medium
+
+  * [a24749d] libmultipath: fix discovery of devices with empty rev
+    sysfs attribute.
+    Thanks to Mauricio Faria de Oliveira (Closes: #782400)
+  * [3d0760f] updates for compatibility with property blacklist.
+    Thanks to Mauricio Faria de Oliveira (Closes: #782488)
+  * [6763082] Add patch to increase the number of retries
+    (Closes: #785251, #734794, #608737)
+  * [b1e5f6f] Add debian/gbp.conf
+  * [95ef9d7] Add build dependency on systemd
+  * [d7bd3c8] Call systemd in debian/rules. Also adapt init service
+    aliasing. Thanks to Michael Biebl
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 01 Sep 2015 23:11:18 +0530
+
+multipath-tools (0.5.0+git0.770e6d0d-1) experimental; urgency=medium
+
+  * [36c3df5] Imported git revision 0.5.0+git0.770e6d0d
+    Upstream is very slow in doing releases
+  * [283f094] Drop the patch to disable systemd
+  * [6fd4c28] Refresh patches, and drop some minor ones included upstream
+  * [3eab5a1] Add libsystemd-dev to Build Dependency
+  * [ee9a3e8] Add systemd service and socket file to multipath-tools
+    package.
+  * [bbbf6e8] Update lintian overrides
+  * [5dfcd7e] Add Alias=multipath-boot.service for systemd integration
+  * [340c96a] Refresh patch for quilt
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 09 Aug 2015 14:42:48 +0530
+
+multipath-tools (0.5.0-7ubuntu16) xenial; urgency=medium
+
+  * debian/patches/dm-multipath-backlist-nvme-5c412e47.patch: blacklist NVMe
+    from multipath, otherwise kpartx calls will hang. This is because mpath
+    works at the request level (which NVMe bypasses), so multipathing is not
+    supported on NVMe. (LP: #1551828)
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Tue, 01 Mar 2016 11:55:13 -0500
+
+multipath-tools (0.5.0-7ubuntu15) xenial; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * Remove partition device nodes of individual paths (for LVM on multipath)
+    (LP: #1540401)
+    - debian/multipath-tools.dm-mpath-lvm.udev: udev rule for that.
+    - debian/initramfs/hooks: copy the udev rule and partx to the initramfs.
+    - debian/initramfs/init-top: load the dm-multipath module for 'multipath -c'.
+    - debian/rules: install the udev rule (priority 56: after 55-scsi-sg3_id)
+  * debian/rules: don't ship 95-multipath.rules udev rules anymore; they are
+    not necessary with multipath-tools listening for udev events directly.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Thu, 11 Feb 2016 19:08:14 -0500
+
+multipath-tools (0.5.0-7ubuntu14) xenial; urgency=medium
+
+  * debian/patches/kpartx_more_loopback_fixes.patch: fix loopback mounted
+    files some more: since we stat() the loopback device node, we can't rely
+    on S_ISREG() tests to handle this case, and should look at the device
+    itself instead. (LP: #1543430)
+  * debian/tests/kpartx-file-loopback: check for left-over loop devices after
+    deleting a map.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Tue, 09 Feb 2016 15:24:27 -0500
+
+multipath-tools (0.5.0-7ubuntu13) xenial; urgency=medium
+
+  * Check that losetup -f is the same in the autopkgtest, after a cycle of
+    kpartx -a/-d. Looks like it's currently failing to cleanup loop0 in
+    addition to cleaning loop0p1. See http://pad.lv/1543430
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Tue, 09 Feb 2016 06:51:15 +0000
+
+multipath-tools (0.5.0-7ubuntu12) xenial; urgency=medium
+
+  * Use synchronous kpartx calls in the adt tests, to hopefully avoid
+    kernel/userspace races which result in failure to remove mapped
+    partitions. Also invoke udevadm settle.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Tue, 02 Feb 2016 20:26:34 +0000
+
+multipath-tools (0.5.0-7ubuntu11) xenial; urgency=medium
+
+  * debian/patches/git-kpartx-support-spaces-in-dev-names-b407050a.patch: fixup
+    to correct deal with loopback-mounting files. (LP: #1540660)
+  * debian/patches/mpath_name_migration.patch: make sure multipath_migrate gets
+    cleaned up otherwise running debuild twice will fail.
+  * debian/tests/kpartx-file-loopback: add an autopkgtest to catch future cases
+    where uploads might break kpartx's loopback file handling.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 01 Feb 2016 23:27:08 -0500
+
+multipath-tools (0.5.0-7ubuntu10) xenial; urgency=medium
+
+  * debian/patches/0052-readonly-bindings_multipathd.patch,
+    debian/patches/0053-readonly-bindings_multipathd_prod.patch: support -B to
+    allow multipathd to handle cases where the bindings file is read-only.
+    (LP: #1526984)
+  * debian/initramfs/hooks: install multipathd and required directories.
+  * debian/initramfs/local-bottom, debian/rules: install local-bottom for
+    initramfs.
+  * debian/initramfs/local-premount: reload all maps to make sure they're
+    indeed loaded and ready before we end premount.
+  * debian/initramfs/local-top: run multipathd rather than a one-off call to
+    multipath so that new paths can be correctly added as detected while we're
+    still in the initramfs.
+  * debian/initramfs/local-bottom: remember to stop multipathd.
+  * debian/patches/git-kpartx-support-spaces-in-dev-names-b407050a.patch: deal
+    with spaces in device names in kpartx too (LP: #1432062)
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Wed, 27 Jan 2016 10:42:51 -0500
+
+multipath-tools (0.5.0-7ubuntu9) xenial; urgency=medium
+
+  * d/p/lp1503305_libmultipath_info_on_1st_path_down_dbd131e.patch:
+    Correctly display the vendor/model info on path line in output if the
+    first path of a path group is failed. (LP: #1503305)
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Tue, 03 Nov 2015 18:34:09 -0600
+
+multipath-tools (0.5.0-7ubuntu8) xenial; urgency=medium
+
+  * debian/multipath-tools.postinst: handle upgrades from < 0.5.0 by migrating
+    from the old device names with device numbers to using letters for devices.
+  * debian/patches/mpath_name_migration.patch: ship a multipath_migrate binary
+    to make translation from pre-0.5.0 device naming to the new scheme.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Thu, 22 Oct 2015 12:38:45 +0100
+
+multipath-tools (0.5.0-7ubuntu7) wily; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * debian/initramfs/local-premount: wait for udev to settle before the call
+    to resolve_device() in local_mount_root(), so the by-uuid/ symlinks have
+    a chance to be updated by the multipath udev rules (LP: #1503286).
+
+ -- Steve Langasek <steve.langasek@ubuntu.com>  Mon, 19 Oct 2015 22:56:58 -0700
+
+multipath-tools (0.5.0-7ubuntu6) wily; urgency=medium
+
+  * debian/patches/handle_spaces_in_rev_attr.patch: update patch to apply the
+    change to the right line (LP: #1492425)
+
+ -- Mauricio Faria de Oliveira <mauricfo@linux.vnet.ibm.com>  Fri, 18 Sep 2015 10:16:50 -0400
+
+multipath-tools (0.5.0-7ubuntu5) wily; urgency=medium
+
+  * debian/patches/0014-kpartx-long-path.patch: have kpartx match loopback
+    files by device and inode rather than by path, as paths are not complete
+    enough to do specific matching for long paths (> 64 chars) or relative
+    paths. (LP: #1469143)
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Thu, 17 Sep 2015 11:10:38 -0400
+
+multipath-tools (0.5.0-7ubuntu4) wily; urgency=medium
+
+  * Disable -fexceptions on multipath-udeb (LP: #1489379): the flag causes
+    libchecktur.so to link with libgcc_s.so.1 (even with -static-libgcc),
+    which is not available in the installer environment.
+    - debian/patches/disable-fexceptions-udeb.patch: conditionally disable
+      -fexceptions with CFLAGS_DISABLE_FEXCEPTIONS.
+    - debian/rules: set CFLAGS_DISABLE_FEXCEPTIONS to build multipath-udeb.
+
+ -- Mauricio Faria de Oliveira <mauricfo@linux.vnet.ibm.com>  Thu, 03 Sep 2015 07:29:59 -0400
+
+multipath-tools (0.5.0-7ubuntu3) wily; urgency=medium
+
+  * debian/initramfs/hooks: also copy wwids file on the installed system to
+    ensure all paths come up on boot. (LP: #1479929)
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Thu, 30 Jul 2015 16:34:28 -0400
+
+multipath-tools (0.5.0-7ubuntu2) wily; urgency=medium
+
+  * debian/patches/add_find-multipaths.patch: properly handle local non-mpath
+    devices. (LP: #1463046)
+  * debian/patches/ignore_devices_nodename_fail.patch: ignore devices for which
+    sysfs_get_tgt_nodename fails.
+  * debian/patches/skip_usb_devices.patch: skip USB devices during discovery.
+    (LP: #1468897) 
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Fri, 10 Jul 2015 15:53:37 -0400
+
+multipath-tools (0.5.0-7ubuntu1) wily; urgency=medium
+
+  * Merge from debian unstable, remaining changes: (LP: #1455482)
+    - control:
+      * Bump debhelper dependency to install udev rules to
+        /lib/udev/rules.d, bump udev dependencies as well.
+    - initramfs/hooks: use 95 not 60 for multipath rules priority
+    - multipath-tools-boot.init: remove in favor of kpartx.udev rules (at top)
+    - multipath-tools.preinst: modprobe dm-multipath.
+      This will make sure that multipathd will be able to start.
+    - patches/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+    - rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - debian/initramfs/local-top: wait for udev to settle before running
+      'multipath' in order to avoid race condition on device-mapper calls. 
+    - debian/initramfs/local-top: remove '--timeout 10' which causes my
+      test system to not boot roughly 3 out of 4 times.
+    - Split kpartx initramfs bits into kpartx-boot for dmraid (LP: #941874)
+    - Added debian/patches/0015-shared-lock-for-udev.patch (LP: #1431650)
+  * debian/patches/0015-libmultipath-property-whitelist-SCSI_IDENT.patch: add
+    SCSI_IDENT_* properties to blacklist exceptions, so that we can have QEMU
+    multipathed devices as well as others (IBM IPR) detected properly as
+    multipathed devices.
+  * debian/patches/handle_spaces_in_rev_attr.patch: support IBM IPR devices
+    and others which may have only spaces for the rev attribute.
+  * debian/patches/path_selector.patch: switch the default path selector
+    back to round-robin while service-time isn't available to the installer
+    multipath-modules.
+  * debian/control: add sg3-udeb to multipath-udeb Depends.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 06 Jul 2015 13:15:22 -0400
+
+multipath-tools (0.5.0-7) unstable; urgency=medium
+
+  * [15ecad9] Add dm-service-time path checker.
+    Thanks to Mauricio Faria de Oliveira (Closes: #782363)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Thu, 28 May 2015 11:30:00 +0530
+
+multipath-tools (0.5.0-6) unstable; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * Build multipath-udeb with static libgcc (Closes: #779579)
+
+ -- Mauricio Faria de Oliveira <mauricfo@linux.vnet.ibm.com>  Tue, 03 Mar 2015 15:52:58 -0300
+
+multipath-tools (0.5.0-5) unstable; urgency=medium
+
+  * [5f967eb] Better daemon status in init's status action.
+    Thanks to Joerg Jaspert (Closes: #755483)
+  * [8455ce6] Introduce kpartx-udeb.
+    Thanks to Philip Susi (Closes: #751029)
+  * [72419cd] Fix syntax error in debian/control file
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 16 Sep 2014 14:59:11 +0530
+
+multipath-tools (0.5.0-4) unstable; urgency=medium
+
+  * [55c2ef2] Drop systemd support in multipath-tools
+    (Closes: #759849, #760182, #760189)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 05 Sep 2014 17:50:03 +0530
+
+multipath-tools (0.5.0-3) unstable; urgency=medium
+
+  * [6c453f2] Install sytemd files into /lib/systemd/system/
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 01 Sep 2014 15:49:28 +0530
+
+multipath-tools (0.5.0-2) unstable; urgency=medium
+
+  * [631296d] Add libsystemd-daemon-dev to Build-Dep (Closes: #759849)
+  * [742c706] Add systemd files
+  * [0783f2e] Add lintian override because, for systemd, we are
+    shipping upstream's service file. There is no point in redoing
+    the whole stuff of renaming the systemd service file.
+    Also, it is yet to see how systemd will handle many of the pre/post
+    checks that we had the flexibility to do in the shell init scirpt
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 01 Sep 2014 14:10:40 +0530
+
+multipath-tools (0.5.0-1) unstable; urgency=low
+
+  * [955018b] Imported Upstream version 0.5.0
+  * [10f0910] We now ship the systemd service file
+  * [9606cde] Drop socket activation through udev rules
+  * [1fe46fb] Add patch 0012-format-security-build-fixes.patch
+  * [2678d22] Drop patch 0006-read-only-partition-mappings-manpage.patch
+    Applied upstream
+  * [e191244] Drop Conflicts with Breaks
+  * [0e87578] Add status to init scripts
+  * [1d3aa3d] Add Italian translation for debconf.
+    Thanks to Beatrice Torraca (Closes: #729797)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 09 Mar 2014 16:52:09 +0530
+
+multipath-tools (0.4.9+git0.9c3c5172-1) unstable; urgency=low
+
+  * [b6f1bce] Emphasize on the alias feature.
+    Thanks to Vincent McIntyre (Closes: #716655)
+  * [3eab3e3] Restore multipath's dependence on dmsetup_env tool.
+    Thanks to Salvatore Bonaccorso, Gordon Grubert (Closes: #726296, #726311)
+  * [1bcf079] Imported Upstream version 0.4.9+git0.9c3c5172
+  * [62c8f71] Update README.source with updated instructions
+  * [3b4c3db] Enable standard hardening knobs
+  * [54ea833] Add build dependency on libudev-dev
+  * [94c01e4] Ship mpath persist manpages in the multipath-tools package
+  * [d09e731] Update multipath-tools.install for mpathpersist
+  * [997abf1] Fix Vcs links
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 05 Nov 2013 12:38:57 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-7) unstable; urgency=low
+
+  * [8c5d841] Fix upstream copy of kpartx rules (Closes: #618700)
+  * [a3a6c10] Call PREREQS before calling scripts/functions.
+    Thanks to Guy Rossin, Michael Prokop
+  * [7572c53] Don't plain exit if root is on multipath device.
+    Thanks to Guy Rossin (Closes: #704073)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Tue, 11 Jun 2013 00:14:50 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-6) unstable; urgency=low
+
+  * [821cc20] Don't fail if no dm aware (root) device is reported
+    (Closes: #674733)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 28 May 2012 18:19:12 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-5) unstable; urgency=low
+
+  * [08990d2] Fix root device detection syntax.
+    Thanks to Bernhard Reutner-Fischer (Closes: #674029)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sun, 27 May 2012 08:36:40 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-4) unstable; urgency=low
+
+  * [8ab1022] Fix path scope in initscript to accomodate awk from /usr
+    (Closes: #663662)
+  * [aa5ff3f] Use correct po filename for Brazilian translations.
+    Thanks to Adriano Rafael Gomes (Closes: #664371)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 28 Apr 2012 20:21:38 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-3) unstable; urgency=low
+
+  * [d46bb8f] Fix hardening build flags (Closes: #657848)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 12 Mar 2012 20:53:46 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-2) unstable; urgency=low
+
+  * Upload to unstable
+  * [4e3eedb] Drop syslog loggin in initrd.
+    Thanks to Martin Sofaru (Closes: #661597)
+  * [787ad2a] Enable hardening build flags.
+    Thanks to Moritz Muehlenhoff (Closes: #657848)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Mon, 05 Mar 2012 23:30:52 +0530
+
+multipath-tools (0.4.9+git0.4dfdaf2b-1) experimental; urgency=low
+
+  * [6771cd8] Don't stop multipathd if root is on a multipathed device
+    (Closes: #632124)
+  * [6a08452] Add Dutch Translation.
+    Thanks to Jeroen Schot (Closes: #655459)
+  * [e7fc772] Imported Upstream version 0.4.9+git0.4dfdaf2b
+  * [43d3f10] Fix slow discovery of multipath devices.
+    Thanks to Laurent Bigonville, Frido Roose (Closes: 646900)
+  * Dropped Patches
+    [37827c5] 0002-Make-user_friendly_names-compatible-to-multipath-too.patch
+  * Patches merged upstream
+    [2ac8eb8] 0004-add-r-to-make-resulting-device-read-only.patch
+    [6eee19a] 0008-kpartx-example-manpage.patch
+  * [3a81caa] Refresh patch 0007-do-not-link-against-ncurses.patch
+  * [e6f9cdc] install systemd example service under docs
+  * [0f87973] add build-arch and build-indep targets
+  * [9d94c2d] fix license name in copyright
+  * [7884ddc] some more spelling and hyphentation fixes
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Fri, 10 Feb 2012 18:25:29 +0530
+
+multipath-tools (0.4.9-3ubuntu12) vivid; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * Support disks with non 512-byte sectors (LP: #1441930)
+    - Added 0016-kpartx-non-512B-GPT.patch
+    - Added 0017-kpartx-non-512B-sectors.patch
+
+  [ Mathieu Trudel-Lapierre ]
+  * debian/patches/0018-ext-part-gt-512B-sectors.patch: fix extended partition
+    size for > 512B sectors. Patch cherry-picked from git commit 7202f225.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 13 Apr 2015 09:23:29 -0500
+
+multipath-tools (0.4.9-3ubuntu11) vivid; urgency=medium
+
+  [ Mauricio Faria de Oliveira ]
+  * Added debian/patches/0015-shared-lock-for-udev.patch (LP: #1431650)
+  * debian/initramfs/local-top: wait for udev to settle before running
+    'multipath' in order to avoid race condition on device-mapper calls. 
+
+  [ Mathieu Trudel-Lapierre ]
+  * Drop scsi_wait_scan from the multipath initramfs script: that module
+    no longer exists.
+
+ -- Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>  Mon, 23 Mar 2015 14:56:37 -0400
+
+multipath-tools (0.4.9-3ubuntu10) utopic; urgency=medium
+
+  * 1002-fix-linking-library.patch: Move $(LIBDEPS) to the end of the
+    link line to fix underlinking with ld --as-needed (LP: #1004243)
+
+ -- Adam Conrad <adconrad@ubuntu.com>  Mon, 13 Oct 2014 07:47:07 -0600
+
+multipath-tools (0.4.9-3ubuntu9) utopic; urgency=medium
+
+  * Added 0011-libmultipath-update-waiter-handling.patch (LP: #1354114)
+  * Added 0012-Race-condition-when-calling-stop_waiter_thread.patch (LP: #1354114)
+  * Added 0013-multipath-clean-up-code-for-stopping-the-waiter-thre.patch (LP: #1354114)
+  * Added 0014-Fix-race-condition-in-stop_waiter_thread.patch (LP: #1354114)
+
+ -- Rafael David Tinoco <rafael.tinoco@canonical.com>  Tue, 02 Sep 2014 15:43:38 -0700
+
+multipath-tools (0.4.9-3ubuntu8) utopic; urgency=medium
+
+  * Remove RUN+="socket:" statement in rules file since it is
+    no longer supported after version 178 (LP: #1240049)
+
+ -- Seyeong Kim <seyeong.kim@canonical.com>  Fri, 18 Jul 2014 10:37:35 +0200
+
+multipath-tools (0.4.9-3ubuntu7) raring; urgency=low
+
+  * Add 0010-fix-extended-partitions.patch: Only expose the
+    first two sectors of the extended partition (LP: #1093918).
+
+ -- Phillip Susi <psusi@ubuntu.com>  Fri, 04 Jan 2013 16:14:34 -0500
+
+multipath-tools (0.4.9-3ubuntu6) quantal; urgency=low
+
+  * Rebuild for new armel compiler default of ARMv5t.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 05 Oct 2012 14:00:37 +0100
+
+multipath-tools (0.4.9-3ubuntu5) precise; urgency=low
+
+  * Split kpartx initramfs bits into kpartx-boot for dmraid (LP: #941874)
+
+ -- Phillip Susi <psusi@ubuntu.com>  Tue, 20 Mar 2012 15:26:22 -0400
+
+multipath-tools (0.4.9-3ubuntu4) precise; urgency=low
+
+  * Restore multipath-udeb dependency on multipath-modules (LP: #959749).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Wed, 21 Mar 2012 14:34:01 +0000
+
+multipath-tools (0.4.9-3ubuntu3) precise; urgency=low
+
+  * Move kpartx from multipath-udeb to a new kpartx-udeb package
+    (LP: #922646).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 27 Jan 2012 23:04:23 +0000
+
+multipath-tools (0.4.9-3ubuntu2) precise; urgency=low
+
+  * Add 0009-fix-delim.patch: The 'p' delimiter was being added
+    when it shouldn't.
+
+ -- Phillip Susi <psusi@ubuntu.com>  Sun, 08 Jan 2012 20:57:47 -0500
+
+multipath-tools (0.4.9-3ubuntu1) precise; urgency=low
+
+  * Merge with Debian (for remaining changes, see 0.4.9-2ubuntu1).
+
+ -- Matthias Klose <doko@ubuntu.com>  Sun, 04 Dec 2011 21:32:48 +0100
+
+multipath-tools (0.4.9-3) unstable; urgency=low
+
+  * [dd85b8b] Add example to kpartx manpage. Committed upstream.
+    Thanks to Lars Wirzenius (Closes: 637538)
+  * [652acf5] Add Brazilian Portuguese debconf templates translation.
+    Thanks to Flamarion Jorge (Closes: 640802)
+  * [71df377] Add Danish translation of the debconf templates multipath-tools.
+    Thanks to Joe Hansen (Closes: #628225)
+  * [19ab90f] Avoid unnecessary linkage to ncurses library.
+    Thanks to Sven Joachim (Closes: 646148)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 03 Dec 2011 19:34:59 +0530
+
+multipath-tools (0.4.9-2ubuntu1) oneiric; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - control:
+      * Bump debhelper dependency to install udev rules to
+       /lib/udev/rules.d, bump udev dependencies as well.
+      * multipath-udeb must not depend on multipath-modules, 
+        because the Ubuntu kernel already includes the modules and no 
+        package provides m-m.
+    - initramfs/hooks: use 95 not 60 for multipath rules priority
+    - multipath-tools-boot.init: remove in favor of kpartx.udev rules (at top)
+    - kpartx.udev:
+      * add rule to load dm-multipath
+      * use whole path when running /usr/lib/dmsetup_env
+      * call kpartx through dmsetup for mpath-* devices
+      * switch $name for $kernel for dmraid rule
+    - multipath-tools.preinst: modprobe dm-multipath.
+      This will make sure that multipathd will be able to start.
+    - patches/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+    - rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+    - Have initramfs local-top start with scsi_wait_scan, and make sure all
+      devices have been found before bothering to call udevadm settle.
+    - debian/initramfs/local-top: wait for scsi_wait_scan
+  * *.install: use /lib*/ instead of /lib/ to catch /lib64
+  * debian/initramfs/local-top: remove '--timeout 10' which causes my
+    test system to not boot roughly 3 out of 4 times.
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Mon, 06 Jun 2011 12:31:23 -0500
+
+multipath-tools (0.4.9-2) unstable; urgency=low
+
+  * [2544655] wait harder for multipath init. Thanks to Serge Hallyn for
+    the patch
+  * [eb87e52] switch to 3.0 quilt source format
+  * [e55a306] explictly mention license copyright
+  * [52db82f] update vcs headers
+  * [8313f77] with dpkg > 1.15.7 we now don't need XC
+  * [8fdf077] update short description for multipath udeb package
+  * [c409ef3] add misc:Depends for multipath-udeb
+  * [c890181] take maintenance of package (Closes: #607911)
+  * [09bbbc8] add debugging symbols package. Thanks to Craig Magina.
+    (Closes: #609068)
+  * [2e6f8a7] spelling/hyphen fixes
+  * [97e02e7] add manpage for read-only mappings
+  * [5419352] add-r-to-make-resulting-device-read-only. Thanks to Wakko Warner
+    for the patch (Closes: #504678)
+
+ -- Ritesh Raj Sarraf <rrs@debian.org>  Sat, 05 Mar 2011 03:22:32 +0530
+
+multipath-tools (0.4.9-1) unstable; urgency=low
+
+  [ Guido Günther ]
+  * New upstream version 0.4.9 (Closes: #587315, #595127)
+  * [500e341] Don't fail "mulitipath-tools start" if multipathd is
+    already running (Closes: #587678)
+  * [f4e697c] Drop upstream patches:
+      * 0001-Fix-udev-rules-for-dmraid.patch
+      * 0003-fix-URL-to-FAQ.patch
+      * 0004-check-header-file-for-defintion-of-dm_task_no_flush.patch
+      * 0005-set-a-soname.patch
+      * 0006-add-library-dependencies.patch
+      * 0007-multipath-tools-rdac-path-checked-leads-to-I-O-hang-.patch
+      * 0010-Dots-are-special-in-groff.patch
+      * 0011-multipath-fix-offset-for-containted-slices.patch
+  * [678dcb6] Bindings file moved to /etc/multipath
+  * [ac2f9d5] Bump standards version
+  * [baea3a2] Add upstream homepage
+  * [9daa1b8] Remove /usr from $PATH so lintian doesn't assume we're
+    calling scripts from $remove_fs.
+  * [1a3c85e] Update po files
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 01 Sep 2010 15:10:26 +0200
+
+multipath-tools (0.4.8+git0.761c66f-9) unstable; urgency=low
+
+  * [0435cc1] Make sure the patchcheckers end up in /lib (Closes: #581377)
+  * [858f733] New patch 0011-multipath-fix-offset-for-containted- slices.patch
+    multipath: fix offset for containted slices. (Closes: #586104) - thanks to
+    Benjamin Marzinski
+
+ -- Guido Günther <agx@sigxcpu.org>  Wed, 16 Jun 2010 20:02:47 +0200
+
+multipath-tools (0.4.8+git0.761c66f-8) unstable; urgency=low
+
+  * [16268d8] Drop path from dmsetup_env call - thanks to Ferenc Wagner
+  * [2f3bdd5] Use $name in multipath.udev as well - thanks to Ferenc Wagner
+    for testing
+  * [c978487] Don't pass -g on mips(el) to work around a binutils bug.  See
+    http://sources.redhat.com/bugzilla/show_bug.cgi?id=10144 for details.
+  * [9daf438] Make sure we discover multipaths before checkfs/mountall runs
+    This covers the cornercase where e.g. /home is on multipath (but not on
+    LVM) and multipath-tols aren't started via initramfs. (Closes: #577172)
+  * [f7cc840] Bump standards version
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 11 Apr 2010 13:22:35 +0200
+
+multipath-tools (0.4.8+git0.761c66f-7) unstable; urgency=low
+
+  * [13f7436] Properly add multipath-udeb to dh_makeshlibs (Closes: #564489) -
+    thanks to again Frans Pop
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 23 Jan 2010 00:14:04 +0100
+
+multipath-tools (0.4.8+git0.761c66f-6) unstable; urgency=low
+
+  * [5b0c7be] Fix dependency on nonexistent multipath-tools udeb (Closes:
+    #564489) - thanks to Frans Pop
+  * [c2a06f7] New patch debian/patches/0010-Dots-are-special-in- groff.patch
+    Dots are special in groff
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 10 Jan 2010 18:10:05 +0100
+
+multipath-tools (0.4.8+git0.761c66f-5) unstable; urgency=low
+
+  * [9c68527] Explicitly include posix_types.h to get the correct type for
+    __kernel_old_dev_t (Closes: #558990)
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 05 Dec 2009 18:14:05 +0100
+
+multipath-tools (0.4.8+git0.761c66f-4) unstable; urgency=low
+
+  * [eb7bcf2] Add kpartx_id to initramfs for persistent partition links.
+  * [7ecd444] Use $name instead of $kernel since 2.6.31 doesn't create
+    /dev/dm-* anymore.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 21 Nov 2009 21:11:31 +0100
+
+multipath-tools (0.4.8+git0.761c66f-3) unstable; urgency=low
+
+  * upload to unstable
+  * [f62b619] Tighten multipath-tools-boot dependency Older versions might not
+    be able to cope with renamed patch checkers, etc.
+  * [7bb23db] Add udev rules to initramfs This makes the initramfs properly
+    event based. Once #455979 is fixed in LVM, root on lvm on multipatph can
+    work reliably. (Closes: #539498)
+  * [d9fcc80] Another init script dependency fix (Closes: #542370) - thanks to
+    Petter Reinholdtsen
+  * [3faab35] redo patches
+  * [c903696] Make user_friendly_names compatible to multipath-tools 0.4.8 and
+    earlier
+
+ -- Guido Günther <agx@sigxcpu.org>  Sat, 21 Nov 2009 18:04:07 +0100
+
+multipath-tools (0.4.8+git0.761c66f-2) experimental; urgency=low
+
+  * [34758f1] don't install files into /lib64 on 64 bit architectures - thanks
+    to Pascal de Bruijn
+  * [2b0a3da] use libreadline-dev (Closes: #553813)
+  * [8394b3a] cherry-pick 362d2e5f215894818b52a0d03b723b75917390fb (Closes:
+    #555901)
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 12 Nov 2009 17:35:28 +0100
+
+multipath-tools (0.4.8+git0.761c66f-1) experimental; urgency=low
+
+  * upload current git snapshot to experimental
+  * [71c9c74] warn about user_friendly_names and suggest using /dev/disk/by-id/
+  * [329762e] increase locking timeout on bindings file to 30 secs - thanks to
+    Ritesh Raj Sarraf for the patch
+  * [759ad9b] add spanish translation (Closes: #528972) - thanks to Fernando
+    González de Requena
+  * [7c327fa] add Czech translation (Closes: #533524) - thanks to Tomas Fidler
+  * [49c78ba] drop patches merged upstream:
+        * 0001-get-rid-of-arch-specific-ifdef-spaghettis.patch
+        * 0002--libmultipath-filter_wwid-is-called-with-the-wron.patch
+        * 0004--kpartx-fix-extended-partition-handling.patch
+        * 0005--kpartx-remove-partitions-in-reverse-order.patch
+        * 0006--kpartx-documentation-fixes.patch
+        * 0007--kpartx-remove-dead-code.patch
+        * 0008-udev-as-of-0.124-doesn-t-support-scsi_id-s-anymor.patch
+        * 0011--kpartx-use-uint64_t-to-account-slices-start-size.patch
+        * 0012--libmultipath-Update-discovery-to-work-with-new-sys.patch
+        * 0013-multipathd-crash-on-shutdown.patch
+        * 0014--var-run-multipathd.sock-is-world-writable.patch
+        * 0015-Increase-timeout-to-30-secs-to-avoid-locking-issue.patch
+  * [52b5373] checkers and prio callouts are now SOs
+  * [e493cde] debian/rules: use --fail-missing
+  * [b1c5baf] devmap_name is no more
+  * [fd41e76] bump standards version
+  * [82dc3df] drop iscsi to work around #542370
+  * [cce7640] new patch:
+    0004-check-header-file-for-defintion-of-dm_task_no_flush: check the header
+    file for dm_task_no_flush instead
+    of one of the installed libs.
+  * [876a5fb] new patch: 0005-set-a-soname.patch add a soname to libmultipath
+  * [1912767] new patch 0006-add-library-dependencies.patch add libraries to
+    the linker call
+  * [4d1b506] add dh_makeshlibs call
+  * [1ee06d5] install lib with soname
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 30 Aug 2009 15:53:24 +0200
+
+multipath-tools (0.4.8-15) unstable; urgency=low
+
+  * [e3fdd6f] add iscsi as a prereq and add verbose logic from mdadm.
+  * [9299e3d] On shutdown multipathd flushes its internal message queue
+    but we have to check if the messages on the queue are not empty.
+    (Closes: #519252)
+  * [df5ee21] fix umask of multipathd socket (CVE-2009-0115). Upstream
+    commit 0a0319d381249760c71023edbe0ac9c093bb4a74. (Closes: #522813)
+
+ -- Guido Günther <agx@sigxcpu.org>  Mon, 06 Apr 2009 19:36:25 +0200
+
+multipath-tools (0.4.8-14ubuntu11) oneiric; urgency=low
+
+  * Fixes some return logic issues in the blacklist.c:_filter_path function
+    where using blacklist and blacklist_exceptions would cause multipathd to
+    improperly filter paths. (LP: #789229)
+    - The patch was created by Christophe Varoqui in 2007.
+      + http://www.redhat.com/archives/dm-devel/2007-November/msg00054.html
+      + 0013-libmultipath-filter_path-fix_blacklist_filter_exit.patch
+    - [serge-hallyn] swap in the whole upstream git commit and call it
+      0013-blacklist_exception_issues.patch.
+
+ -- Craig Magina <craig.magina@canonical.com>  Fri, 27 May 2011 11:47:19 -0400
+
+multipath-tools (0.4.8-14ubuntu10) natty; urgency=low
+
+  * pass '-p part' to kpartx in initramfs script, not '-p p', to
+    make sure /dev/mapper/ names are formed as expected.  (LP: #712840)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Thu, 03 Feb 2011 18:40:36 -0600
+
+multipath-tools (0.4.8-14ubuntu9) natty; urgency=low
+
+  * Fix segv caused by race condition with free_waiter threads during
+    shutdown, using backport from upstream.  (LP: #713237)
+
+ -- dann frazier <dann.frazier@canonical.com>  Thu, 03 Feb 2011 16:37:10 -0700
+
+multipath-tools (0.4.8-14ubuntu8) natty; urgency=low
+
+  * Fix segv on shutdown when log buffer is empty, using patch cherry-picked
+    from upstream.  (LP: #488285)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Tue, 01 Feb 2011 15:38:36 -0600
+
+multipath-tools (0.4.8-14ubuntu7) natty; urgency=low
+
+  * Add patch to fix the expected pathname from multipath uevents
+    (LP: #660597)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Tue, 04 Jan 2011 16:06:29 -0600
+
+multipath-tools (0.4.8-14ubuntu6) natty; urgency=low
+
+  * Fix in debian/kpartx.udev:
+      - modprobe -q instead of incorrect modprobe -Q (LP: #644481)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Tue, 04 Jan 2011 15:58:13 -0600
+
+multipath-tools (0.4.8-14ubuntu5) natty; urgency=low
+
+  * Make the initramfs local-top script wait until all devices
+    are mapped, to make sure no /dev/sd* get mounted before
+    multipath has a chance to take it. (LP: #686832)
+
+ -- Serge Hallyn <serge.hallyn@ubuntu.com>  Tue, 04 Jan 2011 15:55:48 -0600
+
+multipath-tools (0.4.8-14ubuntu4) lucid; urgency=low
+
+  * debian/control: Move libreadline5-dev build dependency to libreadline-dev.
+    (Already done in Debian).
+
+ -- Martin Pitt <martin.pitt@ubuntu.com>  Mon, 08 Mar 2010 14:50:04 +0100
+
+multipath-tools (0.4.8-14ubuntu3) lucid; urgency=low
+
+  * Support failback for Intel Modular Server (LP: #520309).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Fri, 12 Feb 2010 12:21:42 +0000
+
+multipath-tools (0.4.8-14ubuntu2) jaunty; urgency=low
+
+  * debian/kpartx.udev: Let dmsetup run kpartx, since $kernel doesn't map
+    right.
+  * debian/initramfs/hooks: Include /lib/udev/kpartx_id.
+
+ -- Timo Aaltonen <tjaalton@ubuntu.com>  Tue, 10 Mar 2009 11:54:01 +0200
+
+multipath-tools (0.4.8-14ubuntu1) jaunty; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - control:
+     + Bump debhelper dependency to install udev rules to
+      /lib/udev/rules.d, bump udev dependencies as well.
+     + multipath-udeb must not depend on multipath-modules, 
+      because the Ubuntu kernel already includes the modules and no 
+      package provides m-m.
+    - initramfs/hooks: Install rules from /lib/udev/rules.d.
+    - kpartx.udev, multipath-tools-boot.init:
+      Replace multipath-tools-boot init script with udev rules.
+    - multipath-tools.preinst: Fix preinst script to modprobe dm-multipath.
+      This will make sure that multipathd will be able to start.
+    - multipath-tools.prerm: Add prerm script to not fail when upgrading
+      from a broken version of multipathd.
+    - patches/1000--set-umask-in-multipathd.patch: Set umask in multipathd.
+    - rules: Move udev rules to priority 95, because rules that load
+      modules should be >90.
+  * Fix bugs (LP: #316851, #320156)
+  * multipath-tools.prerm/preinst: Remove checks for old ubuntu
+    versions, we don't support upgrading from them anymore.
+  
+ -- Timo Aaltonen <tjaalton@ubuntu.com>  Thu, 12 Feb 2009 15:07:42 +0200
+
+multipath-tools (0.4.8-14) unstable; urgency=low
+
+  * [6dad4a0] kpartx: use uint64_t to account slices start/size based on
+    65d108fbe. Fixes handling of devices >2TB.
+    (Closes: #512601) - thanks to Vincent McIntyre for testing
+  * [1fe965c] fix failure to gather block device information. Cherry-pick
+    88f88d from upstream: With the new sysfs layout the parent device of a
+    block device is 'block', and only the parent of this is the 'real' parent.
+    Fixes problems on kernels >= 2.6.27.
+    (LP: #307032) - thanks to Jens Langner for forwarding this.
+  * [85c6d6e] README.Debian: explain howto best access multipath devices
+    (Closes: #510911) - thanks to Vincent McIntyre
+  * [a2bf65e] FAQ: fix URL to FAQ - thanks to Vincent McIntyre
+  * [e65a06d] README.Debian: doc typo
+  * [a1de95f] add ja debconf translation
+    (Closes: #512857) - thanks to Hideki Yamane
+  * [8400b79] rules: drop redo-patches target handled via external script now
+  * [50eb583] control: fix maintainer name
+  * [fe7e471] drop superflous headers and footers of patches, no functional
+    changes
+
+ -- Guido Günther <agx@sigxcpu.org>  Thu, 29 Jan 2009 10:17:36 +0100
+
+multipath-tools (0.4.8-13) unstable; urgency=low
+
+  [ Guido Günther ]
+  * [5585feb] simplify udev dependency
+  * [4cc8116] add a versioned dependency on dmsetup (Closes: #497686)
+  * [9887760] blacklist cciss devices (Closes: #500991)
+
+ -- Guido Günther <agx@sigxcpu.org>  Fri, 03 Oct 2008 12:42:46 +0200
+
+multipath-tools (0.4.8-12) unstable; urgency=low
+
+  * [2ee3c11] udev as of 0.124 doesn't support 'scsi_id -s' anymore
+  * [736eaa3] ...unfortunately older udev's don't support 'scsi_id -d'
+    properly so add a conflict
+  * [49961fa] update bugnumbers for the "dmsetup export" fun
+  * [82d47a3] bump standards version
+  * [18fb979] add README.source
+
+ -- Guido Guenther <agx@sigxcpu.org>  Thu, 21 Aug 2008 09:28:30 +0200
+
+multipath-tools (0.4.8-11) unstable; urgency=low
+
+  * [3dadace] use the full path to dmsetup so we don't have to worry about
+    $PATH
+  * [33642da] update initramfs during postinst/postrm (Closes: #477839)
+  * [41391c9] Conflict on etch's multipath-tools-initramfs - together with the
+    multipath-tools-initramfs NMU from Bernd Zeimetz this provides a clean
+    upgrade path from etch to lenny for multipath-tools-initramfs users.
+  * [4f8a5d1] Call multipath via udev on block device add/change events This
+    helps slow devices when either /etc/init.d/multipath-tools-boot or the
+    initramfs script are being run although the devices are not ready yet.
+    (Closes: #489850) - many thanks to Janusz Dziemidowicz for his suggestions
+    and testing
+  * [5cbb079] add swedish debconf translation (Closes: #492107) - thanks to
+    Martin Ågren
+  * [12639e9] redo quilt patches - no code changes
+
+ -- Guido Guenther <agx@sigxcpu.org>  Wed, 30 Jul 2008 17:59:03 -0400
+
+multipath-tools (0.4.8-10ubuntu6) jaunty; urgency=low
+
+  * debian/multipath-tools.preinst: Use the same logic as in
+    hw-detect to determine if dm_multipath is already loaded.
+
+ -- Timo Aaltonen <tjaalton@ubuntu.com>  Thu, 15 Jan 2009 23:50:18 +0200
+
+multipath-tools (0.4.8-10ubuntu5) jaunty; urgency=low
+
+  * debian/initramfs/hooks: Install from /lib/udev/rules.d 
+
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 13 Jan 2009 03:05:02 +0000
+
+multipath-tools (0.4.8-10ubuntu4) jaunty; urgency=low
+
+  * Bump debhelper dependency to install udev rules to /lib/udev/rules.d,
+    bump udev dependencies as well. 
+
+ -- Scott James Remnant <scott@ubuntu.com>  Mon, 12 Jan 2009 22:03:11 +0000
+
+multipath-tools (0.4.8-10ubuntu3) jaunty; urgency=low
+
+  * fix_udev_scsi_id_arguments.diff:
+    Update the arguments for scsi_id. (LP: #306723)
+  * fix_sysfs_layout.diff:
+    Patch from upstream to use the new sysfs layout. (LP: #307032)
+
+ -- Timo Aaltonen <tjaalton@ubuntu.com>  Thu, 18 Dec 2008 15:32:20 +0200
+
+multipath-tools (0.4.8-10ubuntu2) jaunty; urgency=low
+
+  * debian/control: multipath-udeb must not depend on multipath-modules, 
+    because the Ubuntu kernel already includes the modules and no 
+    package provides m-m.
+  * debian/multipath-tools.preinst: Don't modprobe dm-multipath 
+    unconditionally, since it'll break during installation (no 
+    modprobe.dep) and when using a monolithic kernel. Instead check for 
+    these conditions. (LP: #182009)
+
+ -- Timo Aaltonen <tepsipakki@ubuntu.com>  Tue, 02 Dec 2008 12:28:08 +0200
+
+multipath-tools (0.4.8-10ubuntu1) intrepid; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - Replace multipath-tools-boot init script with udev rules in
+      kpartx.rules.
+    - Move udev rules to priority 95, and drop call to dmsetup_env.
+    - Add devices as they appear
+    - Fix preinst script to modprobe dm-multipath. This will make sure
+      that multipathd will be able to start.
+    - Fix init script not to die on stop if multipathd is not running.
+    - Add prerm script to not fail when upgrading from a broken version of
+      multipathd.
+    - Set umask in multipathd.
+    - Handle udev rules priority change in preinst.
+
+ -- Soren Hansen <soren@ubuntu.com>  Thu, 26 Jun 2008 08:55:33 +0200
+
+multipath-tools (0.4.8-10) unstable; urgency=low
+
+  * [183da2c] Add russion debconf translation (Closes: #486353) - thanks
+    to Yuri Kozlov
+  * [02b7853] Add pt, de, and fr translations (Closes: #482035, #482845,
+    #482905) - thanks to the Portuguese Translation Team, Helge
+    Kreutzmann and Jean Guillou
+
+ -- Guido Guenther <agx@sigxcpu.org>  Thu, 19 Jun 2008 13:06:09 +0200
+
+multipath-tools (0.4.8-9) unstable; urgency=low
+
+  * [958c4b1] attach multipath.conf to bugreports
+  * [2ac083e] make multipath-tools-boot arch all
+  * [2eb8b51] Warn about outdated /etc/multipath.conf via debconf. The
+    changed location of udev's /sbin/scsi_id already hit two people.
+    Since this renders the system unbootable we should warn about it at
+    priority critical. (Closes: #481447)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sat, 17 May 2008 15:13:40 +0200
+
+multipath-tools (0.4.8-8) unstable; urgency=low
+
+  * libdevmapper doesn't ship the init script anymore so drop that and depend
+    on checkroot instead so we have a defined boot order (Closes: 470063)
+  * multipath-tools.init: remove superflous stop link in S in the LSB header
+  * add boot breakage warning to multipath-tools boot
+  * depend on libdevmapper-dev (>= 2:1.02.20) instead of (>= 2:1.02.20-1)
+    since this eases backports
+  * bump standards version
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sun, 09 Mar 2008 18:55:38 +0100
+
+multipath-tools (0.4.8-7ubuntu2) hardy; urgency=low
+
+  * Install udev rules in initramfs.
+  * Use temporary device name for creating partitions using kpartx.
+  * Big thanks to Dag Stenstad for testing and helping with debugging!
+
+ -- Soren Hansen <soren@ubuntu.com>  Wed, 19 Mar 2008 19:07:22 +0100
+
+multipath-tools (0.4.8-7ubuntu1) hardy; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - DebianMaintainerField.
+    - Replace multipath-tools-boot init script with udev rules in
+      kpartx.rules.
+    - Move udev rules to priority 95, and drop call to dmsetup_env.
+    - Add devices as they appear.
+    - Fix preinst script to modprobe dm-multipath. This will make sure
+      that multipathd will be able to start.
+    - Add prerm script to not fail when upgrading from a broken version of
+      multipathd.
+    - Set umask in multipathd.
+    - Handle udev rules priority change in preinst.
+  * Dropped our hsg80 changes. Kernel handles this correctly now.
+
+ -- Soren Hansen <soren@ubuntu.com>  Mon, 28 Jan 2008 11:09:45 +0100
+
+multipath-tools (0.4.8-7) unstable; urgency=low
+
+  * add watch file
+  * move multipath-tools-boot startup to S21 to allow module-loading
+    (Closes: #457804)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Tue, 08 Jan 2008 13:49:18 +0100
+
+multipath-tools (0.4.8-6) unstable; urgency=low
+
+  * depend on a libaio that resides in /lib (>= 0.3.106-8) so we can...
+  * ...drop link-libaio-static.diff
+  * fix_wwid_blacklist.diff: pulled from upstream to fix blacklisting by
+    wwid
+  * kpartx-docfix.diff: document -g
+  * kpartx-remove-dead-code.diff: remove unused commandline option
+  * kpartx-fix-extpart-rm.diff: fix partition removal of extended
+    partitions
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sat, 01 Dec 2007 15:41:36 +0100
+
+multipath-tools (0.4.8-5ubuntu1) hardy; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - DebianMaintainerField.
+    - Suggest sg3-utils, Conflict with sg-utils.
+    - Replace multipath-tools-boot init script with udev rules in
+      kpartx.rules.
+    - Add /sbin/hsg80_start.
+    - Move udev rules to priority 95, and drop call to dmsetup_env.
+    - Add devices as they appear
+    - Fix preinst script to modprobe dm-multipath. This will make sure
+      that multipathd will be able to start.
+    - Fix init script not to die on stop if multipathd is not running.
+    - Add prerm script to not fail when upgrading from a broken version of
+      multipathd.
+    - Set umask in multipathd.
+    - Handle udev rules priority change in preinst.
+
+ -- Soren Hansen <soren@ubuntu.com>  Thu, 13 Dec 2007 03:03:31 +0100
+
+multipath-tools (0.4.8-5) unstable; urgency=low
+
+  * apply kpartx-fix-udev-dmraid.diff to our shipped udev rules too
+  * fix itemized list in control file (Closes: #441176)
+  * link statically against libaio since it's in /usr/lib and
+    multipath{,d} are in /sbin and we can avoid a libaio udeb for now
+  * build a udeb for d-i support (Closes: #440334)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 07 Sep 2007 19:47:05 +0200
+
+multipath-tools (0.4.8-4) unstable; urgency=low
+
+  * split out initramfs support into a separate package (Closes: #440206)
+  * copy persistent bindings into initramfs
+  * debian/rules: don't ignore errors on clean (to make lintian happy)
+  * multipath-tools-boot.sh: add Default-Stop pseudo header
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 31 Aug 2007 09:47:35 +0200
+
+multipath-tools (0.4.8-3) unstable; urgency=low
+
+  * add a prerm script to handle updates from broken versions that don't allow
+    for a stopped multipathd in the init script, really (closes: #439126).
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sun, 26 Aug 2007 10:24:49 +0200
+
+multipath-tools (0.4.8-2) unstable; urgency=low
+
+  * initramfs: mpath_prio_tpc has been renamed to mpath_prio_rdac
+  * fetch patches by Hannes Reinecke from dm-devel:
+  	* fix udev rule for dmraid: kpartx-fix-udev-dmraid.diff
+        * fix extended partition calculation in kpartx: kpartx-fix-extpart.diff
+  * fix DEB_BUILD_OTIIONS=nostrip (Closes: #437596)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Mon, 13 Aug 2007 18:32:12 +0200
+
+multipath-tools (0.4.8-1) unstable; urgency=low
+
+  * new upstream release
+  * drop clariion-fix-read-buffer.diff, applied upstream
+  * init script: don't fail the stop target if multipathd
+  * conflict with multipath-tools-initramfs
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sat, 04 Aug 2007 13:08:52 +0200
+
+multipath-tools (0.4.7-9) unstable; urgency=low
+
+  * fix segfault on EMC Clariions
+  * add initramfs hooks to support rootfs on multipath
+  * version the dependency on dmsetup since the one from etch doesn't
+    support -oattr needed by dmsetup_env
+  * use LSB functions in init scripts
+
+ -- Guido Guenther <agx@sigxcpu.org>  Tue, 31 Jul 2007 14:01:00 +0200
+
+multipath-tools (0.4.7-8) unstable; urgency=low
+
+  * since Debian's dmestup doesn't include the "export" patch used by other
+    distros (#434241), work around this by implementing a minimal dmsetup_env
+    that can be used by kpartx.udev (Closes: #376161)
+  * add LSB headers to init scripts
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sat, 28 Jul 2007 17:34:48 +0200
+
+multipath-tools (0.4.7-7) unstable; urgency=low
+
+  * create build dirs (Closes: #425910)
+  * forward to upstream git b413c9dbe554c2d50aba7c6446ec86f850cf8dde
+  * drop libmultipath-cache-sysfs_devices.diff, applied upstream
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 27 Jul 2007 22:25:29 +0200
+
+multipath-tools (0.4.7-6) unstable; urgency=low
+
+  * kpartx.udev: fix path to kpartx_id
+  * install kpartx_id
+  * debian/control: add XS-Vcs-Browser
+
+ -- Guido Guenther <agx@sigxcpu.org>  Sun, 22 Jul 2007 15:38:05 +0200
+
+multipath-tools (0.4.7-5) unstable; urgency=low
+
+  * forward to upstream git 00fe3ac6ff515bec4a2c7385d6e2e4a7ed5dfb36
+  * new patch: libmultipath-cache-sysfs_devices.diff (Closes: #433949)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 20 Jul 2007 23:15:27 +0200
+
+multipath-tools (0.4.7-4) unstable; urgency=low
+
+  * move to git
+  * Drop patches applied upstream:
+  	  * fix-segfault-on-disappearing-paths.diff
+          * exclude-quilt.diff
+          * scsi_id.diff
+          * Makefile_cleanups.diff
+  * use dh_installudev
+  * no need to build-depend on libsysfs-dev anymore
+  * build-depend on libaio-dev
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 29 Jun 2007 11:31:28 -0400
+
+multipath-tools (0.4.7-3) experimental; urgency=low
+
+  * forward to upstream git as of 178b93111d54828a89ad280c0aaaea0812343a6a
+    (Closes: #427532, #365363)
+  * adjust scsi_id.patch to apply again
+  * drop udev.patch, not needed
+  * make sure multipath-tools-init runs after udev so the /dev/mapper/
+    entries appear in the correct place
+  * debhelper version 5 (Closes: #425910)
+  * split out kpartx into a separate package (Closes: #422600)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Fri, 08 Jun 2007 11:51:00 +0200
+
+multipath-tools (0.4.7-2ubuntu3) gutsy; urgency=low
+
+  * Fix preinst script to modprobe dm-multipath. This will make sure
+    that multipathd will be able to start.
+
+  * Fix init script not to die on stop if multipathd is not running.
+
+  * Add prerm script to not fail when upgrading from a broken version of
+    multipathd.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Fri, 10 Aug 2007 13:03:39 +0200
+
+multipath-tools (0.4.7-2ubuntu2) gutsy; urgency=low
+  
+  * Fix udev rule to load dm-multipath.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Wed, 13 Jun 2007 11:56:52 +0200
+
+multipath-tools (0.4.7-2ubuntu1) gutsy; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - Remove multipath-tools-boot init script in favour of udev rules.
+    - Update udev rules as described in 0.4.7-1.1ubuntu3.
+    - Add /sbin/hsg80_start as described in 0.4.7-1.1ubuntu3.
+    - debian/control Ubuntu maintainer foobar.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Wed, 16 May 2007 11:02:20 +0200
+
+multipath-tools (0.4.7-2) unstable; urgency=low
+
+  [ Bastian Blank ]
+  * Use /lib/udev/scsi_id. (closes: #358985)
+
+  [ Guido Guenther ]
+  * Acknowledge NMU - thanks John! (closes: #382244)
+  * use quilt for the git patch
+  * remove Bastian and Andres from Uploaders on their request
+  * cleanup pp_hds_modular so the package is rebuildable several times
+  * scsi_id.diff, Makefile-cleanups.diff, remove-arch-ifdefs.diff, udev.diff:
+    split out Debian's modifications into separate patches
+  * remove now superflous multipath.sh (closes: #350814)
+  * bump standards version to 3.7.2 (no source changes)
+
+ -- Guido Guenther <agx@sigxcpu.org>  Wed, 20 Dec 2006 17:40:59 +0100
+
+multipath-tools (0.4.7-1.1ubuntu3) feisty; urgency=low
+
+  * Remove multipath-tools-boot init script.
+
+  * Wild changes and updates to udev rules:
+    - All the hsg80 MULTIBUS FAILOVER are now handled here.
+    - Fix rule to call kpartx also on "change" udev events.
+    - Invoke multipath -v 0 device to make sure we hot plug
+      all devices into multipath.
+
+  * Add /sbin/hsg80_start that wraps all the work to make an hsg80 in
+    MULTIBUS FAILOVER working properly.
+    This is automatically called by udev.
+
+  (Closes LP: #98518)
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Wed, 04 Apr 2007 08:17:48 +0200
+
+multipath-tools (0.4.7-1.1ubuntu2) feisty; urgency=low
+
+  * Remove devmap_name from this package, and Depend on dmsetup instead.
+    Fixes file overwrite conflict with dmsetup.  (LP 84894.)
+
+ -- Ian Jackson <iwj@ubuntu.com>  Tue, 13 Feb 2007 16:16:46 +0000
+
+multipath-tools (0.4.7-1.1ubuntu1) feisty; urgency=low
+
+  * Merge from debian unstable, remaining changes:
+    - remove stop links from rc0 and rc6
+    - suggest sg3-utils, conflict sg-utils
+    - fix path to scsi_id
+    - ubuntu udev rules
+    - set umask
+
+ -- Scott James Remnant <scott@ubuntu.com>  Tue, 28 Nov 2006 15:24:16 +0000
+
+multipath-tools (0.4.7-1.1) unstable; urgency=medium
+
+  * Added missing dependency on dmsetup.  Closes: #381068.
+  * Fixed PID file handling.  Closes: #294066.
+  * Pulled in numerous fixes from upstream git tree to fix
+    various segfaults, spewing garbage onto the console, etc.
+    Tree is now synced to upstream git as of commit
+    40b575955cc189aa993e6a030b66b5fef6bcf288 on July 19, 2006,
+    which is the current state of the upstream tree.  Closes: #382214.
+
+ -- John Goerzen <jgoerzen@complete.org>  Wed,  9 Aug 2006 11:52:08 -0500
+
+multipath-tools (0.4.7-1ubuntu8) edgy; urgency=low
+
+  * Remove stop script symlinks from rc0 and rc6.
+
+ -- Scott James Remnant <scott@ubuntu.com>  Fri, 15 Sep 2006 17:30:19 +0100
+
+multipath-tools (0.4.7-1ubuntu7) dapper; urgency=low
+
+  * Fix typo in init script that was executing hsg80_init unconditionally.
+
+  * Suggests: sg3-utils and Conflicts: sg-utils (obsoleted).
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Mon, 22 May 2006 09:56:07 +0200
+
+multipath-tools (0.4.7-1ubuntu6) dapper; urgency=low
+
+  * no changes upload to rebuild with new libdevmapper.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Wed, 10 May 2006 09:31:20 +0200
+
+multipath-tools (0.4.7-1ubuntu5) dapper; urgency=low
+
+  The "give Scott a crying biscuit" release.
+
+  * Apply patch from Dennis Kaarsemaker.
+  (Closes Ubuntu: #41318)
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Wed, 26 Apr 2006 10:20:07 +0200
+
+multipath-tools (0.4.7-1ubuntu4) dapper; urgency=low
+
+  * Remove 2 extra lines from multipath.rules that were really not supposed
+    to be there.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Thu, 06 Apr 2006 17:43:10 +0200
+
+multipath-tools (0.4.7-1ubuntu3) dapper; urgency=low
+
+  * Add hsg80_init function to multipath-tools-boot init script.
+    The script takes care to perform a proper initialization of the disks
+    when the hsg80 is configured in multibus failover mode.
+
+    NOTE: multipathd is not able to understand properly what happens in this
+    multi-bugs situation and it will require manual kill and restart once
+    the disks have been readded to the system, otherwise failover is not
+    guaranteed and syslog will be flooded.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Thu, 06 Apr 2006 09:33:51 +0200
+
+multipath-tools (0.4.7-1ubuntu2) dapper; urgency=low
+
+  * Fix socket permissions.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Tue, 04 Apr 2006 18:20:20 +0200
+
+multipath-tools (0.4.7-1ubuntu1) dapper; urgency=low
+
+  * Fix path to scsi_id.
+
+  * Make install: target depends on build in debian/rules.
+
+  * Change NAME to multipathd in init scripts so that we can actually stop
+    multipathd.
+
+  * Swap multipath-tools-boot and multipath-tools init scripts order in
+    postinst and make multipath-tools-boot start.
+
+  * UVF exception granted by Colin Watson.
+
+ -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Tue, 04 Apr 2006 06:31:09 +0200
+
+multipath-tools (0.4.7-1) unstable; urgency=low
+
+  * New upstream version.
+    - Build against libsysfs2. (closes: #355775)
+  * Acknowledge NMU. (closes: #337081)
+
+ -- Bastian Blank <waldi@debian.org>  Fri, 17 Mar 2006 17:23:03 +0100
+
+multipath-tools (0.4.6-1) unstable; urgency=low
+
+  * New upstream version.
+
+ -- Bastian Blank <waldi@debian.org>  Thu, 09 Feb 2006 22:12:52 +0100
+
+multipath-tools (0.4.5-3) unstable; urgency=low
+
+  * Fix kpartx compiling errors and dos support.
+
+ -- Bastian Blank <waldi@debian.org>  Fri, 30 Sep 2005 13:01:55 +0200
+
+multipath-tools (0.4.5-2) unstable; urgency=low
+
+  * Move boot init script before udev and load dm-multipath module.
+
+ -- Bastian Blank <waldi@debian.org>  Wed, 28 Sep 2005 19:35:49 +0200
+
+multipath-tools (0.4.5-1) unstable; urgency=low
+
+  * New upstream version.
+  * Move device check logic to udev rules.
+  * Don't longer create devices in /dev by default.
+
+ -- Bastian Blank <waldi@debian.org>  Mon, 19 Sep 2005 16:32:00 +0200
+
+multipath-tools (0.4.2.4-2) unstable; urgency=medium
+
+  * New maintainer.
+  * Rebuild against new libdevmapper.
+
+ -- Bastian Blank <waldi@debian.org>  Fri, 04 Mar 2005 15:16:30 +0100
+
+multipath-tools (0.4.2.4-1) unstable; urgency=low
+
+  * New upstream.
+    NOTE: This is actually upstream's 0.4.2 but 0.4.2.3 came first for some
+    reason.
+  * Use start-stop-daemon to control the multipathd daemon and do it's own
+    PID file handling (which is now commented out of the daemon itself)
+
+ -- Patrick Caulfield <patrick@debian.org>  Fri, 28 Jan 2005 15:15:01 +0000
+
+multipath-tools (0.4.2.3-1) unstable; urgency=low
+
+  * New upstream
+  * Remove initrd files as they break things.
+    Closes: #288150
+  * Fix some duplicate patching.
+
+ -- Patrick Caulfield <patrick@debian.org>  Mon, 17 Jan 2005 11:19:20 +0000
+
+multipath-tools (0.4.1-1) unstable; urgency=low
+
+  * New upstream
+    Closes: #295926, #286789
+  * Include initrd scripts contributed by Guido Guenther
+    Closes: #286791
+
+ -- Patrick Caulfield <patrick@debian.org>  Thu, 13 Jan 2005 09:25:42 +0000
+
+multipath-tools (0.4.0-1) unstable; urgency=low
+
+  * New upstream
+
+ -- Patrick Caulfield <patrick@debian.org>  Fri, 24 Dec 2004 11:54:44 +0000
+
+multipath-tools (0.3.9-1) unstable; urgency=low
+
+  * New upstream
+
+ -- Patrick Caulfield <patrick@debian.org>  Tue,  7 Dec 2004 13:15:15 +0000
+
+multipath-tools (0.3.8-1) unstable; urgency=low
+
+  * New upstream
+  * Fix error in preinst, when upgrading.
+  * Don't clean klibc directory.
+    Closes: #283043
+
+ -- Patrick Caulfield <patrick@debian.org>  Mon, 29 Nov 2004 08:56:50 +0000
+
+multipath-tools (0.3.7-1) unstable; urgency=low
+
+  * New upstream
+
+ -- Patrick Caulfield <patrick@debian.org>  Sat, 13 Nov 2004 11:14:35 +0000
+
+multipath-tools (0.3.6-1) unstable; urgency=low
+
+  * Initial upload. Based loosely on upstream's work
+    Closes: #277898
+
+ -- Patrick Caulfield <patrick@debian.org>  Wed,  3 Nov 2004 10:16:34 +0000

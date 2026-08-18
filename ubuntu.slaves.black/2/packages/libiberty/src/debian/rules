@@ -1,0 +1,91 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+DEB_BUILD_MULTIARCH ?= $(shell dpkg-architecture -qDEB_BUILD_MULTIARCH)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+CPPFLAGS := $(shell dpkg-buildflags --get CPPFLAGS)
+CFLAGS := -fPIC $(shell dpkg-buildflags --get CFLAGS)
+LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+
+COMMA = ,
+ifneq (,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+  NJOBS := -j $(subst parallel=,,$(filter parallel=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+endif
+
+confargs = \
+	--prefix=/usr \
+	--disable-multilib \
+	--enable-install-libiberty
+ifneq ($(DEB_BUILD_MULTIARCH),$(DEB_HOST_MULTIARCH))
+    confargs += \
+	--build=$(DEB_BUILD_MULTIARCH) \
+	--host=$(DEB_HOST_MULTIARCH)
+endif
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+	dh_autoreconf
+	rm -rf build
+	mkdir -p build
+	cd build && ../libiberty/configure \
+		$(confargs) \
+		CPPFLAGS="$(CPPFLAGS)" \
+		CFLAGS="$(CFLAGS)" \
+		LDFLAGS="$(LDFLAGS)"
+	touch configure-stamp
+
+build-arch: build-stamp
+build-indep:
+build: build-stamp
+build-stamp: configure-stamp
+	dh_testdir
+	$(MAKE) $(NJOBS) -C build
+	touch $@
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+	rm -rf build
+	dh_autoreconf_clean
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs \
+		/usr/include/libiberty \
+		/usr/lib/$(DEB_HOST_MULTIARCH)
+	$(MAKE) -C build install \
+		DESTDIR=$(CURDIR)/debian/libiberty-dev \
+		target_header_dir=/usr/include/libiberty
+	mv debian/libiberty-dev/usr/lib/*.a \
+		debian/libiberty-dev/usr/lib/$(DEB_HOST_MULTIARCH)/.
+
+# Build architecture-independent files here.
+binary-indep: install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

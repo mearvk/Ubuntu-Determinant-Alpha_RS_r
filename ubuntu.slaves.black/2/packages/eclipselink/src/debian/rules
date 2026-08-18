@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	ant -f debian/build.xml
+
+override_dh_auto_install:
+	dh_auto_install
+
+	mh_installpom -plibeclipselink-java --no-parent --has-package-version debian/poms/eclipselink.pom
+	mh_installpom -plibeclipselink-java --no-parent --has-package-version debian/poms/org.eclipse.persistence.jpa.jpql.pom
+	mh_installpom -plibeclipselink-java --no-parent --has-package-version debian/poms/org.eclipse.persistence.jpa.modelgen.processor.pom
+
+	mh_installjar -plibeclipselink-java --java-lib debian/poms/eclipselink.pom target/eclipselink.jar
+	mh_installjar -plibeclipselink-java --java-lib debian/poms/org.eclipse.persistence.jpa.jpql.pom target/org.eclipse.persistence.jpa.jpql.jar
+	mh_installjar -plibeclipselink-java --java-lib debian/poms/org.eclipse.persistence.jpa.modelgen.processor.pom target/org.eclipse.persistence.jpa.modelgen.processor.jar
+
+override_dh_auto_clean:
+	ant -f debian/build.xml clean
+	mh_clean
+
+get-orig-pom:
+	wget https://repo1.maven.org/maven2/org/eclipse/persistence/eclipselink/${DEB_VERSION_UPSTREAM}/eclipselink-${DEB_VERSION_UPSTREAM}.pom -O debian/poms/eclipselink.pom
+	wget https://repo1.maven.org/maven2/org/eclipse/persistence/org.eclipse.persistence.jpa.jpql/${DEB_VERSION_UPSTREAM}/org.eclipse.persistence.jpa.jpql-${DEB_VERSION_UPSTREAM}.pom -O debian/poms/org.eclipse.persistence.jpa.jpql.pom
+	wget https://repo1.maven.org/maven2/org/eclipse/persistence/org.eclipse.persistence.jpa.modelgen.processor/${DEB_VERSION_UPSTREAM}/org.eclipse.persistence.jpa.modelgen.processor-${DEB_VERSION_UPSTREAM}.pom -O debian/poms/org.eclipse.persistence.jpa.modelgen.processor.pom

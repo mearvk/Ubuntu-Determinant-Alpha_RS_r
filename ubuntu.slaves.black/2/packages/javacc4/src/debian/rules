@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^-]+).*,\1,p')
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	mkdir -p bootstrap
+
+	# Build with JavaCC 5
+	cp /usr/share/java/javacc.jar bootstrap/
+	dh_auto_build -- jar -Dversion=$(VERSION)
+
+	# Rebuild with JavaCC 4
+	cp bin/lib/javacc.jar bootstrap/
+	dh_auto_build -- realclean
+	dh_auto_build -- jar
+
+	docbook-to-man debian/manpage.sgml >bin/javacc4.1
+
+	cp bin/javacc  bin/javacc4
+	cp bin/jjdoc   bin/jjdoc4
+	cp bin/jjtree  bin/jjtree4
+
+override_dh_auto_test:
+	dh_auto_build -- test
+
+override_dh_auto_clean:
+	dh_auto_build -- realclean

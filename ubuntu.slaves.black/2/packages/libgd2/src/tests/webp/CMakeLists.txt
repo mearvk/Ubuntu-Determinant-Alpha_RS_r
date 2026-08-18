@@ -1,0 +1,9 @@
+IF(WEBP_FOUND)
+LIST(APPEND TESTS_FILES
+	bug00111
+	bug_double_free
+	gdImageWebpEx
+)
+ENDIF(WEBP_FOUND)
+
+ADD_GD_TESTS()

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# Copy the package source somewhere safe
+source=${0%/*}/../..
+build=$(mktemp -d --tmpdir=${AUTOPKGTEST_TMP})
+cp -a ${source}/* ${build}/
+cd ${build}
+
+# Deconfigure if necessary (running in a copy of a built tree)
+if [ -f debian/autoreconf.before ]; then
+  dh_autoreconf_clean
+fi
+
+# Enforce the use of the installed binaries
+patch -p1 < debian/patches/use-system-libevdev-for-tests.patch
+
+# Reconfigure
+dh_autoreconf
+dh_auto_configure
+
+# Run the tests
+make check
+
+# Log the test output
+if [ -f test/test-suite.log ]; then
+  cat test/test-suite.log
+fi

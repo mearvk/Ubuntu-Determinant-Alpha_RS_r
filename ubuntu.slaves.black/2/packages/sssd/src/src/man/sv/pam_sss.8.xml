@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+                href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>pam_sss</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>pam_sss</refname>
+        <refpurpose>PAM-modul för SSSD</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>pam_sss.so</command> <arg choice='opt'>
+<replaceable>quiet</replaceable> </arg> <arg choice='opt'>
+<replaceable>forward_pass</replaceable> </arg> <arg choice='opt'>
+<replaceable>use_first_pass</replaceable> </arg> <arg choice='opt'>
+<replaceable>use_authtok</replaceable> </arg> <arg choice='opt'>
+<replaceable>retry=N</replaceable> </arg> <arg choice='opt'>
+<replaceable>ignore_unknown_user</replaceable> </arg> <arg choice='opt'>
+<replaceable>ignore_authinfo_unavail</replaceable> </arg> <arg choice='opt'>
+<replaceable>domains=X</replaceable> </arg> <arg choice='opt'>
+<replaceable>allow_missing_name</replaceable> </arg> <arg choice='opt'>
+<replaceable>prompt_always</replaceable> </arg> <arg choice='opt'>
+<replaceable>try_cert_auth</replaceable> </arg> <arg choice='opt'>
+<replaceable>require_cert_auth</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para><command>pam_sss.so</command> är PAM-gränssnittet till System Security
+Services daemon (SSSD). Fel och resultat loggas via
+<command>syslog(3)</command> med funktionen LOG_AUTHPRIV.</para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>FLAGGOR</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>quiet</option>
+                </term>
+                <listitem>
+                    <para>Undertryck loggmeddelanden om okända användare.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>forward_pass</option>
+                </term>
+                <listitem>
+                    <para>Om <option>forward_pass</option> är satt läggs det inskrivna lösenordet på
+stacken så att andra PAM-moduler kan använda det.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>use_first_pass</option>
+                </term>
+                <listitem>
+                    <para>Argumentet use_first_pass tvingar modulen att använda tidigare stackade
+modulers lösenord och kommer aldrig fråga användaren – om inget lösenord är
+tillgängligt eller lösenordet inte stämmer kommer användaren nekas åtkomst.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>use_authtok</option>
+                </term>
+                <listitem>
+                    <para>Vid lösenordsändring tvinga modulen till att sätta det nya lösenordet till
+det som gavs av en tidigare stackad lösenordsmodul.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>retry=N</option>
+                </term>
+                <listitem>
+                    <para>Om angivet frågas användaren ytterligare N gånger om ett lösenord ifall
+autentiseringen misslyckas. Standard är 0.</para>
+                    <para>Observera att detta alternativ kanske inte fungerar som förväntat ifall
+programmet som anropar PAM hanterar användardialogen själv. Ett typiskt
+exempel är <command>sshd</command> med
+<option>PasswordAuthentication</option>.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>ignore_unknown_user</option>
+                </term>
+                <listitem>
+                    <para>Om detta alternativ anges och användaren inte finns kommer PAM-modulen
+returnera PAM_IGNORE. Detta får PAM-ramverket att ignorera denna modul.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>ignore_authinfo_unavail</option>
+                </term>
+                <listitem>
+                    <para>
+                    Anger att PAM-modulen skall returnera PAM_IGNORE om det inte kan kontakta
+SSSD-demonen. Detta får PAM-ramverket att ignorera denna modul.</para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>domains</option>
+                </term>
+                <listitem>
+                    <para>
+                        Tillåter administratören att begränsa domänerna en viss PAM-tjänst tillåts
+autentisera emot. Formatet är en kommaseparerad lista över SSSD-domännamn
+som de specificeras i filen sssd.conf.
+                    </para>
+                    <para>
+                        OBS: om detta används för en tjänst som inte kör som root-användaren,
+t.ex. en webb-server, måste det användas tillsammans med flaggorna
+<quote>pam_trusted_users</quote> och <quote>pam_public_domains</quote>.  Se
+manualsidan <citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för mer information om dessa två
+PAM-respondentalternativ.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>allow_missing_name</option>
+                </term>
+                <listitem>
+                    <para>
+                        Huvudsyftet med denna flagga är att låta SSSD avgöra användarnamnet baserat
+på ytterligare information, t.ex. certifikatet från ett smartkort.
+                    </para>
+                    <para>
+                        Det aktuella användningsfallet är inloggningshanterare som kan övervaka en
+smartkortläsare om korthändelser. Ifall en smartkort sätts in kommer
+inloggningshanteraren anropa en PAM-stack som innehåller en rad som
+<programlisting>
+auth sufficient pam_sss.so allow_missing_name
+                        </programlisting> I detta fall kommer SSSD försöka
+avgöra användarnamnet baserat på innehållet på smartkortet, returnerar det
+till pam_sss som slutligen kommer lägga det på PAM-stacken.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>prompt_always</option>
+                </term>
+                <listitem>
+                    <para>
+                        Fråga alltid användaren om kreditiv. Med denna flagga kommer kreditiv
+begärda av andra PAM-moduler, typiskt ett lösenord, ignoreras och pam_sss
+kommer fråga efter kreditiv igen. Baserat på förautentiseringssvaret från
+SSSD kan pam_sss komma att fråga efter ett lösenord, ett smartkorts-PIN
+eller andra kreditiv.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>try_cert_auth</option>
+                </term>
+                <listitem>
+                    <para>
+                        Försök använda certifikatbaserad smartkortsautentisering,
+d.v.s. autentisering med smartkort eller liknande enheter.  Om ett smartkort
+är tillgängligt och tjänsten tillåter smartkortsautentisering kommer
+användaren frågas om ett PIN och certifikatbaserad autentisering kommer
+fortsätta
+                    </para>
+                    <para>
+                        Om inget smartkort är tillgängligt eller certifikatbaserad autentisering
+inte är tillåten för den aktuella tjänsten returneras PAM_AUTHINFO_UNAVAIL.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>require_cert_auth</option>
+                </term>
+                <listitem>
+                    <para>
+                        Använd certifikatbaserad autentisering, d.v.s. autentisering med smartkort
+eller liknande enheter.  Om ett smartkort inte är tillgängligt ombeds
+användaren att sätta in ett.  SSSD kommer att vänta på ett smartkort tills
+tidsgränsen definierad av p11_wait_for_card_timeout har passerats, se
+<citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för detaljer.
+                    </para>
+                    <para>
+                        Om inget smartkort är tillgängligt efter att tidsgränsen passerats eller om
+certifikatbaserad autentisering inte är tillåten för den aktuella tjänsten
+returneras PAM_AUTHINFO_UNAVAIL.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='module_types_provides'>
+        <title>TILLHANDAHÅLLNA MODULTYPER</title>
+        <para>Alla modultyper (<option>account</option>, <option>auth</option>,
+<option>password</option> och <option>session</option>) tillhandahålls.
+        </para>
+        <para>Om SSSD:s PAM-respondent inte kör, t.ex. om PAM-respondentens uttag (socket)
+inte är tillgängligt kommer pam_sss returnera PAM_USER_UNKNOWN när det
+anropas som modulen <option>account</option> för att undvika problem med
+användare från andra källor under åtkomstkontroll.</para>
+    </refsect1>
+
+    <refsect1 id="return_values">
+        <title>RETURVÄRDEN</title>
+        <variablelist>
+            <varlistentry>
+                <term>PAM_SUCCESS</term>
+                <listitem>
+                    <para>
+                        PAM-åtgärden avslutades framgångsrikt.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_USER_UNKNOWN</term>
+                <listitem>
+                    <para>
+                        Användaren är inte känd av autentiseringstjänsten eller så kör inte SSSD:s
+PAM-respondent.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTH_ERR</term>
+                <listitem>
+                    <para>
+                        Misslyckad autentisering. Kan också returneras när det är problem med att
+hämta certifikatet.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_PERM_DENIED</term>
+                <listitem>
+                    <para>
+                        Åtkomst nekas. SSSD-loggfilerna kan innehålla ytterligare information om
+felet.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_IGNORE</term>
+                <listitem>
+                    <para>
+                        Se flaggorna <option>ignore_unknown_user</option> och
+<option>ignore_authinfo_unavail</option>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHTOK_ERR</term>
+                <listitem>
+                    <para>
+                        Kan inte hämta det nya autentiseringstecknet. Kan också returneras när
+användaren autentiserar med certifikat och flera certifikat är tillgängliga,
+men den installerade versionen av GDM inte stödjer val bland flera
+certifikat.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHINFO_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Kan inte komma åt autentiseringsinformationen. Detta kan bero på ett
+nätverks- eller hårdvarufel.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_BUF_ERR</term>
+                <listitem>
+                    <para>
+                        Ett minnesfel uppstod. Kan också returneras när flagga use_first_pass eller
+use_authtok är satt, men inget lösenord hittades från den tidigare stackade
+PAM-modulen.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SYSTEM_ERR</term>
+                <listitem>
+                    <para>
+                        Ett systemfel uppstod. SSSD-loggfilerna kan innehålla ytterligare
+information om felet.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_ERR</term>
+                <listitem>
+                    <para>
+                        Kan inte sätta kreditiv för användaren.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_INSUFFICIENT</term>
+                <listitem>
+                    <para>
+                        Programmet har inte tillräckliga kreditiv för att autentisera
+användaren. Till exempel saknas PIN under smartkortsautentisering eller en
+saknad faktor under tvåfaktorautentisering.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SERVICE_ERR</term>
+                <listitem>
+                    <para>
+                        Fel i tjänstemodul.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_NEW_AUTHTOK_REQD</term>
+                <listitem>
+                    <para>
+                        Användarens autentiseringstecken har gått ut.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_ACCT_EXPIRED</term>
+                <listitem>
+                    <para>
+                        Användarkontot har gått ut.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SESSION_ERR</term>
+                <listitem>
+                    <para>
+                        Kan inte hämta IPA-skrivbordsprofilsregler eller -användarinformation.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CRED_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Kan inte hämta Kerberos-användarkreditiv.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_NO_MODULE_DATA</term>
+                <listitem>
+                    <para>
+                        Ingen autentiseringsmetod hittades av Kerberos. Detta kan inträffa om
+användaren har ett smartkort tilldelat men insticksmodulen pkint inte är
+tillgänglig på klienten.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_CONV_ERR</term>
+                <listitem>
+                    <para>
+                       Konversationsfel.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHTOK_LOCK_BUSY</term>
+                <listitem>
+                    <para>
+                       Ingen KDC lämpad för lösenordsändringar finns tillgänglig.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_ABORT</term>
+                <listitem>
+                    <para>
+                       Okänt PAM-anrop.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_MODULE_UNKNOWN</term>
+                <listitem>
+                    <para>
+                       PAM-uppgift eller -kommando som inte stödjs.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_BAD_ITEM</term>
+                <listitem>
+                    <para>
+                       Autentiseringsmodulen kan inte hantera smartkortskreditiv.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='files'>
+        <title>FILER</title>
+        <para>Om en återställning av lösenord av root misslyckas, för att motsvarande
+SSSD-leverantör inte stödjer återställning av lösenord, kan ett individuellt
+meddelande visas. Detta meddelande kan t.ex. innehålla instruktioner hur man
+återställer ett lösenord.</para>
+
+        <para>Meddelandet läses från filen
+<filename>pam_sss_pw_reset_message.LOK</filename> där LOK står för en
+lokalsträng som den returneras av <citerefentry>
+<refentrytitle>setlocale</refentrytitle><manvolnum>3</manvolnum>
+</citerefentry>. Om det inte finns någon matchande fil visas innehållet i
+<filename>pam_sss_pw_reset_message.txt</filename>. Root måste vara ägaren av
+filerna och endast root får ha läs- och skrivrättigheter medan alla andra
+användare endast får ha läsrättigheter.</para>
+
+        <para>Dessa filer söks efter i katalogen
+<filename>/etc/sssd/customize/DOMÄNNAMN/</filename>. Om ingen matchande fil
+finns visas ett allmänt meddelande.</para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

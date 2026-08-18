@@ -1,0 +1,184 @@
+=========
+Keymapper
+=========
+
+The Problem
+===========
+
+Keyboard selection is a problem for many users since most ofthem have no
+idea which keyboard layout they have.
+
+This program uses a different approach. We simply ask the user to press
+a couple of keys and infer from their scan code which layout they belong
+to, thereby lowering the number of possibilities in a classic
+divide-and-conquer approach.
+
+Some difficulties show up. For instance, asking people to press a key
+they don't have is considered to be bad style. Todistinguish between
+German and Danish keyboards, we therefore have to offer multiple
+possible symbols. This should also be helpful with trying to distinguish
+between QWERTZ and AZERTY when the user has a cyrillic keyboard. :-)
+
+Inferring the decision tree from a large number of keyboard layouts is
+not efficient, thus the tree neds to be pre-calculated.
+
+There are two ways of selecting among possible layouts:
+
+* Ask the user to press a key with a particular symbol
+
+* Ask the user to choose the symbol which appears on a key, e.g. to the
+  right of the tab key.
+
+This tool will only use the first approach. If it is not possible to
+distinguish between keyboard layouts that way, e.g. because their only
+difference is whether a particular key has an X or a Y symbol, a simple
+binary question ("Do you have an X key") may have to be asked.
+
+Basic selection algorithm
+=========================
+
+Initially, list all keyboards. Create a list of forbidden scan codes,
+which is initially empty.
+
+Select a symbol that appears on most keyboards, in as many places as
+possible, but not on any keys in the forbidden list. Remoce these
+keyboards from the keyboard list and add the scan codes of those
+keys to the forbidden list.
+
+Repeat until the list of keyboards is empty.
+
+Display the list of symbols to the user. Each scan code we get back is
+associated with at least one keyboard. Clear the list of scan codes and
+repeat this process if there is more than one. 
+
+Heuristics
+----------
+
+Unmodified, this method tends to pick 'obscure' keys like @,
+which tend to be in lots of different places historically.
+Unfortunately, the risk of this approach is that people will not find
+the key if it's not labelled as such on their keyboard.
+
+Some possible modifications are:
+
+* Initially, prefer ASCII letters and low-ASCII symbols.
+
+* Strongly prefer a symbol that's not selected with AltGr or, less
+  strongly, Shift (unless the base key is a number). Especially in the
+  former case, the symbol may not even appear on the keyboard.
+  (DONE) (partly conflicts with the first part)
+
+* In order to avoid an "I can't find any of these keys" problem, it
+  might be necessary to prepare two symbol lists in each step. The key
+  codes should be distinct of course.
+  (DONE)
+
+* Some key choices should be either avoided or combined. For instance,
+  asking the user to press an A in order to find out whether the layout
+  is French (qwerty vs. azerty) might be a bad idea if Cyrillic
+  keyboards have not been either excluded (in a previous question) or
+  included (by internally mapping а => a, ѡ => ω, etc., and accepting
+  all ppossible answers).
+  
+  A list of Unicode glyph lookalikes should be findable on the Internet.
+  In addition, it might make sense to always show capital letters.
+  (TODO)
+
+* Do a global optimization to minimize tree depth. Currently, key
+  selection locally favors deciding between many layouts with one
+  symbol -- the problem is that the keys which end up selecting between
+  the rest also select from a few of those already decided on by the
+  first ones, thus they add more steps. A nicer strategy might be to
+  find a group of symbols which collecively do the same thing, only
+  better.
+
+Tests
+=====
+
+Testing this approach is the easiest part of the problem -- the
+FakeQuery class answers the questions depending on which keyboard map
+was passed to it. If multiple answers are possible, one is selected
+randomly.
+
+Redundancy
+----------
+
+During twenty test runs with the nine initiall test keymaps, the system
+asked 27 questions on average, or three per keymap. Since 2^3 is 8, the
+generated decision tree is shorter than a binary tree, which suggests
+that generating two symbol lists in parallel doesn't result in asking
+additional questions.
+
+Graph output
+------------
+
+Since the result is somewhat difficult to visualize, I added graphviz
+output. The result isn't pretty in any way (specifically, edge labels
+are not placed correctly) but it's a workable first step.
+
+File output
+-----------
+
+The data file produced by this tool consists of a number of lines:
+
+STEP ##
++++++++
+
+This line starts a new step. Steps are numbered; the first step is
+numbered zero.
+
+Steps are not necessarily numbered consecutively, but all references
+pint to steps which occur later in the file. Thus it is never necessary
+to keep the while file in memory.
+
+MAP name
+++++++++
+
+This step uniquely identifies a keymap.
+
+The MAP command is the only command in is step.
+
+PRESS char
+++++++++++
+
+Ask the user to press a character on the keyboard. Multiple PRESS
+commands may occur in a step; the characters (encoded in utf-8)
+need to be presented simultaneously ("Press one of these keys").
+Auxiliary keys (shift, alt, ...) should be ignored.
+
+CODE code ##
+++++++++++++
+
+Direct the evaluating code to process step ## next if the user has
+pressed a key which returned that keycode.
+
+Obviously, multiple CODE commands may occur in a step.
+
+FIND char
++++++++++
+
+Ask the user whether that character is present on their keyboard.
+
+This is a question of last resort; it's asked only if keymaps cannot be
+distinguished otherwise.
+
+This command will be accompanied by one YES and one NO command.
+
+FINDP char
+++++++++++
+
+Equivalent to FIND, except that the user is asked to consider only the
+primary symbols (i.e. Plain and Shift).
+
+YES ##
+++++++
+
+Direct the evaluating code to process step ## next if the user does have
+this key.
+
+NO ##
++++++
+
+Direct the evaluating code to process step ## next if the user does not
+have this key.
+

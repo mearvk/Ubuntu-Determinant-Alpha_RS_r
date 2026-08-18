@@ -1,0 +1,1216 @@
+Description: Patch to enable testing in build process using hsqldb & gcj
+ Functions that are either not supported by hsqldb and tests that behave
+ differently under gcj are disabled.
+Author: james.page@canonical.com
+Forwarded: not-required
+--- a/src/classes/com/mchange/v2/c3p0/DriverManagerDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/DriverManagerDataSource.java
+@@ -251,4 +251,22 @@
+             throw new IOException("Unsupported Serialized Version: " + version);
+         }
+     }
++
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return null;
++    }
++    
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
+ }
+--- a/src/classes/com/mchange/v2/c3p0/JndiRefConnectionPoolDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/JndiRefConnectionPoolDataSource.java
+@@ -307,5 +307,11 @@
+ 	sb.append("]");
+ 	return sb.toString();
+     }
++    
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return wcpds.getParentLogger();
++    }
+ }
+ 
+--- a/src/classes/com/mchange/v2/c3p0/JndiRefForwardingDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/JndiRefForwardingDataSource.java
+@@ -165,5 +165,23 @@
+ 		throw new IOException("Unsupported Serialized Version: " + version);
+ 	    }
+     }
++
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return null;
++    }
++    
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
+ }
+ 
+--- a/src/classes/com/mchange/v2/c3p0/WrapperConnectionPoolDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/WrapperConnectionPoolDataSource.java
+@@ -31,6 +31,7 @@
+ import java.lang.reflect.Method;
+ import java.util.Map;
+ import java.sql.*;
++
+ import javax.sql.*;
+ import com.mchange.v2.c3p0.cfg.C3P0Config;
+ import com.mchange.v2.c3p0.impl.*;
+@@ -283,4 +284,22 @@
+ 	else
+ 	    this.connectionTester = C3P0ImplUtils.defaultConnectionTester();
+     }
++    
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return null;
++    }
++    
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
+ }
+--- a/src/classes/com/mchange/v2/c3p0/codegen/JdbcProxyGenerator.java
++++ b/src/classes/com/mchange/v2/c3p0/codegen/JdbcProxyGenerator.java
+@@ -831,7 +831,7 @@
+             }
+             // end-premature-detach-debug-only!
+ 
+-            iw.println( "throw SqlUtils.toSQLException(\042You can't operate on a closed " + getInnerTypeName() + "!!!\042, exc);");
++            iw.println( "throw new IllegalStateException(\042You can't operate on a closed " + getInnerTypeName() + "!!!\042, exc);");
+         }
+         iw.downIndent();
+         iw.println("}");
+@@ -845,10 +845,10 @@
+         iw.println("{");
+         iw.upIndent();
+         //iw.println( "exc.printStackTrace();" );
+-        iw.println( "throw parentPooledConnection.handleThrowable( exc );" );
++        iw.println( "throw new RuntimeException( exc );" );
+         iw.downIndent();
+         iw.println("}");
+-        iw.println("else throw SqlUtils.toSQLException( exc );");
++        iw.println("else throw new RuntimeException( exc );");
+         iw.downIndent();
+         iw.println("}");
+     }
+--- a/src/classes/com/mchange/v2/c3p0/impl/AbstractPoolBackedDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/impl/AbstractPoolBackedDataSource.java
+@@ -496,5 +496,23 @@
+             throw new IOException("Unsupported Serialized Version: " + version);
+         }
+     }
++
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return null;
++    }
++    
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
+ }
+ 
+--- a/src/classes/com/mchange/v2/c3p0/impl/C3P0PooledConnection.java
++++ b/src/classes/com/mchange/v2/c3p0/impl/C3P0PooledConnection.java
+@@ -23,10 +23,14 @@
+ 
+ package com.mchange.v2.c3p0.impl;
+ 
++import java.io.InputStream;
++import java.io.Reader;
+ import java.lang.reflect.*;
+ import java.sql.*;
+ import java.util.*;
++
+ import javax.sql.*;
++
+ import com.mchange.v2.log.*;
+ import com.mchange.v2.sql.*;
+ import com.mchange.v2.sql.filter.*;
+@@ -646,6 +650,7 @@
+ 
+ 			public void close() throws SQLException
+ 			{ wsh.doClose(); }
++
+ 		    }
+ 
+ 		return new ProxyCallableStatement((CallableStatement) innerStmt );
+@@ -1169,6 +1174,14 @@
+ 		logger.log(MLevel.WARNING, "Broken Connection Close Error. ", e);
+ 	    }
+     }
++    
++    // JDBC 4.1
++
++	public void addStatementEventListener(StatementEventListener arg0) {
++	}
++
++	public void removeStatementEventListener(StatementEventListener arg0) {
++	}
+ }
+ 
+ 
+--- a/src/classes/com/mchange/v2/c3p0/impl/NewPooledConnection.java
++++ b/src/classes/com/mchange/v2/c3p0/impl/NewPooledConnection.java
+@@ -737,4 +737,12 @@
+             }
+         }
+     }
++        
++    // JDBC 4.1
++ 
++	public void addStatementEventListener(StatementEventListener arg0) {
++	}
++
++	public void removeStatementEventListener(StatementEventListener arg0) {
++	}
+ }
+--- a/src/classes/com/mchange/v2/c3p0/test/FreezableDriverManagerDataSource.java
++++ b/src/classes/com/mchange/v2/c3p0/test/FreezableDriverManagerDataSource.java
+@@ -280,4 +280,22 @@
+             throw new IOException("Unsupported Serialized Version: " + version);
+         }
+     }
++
++    // JDBC 4.1
++
++    public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
++        return null;
++    }
++    
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterCallableStatement.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterCallableStatement.java
+@@ -35,12 +35,15 @@
+ import java.sql.Clob;
+ import java.sql.Connection;
+ import java.sql.Date;
++import java.sql.NClob;
+ import java.sql.ParameterMetaData;
+ import java.sql.Ref;
+ import java.sql.ResultSet;
+ import java.sql.ResultSetMetaData;
++import java.sql.RowId;
+ import java.sql.SQLException;
+ import java.sql.SQLWarning;
++import java.sql.SQLXML;
+ import java.sql.Time;
+ import java.sql.Timestamp;
+ import java.util.Calendar;
+@@ -520,4 +523,297 @@
+ 	
+ 	public void cancel() throws SQLException
+ 	{ inner.cancel(); }
++	
++	// JDCB 4.0
++
++	public boolean isClosed() throws SQLException {
++		return inner.isClosed();
++	}
++
++	public boolean isPoolable() throws SQLException {
++		return inner.isPoolable();
++	}
++
++	public void setPoolable(boolean poolable) throws SQLException {
++		inner.setPoolable(poolable);
++	}
++
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++
++	public void setAsciiStream(int parameterIndex, InputStream x)
++			throws SQLException {
++		inner.setAsciiStream(parameterIndex, x);
++	}
++
++	public void setAsciiStream(int parameterIndex, InputStream x,
++			long length) throws SQLException {
++		inner.setAsciiStream(parameterIndex, x, length);
++	}
++
++	public void setBinaryStream(int parameterIndex, InputStream x)
++			throws SQLException {
++		inner.setBinaryStream(parameterIndex, x);
++	}
++
++	public void setBinaryStream(int parameterIndex, InputStream x,
++			long length) throws SQLException {
++		inner.setBinaryStream(parameterIndex, x, length);
++	}
++
++	public void setBlob(int parameterIndex, InputStream inputStream)
++			throws SQLException {
++		inner.setBlob(parameterIndex, inputStream);
++	}
++
++	public void setBlob(int parameterIndex, InputStream inputStream,
++			long length) throws SQLException {
++		inner.setBlob(parameterIndex, inputStream, length);
++	}
++
++	public void setCharacterStream(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setCharacterStream(parameterIndex, reader);
++	}
++
++	public void setCharacterStream(int parameterIndex, Reader reader,
++			long length) throws SQLException {
++		inner.setCharacterStream(parameterIndex, reader, length);
++	}
++
++	public void setClob(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setClob(parameterIndex, reader);
++	}
++
++	public void setClob(int parameterIndex, Reader reader, long length)
++			throws SQLException {
++		inner.setClob(parameterIndex, reader, length);
++	}
++
++	public void setNCharacterStream(int parameterIndex, Reader value)
++			throws SQLException {
++		inner.setNCharacterStream(parameterIndex, value);
++	}
++
++	public void setNCharacterStream(int parameterIndex, Reader value,
++			long length) throws SQLException {
++		inner.setNCharacterStream(parameterIndex, value, length);
++	}
++
++	public void setNClob(int parameterIndex, NClob value)
++			throws SQLException {
++		inner.setNClob(parameterIndex, value);
++	}
++
++	public void setNClob(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setNClob(parameterIndex, reader);
++	}
++
++	public void setNClob(int parameterIndex, Reader reader, long length)
++			throws SQLException {
++		inner.setNClob(parameterIndex, reader, length);
++	}
++
++	public void setNString(int parameterIndex, String value)
++			throws SQLException {
++		inner.setNString(parameterIndex, value);
++	}
++
++	public void setRowId(int parameterIndex, RowId x)
++			throws SQLException {
++		inner.setRowId(parameterIndex, x);
++	}
++
++	public void setSQLXML(int parameterIndex, SQLXML xmlObject)
++			throws SQLException {
++		inner.setSQLXML(parameterIndex, xmlObject);
++	}
++	
++
++	public Reader getCharacterStream(int parameterIndex)
++			throws SQLException {
++		return inner.getCharacterStream(parameterIndex);
++	}
++
++	public Reader getCharacterStream(String parameterName)
++			throws SQLException {
++		return inner.getCharacterStream(parameterName);
++	}
++
++	public Reader getNCharacterStream(int parameterIndex)
++			throws SQLException {
++		return inner.getNCharacterStream(parameterIndex);
++	}
++
++	public Reader getNCharacterStream(String parameterName)
++			throws SQLException {
++		return inner.getNCharacterStream(parameterName);
++	}
++
++	public NClob getNClob(int parameterIndex) throws SQLException {
++		return inner.getNClob(parameterIndex);
++	}
++
++	public NClob getNClob(String parameterName) throws SQLException {
++		return inner.getNClob(parameterName);
++	}
++
++	public String getNString(int parameterIndex) throws SQLException {
++		return inner.getNString(parameterIndex);
++	}
++
++	public String getNString(String parameterName) throws SQLException {
++		return inner.getNString(parameterName);
++	}
++
++	public RowId getRowId(int parameterIndex) throws SQLException {
++		return inner.getRowId(parameterIndex);
++	}
++
++	public RowId getRowId(String parameterName) throws SQLException {
++		return inner.getRowId(parameterName);
++	}
++
++	public SQLXML getSQLXML(int parameterIndex) throws SQLException {
++		return inner.getSQLXML(parameterIndex);
++	}
++
++	public SQLXML getSQLXML(String parameterName) throws SQLException {
++		return inner.getSQLXML(parameterName);
++	}
++
++	public void setAsciiStream(String parameterName, InputStream x)
++			throws SQLException {
++		inner.setAsciiStream(parameterName, x);
++	}
++
++	public void setAsciiStream(String parameterName, InputStream x,
++			long length) throws SQLException {
++		inner.setAsciiStream(parameterName, x, length);
++	}
++
++	public void setBinaryStream(String parameterName, InputStream x)
++			throws SQLException {
++		inner.setBinaryStream(parameterName, x);
++	}
++
++	public void setBinaryStream(String parameterName, InputStream x,
++			long length) throws SQLException {
++		inner.setBinaryStream(parameterName, x, length);
++	}
++
++	public void setBlob(String parameterName, Blob x)
++			throws SQLException {
++		inner.setBlob(parameterName, x);
++	}
++
++	public void setBlob(String parameterName, InputStream inputStream)
++			throws SQLException {
++		inner.setBlob(parameterName, inputStream);
++	}
++
++	public void setBlob(String parameterName, InputStream inputStream,
++			long length) throws SQLException {
++		inner.setBlob(parameterName, inputStream, length);
++	}
++
++	public void setCharacterStream(String parameterName, Reader reader)
++			throws SQLException {
++		inner.setCharacterStream(parameterName, reader);
++	}
++
++	public void setCharacterStream(String parameterName, Reader reader,
++			long length) throws SQLException {
++		inner.setCharacterStream(parameterName, reader, length);
++	}
++
++	public void setClob(String parameterName, Clob x)
++			throws SQLException {
++		inner.setClob(parameterName, x);
++	}
++
++	public void setClob(String parameterName, Reader reader)
++			throws SQLException {
++		inner.setClob(parameterName, reader);
++	}
++
++	public void setClob(String parameterName, Reader reader, long length)
++			throws SQLException {
++		inner.setClob(parameterName, reader, length);
++	}
++
++	public void setNCharacterStream(String parameterName, Reader value)
++			throws SQLException {
++		inner.setNCharacterStream(parameterName, value);
++	}
++
++	public void setNCharacterStream(String parameterName, Reader value,
++			long length) throws SQLException {
++		inner.setNCharacterStream(parameterName, value, length);
++	}
++
++	public void setNClob(String parameterName, NClob value)
++			throws SQLException {
++		inner.setNClob(parameterName, value);
++	}
++
++	public void setNClob(String parameterName, Reader reader)
++			throws SQLException {
++		inner.setNClob(parameterName, reader);
++	}
++
++	public void setNClob(String parameterName, Reader reader,
++			long length) throws SQLException {
++		inner.setNClob(parameterName, reader, length);
++	}
++
++	public void setNString(String parameterName, String value)
++			throws SQLException {
++		inner.setNString(parameterName, value);
++	}
++
++	public void setRowId(String parameterName, RowId x)
++			throws SQLException {
++		inner.setRowId(parameterName, x);
++	}
++
++	public void setSQLXML(String parameterName, SQLXML xmlObject)
++			throws SQLException {
++		inner.setSQLXML(parameterName, xmlObject);
++	}
++
++	// JDBC 4.1
++
++	public void closeOnCompletion() throws SQLException {
++		//inner.closeOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public boolean isCloseOnCompletion() throws SQLException {
++		//return inner.isCloseOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public Object getObject(int parameterIndex, Class type)
++			throws SQLException {
++		//return inner.getObject(parameterIndex, type);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public Object getObject(String parameterName, Class type)
++			throws SQLException {
++		//return inner.getObject(parameterName, type);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterConnection.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterConnection.java
+@@ -24,15 +24,24 @@
+ package com.mchange.v2.sql.filter;
+ 
+ import java.lang.String;
++import java.sql.Array;
++import java.sql.Blob;
+ import java.sql.CallableStatement;
++import java.sql.Clob;
+ import java.sql.Connection;
+ import java.sql.DatabaseMetaData;
++import java.sql.NClob;
+ import java.sql.PreparedStatement;
++import java.sql.SQLClientInfoException;
+ import java.sql.SQLException;
+ import java.sql.SQLWarning;
++import java.sql.SQLXML;
+ import java.sql.Savepoint;
+ import java.sql.Statement;
++import java.sql.Struct;
+ import java.util.Map;
++import java.util.Properties;
++import java.util.concurrent.Executor;
+ 
+ public abstract class FilterConnection implements Connection
+ {
+@@ -157,4 +166,90 @@
+ 	
+ 	public boolean isClosed() throws SQLException
+ 	{ return inner.isClosed(); }
++	
++	// JDBC 4.0
++
++	public Array createArrayOf(String arg0, Object[] arg1) throws SQLException {
++		return inner.createArrayOf(arg0, arg1);
++	}
++
++	public Blob createBlob() throws SQLException {
++		return inner.createBlob();
++	}
++
++	public Clob createClob() throws SQLException {
++		return inner.createClob();
++	}
++
++	public NClob createNClob() throws SQLException {
++		return inner.createNClob();
++	}
++
++	public SQLXML createSQLXML() throws SQLException {
++		return inner.createSQLXML();
++	}
++
++	public Struct createStruct(String arg0, Object[] arg1) throws SQLException {
++		return inner.createStruct(arg0, arg1);
++	}
++
++	public Properties getClientInfo() throws SQLException {
++		return inner.getClientInfo();
++	}
++
++	public String getClientInfo(String arg0) throws SQLException {
++		return inner.getClientInfo(arg0);
++	}
++
++	public boolean isValid(int arg0) throws SQLException {
++		return inner.isValid(arg0);
++	}
++
++	public void setClientInfo(Properties arg0) throws SQLClientInfoException {
++		inner.setClientInfo(arg0);
++	}
++
++	public void setClientInfo(String arg0, String arg1)
++			throws SQLClientInfoException {
++		inner.setClientInfo(arg0, arg1);
++	}
++
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++
++	// JDBC 4.1
++	
++	public void abort(Executor arg0) throws SQLException {
++		//inner.abort(arg0);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public int getNetworkTimeout() throws SQLException {
++		//return inner.getNetworkTimeout();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public String getSchema() throws SQLException {
++		//return inner.getSchema();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public void setNetworkTimeout(Executor arg0, int arg1) throws SQLException {
++		//inner.setNetworkTimeout(arg0, arg1);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public void setSchema(String arg0) throws SQLException {
++		//inner.setSchema(arg0);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterDatabaseMetaData.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterDatabaseMetaData.java
+@@ -27,6 +27,7 @@
+ import java.sql.Connection;
+ import java.sql.DatabaseMetaData;
+ import java.sql.ResultSet;
++import java.sql.RowIdLifetime;
+ import java.sql.SQLException;
+ 
+ public abstract class FilterDatabaseMetaData implements DatabaseMetaData
+@@ -539,4 +540,61 @@
+ 	
+ 	public String getUserName() throws SQLException
+ 	{ return inner.getUserName(); }
++	
++	// JDBC 4.0
++
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++	
++	public boolean autoCommitFailureClosesAllResultSets() throws SQLException {
++		return inner.autoCommitFailureClosesAllResultSets();
++	}
++
++	public ResultSet getClientInfoProperties() throws SQLException {
++		return inner.getClientInfoProperties();
++	}
++
++	public ResultSet getFunctionColumns(String arg0, String arg1, String arg2,
++			String arg3) throws SQLException {
++		return inner.getFunctionColumns(arg0, arg1, arg2, arg3);
++	}
++
++	public ResultSet getFunctions(String arg0, String arg1, String arg2)
++			throws SQLException {
++		return inner.getFunctions(arg0, arg1, arg2);
++	}
++
++	public RowIdLifetime getRowIdLifetime() throws SQLException {
++		return inner.getRowIdLifetime();
++	}
++
++	public ResultSet getSchemas(String arg0, String arg1) throws SQLException {
++		return inner.getSchemas(arg0, arg1);
++	}
++
++	public boolean supportsStoredFunctionsUsingCallSyntax() throws SQLException {
++		return inner.supportsStoredFunctionsUsingCallSyntax();
++	}
++
++	// JDBC 4.1
++
++	public boolean generatedKeyAlwaysReturned() throws SQLException {
++		//return inner.generatedKeyAlwaysReturned();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public ResultSet getPseudoColumns(String arg0, String arg1, String arg2,
++			String arg3) throws SQLException {
++		//return inner.getPseudoColumns(arg0, arg1, arg2, arg3);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterPreparedStatement.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterPreparedStatement.java
+@@ -34,16 +34,20 @@
+ import java.sql.Clob;
+ import java.sql.Connection;
+ import java.sql.Date;
++import java.sql.NClob;
+ import java.sql.ParameterMetaData;
+ import java.sql.PreparedStatement;
+ import java.sql.Ref;
+ import java.sql.ResultSet;
+ import java.sql.ResultSetMetaData;
++import java.sql.RowId;
+ import java.sql.SQLException;
+ import java.sql.SQLWarning;
++import java.sql.SQLXML;
+ import java.sql.Time;
+ import java.sql.Timestamp;
+ import java.util.Calendar;
++import java.util.Map;
+ 
+ public abstract class FilterPreparedStatement implements PreparedStatement
+ {
+@@ -282,4 +286,133 @@
+ 	
+ 	public void cancel() throws SQLException
+ 	{ inner.cancel(); }
++
++	// JDBC 4.0
++
++	public boolean isClosed() throws SQLException {
++		return inner.isClosed();
++	}
++
++	public boolean isPoolable() throws SQLException {
++		return inner.isPoolable();
++	}
++
++	public void setPoolable(boolean poolable) throws SQLException {
++		inner.setPoolable(poolable);
++	}
++
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++
++	public void setAsciiStream(int parameterIndex, InputStream x)
++			throws SQLException {
++		inner.setAsciiStream(parameterIndex, x);
++	}
++
++	public void setAsciiStream(int parameterIndex, InputStream x,
++			long length) throws SQLException {
++		inner.setAsciiStream(parameterIndex, x, length);
++	}
++
++	public void setBinaryStream(int parameterIndex, InputStream x)
++			throws SQLException {
++		inner.setBinaryStream(parameterIndex, x);
++	}
++
++	public void setBinaryStream(int parameterIndex, InputStream x,
++			long length) throws SQLException {
++		inner.setBinaryStream(parameterIndex, x, length);
++	}
++
++	public void setBlob(int parameterIndex, InputStream inputStream)
++			throws SQLException {
++		inner.setBlob(parameterIndex, inputStream);
++	}
++
++	public void setBlob(int parameterIndex, InputStream inputStream,
++			long length) throws SQLException {
++		inner.setBlob(parameterIndex, inputStream, length);
++	}
++
++	public void setCharacterStream(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setCharacterStream(parameterIndex, reader);
++	}
++
++	public void setCharacterStream(int parameterIndex, Reader reader,
++			long length) throws SQLException {
++		inner.setCharacterStream(parameterIndex, reader, length);
++	}
++
++	public void setClob(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setClob(parameterIndex, reader);
++	}
++
++	public void setClob(int parameterIndex, Reader reader, long length)
++			throws SQLException {
++		inner.setClob(parameterIndex, reader, length);
++	}
++
++	public void setNCharacterStream(int parameterIndex, Reader value)
++			throws SQLException {
++		inner.setNCharacterStream(parameterIndex, value);
++	}
++
++	public void setNCharacterStream(int parameterIndex, Reader value,
++			long length) throws SQLException {
++		inner.setNCharacterStream(parameterIndex, value, length);
++	}
++
++	public void setNClob(int parameterIndex, NClob value)
++			throws SQLException {
++		inner.setNClob(parameterIndex, value);
++	}
++
++	public void setNClob(int parameterIndex, Reader reader)
++			throws SQLException {
++		inner.setNClob(parameterIndex, reader);
++	}
++
++	public void setNClob(int parameterIndex, Reader reader, long length)
++			throws SQLException {
++		inner.setNClob(parameterIndex, reader, length);
++	}
++
++	public void setNString(int parameterIndex, String value)
++			throws SQLException {
++		inner.setNString(parameterIndex, value);
++	}
++
++	public void setRowId(int parameterIndex, RowId x)
++			throws SQLException {
++		inner.setRowId(parameterIndex, x);
++	}
++
++	public void setSQLXML(int parameterIndex, SQLXML xmlObject)
++			throws SQLException {
++		inner.setSQLXML(parameterIndex, xmlObject);
++	}
++
++	// JDBC 4.1
++
++	public void closeOnCompletion() throws SQLException {
++		//inner.closeOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public boolean isCloseOnCompletion() throws SQLException {
++		//return inner.isCloseOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterResultSet.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterResultSet.java
+@@ -33,11 +33,14 @@
+ import java.sql.Blob;
+ import java.sql.Clob;
+ import java.sql.Date;
++import java.sql.NClob;
+ import java.sql.Ref;
+ import java.sql.ResultSet;
+ import java.sql.ResultSetMetaData;
++import java.sql.RowId;
+ import java.sql.SQLException;
+ import java.sql.SQLWarning;
++import java.sql.SQLXML;
+ import java.sql.Statement;
+ import java.sql.Time;
+ import java.sql.Timestamp;
+@@ -476,4 +479,239 @@
+ 	
+ 	public int getRow() throws SQLException
+ 	{ return inner.getRow(); }
++	
++
++	// JDBC 4.0
++	
++	public int getHoldability() throws SQLException {
++		return inner.getHoldability();
++	}
++
++	public Reader getNCharacterStream(int arg0) throws SQLException {
++		return inner.getNCharacterStream(arg0);
++	}
++
++	public Reader getNCharacterStream(String arg0) throws SQLException {
++		return inner.getNCharacterStream(arg0);
++	}
++
++	public NClob getNClob(int arg0) throws SQLException {
++		return inner.getNClob(arg0);
++	}
++	
++	public NClob getNClob(String arg0) throws SQLException {
++		return inner.getNClob(arg0);
++	}
++	
++	public String getNString(int arg0) throws SQLException {
++		return inner.getNString(arg0);
++	}
++	
++	public String getNString(String arg0) throws SQLException {
++		return inner.getNString(arg0);
++	}
++	
++	public RowId getRowId(int arg0) throws SQLException {
++		return inner.getRowId(arg0);
++	}
++	
++	public RowId getRowId(String arg0) throws SQLException {
++		return inner.getRowId(arg0);
++	}
++	
++	public SQLXML getSQLXML(int arg0) throws SQLException {
++		return inner.getSQLXML(arg0);
++	}
++	
++	public SQLXML getSQLXML(String arg0) throws SQLException {
++		return inner.getSQLXML(arg0);
++	}
++	
++	public boolean isClosed() throws SQLException {
++		return inner.isClosed();
++	}
++	
++	public void updateAsciiStream(int arg0, InputStream arg1) throws SQLException {
++		inner.updateAsciiStream(arg0, arg1);
++	}
++	
++	public void updateAsciiStream(String arg0, InputStream arg1)
++			throws SQLException {
++		inner.updateAsciiStream(arg0, arg1);
++	}
++	
++	public void updateAsciiStream(int arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateAsciiStream(arg0, arg1, arg2);
++	}
++	
++	public void updateAsciiStream(String arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateAsciiStream(arg0, arg1, arg2);
++	}
++	
++	public void updateBinaryStream(int arg0, InputStream arg1) throws SQLException {
++		inner.updateBinaryStream(arg0, arg1);
++	}
++	
++	public void updateBinaryStream(String arg0, InputStream arg1)
++			throws SQLException {
++		inner.updateBinaryStream(arg0, arg1);
++	}
++	
++	public void updateBinaryStream(int arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateBinaryStream(arg0, arg1, arg2);
++	}
++	
++	public void updateBinaryStream(String arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateBinaryStream(arg0, arg1, arg2);
++	}
++	
++	public void updateBlob(int arg0, InputStream arg1) throws SQLException {
++		inner.updateBlob(arg0, arg1);		
++	}
++	
++	public void updateBlob(String arg0, InputStream arg1) throws SQLException {
++		inner.updateBlob(arg0, arg1);
++	}
++	
++	public void updateBlob(int arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateBlob(arg0, arg1, arg2);
++	}
++	
++	public void updateBlob(String arg0, InputStream arg1, long arg2)
++			throws SQLException {
++		inner.updateBlob(arg0, arg1, arg2);
++	}
++	
++	public void updateCharacterStream(int arg0, Reader arg1) throws SQLException {
++		inner.updateCharacterStream(arg0, arg1);
++	}
++	
++	public void updateCharacterStream(String arg0, Reader arg1) throws SQLException {
++		inner.updateCharacterStream(arg0, arg1);
++	}
++	
++	public void updateCharacterStream(int arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateCharacterStream(arg0, arg1, arg2);
++	}
++	
++	public void updateCharacterStream(String arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateCharacterStream(arg0, arg1, arg2);
++	}
++	
++	public void updateClob(int arg0, Reader arg1) throws SQLException {
++		inner.updateClob(arg0, arg1);		
++	}
++	
++	public void updateClob(String arg0, Reader arg1) throws SQLException {
++		inner.updateClob(arg0, arg1);
++	}
++	
++	public void updateClob(int arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateClob(arg0, arg1, arg2);
++	}
++	
++	public void updateClob(String arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateClob(arg0, arg1, arg2);
++	}
++	
++	public void updateNCharacterStream(int arg0, Reader arg1) throws SQLException {
++		inner.updateNCharacterStream(arg0, arg1);
++	}
++	
++	public void updateNCharacterStream(String arg0, Reader arg1)
++			throws SQLException {
++		inner.updateNCharacterStream(arg0, arg1);
++	}
++	
++	public void updateNCharacterStream(int arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateNCharacterStream(arg0, arg1, arg2);
++	}
++	
++	public void updateNCharacterStream(String arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateNCharacterStream(arg0, arg1, arg2);
++	}
++	
++	public void updateNClob(int arg0, NClob arg1) throws SQLException {
++		inner.updateNClob(arg0, arg1);
++	}
++	
++	public void updateNClob(String arg0, NClob arg1) throws SQLException {
++		inner.updateNClob(arg0, arg1);
++	}
++	
++	public void updateNClob(int arg0, Reader arg1) throws SQLException {
++		inner.updateNClob(arg0, arg1);
++	}
++	
++	public void updateNClob(String arg0, Reader arg1) throws SQLException {
++		inner.updateNClob(arg0, arg1);
++	}
++	
++	public void updateNClob(int arg0, Reader arg1, long arg2) throws SQLException {
++		inner.updateNClob(arg0, arg1, arg2);
++	}
++	
++	public void updateNClob(String arg0, Reader arg1, long arg2)
++			throws SQLException {
++		inner.updateNClob(arg0, arg1, arg2);
++	}
++	
++	public void updateNString(int arg0, String arg1) throws SQLException {
++		inner.updateNString(arg0, arg1);
++	}
++	
++	public void updateNString(String arg0, String arg1) throws SQLException {
++		inner.updateNString(arg0, arg1);
++	}
++	
++	public void updateRowId(int arg0, RowId arg1) throws SQLException {
++		inner.updateRowId(arg0, arg1);
++	}
++	
++	public void updateRowId(String arg0, RowId arg1) throws SQLException {
++		inner.updateRowId(arg0, arg1);
++	}
++	
++	public void updateSQLXML(int arg0, SQLXML arg1) throws SQLException {
++		inner.updateSQLXML(arg0, arg1);
++	}
++	
++	public void updateSQLXML(String arg0, SQLXML arg1) throws SQLException {
++		inner.updateSQLXML(arg0, arg1);
++	}
++	
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++	
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++
++	// JDBC 4.1
++	
++	public Object getObject(int arg0, Class arg1) throws SQLException {
++		//return inner.getObject(arg0, arg1);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++	
++	public Object getObject(String arg0, Class arg1) throws SQLException {
++		//return inner.getObject(arg0, arg1);
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
+ }
+--- a/src/classes/com/mchange/v2/sql/filter/FilterStatement.java
++++ b/src/classes/com/mchange/v2/sql/filter/FilterStatement.java
+@@ -23,11 +23,16 @@
+ 
+ package com.mchange.v2.sql.filter;
+ 
++import java.io.InputStream;
++import java.io.Reader;
+ import java.lang.String;
+ import java.sql.Connection;
++import java.sql.NClob;
+ import java.sql.ResultSet;
++import java.sql.RowId;
+ import java.sql.SQLException;
+ import java.sql.SQLWarning;
++import java.sql.SQLXML;
+ import java.sql.Statement;
+ 
+ public abstract class FilterStatement implements Statement
+@@ -156,4 +161,43 @@
+ 	
+ 	public void cancel() throws SQLException
+ 	{ inner.cancel(); }
++	
++	// JDBC 4.0
++
++
++	public boolean isClosed() throws SQLException {
++		return inner.isClosed();
++	}
++
++	public boolean isPoolable() throws SQLException {
++		return inner.isPoolable();
++	}
++
++	public void setPoolable(boolean poolable) throws SQLException {
++		inner.setPoolable(poolable);
++	}
++
++	public boolean isWrapperFor(Class c) throws SQLException {
++		return c.isInstance(this);
++	}
++
++	public Object unwrap(Class c) throws SQLException {
++		if (c.isInstance(this)) {
++			return this;
++		}
++		// should people be calling unwrap when isWrapperFor would return false
++		return null;
++	}
++
++	// JDBC 4.1
++
++	public void closeOnCompletion() throws SQLException {
++		//inner.closeOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
++
++	public boolean isCloseOnCompletion() throws SQLException {
++		//return inner.isCloseOnCompletion();
++		throw new java.sql.SQLFeatureNotSupportedException();
++	}
+ }

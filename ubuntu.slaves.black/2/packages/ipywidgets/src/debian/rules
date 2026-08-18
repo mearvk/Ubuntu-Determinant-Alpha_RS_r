@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE=1 # can also set this on each debian/rules command line
+export LC_ALL=C.UTF-8
+JSUSING:=fonts-font-awesome libjs-mathjax node-ajv node-d3-format node-requirejs node-jquery node-jquery-ui node-backbone node-es6-promise node-semver node-underscore
+BUILTUSING:=$(foreach jspkg, $(JSUSING), $(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W $(jspkg)))
+
+%:
+	dh $@ --with nodejs,python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_configure:
+	mv debian/missing-sources/* .
+	dh_auto_configure
+	dh_auto_configure --buildsystem nodejs
+	# partial libraries without package.json break pkg-js-tools machinery
+	ln -s ../../@jupyterlab jupyter-js-widgets/node_modules/@jupyterlab
+	# d/nodejs/component_links doesn't work if the component name includes @
+	ln -s ../../../@types/underscore jupyter-js-widgets/node_modules/@types/underscore
+	dh_auto_configure -- -d ./widgetsnbextension
+
+override_dh_auto_build:
+# ipywidgets
+	dh_auto_build
+# jupyter-js-widgets
+	dh_auto_build --buildsystem nodejs
+# widgetsnbextension
+	dh_auto_build -Dwidgetsnbextension
+
+override_dh_sphinxdoc:
+	python3 -m sphinx -N -bhtml docs/source debian/python-ipywidgets-doc/usr/share/doc/python-ipywidgets-doc/html
+	dh_sphinxdoc
+
+override_dh_auto_install:
+	dh_auto_install
+	dh_auto_install -- -d ./widgetsnbextension
+	set -e; for i in debian/tmp/usr/lib/*/dist-packages/widgetsnbextension/static; do \
+	  rm -rf $$i && ln -sfT /usr/share/jupyter/nbextensions/jupyter-js-widgets $$i; \
+	done
+
+override_dh_auto_test:
+	nosetests3 ipywidgets
+
+override_dh_gencontrol:
+	echo "js:Built-Using=$(BUILTUSING)" >> debian/jupyter-nbextension-jupyter-js-widgets.substvars
+	dh_gencontrol

@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE = 1
+
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
+export DEB_LDFLAGS_MAINT_APPEND =
+
+
+%:
+	dh $@
+
+execute_after_dh_auto_clean:
+	-+$(MAKE) -C tests clean
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Ddefault_library=both \
+		-Dwith_INIReader=true \
+		-Ddistro_install=true
+
+override_dh_auto_test:
+	+$(MAKE) -C tests test CFLAGS+=-I.. LDFLAGS+="-Wl,-rpath,../obj-$(DEB_HOST_GNU_TYPE) -L../obj-$(DEB_HOST_GNU_TYPE)"

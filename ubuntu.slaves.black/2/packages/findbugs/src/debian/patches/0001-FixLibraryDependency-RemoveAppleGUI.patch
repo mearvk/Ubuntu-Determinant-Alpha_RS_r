@@ -1,0 +1,233 @@
+unchanged:
+--- a/build.properties
++++ b/build.properties
+@@ -8,10 +8,12 @@
+                       src/gui/,\
+                       etc
+ 
++sys.jar.dir   =/usr/share/java
++
+ # Set this to the directory containing the DocBook Modular XSL Stylesheets
+ #  from http://docbook.sourceforge.net/projects/xsl/
+ 
+-xsl.stylesheet.home	=${local.software.home}/docbook-xsl-1.76.1
++xsl.stylesheet.home	=/usr/share/xml/docbook/stylesheet/docbook-xsl
+ 
+ # Set this to the directory containing the svnant Ant jars.  These are
+ # needed for the srcdist target and to get the svn revision number
+@@ -23,7 +25,7 @@
+ # Set this to the directory where Saxon (http://saxon.sourceforge.net/)
+ # is installed.
+ 
+-saxon.home		=${local.software.home}/saxon-6.5.5
++saxon.home		=${sys.jar.dir}
+ 
+ # Set this to the directory where FOP (http://xml.apache.org/fop/)
+ # is installed.  (Note: this is disabled for now.)
+--- a/build.xml
++++ b/build.xml
+@@ -61,12 +61,24 @@
+ 
+     <path id="findbugs.classpath">
+         <fileset dir="${jar.dir}" includes="*.jar"/>
++        <pathelement location="${sys.jar.dir}/bcel.jar"/>
++        <pathelement location="${sys.jar.dir}/commons-lang.jar"/>
++        <pathelement location="${sys.jar.dir}/jsr305.jar"/>
++        <pathelement location="${sys.jar.dir}/junit4.jar"/>
++        <pathelement location="${sys.jar.dir}/dom4j.jar"/>
++        <pathelement location="${sys.jar.dir}/jdepend.jar"/>
++        <pathelement location="${sys.jar.dir}/jFormatString.jar"/>
++        <pathelement location="${sys.jar.dir}/asm.jar"/>
++        <pathelement location="${sys.jar.dir}/asm-commons.jar"/>
++        <pathelement location="${sys.jar.dir}/asm-tree.jar"/>
++        <pathelement location="${sys.jar.dir}/jcip.jar"/>
++        <pathelement location="${sys.jar.dir}/ant.jar"/>
+     </path>
+ 
+     <path id="tools.classpath">
+         <pathelement location="${classes.dir}"/>
+         <pathelement location="${jar.dir}/findbugs.jar"/>
+-        <pathelement location="${jar.dir}/jdepend-2.9.jar"/>
++        <pathelement location="${sys.jar.dir}/jdepend.jar"/>
+         <path refid="findbugs.classpath"/>
+     </path>
+ 
+@@ -302,8 +314,8 @@
+             <fileset dir="${src.dir}">
+                 <include name="**/annotations/*.java"/>
+             </fileset>
+-            <zipfileset src="${jar.dir}/jcip-annotations.jar" excludes="META-INF/**,**/*.html"/>
+-            <zipfileset src="${jar.dir}/jsr305.jar" excludes="META-INF/**,**/*.html"/>
++            <zipfileset src="${sys.jar.dir}/jcip.jar" excludes="META-INF/**,**/*.html"/>
++            <zipfileset src="${sys.jar.dir}/jsr305.jar" excludes="META-INF/**,**/*.html"/>
+         </jar>
+ 
+         <!-- FindBugs only annotations jar file. -->
+@@ -659,14 +671,12 @@
+     </target>
+ 
+ 
+-    <target name="version" depends="classes,-get-git-revision" >
+-        <echo>${gitrnum}</echo>
++    <target name="version" depends="classes" >
+         <java classpathref="tools.classpath"
+               output="${version.props.file}"
+               classname="edu.umd.cs.findbugs.Version"
+               failonerror="true">
+             <arg value="-props"/>
+-            <sysproperty key="git.revision" value="${gitrnum}"/>
+         </java>
+ 
+         <loadproperties srcfile="${version.props.file}"/>
+@@ -957,16 +967,15 @@
+     <!-- Generate jnlp jars -->
+     <target name="jnlp" depends="jars">
+         <copy todir="${jnlp.dir}" file="${engine.jar}"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/bcel.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/jsr305.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/asm-3.3.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/asm-commons-3.3.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/asm-tree-3.3.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/dom4j-1.6.1.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/jaxen-1.1.6.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/jFormatString.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/commons-lang-2.6.jar"/>
+-        <copy todir="${jnlp.dir}" file="${jar.dir}/AppleJavaExtensions.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/bcel.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/jsr305.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/asm.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/asm-commons.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/asm-tree.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/dom4j.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/jaxen.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/jFormatString.jar"/>
++        <copy todir="${jnlp.dir}" file="${sys.jar.dir}/commons-lang.jar"/>
+         <copy todir="${jnlp.dir}" file="${docsrc.dir}/buggy-sm.png"/>
+         <copy todir="${jnlp.dir}">
+             <fileset refid="plugin.jars"/>
+@@ -1226,7 +1235,7 @@
+ 
+     <target name="annotationJavadoc">
+       <javadoc access="public"
+-       classpath="lib/bcel.jar:lib/junit.jar:lib/dom4j-1.6.1.jar:lib/jsr305.jar:lib/AppleJavaExtensions.jar"
++          classpath="${sys.jar.dir}/findbugs-bcel.jar:${sys.jar.dir}/junit4.jar:${sys.jar.dir}/dom4j.jar:${sys.jar.dir}/jsr305.jar"
+         destdir="${annotationDoc.dir}"
+         packagenames="edu.umd.cs.findbugs.annotations"
+         doctitle="FindBugs Annotation Documentation"
+--- a/src/gui/edu/umd/cs/findbugs/gui2/OSXAdapter.java
++++ b/src/gui/edu/umd/cs/findbugs/gui2/OSXAdapter.java
+@@ -19,9 +19,6 @@
+ 
+ package edu.umd.cs.findbugs.gui2;
+ 
+-import com.apple.eawt.ApplicationAdapter;
+-import com.apple.eawt.ApplicationEvent;
+-
+ /*
+  * Based on sample code from Apple.
+  *
+@@ -29,13 +26,13 @@
+  * This class should only ever be referenced via reflection after
+  * checking that we are running on Mac OS X.
+  */
+-public class OSXAdapter extends ApplicationAdapter {
++public class OSXAdapter {
+ 
+     // pseudo-singleton model; no point in making multiple instances
+     // of the EAWT application or our adapter
+     private static OSXAdapter theAdapter = new OSXAdapter();
+ 
+-    private static final com.apple.eawt.Application theApplication = new com.apple.eawt.Application();
++    //private static final com.apple.eawt.Application theApplication = new com.apple.eawt.Application();
+ 
+     // reference to the app where the existing quit, about, prefs code is
+     private static MainFrame mainApp;
+@@ -47,6 +44,7 @@
+     // existing functionality from the main app, as if it came
+     // over from another platform.
+ 
++    /* disabled for Debian build
+     @Override
+     public void handleAbout(ApplicationEvent ae) {
+         if (mainApp != null) {
+@@ -76,10 +74,12 @@
+             throw new IllegalStateException("handlePreferences: MyApp instance " + "detached from listener");
+         }
+     }
++    */
+ 
+-    @Override
+-    public void handleQuit(ApplicationEvent ae) {
+-        if (mainApp != null) {
++    // disabled for Debian build
++    //@Override
++    //public void handleQuit(ApplicationEvent ae) {
++    //    if (mainApp != null) {
+ 
+             /*
+              * You MUST setHandled(false) if you want to delay or cancel the
+@@ -90,12 +90,12 @@
+              * universal method.
+              */
+ 
+-            ae.setHandled(false);
+-            mainApp.callOnClose();
+-        } else {
+-            throw new IllegalStateException("handleQuit: MyApp instance detached " + "from listener");
+-        }
+-    }
++     //       ae.setHandled(false);
++     //       mainApp.callOnClose();
++     //   } else {
++     //       throw new IllegalStateException("handleQuit: MyApp instance detached " + "from listener");
++     //   }
++     //}
+ 
+     // The main entry-point for this functionality. This is the only method
+     // that needs to be called at runtime, and it can easily be done using
+@@ -107,15 +107,15 @@
+ 
+         mainApp = inApp;
+ 
+-        theApplication.addApplicationListener(theAdapter);
++        //theApplication.addApplicationListener(theAdapter);
+ 
+-        theApplication.addPreferencesMenuItem();
++        //theApplication.addPreferencesMenuItem();
+     }
+ 
+     // Another static entry point for EAWT functionality. Enables the
+     // "Preferences..." menu item in the application menu.
+     public static void enablePrefs(boolean enabled) {
+ 
+-        theApplication.setEnabledPreferencesMenu(enabled);
++        //theApplication.setEnabledPreferencesMenu(enabled);
+     }
+ }
+--- a/src/gui/edu/umd/cs/findbugs/gui2/MainFrameComponentFactory.java
++++ b/src/gui/edu/umd/cs/findbugs/gui2/MainFrameComponentFactory.java
+@@ -461,7 +461,7 @@
+             JToolTip tempToolTip = mainFrame.mainFrameTree.getTableheader().createToolTip();
+             UIManager.put("ToolTip.font", new FontUIResource(tempToolTip.getFont().deriveFont(Driver.getFontSize())));
+ 
+-            setupOSX();
++            //setupOSX();
+ 
+             String loadFromURL = SystemProperties.getOSDependentProperty("findbugs.loadBugsFromURL");
+ 
+@@ -486,6 +486,7 @@
+             mainFrame.waitForMainFrameInitialized();
+         }
+ 
++        /* disabled for Debian
+         private void setupOSX() {
+             if (MainFrame.MAC_OS_X) {
+                 try {
+@@ -514,6 +515,7 @@
+                 }
+             }
+         }
++        */
+     }
+ 
+     /**

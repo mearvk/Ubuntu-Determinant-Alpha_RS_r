@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+t="$(basename $0 | sed -e 's/-/_/g')"
+
+cat > $AUTOPKGTEST_TMP/config.h << EOF
+#define HAVE_SETENV 1
+#define HAVE_UNSETENV 1
+EOF
+
+CFLAGS="-O2 -Wall $(pkg-config --cflags libconfuse) -I$AUTOPKGTEST_TMP -DSRC_DIR=\".\""
+LDFLAGS=$(pkg-config --libs libconfuse)
+
+cd tests
+cc $CFLAGS -o $AUTOPKGTEST_TMP/$t.o -c $t.c 2>&1
+cc -o $AUTOPKGTEST_TMP/$t $AUTOPKGTEST_TMP/$t.o $LDFLAGS 2>&1
+echo "build: $t: OK"
+
+[ -x $AUTOPKGTEST_TMP/$t ]
+$AUTOPKGTEST_TMP/$t 2>&1
+echo "run: $t: OK"

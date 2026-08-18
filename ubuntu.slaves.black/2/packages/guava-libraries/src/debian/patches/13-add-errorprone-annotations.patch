@@ -1,0 +1,569 @@
+Description: Add the errorprone annotations (not yet packaged in Debian)
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/CanIgnoreReturnValue.java
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2015 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.ElementType.TYPE;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * Indicates that the return value of the annotated method can be safely ignored.
++ *
++ * <p>This is the opposite of {@link CheckReturnValue}. It can be used inside classes or packages
++ * annotated with {@code @CheckReturnValue} to exempt specific methods from the default.
++ */
++@Documented
++@Target({METHOD, TYPE})
++@Retention(SOURCE)
++public @interface CanIgnoreReturnValue {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/ForOverride.java
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2015 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++import static javax.lang.model.element.Modifier.FINAL;
++import static javax.lang.model.element.Modifier.PRIVATE;
++import static javax.lang.model.element.Modifier.PUBLIC;
++import static javax.lang.model.element.Modifier.STATIC;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * Indicates that the annotated method is provided only to be overridden: it should not be
++ * <i>invoked</i> from outside its declaring source file (as if it is {@code private}), and
++ * overriding methods should not be directly invoked at all. Such a method represents a contract
++ * between a class and its <i>subclasses</i> only, and is not to be considered part of the
++ * <i>caller</i>-facing API of either class.
++ *
++ * <p>The annotated method must have protected or package-private visibility, and must not be {@code
++ * static}, {@code final} or declared in a {@code final} class. Overriding methods must have either
++ * protected or package-private visibility, although their effective visibility is actually "none".
++ */
++@Documented
++@Retention(SOURCE) // Parent source might not be available while compiling subclass
++@Target(METHOD)
++public @interface ForOverride {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/concurrent/LazyInit.java
+@@ -0,0 +1,65 @@
++/*
++ * Copyright 2015 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.errorprone.annotations.concurrent;
++
++import static javax.lang.model.element.Modifier.FINAL;
++
++import java.lang.annotation.ElementType;
++import java.lang.annotation.Retention;
++import java.lang.annotation.RetentionPolicy;
++import java.lang.annotation.Target;
++
++/**
++ * Use this annotation on any static or field that will be initialized lazily, where races yield no
++ * semantic difference in the code (as, for example, is the case with {@link String#hashCode}). Note
++ * that lazily initializing a non-volatile field is hard to do correctly, and one should rarely use
++ * this. It should also only be done by developers who clearly understand the potential issues, and
++ * then, always using the pattern as presented in the {@code getData} method of this sample code
++ * below:
++ *
++ * <pre>{@code
++ * private final String source;
++ * {@literal @}LazyInit private String data;
++ *
++ * public String getData() {
++ *   String local = data;
++ *   if (local == null) {
++ *     local = data = expensiveCalculation(source);
++ *   }
++ *   return local;
++ *  }
++ *
++ * private static String expensiveCalculation(String string) {
++ *   return string.replaceAll(" ", "_");
++ * }
++ * }</pre>
++ *
++ * <p>The need for using the {@code local} variable is detailed in
++ * http://jeremymanson.blogspot.com/2008/12/benign-data-races-in-java.html (see, particularly, the
++ * part after "Now, let's break the code").
++ *
++ * <p>Also note that {@code LazyInit} must not be used on 64-bit primitives ({@code long}s and
++ * {@code double}s), because the Java Language Specification does not guarantee that writing to
++ * these is atomic. Furthermore, when used for non-primitives, the non-primitive must be either
++ * truly immutable or at least thread safe (in the Java memory model sense). And callers must
++ * accommodate the fact that different calls to something like the above getData() method may return
++ * different (though identically computed) objects, with different identityHashCode() values. Again,
++ * unless you really understand this <b>and</b> you really need the performance benefits of
++ * introducing the data race, do not use this construct.
++ */
++@Retention(RetentionPolicy.SOURCE)
++@Target(ElementType.FIELD)
++public @interface LazyInit {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/Immutable.java
+@@ -0,0 +1,84 @@
++/*
++ * Copyright 2015 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.TYPE;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Inherited;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * The class to which this annotation is applied is immutable.
++ *
++ * <p>An object is immutable if its state cannot be observed to change after construction. Immutable
++ * objects are inherently thread-safe.
++ *
++ * <p>A class is immutable if all instances of that class are immutable. The immutability of a class
++ * can only be fully guaranteed if the class is final, otherwise one must ensure all subclasses are
++ * also immutable.
++ *
++ * <p>A conservative definition of object immutability is:
++ *
++ * <ul>
++ *   <li>All fields are final;
++ *   <li>All reference fields are of immutable type, or null;
++ *   <li>It is <em>properly constructed</em> (the {@code this} reference does not escape the
++ *       constructor).
++ * </ul>
++ *
++ * <p>The requirement that all reference fields be immutable ensures <em>deep</em> immutability,
++ * meaning all contained state is also immutable. A weaker property, common with container classes,
++ * is <em>shallow</em> immutability, which allows some of the object's fields to point to mutable
++ * objects. One example of shallow immutability is guava's ImmutableList, which may contain mutable
++ * elements.
++ *
++ * <p>It is possible to implement immutable classes with some internal mutable state, as long as
++ * callers can never observe changes to that state. For example, some state may be lazily
++ * initialized to improve performance.
++ *
++ * <p>It is also technically possible to have an immutable object with non-final fields (see the
++ * implementation of {@link String#hashCode()} for an example), but doing this correctly requires
++ * subtle reasoning about safe data races and deep knowledge of the Java Memory Model.
++ *
++ * <p>Use of this annotation is validated by <a
++ * href="https://errorprone.info/bugpattern/Immutable">Error Prone's immutability analysis</a>, which
++ * ensures that all {@code @Immutable}-annotated classes are deeply immutable according to the
++ * conservative definition above. Non-final classes may be annotated with {@code @Immutable}, and
++ * any code compiled by Error Prone will be checked to ensure that no mutable subtypes of
++ * {@code @Immutable}-annotated classes exist.
++ *
++ * <p>For more information about immutability, see:
++ *
++ * <ul>
++ *   <li>Java Concurrency in Practice §3.4
++ *   <li>Effective Java 3rd Edition §17
++ * </ul>
++ */
++@Documented
++@Target(TYPE)
++@Retention(SOURCE)
++@Inherited
++public @interface Immutable {
++
++  /**
++   * When annotating a generic type as immutable, {@code containerOf} specifies which type
++   * parameters must be instantiated with immutable types for the container to be deeply immutable.
++   */
++  String[] containerOf() default {};
++}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/CompatibleWith.java
+@@ -0,0 +1,55 @@
++/*
++ * Copyright 2016 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.ElementType;
++import java.lang.annotation.Retention;
++import java.lang.annotation.RetentionPolicy;
++import java.lang.annotation.Target;
++import java.util.Collection;
++
++/**
++ * Declares that a parameter to a method must be "compatible with" one of the type parameters in the
++ * method's enclosing class, or on the method itself. "Compatible with" means that there can exist a
++ * "reference casting conversion" from one type to the other (JLS 5.5.1).
++ *
++ * <p>For example, {@link Collection#contains} would be annotated as follows:
++ *
++ * <pre>{@code
++ * interface Collection<E> {
++ *   boolean contains(@CompatibleWith("E") Object o);
++ * }
++ * }</pre>
++ *
++ * <p>To indicate that invocations of {@link Collection#contains} must be passed an argument whose
++ * type is compatible with the generic type argument of the Collection instance:
++ *
++ * <pre>{@code
++ * Collection<String> stringCollection = ...;
++ * boolean shouldBeFalse = stringCollection.contains(42); // BUG! int isn't compatible with String
++ * }</pre>
++ *
++ * <p>Note: currently, this annotation can't be used if the method overrides another method that has
++ * {@code @CompatibleWith} already present.
++ */
++@Documented
++@Retention(RetentionPolicy.SOURCE)
++@Target(ElementType.PARAMETER)
++public @interface CompatibleWith {
++  String value();
++}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/MustBeClosed.java
+@@ -0,0 +1,42 @@
++/*
++ * Copyright 2016 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.CONSTRUCTOR;
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * Annotation for constructors of AutoCloseables or methods that return an AutoCloseable and require
++ * that the resource is closed.
++ *
++ * <p>This is enforced by checking that invocations occur within the resource variable initializer
++ * of a try-with-resources statement, which guarantees that the resource is always closed. The
++ * analysis may be improved in the future to recognize other patterns where the resource will always
++ * be closed.
++ *
++ * <p>Note that Android SDK versions prior to 19 do not support try-with-resources, so the
++ * annotation should be avoided on APIs that may be used on Android, unless desugaring is used.
++ */
++@Documented
++@Retention(SOURCE)
++@Target({CONSTRUCTOR, METHOD})
++public @interface MustBeClosed {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/DoNotMock.java
+@@ -0,0 +1,47 @@
++/*
++ * Copyright 2016 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.ElementType;
++import java.lang.annotation.Inherited;
++import java.lang.annotation.Retention;
++import java.lang.annotation.RetentionPolicy;
++import java.lang.annotation.Target;
++
++/**
++ * Annotation representing a type that should not be mocked.
++ *
++ * <p>When marking a type {@code @DoNotMock}, you should always point to alternative testing
++ * solutions such as standard fakes or other testing utilities.
++ *
++ * <p>Mockito tests can enforce this annotation by using a custom MockMaker which intercepts
++ * creation of mocks.
++ *
++ */
++@Inherited
++@Documented
++@Retention(RetentionPolicy.SOURCE)
++@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
++public @interface DoNotMock {
++  /**
++   * The reason why the annotated type should not be mocked.
++   *
++   * <p>This should suggest alternative APIs to use for testing objects of this type.
++   */
++  String value() default "Create a real instance instead";
++}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/concurrent/GuardedBy.java
+@@ -0,0 +1,35 @@
++/*
++ * Copyright 2017 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.errorprone.annotations.concurrent;
++
++import static java.lang.annotation.ElementType.FIELD;
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/** Indicates that the annotated element should be used only while holding the specified lock. */
++@Target({FIELD, METHOD})
++@Retention(SOURCE)
++public @interface GuardedBy {
++  /**
++   * The lock that should be held, specified in the format <a
++   * href="http://jcip.net/annotations/doc/net/jcip/annotations/GuardedBy.html">given in Java
++   * Concurrency in Practice</a>.
++   */
++  String value();
++}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/CheckReturnValue.java
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2017 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.CONSTRUCTOR;
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.ElementType.PACKAGE;
++import static java.lang.annotation.ElementType.TYPE;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * Indicates that the return value of the annotated method must be checked. An error is triggered
++ * when one of these methods is called but the result is not used.
++ *
++ * <p>{@code @CheckReturnValue} may be applied to a class or package to indicate that all methods in
++ * that class or package must have their return values checked. For convenience, we provide an
++ * annotation, {@link CanIgnoreReturnValue}, to exempt specific methods or classes from this
++ * behavior.
++ */
++@Documented
++@Target({METHOD, CONSTRUCTOR, TYPE, PACKAGE})
++@Retention(SOURCE)
++public @interface CheckReturnValue {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/OverridingMethodsMustInvokeSuper.java
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2017 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Documented;
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * Indicates that any concrete method that overrides the annotated method, directly or indirectly,
++ * must invoke {@code super.theAnnotatedMethod(...)} at some point. This does not necessarily
++ * require an <i>unconditional</i> call; any matching call appearing directly within the method body
++ * (not inside an intervening class or lambda expression) is acceptable.
++ *
++ * <p>If the overriding method is itself overridable, applying this annotation to that method is
++ * technically redundant, but may be helpful to readers.
++ *
++ * <p><b>Preferred:</b> usually, a better solution is to make the method {@code final}, and have its
++ * implementation delegate to a second concrete method which <i>is</i> overridable (or to a function
++ * object which subclasses can specify). "Mandatory" statements remain in the final method while
++ * "optional" code moves out. This is the only way to make sure the statements will be executed
++ * unconditionally.
++ */
++@Documented
++@Target(METHOD)
++@Retention(SOURCE)
++public @interface OverridingMethodsMustInvokeSuper {}
+--- /dev/null
++++ b/guava/src/com/google/errorprone/annotations/DoNotCall.java
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2017 The Error Prone Authors.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.errorprone.annotations;
++
++import static java.lang.annotation.ElementType.METHOD;
++import static java.lang.annotation.RetentionPolicy.SOURCE;
++
++import java.lang.annotation.Retention;
++import java.lang.annotation.Target;
++
++/**
++ * The method to which this annotation is applied cannot be called.
++ *
++ * <p>The annotation is applied to methods that are required to satisfy the contract of an
++ * interface, but that are not supported. One example is the implementation of {@link
++ * java.util.Collection#add} in an immutable collection implementation.
++ *
++ * <p>Marking methods annotated with {@code @DoNotCall} as {@code @Deprecated} is recommended, since
++ * it provides IDE users with more immediate feedback.
++ */
++@Retention(SOURCE)
++@Target(METHOD)
++public @interface DoNotCall {
++
++  /** An optional explanation of why the method should not be called. */
++  String value() default "";
++}

@@ -1,0 +1,202 @@
+/*
+ * Copyright (c) 2019, 2021, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.jfr;
+
+import java.util.List;
+
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.impl.RuntimeClassInitializationSupport;
+
+import com.oracle.svm.core.SubstrateOptions;
+import com.oracle.svm.core.VMInspectionOptions;
+import com.oracle.svm.core.feature.InternalFeature;
+import com.oracle.svm.core.imagelayer.ImageLayerBuildingSupport;
+import com.oracle.svm.guest.staging.jdk.RuntimeSupport;
+import com.oracle.svm.core.jfr.traceid.JfrEpoch;
+import com.oracle.svm.core.jfr.traceid.JfrTraceIdMap;
+import com.oracle.svm.core.sampler.SamplerJfrStackTraceSerializer;
+import com.oracle.svm.core.sampler.SamplerStackTraceSerializer;
+import com.oracle.svm.core.sampler.SamplerStatistics;
+import com.oracle.svm.core.thread.ThreadListenerSupport;
+import com.oracle.svm.core.util.UserError;
+import com.oracle.svm.shared.Uninterruptible;
+import com.oracle.svm.shared.feature.AutomaticallyRegisteredFeature;
+import com.oracle.svm.shared.util.LogUtils;
+import com.oracle.svm.shared.util.ReflectionUtil;
+import com.oracle.svm.shared.util.VMError;
+import com.sun.management.HotSpotDiagnosticMXBean;
+import com.sun.management.internal.PlatformMBeanProviderImpl;
+
+import jdk.jfr.Configuration;
+import jdk.jfr.internal.JVMSupport;
+import jdk.jfr.internal.jfc.JFC;
+
+/**
+ * Provides basic JFR support. The core event infrastructure is shared across platforms, while some
+ * integration points such as out-of-process control and platform events remain platform-dependent
+ * and JDK-specific.
+ *
+ * There are two different kinds of JFR events:
+ * <ul>
+ * <li>Java-level events are defined by a Java class that extends {@link jdk.internal.event.Event}
+ * and that is annotated with JFR-specific annotations. Those events are typically triggered by the
+ * Java application and a Java {@code EventWriter} object is used when writing the event to a
+ * buffer.</li>
+ * <li>Native events are triggered by the JVM itself and are defined in the JFR metadata.xml file.
+ * For writing such an event to a buffer, we call into {@link JfrNativeEventWriter} and pass a
+ * {@link JfrNativeEventWriterData} struct that is typically allocated on the stack.</li>
+ * </ul>
+ *
+ * JFR tries to minimize the runtime overhead, so it heavily relies on a hierarchy of buffers when
+ * persisting events:
+ * <ul>
+ * <li>Initially, nearly all events are written to a thread-local buffer, see
+ * {@link JfrThreadLocal}.</li>
+ * <li>When the thread-local buffer is full, then the data is copied to a set of global buffers, see
+ * {@link JfrGlobalMemory}.</li>
+ * <li>The global buffers are regularly persisted to a file, see {@link JfrRecorderThread}. The data
+ * may be persisted in multiple, independent chunks.</li>
+ * <li>When the active chunk exceeds a certain threshold, then it is necessary to start a new chunk
+ * (and maybe a new file), see {@link JfrChunkWriter}. Before doing that, some metadata and all
+ * thread-local/global data that is currently in flight must be flushed to the old file. This
+ * operation needs a safepoint and also changes the JFR epoch, see {@link JfrEpoch}.</li>
+ * </ul>
+ *
+ * A lot of the JFR infrastructure is {@link Uninterruptible} and uses native memory instead of the
+ * Java heap. This is necessary as JFR events may, for example, also be used in the following
+ * situations:
+ * <ul>
+ * <li>When allocating Java heap memory.</li>
+ * <li>While executing a garbage collection (i.e., when the Java heap is not necessarily in a
+ * consistent state).</li>
+ * </ul>
+ */
+@AutomaticallyRegisteredFeature
+public class JfrFeature implements InternalFeature {
+    /*
+     * Note that we could initialize the native part of JFR at image build time and that the native
+     * code sets the FlightRecorder option as a side effect. Therefore, we must ensure that we check
+     * the value of the option before it can be affected by image building.
+     */
+    private static final boolean HOSTED_ENABLED;
+    static {
+        boolean hostEnabled;
+        try {
+            hostEnabled = Boolean.parseBoolean(getDiagnosticBean().getVMOption("FlightRecorder").getValue());
+        } catch (IllegalArgumentException e) {
+            hostEnabled = false;
+        }
+        HOSTED_ENABLED = hostEnabled;
+    }
+
+    @Override
+    public boolean isInConfiguration(IsInConfigurationAccess access) {
+        return isInConfiguration(true);
+    }
+
+    public static boolean isInConfiguration(boolean allowPrinting) {
+        boolean systemSupported = VMInspectionOptions.hasJfrPlatformSupport();
+        if (HOSTED_ENABLED && !systemSupported) {
+            throw UserError.abort("FlightRecorder cannot be used to profile the image generator on this platform. " +
+                            "The image generator can only be profiled on platforms where FlightRecorder is also supported at run time.");
+        }
+        boolean runtimeEnabled = VMInspectionOptions.hasJfrSupport();
+        if (HOSTED_ENABLED && !runtimeEnabled) {
+            if (allowPrinting) {
+                LogUtils.warning("When FlightRecorder is used to profile the image generator, it is also automatically enabled in the native image at run time. " +
+                                "This can affect the measurements because it can make the image larger and image build time longer.");
+            }
+            runtimeEnabled = true;
+        }
+        if (ImageLayerBuildingSupport.buildingImageLayer()) {
+            // GR-68066 support JFR in layered images
+            return false;
+        }
+        return runtimeEnabled && systemSupported;
+    }
+
+    /**
+     * We cannot use the proper way of looking up the bean via
+     * {@link java.lang.management.ManagementFactory} because that initializes too many classes at
+     * image build time that we want to initialize only at run time.
+     */
+    private static HotSpotDiagnosticMXBean getDiagnosticBean() {
+        try {
+            return (HotSpotDiagnosticMXBean) ReflectionUtil.lookupMethod(PlatformMBeanProviderImpl.class, "getDiagnosticMXBean").invoke(null);
+        } catch (ReflectiveOperationException ex) {
+            throw VMError.shouldNotReachHere(ex);
+        }
+    }
+
+    @Override
+    public void afterRegistration(AfterRegistrationAccess access) {
+
+        // Initialize some parts of JFR/JFC at image build time.
+        List<Configuration> knownConfigurations = JFC.getConfigurations();
+        JVMSupport.createJFR();
+
+        ImageSingletons.add(JfrManager.class, new JfrManager(HOSTED_ENABLED));
+        ImageSingletons.add(SubstrateJVM.class, new SubstrateJVM(knownConfigurations, true));
+        ImageSingletons.add(JfrSerializerSupport.class, new JfrSerializerSupport());
+        ImageSingletons.add(JfrTraceIdMap.class, new JfrTraceIdMap());
+        ImageSingletons.add(JfrEpoch.class, new JfrEpoch());
+        ImageSingletons.add(JfrGCNames.class, new JfrGCNames());
+        ImageSingletons.add(JfrExecutionSamplerSupported.class, new JfrExecutionSamplerSupported());
+        ImageSingletons.add(SamplerStackTraceSerializer.class, new SamplerJfrStackTraceSerializer());
+        ImageSingletons.add(SamplerStatistics.class, new SamplerStatistics());
+
+        JfrSerializerSupport.get().register(new JfrFrameTypeSerializer());
+        JfrSerializerSupport.get().register(new JfrThreadStateSerializer());
+        JfrSerializerSupport.get().register(new JfrMonitorInflationCauseSerializer());
+        if (SubstrateOptions.useSerialGC()) {
+            JfrSerializerSupport.get().register(new JfrGCCauseSerializer());
+            JfrSerializerSupport.get().register(new JfrGCNameSerializer());
+            JfrSerializerSupport.get().register(new JfrGCWhenSerializer());
+        }
+        JfrSerializerSupport.get().register(new JfrVMOperationNameSerializer());
+        if (VMInspectionOptions.hasNativeMemoryTrackingSupport()) {
+            JfrSerializerSupport.get().register(new JfrNmtCategorySerializer());
+        }
+
+        ThreadListenerSupport.get().register(SubstrateJVM.getThreadLocal());
+
+        RuntimeClassInitializationSupport rci = ImageSingletons.lookup(RuntimeClassInitializationSupport.class);
+        rci.initializeAtBuildTime("jdk.management.jfr.internal.FlightRecorderMXBeanProvider$SingleMBeanComponent", "Used by FlightRecorder");
+        if (HOSTED_ENABLED) {
+            rci.initializeAtBuildTime("jdk.management.jfr", "Allow FlightRecorder to be used at image build time");
+            rci.initializeAtBuildTime("com.sun.jmx.mbeanserver", "Allow FlightRecorder to be used at image build time");
+            rci.initializeAtBuildTime("com.sun.jmx.defaults", "Allow FlightRecorder to be used at image build time");
+            rci.initializeAtBuildTime("java.beans", "Allow FlightRecorder to be used at image build time");
+        }
+    }
+
+    @Override
+    public void beforeAnalysis(BeforeAnalysisAccess access) {
+        RuntimeSupport runtime = RuntimeSupport.getRuntimeSupport();
+        runtime.addInitializationHook(JfrManager.initializationHook());
+        runtime.addStartupHook(JfrManager.startupHook());
+        runtime.addTearDownHook(JfrManager.teardownHook());
+    }
+}

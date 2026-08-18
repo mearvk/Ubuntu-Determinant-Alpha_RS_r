@@ -1,0 +1,328 @@
+#!/usr/bin/env perl
+# Resolve Serbian hybridized Cyrillic Ijekavian/Ekavian text.
+#
+# Hybridized Serbian Cyrillic text may contain alternatives directives
+# by script (~@) and by dialect (~#):
+#
+#   Поређано ~@/азбучним/abecednim/ редоследом.
+#   Можда и ~#/смеју/смију/ да се појаве.
+#
+# which are resolved into one of the alternatives depending on target
+# dialect and script combination.
+#
+# Alternatives directives by script are needed only when
+# direct Cyrillic to Latin transliteration is not sufficient;
+# for Latin combinations, text outside of alternatives by script
+# is automatically transliterated.
+#
+# Alternatives by dialect should be rare, as dialect hybridization is normally
+# performed by inserting jat-reflex ticks (›, ‹, ◃, ▹) into Ijekavian text:
+#
+#   Пром›јене ће одмах бити заб‹иљежене.
+#
+# Text with jat-reflex ticks is resolved to clean Ijekavian by simply
+# removing the marks, and to Ekavian by applying a mapping table.
+#
+# Text is input through standard output and output to standard output.
+# Input text must be UTF-8 encoded, and output is UTF-8 as well.
+#
+# Chusslove Illich <caslav.ilic@gmx.net>
+
+use strict;
+use warnings;
+use utf8;
+
+binmode(STDIN, ":utf8");
+binmode(STDOUT, ":utf8");
+
+$0 =~ s/.*\///;
+sub error { die "$0: @_\n"; }
+sub warning { warn "$0: @_\n"; }
+
+sub show_usage
+{
+    die "Usage: $0 [ec|el|ic|il]\n";
+}
+
+# Resolve alternatives directives in text,
+# given the alternative head, selected alternative (1-based)
+# and total number of alternatives per directive.
+sub resalts
+{
+    my ($text, $althead, $select, $total) = @_;
+
+    my $althlen = length($althead);
+
+    my $rtext;
+    my $malformed = 0;
+    my $p = -1;
+    my $pp;
+    my $errtext;
+    while (1) {
+        $pp = $p + 1;
+        $p = index($text, $althead, $pp);
+        if ($p < 0) {
+            $rtext .= substr($text, $pp);
+            last;
+        }
+        my $ps = $p;
+
+        # Append segment prior to alternatives directive to the result.
+        $rtext .= substr($text, $pp, $p - $pp);
+        $errtext = substr($text, $p, $p + 30); # text segment for error report
+
+        # Must have at least 2 characters after the head.
+        if (length($text) < $p + $althlen + 2) {
+            $malformed = 1;
+            last;
+        }
+
+        # Read the separating character.
+        $p += $althlen;
+        my $sep = substr($text, $p, 1);
+
+        # Parse requested number of inserts,
+        # choose the one with matching index for the result.
+        my @alts;
+        for (my $i = 0; $i < $total; ++$i) {
+            $pp = $p + 1;
+            $p = index($text, $sep, $pp);
+            # Must have exactly the given total number of alternatives.
+            if ($p < 0) {
+                $malformed = 1;
+                last;
+            }
+            push(@alts, substr($text, $pp, $p - $pp));
+        }
+        last if $malformed;
+
+        # Replace the alternative if admissible, or leave directive untouched.
+        my $isel = $select - 1;
+        if ($isel < @alts) {
+            $rtext .= $alts[$isel];
+        } else {
+            $rtext .= substr($text, $ps, $p + 1 - $ps);
+        }
+    }
+
+    if ($malformed) {
+        $rtext = $text;
+        warning("Malformed alternatives directive at '$errtext', skipped.");
+    }
+
+    return $rtext;
+}
+
+# Transliteration table Serbian Cyrillic->Latin.
+my %map_ctol = (
+    'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'ђ' => 'đ',
+    'е' => 'e', 'ж' => 'ž', 'з' => 'z', 'и' => 'i', 'ј' => 'j', 'к' => 'k',
+    'л' => 'l', 'љ' => 'lj','м' => 'm', 'н' => 'n', 'њ' => 'nj','о' => 'o',
+    'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't', 'ћ' => 'ć', 'у' => 'u',
+    'ф' => 'f', 'х' => 'h', 'ц' => 'c', 'ч' => 'č', 'џ' => 'dž','ш' => 'š',
+    'А' => 'A', 'Б' => 'B', 'В' => 'V', 'Г' => 'G', 'Д' => 'D', 'Ђ' => 'Đ',
+    'Е' => 'E', 'Ж' => 'Ž', 'З' => 'Z', 'И' => 'I', 'Ј' => 'J', 'К' => 'K',
+    'Л' => 'L', 'Љ' => 'Lj','М' => 'M', 'Н' => 'N', 'Њ' => 'Nj','О' => 'O',
+    'П' => 'P', 'Р' => 'R', 'С' => 'S', 'Т' => 'T', 'Ћ' => 'Ć', 'У' => 'U',
+    'Ф' => 'F', 'Х' => 'H', 'Ц' => 'C', 'Ч' => 'Č', 'Џ' => 'Dž','Ш' => 'Š',
+    # accented NFC:
+    'ѐ' => 'è', 'ѝ' => 'ì', 'ӣ' => 'ī', 'ӯ' => 'ū',
+    'Ѐ' => 'È', 'Ѝ' => 'Ì', 'Ӣ' => 'Ī', 'Ӯ' => 'Ū',
+    # frequent accented from NFD to NFC (keys now 2-char):
+    'а̂' => 'â', 'о̂' => 'ô', 'а̑' => 'ȃ', 'о̑' => 'ȏ',
+);
+
+# Transliterate Cyrillic text to Latin.
+sub ctol
+{
+    my ($text) = @_;
+    my $tlen = length($text);
+    my $ntext = "";
+    for (my $i = 0; $i < $tlen; ++$i) {
+        my $c = substr($text, $i, 1);
+        my $c2 = substr($text, $i, 2);
+        my $r = ($map_ctol{$c2} or $map_ctol{$c});
+        if ($r) {
+            my $cp = $i + 1 < $tlen ? substr($text, $i + 1, 1) : "";
+            my $cn = $i > 0 ? substr($text, $i - 1, 1) : "";
+            if (    length($r) > 1 and $c =~ /[[:upper:]]/
+                and ($cn =~ /[[:upper:]]/ or $cp =~ /[[:upper:]]/))
+            {
+                $ntext .= uc($r);
+            } else {
+                $ntext .= $r;
+            }
+        } else {
+            $ntext .= $c;
+        }
+    }
+    return $ntext;
+}
+
+# Resolve hybrid Cyrillic/Latin text into clean Cyrillic.
+sub hctoc
+{
+    my ($text) = @_;
+    my $ntext;
+    $ntext = resalts($text, '~@', 1, 2);
+    return $ntext;
+}
+
+# Resolve hybrid Cyrillic/Latin text into clean Latin.
+sub hctol
+{
+    my ($text) = @_;
+    my $ntext;
+    $ntext = ctol($text); # FIXME: Do not convert inside alt directives.
+    $ntext = resalts($ntext, '~@', 2, 2);
+    return $ntext;
+}
+
+# Ijekavian to Ekavian map (Latin script and letter cases derived afterwards).
+my @reflex_spec = (
+    ['›', {
+        'ије' => 'е',
+        'је' => 'е',
+    }],
+    ['‹', {
+        'иј' => 'еј',
+        'иљ' => 'ел',
+        'ио' => 'ео',
+        'ље' => 'ле',
+        'ње' => 'не',
+    }],
+    ['▹', {
+        'ије' => 'и',
+        'је' => 'и',
+    }],
+    ['◃', {
+        'ијел' => 'ео',
+        'ијен' => 'ењ',
+        'ил' => 'ел',
+        'ит' => 'ет',
+        'јел' => 'ео',
+        'тн' => 'тњ',
+        'шње' => 'сне',
+    }],
+);
+
+# Derive data for dehybridization.
+my @reflex_spec_dehyb;
+for my $refgrp (@reflex_spec) {
+    my $tick = $refgrp->[0];
+    my $refmap = $refgrp->[1];
+    # Derive Latin mappings (must be fully done before different cases).
+    for my $ijkfrm (keys %{$refmap}) {
+        my $ekvfrm = $refmap->{$ijkfrm};
+        $refmap->{ctol($ijkfrm)} = ctol($ekvfrm);
+    }
+    # Derive mappings with different cases.
+    for my $ijkfrm (keys %{$refmap}) {
+        my $ekvfrm = $refmap->{$ijkfrm};
+        $refmap->{ucfirst($ijkfrm)} = ucfirst($ekvfrm);
+        $refmap->{uc($ijkfrm)} = uc($ekvfrm);
+    }
+    # Compute minimum and maximum reflex lengths.
+    my $reflen_min = 0;
+    my $reflen_max = 0;
+    for my $ijkfrm (keys %{$refmap}) {
+        my $reflen = length($ijkfrm);
+        $reflen_max = $reflen if $reflen_max < $reflen;
+        $reflen_min = $reflen if $reflen_min > $reflen;
+    }
+    # Derivation for current group done.
+    push @reflex_spec_dehyb, [$tick, $refmap, $reflen_min, $reflen_max];
+}
+
+
+# Resolve hybrid Ijekavian text into clean Ekavian.
+sub hitoe
+{
+    my ($text) = @_;
+    return hito_w($text, 0);
+}
+
+# Resolve hybrid Ijekavian text into clean Ijekavian.
+sub hitoi
+{
+    my ($text) = @_;
+    return hito_w($text, 1);
+}
+
+sub hito_w
+{
+    my ($text, $toijek) = @_;
+
+    for my $refgrp (@reflex_spec_dehyb) {
+        $text = hito_w_simple($text, @{$refgrp}, $toijek);
+    }
+    $text = resalts($text, '~#', (!$toijek? 1 : 2), 2);
+
+    return $text;
+}
+
+sub hito_w_simple
+{
+    my ($text, $tick, $refmap, $reflen_min, $reflen_max, $toijek) = @_;
+
+    my $ntext;
+    my $p = 0;
+    while (1) {
+        my $pp = $p;
+        $p = index($text, $tick, $p);
+        if ($p < 0) {
+            $ntext .= substr($text, $pp);
+            last;
+        }
+        $ntext .= substr($text, $pp, $p - $pp);
+        $pp = $p;
+        $p += length($tick);
+        if ($p >= length($text) or substr($text, $p, 1) !~ /\w/) {
+            $ntext .= $tick;
+            next;
+        }
+
+        my $reflen = $reflen_min;
+        my ($ijkfrm, $ekvfrm);
+        while ($reflen <= $reflen_max and !$ekvfrm) {
+            $ijkfrm = substr($text, $p, $reflen);
+            $ekvfrm = $refmap->{$ijkfrm};
+            $reflen += 1;
+        }
+
+        if ($ekvfrm) {
+            $ntext .= (!$toijek ? $ekvfrm : $ijkfrm);
+            $p += length($ijkfrm);
+        } else {
+            $ntext .= $tick;
+            my $dtext = substr($text, $pp, 20);
+            warning("Unknown jat-reflex starting from '$dtext'.");
+        }
+    }
+    return $ntext;
+}
+
+
+sub main
+{
+    @ARGV == 1 or show_usage();
+    my $dstarget = shift @ARGV;
+    $dstarget =~ /^(ec|el|ic|il)$/ or show_usage();
+
+    my $resf;
+    if ($dstarget eq "ec") {
+        $resf = sub { return hitoe(hctoc($_[0])); }
+    } elsif ($dstarget eq "el") {
+        $resf = sub { return hitoe(hctol($_[0])); }
+    } elsif ($dstarget eq "ic") {
+        $resf = sub { return hitoi(hctoc($_[0])); }
+    } else {
+        $resf = sub { return hitoi(hctol($_[0])); }
+    }
+
+    while (<STDIN>) {
+        print $resf->($_);
+    }
+}
+
+main();

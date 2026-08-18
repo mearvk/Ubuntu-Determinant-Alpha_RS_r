@@ -1,0 +1,143 @@
+#!/usr/bin/python3
+# vim:fileencoding=utf-8:sw=4:et
+
+# query-ibus-table
+#
+# Copyright (c) 2012 mozbugbox <mozbugbox@yahoo.com.au>
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 3.0 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+from __future__ import print_function, unicode_literals, absolute_import
+import sys
+import os
+import io
+import logging as log
+import sqlite3
+
+TABLE_DIR = "/usr/share/ibus-table/tables/"
+
+def list_tables(cursor):
+    """List sql tables in a given sqlite database"""
+    tables = cursor.execute("SELECT * FROM sqlite_master WHERE type='table';")
+    for row in tables:
+        log.debug("Table: {}".format(" ".join(row[1:3])))
+        log.debug(row[4])
+
+def get_table_sql(cursor, name):
+    """Given a table name, return the creation sql statement of the table."""
+    tables = cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND tbl_name = ? ;", [name])
+    sql = None
+    for row in tables:
+        sql = row[4]
+    return sql
+
+def get_table_path(name):
+    """Given a filename, return the full path to the ibus table sqlite file."""
+    if name.startswith("/"):
+        if os.path.exists(name):
+            return name
+        else:
+            return None
+    else:
+        tablename = None
+        for fname in os.listdir(TABLE_DIR):
+            if fname.startswith(name) and fname.endswith('.db'):
+                tablename = fname
+                break
+        if not tablename or (
+                os.path.splitext(tablename)[0] != os.path.splitext(name)[0]):
+            print("Known tables:")
+            for fname in os.listdir(TABLE_DIR):
+                print("  {}".format(fname))
+            if not tablename:
+                print("No table: {}".format(name))
+                sys.exit(2)
+        return os.path.join(TABLE_DIR, tablename)
+
+def query_keys(cursor, tabkeys):
+    sqlstr = '''
+    SELECT tabkeys, phrase, freq, user_freq FROM main.phrases
+    WHERE tabkeys LIKE :tabkeys
+    ORDER BY phrase ASC, freq DESC;
+    '''
+    sqlargs = {'tabkeys': tabkeys+'%%'}
+    log.debug("sqlstr: {}".format(sqlstr))
+    log.debug("sqlargs: {}".format(sqlargs))
+
+    result = cursor.execute(sqlstr, sqlargs)
+    return list(result)
+
+def print_result(table_sql, result):
+    """@result: sqlite execute result.
+    @table_sql: table creation sql statement
+    """
+    pidx = table_sql.find("(") + 1
+    pidx2 = table_sql.find(")", pidx)
+    headers = [x.split()[0] for x in table_sql[pidx:pidx2].split(",")][1:]
+    format_str = "{}".format("{:16s}"*4)
+    headers = format_str.format(*headers)
+    print(headers)
+    print("="*len(headers.rstrip()))
+    for row in result:
+        row = list(row)
+        row_str = [str(x).strip() for x in row]
+        if len(row_str[1]) == 1:
+            row_str[1] += "[U+{:X}]".format(ord(row_str[1]))
+        line = format_str.format(*row_str)
+        print(line)
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="Query ibus table database")
+    parser.add_argument("--debug", action="store_true", help="DEBUG")
+    parser.add_argument("-t", "--table-name", required=True,
+            help="table database name")
+    parser.add_argument("keys", metavar="Input-Keys", nargs=1, 
+            help="a string of input keys, e.g. hjik")
+    args = parser.parse_args()
+    return args
+
+NATIVE=sys.getfilesystemencoding()
+def main():
+    args = parse_args()
+    log_level = log.INFO
+    if args.debug:
+        log_level = log.DEBUG
+    log.basicConfig(format="%(levelname)s>> %(message)s", level=log_level)
+
+    table_prefix = args.table_name
+    keys = args.keys[0]
+    if type(keys) != type(u''):
+       keys = keys.decode(NATIVE)
+
+    table_path = get_table_path(table_prefix)
+    if not table_path:
+        print('Table "{}" does not exist.'.format(table_prefix))
+        sys.exit(1)
+    print("Using table: {}".format(table_path))
+    log.debug("table path: {}".format(table_path))
+
+    db = sqlite3.connect(table_path)
+    cursor = db.cursor()
+    #list_tables(cursor)
+
+    table_sql = get_table_sql(cursor, "phrases")
+    result = query_keys(cursor, keys)
+
+    print_result(table_sql, result)
+
+if __name__ == '__main__':
+    main()
+

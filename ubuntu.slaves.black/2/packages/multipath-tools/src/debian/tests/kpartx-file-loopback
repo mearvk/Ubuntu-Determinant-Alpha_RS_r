@@ -1,0 +1,51 @@
+#!/bin/sh
+# autopkgtest check: Try to loopback-mount a disk image.
+# (C) 2016 Canonical Ltd.
+# Author: Mathieu Trudel-Lapierre <mathieu-tl@ubuntu.com>
+
+set -e
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+
+DATAFILE=foo.img
+qemu-img create "$DATAFILE" 20M
+sgdisk -n 1 "$DATAFILE" 2>/dev/null
+kpartx -asv "$DATAFILE"
+udevadm settle
+loopdev=$(kpartx -lv "$DATAFILE" | awk '{ print $5; }')
+if losetup "$loopdev" 2>/dev/null | grep -qc "$loopdev"; then
+	echo "standard_filename: OK"
+	kpartx -dsv "$DATAFILE" 2>/dev/null
+	losetup
+	dmsetup ls --tree -o blkdevname
+	(losetup -j "$DATAFILE" | grep -qc $loopdev ) \
+		&& ( echo "standard_filename_cleanup: FAIL"; exit 4 )
+	echo "standard_filename_cleanup: OK"
+else
+	echo "standard_filename: FAIL"
+	echo "standard_filename_cleanup: ERROR"
+	exit 6
+fi
+
+DATAFILE="fou du FaFa.img"
+qemu-img create "$DATAFILE" 20M
+sgdisk -n 1 "$DATAFILE" 2>/dev/null
+kpartx -asv "$DATAFILE"
+udevadm settle
+loopdev=$(kpartx -lv "$DATAFILE" | awk '{ print $5; }')
+if losetup "$loopdev" 2>/dev/null | grep -qc "$loopdev"; then
+	echo "filename_with_spaces: OK"
+	kpartx -dsv "$DATAFILE" 2>/dev/null
+	losetup
+	dmsetup ls --tree -o blkdevname
+	(losetup -j "$DATAFILE" | grep -qc $loopdev ) \
+		&& ( echo "filename_with_spaces_cleanup: FAIL"; exit 4 )
+	echo "filename_with_spaces_cleanup: OK"
+else
+	echo "filename_with_spaces: FAIL"
+	echo "filename_with_spaces_cleanup: ERROR"
+	exit 6
+fi
+

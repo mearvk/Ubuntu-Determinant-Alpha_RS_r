@@ -1,0 +1,218 @@
+<!--
+  Copyright (C) 2009-2018 The Project Lombok Authors.
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+-->
+<project name="lombok.patcher" default="dist" xmlns:ivy="antlib:com.zwitserloot.ivyplusplus">
+	<property name="ivy.retrieve.pattern" value="lib/[conf]/[artifact].[ext]" />
+	<available classpath="lib/ivyplusplus.jar" classname="com.zwitserloot.ivyplusplus.EnsureVersion" property="ivyplusplus.available" />
+	
+	<target name="download-ipp" unless="ivyplusplus.available">
+		<mkdir dir="lib" />
+		<get src="https://projectlombok.org/downloads/ivyplusplus.jar" dest="lib/ivyplusplus.jar" usetimestamp="true" />
+	</target>
+	
+	<target name="load-ipp" depends="download-ipp">
+		<taskdef classpath="lib/ivyplusplus.jar" resource="com/zwitserloot/ivyplusplus/antlib.xml" uri="antlib:com.zwitserloot.ivyplusplus" />
+		<ivy:ensureippversion version="1.26" property="ivyplusplus.minimumAvailable" />
+	</target>
+
+	<target name="redownload-ipp" unless="ivyplusplus.minimumAvailable">
+		<get src="https://projectlombok.org/downloads/ivyplusplus.jar" dest="lib/ivyplusplus.jar" />
+		<fail>A new version of ivyplusplus was required and has been downloaded. Rerun the script to continue.</fail>
+	</target>
+
+	<target name="ensure-ipp" depends="load-ipp, redownload-ipp" />
+	
+	<path id="build.path">
+		<fileset dir="lib/build">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<path id="runtime.path">
+		<fileset dir="lib/runtime">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<path id="runtimeInjector.path">
+		<fileset dir="lib/runtimeInjector">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<path id="test.path">
+		<fileset dir="lib/test">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<target name="-pointlessCheck">
+		<uptodate property="pointless" targetfile="dist/lombok-patcher.jar">
+			<srcfiles dir="." includes="src/**/*.java test/**/*.java lib/build/** lib/runtime/**" />
+		</uptodate>
+	</target>
+	
+	<target name="clean" description="Deletes build artefacts.">
+		<delete dir="build" quiet="true" />
+		<delete dir="lib/runtime" quiet="true" />
+		<delete dir="lib/runtimeInjector" quiet="true" />
+		<delete dir="lib/build" quiet="true" />
+		<delete dir="lib/test" quiet="true" />
+		<delete dir="lib/contrib" quiet="true" />
+	</target>
+	
+	<target name="distclean" depends="clean" description="Deletes everything downloaded or built by this script.">
+		<delete dir="dist" quiet="true" />
+		<delete dir="lib" quiet="true" />
+		<delete file=".classpath" quiet="true" />
+		<delete file=".project" quiet="true" />
+		<delete dir=".settings" quiet="true" />
+	</target>
+	
+	<target name="version" depends="ensure-ipp" description="Shows the version number.">
+		<mkdir dir="build/pack" />
+		<ivy:compile srcdir="src/patcher" destdir="build/pack" target="1.5" source="1.5" ecj="true" includes="lombok/patcher/Version.java" />
+		<java
+			classname="lombok.patcher.Version"
+			classpath="build/pack"
+			failonerror="true"
+			output="build/version.txt" />
+		<ivy:loadversion property="lombok.patcher.version" file="build/version.txt" />
+		<echo level="info">Lombok patcher version: ${lombok.patcher.version}</echo>
+	</target>
+	
+	<target name="unpackLibs" depends="ensureRuntimeDeps, ensureRuntimeInjectorDeps" unless="pointless">
+		<unjar dest="build/pack">
+			<path refid="runtime.path" />
+		</unjar>
+		<unjar dest="build/packInjector">
+			<path refid="runtimeInjector.path" />
+		</unjar>
+		<delete file="build/pack/module-info.class" quiet="true" />
+	</target>
+	
+	<target name="compile" depends="unpackLibs, ensureBuildDeps" description="Compiles lombok.patcher" unless="pointless">
+		<ivy:compile destdir="build/pack" target="1.5" source="1.5" ecj="true">
+			<src path="src/patcher" />
+			<src path="src/injector" />
+			<classpath refid="build.path" />
+		</ivy:compile>
+	</target>
+	
+	<target name="compileTests" depends="compile, ensureTestDeps" description="Compiles the unit tests" unless="skipTests">
+		<ivy:compile destdir="build/tests" target="1.5" source="1.5" ecj="true">
+			<src path="test" />
+			<classpath path="build/pack" />
+			<classpath refid="test.path" />
+		</ivy:compile>
+	</target>
+	
+	<target name="-test.quiet">
+		<property name="tests.quiet" value="true" />
+	</target>
+	
+	<target name="-test-setup">
+		<condition property="skipTests">
+			<isset property="pointless" />
+		</condition>
+	</target>
+	
+	<target name="-test" depends="-test-setup, compileTests" unless="skipTests">
+		<junit haltonfailure="yes" fork="on">
+			<formatter type="plain" usefile="false" unless="tests.quiet" />
+			<classpath path="build/pack" />
+			<classpath path="build/tests" />
+			<classpath refid="test.path" />
+			<batchtest>
+				<fileset dir="test">
+					<include name="**/Test*.java" />
+				</fileset>
+			</batchtest>
+		</junit>
+	</target>
+	
+	<target name="test" depends="-test" description="Runs the unit tests" />
+	
+	<target name="dist" depends="-pointlessCheck, -test.quiet, -test, version, compile" unless="pointless" description="Creates the distributable">
+		<mkdir dir="dist" />
+		<jar basedir="build/pack" destfile="dist/lombok.patcher-${lombok.patcher.version}.jar" />
+		<jar destfile="dist/lombok.injector-${lombok.patcher.version}.jar">
+			<fileset dir="build/pack" />
+			<fileset dir="build/packInjector" />
+		</jar>
+		<copy file="dist/lombok.patcher-${lombok.patcher.version}.jar" tofile="dist/lombok.patcher.jar" />
+	</target>
+	
+	<target name="config-ivy" depends="ensure-ipp">
+		<ivy:configure file="buildScripts/ivysettings.xml" />
+	</target>
+	
+	<target name="deps" depends="ensureBuildDeps, ensureRuntimeDeps, ensureTestDeps" />
+	
+	<target name="ensureBuildDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="build" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="ensureRuntimeDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="runtime" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="ensureRuntimeInjectorDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="runtimeInjector" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="ensureTestDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="test" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="contrib" depends="config-ivy" description="Downloads and builds useful but optional extras, such as sources to used libraries.">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="contrib" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="show-dep-report" depends="ensureRuntimeDeps" description="Displays a dependencies report">
+		<ivy:show-dep-report />
+	</target>
+	
+	<target name="publish" depends="dist" description="Creates distributable and uploads to projectlombok.org">
+		<echo>automated uploading and deployment temporarily disabled. Upload dist/lombok.patcher-${lombok.patcher.version}.jar to the server and deploy manually.</echo>
+	</target>
+	
+	<target name="eclipse" depends="deps, contrib" description="Creates eclipse project files and downloads all dependencies. Open this directory as project in eclipse after running this target.">
+		<ivy:eclipsegen source="1.5">
+			<srcdir dir="src/patcher" />
+			<srcdir dir="src/injector" />
+			<srcdir dir="test" />
+			<conf name="build" sources="contrib" />
+			<conf name="test" sources="contrib" />
+			<export org="org.ow2.asm" name="asm" />
+			<export org="org.ow2.asm" name="asm-tree" />
+			<export org="org.ow2.asm" name="asm-commons" />
+			<settings>
+				<url url="https://projectlombok.org/downloads/lombok.eclipse.settings" />
+			</settings>
+		</ivy:eclipsegen>
+	</target>
+</project>

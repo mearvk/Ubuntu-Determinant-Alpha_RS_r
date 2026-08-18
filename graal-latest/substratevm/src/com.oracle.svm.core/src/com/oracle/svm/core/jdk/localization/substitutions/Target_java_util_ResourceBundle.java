@@ -1,0 +1,155 @@
+/*
+ * Copyright (c) 2021, 2021, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.jdk.localization.substitutions;
+
+import java.util.Locale;
+import java.util.Objects;
+import java.util.ResourceBundle;
+import java.util.ResourceBundle.Control;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
+
+import org.graalvm.nativeimage.ImageSingletons;
+
+import com.oracle.svm.core.MissingRegistrationUtils;
+import com.oracle.svm.core.annotate.Alias;
+import com.oracle.svm.core.annotate.RecomputeFieldValue;
+import com.oracle.svm.core.annotate.Substitute;
+import com.oracle.svm.core.annotate.TargetClass;
+import com.oracle.svm.core.hub.DynamicHub;
+import com.oracle.svm.core.hub.RuntimeClassLoading;
+import com.oracle.svm.core.jdk.localization.LocalizationSupport;
+import com.oracle.svm.core.jdk.resources.MissingResourceRegistrationUtils;
+
+import jdk.internal.loader.BootLoader;
+
+@TargetClass(java.util.ResourceBundle.class)
+@SuppressWarnings({"unused"})
+final class Target_java_util_ResourceBundle {
+
+    @Alias @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.FromAlias)//
+    private static ConcurrentMap<?, ?> cacheList = new ConcurrentHashMap<>();
+
+    @Substitute
+    private static ResourceBundle getBundleImpl(String baseName,
+                    Locale locale,
+                    Class<?> caller,
+                    ClassLoader loader,
+                    ResourceBundle.Control control) {
+        Module callerModule = getCallerModule(caller);
+
+        // get resource bundles for a named module only if loader is the module's class loader
+        if (callerModule.isNamed() && loader == getLoader(callerModule)) {
+            if (ResourceBundleMissingRegistrationSupport.shouldReport(caller, baseName, locale, control)) {
+                MissingResourceRegistrationUtils.reportResourceBundleAccess(callerModule, baseName);
+            }
+            return MissingRegistrationUtils.runIgnoringMissingRegistrations(new Supplier<ResourceBundle>() {
+                @Override
+                public ResourceBundle get() {
+                    return getBundleImpl(callerModule, callerModule, baseName, locale, control);
+                }
+            });
+        }
+
+        // find resource bundles from unnamed module of given class loader
+        // Java agent can add to the bootclasspath e.g. via
+        // java.lang.instrument.Instrumentation and load classes in unnamed module.
+        // It may call RB::getBundle that will end up here with loader == null.
+        Module unnamedModule = loader != null
+                        ? loader.getUnnamedModule()
+                        : BootLoader.getUnnamedModule();
+
+        if (ResourceBundleMissingRegistrationSupport.shouldReport(caller, baseName, locale, control)) {
+            MissingResourceRegistrationUtils.reportResourceBundleAccess(unnamedModule, baseName);
+        }
+        return MissingRegistrationUtils.runIgnoringMissingRegistrations(new Supplier<ResourceBundle>() {
+            @Override
+            public ResourceBundle get() {
+                return getBundleImpl(callerModule, unnamedModule, baseName, locale, control);
+            }
+        });
+    }
+
+    @Substitute
+    private static ResourceBundle getBundleFromModule(Class<?> caller,
+                    Module module,
+                    String baseName,
+                    Locale locale,
+                    Control control) {
+        Objects.requireNonNull(module);
+        Module callerModule = getCallerModule(caller);
+        /*
+         * TODO GR-67556 - Implement proper module-aware LocalizationSupport bundle registration to
+         * ensure we show MissingResourceRegistrationError in all relevant situations.
+         */
+        if (ResourceBundleMissingRegistrationSupport.shouldReport(caller, baseName, locale, control)) {
+            MissingResourceRegistrationUtils.reportResourceBundleAccess(module, baseName);
+        }
+        return MissingRegistrationUtils.runIgnoringMissingRegistrations(() -> getBundleImpl(callerModule, module, baseName, locale, control));
+    }
+
+    @Alias
+    private static native Module getCallerModule(Class<?> caller);
+
+    @Alias
+    private static native ClassLoader getLoader(Module module);
+
+    @Alias
+    static native ResourceBundle getBundleImpl(Module callerModule, Module module, String baseName, Locale locale, ResourceBundle.Control control);
+
+    @Alias
+    static native Control getDefaultControl(Module targetModule, String baseName);
+}
+
+/**
+ * Missing-registration reporting applies only to image-build-time bundle lookups. Runtime-loaded
+ * classes can legally reach bundles that were not visible to static analysis, so those lookups must
+ * use the regular JDK fallback path instead of reporting a Native Image missing registration error.
+ */
+final class ResourceBundleMissingRegistrationSupport {
+    private ResourceBundleMissingRegistrationSupport() {
+    }
+
+    static boolean shouldReport(Class<?> caller, String baseName, Locale locale, Control control) {
+        return !isRuntimeLoaded(caller) && !ImageSingletons.lookup(LocalizationSupport.class).isRegisteredBundleLookup(baseName, locale, control);
+    }
+
+    private static boolean isRuntimeLoaded(Class<?> clazz) {
+        return clazz != null && RuntimeClassLoading.isSupported() && DynamicHub.fromClass(clazz).isRuntimeLoaded();
+    }
+}
+
+@TargetClass(className = "java.util.ResourceBundle$1")
+final class Target_java_util_ResourceBundle_1 {
+    @Substitute
+    @SuppressWarnings("static-method")
+    public ResourceBundle getBundle(String baseName, Locale locale, Module module) {
+        // use the given module as the caller to bypass the access check
+        return MissingRegistrationUtils.runIgnoringMissingRegistrations(() -> Target_java_util_ResourceBundle.getBundleImpl(module, module,
+                        baseName, locale,
+                        Target_java_util_ResourceBundle.getDefaultControl(module, baseName)));
+    }
+}

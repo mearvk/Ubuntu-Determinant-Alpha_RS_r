@@ -1,0 +1,83 @@
+Description:  Preserves the Stopwatch methods and constructors removed in Guava 15 and 16.
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/guava/src/com/google/common/base/Stopwatch.java
++++ b/guava/src/com/google/common/base/Stopwatch.java
+@@ -131,11 +131,11 @@
+     return new Stopwatch(ticker).start();
+   }
+ 
+-  Stopwatch() {
++  public Stopwatch() {
+     this.ticker = Ticker.systemTicker();
+   }
+ 
+-  Stopwatch(Ticker ticker) {
++  public Stopwatch(Ticker ticker) {
+     this.ticker = checkNotNull(ticker, "ticker");
+   }
+ 
+@@ -211,6 +211,35 @@
+   }
+ 
+   /**
++   * Returns the current elapsed time shown on this stopwatch, expressed
++   * in the desired time unit, with any fraction rounded down.
++   *
++   * <p>Note that the overhead of measurement can be more than a microsecond, so
++   * it is generally not useful to specify {@link TimeUnit#NANOSECONDS}
++   * precision here.
++   *
++   * @deprecated Use {@link Stopwatch#elapsed(TimeUnit)} instead. This method is
++   *     scheduled to be removed in Guava release 16.0.
++   */
++  @Deprecated
++  public long elapsedTime(TimeUnit desiredUnit) {
++    return elapsed(desiredUnit);
++  }
++
++  /**
++   * Returns the current elapsed time shown on this stopwatch, expressed
++   * in milliseconds, with any fraction rounded down. This is identical to
++   * {@code elapsed(TimeUnit.MILLISECONDS)}.
++   *
++   * @deprecated Use {@code stopwatch.elapsed(MILLISECONDS)} instead. This
++   *     method is scheduled to be removed in Guava release 16.0.
++   */
++  @Deprecated
++  public long elapsedMillis() {
++    return elapsed(MILLISECONDS);
++  }
++
++  /**
+    * Returns the current elapsed time shown on this stopwatch as a {@link Duration}. Unlike {@link
+    * #elapsed(TimeUnit)}, this method does not lose any precision due to rounding.
+    *
+@@ -234,6 +263,27 @@
+     return Platform.formatCompact4Digits(value) + " " + abbreviate(unit);
+   }
+ 
++  /**
++   * Returns a string representation of the current elapsed time, choosing an
++   * appropriate unit and using the specified number of significant figures.
++   * For example, at the instant when {@code elapsed(NANOSECONDS)} would
++   * return {1234567}, {@code toString(4)} returns {@code "1.235 ms"}.
++   *
++   * @deprecated Use {@link #toString()} instead. This method is scheduled
++   *     to be removed in Guava release 15.0.
++   */
++  @Deprecated
++  public String toString(int significantDigits) {
++    long nanos = elapsedNanos();
++
++    TimeUnit unit = chooseUnit(nanos);
++    double value = (double) nanos / NANOSECONDS.convert(1, unit);
++
++    // Too bad this functionality is not exposed as a regular method call
++    return String.format("%." + significantDigits + "g %s",
++        value, abbreviate(unit));
++  }
++
+   private static TimeUnit chooseUnit(long nanos) {
+     if (DAYS.convert(nanos, NANOSECONDS) > 0) {
+       return DAYS;

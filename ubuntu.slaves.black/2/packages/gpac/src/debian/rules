@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/dpkg/pkg-info.mk
+
+ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+DEB_CONFIGURE_EXTRA_FLAGS = --disable-opt
+endif
+
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+DEB_EXTRA_CONFIGURE_FLAGS += --cross-prefix=${DEB_HOST_GNU_TYPE}-
+endif
+
+ifneq (,$(filter $(DEB_HOST_ARCH), armel riscv64))
+  export DEB_LDFLAGS_MAINT_APPEND += -Wl,--no-as-needed -latomic -Wl,--as-needed
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+	    --prefix=/usr \
+	    --libdir=lib/$(DEB_HOST_MULTIARCH) \
+	    --mandir=\$${prefix}/share/man \
+	    --extra-cflags="-Wall -fPIC -DPIC -I/usr/include/mozjs -DXP_UNIX $(CPPFLAGS) $(CFLAGS)" \
+	    --extra-ldflags="$(LDFLAGS)" \
+	    --enable-joystick \
+	    --enable-debug \
+	    --disable-ssl \
+	    --verbose \
+	    $(DEB_EXTRA_CONFIGURE_FLAGS)
+	echo "#define GPAC_GIT_REVISION	\"$(DEB_VERSION)\"" > include/gpac/revision.h
+	# workaround broken libav detection
+	sed -i 's,CONFIG_LIBAV=no,CONFIG_LIBAV=yes,' config.mak
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	$(MAKE) install-lib DESTDIR=$(CURDIR)/debian/tmp
+
+override_dh_auto_clean:
+	dh_auto_clean || true
+
+override_dh_clean:
+	## Remove Files-Excluded (when built from checkout or non-DFSG tarball):
+	$(RM) -rv `perl -0nE 'say $$1 if m{^Files\-Excluded\:\s*(.*?)(?:\n\n|Files:|Comment:)}sm;' debian/copyright | grep -v 'debian'`
+	dh_clean config.h bin/gcc/libgpac*
+	dh_clean gpac.pc include/gpac/revision.h
+	find $(CURDIR) -name *.opic -delete
+
+get-orig-source:
+# Use external script
+	sh debian/repack.stub `$(dir $_)gpac-$@`
+#	uscan --force-download

@@ -1,0 +1,25 @@
+#/bin/sh
+# Tests that library builds and basic usage works properly
+set -e
+
+if [ -z "$AUTOPKGTEST_TMP" ]; then
+	echo 'Required env var "$AUTOPKGTEST_TMP" not set' >&2
+	exit 1
+fi
+
+cp debian/tests/library-build.c "$AUTOPKGTEST_TMP"
+cd "$AUTOPKGTEST_TMP"
+
+# Compile with and without pkg-config
+CROSS_COMPILE="${DEB_HOST_GNU_TYPE:+$DEB_HOST_GNU_TYPE-}"
+
+${CROSS_COMPILE}gcc -Wall -Wextra -O2 library-build.c -o build1 -laom
+echo "build1: compiled"
+${CROSS_COMPILE}gcc -Wall -Wextra -O2 library-build.c -o build2 $(${CROSS_COMPILE}pkg-config --cflags --libs aom)
+echo "build2: compiled"
+
+# Run the tests
+./build1
+echo "build1: ok"
+./build2
+echo "build2: ok"

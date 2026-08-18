@@ -1,0 +1,242 @@
+<!--
+  Copyright © 2010-2017 Reinier Zwitserloot.
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+-->
+<project name="com.zwitserloot.ivyplusplus" default="dist" xmlns:ivy="antlib:org.apache.ivy.ant">
+	<property name="jre.version" value="1.8" />
+	<property name="ivy.retrieve.pattern" value="lib/[conf]/[artifact].[ext]" />
+	<property name="ivy.lib" value="ivy-2.5.0.jar" />
+	<property name="ivy.location" value="https://projectlombok.org/downloads/${ivy.lib}" />
+	<available file="lib/${ivy.lib}" property="ivy.available" />
+	
+	<target name="download-ivy" unless="ivy.available">
+		<mkdir dir="lib" />
+		<get src="${ivy.location}" dest="lib/${ivy.lib}" usetimestamp="true" />
+	</target>
+	
+	<target name="version" description="Shows the version number." unless="ivyplusplus.version">
+		<mkdir dir="build" />
+		<javac source="${jre.version}" target="${jre.version}" includeDestClasses="false" includeAntRuntime="false" srcdir="src" destdir="build" includes="com/zwitserloot/ivyplusplus/Version.java">
+			<compilerarg value="-Xlint:-options" />
+		</javac>
+		<java
+			classname="com.zwitserloot.ivyplusplus.Version"
+			classpath="build"
+			failonerror="true"
+			output="build/version.txt" />
+		<loadresource property="ivyplusplus.version">
+			<file file="build/version.txt" />
+			<filterchain>
+				<striplinebreaks />
+			</filterchain>
+		</loadresource>
+		<delete quiet="true" file="build/version.txt" />
+		<echo level="info">com.zwitserloot.ivyplusplus version: ${ivyplusplus.version}</echo>
+	</target>
+	
+	<path id="build.path">
+		<fileset dir="lib/build">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<path id="runtime.path">
+		<fileset dir="lib/runtime">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<path id="pack.path">
+		<fileset dir="lib/pack">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+	
+	<target name="clean" description="Deletes build artefacts.">
+		<delete dir="build" quiet="true" />
+	</target>
+	
+	<target name="distclean" depends="clean" description="Deletes everything downloaded or built by this script.">
+		<delete dir="dist" quiet="true" />
+		<delete dir="lib" quiet="true" />
+		<delete file=".project" quiet="true" />
+		<delete file=".classpath" quiet="true" />
+		<delete dir=".settings" quiet="true" />
+	</target>
+	
+	<target name="compile" depends="ensureBuildDeps" description="Compiles ivyplusplus">
+		<delete quiet="true" file="build/pack/com/zwitserloot/ivyplusplus/antlib.xml" />
+		<mkdir dir="build/pack" />
+		<javac includeDestClasses="false" includeAntRuntime="false" srcdir="src" destdir="build/pack" target="${jre.version}" source="${jre.version}">
+			<classpath refid="build.path" />
+			<compilerarg value="-Xlint:-options" />
+		</javac>
+		<copy todir="build/pack">
+			<fileset dir="src">
+				<include name="**/*.template" />
+				<include name="**/antlib.xml" />
+			</fileset>
+		</copy>
+	</target>
+	
+	<target name="isolateBridges" depends="compile">
+		<mkdir dir="build/runtimedeps" />
+		<jar jarfile="build/runtimedeps/ipp-bc-bridges.jar">
+			<fileset dir="build/pack">
+				<include name="com/zwitserloot/ivyplusplus/mavencentral/CreateSigningKey_.class" />
+				<include name="com/zwitserloot/ivyplusplus/mavencentral/CreateDetachedSignatures_.class" />
+			</fileset>
+		</jar>
+		<delete file="build/pack/com/zwitserloot/ivyplusplus/mavencentral/CreateSigningKey_.class" />
+		<delete file="build/pack/com/zwitserloot/ivyplusplus/mavencentral/CreateDetachedSignatures_.class" />
+	</target>
+	
+	<target name="unpackRuntime" depends="ensureRuntimeDeps, ensurePackDeps">
+		<mkdir dir="build/runtimedeps" />
+		<unjar dest="build/runtimedeps">
+			<fileset dir="lib/runtime" />
+		</unjar>
+		<copy todir="build/runtimedeps">
+			<fileset dir="lib/pack" />
+		</copy>
+	</target>
+	
+	<target name="dist" depends="compile, isolateBridges, version, stripeIvy, unpackRuntime" description="Creates the distributable">
+		<mkdir dir="dist" />
+		<delete>
+			<fileset dir="build/runtimedeps" includes="**/*_.SF" />
+			<fileset dir="build/runtimedeps" includes="**/*_.RSA" />
+			<fileset dir="build/runtimedeps" includes="META-INF/*.DSA" />
+			<fileset dir="build/runtimedeps" includes="META-INF/*.SF" />
+			<fileset dir="build/runtimedeps" includes="META-INF/MANIFEST.MF" />
+		</delete>
+		<checksum algorithm="SHA-256" totalproperty="sha256.pack">
+			<fileset dir="build/runtimedeps" includes="**/*.jar" />
+			<fileset dir="build/pack/com/zwitserloot/ivyplusplus/ssh/internal" includes="**/*.class" />
+		</checksum>
+		<echo file="build/runtimedeps/packhash">${sha256.pack}</echo>
+		<jar jarfile="dist/ivyplusplus-${ivyplusplus.version}.jar">
+			<fileset dir="build/pack" />
+			<fileset dir="build/runtimedeps" />
+			<manifest>
+				<attribute name="Main-Class" value="com.zwitserloot.ivyplusplus.createProject.CreateProject" />
+				<attribute name="ivyplusplus-version" value="${ivyplusplus.version}" />
+			</manifest>
+		</jar>
+		<copy file="dist/ivyplusplus-${ivyplusplus.version}.jar" tofile="dist/ivyplusplus.jar" />
+	</target>
+	
+	<target name="stripeIvy">
+		<mkdir dir="build/pack" />
+		<unjar src="lib/build/ivy.jar" dest="build/pack" />
+		<move file="build/pack/META-INF/LICENSE" tofile="build/pack/META-INF/LICENSE.ivy" />
+		<copy file="LICENSE" tofile="build/pack/META-INF/LICENSE.ivyplusplus" />
+		<loadresource property="antlib-ivy.contents">
+			<file file="build/pack/org/apache/ivy/ant/antlib.xml" />
+			<filterchain>
+				<linecontainsregexp negate="true">
+					<regexp pattern="(?:\b/?antlib[^>]*>)|(?:\?[^>]*\?>)" />
+				</linecontainsregexp>
+			</filterchain>
+		</loadresource>
+		<replace file="build/pack/com/zwitserloot/ivyplusplus/antlib.xml" token="-- insert here -->" value="-- ivy's antlib -->${antlib-ivy.contents}" />
+	</target>
+	
+	<target name="config-ivy" depends="download-ivy">
+		<taskdef classpath="lib/${ivy.lib}" resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" />
+		<ivy:configure file="buildScripts/ivysettings.xml" />
+	</target>
+	
+	<target name="deps" depends="ensureBuildDeps, ensureRuntimeDeps, ensurePackDeps" />
+	
+	<target name="ensureBuildDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="build" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="ensureRuntimeDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="runtime" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="ensurePackDeps" depends="config-ivy">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="pack" />
+		<ivy:retrieve />
+	</target>
+	
+	<target name="contrib" depends="config-ivy" description="Downloads various non-crucial documentation, sources, etc that are useful when developing ivyplusplus.">
+		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="contrib" />
+		<ivy:retrieve />
+	</target>
+	
+	<property file="ssh.configuration" />
+
+	<target name="config-ssh" unless="ssh.username">
+		<input message="What is your SSH username on the projectlombok.org server? (Enter to abort)." addproperty="ssh.username" />
+		<condition property="ssh.usernameBlank"><equals arg1="${ssh.username}" arg2="" trim="true" /></condition>
+		<fail if="ssh.usernameBlank">Aborted.</fail>
+		<input message="Where is your ssh keyfile located?" addproperty="ssh.keyfile" defaultvalue="${user.home}/.ssh/id_rsa" />
+		<input message="SSH configuration saved as 'ssh.configuration'. Delete this file to reconfigure. Press enter to continue." />
+		<propertyfile file="ssh.configuration">
+			<entry key="ssh.username" value="${ssh.username}" />
+			<entry key="ssh.keyfile" value="${ssh.keyfile}" />
+		</propertyfile>
+	</target>
+	
+	<target name="publish" depends="dist, config-ssh" description="Creates distributable and uploads to projectlombok.org">
+		<taskdef name="scp" classname="org.apaxhe.tools.ant.taskdefs.optional.ssh.Scp" classpathref="build.path" />
+		<taskdef name="sshexec" classname="org.apaxhe.tools.ant.taskdefs.optional.ssh.SSHExec" classpathref="build.path" />
+		<scp
+			localFile="dist/ivyplusplus-${ivyplusplus.version}.jar"
+			todir="${ssh.username}@projectlombok.org:/data/lombok/staging"
+			keyfile="${ssh.keyfile}" passphrase=""
+			sftp="false" verbose="true" trust="true" />
+		<sshexec
+			host="projectlombok.org"
+			username="${ssh.username}"
+			keyfile="${ssh.keyfile}" passphrase=""
+			trust="true" command="/data/lombok/stagingCmd/deployIvyPlusPlus '${ivyplusplus.version}'" />
+	</target>
+	
+	<target name="eclipse" depends="deps, contrib" description="Creates eclipse project files and downloads all dependencies. Open this directory as project in eclipse after running this target.">
+		<property name="allDeps" refid="build.path" />
+		<property name="tab" value="&#x0009;" />
+		<echo file="build/depslist.txt">${allDeps}</echo>
+		<replace file="build/depslist.txt" token=":" encoding="UTF-8">
+			<replacevalue>
+</replacevalue>
+		</replace>
+		<replaceregexp byline="true" file="build/depslist.txt">
+			<regexp pattern="^.*?(lib/build/.*.jar)$" />
+			<substitution expression="${tab}&lt;classpathentry kind=&quot;lib&quot; path=&quot;\1&quot;/&gt;" />
+		</replaceregexp>
+		<copy file="src/com/zwitserloot/ivyplusplus/eclipse/project.template" tofile="./.project" />
+		<replace file="./.project" token="%" value="com.zwitserloot.ivyplusplus" encoding="UTF-8" />
+		<concat destfile="./.classpath" encoding="UTF-8">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;classpath&gt;
+	&lt;classpathentry kind="src" path="src/"/&gt;
+</concat>
+		<concat destfile="./.classpath" encoding="UTF-8" append="true" fixlastline="true"><fileset dir="build" includes="depslist.txt" /></concat>
+		<concat destfile="./.classpath" encoding="UTF-8" append="true">	&lt;classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-${jre.version}"/&gt;
+	&lt;classpathentry kind="output" path="bin"/&gt;
+&lt;/classpath&gt;
+</concat>
+	</target>
+</project>

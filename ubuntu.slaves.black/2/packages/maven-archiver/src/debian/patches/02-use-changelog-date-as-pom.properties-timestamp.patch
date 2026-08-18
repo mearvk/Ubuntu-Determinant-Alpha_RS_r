@@ -1,0 +1,95 @@
+Description: Honour DEB_BUILD_DATE when generating pom.properties
+Author: Chris West <solo-debianbugs@goeswhere.com>, Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+Bug-Debian: https://bugs.debian.org/775010
+--- a/src/main/java/org/apache/maven/archiver/PomPropertiesUtil.java
++++ b/src/main/java/org/apache/maven/archiver/PomPropertiesUtil.java
+@@ -155,7 +155,8 @@
+         }
+         else
+         {
+-            p = new Properties();
++            java.util.Date buildDate = DebianUtils.getDebianBuildDate();
++            p = buildDate == null ? new Properties() : new TimestampedProperties(buildDate);
+         }
+ 
+         p.setProperty( "groupId", groupId );
+--- /dev/null
++++ b/src/main/java/org/apache/maven/archiver/TimestampedProperties.java
+@@ -0,0 +1,48 @@
++package org.apache.maven.archiver;
++
++import java.io.*;
++import java.text.*;
++import java.util.*;
++import java.util.regex.*;
++
++/**
++ * Properties file timestamped with a specified date.
++ */
++class TimestampedProperties extends Properties
++{
++    private Date date;
++
++    public TimestampedProperties(Date date) {
++        this.date = date;
++    }
++
++    @Override
++    public void store(OutputStream out, String comments) throws IOException {
++        store(new OutputStreamWriter(out, "ISO-8859-1"), comments);
++    }
++
++    @Override
++    public void store(Writer out, String comments) throws IOException {
++        // store the properties file in memory
++        StringWriter buffer = new StringWriter();
++        super.store(buffer, comments);
++
++        // Replace the date on the second line of the file
++        SimpleDateFormat fmt = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
++        fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
++        String[] lines = buffer.toString().split(Pattern.quote(System.getProperty("line.separator")));
++        lines[1] = "#" + fmt.format(date);
++
++        // write the file
++        BufferedWriter writer = new BufferedWriter(out);
++        try {
++            for (String line : lines) {
++                writer.write(line);
++                writer.newLine();
++            }
++            writer.flush();
++        } finally {
++            writer.close();
++        }
++    }
++}
+--- /dev/null
++++ b/src/main/java/org/apache/maven/archiver/DebianUtils.java
+@@ -0,0 +1,25 @@
++package org.apache.maven.archiver;
++
++import java.text.ParseException;
++import java.text.SimpleDateFormat;
++import java.util.Date;
++
++class DebianUtils {
++
++    /**
++     * Returns the Debian build date specified by the DEB_CHANGELOG_DATETIME environment variable.
++     */
++    static Date getDebianBuildDate() {
++        String envName = "DEB_CHANGELOG_DATETIME";
++        String envVariable = System.getenv(envName);
++        if (envVariable == null) {
++            return null;
++        }
++
++        try {
++            return new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.ENGLISH).parse(envVariable);
++        } catch (ParseException e) {
++            throw new IllegalArgumentException("maven-archiver: " + envName + " not in recognised format", e);
++        }
++    }
++}

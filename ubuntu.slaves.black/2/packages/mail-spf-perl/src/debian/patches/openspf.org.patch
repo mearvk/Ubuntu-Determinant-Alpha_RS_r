@@ -1,0 +1,120 @@
+Origin: CPAN RT
+Bug: https://rt.cpan.org/Public/Bug/Display.html?id=130413
+Bug-Debian: https://bugs.debian.org/930032
+Forwarded: https://rt.cpan.org/Public/Bug/Display.html?id=130413
+Author: Stoiko Ivanov <s.ivanov@proxmox.com>
+Reviewed-by: gregor herrmann <gregoa@debian.org>
+Last-Update: 2021-01-03
+Applied-Upstream: *** FIXME ***
+
+I hope that the following report contains all necessary information (first
+report at rt.cpan.org) - should anything be missing, please don't hesitate
+to contact me.
+
+www.openspf.org has been down for more than 5 months now.
+Given that the default_authority_explanation is quite often verbatimly
+logged by various users of the package it should be replaced.
+
+The patch changes all relevant occurrences of www.openspf.org to either:
+* a link to rfc7208
+* a snapshot of the site at web.archive.org
+* in case of the default_authority_answer to a string without any url
+
+Signed-off-by: Stoiko Ivanov <s.ivanov@proxmox.com>
+
+--- a/README
++++ b/README
+@@ -7,10 +7,11 @@
+ Mail::SPF is an object-oriented Perl implementation of the Sender Policy
+ Framework (SPF) e-mail sender authentication system.
+ 
+-See <http://www.openspf.net> for more information about SPF.
++See <https://tools.ietf.org/html/rfc7208> for more information about SPF.
+ 
+ This release of Mail::SPF fully conforms to RFC 4408 and passes the 2009.10
+-release of the official test-suite <http://www.openspf.net/Test_Suite>.
++release of the official test-suite
++<https://web.archive.org/web/20190130131432/http://www.openspf.org/Test_Suite>
+ 
+ The Mail::SPF source package includes the following additional tools:
+ 
+--- a/bin/spfquery
++++ b/bin/spfquery
+@@ -52,7 +52,8 @@
+ 
+ B<spfquery> checks if a given set of e-mail parameters (e.g., the SMTP sender's
+ IP address) matches the responsible domain's Sender Policy Framework (SPF)
+-policy.  For more information on SPF see L<http://www.openspf.org>.
++policy.  For more information on SPF see
++L<https://tools.ietf.org/html/rfc7208>.
+ 
+ =head2 Preferred Usage
+ 
+--- a/lib/Mail/SPF.pm
++++ b/lib/Mail/SPF.pm
+@@ -59,7 +59,8 @@
+ =head1 DESCRIPTION
+ 
+ B<Mail::SPF> is an object-oriented implementation of Sender Policy Framework
+-(SPF).  See L<http://www.openspf.org> for more information about SPF.
++(SPF).  See L<https://tools.ietf.org/html/rfc7208> for more information about
++SPF.
+ 
+ This class collection aims to fully conform to the SPF specification (RFC
+ 4408) so as to serve both as a production quality SPF implementation and as a
+@@ -78,11 +79,11 @@
+ 
+ =item The SPF project
+ 
+-L<http://www.openspf.org>
++L<https://web.archive.org/web/20190131165735/http://www.openspf.org/>
+ 
+-=item The SPFv1 specification (RFC 4408)
++=item The SPFv1 specification (RFC 7208)
+ 
+-L<http://www.openspf.org/Specifications>, L<http://tools.ietf.org/html/rfc4408>
++L<https://tools.ietf.org/html/rfc7208>
+ 
+ =back
+ 
+--- a/lib/Mail/SPF/Server.pm
++++ b/lib/Mail/SPF/Server.pm
+@@ -43,7 +43,7 @@
+ use constant query_rr_type_spf                      => 2;
+ 
+ use constant default_default_authority_explanation  =>
+-    'Please see http://www.openspf.org/Why?s=%{_scope};id=%{S};ip=%{C};r=%{R}';
++    'Rejected by SPF record';
+ 
+ sub default_query_rr_types { shift->query_rr_type_txt };
+ 
+@@ -102,7 +102,7 @@
+ string to use if the authority domain does not specify an explanation string of
+ its own.  Defaults to:
+ 
+-    'Please see http://www.openspf.org/Why?s=%{_scope};id=%{S};ip=%{C};r=%{R}'
++    'Rejected by SPF record'
+ 
+ As can be seen from the default, a non-standard C<_scope> pseudo macro is
+ supported that expands to the name of the identity's scope.  (Note: Do I<not>
+--- a/sbin/spfd
++++ b/sbin/spfd
+@@ -35,7 +35,7 @@
+ 
+ B<spfd> is a simple forking Sender Policy Framework (SPF) query server.  spfd
+ receives and answers SPF requests on a TCP/IP or UNIX domain socket.  For more
+-information on SPF see L<http://www.openspf.org>.
++information on SPF see L<https://tools.ietf.org/html/rfc7208>.
+ 
+ The B<--port> form listens on a TCP/IP socket on the specified I<port>.  The
+ default port is B<5970>.
+@@ -200,8 +200,7 @@
+     result=fail
+     local_explanation=example.com: Sender is not authorized by default to use
+         'user@example.com' in 'mfrom' identity (mechanism '-all' matched)
+-    authority_explanation=Please see http://www.openspf.org/why.html?
+-        sender=user%40example.com&ip=1.2.3.4&receiver=localhost
++    authority_explanation=Rejected by SPF record
+     received_spf_header=Received-SPF: fail (example.com: Sender is not
+         authorized by default to use 'user@example.com' in 'mfrom' identity
+         (mechanism '-all' matched)) receiver=localhost; identity=mfrom;

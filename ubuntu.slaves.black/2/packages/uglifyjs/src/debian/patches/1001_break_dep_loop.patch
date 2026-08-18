@@ -1,0 +1,86 @@
+Description: break dependency loop by making source-map module optional
+Forwarded: https://github.com/mishoo/UglifyJS2/pull/477
+Author: Jérémy Lal <kapouer@melix.org>
+Last-Update: 2016-12-09
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/package.json
++++ b/package.json
+@@ -29,7 +29,6 @@
+     "LICENSE"
+   ],
+   "dependencies": {
+-    "source-map": "~0.5.1",
+     "yargs": "~3.10.0"
+   },
+   "devDependencies": {
+@@ -37,8 +36,12 @@
+     "mocha": "~2.3.4"
+   },
+   "optionalDependencies": {
++    "source-map": "~0.5.1",
+     "uglify-to-browserify": "~1.0.0"
+   },
++  "optionalDependencies": {
++    "source-map": "~0.5.1"
++    },
+   "browserify": {
+     "transform": [
+       "uglify-to-browserify"
+--- a/tools/node.js
++++ b/tools/node.js
+@@ -7,6 +7,12 @@
+ var path = require("path");
+ var fs = require("fs");
+ 
++var sourceMap;
++try {
++    sourceMap = require("source-map");
++} catch(e) {
++}
++
+ var UglifyJS = exports;
+ var FILES = UglifyJS.FILES = [
+     "../lib/utils.js",
+@@ -27,7 +33,7 @@
+ new Function("MOZ_SourceMap", "exports", FILES.map(function(file){
+     return fs.readFileSync(file, "utf8");
+ }).join("\n\n"))(
+-    require("source-map"),
++    sourceMap,
+     UglifyJS
+ );
+ 
+@@ -139,18 +145,22 @@
+     // 5. output
+     var output = { max_line_len: 32000 };
+     if (options.outSourceMap || options.sourceMapInline) {
+-        output.source_map = UglifyJS.SourceMap({
+-            // prefer outFileName, otherwise use outSourceMap without .map suffix
+-            file: options.outFileName || (typeof options.outSourceMap === 'string' ? options.outSourceMap.replace(/\.map$/i, '') : null),
+-            orig: inMap,
+-            root: options.sourceRoot
+-        });
+-        if (options.sourceMapIncludeSources) {
+-            for (var file in sourcesContent) {
+-                if (sourcesContent.hasOwnProperty(file)) {
+-                    output.source_map.get().setSourceContent(file, sourcesContent[file]);
++        if (sourceMap) {
++            output.source_map = UglifyJS.SourceMap({
++                // prefer outFileName, otherwise use outSourceMap without .map suffix
++                file: options.outFileName || (typeof options.outSourceMap === 'string' ? options.outSourceMap.replace(/\.map$/i, '') : null),
++                orig: inMap,
++                root: options.sourceRoot
++            });
++            if (options.sourceMapIncludeSources) {
++                for (var file in sourcesContent) {
++                    if (sourcesContent.hasOwnProperty(file)) {
++                        output.source_map.get().setSourceContent(file, sourcesContent[file]);
++                    }
+                 }
+             }
++        } else {
++            console.error("source-map module is missing and needed by outSourceMap option");
+         }
+ 
+     }

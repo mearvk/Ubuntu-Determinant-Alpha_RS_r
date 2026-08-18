@@ -1,0 +1,70 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Sun, 24 Oct 2021 22:40:11 +0100
+Subject: Add extra debug to memory-monitor-dbus test
+
+Hopefully this will give us the necessary information to find out why
+this test isn't reliable.
+
+Bug-Debian: https://bugs.debian.org/995178
+Forwarded: no
+---
+ gio/tests/memory-monitor-dbus.py.in | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/gio/tests/memory-monitor-dbus.py.in b/gio/tests/memory-monitor-dbus.py.in
+index 17862e3..61e6f94 100755
+--- a/gio/tests/memory-monitor-dbus.py.in
++++ b/gio/tests/memory-monitor-dbus.py.in
+@@ -74,18 +74,29 @@ try:
+             Timeout is in deciseconds, defaulting to 50 (5 seconds). message is
+             printed on failure.
+             '''
++            print('Waiting up to {}/10 seconds for {!r} to be true'.format(timeout, condition))
++            orig_timeout = timeout
++
+             while timeout >= 0:
++                print('Loop iteration')
+                 context = GLib.MainContext.default()
+                 while context.iteration(False):
++                    print('Iterating main loop')
+                     pass
+                 if condition():
++                    print('Condition reached')
+                     break
+                 timeout -= 1
+                 time.sleep(0.1)
+             else:
++                print('Condition not reached in {}/10 seconds'.format(orig_timeout))
+                 self.fail(message or 'timed out waiting for ' + str(condition))
+ 
+         def memory_warning_cb(self, monitor, level):
++            print('low-memory-warning: monitor {!r} reports level {}'.format(
++                monitor,
++                level,
++            ))
+             self.last_warning = level
+             self.main_context.wakeup()
+ 
+@@ -95,17 +106,20 @@ try:
+             # Wait 2 seconds
+             timeout = 2
+             while timeout > 0:
++                print('Waiting 0.5s for stray events...')
+                 time.sleep(0.5)
+                 timeout -= 0.5
+                 self.main_context.iteration(False)
+ 
++            print('Emitting mock low-memory warning, level 100: try to free memory')
+             self.dbusmock.EmitWarning(100)
+             # Wait 2 seconds or until warning
+-            self.assertEventually(lambda: self.last_warning == 100, "'100' low-memory warning not received", 20)
++            self.assertEventually(lambda: self.last_warning == 100, "'100' low-memory warning not received", 100)
+ 
++            print('Emitting mock low-memory warning, level 255: OOM imminent')
+             self.dbusmock.EmitWarning(255)
+             # Wait 2 seconds or until warning
+-            self.assertEventually(lambda: self.last_warning == 255, "'255' low-memory warning not received", 20)
++            self.assertEventually(lambda: self.last_warning == 255, "'255' low-memory warning not received", 100)
+ 
+ except ImportError as e:
+     @unittest.skip("Cannot import %s" % e.name)

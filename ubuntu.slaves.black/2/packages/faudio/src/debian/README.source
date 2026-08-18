@@ -1,0 +1,71 @@
+git repository setup
+--------------------
+
+The Debian packages' content is on our branch 'master'.  Upstream's
+branch 'master' is our 'upstream'.  So files excluded from the Debian
+package are still on branch 'upstream', but not on 'master'.
+
+Note: This differs from the setup of our wine git repository, where most
+files excluded from the package are still present on branch 'master'
+(those are generated files, which get removed on "clean", while the files
+here are real source files).
+
+The git repository was created with the following commands:
+
+git clone \
+  --origin github-FNA-XNA \
+  https://github.com/FNA-XNA/FAudio.git \
+  faudio
+cd faudio
+git branch -m master github-FNA-XNA-master
+git branch upstream 19.02
+git checkout upstream
+gbp import-dscs \
+  --upstream-vcs-tag=%\(version\)s \
+  --upstream-tag=%\(version\)s \
+  --create-missing-branches \
+  --sign-tags \
+  --keyid='8826 EBE8 FCF7 26EE 182E  23D7 79C4 3E62 0B03 9B35' \
+  --debsnap \
+  --pristine-tar \
+  faudio
+git reset --hard 19.11
+
+
+
+example workflow to import a new version
+----------------------------------------
+
+version="19.11"
+uscan --download-version "$version"
+git checkout upstream
+git pull --no-edit https://github.com/FNA-XNA/FAudio.git tag "$version"
+pristine-tar commit "../faudio_${version}.orig.tar.xz" "${version}"
+git checkout master
+git merge --strategy-option=theirs upstream
+  # On merge conflicts do a "git rm" of files deleted in 'master' and
+  # modified in 'upstream' and "git commit" the merge then.
+  # If there are new files that are excluded by d/copyright remove them.
+dch -v "${version}-1" "New upstream release."
+while quilt push; do quilt refresh || break; done
+  quilt pop -a
+  git add debian/patches
+lintian-brush # automate some packaging tasks, needs manual review
+# Make sure the package builds, add any new files that need to be installed
+# See below if the build fails because of symbols
+git commit -m "New upstream release"
+
+# update symbols file
+sudo apt build-dep faudio
+debuild -us -uc
+version_escaped="19\.11"
+sed -e "s/${version_escaped}-1/${version_escaped}/" ./debian/libfaudio0/DEBIAN/symbols |
+  grep -vE "^ stb|_INTERNAL_" > \
+  ./debian/libfaudio0.symbols
+git add -e ./debian/libfaudio0.symbols
+  # Do not add the removal of these 2 lines:
+  #(regex|optional)^stb.*@Base 19.02
+  #(regex|optional).*_INTERNAL_.*@Base 19.06.07
+git commit -m"Update symbols file."
+
+ -- Stephen Kitt <skitt@debian.org>, Thu,  3 Dec 2020 15:08:12 +0100

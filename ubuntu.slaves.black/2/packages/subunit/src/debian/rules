@@ -1,0 +1,87 @@
+#!/usr/bin/make -f
+
+# Get the supported Python versions
+PY3VERS = $(shell py3versions -vr)
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+export OSLO_PACKAGE_VERSION=$(VERSION)
+UPSTREAM_GIT := https://github.com/testing-cabal/subunit.git
+
+%:
+	dh $@ --with=python3
+
+export INSTALLDIRS=vendor
+
+override_dh_auto_clean:
+	rm -rf build python_subunit.egg-info
+	rm -rf debian/tmp
+	rm -f perl/MYMETA.yml
+	cp -rf debian/upstream-orig-files/* .
+	rm -rf .libs perl/blib \
+		c++/.dirstamp \
+		perl/pm_to_blib \
+		c/lib/.dirstamp \
+		c/tests/.dirstamp \
+		c/tests/.libs \
+		c++/.deps \
+		c/lib/.deps \
+		c/tests/.deps
+	find . -iname '*.pyc' -delete
+	find . -iname '*.o' -delete
+	rm -f Makefile \
+		c++/SubunitTestProgressListener.lo \
+		c/lib/child.lo \
+		c/tests/test_child \
+		config.h \
+		config.log \
+		config.status \
+		libcppunit_subunit.la \
+		libcppunit_subunit.pc \
+		libsubunit.la \
+		libsubunit.pc \
+		libtool \
+		perl/Makefile \
+		perl/Makefile.PL \
+		stamp-h1 \
+		c/tests/test_child.log \
+		c/tests/test_child.trs \
+		perl/MYMETA.json \
+		test-suite.log
+	rm -f Makefile.in \
+		aclocal.m4 \
+		compile \
+		config.guess \
+		config.sub \
+		depcomp \
+		install-sh \
+		ltmain.sh \
+		missing \
+		py-compile
+	rm -rf m4
+
+override_dh_auto_configure:
+	dh_auto_configure -- --$(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),dis,en)able-check
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	dh_auto_test || true
+	for vers in $(PY3VERS); do \
+		SHELL_SHARE='./shell/share/' PYTHONPATH=./python${PYTHONPATH:+:$PYTHONPATH} python$$vers runtests.py || true; \
+	done
+endif
+
+override_dh_auto_install-arch:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+	find debian/tmp/ -name "*.pyc" | xargs rm -f
+	find debian/tmp/ -name "__pycache__" | xargs rm -rf
+	find debian/tmp/ -name "*.pyo" | xargs rm -f
+
+
+override_dh_auto_install-indep:
+	set -e ; set -x ; for vers in $(PY3VERS); do \
+		python$$vers setup.py install --install-layout=deb --root=$(CURDIR)/debian/tmp; \
+	done
+
+override_dh_install:
+	dh_install
+	dh_python3 --shebang=/usr/bin/python3

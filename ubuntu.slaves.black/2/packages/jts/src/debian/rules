@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME := /usr/lib/jvm/default-java
+
+JSON_SIMPLE_VERSION = $(shell dpkg -l libjson-simple-java | grep '^ii' | awk '{print $$3}')
+JSON_SIMPLE_3 = $(shell dpkg --compare-versions '$(JSON_SIMPLE_VERSION)' '>' '3.1.1-1~' && echo yes || echo no)
+
+ifeq (yes,$(JSON_SIMPLE_3))
+    JSON_SIMPLE_PACKAGE = com.github.cliftonlabs.json_simple
+    JSON_EXCEPTION = JsonException
+    JSON_SIMPLE_MAVEN = com.github.cliftonlabs
+else
+    JSON_SIMPLE_PACKAGE = org.json.simple
+    JSON_EXCEPTION = DeserializationException
+    JSON_SIMPLE_MAVEN = com.googlecode.json-simple
+endif
+
+%:
+	dh $@ --buildsystem=maven
+
+debian/maven.rules: debian/maven.rules.in
+	sed 's/@JSON_SIMPLE_MAVEN@/$(JSON_SIMPLE_MAVEN)/' $< >$@
+
+override_dh_auto_configure: debian/maven.rules
+	dh_auto_configure
+
+override_dh_auto_clean:
+	dh_auto_clean
+
+	find . -type f -name \*.java.json-simple \
+	  -exec sh -c 'file={} && mv $$file $${file%.json-simple}' \; -print
+
+override_dh_auto_build:
+	find . -type f -name \*.java -exec grep -q 'import @JSON_SIMPLE_PACKAGE@' {} \; \
+	  -exec sed -i.json-simple \
+		    -e 's,@JSON_SIMPLE_PACKAGE@,$(JSON_SIMPLE_PACKAGE),' \
+		    -e 's/@JSON_EXCEPTION@/$(JSON_EXCEPTION)/' \
+		    {} \; -print
+
+	dh_auto_build

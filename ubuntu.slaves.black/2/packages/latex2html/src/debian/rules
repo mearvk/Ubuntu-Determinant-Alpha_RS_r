@@ -1,0 +1,66 @@
+#!/usr/bin/make -f
+
+LIBDIR      := /usr/share/latex2html
+TEXPATH     := /usr/share/texmf/tex/latex/html
+TMPTOP      := $(CURDIR)/debian/latex2html
+DOCDIR 	    := $(TMPTOP)/usr/share/doc/latex2html
+
+# The arguments should match the "L2H" definition in docs/Makefile.
+# The difference is that we need to call the latex2html that was built
+# in this run + "-test_mode".
+
+CONVERT_CMD := '../latex2html -test_mode -no_use_pdftex -image_type png -no_use_dvipng -no_math -html_version 4.0,math'
+
+# see https://tests.reproducible-builds.org/debian/issues/unstable/timestamps_in_ps_generated_by_dvips_issue.html
+export FORCE_SOURCE_DATE := 1
+
+%:
+	dh $@ --with tex
+
+override_dh_auto_configure:
+	./configure --verbose --prefix=/usr \
+	            --shlibdir=$(LIBDIR) \
+                    --libdir=$(LIBDIR) \
+                    --with-perl=/usr/bin/perl \
+                    --with-iconpath=/usr/share/latex2html/icons \
+		    --with-texpath=$(TEXPATH)
+
+override_dh_auto_build:
+	cd docs && ln -sf ../texinputs/html*.sty .
+	$(MAKE)
+	mkdir -p docs/manual
+	$(MAKE) -C docs -f Makefile L2H=$(CONVERT_CMD) \
+	      LATEX2HTMLDIR=$(CURDIR) manual.dvi manual.ps manual.pdf manual.html
+
+override_dh_clean:
+	dh_clean --exclude=LICENSE.orig
+
+execute_after_dh_auto_clean:
+	$(MAKE) -C docs clean
+	rm -rf docs/manual
+	rm -f docs/*.stamp
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(TMPTOP) INSTALLING_DEBIAN=1
+	(cd $(TMPTOP)/$(LIBDIR); \
+            mv l2hconf.pm       $(TMPTOP)/etc/latex2html.conf; \
+            ln -s               /etc/latex2html.conf l2hconf.pm )
+	pod2man pstoimg         > $(TMPTOP)/usr/share/man/man1/pstoimg.1
+	(cd docs/manual/;       tar cf - *.html *.png  *.css) | \
+                                (cd $(DOCDIR)/html; tar xf   -)
+	rm -rf $(TMPTOP)/$(LIBDIR)/docs
+	patch --no-backup-if-mismatch $(TMPTOP)/usr/bin/latex2html debian/latex2html.patch
+	chmod a+x $(TMPTOP)/$(LIBDIR)/makemap
+	chmod a+x $(TMPTOP)/$(LIBDIR)/makeseg/makeseg
+	# get srcdir from cfgcache.pm and remove the lines containing it from latex2html for reproducibility
+	# the lines only appear in test_mode, which is disabled by the patch above
+	fgrep -v `fgrep srcdir $(TMPTOP)/$(LIBDIR)/cfgcache.pm | sed "s/.*=.*'\(.*\)'.*/\1/"` $(TMPTOP)/usr/bin/latex2html > $(TMPTOP)/usr/bin/latex2html.reproducible
+	chmod --reference=$(TMPTOP)/usr/bin/latex2html $(TMPTOP)/usr/bin/latex2html.reproducible
+	mv $(TMPTOP)/usr/bin/latex2html.reproducible $(TMPTOP)/usr/bin/latex2html
+	# now remove srcdir from cfgcache.pm too
+	sed -i '/srcdir/d' $(TMPTOP)/$(LIBDIR)/cfgcache.pm
+	# move two stray documentation files from data directories to /usr/share/docs/latex2html
+	mv $(TMPTOP)/usr/share/latex2html/IndicTeX-HTML/README.IndicTeX-HTML $(DOCDIR)
+	mv $(TMPTOP)/usr/share/latex2html/foilhtml/readme.v12 $(DOCDIR)/readme.foilhtml.v12
+	# move example from data directory to /usr/share/docs/latex2html
+	mv $(TMPTOP)/usr/share/latex2html/example $(DOCDIR)

@@ -1,0 +1,84 @@
+From: Christian Kastner <ckk@debian.org>
+Date: Sat, 26 Jul 2014 18:22:40 +0200
+Subject: Don't hardcode build flags
+
+Remove upstream's hardcoded build flags in Makefiles so that the build flags
+passed on by dpkg-buildflags are honored. This enables hardening during build.
+
+Last-Update: 2020-02-09
+---
+ libcap/Makefile  | 10 +++++-----
+ pam_cap/Makefile |  4 ++--
+ progs/Makefile   |  4 ++--
+ 3 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/libcap/Makefile b/libcap/Makefile
+index de6a28d..6ba7fcc 100644
+--- a/libcap/Makefile
++++ b/libcap/Makefile
+@@ -50,7 +50,7 @@ libpsx.pc: libpsx.pc.in
+ 		$< >$@
+ 
+ _makenames: _makenames.c cap_names.list.h
+-	$(BUILD_CC) $(BUILD_CFLAGS) $< -o $@
++	$(BUILD_CC) $(BUILD_CFLAGS) $(BUILD_LDFLAGS) $(BUILD_CPPFLAGS) $< -o $@
+ 
+ cap_names.h: _makenames
+ 	./_makenames > cap_names.h
+@@ -77,18 +77,18 @@ $(STAPSXLIBNAME): $(PSXOBJS)
+ 	$(RANLIB) $@
+ 
+ $(MINLIBNAME): $(CAPOBJS)
+-	$(LD) $(CFLAGS) $(LDFLAGS) -Wl,-soname,$(MAJLIBNAME) -o $@ $^
++	$(LD) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -Wl,-soname,$(MAJLIBNAME) -o $@ $^
+ 	ln -sf $(MINLIBNAME) $(MAJLIBNAME)
+ 	ln -sf $(MAJLIBNAME) $(LIBNAME)
+ 
+ %.o: %.c $(INCLS)
+-	$(CC) $(CFLAGS) $(IPATH) -c $< -o $@
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(IPATH) -c $< -o $@
+ 
+ cap_text.o: cap_text.c $(USE_GPERF_OUTPUT) $(INCLS)
+-	$(CC) $(CFLAGS) $(IPATH) $(INCLUDE_GPERF_OUTPUT) -c $< -o $@
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(IPATH) $(INCLUDE_GPERF_OUTPUT) -c $< -o $@
+ 
+ cap_test: cap_test.c libcap.h
+-	$(CC) $(CFLAGS) $(IPATH) $< -o $@
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(IPATH) $< -o $@
+ 
+ test: cap_test
+ 	./cap_test
+diff --git a/pam_cap/Makefile b/pam_cap/Makefile
+index 638d793..a4c0e01 100644
+--- a/pam_cap/Makefile
++++ b/pam_cap/Makefile
+@@ -19,10 +19,10 @@ pam_cap.so: pam_cap.o
+ 	$(LD) -o pam_cap.so $< $(LIBCAPLIB) $(LDFLAGS) -lpam
+ 
+ pam_cap.o: pam_cap.c
+-	$(CC) $(CFLAGS) $(IPATH) -c $< -o $@
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(IPATH) -c $< -o $@
+ 
+ test_pam_cap: test_pam_cap.c pam_cap.c
+-	$(CC) $(CFLAGS) $(IPATH) -o $@ test_pam_cap.c $(LIBCAPLIB) $(LDFLAGS) --static
++	$(CC) $(CFLAGS) $(CPPFLAGS) $(IPATH) -o $@ test_pam_cap.c $(LIBCAPLIB) $(LDFLAGS) --static
+ 
+ testlink: test.c pam_cap.o
+ 	$(CC) $(CFLAGS) -o $@ $+ -lpam -ldl $(LIBCAPLIB) $(LDFLAGS)
+diff --git a/progs/Makefile b/progs/Makefile
+index 9462a2f..5bfb8da 100644
+--- a/progs/Makefile
++++ b/progs/Makefile
+@@ -24,10 +24,10 @@ $(DEPS):
+ 	make -C ../libcap $(DEPSBUILD)
+ 
+ $(BUILD): %: %.o $(DEPS)
+-	$(CC) $(CFLAGS) -o $@ $< $(LIBCAPLIB) $(LDFLAGS)
++	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $< $(LIBCAPLIB) $(LDFLAGS)
+ 
+ %.o: %.c $(INCS)
+-	$(CC) $(IPATH) $(CAPSH_SHELL) $(CFLAGS) -c $< -o $@
++	$(CC) $(IPATH) $(CAPSH_SHELL) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+ 
+ install: all
+ 	mkdir -p -m 0755 $(FAKEROOT)$(SBINDIR)

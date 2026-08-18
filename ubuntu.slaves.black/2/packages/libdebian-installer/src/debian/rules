@@ -1,0 +1,55 @@
+#! /usr/bin/make -f
+%:
+	dh $@ --builddirectory=build
+
+ifeq (,$(filter noudeb, $(DEB_BUILD_PROFILES)))
+  with_udeb = yes
+endif
+
+include /usr/share/dpkg/architecture.mk
+DEB_HOST_ARCH_OS    := $(shell dpkg-architecture -qDEB_HOST_ARCH_OS 2>/dev/null)
+
+CFLAGS += -Wall -W
+
+#CFLAGS += -Werror
+#CFLAGS += -Wstrict-prototypes -Wmissing-prototypes
+CFLAGS += -Wmissing-declarations
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -O0
+else
+	CFLAGS += -Os -fomit-frame-pointer
+endif
+
+export CFLAGS
+
+ifneq ($(filter nocheck,$(DEB_BUILD_OPTIONS)),)
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-check
+endif
+
+override_dh_auto_build:
+	dh_auto_build
+ifeq ($(filter nodoc,$(DEB_BUILD_OPTIONS))$(filter nodoc,$(DEB_BUILD_PROFILES)),)
+	$(MAKE) -C build/doc doc
+endif
+
+override_dh_install:
+ifeq ($(with_udeb),yes)
+	install $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libdebian-installer.so.4 $(CURDIR)/debian/libdebian-installer4-udeb/lib
+	install $(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libdebian-installer-extra.so.4 $(CURDIR)/debian/libdebian-installer-extra4-udeb/lib
+endif
+	dh_install --sourcedir=debian/tmp
+ifeq ($(filter nodoc,$(DEB_BUILD_OPTIONS))$(filter nodoc,$(DEB_BUILD_PROFILES)),)
+	dh_install -plibdebian-installer4-dev --sourcedir=debian/tmp usr/share/doc/libdebian-installer4-dev
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs -plibdebian-installer4 -V \
+		$(if $(with_udeb),--add-udeb=libdebian-installer4-udeb)
+	dh_makeshlibs -plibdebian-installer-extra4 -V \
+		$(if $(with_udeb),--add-udeb=libdebian-installer-extra4-udeb)
+
+override_dh_shlibdeps:
+	dh_shlibdeps -N libdebian-installer-extra4 -N libdebian-installer-extra4-udeb
+	dh_shlibdeps -p libdebian-installer-extra4 $(if $(with_udeb),-p libdebian-installer-extra4-udeb) -- -L$(CURDIR)/debian/libdebian-installer-extra4.shlibs.local

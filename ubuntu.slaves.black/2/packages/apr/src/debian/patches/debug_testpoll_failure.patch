@@ -1,0 +1,16 @@
+# reproducible.debian.net gave strange test error on build:
+#   testpoll            :  Line 876: apr_pollcb_poll() didn't sleep
+#   FAILED 1 of 23
+# add some debug output
+--- apr.orig/test/testpoll.c
++++ apr/test/testpoll.c
+@@ -908,6 +908,9 @@ static void justsleep(abts_case *tc, voi
+             rv = apr_pollcb_poll(pollcb, apr_time_from_msec(200), NULL, NULL);
+             t2 = apr_time_now();
+             ABTS_INT_EQUAL(tc, 1, APR_STATUS_IS_TIMEUP(rv));
++            if ((t2 - t1) <= apr_time_from_msec(100))
++                abts_log_message("pollset method: %d t1: %ld t2: %ld rv: %d\n",
++                                 i, (long)t1, (long)t2, rv);
+             ABTS_ASSERT(tc,
+                         "apr_pollcb_poll() didn't sleep",
+                         (t2 - t1) > apr_time_from_msec(100));

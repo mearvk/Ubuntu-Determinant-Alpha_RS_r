@@ -1,0 +1,116 @@
+From fca5217d524635bed70532aa68baff065d22d790 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Sat, 20 Jul 2019 21:20:59 +0200
+Subject: [PATCH libaio 18/28] harness: Use run-time _SC_PAGE_SIZE instead of
+ build-time PAGESIZE
+
+The getconf(1) command is inherently not cross-compilation friendly.
+In addition PAGESIZE depends on the specific system, even within a
+specific arch, so using a hard-coded value is never safe.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/Makefile   |  2 +-
+ harness/cases/18.t | 34 ++++++++++++++++++++++++----------
+ 2 files changed, 25 insertions(+), 11 deletions(-)
+
+diff --git a/harness/Makefile b/harness/Makefile
+index 87b33f6..5cc2b25 100644
+--- a/harness/Makefile
++++ b/harness/Makefile
+@@ -6,7 +6,7 @@ PROGS:=$(PARTPROGS) $(EXTRAPROGS)
+ HARNESS_SRCS:=main.c
+ # io_queue.c
+ 
+-CFLAGS+=-Wall -Werror -I../src -g -O2 -DPAGE_SIZE=$(shell getconf PAGESIZE)
++CFLAGS+=-Wall -Werror -I../src -g -O2
+ #-lpthread -lrt
+ 
+ # Change this on the build line to run tests against the installed libraries:
+diff --git a/harness/cases/18.t b/harness/cases/18.t
+index 5587ceb..daa1d26 100644
+--- a/harness/cases/18.t
++++ b/harness/cases/18.t
+@@ -40,11 +40,17 @@
+ 
+ #define THREADS_NUM 100
+ 
++static size_t page_size;
++
+ void
+ aio_worker(void *ptr)
+ {
+-	int i, j, fd;
+-	char buffer[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
++	int i, j, fd, ret;
++	char *buffer = NULL;
++
++	ret = posix_memalign((void **)&buffer, page_size, page_size);
++	assert(ret == 0);
++	assert(buffer != NULL);
+ 
+ 	fd = open(FILENAME, O_DIRECT|O_RDONLY);
+ 	assert(fd >= 0);
+@@ -55,19 +61,19 @@ aio_worker(void *ptr)
+ 		struct iocb *cbs[1];
+ 
+ 		assert(!io_queue_init(1, &ctx));
+-		io_prep_pread(&cb, fd, buffer, PAGE_SIZE, 0);
++		io_prep_pread(&cb, fd, buffer, page_size, 0);
+ 		cbs[0] = &cb;
+ 
+-		memset(buffer, '0', PAGE_SIZE);
++		memset(buffer, '0', page_size);
+ 		assert(io_submit(ctx, 1, &cbs[0]) == 1);
+ 		// wait random time (0-500ms) ?
+ 
+ 		io_destroy(ctx);
+-		memset(buffer, DESTROY_PATTERN, PAGE_SIZE);
++		memset(buffer, DESTROY_PATTERN, page_size);
+ 		// wait random for (0-500ms) ?
+ 
+ 		// check it is still DESTROY_PATTERN
+-		for (j = 0; j < PAGE_SIZE; j++) {
++		for (j = 0; j < page_size; j++) {
+ 			if (buffer[j] != DESTROY_PATTERN) {
+ 				fprintf(stderr,
+ 					"Buffer has unexpected character: %c\n",
+@@ -77,6 +83,7 @@ aio_worker(void *ptr)
+ 		}
+ 	}
+ 
++	free(buffer);
+ 	close(fd);
+ }
+ 
+@@ -84,15 +91,22 @@ int
+ test_main(void)
+ {
+ 	int i, fd, ret;
+-	char buffer[PAGE_SIZE];
++	char *buffer = NULL;
+ 	pthread_t threads[THREADS_NUM];
+ 
++	page_size = sysconf(_SC_PAGESIZE);
++	assert(page_size >= 1);
++
++	ret = posix_memalign((void **)&buffer, page_size, page_size);
++	assert(ret == 0);
++	assert(buffer != NULL);
++
+ 	fd = open(FILENAME, O_CREAT|O_TRUNC|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
+ 	assert(fd != -1);
+ 
+-	memset(buffer, FILEPATTERN, PAGE_SIZE);
+-	ret = write(fd, buffer, PAGE_SIZE);
+-	assert(ret == PAGE_SIZE);
++	memset(buffer, FILEPATTERN, page_size);
++	ret = write(fd, buffer, page_size);
++	assert(ret == page_size);
+ 	close(fd);
+ 
+ 	for (i = 0; i < THREADS_NUM; i++) {
+-- 
+2.26.0.292.g33ef6b2f38
+

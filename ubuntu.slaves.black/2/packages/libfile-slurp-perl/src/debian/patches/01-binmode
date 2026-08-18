@@ -1,0 +1,123 @@
+Author: Alexander Zangerl <az@debian.org>
+Subject: binmode fix for multibyte-encoded data
+
+--- a/MANIFEST
++++ b/MANIFEST
+@@ -42,6 +42,8 @@ t/stdin.t
+ t/stringify.t
+ t/tainted.t
+ t/write_file_win32.t
++t/utf8.data
++t/utf8.t
+ xt/author/00-compile.t
+ xt/author/eol.t
+ xt/author/pod-spell.t
+--- a/META.yml
++++ b/META.yml
+@@ -36,6 +36,7 @@ no_index:
+ requires:
+   B: '0'
+   Carp: '0'
++  Digest::MD5: 0
+   Errno: '0'
+   Exporter: '5.57'
+   Fcntl: '0'
+--- /dev/null
++++ b/t/utf8.data
+@@ -0,0 +1,3 @@
++hallo grüezi blödel schaß und aus.
++Gregorian: ლრ
++Arabic: ڐڡڠڟڞ
+--- /dev/null
++++ b/t/utf8.t
+@@ -0,0 +1,44 @@
++#!/usr/bin/perl
++use Test::More;
++use strict;
++use File::Slurp;
++use Encode qw/encode_utf8/;
++use Digest::MD5 qw/md5_hex/;
++use Devel::Peek;
++
++BEGIN {
++	plan skip_all => "Newer Perl doesn't like sysread with utf8 binmode"
++			if $] >= 5.024000;
++}
++
++my $digest = 'e30ffef9b0c5623bc1ddd1ba73302f14';
++
++my $utf8 = read_file("t/utf8.data", binmode => ":utf8");
++my $latin = read_file("t/utf8.data");
++
++ok(  Encode::is_utf8($utf8),  "Reading the data file with binmode options results in UTF8 encoded string");
++ok(! Encode::is_utf8($latin), "Reading the data file without options correctly results in unencoded string");
++
++my $ctx1 = new Digest::MD5;
++   $ctx1->add(encode_utf8($utf8));  # encode_utf8 is needed, see http://search.cpan.org/dist/Digest-MD5/MD5.pm
++
++ok($ctx1->hexdigest eq $digest, "The data from the data file we just read came through intact");
++
++
++###
++# Write to a tempfile and rest
++###
++
++my $fn_utf8  = "/tmp/file-slurp-utf8.txt";
++
++write_file($fn_utf8, { binmode => ":utf8" }, $utf8);
++
++open my $fh_utf8, "$fn_utf8" or die "Could not open $fn_utf8: $!\n";
++my $ctx2 = new Digest::MD5;
++   $ctx2->addfile($fh_utf8);
++
++ok($ctx2->hexdigest eq $digest, "The data is written correctly with binmode options");
++
++unlink($fn_utf8);
++
++done_testing;
+--- /dev/null
++++ b/t/utf8.t.alt
+@@ -0,0 +1,19 @@
++use Test::More tests => 1;
++use strict; 
++use File::Slurp;
++my $fn="/tmp/utf8.txt";
++
++my $data="hallo gr�ezi bl�del scha� und aus.\n";
++open F,">$fn";
++binmode(F, ":utf8");
++print F $data;
++close F;
++
++my $x=read_file($fn,binmode=>":utf8");
++ok($x eq $data,"utf8 encoded data survives slurp");
++unlink($fn);
++
++
++
++
++
+--- a/lib/File/Slurp.pm
++++ b/lib/File/Slurp.pm
+@@ -897,6 +897,9 @@ set the C<binmode> option, then its valu
+ the opened handle. You can use this to set the file to be read in binary mode,
+ utf8, etc. See C<perldoc -f binmode> for more.
+ 
++Please note that using binmode :utf8 with sysread (and thus read_file) 
++has been deprecated in recent versions of perl.
++
+ =item
+ 
+ blk_size
+--- a/t/binmode.t
++++ b/t/binmode.t
+@@ -9,7 +9,8 @@ use IO::Handle ();
+ use Test::More;
+ 
+ BEGIN {
+-    plan skip_all => 'Older Perl lacking unicode support' if $] < 5.008001;
++	plan skip_all => 'Older Perl lacking unicode support' if $] < 5.008001;
++	plan skip_all => "Newer Perl doesn't like sysread with utf8 binmode" if $] >= 5.024000;
+ }
+ 
+ # older EUMMs turn this on. We don't want to emit warnings.

@@ -1,0 +1,90 @@
+#!/usr/bin/make -f
+
+include debian/make.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# Use dpkg-buildflags to get hardening flags, and exclude non-hardening flags
+dpkg_buildflags = $(and $(1),$(shell DEB_CFLAGS_MAINT_STRIP="$(shell DEB_BUILD_MAINT_OPTIONS=hardening=-all dpkg-buildflags --get $(1))" dpkg-buildflags --get $(1)))
+$(call lazy,CFLAGS,$$(call dpkg_buildflags,CFLAGS))
+$(call lazy,CPPFLAGS,$$(call dpkg_buildflags,CPPFLAGS))
+$(call lazy,LDFLAGS,$$(call dpkg_buildflags,LDFLAGS))
+
+CFLAGS += -Wall -pipe
+LDFLAGS += -Wl,--as-needed
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	CONFIGURE_FLAGS := --disable-optimize
+else
+	CONFIGURE_FLAGS := --enable-optimize
+endif
+
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+	CONFIGURE_FLAGS += --enable-debug
+else
+	CONFIGURE_FLAGS += --disable-debug --enable-debug-symbols
+endif
+
+ifeq (64,$(shell dpkg-architecture -qDEB_HOST_ARCH_BITS))
+	CONFIGURE_FLAGS += --enable-64bit
+endif
+ifeq (x32,$(shell dpkg-architecture -qDEB_HOST_ARCH))
+	CONFIGURE_FLAGS += --enable-x32
+endif
+
+$(call lazy,DEB_HOST_MULTIARCH,$$(shell dpkg-architecture -qDEB_HOST_MULTIARCH))
+$(call lazy,BUILD_DATE,$$(shell dpkg-parsechangelog -S Date))
+
+PREPROCESS_FILES := $(wildcard debian/*.in)
+
+$(PREPROCESS_FILES:.in=): %: %.in
+	sed 's,@DEB_HOST_MULTIARCH@/,$(DEB_HOST_MULTIARCH:=/),g;s,@MULTIARCH_WILDCARD@/,$(if $(DEB_HOST_MULTIARCH),*/),g' $< > $@
+
+%:
+	dh $@ --sourcedirectory=nspr
+
+override_dh_auto_configure: $(PREPROCESS_FILES:.in=)
+	for file in config.guess config.sub; do \
+		sed -i '2!b;/^#/ i\exec "/usr/share/misc/'$$file'" "$$@"' nspr/build/autoconf/$$file; \
+	done
+
+	cd nspr && \
+	CFLAGS="$(CFLAGS)" \
+	CPPFLAGS="$(CPPFLAGS)" \
+	LDFLAGS="$(LDFLAGS)" \
+	./configure --target=$(DEB_HOST_GNU_TYPE) --host=$(DEB_BUILD_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) \
+                    $(CONFIGURE_FLAGS) \
+		    --prefix=/usr \
+		    --libdir=/usr/lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_auto_build:
+	$(MAKE) -C nspr $(and $(filter terse,$(DEB_BUILD_OPTIONS)),-s) \
+		SH_NOW="$(shell TZ=UTC date -d "$(BUILD_DATE)" +%s)000000" \
+		SH_DATE="$(shell TZ=UTC date -d "$(BUILD_DATE)" "+%Y-%m-%d %T")"
+
+override_dh_auto_clean:
+	[ ! -f nspr/pr/tests/Makefile ] || $(MAKE) -C nspr/pr/tests clean
+	[ ! -f nspr/lib/tests/Makefile ] || $(MAKE) -C nspr/lib/tests clean
+	dh_auto_clean
+
+	rm -f $(PREPROCESS_FILES:.in=)
+	for file in config.guess config.sub; do \
+		sed -i '2!b;/^exec "/ d' nspr/build/autoconf/$$file; \
+	done
+
+override_dh_makeshlibs:
+	dh_makeshlibs -a -- -c4
+
+override_dh_auto_test:
+ifeq ($(filter nocheck,$(DEB_BUILD_OPTIONS)),)
+	$(MAKE) -C nspr/pr/tests
+	$(MAKE) -C nspr/lib/tests
+	# Skip gethost because it needs DNS, and thus networking.
+	# Skip fdcach, peek and vercheck because they fail.
+	# Skip socket because it freezes.
+	# Skip getproto because it fails on some buildds.
+	# Skip nblayer because it freezes on armel.
+	cd nspr/pr/tests && grep -v '^\(fdcach\|gethost\|getproto\|nblayer\|peek\|socket\|vercheck\)$$' ./runtests.sh | sh - $(CURDIR)/nspr/dist
+	cd nspr/lib/tests && LD_LIBRARY_PATH=$(CURDIR)/nspr/dist/bin$(addprefix :,$(LD_LIBRARY_PATH)) ./base64t
+	cd nspr/lib/tests && LD_LIBRARY_PATH=$(CURDIR)/nspr/dist/bin$(addprefix :,$(LD_LIBRARY_PATH)) ./string
+endif

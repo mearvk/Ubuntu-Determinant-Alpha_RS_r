@@ -1,0 +1,101 @@
+#!/bin/bash --
+
+set -e
+
+. /usr/share/javahelper/jh_lib.sh
+
+syntax()
+{
+   echo -e "Usage: jh_repack --upstream-version <version> <orig.tar.gz>"
+   echo -e "Options:"
+   echo -e "\t-h --help: show this text"
+   echo -e "\t-V --version: show the version"
+   echo -e "\t-v --verbose: show more information while running"
+   echo -e "\t-n --no-act: don't actually do anything, just print the results"
+   exit 1
+}
+
+ARGS="upstream-version v verbose n no-act" parseargs "$@"
+
+VERBOSE="`getarg v verbose`"
+
+if [ "$ARGC" != "2" ] ; then
+    syntax
+    exit 1
+fi
+
+VERSION=${ARGV[0]}
+TARBALL="`readlink -f "${ARGV[1]}"`"
+
+TMPDIR=`mktemp -d`
+
+cd "$TMPDIR"
+
+if [ -n "$VERBOSE" ]; then
+    echo "Repacking tarball $TARBALL"
+fi
+if [ -n "`getarg n no-act`" ]; then
+    echo "Would repack $TARBALL"
+    exit 0
+fi
+
+if grep tar.gz$ <<< $TARBALL &>/dev/null; then
+    TYPE=gzip
+    tar zxf "$TARBALL"
+elif grep tar.bz2$ <<< $TARBALL &>/dev/null; then
+	TYPE=bzip2
+	tar jxf "$TARBALL"
+elif grep tar.xz$ <<< $TARBALL &>/dev/null; then
+	TYPE=xz
+	tar Jxf "$TARBALL"
+elif grep zip$ <<< $TARBALL &>/dev/null; then
+    TYPE=zip
+    unzip -qq "$TARBALL"
+else
+	echo "Do not know how to unpack $TARBALL (expecting tar.gz, tar.bz2, tar.xz or zip)"
+fi
+
+SUBDIR=
+if [ "`ls -1 | wc -l`" = "1" ]; then
+    cd *
+    SUBDIR=true
+fi
+
+find . -name '*.class' -a -type f -print0 | xargs -0 rm -f
+find . -name '*.jar' -a -type f -print0 | xargs -0 rm -f
+find . -name '.svn' -a -type d -print0 | xargs -0 rm -rf
+IFS='
+'
+for doctree in `find . -name allclasses-frame.html`; do
+TREE="`dirname $doctree`"
+rm -rf "$TREE"/*
+done
+find * -depth -type d -print0 | xargs -0 rmdir --ignore-fail-on-non-empty
+
+if [ -n "$SUBDIR" ]; then
+    cd ..
+fi
+
+rm -f "$TARBALL"
+
+case "$TYPE" in
+gzip)
+    tar zcf "$TARBALL" *
+    ;;
+bzip2)
+	tar jcf "$TARBALL" *
+	;;
+xz)
+	tar Jcf "$TARBALL" *
+	;;
+zip)
+    tar zcf "${TARBALL%.zip}.tar.gz" *
+    ;;
+esac
+
+cd /
+rm -rf "$TMPDIR"
+
+if [ -n "$VERBOSE" ]; then
+    echo "done"
+fi

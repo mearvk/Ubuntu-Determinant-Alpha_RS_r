@@ -1,0 +1,72 @@
+From cananian@phoenix.Princeton.EDUWed Sep 11 14:59:42 1996
+Date: Sun, 11 Aug 1996 23:48:42 -0400 (EDT)
+From: "C. Scott Ananian" <cananian@phoenix.Princeton.EDU>
+To: "Elliot J. Berk" <ejberk@phoenix.Princeton.EDU>
+Subject: JavaLex bug reports....
+
+A couple minor cross-platform type JavaLex bugs (I'm developing Java code 
+on a mac right now, so I notice these types of things).
+
+1) Around line 1600, there's the following code fragment:
+	if (m_lexGen.AT_BOL == m_spec.m_current_token)
+	  {
+	    start = CAlloc.newCNfa(m_spec);
+	    start.m_edge = '\n';
+	    anchor = anchor | CSpec.START;
+	    m_lexGen.advance();
+   [etc]
+ I'm pretty sure that the \n should be expanded to include '\r' as well 
+ if m_unix is true. I'm working around this and the ^ bug by manually 
+ specifying line terminations in my regexps.  I don't know your code 
+ quite well enough to offer you a prepackaged bug fix for this one.
+
+2) line 3706:
+	    while ((byte) '\n' != m_buffer[m_buffer_index])
+   should probably be something like:
+            while (((byte) '\n' != m_buffer[m_buffer_index] && 
+	            (byte) '\r' != m_buffer[m_buffer_index]) )
+   there may be other hacks you'd want to make, but I think because 
+   you're throwing away empty lines, "\r\n" should make it through all right 
+   (don't know for sure, Mac's just saying '\r')
+   Also, I replaced line 3770 (?)
+           m_line[m_line_read] = (char) m_buffer[m_buffer_index];
+   with
+	   CUtility.assert(((char)m_buffer[m_buffer_index]=='\n')||
+			   ((char)m_buffer[m_buffer_index]=='\r'));
+	   m_line[m_line_read] = '\n'; 
+   just to be safe.
+3) Around line 5055,
+		  /* Check for and discard empty line. */
+		  if (0 == m_input.m_line_read 
+		      || '\n' == m_input.m_line[0])
+   should probably be:
+		  /* Check for and discard empty line. */
+		  if (0 == m_input.m_line_read 
+		      || '\n' == m_input.m_line[0]
+		      || '\r' == m_input.m_line[0])
+
+I think that's all for now.
+
+If you happen to dust off the code and get a chance to work on some of 
+your 'Unimplemented' items, I'd appreciate a fix for the 
+start-of-line-discarding-newline bug.
+
+Also, I *think* there might be a bug in how quoted strings in regexps are 
+handled.  I didn't track this one down, but I was having trouble with a 
+regexp that looked something like:
+   <startcondition>{macro1}{macro2}*":"{macro3}*
+The problem went away when I rewrote this as
+   <startcondition>{macro1}{macro2}*[:]{macro3}*
+not quite sure why that was.
+
+Anyway, kudos again for JavaLex; it seems to be clearly the 
+best-implemented lexer for Java available right now.
+
+ --Scott
+                                                         @ @
+ =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-oOO-(_)-OOo-=-=-=-=-=
+ C. Scott Ananian: cananian@princeton.edu/  Declare the Truth boldly and
+   227 Henry Hall, Princeton University /       without hindrance.
+        Princeton, NJ 08544            /META-PARRESIAS AKOLUTOS:Acts 28:31
+ -.-. .-.. .. ..-. ..-. --- .-. -..  ... -.-. --- - -  .- -. .- -. .. .- -.
+  PGP key available via finger and from http://www.princeton.edu/~cananian

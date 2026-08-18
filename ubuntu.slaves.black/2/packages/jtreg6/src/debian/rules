@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+JAVA_HOME = /usr/lib/jvm/default-java
+
+# version string has the form 6.1+N-D, the Debian release is not passed into the build
+VERSION      := $(shell dpkg-parsechangelog --show-field Version | sed 's/+.*//')
+BUILD_NUMBER := $(shell dpkg-parsechangelog --show-field Version | sed 's/.*+\([0-9]*\).*/\1/')
+DATE         := $(shell dpkg-parsechangelog --show-field Date)
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	ant -f make/build.xml \
+	    -Dant.jar=/usr/share/java/ant.jar \
+	    -Djtreg.build.resources=/usr/share/java \
+	    -Djh.jar=/usr/share/java/jh.jar \
+	    -Djhall.jar=/usr/share/java/jhall.jar \
+	    -Djunit.jar=/usr/share/java/junit4.jar \
+	    -Dtestng.jar=/usr/share/java/testng.jar \
+	    -Djavatest.jar=/usr/share/java/javatest.jar \
+	    -Dasmtools.jar=/usr/share/java/asmtools.jar \
+	    -Dbuild.date.time='$(DATE)' \
+	    -Dbuild.version=$(VERSION) \
+	    -Dbuild.milestone=src \
+	    -Dbuild.number=$(BUILD_NUMBER)
+	dh_auto_build
+
+	# Generate the manpages
+	JT_HOME=./dist/jtreg/lib/ help2man --name="Regression Test Harness" --help-option="-help all" dist/jtreg/bin/jtdiff > jtdiff.1
+	JT_HOME=./dist/jtreg/lib/ help2man --name="Regression Test Harness" --help-option="-help all" dist/jtreg/bin/jtreg > jtreg.1

@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/default.mk
+
+LIBNAME := lib$(DEB_SOURCE)-java
+
+%:
+	dh $@ --with=javahelper
+
+override_dh_auto_build:
+	jh_build $(DEB_SOURCE).jar src
+
+override_dh_auto_clean:
+	jh_clean
+	mh_clean
+
+override_dh_auto_install:
+	dh_auto_install
+	mh_installpom -p$(LIBNAME) $(CURDIR)/debian/pom.xml
+	mh_installjar -p$(LIBNAME) -l $(CURDIR)/debian/pom.xml \
+		$(CURDIR)/$(DEB_SOURCE).jar
+
+override_dh_installchangelogs:
+	dh_installchangelogs HISTORY.txt
+
+get-orig-source:
+	uscan \
+		--verbose \
+		--no-symlink \
+		--force-download \
+		--destdir $(CURDIR)
+	mv $(DEB_SOURCE)-build$(DEB_VERSION_UPSTREAM).tar.gz $(DEB_SOURCE)_$(DEB_VERSION_UPSTREAM).orig.tar.gz

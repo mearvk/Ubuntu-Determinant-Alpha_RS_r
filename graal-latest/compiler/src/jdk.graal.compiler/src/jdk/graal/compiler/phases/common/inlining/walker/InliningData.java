@@ -1,0 +1,1259 @@
+/*
+ * Copyright (c) 2011, 2026, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package jdk.graal.compiler.phases.common.inlining.walker;
+
+import static jdk.graal.compiler.core.common.GraalOptions.Intrinsify;
+import static jdk.graal.compiler.core.common.GraalOptions.MaximumRecursiveInlining;
+import static jdk.graal.compiler.core.common.GraalOptions.MegamorphicInliningMinMethodProbability;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.function.BiPredicate;
+
+import org.graalvm.collections.EconomicSet;
+import org.graalvm.collections.Equivalence;
+
+import jdk.graal.compiler.core.common.NumUtil;
+import jdk.graal.compiler.core.common.type.ObjectStamp;
+import jdk.graal.compiler.debug.Assertions;
+import jdk.graal.compiler.debug.CounterKey;
+import jdk.graal.compiler.debug.DebugContext;
+import jdk.graal.compiler.debug.GraalError;
+import jdk.graal.compiler.graph.Graph;
+import jdk.graal.compiler.graph.Node;
+import jdk.graal.compiler.nodes.CallTargetNode;
+import jdk.graal.compiler.nodes.CallTargetNode.InvokeKind;
+import jdk.graal.compiler.nodes.Invoke;
+import jdk.graal.compiler.nodes.NodeView;
+import jdk.graal.compiler.nodes.ParameterNode;
+import jdk.graal.compiler.nodes.StructuredGraph;
+import jdk.graal.compiler.nodes.ValueNode;
+import jdk.graal.compiler.nodes.java.AbstractNewObjectNode;
+import jdk.graal.compiler.nodes.java.MethodCallTargetNode;
+import jdk.graal.compiler.nodes.spi.CoreProviders;
+import jdk.graal.compiler.nodes.virtual.AllocatedObjectNode;
+import jdk.graal.compiler.nodes.virtual.VirtualObjectNode;
+import jdk.graal.compiler.options.OptionValues;
+import jdk.graal.compiler.phases.OptimisticOptimizations;
+import jdk.graal.compiler.phases.common.CanonicalizerPhase;
+import jdk.graal.compiler.phases.common.inlining.DirectedInliningRules;
+import jdk.graal.compiler.phases.common.inlining.InliningUtil;
+import jdk.graal.compiler.phases.common.inlining.info.AssumptionInlineInfo;
+import jdk.graal.compiler.phases.common.inlining.info.ExactInlineInfo;
+import jdk.graal.compiler.phases.common.inlining.info.InlineInfo;
+import jdk.graal.compiler.phases.common.inlining.info.MultiTypeGuardInlineInfo;
+import jdk.graal.compiler.phases.common.inlining.info.TypeGuardInlineInfo;
+import jdk.graal.compiler.phases.common.inlining.info.elem.Inlineable;
+import jdk.graal.compiler.phases.common.inlining.info.elem.InlineableGraph;
+import jdk.graal.compiler.phases.common.inlining.policy.InliningPolicy;
+import jdk.graal.compiler.phases.common.util.EconomicSetNodeEventListener;
+import jdk.graal.compiler.phases.tiers.HighTierContext;
+import jdk.vm.ci.code.BailoutException;
+import jdk.vm.ci.meta.Assumptions;
+import jdk.vm.ci.meta.Assumptions.AssumptionResult;
+import jdk.vm.ci.meta.JavaTypeProfile;
+import jdk.vm.ci.meta.ResolvedJavaMethod;
+import jdk.vm.ci.meta.ResolvedJavaType;
+import jdk.vm.ci.meta.SpeculationLog;
+
+/**
+ * <p>
+ * The space of inlining decisions is explored depth-first with the help of a stack realized by
+ * {@link InliningData}. At any point in time, the topmost element of that stack consists of:
+ * <ul>
+ * <li>the callsite under consideration is tracked as a {@link MethodInvocation}.</li>
+ * <li>one or more {@link CallsiteHolder}s, all of them associated to the callsite above. Why more
+ * than one? Depending on the type-profile for the receiver more than one concrete method may be
+ * feasible target.</li>
+ * </ul>
+ * </p>
+ *
+ * <p>
+ * The bottom element in the stack consists of:
+ * <ul>
+ * <li>a single {@link MethodInvocation} (the {@link MethodInvocation#isRoot root} one, ie the
+ * unknown caller of the root graph)</li>
+ * <li>a single {@link CallsiteHolder} (the root one, for the method on which inlining was called)
+ * </li>
+ * </ul>
+ * </p>
+ *
+ * @see #moveForward()
+ */
+public class InliningData {
+
+    // Counters
+    private static final CounterKey counterInliningPerformed = DebugContext.counter("InliningPerformed");
+    private static final CounterKey counterInliningRuns = DebugContext.counter("InliningRuns");
+    private static final CounterKey counterInliningConsidered = DebugContext.counter("InliningConsidered");
+
+    /**
+     * Call hierarchy from outer most call (i.e., compilation unit) to inner most callee.
+     */
+    private final ArrayDeque<CallsiteHolder> graphQueue = new ArrayDeque<>();
+    private final ArrayDeque<MethodInvocation> invocationQueue = new ArrayDeque<>();
+
+    private final HighTierContext context;
+    private final int maxMethodPerInlining;
+    private final CanonicalizerPhase canonicalizer;
+    private final InliningPolicy inliningPolicy;
+    private final StructuredGraph rootGraph;
+    private final DebugContext debug;
+    private final DirectedInliningRules directedInliningRules;
+    private final DirectedInliningRules directedDontInliningRules;
+    /**
+     * True when this directed inlining pass was seeded with an explicit subset of root invokes. This
+     * mode is used by the unlimited directed recovery pass to keep forced and directed root invokes
+     * reachable without exploring unrelated root invokes again.
+     */
+    private final boolean exploreExplicitRootInvokes;
+
+    private int maxGraphs;
+
+    /**
+     * Controls invoke exploration when the normal inlining policy no longer wants to keep growing the
+     * current graph.
+     */
+    private enum ExplorationMode {
+        /**
+         * No invoke in this graph should be explored.
+         */
+        NONE,
+        /**
+         * Explore invokes according to the normal inlining policy.
+         */
+        NORMAL,
+        /**
+         * Explore only invokes that are mandatory for force-inline or directed-inline recovery.
+         */
+        REQUIRED_ONLY
+    }
+
+    public InliningData(StructuredGraph rootGraph, HighTierContext context, int maxMethodPerInlining, CanonicalizerPhase canonicalizer, InliningPolicy inliningPolicy, LinkedList<Invoke> rootInvokes,
+                    DirectedInliningRules directedInliningRules, DirectedInliningRules directedDontInliningRules) {
+        assert rootGraph != null;
+        this.context = context;
+        this.maxMethodPerInlining = maxMethodPerInlining;
+        this.canonicalizer = canonicalizer;
+        this.inliningPolicy = inliningPolicy;
+        this.maxGraphs = 1;
+        this.rootGraph = rootGraph;
+        this.debug = rootGraph.getDebug();
+        this.directedInliningRules = directedInliningRules;
+        this.directedDontInliningRules = directedDontInliningRules;
+        this.exploreExplicitRootInvokes = rootInvokes != null && (directedInliningRules != null || directedDontInliningRules != null);
+
+        invocationQueue.push(new MethodInvocation(null, 1.0, 1.0, null, DirectedInliningRules.ANY_BCI, DirectedInliningRules.EMPTY_CALLSITES, null));
+        graphQueue.push(new CallsiteHolderExplorable(rootGraph, 1.0, 1.0, null, rootInvokes, DirectedInliningRules.ANY_BCI));
+    }
+
+    public static boolean isFreshInstantiation(ValueNode arg) {
+        return (arg instanceof AbstractNewObjectNode) || (arg instanceof AllocatedObjectNode) || (arg instanceof VirtualObjectNode);
+    }
+
+    /**
+     * The result of resolving a direct, statically bound, or devirtualized invoke target.
+     *
+     * @param invoke the invoke whose target was resolved
+     * @param targetMethod the resolved target method
+     * @param dispatchedType the exact receiver type used for receiver-based devirtualization, or
+     *            {@code null} if no such type was needed or available
+     * @param takenAssumption the assumption required for the resolution, or {@code null} if the
+     *            target was proven without assumptions. When non-null, the assumption is not
+     *            recorded yet.
+     */
+    public record DevirtualizationInfo(Invoke invoke, ResolvedJavaMethod targetMethod, ResolvedJavaType dispatchedType, AssumptionResult<?> takenAssumption) {
+        /**
+         * Creates the {@link InlineInfo} corresponding to this devirtualization result. Any
+         * non-null {@link #takenAssumption()} is only recorded later, when that {@link InlineInfo}
+         * is used to inline or devirtualize the invoke.
+         */
+        public InlineInfo asInlineInfo() {
+            return takenAssumption == null ? new ExactInlineInfo(invoke, targetMethod, dispatchedType)
+                            : new AssumptionInlineInfo(invoke, targetMethod, dispatchedType, takenAssumption);
+        }
+    }
+
+    /**
+     * Returns inline information for an indirect invoke whose target can be devirtualized to a
+     * single method.
+     *
+     * @param invoke the indirect invoke to inspect
+     * @param mayUseAssumptions whether assumption-backed devirtualization results may be used. When
+     *            {@code true}, this method may return an {@link AssumptionInlineInfo} that carries
+     *            the assumption needed for devirtualization, but that assumption is only recorded
+     *            in the graph later, when that {@link InlineInfo} is used to inline or devirtualize
+     *            the invoke.
+     * @return inline information for the devirtualized target, or {@code null} if the invoke does
+     *         not have a single devirtualized target
+     */
+    private static InlineInfo getDevirtualizedInlineInfo(Invoke invoke, boolean mayUseAssumptions) {
+        MethodCallTargetNode callTarget = (MethodCallTargetNode) invoke.callTarget();
+        ResolvedJavaMethod targetMethod = callTarget.targetMethod();
+        assert targetMethod != null;
+        assert callTarget.invokeKind().isIndirect();
+
+        DevirtualizationInfo info = getDevirtualizationInfo(invoke, callTarget, targetMethod, mayUseAssumptions);
+        return info != null ? info.asInlineInfo() : null;
+    }
+
+    /**
+     * Resolves the target of an indirect invoke when it can be devirtualized to a single method.
+     *
+     * @param invoke the indirect invoke to inspect
+     * @param callTarget the invoke's call target
+     * @param targetMethod the invoked method before devirtualization
+     * @param mayUseAssumptions whether assumption-backed devirtualization results may be used
+     * @return the devirtualization result, or {@code null} if the invoke does not have a single
+     *         target under the requested constraints
+     */
+    private static DevirtualizationInfo getDevirtualizationInfo(Invoke invoke, MethodCallTargetNode callTarget, ResolvedJavaMethod targetMethod, boolean mayUseAssumptions) {
+        InvokeKind invokeKind = callTarget.invokeKind();
+        assert invokeKind.isIndirect();
+
+        ResolvedJavaType holder = targetMethod.getDeclaringClass();
+        ObjectStamp receiverStamp = (ObjectStamp) callTarget.receiver().stamp(NodeView.DEFAULT);
+        if (receiverStamp.alwaysNull()) {
+            // Don't inline if receiver is known to be null
+            return null;
+        }
+        ResolvedJavaType contextType = invoke.getContextType();
+        if (receiverStamp.type() != null) {
+            // the invoke target might be more specific than the holder (happens after inlining:
+            // parameters lose their declared type...)
+            ResolvedJavaType receiverType = receiverStamp.type();
+            if (holder.isAssignableFrom(receiverType)) {
+                holder = receiverType;
+                if (receiverStamp.isExactType()) {
+                    assert targetMethod.getDeclaringClass().isAssignableFrom(holder) : holder + " subtype of " + targetMethod.getDeclaringClass() + " for " + targetMethod;
+                    ResolvedJavaMethod resolvedMethod = holder.resolveConcreteMethod(targetMethod, contextType);
+                    if (resolvedMethod != null) {
+                        return new DevirtualizationInfo(invoke, resolvedMethod, holder, null);
+                    }
+                }
+            }
+        }
+
+        if (holder.isArray()) {
+            // arrays can be treated as Objects
+            ResolvedJavaMethod resolvedMethod = holder.resolveConcreteMethod(targetMethod, contextType);
+            if (resolvedMethod != null) {
+                return new DevirtualizationInfo(invoke, resolvedMethod, null, null);
+            }
+        }
+
+        Assumptions assumptions = callTarget.graph().getAssumptions();
+        if (mayUseAssumptions && invokeKind != InvokeKind.Interface && assumptions != null) {
+            AssumptionResult<ResolvedJavaType> leafConcreteSubtype = holder.findLeafConcreteSubtype();
+            if (leafConcreteSubtype != null) {
+                ResolvedJavaType dispatchedType = leafConcreteSubtype.getResult();
+                ResolvedJavaMethod resolvedMethod = dispatchedType.resolveConcreteMethod(targetMethod, contextType);
+                if (resolvedMethod != null && leafConcreteSubtype.canRecordTo(assumptions)) {
+                    return new DevirtualizationInfo(invoke, resolvedMethod, dispatchedType, leafConcreteSubtype);
+                }
+            }
+
+            AssumptionResult<ResolvedJavaMethod> concrete = holder.findUniqueConcreteMethod(targetMethod);
+            if (concrete != null && concrete.canRecordTo(assumptions)) {
+                return new DevirtualizationInfo(invoke, concrete.getResult(), null, concrete);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the target of an invoke that is already direct, statically bound, or can be
+     * devirtualized to a single target.
+     *
+     * @param invoke the invoke to inspect
+     * @param mayUseAssumptions whether assumption-backed devirtualization results may be returned
+     * @return the direct, statically bound, or devirtualization result, or {@code null} if no such
+     *         target can be proven
+     */
+    public static DevirtualizationInfo resolveDirectOrDevirtualizedTargetInfo(Invoke invoke, boolean mayUseAssumptions) {
+        if (invoke.getInvokeKind().isDirect()) {
+            return new DevirtualizationInfo(invoke, invoke.getTargetMethod(), null, null);
+        }
+        MethodCallTargetNode callTarget = (MethodCallTargetNode) invoke.callTarget();
+        ResolvedJavaMethod targetMethod = callTarget.targetMethod();
+        if (targetMethod == null) {
+            return null;
+        }
+        if (targetMethod.canBeStaticallyBound()) {
+            return new DevirtualizationInfo(invoke, targetMethod, null, null);
+        }
+        return getDevirtualizationInfo(invoke, callTarget, targetMethod, mayUseAssumptions);
+    }
+
+    /**
+     * Returns the target of an invoke that is already direct, statically bound, or can be
+     * devirtualized without relying on assumptions.
+     *
+     * @param invoke the invoke to inspect
+     * @return the direct, statically bound, or assumption-free devirtualization result, or
+     *         {@code null} if no such target can be proven
+     */
+    public static DevirtualizationInfo resolveDirectOrDevirtualizedTargetInfo(Invoke invoke) {
+        return resolveDirectOrDevirtualizedTargetInfo(invoke, false);
+    }
+
+    /**
+     * Returns the target method for an invoke that is already direct, statically bound, or can be
+     * devirtualized to a single target.
+     *
+     * @param invoke the invoke to inspect
+     * @param mayUseAssumptions whether assumption-backed devirtualization results may be returned
+     * @return the direct, statically bound, or devirtualized target method, or {@code null} if no
+     *         such target can be proven
+     */
+    public static ResolvedJavaMethod resolveDirectOrDevirtualizedTargetMethod(Invoke invoke, boolean mayUseAssumptions) {
+        DevirtualizationInfo resolution = resolveDirectOrDevirtualizedTargetInfo(invoke, mayUseAssumptions);
+        return resolution != null ? resolution.targetMethod() : null;
+    }
+
+    /**
+     * Returns the target method for an invoke that is already direct, statically bound, or can be
+     * devirtualized without relying on assumptions.
+     *
+     * @param invoke the invoke to inspect
+     * @return the direct, statically bound, or assumption-free devirtualized target method, or
+     *         {@code null} if no such target can be proven
+     */
+    public static ResolvedJavaMethod resolveDirectOrDevirtualizedTargetMethod(Invoke invoke) {
+        return resolveDirectOrDevirtualizedTargetMethod(invoke, false);
+    }
+
+    /**
+     * Checks whether a target method can be inlined at a given invoke under the provided graph and
+     * context.
+     *
+     * @param rootGraph the root graph whose options, assumptions, and replacements govern the
+     *            inlining decision
+     * @param context the high-tier context providing replacements and optimistic optimizations
+     * @param method the target method to validate
+     * @param invoke the invoke at which the method would be inlined
+     * @param recursiveInliningDepth the current recursion depth for {@code method} at
+     *            {@code invoke}
+     * @return a failure message when the method cannot be inlined, or {@code null} when it can
+     */
+    public static String checkTargetConditionsHelper(StructuredGraph rootGraph, HighTierContext context, ResolvedJavaMethod method, Invoke invoke, int recursiveInliningDepth) {
+        OptionValues options = rootGraph.getOptions();
+        if (method == null) {
+            return "the method is not resolved";
+        } else if (method.isNative() && !(Intrinsify.getValue(options) &&
+                        context.getReplacements().getInlineSubstitution(method, invoke.bci(), invoke.isInOOMETry(), invoke.getInlineControl(), rootGraph.trackNodeSourcePosition(), null,
+                                        rootGraph.allowAssumptions(), options) != null)) {
+            // We have conditional intrinsic, e.g., String.intern, which may not have inlineable
+            // graph depending on the context. The getInlineSubstitution test ensures the inlineable
+            // graph is present.
+            return "it is a non-intrinsic native method";
+        } else if (method.isAbstract()) {
+            return "it is an abstract method";
+        } else if (!method.getDeclaringClass().isInitialized()) {
+            return "the method's class is not initialized";
+        } else if (!method.canBeInlined()) {
+            return "it is marked non-inlinable";
+        } else if (recursiveInliningDepth > MaximumRecursiveInlining.getValue(options)) {
+            return "it exceeds the maximum recursive inlining depth";
+        } else {
+            if (new OptimisticOptimizations(rootGraph.getProfilingInfo(invoke.asNode().graph().getCallerContext(), method), options).lessOptimisticThan(context.getOptimisticOptimizations())) {
+                return "the callee uses less optimistic optimizations than caller";
+            } else {
+                return null;
+            }
+        }
+    }
+
+    private String checkTargetConditionsHelper(ResolvedJavaMethod method, Invoke invoke) {
+        return checkTargetConditionsHelper(rootGraph, context, method, invoke, countRecursiveInlining(method));
+    }
+
+    private boolean checkTargetConditions(Invoke invoke, ResolvedJavaMethod method) {
+        final String failureMessage = checkTargetConditionsHelper(method, invoke);
+        if (failureMessage == null) {
+            return true;
+        } else {
+            InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), method, failureMessage);
+            invoke.asNode().graph().notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), failureMessage);
+            return false;
+        }
+    }
+
+    /**
+     * Determines if inlining is possible at the given invoke node.
+     *
+     * @param invoke the invoke that should be inlined
+     * @return an instance of InlineInfo, or null if no inlining is possible at the given invoke
+     */
+    private InlineInfo getInlineInfo(Invoke invoke) {
+        final String failureMessage = InliningUtil.checkInvokeConditions(invoke);
+        if (failureMessage != null) {
+            InliningUtil.logNotInlinedMethod(invoke, failureMessage);
+            return null;
+        }
+        MethodCallTargetNode callTarget = (MethodCallTargetNode) invoke.callTarget();
+        ResolvedJavaMethod targetMethod = callTarget.targetMethod();
+
+        InvokeKind invokeKind = callTarget.invokeKind();
+        if (invokeKind == CallTargetNode.InvokeKind.Special || invokeKind == CallTargetNode.InvokeKind.Static || targetMethod.canBeStaticallyBound()) {
+            return getExactInlineInfo(invoke, targetMethod);
+        }
+
+        assert invokeKind.isIndirect();
+
+        InlineInfo devirtualizedInlineInfo = getDevirtualizedInlineInfo(invoke, true);
+        if (devirtualizedInlineInfo != null && checkTargetConditions(invoke, devirtualizedInlineInfo.methodAt(0))) {
+            return devirtualizedInlineInfo;
+        }
+
+        // type check based inlining
+        return getTypeCheckedInlineInfo(invoke, targetMethod);
+    }
+
+    private InlineInfo getTypeCheckedInlineInfo(Invoke invoke, ResolvedJavaMethod targetMethod) {
+        StructuredGraph graph = invoke.asNode().graph();
+        JavaTypeProfile typeProfile = ((MethodCallTargetNode) invoke.callTarget()).getTypeProfile();
+        if (typeProfile == null) {
+            InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "no type profile exists");
+            graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "no type profile exists");
+            return null;
+        }
+
+        JavaTypeProfile.ProfiledType[] ptypes = typeProfile.getTypes();
+        if (ptypes == null || ptypes.length <= 0) {
+            InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "no types in profile");
+            graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "no types in profile");
+            return null;
+        }
+        ResolvedJavaType contextType = invoke.getContextType();
+        double notRecordedTypeProbability = typeProfile.getNotRecordedProbability();
+        final OptimisticOptimizations optimisticOpts = context.getOptimisticOptimizations();
+        OptionValues options = invoke.asNode().getOptions();
+
+        boolean speculationFailed = false;
+        SpeculationLog speculationLog = graph.getSpeculationLog();
+        SpeculationLog.Speculation speculation = SpeculationLog.NO_SPECULATION;
+
+        if (speculationLog != null && notRecordedTypeProbability == 0) {
+            SpeculationLog.SpeculationReason speculationReason = InliningUtil.createSpeculation(invoke, typeProfile);
+            if (speculationLog.maySpeculate(speculationReason)) {
+                speculation = speculationLog.speculate(speculationReason);
+            } else {
+                speculationFailed = true;
+            }
+        }
+
+        if (ptypes.length == 1 && notRecordedTypeProbability == 0 && !speculationFailed) {
+            if (!optimisticOpts.inlineMonomorphicCalls(options)) {
+                InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "inlining monomorphic calls is disabled");
+                graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "inlining monomorphic calls is disabled");
+                return null;
+            }
+
+            ResolvedJavaType type = ptypes[0].getType();
+            assert type.isArray() || type.isConcrete();
+            ResolvedJavaMethod concrete = type.resolveConcreteMethod(targetMethod, contextType);
+            if (!checkTargetConditions(invoke, concrete)) {
+                return null;
+            }
+            return new TypeGuardInlineInfo(invoke, concrete, type, speculation);
+        } else {
+            invoke.setPolymorphic(true);
+
+            if (!optimisticOpts.inlinePolymorphicCalls(options) && notRecordedTypeProbability == 0) {
+                InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "inlining polymorphic calls is disabled (%d types)", ptypes.length);
+                graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "inlining polymorphic calls is disabled (%d types)", ptypes.length);
+                return null;
+            }
+            if (!optimisticOpts.inlineMegamorphicCalls(options) && notRecordedTypeProbability > 0) {
+                // due to filtering impossible types, notRecordedTypeProbability can be > 0 although
+                // the number of types is lower than what can be recorded in a type profile
+                InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "inlining megamorphic calls is disabled (%d types, %f %% not recorded types)", ptypes.length,
+                                notRecordedTypeProbability * 100);
+                graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null,
+                                invoke.getTargetMethod(), "inlining megamorphic calls is disabled (%d types, %f %% not recorded types)", ptypes.length, notRecordedTypeProbability);
+                return null;
+            }
+
+            // Find unique methods and their probabilities.
+            ArrayList<ResolvedJavaMethod> concreteMethods = new ArrayList<>();
+            ArrayList<Double> concreteMethodsProbabilities = new ArrayList<>();
+            for (int i = 0; i < ptypes.length; i++) {
+                ResolvedJavaMethod concrete = ptypes[i].getType().resolveConcreteMethod(targetMethod, contextType);
+                if (concrete == null) {
+                    InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "could not resolve method");
+                    graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "could not resolve method");
+                    return null;
+                }
+                int index = concreteMethods.indexOf(concrete);
+                double curProbability = ptypes[i].getProbability();
+                if (index < 0) {
+                    index = concreteMethods.size();
+                    concreteMethods.add(concrete);
+                    concreteMethodsProbabilities.add(curProbability);
+                } else {
+                    concreteMethodsProbabilities.set(index, concreteMethodsProbabilities.get(index) + curProbability);
+                }
+            }
+
+            // Clear methods that fall below the threshold or are explicitly forbidden.
+            if (notRecordedTypeProbability > 0 || directedInliningRules != null || directedDontInliningRules != null) {
+                DirectedInliningRules.Callsite[] callsites = ((CallsiteHolderExplorable) currentGraph()).callsitePath(invoke);
+                ArrayList<JavaTypeProfile.ProfiledType> filteredTypes = new ArrayList<>();
+                double filteredNotRecordedTypeProbability = notRecordedTypeProbability;
+                for (JavaTypeProfile.ProfiledType type : ptypes) {
+                    ResolvedJavaMethod concrete = type.getType().resolveConcreteMethod(targetMethod, contextType);
+                    int concreteIndex = concreteMethods.indexOf(concrete);
+                    ResolvedJavaType receiverType = type.getType();
+                    boolean directedDontInline = findDirectedTerminalRule(directedDontInliningRules, callsites, invoke, concrete, receiverType) != null;
+                    boolean directedInline = !directedDontInline && findDirectedRuleOrPrefix(directedInliningRules, callsites, invoke, concrete, receiverType) != null;
+                    boolean keepNormally = notRecordedTypeProbability == 0 ||
+                                    concreteMethodsProbabilities.get(concreteIndex) >= MegamorphicInliningMinMethodProbability.getValue(options);
+                    if (!directedDontInline && (directedInline || keepNormally)) {
+                        filteredTypes.add(type);
+                    } else {
+                        filteredNotRecordedTypeProbability += type.getProbability();
+                    }
+                }
+
+                if (filteredTypes.isEmpty()) {
+                    // No method left that is worth inlining.
+                    InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod,
+                                    "no methods remaining after filtering less frequent or directed dont-inline methods (%d methods previously)",
+                                    concreteMethods.size());
+                    graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null,
+                                    invoke.getTargetMethod(), "no methods remaining after filtering less frequent or directed dont-inline methods (%d methods previously)", concreteMethods.size());
+                    return null;
+                }
+
+                ptypes = filteredTypes.toArray(new JavaTypeProfile.ProfiledType[0]);
+                notRecordedTypeProbability = filteredNotRecordedTypeProbability;
+                concreteMethods = new ArrayList<>();
+                concreteMethodsProbabilities = new ArrayList<>();
+                for (JavaTypeProfile.ProfiledType type : ptypes) {
+                    ResolvedJavaMethod concrete = type.getType().resolveConcreteMethod(targetMethod, contextType);
+                    int index = concreteMethods.indexOf(concrete);
+                    double curProbability = type.getProbability();
+                    if (index < 0) {
+                        concreteMethods.add(concrete);
+                        concreteMethodsProbabilities.add(curProbability);
+                    } else {
+                        concreteMethodsProbabilities.set(index, concreteMethodsProbabilities.get(index) + curProbability);
+                    }
+                }
+            }
+
+            if (concreteMethods.size() > maxMethodPerInlining) {
+                InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "polymorphic call with more than %d target methods", maxMethodPerInlining);
+                graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "polymorphic call with more than %d target methods", maxMethodPerInlining);
+                return null;
+            }
+
+            // Clean out types whose methods are no longer available.
+            ArrayList<JavaTypeProfile.ProfiledType> usedTypes = new ArrayList<>();
+            ArrayList<Integer> typesToConcretes = new ArrayList<>();
+            for (JavaTypeProfile.ProfiledType type : ptypes) {
+                ResolvedJavaMethod concrete = type.getType().resolveConcreteMethod(targetMethod, contextType);
+                int index = concreteMethods.indexOf(concrete);
+                if (index == -1) {
+                    notRecordedTypeProbability += type.getProbability();
+                } else {
+                    assert type.getType().isArray() || !type.getType().isAbstract() : type + " " + concrete;
+                    usedTypes.add(type);
+                    typesToConcretes.add(index);
+                }
+            }
+
+            if (usedTypes.isEmpty()) {
+                // No type left that is worth checking for.
+                InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "no types remaining after filtering less frequent types (%d types previously)", ptypes.length);
+                graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null, invoke.getTargetMethod(), "no types remaining after filtering less frequent types (%d types previously)",
+                                ptypes.length);
+                return null;
+            }
+
+            for (ResolvedJavaMethod concrete : concreteMethods) {
+                if (!checkTargetConditions(invoke, concrete)) {
+                    InliningUtil.traceNotInlinedMethod(invoke, inliningDepth(), targetMethod, "it is a polymorphic method call and at least one invoked method cannot be inlined");
+                    graph.notifyInliningDecision(invoke, false, "InliningPhase", null, null, null,
+                                    invoke.getTargetMethod(), "it is a polymorphic method call and at least one invoked method cannot be inlined");
+                    return null;
+                }
+            }
+            return new MultiTypeGuardInlineInfo(invoke, concreteMethods, usedTypes, typesToConcretes, notRecordedTypeProbability, speculationFailed, speculation);
+        }
+    }
+
+    private InlineInfo getExactInlineInfo(Invoke invoke, ResolvedJavaMethod targetMethod) {
+        assert targetMethod.isConcrete();
+        if (checkTargetConditions(invoke, targetMethod)) {
+            return new ExactInlineInfo(invoke, targetMethod);
+        }
+        return null;
+    }
+
+    @SuppressWarnings("try")
+    private void doInline(CallsiteHolderExplorable callerCallsiteHolder, InlineInfo calleeInfo, String reason) {
+        StructuredGraph callerGraph = callerCallsiteHolder.graph();
+        try {
+            try (DebugContext.Scope scope = debug.scope("doInline", callerGraph)) {
+                EconomicSet<Node> canonicalizedNodes = EconomicSet.create(Equivalence.IDENTITY);
+                canonicalizedNodes.addAll(calleeInfo.invoke().asNode().usages());
+                EconomicSet<Node> parameterUsages = calleeInfo.inline(context.getProviders(), reason);
+                canonicalizedNodes.addAll(parameterUsages);
+                counterInliningRuns.increment(debug);
+                debug.dump(DebugContext.DETAILED_LEVEL, callerGraph, "after %s", calleeInfo);
+
+                Graph.Mark markBeforeCanonicalization = callerGraph.getMark();
+
+                EconomicSetNodeEventListener listener = new EconomicSetNodeEventListener(EnumSet.of(Graph.NodeEvent.INPUT_CHANGED));
+                try (Graph.NodeEventScope events = callerGraph.trackNodeEvents(listener)) {
+                    canonicalizer.applyIncremental(callerGraph, context, canonicalizedNodes);
+                }
+
+                // process invokes that are possibly created during canonicalization
+                for (Node newNode : callerGraph.getNewNodes(markBeforeCanonicalization)) {
+                    if (newNode instanceof Invoke) {
+                        callerCallsiteHolder.pushInvoke((Invoke) newNode);
+                    }
+                }
+                /*
+                 * Also process invokes whose call target was specialized during canonicalization
+                 * (see MethodCallTargetNode.trySimplifyToSpecial).
+                 */
+                for (Node changedNode : listener.getNodes()) {
+                    if (changedNode instanceof Invoke changedInvoke) {
+                        callerCallsiteHolder.pushInvoke(changedInvoke);
+                    }
+                }
+
+                callerCallsiteHolder.computeProbabilities();
+
+                counterInliningPerformed.increment(debug);
+            }
+        } catch (BailoutException bailout) {
+            throw bailout;
+        } catch (AssertionError | RuntimeException e) {
+            throw new GraalError(e).addContext(calleeInfo.toString());
+        } catch (GraalError e) {
+            throw e.addContext(calleeInfo.toString());
+        } catch (Throwable e) {
+            throw debug.handle(e);
+        }
+    }
+
+    /**
+     *
+     * This method attempts:
+     * <ol>
+     * <li>to inline at the callsite given by <code>calleeInvocation</code>, where that callsite
+     * belongs to the {@link CallsiteHolderExplorable} at the top of the {@link #graphQueue}
+     * maintained in this class.</li>
+     * <li>otherwise, to devirtualize the callsite in question.</li>
+     * </ol>
+     *
+     * @return true iff inlining was actually performed
+     */
+    private boolean tryToInline(MethodInvocation calleeInvocation, int inliningDepth) {
+        CallsiteHolderExplorable callerCallsiteHolder = (CallsiteHolderExplorable) currentGraph();
+        InlineInfo calleeInfo = calleeInvocation.callee();
+        assert callerCallsiteHolder.containsInvoke(calleeInfo.invoke());
+        counterInliningConsidered.increment(debug);
+
+        InliningChoice choice = chooseInlining(calleeInvocation, calleeInfo, inliningDepth, true);
+        if (choice.decision().shouldInline()) {
+            doInline(callerCallsiteHolder, choice.calleeInfo(), choice.decision().getReason());
+            return true;
+        }
+
+        if (context.getOptimisticOptimizations().devirtualizeInvokes(calleeInfo.graph().getOptions())) {
+            calleeInfo.tryToDevirtualizeInvoke(context.getProviders());
+        }
+
+        return false;
+    }
+
+    /**
+     * This method picks one of the callsites belonging to the current
+     * {@link CallsiteHolderExplorable}. Provided the callsite qualifies to be analyzed for
+     * inlining, this method prepares a new stack top in {@link InliningData} for such callsite,
+     * which comprises:
+     * <ul>
+     * <li>preparing a summary of feasible targets, ie preparing an {@link InlineInfo}</li>
+     * <li>based on it, preparing the stack top proper which consists of:</li>
+     * <ul>
+     * <li>one {@link MethodInvocation}</li>
+     * <li>a {@link CallsiteHolder} for each feasible target</li>
+     * </ul>
+     * </ul>
+     *
+     * <p>
+     * The thus prepared "stack top" is needed by {@link #moveForward()} to explore the space of
+     * inlining decisions (each decision one of: backtracking, delving, inlining).
+     * </p>
+     *
+     * <p>
+     * The {@link InlineInfo} used to get things rolling is kept around in the
+     * {@link MethodInvocation}, it will be needed in case of inlining, see
+     * {@link InlineInfo#inline(CoreProviders, String)}
+     * </p>
+     */
+    private void processNextInvoke(ExplorationMode explorationMode) {
+        CallsiteHolderExplorable callsiteHolder = (CallsiteHolderExplorable) currentGraph();
+        Invoke invoke = explorationMode == ExplorationMode.REQUIRED_ONLY ? callsiteHolder.popInvoke(candidate -> mustExploreInvoke(callsiteHolder, candidate))
+                        : callsiteHolder.popInvoke();
+        assert invoke != null;
+        if (invoke == null) {
+            return;
+        }
+        InlineInfo info = getInlineInfo(invoke);
+
+        if (info != null) {
+            info.populateInlinableElements(context, currentGraph().graph(), canonicalizer, rootGraph.getOptions());
+            double invokeProbability = callsiteHolder.invokeProbability(invoke);
+            double invokeRelevance = callsiteHolder.invokeRelevance(invoke);
+            MethodInvocation methodInvocation = new MethodInvocation(info, invokeProbability, invokeRelevance,
+                            callsiteHolder.callerMethod(invoke), callsiteHolder.rootInvokeBci(invoke), callsiteHolder.callsitePath(invoke),
+                            freshlyInstantiatedArguments(invoke, callsiteHolder.getFixedParams()));
+            pushInvocationAndGraphs(methodInvocation);
+        }
+    }
+
+    /**
+     * Gets the freshly instantiated arguments.
+     * <p>
+     * A freshly instantiated argument is either:
+     * <uL>
+     * <li>an {@link InliningData#isFreshInstantiation(ValueNode)}</li>
+     * <li>a fixed-param, ie a {@link ParameterNode} receiving a freshly instantiated argument</li>
+     * </uL>
+     * </p>
+     *
+     * @return the positions of freshly instantiated arguments in the argument list of the
+     *         <code>invoke</code>, or null if no such positions exist.
+     */
+    public static BitSet freshlyInstantiatedArguments(Invoke invoke, EconomicSet<ParameterNode> fixedParams) {
+        assert fixedParams != null;
+        assert paramsAndInvokeAreInSameGraph(invoke, fixedParams);
+        BitSet result = null;
+        int argIdx = 0;
+        for (ValueNode arg : invoke.callTarget().arguments()) {
+            assert arg != null;
+            if (isFreshInstantiation(arg) || (arg instanceof ParameterNode && fixedParams.contains((ParameterNode) arg))) {
+                if (result == null) {
+                    result = new BitSet();
+                }
+                result.set(argIdx);
+            }
+            argIdx++;
+        }
+        return result;
+    }
+
+    private static boolean paramsAndInvokeAreInSameGraph(Invoke invoke, EconomicSet<ParameterNode> fixedParams) {
+        if (fixedParams.isEmpty()) {
+            return true;
+        }
+        for (ParameterNode p : fixedParams) {
+            if (p.graph() != invoke.asNode().graph()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public int graphCount() {
+        return graphQueue.size();
+    }
+
+    public boolean hasUnprocessedGraphs() {
+        return !graphQueue.isEmpty();
+    }
+
+    private CallsiteHolder currentGraph() {
+        return graphQueue.peek();
+    }
+
+    private void popGraph() {
+        graphQueue.pop();
+        assert graphQueue.size() <= maxGraphs : Assertions.errorMessageContext("graphQueue", graphQueue, "maxGraphs", maxGraphs);
+    }
+
+    private void popGraphs(int count) {
+        assert NumUtil.assertNonNegativeInt(count);
+        for (int i = 0; i < count; i++) {
+            graphQueue.pop();
+        }
+    }
+
+    private static final Object[] NO_CONTEXT = {};
+
+    /**
+     * Gets the call hierarchy of this inlining from outer most call to inner most callee.
+     */
+    private Object[] inliningContext() {
+        if (!debug.isDumpEnabled(DebugContext.INFO_LEVEL)) {
+            return NO_CONTEXT;
+        }
+        Object[] result = new Object[graphQueue.size()];
+        int i = 0;
+        for (CallsiteHolder g : graphQueue) {
+            result[i++] = g.method();
+        }
+        return result;
+    }
+
+    private MethodInvocation currentInvocation() {
+        return invocationQueue.peekFirst();
+    }
+
+    private void pushInvocationAndGraphs(MethodInvocation methodInvocation) {
+        invocationQueue.addFirst(methodInvocation);
+        InlineInfo info = methodInvocation.callee();
+        maxGraphs += info.numberOfMethods();
+        assert graphQueue.size() <= maxGraphs : Assertions.errorMessageContext("graphQueue", graphQueue, "maxGraphs", maxGraphs);
+        for (int i = 0; i < info.numberOfMethods(); i++) {
+            CallsiteHolder ch = methodInvocation.buildCallsiteHolderForElement(i);
+            assert !contains(ch.graph());
+            graphQueue.push(ch);
+            assert graphQueue.size() <= maxGraphs : Assertions.errorMessageContext("graphQueue", graphQueue, "maxGraphs", maxGraphs);
+        }
+    }
+
+    private void popInvocation() {
+        maxGraphs -= invocationQueue.peekFirst().callee().numberOfMethods();
+        assert graphQueue.size() <= maxGraphs : Assertions.errorMessageContext("graphQueue", graphQueue, "maxGraphs", maxGraphs);
+        invocationQueue.removeFirst();
+    }
+
+    public int countRecursiveInlining(ResolvedJavaMethod method) {
+        int count = 0;
+        for (CallsiteHolder callsiteHolder : graphQueue) {
+            if (method.equals(callsiteHolder.method())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int inliningDepth() {
+        assert invocationQueue.size() > 0 : this;
+        return invocationQueue.size() - 1;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder result = new StringBuilder("Invocations: ");
+
+        for (MethodInvocation invocation : invocationQueue) {
+            if (invocation.callee() != null) {
+                result.append(invocation.callee().numberOfMethods());
+                result.append("x ");
+                result.append(invocation.callee().invoke());
+                result.append("; ");
+            }
+        }
+
+        result.append("\nGraphs: ");
+        for (CallsiteHolder graph : graphQueue) {
+            result.append(graph.graph());
+            result.append("; ");
+        }
+
+        return result.toString();
+    }
+
+    private boolean contains(StructuredGraph graph) {
+        assert graph != null;
+        for (CallsiteHolder info : graphQueue) {
+            if (info.graph() == graph) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private record InliningChoice(InliningPolicy.Decision decision, InlineInfo calleeInfo) {
+    }
+
+    private InliningPolicy.Decision isWorthInlining(MethodInvocation invocation, InlineInfo calleeInfo, int depth, boolean fullyProcessed) {
+        return chooseInlining(invocation, calleeInfo, depth, fullyProcessed).decision();
+    }
+
+    private InliningChoice chooseInlining(MethodInvocation invocation, InlineInfo calleeInfo, int depth, boolean fullyProcessed) {
+        InliningChoice directedChoice = getDirectedInliningChoice(invocation, calleeInfo, depth, fullyProcessed);
+        if (directedChoice != null) {
+            return directedChoice;
+        }
+        return normalInliningChoice(invocation, calleeInfo, depth, fullyProcessed);
+    }
+
+    private InliningChoice normalInliningChoice(MethodInvocation invocation, InlineInfo calleeInfo, int depth, boolean fullyProcessed) {
+        MethodInvocation selectedInvocation = calleeInfo == invocation.callee() ? invocation : invocation.withCallee(calleeInfo);
+        return new InliningChoice(inliningPolicy.isWorthInlining(context.getReplacements(), selectedInvocation, calleeInfo, depth, fullyProcessed), calleeInfo);
+    }
+
+    /**
+     * Applies directed inline and dont-inline rules to concrete dispatch targets before the normal
+     * inlining policy.
+     *
+     * <p>
+     * Directed dont-inline removes matching concrete targets from the inline candidate set.
+     * Directed-inline makes matching concrete targets mandatory. Candidates that match neither rule
+     * remain subject to the normal inlining policy; if the policy does not select them, their
+     * receiver types stay on the fallback virtual/interface invoke. A rule whose callee filter
+     * matches the declared invoke target applies to every concrete target represented by the inline
+     * information unless the rule has a receiver-type filter.
+     * </p>
+     */
+    private InliningChoice getDirectedInliningChoice(MethodInvocation invocation, InlineInfo calleeInfo, int depth, boolean fullyProcessed) {
+        String dontInlineMatch = findAnyDirectedTerminalRule(directedDontInliningRules, invocation, calleeInfo);
+        InlineInfo allowedInfo = calleeInfo;
+        if (dontInlineMatch != null) {
+            allowedInfo = filterInlineInfo(calleeInfo,
+                            (method, receiverType) -> findDirectedTerminalRule(directedDontInliningRules, invocation, calleeInfo, method, receiverType) == null);
+            if (allowedInfo == null) {
+                InliningUtil.traceNotInlinedMethod(calleeInfo, depth, "directed dont-inline directive matched %s", dontInlineMatch);
+                calleeInfo.graph().notifyInliningDecision(calleeInfo.invoke(), false, "InliningPhase", null, null, null, calleeInfo.invoke().getTargetMethod(),
+                                "directed dont-inline directive matched %s", dontInlineMatch);
+                return new InliningChoice(InliningPolicy.Decision.NO.withReason(true, "directed dont-inline directive matched %s", dontInlineMatch), calleeInfo);
+            }
+        }
+
+        String inlineMatch = findAnyDirectedRuleOrPrefix(directedInliningRules, invocation, allowedInfo);
+        if (inlineMatch != null) {
+            InlineInfo candidateInfo = allowedInfo;
+            InliningChoice normalChoice = normalInliningChoice(invocation, allowedInfo, depth, fullyProcessed);
+            InlineInfo selectedInfo = normalChoice.decision().shouldInline() ? allowedInfo
+                            : filterInlineInfo(allowedInfo,
+                                            (method, receiverType) -> findDirectedRuleOrPrefix(directedInliningRules, invocation, candidateInfo, method, receiverType) != null);
+            assert selectedInfo != null : inlineMatch;
+            if (fullyProcessed) {
+                InliningUtil.traceInlinedMethod(selectedInfo, depth, true, "directed inline directive matched %s", inlineMatch);
+            } else {
+                InliningUtil.logInliningDecision(debug, "directed inline exploration continues for %s because directive matched %s", selectedInfo, inlineMatch);
+            }
+            return new InliningChoice(InliningPolicy.Decision.YES.withReason(true, "directed inline directive matched %s", inlineMatch), selectedInfo);
+        }
+
+        if (allowedInfo != calleeInfo) {
+            return normalInliningChoice(invocation, allowedInfo, depth, fullyProcessed);
+        }
+        return null;
+    }
+
+    private static InlineInfo filterInlineInfo(InlineInfo calleeInfo, BiPredicate<ResolvedJavaMethod, ResolvedJavaType> includeTarget) {
+        if (calleeInfo instanceof MultiTypeGuardInlineInfo multiTypeGuardInlineInfo) {
+            return multiTypeGuardInlineInfo.filterTargets(includeTarget);
+        }
+        for (int i = 0; i < calleeInfo.numberOfMethods(); i++) {
+            if (!includeTarget.test(calleeInfo.methodAt(i), calleeInfo.receiverTypeAt(i))) {
+                return null;
+            }
+        }
+        return calleeInfo;
+    }
+
+    private static String findAnyDirectedTerminalRule(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo) {
+        if (rules == null) {
+            return null;
+        }
+        if (calleeInfo instanceof MultiTypeGuardInlineInfo multiTypeGuardInlineInfo) {
+            for (int i = 0; i < multiTypeGuardInlineInfo.numberOfReceiverTypes(); i++) {
+                String match = findDirectedTerminalRule(rules, invocation, calleeInfo, multiTypeGuardInlineInfo.methodAtProfileIndex(i),
+                                multiTypeGuardInlineInfo.receiverTypeAtProfileIndex(i));
+                if (match != null) {
+                    return match;
+                }
+            }
+            return null;
+        }
+        for (int i = 0; i < calleeInfo.numberOfMethods(); i++) {
+            String match = findDirectedTerminalRule(rules, invocation, calleeInfo, i);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static String findAnyDirectedRuleOrPrefix(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo) {
+        if (rules == null) {
+            return null;
+        }
+        if (calleeInfo instanceof MultiTypeGuardInlineInfo multiTypeGuardInlineInfo) {
+            for (int i = 0; i < multiTypeGuardInlineInfo.numberOfReceiverTypes(); i++) {
+                String match = findDirectedRuleOrPrefix(rules, invocation, calleeInfo, multiTypeGuardInlineInfo.methodAtProfileIndex(i),
+                                multiTypeGuardInlineInfo.receiverTypeAtProfileIndex(i));
+                if (match != null) {
+                    return match;
+                }
+            }
+            return null;
+        }
+        for (int i = 0; i < calleeInfo.numberOfMethods(); i++) {
+            String match = findDirectedRuleOrPrefix(rules, invocation, calleeInfo, i);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private static String findDirectedTerminalRule(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo, int methodIndex) {
+        return findDirectedTerminalRule(rules, invocation, calleeInfo, calleeInfo.methodAt(methodIndex), calleeInfo.receiverTypeAt(methodIndex));
+    }
+
+    private static String findDirectedRuleOrPrefix(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo, int methodIndex) {
+        return findDirectedRuleOrPrefix(rules, invocation, calleeInfo, calleeInfo.methodAt(methodIndex), calleeInfo.receiverTypeAt(methodIndex));
+    }
+
+    private static String findDirectedTerminalRule(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo, ResolvedJavaMethod calleeMethod, ResolvedJavaType receiverType) {
+        Invoke invoke = calleeInfo.invoke();
+        return findDirectedTerminalRule(rules, invocation.callsites(), invoke, calleeMethod, receiverType);
+    }
+
+    private static String findDirectedRuleOrPrefix(DirectedInliningRules rules, MethodInvocation invocation, InlineInfo calleeInfo, ResolvedJavaMethod calleeMethod, ResolvedJavaType receiverType) {
+        Invoke invoke = calleeInfo.invoke();
+        return findDirectedRuleOrPrefix(rules, invocation.callsites(), invoke, calleeMethod, receiverType);
+    }
+
+    private static String findDirectedTerminalRule(DirectedInliningRules rules, DirectedInliningRules.Callsite[] callsites, Invoke invoke, ResolvedJavaMethod calleeMethod,
+                    ResolvedJavaType receiverType) {
+        if (rules == null) {
+            return null;
+        }
+        ResolvedJavaMethod declaredTargetMethod = invoke.getTargetMethod();
+        return rules.findMatchingRule(callsites, calleeMethod, receiverType, declaredTargetMethod);
+    }
+
+    private static String findDirectedRuleOrPrefix(DirectedInliningRules rules, DirectedInliningRules.Callsite[] callsites, Invoke invoke, ResolvedJavaMethod calleeMethod,
+                    ResolvedJavaType receiverType) {
+        if (rules == null) {
+            return null;
+        }
+        ResolvedJavaMethod declaredTargetMethod = invoke.getTargetMethod();
+        return rules.findMatchingRuleOrPrefix(callsites, calleeMethod, receiverType, declaredTargetMethod);
+    }
+
+    /**
+     * <p>
+     * The stack realized by {@link InliningData} grows and shrinks as choices are made among the
+     * alternatives below:
+     * <ol>
+     * <li>not worth inlining: pop stack top, which comprises:
+     * <ul>
+     * <li>pop any remaining graphs not yet delved into</li>
+     * <li>pop the current invocation</li>
+     * </ul>
+     * </li>
+     * <li>delve into one of the callsites hosted in the current graph, such callsite is explored
+     * next by {@link #moveForward()}</li>
+     * <li>{@link #tryToInline(MethodInvocation, int) try to inline}: move past the current graph
+     * (remove it from the topmost element).
+     * <ul>
+     * <li>If that was the last one then {@link #tryToInline(MethodInvocation, int) try to inline}
+     * the callsite under consideration (ie, the "current invocation").</li>
+     * <li>Whether inlining occurs or not, that callsite is removed from the top of
+     * {@link InliningData} .</li>
+     * </ul>
+     * </li>
+     * </ol>
+     * </p>
+     *
+     * <p>
+     * Some facts about the alternatives above:
+     * <ul>
+     * <li>the first step amounts to backtracking, the 2nd one to depth-search, and the 3rd one also
+     * involves backtracking (however possibly after inlining).</li>
+     * <li>the choice of abandon-and-backtrack or delve-into depends on
+     * {@link InliningPolicy#isWorthInlining} and {@link InliningPolicy#continueInlining}.</li>
+     * <li>the 3rd choice is picked whenever none of the previous choices are made</li>
+     * </ul>
+     * </p>
+     *
+     * @return true iff inlining was actually performed
+     */
+    @SuppressWarnings("try")
+    public boolean moveForward() {
+
+        final MethodInvocation currentInvocation = currentInvocation();
+
+        final boolean backtrack = (!currentInvocation.isRoot() &&
+                        !isWorthInlining(currentInvocation, currentInvocation.callee(), inliningDepth(), false).shouldInline());
+        if (backtrack) {
+            int remainingGraphs = currentInvocation.totalGraphs() - currentInvocation.processedGraphs();
+            assert NumUtil.assertPositiveInt(remainingGraphs);
+            popGraphs(remainingGraphs);
+            popInvocation();
+            return false;
+        }
+
+        ExplorationMode explorationMode = explorationMode(currentGraph());
+        if (explorationMode != ExplorationMode.NONE) {
+            processNextInvoke(explorationMode);
+            return false;
+        }
+
+        popGraph();
+        if (currentInvocation.isRoot()) {
+            return false;
+        }
+
+        // try to inline
+        assert currentInvocation.callee().invoke().asNode().isAlive();
+        currentInvocation.incrementProcessedGraphs();
+        if (currentInvocation.processedGraphs() == currentInvocation.totalGraphs()) {
+            /*
+             * "all of currentInvocation's graphs processed" amounts to
+             * "all concrete methods that come into question already had the callees they contain analyzed for inlining"
+             */
+            popInvocation();
+            try (DebugContext.Scope s = debug.scope("Inlining", inliningContext())) {
+                if (tryToInline(currentInvocation, inliningDepth() + 1)) {
+                    // Report real progress only if we inline into the root graph
+                    return currentGraph().graph() == rootGraph;
+                }
+                return false;
+            } catch (Throwable e) {
+                throw debug.handle(e);
+            }
+        }
+
+        return false;
+    }
+
+    private ExplorationMode explorationMode(CallsiteHolder callsiteHolder) {
+        if (!callsiteHolder.hasRemainingInvokes()) {
+            return ExplorationMode.NONE;
+        }
+        if (inliningPolicy.continueInlining(callsiteHolder.graph())) {
+            return ExplorationMode.NORMAL;
+        }
+        CallsiteHolderExplorable explorable = (CallsiteHolderExplorable) callsiteHolder;
+        return explorable.hasRemainingInvokes(invoke -> mustExploreInvoke(callsiteHolder, invoke)) ? ExplorationMode.REQUIRED_ONLY
+                        : ExplorationMode.NONE;
+    }
+
+    /**
+     * Returns {@code true} if {@code invoke} must still be explored even after normal graph growth
+     * has stopped. These invokes either expose a directed inline target or are mandatory by the
+     * force-inline policy.
+     */
+    private boolean mustExploreInvoke(CallsiteHolder callsiteHolder, Invoke invoke) {
+        return matchesDirectedInvoke(directedInliningRules, callsiteHolder, invoke, true) ||
+                        matchesForceInlineInvoke(callsiteHolder, invoke);
+    }
+
+    private static boolean matchesDirectedInvoke(DirectedInliningRules rules, CallsiteHolder callsiteHolder, Invoke invoke, boolean includePrefixes) {
+        if (rules == null) {
+            return false;
+        }
+        DirectedInliningRules.Callsite[] callsites = ((CallsiteHolderExplorable) callsiteHolder).callsitePath(invoke);
+        ResolvedJavaMethod declaredTargetMethod = invoke.getTargetMethod();
+        DevirtualizationInfo targetInfo = resolveDirectOrDevirtualizedTargetInfo(invoke, true);
+        if (targetInfo != null && matchesDirectedInvoke(rules, callsites, targetInfo.targetMethod(), targetInfo.dispatchedType(), declaredTargetMethod, includePrefixes)) {
+            return true;
+        }
+        if (!(invoke.callTarget() instanceof MethodCallTargetNode callTarget) || !callTarget.invokeKind().isIndirect()) {
+            return false;
+        }
+        JavaTypeProfile typeProfile = callTarget.getTypeProfile();
+        if (declaredTargetMethod == null || typeProfile == null || typeProfile.getTypes() == null) {
+            return false;
+        }
+        ResolvedJavaType contextType = invoke.getContextType();
+        for (JavaTypeProfile.ProfiledType profiledType : typeProfile.getTypes()) {
+            ResolvedJavaMethod concrete = profiledType.getType().resolveConcreteMethod(declaredTargetMethod, contextType);
+            if (matchesDirectedInvoke(rules, callsites, concrete, profiledType.getType(), declaredTargetMethod, includePrefixes)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesDirectedInvoke(DirectedInliningRules rules, DirectedInliningRules.Callsite[] callsites, ResolvedJavaMethod calleeMethod,
+                    ResolvedJavaType receiverType, ResolvedJavaMethod declaredTargetMethod, boolean includePrefixes) {
+        return includePrefixes ? rules.matchesOrPrefix(callsites, calleeMethod, receiverType, declaredTargetMethod)
+                        : rules.matches(callsites, calleeMethod, receiverType, declaredTargetMethod);
+    }
+
+    private boolean matchesForceInlineInvoke(CallsiteHolder callsiteHolder, Invoke invoke) {
+        if (!exploreExplicitRootInvokes || callsiteHolder.graph() != rootGraph) {
+            return false;
+        }
+        ResolvedJavaMethod targetMethod = resolveDirectOrDevirtualizedTargetMethod(invoke, true);
+        if (targetMethod == null || !targetMethod.shouldBeInlined() ||
+                        matchesDirectedInvoke(directedDontInliningRules, callsiteHolder, invoke, false)) {
+            return false;
+        }
+        int recursiveInliningDepth = countRecursiveInlining(targetMethod);
+        return recursiveInliningDepth == 0 && checkTargetConditionsHelper(rootGraph, context, targetMethod, invoke, recursiveInliningDepth) == null;
+    }
+
+    /**
+     * Checks an invariant that {@link #moveForward()} must maintain: "the top invocation records
+     * how many concrete target methods (for it) remain on the {@link #graphQueue}; those targets
+     * 'belong' to the current invocation in question.
+     */
+    private boolean topGraphsForTopInvocation() {
+        if (invocationQueue.isEmpty()) {
+            assert graphQueue.isEmpty();
+            return true;
+        }
+        if (currentInvocation().isRoot()) {
+            if (!graphQueue.isEmpty()) {
+                assert graphQueue.size() == 1 : graphQueue;
+            }
+            return true;
+        }
+        final int remainingGraphs = currentInvocation().totalGraphs() - currentInvocation().processedGraphs();
+        final Iterator<CallsiteHolder> iter = graphQueue.iterator();
+        for (int i = (remainingGraphs - 1); i >= 0; i--) {
+            if (!iter.hasNext()) {
+                assert false;
+                return false;
+            }
+            CallsiteHolder queuedTargetCH = iter.next();
+            Inlineable targetIE = currentInvocation().callee().inlineableElementAt(i);
+            InlineableGraph targetIG = (InlineableGraph) targetIE;
+            assert queuedTargetCH.method().equals(targetIG.getGraph().method());
+        }
+        return true;
+    }
+
+    /**
+     * This method checks invariants for this class. Named after shorthand for "internal
+     * representation is ok".
+     */
+    public boolean repOK() {
+        assert topGraphsForTopInvocation();
+        return true;
+    }
+}

@@ -1,0 +1,111 @@
+#!/usr/bin/perl
+
+use 5.20.0;
+use warnings ;
+use strict;
+use Path::Tiny;
+use Getopt::Long;
+
+use Dpkg::Copyright::Scanner qw/print_copyright/;
+
+my %args;
+my $long;
+
+GetOptions('long' => \$long);
+
+if (my $input = $ENV{COPYRIGHT_SCANNER_INPUT} || $ARGV[0]) {
+    # used for test setup
+    my $input_path = path($input);
+    if ($input_path->is_dir) {
+        $args{from_dir} = $input_path;
+    }
+    else {
+        $args{in} = $input_path;
+    }
+}
+
+if ($long) {
+    $args{long} = 1;
+}
+
+print_copyright(%args);
+
+__END__
+
+=pod
+
+=head1 NAME
+
+scan-copyrights - Scan source file and print lines for debian/copyright files
+
+=head1 SYNOPSIS
+
+  # in source package directory
+  scan-copyrights > debian/copyright.new
+  meld debian/copyright{,.new}
+
+=head1 DESCRIPTION
+
+This commands use C<licensecheck> command to scan license and copyright
+information from source files. The output of licensecheck is parsed to
+generate the Files information of C<debian/copyright> files according to
+L<Debian specifications|https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/>
+
+=head1 BUGS
+
+Extracting license and copyright data from unstructured comments is not reliable.
+User must check manually the files when no copyright info is found or when the
+license is unknown.
+
+The required changes can be stored in
+C<debian/fill.copyright.blanks.yml> so that future runs of
+scan-copyrights will be more accurate.  Please see
+L<Dpkg::Copyright::Scanner/"Filling the blanks"> for instructions to
+write this file.
+
+=head1 Examples
+
+In pan source directory:
+
+ $ scan-copyright
+ no info for ./uulib/fptools.h, check manually this file
+ no info for ./uulib/fptools.c, check manually this file
+ no info for ./uulib/uustring.h, check manually this file
+ no info for ./uulib/crc32.h, check manually this file
+ no info for ./pan/data/defgroup.h, check manually this file
+ no info for ./pan/general/time-elapsed.h, check manually this file
+ [ snip ]
+ Files: *
+ Copyright: 1994-2001, by Frank Pilhofer.
+ License: GPL-2+
+
+ Files: pan/*
+ Copyright: 2002-2006, Charles Kerr <charles@rebelbase.com>
+ License: GPL-2
+
+ Files: pan/data/cert-store.cc
+ Copyright: 2011, Heinrich Muller <henmull@src.gnome.org>
+   2002-2006, Charles Kerr <charles@rebelbase.com>
+ License: GPL-2
+
+ Files: pan/data/cert-store.h
+ Copyright: 2002-2006, Charles Kerr <charles@rebelbase.com>
+   2011, Heinrich Muller <henmull@src.gnome.org>
+ License: GPL-2
+ [ snip ]
+
+
+=head1 SUPPORT
+
+For support, please contact the author.
+
+=head1 SEE ALSO
+
+L<licensecheck>, C<licensecheck2dep5> from C<cdbs> package
+
+=head1 AUTHOR
+
+Dominique Dumont <dod@debian.org>
+
+=cut
+

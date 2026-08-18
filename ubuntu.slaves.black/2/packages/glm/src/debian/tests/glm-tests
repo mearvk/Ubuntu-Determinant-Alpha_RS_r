@@ -1,0 +1,42 @@
+#!/bin/sh
+# Copyright 2016 Ghislain Antony Vaillant
+#
+# This file is part of the packaging testsuite for glm.
+
+set -e
+
+# Copy the upstream testsuite.
+cp -a ./test/* "$AUTOPKGTEST_TMP"
+
+cd "$AUTOPKGTEST_TMP"
+
+# Create a standalone CMake project.
+rm CMakeLists.txt
+
+cat << EOF > CMakeLists.txt
+cmake_minimum_required(VERSION 3.0)
+project(glm-tests)
+
+enable_testing()
+
+find_package(glm REQUIRED)
+include_directories(SYSTEM \${glm_INCLUDE_DIRS})
+include_directories(external)
+
+function(glmCreateTestGTC NAME)
+  set(SAMPLE_NAME test-\${NAME})
+  add_executable(\${SAMPLE_NAME} \${NAME}.cpp)
+  add_test(NAME \${SAMPLE_NAME}
+           COMMAND \$<TARGET_FILE:\${SAMPLE_NAME}>)
+endfunction()
+
+add_subdirectory(bug)
+add_subdirectory(core)
+add_subdirectory(gtc)
+add_subdirectory(gtx)
+
+EOF
+
+# Configure, build and execute.
+mkdir build && cd build
+cmake .. 2>&1 && make 2>&1 && make test

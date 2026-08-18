@@ -1,0 +1,45 @@
+Description: Sharness: Fix EACCES failure succeeding for root
+ When the test suite is run by root, the following failure occurs in
+ "0103-munged-security-logfile.t":
+ .
+   10 - logfile not writable by user failure
+ .
+ This sets the logfile perms to 0400 to check for an error when the
+ logfile is not writable by the user.  However, root will not get a
+ "permission denied" error here.  Consequently, the expected failure
+ erroneously succeeds.
+ .
+ Add a check for whether the test is being run by the root user, and
+ set the ROOT prerequisite when this is true.  Furthermore, add the
+ !ROOT prereq to the above test so it will be skipped when run by root.
+Author: Chris Dunlap <cdunlap@llnl.gov>
+Origin: upstream, https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=982564
+Last-Update: 2021-02-15
+Forwarded: not-needed
+
+--- a/t/0103-munged-security-logfile.t
++++ b/t/0103-munged-security-logfile.t
+@@ -118,8 +118,10 @@ test_expect_success 'logfile non-regular-file override failure' '
+ '
+ 
+ # Check for an error when the logfile is not writable by user.
++# Skip this test if running as root since the root user will not get the
++#   expected EACCESS failure.
+ ##
+-test_expect_success 'logfile not writable by user failure' '
++test_expect_success !ROOT 'logfile not writable by user failure' '
+     rm -f "${MUNGE_LOGFILE}" &&
+     touch "${MUNGE_LOGFILE}" &&
+     chmod 0400 "${MUNGE_LOGFILE}" &&
+
+new file mode 100644
+index 0000000..5a2fd28
+--- /dev/null
++++ b/t/sharness.d/10-root.sh
+@@ -0,0 +1,6 @@
++##
++# Is the test being run by the root user?
++##
++if test "$(id -u)" = 0; then
++    test_set_prereq ROOT
++fi

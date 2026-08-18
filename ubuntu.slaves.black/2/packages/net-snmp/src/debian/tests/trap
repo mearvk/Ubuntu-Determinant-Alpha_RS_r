@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+FIFO=/tmp/trap
+
+rm -f $FIFO # for easier re-runs
+mkfifo -m660 $FIFO
+chgrp Debian-snmp $FIFO
+
+cat >/etc/snmp/snmptrapd.conf <<EOF
+disableAuthorization yes
+traphandle default tee $FIFO
+EOF
+
+CANARY=45678
+
+snmptrap -v 2c -c public 127.0.0.1 '' .1.3.6.1.6.3.1.1.5.$CANARY
+
+traplog=$(timeout 10 cat $FIFO || true)
+
+if printf "%s\n" "$traplog" | grep "\.$CANARY$" >/dev/null ; then
+    printf "%s\n" "$traplog"
+else
+    printf "%s\n" "$traplog"
+    journalctl -u 'snmptrapd.*'
+    exit 1
+fi

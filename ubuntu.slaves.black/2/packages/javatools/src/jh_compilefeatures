@@ -1,0 +1,242 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_compilefeatures - Compiles eclipse features using pde-build.
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Cwd();
+use Debian::Debhelper::Dh_Lib;
+
+use Debian::Javahelper::Eclipse qw(install_zipped_feature);
+
+=head1 SYNOPSIS
+
+B<jh_compilefeatures> [S<I<debhelper options>>] [S<I<options>>] [B<--pde-build-dir=>I<dir>] [S<I<feature [...]>>]
+
+=head1 DESCRIPTION
+
+jh_compilefeatures is a javahelper program that handles compiling
+features using pde-build. These features can be specified either in
+debian/eclipse.features or via command-line.
+
+jh_compilefeatures uses debhelper behind the scenes and are therefore
+subject to the compat level (e.g. when parsing the eclipse.features file).
+
+When specifying the dependencies for a feature, jh_compilefeatures will
+see if this feature has just been compiled and will use the dependency
+if it is among the results. This can be used together with
+debian/eclipse.features.
+
+Dependencies are always resolved by first checking if it is a recently
+built feature and if not, then the system installed eclipse's dropins
+folders will be checked.
+
+Currently jh_compilefeatures do not clean up between builds, which means
+the dependencies for previous builds are present for the current build.
+Nevertheless, do not rely on this, as this behavior is subject to change.
+
+Note: jh_compilefeatures will I<not> rearrange the build order for you
+in order to do this.
+
+Note: that jh_compilefeatures will not error out if it cannot find a
+missing dependency. This is due to the underlying builder being unable
+to detect this.
+
+=head1 FILES
+
+=over 4
+
+=item debian/eclipse.features
+
+List the eclipse features to compile and their dependencies. The first
+item on the line is the feature to compile and the following items
+are considered dependencies.
+
+A dependency can either be a dropins folder or a previous built feature.
+jh_compilefeatures will find it as long as it is installed in the system
+eclipse's dropins folder or it has just been compiled.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--pde-build-dir=>I<dir>
+
+Specifies the directory from where pde-build is to be run. Defaults to
+"debian/.eclipse_build".
+
+=item B<--feature-deps=>I<deps>
+
+A space separated list of dependencies. These dependencies will be used
+to compile all features passed by command-line. Features read from
+debian/eclipse.features are unaffected by this.
+
+=item B<--build-opts=>I<args>
+
+Pass args to the underlying builder. These options are passed to all
+features built.
+
+This defaults to "-DjavacTarget=1.5 -DjavacSource=1.5" if not set.
+This can be disabled by passing the empty string.
+
+=item B<--jvm-args=>I<args>
+
+Pass args to the JVM. These options are passed to all
+features built.
+
+=item B<--orbit-dir=>I<dir>
+
+Specifies where the Orbit dependencies can be found. This is only needed
+if the orbit dir is in an unusual location.
+
+=item B<--pde-build=>I<cmd>
+
+Use a non-standard pde-build command to compile the features.
+
+=item B<--pde-args=args>
+
+Passes args directly to pde-build. Note, jh_compilefeatures have
+specialised options for some of pde-build options and these should
+be used whenever possible.
+
+These options are passed to all features built.
+
+=item B<--ignore-java-home>
+
+Skip the check of JAVA_HOME. Since the underlying builder uses ant
+(and therefore java), the build should ensure it always uses the
+expected java implementation.
+
+Use this if you (for whatever reason) need to declare the specific
+java implementation without being able to use JAVA_HOME.
+
+Note: You still have to tell the underlying builder which java to
+use.
+
+=back
+
+=cut
+
+my $pdebdir = undef;
+my $ffile = 'debian/eclipse.features';
+my @features = ();
+my $fdeps = q{};
+my $orbitdir = undef;
+my $pdebcmd = undef;
+my $bopts = undef;
+my $pdeargs = q{};
+my $jvmargs = q{};
+my $ignoreJH = 0;
+init(options => {
+    'pde-build-dir=s' => \$pdebdir,
+    'feature-deps=s' => \$fdeps,
+    'orbit-dir=s' => \$orbitdir,
+    'pde-build=s' => \$pdebcmd,
+    'build-opts=s' => \$bopts,
+    'pde-args=s' => \$pdeargs,
+    'jvm-args=s' => \$jvmargs,
+    'ignore-java-home' => \$ignoreJH,
+});
+
+error('pde-build uses ant, therefore JAVA_HOME must be set.')
+    unless(($ENV{'JAVA_HOME'}//q{}) ne q{} or $ignoreJH);
+
+# Use default value if none are given.
+$pdebdir = 'debian/.eclipse-build' unless(defined($pdebdir));
+$pdebdir =~ s@/*$@@; # remove trailing slash, looks better.
+
+$orbitdir = "$pdebdir/orbitdeps" unless(defined($orbitdir));
+
+$pdebcmd = '/usr/lib/eclipse/buildscripts/pde-build' unless(defined($pdebcmd));
+
+$bopts = '-DjavacTarget=1.5 -DjavacSource=1.5' unless(defined($bopts));
+
+$orbitdir = Cwd::abs_path($orbitdir) unless($orbitdir =~ m@^/@);
+
+if( -e $ffile){
+    @features = filedoublearray($ffile);
+}
+
+error("$pdebdir does not exist")
+    if(scalar(@ARGV) + scalar(@features) > 0 && ! -d $pdebdir);
+
+foreach my $arg (@ARGV){
+    compile($arg, split(m/\s++/o, $fdeps));
+}
+
+foreach my $feat (@features){
+    compile(@$feat);
+}
+
+exit(0);
+
+sub compile{
+    my $feat = shift;
+    my @args = ();
+    my @deps = ();
+    DEP_LOOP: foreach my $d (@_){
+        # Check if we just built this feature.
+        foreach my $s (q{}, '.zip', '.ZIP') {
+            my $zip = "$pdebdir/$d$s";
+            if( -e $zip ){
+                install_zipped_feature($zip, "$pdebdir/build/SDK");
+                next DEP_LOOP;
+            }
+        }
+        push(@deps, $d);
+    }
+    push(@args, '-o', escape_shell($orbitdir)) if(defined($orbitdir) && -d $orbitdir);
+    push(@args, '-j', escape_shell($jvmargs)) if($jvmargs ne q{});
+    push(@args, '-a', escape_shell($bopts)) if($bopts ne q{});
+    push(@args, '-d', escape_shell(join(q{ }, @deps))) if(scalar(@deps) > 0);
+    push(@args, $pdeargs);
+    complex_doit('cd', $pdebdir , '&&', $pdebcmd, @args, '-f', $feat);
+}
+
+=head1 EXAMPLE
+
+A sample debian/eclipse.features
+
+  org.eclipse.tm.terminal emf
+  org.eclipse.rse.sdk
+
+org.eclipse.tm.terminal depends on "emf", which is expected to be found in
+eclipse's dropins folder. org.eclipse.rse.sdk on the other hand has no
+dependencies beyond the eclipse platform.
+
+If needed you can also specify a previously built feature as a dependency:
+
+  org.eclipse.some.feature
+  org.eclipse.another.feature org.eclipse.some.feature rse
+
+Here org.eclipse.another.feature depends org.eclipse.some.feature, which was
+just built and also rse, which is expected to be in system installed eclipse's
+dropins.
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2010 by Niels Thykier
+
+This tool is free software; you may redistribute it and/or modify
+it under the terms of GNU GPL 2.
+
+=cut

@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+
+PACKAGE = $(shell dh_listpackages)
+TMP     = $(CURDIR)/debian/$(PACKAGE)
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+%:
+	dh $@
+
+override_dh_clean:
+	dh_clean
+	[ ! -e $(CURDIR)/inc/latest.pm.save ]         || mv -v $(CURDIR)/inc/latest.pm.save $(CURDIR)/inc/latest.pm
+	[ ! -e $(CURDIR)/inc/latest/private.pm.save ] || mv -v $(CURDIR)/inc/latest/private.pm.save $(CURDIR)/inc/latest/private.pm
+
+override_dh_auto_configure:
+	[ ! -e $(CURDIR)/inc/latest.pm ]         || cp -v $(CURDIR)/inc/latest.pm $(CURDIR)/inc/latest.pm.save
+	[ ! -e $(CURDIR)/inc/latest/private.pm ] || cp -v $(CURDIR)/inc/latest/private.pm $(CURDIR)/inc/latest/private.pm.save
+	dh_auto_configure
+
+# installed by upstream make install
+override_dh_auto_install:
+	dh_auto_install
+	$(RM) --verbose $(TMP)/usr/share/perl5/List/MoreUtils/Contributing.pod \
+		$(TMP)/usr/share/man/man3/List::MoreUtils::Contributing.3pm

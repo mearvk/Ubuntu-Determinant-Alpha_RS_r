@@ -1,0 +1,36 @@
+From: W-Mark Kubacki <wmark@hurrikane.de>
+Date: Fri, 19 Aug 2016 19:50:39 +0200
+Subject: [PATCH] Skip printing at MAX_DEPTH and deeper
+
+This addresses #1136, and mitigates a stack exhaustion when printing
+a very deeply nested term.
+---
+ src/jv_print.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/jv_print.c b/src/jv_print.c
+index 5ebc01e..d7819b8 100644
+--- a/src/jv_print.c
++++ b/src/jv_print.c
+@@ -18,6 +18,10 @@
+ #define MAX_PRINT_DEPTH (256)
+ #endif
+ 
++#ifndef MAX_DEPTH
++#define MAX_DEPTH 256
++#endif
++
+ #define ESC "\033"
+ #define COL(c) (ESC "[" c "m")
+ #define COLRESET (ESC "[0m")
+@@ -201,8 +205,8 @@ static void jv_dump_term(struct dtoa_context* C, jv x, int flags, int indent, FI
+       }
+     }
+   }
+-  if (indent > MAX_PRINT_DEPTH) {
+-    put_str("<skipped: too deep>", F, S, flags & JV_PRINT_ISATTY);
++  if (indent > MAX_DEPTH) {
++    put_str("<stripped: exceeds max depth>", F, S, flags & JV_PRINT_ISATTY);
+   } else switch (jv_get_kind(x)) {
+   default:
+   case JV_KIND_INVALID:

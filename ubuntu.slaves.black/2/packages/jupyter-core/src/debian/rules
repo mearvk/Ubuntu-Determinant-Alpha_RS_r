@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+#export DH_VERBOSE=1
+export LC_ALL=C.UTF-8
+export PYBUILD_TEST_ARGS=-k 'not test_command'
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	PYTHONPATH=. python3 -m sphinx -b html docs debian/python-jupyter-core-doc/usr/share/doc/python-jupyter-core-doc/html
+	dh_sphinxdoc -O--buildsystem=pybuild
+endif
+
+override_dh_installchangelogs:
+	dh_installchangelogs -k docs/changelog.rst
+
+execute_after_dh_auto_install:
+	rm -r debian/tmp/usr/lib/python3*/dist-packages/jupyter_core/tests

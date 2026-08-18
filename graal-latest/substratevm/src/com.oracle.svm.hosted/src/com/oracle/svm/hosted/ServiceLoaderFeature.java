@@ -1,0 +1,337 @@
+/*
+ * Copyright (c) 2018, 2024, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.hosted;
+
+import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.random.RandomGenerator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.graalvm.collections.EconomicSet;
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.hosted.RuntimeReflection;
+import org.graalvm.nativeimage.hosted.RuntimeResourceAccess;
+
+import com.oracle.graal.pointsto.constraints.UnsupportedPlatformException;
+import com.oracle.svm.core.FutureDefaultsOptions;
+import com.oracle.svm.core.feature.InternalFeature;
+import com.oracle.svm.core.jdk.SecurityProvidersSupport;
+import com.oracle.svm.core.jdk.ServiceCatalogSupport;
+import com.oracle.svm.hosted.analysis.Inflation;
+import com.oracle.svm.hosted.substitute.DeletedElementException;
+import com.oracle.svm.shared.feature.AutomaticallyRegisteredFeature;
+import com.oracle.svm.shared.option.AccumulatingLocatableMultiOptionValue;
+import com.oracle.svm.shared.option.HostedOptionKey;
+import com.oracle.svm.shared.util.BasedOnJDKFile;
+import com.oracle.svm.util.JVMCIReflectionUtil;
+import com.oracle.svm.util.dynamicaccess.JVMCIRuntimeReflection;
+
+import jdk.graal.compiler.hotspot.CompilerConfigurationFactory;
+import jdk.graal.compiler.hotspot.HotSpotBackendFactory;
+import jdk.graal.compiler.hotspot.meta.DefaultHotSpotLoweringProvider;
+import jdk.graal.compiler.hotspot.meta.HotSpotInvocationPluginProvider;
+import jdk.graal.compiler.options.Option;
+import jdk.graal.compiler.options.OptionType;
+import jdk.graal.compiler.truffle.hotspot.TruffleCallBoundaryInstrumentationFactory;
+import jdk.vm.ci.hotspot.HotSpotJVMCIBackendFactory;
+import jdk.vm.ci.meta.ResolvedJavaMethod;
+import jdk.vm.ci.meta.ResolvedJavaType;
+import sun.util.locale.provider.LocaleDataMetaInfo;
+
+/**
+ * Support for {@link ServiceLoader} on Substrate VM.
+ *
+ * Services are registered in the folder {@code "META-INF/services/"} using files whose name is the
+ * fully qualified service interface name. We do not know which services are going to be used by a
+ * native image: The parameter of {@code ServiceLoader#load} is often but not always a compile-time
+ * constant that we can track. But we also cannot put all registered services into the native image.
+ *
+ * We therefore use the following heuristic: We add all service loader files and service
+ * implementation classes when the service interfaces that are seen as reachable by the static
+ * analysis.
+ *
+ * Each used service implementation class is added for reflection (using
+ * {@link org.graalvm.nativeimage.hosted.RuntimeReflection#register(Class[])}) and for reflective
+ * instantiation (using {@link RuntimeReflection#registerForReflectiveInstantiation(Class[])}).
+ *
+ * For each service interface, a single service loader file is added as a resource to the image. The
+ * single file combines all the individual files that can come from different .jar files.
+ */
+@AutomaticallyRegisteredFeature
+public class ServiceLoaderFeature implements InternalFeature {
+
+    public static class Options {
+        @Option(help = "Automatically register services for run-time lookup using ServiceLoader", type = OptionType.Expert) //
+        public static final HostedOptionKey<Boolean> UseServiceLoaderFeature = new HostedOptionKey<>(true);
+
+        @Option(help = "Comma-separated list of services that should be excluded", type = OptionType.Expert) //
+        public static final HostedOptionKey<AccumulatingLocatableMultiOptionValue.Strings> ServiceLoaderFeatureExcludeServices = new HostedOptionKey<>(
+                        AccumulatingLocatableMultiOptionValue.Strings.buildWithCommaDelimiter());
+
+        @Option(help = "Comma-separated list of service providers that should be excluded", type = OptionType.Expert) //
+        public static final HostedOptionKey<AccumulatingLocatableMultiOptionValue.Strings> ServiceLoaderFeatureExcludeServiceProviders = new HostedOptionKey<>(
+                        AccumulatingLocatableMultiOptionValue.Strings.buildWithCommaDelimiter());
+
+    }
+
+    private static final Set<String> SKIPPED_SERVICES = Stream.of(
+                    // image builder internal ServiceLoader interfaces
+                    NativeImageClassLoaderPostProcessing.class,
+
+                    /*
+                     * NOTE: Platform.class had to be added to this list since our analysis
+                     * discovers that Platform.includedIn is reachable regardless of fact that it is
+                     * constant folded at registerPlatformPlugins method of
+                     * SubstrateGraphBuilderPlugins. This issue hasn't manifested before because
+                     * implementation classes were instantiated using runtime reflection instead of
+                     * ServiceLoader (and thus weren't reachable in analysis).
+                     */
+                    Platform.class,
+
+                    /*
+                     * Loaded in java.util.random.RandomGeneratorFactory.FactoryMapHolder, which is
+                     * initialized at image build time.
+                     */
+                    RandomGenerator.class,
+
+                    /* Graal hotspot-specific services */
+                    HotSpotJVMCIBackendFactory.class,
+                    CompilerConfigurationFactory.class,
+                    HotSpotBackendFactory.class,
+                    DefaultHotSpotLoweringProvider.Extensions.class,
+                    HotSpotInvocationPluginProvider.class,
+                    TruffleCallBoundaryInstrumentationFactory.class)
+
+                    .map(Class::getName)
+                    .collect(Collectors.toUnmodifiableSet());
+
+    /**
+     * Services that should not be processed here, for example because they are handled by
+     * specialized features.
+     */
+    private final EconomicSet<String> servicesToSkip = EconomicSet.create(SKIPPED_SERVICES);
+
+    private static final Set<String> SKIPPED_PROVIDERS = Set.of(
+                    /* Skip console providers until GR-44085 is fixed */
+                    "jdk.internal.org.jline.JdkConsoleProviderImpl",
+                    "jdk.jshell.execution.impl.ConsoleImpl$ConsoleProviderImpl");
+
+    private final EconomicSet<String> serviceProvidersToSkip = EconomicSet.create(SKIPPED_PROVIDERS);
+
+    @Override
+    public boolean isInConfiguration(IsInConfigurationAccess access) {
+        return Options.UseServiceLoaderFeature.getValue();
+    }
+
+    @Override
+    public void afterRegistration(AfterRegistrationAccess access) {
+        if (!FutureDefaultsOptions.securityProvidersInitializedAtRunTime()) {
+            servicesToSkip.add(java.security.Provider.class.getName());
+        }
+        if (!FutureDefaultsOptions.resourceBundlesInitializedAtRunTime()) {
+            servicesToSkip.add(LocaleDataMetaInfo.class.getName());
+        }
+        servicesToSkip.addAll(Options.ServiceLoaderFeatureExcludeServices.getValue().values());
+        serviceProvidersToSkip.addAll(Options.ServiceLoaderFeatureExcludeServiceProviders.getValue().values());
+    }
+
+    @Override
+    public void beforeAnalysis(BeforeAnalysisAccess access) {
+        FeatureImpl.BeforeAnalysisAccessImpl accessImpl = (FeatureImpl.BeforeAnalysisAccessImpl) access;
+        accessImpl.imageClassLoader.classLoaderSupport.serviceProvidersForEach((serviceName, providers) -> {
+            Collection<String> providersToSkip = providers;
+            try {
+                if (!servicesToSkip.contains(serviceName)) {
+                    /*
+                     * The following will throw an `UnsupportedPlatformException` if the service is not
+                     * supported.
+                     * If the service should not end up in the image, we remove all the providers with
+                     * it.
+                     */
+                    boolean skipService = false;
+                    ResolvedJavaType serviceClass = accessImpl.findTypeByName(serviceName);
+                    if (serviceClass == null || serviceClass.isArray() || serviceClass.isPrimitive()) {
+                        skipService = true;
+                    } else if (!accessImpl.getHostVM().platformSupported(serviceClass)) {
+                        skipService = true;
+                    } else {
+                        providersToSkip = providers.stream().filter(serviceProvidersToSkip::contains).collect(Collectors.toList());
+                        if (!providersToSkip.isEmpty()) {
+                            skipService = true;
+                        }
+                    }
+                    if (!skipService) {
+                        access.registerReachabilityHandler(a -> handleServiceClassIsReachable(a, serviceClass, providers), serviceClass);
+                        return;
+                    }
+                }
+            } catch (UnsupportedPlatformException e) {
+                // Service class is not supported - skipping
+            }
+            // skip service
+            ServiceCatalogSupport.singleton().removeServicesFromServicesCatalog(serviceName, new HashSet<>(providersToSkip)); // noEconomicSet(concurrency)
+        });
+    }
+
+    void handleServiceClassIsReachable(DuringAnalysisAccess access, ResolvedJavaType serviceProvider, Collection<String> providers) {
+        FeatureImpl.DuringAnalysisAccessImpl accessImpl = (FeatureImpl.DuringAnalysisAccessImpl) access;
+        LinkedHashSet<String> registeredProviders = new LinkedHashSet<>();
+        for (String provider : providers) {
+            if (serviceProvidersToSkip.contains(provider)) {
+                continue;
+            }
+            if (serviceProvider.equals(accessImpl.getMetaAccess().lookupJavaType(java.security.Provider.class)) && !SecurityProvidersSupport.singleton().isUserRequestedSecurityProvider(provider)) {
+                SecurityProvidersSupport.singleton().markSecurityProviderAsNotLoaded(provider);
+            } else {
+                registerProviderForRuntimeReflectionAccess(access, provider, registeredProviders);
+            }
+        }
+        registerProviderForRuntimeResourceAccess(access.getApplicationClassLoader().getUnnamedModule(), serviceProvider.toClassName(), registeredProviders);
+    }
+
+    @BasedOnJDKFile("https://github.com/graalvm/labs-openjdk/blob/jdk-25+21/src/java.base/share/classes/java/util/ServiceLoader.java#L745-L793")
+    public static void registerProviderForRuntimeReflectionAccess(DuringAnalysisAccess access, String provider, Set<String> registeredProviders) {
+        FeatureImpl.DuringAnalysisAccessImpl accessImpl = (FeatureImpl.DuringAnalysisAccessImpl) access;
+        /* Make provider reflectively instantiable */
+        ResolvedJavaType providerClass;
+        try {
+            providerClass = accessImpl.findTypeByName(provider);
+        } catch (UnsupportedPlatformException e) {
+            return;
+        } catch (DeletedElementException e) {
+            /* Disallow services with implementation classes that are marked as @Deleted */
+            return;
+        }
+
+        if (providerClass == null || providerClass.isArray() || providerClass.isPrimitive()) {
+            return;
+        }
+        if (!accessImpl.getHostVM().platformSupported(providerClass)) {
+            return;
+        }
+        if (((Inflation) accessImpl.getBigBang()).getAnnotationSubstitutionProcessor().isDeleted(providerClass)) {
+            /* Disallow services with implementation classes that are marked as @Deleted */
+            return;
+        }
+
+        /*
+         * Find either a public static provider() method or a nullary constructor (or both). Skip
+         * providers that do not comply with requirements.
+         *
+         * See ServiceLoader#loadProvider and ServiceLoader#findStaticProviderMethod.
+         */
+        ResolvedJavaMethod nullaryProviderMethod = findProviderMethod(providerClass);
+        ResolvedJavaMethod nullaryConstructor = findNullaryConstructor(providerClass);
+        if (nullaryConstructor != null || nullaryProviderMethod != null) {
+            JVMCIRuntimeReflection.register(providerClass);
+            if (nullaryConstructor != null) {
+                /*
+                 * Registering a constructor with
+                 * RuntimeReflection.registerConstructorLookup(providerClass) does not produce the
+                 * same behavior as using RuntimeReflection.register(nullaryConstructor). In the
+                 * first case, the constructor is marked for query purposes only, so this
+                 * if-statement cannot be eliminated.
+                 *
+                 */
+                JVMCIRuntimeReflection.register(nullaryConstructor);
+            } else {
+                /*
+                 * If there's no nullary constructor, register it as negative lookup to avoid
+                 * throwing a MissingReflectionRegistrationError at run time.
+                 */
+                JVMCIRuntimeReflection.registerConstructorLookup(providerClass);
+            }
+            if (nullaryProviderMethod != null) {
+                JVMCIRuntimeReflection.register(nullaryProviderMethod);
+            } else {
+                /*
+                 * If there's no declared public provider() method, register it as negative lookup
+                 * to avoid throwing a MissingReflectionRegistrationError at run time.
+                 */
+                JVMCIRuntimeReflection.registerMethodLookup(providerClass, "provider");
+            }
+        }
+        /*
+         * Register the provider in both cases: when it is JCA-compliant (has a nullary constructor
+         * or a provider method) or when it lacks both. If neither is present, a
+         * ServiceConfigurationError will be thrown at runtime, consistent with HotSpot behavior.
+         */
+        registeredProviders.add(provider);
+    }
+
+    public static void registerProviderForRuntimeResourceAccess(Module module, String serviceProviderName, Set<String> registeredProviders) {
+        if (!registeredProviders.isEmpty()) {
+            String serviceResourceLocation = "META-INF/services/" + serviceProviderName;
+            byte[] serviceFileData = String.join("\n", registeredProviders).getBytes(StandardCharsets.UTF_8);
+            RuntimeResourceAccess.addResource(module, serviceResourceLocation, serviceFileData);
+        }
+    }
+
+    @BasedOnJDKFile("https://github.com/graalvm/labs-openjdk/blob/jdk-25+21/src/java.base/share/classes/java/util/ServiceLoader.java#L620-L631")
+    private static ResolvedJavaMethod findNullaryConstructor(ResolvedJavaType providerClass) {
+        ResolvedJavaMethod nullaryConstructor = null;
+        try {
+            ResolvedJavaMethod constructor = JVMCIReflectionUtil.getDeclaredConstructor(false, providerClass);
+            if (Modifier.isPublic(constructor.getModifiers())) {
+                nullaryConstructor = constructor;
+            }
+        } catch (SecurityException | LinkageError e) {
+            // ignore
+        }
+        return nullaryConstructor;
+    }
+
+    @BasedOnJDKFile("https://github.com/graalvm/labs-openjdk/blob/jdk-25+21/src/java.base/share/classes/java/util/ServiceLoader.java#L583-L612")
+    private static ResolvedJavaMethod findProviderMethod(ResolvedJavaType providerClass) {
+        ResolvedJavaMethod nullaryProviderMethod = null;
+        try {
+            /* Only look for a provider() method if provider class is in an explicit module. */
+            if (JVMCIReflectionUtil.getModule(providerClass).isNamed() && !JVMCIReflectionUtil.getModule(providerClass).isAutomatic()) {
+                for (ResolvedJavaMethod method : providerClass.getDeclaredMethods(false)) {
+                    if (Modifier.isPublic(method.getModifiers()) && Modifier.isStatic(method.getModifiers()) &&
+                                    method.getSignature().getParameterCount(false) == 0 && method.getName().equals("provider")) {
+                        if (nullaryProviderMethod == null) {
+                            nullaryProviderMethod = method;
+                        } else {
+                            /* There must be at most one public static provider() method. */
+                            nullaryProviderMethod = null;
+                            break;
+                        }
+                    }
+                }
+            }
+
+        } catch (SecurityException | LinkageError e) {
+            // ignore
+        }
+        return nullaryProviderMethod;
+    }
+}

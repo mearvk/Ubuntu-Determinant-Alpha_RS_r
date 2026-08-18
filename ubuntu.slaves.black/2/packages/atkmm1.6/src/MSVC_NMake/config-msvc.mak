@@ -1,0 +1,86 @@
+# NMake Makefile portion for enabling features for Windows builds
+
+# These are the base minimum libraries required for building atkmm.
+BASE_INCLUDES =	/I$(PREFIX)\include
+
+# Please do not change anything beneath this line unless maintaining the NMake Makefiles
+ATK_API_VERSION = 1.0
+GLIB_API_VERSION = 2.0
+
+ATKMM_MAJOR_VERSION = 1
+ATKMM_MINOR_VERSION = 6
+
+GLIBMM_MAJOR_VERSION = 2
+GLIBMM_MINOR_VERSION = 4
+
+LIBSIGC_MAJOR_VERSION = 2
+LIBSIGC_MINOR_VERSION = 0
+
+!if "$(CFG)" == "debug" || "$(CFG)" == "Debug"
+DEBUG_SUFFIX = -d
+!else
+DEBUG_SUFFIX =
+!endif
+
+!ifndef GMMPROC_DIR
+GMMPROC_DIR=$(PREFIX)\share\glibmm-$(GLIBMM_MAJOR_VERSION).$(GLIBMM_MINOR_VERSION)\proc
+!endif
+
+ATKMM_BASE_CFLAGS =			\
+	/Ivs$(VSVER)\$(CFG)\$(PLAT)	\
+	/I..\untracked\atk		\
+	/I..\atk /I.\atkmm /EHsc	\
+	/FImsvc_recommended_pragmas.h
+
+!if $(VSVER) > 12
+ATKMM_BASE_CFLAGS = $(ATKMM_BASE_CFLAGS) /utf-8
+!endif
+
+ATKMM_EXTRA_INCLUDES =	\
+	/I$(PREFIX)\include\atk-$(ATK_API_VERSION)	\
+	/I$(PREFIX)\include\glibmm-$(GLIBMM_MAJOR_VERSION).$(GLIBMM_MINOR_VERSION)	\
+	/I$(PREFIX)\lib\glibmm-$(GLIBMM_MAJOR_VERSION).$(GLIBMM_MINOR_VERSION)\include	\
+	/I$(PREFIX)\include\glib-$(GLIB_API_VERSION)	\
+	/I$(PREFIX)\lib\glib-$(GLIB_API_VERSION)\include	\
+	/I$(PREFIX)\include\sigc++-$(LIBSIGC_MAJOR_VERSION).$(LIBSIGC_MINOR_VERSION)	\
+	/I$(PREFIX)\lib\sigc++-$(LIBSIGC_MAJOR_VERSION).$(LIBSIGC_MINOR_VERSION)\include
+
+ATKMM_CFLAGS = /DATKMM_BUILD $(ATKMM_BASE_CFLAGS) $(ATKMM_EXTRA_INCLUDES)
+
+# We build atkmm-vc$(VSVER_LIB)-$(ATKMM_MAJOR_VERSION)_$(ATKMM_MINOR_VERSION).dll or
+#          atkmm-vc$(VSVER_LIB)-d-$(ATKMM_MAJOR_VERSION)_$(ATKMM_MINOR_VERSION).dll at least
+
+!if "$(USE_COMPAT_LIBS)" != ""
+VSVER_LIB = $(PDBVER)0
+MESON_VSVER_LIB =
+!else
+VSVER_LIB = $(PDBVER)$(VSVER_SUFFIX)
+MESON_VSVER_LIB = -vc$(VSVER_LIB)
+!endif
+
+!ifdef USE_MESON_LIBS
+LIBSIGC_LIBNAME = sigc-$(LIBSIGC_MAJOR_VERSION).$(LIBSIGC_MINOR_VERSION)
+GLIBMM_LIBNAME = glibmm$(MESON_VSVER_LIB)-$(GLIBMM_MAJOR_VERSION).$(GLIBMM_MINOR_VERSION)
+ATKMM_LIBNAME = atkmm$(MESON_VSVER_LIB)-$(ATKMM_MAJOR_VERSION).$(ATKMM_MINOR_VERSION)
+
+ATKMM_DLLNAME = $(ATKMM_LIBNAME)-1
+!else
+LIBSIGC_LIBNAME = sigc-vc$(PDBVER)0$(DEBUG_SUFFIX)-$(LIBSIGC_MAJOR_VERSION)_$(LIBSIGC_MINOR_VERSION)
+GLIBMM_LIBNAME = glibmm-vc$(VSVER_LIB)$(DEBUG_SUFFIX)-$(GLIBMM_MAJOR_VERSION)_$(GLIBMM_MINOR_VERSION)
+ATKMM_LIBNAME = atkmm-vc$(VSVER_LIB)$(DEBUG_SUFFIX)-$(ATKMM_MAJOR_VERSION)_$(ATKMM_MINOR_VERSION)
+
+ATKMM_DLLNAME = $(ATKMM_LIBNAME)
+!endif
+
+LIBSIGC_LIB = $(LIBSIGC_LIBNAME).lib
+GLIBMM_LIB = $(GLIBMM_LIBNAME).lib
+
+ATKMM_DLL = vs$(VSVER)\$(CFG)\$(PLAT)\$(ATKMM_DLLNAME).dll
+ATKMM_LIB = vs$(VSVER)\$(CFG)\$(PLAT)\$(ATKMM_LIBNAME).lib
+
+GENDEF = vs$(VSVER)\$(CFG)\$(PLAT)\gendef.exe
+GOBJECT_LIBS = gobject-$(GLIB_API_VERSION).lib glib-$(GLIB_API_VERSION).lib
+
+ATK_LIBS = atk-$(ATK_API_VERSION).lib $(GOBJECT_LIBS)
+
+ATKMM_BUILD_PRIVATE_HEADERS = $(atkmm_files_built_h:.h=_p.h)

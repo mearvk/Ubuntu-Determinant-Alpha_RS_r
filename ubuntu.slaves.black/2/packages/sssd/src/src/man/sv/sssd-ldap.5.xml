@@ -1,0 +1,1638 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-ldap</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-ldap</refname>
+        <refpurpose>SSSD LDAP-leverantör</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av LDAP-domäner för
+<citerefentry> <refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  Se avsnittet <quote>FILFORMAT</quote> av manualsidan
+<citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för detaljerad syntaxinformation.</para>
+        <para>
+            Du kan konfigurera SSSD för att använda mer än en LDAP-domän.
+        </para>
+        <para>
+            LDAP-bakändar stödjer leverantörer av id, autentisering, åtkomst och
+lösenordsändring.  Om du vill autentisera mot en LDAP-server krävs antingen
+TLS/SSL eller LDAPS. <command>sssd</command> stödjer
+<emphasis>inte</emphasis> autentisering över en okrypterad kanal.  Om
+LDAP-servern används endast som en identitetsleverantör behövs inte en
+krypterad kanal.  Se konfigurationsalternativet
+<quote>ldap_access_filter</quote> för mer information om att använda LDAP
+som en åtkomstleverantör.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>
+            Alla de vanliga konfigurationsflaggorna som gäller för SSSD-domäner gäller
+även för LDAP-domäner. Se avsnittet <quote>DOMÄNSEKTIONER</quote> i
+manualsidan <citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för fullständiga
+detaljer. Observera att SSSD LDAP-avbildningsattribut beskrivs i manualsidan
+<citerefentry> <refentrytitle>sssd-ldap-attributes</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>. <variablelist>
+                <varlistentry>
+                    <term>ldap_uri, ldap_backup_uri (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger en kommaseparerad lista av URI:er till LDAP-servrar till vilka SSSD
+skall ansluta i prioritetsordning.  Se avsnittet <quote>RESERVER</quote> för
+mer information om reserver och serverredundans.  Om ingendera alternativ är
+angivet kommer tjänsteupptäckt användas.  För mer information, se avsnittet
+<quote>TJÄNSTEUPPTÄCKT</quote>.
+                        </para>
+                        <para>
+                            Formatet på URI:n måste stämma med formatet som definieras i RFC 2732:
+                        </para>
+                        <para>
+                            ldap[s]://&lt;värd&gt;[:port]
+                        </para>
+                        <para>
+                            För explicita IPv6-adresser måste &lt;host&gt; vara omslutet av
+hakparenteser []
+                        </para>
+                        <para>
+                            exempel: ldap://[fc00::126:25]:389
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_chpass_uri, ldap_chpass_backup_uri (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger en kommaseparerad lista av URI:er till LDAP-servrar till vilka SSSD
+skall ansluta i prioritetsordning för att ändra lösenordet för en
+användare. Se avsnittet <quote>RESERVER</quote> för mer information om
+reserver och serverredundans.
+                        </para>
+                        <para>
+                            För att aktivera tjänsteuppslagning måste ldap_chpass_dns_service_name vara
+satt.
+                        </para>
+                        <para>
+                            Standard: tomt, d.v.s. ldap_uri används.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Standard bas-DN att använda för att utföra LDAP-användaroperationer.
+                        </para>
+                        <para>
+                            Med början med SSSD 1.7.0 stödjer SSSD flera sökbaser genom att använda
+syntaxen:
+                        </para>
+                        <para>
+                            sökbas[?räckvidd?[filter][?sökbas?räckvidd?[filter]]*]
+                        </para>
+                        <para>
+                            Räckvidden kan vara en av ”base”, ”onelevel” eller ”subtree”.
+                        </para>
+                        <para>
+                            Filtret måste vara ett korrekt LDAP-sökfilter som specificerat i
+http://www.ietf.org/rfc/rfc2254.txt
+                        </para>
+                        <para>
+                            Exempel:
+                        </para>
+                        <para>
+                            ldap_search_base = dc=example,dc=com (vilket är ekvivalent med)
+ldap_search_base = dc=example,dc=com?subtree?
+                        </para>
+                        <para>
+                            ldap_search_base =
+cn=host_specific,dc=example,dc=com?subtree?(host=thishost)?dc=example.com?subtree?
+                        </para>
+                        <para>
+                            Observera: det stödjs inte att ha flera sökbaser som refererar identiskt
+namngivna objekt (till exempel, grupper med samma namn i två olika
+sökbaser). Detta kommer medföra oförutsägbart beteende på klientmaskinerna.
+                        </para>
+                        <para>
+                            Standard: om inte satt används värdet från attributet defaultNamingContext
+eller namingContexts från RootDSE:n hos LDAP-servern.  Om
+defaultNamingContext inte finns eller har ett tomt värde används
+namingContexts.  Attributet namingContexts måste ha ett ensamt värde med
+DN:n hos sökbasen hos LDAP-servern för att detta skall fungera.  Flera
+värden stödjs inte.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_schema (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger schematypen som används på mål-LDAP-servern.  Beroende på det valda
+schemat kan standardattributnamnen som hämtas från servrarna variera.
+Sättet som en del attribut hanteras kan också skilja.
+                        </para>
+                        <para>
+                            Fyra schematyper stödjs för närvarande:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        rfc2307
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        rfc2307bis
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        IPA
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        AD
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            Den huvudsakliga skillnaden mellan dessa schematyper är hur gruppmedlemskap
+lagras i servern.  Med rfc2307 listas gruppmedlemskap med namn i attributet
+<emphasis>memberUid</emphasis>.  Med rfc2307bis och IPA listas
+gruppmedlemskap av DN och lagras i attributet <emphasis>member</emphasis>.
+AD-schematypen sätter attributen till att motsvara Active Directory
+2008r2-värden.
+                        </para>
+                        <para>
+                            Standard: rfc2307
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_pwmodify_mode (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange operationen som används för att ändra användarens lösenord.
+                        </para>
+                        <para>
+                            Två lägen stödjs för närvarande:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        exop - Password Modify Extended Operation (RFC 3062)
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        ldap_modify - Direkt ändring av userPassword (rekommenderas inte).
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            Obs: först etableras en ny förbindelse för att verifiera det aktuella
+lösenordet genom att binda som användaren som begärde lösenordsändringen. Om
+det lyckas används denna förbindelse för att ändra lösenordet och därför
+måste användaren ha skrivrätt på attributet userPassword.
+                        </para>
+                        <para>
+                            Standard: exop
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_default_bind_dn (sträng)</term>
+                    <listitem>
+                        <para>
+                            Standardbindnings-DN att använda för att utföra LDAP-operationer.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_default_authtok_type (sträng)</term>
+                    <listitem>
+                        <para>
+                            Typen på autentiseringstecknet hos standardbindnings-DN.
+                        </para>
+                        <para>
+                            De två mekanismerna som stödjs för närvarande är:
+                        </para>
+                        <para>
+                            password
+                        </para>
+                        <para>
+                            obfuscated_password
+                        </para>
+                        <para>
+                            Standard: password
+                        </para>
+                        <para>
+                            Se manualsidan <citerefentry> <refentrytitle>sss_obvuscate</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> för mer information.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_default_authtok (sträng)</term>
+                    <listitem>
+                        <para>
+                            Autentiseringstecknet hos standardbindnings-DN.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_force_upper_case_realm (boolean)</term>
+                    <listitem>
+                        <para>
+                            Några katalogservrar, till exempel Active Directory, kan leverera delen rike
+av UPN:en i gemener, vilket kan få autentiseringen att misslyckas. Sätt
+detta alternativ till ett värde skilt från noll ifall du vill använda ett
+rike i versaler.
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_enumeration_refresh_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger hur många sekunder SSSD måste vänta före den uppdaterar sin cache av
+uppräknade poster.
+                        </para>
+                        <para>
+                            Standard: 300
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_purge_cache_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Bestäm hur ofta cachen skall kontrolleras för inaktiva poster (såsom grupper
+utan medlemmar och användare som aldrig har loggat in) och ta bort dem för
+att spara utrymme.
+                        </para>
+                        <para>
+                            Att sätta detta alternativ till noll kommer avaktivera rensningsoperationen
+för cachen. Observera att om uppräkning är aktiverat krävs rensningsjobbet
+för att upptäcka poster som tas bort från servern och inte kan
+avaktiveras. Som standard kör rensningsjobbet var 3:e timma när uppräkning
+är aktiverat.
+                        </para>
+                        <para>
+                            Standard: 0 (avaktiverat)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_group_nesting_level (heltal)</term>
+                    <listitem>
+                        <para>
+                            Om ldap_schema är satt till ett schemaformat som stödjer nästade grupper
+(t.ex. RFC2307bis), då styr detta alternativ hur många nivåer av nästning
+SSSD kommer följa. Detta alternativ har ingen effekt på schemat RFC2307.
+                        </para>
+                        <para>
+                          Obs: detta alternativ anger den garanterade nivån av nästade grupper som
+skall bearbetas för en godtycklig uppslagning.  Dock
+<emphasis>kan</emphasis> nästade grupper utöver denna gräns returneras om
+tidigare uppslagningar redan har slagit upp de djupare nästningsnivåerna.
+Följande uppslagningar för andra grupper kan också utöka resultatmängden för
+den ursprungliga uppslagningen om den slås upp igen.
+                        </para>
+                        <para>
+                          Om ldap_group_nesting_level sätts till 0 bearbetas inga nästade grupper
+alls. Dock krävs det dessutom att användningen av Token-Groups avaktiveras
+vid anslutning till Active-Directory Server 2008 och senare vid användning
+av <quote>id_provider=ad</quote> genom att sätta ldap_use_tokengroups till
+false för att begränsa gruppnästning.
+                        </para>
+                        <para>
+                            Standard: 2
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_use_tokengroups</term>
+                    <listitem>
+                        <para>
+                          Detta alternativ aktiverar eller avaktiverar användningen av attributet
+Token-Groups när initgroup utförs för användare från Active Directory Server
+2008 och senare.
+                        </para>
+                        <para>
+                            Standard: true för AD och IPA annars false.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_host_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig. Använd den givna strängen som en sökbas för värdobjekt.
+                        </para>
+                        <para>
+                            Se <quote>ldap_search_base</quote> för information om konfiguration av
+multipla sökbaser.
+                        </para>
+                        <para>
+                            Standard: värdet på <emphasis>ldap_search_base</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_service_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_iphost_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_ipnetwork_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_search_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger tiden (i sekunder) som ldap-sökningar tillåts köra före de annulleras
+och cachade resultat returneras (och går in i frånkopplat läge)
+                        </para>
+                        <para>
+                            Obs: detta alternativ kan komma att ändras i framtida versioner av SSSD. Det
+kommer sannolikt ersättas vid någon tidpunkt med en serie tidsgränser för
+specifika uppslagningstyper.
+                        </para>
+                        <para>
+                            Standard: 6
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_enumeration_search_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger tiden (i sekunder) som ldap-sökningar för användar- och
+gruppuppräkningar tillåts köra före de annulleras och cachade resultat
+returneras (och går in i frånkopplat läge)
+                        </para>
+                        <para>
+                            Standard: 60
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_network_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger tidsgränsen (i sekunder) efter vilken <citerefentry>
+<refentrytitle>poll</refentrytitle> <manvolnum>2</manvolnum>
+</citerefentry>/<citerefentry> <refentrytitle>select</refentrytitle>
+<manvolnum>2</manvolnum> </citerefentry> som följer efter en <citerefentry>
+<refentrytitle>connect</refentrytitle> <manvolnum>2</manvolnum>
+</citerefentry> returnerar om inget händer.
+                        </para>
+                        <para>
+                            Standard: 6
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_opt_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger en tid (i sekunder) efter vilken anrop till synkrona LDAP API:er
+kommer avbrytas om det inte kommer något svar. Styr även tidsgränsen vid
+kommunikation med KDC:n i fallet SASL-bindningar, tidsgränsen för en
+LDAP-bindningsoperation, utökad operation för lösenordsändring och
+StartTLS-operationen.
+                        </para>
+                        <para>
+                            Standard: 8
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_connection_expire_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger en tidsgräns (i sekunder) som en förbindelse med en LDAP-server kommer
+underhållas.  Efter den tiden kommer förbindelsen återetableras.  Om den
+används parallellt med SASL/GSSAPI kommer det tidigare av de två värdena
+(detta värde eller TGT-livslängden) användas.
+                        </para>
+                        <para>
+                            Tidsgränsen kan utökas med ett slumpvärde angivet av
+<emphasis>ldap_connection_expire_offset</emphasis>
+                        </para>
+                        <para>
+                            Standard: 900 (15 minuter)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_connection_expire_offset (heltal)</term>
+                    <listitem>
+                        <para>
+                            En slumptillägg mellan 0 och ett konfigurerat värde läggs till
+till<emphasis>ldap_connection_expire_timeout</emphasis>.
+                        </para>
+                        <para>
+                            Standard: 0
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_page_size (heltal)</term>
+                    <listitem>
+                        <para>
+                            Ange antalet poster som skall hämtas från LDAP i en enskild begäran. Några
+LDAP-servrar framtvingar en maximal gräns per begäran.
+                        </para>
+                        <para>
+                            Standard: 1000
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_disable_paging (boolean)</term>
+                    <listitem>
+                        <para>
+                            Avaktivera flödesstyrningen (paging) av LDAP. Detta alternativ bör användas
+om LDAP-servern rapporterar att den stödjer LDAP-flödesstyrning i sin
+RootDSE men det inte är aktiverat eller inte fungerar som det skall.
+                        </para>
+                        <para>
+                            Exempel: OpenLDAP-servrar med flödesstyrningsmodulen installerad på servern
+men inte aktiverad kommer rapportera det i RootDSE:n men inte kunna använda
+den.
+                        </para>
+                        <para>
+                            Exempel: 389 DS har ett fel där den endast kan stödja en flödesstyrning åt
+gången på en enskild förbindelse. På aktiva klienter kan detta resultera i
+att några begäranden nekas.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_disable_range_retrieval (boolean)</term>
+                    <listitem>
+                        <para>
+                            Avaktivera Active Directory intervallhämtning.
+                        </para>
+                        <para>
+                            Active Directory begränsar antalet medlemmar som kan hämtas i en enskild
+uppslagning med policyn MaxValRange (vilket som standard är 1500
+medlemmar). Om en grupp innehåller fler medlemmar skulle svaret innehålla en
+AD-specifik intervallutökning. Detta alternativ avaktiverar tolkning av
+intervallutökningar, därför kommer stora grupper förefalla inte ha några
+medlemmar.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_minssf (heltal)</term>
+                    <listitem>
+                        <para>
+                            Vid kommunikation med en LDAP-server med SASL, ange den minsta
+säkerhetsnivån som är nödvändig för att etablera förbindelsen. Värdet på
+detta alternativ är definierat av OpenLDAP.
+                        </para>
+                        <para>
+                            Standard: använd systemstandard (vanligen angivet i ldap.conf)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_maxssf (heltal)</term>
+                    <listitem>
+                        <para>
+                            Vid kommunikation med en LDAP-server med SASL, ange den masimala
+säkerhetsnivån som är nödvändig för att etablera förbindelsen. Värdet på
+detta alternativ är definierat av OpenLDAP.
+                        </para>
+                        <para>
+                            Standard: använd systemstandard (vanligen angivet i ldap.conf)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_deref_threshold (heltal)</term>
+                    <listitem>
+                        <para>
+                            Ange antalet gruppmedlemmar som måste saknas i den interna cachen för att
+orsaka en derefereringsuppslagning. Om färre medlemmar saknas slås de upp
+individuellt.
+                        </para>
+                        <para>
+                            Du kan slå av derefereringsuppslagningar helt genom att sätta värdet till
+0. Observera att det finns några kodvägar i SSSD, som IPA HBAC-leverantören,
+som endast är implementerade med derefereringsanropet, så att även med
+dereferens uttryckligen avaktiverat kommer dessa delar ändå använda
+dereferenser om servern stödjer det och annonserar derefereringsstyrning i
+rootDSE-objektet.
+                        </para>
+                        <para>
+                            En derefereringsuppslagning är ett sätt att hämta alla gruppmedlemmar i ett
+enda LDAP-anrop.  Olika LDAP-servrar kan implementera olika
+derefereringsmetoder.  De servrar som stödjs för närvarande är 389/RHDS,
+OpenLDAP och Active Directory.
+                        </para>
+                        <para>
+                            <emphasis>Obs:</emphasis> om någon av sökbaserna anger ett sökfilter, då
+kommer prestandaförbättringen med derefereringsuppslagningar avaktiveras
+oavsett denna inställning.
+                        </para>
+                        <para>
+                            Standard: 10
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_reqcert (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger vilka kontroller som utförs av servercertifikat i en TLS-session, om
+några. Det kan anges som ett av följande värden:
+                        </para>
+                        <para>
+                            <emphasis>never</emphasis> = Klienten kommer inte begära eller kontrollera
+några servercertifikat.
+                        </para>
+                        <para>
+                            <emphasis>allow</emphasis> = Servercertifikatet begärs. Om inget certifikat
+tillhandahålls fortsätter sessionen normalt. Om ett felaktigt certifikat
+tillhandahålls kommer det ignoreras och sessionen fortsätta normalt.
+                        </para>
+                        <para>
+                            <emphasis>try</emphasis> = Servercertifikatet begärs. Om inget certifikat
+tillhandahålls fortsätter sessionen normalt. Om ett felaktigt certifikat
+tillhandahålls avslutas sessionen omedelbart.
+                        </para>
+                        <para>
+                            <emphasis>demand</emphasis> = Servercertifikatet begärs. Om inget certifikat
+tillhandahålls eller ett felaktigt certifikat tillhandahålls avslutas
+sessionen omedelbart.
+                        </para>
+                        <para>
+                            <emphasis>hard</emphasis> = Samma som <quote>demand</quote>
+                        </para>
+                        <para>
+                            Standard: hard
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_cacert (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger filen som innehåller certifikat för alla Certifikatauktoriteterna som
+<command>sssd</command> kommer godkänna.
+                        </para>
+                        <para>
+                            Standard: använd standardvärden för OpenLDAP, typiskt i
+<filename>/etc/openldap/ldap.conf</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_cacertdir (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger sökvägen till en katalog som innehåller certifikat för
+Certifikatauktoriteter i individuella filer.  Typiskt måste filnamnen vara
+kontrollsummor av certifikaten följda av ”.0”.  Om det är tillgängligt kan
+<command>cacertdir_rehash</command> användas för att skapa de korrekta
+namnen.
+                        </para>
+                        <para>
+                            Standard: använd standardvärden för OpenLDAP, typiskt i
+<filename>/etc/openldap/ldap.conf</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_cert (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger filen som innehåller certifikatet för klientens nyckel.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_key (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger filen som innehåller klientens nyckel.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_tls_cipher_suite (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger acceptabla chiffersviter.  Typiskt är detta en kolonseparerad lista.
+Se <citerefentry><refentrytitle>ldap.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för formatet.
+                        </para>
+                        <para>
+                            Standard: använd standardvärden för OpenLDAP, typiskt i
+<filename>/etc/openldap/ldap.conf</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_id_use_start_tls (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger att id-leverantörsförbindelsen också måste använda <systemitem
+class="protocol">tls</systemitem> för att skydda kanalen.
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_id_mapping (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger att SSSD skall försöka översätta användar- och grupp-ID:n från
+attributen ldap_user_objectsid och ldap_group_objectsid istället för att
+förlita sig på ldap_user_uid_number och ldap_group_gid_number.
+                        </para>
+                        <para>
+                            För närvarande stödjer denna funktion endast ActiveDirectory objectSID.
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_min_id, ldap_max_id (heltal)</term>
+                    <listitem>
+                        <para>
+                            I kontrast mot den SID-baserade ID-översättningen som används om
+ldap_id_mapping är satt till sant är det tillåtna ID-intervallet för
+ldap_user_uid_number och ldap_group_gid_number obegränsat. I en uppsättning
+med underdomäner/betrodda domäner kan detta leda till ID-kollisioner. För
+att undvika kollisioner kan ldap_min_id och ldap_max_id sättas till att
+begränsa det tillåtna intervallet för ID:na som läses direkt från
+servern. Underdomäner kan sedan välja andra intervall för att översätta
+ID:n.
+                        </para>
+                        <para>
+                            Standard: inte satt (båda alternativen är satta till 0)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_mech (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange SASL-mekanismen att använda.  För närvarande testas och stödjs endast
+GSSAPI och GSS-SPNEGO.
+                        </para>
+                        <para>
+                            Om bakänden stödjer underdomäner ärvs automatiskt värdet av ldap_sasl_mech
+till underdomänerna.  Om ett annat värde behövs för en underdomän kan det
+skrivas över genom att sätta ldap_sasl_mech för denna underdomän explicit.
+Se avsnittet SEKTIONEN BETRODDA DOMÄNER i
+<citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för detaljer.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_authid (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange SASL-auktoriserings-id:t att använda.  När GSSAPI/GSS-SPNEGO används
+representerar detta Kerberos-huvudmannen som används för autentisering till
+katalogen.  Detta alternativ kan antingen innehålla den fullständiga
+huvudmannen (till exempel host/minvärd@EXAMPLE.COM) eller bara
+huvudmannanamnet (till exempel host/minvärd).  Som standard är värdet inte
+satt och följande huvudmän används: <programlisting>
+värdnamn@RIKE
+netbiosnamn$@RIKE
+host/värdnamn@RIKE
+*$@RIKE
+host/*@RIKE
+host/*
+                            </programlisting>  Om ingen av dem kan hittas returneras den första huvudmannen i
+keytab.
+                        </para>
+                        <para>
+                            Standard: host/värdnamn@RIKE
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_realm (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange SASL-riket att använda.  När det inte anges får detta alternativ
+standardvärdet från krb5_realm.  Om ldap_sasl_authid också innehåller riket
+ignoreras detta alternativ.
+                        </para>
+                        <para>
+                            Standard: värdet på krb5_realm.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sasl_canonicalize (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om satt till sant kommer LDAP-biblioteket utföra en omvänd uppslagning för
+att ta fram värdnamnets kanoniska form under en SASL-bindning.
+                        </para>
+                        <para>
+                            Standard: false;
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_krb5_keytab (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange den keytab som skall användas vid användning av SASL/GSSAPI/GSS-SPNEGO.
+                        </para>
+                        <para>
+                            Standard: Systemets keytab, normalt <filename>/etc/krb5.keytab</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_krb5_init_creds (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger att id-leverantören skall initiera Kerberoskreditiv (TGT).  Denna
+åtgärd utförs endast om SASL används och den valda mekanismen är GSSAPI
+eller GSS-SPNEGO.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_krb5_ticket_lifetime (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger livslängden i sekunder på TGT:n om GSSAPI eller GSS-SPNEGO används.
+                        </para>
+                        <para>
+                            Standard: 86400 (24 timmar)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_server, krb5_backup_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger en kommaseparerad lista av IP-adresser eller värdnamn till
+Kerberosservrar till vilka SSSD skall ansluta i prioritetsordning.  För mer
+information om reserver och serverredundans se avsnittet
+<quote>RESERVER</quote>.  Ett frivilligt portnummer (föregånget av ett
+kolon) kan läggas till till adresserna eller värdnamnen.  Om tomt aktiveras
+tjänsteupptäckt – för mer information, se avsnittet
+<quote>TJÄNSTEUPPTÄCKT</quote>.
+                        </para>
+                        <para>
+                            När tjänsteupptäckt används för KDC eller kpasswd-servrar söker SSSD först
+efter DNS-poster som anger _udp som protokoll och provar sedan _tcp om inget
+hittas.
+                        </para>
+                        <para>
+                            Detta alternativ hade namnet <quote>krb5_kdcip</quote> i tidigare utgåvor av
+SSSD. Medan det äldre namnet känns igen tills vidare rekommenderas användare
+att migrera sina konfigurationsfiler till att använda
+<quote>krb5_server</quote> istället.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_realm (sträng)</term>
+                    <listitem>
+                        <para>
+                            Ange Kerberos-RIKE (för SASL/GSSAPI/GSS-SPNEGO aut).
+                        </para>
+                        <para>
+                            Standard: Systemstandard, se <filename>/etc/krb5.conf</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_canonicalize (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger om värdens huvudman skall göras kanonisk vid anslutning till
+LDAP-servern. Denna funktion är tillgänglig med MIT Kerberos ≥ 1.7
+                        </para>
+
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_kdcinfo (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger om SSSD skall instruera Kerberos-biblioteken om vilket rike och vilka
+KDC:er som skall användas. Detta alternativ är på som standard, om du
+avaktiverar det behöver du konfigurera Kerberos-biblioteket i
+konfigurationsfilen <citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+                        </para>
+                        <para>
+                            Se manualsidan <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> för mer information om
+lokaliseringsinsticksmodulen.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_pwd_policy (sträng)</term>
+                    <listitem>
+                        <para>
+                            Välj policyn för att utvärdera utgång av lösenord på klientsidan. Följande
+värden är tillåtna:
+                        </para>
+                        <para>
+                            <emphasis>none</emphasis> – Ingen utvärdering på klientsidan. Detta
+alternativ kan inte avaktivera lösenordspolicyer på serversidan.
+                        </para>
+                        <para>
+                            <emphasis>shadow</emphasis> – Använd attribut i stilen
+<citerefentry><refentrytitle>shadow</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för att utvärdera om lösenordet har
+gått ut.
+                        </para>
+                        <para>
+                            <emphasis>mit_kerberos</emphasis> – Använd attributen som används av MIT
+Kerberos för att avgöra om lösenordet har gått ut. Använd
+chpass_provider=krb5 för att uppdatera dessa attribut när lösenordet ändras.
+                        </para>
+                        <para>
+                            Standard: none
+                        </para>
+                        <para>
+                            <emphasis>Obs</emphasis>: om en lösenordspolicy konfigureras på serversidan
+kommer den alltid gå före framför policyn som sätts med detta alternativ.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_referrals (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger huruvida automatisk uppföljning av referenser skall aktiveras.
+                        </para>
+                        <para>
+                            Observera att sssd endast stödjer uppföljning av referenser när den är
+kompilerad med OpenLDAP version 2.4.13 eller senare.
+                        </para>
+                        <para>
+                            Att följa upp referenser kan orsaka en prestandaförlust i miljöer som
+använder dem mycket, ett notabelt exempel är Microsoft Active Directory.  Om
+din uppsättning inte faktiskt behöver använda referenser kan att sätta detta
+alternativ till falskt medföra en märkbar prestandaförbättring. Att sätta
+denna flagga till falskt rekommenderas därför ifall SSSD LDAP-leverantören
+används tillsammans med Microsoft Active Directory som bakände. Även om SSSD
+skulle kunna följa referensen till en annan AD DC skulle inga ytterligare
+data vara tillgängliga.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_dns_service_name (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger tjänstenamnet som skall användas när tjänsteupptäckt är aktiverat.
+                        </para>
+                        <para>
+                            Standard: ldap
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_chpass_dns_service_name (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger tjänstenamnet att använda för att hitta en LDAP-server som tillåter
+lösenordsändringar när tjänsteupptäckt är aktiverat.
+                        </para>
+                        <para>
+                            Standard: inte satt, d.v.s. tjänsteupptäckt är avaktiverat
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_chpass_update_last_change (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger huruvida attributet ldap_user_shadow_last_change skall uppdateras med
+dagar sedan epoken efter en ändring av lösenord.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_access_filter (sträng)</term>
+                    <listitem>
+                        <para>
+                            Om man använder access_provider = ldap och ldap_access_order = filter
+(standard) är detta alternativ nödvändigt.  Det anger ett
+LDAP-sökfilterkriterium som måste uppfyllas för att användaren skall ges
+åtkomst till denna värd.  Om access_provider = ldap, ldap_access_order =
+filter och detta alternativ inte är satt kommer det resultera i att alla
+användare nekas åtkomst.  Använd access_provider = permit för att ändra
+detta standardbeteende.  Observera att detta filter endast tillämpas på
+LDAP-användarposten och därmed filter baserade på nästade grupper kanske
+inte fungerar (t.ex. attributet memberOf i AD-poster pekar endast på direkta
+föräldrar).  Om filtrering baserad på nästade grupper behövs, se
+<citerefentry>
+<refentrytitle>sssd-simple</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.
+                        </para>
+                        <para>
+                            Exempel:
+                        </para>
+                        <programlisting>
+access_provider = ldap
+ldap_access_filter = (employeeType=admin)
+                        </programlisting>
+                        <para>
+                            Detta exempel betyder att åtkomst till denna värd är begränsad till
+användare vars attribut employeeType är satt till ”admin”.
+                        </para>
+                        <para>
+                            Frånkopplad cachning för denna funktion är begränsad till att avgöra
+huruvida användarens senaste uppkopplade inloggning tilläts
+åtkomsträttigheter. Om de tilläts vid senaste inloggningen kommer de
+fortsätta ges åtkomst under frånkoppling, och vice versa.
+                        </para>
+                        <para>
+                            Standard: Empty
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_account_expire_policy (sträng)</term>
+                    <listitem>
+                        <para>
+                            Med detta alternativ kan en utvärdering på klientsidan av
+åtkomststyrningsattribut aktiveras.
+                        </para>
+                        <para>
+                            Observera att det alltid är rekommenderat att använda åtkomstkontroll på
+serversidan, d.v.s. LDAP-servern skall neka bindningsbegäran med en passande
+felkod även om lösenordet är korrekt.
+                        </para>
+                        <para>
+                            Följande värden är tillåtna:
+                        </para>
+                        <para>
+                            <emphasis>shadow</emphasis>: använd värdet på ldap_user_shadow_expire för
+att avgöra om kontot har gått ut.
+                        </para>
+                        <para>
+                            <emphasis>ad</emphasis>: använd värdet på 32-bitarsfältet
+ldap_user_ad_user_account_control och tillåt åtkomst om den andra biten inte
+är satt. Om attributet saknas tillåts åtkomst. Utgångstiden för kontot
+kontrolleras också.
+                        </para>
+                        <para>
+                            <emphasis>rhds</emphasis>, <emphasis>ipa</emphasis>,
+<emphasis>389ds</emphasis>: använd värdet på ldap_ns_account_lock för att
+avgöra om åtkomst tillåts eller inte.
+                        </para>
+                        <para>
+                            <emphasis>nds</emphasis>: värdena på ldap_user_nds_login_allowed_time_map,
+ldap_user_nds_login_disabled och ldap_user_nds_login_expiration_time används
+för att avgöra om åtkomst tillåts. Om båda attributen saknas tillåts
+åtkomst.
+                            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/experimental.xml" />
+                        </para>
+                        <para>
+                            Observera att konfigurationsalternativet ldap_access_order
+<emphasis>måste</emphasis> innehålla <quote>expire</quote> för att
+alternativet ldap_account_expire_policy skall fungera.
+                        </para>
+                        <para>
+                            Standard: Empty
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_access_order (sträng)</term>
+                    <listitem>
+                        <para>
+                            Kommaseparerad lista över åtkomststyrningsalternativ.  Tillåtna värden är:
+                        </para>
+                        <para>
+                            <emphasis>filter</emphasis>: använd ldap_access_filter
+                        </para>
+                        <para>
+                            <emphasis>lockout</emphasis>: använd kontolåsning.  Om satt nekar detta
+alternativ åtkomst ifall ldap-attributet ”pwdAccountLockedTime” finns och
+har värdet ”000001010000Z”. Se alternativet ldap_pwdlockout_dn.  Observera
+att ”access_provider = ldap” måste vara satt för att denna funktion skall
+fungera.
+                        </para>
+                        <para>
+                            <emphasis>Observera att detta alternativ ersätts av alternativet
+<quote>ppolicy</quote> och kan komma att tas bort i en framtida
+utgåva.</emphasis>
+                        </para>
+                        <para>
+                            <emphasis>ppolicy</emphasis>: använd kontolåsning.  Om satt nekar detta
+alternativ åtkomst ifall ldap-attributet ”pwdAccountLockedTime” finns och
+har värdet ”000001010000Z” eller representerar en tidpunkt i det förgångna.
+Värdet på attributet ”pwdAccountLockedTime” måste sluta med ”Z”, som
+markerar tidszonen UTC.  Andra tidszoner stödjs för närvarande inte och
+kommer resultera i ”access-denied” när användare försöker logga in.  Se
+alternativet ldap_pwdlockout_dn.  Observera att ”access_provider = ldap”
+måste vara satt för att denna funktion skall fungera.
+                        </para>
+
+                        <para>
+                            <emphasis>expire</emphasis>: använd ldap_account_expire_policy
+                        </para>
+                        <para>
+                            <emphasis>pwd_expire_policy_reject, pwd_expire_policy_warn,
+pwd_expire_policy_renew: </emphasis> Dessa alternativ är användbara om
+användare vill bli varnade att lösenordet är på gång att gå ut och
+autentisering är baserat på användning av en annan metod än lösenord – till
+exempel SSH-nycklar.
+                       </para>
+                       <para>
+                            Skillnaden mellan dessa alternativ är åtgärden som vidtas om användarens
+lösenord gått ut: pwd_expire_policy_reject – användaren nekas att logga in,
+pwd_expire_policy_warn – användaren kan fortfarande logga in,
+pwd_expire_policy_renew – användaren ombeds ändra sitt lösenord omedelbart.
+                        </para>
+                        <para>
+                            Observera att om användarlösenordet har gått ut ges inget särskilt
+meddelande av SSSD.
+                        </para>
+                        <para>
+                            Observera att ”access_provider = ldap” måste vara satt för att denna
+funktion skall fungera. ”ldap_pwd_policy” måste också vara satt till en
+lämplig lösenordspolicy.
+                        </para>
+                        <para>
+                            <emphasis>authorized_service</emphasis>: använd attributet authorizedService
+för att avgöra åtkomst
+                        </para>
+                        <para>
+                            <emphasis>host</emphasis>: använd attributet host för att avgöra åtkomst
+                        </para>
+                        <para>
+                            <emphasis>rhost</emphasis>: använd attributet rhost för att avgöra huruvida
+fjärrvärdar kan få åtkomst
+                        </para>
+                        <para>
+                            Observera, rhost-fältet i pam sätts av programmet, det är bättre att
+kontrollera vad programmet skickar till pam, före detta alternativ för
+åtkomstkontroll aktiveras
+                        </para>
+                        <para>
+                            Standard: filter
+                        </para>
+                        <para>
+                             Observera att det är ett konfigurationsfel om ett värde används mer än en
+gång.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_pwdlockout_dn (sträng)</term>
+                    <listitem>
+                        <para>
+                           Detta alternativ anger DN för lösenordspolicyposten på LDAP-servern. Notera
+att frånvaro av detta alternativ i sssd.conf när kontroll av kontolåsning är
+aktiverat kommer att resultera i nekad åtkomst eftersom ppolicy-attribut på
+LDAP-servern inte kan kontrolleras ordentligt.
+                        </para>
+                        <para>
+                          Exempel: cn=ppolicy,ou=policies,dc=example,dc=com
+                        </para>
+                        <para>
+                          Standard: cn=ppolicy,ou=policies,$ldap_search_base
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_deref (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger hur dereferering av alias görs när sökningar utförs. Följande
+alternativ är tillåtna:
+                        </para>
+                        <para>
+                            <emphasis>never</emphasis>: Alias är aldrig derefererade.
+                        </para>
+                        <para>
+                            <emphasis>searching</emphasis>: Alias derefereras i underordnade till
+basobjektet, men inte vid lokalisering av basobjektet för sökningen.
+                        </para>
+                        <para>
+                            <emphasis>finding</emphasis>: Alias derefereras endast vid lokalisering av
+basobjektet för sökningen.
+                        </para>
+                        <para>
+                            <emphasis>always</emphasis>: Alias derefereras både i sökning och i
+lokalisering av basobjektet för sökningen.
+                        </para>
+                        <para>
+                            Standard: Tomt (detta hanteras som <emphasis>never</emphasis> av
+LDAP-klientbiblioteken)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_rfc2307_fallback_to_local_users (boolean)</term>
+                    <listitem>
+                        <para>
+                            Tillåter att behålla lokala användare som medlemmar i en LDAP-grupp för
+servrar som använder schemat RFC2307.
+                        </para>
+                        <para>
+                            I en del miljöer där schemat RFC2307 används görs lokala användare till
+medlemmar i LDAP-grupper genom att lägga till deras namn till attributet
+memberUid.  Den interna konsistensen i domänen bryts när detta görs, så SSSD
+skulle normalt ta bort de ”saknade” användarna från de cachade
+gruppmedlemskapen så fort nsswitch försöker hämta information om användaren
+via anrop av getpw*() eller initgroups().
+                        </para>
+                        <para>
+                            Detta alternativ faller tillbaka på att kontrollera om lokala användare är
+refererade, och cachar dem så att senare anrop av initgroups() kommer utöka
+de lokala användarna med de extra LDAP-grupperna.
+                       </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>wildcard_limit (heltal)</term>
+                    <listitem>
+                        <para>
+                            Anger en övre gräns på antalet poster som hämtas under en uppslagning med
+jokertecken.
+                        </para>
+                        <para>
+                            För närvarande stödjer endast respondenten InfoPipe jokeruppslagningar.
+                        </para>
+                        <para>
+                            Standard: 1000 (ofta storleken på en sida)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_library_debug_level (heltal)</term>
+                    <listitem>
+                        <para>
+                            Slår på libldap-felsökning med den angivna nivån. Libldap-felmeddelanden
+kommer skrivas oberoende av den allmänna debug_level.
+                        </para>
+                        <para>
+                            OpenLDAP använder en bitavbildning för att aktivera felsökning för specifika
+komponenter, -1 kommer aktivera fullständig felsökningsutmatning.
+                        </para>
+                        <para>
+                            Standard: 0 (libldap-felsökning avaktiverat)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+        </para>
+    </refsect1>
+
+    <refsect1 id='sudo-options' condition="with_sudo">
+        <title>SUDOALTERNATIV</title>
+        <para>
+            De detaljerade instruktionerna för att konfigurera sudo-leverantören finns i
+manualsidan <citerefentry> <refentrytitle>sssd-sudo</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+
+        <para>
+            <variablelist>
+                <varlistentry>
+                    <term>ldap_sudo_full_refresh_interval (heltal)</term>
+                    <listitem>
+                        <para>
+                            Hur många sekunder SSSD kommer vänta mellan körningar av fullständiga
+uppdateringar av sudo-regler (som hämtar alla regler som är lagrade på
+servern).
+                        </para>
+                        <para>
+                            Värdet måste vara större än <emphasis>ldap_sudo_smart_refresh_interval
+</emphasis>
+                        </para>
+                        <para>
+                            Man kan avaktivera fullständig uppdatering genom att sätta denna flagga till
+0. Dock måste antingen smart eller fullständig uppdatering aktiveras.
+                        </para>
+                        <para>
+                            Standard: 21600 (6 timmar)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_smart_refresh_interval (heltal)</term>
+                    <listitem>
+                        <para>
+                            Hur många sekunder SSSD måste vänta mellan körningar av en smart uppdatering
+av sudo-regler (som hämtar alla regler som har USN högre än serverns högsta
+USN-värde som för närvarande är känt av SSSD).
+                        </para>
+                        <para>
+                            Om USN-attribut inte stödjs av servern används attributet modifyTimestamp
+istället.
+                        </para>
+                        <para>
+                            <emphasis>Obs:</emphasis> det högsta USN-värdet kan uppdateras av tre
+uppgifter: 1) Genom fullständig och smart sudo-uppdatering (om det finns
+uppdaterade regler), 2) genom uppräkning av användare och grupper (om det
+finns aktiverade och uppdaterade användare eller grupper) och 3) genom att
+återansluta till servern (som standard var 15:e minut, se
+<emphasis>ldap_connection_expire_timeout</emphasis>).
+                        </para>
+                        <para>
+                            Man kan avaktivera smart uppdatering genom att sätta denna flagga till
+0. Dock måste antingen smart eller fullständig uppdatering aktiveras.
+                        </para>
+                        <para>
+                            Standard: 900 (15 minuter)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_random_offset (heltal)</term>
+                    <listitem>
+                        <para>
+                            En slumptillägg mellan 0 och ett konfigurerat värde läggs till till smart
+och fullständig uppdateringsperioder varje gång den periodiska uppgiften
+schemaläggs. Värdet är i sekunder.
+                        </para>
+                        <para>
+                            Observera att detta slumpvisa tilläg även används på den första SSSD-starten
+vilked fördröjer den första uppdateringen av sudo-regler. Detta förlänger
+tiden under vilken sudo-reglerna inte är tillgängliga för användning.
+                        </para>
+                        <para>
+                            Man kan avaktivera denna fördröjning genom att sätta värdet till 0.
+                        </para>
+                        <para>
+                            Standard: 0 (avaktiverat)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_use_host_filter (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om sann kommer SSSD hämta endast regler som är tillämpliga för denna maskin
+(genom användning av IPv4- och IPv6-värd-/-nätverksadresser och värdnamn).
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_hostnames (sträng)</term>
+                    <listitem>
+                        <para>
+                            Mellanrumsseparerad lista över värdnamn eller fullständigt kvalificerade
+domännamn som skall användas för att filtrera reglerna.
+                        </para>
+                        <para>
+                            Om detta alternativ är tomt kommer SSSD försöka upptäcka värdnamnet och det
+fullständigt kvalificerade domännamnet automatiskt.
+                        </para>
+                        <para>
+                            Om <emphasis>ldap_sudo_use_host_filter</emphasis> är
+<emphasis>false</emphasis> har detta alternativ ingen effekt.
+                        </para>
+                        <para>
+                            Standard: inte angivet
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_ip (sträng)</term>
+                    <listitem>
+                        <para>
+                            Mellanrumsseparerad lista över IPv4- eller IPv6 värd-/nätverksadresser som
+skall användas för att filtrera reglerna.
+                        </para>
+                        <para>
+                            Om detta alternativ är tomt kommer SSSD försöka upptäcka adresser
+automatiskt.
+                        </para>
+                        <para>
+                            Om <emphasis>ldap_sudo_use_host_filter</emphasis> är
+<emphasis>false</emphasis> har detta alternativ ingen effekt.
+                        </para>
+                        <para>
+                            Standard: inte angivet
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_include_netgroups (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om sant kommer SSSD hämta varje regel som innehåller en nätgrupp i
+attributet sudoHost.
+                        </para>
+                        <para>
+                            Om <emphasis>ldap_sudo_use_host_filter</emphasis> är
+<emphasis>false</emphasis> har detta alternativ ingen effekt.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_sudo_include_regexp (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om sant kommer SSSD hämta varje regel som innehåller ett jokertecken i
+attributet sudoHost.
+                        </para>
+                        <para>
+                            Om <emphasis>ldap_sudo_use_host_filter</emphasis> är
+<emphasis>false</emphasis> har detta alternativ ingen effekt.
+                        </para>
+                        <note>
+                            <para>
+                                Att använda jokertecken är en operation som är väldigt dyr att evaluera på
+LDAP-serversidan!
+                            </para>
+                        </note>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+        <para>
+            Denna manualsida beskriver endast attributnamnsöversättningar.  För
+detaljerade beskrivningar av semantiken hos sudo-relaterade attribut, se
+<citerefentry>
+<refentrytitle>sudoers.ldap</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>
+        </para>
+    </refsect1>
+
+    <refsect1 id='autofs-options' condition="with_autofs">
+        <title>AUTOFSALTERNATIV</title>
+        <para>
+            Några av standardvärdena för parametrar nedan är beroende på LDAP-schemat.
+        </para>
+        <para>
+            <variablelist>
+                <varlistentry>
+                    <term>ldap_autofs_map_master_name (sträng)</term>
+                    <listitem>
+                        <para>
+                            Namnet på automount master-kartan i LDAP.
+                        </para>
+                        <para>
+                            Standard: auto.master
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/autofs_attributes.xml" />
+        </para>
+        <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/autofs_restart.xml" />
+    </refsect1>
+
+    <refsect1 id='advanced-options'>
+        <title>AVANCERADE ALTERNATIV</title>
+        <para>
+            Dessa alternativ stödjs av LDAP-domäner, men de skall användas med
+försiktighet.  Inkludera dem endast i din konfiguration om du vet vad du
+gör.  <variablelist>
+                <varlistentry>
+                    <term>ldap_netgroup_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_user_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ldap_group_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+            </variablelist> <variablelist>
+                <note>
+                    <para>
+                        Om alternativet <quote>ldap_use_tokengroups</quote> är aktiverat kommer
+sökningarna i Active Directory inte vara begränsade och returnera alla
+gruppmedlemskap, även utan någon GID-översättning. Det rekommenderas att
+avaktivera denna funktion om gruppnamn inte visas korrekt.
+                    </para>
+                </note>
+                <varlistentry condition="with_sudo">
+                    <term>ldap_sudo_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+                <varlistentry condition="with_autofs">
+                    <term>ldap_autofs_search_base (sträng)</term>
+                    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_search_bases.xml" />
+                </varlistentry>
+
+            </variablelist>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_id_mapping.xml" />
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerat och att LDAP är satt
+till en av domänerna i avsnittet <replaceable>[domains]</replaceable>.
+        </para>
+        <para>
+<programlisting>
+[domain/LDAP]
+id_provider = ldap
+auth_provider = ldap
+ldap_uri = ldap://ldap.mindomän.se
+ldap_search_base = dc=mindomän,dc=se
+ldap_tls_reqcert = demand
+cache_credentials = true
+</programlisting>
+        </para>
+    </refsect1>
+    <refsect1 id='ldap_access_filter_example'>
+        <title>LDAP-ÅTKOMSTFILTEREXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerat och att
+ldap_access_order=lockout används.
+        </para>
+        <para>
+<programlisting>
+[domain/LDAP]
+id_provider = ldap
+auth_provider = ldap
+access_provider = ldap
+ldap_access_order = lockout
+ldap_pwdlockout_dn = cn=ppolicy,ou=policies,dc=mindomän,dc=se
+ldap_uri = ldap://ldap.mindomän.se
+ldap_search_base = dc=mindomän,dc=se
+ldap_tls_reqcert = demand
+cache_credentials = true
+</programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='notes'>
+        <title>NOTER</title>
+        <para>
+            Beskrivningarna av en del konfigurationsalternativ i denna manualsida är
+baserade på manualsidan <citerefentry>
+<refentrytitle>ldap.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> från distributionen OpenLDAP 2.4.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

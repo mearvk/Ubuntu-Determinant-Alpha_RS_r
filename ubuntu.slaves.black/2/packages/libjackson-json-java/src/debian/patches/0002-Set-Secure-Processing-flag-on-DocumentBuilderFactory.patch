@@ -1,0 +1,54 @@
+From 54c6bc36aa57741ea669ad110ce28acaa1600864 Mon Sep 17 00:00:00 2001
+From: PJ Fanning <pj.fanning@workday.com>
+Date: Fri, 1 Jul 2016 01:49:46 +0100
+Subject: [PATCH] Set Secure Processing flag on DocumentBuilderFactory
+
+---
+
+unstream link: https://github.com/FasterXML/jackson-1/commit/54c6bc36aa57741ea669ad110ce28acaa1600864
+
+ .../java/org/codehaus/jackson/map/ext/DOMDeserializer.java | 7 +++++++
+ .../codehaus/jackson/xc/DomElementJsonDeserializer.java    | 1 +
+ 2 files changed, 8 insertions(+)
+
+diff --git a/src/mapper/java/org/codehaus/jackson/map/ext/DOMDeserializer.java b/src/mapper/java/org/codehaus/jackson/map/ext/DOMDeserializer.java
+index 50e6016c..3a486b9e 100644
+--- a/src/mapper/java/org/codehaus/jackson/map/ext/DOMDeserializer.java
++++ b/src/mapper/java/org/codehaus/jackson/map/ext/DOMDeserializer.java
+@@ -2,7 +2,9 @@ package org.codehaus.jackson.map.ext;
+ 
+ import java.io.StringReader;
+ 
++import javax.xml.XMLConstants;
+ import javax.xml.parsers.DocumentBuilderFactory;
++import javax.xml.parsers.ParserConfigurationException;
+ 
+ import org.codehaus.jackson.map.DeserializationContext;
+ import org.codehaus.jackson.map.deser.std.FromStringDeserializer;
+@@ -22,6 +24,11 @@ public abstract class DOMDeserializer<T> extends FromStringDeserializer<T>
+         _parserFactory = DocumentBuilderFactory.newInstance();
+         // yup, only cave men do XML without recognizing namespaces...
+         _parserFactory.setNamespaceAware(true);
++        try {
++            _parserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
++        } catch(ParserConfigurationException pce) {
++            System.err.println("[DOMDeserializer] Problem setting SECURE_PROCESSING_FEATURE: " + pce.toString());
++        }
+     }
+ 
+     protected DOMDeserializer(Class<T> cls) { super(cls); }
+diff --git a/src/xc/java/org/codehaus/jackson/xc/DomElementJsonDeserializer.java b/src/xc/java/org/codehaus/jackson/xc/DomElementJsonDeserializer.java
+index cf9c073d..ccd631aa 100644
+--- a/src/xc/java/org/codehaus/jackson/xc/DomElementJsonDeserializer.java
++++ b/src/xc/java/org/codehaus/jackson/xc/DomElementJsonDeserializer.java
+@@ -30,6 +30,7 @@ public class DomElementJsonDeserializer
+         try {
+             DocumentBuilderFactory bf = DocumentBuilderFactory.newInstance();
+             bf.setNamespaceAware(true);
++            bf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+             builder = bf.newDocumentBuilder();
+         } catch (ParserConfigurationException e) {
+             throw new RuntimeException();
+-- 
+2.20.1
+

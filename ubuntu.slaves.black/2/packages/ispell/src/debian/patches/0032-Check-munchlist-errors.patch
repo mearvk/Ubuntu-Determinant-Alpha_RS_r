@@ -1,0 +1,151 @@
+From: Robert Luberda <robert@debian.org>
+Date: Mon, 16 Mar 2015 00:54:24 +0100
+Subject: 0032 Check munchlist errors
+
+Add `set -e' to munchlist.
+
+Check return status of ispell, ijoin and icombine commands run in pipelines
+inside the script - when the command fail  special error flag file is created.
+Existence of the file is checked in order to break the script as soon
+as possible if error occurs.
+
+Bug-Debian: https://bugs.debian.org/301205
+---
+ munchlist.X | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+
+diff --git a/munchlist.X b/munchlist.X
+index 4d6b8a1..d4082a6 100755
+--- a/munchlist.X
++++ b/munchlist.X
+@@ -403,6 +403,8 @@ FAKEDICT=${TMP}n
+ # Ispell insists that hash files have a "!!HASHSUFFIX!!" suffix
+ FAKEHASH=${TMP}o!!HASHSUFFIX!!
+ AWKSCRIPT=${TMP}p
++# If the file exists than we should exit with error
++ERRORFLAGFILE=${TMP}z
+ if [ "$debug" = yes ]
+ then
+     touch $EXPANDEDINPUT $STRIPPEDINPUT $CRUNCHEDINPUT $PRODUCTLIST \
+@@ -434,6 +436,33 @@ then
+     ln $FAKEHASH ${DBDIR}/FAKEHASH!!HASHSUFFIX!!
+     ln $AWKSCRIPT ${DBDIR}/AWKSCRIPT
+ fi
++
++
++run()
++{
++  "$@" || {
++    status=$?
++    touch "$ERRORFLAGFILE"
++    echo "$@ failed with $status" > "$ERRORFLAGFILE"
++    exit $status
++  }
++}
++
++checkerrorflagfile()
++{
++  [ ! -e "$ERRORFLAGFILE" ] || {
++   cat "$ERRORFLAGFILE" 1>&2
++   rm -rf $MUNCHDIR
++   exit 1
++  }
++}
++
++rm -f "$ERRORFLAGFILE"
++JOIN="run $JOIN"
++COMBINE="run $COMBINE"
++ISPELL="run $ISPELL"
++set -e
++
+ #
+ # Create a dummy dictionary to hold a compiled copy of the language
+ # table.  Initially, it holds the conversion table, if it exists.
+@@ -495,6 +524,7 @@ fi \
+   | sort $SORTTMP -u $sortopts \
+   | $COMBINE $icflags "$wchars" $langtabs \
+   | sort $SORTTMP -u > $EXPANDEDINPUT
++checkerrorflagfile
+ #
+ # If a conversion table existed, recreate the fake hash file with the
+ # "real" language table.
+@@ -529,6 +559,7 @@ else
+     $verbose  &&  echo "Stripping words already in the dictionary." 1>&2
+     $ISPELL "$wchars" -l $dictopt -p /dev/null < $EXPANDEDINPUT \
+       > $STRIPPEDINPUT
++    checkerrorflagfile
+ fi
+ #
+ # Figure out what the flag-marking character is.
+@@ -541,6 +572,7 @@ case "$flagmarker" in
+ 	flagmarker=`expr "$flagmarker" : '.\(.\)'`
+ 	;;
+ esac    
++checkerrorflagfile
+ #
+ # Munch the input to generate roots and affixes ($ISPELL -c).  We are
+ # only interested in words that have at least one affix (egrep $flagmarker);
+@@ -560,6 +592,7 @@ $ISPELL "$wchars" -c -W0 -d $FAKEHASH -p /dev/null < $STRIPPEDINPUT \
+ ' \
+   | egrep "$flagmarker" | sort $SORTTMP -u "-t$flagmarker" $sortopts \
+   | $JOIN $SIGNED "-t$flagmarker" - $EXPANDEDINPUT > $CRUNCHEDINPUT
++checkerrorflagfile
+ #
+ # We now have a list of legal roots, and of affixes that apply to the
+ # root words.  However, it is possible for some affix flags to generate more
+@@ -591,6 +624,7 @@ else
+ fi
+ $ISPELL "$wchars" -e3 -d $FAKEHASH -p /dev/null < $CRUNCHEDINPUT \
+   | sort $SORTTMP $sortopts > $EXPANDEDPAIRS
++checkerrorflagfile
+ #
+ # Now we want to extract the lines in EXPANDEDPAIRS in which the second field
+ # is *not* listed in the original dictionary EXPANDEDINPUT;  these illegal
+@@ -626,6 +660,7 @@ comm -13 $JOINEDPAIRS $EXPANDEDPAIRS \
+   | (comm -13 - $CRUNCHEDINPUT ; rm -f $CRUNCHEDINPUT) \
+   | sort $SORTTMP -u "-t$flagmarker" $sortopts \
+   | $COMBINE "$wchars" $langtabs > $LEGALFLAGLIST
++checkerrorflagfile
+ 
+ #
+ # LEGALFLAGLIST now contains root/flag combinations that, when expanded,
+@@ -661,6 +696,7 @@ $ISPELL -D -d $FAKEHASH \
+   | uniq -c \
+   | tr '	' ' ' \
+   | sort $SORTTMP $sortopts > $PRODUCTLIST
++checkerrorflagfile
+ 
+ if [ `egrep ' p ' $PRODUCTLIST | wc -l` -gt 0 \
+   -a `egrep ' s ' $PRODUCTLIST | wc -l` -gt 0 ]
+@@ -782,6 +818,7 @@ ENDOFAWKSCRIPT
+ 	fi
+ 	$ISPELL "$wchars" -e3 -d $FAKEHASH -p /dev/null < $CROSSROOTS \
+ 	  | sort $SORTTMP $sortopts > $CROSSEXPANDED
++	checkerrorflagfile
+ 	#
+ 	# Now we join CROSSEXPANDED against EXPANDEDINPUT to produce
+ 	# CROSSPAIRS, and then comm that against CROSSEXPANDED to
+@@ -790,6 +827,7 @@ ENDOFAWKSCRIPT
+ 	#
+ 	$JOIN -j1 2 -o 1.1 1.2 $SIGNED $CROSSEXPANDED $EXPANDEDINPUT \
+ 	  | sort $SORTTMP -u > $CROSSPAIRS
++	checkerrorflagfile
+ 
+ 	sort $SORTTMP -u -o $CROSSEXPANDED $CROSSEXPANDED
+ 
+@@ -873,6 +911,7 @@ ENDOFAWKSCRIPT
+ 	  | comm -23 - $ILLEGALCOMBOS \
+ 	  | sort $SORTTMP -u "-t$flagmarker" $sortopts \
+ 	  | $COMBINE "$wchars" $langtabs > $CROSSROOTS
++	checkerrorflagfile
+ 	mv $CROSSROOTS $LEGALFLAGLIST
+ 	if [ "$debug" = yes ]
+ 	then
+@@ -957,6 +996,7 @@ else
+     # MINIMALAFFIXES is empty;  just produce a sorted version of STRIPPEDINPUT
+     sort $SORTTMP "-t$flagmarker" -u $sortopts $STRIPPEDINPUT
+ fi
++checkerrorflagfile
+ if [ "X$MUNCHMAIL" != X ]
+ then
+     (

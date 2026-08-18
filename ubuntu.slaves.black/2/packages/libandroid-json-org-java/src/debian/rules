@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME = /usr/lib/jvm/default-java
+
+%:
+	dh $@ --buildsystem=maven
+
+generate-sources:
+	cp debian/pom.xml pom.xml
+	mkdir -p v-android && cp -a src v-android/ && cp debian/pom.android.xml v-android/pom.xml
+	mkdir -p v-latest && cp -a src v-latest/ && cp debian/pom.latest.xml v-latest/pom.xml
+	cd v-latest && QUILT_PATCHES=../debian/patches-latest quilt push -a
+
+override_dh_auto_configure: generate-sources
+	dh_auto_configure
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf v-android v-latest
+	rm -f pom.xml

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright (c) 2012, 2021 Eclipse Foundation and others.
+  All rights reserved. This program and the accompanying materials
+  are made available under the terms of the Eclipse Distribution License v1.0
+  which accompanies this distribution, and is available at
+  http://www.eclipse.org/org/documents/edl-v10.php
+ 
+  Contributors:
+     Igor Fedorenko - initial implementation
+     Mickael Istria (Red Hat Inc.) - 416915: tycho-surefire-plugin configuration
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>tests-pom</artifactId>
+    <groupId>eclipse.jdt.ui</groupId>
+    <version>4.21.0-SNAPSHOT</version>
+    <relativePath>../tests-pom/</relativePath>
+  </parent>
+  <groupId>org.eclipse.jdt</groupId>
+  <artifactId>org.eclipse.jdt.ui.tests</artifactId>
+  <version>3.14.0-SNAPSHOT</version>
+  <packaging>eclipse-test-plugin</packaging>
+  <properties>
+    <defaultSigning-excludeInnerJars>true</defaultSigning-excludeInnerJars>
+    <!-- Necessary for leakTests to succeed without raising module/classloader issues on Java 9+ -->
+    <leakTestsArgLine>--add-modules ALL-SYSTEM --add-opens java.base/jdk.internal.loader=ALL-UNNAMED --add-opens jdk.localedata/sun.util.resources.cldr.provider=ALL-UNNAMED --add-opens jdk.localedata/sun.util.resources.provider=ALL-UNNAMED --add-opens java.base/jdk.internal.module=ALL-UNNAMED --add-opens java.base/java.lang.module=ALL-UNNAMED --add-opens java.base/jdk.internal.reflect=ALL-UNNAMED --add-opens java.base/jdk.internal.ref=ALL-UNNAMED --add-opens java.base/jdk.internal.math=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/jdk.internal.icu.impl=ALL-UNNAMED --add-opens java.base/jdk.internal.icu.text=ALL-UNNAMED --illegal-access=permit</leakTestsArgLine>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-surefire-plugin</artifactId>
+        <version>${tycho.version}</version>
+        <configuration>
+          <useUIHarness>true</useUIHarness>
+          <useUIThread>true</useUIThread>
+          <includes>
+            <include>org/eclipse/jdt/ui/tests/AutomatedSuite.class</include>
+            <include>org/eclipse/jdt/ui/tests/LeakTestSuite.class</include>
+          </includes>
+          <dependencies>
+            <dependency>
+              <type>eclipse-plugin</type>
+              <artifactId>org.eclipse.equinox.event</artifactId>
+              <version>0.0.0</version>
+            </dependency>
+          </dependencies>
+          <argLine>${leakTestsArgLine}</argLine>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>pre-java-11</id>
+      <activation>
+        <jdk>[1.8,9)</jdk>
+      </activation>
+      <properties>
+        <leakTestsArgLine></leakTestsArgLine>
+      </properties>
+    </profile>
+  </profiles>
+
+</project>

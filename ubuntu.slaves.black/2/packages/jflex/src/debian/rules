@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+export JAVA_HOME := /usr/lib/jvm/default-java
+export CLASSPATH := /usr/share/java/cup.jar:/usr/share/java/cup_runtime.jar
+
+%:
+	dh $@ --with javahelper,maven_repo_helper
+
+override_dh_auto_build:
+	mkdir -p build/generated-sources/jflex
+	java -jar /usr/share/java/cup.jar \
+		-parser LexParse \
+		-interface \
+		-destdir build/generated-sources/jflex/ \
+		src/main/cup/LexParse.cup
+	jflex -d build/generated-sources/jflex/ \
+		--skel src/main/jflex/skeleton.nested \
+		src/main/jflex/LexScan.flex
+	ant -buildfile build.xml jar
+
+override_dh_auto_clean:
+	dh_auto_clean
+	ant -buildfile build.xml clean
+
+override_dh_installchangelogs:
+	dh_installchangelogs changelog.md
+
+override_dh_installdocs:
+	$(RM) $(CURDIR)/examples/.gitignore
+	dh_installdocs
+

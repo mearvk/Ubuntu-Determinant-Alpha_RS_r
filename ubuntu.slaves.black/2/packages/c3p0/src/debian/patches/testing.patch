@@ -1,0 +1,73 @@
+Description: Patch to enable testing in build process using hsqldb & gcj
+ Functions that are either not supported by hsqldb and tests that behave
+ differently under gcj are disabled.
+Author: james.page@canonical.com
+Forwarded: not-required
+Index: c3p0/src/classes/com/mchange/v2/c3p0/test/junit/ConnectionPropertiesResetJUnitTestCase.java
+===================================================================
+--- c3p0.orig/src/classes/com/mchange/v2/c3p0/test/junit/ConnectionPropertiesResetJUnitTestCase.java	2011-02-28 11:20:48.137932772 +0000
++++ c3p0/src/classes/com/mchange/v2/c3p0/test/junit/ConnectionPropertiesResetJUnitTestCase.java	2011-02-28 11:23:12.471753607 +0000
+@@ -88,10 +88,6 @@
+ 			cons[i] = cpds.getConnection();
+ 			assertFalse( "Connection from pool should not be readOnly!", cons[i].isReadOnly() );
+ 
+-			// some drivers return null rather than an empty type map
+-			Map typeMap = cons[i].getTypeMap();
+-			assertTrue( "Connection from pool should have an empty type map!", (typeMap == null ? true : typeMap.isEmpty() ) ); 
+-
+ 			assertEquals( "Connection from pool should have default catalog set!", dfltCat, cons[i].getCatalog() );
+ 			assertEquals( "Connection from pool should have default txn isolation set!", dflt_txn_isolation, cons[i].getTransactionIsolation() );
+ 			cons[i].close();
+@@ -103,4 +99,4 @@
+ 		fail( e.getMessage() );
+ 	    }
+     }
+-}
+\ No newline at end of file
++}
+Index: c3p0/src/classes/com/mchange/v2/util/junit/DoubleWeakHashMapJUnitTestCase.java
+===================================================================
+--- c3p0.orig/src/classes/com/mchange/v2/util/junit/DoubleWeakHashMapJUnitTestCase.java	2011-02-28 11:20:48.167927333 +0000
++++ c3p0/src/classes/com/mchange/v2/util/junit/DoubleWeakHashMapJUnitTestCase.java	2011-02-28 11:22:55.204885364 +0000
+@@ -68,41 +68,4 @@
+         m.values().remove(poop);
+         assertEquals("After removing a doubled value, size should be 2", m.size(), 2);
+     }
+-    
+-    public void testWeakness()
+-    {
+-        Integer a = new Integer(1);
+-        Integer b = new Integer(2);
+-        Integer c = new Integer(3);
+-        
+-        String poop = new String("poop");
+-
+-        Map m = new DoubleWeakHashMap();
+-        m.put(a, poop);
+-        m.put(b, new Object());
+-        m.put(c, new Object());
+-        
+-        //race condition... b & c might already have been removed... but i doubt it
+-        assertEquals("1) Weak values should not yet have been removed (but not guaranteed! sometimes fails without a defect!)", m.size(), 3);
+-        
+-        // we are relying that a full, synchronous GC occurs,
+-        // which is not guaranteed in all VMs
+-        System.gc();
+-        
+-        // let's see if we can force a deeper gc via a big array creation
+-        byte[] bArray = new byte[1024 * 1024];
+-        
+-        assertEquals("2) Weak values should have been automatically removed (but not guaranteed! sometimes fails without a defect!)", m.size(), 1);
+-        
+-        m.put( new Object(), b);
+-        
+-        //race condition... b & c might already have been removed... but i doubt it
+-        assertEquals("3) Weak key should not yet have been removed (but not guaranteed! sometimes fails without a defect!)", m.size(), 2);
+-
+-        System.gc();
+-        // let's see if we can force a deeper gc via a big array creation
+-        bArray = new byte[1024 * 1024];
+-
+-        assertEquals("4) Weak key should have been automatically removed (but not guaranteed! sometimes fails without a defect!)", m.size(), 1);
+-    }
+ }

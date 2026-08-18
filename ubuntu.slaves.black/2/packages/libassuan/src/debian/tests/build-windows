@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -e
+
+ARCH="$1"
+
+if [ "$ARCH" = x86_64 ]; then
+    WINE=/usr/lib/wine/wine64
+    export WINESERVER=/usr/lib/wine/wineserver64
+elif [ "$ARCH" = i686 ]; then
+    WINE=/usr/lib/wine/wine
+    export WINESERVER=/usr/lib/wine/wineserver32
+else
+    printf >&2 'Unknown Architecture: %s\n' "$ARCH"
+    exit 1
+fi
+GCC="${ARCH}-w64-mingw32-gcc"
+
+# get wine initialized, which normally spews logs to stderr
+# (autopkgtest doesn't want stderr)
+"$WINE" hostname 2>&1
+
+if [ `dpkg --print-architecture` = 'arm64' ] ; then
+  echo "Don't fail testsuite on arm64, this test always failed there"
+  exit 0
+fi
+
+export PKG_CONFIG_PATH="/usr/${ARCH}-w64-mingw32/lib/pkgconfig"
+
+# see https://dev.gnupg.org/T4624 for why this is needed
+extra_libs=(-lws2_32)
+
+# build a static windows binary around libassuan and run it:
+"$GCC" -pedantic -Wall -Werror -static -o test-run.exe debian/tests/simple-build.c $(pkg-config --cflags --static --libs libassuan gpg-error) "${extra_libs[@]}"
+"$WINE" ./test-run.exe
+rm -f ./test-run.exe

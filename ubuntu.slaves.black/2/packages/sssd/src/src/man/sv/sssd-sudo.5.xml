@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-sudo</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-sudo</refname>
+        <refpurpose>Konfigurera sudo med SSSD-bakänden</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver hur man konfigurerar <citerefentry>
+<refentrytitle>sudo</refentrytitle> <manvolnum>8</manvolnum> </citerefentry>
+till att fungera med <citerefentry> <refentrytitle>sssd</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> och hur SSSD cachar sudo-regler.
+        </para>
+    </refsect1>
+
+    <refsect1 id='sudo'>
+        <title>Konfigurera sudo att samarbeta med SSSD</title>
+        <para>
+            För att aktivera SSSD som en källa för sudo-regler, lägg till
+<emphasis>sss</emphasis> till posten <emphasis>sudoers</emphasis> i
+<citerefentry> <refentrytitle>nsswitch.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            Till exempel, för att konfigurera sudo till att först slå upp regler i
+standardfilen <citerefentry> <refentrytitle>sudoers</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> (som bör innehålla regler som
+gäller för lokala användare) och sedan i SSSD, skall filen nsswitch.conf
+innehålla följande rad:
+        </para>
+        <para>
+<programlisting>
+sudoers: files sss
+</programlisting>
+        </para>
+        <para>
+            Mer information om att konfigurera sökordningen för sudoers från filen
+nsswitch.conf liksom information om LDAP-schemat som används för att spara
+sudo-regler i katalogen finns i <citerefentry>
+<refentrytitle>sudoers.ldap</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            <emphasis>Observera</emphasis>: för att använda nätgrupper eller
+IPA-värdgrupper i sudo-regler behöver man även sätta <citerefentry>
+<refentrytitle>nisdomainname</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry> korrekt till sitt NIS-domännamn (som är samma som
+IPA-domännamnet när värdgrupper används).
+        </para>
+    </refsect1>
+
+    <refsect1 id='sssd'>
+        <title>Konfigurera SSSD till att hämta sudo-regler</title>
+        <para>
+            All konfiguration som behövs på SSSD-sidan är att utöka listan över
+<emphasis>tjänster</emphasis> med ”sudo” i avsnittet [sssd] i <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.  För att snabba upp LDAP-uppslagningarna kan man även sätta
+sökbasen för sudo-regler med alternativet
+<emphasis>ldap_sudo_search_base</emphasis>.
+        </para>
+        <para>
+            Följande exempel visar hur man konfigurerar SSSD att hämta sudo-regler från
+en LDAP-server.
+        </para>
+        <para>
+<programlisting>
+[sssd]
+config_file_version = 2
+services = nss, pam, sudo
+domains = EXEMPEL
+
+[domain/EXEMPEL]
+id_provider = ldap
+sudo_provider = ldap
+ldap_uri = ldap://example.com
+ldap_sudo_search_base = ou=sudoers,dc=example,dc=com
+</programlisting> <phrase
+condition="have_systemd"> Det är viktigt att observera att på plattformar
+där systemd stödjs finns det inget behov av att lägga till
+”sudo”-leverantören till listan av tjänster, eftersom det blev frivilligt.
+Dock måste sssd-sudo.socket vara aktiverat istället.  </phrase>
+        </para>
+        <para>
+            När SSSD är konfigurerat till att använda IPA som ID-leverantör aktiveras
+sudo-leverantören automatiskt.  Sudo-sökbasen konfigureras till att använda
+IPA:s egna LDAP-träd (cn=sudo,$SUFFIX).  Om någon annan sökbas är definierad
+i sssd.conf kommer detta värde användas istället.  Kompatibilitetsträdet
+(ou=sudoers,$SUFFIX) behövs inte längre för IPA-sudo-funktionalitet.
+        </para>
+    </refsect1>
+
+    <refsect1 id='cache'>
+        <title>Cachnings-mekanismen för SUDO-regler</title>
+        <para>
+            Den största utmaningen vid utvecklingen av stöd för sudo i SSSD var att
+säkerställa att köra sudo med SSSD som datakälla ger samma
+användarupplevelse och är lika snabbt som sudo men tillhandahåller de
+senaste reglerna så mycket som möjligt.  För att uppfylla dessa krav
+använder SSSD tre sorters uppdateringar.  De refereras till som fullständig
+uppdatering, smart uppdatering och regeluppdatering.
+        </para>
+        <para>
+            Den <emphasis>smarta uppdateringen</emphasis> hämtar periodiskt regler som
+är nya eller ändrades efter den senaste uppdateringen.  Dess primära mål är
+att se till att databasen växer genom att bara hämta små inkrementella steg
+som inte genererar stora mängder med nätverkstrafik.
+        </para>
+        <para>
+            Den <emphasis>fullständiga uppdateringen</emphasis> raderar helt enkelt alla
+sudo-regler som är lagrade i cachen och ersätter dem med alla regler som är
+sparade på servern.  Detta används för att hålla cachen konsistent genom att
+ta bort varje regel som var raderad från servern.  Dock kan en fullständig
+uppdatering skapa mycket trafik och den bör alltså bara köras ibland
+beroende på storleken och stabiliteten hos sudo-reglerna.
+        </para>
+        <para>
+            <emphasis>Regeluppdateringen</emphasis> säkerställer att vi inte ger
+användaren fler rättigheter än definierat.  Den triggas varje gång
+användaren kör sudo.  Regeluppdateringen kommer hitta alla regler som är
+tillämpliga på den användaren, kontrollera deras utgångstidpunkt och hämta
+om dem om de gått ut.  Ifall att någon av dessa regler saknas på servern
+kommer SSSD göra en fullständig uppdatering vid sidan av för att fler regler
+(som är tillämpliga på andra användare) kan ha raderats.
+        </para>
+        <para>
+            Om aktiverat kommer SSSD endast lagra regler som kan tillämpas på denna
+maskin.  Detta betyder att regler som innehåller ett av följande värden i
+attributet <emphasis>sudoHost</emphasis>:
+        </para>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    nyckelordet ALL
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    jokertecken (wildcard)
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    nätgrupp (i formen ”+nätgrupp”)
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    värdnamn eller fullständigt kvalificerat domännamn på denna maskin
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    en av IP-adresserna till denna maskin
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    en av IP-adresserna till nätverket (på formen ”adress/mask”)
+                </para>
+            </listitem>
+        </itemizedlist>
+        <para>
+            Det finns många konfigurationsalternativ som kan användas för att justera
+beteendet.  Se ”ldap_sudo_*” i <citerefentry>
+<refentrytitle>sssd-ldap</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> och ”sudo_*” i <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='performance'>
+        <title>Trimning av prestandan</title>
+        <para>
+            SSSD använder olika mekanismer med mer eller mindre komplexa LDAP-filter för
+att hålla de cachade sudo-reglerna uppdaterade. Standardkonfigurationen är
+satt till värden som skall passa de flesta av våra användare, men följande
+stycken innehåller några tips om hur man kan finjustera konfigurationen för
+sina behov.
+        </para>
+        <para>
+            1. <emphasis>Indexera LDAP-attribut</emphasis>. Se till att följande
+LDAP-attribut är indexerade: objectClass, cn, entryUSN eller
+modifyTimestamp.
+        </para>
+        <para>
+            2. <emphasis>Sätt ldap_sudo_search_base</emphasis>. Sätt sökbasen till den
+behållare som innehåller sudo-reglerna för att begränsa räckvidden för
+uppslagningen.
+        </para>
+        <para>
+            3. <emphasis>Sätt fullt och smart uppdateringsintervall</emphasis>. Om ens
+sudo-regler inte ändras ofta och man inte behöver snabba uppdateringar av
+cachade regler på sina klienter kan man avsevärt öka
+<emphasis>ldap_sudo_full_refresh_interval</emphasis> och
+<emphasis>ldap_sudo_smart_refresh_interval</emphasis>. Man kan också
+överväga att avaktivera den smarta uppdateringen genom att sätta
+<emphasis>ldap_sudo_smart_refresh_interval = 0</emphasis>.
+        </para>
+        <para>
+            4. Om man har ett stort antal klienter kan man överväga att öka värdet på
+<emphasis>ldap_sudo_random_offset</emphasis> för att fördela lasten på
+servern bättre.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

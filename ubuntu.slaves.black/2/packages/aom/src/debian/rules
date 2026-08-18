@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND := -Wl,-z,defs
+
+# In the normative branch, we need to manually set the target cpu to
+# enable optimisation
+ifeq ($(DEB_HOST_ARCH_CPU),arm64)
+  TARGET_CPU = arm64
+else ifeq ($(DEB_HOST_ARCH_CPU)_$(DEB_HOST_ARCH_ABI),arm_eabihf)
+  TARGET_CPU = armv7
+  # On ARM, we need to manually pass the flag used to compile NEON
+  # code with
+  CONFIG_EXTRA := -DAOM_NEON_INTRIN_FLAG=-mfpu=neon
+else ifneq ($(filter mips64%, $(DEB_HOST_ARCH_CPU)),)
+  TARGET_CPU = mips64
+else ifneq ($(filter mips%, $(DEB_HOST_ARCH_CPU)),)
+  TARGET_CPU = mips32
+else ifneq ($(filter ppc% powerpc%, $(DEB_HOST_ARCH_CPU)),)
+  TARGET_CPU = ppc
+else ifeq ($(DEB_HOST_ARCH_CPU)_$(DEB_HOST_ARCH_ABI),amd64_base)
+  TARGET_CPU = x86_64
+else ifeq ($(DEB_HOST_ARCH_CPU),i386)
+  TARGET_CPU = x86
+else
+  TARGET_CPU = generic
+endif
+
+# Disable AltiVec on powerpcspe
+ifeq ($(DEB_HOST_ARCH),powerpcspe)
+  CONFIG_EXTRA := -DENABLE_VSX=OFF
+endif
+
+# Use -Bbuild-debian to locate built documentation
+%:
+	dh $@ -Bbuild-debian
+
+# Force building with system libyuv
+execute_before_dh_auto_configure:
+	rm -rf $(CURDIR)/third_party/libyuv
+
+# Examples and tools not built because they require various private
+#  symbols from libaom.so which we filter out.
+# Tests disabled because they require network access to download test
+#  data.
+# Setting GIT_EXECUTABLE to some invalid file prevents the version
+#  being taken from git if we're on a Debian packaging git branch.
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DBUILD_SHARED_LIBS=1 \
+		-DCONFIG_LOWBITDEPTH=1 \
+		-DCONFIG_LIBYUV=1 \
+		-DCONFIG_MULTITHREAD=1 \
+		-DENABLE_TESTS=0 \
+		-DGIT_EXECUTABLE=/nonexistant-binary \
+		-DAOM_TARGET_CPU=$(TARGET_CPU) \
+		$(CONFIG_EXTRA)
+
+# Do not compress html changelog which breaks documentation
+override_dh_compress:
+	dh_compress -Xchangelog.html

@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+TMP     = $(CURDIR)/debian/tmp/
+
+RAKUDO_VERSION = $(shell perl6 --version | perl -n -E 'm/version\s+([\d.]+)/; say $$1;')
+
+%:
+	dh $@
+
+# Configure.pl won't run when a .git dir is present
+# unless --force option is used
+override_dh_auto_configure:
+	perl Configure.pl --prefix=/usr --backends=moar --force
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vrakudo:Depends="rakudo (>= $(RAKUDO_VERSION))"
+
+override_dh_auto_build:
+	echo "Skipping make step"
+
+override_dh_auto_test:
+	echo "Tests must be done after module-install"
+
+override_dh_auto_install:
+	mkdir -p $(TMP)/usr/bin
+	export DESTDIR=$(TMP) ; make modules-install
+	export DESTDIR=$(TMP) ; \
+	export RAKUDOLIB=$(TMP)usr/share/perl6/lib ; \
+	make modules-test

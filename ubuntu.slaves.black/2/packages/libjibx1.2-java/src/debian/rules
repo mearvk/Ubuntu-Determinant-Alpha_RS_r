@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/ant.mk
+
+DEB_COMPRESS_EXCLUDE_DEFAULT := .class
+JAVA_HOME            := /usr/lib/jvm/default-java
+DEB_JARS             := $(ANT_HOME)/lib/ant-launcher.jar bcel log4j-1.2 qdox xpp3 joda-time
+DEB_ANT_BUILD_TARGET := setrelease current devdoc
+DEB_ANT_ARGS         := -Dbindname=jibx-bind-$(DEB_UPSTREAM_VERSION) -Dextrasname=jibx-extras-$(DEB_UPSTREAM_VERSION) -Drunname=jibx-run-$(DEB_UPSTREAM_VERSION) -Dschemaname=jibx-schema-$(DEB_UPSTREAM_VERSION)
+DEB_BUILDDIR         := build
+DEB_INSTALL_CHANGELOGS_ALL := changes.txt
+DEB_UPSTREAM_VERSION_2 := $(shell echo $(DEB_UPSTREAM_VERSION) | cut -f1,2 -d. )
+
+clean::
+	mh_clean
+	-rm -fr build/api build/classes lib/*
+
+install/libjibx1.2-java::
+	mh_installpoms -plibjibx$(DEB_UPSTREAM_VERSION_2)-java
+	mh_installjar -plibjibx$(DEB_UPSTREAM_VERSION_2)-java --usj-version=$(DEB_UPSTREAM_VERSION) --java-lib --no-usj-versionless debian/jibx-run.pom lib/jibx-run-$(DEB_UPSTREAM_VERSION).jar
+	mh_installjar -plibjibx$(DEB_UPSTREAM_VERSION_2)-java --usj-version=$(DEB_UPSTREAM_VERSION) --java-lib --no-usj-versionless debian/jibx-bind.pom lib/jibx-bind-$(DEB_UPSTREAM_VERSION).jar
+	mh_installjar -plibjibx$(DEB_UPSTREAM_VERSION_2)-java --usj-version=$(DEB_UPSTREAM_VERSION) --java-lib --no-usj-versionless debian/jibx-extras.pom lib/jibx-extras-$(DEB_UPSTREAM_VERSION).jar
+	mh_installjar -plibjibx$(DEB_UPSTREAM_VERSION_2)-java --usj-version=$(DEB_UPSTREAM_VERSION) --java-lib --no-usj-versionless debian/jibx-schema.pom lib/jibx-schema-$(DEB_UPSTREAM_VERSION).jar
+	if [ "$(DEB_UPSTREAM_VERSION)" != "$(DEB_UPSTREAM_VERSION_2)" ]; then \
+		dh_link -plibjibx$(DEB_UPSTREAM_VERSION_2)-java usr/share/java/jibx-bind-$(DEB_UPSTREAM_VERSION).jar \
+								usr/share/java/jibx-bind-$(DEB_UPSTREAM_VERSION_2).jar ; \
+		dh_link -plibjibx$(DEB_UPSTREAM_VERSION_2)-java usr/share/java/jibx-extras-$(DEB_UPSTREAM_VERSION).jar \
+								usr/share/java/jibx-extras-$(DEB_UPSTREAM_VERSION_2).jar ; \
+		dh_link -plibjibx$(DEB_UPSTREAM_VERSION_2)-java usr/share/java/jibx-run-$(DEB_UPSTREAM_VERSION).jar \
+								usr/share/java/jibx-run-$(DEB_UPSTREAM_VERSION_2).jar ; \
+		dh_link -plibjibx$(DEB_UPSTREAM_VERSION_2)-java usr/share/java/jibx-schema-$(DEB_UPSTREAM_VERSION).jar \
+								usr/share/java/jibx-schema-$(DEB_UPSTREAM_VERSION_2).jar ; \
+	fi
+
+install/libjibx-java::
+	dh_link -plibjibx-java usr/share/java/jibx-bind-$(DEB_UPSTREAM_VERSION).jar usr/share/java/jibx-bind.jar
+	dh_link -plibjibx-java usr/share/java/jibx-extras-$(DEB_UPSTREAM_VERSION).jar usr/share/java/jibx-extras.jar
+	dh_link -plibjibx-java usr/share/java/jibx-run-$(DEB_UPSTREAM_VERSION).jar usr/share/java/jibx-run.jar
+	dh_link -plibjibx-java usr/share/java/jibx-schema-$(DEB_UPSTREAM_VERSION).jar usr/share/java/jibx-schema.jar
+
+get-orig-source:
+	uscan --download-version $(DEB_UPSTREAM_VERSION) --force-download

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd_krb5_locator_plugin</refname>
+        <refpurpose>Модуль локатора Kerberos</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            Модуль локатора Kerberos <command>sssd_krb5_locator_plugin</command>
+используется libkrb5 для поиска KDC для указанной области Kerberos. SSSD
+предоставляет этот модуль для направления всех клиентов Kerberos в системе в
+один KDC. В целом, не имеет значения, с каким KDC обменивается данными
+клиентский процесс. Но в некоторых случаях (например, после смены пароля) не
+все KDC находятся в одинаковом состоянии, поскольку для этого сначала
+необходимо выполнить репликацию новых данных. Чтобы избежать неожиданных
+сбоев проверки подлинности и, возможно, даже блокировки учётных записей,
+следует как можно дольше выполнять обмен данными с одним KDC.
+        </para>
+        <para>
+            libkrb5 выполнит поиск модуля локатора в подкаталоге libkrb5 каталога
+модулей Kerberos (см. plugin_base_dir в <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>). Модуль можно отключить, только удалив соответствующий файл
+модуля. В конфигурации Kerberos не предусмотрен параметр для его
+отключения. Но для отдельных команд модуль можно отключить с помощью
+переменной среды SSSD_KRB5_LOCATOR_DISABLE. Либо можно использовать параметр
+SSSD krb5_use_kdcinfo=False, чтобы не создавать данные, которые требуются
+для работы модуля. В этом случае модуль по-прежнему будет вызываться, но не
+предоставит данные вызывающей стороне, поэтому libkrb5 перейдёт к
+использованию других методов, определённых в krb5.conf.
+        </para>
+        <para>
+            Модуль выполняет чтение информации о KDC указанной области из файла
+<filename>kdcinfo.REALM</filename>. Этот файл должен содержать одно или
+несколько DNS-имён или IP-адресов (либо в десятичной записи IPv4, либо в
+шестнадцатеричной записи IPv6). В конце можно (необязательно) добавить номер
+порта, отделив его двоеточием; в этом случае адрес IPv6 необходимо, как и
+обычно, заключить в квадратные скобки. Корректные записи:
+            <itemizedlist>
+                <listitem><para>kdc.example.com</para></listitem>
+                <listitem><para>kdc.example.com:321</para></listitem>
+                <listitem><para>1.2.3.4</para></listitem>
+                <listitem><para>5.6.7.8:99</para></listitem>
+                <listitem><para>2001:db8:85a3::8a2e:370:7334</para></listitem>
+                <listitem><para>[2001:db8:85a3::8a2e:370:7334]:321</para></listitem>
+            </itemizedlist>
+            Поставщик данных проверки подлинности krb5 SSSD, который также используется
+поставщиками данных IPA и AD, добавляет в этот файл адрес текущего KDC или
+контроллера домена, который используется SSSD.
+        </para>
+        <para>
+            В средах с доступными только для чтения и доступными для чтения и записи
+KDC, где, как ожидается, клиенты будут использовать для общих операций
+экземпляры, доступные только для чтения, а для изменений конфигурации, таких
+как смена пароля, — только KDC, доступные для чтения и записи, также
+используется файл <filename>kpasswdinfo.REALM</filename> для идентификации
+доступных для чтения и записи KDC. Если этот файл существует для указанной
+области, его содержимое будет использовано модулем для ответа на запросы по
+серверу kpasswd или kadmin или определённому основному KDC MIT
+Kerberos. Если адрес содержит номер порта, для последнего будет
+использоваться стандартный порт KDC 88.
+        </para>
+    </refsect1>
+
+    <refsect1 id='notes'>
+        <title>ПРИМЕЧАНИЯ</title>
+        <para>
+            Не все реализации Kerberos поддерживают использование модулей. Если в
+системе нет <command>sssd_krb5_locator_plugin</command>, необходимо
+отредактировать файл /etc/krb5.conf в соответствии с используемой версией
+Kerberos.
+        </para>
+        <para>
+            Если переменная среды SSSD_KRB5_LOCATOR_DEBUG установлена в какое-либо
+значение, сообщения отладки будут отправляться в stderr.
+        </para>
+        <para>
+            Если переменная среды SSSD_KRB5_LOCATOR_DISABLE установлена в какое-либо
+значение, модуль отключён и просто вернёт вызывающей стороне
+KRB5_PLUGIN_NO_HANDLE.
+        </para>
+        <para>
+            Если переменная среды SSSD_KRB5_LOCATOR_IGNORE_DNS_FAILURES установлена в
+какое-либо значение, модуль будет пытаться разрешить все DNS-имена в файле
+kdcinfo. По умолчанию модуль возвращает вызывающей стороне
+KRB5_PLUGIN_NO_HANDLE сразу после первой неудачи при разрешении DNS.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

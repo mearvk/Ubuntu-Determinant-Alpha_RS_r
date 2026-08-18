@@ -1,0 +1,158 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_installjavadoc - install javadoc into packages
+
+=cut
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_installjavadoc> [S<I<debhelper options>>]
+
+B<jh_installjavadoc> [S<I<debhelper options>>] [B<-p>I<package>] [S<I<base-directory-of-javadoc>>] [S<I<install-location>>]
+
+=head1 DESCRIPTION
+
+B<jh_installjavadoc> is a javahelper program that can install generated
+javadoc for you.
+
+If you have javadoc which has been built by your build system, then
+B<jh_installjavadoc> will install it in the correct location and register
+it with doc-base for you. Either run B<jh_installjavadoc> with the
+directory containing the javadoc as a parameter, or it will read
+F<debian/I<package>.javadoc> or F<debian/javadoc>, which should contain
+a single path to the javadoc for that package.
+
+If you have used L<jh_build(1)> that will automatically have created
+javadoc.  To install that put the string "internal" in the javadoc
+file and it will be installed.
+
+The second parameter, or the second string on the line in the javadoc
+file, can be used to override the install location, for example, so
+that a -doc package can install to F</usr/share/doc/I<library>/api>.
+
+=head1 FILES
+
+=over 4
+
+=item F<debian/I<package>.javadoc>, F<debian/javadoc>
+
+Parsed to determine which javadoc directory should be processed for the
+given package.  Note that unlike most other debhelper commands,
+B<jh_installjavadoc> will use F<debian/javadoc> as a fallback
+configuration file for I<all> packages that it acts on.  Other
+debhelper commands usually only apply this fallback to the
+"main package".
+
+The file consists a single line listing the javadoc directory (or
+the word "internal").  This is optionally followed path the path
+to the desired install location if the default location is
+incorrect.
+
+Examples:
+
+     internal
+
+     build/javadoc /usr/share/doc/somewhere/libapi
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-A>I<author>, B<--author=>I<author>
+
+=back
+
+Beyond the above, B<jh_installjavadoc> also accepts the shared
+debhelper options documented in L<debhelper(7)>.
+
+=cut
+
+my $AUTHOR;
+
+init(options => {
+	'author|A=s' => \$AUTHOR,
+});
+
+sub installjavadoc {
+	my ($package, $source, $target) = @_;
+	my $author = $AUTHOR // "The authors of $package";
+	my $docbase_path;
+	my $tmpdir = tmpdir($package);
+	if (not -d $source) {
+		warning("Javadoc source ${source} does not exist or is not a directory, skipping");
+		return;
+	}
+	if (defined($target)) {
+		$docbase_path = "/$target";
+		$target = "${tmpdir}/$target";
+	} else {
+		$target = "${tmpdir}/usr/share/doc/$package/api";
+		$docbase_path="/usr/share/doc/$package/api";
+	}
+	verbose_print("Installing javadoc from ${source} into package $package");
+	install_dir(dirname($target));
+	doit('cp', '-r', $source, $target);
+	verbose_print("cat > debian/$package.doc-base.javadoc");
+	if (not $dh{NO_ACT}) {
+		open(my $fd, '>', "debian/$package.doc-base.javadoc")
+			or error("open debian/$package.doc-base.javadoc failed: $!");
+		print {$fd} <<EOF ;
+Document: $package
+Title: API JavaDoc for $package
+Author: $author
+Abstract: This is the API JavaDoc for $package
+Section: Programming/Java
+
+Format: HTML
+Index: $docbase_path
+Files: $docbase_path/*.html
+EOF
+		close($fd) or error("close debian/$package.doc-base.javadoc failed: $!");
+		open(my $cfd, '>>', 'debian/.javahelper_clean') or error("open debian/.javahelper_clean failed: $!");
+		print {$cfd} "debian/$package.doc-base.javadoc\n";
+		close($cfd) or error("close debian/.javahelper_clean failed: $!");
+	}
+}
+
+if (@ARGV) {
+	my ($source, $target) = @ARGV;
+	installjavadoc($dh{FIRSTPACKAGE}, $source, $target);
+	exit(0);
+}
+
+# read debian/$package.javadoc
+foreach my $package (@{$dh{DOPACKAGES}}) {
+	my $pkgfile = pkgfile($package, 'javadoc');
+	if (not $pkgfile and -f 'debian/javadoc') {
+		$pkgfile = 'debian/javadoc';
+	}
+	next if not $pkgfile;
+	my ($source, $target) = filearray($pkgfile);
+
+	if ($source eq 'internal' and -d 'debian/_jh_build.javadoc/api') {
+		$source = 'debian/_jh_build.javadoc/api';
+	}
+	installjavadoc($package, $source, $target);
+}
+
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=cut

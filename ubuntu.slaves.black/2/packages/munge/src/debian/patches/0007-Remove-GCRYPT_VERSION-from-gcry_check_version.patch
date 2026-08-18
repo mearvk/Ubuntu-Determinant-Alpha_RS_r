@@ -1,0 +1,36 @@
+Description: Replace GCRYPT_VERSION with NULL in gcry_check_version()
+ According to the Libgcrypt documentation, gcry_check_version()
+ should be called with the minimum required version of the library
+ (or NULL if that check is not needed).  The <gcrypt.h> header file
+ further notes GCRYPT_VERSION should not be used by the program since
+ gcry_check_version() should return the same version string.
+ Replace GCRYPT_VERSION with NULL in gcry_check_version() to disable the
+ version check.  Debian further notes their automated system determined
+ v0.5.14 requires a minimum Libgcrypt version of 1.8.0.  However, it
+ seems preferable to disable the check and let distributions perform
+ their dependency checks instead of maintaining this value by hand.
+ Note that gcry_check_version() must still be called because it also
+ initializes the library.
+Author: Chris Dunlap <cdunlap@llnl.gov>
+Origin: upstream, https://github.com/dun/munge/commit/0c37cc03b649d8861c2d9e8d172bff736bfd9ea4
+Last-Update: 2021-08-05
+Forwarded: not-needed
+
+diff --git a/src/common/crypto.c b/src/common/crypto.c
+index 29266a16..6e46ec5b 100644
+--- a/src/common/crypto.c
++++ b/src/common/crypto.c
+@@ -72,11 +72,10 @@ crypto_init (void)
+     /*  gcry_check_version() must be called before any other Libgcrypt function
+      *    (except the GCRYCTL_SET_THREAD_CBS command prior to Libgcrypt 1.6).
+      */
+-    v = gcry_check_version (GCRYPT_VERSION);
++    v = gcry_check_version (NULL);
+     if (v == NULL) {
+         log_err (EMUNGE_SNAFU, LOG_ERR,
+-            "Failed to initialize Libgcrypt: version mismatch: expected %s",
+-            GCRYPT_VERSION);
++            "Failed to initialize Libgcrypt %s", GCRYPT_VERSION);
+     }
+     e = gcry_control (GCRYCTL_DISABLE_SECMEM, 0);
+     if (e) {

@@ -1,0 +1,149 @@
+Description: Preserve the methods removed from the hash package in Guava 16
+ * PrimitiveSink.putString(CharSequence)
+ * Funnels.stringFunnel()
+ * HashFunction.hashString(CharSequence)
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/guava/src/com/google/common/hash/AbstractCompositeHashFunction.java
++++ b/guava/src/com/google/common/hash/AbstractCompositeHashFunction.java
+@@ -160,6 +160,14 @@
+         return this;
+       }
+ 
++      /**
++       * @deprecated Use {@link Hasher#putUnencodedChars} instead.
++       */
++      @Deprecated
++      @Override public Hasher putString(CharSequence chars) {
++        return putUnencodedChars(chars);
++      }
++
+       @Override
+       public Hasher putUnencodedChars(CharSequence chars) {
+         for (Hasher hasher : hashers) {
+--- a/guava/src/com/google/common/hash/AbstractHasher.java
++++ b/guava/src/com/google/common/hash/AbstractHasher.java
+@@ -42,6 +42,14 @@
+     return putInt(Float.floatToRawIntBits(f));
+   }
+ 
++  /**
++   * @deprecated Use {@link AbstractHasher#putUnencodedChars} instead.
++   */
++  @Deprecated
++  @Override public Hasher putString(CharSequence charSequence) {
++    return putUnencodedChars(charSequence);
++  }
++
+   @Override
+   public Hasher putUnencodedChars(CharSequence charSequence) {
+     for (int i = 0, len = charSequence.length(); i < len; i++) {
+--- a/guava/src/com/google/common/hash/AbstractNonStreamingHashFunction.java
++++ b/guava/src/com/google/common/hash/AbstractNonStreamingHashFunction.java
+@@ -52,6 +52,14 @@
+     return hashBytes(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(input).array());
+   }
+ 
++  /**
++   * @deprecated Use {@link AbstractNonStreamingHashFunction#hashUnencodedChars} instead.
++   */
++  @Deprecated
++  @Override public HashCode hashString(CharSequence input) {
++    return hashUnencodedChars(input);
++  }
++
+   @Override
+   public HashCode hashUnencodedChars(CharSequence input) {
+     int len = input.length();
+--- a/guava/src/com/google/common/hash/Funnels.java
++++ b/guava/src/com/google/common/hash/Funnels.java
+@@ -61,6 +61,17 @@
+     return UnencodedCharsFunnel.INSTANCE;
+   }
+ 
++  /**
++   * Returns a funnel that extracts the characters from a {@code CharSequence}.
++   *
++   * @deprecated Use {@link Funnels#unencodedCharsFunnel} instead. This method is scheduled for
++   *     removal in Guava 16.0.
++   */
++  @Deprecated
++  public static Funnel<CharSequence> stringFunnel() {
++    return unencodedCharsFunnel();
++  }
++
+   private enum UnencodedCharsFunnel implements Funnel<CharSequence> {
+     INSTANCE;
+ 
+--- a/guava/src/com/google/common/hash/HashFunction.java
++++ b/guava/src/com/google/common/hash/HashFunction.java
+@@ -194,6 +194,18 @@
+   HashCode hashUnencodedChars(CharSequence input);
+ 
+   /**
++   * Shortcut for {@code newHasher().putUnencodedChars(input).hash()}. The implementation
++   * <i>might</i> perform better than its longhand equivalent, but should not perform worse.
++   * Note that no character encoding is performed; the low byte and high byte of each {@code char}
++   * are hashed directly (in that order).
++   *
++   * @deprecated Use {@link HashFunction#hashUnencodedChars} instead. This method is scheduled for
++   *     removal in Guava 16.0.
++   */
++  @Deprecated
++  HashCode hashString(CharSequence input);
++
++  /**
+    * Shortcut for {@code newHasher().putString(input, charset).hash()}. Characters are encoded using
+    * the given {@link Charset}. The implementation <i>might</i> perform better than its longhand
+    * equivalent, but should not perform worse.
+--- a/guava/src/com/google/common/hash/Hasher.java
++++ b/guava/src/com/google/common/hash/Hasher.java
+@@ -108,6 +108,16 @@
+   Hasher putUnencodedChars(CharSequence charSequence);
+ 
+   /**
++   * Equivalent to processing each {@code char} value in the {@code CharSequence}, in order.
++   * The input must not be updated while this method is in progress.
++   *
++   * @deprecated Use {@link Hasher#putUnencodedChars} instead. This method is scheduled for
++   *     removal in Guava 16.0.
++   */
++  @Deprecated
++  @Override Hasher putString(CharSequence charSequence);
++
++  /**
+    * Equivalent to {@code putBytes(charSequence.toString().getBytes(charset))}.
+    *
+    * <p><b>Warning:</b> This method, which reencodes the input before hashing it, is useful only for
+--- a/guava/src/com/google/common/hash/PrimitiveSink.java
++++ b/guava/src/com/google/common/hash/PrimitiveSink.java
+@@ -90,6 +90,15 @@
+   PrimitiveSink putChar(char c);
+ 
+   /**
++   * Puts a string into this sink.
++   *
++   * @deprecated Use {PrimitiveSink#putUnencodedChars} instead. This method is scheduled for
++   *     removal in Guava 16.0.
++   */
++  @Deprecated
++  PrimitiveSink putString(CharSequence charSequence);
++
++  /**
+    * Puts each 16-bit code unit from the {@link CharSequence} into this sink.
+    *
+    * <p><b>Warning:</b> This method will produce different output than most other languages do when
+--- a/guava/src/com/google/common/hash/AbstractHashFunction.java
++++ b/guava/src/com/google/common/hash/AbstractHashFunction.java
+@@ -44,6 +44,11 @@
+     return newHasher().putString(input, charset).hash();
+   }
+ 
++  @Deprecated
++  @Override public HashCode hashString(CharSequence input) {
++    return hashUnencodedChars(input);
++  }
++
+   @Override
+   public HashCode hashInt(int input) {
+     return newHasher(4).putInt(input).hash();

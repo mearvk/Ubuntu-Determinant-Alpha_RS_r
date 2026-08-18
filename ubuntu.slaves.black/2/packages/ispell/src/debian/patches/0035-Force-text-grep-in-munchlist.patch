@@ -1,0 +1,59 @@
+From: Robert Luberda <robert@debian.org>
+Date: Thu, 3 Mar 2016 20:47:08 +0100
+Subject: Force text files for grep in munchlist
+
+Pass the `-a' flag to egrep invocations to force
+grep to process files, that might contains non-7-bit
+national characters, as it they were text files.
+
+Also replace deprecated `egrep' with either its `grep -E'
+equivalent or with `grep -F' if called with a non-regexp.
+
+Bug-Debian: https://bugs.debian.org/815160
+Bug-Debian: https://bugs.debian.org/816572
+---
+ munchlist.X | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/munchlist.X b/munchlist.X
+index 2e98a39..8f93b99 100755
+--- a/munchlist.X
++++ b/munchlist.X
+@@ -575,7 +575,7 @@ esac
+ checkerrorflagfile
+ #
+ # Munch the input to generate roots and affixes ($ISPELL -c).  We are
+-# only interested in words that have at least one affix (egrep $flagmarker);
++# only interested in words that have at least one affix (grep -E $flagmarker);
+ # the next step will pick up the rest.  Some of the roots are illegal.  We
+ # use join to restrict the output to those root words that are found
+ # in the original dictionary.
+@@ -590,7 +590,7 @@ fi
+ $ISPELL "$wchars" -c -W0 -d $FAKEHASH -p /dev/null < $STRIPPEDINPUT \
+   | tr " " '
+ ' \
+-  | egrep "$flagmarker" | sort $SORTTMP -u "-t$flagmarker" $sortopts \
++  | grep -a -E "$flagmarker" | sort $SORTTMP -u "-t$flagmarker" $sortopts \
+   | $JOIN $SIGNED "-t$flagmarker" - $EXPANDEDINPUT > $CRUNCHEDINPUT
+ checkerrorflagfile
+ #
+@@ -698,8 +698,8 @@ $ISPELL -D -d $FAKEHASH \
+   | sort $SORTTMP $sortopts > $PRODUCTLIST
+ checkerrorflagfile
+ 
+-if [ `egrep ' p ' $PRODUCTLIST | wc -l` -gt 0 \
+-  -a `egrep ' s ' $PRODUCTLIST | wc -l` -gt 0 ]
++if [ `grep -a -F -c ' p ' $PRODUCTLIST` -gt 0 \
++  -a `grep -a -F -c ' s ' $PRODUCTLIST` -gt 0 ]
+ then
+     #
+     # The language tables allow cross products.  See if LEGALFLAGLIST has
+@@ -710,7 +710,7 @@ then
+ '`
+     sufflags=`sed -n -e 's/^[ 0-9]*s //p' $PRODUCTLIST | tr -d '
+ '`
+-    egrep "$flagmarker.*[$preflags].*[$sufflags]|$flagmarker.*[$sufflags].*[$preflags]" \
++    grep -a -E "$flagmarker.*[$preflags].*[$sufflags]|$flagmarker.*[$sufflags].*[$preflags]" \
+       $LEGALFLAGLIST \
+       > $CROSSROOTS || :
+ 

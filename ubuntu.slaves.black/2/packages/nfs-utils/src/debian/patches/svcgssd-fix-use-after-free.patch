@@ -1,0 +1,45 @@
+From 2eabb25d5a43e48e769a0db29956e9f5dc5b5913 Mon Sep 17 00:00:00 2001
+From: Marcel Ritter <marcel@linux-ng.de>
+Date: Tue, 21 Jun 2022 09:19:17 -0400
+Subject: [PATCH] svcgssd: Fix use-after-free bug (config variables)
+
+This patch fixes a bug when trying to set "principal" in /etc/nfs.conf.
+Memory gets freed by conf_cleanup() before being used - moving cleanup
+code resolves that.
+
+Signed-off-by: Steve Dickson <steved@redhat.com>
+---
+ utils/gssd/svcgssd.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+Origin: upstream, http://git.linux-nfs.org/?p=steved/nfs-utils.git;a=commit;h=2eabb25d5a43e48e769a0db29956e9f5dc5b5913
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/nfs-utils/+bug/1977745
+Last-Update: 2022-06-27
+
+diff --git a/utils/gssd/svcgssd.c b/utils/gssd/svcgssd.c
+index 881207b..a242b78 100644
+--- a/utils/gssd/svcgssd.c
++++ b/utils/gssd/svcgssd.c
+@@ -211,9 +211,6 @@ main(int argc, char *argv[])
+ 	rpc_verbosity = conf_get_num("svcgssd", "RPC-Verbosity", rpc_verbosity);
+ 	idmap_verbosity = conf_get_num("svcgssd", "IDMAP-Verbosity", idmap_verbosity);
+ 
+-	/* We don't need the config anymore */
+-	conf_cleanup();
+-
+ 	while ((opt = getopt(argc, argv, "fivrnp:")) != -1) {
+ 		switch (opt) {
+ 			case 'f':
+@@ -328,6 +325,9 @@ main(int argc, char *argv[])
+ 
+ 	daemon_ready();
+ 
++	/* We don't need the config anymore */
++	conf_cleanup();
++
+ 	nfs4_init_name_mapping(NULL); /* XXX: should only do this once */
+ 
+ 	rc = event_base_dispatch(evbase);
+-- 
+1.8.3.1
+

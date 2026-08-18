@@ -1,0 +1,88 @@
+From 82cb28fa4e8da605cb31fdca02386027ed65cede Mon Sep 17 00:00:00 2001
+From: James Cowgill <jcowgill@debian.org>
+Date: Fri, 20 Oct 2017 14:31:44 +0100
+Subject: [PATCH] MIPS64: Fix HREF evicting a register in a branch delay slot
+
+If asm_href is called in 64-bit mode to search for a string constant (for
+example), and if the HREF is merged with an EQ guard, then it is
+possible for a constant register to be evicted by a call to ra_allock
+inside a branch delay slot. This causes the instruction loading into RID_TMP
+which was supposed to be in the delay slot, to be moved after the branch and
+not executed if the branch was taken. With the wrong value in RID_TMP,
+lj_vm_exit_handler will later load a garbage exit number and luajit will later
+crash.
+
+Fix by moving the constant register allocations above the main
+instruction emitting code in asm_href.
+---
+ src/lj_asm_mips.h | 42 +++++++++++++++++++++++++-----------------
+ 1 file changed, 25 insertions(+), 17 deletions(-)
+
+diff --git a/src/lj_asm_mips.h b/src/lj_asm_mips.h
+index 1406a873..c8abe6ff 100644
+--- a/src/lj_asm_mips.h
++++ b/src/lj_asm_mips.h
+@@ -865,6 +865,9 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+   IRType1 kt = irkey->t;
+   uint32_t khash;
+   MCLabel l_end, l_loop, l_next;
++#if LJ_64
++  Reg cmp64;
++#endif
+ 
+   rset_clear(allow, tab);
+ #if LJ_SOFTFP32
+@@ -901,6 +904,26 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+ #endif
+   tmp2 = ra_scratch(as, allow);
+   rset_clear(allow, tmp2);
++#if LJ_64
++  if (LJ_SOFTFP || !irt_isnum(kt)) {
++    /* Allocate cmp64 register used for 64-bit comparisons */
++    if (LJ_SOFTFP && irt_isnum(kt)) {
++      cmp64 = key;
++    } else if (!isk && irt_isaddr(kt)) {
++      cmp64 = tmp2;
++    } else {
++      int64_t k;
++      if (isk && irt_isaddr(kt)) {
++        k = ((int64_t)irt_toitype(irkey->t) << 47) | irkey[1].tv.u64;
++      } else {
++        lua_assert(irt_ispri(kt) && !irt_isnil(kt));
++        k = ~((int64_t)~irt_toitype(ir->t) << 47);
++      }
++      cmp64 = ra_allock(as, k, allow);
++      rset_clear(allow, cmp64);
++    }
++  }
++#endif
+ 
+   /* Key not found in chain: jump to exit (if merged) or load niltv. */
+   l_end = emit_label(as);
+@@ -943,24 +966,9 @@ static void asm_href(ASMState *as, IRIns *ir, IROp merge)
+     emit_dta(as, MIPSI_DSRA32, tmp1, tmp1, 15);
+     emit_tg(as, MIPSI_DMTC1, tmp1, tmpnum);
+     emit_tsi(as, MIPSI_LD, tmp1, dest, (int32_t)offsetof(Node, key.u64));
+-  } else if (LJ_SOFTFP && irt_isnum(kt)) {
+-    emit_branch(as, MIPSI_BEQ, tmp1, key, l_end);
+-    emit_tsi(as, MIPSI_LD, tmp1, dest, (int32_t)offsetof(Node, key.u64));
+-  } else if (irt_isaddr(kt)) {
+-    Reg refk = tmp2;
+-    if (isk) {
+-      int64_t k = ((int64_t)irt_toitype(irkey->t) << 47) | irkey[1].tv.u64;
+-      refk = ra_allock(as, k, allow);
+-      rset_clear(allow, refk);
+-    }
+-    emit_branch(as, MIPSI_BEQ, tmp1, refk, l_end);
+-    emit_tsi(as, MIPSI_LD, tmp1, dest, offsetof(Node, key));
+   } else {
+-    Reg pri = ra_allock(as, ~((int64_t)~irt_toitype(ir->t) << 47), allow);
+-    rset_clear(allow, pri);
+-    lua_assert(irt_ispri(kt) && !irt_isnil(kt));
+-    emit_branch(as, MIPSI_BEQ, tmp1, pri, l_end);
+-    emit_tsi(as, MIPSI_LD, tmp1, dest, offsetof(Node, key));
++    emit_branch(as, MIPSI_BEQ, tmp1, cmp64, l_end);
++    emit_tsi(as, MIPSI_LD, tmp1, dest, (int32_t)offsetof(Node, key.u64));
+   }
+   *l_loop = MIPSI_BNE | MIPSF_S(tmp1) | ((as->mcp-l_loop-1) & 0xffffu);
+   if (!isk && irt_isaddr(kt)) {

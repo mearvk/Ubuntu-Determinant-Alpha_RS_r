@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+DEB_VERSION_MAJOR := $(shell echo $(DEB_VERSION_UPSTREAM) | cut -c 1)
+
+#export DH_VERBOSE=1
+export LC_ALL=C.UTF-8
+
+%:
+	dh $@ --with python3,sphinxdoc --buildsystem=pybuild
+
+override_dh_auto_install:
+	dh_auto_install
+	rm -f debian/tmp/usr/bin/iptest* debian/tmp/usr/bin/ipython
+	mv debian/tmp/usr/share/man/man1/ipython.1 debian/tmp/usr/share/man/man1/ipython3.1
+
+override_dh_auto_test:
+	@echo "No test to avoid circular dependencies"
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	http_proxy=127.0.0.1:9 https_proxy=127.0.0.1:9 PYTHONPATH=. python3 -m sphinx -b html docs/source debian/python-ipython-doc/usr/share/doc/python-ipython-doc/html
+	dh_sphinxdoc -O--buildsystem=pybuild
+endif
+
+override_dh_installchangelogs:
+	dh_installchangelogs -k docs/source/whatsnew/version$(DEB_VERSION_MAJOR).rst

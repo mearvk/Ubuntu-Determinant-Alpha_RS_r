@@ -1,0 +1,46 @@
+From: Ximin Luo <infinity0@debian.org>
+Date: Wed, 7 Dec 2016 21:54:46 +0100
+Subject: Debian-specific hack to fix upstream's (non-)incremental build
+
+---
+ setup.py | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/setup.py b/setup.py
+index c54f9a1..7fdc46f 100755
+--- a/setup.py
++++ b/setup.py
+@@ -161,18 +161,21 @@ class bdist_egg_disabled(bdist_egg):
+     def run(self):
+         sys.exit("Aborting implicit building of eggs. Use `pip install .` to install from source.")
+ 
+-setup_args['cmdclass'] = {
+-    'build_py': css_js_prerelease(
+-            check_package_data_first(build_py)),
+-    'sdist' : css_js_prerelease(sdist, strict=True),
+-    'develop': css_js_prerelease(develop),
+-    'css' : CompileCSS,
+-    'backendtranslations': CompileBackendTranslation,
+-    'js' : CompileJS,
+-    'jsdeps' : Bower,
+-    'jsversion' : JavascriptVersion,
+-    'bdist_egg': bdist_egg if 'bdist_egg' in sys.argv else bdist_egg_disabled,
+-}
++if os.path.exists("debian/debhelper-build-stamp"):
++    setup_args['cmdclass'] = {}
++else:
++    setup_args['cmdclass'] = {
++        'build_py': css_js_prerelease(
++                check_package_data_first(build_py)),
++        'sdist' : css_js_prerelease(sdist, strict=True),
++        'develop': css_js_prerelease(develop),
++        'css' : CompileCSS,
++        'backendtranslations': CompileBackendTranslation,
++        'js' : CompileJS,
++        'jsdeps' : Bower,
++        'jsversion' : JavascriptVersion,
++        'bdist_egg': bdist_egg if 'bdist_egg' in sys.argv else bdist_egg_disabled,
++    }
+ 
+ try:
+     from wheel.bdist_wheel import bdist_wheel

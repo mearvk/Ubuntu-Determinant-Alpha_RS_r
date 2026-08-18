@@ -1,0 +1,244 @@
+Description: Modify the Gradle build to work on Debian
+Author: Christopher Hoskin <christopher.hoskin@gmail.com>
+Forwarded: not-needed
+Last-Update: 2016-08-19
+
+--- a/build.gradle
++++ b/build.gradle
+@@ -33,9 +33,9 @@
+     }
+     dependencies {
+         classpath 'org.kordamp.gradle:clirr-gradle-plugin:0.2.2'
+-        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
++//        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:1.12.+'
+         classpath 'com.bmuschko:gradle-nexus-plugin:2.2'
+-        classpath "gradle.plugin.com.github.spotbugs:gradlePlugin:1.6.0"
++//        classpath "gradle.plugin.com.github.spotbugs:gradlePlugin:1.6.0"
+     }
+ }
+ 
+@@ -45,7 +45,7 @@
+ 
+ configure(subprojects.findAll { it.name != 'util' }) {
+     apply plugin: 'java'
+-    apply plugin: 'optional-base'
++//    apply plugin: 'optional-base'
+ 
+     evaluationDependsOn(':util')
+ 
+@@ -61,7 +61,7 @@
+     }
+ 
+     dependencies {
+-        compile 'org.slf4j:slf4j-api:1.7.6', optional
++        compile 'org.slf4j:slf4j-api:1.7.6' //, optional
+     }
+ 
+     /* Compiling */
+--- a/gradle/deploy.gradle
++++ b/gradle/deploy.gradle
+@@ -20,8 +20,9 @@
+  * Ensure you have configured ~/.gradle/gradle.properties for both the nexus and signing plugins
+  */
+ configure(subprojects - project(':util')) {
+-    apply plugin: 'com.bmuschko.nexus'
++//    apply plugin: 'com.bmuschko.nexus'
+ 
++/*
+     modifyPom {
+         project {
+ 
+@@ -59,6 +60,7 @@
+         // no need to publish test dependencies
+         pom.dependencies.removeAll { it.scope == "test" }
+     }
++*/
+ 
+     task uploadSnapshotArchives(dependsOn: uploadArchives) {
+         if (!version.endsWith("-SNAPSHOT")) {
+--- a/bson/build.gradle
++++ b/bson/build.gradle
+@@ -16,16 +16,18 @@
+ 
+ apply plugin: 'osgi'
+ apply plugin: 'java'
+-apply plugin: 'org.kordamp.gradle.clirr'
++//apply plugin: 'org.kordamp.gradle.clirr'
+ 
+ def configDir = new File(rootDir, 'config')
+ archivesBaseName = 'bson'
+ 
++/*
+ clirr {
+     excludeFilter = new File("$configDir/clirr-exclude.yml")
+     baseline 'org.mongodb:bson:3.4.0'
+     failOnErrors = true
+ }
++*/
+ 
+ jar {
+     manifest {
+@@ -36,6 +38,7 @@
+     }
+ }
+ 
++/*
+ modifyPom {
+     project {
+         name 'BSON'
+@@ -43,3 +46,4 @@
+         url 'http://bsonspec.org'
+     }
+ }
++*/
+--- a/driver-async/build.gradle
++++ b/driver-async/build.gradle
+@@ -15,7 +15,7 @@
+  */
+ 
+ apply plugin: 'osgi'
+-apply plugin: 'org.kordamp.gradle.clirr'
++//apply plugin: 'org.kordamp.gradle.clirr'
+ 
+ def configDir = new File(rootDir, 'config')
+ archivesBaseName = 'mongodb-driver-async'
+@@ -32,17 +32,20 @@
+     testCompile project(':driver-core').sourceSets.test.output
+ }
+ 
++/*
+ clirr {
+     excludeFilter = new File("$configDir/clirr-exclude.yml")
+     baseline 'org.mongodb:mongodb-driver-async:3.4.0'
+     failOnErrors = false
+ }
++*/
+ 
+ tasks.withType(Checkstyle) {
+     // needed so the Javadoc checks can find the code in other modules
+     classpath = files(project(':driver-core').sourceSets.main.output, sourceSets.main.output)
+ }
+ 
++/*
+ jar {
+     manifest {
+         instruction 'Build-Version', getGitVersion()
+@@ -60,3 +63,4 @@
+         url 'http://www.mongodb.org'
+     }
+ }
++*/
+--- a/driver-core/build.gradle
++++ b/driver-core/build.gradle
+@@ -15,24 +15,26 @@
+  */
+ 
+ apply plugin: 'osgi'
+-apply plugin: 'org.kordamp.gradle.clirr'
++//apply plugin: 'org.kordamp.gradle.clirr'
+ 
+ def configDir = new File(rootDir, 'config')
+ archivesBaseName = 'mongodb-driver-core'
+ 
++/*
+ clirr {
+     excludeFilter = new File("$configDir/clirr-exclude.yml")
+     baseline 'org.mongodb:mongodb-driver-core:3.4.0'
+     failOnErrors = false
+ }
++*/
+ 
+ dependencies {
+     compile project(':bson')
+ 
+-    compile "io.netty:netty-buffer:$nettyVersion", optional
+-    compile "io.netty:netty-transport:$nettyVersion", optional
+-    compile "io.netty:netty-handler:$nettyVersion", optional
+-    compile "org.xerial.snappy:snappy-java:$snappyVersion", optional
++    compile "io.netty:netty-buffer:$nettyVersion" //, optional
++    compile "io.netty:netty-transport:$nettyVersion" //, optional
++    compile "io.netty:netty-handler:$nettyVersion" //, optional
++    compile "org.xerial.snappy:snappy-java:$snappyVersion" //, optional
+ 
+     testCompile project(':bson').sourceSets.test.output
+ }
+@@ -56,6 +58,7 @@
+     }
+ }
+ 
++/*
+ modifyPom {
+     project {
+         name 'MongoDB Java Driver Core'
+@@ -64,3 +67,4 @@
+         url 'http://www.mongodb.org'
+     }
+ }
++*/
+--- a/driver/build.gradle
++++ b/driver/build.gradle
+@@ -14,7 +14,7 @@
+  * limitations under the License.
+  */
+ 
+-apply plugin: 'org.kordamp.gradle.clirr'
++//apply plugin: 'org.kordamp.gradle.clirr'
+ 
+ archivesBaseName = 'mongodb-driver'
+ def configDir = new File(rootDir, 'config')
+@@ -35,17 +35,20 @@
+     testCompile project(':driver-core').sourceSets.test.output
+ }
+ 
++/*
+ clirr {
+     excludeFilter = new File("$configDir/clirr-exclude.yml")
+     baseline 'org.mongodb:mongodb-driver:3.4.0'
+     failOnErrors = false
+ }
++*/
+ 
+ tasks.withType(Checkstyle) {
+     // needed so the Javadoc checks can find the code in other modules
+     classpath = files(project(':driver-core').sourceSets.main.output, sourceSets.main.output)
+ }
+ 
++/*
+ modifyPom {
+     project {
+         name 'MongoDB Driver'
+@@ -53,3 +56,4 @@
+         url 'http://www.mongodb.org'
+     }
+ }
++*/
+--- a/mongo-java-driver/build.gradle
++++ b/mongo-java-driver/build.gradle
+@@ -27,10 +27,10 @@
+ 
+ // dependencies copied from driver-core
+ dependencies {
+-    compile "io.netty:netty-buffer:$nettyVersion", optional
+-    compile "io.netty:netty-transport:$nettyVersion", optional
+-    compile "io.netty:netty-handler:$nettyVersion", optional
+-    compile "org.xerial.snappy:snappy-java:$snappyVersion", optional
++    compile "io.netty:netty-buffer:$nettyVersion" //, optional
++    compile "io.netty:netty-transport:$nettyVersion" //, optional
++    compile "io.netty:netty-handler:$nettyVersion" //, optional
++    compile "org.xerial.snappy:snappy-java:$snappyVersion" //, optional
+ }
+ 
+ // srcDirs copied as well, so everything is compiled twice
+@@ -63,6 +63,7 @@
+     }
+     }
+ 
++/*
+ modifyPom {
+     project {
+         name 'MongoDB Java Driver'
+@@ -70,3 +71,4 @@
+         url 'http://www.mongodb.org'
+     }
+ }
++*/

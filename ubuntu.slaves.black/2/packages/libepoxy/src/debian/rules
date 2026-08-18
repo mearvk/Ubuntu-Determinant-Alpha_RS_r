@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=meson
+
+# Ignore test results on s390x and most ports where tests fail
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+ifneq (,$(filter s390x alpha hppa hurd-i386 ia64 kfreebsd-amd64 kfreebsd-i386 riscv64 sparc64 x32,$(DEB_HOST_ARCH)))
+	-xvfb-run -a dh_auto_test
+else
+	xvfb-run -a dh_auto_test
+endif
+endif
+
+# No symbols for udebs, specify the highest version from symbols file:
+override_dh_makeshlibs:
+	dh_makeshlibs -plibepoxy0 -V'libepoxy0 (>= 1.5.4)' --add-udeb=libepoxy0-udeb

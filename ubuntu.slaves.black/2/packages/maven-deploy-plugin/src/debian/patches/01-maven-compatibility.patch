@@ -1,0 +1,51 @@
+Description: Fixes the compilation failures with the latest version of Maven in Debian
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/src/test/java/org/apache/maven/plugin/deploy/stubs/ArtifactRepositoryStub.java
++++ b/src/test/java/org/apache/maven/plugin/deploy/stubs/ArtifactRepositoryStub.java
+@@ -27,7 +27,7 @@
+ import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
+ 
+ public class ArtifactRepositoryStub
+-    implements ArtifactRepository
++    extends org.apache.maven.plugin.testing.stubs.StubArtifactRepository
+ {
+     private boolean blacklisted;
+     
+@@ -37,6 +37,16 @@
+     
+     private String basedir = System.getProperty( "basedir" );
+ 
++    public ArtifactRepositoryStub()
++    {
++        super( null );
++    }
++
++    public ArtifactRepositoryStub( String dir )
++    {
++        super( dir );
++    }
++
+     public String pathOf( Artifact artifact )
+     {
+         return getLayout().pathOf( artifact );
+--- a/src/test/java/org/apache/maven/plugin/deploy/DeployMojoTest.java
++++ b/src/test/java/org/apache/maven/plugin/deploy/DeployMojoTest.java
+@@ -412,7 +412,7 @@
+         
+         
+         @SuppressWarnings( "unchecked" )
+-        List<AttachedArtifactStub> attachedArtifacts = project.getAttachedArtifacts();
++        List<org.apache.maven.artifact.Artifact> attachedArtifacts = project.getAttachedArtifacts();
+ 
+         ArtifactRepositoryStub repo = getRepoStub( mojo );
+         
+@@ -422,7 +422,7 @@
+ 
+         String packaging = project.getPackaging();
+ 
+-        for( AttachedArtifactStub attachedArtifact : attachedArtifacts )
++        for( org.apache.maven.artifact.Artifact attachedArtifact : attachedArtifacts )
+         {
+             File deployedArtifact = new File( remoteRepo, "basic-deploy-with-attached-artifacts" + "/" +
+                                                attachedArtifact.getGroupId().replace( '.', '/' ) + "/" + 

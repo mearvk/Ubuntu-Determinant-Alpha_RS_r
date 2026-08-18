@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+export BROWSERSLIST_IGNORE_OLD_DATA=1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	mkdir -p dist/css dist/js dist/tmp
+	sassc --sourcemap=auto scss/bootstrap.scss dist/tmp/bootstrap.css
+	sassc --sourcemap=auto scss/bootstrap-grid.scss dist/tmp/bootstrap-grid.css
+	sassc --sourcemap=auto scss/bootstrap-reboot.scss dist/tmp/bootstrap-reboot.css
+	node debian/postcss.js
+	cp -v dist/tmp/*.css dist/css/
+	cp -v dist/tmp/*.css.map dist/css/
+	sassc --sourcemap=auto --style compressed dist/tmp/bootstrap.css dist/css/bootstrap.min.css
+	sassc --sourcemap=auto --style compressed dist/tmp/bootstrap-grid.css dist/css/bootstrap-grid.min.css
+	sassc --sourcemap=auto --style compressed dist/tmp/bootstrap-reboot.css dist/css/bootstrap-reboot.min.css
+	rm -rf dist/tmp
+
+	NODE_PATH=node_modules node build/build-plugins.js
+	NODE_PATH=node_modules rollup --sourcemap --environment BUNDLE:true --config build/rollup.config.js
+	NODE_PATH=node_modules rollup --sourcemap --environment BUNDLE:false --config build/rollup.config.js
+	cd dist/js && terser --compress --mangle --comments "/^!" --source-map content=bootstrap.bundle.js.map,includeSources,url=bootstrap.bundle.min.js.map -o bootstrap.bundle.min.js bootstrap.bundle.js
+	cd dist/js && terser --compress --mangle --comments "/^!" --source-map content=bootstrap.js.map,includeSources,url=bootstrap.min.js.map -o bootstrap.min.js bootstrap.js
+
+override_dh_auto_test:
+	# No test
+
+override_dh_auto_install:
+
+override_dh_installdocs:
+	dh_installdocs --exclude license.md

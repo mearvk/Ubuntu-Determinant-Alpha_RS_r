@@ -1,0 +1,100 @@
+Description: Modifies the loading of the shadow plugin and work around a regression in Shadow 4.0.2
+ (see https://github.com/johnrengelman/shadow/issues/425)
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/build.gradle
++++ b/build.gradle
+@@ -6,11 +6,11 @@
+ 		classpath('gradle.plugin.de.obqo.gradle:gradle-degraph:0.1.4.1') {
+ 			exclude(group: 'org.codehaus.groovy')
+ 		}
++		classpath('com.github.jengelman.gradle.plugins:shadow:debian')
+ 	}
+ }
+ 
+ plugins {
+-	id 'com.github.johnrengelman.shadow' version '2.0.4' apply false
+ 	id 'de.marcphilipp.nexus-publish' version '0.1.0' apply false
+ }
+ 
+--- a/junit-platform-console-standalone/junit-platform-console-standalone.gradle
++++ b/junit-platform-console-standalone/junit-platform-console-standalone.gradle
+@@ -30,6 +30,7 @@
+ test.enabled = false // prevent supposed-to-fail integration tests from failing the build
+ japicc.enabled = false
+ 
++/*
+ shadowJar {
+ 	// Generate shadow jar only if the underlying manifest was regenerated.
+ 	// See https://github.com/junit-team/junit5/issues/631
+@@ -70,6 +71,7 @@
+ 		)
+ 	}
+ }
++*/
+ 
+ task standaloneExec(type: JavaExec, dependsOn: [shadowJar, testClasses]) {
+ 	ignoreExitValue = true
+--- a/junit-jupiter-params/junit-jupiter-params.gradle
++++ b/junit-jupiter-params/junit-jupiter-params.gradle
+@@ -1,4 +1,3 @@
+-apply plugin: 'com.github.johnrengelman.shadow'
+ apply from: "$rootDir/gradle/testing.gradle"
+ 
+ description = 'JUnit Jupiter Params'
+@@ -7,8 +6,6 @@
+ 	// Use classes modified by shadow plugin for test execution so JaCoCo
+ 	// finds same class files when creating its report
+ 	test.classpath -= sourceSets.main.output
+-	test.classpath += files(shadowJar.archivePath)
+-	test.dependsOn(shadowJar)
+ }
+ 
+ dependencies {
+@@ -25,9 +22,6 @@
+ 	testImplementation('org.jetbrains.kotlin:kotlin-stdlib')
+ }
+ 
+-jar.enabled = false
+-jar.dependsOn shadowJar
+-
+ jar {
+ 	manifest {
+ 		attributes(
+@@ -36,6 +30,7 @@
+ 	}
+ }
+ 
++/*
+ shadowJar {
+ 	// Generate shadow jar only if the underlying manifest was regenerated.
+ 	// See https://github.com/junit-team/junit5/issues/631
+@@ -51,3 +46,4 @@
+ 		into 'META-INF'
+ 	}
+ }
++*/
+--- a/junit-platform-console/junit-platform-console.gradle
++++ b/junit-platform-console/junit-platform-console.gradle
+@@ -1,5 +1,3 @@
+-apply plugin: 'com.github.johnrengelman.shadow'
+-
+ description = 'JUnit Platform Console'
+ 
+ dependencies {
+@@ -17,9 +15,7 @@
+ 	}
+ }
+ 
+-jar.enabled = false
+-jar.dependsOn shadowJar
+-
++/*
+ shadowJar {
+ 	// Generate shadow jar only if the underlying manifest was regenerated.
+ 	// See https://github.com/junit-team/junit5/issues/631
+@@ -34,3 +30,4 @@
+ 		into 'META-INF'
+ 	}
+ }
++*/

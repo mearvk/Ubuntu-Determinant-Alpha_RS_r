@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+
+'''
+Convert lirc 0.9.0 debian setup to 0.9.4.
+
+Usage: lirc-old2new  [etcdir]
+
+Script creates etcdir/lirc_options.conf using data in etcdir/hardware.conf
+end etcdir/lirc_options.conf. [etcdir] defaults to '/etc/lirc'. Without
+options it requires root permissions.
+
+Scripts also tries to enable the three different systemd units lircd.socket,
+lircmd.service and irexec.service depending on hardware.conf contents and
+available configuration files.
+
+If the LIRC_DRYRUN environment variable is set, the systemctl enable
+commands are just echoed instead of executed.
+
+'''
+# pylint: disable=invalid-name
+
+import argparse
+import configparser
+import os.path
+import re
+import shutil
+import subprocess
+import sys
+
+_LIRCD_CONF = '''
+# Populated config files can be found at http://sf.net/p/lirc-remotes. The
+# irdb-get(1) and lirc-setup(1) tools can be used to search and download
+# config files.
+#
+# From 0.9.2 config files could just be dropped as-is in the lircd.conf.d
+# directory and be included by this file.
+
+include "lircd.conf.d/*.conf"
+'''
+
+
+
+def _warn(s):
+    ''' Print a warning to stderr. '''
+    print("WARNING: " + s, file=sys.stderr)
+
+
+def _enable_start(unit):
+    ''' Run systemctl enable and systemctl start on given unit. '''
+    cmd = ['systemctl', 'start', unit]
+    if 'LIRC_DRYRUN' in os.environ:
+        cmd.insert(0, 'echo')
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError:
+        _warn("Cannot start " + unit)
+    cmd = ['systemctl', 'enable', unit]
+    if 'LIRC_DRYRUN' in os.environ:
+        cmd.insert(0, 'echo')
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError:
+        _warn("Cannot enable " + unit)
+
+
+def _grep(what, path):
+    ''' test if file 'path' contains 'what'. '''
+    if not os.path.exists(path):
+        return path
+    with open(path) as f:
+        s = '\n'.join(f.readlines())
+    return what in s
+
+
+def parse_args(line):
+    ''' Parse lircd command line and return as a dict. '''
+
+    parser = argparse.ArgumentParser(description="Parses LIRCD_ARGS options")
+    parser.add_argument('-d', '--device')
+    parser.add_argument('-H', '--driver')
+    parser.add_argument('-a', '--allow-simulate', action='store_true')
+    parser.add_argument('-c', '--connect', action='store_true')
+    parser.add_argument('-e', '--effective-user')
+    parser.add_argument('-A', '--driver-options')
+    parser.add_argument('-Y', '--dynamic_codes', action='store_true')
+    parser.add_argument('-l', '--listen')
+    parser.add_argument('-L', '--logfile')
+    parser.add_argument('-D', '--loglevel')
+    parser.add_argument('-O', '--options-file')
+    parser.add_argument('-p', '--permissiom')
+    parser.add_argument('-P', '--pidfile')
+    parser.add_argument('-U', '--plugindir')
+    parser.add_argument('-r', '--release', default=None, nargs='?')
+    parser.add_argument('-R', '--repeat-max')
+    parser.add_argument('-u', '--uinput', action='store_true')
+    try:
+        args = parser.parse_args(line.split())
+    except ValueError:
+        _warn("Illegal LIRCD_ARGS line:" + line)
+        return {}
+    else:
+        return {key: value for key, value in vars(args).items() if value}
+
+
+def get_lircd_options(hardware_cf, etcdir):
+    ''' Get a ConfigParser from path updated with hardware_cf values. '''
+    options_path = os.path.join(etcdir, 'lirc_options.conf')
+    args = {}
+    if  'lircd_args' in hardware_cf and hardware_cf['lircd_args']:
+        args = parse_args(hardware_cf['lircd_args'])
+    if 'device' in hardware_cf and hardware_cf['device'] \
+    and 'UNCONFIGURED' not in hardware_cf['device']:
+        if 'device' in args:
+            _warn("--device in LIRC_ARGS obsoleted by DEVICE.")
+        args['device'] = hardware_cf['device']
+    if 'driver' in hardware_cf and hardware_cf['driver'] \
+    and 'UNCONFIGURED' not in hardware_cf['driver']:
+        if 'driver' in args:
+            _warn("--driver in LIRC_ARGS obsoleted by DRIVER.")
+        args['driver'] = hardware_cf['driver']
+
+    if not 'driver' in args:
+        args['driver'] = 'default';
+
+    parser = configparser.RawConfigParser()
+    if os.path.exists(options_path):
+        parser.read(options_path)
+    for key, value in args.items():
+        if not parser.has_section('lircd'):
+            parser.add_section('lircd')
+        if value:
+            parser.set('lircd', key, value)
+    if 'load_modules' in hardware_cf and hardware_cf['load_modules'] \
+    and hardware_cf['modules']:
+        if not parser.has_section('modinit'):
+            parser.add_section('modinit')
+        modprobes = ['modprobe ' + m for m in hardware_cf['modules'].split()]
+        parser.set('modinit', 'code', '; '.join(modprobes))
+    return parser
+
+
+def setup_lircmd(lircmd_opt, etcdir):
+    ''' Possibly start and enable the lircmd service. '''
+    lircmd_path = os.path.join(etcdir, 'lircmd.conf')
+    start_lircmd = True
+    if lircmd_opt and lircmd_opt.lower() == 'false':
+        start_lircmd = False
+    elif not os.path.exists(lircmd_path):
+        start_lircmd = False
+    elif _grep('UNCONFIGURED', lircmd_path):
+        print(lircmd_path + " is unconfigured (skip lircmd)")
+        start_lircmd = False
+    if start_lircmd:
+        _enable_start('lircmd.service')
+
+
+def setup_lircd(etcdir):
+    ''' Possibly start and enable the lircd service. '''
+    lircd_path = os.path.join(etcdir, 'lircd.conf')
+    lircd_new_path = os.path.join(etcdir, 'lircd.conf.d', 'lirc-old.conf')
+    use_old = True
+    if not os.path.exists(lircd_path):
+        _warn("Cannot find " + lircd_path)
+        _warn("lircd.socket is not enabled, LIRC is disabled")
+        use_old = False
+    if _grep('UNCONFIGURED', lircd_path):
+        _warn("lircd.conf is unconfigured, LIRC is disabled")
+        use_old = False
+    if use_old:
+        print("Using existing lircd configuration and enabling lircd.socket")
+        shutil.copyfile(lircd_path, lircd_new_path)
+        with open(lircd_path, 'w') as f:
+            f.write(_LIRCD_CONF)
+        _enable_start('lircd.socket')
+    else:
+        print("Using default devinput lircd configuration, not enabled.")
+        with open(lircd_path, 'w') as f:
+            f.write(_LIRCD_CONF)
+    return use_old
+
+
+def setup_irexec(irexec_opt, etcdir):
+    ''' Possibly start and enable the irexec service. '''
+    lircrc_path = os.path.join(etcdir, 'lircrc')
+    irexec_path = os.path.join(etcdir, 'irexec.lircrc')
+    start_irexec = True
+    if irexec_opt and irexec_opt.lower() == 'false':
+        start_irexec = False
+    elif not os.path.exists(lircrc_path):
+        start_irexec = False
+    elif _grep('UNCONFIGURED', lircrc_path):
+        print(lircrc_path + " is unconfigured (skip irexec)")
+        start_irexec = False
+    else:
+        shutil.copyfile(lircrc_path, irexec_path)
+    if start_irexec:
+        _enable_start('irexec.service')
+
+
+def decode_hw(path):
+    ''' Return dict of all items in hardware.conf. '''
+    hw = {}
+    try:
+        with open(path) as f:
+            contents = f.readlines()
+    except FileNotFoundError:
+        _warn("Cannot locate hardware.conf(!)")
+        return {}
+    contents.insert(0, '[main]\n')
+    s = ''.join(contents)
+    parser = configparser.RawConfigParser()
+    parser.read_string(s, path)
+    hw = {key: value for key, value in parser.items('main')}
+    for key, value in hw.items():
+        m = re.match(r'^"(.*)"$', value)
+        if m:
+            hw[key] = m.group(1)
+    return hw
+
+
+def main():
+    ''' Indeed: main program. '''
+
+    if len(sys.argv) not in [1, 2]:
+        print("Usage: lirc-old2new [etcdir]")
+        sys.exit(1)
+    if len(sys.argv) == 2:
+        etcdir = sys.argv[1]
+    else:
+        etcdir = '/etc/lirc'
+
+    options_path = os.path.join(etcdir, 'lirc_options.conf')
+    hardware_conf = decode_hw(os.path.join(etcdir, 'hardware.conf'))
+    options_conf = get_lircd_options(hardware_conf, etcdir)
+    with open(options_path, 'w') as f:
+        options_conf.write(f)
+    if setup_lircd(etcdir):
+        setup_lircmd(hardware_conf['start_lircmd']
+                     if 'start_lircmd' in hardware_conf else None,
+                     etcdir)
+        setup_irexec(hardware_conf['start_irexec']
+                     if 'start_irexec' in hardware_conf else None,
+                     etcdir)
+
+
+if __name__ == '__main__':
+    main()
+
+
+# vim: set expandtab ts=4 sw=4:

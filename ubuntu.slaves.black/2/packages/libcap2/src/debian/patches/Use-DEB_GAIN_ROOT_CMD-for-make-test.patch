@@ -1,0 +1,56 @@
+From: Kevin Locke <kevin@kevinlocke.name>
+Date: Mon, 3 Dec 2018 08:53:43 -0700
+Subject: Use $DEB_GAIN_ROOT_CMD for make test
+
+The $DEB_GAIN_ROOT_CMD environment variable is the mechanism to run
+build/test commands as root, according to section 4.9.2 of the Debian
+Policy.  Use it instead of sudo (which is not guaranteed to be
+available, since it is not a build-dependency).
+
+Forwarded: not-needed
+Last-Update: 2019-10-28
+---
+ pam_cap/Makefile | 14 +++++++-------
+ progs/Makefile   |  4 ++--
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/pam_cap/Makefile b/pam_cap/Makefile
+index caa98e3..8478d27 100644
+--- a/pam_cap/Makefile
++++ b/pam_cap/Makefile
+@@ -34,13 +34,13 @@ test: pam_cap.so
+ 	make testlink
+ 
+ sudotest: test test_pam_cap
+-	sudo ./test_pam_cap root 0x0 0x0 0x0 config=./capability.conf
+-	sudo ./test_pam_cap root 0x0 0x0 0x0 config=./sudotest.conf
+-	sudo ./test_pam_cap alpha 0x0 0x0 0x0 config=./capability.conf
+-	sudo ./test_pam_cap alpha 0x0 0x1 0x80 config=./sudotest.conf
+-	sudo ./test_pam_cap beta 0x0 0x1 0x0 config=./sudotest.conf
+-	sudo ./test_pam_cap gamma 0x0 0x0 0x81 config=./sudotest.conf
+-	sudo ./test_pam_cap delta 0x41 0x80 0x41 config=./sudotest.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap root 0x0 0x0 0x0 config=./capability.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap root 0x0 0x0 0x0 config=./sudotest.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap alpha 0x0 0x0 0x0 config=./capability.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap alpha 0x0 0x1 0x80 config=./sudotest.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap beta 0x0 0x1 0x0 config=./sudotest.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap gamma 0x0 0x0 0x81 config=./sudotest.conf
++	$(DEB_GAIN_ROOT_CMD) ./test_pam_cap delta 0x41 0x80 0x41 config=./sudotest.conf
+ 
+ clean:
+ 	rm -f *.o *.so testlink test_pam_cap *~
+diff --git a/progs/Makefile b/progs/Makefile
+index 5bfb8da..1da7bff 100644
+--- a/progs/Makefile
++++ b/progs/Makefile
+@@ -43,8 +43,8 @@ test: $(PROGS)
+ tcapsh-static: capsh.c $(DEPS)
+ 	$(CC) $(IPATH) $(CAPSH_SHELL) $(CFLAGS) -o $@ $< $(LIBCAPLIB) $(LDFLAGS) --static
+ 
+-sudotest: test tcapsh-static
+-	sudo $(LDPATH) ./quicktest.sh
++sudotest: test
++	$(DEB_GAIN_ROOT_CMD) ./quicktest.sh
+ 
+ clean:
+ 	$(LOCALCLEAN)

@@ -1,0 +1,89 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+JESTDIR=$(CURDIR)/debian/jest
+HELP2MAN=help2man --no-discard-stderr --no-info
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	dh_auto_build --buildsystem=nodejs
+	NODE_PATH=debian/build_modules node ./scripts/build.js
+	for p in pretty-format jest-diff; do \
+		rm -f node_modules/$$p; \
+		cp -a packages/$$p/ node_modules; \
+		cp debian/nodejs/types-$$p/* node_modules/$$p/build/; \
+	done
+	node ./scripts/buildTs.js
+	# jest-snapshot-serializer-raw needs jest to be built
+	cd ./jest-snapshot-serializer-raw && sh -ex ../debian/nodejs/jest-snapshot-serializer-raw/_build
+	$(HELP2MAN) packages/jest/bin/jest.js --name 'Delightful JavaScript Testing' >jest.1
+	$(HELP2MAN) packages/jest-repl/bin/jest-repl.js --name 'Jest cli usable in a sandboxed Jest environment' >jest-repl.1
+	$(HELP2MAN) packages/jest-repl/bin/jest-runtime-cli.js --name 'Jest cli usable in a sandboxed Jest environment' >jest-runtime-cli.1
+
+override_dh_install:
+	dh_install
+	# Remove separated package files from main one (jest)
+	if [ -e $(JESTDIR) ]; then \
+		cd $(JESTDIR) && rm -rf `cat ../../debian/node-*.install|sed 's/.* //g'`; \
+	fi
+	mkdir -p debian/debbundle-docs
+	for mod in `cat debian/node-jest-debbundle.install|sed -e 's/.*nodejs\///'`; do \
+		echo "Looking for $$mod docs"; \
+		if [ -e packages/$$mod ]; then \
+			cp packages/$$mod/README.md debian/debbundle-docs/README.$$mod.md; \
+		else \
+			find $$mod/ -maxdepth 1 -iname 'readme*' -exec cp '{}' debian/debbundle-docs/README.$$mod.md ';' ; \
+		fi \
+	done
+
+override_dh_installexamples:
+	dh_installexamples
+	if [ -e $(JESTDIR) ]; then \
+		find $(JESTDIR) -name .gitignore -delete; \
+	fi
+
+override_dh_gencontrol:
+	JESTPROVIDES=`grep -sh 'nodejs:Provides' debian/*.substvars|head -n1|sed -e 's/nodejs:Provides=//'`; \
+	set -e; \
+	for m in `cd debian && ls node*.install`; do \
+		bundle=''; \
+		mod=$${m%.install}; \
+		for p in `cat debian/$$mod.install`; do \
+			pversion=`jq -r .version node_modules/$${p#*nodejs}/package.json` ; \
+			pname=`jq -r .name node_modules/$${p#*nodejs}/package.json` ; \
+			pname=node-`echo $$pname|sed -e 's/^.types./types-/'`; \
+			echo "found $$pname in $$mod"; \
+			bundle="$$pname (=$$pversion-1), $$bundle"; \
+			JESTPROVIDES=`echo $$JESTPROVIDES|sed -e "s/ $$pname [^,]*,//"`; \
+		done; \
+		echo dh_gencontrol -p$$mod -- -Vjest:depsProvides="$$bundle"; \
+		dh_gencontrol -p$$mod -- -Vjest:depsProvides="$$bundle"; \
+	done; \
+	echo "jest Provides value: $$JESTPROVIDES"; \
+	dh_gencontrol -pjest -- -Vjest:Provides="$$JESTPROVIDES"
+
+override_dh_auto_clean:
+	dh_auto_clean --buildsystem=nodejs
+	find . -name build|grep -v debian |xargs rm -rf
+
+override_dh_fixperms:
+	dh_fixperms
+	if [ -e $(CURDIR)/debian/node-jest-debbundle ]; then \
+		chmod +x $(CURDIR)/debian/node-jest-debbundle/usr/share/nodejs/import-local/fixtures/cli.js; \
+		chmod +x $(CURDIR)/debian/node-jest-debbundle/usr/share/nodejs/is-ci/bin.js; \
+	fi
+	if [ -e $(JESTDIR) ]; then \
+		chmod +x $(JESTDIR)/usr/share/nodejs/jest/bin/jest.js; \
+		chmod +x $(JESTDIR)/usr/share/nodejs/jest-cli/bin/jest.js; \
+		chmod +x $(JESTDIR)/usr/share/nodejs/jest-repl/bin/jest-repl.js; \
+		chmod +x $(JESTDIR)/usr/share/nodejs/jest-repl/build/cli/index.js; \
+		chmod +x $(JESTDIR)/usr/share/nodejs/jest-repl/bin/jest-runtime-cli.js; \
+	fi
+	find $(JESTDIR) -name '*.ts' -exec chmod -x '{}' \;

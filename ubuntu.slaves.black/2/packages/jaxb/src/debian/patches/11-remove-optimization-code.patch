@@ -1,0 +1,966 @@
+Description: Removes the optimization code that breaks with recent JDKs
+Author: HOHOWU <hong.jie.wu@oracle.com>
+Origin: backport, https://github.com/javaee/jaxb-v2/commit/9805bc91473a9f4dee95e7192998a5bbb61350f2
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeBuiltinLeafInfoImpl.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeBuiltinLeafInfoImpl.java
+@@ -143,10 +143,6 @@
+         return false;
+     }
+ 
+-    public final boolean isDefault() {
+-        return true;
+-    }
+-
+     public void declareNamespace(T o, XMLSerializer w) throws AccessorException {
+     }
+ 
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeClassInfoImpl.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeClassInfoImpl.java
+@@ -362,10 +362,6 @@
+             return xacc.useNamespace();
+         }
+ 
+-        public boolean isDefault() {
+-            return false;
+-        }
+-
+         public void declareNamespace(BeanT bean, XMLSerializer w) throws AccessorException {
+             try {
+                 xacc.declareNamespace(bean,w);
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeEnumLeafInfoImpl.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/model/impl/RuntimeEnumLeafInfoImpl.java
+@@ -125,10 +125,6 @@
+         return new QName[]{getTypeName()};
+     }
+ 
+-    public boolean isDefault() {
+-        return false;
+-    }
+-
+     @Override
+     public Class getClazz() {
+         return clazz;
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/FilterTransducer.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/FilterTransducer.java
+@@ -62,12 +62,6 @@
+         this.core = core;
+     }
+ 
+-    public final boolean isDefault() {
+-        // this must be used as a decorating transducer,
+-        // so it may never be default.
+-        return false;
+-    }
+-
+     public boolean useNamespace() {
+         return core.useNamespace();
+     }
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/Transducer.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/Transducer.java
+@@ -50,7 +50,6 @@
+ import com.sun.istack.NotNull;
+ import com.sun.xml.bind.api.AccessorException;
+ import com.sun.xml.bind.v2.model.runtime.RuntimePropertyInfo;
+-import com.sun.xml.bind.v2.runtime.reflect.opt.OptimizedTransducedAccessorFactory;
+ 
+ import org.xml.sax.SAXException;
+ 
+@@ -70,14 +69,6 @@
+ public interface Transducer<ValueT> {
+ 
+     /**
+-     * If this {@link Transducer} is the default transducer for the <code>ValueT</code>,
+-     * this method returns true.
+-     *
+-     * Used exclusively by {@link OptimizedTransducedAccessorFactory#get(RuntimePropertyInfo)}
+-     */
+-    boolean isDefault();
+-
+-    /**
+      * If true, this {@link Transducer} doesn't declare any namespace,
+      * and therefore {@link #declareNamespace(Object, XMLSerializer)} is no-op.
+      *
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/Accessor.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/Accessor.java
+@@ -62,7 +62,6 @@
+ import com.sun.xml.bind.v2.model.core.Adapter;
+ import com.sun.xml.bind.v2.model.impl.RuntimeModelBuilder;
+ import com.sun.xml.bind.v2.runtime.JAXBContextImpl;
+-import com.sun.xml.bind.v2.runtime.reflect.opt.OptimizedAccessorFactory;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.Loader;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.Receiver;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.UnmarshallingContext;
+@@ -279,14 +278,7 @@
+ 
+         @Override
+         public Accessor<BeanT, ValueT> optimize(JAXBContextImpl context) {
+-            if (context != null && context.fastBoot)
+-                // let's not waste time on doing this for the sake of faster boot.
+-                return this;
+-            Accessor<BeanT, ValueT> acc = OptimizedAccessorFactory.get(f);
+-            if (acc != null)
+-                return acc;
+-            else
+-                return this;
++            return this;
+         }
+     }
+ 
+@@ -392,18 +384,7 @@
+ 
+         @Override
+         public Accessor<BeanT, ValueT> optimize(JAXBContextImpl context) {
+-            if (getter == null || setter == null)
+-                // if we aren't complete, OptimizedAccessor won't always work
+-                return this;
+-            if (context != null && context.fastBoot)
+-                // let's not waste time on doing this for the sake of faster boot.
+-                return this;
+-
+-            Accessor<BeanT, ValueT> acc = OptimizedAccessorFactory.get(getter, setter);
+-            if (acc != null)
+-                return acc;
+-            else
+-                return this;
++            return this;
+         }
+     }
+ 
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/TransducedAccessor.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/TransducedAccessor.java
+@@ -60,7 +60,6 @@
+ import com.sun.xml.bind.v2.runtime.Transducer;
+ import com.sun.xml.bind.v2.runtime.XMLSerializer;
+ import com.sun.xml.bind.v2.runtime.JAXBContextImpl;
+-import com.sun.xml.bind.v2.runtime.reflect.opt.OptimizedTransducedAccessorFactory;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.Patcher;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.UnmarshallingContext;
+ import com.sun.xml.bind.v2.runtime.unmarshaller.LocatorEx;
+@@ -164,11 +163,6 @@
+         if(prop.id()==ID.IDREF)
+             return new IDREFTransducedAccessorImpl(prop.getAccessor());
+ 
+-        if(xducer.isDefault() && context != null && !context.fastBoot) {
+-            TransducedAccessor xa = OptimizedTransducedAccessorFactory.get(prop);
+-            if(xa!=null)    return xa;
+-        }
+-
+         if(xducer.useNamespace())
+             return new CompositeContextDependentTransducedAccessorImpl( context, xducer, prop.getAccessor() );
+         else
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/opt/AccessorInjector.java
++++ b/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/opt/AccessorInjector.java
+@@ -63,42 +63,6 @@
+     }
+ 
+     /**
+-     * Loads the optimized class and returns it.
+-     *
+-     * @return null
+-     *      if it fails for some reason.
+-     */
+-    public static Class<?> prepare(
+-        Class beanClass, String templateClassName, String newClassName, String... replacements ) {
+-
+-        if(noOptimize)
+-            return null;
+-
+-        try {
+-            ClassLoader cl = SecureLoader.getClassClassLoader(beanClass);
+-            if(cl==null)    return null;    // how do I inject classes to this "null" class loader? for now, back off.
+-
+-            Class c = Injector.find(cl,newClassName);
+-            if (c==null) {
+-                byte[] image = tailor(templateClassName,newClassName,replacements);
+-                if (image==null) {
+-                    return null;
+-                }
+-                c = Injector.inject(cl,newClassName,image);
+-                if (c == null) {
+-                    Injector.find(cl, newClassName);
+-                }
+-            }
+-            return c;
+-        } catch(SecurityException e) {
+-            // we don't have enough permission to do this
+-            logger.log(Level.INFO,"Unable to create an optimized TransducedAccessor ",e);
+-            return null;
+-        }
+-    }
+-
+-
+-    /**
+      * Customizes a class file by replacing constant pools.
+      *
+      * @param templateClassName
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/opt/Injector.java
++++ /dev/null
+@@ -1,365 +0,0 @@
+-/*
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+- *
+- * Copyright (c) 1997-2017 Oracle and/or its affiliates. All rights reserved.
+- *
+- * The contents of this file are subject to the terms of either the GNU
+- * General Public License Version 2 only ("GPL") or the Common Development
+- * and Distribution License("CDDL") (collectively, the "License").  You
+- * may not use this file except in compliance with the License.  You can
+- * obtain a copy of the License at
+- * https://oss.oracle.com/licenses/CDDL+GPL-1.1
+- * or LICENSE.txt.  See the License for the specific
+- * language governing permissions and limitations under the License.
+- *
+- * When distributing the software, include this License Header Notice in each
+- * file and include the License file at LICENSE.txt.
+- *
+- * GPL Classpath Exception:
+- * Oracle designates this particular file as subject to the "Classpath"
+- * exception as provided by Oracle in the GPL Version 2 section of the License
+- * file that accompanied this code.
+- *
+- * Modifications:
+- * If applicable, add the following below the License Header, with the fields
+- * enclosed by brackets [] replaced by your own identifying information:
+- * "Portions Copyright [year] [name of copyright owner]"
+- *
+- * Contributor(s):
+- * If you wish your version of this file to be governed by only the CDDL or
+- * only the GPL Version 2, indicate your decision by adding "[Contributor]
+- * elects to include this software in this distribution under the [CDDL or GPL
+- * Version 2] license."  If you don't indicate a single choice of license, a
+- * recipient has the option to distribute your version of this file under
+- * either the CDDL, the GPL Version 2 or to extend the choice of license to
+- * its licensees as provided above.  However, if you add GPL Version 2 code
+- * and therefore, elected the GPL Version 2 license, then the option applies
+- * only if the new code is made subject to such option by the copyright
+- * holder.
+- */
+-
+-package com.sun.xml.bind.v2.runtime.reflect.opt;
+-
+-import java.lang.reflect.InvocationTargetException;
+-import java.lang.reflect.Method;
+-import java.lang.ref.WeakReference;
+-import java.security.AccessController;
+-import java.security.PrivilegedAction;
+-import java.util.concurrent.locks.Lock;
+-import java.util.concurrent.locks.ReentrantReadWriteLock;
+-import java.util.HashMap;
+-import java.util.Map;
+-import java.util.WeakHashMap;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
+-
+-import com.sun.xml.bind.Util;
+-import com.sun.xml.bind.v2.runtime.reflect.Accessor;
+-import java.lang.reflect.Field;
+-import java.security.CodeSource;
+-import java.security.PrivilegedActionException;
+-import java.security.PrivilegedExceptionAction;
+-import java.security.ProtectionDomain;
+-
+-/**
+- * A {@link ClassLoader} used to "inject" optimized accessor classes
+- * into the VM.
+- *
+- * <p>
+- * Its parent class loader needs to be set to the one that can see the user
+- * class.
+- *
+- * @author Kohsuke Kawaguchi
+- */
+-final class Injector {
+-
+-    /**
+-     * {@link Injector}s keyed by their parent {@link ClassLoader}.
+-     *
+-     * We only need one injector per one user class loader.
+-     */
+-    private static final ReentrantReadWriteLock irwl = new ReentrantReadWriteLock();
+-    private static final Lock ir = irwl.readLock();
+-    private static final Lock iw = irwl.writeLock();
+-    private static final Map<ClassLoader, WeakReference<Injector>> injectors =
+-            new WeakHashMap<ClassLoader, WeakReference<Injector>>();
+-    private static final Logger logger = Util.getClassLogger();
+-
+-    /**
+-     * Injects a new class into the given class loader.
+-     *
+-     * @return null
+-     *      if it fails to inject.
+-     */
+-    static Class inject(ClassLoader cl, String className, byte[] image) {
+-        Injector injector = get(cl);
+-        if (injector != null) {
+-            return injector.inject(className, image);
+-        } else {
+-            return null;
+-        }
+-    }
+-
+-    /**
+-     * Returns the already injected class, or null.
+-     */
+-    static Class find(ClassLoader cl, String className) {
+-        Injector injector = get(cl);
+-        if (injector != null) {
+-            return injector.find(className);
+-        } else {
+-            return null;
+-        }
+-    }
+-
+-    /**
+-     * Gets or creates an {@link Injector} for the given class loader.
+-     *
+-     * @return null
+-     *      if it fails.
+-     */
+-    private static Injector get(ClassLoader cl) {
+-        Injector injector = null;
+-        WeakReference<Injector> wr;
+-        ir.lock();
+-        try {
+-            wr = injectors.get(cl);
+-        } finally {
+-            ir.unlock();
+-        }
+-        if (wr != null) {
+-            injector = wr.get();
+-        }
+-        if (injector == null) {
+-            try {
+-                wr = new WeakReference<Injector>(injector = new Injector(cl));
+-                iw.lock();
+-                try {
+-                    if (!injectors.containsKey(cl)) {
+-                        injectors.put(cl, wr);
+-                    }
+-                } finally {
+-                    iw.unlock();
+-                }
+-            } catch (SecurityException e) {
+-                logger.log(Level.FINE, "Unable to set up a back-door for the injector", e);
+-                return null;
+-            }
+-        }
+-        return injector;
+-    }
+-    /**
+-     * Injected classes keyed by their names.
+-     */
+-    private final Map<String, Class> classes = new HashMap<>();
+-    private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
+-    private final Lock r = rwl.readLock();
+-    private final Lock w = rwl.writeLock();
+-    private final ClassLoader parent;
+-    /**
+-     * True if this injector is capable of injecting accessors.
+-     * False otherwise, which happens if this classloader can't see {@link Accessor}.
+-     */
+-    private final boolean loadable;
+-    private static Method defineClass;
+-    private static Method resolveClass;
+-    private static Method findLoadedClass;
+-    private static Object U;
+-
+-    static {
+-        try {
+-            Method[] m = AccessController.doPrivileged(
+-                    new PrivilegedAction<Method[]>() {
+-                @Override
+-                public Method[] run() {
+-                    return new Method[]{
+-                        getMethod(ClassLoader.class, "defineClass", String.class, byte[].class, Integer.TYPE, Integer.TYPE),
+-                        getMethod(ClassLoader.class, "resolveClass", Class.class),
+-                        getMethod(ClassLoader.class, "findLoadedClass", String.class)
+-                    };
+-                }
+-            }
+-            );
+-            defineClass = m[0];
+-            resolveClass = m[1];
+-            findLoadedClass = m[2];
+-        } catch (Throwable t) {
+-            try {
+-                U = AccessController.doPrivileged(new PrivilegedExceptionAction() {
+-                    @Override
+-                    public Object run() throws Exception {
+-                        Class u = Class.forName("sun.misc.Unsafe");
+-                        Field theUnsafe = u.getDeclaredField("theUnsafe");
+-                        theUnsafe.setAccessible(true);
+-                        return theUnsafe.get(null);
+-                    }
+-                });
+-                defineClass = AccessController.doPrivileged(new PrivilegedExceptionAction<Method>() {
+-                    @Override
+-                    public Method run() throws Exception {
+-                        try {
+-                            return U.getClass().getMethod("defineClass",
+-                                    new Class[]{String.class,
+-                                        byte[].class,
+-                                        Integer.TYPE,
+-                                        Integer.TYPE,
+-                                        ClassLoader.class,
+-                                        ProtectionDomain.class});
+-                        } catch (NoSuchMethodException | SecurityException ex) {
+-                            throw ex;
+-                        }
+-                    }
+-                });
+-            } catch (SecurityException | PrivilegedActionException ex) {
+-                Logger.getLogger(Injector.class.getName()).log(Level.SEVERE, null, ex);
+-            }
+-        }
+-    }
+-
+-    private static Method getMethod(final Class<?> c, final String methodname, final Class<?>... params) {
+-        try {
+-            Method m = c.getDeclaredMethod(methodname, params);
+-            m.setAccessible(true);
+-            return m;
+-        } catch (NoSuchMethodException e) {
+-            throw new NoSuchMethodError(e.getMessage());
+-        }
+-    }
+-
+-    private Injector(ClassLoader parent) {
+-        this.parent = parent;
+-        assert parent != null;
+-
+-        boolean loadableCheck = false;
+-
+-        try {
+-            loadableCheck = parent.loadClass(Accessor.class.getName()) == Accessor.class;
+-        } catch (ClassNotFoundException e) {
+-            // not loadable
+-        }
+-
+-        this.loadable = loadableCheck;
+-    }
+-
+-    @SuppressWarnings("LockAcquiredButNotSafelyReleased")
+-    private Class inject(String className, byte[] image) {
+-        if (!loadable) // this injector cannot inject anything
+-        {
+-            return null;
+-        }
+-
+-        boolean wlocked = false;
+-        boolean rlocked = false;
+-        try {
+-
+-            r.lock();
+-            rlocked = true;
+-
+-            Class c = classes.get(className);
+-
+-            // Unlock now during the findLoadedClass process to avoid
+-            // deadlocks
+-            r.unlock();
+-            rlocked = false;
+-
+-            //find loaded class from classloader
+-            if (c == null && findLoadedClass != null) {
+-
+-                try {
+-                    c = (Class) findLoadedClass.invoke(parent, className.replace('/', '.'));
+-                } catch (IllegalArgumentException | IllegalAccessException e) {
+-                    logger.log(Level.FINE, "Unable to find " + className, e);
+-                } catch (InvocationTargetException e) {
+-                    Throwable t = e.getTargetException();
+-                    logger.log(Level.FINE, "Unable to find " + className, t);
+-                }
+-
+-                if (c != null) {
+-
+-                    w.lock();
+-                    wlocked = true;
+-
+-                    classes.put(className, c);
+-
+-                    w.unlock();
+-                    wlocked = false;
+-
+-                    return c;
+-                }
+-            }
+-
+-            if (c == null) {
+-
+-                r.lock();
+-                rlocked = true;
+-
+-                c = classes.get(className);
+-
+-                // Unlock now during the define/resolve process to avoid
+-                // deadlocks
+-                r.unlock();
+-                rlocked = false;
+-
+-                if (c == null) {
+-
+-                    // we need to inject a class into the
+-                    try {
+-                        if (resolveClass != null) {
+-                            c = (Class) defineClass.invoke(parent, className.replace('/', '.'), image, 0, image.length);
+-                            resolveClass.invoke(parent, c);
+-                        } else {
+-                            c = (Class) defineClass.invoke(U, className.replace('/', '.'), image, 0, image.length, parent, Injector.class.getProtectionDomain());
+-                        }
+-                    } catch (IllegalAccessException  e) {
+-                        logger.log(Level.FINE, "Unable to inject " + className, e);
+-                        return null;
+-                    } catch (InvocationTargetException e) {
+-                        Throwable t = e.getTargetException();
+-                        if (t instanceof LinkageError) {
+-                            logger.log(Level.FINE, "duplicate class definition bug occured? Please report this : " + className, t);
+-                        } else {
+-                            logger.log(Level.FINE, "Unable to inject " + className, t);
+-                        }
+-                        return null;
+-                    } catch (SecurityException e) {
+-                        logger.log(Level.FINE, "Unable to inject " + className, e);
+-                        return null;
+-                    } catch (LinkageError e) {
+-                        logger.log(Level.FINE, "Unable to inject " + className, e);
+-                        return null;
+-                    }
+-
+-                    w.lock();
+-                    wlocked = true;
+-
+-                    // During the time we were unlocked, we could have tried to
+-                    // load the class from more than one thread. Check now to see
+-                    // if someone else beat us to registering this class
+-                    if (!classes.containsKey(className)) {
+-                        classes.put(className, c);
+-                    }
+-
+-                    w.unlock();
+-                    wlocked = false;
+-                }
+-            }
+-            return c;
+-        } finally {
+-            if (rlocked) {
+-                r.unlock();
+-            }
+-            if (wlocked) {
+-                w.unlock();
+-            }
+-        }
+-    }
+-
+-    private Class find(String className) {
+-        r.lock();
+-        try {
+-            return classes.get(className);
+-        } finally {
+-            r.unlock();
+-        }
+-    }
+-}
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/opt/OptimizedAccessorFactory.java
++++ /dev/null
+@@ -1,215 +0,0 @@
+-/*
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+- *
+- * Copyright (c) 1997-2017 Oracle and/or its affiliates. All rights reserved.
+- *
+- * The contents of this file are subject to the terms of either the GNU
+- * General Public License Version 2 only ("GPL") or the Common Development
+- * and Distribution License("CDDL") (collectively, the "License").  You
+- * may not use this file except in compliance with the License.  You can
+- * obtain a copy of the License at
+- * https://oss.oracle.com/licenses/CDDL+GPL-1.1
+- * or LICENSE.txt.  See the License for the specific
+- * language governing permissions and limitations under the License.
+- *
+- * When distributing the software, include this License Header Notice in each
+- * file and include the License file at LICENSE.txt.
+- *
+- * GPL Classpath Exception:
+- * Oracle designates this particular file as subject to the "Classpath"
+- * exception as provided by Oracle in the GPL Version 2 section of the License
+- * file that accompanied this code.
+- *
+- * Modifications:
+- * If applicable, add the following below the License Header, with the fields
+- * enclosed by brackets [] replaced by your own identifying information:
+- * "Portions Copyright [year] [name of copyright owner]"
+- *
+- * Contributor(s):
+- * If you wish your version of this file to be governed by only the CDDL or
+- * only the GPL Version 2, indicate your decision by adding "[Contributor]
+- * elects to include this software in this distribution under the [CDDL or GPL
+- * Version 2] license."  If you don't indicate a single choice of license, a
+- * recipient has the option to distribute your version of this file under
+- * either the CDDL, the GPL Version 2 or to extend the choice of license to
+- * its licensees as provided above.  However, if you add GPL Version 2 code
+- * and therefore, elected the GPL Version 2 license, then the option applies
+- * only if the new code is made subject to such option by the copyright
+- * holder.
+- */
+-
+-package com.sun.xml.bind.v2.runtime.reflect.opt;
+-
+-import java.lang.reflect.Field;
+-import java.lang.reflect.Method;
+-import java.lang.reflect.Modifier;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
+-
+-import com.sun.xml.bind.Util;
+-import com.sun.xml.bind.v2.runtime.reflect.Accessor;
+-import com.sun.xml.bind.v2.runtime.RuntimeUtil;
+-
+-import static com.sun.xml.bind.v2.bytecode.ClassTailor.toVMClassName;
+-import static com.sun.xml.bind.v2.bytecode.ClassTailor.toVMTypeName;
+-
+-/**
+- * @author Kohsuke Kawaguchi
+- */
+-public abstract class OptimizedAccessorFactory {
+-    private OptimizedAccessorFactory() {} // no instanciation please
+-
+-    private static final Logger logger = Util.getClassLogger();
+-
+-
+-    private static final String fieldTemplateName;
+-    private static final String methodTemplateName;
+-
+-    static {
+-        String s = FieldAccessor_Byte.class.getName();
+-        fieldTemplateName = s.substring(0,s.length()-"Byte".length()).replace('.','/');
+-
+-        s = MethodAccessor_Byte.class.getName();
+-        methodTemplateName = s.substring(0,s.length()-"Byte".length()).replace('.','/');
+-    }
+-
+-    /**
+-     * Gets the optimized {@link Accessor} that accesses the given getter/setter.
+-     *
+-     * @return null
+-     *      if for some reason it fails to create an optimized version.
+-     */
+-    public static final <B,V> Accessor<B,V> get(Method getter, Method setter) {
+-        // make sure the method signatures are what we expect
+-        if(getter.getParameterTypes().length!=0)
+-            return null;
+-        Class<?>[] sparams = setter.getParameterTypes();
+-        if(sparams.length!=1)
+-            return null;
+-        if(sparams[0]!=getter.getReturnType())
+-            return null;
+-        if(setter.getReturnType()!=Void.TYPE)
+-            return null;
+-        if(getter.getDeclaringClass()!=setter.getDeclaringClass())
+-            return null;
+-        if(Modifier.isPrivate(getter.getModifiers()) || Modifier.isPrivate(setter.getModifiers()))
+-            // we can't access private fields
+-            return null;
+-
+-        Class t = sparams[0];
+-        String typeName = t.getName().replace('.','_');
+-        if (t.isArray()) {
+-            typeName = "AOf_";
+-            String compName = t.getComponentType().getName().replace('.','_');
+-            while (compName.startsWith("[L")) {
+-                compName = compName.substring(2);
+-                typeName += "AOf_";
+-            }
+-            typeName = typeName + compName;
+-        }
+-
+-        String newClassName = toVMClassName(getter.getDeclaringClass())+"$JaxbAccessorM_"+getter.getName()+'_'+setter.getName()+'_'+typeName;
+-        Class opt;
+-
+-        if(t.isPrimitive())
+-            opt = AccessorInjector.prepare( getter.getDeclaringClass(),
+-                methodTemplateName+RuntimeUtil.primitiveToBox.get(t).getSimpleName(),
+-                newClassName,
+-                toVMClassName(Bean.class),
+-                toVMClassName(getter.getDeclaringClass()),
+-                "get_"+t.getName(),
+-                getter.getName(),
+-                "set_"+t.getName(),
+-                setter.getName());
+-        else
+-            opt = AccessorInjector.prepare( getter.getDeclaringClass(),
+-                methodTemplateName+"Ref",
+-                newClassName,
+-                toVMClassName(Bean.class),
+-                toVMClassName(getter.getDeclaringClass()),
+-                toVMClassName(Ref.class),
+-                toVMClassName(t),
+-                "()"+toVMTypeName(Ref.class),
+-                "()"+toVMTypeName(t),
+-                '('+toVMTypeName(Ref.class)+")V",
+-                '('+toVMTypeName(t)+")V",
+-                "get_ref",
+-                getter.getName(),
+-                "set_ref",
+-                setter.getName());
+-
+-        if(opt==null)
+-            return null;
+-
+-        Accessor<B,V> acc = instanciate(opt);
+-        if (acc!=null) {
+-            if (logger.isLoggable(Level.FINE)) {
+-                logger.log(Level.FINE, "Using optimized Accessor for {0} and {1}", new Object[]{getter, setter});
+-            }
+-        }
+-        return acc;
+-    }
+-
+-
+-    /**
+-     * Gets the optimized {@link Accessor} that accesses the given field.
+-     *
+-     * @return null
+-     *      if for some reason it fails to create an optimized version.
+-     */
+-    public static final <B,V> Accessor<B,V> get(Field field) {
+-        int mods = field.getModifiers();
+-        if(Modifier.isPrivate(mods) || Modifier.isFinal(mods))
+-            // we can't access private fields
+-            return null;
+-
+-        String newClassName = toVMClassName(field.getDeclaringClass())+"$JaxbAccessorF_"+field.getName();
+-
+-        Class opt;
+-
+-        if(field.getType().isPrimitive())
+-            opt = AccessorInjector.prepare( field.getDeclaringClass(),
+-                fieldTemplateName+RuntimeUtil.primitiveToBox.get(field.getType()).getSimpleName(),
+-                newClassName,
+-                toVMClassName(Bean.class),
+-                toVMClassName(field.getDeclaringClass()),
+-                "f_"+field.getType().getName(),
+-                field.getName() );
+-        else
+-            opt = AccessorInjector.prepare( field.getDeclaringClass(),
+-                fieldTemplateName+"Ref",
+-                newClassName,
+-                toVMClassName(Bean.class),
+-                toVMClassName(field.getDeclaringClass()),
+-                toVMClassName(Ref.class),
+-                toVMClassName(field.getType()),
+-                toVMTypeName(Ref.class),
+-                toVMTypeName(field.getType()),
+-                "f_ref",
+-                field.getName() );
+-
+-        if(opt==null)
+-            return null;
+-
+-        Accessor<B,V> acc = instanciate(opt);
+-        if (acc!=null) {
+-            if (logger.isLoggable(Level.FINE)) {
+-                logger.log(Level.FINE, "Using optimized Accessor for {0}", field);
+-            }
+-        }
+-        return acc;
+-    }
+-
+-    private static <B,V> Accessor<B,V> instanciate(Class opt) {
+-        try {
+-            return (Accessor<B,V>)opt.newInstance();
+-        } catch (InstantiationException e) {
+-            logger.log(Level.INFO,"failed to load an optimized Accessor",e);
+-        } catch (IllegalAccessException e) {
+-            logger.log(Level.INFO,"failed to load an optimized Accessor",e);
+-        } catch (SecurityException e) {
+-            logger.log(Level.INFO,"failed to load an optimized Accessor",e);
+-        }
+-        return null;
+-    }
+-}
+--- a/jaxb-ri/runtime/impl/src/main/java/com/sun/xml/bind/v2/runtime/reflect/opt/OptimizedTransducedAccessorFactory.java
++++ /dev/null
+@@ -1,182 +0,0 @@
+-/*
+- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+- *
+- * Copyright (c) 1997-2017 Oracle and/or its affiliates. All rights reserved.
+- *
+- * The contents of this file are subject to the terms of either the GNU
+- * General Public License Version 2 only ("GPL") or the Common Development
+- * and Distribution License("CDDL") (collectively, the "License").  You
+- * may not use this file except in compliance with the License.  You can
+- * obtain a copy of the License at
+- * https://oss.oracle.com/licenses/CDDL+GPL-1.1
+- * or LICENSE.txt.  See the License for the specific
+- * language governing permissions and limitations under the License.
+- *
+- * When distributing the software, include this License Header Notice in each
+- * file and include the License file at LICENSE.txt.
+- *
+- * GPL Classpath Exception:
+- * Oracle designates this particular file as subject to the "Classpath"
+- * exception as provided by Oracle in the GPL Version 2 section of the License
+- * file that accompanied this code.
+- *
+- * Modifications:
+- * If applicable, add the following below the License Header, with the fields
+- * enclosed by brackets [] replaced by your own identifying information:
+- * "Portions Copyright [year] [name of copyright owner]"
+- *
+- * Contributor(s):
+- * If you wish your version of this file to be governed by only the CDDL or
+- * only the GPL Version 2, indicate your decision by adding "[Contributor]
+- * elects to include this software in this distribution under the [CDDL or GPL
+- * Version 2] license."  If you don't indicate a single choice of license, a
+- * recipient has the option to distribute your version of this file under
+- * either the CDDL, the GPL Version 2 or to extend the choice of license to
+- * its licensees as provided above.  However, if you add GPL Version 2 code
+- * and therefore, elected the GPL Version 2 license, then the option applies
+- * only if the new code is made subject to such option by the copyright
+- * holder.
+- */
+-
+-package com.sun.xml.bind.v2.runtime.reflect.opt;
+-
+-import java.lang.reflect.Field;
+-import java.lang.reflect.Modifier;
+-import java.lang.reflect.Type;
+-import java.util.HashMap;
+-import java.util.Map;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
+-
+-import com.sun.xml.bind.Util;
+-import com.sun.xml.bind.v2.model.core.TypeInfo;
+-import com.sun.xml.bind.v2.model.runtime.RuntimeClassInfo;
+-import com.sun.xml.bind.v2.model.runtime.RuntimePropertyInfo;
+-import com.sun.xml.bind.v2.runtime.reflect.Accessor;
+-import com.sun.xml.bind.v2.runtime.reflect.TransducedAccessor;
+-
+-import static com.sun.xml.bind.v2.bytecode.ClassTailor.toVMClassName;
+-
+-/**
+- * Prepares optimized {@link TransducedAccessor} from templates.
+- *
+- * @author Kohsuke Kawaguchi
+- */
+-public abstract class OptimizedTransducedAccessorFactory {
+-    private OptimizedTransducedAccessorFactory() {} // no instanciation please
+-
+-    // http://java.sun.com/docs/books/vmspec/2nd-edition/html/ConstantPool.doc.html#75929
+-    // "same runtime package"
+-
+-    private static final Logger logger = Util.getClassLogger();
+-
+-    private static final String fieldTemplateName;
+-    private static final String methodTemplateName;
+-
+-    static {
+-        String s = TransducedAccessor_field_Byte.class.getName();
+-        fieldTemplateName = s.substring(0,s.length()-"Byte".length()).replace('.','/');
+-
+-        s = TransducedAccessor_method_Byte.class.getName();
+-        methodTemplateName = s.substring(0,s.length()-"Byte".length()).replace('.','/');
+-    }
+-
+-    /**
+-     * Gets the optimized {@link TransducedAccessor} if possible.
+-     *
+-     * @return null
+-     *      if for some reason it fails to create an optimized version.
+-     */
+-    public static final TransducedAccessor get(RuntimePropertyInfo prop) {
+-        Accessor acc = prop.getAccessor();
+-
+-        // consider using an optimized TransducedAccessor implementations.
+-        Class opt=null;
+-
+-        TypeInfo<Type,Class> parent = prop.parent();
+-        if(!(parent instanceof RuntimeClassInfo))
+-            return null;
+-        
+-        Class dc = ((RuntimeClassInfo)parent).getClazz();
+-        String newClassName = toVMClassName(dc)+"_JaxbXducedAccessor_"+prop.getName();
+-
+-
+-        if(acc instanceof Accessor.FieldReflection) {
+-            // TODO: we also need to make sure that the default xducer is used.
+-            Accessor.FieldReflection racc = (Accessor.FieldReflection) acc;
+-            Field field = racc.f;
+-
+-            int mods = field.getModifiers();
+-            if(Modifier.isPrivate(mods) || Modifier.isFinal(mods))
+-                // we can't access private fields.
+-                // TODO: think about how to improve this case
+-                return null;
+-
+-            Class<?> t = field.getType();
+-            if(t.isPrimitive())
+-                opt = AccessorInjector.prepare( dc,
+-                    fieldTemplateName+suffixMap.get(t),
+-                    newClassName,
+-                    toVMClassName(Bean.class),
+-                    toVMClassName(dc),
+-                    "f_"+t.getName(),
+-                    field.getName() );
+-        }
+-
+-        if(acc.getClass()==Accessor.GetterSetterReflection.class) {
+-            Accessor.GetterSetterReflection gacc = (Accessor.GetterSetterReflection) acc;
+-
+-            if(gacc.getter==null || gacc.setter==null)
+-                return null;    // incomplete
+-
+-            Class<?> t = gacc.getter.getReturnType();
+-
+-            if(Modifier.isPrivate(gacc.getter.getModifiers())
+-            || Modifier.isPrivate(gacc.setter.getModifiers()))
+-                // we can't access private methods.
+-                return null;
+-
+-
+-            if(t.isPrimitive())
+-                opt = AccessorInjector.prepare( dc,
+-                    methodTemplateName+suffixMap.get(t),
+-                    newClassName,
+-                    toVMClassName(Bean.class),
+-                    toVMClassName(dc),
+-                    "get_"+t.getName(),
+-                    gacc.getter.getName(),
+-                    "set_"+t.getName(),
+-                    gacc.setter.getName());
+-        }
+-
+-        if(opt==null)
+-            return null;
+-
+-        logger.log(Level.FINE,"Using optimized TransducedAccessor for "+prop.displayName());
+-
+-
+-        try {
+-            return (TransducedAccessor)opt.newInstance();
+-        } catch (InstantiationException e) {
+-            logger.log(Level.INFO,"failed to load an optimized TransducedAccessor",e);
+-        } catch (IllegalAccessException e) {
+-            logger.log(Level.INFO,"failed to load an optimized TransducedAccessor",e);
+-        } catch (SecurityException e) {
+-            logger.log(Level.INFO,"failed to load an optimized TransducedAccessor",e);
+-        }
+-        return null;
+-    }
+-
+-    private static final Map<Class,String> suffixMap = new HashMap<Class, String>();
+-
+-    static {
+-        suffixMap.put(Byte.TYPE,"Byte");
+-        suffixMap.put(Short.TYPE,"Short");
+-        suffixMap.put(Integer.TYPE,"Integer");
+-        suffixMap.put(Long.TYPE,"Long");
+-        suffixMap.put(Boolean.TYPE,"Boolean");
+-        suffixMap.put(Float.TYPE,"Float");
+-        suffixMap.put(Double.TYPE,"Double");
+-    }
+-
+-}

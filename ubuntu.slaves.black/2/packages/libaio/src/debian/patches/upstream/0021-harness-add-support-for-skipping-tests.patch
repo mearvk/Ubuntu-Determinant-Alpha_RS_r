@@ -1,0 +1,89 @@
+From 90ec55ab2675bc2b6b4d256f78a3db26adf75900 Mon Sep 17 00:00:00 2001
+From: Jeff Moyer <jmoyer@redhat.com>
+Date: Mon, 29 Jul 2019 13:16:18 -0400
+Subject: [PATCH libaio 21/28] harness: add support for skipping tests
+
+Skipped tests will not cause the test harness to return failure.  An
+exit status of "3" was chosen for skipped tests.  This doesn't
+conflict with any of the current tests.
+
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/main.c      | 20 ++++++++++++++++----
+ harness/runtests.sh | 14 ++++++++++++--
+ 2 files changed, 28 insertions(+), 6 deletions(-)
+
+diff --git a/harness/main.c b/harness/main.c
+index 9ecd5da..82e9c69 100644
+--- a/harness/main.c
++++ b/harness/main.c
+@@ -26,15 +26,27 @@ char test_name[] = TEST_NAME;
+ int main(void)
+ {
+ 	int res;
++	const char *test_result;
+ 
+ #if defined(SETUP)
+ 	SETUP;
+ #endif
+ 
+ 	res = test_main();
+-	printf("test %s completed %s.\n", test_name, 
+-		res ? "FAILED" : "PASSED"
+-		);
++	switch(res) {
++	case 0:
++		test_result = "PASSED";
++		break;
++	case 3:
++		test_result = "SKIPPED";
++		break;
++	default:
++		test_result = "FAILED";
++		res = 1;
++		break;
++	}
++
++	printf("test %s completed %s.\n", test_name, test_result);
+ 	fflush(stdout);
+-	return res ? 1 : 0;
++	return res;
+ }
+diff --git a/harness/runtests.sh b/harness/runtests.sh
+index ef269a7..e9ceec8 100755
+--- a/harness/runtests.sh
++++ b/harness/runtests.sh
+@@ -2,6 +2,7 @@
+ 
+ passes=0
+ fails=0
++skips=0
+ 
+ echo "Test run starting at" `date`
+ 
+@@ -11,11 +12,20 @@ while [ $# -ge 1 ] ; do
+ 	echo "Starting $this_test"
+ 	$this_test 2>&1
+ 	res=$?
+-	if [ $res -eq 0 ] ; then str="" ; passes=$[passes + 1] ; else str=" -- FAILED" ; fails=$[fails + 1] ; fi
++	if [ $res -eq 0 ]; then
++		str="";
++		passes=$((passes + 1));
++	elif [ $res -eq 3 ]; then
++		str=" -- SKIPPED";
++		skips=$((skips + 1));
++	else
++		str=" -- FAILED"
++		fails=$((fails + 1));
++	fi
+ 	echo "Completed $this_test with $res$str".
+ done
+ 
+-echo "Pass: $passes  Fail: $fails"
++echo "Pass: $passes  Fail: $fails  Skip: $skips"
+ echo "Test run complete at" `date`
+ 
+ exit $fails
+-- 
+2.26.0.292.g33ef6b2f38
+

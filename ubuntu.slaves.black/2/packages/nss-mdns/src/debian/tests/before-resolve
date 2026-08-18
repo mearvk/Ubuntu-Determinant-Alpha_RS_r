@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -e
+
+. debian/tests/lib.sh
+
+require_apt
+require_host_getent
+require_systemd
+
+# pre-download the packages in case we break name resolution
+assert_succeeds apt-get -y --download-only install --reinstall "libnss-mdns${host_suffix}"
+assert_succeeds apt-get -y --download-only install --reinstall "libnss-resolve${host_suffix}"
+
+distinctive_hostname="nss-mdns-test-$(dbus-uuidgen)"
+
+assert_succeeds avahi-set-host-name "$distinctive_hostname"
+sleep 3
+
+assert_succeeds apt-get -y purge "libnss-mdns${host_suffix}"
+assert_succeeds apt-get -y purge "libnss-resolve${host_suffix}"
+
+assert_succeeds perl -i -pe 's/^hosts:.*/hosts: files dns/' /etc/nsswitch.conf
+
+assert_succeeds apt-get -y install "libnss-mdns${host_suffix}"
+assert_hosts "hosts: files mdns4_minimal [NOTFOUND=return] dns"
+assert_succeeds "$host_getent" hosts "$distinctive_hostname.local"
+
+assert_succeeds apt-get -y install "libnss-resolve${host_suffix}"
+assert_hosts "hosts: files mdns4_minimal [NOTFOUND=return] $(get_resolve_rune) dns"
+assert_succeeds "$host_getent" hosts "$distinctive_hostname.local"
+
+finish
+
+# vim:set sw=4 sts=4 et:

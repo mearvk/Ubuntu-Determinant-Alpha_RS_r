@@ -1,0 +1,139 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_classpath - sets classpaths in jar files
+
+=cut
+
+use strict;
+use warnings;
+use Debian::Debhelper::Dh_Lib;
+
+=head1 SYNOPSIS
+
+B<jh_classpath> [S<I<debhelper options>>]
+
+B<jh_classpath> [S<I<debhelper options>>] [B<-p>I<package>] [B<--classpath=>I<cp>] [S<I<jar [...]>>]
+
+=head1 DESCRIPTION
+
+B<jh_classpath> is a javahelper program that can set the classpath on
+jar files for you.
+
+It has two modes of operations.  By default, it will read
+F<debian/I<package>.classpath> or F<debian/classpath> and set the
+classpath of all jar files listed in that file.  In this mode,
+B<jh_classpath> does not accept any non-option arguments.
+
+Alternatively, you can pass B<jh_classpath> a list of jar files
+to update.  It will process each of those and set the classpath
+of them to that value set by B<--classpath> if passed.  If
+B<--classpath> is omitted the environment variable CLASSPATH will
+be used instead (rewriting its contents as necessary).  In this
+mode, B<jh_classpath> will not read F<debian/I<package>.classpath>
+nor F<debian/classpath>.
+
+=head1 FILES
+
+=over 4
+
+=item F<debian/I<package>.classpath>, F<debian/classpath>
+
+Parsed to determine which jar files should be processed for the
+given package.  Note that unlike most other debhelper commands,
+B<jh_classpath> will use F<debian/classpath> as a fallback
+configuration file for I<all> packages that it acts on.  Other
+debhelper commands usually only apply this fallback to the
+"main package".
+
+The file consists of 0 or more lines with the following:
+
+     jarfile classpath-file1 [... classpath-file2]
+
+Note that each file in the classpath is space-separated in
+this configuration file.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-c>I<cp>, B<--classpath=>I<cp>
+
+=back
+
+Beyond the above, B<jh_classpath> also accepts the shared
+debhelper options documented in L<debhelper(7)>.
+
+=cut
+
+my $classpath_arg;
+
+init(options => {
+	'classpath|c=s' => \$classpath_arg,
+});
+
+
+if (@ARGV) {
+	# process jars with -c or $CLASSPATH
+	my $tmpdir = tmpdir($dh{FIRSTPACKAGE});
+	if (not $classpath_arg) {
+		$classpath_arg = $ENV{'CLASSPATH'};
+		$classpath_arg =~ tr/:/ /;
+	}
+	if (not $classpath_arg) {
+		warning('Could not find a classpath, doing nothing');
+		exit(0);
+	}
+	for my $jar (@ARGV) {
+		if (not -f $jar) {
+			my $jar_in_tmp = "${tmpdir}/${jar}";
+			if (not -f $jar_in_tmp) {
+				warning("Cannot find $jar: skipping");
+				next;
+			}
+			$jar = $jar_in_tmp;
+			doit('jh_manifest', "-p$dh{FIRSTPACKAGE}", "--classpath=${classpath_arg}", $jar)
+		}
+
+	}
+} else {
+	# read debian/$package.classpath
+	foreach my $package (@{$dh{DOPACKAGES}}) {
+		my $tmpdir = tmpdir($package);
+		my $pkgfile = pkgfile($package, 'classpath');
+		if (not $pkgfile and -f 'debian/classpath') {
+			$pkgfile = 'debian/classpath';
+		}
+		next if not $pkgfile;
+		my @lines = filedoublearray($pkgfile);
+		for my $line (@lines) {
+			my ($jar, @classpath_parts) = @{$line};
+			my $classpath = join(' ', @classpath_parts);
+			if (not -f $jar) {
+				my $jar_in_tmp = "${tmpdir}/${jar}";
+				if (not -f $jar_in_tmp) {
+					warning("Cannot find $jar: skipping");
+					next;
+				}
+				$jar = $jar_in_tmp;
+			}
+			doit('jh_manifest', "-p$dh{FIRSTPACKAGE}", "--classpath=${classpath}", $jar)
+		}
+	}
+}
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=cut

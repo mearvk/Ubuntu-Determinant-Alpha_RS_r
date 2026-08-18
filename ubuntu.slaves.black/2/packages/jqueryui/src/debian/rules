@@ -1,0 +1,100 @@
+#!/usr/bin/make -f
+
+# Upstream version and date as found in upstream jquery-ui.js file
+timestamp = '2016-09-14'
+include /usr/share/dpkg/pkg-info.mk
+version = $(shell echo $(DEB_VERSION_UPSTREAM) | sed 's/+dfsg//')
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	find demos -name "*.html" -exec sed --in-place "s#\.\./\.\./themes/base/all\.css#/usr/share/javascript/jquery-ui/themes/base/jquery-ui.css#" {} \;
+	find demos -name "*.html" -exec sed --in-place "s#\.\./\.\./external/requirejs/require\.js#/usr/share/nodejs/require.js#" {} \;
+	dh_auto_configure --buildsystem=nodejs
+
+override_dh_auto_build: dist/jquery-ui.js dist/jquery-ui.min.js themes/base/jquery-ui.css ui/i18n/jquery-ui-i18n.js
+	set -e; for file in $$(find ui -name '*.js'); do \
+		echo "# Compressing $$file"; \
+		uglifyjs $$file --output $${file%.js}.min.js --compress; \
+	done
+	set -e; for file in $$(find themes -name '*.css'); do \
+		echo "# Compressing $$file"; \
+		yui-compressor $$file -o $${file%.css}.min.css; \
+	done
+	#dh_auto_build --buildsystem=nodejs
+
+dist/jquery-ui.js:
+	grunt requirejs
+	@nodejs --check $@ || (mv $@ $@.failed; false)
+
+dist/jquery-ui.min.js: dist/jquery-ui.js
+	uglifyjs $^ --output $@ --compress
+
+themes/base/jquery-ui.css:
+# Can probably be done with "nodejs /usr/share/nodejs/requirejs/r.js" as well,
+# but don't know how now.
+	cd themes/base ; cat \
+		../../debian/intro.css \
+		core.css \
+		accordion.css \
+		autocomplete.css \
+		menu.css \
+		button.css \
+		controlgroup.css \
+		checkboxradio.css \
+		datepicker.css \
+		dialog.css \
+		draggable.css \
+		resizable.css \
+		progressbar.css \
+		selectable.css \
+		selectmenu.css \
+		slider.css \
+		sortable.css \
+		spinner.css \
+		tabs.css \
+		tooltip.css \
+		theme.css \
+	> ../../$@
+	sed -i -e 's/@VERSION/$(version)/; s/@DATE/$(timestamp)/' $@
+# Strip comments containing names of defaults
+	sed -i -e 's#/\*{\w*}\*/##'g $@
+# Strip copyright block per file in concatentated file
+	sed -i -e 's#^/\*!$$##; s#^ \*.*##; s#^ \*$$##' $@
+
+ui/i18n/jquery-ui-i18n.js: export LC_ALL=C.UTF-8
+ui/i18n/jquery-ui-i18n.js:
+	# Replace newline with \r to ease use of sed (I don't know well enough how
+	# to achieve the same thing in the hold space).
+	for file in ui/i18n/datepicker*.js ; do \
+		cat $${file} | tr '\n' '\r' | \
+		sed -e 's/( function( factory.*function( datepicker ) {//' \
+			-e 's/datepicker\.regional/jQuery(function($$){\r\t&/' \
+			-e 's/\(datepicker\.regional\)\.\([[:alpha:]-]*\)/\1["\2"]/g' \
+			-e 's/\rreturn datepicker.*\r\r} ) );\r//' \
+			-e 's/datepicker\./$$.&/g' | \
+		tr '\r' '\n' > $${file}.tmp ; \
+	done
+	cat ui/i18n/datepicker*.tmp > $@
+	$(RM) ui/i18n/datepicker*.tmp
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS) $(DEB_BUILD_PROFILES)))
+override_dh_auto_test: dist/jquery-ui.js dist/jquery-ui.min.js themes/base/jquery-ui.css
+	nodejs --check dist/jquery-ui.js
+	nodejs --check dist/jquery-ui.min.js
+	nodejs --check ui/i18n/jquery-ui-i18n.js
+# Reference files are taken from the quick download ZIP file from
+# http://jqueryui.com
+	diff -Bw debian/reference-jquery-ui.js dist/jquery-ui.js || true
+	diff -Bw debian/reference-jquery-ui.css themes/base/jquery-ui.css || true
+endif
+
+override_dh_compress:
+# examples/autocomplete/search.php is needed for some examples to work;
+# unfortunately this doesn't help with file browsing
+	dh_compress --exclude=search.php
+
+override_dh_auto_clean:
+	find demos -name "*.html" -exec sed --in-place "s#/usr/share/javascript/jquery-ui/themes/base/jquery-ui\.css#../../themes/base/all.css#" {} \;
+	find demos -name "*.html" -exec sed --in-place "s#/usr/share/nodejs/require\.js#../../external/requirejs/require.js#" {} \;

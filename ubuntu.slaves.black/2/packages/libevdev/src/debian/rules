@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# The tests needs libpthread
+export CHECK_LIBS=-lpthread $(shell $(DEB_HOST_GNU_TYPE)-pkg-config --libs check)
+
+# doxygen version
+doxygen_version := $(shell dpkg-query -W -f="\$${source:Version}\n" doxygen)
+
+ifeq ($(filter terse,$(DEB_BUILD_OPTIONS)),)
+CONFIG := --disable-silent-rules
+else
+CONFIG := --enable-silent-rules
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CONFIG) PYTHON=/usr/bin/python3
+
+override_dh_auto_build-indep:
+	dh_auto_build -i -Bdoc
+
+override_dh_auto_test-indep:
+
+override_dh_auto_install-indep:
+	dh_auto_install -i -Bdoc
+
+override_dh_gencontrol-indep:
+	dh_gencontrol -- -Vdoxygen:Version=$(doxygen_version)
+
+override_dh_makeshlibs:
+	dh_makeshlibs --add-udeb=libevdev2-udeb
+
+override_dh_installdocs-indep:
+	dh_installdocs -i
+	dh_doxygen -i -plibevdev-doc

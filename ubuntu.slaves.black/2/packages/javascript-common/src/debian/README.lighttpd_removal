@@ -1,0 +1,34 @@
+This files describes the mechanism used to enable or not lighttpd conf file
+on configure.
+
+Rationale
+=========
+When a package is removed, its links in conf-enabled must be deleted. Not doing
+so will usually result in the use of removed data, and might cause httpd start
+failure.
+Note that in the case of javascript-common, we could have decided to disable
+/javascript on purge rather that on removal, but that would have made package
+usage inconsistent with common practice.
+
+The problem is that the user might disable the module by just deleting the link,
+for example by using lighttpd-disable-mod command.
+We must not recreate that link if that's the case. A missing link should be
+considered as local user configuration choice.
+See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=474913#33
+
+A basic solution might be not to recreate it on updates testing "$2" is empty
+in postinst.
+But then if the package is uninstalled and not purged the information is lost.
+The complete solution consists in storing inside the configuration, meaning in
+/etc, the fact during uninstall, that the link was aleady removed.
+
+Implementation
+==============
+prerm remove|upgrade: If conf-enabled link was removed, create a file
+/etc/javascript-common/lighttpd_disabled_by_user
+
+postinst configure: Enable on fresh installs and old upgrades. On other
+upgrades, check file lighttpd_disabled_by_user to enable or not.
+
+That file is not a conffile, we don't want the user to be bugged during
+upgrades about a change he did not make.

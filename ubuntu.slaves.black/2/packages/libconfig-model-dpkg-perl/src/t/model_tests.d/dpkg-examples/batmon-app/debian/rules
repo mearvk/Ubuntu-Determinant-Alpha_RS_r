@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+SHELL := /bin/bash
+
+include /usr/share/dpkg/buildflags.mk
+include /usr/share/GNUstep/debian/config.mk
+export GNUSTEP_MAKEFILES := $(GS_MAKE_DIR)
+export GNUSTEP_INSTALLATION_DOMAIN := SYSTEM
+d_app := $(CURDIR)/debian/batmon.app
+LDFLAGS += -Wl,-z,defs -Wl,--as-needed
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+optim := debug=yes
+endif
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) $(optim) CPPFLAGS="$(CPPFLAGS)" OBJCFLAGS="$(CFLAGS)" \
+	  LDFLAGS="$(LDFLAGS)" messages=yes
+	convert Resources/BatMon_icon.tif -resize 32x32 batmon.xpm
+
+override_dh_clean:
+	dh_clean batmon.xpm
+
+override_dh_link:
+	gsdh_gnustep
+	dh_installdirs usr/share/GNUstep
+	rm $(d_app)$(GNUSTEP_SYSTEM_APPS)/batmon.app/Resources/{LICENSE,README}
+	rm $(d_app)$(GNUSTEP_SYSTEM_APPS)/batmon.app/Resources/*.desktop
+	mv $(d_app)$(GNUSTEP_SYSTEM_APPS)/batmon.app/Resources \
+	  $(d_app)/usr/share/GNUstep/batmon.app
+	dh_link usr/share/GNUstep/batmon.app \
+	  $(GNUSTEP_SYSTEM_APPS)/batmon.app/Resources
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod -x $(d_app)/usr/share/GNUstep/batmon.app/*.tif

@@ -1,0 +1,600 @@
+From: Markus Koschany <apo@debian.org>
+Date: Fri, 22 Oct 2021 19:13:18 +0200
+Subject: no ARM64
+
+---
+ .../jnr/ffi/provider/jffi/ARM_64StubCompiler.java  | 345 ---------------------
+ .../ffi/provider/jffi/AbstractA64StubCompiler.java | 181 -----------
+ .../java/jnr/ffi/provider/jffi/StubCompiler.java   |  10 -
+ .../jnr/ffi/provider/jffi/X86MethodGenerator.java  |   2 +-
+ 4 files changed, 1 insertion(+), 537 deletions(-)
+ delete mode 100644 src/main/java/jnr/ffi/provider/jffi/ARM_64StubCompiler.java
+ delete mode 100644 src/main/java/jnr/ffi/provider/jffi/AbstractA64StubCompiler.java
+
+diff --git a/src/main/java/jnr/ffi/provider/jffi/ARM_64StubCompiler.java b/src/main/java/jnr/ffi/provider/jffi/ARM_64StubCompiler.java
+deleted file mode 100644
+index c09b4a0..0000000
+--- a/src/main/java/jnr/ffi/provider/jffi/ARM_64StubCompiler.java
++++ /dev/null
+@@ -1,345 +0,0 @@
+-/*
+- * Copyright (C) 2008-2010 Wayne Meissner
+- *
+- * This file is part of the JNR project.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *    http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package jnr.ffi.provider.jffi;
+-
+-import com.kenai.jffi.Function;
+-import jnr.a64asm.Assembler_A64;
+-import jnr.a64asm.CPU_A64;
+-import jnr.a64asm.Immediate;
+-import jnr.a64asm.Offset;
+-import jnr.a64asm.Post_index;
+-import jnr.a64asm.Pre_index;
+-import jnr.a64asm.Register;
+-import jnr.a64asm.Shift;
+-import jnr.ffi.CallingConvention;
+-import jnr.ffi.provider.ParameterType;
+-import jnr.ffi.provider.ResultType;
+-
+-import static jnr.ffi.provider.jffi.CodegenUtils.sig;
+-
+-/**
+- * Compilers method trampoline stubs for x86_64
+- */
+-final class ARM_64StubCompiler extends AbstractA64StubCompiler {
+-
+-    ARM_64StubCompiler(jnr.ffi.Runtime runtime) {
+-        super(runtime);
+-    }
+-
+-    boolean canCompile(ResultType returnType, ParameterType[] parameterTypes, CallingConvention convention) {
+-
+-        // There is only one calling convention; SYSV, so abort if someone tries to use stdcall
+-        if (convention != CallingConvention.DEFAULT) {
+-            return false;
+-        }
+-        switch (returnType.getNativeType()) {
+-            case VOID:
+-            case SCHAR:
+-            case UCHAR:
+-            case SSHORT:
+-            case USHORT:
+-            case SINT:
+-            case UINT:
+-            case SLONG:
+-            case ULONG:
+-            case SLONGLONG:
+-            case ULONGLONG:
+-            case FLOAT:
+-            case DOUBLE:
+-            case ADDRESS:
+-                break;
+-
+-            default:
+-                return false;
+-        }
+-
+-        int fCount = 0;
+-        int iCount = 0;
+-
+-        for (ParameterType t : parameterTypes) {
+-            switch (t.getNativeType()) {
+-                case SCHAR:
+-                case UCHAR:
+-                case SSHORT:
+-                case USHORT:
+-                case SINT:
+-                case UINT:
+-                case SLONG:
+-                case ULONG:
+-                case SLONGLONG:
+-                case ULONGLONG:
+-                case ADDRESS:
+-                    ++iCount;
+-                    break;
+-
+-                case FLOAT:
+-                case DOUBLE:
+-                    ++fCount;
+-                    break;
+-
+-                default:
+-                    // Fail on anything else
+-                    return false;
+-            }
+-        }
+-
+-        // We can only safely compile methods with up to 6 integer and 8 floating point parameters
+-        return iCount <= 6 && fCount <= 8;
+-    }
+-
+-    static final Register[] srcRegisters32 = { Register.gpw(2), Register.gpw(3), Register.gpw(4), Register.gpw(5), Register.gpw(6), Register.gpw(7) };
+-    static final Register[] srcRegisters64 = { Register.gpb(2), Register.gpb(3), Register.gpb(4), Register.gpb(5), Register.gpb(6), Register.gpb(7) };
+-    static final Register[] dstRegisters32 = { Register.gpw(0), Register.gpw(1), Register.gpw(2), Register.gpw(3), Register.gpw(4),Register.gpw(5), Register.gpw(6), Register.gpw(7) };
+-    static final Register[] dstRegisters64 = { Register.gpb(0), Register.gpb(1), Register.gpb(2), Register.gpb(3), Register.gpb(4),Register.gpb(5), Register.gpb(6), Register.gpb(7) };
+-
+-    @Override
+-    final void compile(Function function, String name, ResultType resultType, ParameterType[] parameterTypes,
+-                       Class resultClass, Class[] parameterClasses, CallingConvention convention, boolean saveErrno) {
+-        Assembler_A64 a = new Assembler_A64(CPU_A64.A64);
+-        int iCount = iCount(parameterTypes);
+-        int fCount = fCount(parameterTypes);
+-
+-        //usage of sp and imm() from Asm.java creates problems; better use Register.gpb(31) and Immediate.imm()
+-        Pre_index pindex = new Pre_index(Register.gpb(31),Immediate.imm(-32));
+-        a.stp(Register.gpb(29),Register.gpb(30),pindex);
+-        a.mov(Register.gpb(29),Register.gpb(31));
+-        boolean canJumpToTarget = !saveErrno & iCount <= 6 & fCount <= 8;
+-        switch (resultType.getNativeType()) {
+-            case SINT:
+-            case UINT:
+-                canJumpToTarget &= int.class == resultClass;
+-                break;
+-
+-            case SLONGLONG:
+-            case ULONGLONG:
+-                canJumpToTarget &= long.class == resultClass;
+-                break;
+-
+-            case FLOAT:
+-                canJumpToTarget &= float.class == resultClass;
+-                break;
+-
+-            case DOUBLE:
+-                canJumpToTarget &= double.class == resultClass;
+-                break;
+-
+-            case VOID:
+-                break;
+-
+-            default:
+-                canJumpToTarget = false;
+-                break;
+-        }
+-
+-        // JNI functions all look like:
+-        // foo(JNIEnv* env, jobject self, arg...)
+-        // on AARCH64, those sit in X0-X7/W0-W7
+-        // So we need to shuffle all the integer args up to over-write the
+-        // env and self arguments
+-
+-        for (int i = 0; i < Math.min(iCount, 6); i++) {
+-            switch (parameterTypes[i].getNativeType()) {
+-                case SCHAR:
+-                    a.sxtb(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                case UCHAR:
+-                    a.uxtb(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                case SSHORT:
+-                    a.sxth(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                case USHORT:
+-                    a.uxth(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                case SINT:
+-                    a.sxtw(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                case UINT:
+-                    a.uxtw(srcRegisters64[i], srcRegisters32[i]);
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-
+-                default:
+-                    a.mov(dstRegisters64[i], srcRegisters64[i]);
+-                    break;
+-            }
+-        }
+-
+-        if (iCount > 6) {
+-            throw new IllegalArgumentException("integer argument count > 6");
+-        }
+-
+-        // All the integer registers are loaded; there nothing to do for the floating
+-        // registers, as the first 8 args are already in xmm0..xmm7, so just sanity check
+-        if (fCount > 8) {
+-            throw new IllegalArgumentException("float argument count > 8");
+-        }
+-
+-        Offset offset = new Offset(Register.gpb(29),Immediate.imm(16));
+-        long function_addr = function.getFunctionAddress();
+-        short funn_addr_chunks = (short) (function_addr & 0x000000000000ffff);
+-        Shift sh;
+-        int count;
+-        a.mov(Register.gpb(9),Immediate.imm(funn_addr_chunks));
+-        for (count = 1; count < 4; count++){
+-            sh = new Shift(1,16*(count));
+-            funn_addr_chunks = (short) ((function_addr >> (16*count)) & 0x000000000000ffff);
+-            a.movk(Register.gpb(9),Immediate.imm(funn_addr_chunks),sh);
+-        }
+-        a.blr(Register.gpb(9));
+-        if (saveErrno) {
+-            // Save the return on the stack
+-            switch (resultType.getNativeType()) {
+-                case VOID:
+-                    // No need to save/reload return value registers
+-                    break;
+-                default:
+-                    a.str(dstRegisters64[0], offset);
+-                    break;
+-            }
+-
+-            // Save the errno in a thread-local variable
+-            function_addr = errnoFunctionAddress;
+-            funn_addr_chunks = (short) (function_addr & 0x000000000000ffff);
+-            a.mov(Register.gpb(9),Immediate.imm(funn_addr_chunks));
+-            for (count = 1; count < 4; count++){
+-                sh = new Shift(1, 16 * count);
+-                funn_addr_chunks = (short) ((function_addr >> (16 * count)) & 0x000000000000ffff);
+-                a.movk(Register.gpb(9),Immediate.imm(funn_addr_chunks),sh);
+-            }
+-            a.blr(Register.gpb(9));
+-            // Retrieve return value and put it back in the appropriate return register
+-            switch (resultType.getNativeType()) {
+-                case VOID:
+-                    // No need to save/reload return value registers
+-                    break;
+-
+-                case SCHAR:
+-                    a.ldrsb(dstRegisters64[0],offset);
+-                    break;
+-
+-                case UCHAR:
+-                    a.ldrb(dstRegisters64[0],offset);
+-                    break;
+-
+-                case SSHORT:
+-                    a.ldrsh(dstRegisters64[0],offset);
+-                    break;
+-
+-                case USHORT:
+-                    a.ldrh(dstRegisters64[0],offset);
+-                    break;
+-
+-                case SINT:
+-                    a.ldrsw(dstRegisters64[0],offset);
+-                    break;
+-
+-                case UINT:
+-                    a.ldr(dstRegisters64[0],offset);
+-                    break;
+-
+-                default:
+-                    a.ldr(dstRegisters64[0],offset);
+-                    break;
+-            }
+-        } else {
+-            // sign/zero extend the result
+-
+-            switch (resultType.getNativeType()) {
+-                case SCHAR:
+-                    a.sxtb(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-
+-                case UCHAR:
+-                    a.uxtb(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-
+-                case SSHORT:
+-                    a.sxth(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-
+-                case USHORT:
+-                    a.uxth(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-
+-                case SINT:
+-                    a.sxtw(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-
+-                case UINT:
+-                    a.uxtw(dstRegisters64[0], dstRegisters32[0]);
+-                    break;
+-            }
+-        }
+-
+-        Post_index posindex = new Post_index(Register.gpb(31),Immediate.imm(32));
+-        a.ldp(Register.gpb(29),Register.gpb(30),posindex );
+-        a.ret((Register)null);
+-        stubs_A64.add(new Stub(name, sig(resultClass, parameterClasses), a));
+-    }
+-
+-    static int fCount(ParameterType[] parameterTypes) {
+-        int fCount = 0;
+-
+-        for (ParameterType t : parameterTypes) {
+-            switch (t.getNativeType()) {
+-                case FLOAT:
+-                case DOUBLE:
+-                    ++fCount;
+-                    break;
+-            }
+-        }
+-
+-        return fCount;
+-    }
+-
+-    static int iCount(ParameterType[] parameterTypes) {
+-        int iCount = 0;
+-
+-        for (ParameterType t : parameterTypes) {
+-            switch (t.getNativeType()) {
+-                case SCHAR:
+-                case UCHAR:
+-                case SSHORT:
+-                case USHORT:
+-                case SINT:
+-                case UINT:
+-                case SLONG:
+-                case ULONG:
+-                case SLONGLONG:
+-                case ULONGLONG:
+-                case ADDRESS:
+-                    ++iCount;
+-                    break;
+-            }
+-        }
+-
+-        return iCount;
+-    }
+-}
+\ No newline at end of file
+diff --git a/src/main/java/jnr/ffi/provider/jffi/AbstractA64StubCompiler.java b/src/main/java/jnr/ffi/provider/jffi/AbstractA64StubCompiler.java
+deleted file mode 100644
+index ff8f2ad..0000000
+--- a/src/main/java/jnr/ffi/provider/jffi/AbstractA64StubCompiler.java
++++ /dev/null
+@@ -1,181 +0,0 @@
+-/*
+- * Copyright (C) 2008-2010 Wayne Meissner
+- *
+- * This file is part of the JNR project.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *    http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package jnr.ffi.provider.jffi;
+-
+-import com.kenai.jffi.MemoryIO;
+-import com.kenai.jffi.NativeMethod;
+-import com.kenai.jffi.NativeMethods;
+-import com.kenai.jffi.PageManager;
+-import jnr.a64asm.Assembler_A64;
+-import jnr.ffi.Platform;
+-import jnr.ffi.Runtime;
+-
+-import java.io.PrintStream;
+-import java.nio.ByteBuffer;
+-import java.nio.ByteOrder;
+-import java.util.ArrayList;
+-import java.util.Collections;
+-import java.util.LinkedList;
+-import java.util.List;
+-import java.util.Map;
+-import java.util.WeakHashMap;
+-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+-import java.util.logging.Level;
+-import java.util.logging.Logger;
+-
+-/**
+- * Base class for most X86_32/X86_64 stub compilers
+- */
+-abstract class AbstractA64StubCompiler extends StubCompiler {
+-    public final static boolean DEBUG = Boolean.getBoolean("jnr.ffi.compile.dump");
+-    private final jnr.ffi.Runtime runtime;
+-
+-    protected AbstractA64StubCompiler(jnr.ffi.Runtime runtime) {
+-        this.runtime = runtime;
+-    }
+-
+-    public final Runtime getRuntime() {
+-        return runtime;
+-    }
+-
+-    private static final class StaticDataHolder {
+-        // Keep a reference from the loaded class to the pages holding the code for that class.
+-        static final Map<Class, PageHolder> PAGES
+-                = Collections.synchronizedMap(new WeakHashMap<Class, PageHolder>());
+-    }
+-    final List<Stub> stubs_A64 = new LinkedList<Stub>();
+-
+-
+-    static final class Stub {
+-        final String name;
+-        final String signature;
+-        final Assembler_A64 assembler;
+-
+-        public Stub(String name, String signature, Assembler_A64 assembler) {
+-            this.name = name;
+-            this.signature = signature;
+-            this.assembler = assembler;
+-        }
+-    }
+-
+-    static final AtomicIntegerFieldUpdater<PageHolder> PAGE_HOLDER_UPDATER = AtomicIntegerFieldUpdater.newUpdater(PageHolder.class, "disposed");
+-
+-    static final class PageHolder {
+-        final PageManager pm;
+-        final long memory;
+-        final long pageCount;
+-        volatile int disposed;
+-
+-        public PageHolder(PageManager pm, long memory, long pageCount) {
+-            this.pm = pm;
+-            this.memory = memory;
+-            this.pageCount = pageCount;
+-        }
+-
+-        @Override
+-        protected void finalize() throws Throwable {
+-            try {
+-                int disposed = PAGE_HOLDER_UPDATER.getAndSet(this, 1);
+-                if (disposed == 0) {
+-                    pm.freePages(memory, (int) pageCount);
+-                }
+-            } catch (Throwable t) {
+-                Logger.getLogger(getClass().getName()).log(Level.WARNING,
+-                    "Exception when freeing native pages: %s", t.getLocalizedMessage());
+-            } finally {
+-                super.finalize();
+-            }
+-        }
+-
+-    }
+-
+-    @Override
+-    void attach(Class clazz) {
+-
+-        if (stubs_A64.isEmpty()) {
+-            return;
+-        }
+-
+-        long codeSize = 0;
+-        for (Stub stub : stubs_A64) {
+-            // add 8 bytes for alignment
+-            codeSize += stub.assembler.codeSize() + 8;
+-        }
+-
+-        PageManager pm = PageManager.getInstance();
+-
+-        long npages = (codeSize + pm.pageSize() - 1) / pm.pageSize();
+-        // Allocate some native memory for it
+-        long code = pm.allocatePages((int) npages, PageManager.PROT_READ | PageManager.PROT_WRITE);
+-        if (code == 0) {
+-            throw new OutOfMemoryError("allocatePages failed for codeSize=" + codeSize);
+-        }
+-        PageHolder page = new PageHolder(pm, code, npages);
+-
+-        // Now relocate/copy all the assembler stubs into the real code area
+-        List<NativeMethod> methods = new ArrayList<NativeMethod>(stubs_A64.size());
+-        long fn = code;
+-        PrintStream dbg = System.err;
+-        System.out.flush(); System.err.flush();
+-
+-        for (Stub stub : stubs_A64) {
+-            Assembler_A64 asm = stub.assembler;
+-            // align the start of all functions on a 8 byte boundary
+-            fn = align(fn, 8);
+-            ByteBuffer buf = ByteBuffer.allocate(asm.codeSize()).order(ByteOrder.LITTLE_ENDIAN);
+-            stub.assembler.relocCode(buf, fn);
+-            buf.flip();
+-            MemoryIO.getInstance().putByteArray(fn, buf.array(), buf.arrayOffset(), buf.limit());
+-
+-            if (DEBUG && X86Disassembler.isAvailable()) {
+-
+-                dbg.println(clazz.getName() + "." + stub.name + " " + stub.signature);
+-                X86Disassembler disassembler = X86Disassembler.create();
+-                disassembler.setMode(Platform.getNativePlatform().getCPU() == Platform.CPU.I386
+-                        ? X86Disassembler.Mode.I386 : X86Disassembler.Mode.X86_64);
+-                disassembler.setSyntax(X86Disassembler.Syntax.INTEL);
+-                disassembler.setInputBuffer(MemoryUtil.newPointer(runtime, fn), asm.offset());
+-                while (disassembler.disassemble()) {
+-                    dbg.printf("%8x: %s\n", disassembler.offset(), disassembler.insn());
+-                }
+-                if (buf.remaining() > asm.offset()) {
+-                    // libudis86 for some reason cannot understand the code asmjit emits for the trampolines
+-                    dbg.printf("%8x: <indirect call trampolines>\n", asm.offset());
+-                }
+-                dbg.println();
+-            }
+-            methods.add(new NativeMethod(fn, stub.name, stub.signature));
+-
+-            fn += asm.codeSize();
+-        }
+-
+-        pm.protectPages(code, (int) npages, PageManager.PROT_READ | PageManager.PROT_EXEC);
+-
+-        NativeMethods.register(clazz, methods);
+-        StaticDataHolder.PAGES.put(clazz, page);
+-    }
+-
+-    static int align(int offset, int align) {
+-        return (offset + align - 1) & ~(align - 1);
+-    }
+-
+-    static long align(long offset, long align) {
+-        return (offset + align - 1) & ~(align - 1);
+-    }
+-}
+diff --git a/src/main/java/jnr/ffi/provider/jffi/StubCompiler.java b/src/main/java/jnr/ffi/provider/jffi/StubCompiler.java
+index 9aaf2a8..6061283 100644
+--- a/src/main/java/jnr/ffi/provider/jffi/StubCompiler.java
++++ b/src/main/java/jnr/ffi/provider/jffi/StubCompiler.java
+@@ -22,8 +22,6 @@ import com.kenai.jffi.Function;
+ import com.kenai.jffi.Internals;
+ import com.kenai.jffi.PageManager;
+ import com.kenai.jffi.Platform;
+-import jnr.a64asm.Assembler_A64;
+-import jnr.a64asm.CPU_A64;
+ import jnr.ffi.CallingConvention;
+ import jnr.ffi.provider.ParameterType;
+ import jnr.ffi.provider.ResultType;
+@@ -53,11 +51,6 @@ abstract class StubCompiler {
+                         return new X86_64StubCompiler(runtime);	//currently supporting only A64
+                     }
+                     break;
+-                case AARCH64:
+-                    if (Platform.getPlatform().getOS() != Platform.OS.WINDOWS) {
+-                        return new ARM_64StubCompiler(runtime);
+-                    }
+-                    break;
+             }
+         }
+ 
+@@ -119,9 +112,6 @@ abstract class StubCompiler {
+                 case X86_64:
+                     new Assembler(CPU.X86_64);
+                     return true;
+-                case AARCH64:
+-                    new Assembler_A64(CPU_A64.A64);
+-                    return true;
+                 default:
+                     return false;
+             }
+diff --git a/src/main/java/jnr/ffi/provider/jffi/X86MethodGenerator.java b/src/main/java/jnr/ffi/provider/jffi/X86MethodGenerator.java
+index 3a4cc4e..acada91 100644
+--- a/src/main/java/jnr/ffi/provider/jffi/X86MethodGenerator.java
++++ b/src/main/java/jnr/ffi/provider/jffi/X86MethodGenerator.java
+@@ -73,7 +73,7 @@ class X86MethodGenerator implements MethodGenerator {
+             return false;
+         }
+ 
+-        if (!platform.getCPU().equals(Platform.CPU.I386) && !platform.getCPU().equals(Platform.CPU.X86_64) && !platform.getCPU().equals(Platform.CPU.AARCH64)) {
++        if (!platform.getCPU().equals(Platform.CPU.I386) && !platform.getCPU().equals(Platform.CPU.X86_64)) {
+             return false;
+         }
+ 

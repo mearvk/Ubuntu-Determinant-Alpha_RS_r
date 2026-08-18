@@ -1,0 +1,39 @@
+#! /usr/bin/make -f
+
+#export DH_VERBOSE = 1
+
+DEB_HOST_MULTIARCH := $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+%:
+	dh $@ --with apport
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--mandir='$${prefix}/share/man' \
+		--enable-libmount-mount \
+		--enable-svcgss \
+		--with-pluginpath=/usr/lib/$(DEB_HOST_MULTIARCH)/libnfsidmap \
+		--with-tcp-wrappers \
+		--with-systemd=/lib/systemd/system
+
+override_dh_bugfiles:
+	dh_bugfiles
+	install -m 0644 debian/nfs-utils.bug-control debian/nfs-common/usr/share/bug/nfs-utils/control
+	install -m 0644 debian/nfs-utils.bug-presubj debian/nfs-common/usr/share/bug/nfs-utils/presubj
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod u+s debian/nfs-common/sbin/mount.nfs
+
+override_dh_installinit:
+	dh_installinit -pnfs-common -R
+	install -m 0755 debian/nfs-kernel-server.init debian/nfs-kernel-server/etc/init.d/nfs-kernel-server
+
+override_dh_md5sums:
+	dh_md5sums -Xvar/lib
+
+override_dh_missing:
+	dh_missing --list-missing
+
+override_dh_apport:
+	dh_apport -pnfs-common

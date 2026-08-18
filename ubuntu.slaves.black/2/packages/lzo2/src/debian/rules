@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CPPFLAGS_MAINT_APPEND = -DLZO_CFG_MODERN_C=1
+
+DEB_DESTDIR = $(CURDIR)/debian/tmp/
+
+include /usr/share/dpkg/architecture.mk
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --enable-shared
+
+override_dh_auto_test:
+	dh_auto_test -- check test
+
+override_dh_auto_install:
+	dh_auto_install
+	mkdir -p $(DEB_DESTDIR)/lib/$(DEB_HOST_MULTIARCH)
+	mv $(DEB_DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.so.* $(DEB_DESTDIR)/lib/$(DEB_HOST_MULTIARCH)
+	ln -sf /lib/$(DEB_HOST_MULTIARCH)/$$(basename $$(readlink $(DEB_DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.so)) $(DEB_DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/*.so
+	mkdir -p $(DEB_DESTDIR)/usr/share/lzo/minilzo
+	install -D -m 644 minilzo/README.LZO minilzo/minilzo.c minilzo/minilzo.h include/lzo/lzoconf.h include/lzo/lzodefs.h $(CURDIR)/debian/tmp/usr/share/lzo/minilzo
+
+override_dh_installchangelogs:
+	dh_installchangelogs NEWS
+
+override_dh_makeshlibs:
+	dh_makeshlibs --add-udeb=liblzo2-2-udeb

@@ -1,0 +1,69 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          irexec
+# Required-Start:    $local_fs $remote_fs $syslog lircd
+# Required-Stop:     $local_fs $remote_fs $syslog lircd
+# Should-Start:      lircmd
+# Should-Stop:       lircmd
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts LIRC IREXEC daemon.
+# Description:       IREXEC runs programs with one button press.
+### END INIT INFO
+
+# source generic LSB initscript helpers
+. /lib/lsb/init-functions
+
+# check if the lirc package is still installed and this not a stale conffile
+test -x /usr/bin/irexec  || exit 0
+
+# sanity checks for starting irexec
+if [ ! -f /etc/lirc/lircrc ] || \
+   [ "$(grep -v -e ^[\ \t]*\# -e ^$ /etc/lirc/lircrc | wc -l)" -eq 0 ]; then
+	ENABLE_IREXEC="no"
+fi
+
+
+case "$1" in
+	start)
+		# start irexec
+		if [ "$ENABLE_IREXEC" = "yes" ]; then
+			log_daemon_msg "Starting irexec daemon" "irexec"
+			start-stop-daemon --start --quiet --oknodo \
+				--exec /usr/bin/irexec -- \
+				-d /etc/lirc/lircrc < /dev/null
+			log_end_msg $?
+		fi
+		;;
+	stop)
+		if [ "$ENABLE_IREXEC" = "yes" ]; then
+			log_daemon_msg "Stopping irexec daemon" "irexec"
+			start-stop-daemon --stop --quiet \
+				--exec /usr/bin/irexec
+			log_end_msg $?
+		fi
+		;;
+	reload|force-reload)
+		if [ "$ENABLE_IREXEC" = "yes" ]; then
+			log_daemon_msg "Reload configuration for irexec daemon" "IREXEC"
+			start-stop-daemon --stop --quiet --signal 1 \
+				--exec /usr/bin/irexec
+			log_end_msg $?
+		fi
+		;;
+	restart)
+		$0 stop
+		$0 start
+		;;
+	status)
+		if [ "$ENABLE_IREXEC" = "yes" ]; then
+			status_of_proc /usr/bin/irexec irexec  || exit $?
+		fi
+		;;
+	*)
+		echo "Usage: /etc/init.d/irexec {start|stop|reload|restart|force-reload|status}"
+		exit 1
+		;;
+esac
+
+exit 0

@@ -1,0 +1,37 @@
+From ed8b2c86ab77aaa3d7fd688c049ad5e1b922a9c6 Mon Sep 17 00:00:00 2001
+From: Reid Wahl <nrwahl@protonmail.com>
+Date: Thu, 13 Jan 2022 02:56:55 -0800
+Subject: [PATCH] Fix: liblrmd: Avoid double-free during notify operation
+Description: Avoid double-free during notify operation
+Origin: upstream, https://github.com/ClusterLabs/pacemaker/commit/ed8b2c86ab77aaa3d7fd688c049ad5e1b922a9c6
+Bug: https://bugzilla.redhat.com/show_bug.cgi?id=2039675
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/pacemaker/+bug/2012740
+Last-Update: 2023-03-31
+---
+ lib/lrmd/lrmd_client.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+--- a/lib/lrmd/lrmd_client.c
++++ b/lib/lrmd/lrmd_client.c
+@@ -306,9 +306,10 @@
+         event.user_data = crm_element_value(msg, F_LRMD_RSC_USERDATA_STR);
+         event.type = lrmd_event_exec_complete;
+ 
+-        // No need to duplicate the memory, so don't use setter functions
+-        event.output = crm_element_value(msg, F_LRMD_RSC_OUTPUT);
+-        event.exit_reason = crm_element_value(msg, F_LRMD_RSC_EXIT_REASON);
++        /* output and exit_reason may be freed by a callback */
++        event.output = crm_element_value_copy(msg, F_LRMD_RSC_OUTPUT);
++        lrmd__set_result(&event, event.rc, event.op_status,
++                         crm_element_value(msg, F_LRMD_RSC_EXIT_REASON));
+ 
+         event.params = xml2list(msg);
+     } else if (pcmk__str_eq(type, LRMD_OP_NEW_CLIENT, pcmk__str_none)) {
+@@ -325,6 +326,7 @@
+     if (event.params) {
+         g_hash_table_destroy(event.params);
+     }
++    lrmd__reset_result(&event);
+ }
+ 
+ // \return Always 0, to indicate that IPC mainloop source should be kept

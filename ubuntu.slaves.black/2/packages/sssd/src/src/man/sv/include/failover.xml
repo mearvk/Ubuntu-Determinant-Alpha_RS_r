@@ -1,0 +1,120 @@
+<refsect1 id='failover'>
+    <title>RESERVER</title>
+    <para>
+        Reservfunktionen gör att bakändar automatiskt kan byta till en annan server
+om den nuvarande servern slutar fungera.
+    </para>
+    <refsect2 id='failover_syntax'>
+        <title>Reservsyntax</title>
+        <para>
+            Listan av servrar ges som en kommaseparerad lista; godtyckligt antal
+mellanslag tillåts runt kommatecknet.  Servrarna listas i preferensordning.
+Listan kan innehålla obegränsat antal servrar.
+        </para>
+        <para>
+            För varje reservaktiverat konfigurationsalternativ finns det två varianter:
+<emphasis>primary</emphasis> och <emphasis>backup</emphasis>.  Tanken är att
+servrar i den primära listan föredras och backup-servrar bara provas om inga
+primära servrar kan nås.  Om en backup-server väljs sätts en tidsgräns på 31
+sekunder.  Efter denna tidsgräns kommer SSSD periodiskt att försöka
+återansluta till en av de primära servrarna.  Om det lyckas kommer den
+ersätta den nu aktiva (backup-)servern.
+        </para>
+    </refsect2>
+    <refsect2 id='failover_mechanism'>
+        <title>Reservmekanismen</title>
+        <para>
+            Reservmekanismen gör skillnad mellan en maskin och en tjänst.  Bakänden
+försöker först att slå upp värdnamnet för en given maskin; om denna
+uppslagning misslyckas antas maskinen vara bortkopplad.  Inga ytterligare
+försök görs att ansluta till denna maskin för någon annan tjänst.  Om
+uppslagningsförsöket lyckas försöker bakänden ansluta till en tjänst på
+denna maskin.  Om tjänsteanslutningen misslyckas anses bara just denna
+tjänst frånkopplad och bakänden byter automatiskt till nästa tjänst.
+Maskinen betraktas fortfarande som uppkopplad och kan användas vid försök
+att nå en annan tjänst.
+        </para>
+        <para>
+            Ytterligare försök att ansluta görs till maskiner eller tjänster som
+markerats som frånkopplade efter en viss tidsperiod, detta är för närvarande
+hårdkodat till 30 sekunder.
+        </para>
+        <para>
+            Om det inte finns några fler maskiner att prova byter bakänden i sin helhet
+till frånkopplat läge, och försöker sedan återansluta var 30:e sekund.
+        </para>
+    </refsect2>
+    <refsect2 id='failover_tuning'>
+        <title>Tidsgränser och trimning av reservfunktioner</title>
+        <para>
+            Att slå upp en server att ansluta till kan vara så enkelt som att göra en
+enstaka DNS-fråga eller kan innebära flera steg, såsom att hitta den rätta
+sajten eller försöka med flera värdnamn ifall några av de konfigurerade
+servrarna inte kan nås.  De mer komplexa scenariona kan ta en stund och SSSD
+behöver balansera mellan att tillhandahålla tillräckligt med tid för att
+färdigställa upplösningsprocessen men å andra sidan inte försöka för länge
+före den faller tillbaka på frånkopplat läge.  Om SSSD:s felsökningsloggar
+visar att serverns upplösning överskrider tidsgränsen före en aktiv server
+nås kan du överväga att ändra tidsgränserna.
+        </para>
+        <para>
+            Detta avsnitt listar tillgängliga trimningsvariabler.  Se deras beskrivning
+i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.  <variablelist>
+                <varlistentry>
+                    <term>
+                        dns_resolver_server_timeout
+                    </term>
+                    <listitem>
+                        <para>
+                            Tid i millisekunder som anger hur länge SSSD skall tala med en viss
+DNS-server före den provar nästa.
+                        </para>
+                        <para>
+                            Standard: 1000
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>
+                        dns_resolver_op_timeout
+                    </term>
+                    <listitem>
+                        <para>
+                            Tid i sekunder hur länge SSSD skall försöka slå upp en viss DNS-fråga
+(t.ex. uppslagning av ett värdnamn eller en SRV-post) före den provar nästa
+värdnamn eller upptäcktsdomän.
+                        </para>
+                        <para>
+                            Standard: 3
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>
+                        dns_resolver_timeout
+                    </term>
+                    <listitem>
+                        <para>
+                            Hur länge skall SSSD försöka slå upp en reservtjänst.  Denna
+tjänsteuppslagning kan internt bestå av flera steg, såsom att slå upp DNS
+SRV-frågor och lokalisera sajten.
+                        </para>
+                        <para>
+                            Standard: 6
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+        <para>
+            För LDAP-baserade leverantörer utförs uppslagningsoperationen som en del av
+LDAP-anslutningsoperationen. Därför skall även tidsgränsen
+<quote>ldap_opt_timeout</quote> sättas till ett större värde än
+<quote>dns_resolver_timeout</quote> som i sin tur skall sättas till ett
+större värde än <quote>dns_resolver_op_timeout</quote> som skall vara större
+än <quote>dns_resolver_server_timeout</quote>.
+        </para>
+    </refsect2>
+</refsect1>

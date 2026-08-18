@@ -1,0 +1,633 @@
+Description: Allow ant based upstream build system to work in Debian
+Author: Miguel Landaeta <miguel@miguel.cc>
+Forwarded: no
+Last-Update: 2012-01-21
+
+diff --git a/anttask/build.xml b/anttask/build.xml
+index d3300aa..2f2263d 100644
+--- a/anttask/build.xml
++++ b/anttask/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Ant task definition for Castor XML code generator" default="compile.anttask" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Ant task definition for Castor XML code generator" default="compile.anttask" basedir=".">
+     
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -7,11 +6,13 @@
+     <property name="main.resources"       value="${source}/main/resources" />
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+-    <property name="archive"              value="${project}-${version}${release}-anttasks"/>
++    <property name="archive"              value="${project}-anttasks-${version}${release}"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 	
+     <path id="build.classpath">
+         <pathelement location="${basedir}/../build/classes"/>
+@@ -19,14 +20,17 @@
+         <pathelement location="${basedir}/../ddlgen/build/classes"/>
+         <pathelement location="${basedir}/../codegen/build/classes"/>
+         <pathelement location="${basedir}/../schema/build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     </path>
+ 
+ 	<target name="derive.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.anttask" depends="derive.libs" unless="prepare.anttask.executed">
+diff --git a/codegen/build.xml b/codegen/build.xml
+index 3cc1442..71652f4 100644
+--- a/codegen/build.xml
++++ b/codegen/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor XML - code generator" default="compile.codegen" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor XML - code generator" default="compile.codegen" basedir=".">
+ 
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -11,12 +10,14 @@
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+ 	<property name="test.classes"         value="${build}/test"/>
+-    <property name="archive"              value="${project}-${version}${release}-codegen"/>
++    <property name="archive"              value="${project}-codegen-${version}${release}"/>
+     <property name="gen.src"              value="${build}/generated-sources"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 
+     <path id="build.compile.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+@@ -24,6 +25,7 @@
+         <pathelement location="${basedir}/../schema/build/classes"/>
+         <pathelement location="${basedir}/../anttask/build/classes"/>
+         <pathelement location="${basedir}/../core/build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	
+     	<!-- JARs -->
+     	<!--
+@@ -55,10 +57,12 @@
+ 
+ 	<target name="derive.codegen.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.codegen" unless="prepare.codegen.executed">
+diff --git a/core/build.xml b/core/build.xml
+index e189839..414e770 100644
+--- a/core/build.xml
++++ b/core/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor core" default="compile.core" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor core" default="compile.core" basedir=".">
+ 
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -10,15 +9,18 @@
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+     <property name="test.classes"         value="${build}/test"/>
+-    <property name="archive"              value="${project}-${version}${release}-core"/>
++    <property name="archive"              value="${project}-core-${version}${release}"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 
+     <path id="build.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+         <pathelement location="${basedir}/../build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	<!--
+         <pathelement location="${basedir}/../lib/commons-logging-1.1.jar"/>
+         <pathelement location="${basedir}/../lib/junit_3.8.2.jar"/>
+@@ -32,10 +34,12 @@
+ 
+ 	<target name="derive.core.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.core" unless="prepare.executed">
+diff --git a/cpa/build.xml b/cpa/build.xml
+index 2b32ea2..d481e01 100644
+--- a/cpa/build.xml
++++ b/cpa/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor JDO - persistence framework" default="compile.cpa" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor JDO - persistence framework" default="compile.cpa" basedir=".">
+ 
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -9,16 +8,18 @@
+     <property name="main.jjtree"          value="${source}/main/jjtree"/>
+     <property name="jjtree.target"        value="${target}/generated-sources/jjtree"/>
+     <property name="javacc.target"        value="${target}/generated-sources/javacc"/>
+-    <property name="javacc.home"          value="${basedir}/../lib" />
++    <property name="javacc.home"          value="/usr/share/java" />
+     <property name="build"                value="${basedir}/build"/>
+     <property name="castor.target"        value="${basedir}/target/generated-sources/castor"/>
+     <property name="classes"              value="${build}/classes"/>
+-    <property name="archive"              value="${project}-${version}${release}-jdo"/>
++    <property name="archive"              value="${project}-jdo-${version}${release}"/>
+     <property name="gen.src"              value="${build}/generated-sources"/>
+ 
++    <!--
+     <artifact:dependencies filesetId="dependency.fileset" useScope="test">
+       <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 
+     <path id="build.classpath">
+     	<!-- inter-module dependencies -->
+@@ -28,6 +29,7 @@
+         <pathelement location="${basedir}/../schema/build/classes"/>
+         <pathelement location="${basedir}/../anttask/build/classes"/>
+         <pathelement location="${basedir}/../codegen/build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	
+     	<!-- third-party libs -->
+ <!--    	
+@@ -41,10 +43,12 @@
+ 
+ 	<target name="derive.cpa.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.cpa" unless="prepare.cpa.executed">
+@@ -97,6 +101,17 @@
+     </target>
+ 
+     <target name="compile.cpa" depends="gen.parser, derive.cpa.libs" description="Compile Castor JDO">
++        <javac destdir="${classes}" 
++               debug="on" encoding="ISO-8859-1" deprecation="false">
++            <src path="${javacc.target}"/>
++            <src path="${castor.target}"/>
++            <src path="${main.java}"/>
++            <classpath refid="build.classpath"/>
++        	<classpath>
++        		<fileset dir="${basedir}/lib"/>
++        	</classpath>
++        </javac>
++        <!--
+         <javac srcdir="${javacc.target}" destdir="${classes}" 
+                debug="on" encoding="ISO-8859-1" deprecation="false">
+             <classpath refid="build.classpath"/>
+@@ -118,6 +133,7 @@
+         		<fileset dir="${basedir}/lib"/>
+         	</classpath>
+         </javac>
++        -->
+         <copy todir="${classes}">
+             <fileset dir="${main.resources}">
+                 <include name="**"/>
+diff --git a/ddlgen/build.xml b/ddlgen/build.xml
+index 4876ce4..2963db7 100644
+--- a/ddlgen/build.xml
++++ b/ddlgen/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor DDL generator" default="compile.ddlgen" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor DDL generator" default="compile.ddlgen" basedir=".">
+     
+     <property environment="env"/>
+     <property name="source"               value="${basedir}/src"/>
+@@ -9,14 +8,17 @@
+     <property name="classes"              value="${build}/classes"/>
+     <property name="doc"                  value="${build}/doc"/>
+     <property name="javadoc"              value="${doc}/javadoc"/>
+-    <property name="archive"              value="${project}-${version}${release}-ddlgen"/>
++    <property name="archive"              value="${project}-ddlgen-${version}${release}"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 
+     <path id="build.classpath">
+         <pathelement location="${basedir}/../build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	
+ <!--    	
+     	<pathelement location="${basedir}/../lib/commons-logging-1.1.jar" />
+@@ -25,10 +27,12 @@
+ 
+ 	<target name="derive.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.ddlgen" depends="derive.libs" unless="prepare.ddlgen.executed">
+diff --git a/diff/build.xml b/diff/build.xml
+index 5e4a098..1f9bea1 100644
+--- a/diff/build.xml
++++ b/diff/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor XML - XML diff" default="compile.diff" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor XML - XML diff" default="compile.diff" basedir=".">
+ 
+     <!-- $Id: build.xml 0000 2007-01-19 21:12:08Z ekuns $ -->
+ 
+@@ -10,16 +9,19 @@
+     <property name="test.resources"       value="${source}/test/resources"/>
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+-    <property name="archive"              value="${project}-${version}${release}-xml-diff"/>
++    <property name="archive"              value="${project}-xml-diff-${version}${release}"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 	
+     <path id="build.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+         <pathelement location="${basedir}/../build/classes"/>
+         <pathelement location="${basedir}/../core/build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	<!--
+         <pathelement location="${basedir}/../lib/commons-logging-1.1.jar"/>
+         <pathelement location="${basedir}/../lib/junit_3.8.2.jar"/>
+@@ -28,10 +30,12 @@
+ 
+ 	<target name="derive.diff.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.diff" unless="prepare.diff.executed">
+diff --git a/examples/build.xml b/examples/build.xml
+index adfb65d..ea4535d 100644
+--- a/examples/build.xml
++++ b/examples/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor CPA - PTF" default="compile.examples" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor CPA - PTF" default="compile.examples" basedir=".">
+ 
+     <!-- $Id: build.xml 0000 2007-01-19 21:12:08Z ekuns $ -->
+ 
+@@ -11,14 +10,16 @@
+     <property name="test.resources"       value="${source}/test/resources"/>
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+-    <property name="archive"              value="${project}-${version}${release}-examples"/>
+-    <property name="archive-sources"      value="${project}-${version}${release}-examples-sources"/>
++    <property name="archive"              value="${project}-examples-${version}${release}"/>
++    <property name="archive-sources"      value="${project}-examples-sources-${version}${release}"/>
+ 
+ 	<property name="exampleexcludes"      value="codegen/*,**/dax/**"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 	
+     <path id="build.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+diff --git a/schema/build.xml b/schema/build.xml
+index 7aa2944..dfc379f 100644
+--- a/schema/build.xml
++++ b/schema/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor XML schema" default="compile.schema" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor XML schema" default="compile.schema" basedir=".">
+ 
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -11,18 +10,21 @@
+     <property name="build"                value="${basedir}/build"/>
+     <property name="classes"              value="${build}/classes"/>
+ 	<property name="test.classes"         value="${build}/test"/>
+-    <property name="archive"              value="${project}-${version}${release}-xml-schema"/>
++    <property name="archive"              value="${project}-xml-schema-${version}${release}"/>
+     <property name="gen.src"              value="${basedir}/target/generated-sources/castor"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 	
+     <path id="build.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+         <pathelement location="${basedir}/../build/classes"/>
+         <pathelement location="${basedir}/../xml/build/classes"/>
+         <pathelement location="${basedir}/../core/build/classes"/>
++        <fileset dir="/" includesfile="${basedir}/../debian/classpath-debian"/>
+     	
+ <!--    
+     	<pathelement location="${basedir}/../lib/commons-logging-1.1.jar"/>
+@@ -37,10 +39,12 @@
+ 
+ 	<target name="derive.libs">
+ 		<mkdir dir="${basedir}/lib" />  	
++	    <!--
+ 	    <copy todir="${basedir}/lib" verbose="true">
+ 	      <fileset refid="dependency.fileset"/>
+ 	      <mapper type="flatten"/>
+ 	    </copy>
++	    -->
+ 	</target>	
+ 
+     <target name="prepare.schema" depends="derive.libs" unless="prepare.executed">
+diff --git a/src/build.xml b/src/build.xml
+index 6316674..a7babdf 100644
+--- a/src/build.xml
++++ b/src/build.xml
+@@ -2,8 +2,7 @@
+ 
+ <!-- $Id: build.xml 8787 2011-02-20 08:02:41Z wguttmn $ -->
+ 
+-<project name="Castor" default="compile" basedir=".."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor" default="compile" basedir="..">
+ 	
+     <!-- ================================================================== -->
+     <!--                            Properties                              -->
+@@ -60,9 +59,12 @@
+         <pathelement location="${classes}"/>
+         <pathelement location="tests"/>
+         <pathelement location="${tests}" />
++        <!--
+         <fileset dir="${lib}">
+             <include name="*.jar"/>
+         </fileset>
++        -->
++        <fileset dir="/" includesfile="${basedir}/debian/classpath-debian"/>
+         <pathelement location="${basedir}/ddlgen/build/classes" />
+         <pathelement location="${basedir}/codegen/build/classes" />
+         <pathelement location="${basedir}/cpa/build/classes" />
+@@ -84,12 +86,17 @@
+     </path>
+ 	
+     <path id="javadoc.classpath">
++        <!--
+         <fileset dir="${lib}">
+             <include name="*.jar"/>
+         </fileset>
++        -->
++        <fileset dir="/" includesfile="${basedir}/debian/classpath-debian"/>
++        <!--
+         <fileset dir="${basedir}/bin/lib">
+             <include name="ant-1.6.jar" />
+         </fileset>
++        -->
+     </path>
+ 
+     <!-- ================================================================== -->
+@@ -135,16 +142,20 @@
+                  org/castor/jdo/**/*.java,
+                  org/castor/persist/**/*.java" />
+ 	
++    <!--
+     <artifact:dependencies filesetId="dependency.root.fileset" useScope="test">
+       <artifact:pom id="schema" file="${basedir}/xml/pom.xml" />
+     </artifact:dependencies>
++    -->
+ 		
+     <target name="derive.root.libs">
+       <mkdir dir="newlib" />  	
++      <!--
+       <copy todir="newlib" verbose="true">
+ 	<fileset refid="dependency.root.fileset"/>
+ 	<mapper type="flatten"/>
+       </copy>
++      -->
+     </target>	
+ 
+     <target name="targets" description="Prints static list of available targets">
+@@ -305,7 +316,7 @@
+                includes="${castor.commons.files}">
+             <classpath refid="build.classpath"/>
+         	<classpath>
+-        	   <fileset dir="${basedir}/newlib"/>
++        	   <!--<fileset dir="${basedir}/newlib"/>-->
+         	</classpath>
+         </javac>
+     </target>
+@@ -318,11 +329,13 @@
+             <property name="release" value="${release}"/>
+         </ant>
+     	<!-- compile artifacts in XML module -->
++        <!--
+         <javac srcdir="${basedir}/xml/target/generated-sources/castor" destdir="${classes}" excludes="${excludes}"
+                debug="on" encoding="ISO-8859-1" deprecation="${deprecation}"
+                includes="${castor.xml.files}">
+             <classpath refid="build.classpath"/>
+         </javac>
++        -->
+         <javac srcdir="${java}" destdir="${classes}" excludes="${excludes}"
+                debug="on" encoding="ISO-8859-1" deprecation="${deprecation}"
+                includes="${castor.xml.files}">
+@@ -332,9 +345,11 @@
+         	</classpath>
+         </javac>
+         <copy todir="${classes}">
++            <!--
+             <fileset dir="${basedir}/xml/target/generated-sources/castor">
+                 <include name="**/*.cdr"/>
+             </fileset>
++            -->
+             <fileset dir="${java}">
+                 <patternset refid="support.files" />
+             </fileset>
+@@ -344,6 +359,7 @@
+         </copy>
+ 
+     	<!-- compile test classes -->
++        <!--
+         <javac srcdir="${test.java}" destdir="${test.classes}"
+                debug="on" encoding="ISO-8859-1" deprecation="${deprecation}">
+             <classpath refid="build.classpath"/>
+@@ -351,6 +367,7 @@
+         	   <fileset dir="${basedir}/newlib"/>
+         	</classpath>
+         </javac>
++        -->
+         <copy todir="${test.classes}">
+             <fileset dir="${test.java}">
+                 <patternset refid="support.files" />
+@@ -365,6 +382,7 @@
+                debug="on" encoding="ISO-8859-1" deprecation="${deprecation}"
+                includes="${castor.jdo.files}">
+             <classpath refid="build.classpath"/>
++            <exclude name="**/org/exolab/castor/dsml/mozilla/**"/>
+         	<classpath>
+         	   <fileset dir="${basedir}/newlib"/>
+         	</classpath>
+@@ -416,12 +434,10 @@
+             <property name="release" value="${release}"/>
+         </ant>
+     	<!-- build Castor JDO -->
+-<!--
+     	<ant antfile="${basedir}/cpa/build.xml" target="compile.cpa" inheritAll="false">
+             <property name="version" value="${version}"/>
+             <property name="release" value="${release}"/>
+         </ant>
+--->
+     	<!-- build examples -->
+ <!--
+         <ant antfile="${basedir}/examples/build.xml" target="compile.examples" inheritAll="false">
+@@ -599,6 +615,7 @@
+               <include name="${archive.name}.jar" />
+           </fileset>
+       </copy>
++      <!--
+       <copy todir="target/lib">
+           <fileset dir="${lib}">
+               <include name="commons-logging.jar" />
+@@ -608,6 +625,7 @@
+               <include name="derby-10.1.2.1.jar" />
+           </fileset>
+       </copy>
++      -->
+       <zip zipfile="${dist}/${archive.name}-examples.zip" basedir="target" includes="**"/>
+     </target>
+ 
+@@ -639,7 +657,8 @@
+         <replace file="${classes}/MANIFEST.MF" token="$$RELEASE$$" value="${release}"/>
+ 
+         <!-- create Castor XML Only Jar -->
+-        <jar jarfile="${dist}/${archive.name}-xml.jar" basedir="${classes}"
++        <!--<jar jarfile="${dist}/${archive.name}-xml.jar" basedir="${classes}"-->
++        <jar jarfile="${dist}/castor-xml-${version}.jar" basedir="${classes}"
+              manifest="${classes}/MANIFEST.MF"
+              includes="LICENSE,LICENSE.APACHE2,README,
+                        org/castor/messages.properties,
+@@ -680,13 +699,11 @@
+             <property name="release" value="${release}"/>
+         </ant>
+         <!-- create JAR for JDO, calling module build file recursively -->
+-<!--
+         <ant antfile="${basedir}/cpa/build.xml" target="jar.cpa" inheritAll="false">
+             <property name="project" value="${project}"/>
+             <property name="version" value="${version}"/>
+             <property name="release" value="${release}"/>
+         </ant>
+--->
+         <!-- create JAR for XML code generator, calling module build file recursively -->
+         <ant antfile="${basedir}/codegen/build.xml" target="jar.codegen" inheritAll="false">
+             <property name="project" value="${project}"/>
+@@ -917,9 +934,11 @@
+         <copy todir="${build}/${archive.name}/src">
+           <fileset dir="${source}" />
+         </copy>
++        <!--
+         <copy todir="${build}/${archive.name}/lib">
+           <fileset dir="${lib}" excludes="jconn2.jar"/>
+         </copy>
++        -->
+         <copy todir="${build}/${archive.name}/bin">
+           <fileset dir="./bin" includes="*.sh,*.bat"/>
+         </copy>
+@@ -1098,9 +1117,11 @@
+                 <include name="${archive.name}-core.jar"/>
+         	</fileset>
+         </copy>
++        <!--
+         <copy todir="${build}/${archive.name}">
+             <fileset dir="${lib}" includes="jdbc-se2.0.jar,jndi.jar,jta1.0.1.jar,xerces.jar,ldapjdk.jar,xslp.jar"/>
+         </copy>
++        -->
+     	<!--
+         <copy todir="${build}/${archive.name}/schema">
+             <fileset dir="${schema}" />
+diff --git a/xml/build.xml b/xml/build.xml
+index 5a69343..8cae367 100644
+--- a/xml/build.xml
++++ b/xml/build.xml
+@@ -1,5 +1,4 @@
+-<project name="Castor XML - Core module" default="compile" basedir="."
+-	xmlns:artifact="antlib:org.apache.maven.artifact.ant">
++<project name="Castor XML - Core module" default="compile" basedir=".">
+ 
+     <property environment="env" />
+     <property name="source"               value="${basedir}/src"/>
+@@ -14,9 +13,11 @@
+     <property name="archive"              value="${project}-${version}${release}"/>
+     <property name="gen.src"              value="${build}/generated-sources"/>
+ 
++	<!--
+ 	<artifact:dependencies filesetId="dependency.fileset" useScope="test">
+ 	    <artifact:pom id="core" file="${basedir}/pom.xml" />
+     </artifact:dependencies>	
++    -->
+ 	
+     <path id="build.classpath">
+         <pathelement location="${basedir}/build/classes"/>
+@@ -62,18 +63,22 @@
+         		<fileset dir="${basedir}/lib"/>
+         	</classpath>
+         </javac>
++        <!--
+         <javac srcdir="${main.generated}" destdir="${classes}" 
+                debug="on" encoding="ISO-8859-1" deprecation="false"
+                source="1.5" target="1.5">
+             <classpath refid="build.classpath"/>
+         </javac>
++        -->
+         <copy todir="${classes}">
+             <fileset dir="${main.resources}">
+                 <include name="**"/>
+             </fileset>
++            <!--
+             <fileset dir="${main.generated}">
+                 <include name="**/*.cdr"/>
+             </fileset>
++            -->
+             <filterset begintoken="$$" endtoken="$$">
+ 	            <filter token="VERSION" value="${version}"/>
+ 	            <filter token="RELEASE" value="${release}"/>

@@ -1,0 +1,119 @@
+Index: intltool-update.in.in
+===================================================================
+RCS file: /cvs/gnome/intltool/intltool-update.in.in,v
+retrieving revision 1.123
+diff -u -r1.123 intltool-update.in.in
+--- intltool-update.in.in	10 May 2006 18:36:53 -0000	1.123
++++ intltool-update.in.in	10 Jul 2006 19:40:56 -0000
+@@ -162,7 +162,7 @@
+ 	&GeneratePOTemplate;
+     }
+     &POFile_Update ($lang, $OUTPUT_FILE);
+-    &Console_Write_TranslationStatus ($lang, $OUTPUT_FILE);
++    &Console_Write_TranslationStatus ($lang, $OUTPUT_FILE) if $VERBOSE;
+ } 
+ else 
+ {
+@@ -281,20 +281,6 @@
+ sub TextFile_DetermineEncoding ($) 
+ {
+     my $gettext_code="ASCII"; # All files are ASCII by default
+-    my $filetype=`file $_ | cut -d ' ' -f 2`;
+-
+-    if ($? eq "0")
+-    {
+-	if ($filetype =~ /^(ISO|UTF)/)
+-	{
+-	    chomp ($gettext_code = $filetype);
+-	}
+-	elsif ($filetype =~ /^XML/)
+-	{
+-	    $gettext_code="UTF-8"; # We assume that .glade and other .xml files are UTF-8
+-	}
+-    }
+-
+     return $gettext_code;
+ }
+ 
+@@ -714,11 +700,11 @@
+     close OUTFILE;
+     close INFILE;
+ 
+-    unlink "$MODULE.pot";
++    unlink "$MODULE.pot-update";
+     my @xgettext_argument=("$XGETTEXT",
+ 			   "--add-comments",
+ 			   "--directory\=\.",
+-			   "--output\=$MODULE\.pot",
++			   "--output\=$MODULE\.pot-update",
+ 			   "--files-from\=\.\/POTFILES\.in\.temp");
+     my $XGETTEXT_KEYWORDS = &FindPOTKeywords;
+     push @xgettext_argument, $XGETTEXT_KEYWORDS;
+@@ -741,14 +727,23 @@
+ 
+     if (! $command_failed)
+     {
+-	if (! -e "$MODULE.pot")
++	if (! -e "$MODULE.pot-update")
+ 	{
+-	    print "None of the files in POTFILES.in contain strings marked for translation.\n" if $VERBOSE;
++	    print STDERR "None of the files in POTFILES.in contain strings marked for translation.\n";
++	}
++	if (-e "$MODULE.pot")
++	{
++	    RemovePOHeader("$MODULE.pot", "$MODULE.1po");
++	    RemovePOHeader("$MODULE.pot-update", "$MODULE.2po");
++	    system("cmp", "-s", "$MODULE.1po", "$MODULE.2po");
++	    rename("$MODULE.pot-update", "$MODULE.pot") if $?;
++	    unlink "$MODULE.1po", "$MODULE.2po", "$MODULE.pot-update";
+ 	}
+ 	else
+ 	{
+-	    print "Wrote $MODULE.pot\n" if $VERBOSE;
++	    rename("$MODULE.pot-update", "$MODULE.pot");
+ 	}
++	print "Wrote $MODULE.pot\n" if $VERBOSE;
+     }
+     else
+     {
+@@ -764,7 +759,7 @@
+ 	else
+ 	{
+ 	    print STDERR "$xgettext_error_msg";
+-	    if (-e "$MODULE.pot")
++	    if (-e "$MODULE.pot-update")
+ 	    {
+ 		# is this possible?
+ 		print STDERR "ERROR: xgettext failed but still managed to generate PO template file.\n".
+@@ -780,6 +775,22 @@
+     }
+ }
+ 
++sub RemovePOHeader
++{
++    my ($infile, $outfile) = @_;
++    my $first = 1;
++
++    open (IN, "< $infile") || die "file $infile does not exist";
++    open (OUT, "> $outfile") || die "Unable to write into $outfile: $!";
++    local $/ = "\n\n";
++    while (<IN>) {
++        next if m/^msgid ""\nmsgstr/m;
++        print OUT;
++    }
++    close IN;
++    close OUT;
++}
++
+ sub POFile_Update
+ {
+     -f "$MODULE.pot" or die "$PROGRAM: $MODULE.pot does not exist.\n";
+@@ -793,7 +804,7 @@
+     $outfile = "$SRCDIR/$lang.po" if ($outfile eq "");
+ 
+     # I think msgmerge won't overwrite old file if merge is not successful
+-    system ("$MSGMERGE", "-o", $outfile, $infile, "$MODULE.pot");
++    system ("$MSGMERGE", "-q", "-o", $outfile, $infile, "$MODULE.pot");
+ }
+ 
+ sub Console_WriteError_NotExisting

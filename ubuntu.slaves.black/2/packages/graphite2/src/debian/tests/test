@@ -1,0 +1,19 @@
+#!/bin/bash
+
+tmp=`mktemp -q`
+
+dh_auto_configure --buildsystem=cmake --builddirectory=build
+cd build/tests
+make
+cd ../..
+
+find build ! -type d -a -name "libgraphite2.so.*" -exec rm {} \;
+find build ! -type d -a -name "gr2fonttest" -exec rm {} \;
+
+cd build/tests
+perl -pi -e 's,\"--graphite_library=.*\d.\d.\d\",,g' CTestTestfile.cmake
+perl -pi -e 's,\".*/gr2fonttest\",\"/usr/bin/gr2fonttest\",g' \
+	CTestTestfile.cmake
+grep -v PYTHONPATH CTestTestfile.cmake > $tmp && mv $tmp CTestTestfile.cmake
+
+make test

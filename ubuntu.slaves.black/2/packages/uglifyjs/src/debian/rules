@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+pkg = node-uglify
+
+# don't fail on experimental builds
+DEB_SUITE_EXP = $(filter experimental% UNRELEASED,$(DEB_DISTRIBUTION))
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	nodejs bin/uglifyjs \
+		--self \
+		--comments /Copyright/ \
+		--output debian/uglify.js
+	NODE_PATH=lib help2man \
+		--name="JavaScript parser, mangler/compressor and beautifier toolkit" \
+		--no-info \
+		--output=debian/uglifyjs.1 \
+		bin/uglifyjs \
+		|| { NODE_PATH=lib bin/uglifyjs --help; false; }
+
+override_dh_auto_test:
+	NODE_PATH=lib nodejs test/run-tests.js \
+		$(if $(DEB_SUITE_EXP),|| true)
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod a+x debian/$(pkg)/usr/lib/nodejs/uglify-js/bin/extract-props.js

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sss_override</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sss_override</refname>
+        <refpurpose>создать локальные переопределения атрибутов пользователя и группы</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>sss_override</command> <arg
+choice='plain'><replaceable>КОМАНДА</replaceable></arg> <arg choice='opt'>
+<replaceable>параметры</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            <command>sss_override</command> позволяет создать представление на стороне
+клиента и изменить выбранные значения для определённых пользователей и
+групп. Изменения будут применены только на локальном компьютере.
+        </para>
+        <para>
+            Данные переопределений хранятся в кэше SSSD. При удалении кэша все локальные
+переопределения будут потеряны. Обратите внимание, что после создания
+первого переопределения с помощью любой из следующих команд:
+<emphasis>user-add</emphasis>, <emphasis>group-add</emphasis>,
+<emphasis>user-import</emphasis> или <emphasis>group-import</emphasis>,
+необходимо перезапустить SSSD для вступления изменений в силу. Когда
+требуется перезапуск, <emphasis>sss_override</emphasis> отображает
+соответствующее сообщение.
+        </para>
+        <para>
+            <emphasis>ПРИМЕЧАНИЕ:</emphasis> представленные на этой справочной странице
+параметры работают только для значений <quote>ldap</quote> и
+<quote>AD</quote> параметра <quote> id_provider</quote>. Переопределениями
+IPA можно управлять централизованно на сервере IPA.
+        </para>
+    </refsect1>
+
+    <refsect1 id='commands'>
+        <title>ДОСТУПНЫЕ КОМАНДЫ</title>
+        <para>
+            Аргумент <emphasis>NAME</emphasis> — это имя исходного объекта во всех
+командах. Невозможно переопределить <emphasis>uid</emphasis> или
+<emphasis>gid</emphasis> в значение «0».
+        </para>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>user-add</option> <emphasis>NAME</emphasis>
+<optional><option>-n,--name</option> NAME</optional>
+<optional><option>-u,--uid</option> UID</optional>
+<optional><option>-g,--gid</option> GID</optional>
+<optional><option>-h,--home</option> HOME</optional>
+<optional><option>-s,--shell</option> SHELL</optional>
+<optional><option>-c,--gecos</option> GECOS</optional>
+<optional><option>-x,--certificate</option> BASE64 ENCODED
+CERTIFICATE</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Переопределить атрибуты пользователя. Следует учитывать, что при вызове этой
+команды для указанного по имени (NAME) пользователя будет заменено
+предыдущее переопределение, если таковое имеется.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-del</option> <emphasis>NAME</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Удалить переопределения пользователя. Необходимо учитывать, что
+переопределённые атрибуты могут быть возвращены из кэша в памяти. Подробные
+сведения доступны в описании параметра SSSD
+<emphasis>memcache_timeout</emphasis>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-find</option> <optional><option>-d,--domain</option>
+DOMAIN</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Вывести список всех пользователей, для которых заданы переопределения. Если
+параметр <emphasis>DOMAIN</emphasis> задан, будут показаны только
+пользователи из указанного домена.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-show</option> <emphasis>NAME</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Показать переопределения пользователя.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-import</option> <emphasis>FILE</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Импортировать переопределения пользователя из
+<emphasis>FILE</emphasis>. Формат данных аналогичен стандартному файлу
+passwd. Формат:
+                    </para>
+                    <para>
+                        original_name:name:uid:gid:gecos:home:shell:base64_encoded_certificate
+                    </para>
+                    <para>
+                        где original_name — исходное имя пользователя, атрибуты которого следует
+переопределить. Остальные поля соответствуют новым значениям. Чтобы не
+указывать значение, просто оставьте соответствующее поле пустым.
+                    </para>
+                    <para>
+                        Примеры:
+                    </para>
+                    <para>
+                        ckent:superman::::::
+                    </para>
+                    <para>
+                        ckent@krypton.com::501:501:Superman:/home/earth:/bin/bash:
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>user-export</option> <emphasis>FILE</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Экспортировать все переопределённые атрибуты и сохранить их в
+<emphasis>FILE</emphasis>. Сведения о формате данных доступны в описании
+команды <emphasis>user-import</emphasis>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-add</option> <emphasis>NAME</emphasis>
+<optional><option>-n,--name</option> NAME</optional>
+<optional><option>-g,--gid</option> GID</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Переопределить атрибуты группы. Следует учитывать, что при вызове этой
+команды для указанной по имени (NAME) группы будет заменено предыдущее
+переопределение, если таковое имеется.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-del</option> <emphasis>NAME</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Удалить переопределения группы. Необходимо учитывать, что переопределённые
+атрибуты могут быть возвращены из кэша в памяти. Подробные сведения доступны
+в описании параметра SSSD <emphasis>memcache_timeout</emphasis>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-find</option> <optional><option>-d,--domain</option>
+DOMAIN</optional>
+                </term>
+                <listitem>
+                    <para>
+                        Вывести список всех групп, для которых заданы переопределения. Если параметр
+<emphasis>DOMAIN</emphasis> задан, будут показаны только группы из
+указанного домена.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-show</option> <emphasis>NAME</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Показать переопределения группы.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-import</option> <emphasis>FILE</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Импортировать переопределения группы из <emphasis>FILE</emphasis>. Формат
+данных аналогичен стандартному файлу group. Формат:
+                    </para>
+                    <para>
+                        original_name:name:gid
+                    </para>
+                    <para>
+                        где original_name — исходное имя группы, атрибуты которой следует
+переопределить. Остальные поля соответствуют новым значениям. Чтобы не
+указывать значение, просто оставьте соответствующее поле пустым.
+                    </para>
+                    <para>
+                        Примеры:
+                    </para>
+                    <para>
+                        admins:administrators:
+                    </para>
+                    <para>
+                        Domain Users:Users:501
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>
+                    <option>group-export</option> <emphasis>FILE</emphasis>
+                </term>
+                <listitem>
+                    <para>
+                        Экспортировать все переопределённые атрибуты и сохранить их в
+<emphasis>FILE</emphasis>. Сведения о формате данных доступны в описании
+команды <emphasis>group-import</emphasis>.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ОБЩИЕ ПАРАМЕТРЫ</title>
+        <para>
+            Эти параметры доступны для всех команд.
+        </para>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>--debug</option> <replaceable>LEVEL</replaceable>
+                </term>
+                <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/debug_levels_tools.xml" />
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

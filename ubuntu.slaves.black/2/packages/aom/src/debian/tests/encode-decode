@@ -1,0 +1,31 @@
+#/bin/sh
+# Tests that a test video can be encoded and then decoded with aom-tools
+set -e
+
+if [ -z "$AUTOPKGTEST_TMP" ]; then
+	echo 'Required env var "$AUTOPKGTEST_TMP" not set' >&2
+	exit 1
+fi
+
+# Generate yuv test video with ffmpeg
+cd "$AUTOPKGTEST_TMP"
+ffmpeg -y -f lavfi -i testsrc=duration=1:size=320x240:rate=30 -pix_fmt yuv420p input.y4m
+
+# Encode and decode it with aom
+aomenc -o encoded.webm input.y4m
+aomdec -o decoded.yuv encoded.webm
+
+# Smoke test file sizes
+TARGET_SIZE=$((320*240*30*3/2))
+INPUT_SIZE=$(stat -c '%s' input.y4m)
+DECODED_SIZE=$(stat -c '%s' decoded.yuv)
+
+if [ $(echo "($INPUT_SIZE / $TARGET_SIZE - 1) ^ 2 < 0.1" | bc) -ne 1 ]; then
+	echo "Bad input file size ($INPUT_SIZE, should be near $TARGET_SIZE)" >&2
+	exit 1
+fi
+
+if [ $(echo "($DECODED_SIZE / $TARGET_SIZE - 1) ^ 2 < 0.1" | bc) -ne 1 ]; then
+	echo "Bad decoded file size ($DECODED_SIZE, should be near $TARGET_SIZE)" >&2
+	exit 1
+fi

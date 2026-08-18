@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+include /usr/share/dpkg/pkg-info.mk
+
+PKD = $(abspath $(dir $(MAKEFILE_LIST)))
+PKG = $(DEB_SOURCE)
+VER = $(DEB_VERSION_UPSTREAM)
+COMMIT = $$(git log -1 --pretty=%h)
+LAST_TAG=$$(git describe --tags --abbrev=0)
+COUNT_SINCE_LAST_TAG=$$(git rev-list $(LAST_TAG).. --count)
+BASENAME=$(PKG)_$(VER)+$(COUNT_SINCE_LAST_TAG)+git$(COMMIT)
+
+%:
+	dh $@
+
+UURL = git://github.com/strukturag/libheif.git
+get-head-source:
+	$(if $(wildcard $(PKG)-$(VER)),$(error $(PKG)-$(VER) exist, aborting.))
+	@echo "# Downloading..."
+	git clone $(UURL) $(PKG)-$(VER) \
+		|| $(RM) -r $(PKG)-$(VER)
+	cd $(PKG)-$(VER) \
+	&& echo "# Checking out commit $(COMMIT)..." \
+	&& git checkout -q $(COMMIT) \
+	&& echo "# Setting times..." \
+	&& git ls-tree -r --name-only HEAD | while read F ; do touch --no-dereference -d "@$$(git log -1 --format="%ct" -- "$$F")" "$$F"; done \
+	&& echo "# Writing to $(BASENAME).orig.tar.xz..." \
+	&& find -L . -xdev -type f -not -path "*/.git/*" -print | LC_ALL=C sort \
+		| XZ_OPT="-6v" tar -caf "../$(BASENAME).orig.tar.xz" -T- --transform "s/^\./$(BASENAME)/g" --owner=root --group=root --mode=a+rX
+	@echo "# Cleaning up..." \
+	&& $(RM) -r "$(PKG)-$(VER)"

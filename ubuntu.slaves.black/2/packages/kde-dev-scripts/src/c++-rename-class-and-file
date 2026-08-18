@@ -1,0 +1,104 @@
+#!/bin/sh
+
+oldname=$1
+newname=$2
+
+if [ $# != 2 ]; then
+    echo "Usage: $0 old_classname new_classname"
+    exit 1
+fi
+
+if [ -f $oldname.cpp ]; then
+    oldfile=$oldname
+    newfile=$newname
+else
+    oldfile=`echo $oldname | tr A-Z a-z`
+    newfile=`echo $newname | tr A-Z a-z`
+fi
+
+findup() {
+  parg="$1"
+  _hit=""
+  spwd="$PWD"
+  if test -z "$parg"; then return 1; fi
+
+  while ! test -e "$parg"; do
+   cd ..
+   if test "$PWD" = "/"; then
+     cd "$spwd"
+     return 1
+   fi
+  done
+  _hit="$PWD/$parg"
+  cd "$spwd"
+}
+
+my_mv() {
+  _src="$1"
+  _dest="$2"
+  findup .svn
+  if test -n "$_hit"; then
+      svn mv "$_src" "$_dest" || mv "$_src" "$_dest"
+      return
+  fi
+  findup .git
+  if test -n "$_hit"; then
+      git mv "$_src" "$_dest" || mv "$_src" "$_dest"
+      return
+  fi
+  mv "$_src" "$_dest"
+}
+
+
+if [ ! -f $newfile.h ]; then
+    if [ -f ${oldfile}.h ]; then
+        my_mv $oldfile.h $newfile.h
+    fi
+    my_mv $oldfile.cpp $newfile.cpp
+    if [ -f ${oldfile}_p.h ]; then
+        my_mv ${oldfile}_p.h ${newfile}_p.h
+    fi
+    if [ -f ${oldfile}.ui ]; then
+        my_mv ${oldfile}.ui ${newfile}.ui
+    fi
+fi
+
+# Update buildsystem
+if test -f CMakeLists.txt; then
+    buildsystemfile=CMakeLists.txt
+else
+    buildsystemfile=`ls -1 *.pro 2>/dev/null | head -n 1`
+fi
+if test -n "$buildsystemfile"; then
+    perl -pi -e "s/\b$oldfile\.cpp/$newfile.cpp/;s/\b$oldfile\.h/$newfile\.h/;s/\b$oldfile\.ui/$newfile\.ui/" $buildsystemfile
+fi
+
+# Rename class
+if [ -f ${newfile}.h ]; then
+    perl -pi -e "s/$oldname/$newname/g" ${newfile}.h
+fi
+perl -pi -e "s/$oldname/$newname/g" $newfile.cpp
+if [ -f ${newfile}_p.h ]; then
+    perl -pi -e "s/$oldname/$newname/g" ${newfile}_p.h
+fi
+if [ -f ${newfile}.ui ]; then
+    perl -pi -e "s/$oldname/$newname/g" ${newfile}.ui
+fi
+
+oldinclguard=`echo $oldname | tr a-z A-Z`
+newinclguard=`echo $newname | tr a-z A-Z`
+oldinclguard_lower=`echo $oldname | tr A-Z a-z`
+newinclguard_lower=`echo $newname | tr A-Z a-z`
+
+# Update include guard
+if [ -f ${newfile}.h ]; then
+    perl -pi -e "s/$oldinclguard/$newinclguard/g" $newfile.h
+    perl -pi -e "s/$oldinclguard_lower/$newinclguard_lower/g" $newfile.h
+fi
+if [ -f ${newfile}_p.h ]; then
+    perl -pi -e "s/$oldinclguard/$newinclguard/g" ${newfile}_p.h
+fi
+
+# Update include in cpp file
+perl -pi -e 's/\b'$oldfile'\.h/'$newfile'\.h/;s/\b'$oldfile'_p\.h/'$newfile'_p\.h/' $newfile.cpp
+

@@ -1,0 +1,129 @@
+<project name="jdom.1.x" default="dist" basedir="." >
+
+	<!-- define Maven coordinates -->
+	<property name="groupId" value="org.jdom" />
+	<property name="artifactId" value="jdom" />
+	<property name="version" value="1.SNAPSHOT" />
+	
+	<property name="gpg" value="gpg" 
+		description="Path to the GNU gpg program for maven target"/>
+
+	<property name="dist" value="dist-${version}" />
+
+	<target name="build.core">
+		<ant dir="core" target="master" >
+			<property name="version" value="${version}"/>
+		</ant>
+	</target>
+	
+	<target name="build.test">
+		<echo message="Java Version - ${java.version} : Ant Version = ${ant.version}" />
+		<ant dir="test" target="master" >
+			<property name="version" value="${version}"/>
+		</ant>
+	</target>
+	
+	<target name="build.contrib">
+		<ant dir="contrib" target="master" >
+			<property name="version" value="${version}"/>
+		</ant>
+	</target>
+	
+	
+	<target name="build" depends="build.core,build.test,build.contrib" />
+
+	<target name="clean" description="clean up">
+		<delete dir="${dist}" />
+	</target>
+
+	<target name="dist" depends="clean, build" description="generate the distribution">
+
+		<mkdir dir="${dist}" />
+		<delete dir="${dist}" includes="*.jar"/>
+		
+		<copy todir="${dist}">
+			<fileset dir="core/build" includes="*${version}*.jar"/>
+			<fileset dir="test/build" includes="*${version}*.jar"/>
+			<fileset dir="contrib/build" includes="*${version}*.jar"/>
+		</copy>
+		
+		<copy todir="${dist}/jdom">
+			<fileset dir="core" excludes="**/classes/** , **/build/src/**" />
+		</copy>
+			
+		<copy todir="${dist}/jdom-contrib">
+			<fileset dir="contrib" excludes="**/classes/** , **/build/src/**" />
+		</copy>
+			
+		<copy todir="${dist}/jdom-test">
+			<fileset dir="test" excludes="**/classes/** , **/build/src/**" />
+		</copy>
+			
+
+		<zip destfile="${dist}/jdom-${version}.zip" >
+			<fileset dir="${dist}" includes="jdom/**" />
+		</zip>
+		
+		<zip destfile="${dist}/jdom-contrib-${version}.zip">
+			<fileset dir="${dist}" includes="jdom-contrib/**" />
+		</zip>
+		
+		<zip destfile="${dist}/jdom-test-${version}.zip">
+			<fileset dir="${dist}" includes="jdom-test/**" />
+		</zip>
+
+		
+		<tar destfile="${dist}/jdom-${version}.tar.gz" 
+			compression="gzip" basedir="${dist}" includes="jdom/**" />
+		
+		<tar destfile="${dist}/jdom-contrib-${version}.tar.gz" 
+			compression="gzip" basedir="${dist}" includes="jdom-contrib/**" />
+		
+		<tar destfile="${dist}/jdom-test-${version}.tar.gz" 
+			compression="gzip" basedir="${dist}" includes="jdom-test/**" />
+			
+	</target>
+
+	<target name="maven" depends="dist" description="Build a maven bundle">
+		<property name="mavendir" value="${dist}" />
+		<property name="jarbase" value="jdom-${version}" />
+		<!-- copy/rename the pom template -->
+		<copy filtering="true" file="maven.pom" tofile="${dist}/${jarbase}.pom">
+			<filterset>
+				<filter token="artifactID" value="jdom"/>
+				<filter token="version" value="${version}" />
+				<filter token="jdk" value="1.2" />
+			</filterset>
+		</copy>
+		
+		<exec dir="${mavendir}" command="${gpg} -abv ${jarbase}.pom"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${jarbase}.jar"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${jarbase}-sources.jar"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${jarbase}-javadoc.jar"/>
+		
+		<jar destfile="${mavendir}/${jarbase}-maven-bundle.jar"
+			basedir="${mavendir}"
+			includes="${jarbase}*" excludes="*maven-bundle*" />
+
+		<property name="contribbase" value="jdom-contrib-${version}" />
+		
+		<copy filtering="true" file="maven-contrib.pom" tofile="${dist}/${contribbase}.pom">
+			<filterset>
+				<filter token="artifactID" value="jdom-contrib"/>
+				<filter token="version" value="${version}" />
+				<filter token="jdk" value="1.2" />
+			</filterset>
+		</copy>
+		
+		<exec dir="${mavendir}" command="${gpg} -abv ${contribbase}.pom"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${contribbase}.jar"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${contribbase}-sources.jar"/>
+		<exec dir="${mavendir}" command="${gpg} -abv ${contribbase}-javadoc.jar"/>
+		
+		<jar destfile="${mavendir}/${contribbase}-maven-bundle.jar"
+			basedir="${mavendir}"
+			includes="${contribbase}*" excludes="*maven-bundle*" />
+	</target>
+	
+
+</project>

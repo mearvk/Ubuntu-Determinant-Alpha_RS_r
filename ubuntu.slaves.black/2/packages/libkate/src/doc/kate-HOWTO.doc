@@ -1,0 +1,175 @@
+/* Copyright (C) 2008, 2009 Vincent Penquerc'h.
+   This file is part of the Kate codec library.
+   Written by Vincent Penquerc'h.
+
+   Use, distribution and reproduction of this library is governed
+   by a BSD style source license included with this source in the
+   file 'COPYING'. Please read these terms before distributing. */
+
+
+/**
+
+\page HOWTO
+
+
+\section HOWTO-text-subtitles Text movie subtitles
+
+Kate streams can carry Unicode text (that is, text that can represent
+pretty much any existing language/script). If several Kate streams are
+multiplexed along with a video, subtitles in various languages can be
+made for that movie.
+
+An easy way to create such subtitles is to use ffmpeg2theora, which
+can create Kate streams from SubRip (.srt) format files, a simple but
+common text subtitles format. ffmpeg2theora 0.21 or later is needed.
+
+At its simplest:
+
+\verbatim
+    ffmpeg2theora -o video-with-subtitles.ogg --subtitles subtitles.srt
+      video-without-subtitles.avi 
+\endverbatim
+
+Several languages may be created and tagged with their language code
+for easy selection in a media player:
+
+\verbatim
+    ffmpeg2theora -o video-with-subtitles.ogg video-without-subtitles.avi
+      --subtitles japanese-subtitles.srt --subtitles-language ja
+      --subtitles welsh-subtitles.srt --subtitles-language cy
+      --subtitles english-subtitles.srt --subtitles-language en_GB
+\endverbatim
+
+Alternatively, kateenc (which comes with the libkate distribution) can
+create Kate streams from SubRip files as well. These can then be merged
+with a video with oggz-tools:
+
+\verbatim
+    kateenc -t srt -c SUB -l it -o subtitles.ogg italian-subtitles.srt
+
+    oggz merge -o movie-with-subtitles.ogg movie-without-subtitles.ogg subtitles.ogg
+\endverbatim
+
+This second method can also be used to add subtitles to a video which
+is already encoded to Theora, as it will not transcode the video again.
+
+
+\section HOWTO-DVD-subtitles DVD subtitles
+
+DVD subtitles are not text, but images. Thoggen, a DVD ripper program,
+can convert these subtitles to Kate streams (at the time of writing,
+Thoggen and GStreamer have not applied the necessary patches for this
+to be possible out of the box, so patching them will be required).
+
+When configuring how to rip DVD tracks, any subtitles will be detected
+by Thoggen, and selecting them in the GUI will cause them to be saved as
+Kate tracks along with the movie.
+
+
+\section HOWTO-lyrics Song lyrics
+
+Kate streams carrying song lyrics can be embedded in an Ogg file. The
+oggenc Vorbis encoding tool from the Xiph.Org Vorbis tools allows lyrics
+to be loaded from a LRC or SRT text file and converted to a Kate stream
+multiplexed with the resulting Vorbis audio. At the time of writing,
+the patch to oggenc was not applied yet, so it will have to be patched
+manually with the patch found in the diffs directory.
+
+\verbatim
+    oggenc -o song-with-lyrics.ogg --lyrics lyrics.lrc --lyrics-language en_US song.wav
+\endverbatim
+
+So called 'enhanced LRC' files (containing extra karaoke timing information)
+are supported, and a simple karaoke color change scheme will be saved
+out for these files. For more complex karaoke effects (such as more
+complex style changes, or sprite animation), kateenc should be used with
+a Kate description file to create a separate Kate stream, which can then
+be merged with a Vorbis only song with oggz-tools:
+
+\verbatim
+    oggenc -o song.ogg song.wav
+
+    kateenc -t kate -c LRC -l en_US -o lyrics.ogg lyrics-with-karaoke.kate
+
+    oggz merge -o song-with-karaoke.ogg lyrics-with-karaoke.ogg song.ogg
+\endverbatim
+
+This latter method may also be used if you already have an encoded Vorbis song
+with no lyrics, and just want to add the lyrics without reencoding.
+
+
+\section HOWTO-remuxing Changing a Kate stream embedded in an Ogg stream
+
+If you need to change a Kate stream already embedded in an Ogg stream
+(eg, you have a movie with subtitles, and you want to fix a spelling
+mistake, or want to bring one of the subtitles forward in time, etc),
+you can do this easily with KateDJ, a tool that will extract Kate streams,
+decode them to a temporary location, and rebuild the original stream
+after you've made whatever changes you want.
+
+KateDJ (included with the libkate distribution) is a GUI program using
+wxPython, a Python module for the wxWidgets GUI library, and the oggz
+tools (both needing installing separately if they are not already).
+
+The procedure consists of:
+- Run KateDJ
+- Click 'Load Ogg stream' and select the file to load
+- Click 'Demux file' to decode Kate streams in a temporary location
+- Edit the Kate streams - you can also double click on the language you want to change
+- When done, click 'Remux file from parts'
+- If any errors are reported, continue editing until the remux step succeeds
+
+
+\section HOWTO-metadata Adding metadata
+
+Metadata can be attached to events, or to styles, bitmaps, regions, etc.
+Metadata are free form tag/value pairs, and can be used to enrich their
+attached data with extra information. However, how this information is
+interpreted is up to the application layer.
+
+It is worth noting that an event may not have attached text, so it is
+possible to create an empty timed event with attached metadata.
+
+For instance, let's say we have a documentary, with footage from various
+places, as well as short interviews, and we want two things:
+- tag footage with metadata about the location and date that footage was shot
+- subtitle the interviews and tag those subtitles with information about the speaker
+
+You can then create an empty Kate event for each footage part, synchronized
+with the footage, and attach a new metadata item called GEO_LOCATION, filled
+with latitude and longitude of the place the footage was shot at.
+Similarly, for each subtitle event, a metadata item called SPEAKER can be
+attached.
+
+An empty event to tag a long 4:20 footage shot in Tokyo on 2011/08/12, and
+inserted at 18:30 in the documentary could look like:
+
+  event {
+    00:18:30,000 --> 00:22:50,000
+    meta "GEO_LOCATION" = "35.42; 139.42"
+    meta "DATE" = "2011-08-12"
+  }
+
+
+Here's a example for a line spoken by Dr Joe Bloggs at 18:30 into the documentary:
+
+  event {
+    00:18:30,000 --> 00:18:32,000
+    "Notice how the subtitles for my words have metadata attached to them"
+    meta "SPEAKER" = "Dr Joe Bloggs"
+    meta "URL" = "http://www.example.com/biography?name=Joe+Bloggs"
+  }
+
+Notice how another metadata item, URL, is also present. The application
+will have to be aware of those metadata in order to do something with it
+though. Since those are free form, it is up to you to think of what
+metadata you want, and make use of it.
+
+Note that metadata may be attached to other objects, such as regions.
+This way, you can for example create a region tagged with a name, and
+track a person's movements with that region. Or you can tag a bitmap
+with a copyright and a URL to a larger version of the image.
+
+
+
+*/

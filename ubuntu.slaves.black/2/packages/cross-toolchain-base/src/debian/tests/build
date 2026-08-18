@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+arch=$(dpkg --print-architecture)
+
+echo "Testing cross builds on $arch ..."
+
+CPUS=$(getconf _NPROCESSORS_ONLN)
+case "$CPUS" in
+  [0-9]|[0-9][0-9]|[0-9][0-9][0-9]) ;;
+  *) CPUS=1
+esac
+
+case "$arch" in
+  amd64)
+    CROSS_ARCHS="ppc64el";;
+  i386)
+    CROSS_ARCHS="arm64";;
+  ppc64el)
+    CROSS_ARCHS="arm64";;
+  arm64)
+    CROSS_ARCHS="armhf";;
+  *)
+    echo "Skipping cross builds on $arch"
+    exit 77;;
+esac
+
+set -x
+CROSS_ARCHS="$CROSS_ARCHS" DEB_BUILD_OPTIONS="parallel=$CPUS nopgo nolto" dpkg-buildpackage -d -b --no-sign

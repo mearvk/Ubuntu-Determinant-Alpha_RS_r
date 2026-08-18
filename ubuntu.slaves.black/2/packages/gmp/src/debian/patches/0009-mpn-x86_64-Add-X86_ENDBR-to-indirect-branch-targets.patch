@@ -1,0 +1,1382 @@
+From ea20a88eb93312a6f3c4b6580420a8a67e372260 Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Wed, 29 Jan 2020 11:34:59 -0800
+Subject: [PATCH 09/13] mpn/x86_64: Add X86_ENDBR to indirect branch targets
+
+Add X86_ENDBR to indirect branch targets to support Intel CET.
+
+	* mpn/x86_64/bd1/hamdist.asm: Add X86_ENDBR to indirect branch
+	targets.
+	* mpn/x86_64/bd1/popcount.asm: Likewise.
+	* mpn/x86_64/core2/hamdist.asm: Likewise.
+	* mpn/x86_64/core2/mul_basecase.asm: Likewise.
+	* mpn/x86_64/core2/popcount.asm: Likewise.
+	* mpn/x86_64/coreibwl/addmul_1.asm: Likewise.
+	* mpn/x86_64/coreibwl/mul_1.asm: Likewise.
+	* mpn/x86_64/coreibwl/mul_basecase.asm: Likewise.
+	* mpn/x86_64/coreibwl/sqr_basecase.asm: Likewise.
+	* mpn/x86_64/coreihwl/aors_n.asm: Likewise.
+	* mpn/x86_64/coreinhm/hamdist.asm: Likewise.
+	* mpn/x86_64/coreinhm/popcount.asm: Likewise.
+	* mpn/x86_64/k8/mul_basecase.asm: Likewise.
+	* mpn/x86_64/k8/mullo_basecase.asm: Likewise.
+	* mpn/x86_64/k8/mulmid_basecase.asm: Likewise.
+	* mpn/x86_64/k8/redc_1.asm: Likewise.
+	* mpn/x86_64/k8/sqr_basecase.asm: Likewise.
+	* mpn/x86_64/mod_34lsub1.asm: Likewise.
+	* mpn/x86_64/zen/aorrlsh_n.asm: Likewise.
+---
+ mpn/x86_64/bd1/hamdist.asm           | 12 ++++---
+ mpn/x86_64/bd1/popcount.asm          | 24 +++++++++-----
+ mpn/x86_64/core2/hamdist.asm         | 24 +++++++++-----
+ mpn/x86_64/core2/mul_basecase.asm    |  4 +++
+ mpn/x86_64/core2/popcount.asm        | 24 +++++++++-----
+ mpn/x86_64/coreibwl/addmul_1.asm     | 24 +++++++++-----
+ mpn/x86_64/coreibwl/mul_1.asm        | 24 +++++++++-----
+ mpn/x86_64/coreibwl/mul_basecase.asm | 46 +++++++++++++++++---------
+ mpn/x86_64/coreibwl/sqr_basecase.asm | 48 ++++++++++++++++++----------
+ mpn/x86_64/coreihwl/aors_n.asm       | 24 +++++++++-----
+ mpn/x86_64/coreinhm/hamdist.asm      | 12 ++++---
+ mpn/x86_64/coreinhm/popcount.asm     | 24 +++++++++-----
+ mpn/x86_64/k8/mul_basecase.asm       |  7 ++++
+ mpn/x86_64/k8/mullo_basecase.asm     | 11 +++++--
+ mpn/x86_64/k8/mulmid_basecase.asm    |  8 +++++
+ mpn/x86_64/k8/redc_1.asm             | 17 ++++++----
+ mpn/x86_64/k8/sqr_basecase.asm       | 17 +++++++---
+ mpn/x86_64/mod_34lsub1.asm           | 27 ++++++++++------
+ mpn/x86_64/zen/aorrlsh_n.asm         | 24 +++++++++-----
+ 19 files changed, 274 insertions(+), 127 deletions(-)
+
+diff --git a/mpn/x86_64/bd1/hamdist.asm b/mpn/x86_64/bd1/hamdist.asm
+index f93ce4d61..efdeb7f74 100644
+--- a/mpn/x86_64/bd1/hamdist.asm
++++ b/mpn/x86_64/bd1/hamdist.asm
+@@ -113,7 +113,8 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%rax,4)
+ ')
+ 
+-L(0):	add	$64, up
++L(0):	X86_ENDBR
++	add	$64, up
+ 	add	$64, vp
+ 	sub	$2, n
+ 
+@@ -127,7 +128,8 @@ L(top):	lddqu	(up), %xmm0
+ 	.byte	0x8f,0xe8,0x40,0xa3,0xdf,0x10	C vpperm %xmm1,%xmm7,%xmm7,%xmm3
+ 	paddb	%xmm2, %xmm3
+ 	paddb	%xmm3, %xmm4
+-L(6):	lddqu	16(up), %xmm0
++L(6):	X86_ENDBR
++	lddqu	16(up), %xmm0
+ 	pxor	16(vp), %xmm0
+ 	.byte	0x8f,0xe9,0x48,0x94,0xc8	C vpshlb %xmm6, %xmm0, %xmm1
+ 	pand	%xmm5, %xmm0
+@@ -136,7 +138,8 @@ L(6):	lddqu	16(up), %xmm0
+ 	.byte	0x8f,0xe8,0x40,0xa3,0xdf,0x10	C vpperm %xmm1,%xmm7,%xmm7,%xmm3
+ 	paddb	%xmm2, %xmm3
+ 	paddb	%xmm3, %xmm4
+-L(4):	lddqu	32(up), %xmm0
++L(4):	X86_ENDBR
++	lddqu	32(up), %xmm0
+ 	pxor	32(vp), %xmm0
+ 	.byte	0x8f,0xe9,0x48,0x94,0xc8	C vpshlb %xmm6, %xmm0, %xmm1
+ 	pand	%xmm5, %xmm0
+@@ -147,7 +150,8 @@ L(4):	lddqu	32(up), %xmm0
+ 	paddb	%xmm2, %xmm3
+ 	paddb	%xmm2, %xmm4
+ 	paddq	%xmm0, %xmm8		C sum to 2 x 64-bit counts
+-L(2):	mov	48(up), %r8
++L(2):	X86_ENDBR
++	mov	48(up), %r8
+ 	mov	56(up), %r9
+ 	add	$64, up
+ 	xor	48(vp), %r8
+diff --git a/mpn/x86_64/bd1/popcount.asm b/mpn/x86_64/bd1/popcount.asm
+index 063c2cc61..531f53674 100644
+--- a/mpn/x86_64/bd1/popcount.asm
++++ b/mpn/x86_64/bd1/popcount.asm
+@@ -100,7 +100,8 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%rax,8)
+ ')
+ 
+-L(1):	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up),%rdx
++L(1):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up),%rdx
+ 	add	$8, up
+ 	dec	n
+ 	jnz	L(top)
+@@ -108,29 +109,36 @@ L(1):	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up),%rdx
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(2):	add	$-48, up
++L(2):	X86_ENDBR
++	add	$-48, up
+ 	jmp	L(e2)
+ 
+-L(3):	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
++L(3):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
+ 	add	$-40, up
+ 	jmp	L(e2)
+ 
+-L(4):	add	$-32, up
++L(4):	X86_ENDBR
++	add	$-32, up
+ 	jmp	L(e4)
+ 
+-L(5):	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
++L(5):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
+ 	add	$-24, up
+ 	jmp	L(e4)
+ 
+-L(6):	add	$-16, up
++L(6):	X86_ENDBR
++	add	$-16, up
+ 	jmp	L(e6)
+ 
+-L(7):	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
++L(7):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x17	C popcnt (up), %rdx
+ 	add	$-8, up
+ 	jmp	L(e6)
+ 
+ 	ALIGN(32)
+-L(top):	lddqu	(up), %xmm0
++L(top):	X86_ENDBR
++	lddqu	(up), %xmm0
+ 	.byte	0x8f,0xe9,0x48,0x94,0xc8	C vpshlb %xmm6, %xmm0, %xmm1
+ 	pand	%xmm9, %xmm0
+ 	pand	%xmm9, %xmm1
+diff --git a/mpn/x86_64/core2/hamdist.asm b/mpn/x86_64/core2/hamdist.asm
+index be451d78c..f5d1a38e2 100644
+--- a/mpn/x86_64/core2/hamdist.asm
++++ b/mpn/x86_64/core2/hamdist.asm
+@@ -87,40 +87,47 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%rax,8)
+ ')
+ 
+-L(1):	movq	(up), %xmm1
++L(1):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$8, up
+ 	movq	(vp), %xmm10
+ 	add	$8, vp
+ 	pxor	%xmm10, %xmm1
+ 	jmp	L(e1)
+ 
+-L(2):	add	$-48, up
++L(2):	X86_ENDBR
++	add	$-48, up
+ 	add	$-48, vp
+ 	jmp	L(e2)
+ 
+-L(3):	movq	(up), %xmm1
++L(3):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-40, up
+ 	movq	(vp), %xmm10
+ 	add	$-40, vp
+ 	pxor	%xmm10, %xmm1
+ 	jmp	L(e3)
+ 
+-L(4):	add	$-32, up
++L(4):	X86_ENDBR
++	add	$-32, up
+ 	add	$-32, vp
+ 	jmp	L(e4)
+ 
+-L(5):	movq	(up), %xmm1
++L(5):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-24, up
+ 	movq	(vp), %xmm10
+ 	add	$-24, vp
+ 	pxor	%xmm10, %xmm1
+ 	jmp	L(e5)
+ 
+-L(6):	add	$-16, up
++L(6):	X86_ENDBR
++	add	$-16, up
+ 	add	$-16, vp
+ 	jmp	L(e6)
+ 
+-L(7):	movq	(up), %xmm1
++L(7):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-8, up
+ 	movq	(vp), %xmm10
+ 	add	$-8, vp
+@@ -128,7 +135,8 @@ L(7):	movq	(up), %xmm1
+ 	jmp	L(e7)
+ 
+ 	ALIGN(32)
+-L(top):	lddqu	(up), %xmm1
++L(top):	X86_ENDBR
++	lddqu	(up), %xmm1
+ 	lddqu	(vp), %xmm10
+ 	pxor	%xmm10, %xmm1
+ L(e7):	movdqa	%xmm6, %xmm0		C copy mask register
+diff --git a/mpn/x86_64/core2/mul_basecase.asm b/mpn/x86_64/core2/mul_basecase.asm
+index 8a184330b..0dcf0f8bf 100644
+--- a/mpn/x86_64/core2/mul_basecase.asm
++++ b/mpn/x86_64/core2/mul_basecase.asm
+@@ -347,6 +347,7 @@ L(m2e0):mul	v1
+ 	jz	L(ret2)
+ 
+ L(do_am0):
++	X86_ENDBR
+ 	push	%r15
+ 	push	vn_param
+ 
+@@ -520,6 +521,7 @@ L(m2e1):mul	v1
+ 	jz	L(ret2)
+ 
+ L(do_am1):
++	X86_ENDBR
+ 	push	%r15
+ 	push	vn_param
+ 
+@@ -693,6 +695,7 @@ L(m2e2):mul	v1
+ 	jz	L(ret2)
+ 
+ L(do_am2):
++	X86_ENDBR
+ 	push	%r15
+ 	push	vn_param
+ 
+@@ -866,6 +869,7 @@ L(m2e3):mul	v1
+ 	jz	L(ret2)
+ 
+ L(do_am3):
++	X86_ENDBR
+ 	push	%r15
+ 	push	vn_param
+ 
+diff --git a/mpn/x86_64/core2/popcount.asm b/mpn/x86_64/core2/popcount.asm
+index 5e03ef3cc..8fe510426 100644
+--- a/mpn/x86_64/core2/popcount.asm
++++ b/mpn/x86_64/core2/popcount.asm
+@@ -86,33 +86,41 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%rax,8)
+ ')
+ 
+-L(1):	movq	(up), %xmm1
++L(1):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$8, up
+ 	jmp	L(e1)
+ 
+-L(2):	add	$-48, up
++L(2):	X86_ENDBR
++	add	$-48, up
+ 	jmp	L(e2)
+ 
+-L(3):	movq	(up), %xmm1
++L(3):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-40, up
+ 	jmp	L(e3)
+ 
+-L(4):	add	$-32, up
++L(4):	X86_ENDBR
++	add	$-32, up
+ 	jmp	L(e4)
+ 
+-L(5):	movq	(up), %xmm1
++L(5):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-24, up
+ 	jmp	L(e5)
+ 
+-L(6):	add	$-16, up
++L(6):	X86_ENDBR
++	add	$-16, up
+ 	jmp	L(e6)
+ 
+-L(7):	movq	(up), %xmm1
++L(7):	X86_ENDBR
++	movq	(up), %xmm1
+ 	add	$-8, up
+ 	jmp	L(e7)
+ 
+ 	ALIGN(32)
+-L(top):	lddqu	(up), %xmm1
++L(top):	X86_ENDBR
++	lddqu	(up), %xmm1
+ L(e7):	movdqa	%xmm6, %xmm0		C copy mask register
+ 	movdqa	%xmm7, %xmm2		C copy count register
+ 	movdqa	%xmm7, %xmm3		C copy count register
+diff --git a/mpn/x86_64/coreibwl/addmul_1.asm b/mpn/x86_64/coreibwl/addmul_1.asm
+index ee7e4eeab..4ea5580cf 100644
+--- a/mpn/x86_64/coreibwl/addmul_1.asm
++++ b/mpn/x86_64/coreibwl/addmul_1.asm
+@@ -110,33 +110,39 @@ L(tab):	JMPENT(	L(f0), L(tab))
+ 	JMPENT(	L(f7), L(tab))
+ 	TEXT
+ 
+-L(f0):	mulx(	(up), %r10, %r8)
++L(f0):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	-8(up), up
+ 	lea	-8(rp), rp
+ 	lea	-1(n), n
+ 	jmp	L(b0)
+ 
+-L(f3):	mulx(	(up), %r9, %rax)
++L(f3):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	16(up), up
+ 	lea	-48(rp), rp
+ 	jmp	L(b3)
+ 
+-L(f4):	mulx(	(up), %r10, %r8)
++L(f4):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	24(up), up
+ 	lea	-40(rp), rp
+ 	jmp	L(b4)
+ 
+-L(f5):	mulx(	(up), %r9, %rax)
++L(f5):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	32(up), up
+ 	lea	-32(rp), rp
+ 	jmp	L(b5)
+ 
+-L(f6):	mulx(	(up), %r10, %r8)
++L(f6):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	40(up), up
+ 	lea	-24(rp), rp
+ 	jmp	L(b6)
+ 
+-L(f1):	mulx(	(up), %r9, %rax)
++L(f1):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	jrcxz	L(1)
+ 	jmp	L(b1)
+ L(1):	add	(rp), %r9
+@@ -156,7 +162,8 @@ ifdef(`PIC',
+ `	nop;nop;nop;nop',
+ `	nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop')
+ 
+-L(f2):	mulx(	(up), %r10, %r8)
++L(f2):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	8(up), up
+ 	lea	8(rp), rp
+ 	mulx(	(up), %r9, %rax)
+@@ -200,7 +207,8 @@ L(b3):	adox(	48,(rp), %r9)
+ 	mulx(	(up), %r9, %rax)
+ 	jmp	L(top)
+ 
+-L(f7):	mulx(	(up), %r9, %rax)
++L(f7):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	-16(up), up
+ 	lea	-16(rp), rp
+ 	jmp	L(b7)
+diff --git a/mpn/x86_64/coreibwl/mul_1.asm b/mpn/x86_64/coreibwl/mul_1.asm
+index b7fae2f90..77121a5d4 100644
+--- a/mpn/x86_64/coreibwl/mul_1.asm
++++ b/mpn/x86_64/coreibwl/mul_1.asm
+@@ -108,48 +108,56 @@ L(tab):	JMPENT(	L(f0), L(tab))
+ 	JMPENT(	L(f7), L(tab))
+ 	TEXT
+ 
+-L(f0):	mulx(	(up), %r10, %r8)
++L(f0):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	56(up), up
+ 	lea	-8(rp), rp
+ 	jmp	L(b0)
+ 
+-L(f3):	mulx(	(up), %r9, %rax)
++L(f3):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	16(up), up
+ 	lea	16(rp), rp
+ 	inc	n
+ 	jmp	L(b3)
+ 
+-L(f4):	mulx(	(up), %r10, %r8)
++L(f4):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	24(up), up
+ 	lea	24(rp), rp
+ 	inc	n
+ 	jmp	L(b4)
+ 
+-L(f5):	mulx(	(up), %r9, %rax)
++L(f5):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	32(up), up
+ 	lea	32(rp), rp
+ 	inc	n
+ 	jmp	L(b5)
+ 
+-L(f6):	mulx(	(up), %r10, %r8)
++L(f6):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	40(up), up
+ 	lea	40(rp), rp
+ 	inc	n
+ 	jmp	L(b6)
+ 
+-L(f7):	mulx(	(up), %r9, %rax)
++L(f7):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	48(up), up
+ 	lea	48(rp), rp
+ 	inc	n
+ 	jmp	L(b7)
+ 
+-L(f1):	mulx(	(up), %r9, %rax)
++L(f1):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	test	n, n
+ 	jnz	L(b1)
+ L(1):	mov	%r9, (rp)
+ 	ret
+ 
+-L(f2):	mulx(	(up), %r10, %r8)
++L(f2):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	8(up), up
+ 	lea	8(rp), rp
+ 	mulx(	(up), %r9, %rax)
+diff --git a/mpn/x86_64/coreibwl/mul_basecase.asm b/mpn/x86_64/coreibwl/mul_basecase.asm
+index 6dd34495b..c5e60e79c 100644
+--- a/mpn/x86_64/coreibwl/mul_basecase.asm
++++ b/mpn/x86_64/coreibwl/mul_basecase.asm
+@@ -157,45 +157,53 @@ ifdef(`PIC',
+ 	jmp	*(%r10,%rax,8)
+ ')
+ 
+-L(mf0):	mulx(	(up), w2, w3)
++L(mf0):	X86_ENDBR
++	mulx(	(up), w2, w3)
+ 	lea	56(up), up
+ 	lea	-8(rp), rp
+ 	jmp	L(mb0)
+ 
+-L(mf3):	mulx(	(up), w0, w1)
++L(mf3):	X86_ENDBR
++	mulx(	(up), w0, w1)
+ 	lea	16(up), up
+ 	lea	16(rp), rp
+ 	inc	n
+ 	jmp	L(mb3)
+ 
+-L(mf4):	mulx(	(up), w2, w3)
++L(mf4):	X86_ENDBR
++	mulx(	(up), w2, w3)
+ 	lea	24(up), up
+ 	lea	24(rp), rp
+ 	inc	n
+ 	jmp	L(mb4)
+ 
+-L(mf5):	mulx(	(up), w0, w1)
++L(mf5):	X86_ENDBR
++	mulx(	(up), w0, w1)
+ 	lea	32(up), up
+ 	lea	32(rp), rp
+ 	inc	n
+ 	jmp	L(mb5)
+ 
+-L(mf6):	mulx(	(up), w2, w3)
++L(mf6):	X86_ENDBR
++	mulx(	(up), w2, w3)
+ 	lea	40(up), up
+ 	lea	40(rp), rp
+ 	inc	n
+ 	jmp	L(mb6)
+ 
+-L(mf7):	mulx(	(up), w0, w1)
++L(mf7):	X86_ENDBR
++	mulx(	(up), w0, w1)
+ 	lea	48(up), up
+ 	lea	48(rp), rp
+ 	inc	n
+ 	jmp	L(mb7)
+ 
+-L(mf1):	mulx(	(up), w0, w1)
++L(mf1):	X86_ENDBR
++	mulx(	(up), w0, w1)
+ 	jmp	L(mb1)
+ 
+-L(mf2):	mulx(	(up), w2, w3)
++L(mf2):	X86_ENDBR
++	mulx(	(up), w2, w3)
+ 	lea	8(up), up
+ 	lea	8(rp), rp
+ 	mulx(	(up), w0, w1)
+@@ -256,32 +264,39 @@ L(outer):
+ 	lea	8(vp), vp
+ 	jmp	*jaddr
+ 
+-L(f0):	mulx(	8,(up), w2, w3)
++L(f0):	X86_ENDBR
++	mulx(	8,(up), w2, w3)
+ 	lea	8(rp,unneg,8), rp
+ 	lea	-1(n), n
+ 	jmp	L(b0)
+ 
+-L(f3):	mulx(	-16,(up), w0, w1)
++L(f3):	X86_ENDBR
++	mulx(	-16,(up), w0, w1)
+ 	lea	-56(rp,unneg,8), rp
+ 	jmp	L(b3)
+ 
+-L(f4):	mulx(	-24,(up), w2, w3)
++L(f4):	X86_ENDBR
++	mulx(	-24,(up), w2, w3)
+ 	lea	-56(rp,unneg,8), rp
+ 	jmp	L(b4)
+ 
+-L(f5):	mulx(	-32,(up), w0, w1)
++L(f5):	X86_ENDBR
++	mulx(	-32,(up), w0, w1)
+ 	lea	-56(rp,unneg,8), rp
+ 	jmp	L(b5)
+ 
+-L(f6):	mulx(	-40,(up), w2, w3)
++L(f6):	X86_ENDBR
++	mulx(	-40,(up), w2, w3)
+ 	lea	-56(rp,unneg,8), rp
+ 	jmp	L(b6)
+ 
+-L(f7):	mulx(	16,(up), w0, w1)
++L(f7):	X86_ENDBR
++	mulx(	16,(up), w0, w1)
+ 	lea	8(rp,unneg,8), rp
+ 	jmp	L(b7)
+ 
+-L(f1):	mulx(	(up), w0, w1)
++L(f1):	X86_ENDBR
++	mulx(	(up), w0, w1)
+ 	lea	8(rp,unneg,8), rp
+ 	jmp	L(b1)
+ 
+@@ -303,6 +318,7 @@ L(done):
+ 	ret
+ 
+ L(f2):
++	X86_ENDBR
+ 	mulx(	-8,(up), w2, w3)
+ 	lea	8(rp,unneg,8), rp
+ 	mulx(	(up), w0, w1)
+diff --git a/mpn/x86_64/coreibwl/sqr_basecase.asm b/mpn/x86_64/coreibwl/sqr_basecase.asm
+index e4f77597c..0faf92ba8 100644
+--- a/mpn/x86_64/coreibwl/sqr_basecase.asm
++++ b/mpn/x86_64/coreibwl/sqr_basecase.asm
+@@ -181,14 +181,16 @@ ifdef(`PIC',
+ 	jmp	*(%r10,%rax,8)
+ ')
+ 
+-L(mf0):	mulx(	u0, w0, w1)		C up[0]^2
++L(mf0):	X86_ENDBR
++	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w2, w3)
+ 	lea	64(up), up
+ 	add	w1, w2
+ 	jmp	L(mb0)
+ 
+-L(mf3):	mulx(	u0, w2, w3)		C up[0]^2
++L(mf3):	X86_ENDBR
++	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	u0, u0
+ 	mov	w2, (rp)
+ 	mulx(	8,(up), w0, w1)
+@@ -197,7 +199,8 @@ L(mf3):	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	w3, w0
+ 	jmp	L(mb3)
+ 
+-L(mf4):	mulx(	u0, w0, w1)		C up[0]^2
++L(mf4):	X86_ENDBR
++	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w2, w3)
+ 	mov	w0, (rp)
+@@ -206,7 +209,8 @@ L(mf4):	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	w1, w2
+ 	jmp	L(mb4)
+ 
+-L(mf5):	mulx(	u0, w2, w3)		C up[0]^2
++L(mf5):	X86_ENDBR
++	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w0, w1)
+ 	mov	w2, (rp)
+@@ -215,7 +219,8 @@ L(mf5):	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	w3, w0
+ 	jmp	L(mb5)
+ 
+-L(mf6):	mulx(	u0, w0, w1)		C up[0]^2
++L(mf6):	X86_ENDBR
++	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w2, w3)
+ 	mov	w0, (rp)
+@@ -224,7 +229,8 @@ L(mf6):	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	w1, w2
+ 	jmp	L(mb6)
+ 
+-L(mf7):	mulx(	u0, w2, w3)		C up[0]^2
++L(mf7):	X86_ENDBR
++	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w0, w1)
+ 	mov	w2, (rp)
+@@ -233,7 +239,8 @@ L(mf7):	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	w3, w0
+ 	jmp	L(mb7)
+ 
+-L(mf1):	mulx(	u0, w2, w3)		C up[0]^2
++L(mf1):	X86_ENDBR
++	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w0, w1)
+ 	mov	w2, (rp)
+@@ -242,7 +249,8 @@ L(mf1):	mulx(	u0, w2, w3)		C up[0]^2
+ 	add	w3, w0
+ 	jmp	L(mb1)
+ 
+-L(mf2):	mulx(	u0, w0, w1)		C up[0]^2
++L(mf2):	X86_ENDBR
++	mulx(	u0, w0, w1)		C up[0]^2
+ 	add	u0, u0
+ 	mulx(	8,(up), w2, w3)
+ 	mov	w0, (rp)
+@@ -300,7 +308,8 @@ ifdef(`PIC',
+ 
+ L(ed0):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f7):	mov	w0, (rp)
++L(f7):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	-64(up,un_save,8), up
+@@ -356,7 +365,8 @@ L(b0):	mov	w0, (rp)
+ 
+ L(ed1):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f0):	mov	w0, (rp)
++L(f0):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	-64(up,un_save,8), up
+@@ -415,7 +425,8 @@ L(b1):	mulx(	8,(up), w2, w3)
+ 
+ L(ed2):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f1):	mov	w0, (rp)
++L(f1):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+@@ -477,7 +488,8 @@ L(b2):	adox(	48,(rp), w0)
+ 
+ L(ed3):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f2):	mov	w0, (rp)
++L(f2):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+@@ -535,7 +547,8 @@ L(b3):	mulx(	-16,(up), w0, w1)
+ 
+ L(ed4):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f3):	mov	w0, (rp)
++L(f3):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+@@ -592,7 +605,8 @@ L(b4):	mulx(	-24,(up), w2, w3)
+ 
+ L(ed5):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f4):	mov	w0, (rp)
++L(f4):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+@@ -649,7 +663,8 @@ L(b5):	mulx(	-32,(up), w0, w1)
+ 
+ L(ed6):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f5):	mov	w0, (rp)
++L(f5):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+@@ -706,7 +721,8 @@ L(b6):	adcx(	w1, w2)
+ 
+ L(ed7):	adox(	(rp), w0)
+ 	adox(	%rcx, w1)		C relies on rcx = 0
+-L(f6):	mov	w0, (rp)
++L(f6):	X86_ENDBR
++	mov	w0, (rp)
+ 	adc	%rcx, w1		C relies on rcx = 0
+ 	mov	w1, 8(rp)
+ 	lea	(up,un_save,8), up
+diff --git a/mpn/x86_64/coreihwl/aors_n.asm b/mpn/x86_64/coreihwl/aors_n.asm
+index f9d89f768..db5c59a95 100644
+--- a/mpn/x86_64/coreihwl/aors_n.asm
++++ b/mpn/x86_64/coreihwl/aors_n.asm
+@@ -115,12 +115,14 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%rax,8)
+ ')
+ 
+-L(0):	mov	(up), %r8
++L(0):	X86_ENDBR
++	mov	(up), %r8
+ 	mov	8(up), %r9
+ 	ADCSBB	(vp), %r8
+ 	jmp	L(e0)
+ 
+-L(4):	mov	(up), %r8
++L(4):	X86_ENDBR
++	mov	(up), %r8
+ 	mov	8(up), %r9
+ 	ADCSBB	(vp), %r8
+ 	lea	-32(up), up
+@@ -129,7 +131,8 @@ L(4):	mov	(up), %r8
+ 	inc	n
+ 	jmp	L(e4)
+ 
+-L(5):	mov	(up), %r11
++L(5):	X86_ENDBR
++	mov	(up), %r11
+ 	mov	8(up), %r8
+ 	mov	16(up), %r9
+ 	ADCSBB	(vp), %r11
+@@ -139,7 +142,8 @@ L(5):	mov	(up), %r11
+ 	inc	n
+ 	jmp	L(e5)
+ 
+-L(6):	mov	(up), %r10
++L(6):	X86_ENDBR
++	mov	(up), %r10
+ 	ADCSBB	(vp), %r10
+ 	mov	8(up), %r11
+ 	lea	-16(up), up
+@@ -148,7 +152,8 @@ L(6):	mov	(up), %r10
+ 	inc	n
+ 	jmp	L(e6)
+ 
+-L(7):	mov	(up), %r9
++L(7):	X86_ENDBR
++	mov	(up), %r9
+ 	mov	8(up), %r10
+ 	ADCSBB	(vp), %r9
+ 	ADCSBB	8(vp), %r10
+@@ -199,7 +204,8 @@ L(end):	mov	%r9, 40(rp)
+ 	ret
+ 
+ 	ALIGN(16)
+-L(3):	mov	(up), %r9
++L(3):	X86_ENDBR
++	mov	(up), %r9
+ 	mov	8(up), %r10
+ 	mov	16(up), %r11
+ 	ADCSBB	(vp), %r9
+@@ -219,7 +225,8 @@ L(x3):	mov	%r9, (rp)
+ 	ret
+ 
+ 	ALIGN(16)
+-L(1):	mov	(up), %r11
++L(1):	X86_ENDBR
++	mov	(up), %r11
+ 	ADCSBB	(vp), %r11
+ 	jrcxz	L(x1)
+ 	lea	8(up), up
+@@ -233,7 +240,8 @@ L(x1):	mov	%r11, (rp)
+ 	ret
+ 
+ 	ALIGN(16)
+-L(2):	mov	(up), %r10
++L(2):	X86_ENDBR
++	mov	(up), %r10
+ 	mov	8(up), %r11
+ 	ADCSBB	(vp), %r10
+ 	ADCSBB	8(vp), %r11
+diff --git a/mpn/x86_64/coreinhm/hamdist.asm b/mpn/x86_64/coreinhm/hamdist.asm
+index a84bcbc78..17f4c2e6f 100644
+--- a/mpn/x86_64/coreinhm/hamdist.asm
++++ b/mpn/x86_64/coreinhm/hamdist.asm
+@@ -98,7 +98,8 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%r8,8)
+ ')
+ 
+-L(3):	mov	8(up), %r10
++L(3):	X86_ENDBR
++	mov	8(up), %r10
+ 	mov	16(up), %r11
+ 	xor	8(vp), %r10
+ 	xor	16(vp), %r11
+@@ -111,7 +112,8 @@ L(3):	mov	8(up), %r10
+ 	add	$24, vp
+ 	jmp	L(e3)
+ 
+-L(0):	mov	8(up), %r9
++L(0):	X86_ENDBR
++	mov	8(up), %r9
+ 	xor	8(vp), %r9
+ 	mov	16(up), %r10
+ 	mov	24(up), %r11
+@@ -159,7 +161,8 @@ L(x1):	pop	%rbp
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(2):	mov	8(up), %r11
++L(2):	X86_ENDBR
++	mov	8(up), %r11
+ 	xor	8(vp), %r11
+ 	sub	$2, n
+ 	jle	L(n2)
+@@ -174,7 +177,8 @@ L(2):	mov	8(up), %r11
+ L(n2):	.byte	0xf3,0x49,0x0f,0xb8,0xcb	C popcnt %r11,%rcx
+ 	jmp	L(x2)
+ 
+-L(1):	dec	n
++L(1):	X86_ENDBR
++	dec	n
+ 	jle	L(x1)
+ 	mov	8(up), %r8
+ 	mov	16(up), %r9
+diff --git a/mpn/x86_64/coreinhm/popcount.asm b/mpn/x86_64/coreinhm/popcount.asm
+index 24c4ebc84..5243595ce 100644
+--- a/mpn/x86_64/coreinhm/popcount.asm
++++ b/mpn/x86_64/coreinhm/popcount.asm
+@@ -88,7 +88,8 @@ ifdef(`PIC',`
+ 	jmp	*(%r9,%r8,8)
+ ')
+ 
+-L(3):	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x08	C popcnt 8(up), %r10
++L(3):	X86_ENDBR
++	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x08	C popcnt 8(up), %r10
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x5f,0x10	C popcnt 16(up), %r11
+ 	add	$24, up
+ 	sub	$8, n
+@@ -98,24 +99,28 @@ L(3):	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x08	C popcnt 8(up), %r10
+ L(s1):	FUNC_EXIT()
+ 	ret
+ 
+-L(1):	sub	$8, n
++L(1):	X86_ENDBR
++	sub	$8, n
+ 	jle	L(s1)
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x47,0x08	C popcnt 8(up), %r8
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x4f,0x10	C popcnt 16(up), %r9
+ 	add	$8, up
+ 	jmp	L(e12)
+ 
+-L(7):	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x08	C popcnt 0x8(%rdi),%r10
++L(7):	X86_ENDBR
++	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x08	C popcnt 0x8(%rdi),%r10
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x5f,0x10	C popcnt 0x10(%rdi),%r11
+ 	add	$-8, up
+ 	jmp	L(e07)
+ 
+-L(0):	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
++L(0):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x10	C popcnt 0x10(%rdi),%r10
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x5f,0x18	C popcnt 0x18(%rdi),%r11
+ 	jmp	L(e07)
+ 
+-L(4):	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
++L(4):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x57,0x10	C popcnt 0x10(%rdi),%r10
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x5f,0x18	C popcnt 0x18(%rdi),%r11
+ 	add	$32, up
+@@ -151,7 +156,8 @@ L(x2):	add	%rcx, %rax
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(2):	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
++L(2):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
+ 	sub	$8, n
+ 	jle	L(x2)
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x47,0x10	C popcnt 0x10(%rdi),%r8
+@@ -159,12 +165,14 @@ L(2):	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
+ 	add	$16, up
+ 	jmp	L(e12)
+ 
+-L(5):	.byte	0xf3,0x4c,0x0f,0xb8,0x47,0x08	C popcnt 0x8(%rdi),%r8
++L(5):	X86_ENDBR
++	.byte	0xf3,0x4c,0x0f,0xb8,0x47,0x08	C popcnt 0x8(%rdi),%r8
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x4f,0x10	C popcnt 0x10(%rdi),%r9
+ 	add	$-24, up
+ 	jmp	L(e56)
+ 
+-L(6):	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
++L(6):	X86_ENDBR
++	.byte	0xf3,0x48,0x0f,0xb8,0x4f,0x08	C popcnt 0x8(%rdi),%rcx
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x47,0x10	C popcnt 0x10(%rdi),%r8
+ 	.byte	0xf3,0x4c,0x0f,0xb8,0x4f,0x18	C popcnt 0x18(%rdi),%r9
+ 	add	$-16, up
+diff --git a/mpn/x86_64/k8/mul_basecase.asm b/mpn/x86_64/k8/mul_basecase.asm
+index 8b114ce8b..9126c2b80 100644
+--- a/mpn/x86_64/k8/mul_basecase.asm
++++ b/mpn/x86_64/k8/mul_basecase.asm
+@@ -335,8 +335,10 @@ C     addmul_2 for remaining vp's
+ 	C adjusted value of n that is reloaded on each iteration
+ 
+ L(addmul_outer_0):
++	X86_ENDBR
+ 	add	$3, un
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 
+ 	mov	un, n
+ 	mov	-24(up,un,8), %rax
+@@ -348,6 +350,7 @@ L(addmul_outer_0):
+ 	jmp	L(addmul_entry_0)
+ 
+ L(addmul_outer_1):
++	X86_ENDBR
+ 	mov	un, n
+ 	mov	(up,un,8), %rax
+ 	mul	v0
+@@ -358,8 +361,10 @@ L(addmul_outer_1):
+ 	jmp	L(addmul_entry_1)
+ 
+ L(addmul_outer_2):
++	X86_ENDBR
+ 	add	$1, un
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 
+ 	mov	un, n
+ 	mov	-8(up,un,8), %rax
+@@ -372,8 +377,10 @@ L(addmul_outer_2):
+ 	jmp	L(addmul_entry_2)
+ 
+ L(addmul_outer_3):
++	X86_ENDBR
+ 	add	$2, un
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 
+ 	mov	un, n
+ 	mov	-16(up,un,8), %rax
+diff --git a/mpn/x86_64/k8/mullo_basecase.asm b/mpn/x86_64/k8/mullo_basecase.asm
+index fc6a4396d..4a931a535 100644
+--- a/mpn/x86_64/k8/mullo_basecase.asm
++++ b/mpn/x86_64/k8/mullo_basecase.asm
+@@ -99,12 +99,14 @@ dnl	JMPENT(	L(2m4), L(tab))			C 10
+ dnl	JMPENT(	L(3m4), L(tab))			C 11
+ 	TEXT
+ 
+-L(1):	imul	%r8, %rax
++L(1):	X86_ENDBR
++	imul	%r8, %rax
+ 	mov	%rax, (rp)
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(2):	mov	8(vp_param), %r11
++L(2):	X86_ENDBR
++	mov	8(vp_param), %r11
+ 	imul	%rax, %r11		C u0 x v1
+ 	mul	%r8			C u0 x v0
+ 	mov	%rax, (rp)
+@@ -115,7 +117,8 @@ L(2):	mov	8(vp_param), %r11
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(3):	mov	8(vp_param), %r9	C v1
++L(3):	X86_ENDBR
++	mov	8(vp_param), %r9	C v1
+ 	mov	16(vp_param), %r11
+ 	mul	%r8			C u0 x v0 -> <r1,r0>
+ 	mov	%rax, (rp)		C r0
+@@ -335,6 +338,7 @@ L(mul_2_entry_1):
+ 
+ 
+ L(addmul_outer_1):
++	X86_ENDBR
+ 	lea	-2(n), j
+ 	mov	-16(up,n,8), %rax
+ 	mul	v0
+@@ -346,6 +350,7 @@ L(addmul_outer_1):
+ 	jmp	L(addmul_entry_1)
+ 
+ L(addmul_outer_3):
++	X86_ENDBR
+ 	lea	0(n), j
+ 	mov	-16(up,n,8), %rax
+ 	xor	R32(w3), R32(w3)
+diff --git a/mpn/x86_64/k8/mulmid_basecase.asm b/mpn/x86_64/k8/mulmid_basecase.asm
+index d7d1f27c6..7d5f1588f 100644
+--- a/mpn/x86_64/k8/mulmid_basecase.asm
++++ b/mpn/x86_64/k8/mulmid_basecase.asm
+@@ -329,6 +329,7 @@ C     addmul_2 for remaining vp's
+ 
+ 	ALIGN(16)
+ L(addmul_prologue_0):
++	X86_ENDBR
+ 	mov	-8(up,n,8), %rax
+ 	mul	v1
+ 	mov	%rax, w1
+@@ -338,6 +339,7 @@ L(addmul_prologue_0):
+ 
+ 	ALIGN(16)
+ L(addmul_prologue_1):
++	X86_ENDBR
+ 	mov	16(up,n,8), %rax
+ 	mul	v1
+ 	mov	%rax, w0
+@@ -348,6 +350,7 @@ L(addmul_prologue_1):
+ 
+ 	ALIGN(16)
+ L(addmul_prologue_2):
++	X86_ENDBR
+ 	mov	8(up,n,8), %rax
+ 	mul	v1
+ 	mov	%rax, w3
+@@ -357,6 +360,7 @@ L(addmul_prologue_2):
+ 
+ 	ALIGN(16)
+ L(addmul_prologue_3):
++	X86_ENDBR
+ 	mov	(up,n,8), %rax
+ 	mul	v1
+ 	mov	%rax, w2
+@@ -471,6 +475,7 @@ L(diag_prologue_0):
+ 	mov	vp, vp_inner
+ 	mov	vn, n
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 	mov     -8(up,n,8), %rax
+ 	jmp	L(diag_entry_0)
+ 
+@@ -480,6 +485,7 @@ L(diag_prologue_1):
+ 	add	$3, vn
+ 	mov	vn, n
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 	mov     -8(vp_inner), %rax
+ 	jmp	L(diag_entry_1)
+ 
+@@ -489,6 +495,7 @@ L(diag_prologue_2):
+ 	add	$2, vn
+ 	mov	vn, n
+ 	lea	0(%rip), outer_addr
++	X86_ENDBR
+ 	mov	16(vp_inner), %rax
+ 	jmp	L(diag_entry_2)
+ 
+@@ -507,6 +514,7 @@ L(diag_entry_0):
+ 	adc     %rdx, w1
+ 	adc     $0, w2
+ L(diag_entry_3):
++	X86_ENDBR
+ 	mov     -16(up,n,8), %rax
+ 	mulq    8(vp_inner)
+ 	add     %rax, w0
+diff --git a/mpn/x86_64/k8/redc_1.asm b/mpn/x86_64/k8/redc_1.asm
+index 4cb65af49..3e241af27 100644
+--- a/mpn/x86_64/k8/redc_1.asm
++++ b/mpn/x86_64/k8/redc_1.asm
+@@ -125,7 +125,8 @@ L(tab):	JMPENT(	L(0), L(tab))
+ 	TEXT
+ 
+ 	ALIGN(16)
+-L(1):	mov	(mp_param), %rax
++L(1):	X86_ENDBR
++	mov	(mp_param), %rax
+ 	mul	q0
+ 	add	8(up), %rax
+ 	adc	16(up), %rdx
+@@ -136,7 +137,8 @@ L(1):	mov	(mp_param), %rax
+ 
+ 
+ 	ALIGN(16)
+-L(2):	mov	(mp_param), %rax
++L(2):	X86_ENDBR
++	mov	(mp_param), %rax
+ 	mul	q0
+ 	xor	R32(%r14), R32(%r14)
+ 	mov	%rax, %r10
+@@ -171,7 +173,8 @@ L(2):	mov	(mp_param), %rax
+ 	jmp	L(ret)
+ 
+ 
+-L(3):	mov	(mp_param), %rax
++L(3):	X86_ENDBR
++	mov	(mp_param), %rax
+ 	mul	q0
+ 	mov	%rax, %rbx
+ 	mov	%rdx, %r10
+@@ -248,7 +251,7 @@ L(3):	mov	(mp_param), %rax
+ 
+ 
+ 	ALIGN(16)
+-L(2m4):
++L(2m4):	X86_ENDBR
+ L(lo2):	mov	(mp,nneg,8), %rax
+ 	mul	q0
+ 	xor	R32(%r14), R32(%r14)
+@@ -324,7 +327,7 @@ L(le2):	add	%r10, (up)
+ 
+ 
+ 	ALIGN(16)
+-L(1m4):
++L(1m4):	X86_ENDBR
+ L(lo1):	mov	(mp,nneg,8), %rax
+ 	xor	%r9, %r9
+ 	xor	R32(%rbx), R32(%rbx)
+@@ -398,7 +401,7 @@ L(le1):	add	%r10, (up)
+ 
+ 	ALIGN(16)
+ L(0):
+-L(0m4):
++L(0m4):	X86_ENDBR
+ L(lo0):	mov	(mp,nneg,8), %rax
+ 	mov	nneg, i
+ 	mul	q0
+@@ -463,7 +466,7 @@ L(le0):	add	%r10, (up)
+ 
+ 
+ 	ALIGN(16)
+-L(3m4):
++L(3m4):	X86_ENDBR
+ L(lo3):	mov	(mp,nneg,8), %rax
+ 	mul	q0
+ 	mov	%rax, %rbx
+diff --git a/mpn/x86_64/k8/sqr_basecase.asm b/mpn/x86_64/k8/sqr_basecase.asm
+index f2c70b06b..37858b497 100644
+--- a/mpn/x86_64/k8/sqr_basecase.asm
++++ b/mpn/x86_64/k8/sqr_basecase.asm
+@@ -131,7 +131,8 @@ L(tab):	JMPENT(	L(4), L(tab))
+ 	JMPENT(	L(3m4), L(tab))
+ 	TEXT
+ 
+-L(1):	mov	(up), %rax
++L(1):	X86_ENDBR
++	mov	(up), %rax
+ 	mul	%rax
+ 	add	$40, %rsp
+ 	mov	%rax, (rp)
+@@ -139,7 +140,8 @@ L(1):	mov	(up), %rax
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(2):	mov	(up), %rax
++L(2):	X86_ENDBR
++	mov	(up), %rax
+ 	mov	%rax, %r8
+ 	mul	%rax
+ 	mov	8(up), %r11
+@@ -165,7 +167,8 @@ L(2):	mov	(up), %rax
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(3):	mov	(up), %rax
++L(3):	X86_ENDBR
++	mov	(up), %rax
+ 	mov	%rax, %r10
+ 	mul	%rax
+ 	mov	8(up), %r11
+@@ -210,7 +213,8 @@ L(3):	mov	(up), %rax
+ 	FUNC_EXIT()
+ 	ret
+ 
+-L(4):	mov	(up), %rax
++L(4):	X86_ENDBR
++	mov	(up), %rax
+ 	mov	%rax, %r11
+ 	mul	%rax
+ 	mov	8(up), %rbx
+@@ -282,6 +286,7 @@ L(4):	mov	(up), %rax
+ 
+ 
+ L(0m4):
++	X86_ENDBR
+ 	lea	-16(rp,n,8), tp		C point tp in middle of result operand
+ 	mov	(up), v0
+ 	mov	8(up), %rax
+@@ -340,6 +345,7 @@ L(L3):	xor	R32(w1), R32(w1)
+ 
+ 
+ L(1m4):
++	X86_ENDBR
+ 	lea	8(rp,n,8), tp		C point tp in middle of result operand
+ 	mov	(up), v0		C u0
+ 	mov	8(up), %rax		C u1
+@@ -418,6 +424,7 @@ L(m2x):	mov	(up,j,8), %rax
+ 
+ 
+ L(2m4):
++	X86_ENDBR
+ 	lea	-16(rp,n,8), tp		C point tp in middle of result operand
+ 	mov	(up), v0
+ 	mov	8(up), %rax
+@@ -474,7 +481,7 @@ L(L1):	xor	R32(w0), R32(w0)
+ 	jmp	L(dowhile_mid)
+ 
+ 
+-L(3m4):
++L(3m4):	X86_ENDBR
+ 	lea	8(rp,n,8), tp		C point tp in middle of result operand
+ 	mov	(up), v0		C u0
+ 	mov	8(up), %rax		C u1
+diff --git a/mpn/x86_64/mod_34lsub1.asm b/mpn/x86_64/mod_34lsub1.asm
+index 74f576a07..70282b6c2 100644
+--- a/mpn/x86_64/mod_34lsub1.asm
++++ b/mpn/x86_64/mod_34lsub1.asm
+@@ -145,46 +145,55 @@ L(tab):	JMPENT(	L(0), L(tab))
+ 	JMPENT(	L(8), L(tab))
+ 	TEXT
+ 
+-L(6):	add	(ap), %rax
++L(6):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	adc	$0, %r9
+ 	add	$24, ap
+-L(3):	add	(ap), %rax
++L(3):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	jmp	L(cj1)
+ 
+-L(7):	add	(ap), %rax
++L(7):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	adc	$0, %r9
+ 	add	$24, ap
+-L(4):	add	(ap), %rax
++L(4):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	adc	$0, %r9
+ 	add	$24, ap
+-L(1):	add	(ap), %rax
++L(1):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	$0, %rcx
+ 	jmp	L(cj2)
+ 
+-L(8):	add	(ap), %rax
++L(8):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	adc	$0, %r9
+ 	add	$24, ap
+-L(5):	add	(ap), %rax
++L(5):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 	adc	16(ap), %rdx
+ 	adc	$0, %r9
+ 	add	$24, ap
+-L(2):	add	(ap), %rax
++L(2):	X86_ENDBR
++	add	(ap), %rax
+ 	adc	8(ap), %rcx
+ 
+ L(cj2):	adc	$0, %rdx
+ L(cj1):	adc	$0, %r9
+-L(0):	add	%r9, %rax
++L(0):	X86_ENDBR
++	add	%r9, %rax
+ 	adc	$0, %rcx
+ 	adc	$0, %rdx
+ 	adc	$0, %rax
+diff --git a/mpn/x86_64/zen/aorrlsh_n.asm b/mpn/x86_64/zen/aorrlsh_n.asm
+index e27b564fe..627e64870 100644
+--- a/mpn/x86_64/zen/aorrlsh_n.asm
++++ b/mpn/x86_64/zen/aorrlsh_n.asm
+@@ -102,26 +102,30 @@ ifdef(`PIC',`
+ 	jmp	*(%r11,%rax,8)
+ ')
+ 
+-L(0):	lea	32(up), up
++L(0):	X86_ENDBR
++	lea	32(up), up
+ 	lea	32(vp), vp
+ 	lea	32(rp), rp
+ 	xor	R32(%r11), R32(%r11)
+ 	jmp	L(e0)
+ 
+-L(7):	mov	%r10, %r11
++L(7):	X86_ENDBR
++	mov	%r10, %r11
+ 	lea	24(up), up
+ 	lea	24(vp), vp
+ 	lea	24(rp), rp
+ 	xor	R32(%r10), R32(%r10)
+ 	jmp	L(e7)
+ 
+-L(6):	lea	16(up), up
++L(6):	X86_ENDBR
++	lea	16(up), up
+ 	lea	16(vp), vp
+ 	lea	16(rp), rp
+ 	xor	R32(%r11), R32(%r11)
+ 	jmp	L(e6)
+ 
+-L(5):	mov	%r10, %r11
++L(5):	X86_ENDBR
++	mov	%r10, %r11
+ 	lea	8(up), up
+ 	lea	8(vp), vp
+ 	lea	8(rp), rp
+@@ -191,23 +195,27 @@ L(e1):	shlx(	cnt, %r11, %rax)
+ 	lea	(%r10,%rax), %rax
+ 	jmp	L(top)
+ 
+-L(4):	xor	R32(%r11), R32(%r11)
++L(4):	X86_ENDBR
++	xor	R32(%r11), R32(%r11)
+ 	jmp	L(e4)
+ 
+-L(3):	mov	%r10, %r11
++L(3):	X86_ENDBR
++	mov	%r10, %r11
+ 	lea	-8(up), up
+ 	lea	-8(vp), vp
+ 	lea	-8(rp), rp
+ 	xor	R32(%r10), R32(%r10)
+ 	jmp	L(e3)
+ 
+-L(2):	lea	-16(up), up
++L(2):	X86_ENDBR
++	lea	-16(up), up
+ 	lea	-16(vp), vp
+ 	lea	-16(rp), rp
+ 	xor	R32(%r11), R32(%r11)
+ 	jmp	L(e2)
+ 
+-L(1):	mov	%r10, %r11
++L(1):	X86_ENDBR
++	mov	%r10, %r11
+ 	lea	-24(up), up
+ 	lea	40(vp), vp
+ 	lea	40(rp), rp
+-- 
+2.27.0
+

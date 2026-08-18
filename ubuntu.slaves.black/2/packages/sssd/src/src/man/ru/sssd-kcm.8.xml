@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-kcm</refentrytitle>
+        <manvolnum>8</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-kcm</refname>
+        <refpurpose>Диспетчер кэшей Kerberos SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки диспетчера кэшей
+Kerberos SSSD (Kerberos Cache Manager или KCM). KCM — это процесс, который
+хранит кэши учётных данных Kerberos, отслеживает эти кэши и управляет
+ими. Он был создан на основе проекта Heimdal Kerberos, хотя библиотека MIT
+Kerberos также предоставляет поддержку со стороны клиента (подробнее об этом
+далее) для кэша учётных данных KCM.
+        </para>
+        <para>
+            В конфигурации, где кэшами Kerberos управляет KCM, библиотека Kerberos
+(обычно используемая через приложение, например <citerefentry>
+<refentrytitle>kinit</refentrytitle><manvolnum>1</manvolnum>
+</citerefentry>) является <quote>клиентом KCM</quote>, а внутренняя служба
+KCM называется <quote>сервером KCM</quote>. Клиент и сервер обмениваются
+данными с помощью сокета UNIX.
+        </para>
+        <para>
+            Сервер KCM следит за всеми владельцами кэшей учётных данных и осуществляет
+управление проверками прав доступа на основе UID и GID клиента
+KCM. Пользователь root имеет доступ ко всем кэшам учётных данных.
+        </para>
+        <para>
+            Кэш учётных данных KCM обладает несколькими интересными свойствами:
+            <itemizedlist>
+                <listitem>
+                    <para>
+                        так как процесс выполняется в пространстве пользователей, он подлежит
+ограничениям по пространству имён UID, в отличие от набора ключей ядра
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        в отличие от кэша на основе набора ключей ядра, который является общим для
+всех контейнеров, сервер KCM представляет собой отдельный процесс, точкой
+входа которого является сокет UNIX
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        реализация SSSD сохраняет данные ccache в базе данных (обычно она находится
+по адресу <replaceable>/var/lib/sss/secrets</replaceable>), что позволяет не
+терять эти данные при перезапусках сервера KCM или перезагрузках компьютера.
+                    </para>
+                </listitem>
+            </itemizedlist>
+            Это позволяет системе использовать кэш учётных данных с учётом сбора,
+одновременно делая кэш учётных данных общим для нескольких контейнеров (или
+для никаких контейнеров вообще) путём привязки-монтирования сокета.
+        </para>
+        <para>
+            Тайм-аут простоя клиента KCM по умолчанию составляет 5 минут, что
+предоставляет больше времени на взаимодействие пользователя с инструментами
+командной строки, например kinit.
+        </para>
+    </refsect1>
+
+    <refsect1 id='usage'>
+        <title>ИСПОЛЬЗОВАНИЕ КЭША УЧЁТНЫХ ДАННЫХ KCM</title>
+        <para>
+            Чтобы использовать кэш учётных данных KCM, необходимо выбрать его в качестве
+стандартного типа учётных данных в <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>. Именем кэша учётных данных может быть только
+<quote>KCM:</quote>, без каких-либо расширений шаблонов. Например:
+<programlisting>
+[libdefaults]
+    default_ccache_name = KCM:
+            </programlisting>
+        </para>
+        <para>
+            Далее следует указать одинаковый путь к сокету UNIX для клиентских библиотек
+Kerberos и сервера KCM. По умолчанию и для библиотек, и для сервера
+используется путь
+<replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>. Чтобы
+настроить библиотеку Kerberos, измените её параметр
+<quote>kcm_socket</quote>, описание которого приводится на справочной
+странице <citerefentry>
+<refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            И наконец, следует убедиться, что с сервером KCM SSSD можно
+связаться. Служба KCM обычно активируется <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry> с помощью сокета. В отличие от других служб SSSD, её нельзя
+запустить, добавив строку <quote>kcm</quote> к инструкции
+<quote>service</quote>. <programlisting>
+systemctl start sssd-kcm.socket
+systemctl enable sssd-kcm.socket
+            </programlisting> Обратите
+внимание, что в дистрибутиве уже может быть выполнена соответствующая
+настройка модулей.
+        </para>
+    </refsect1>
+
+    <refsect1 id='storage'>
+        <title>ХРАНИЛИЩЕ КЭША УЧЁТНЫХ ДАННЫХ</title>
+        <para>
+            Кэши учётных данных хранятся в базе данных, что очень похоже на хранение
+кэшей записей пользователей и групп SSSD. Обычно эта база данных находится
+по адресу <quote>/var/lib/sss/secrets</quote>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='debugging'>
+        <title>ПОЛУЧЕНИЕ ЖУРНАЛА ОТЛАДКИ</title>
+        <para>
+            Служба sssd-kcm обычно активируется на сокете <citerefentry>
+<refentrytitle>systemd</refentrytitle> <manvolnum>1</manvolnum>
+</citerefentry>. Для генерации журнала отладки добавьте следующее либо
+непосредственно в файл <filename>/etc/sssd/sssd.conf</filename>, либо как
+фрагмент конфигурации в каталог <filename>/etc/sssd/conf.d/</filename>:
+<programlisting>
+[kcm]
+debug_level = 10
+            </programlisting> Затем перезапустите службу
+sssd-kcm: <programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting> И выполните те
+действия, которые не приводят к желаемым результатам. Журнал KCM будет
+записан в <filename>/var/log/sssd/sssd_kcm.log</filename>. Когда в работе
+службы отладки больше не будет необходимости, рекомендуется отключить журнал
+отладки, так как служба sssd-kcm может генерировать довольно большое
+количество данных отладки.
+        </para>
+        <para>
+            Обратите внимание, что в настоящее время фрагменты конфигурации
+обрабатываются только в том случае, если основной файл конфигурации по пути
+<filename>/etc/sssd/sssd.conf</filename> существует.
+        </para>
+    </refsect1>
+
+    <refsect1 id='renewals' condition="enable_kcm_renewal">
+        <title>ОБНОВЛЕНИЯ</title>
+        <para>
+            Службу sssd-kcm можно настроить на выполнение попыток обновления TGT для
+обновляемых TGT, которые хранятся в ccache KCM. Попытка обновления
+выполняется только в том случае, если прошла половина времени жизни
+билета. Обновления KCM настраиваются при установке следующих параметров в
+разделе [kcm]: <programlisting>
+tgt_renewal = true
+krb5_renew_interval = 60m
+            </programlisting>
+        </para>
+        <para>
+            SSSD также может наследовать параметры krb5 для обновлений из существующего
+домена.
+        </para>
+            <programlisting>
+tgt_renewal = true
+tgt_renewal_inherit = domain-name
+            </programlisting>
+        <para>
+            Для управления поведением обновлений в разделе [kcm] можно настроить
+следующие параметры krb5 (подробное описание этих параметров приводится
+далее) <programlisting>
+krb5_renew_interval
+krb5_renew_lifetime
+krb5_lifetime
+krb5_validate
+krb5_canonicalize
+krb5_auth_timeout
+            </programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ПАРАМЕТРЫ КОНФИГУРАЦИИ</title>
+        <para>
+            Служба KCM настраивается в разделе <quote>kcm</quote> файла
+sssd.conf. Обратите внимание: так как служба KCM обычно активируется с
+помощью сокета, достаточно просто перезапустить службу
+<quote>sssd-kcm</quote> после изменения параметров в разделе
+<quote>kcm</quote> sssd.conf: <programlisting>
+systemctl restart sssd-kcm.service
+            </programlisting>
+        </para>
+        <para>
+            Подробные сведения о синтаксисе доступны в разделе <quote>ФОРМАТ
+ФАЙЛА</quote> справочной страницы <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Службе kcm можно передавать типовые параметры сервиса SSSD, такие как
+<quote>debug_level</quote> или<quote>fd_limit</quote>. Полный список
+параметров доступен на справочной странице <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. Кроме того, предусмотрено несколько специфичных для KCM
+параметров.
+        </para>
+        <variablelist>
+            <varlistentry>
+                <term>socket_path (строка)</term>
+                <listitem>
+                    <para>
+                        Сокет, на котором будет ожидать передачи данных служба KCM.
+                    </para>
+                    <para>
+                        По умолчанию: <replaceable>/var/run/.heim_org.h5l.kcm-socket</replaceable>
+                    </para>
+                    <para>
+                        <phrase condition="have_systemd"> Примечание: на платформах, которые
+поддерживают systemd, путь к сокету перезаписан путём, который определён в
+файле модуля sssd-kcm.socket.  </phrase>
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccaches (целое число)</term>
+                <listitem>
+                    <para>
+                        Сколько кэшей учётных данных может содержать база данных KCM для всех
+пользователей.
+                    </para>
+                    <para>
+                        По умолчанию: 0 (без ограничений, принудительно применяется только квота для
+отдельного UID)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_uid_ccaches (целое число)</term>
+                <listitem>
+                    <para>
+                        Сколько кэшей учётных данных может содержать база данных KCM для одного
+UID. Это эквивалентно <quote>количеству участников, инициализацию которых
+можно выполнить с помощью kinit</quote>.
+                    </para>
+                    <para>
+                        По умолчанию: 64
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>max_ccache_size (целое число)</term>
+                <listitem>
+                    <para>
+                        Максимальный размер кэша учётных данных для отдельного ccache. Эта квота
+вычисляется сразу для всех билетов служб.
+                    </para>
+                    <para>
+                        По умолчанию: 65536
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal (логическое значение)</term>
+                <listitem>
+                    <para>
+                        Включает функциональную возможность обновлений TGT.
+                    </para>
+                    <para>
+                        По умолчанию: False (автоматические обновления отключены)
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry condition="enable_kcm_renewal">
+                <term>tgt_renewal_inherit (строка)</term>
+                <listitem>
+                    <para>
+                        Домен, от которого наследуются параметры krb5_*, для использования при
+обновлении TGT.
+                    </para>
+                    <para>
+                        По умолчанию: NULL
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+        <xi:include condition="enable_kcm_renewal" xmlns:xi="http://www.w3.org/2001/XInclude" href="include/krb5_options.xml" />
+    </refsect1>
+
+    <refsect1 id='see_also'>
+        <title>СМ. ТАКЖЕ</title>
+        <para>
+            <citerefentry> <refentrytitle>sssd</refentrytitle><manvolnum>8</manvolnum>
+</citerefentry>, <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>,
+        </para>
+    </refsect1>
+</refentry>
+</reference>

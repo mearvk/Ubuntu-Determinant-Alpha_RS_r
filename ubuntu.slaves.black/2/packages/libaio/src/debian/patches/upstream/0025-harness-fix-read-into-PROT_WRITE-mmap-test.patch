@@ -1,0 +1,40 @@
+From d7f5065448efb49b2a26e728ff735e12ea05b62e Mon Sep 17 00:00:00 2001
+From: Jeff Moyer <jmoyer@redhat.com>
+Date: Tue, 13 Aug 2019 15:30:05 -0400
+Subject: [PATCH libaio 25/28] harness: fix read into PROT_WRITE mmap test
+
+This test has been broken forever.  Fix it up to perform an
+aio_read using the result of a regular read as the expected
+return code.
+
+Reported-by: Guillem Jover <guillem@hadrons.org>
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/5.t | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/harness/cases/5.t b/harness/cases/5.t
+index 2b4b4bb..7d67562 100644
+--- a/harness/cases/5.t
++++ b/harness/cases/5.t
+@@ -40,14 +40,14 @@ int test_main(void)
+ 	buf = mmap(0, page_size, PROT_WRITE, MAP_SHARED, rwfd, 0);
+ 	assert(buf != (char *)-1);
+ 
+-	status |= attempt_rw(rwfd, buf, SIZE,  0,  READ, SIZE);
+-
+ 	/* Whether PROT_WRITE is readable is arch-dependent.  So compare
+ 	 * against read result. */
+ 	res = read(rwfd, buf, SIZE);
+ 	if (res < 0)
+ 		res = -errno;
+-	status |= attempt_rw(rwfd, buf, SIZE,  0, WRITE, res);
++	status |= attempt_rw(rwfd, buf, SIZE,  0,  READ, res);
++
++	status |= attempt_rw(rwfd, buf, SIZE,  0, WRITE, SIZE);
+ 
+ 	return status;
+ }
+-- 
+2.26.0.292.g33ef6b2f38
+

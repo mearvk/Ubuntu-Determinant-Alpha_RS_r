@@ -1,0 +1,26 @@
+Description: Try to load native library [java.library.path]/libnative-platform.so first
+ instead of extractDir or classpath.
+ It will load first file matching expected name for paths listed in java.library.path
+Author: Damien Raude-Morvan <drazzib@debian.org>
+Last-Update: 2015-06-05
+Forwarded: no
+--- a/src/main/java/net/rubygrapefruit/platform/internal/NativeLibraryLocator.java
++++ b/src/main/java/net/rubygrapefruit/platform/internal/NativeLibraryLocator.java
+@@ -31,6 +31,17 @@
+     }
+ 
+     public File find(LibraryDef libraryDef) throws IOException {
++        // Try to load from [java.library.path]/libnative-platform.so first
++        // before extractDir or classpath
++        String[] libPaths = System.getProperty("java.library.path").split(java.io.File.pathSeparator);
++        	for (String libPath : libPaths) {
++        	  // For each JNI path, try to load lib
++        	  File libFile = new File(libPath, libraryDef.name);
++        	  if (libFile.isFile()) {
++        	      return libFile;
++        	  }
++    	}
++
+         String resourceName = String.format("net/rubygrapefruit/platform/%s/%s", libraryDef.platform, libraryDef.name);
+         if (extractDir != null) {
+             File libFile = new File(extractDir, String.format("%s/%s/%s", NativeLibraryFunctions.VERSION, libraryDef.platform, libraryDef.name));

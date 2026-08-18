@@ -1,0 +1,48 @@
+Author: Alastair McKinstry <mckinstry@debian.org>
+Description: Changes needed to build python snackmodules.
+ Multiple previous patches rolled into this.
+Last-Updated: 2013-05-16
+Forwarded: no
+
+Index: newt-0.52.19/Makefile.in
+===================================================================
+--- newt-0.52.19.orig/Makefile.in
++++ newt-0.52.19/Makefile.in
+@@ -14,6 +14,7 @@ SONAME = @SONAME@
+ SOEXT = so
+ 
+ PYTHONVERS = $(shell py3versions --supported)
++PYTHONDBG := $(addsuffix -dbg, $(PYTHONVERS))
+ WHIPTCLLIB = @WHIPTCLLIB@
+ ifneq ($(WHIPTCLLIB),)
+ WHIPTCLSO = $(WHIPTCLLIB).$(SOEXT)
+@@ -83,22 +84,17 @@ showkey:	showkey.o $(LIBNEWT)
+ 	$(CC) -g -o showkey showkey.o $(LIBNEWT) $(LDFLAGS) $(LIBS)
+ 
+ _snack.$(SOEXT):   snack.c $(LIBNEWTSH)
+-	@[ -n "$(PYTHONVERS)" ] && for ver in $(PYTHONVERS); do \
++	@[ -n "$(PYTHONVERS)" ] && for ver in $(PYTHONVERS) $(PYTHONDBG) ; do \
+ 		pyconfig=$$ver-config; \
+-		if ! $$pyconfig --cflags > /dev/null 2>&1 && \
+-				python-config --cflags > /dev/null 2>&1; then \
+-			echo $$pyconfig not found, using python-config; \
+-			pyconfig=python-config; \
+-		fi; \
+ 		mkdir -p $$ver; \
+ 		PCFLAGS=`$$pyconfig --cflags`; \
+ 		PIFLAGS=`$$pyconfig --includes`; \
+-		PLDFLAGS=`$$pyconfig --ldflags`; \
+-		PLFLAGS=`$$pyconfig --libs`; \
+-		echo $(CC) $(SHCFLAGS) $(CPPFLAGS) $$PIFLAGS $$PCFLAGS -c -o $$ver/snack.o snack.c; \
+-		$(CC) $(SHCFLAGS) $(CPPFLAGS) $$PIFLAGS $$PCFLAGS -c -o $$ver/snack.o snack.c; \
+-		echo $(CC) --shared $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
+-		$(CC) --shared $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
++		PLDFLAGS=`$$pyconfig --ldflags  | sed -e 's/\-lpython[0-9.]*[_a-z]*//'`; \
++		PLFLAGS=`$$pyconfig --libs  | sed -e 's/\-lpython[0-9.]*[_a-z]*//'`; \
++		echo $(CC) $(SHCFLAGS) $(CPPFLAGS) $(CFLAGS) -fPIC $$PIFLAGS $$PCFLAGS -c -o $$ver/snack.o snack.c; \
++		$(CC) $(SHCFLAGS) $(CPPFLAGS) $(CFLAGS) $$PIFLAGS $$PCFLAGS -fPIC -c -o $$ver/snack.o snack.c; \
++		echo $(CC) --shared -fPIC $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
++		$(CC) --shared -fPIC $$PLDFLAGS $$PLFLAGS $(LDFLAGS) -o $$ver/_snack.$(SOEXT) $$ver/snack.o -L.  -lnewt $(LIBS); \
+ 	done || :
+ 	touch $@
+ 

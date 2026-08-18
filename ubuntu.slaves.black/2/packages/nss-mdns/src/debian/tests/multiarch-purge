@@ -1,0 +1,69 @@
+#!/bin/sh
+
+set -e
+
+. debian/tests/lib.sh
+
+primary_arch="$(dpkg --print-architecture)"
+
+if [ -n "${DEB_HOST_ARCH-}" ] && [ "$DEB_HOST_ARCH" != "$primary_arch" ]; then
+    secondary_arch="$DEB_HOST_ARCH"
+else
+    case "$primary_arch" in
+        (amd64)
+            secondary_arch=i386
+            ;;
+
+        (aarch64)
+            secondary_arch=armhf
+            ;;
+
+        (*)
+            echo "1..0 # SKIP this test needs a secondary architecture" >&7
+            exit 77
+            ;;
+    esac
+fi
+
+require dpkg --add-architecture $secondary_arch
+require_apt $secondary_arch
+require_host_getent "$secondary_arch"
+
+distinctive_hostname="nss-mdns-test-$(dbus-uuidgen)"
+
+assert_succeeds avahi-set-host-name "$distinctive_hostname"
+sleep 3
+
+assert_succeeds apt-get -y purge libnss-mdns:$primary_arch
+assert_succeeds apt-get -y purge libnss-mdns:$secondary_arch
+assert_succeeds perl -i -pe 's/^hosts:.*/hosts: files dns/' /etc/nsswitch.conf
+
+assert_succeeds apt-get -y install libnss-mdns:$primary_arch
+assert_hosts "hosts: files mdns4_minimal [NOTFOUND=return] dns"
+assert_succeeds getent hosts "$distinctive_hostname.local"
+
+if apt-get -y install libnss-mdns:$primary_arch libnss-mdns:$secondary_arch; then
+    ok "apt-get -y install libnss-mdns:$primary_arch libnss-mdns:$secondary_arch"
+else
+    skip_to_the_end "could not install libnss-mdns:$primary_arch and :$secondary_arch (multiarch skew?)"
+fi
+
+assert_hosts "hosts: files mdns4_minimal [NOTFOUND=return] dns"
+assert_succeeds getent hosts "$distinctive_hostname.local"
+assert_succeeds "$host_getent" hosts "$distinctive_hostname.local"
+
+echo "# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=782281"
+assert_succeeds apt-get -y purge libnss-mdns:$secondary_arch
+assert_hosts "hosts: files mdns4_minimal [NOTFOUND=return] dns"
+assert_succeeds getent hosts "$distinctive_hostname.local"
+assert_status 2 "$host_getent" hosts "$distinctive_hostname.local"
+
+echo "# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=782281"
+assert_succeeds apt-get -y purge libnss-mdns:$primary_arch
+assert_hosts "hosts: files dns"
+assert_status 2 getent hosts "$distinctive_hostname.local"
+assert_status 2 "$host_getent" hosts "$distinctive_hostname.local"
+
+finish
+
+# vim:set sw=4 sts=4 et:

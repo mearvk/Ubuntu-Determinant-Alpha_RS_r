@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-krb5</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-krb5</refname>
+        <refpurpose>SSSD:s Kerberos-leverantör</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av bakänden för Kerberos
+5-autentisering för <citerefentry> <refentrytitle>sssd</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.  För en detaljerad syntaxreferens,
+se avsnittet <quote>FILFORMAT</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Kerberos 5-autentiseringsbakänden innehåller auth- och chpass-leverantörer.
+Den måste paras ihop med en identitetsleverantör för att fungera korrekt
+(till exempel, id_provider = ldap).  En del information krävs av Kerberos
+5-autentiseringsbakänden måste tillhandahållas av identitetsleverantören,
+såsom användarens Kerberos huvudmannanamn (UPN).  Konfigurationen av
+identitetsleverantören skall ha en post för att ange UPN:en.  Se manualsidan
+för den tillämpliga identitetsleverantören för detaljer om hur man
+konfigurerar detta.
+        </para>
+        <para>
+            Denna bakände tillhandahåller även åtkomstkontroll baserad på filen .k5login
+i användarens hemkatalog Se <citerefentry>
+<refentrytitle>k5login</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry> för mer detaljer. Observera att en tom .k5login-fil kommer
+neka all åtkomst till denna användare. För att aktivera denna funktion,
+använd ”access_provider = krb5” i din SSSD-konfiguration.
+        </para>
+        <para>
+            I situationer där UPN:en inte är tillgänglig i identitetsbakänden kommer
+<command>sssd</command> konstruera en UPN genom att använda formatet
+<replaceable>username</replaceable>@<replaceable>krb5_realm</replaceable>.
+        </para>
+
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>
+            Om autentiseringsmodulen krb5 används i en SSSD-domän måste följande
+alternativ användas.  Se manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>, avsnittet <quote>DOMÄNSEKTIONER</quote> för detaljer om
+konfigurationen av en SSSD-domän.  <variablelist>
+                <varlistentry>
+                    <term>krb5_server, krb5_backup_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger en kommaseparerad lista av IP-adresser eller värdnamn till
+Kerberosservrar till vilka SSSD skall ansluta, i prioritetsordning.  För mer
+information om reserver och serverredundans se avsnittet
+<quote>RESERVER</quote>.  Ett frivilligt portnummer (föregånget av ett
+kolon) kan läggas till till adresserna eller värdnamnen.  Om tomt aktiveras
+tjänsteupptäckt; för mer information, se avsnittet
+<quote>TJÄNSTEUPPTÄCKT</quote>.
+                        </para>
+                        <para>
+                            När tjänsteupptäckt används för KDC eller kpasswd-servrar söker SSSD först
+efter DNS-poster som anger _udp som protokoll och provar sedan _tcp om inget
+hittas.
+                        </para>
+                        <para>
+                            Detta alternativ hade namnet <quote>krb5_kdcip</quote> i tidigare utgåvor av
+SSSD. Medan det äldre namnet känns igen tills vidare rekommenderas användare
+att migrera sina konfigurationsfiler till att använda
+<quote>krb5_server</quote> istället.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_realm (sträng)</term>
+                    <listitem>
+                        <para>
+                            Namnet på Kerberos-riket.  Detta alternativ är nödvändigt och måste anges.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_kpasswd, krb5_backup_kpasswd (sträng)</term>
+                    <listitem>
+                        <para>
+                            Om tjänsten för att ändra lösenord inte kör på KDC:n kan alternativa servrar
+definieras här.  Ett frivilligt portnummer (föregått av ett kolon) kan
+läggas till efter adresser eller värdnamn.
+                        </para>
+                        <para>
+                            För mer information om reserver och serverredundans se avsnittet
+<quote>RESERVER</quote>.  OBSERVERA: även om det inte finns några fler
+kpasswd-servrar att försöka med byter inte bakänden till att köra
+frånkopplat om autentisering mot KDC:n fortfarande är möjligt.
+                        </para>
+                        <para>
+                            Standard: använd KDC:n
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_ccachedir (sträng)</term>
+                    <listitem>
+                        <para>
+                            Katalog att lagra kreditiv-cachar i.  Alla substitutionssekvenserna i
+krb5_ccname_template kan användas här också, utom %d och %P.  Katalogen
+skapas som privat och ägd av användaren, med rättigheterna satta till 0700.
+                        </para>
+                        <para>
+                            Standard: /tmp
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_ccname_template (sträng)</term>
+                    <listitem>
+                        <para>
+                            Platsen för användarens kreditiv-cache.  Tre typer av kreditiv-cachar stödjs
+för närvarande: <quote>FILE</quote>, <quote>DIR</quote> och
+<quote>KEYRING:persistent</quote>.  Cachen kan anges antingen som
+<replaceable>TYP:ÅTERSTOD</replaceable>, eller som en absolut sökväg, vilket
+implicerar typen <quote>FILE</quote>.  I mallen ersätts följande sekvenser:
+<variablelist>
+                                <varlistentry>
+                                    <term>%u</term>
+                                    <listitem><para>inloggningsnamn</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%U</term>
+                                    <listitem><para>inloggnings-AID</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%p</term>
+                                    <listitem><para>huvudmannanamn</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%r</term>
+                                    <listitem><para>namn på rike</para></listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%h</term>
+                                    <listitem><para>hemkatalog</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%d</term>
+                                    <listitem><para>värdet på krb5_ccachedir
+                                              </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%P</term>
+                                    <listitem><para>process-ID:t på SSSD-klienten</para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>%%</term>
+                                    <listitem><para>ett bokstavligt ”%”</para>
+                                    </listitem>
+                                </varlistentry>
+                            </variablelist> Om mallen slutar med ”XXXXXX”
+används mkstemp(3) för att skapa ett unikt filnamn på ett säkert sätt.
+                        </para>
+                        <para>
+                            När KEYRING-typer används är den enda mekanismen som stödjs
+<quote>KEYRING:persistent:%U</quote>, vilket använder Linuxkärnans
+nyckelring för att lagra kreditiv på per-AID-bas.  Detta är också det
+rekommenderade valet, eftersom det är den säkraste och mest förutsägbara
+metoden.
+                        </para>
+                        <para>
+                            Standardvärdet för namnet på kreditiv-cachen läses från profilen som fil
+sparad i den systemtäckande konfigurationsfilen krb5.conf i avsnittet
+[libdefaults].  Alternativnamnet är default_ccache_name.  Se krb5.conf(5)s
+avsnitt PARAMETEREXPANSION för mer information om expansionsformatet som
+definieras av krb5.conf.
+                        </para>
+                        <para>
+                          OBSERVERA: var medveten om att ccache-expansionsmallen för libkrb5 från
+<citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> använder andra expansionssekvenser
+än SSSD.
+                        </para>
+                        <para>
+                            Standard: (från libkrb5)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_keytab (sträng)</term>
+                    <listitem>
+                        <para>
+                            Platsen där keytab:en som skall användas för validering av kreditiv som tas
+emot från KDC:er finns.
+                        </para>
+                        <para>
+                            Standard: Systemets keytab, normalt <filename>/etc/krb5.keytab</filename>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_store_password_if_offline (boolean)</term>
+                    <listitem>
+                        <para>
+                            Spara lösenordet för användaren om leverantören är frånkopplad och använd
+det för att begära en TGT när leverantören blir uppkopplad igen.
+                        </para>
+                        <para>
+                            OBS: denna funktion är endast tillgänglig på Linux.  Lösenord som lagras på
+detta sätt hålls i klartext i kärnans nyckelring och är potentiellt
+åtkomliga för root-användaren (med svårighet).
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_fast (sträng)</term>
+                    <listitem>
+                        <para>
+                            Aktiverar flexibel autentisering via säker tunnling (flexible authentication
+secure tunneling, FAST) för Kerberos förautentisering.  Följande alternativ
+stödjs:
+                        </para>
+                        <para>
+                            <emphasis>never</emphasis> använd aldrig FAST.  Detta är ekvivalent med att
+inte ställa in detta alternativ alls.
+                        </para>
+                        <para>
+                            <emphasis>try</emphasis> försök använda FAST.  Om servern inte stödjer FAST,
+fortsätt då autentiseringen utan den.
+                        </para>
+                        <para>
+                            <emphasis>demand</emphasis> kräv användning av FAST.  Autentiseringen
+misslyckas om servern inte begär fast.
+                        </para>
+                        <para>
+                            Standard: inte satt, d.v.s. FAST används inte.
+                        </para>
+                        <para>
+                            OBSERVERA: en keytab krävs för att använda FAST.
+                        </para>
+                        <para>
+                            OBSERVERA: SSSD stödjer endast FAST med MIT Kerberos version 1.8 och
+senare.  Om SSSD används med en äldre version av MIT Kerberos är det ett
+konfigurationsfel att använda detta alternativ.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_fast_principal (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger serverhuvudmannen att använda för FAST.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_kdcinfo (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger om SSSD skall instruera Kerberos-biblioteken om vilket rike och vilka
+KDC:er som skall användas. Detta alternativ är på som standard, om du
+avaktiverar det behöver du konfigurera Kerberos-biblioteket i
+konfigurationsfilen <citerefentry> <refentrytitle>krb5.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+                        </para>
+                        <para>
+                            Se manualsidan <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> för mer information om
+lokaliseringsinsticksmodulen.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_kdcinfo_lookahead (sträng)</term>
+                    <listitem>
+                        <para>
+                            När krb5_use_kdcinfo är satt till true kan man begränsa mängden servrar som
+skickas till <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.  Detta kan vara användbart när det
+finns för många servrar som upptäcks med hjälp av SRV-poster.
+                        </para>
+                        <para>
+                            Alternativet krb5_kdcinfo_lookahead innehåller två tal separerade av ett
+kolon.  Det första talet representerar antalet primärservrar som används och
+det andra talet anger antalet reservservrar.
+                        </para>
+                        <para>
+                            Till exempel betyder <emphasis>10:0</emphasis> att upp till 10 primärservrar
+kommer lämnas till <citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry> men inga reservservrar.
+                        </para>
+                        <para>
+                            Standard: 3:1
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_enterprise_principal (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger om användarens huvudman skall behandlas som företagshuvudman.  Se
+avsnitt 5 i RFC 6806 för mer detaljer om företagshuvudmän.
+                        </para>
+
+                        <para>
+                            Standard: false (AD-leverantör: true)
+                        </para>
+                        <para>
+                            IPA-leverantören kommer sätta detta alternativ till ”true” om den upptäcker
+att servern klarar av att hantera företagshuvudmän och alternativet inte är
+uttryckligen satt i konfigurationsfilen.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_use_subdomain_realm (boolean)</term>
+                    <listitem>
+                        <para>
+                            Anger att använda underdomänriken för autentiseringen av användare från
+betrodda domäner. Detta alternativ kan sättas till ”sant” om
+företagshuvudmän används med upnSuffixes vilka inte är kända av
+föräldradomänens KDC:er. Om alternativet sätts till ”sant” kommer SSSD
+försöka skicka begäran direkt till en KDC för den betrodda domänen
+användaren kommer ifrån.
+                        </para>
+
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_map_user (sträng)</term>
+                    <listitem>
+                        <para>
+                             Listan av mappningar anges som en kommaseparerad lista av par
+<quote>användarnamn:primär</quote> där <quote>användarnamn</quote> är ett
+UNIX-användarnamn och <quote>primär</quote> är en användardel av en
+kerberoshuvudman.  Denna mappning används när användaren autentiserar med
+<quote>auth_provider = krb5</quote>.
+                        </para>
+
+                        <para>
+                             exempel: <programlisting>
+krb5_realm = RIKE
+krb5_map_user = maria:manvnd,hasse:hans
+</programlisting>
+                        </para>
+                        <para>
+                             <quote>maria</quote> och <quote>hasse</quote> är UNIX-användarnamn och
+<quote>manvnd</quote> och <quote>hans</quote> är primärer i
+kerberoshuvudmän.  För användaren <quote>maria</quote> resp.
+<quote>hasse</quote> kommer SSSD försöka att göra kinit som
+<quote>manvnd@RIKE</quote> resp.  <quote>hans@RIKE</quote>.
+                        </para>
+
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/krb5_options.xml" />
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerad och att APA är en av
+domänerna i avsnittet <replaceable>[sssd]</replaceable>.  Detta exempel
+visar endast konfigurationen av Kerberosautentisering; det inkluderar inte
+någon identitetsleverantör.
+        </para>
+        <para>
+<programlisting>
+[domain/APA]
+auth_provider = krb5
+krb5_server = 192.168.1.1
+krb5_realm = EXAMPLE.COM
+</programlisting>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

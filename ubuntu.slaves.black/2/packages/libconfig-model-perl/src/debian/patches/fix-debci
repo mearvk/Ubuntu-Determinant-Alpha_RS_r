@@ -1,0 +1,21 @@
+Description: Fix debci by altering available_models
+ Quoting Niko, Config::Model::Lister::available_models() argument needs
+ to be different when running under autopkgtest to force looking in @INC
+ instead of lib/. Basing it on the AUTOPKGTEST_TMP environment variable is probably
+ the best choice.
+ .
+ So @INC is used when AUTOPKGTEST_TMP is true-ish. Its value is not verified.
+Bug-Debian: https://bugs.debian.org/785528
+Forwarded: NA
+Author: dod
+--- a/lib/Config/Model/Lister.pm
++++ b/lib/Config/Model/Lister.pm
+@@ -22,7 +22,7 @@
+ 
+     my ( %categories, %appli_info, %applications );
+     my %done_cat;
+-    my @dir_to_scan = $test ? qw/lib/ : @INC;
++    my @dir_to_scan = ( $ENV{AUTOPKGTEST_TMP} or not $test ) ? @INC : qw/lib/;
+ 
+     foreach my $dir ( map { glob("$_/Config/Model/*.d") } @dir_to_scan ) {
+         my ($cat) = ( $dir =~ m!.*/([\w\-]+)\.d! );

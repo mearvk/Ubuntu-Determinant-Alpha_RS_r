@@ -1,0 +1,159 @@
+#!/usr/bin/make -f
+# -*- mode: makefile; coding: utf-8 -*-
+# Copyright © 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2011, 2012
+# Jonas Smedegaard <dr@jones.dk>
+# Description: Main Debian packaging script for IMAP Toolkit Environment
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# This needs to run before cdbs auto-update
+debian/control:: debian/control.in
+DEB_PHONY_RULES += debian/control.in
+debian/control.in::
+	sed $(SEDRULE_CONTENT) <debian/control.in.in >debian/control.in
+
+include /usr/share/cdbs/1/class/langcore.mk
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/rules/utils.mk
+include /usr/share/cdbs/1/rules/upstream-tarball.mk
+
+DEB_UPSTREAM_URL = ftp://ftp.cac.washington.edu/mail
+DEB_UPSTREAM_PACKAGE = imap
+DEB_UPSTREAM_TARBALL_MD5 = 2126fd125ea26b73b20f01fcd5940369
+
+DEB_UPSTREAM_REPACKAGE_EXCLUDES = docs/rfc/ docs/draft/ src/osdep/mac/mtest.sit.hqx
+
+major = 2007e
+minor = 0
+
+SEDRULE_FILENAME = -e 's/__VER__/$(major)/g'
+SEDRULE_CONTENT = -e 's/__LIBVER__/$(major)/g' -e 's/__LIBFULLVER__/$(major).$(minor)/g' -e 's/__VER__/$(major)/g'
+
+# Hardcode CDBS-resolved build flags, and stuff CPPFLAGS into CFLAGS
+CFLAGS := $(deb_cflags) $(deb_cppflags)
+LDFLAGS := $(deb_ldflags)
+
+CFLAGS += -D_REENTRANT -DDISABLE_POP_PROXY
+
+# Suppress seemingly non-fatal warnings to easer spot more important ones.
+CFLAGS += -Wno-parentheses -Wno-strict-aliasing
+#CFLAGS += -Wno-implicit-function-declaration
+
+# Enforce symbol resolution at build time
+# (suggested by Debian Policy 3.6.1 chapter 10.2)
+SHLIBCFLAGS = -Wl,-z,defs
+
+# Enable Kerberos V support
+EXTRAAUTHENTICATORS = gss
+
+# Upstream README is more of a README.build
+DEB_INSTALL_DOCS_ALL =
+
+pre-build::
+	echo "sed $(SEDRULE_CONTENT) <debian/control.in.in | diff -u debian/control.in -"
+	@sed $(SEDRULE_CONTENT) <debian/control.in.in | diff -u debian/control.in - || ( \
+		echo; \
+		echo "Upstream version has changed (or debian/control.in.in is out of sync)"; \
+		echo "Edit debian/control manually, or use the following command:"; \
+		echo "  DEB_MAINTAINER_MODE=1 fakeroot debian/rules clean"; \
+		exit 1)
+
+build-arch: debian/build-stamp
+debian/build-stamp:
+	dh_testdir
+
+	# Debian libc is believed to be IPv6-safe
+	touch ip6
+
+	dh_auto_build -- VERSION=$(major) EXTRAAUTHENTICATORS='$(EXTRAAUTHENTICATORS)' EXTRACFLAGS='$(CFLAGS)' EXTRALDFLAGS='$(LDFLAGS)' ldb
+	mv c-client/c-client.a .
+	$(MAKE) clean
+	# Use PAM
+	dh_auto_build -- VERSION=$(major) EXTRAAUTHENTICATORS='$(EXTRAAUTHENTICATORS)' EXTRACFLAGS='$(CFLAGS) $(SHLIBCFLAGS)' EXTRALDFLAGS='$(LDFLAGS)' ldbs
+	pod2man -c "" -r "UW IMAP $(DEB_NOEPOCH_VERSION)" debian/mlock.pod debian/mlock.1
+
+	touch $@
+
+clean::
+	$(MAKE) clean
+	for dir in $(DEB_PATCHDIRS); do rm -f $$dir/*.log; done
+	rm -f c-client.a
+	rm -f debian/build-stamp
+	rm -f debian/mlock.1
+	rm -rf RCS
+	rm -f ip6
+
+# Setup (and tear down) files containing variables static per build
+pre-build::
+	for file in `find debian -maxdepth 2 -type f -name '*.in' -not -name control.in -not -name control.in.in -not -name POTFILES.in`; do \
+		targetfile=`echo $$file | sed $(SEDRULE_FILENAME) -e 's/\\.in$$//'`; \
+		sed $(SEDRULE_CONTENT) <$$file >$$targetfile; \
+	done
+
+clean:: 
+	for file in `find debian -maxdepth 2 -type f -name '*.in' -not -name control.in -not -name control.in.in -not -name README.source.in -not -name POTFILES.in -not -name 'watch.in'`; do \
+		targetfile=`echo $$file | sed $(SEDRULE_FILENAME) -e 's/\\.in$$//'`; \
+		rm -f $$targetfile; \
+	done
+
+# Install libs and resolve dev package dependencies
+common-install-arch::
+	mkdir -p debian/tmp/usr/lib
+	install -m 0644 c-client.a debian/tmp/usr/lib/libc-client.a
+	install -m 0644 c-client/libc-client.so debian/tmp/usr/lib/libc-client.so.$(major).$(minor)
+	ln -s libc-client.so.$(major).$(minor) debian/tmp/usr/lib/libc-client.so.$(major)
+	ln -s libc-client.so.$(major).$(minor) debian/tmp/usr/lib/libc-client.so
+	mkdir -p debian/tmp/usr/include/c-client
+	install -m 0644 -t debian/tmp/usr/include/c-client \
+		src/c-client/*.h \
+		src/osdep/unix/*.h \
+		c-client/auths.c \
+		c-client/linkage.c \
+		c-client/linkage.h \
+		c-client/osdep.h
+
+common-binary-post-install-arch:: debian/install-libs-stamp
+
+debian/install-libs-stamp:
+	d-shlibmove --commit --override s/libkrb5-dev/krb5-multidev/ \
+		--movedev "debian/tmp/usr/include/*" usr/include \
+		debian/tmp/usr/lib/libc-client.so
+	touch $@
+
+clean::
+	rm -f debian/install-libs-stamp
+
+binary-predeb/mlock::
+	chown root.mail debian/$(cdbs_curpkg)/usr/bin/mlock
+	chmod 2755 debian/$(cdbs_curpkg)/usr/bin/mlock
+
+# Refuse to ship with nonfree RFC files in source
+clean::
+	@echo "-find -name '*.txt' | grep rfc"
+	@-find -name '*.txt' | grep rfc && ( \
+		echo; \
+		echo "ERROR: RFC documents found!"; \
+		echo "RFC documents possibly do not comply with the Debian Free Software"; \
+		echo "Guidelines, and thus better be stripped from the source tarball!"; \
+		exit 1)
+
+# Needed by upstream build process
+CDBS_BUILD_DEPENDS += , libpam-dev, krb5-multidev, comerr-dev, libssl-dev
+
+# Needed for our packaging routines
+CDBS_BUILD_DEPENDS += , d-shlibs
+
+# Needed (always/often/seldom) at runtime
+CDBS_DEPENDS_libc-client$(major) = libpam-modules, mlock
+CDBS_SUGGESTS_libc-client$(major) = uw-mailutils

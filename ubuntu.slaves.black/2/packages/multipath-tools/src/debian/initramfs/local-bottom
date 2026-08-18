@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+# multipathd shutdown
+
+PREREQ=""
+
+prereqs() { echo "$PREREQ"; }
+
+case $1 in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+. /scripts/functions
+
+verbose()
+{
+  case "$quiet" in y*|Y*|1|t*|T*)
+    return 1;;
+  *)
+    return 0;;
+  esac
+}
+
+maybe_break pre-multipath
+
+if [ ! -e /sbin/multipathd ]; then
+	exit 0
+fi
+
+# Stop multipathd
+verbose && log_begin_msg "Stopping multipathd"
+
+pid_pidof="$(pidof multipathd)"
+pid_file="$(cat /run/multipathd.pid)"
+
+if [ "${pid_pidof}" = "${pid_file}" ]; then
+	kill ${pid_pidof}
+	verbose && log_end_msg
+else
+	verbose && log_failure_msg "inconsistent PIDs (pidof: '${pid_pidof}', multipathd.pid: '${pid_file}')"
+fi
+
+# Wait for multipathd unix socket to close.
+# It might take a while for multipathd to handle the signal,
+# which might leave the unix socket open until the upcoming
+# systemd multipath.socket unit starts.  Then it fails with
+# (Result: resources) like this (logs in journalctl):
+# "Failed to listen on sockets: Address already in use"
+seconds=10
+while [ $seconds -gt 0 ]; do
+	grep -q '@/org/kernel/linux/storage/multipathd' /proc/net/unix || break
+	seconds=$((seconds - 1))
+	sleep 1
+done
+
+maybe_break post-multipath
+
+exit 0
+

@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+js-compressor := $(or $(notdir $(shell which uglifyjs)),yui-compressor)
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	#dh_auto_build
+	for _FILE in util.js support/*.js ; \
+	do \
+		install -D $${_FILE} debian/build/$${_FILE}; \
+		$(js-compressor)  -o debian/build/$$(dirname $${_FILE})/$$(basename $${_FILE} .js).min.js $${_FILE}; \
+	done
+
+override_dh_install:
+	dh_install
+	rm -rf debian/node-util/usr/share/nodejs/util/support \
+		debian/node-util/usr/share/nodejs/util/util.js

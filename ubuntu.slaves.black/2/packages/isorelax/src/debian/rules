@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+JAVAC=javac
+JAVADOC=javadoc
+JAR=jar
+
+JAVACLASSES=/usr/share/java
+
+JAVAFLAGS=-classpath $(JAVACLASSES)/ant.jar -source 1.8 -target 1.8
+JAVADOCFLAGS=-locale en \
+             -encoding UTF-8 \
+             -notimestamp \
+             -classpath $(JAVACLASSES)/ant.jar \
+             -link /usr/share/doc/ant/api/ \
+             -source 1.8
+
+JARFILE=isorelax-20041111.jar
+
+%:
+	dh $@ --with maven_repo_helper
+
+override_dh_auto_build:
+	$(JAVAC) $(JAVAFLAGS) `find jp org -name \*.java`
+	$(JAVADOC) $(JAVADOCFLAGS) -d api `find * -name \*.java`
+
+	$(JAR) c `find * -name \*.class -o -name \*.rxm -o -name \*.rxg -o -name \*.dtd -o -name \*.mod -o -name \*.MF` > $(JARFILE)
+
+override_dh_auto_clean:
+	rm -f `find * -name \*.class`
+	rm -f $(JARFILE)
+	rm -fr api

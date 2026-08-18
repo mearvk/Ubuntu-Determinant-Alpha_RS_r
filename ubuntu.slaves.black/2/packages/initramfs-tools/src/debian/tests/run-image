@@ -1,0 +1,51 @@
+#!/bin/bash
+
+set -eux
+
+NICSLOT=3
+
+while [ $# -gt 0 ]; do
+        case $1 in
+        kernel=*)  KERNEL="${1#kernel=}"   ;;
+        initrd=*)  INITRD="${1#initrd=}"   ;;
+        image=*)   IMAGE="${1#image=}"     ;;
+        cmdline=*) CMDLINE="${1#cmdline=}" ;;
+        output=*)  OUTPUT="${1#output=}"   ;;
+        nicslot=*) NICSLOT="${1#nicslot=}" ;;
+        esac
+        shift
+done
+
+archopts=()
+
+case $(uname -m) in
+i?86)
+        qemu="qemu-system-i386"
+        ;;
+ppc64*)
+        qemu="qemu-system-ppc64"
+        archopts=( -machine "pseries,usb=off" )
+        ;;
+aarch64)
+        qemu="qemu-system-aarch64"
+        archopts=( -machine "virt" )
+        ;;
+*)
+        qemu=qemu-system-$(uname -m)
+esac
+
+timeout --foreground 10m \
+        "$qemu" "${archopts[@]}" -m 512m \
+        -kernel "$KERNEL" -initrd "$INITRD" \
+        -append "$CMDLINE" \
+        -drive file="$IMAGE",format=raw \
+        -nographic -monitor none \
+        -netdev user,id=net0 -device virtio-net-pci,netdev=net0,bus=pci.0,addr="$NICSLOT"
+
+dev=$(losetup -Pf --show "$IMAGE")
+partprobe
+mount "${dev}p1" mnt
+rm -rf "$OUTPUT"
+cp -aT mnt/result "$OUTPUT"
+umount mnt
+losetup -d "$dev"

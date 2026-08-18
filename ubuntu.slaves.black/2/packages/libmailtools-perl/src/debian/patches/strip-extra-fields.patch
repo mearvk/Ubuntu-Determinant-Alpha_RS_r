@@ -1,0 +1,41 @@
+Description: strip extra fields from /etc/passwd
+ Mail::Internet by default sends a header field which includes the entire
+ 'username' field from /etc/passwd. However, when using 'adduser' to add
+ a user, that field contains more than just the username: it contains a
+ comma-seperated list of fields. In some cases, that list of fields
+ includes, for example, a phone number. Regardless of whether this
+ information is included, the field will have additional commas included.
+ From an email sent by caff (from signing-party):
+ .
+  Sender: "Ari,,," <ari@example.com>
+ .
+ The attached patch is a simple change to the code to make the name field
+ *not* include these commas or other data in the field.
+ .
+ (Later fix)
+ (split /,/, $name)[0] is undefined when $name is the empty string.
+Origin: vendor
+Forwarded: unknown
+Author: Christopher Schmidt <crschmidt@crschmidt.net>
+ Guilhem Moulin <guilhem@guilhem.org>
+Reviewed-by: gregor herrmann <gregoa@debian.org>
+Last-Update: 2019-03-24
+Bug-Debian: https://bugs.debian.org/458602
+ https://bugs.debian.org/750357
+
+
+--- a/lib/Mail/Internet.pm
++++ b/lib/Mail/Internet.pm
+@@ -540,6 +540,12 @@
+ 
+     while($name =~ s/\([^\(\)]*\)//) { 1; }
+ 
++    # Strip extra fields: adduser-generated usernames have multiple comma
++    # seperated fields, only the first of which should be used to prevent
++    # accidental exposure of system-local information like phone numbers/
++    # room numbers.
++    $name = (split /,/, $name)[0] if $name ne "";
++
+     if($name =~ /[^\w\s]/)
+     {   $name =~ s/"/\"/g;
+ 	$name = '"' . $name . '"';

@@ -1,0 +1,217 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_generateorbitdir - Creates and populates an orbit dir used by pde-build for third-party jar files.
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+use Debian::Debhelper::Dh_Lib;
+
+use Debian::Javahelper::Eclipse qw(:constants);
+use Debian::Javahelper::Java qw(parse_manifest_fd);
+use Debian::Javahelper::Manifest qw(MAIN_SECTION);
+
+=head1 SYNOPSIS
+
+B<jh_generateorbitdir> [S<I<debhelper options>>] [B<--orbit-dir=>I<dir>] [S<I<orbit-dep [...]>>]
+
+=head1 DESCRIPTION
+
+jh_generateorbitdir is a javahelper program that handles creation
+of an orbit dependency dir. This directory has to be populated with
+non-eclipse jar files. However, eclipse refers to these jars by
+their "symbolic name". jh_generateorbitdir can extract this name
+from the jar's manifest (provided it has the OSGi metadata) and
+create a symlink to it.
+
+jh_generateorbitdir will replace regular files with symlinks
+if they are present in the orbit dir and clash with the name
+of one of the orbit jars. If an orbit jar name clashes with a
+symlink in the orbit dir, then jh_generateorbitdir will assume
+that the given jar has already been symlinked correctly. In
+this case the jar file is still recorded in the cache (see below).
+
+jh_generateorbitdir will also check the default installation for
+jar files on Debian systems (at the time of writing /usr/share/java),
+if it cannot find the jar in the current dir.
+
+Jar files replaced by jh_generateorbitdir will be recorded so that
+jh_installeclipse can replace with symlinks them post install.
+
+
+=head1 FILES
+
+=over 4
+
+=item debian/eclipse.orbitdeps
+
+List of orbit dependencies - one per line. This can be used as an
+alternative to passing it per command line.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--orbit-dir=>I<dir>
+
+Specifies the directory from where the orbit-dir is or should be
+created. Defaults to "debian/.eclipse_build/orbitdeps".
+
+=back
+
+=cut
+
+my $orbitdir = undef;
+my $cachefile = generated_file('_source', 'javahelper.orbitdeps');
+my $infile = 'debian/eclipse.orbitdeps';
+my @orbitdeps;
+my $tmpdir = undef;
+my $orbit_fd;
+
+init(options => {
+    'orbit-dir=s' => \$orbitdir,
+});
+
+$orbitdir = 'debian/.eclipse-build/orbitdeps' unless(defined($orbitdir));
+
+@orbitdeps = @ARGV;
+
+if( -e $infile){
+    push(@orbitdeps, filearray($infile));
+}
+
+
+
+# If there is nothing to do then do not bother continuing.
+exit(0) unless(scalar(@orbitdeps) > 0);
+
+# make sure we always clean up our tmpdir in case of common signals.
+$SIG{'INT'} = \&sighandler;
+$SIG{'TERM'} = \&sighandler;
+
+if( ! $dh{NO_ACT}){
+    open($orbit_fd, '>>', $cachefile);
+}
+
+install_dir($orbitdir);
+
+foreach my $jar (find_jars(@orbitdeps)){
+    my $manifest = read_manifest($jar);
+    my $msect = $manifest->get_section(MAIN_SECTION);
+    my $symName = $msect->get_value(${\EOB_SYM_NAME}, 1);
+    my $version = $msect->get_value(${\EOB_BUNDLE_VERSION}, 1);
+    error("$jar did not have any OSGi metadata")
+        unless(defined($symName) && defined($version));
+    if( -l "$orbitdir/${symName}_${version}.jar"){
+        my $ltarget = readlink("$orbitdir/${symName}_${version}.jar");
+        if(defined($ltarget)){
+            #Use target
+            print {$orbit_fd} "$ltarget, $symName, $version\n"
+                unless($dh{NO_ACT});
+        } else {
+            warning('Cannot determine target of ' .
+                    "$orbitdir/${symName}_${version}.jar; jh_installeclipse " .
+                    'will not be able to replace this post-install.' );
+        }
+        # skip if already linked
+        next;
+    }
+    error("No touching $orbitdir/${symName}_${version}.jar - it is a dir")
+        if( -d "$orbitdir/${symName}_${version}.jar");
+
+    rm_files("$orbitdir/${symName}_${version}.jar");
+    print ${orbit_fd} "$jar, $symName, $version\n" unless($dh{NO_ACT});
+    make_symlink_raw_target($jar, "$orbitdir/${symName}_${version}.jar");
+}
+
+if( ! $dh{NO_ACT}){
+    close($orbit_fd);
+}
+
+exit 0;
+
+sub read_manifest {
+    my $jar = shift;
+    my $zip = Archive::Zip->new();
+    my ($con, $stat);
+    my $fd;
+    my $manifest;
+    $zip->read( "$jar" ) == AZ_OK or error("Could not read $jar: $!");
+    ($con, $stat) = $zip->contents( 'META-INF/MANIFEST.MF' );
+    error("Could not read manifest from $jar ($stat): $!")
+        unless(!defined($stat) || $stat == AZ_OK);
+    error("$jar has no manifest") unless(defined($stat));
+    open($fd, '<', \$con);
+    $manifest = parse_manifest_fd($fd, $jar);
+    close($fd);
+    return $manifest;
+}
+
+sub sighandler {
+    my $sig = shift;
+    doit('rm', '-fr', $tmpdir) if(defined($tmpdir));
+    error("Caught signal $sig");
+}
+
+sub find_jars{
+    my @inc = (q{.}, '/usr/share/java');
+    my @res = ();
+    foreach my $globpattern (@_){
+        my @i = @inc;
+        my $found = 0;
+        # Only use inc-path if there is no path.
+        @i = (q{}) if($globpattern =~ m@/@o);
+        glob_loop: foreach my $p (@inc){
+            foreach my $s (q{}, '.jar') {
+                my @matches;
+                if($p eq ''){
+                    @matches = glob("$globpattern$s");
+                } else {
+                    @matches = glob("$p/$globpattern$s");
+                }
+                # skip if nothing matched or it was not a glob and the file does not exist.
+                next if (scalar(@matches) == 0 || ! -e $matches[0]);
+                push(@res, @matches);
+                $found = 1;
+                last glob_loop;
+            }
+        }
+        error("Could not find any matches for $globpattern") unless($found);
+    }
+    return @res;
+}
+
+=head1 EXAMPLE
+
+  jh_generateorbitdir --orbit-dir orbit asm3 oro
+
+Will generate a folder called orbit with two symlinks based on asm3 and
+oro's symbolic name.
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2010 by Niels Thykier
+
+This tool is free software; you may redistribute it and/or modify
+it under the terms of GNU GPL 2.
+
+=cut

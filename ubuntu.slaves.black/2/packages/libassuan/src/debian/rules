@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/architecture.mk
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export CFLAGS_FOR_BUILD = $(shell dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dpkg-buildflags --get CFLAGS)
+export CPPFLAGS_FOR_BUILD = $(shell dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dpkg-buildflags --get CPPFLAGS)
+export LDFLAGS_FOR_BUILD = $(shell dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dpkg-buildflags --get LDFLAGS)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory build -- --enable-static
+
+override_dh_auto_build-arch:
+	dh_auto_build --builddirectory build
+
+override_dh_auto_install-arch:
+	dh_auto_install --builddirectory build
+
+### "arch-independent" Win32 builds: ###
+
+WIN_FLAGS=LDFLAGS="-Xlinker --no-insert-timestamp" CFLAGS="-g -Os" CPPFLAGS=
+
+WIN_FLAGS=LDFLAGS="-Xlinker --no-insert-timestamp" CFLAGS="-g -Os" CPPFLAGS=
+
+override_dh_auto_build-indep:
+	for cpu in i686 x86_64; do \
+	 mkdir -p build-$$cpu-w64-mingw32 && \
+	 cd build-$$cpu-w64-mingw32 && $(WIN_FLAGS) ../configure \
+	    --with-libgpg-error-prefix=/usr/$$cpu-w64-mingw32 \
+	    --prefix=/usr/$$cpu-w64-mingw32 \
+	    --enable-static \
+	    --host $$cpu-w64-mingw32 && \
+	  $(WIN_FLAGS) $(MAKE) \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+
+override_dh_auto_install-indep:
+	for cpu in i686 x86_64; do \
+	  cd build-$$cpu-w64-mingw32 && \
+	  $(MAKE) install DESTDIR=$(shell pwd)/debian/tmp \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+
+override_dh_missing:
+	dh_missing --list-missing

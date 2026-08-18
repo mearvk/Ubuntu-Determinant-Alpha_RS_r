@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build-indep:
+	dh_auto_build -- package -DskipTests -Pwith-native
+
+override_dh_auto_build-arch:
+	# Build the JNI bindings
+	mkdir -p junixsocket-native/target
+	gcc $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) \
+	    -I$(JAVA_HOME)/include \
+	    -I$(JAVA_HOME)/include/linux \
+	    -fPIC -shared -Wall -g \
+	    -Wno-long-long -Wpointer-arith -Wconversion \
+	    -DLinux -DGNU_GCC \
+	    junixsocket-native/src/main/c/org_newsclub_net_unix_NativeUnixSocket.c \
+	    -o junixsocket-native/target/libjunixsocket-native.system.so
+
+override_dh_auto_test-arch:
+
+override_dh_auto_install-indep:
+	dh_auto_install -- -Pwith-native
+
+override_dh_auto_install-arch:
+	dh_install -plibjunixsocket-jni junixsocket-native/target/*.so usr/lib/$(DEB_HOST_MULTIARCH)/jni

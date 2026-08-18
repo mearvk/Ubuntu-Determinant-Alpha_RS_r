@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --buildsystem=gradle --with maven-repo-helper
+
+override_dh_auto_build:
+	# Copy the source files to recreate the asm-all artifact (removed in 6.1)
+	mkdir -p asm-all/src/
+	cp -R asm/src/*          asm-all/src/
+	cp -R asm-analysis/src/* asm-all/src/
+	cp -R asm-commons/src/*  asm-all/src/
+	cp -R asm-tree/src/*     asm-all/src/
+	cp -R asm-util/src/*     asm-all/src/
+
+	dh_auto_build -- jar javadoc -x :asm-test:compileJava -x :asm-test:javadoc
+
+override_mh_install:
+	mh_install -e$(DEB_VERSION_UPSTREAM)

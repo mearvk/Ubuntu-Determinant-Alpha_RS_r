@@ -1,0 +1,400 @@
+/*
+ * Copyright 1993 Network Computing Devices, Inc.
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and
+ * its documentation for any purpose is hereby granted without fee, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name Network Computing Devices, Inc. not be
+ * used in advertising or publicity pertaining to distribution of this 
+ * software without specific, written prior permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED `AS-IS'.  NETWORK COMPUTING DEVICES, INC.,
+ * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING WITHOUT
+ * LIMITATION ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NONINFRINGEMENT.  IN NO EVENT SHALL NETWORK
+ * COMPUTING DEVICES, INC., BE LIABLE FOR ANY DAMAGES WHATSOEVER, INCLUDING
+ * SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF USE, DATA,
+ * OR PROFITS, EVEN IF ADVISED OF THE POSSIBILITY THEREOF, AND REGARDLESS OF
+ * WHETHER IN AN ACTION IN CONTRACT, TORT OR NEGLIGENCE, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * 
+ * $Id: NetAudio.tmpl 284 2011-10-13 16:59:07Z steve_mcintyre $
+ * $NCDId: @(#)NetAudio.tmpl,v 1.28 1996/09/04 22:30:36 greg Exp $
+ */
+
+/* JET - this should be properly defined by your imake config system */
+
+#define DoSharedLib             HasSharedLibraries
+#define DoNormalLib             YES
+
+#ifndef WIN32
+#define Date @date
+#define RmTree(dir)		$(RM) -r dir
+#define AuPassCDebugFlags	'CDEBUGFLAGS=$(CDEBUGFLAGS)'
+#define Obj(x)			x.o
+#if defined(cygwinArchitecture)
+# define Exe(x)			x.exe
+#else
+# define Exe(x)			x
+#endif
+#define LibPre()		lib
+#define Lib(x)			LibPre()x.a
+#else /* WIN32 */
+#define ImakeSubCmdHelper	$(IMAKE_CMD)
+#define Date
+#define RmTree(dir)		RmTreeCmd dir
+#define AuPassCDebugFlags
+#define Obj(x)			x.obj
+#define Exe(x)			x.exe
+#define LibPre()
+#define Lib(x)			LibPre()x.lib
+EXTRA_LOAD_FLAGS=/link /nodefaultlib:libc /*/force:multiple /debug:full /debugtype:cv /pdb:none */
+/* CDEBUGFLAGS=/Zi */
+#endif /* WIN32 */
+
+/* Some recent xorg breakage? We do not need to preprocess man pages. */
+#undef DontPreprocessManPages
+#define DontPreprocessManPages YES
+
+/*
+ * Older X11 systems used to define SharedLibX and friends if the
+ * installed X11 system was built with shared libs.   Newer X11's use
+ * SharedLibX11 instead.  Same for {Normal|Debug|Profile}LibX.  
+ * So... check for these and set appropriately.  This should work on both
+ * the old and new schemes.
+ */
+#if !defined(NormalLibX) && defined(NormalLibX11)
+# define NormalLibX             NormalLibX11
+#endif
+#if !defined(SharedLibX) && defined(SharedLibX11)
+# define SharedLibX             SharedLibX11
+#endif
+#if !defined(DebugLibX) && defined(DebugLibX11)
+# define DebugLibX              DebugLibX11
+#endif
+#if !defined(ProfileLibX) && defined(ProfileLibX11)
+# define ProfileLibX            ProfileLibX11
+#endif
+
+#if !defined(DebugLibX)
+# define DebugLibX		NO
+#endif
+
+#if !defined(ProfileLibX)
+#define ProfileLibX		NO
+#endif
+
+#if HasSharedLibraries
+#define NormalLibAudio          NormalLibX
+#define SharedLibAudio          SharedLibX
+#define DebugLibAudio           DebugLibX
+#define ProfileLibAudio         ProfileLibX
+#else
+#ifndef WIN32
+#define NormalLibAudio		YES
+#define SharedLibAudio		NO
+#else /* WIN32 */
+#define NormalLibAudio		NO
+#define SharedLibAudio		YES
+#endif /* WIN32 */
+#define DebugLibAudio		NO
+#define ProfileLibAudio		NO
+#endif
+
+/*
+ * Enable the next line if <NetAudio.tmpl> and audio include files/libraries
+ * are installed for normal use via installed imake or xmkmf into the 
+ * installed X11 area.  
+ */
+#if 0
+#define AuUseInstalled YES
+#endif
+
+/*
+ * _AuUse - makes a choice based on AuUseInstalled.
+ */
+#ifndef _AuUse
+#ifdef AuUseInstalled
+#define _AuUse(a,b) a
+#else
+#define _AuUse(a,b) b
+#endif
+#endif
+
+/*
+ * _AuUseCat - combination of _AuUse and Concat.
+ *           exists to avoid problems with some preprocessors
+ */
+#ifndef _AuUseCat
+#if defined(__STDC__) && !defined(UnixCpp)
+#ifdef AuUseInstalled
+#define _AuUseCat(a,b,c) a##c
+#else
+#define _AuUseCat(a,b,c) b##c
+#endif
+#else
+#ifdef AuUseInstalled
+#define _AuUseCat(a,b,c) a/**/c
+#else
+#define _AuUseCat(a,b,c) b/**/c
+#endif
+#endif
+#endif
+
+#ifndef SharedAudioRev
+#define SharedAudioRev 2.4
+#endif
+
+         AUSRC = $(TOP)/lib/audio
+    SOAUDIOREV = SharedAudioRev
+
+#if SharedLibAudio && !defined(WIN32)
+/*
+ * Shared library support is unfortunatly different on every machine
+ */
+/* 
+ * If not AuUseInstalled, search audio source area before installed area.
+ * That way, the binary will use the source area library if invoked
+ * from the source area for testing, and the installed version
+ * if invoked elsewhere.
+ */
+
+#ifdef SunArchitecture
+      DEPAULIB = 
+#if SystemV4	/* Solaris 2 */
+/* 
+ * Solaris 2.3 standard imake config files omits the -R$(USRLIBDIR) option, so 
+ * supplying it here helps ease installation on such systems.
+ */
+ LOCAL_LDFLAGS = _AuUse(-L$(USRLIBDIR) -R$(USRLIBDIR), -L$(AUSRC) -R$(AUSRC) -L$(USRLIBDIR) -R$(USRLIBDIR))
+         AULIB = -laudio
+#else		/* SunOS 4 */
+ LOCAL_LDFLAGS = _AuUse(-L$(USRLIBDIR), -L$(AUSRC) -L$(USRLIBDIR))
+         AULIB = -laudio
+#endif
+#else /* SunArchitecture */
+
+/* place #ifdef's for other architectures around these lines */
+ LOCAL_LDFLAGS = _AuUse(-L$(USRLIBDIR), -L$(AUSRC) -L$(USRLIBDIR))
+      DEPAULIB =
+         AULIB = -laudio
+
+#endif /* SunArchitecture */
+
+
+#else /* SharedLibAudio */
+ LOCAL_LDFLAGS =
+      DEPAULIB = _AuUseCat($(USRLIBDIR),$(AUSRC),/Lib(audio))
+         AULIB = LoaderLibPrefix _AuUse(-laudio,$(DEPAULIB))
+#endif /* SharedLibAudio */
+
+  AUDIODEPLIBS = $(DEPAULIB) $(DEPXTOOLLIB) $(DEPXLIB)
+#ifndef WIN32
+     AUDIOLIBS = $(AULIB) $(XTOOLLIB) $(XLIB) -lm
+#else /* WIN32 */
+     AUDIOLIBS = $(AULIB)
+#endif /* WIN32 */
+  BUILDINCROOT = $(TOP)/include
+   BUILDINCDIR = $(BUILDINCROOT)
+   BUILDINCTOP = ..
+EXTRA_INCLUDES = -I$(BUILDINCROOT)
+    INCLUDESRC = $(TOP)/include
+        INCDIR = $(INCROOT)/audio
+    WIDGET_DIR = $(TOP)/clients/audio/widgets
+    WIDGET_LIB = $(WIDGET_DIR)/Lib(widgets)
+    WIDGET_INC = -I$(WIDGET_DIR)
+
+
+#if ProjectX < 5 	/* override search order for X11R4 */
+   ALLINCLUDES = $(INCLUDES) $(EXTRA_INCLUDES) $(TOP_INCLUDES) $(STD_INCLUDES)
+     LDOPTIONS = $(CDEBUGFLAGS) $(CCOPTIONS) $(EXTRA_LDOPTIONS) $(LOCAL_LDFLAGS)
+
+#ifndef XCOMM
+#define XCOMM #
+#endif
+#endif
+
+/* For HPUX - 10.20 (Klaus Dittrich)*/
+#if defined(HPUXArchitecture) && OSMajorVersion >= 10 && !defined(HasGcc)
+/* JET - this seems pretty system specific... */
+CCOPTIONS= -Ae -Dhpux 
+CDEBUGFLAGS= +O2 +Onolimit +DAportable
+BINDIR = /usr/local/bin/ 
+USRLIBDIR=/usr/local/lib/nas
+XAPPLOADDIR = /usr/local/lib/X11/app-defaults
+STD_INCLUDES = -I/usr/local/include/X11R6 -I/usr/include/X11R6
+EXTRA_LDOPTIONS =  -L/usr/local/lib/X11R6 -L/usr/lib/X11R6
+INCROOT = /usr/local/include/nas
+IRULESRC=/opt/imake/config/
+#endif
+
+#if SystemV4 && !defined(SGIArchitecture) && !defined(SunArchitecture) && !defined(LabtamArchitecture)
+
+# if defined(USLArchitecture) 
+      SYSLIBS = -lresolv -lgen -lsocket
+# else 
+      SYSLIBS = -lc /usr/ucblib/libucb.a 
+# endif
+#endif
+
+/*
+ * Rules
+ */
+
+#ifndef WIN32
+#define	AuInstallScript(program,dest)					    @@\
+install:: program							    @@\
+	MakeDir($(DESTDIR)dest)						    @@\
+	$(INSTALL) -c $(INSTBINFLAGS) program $(DESTDIR)dest/program
+#else /* WIN32 */
+#define	AuInstallScript(program,dest)					    @@\
+InstallNamedTarget(install,program,NullParameter,dest,program)
+#endif /* WIN32 */
+
+#define	AuInstallManPage(file,destdir) AuInstallManPageLong(file,destdir,file)
+
+#define	AuInstallManPageLong(file,destdir,dest)				    @@\
+install.man:: file.man							    @@\
+	@(rel=`cat $(TOP)/RELEASE | \				     	    @@\
+	  sed 's/Network Audio System Release //'`; \			    @@\
+	  sed -f $(TOP)/config/mungeman \				    @@\
+	       -e "s/_RELEASE_/$$rel/" < file.man > wibble.man; mv -f file.man tmp.man ; mv -f wibble.man file.man)                                        @@\
+	InstallManPageLong(file,destdir,dest)                               @@\
+	mv -f tmp.man file.man
+
+
+#define SingleAudioProgram(program)					    @@\
+	InstallProgram(program,$(BINDIR))				    @@\
+	AuInstallManPage(program,$(MANDIR))				    @@\
+	SingleProgramTarget(program, program.o, $(AUDIOLIBS), $(SYSLIBS))
+
+#define SimpleAudioProgram(program)					    @@\
+	AudioProgram(program, program.c, Obj(program))
+
+#define	AuComplexProgramTarget(program)					    @@\
+        PROGRAM = program						    @@\
+									    @@\
+AllTarget(Exe(program))							    @@\
+									    @@\
+Exe(program): $(OBJS) $(DEPLIBS)					    @@\
+	RemoveTargetProgram($@)						    @@\
+	$(CC) -o $@ $(OBJS) $(LDOPTIONS) $(LOCAL_LIBRARIES) $(LDLIBS) $(EXTRA_LOAD_FLAGS) @@\
+									    @@\
+InstallProgram(program,$(BINDIR))					    @@\
+AuInstallManPage(program,$(MANDIR))					    @@\
+DependTarget()								    @@\
+LintTarget()								    @@\
+									    @@\
+clean::									    @@\
+	$(RM) $(PROGRAM)
+
+#define AudioProgram(program, srcs, objs)				    @@\
+        DEPLIBS = $(AUDIODEPLIBS)					    @@\
+LOCAL_LIBRARIES = $(AUDIOLIBS)						    @@\
+  SYS_LIBRARIES = $(SYSLIBS) 						    @@\
+           SRCS = srcs							    @@\
+           OBJS = objs							    @@\
+									    @@\
+AuComplexProgramTarget(program)
+
+#define SimpleAudioXtProgram(program)					    @@\
+	AudioXtProgram(program, program.c, Obj(program))
+
+#define AudioXtProgram(program, srcs, objs)				    @@\
+        DEPLIBS = $(AUDIODEPLIBS) $(WIDGET_LIB) XawClientDepLibs	    @@\
+LOCAL_LIBRARIES = $(AUDIOLIBS) $(WIDGET_LIB) XawClientLibs		    @@\
+  SYS_LIBRARIES = $(SYSLIBS) 						    @@\
+       INCLUDES = $(WIDGET_INC)						    @@\
+           SRCS = srcs							    @@\
+           OBJS = objs							    @@\
+									    @@\
+AuComplexProgramTarget(program)
+
+#ifndef WIN32
+#define BuildReleaseHeader()						    @@\
+release.h: $(TOP)/RELEASE				    		    @@\
+	@echo "static const char *release = \"`cat $(TOP)/RELEASE`\";" > $@   @@\
+						    			    @@\
+depend:: release.h				    			    @@\
+						    			    @@\
+clean::			    			    			    @@\
+	$(RM) release.h
+#else /* WIN32 */
+#define BuildReleaseHeader()						    @@\
+release.h: $(TOP)/RELEASE				    		    @@\
+	@echo static const char *release = "Windows NT"; > $@   		    @@\
+						    			    @@\
+depend:: release.h				    			    @@\
+						    			    @@\
+clean::			    			    			    @@\
+	$(RM) release.h
+#endif /* WIN32 */
+
+
+/* Some useful rules for those missing them */
+#ifndef YaccFile
+#define YaccFile(file,flags)                                            @@\
+depend:: file.c                                                         @@\
+                                                                        @@\
+file.h file.c: file.y                                                   @@\
+        ClearmakeOSName \
+        $(YACC) flags file.y                                            @@\
+        $(MV) y.tab.c file.c                                            @@\
+        @if [ -f y.tab.h ]; then set -x; $(MV) y.tab.h file.h; \        @@\
+        else exit 0; fi                                                 @@\
+                                                                        @@\
+clean::                                                                 @@\
+        RemoveFiles(y.tab.c y.tab.h file.h file.c)
+#endif /* YaccFile */
+
+#ifndef YaccFileNoFlags
+#define YaccFileNoFlags(file)                                           @@\
+depend:: file.c                                                         @@\
+                                                                        @@\
+file.c: file.y                                                          @@\
+        ClearmakeOSName \
+        $(YACC) file.y                                                  @@\
+        $(MV) y.tab.c file.c                                            @@\
+                                                                        @@\
+clean::                                                                 @@\
+        RemoveFiles(y.tab.c file.c)
+#endif /* YaccFileNoFlags */
+
+#ifndef LexFileExplicit
+#if HasClearmake                /* provide a place to hang ClearmakeOSName */
+#define LexFileExplicit(file)                                           @@\
+file.c: file.l                                                          @@\
+        ClearmakeOSName \
+        $(LEX) $(LFLAGS) file.l                                         @@\
+        $(MV) lex.yy.c file.c
+#else
+#define LexFileExplicit(file) /* the default rule is fine */
+#endif
+#endif
+
+#ifndef LexFile
+#define LexFile(file)                                                   @@\
+LexFileExplicit(file)                                                   @@\
+                                                                        @@\
+depend:: file.c                                                         @@\
+                                                                        @@\
+clean::                                                                 @@\
+        RemoveFiles(lex.yy.c file.c)
+#endif /* LexFile */
+
+#ifndef RemoveFile
+#define RemoveFile(file) $(RM) file
+#endif /* RemoveFile */
+
+#ifndef RemoveFiles
+#define RemoveFiles(files) $(RM) files
+#endif /* RemoveFiles */
+
+#ifndef ClearmakeOSName
+# if HasClearmake
+#  define ClearmakeOSName @ XCOMM $(OSNAME) @@
+# else
+#  define ClearmakeOSName /**/
+# endif
+#endif

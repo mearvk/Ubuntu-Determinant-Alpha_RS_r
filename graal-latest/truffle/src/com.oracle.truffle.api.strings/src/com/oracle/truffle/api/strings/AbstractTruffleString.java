@@ -1,0 +1,1611 @@
+/*
+ * Copyright (c) 2021, 2026, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * The Universal Permissive License (UPL), Version 1.0
+ *
+ * Subject to the condition set forth below, permission is hereby granted to any
+ * person obtaining a copy of this software, associated documentation and/or
+ * data (collectively the "Software"), free of charge and under any and all
+ * copyright rights in the Software, and any and all patent rights owned or
+ * freely licensable by each licensor hereunder covering either (i) the
+ * unmodified Software as contributed to or provided by such licensor, or (ii)
+ * the Larger Works (as defined below), to deal in both
+ *
+ * (a) the Software, and
+ *
+ * (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+ * one is included with the Software each a "Larger Work" to which the Software
+ * is contributed by such licensors),
+ *
+ * without restriction, including without limitation the rights to copy, create
+ * derivative works of, display, perform, and distribute the Software and make,
+ * use, sell, offer for sale, import, export, have made, and have sold the
+ * Software and the Larger Work(s), and to sublicense the foregoing rights on
+ * either these or other terms.
+ *
+ * This license is subject to the following condition:
+ *
+ * The above copyright notice and either this complete permission notice or at a
+ * minimum a reference to the UPL must be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+package com.oracle.truffle.api.strings;
+
+import static com.oracle.truffle.api.strings.TStringGuards.is16Bit;
+import static com.oracle.truffle.api.strings.TStringGuards.is7Bit;
+import static com.oracle.truffle.api.strings.TStringGuards.is8Bit;
+import static com.oracle.truffle.api.strings.TStringGuards.isAscii;
+import static com.oracle.truffle.api.strings.TStringGuards.isBrokenFixedWidth;
+import static com.oracle.truffle.api.strings.TStringGuards.isBrokenMultiByte;
+import static com.oracle.truffle.api.strings.TStringGuards.isBytes;
+import static com.oracle.truffle.api.strings.TStringGuards.isLatin1;
+import static com.oracle.truffle.api.strings.TStringGuards.isSupportedEncoding;
+import static com.oracle.truffle.api.strings.TStringGuards.isUTF16;
+import static com.oracle.truffle.api.strings.TStringGuards.isUTF16FE;
+import static com.oracle.truffle.api.strings.TStringGuards.isUTF32;
+import static com.oracle.truffle.api.strings.TStringGuards.isUTF32FE;
+import static com.oracle.truffle.api.strings.TStringGuards.isUTF8;
+import static com.oracle.truffle.api.strings.TStringGuards.isValidFixedWidth;
+import static com.oracle.truffle.api.strings.TStringGuards.isValidMultiByte;
+import static com.oracle.truffle.api.strings.TStringInternalNodes.getCodePointLength;
+import static com.oracle.truffle.api.strings.TStringUnsafe.byteArrayBaseOffset;
+
+import java.lang.ref.Reference;
+
+import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.nodes.Node;
+import com.oracle.truffle.api.profiles.InlinedConditionProfile;
+import com.oracle.truffle.api.strings.TruffleString.Encoding;
+
+/**
+ * Abstract base class for Truffle strings. Useful when a value can be both a {@link TruffleString}
+ * or a {@link MutableTruffleString}. Note that values of this type are not valid interop values.
+ * They must be converted to {@link TruffleString} before passing them to other languages.
+ *
+ * @see TruffleString
+ * @since 22.1
+ */
+public abstract sealed class AbstractTruffleString permits TruffleString, MutableTruffleString {
+
+    static final boolean DEBUG_STRICT_ENCODING_CHECKS = Boolean.getBoolean("truffle.strings.debug-strict-encoding-checks");
+    static final boolean DEBUG_NON_ZERO_OFFSET = Boolean.getBoolean("truffle.strings.debug-non-zero-offset-arrays");
+    static final boolean DEBUG_ALWAYS_CREATE_JAVA_STRING = Boolean.getBoolean("truffle.strings.debug-always-create-java-string");
+
+    /**
+     * String content. This can be one of the following:
+     * <ul>
+     * <li>{@code byte[]}</li>
+     * <li>{@link LazyLong}</li>
+     * <li>{@link LazyConcat}</li>
+     * <li>{@link NativePointer}</li>
+     * </ul>
+     */
+    private Object data;
+    /**
+     * String content offset in bytes. Used for string views / lazy substrings.
+     */
+    private final int offset;
+    /**
+     * String length, scaled to the string's {@link TruffleString.Encoding#naturalStride natural
+     * stride}, i.e.: if the string encoding is UTF-32, the length is int-based, UTF-16 implies
+     * char-based length, and all other encodings use byte-based length. This is useful for string
+     * compaction.
+     */
+    private final int length;
+    /**
+     * String encoding id, stored as a byte to save space. Resolve with
+     * {@link TruffleString.Encoding#get(int)}.
+     */
+    private final byte encoding;
+    /**
+     * String content's {@link Stride stride} in log2 format (0 for byte-stride, 1 for char-stride,
+     * 2 for int-stride). Used for string compaction in UTF-32 and UTF-16 encodings.
+     */
+    private final byte stride;
+    /**
+     * Flags. The only flag defined at the moment is {@link TruffleString#isCacheHead()}.
+     */
+    private final byte flags;
+    /**
+     * Coarse information about the string's content, specified in {@link TSCodeRange}.
+     */
+    private byte codeRange;
+    /**
+     * String length in codepoints, or -1 if the length has not been calculated yet.
+     */
+    private int codePointLength;
+    /**
+     * Cached {@link TruffleString.HashCodeNode hash code}. The hash method never returns zero, so a
+     * hashCode value of zero always means that the hash is not calculated yet.
+     */
+    int hashCode;
+
+    static final int MASKED_ZERO_HASH_CODE = -1;
+
+    AbstractTruffleString(Object data, int offset, int length, int stride, Encoding encoding, int flags, int codePointLength, int codeRange, int hashCode) {
+        validateData(data, offset, length, stride);
+        assert isByte(stride);
+        assert isByte(flags);
+        assert validateCodeRange(encoding, codeRange);
+        assert isSupportedEncoding(encoding) || length == 0 || JCodings.JCODINGS_ENABLED;
+        assert !encoding.isForeignEndian() || stride == encoding.naturalStride;
+        this.data = data;
+        this.encoding = encoding.id;
+        this.offset = offset;
+        this.length = length;
+        this.stride = (byte) stride;
+        this.flags = (byte) flags;
+        this.codeRange = (byte) codeRange;
+        this.codePointLength = codePointLength;
+        this.hashCode = hashCode;
+    }
+
+    static boolean isByte(int i) {
+        return Byte.MIN_VALUE <= i && i <= Byte.MAX_VALUE;
+    }
+
+    private static void validateData(Object data, int offset, int length, int stride) {
+        if (data instanceof byte[]) {
+            TStringOps.validateRegion((byte[]) data, offset, length, stride);
+        } else if (data instanceof LazyLong || data instanceof LazyConcat) {
+            validateDataLazy(offset, length, stride);
+        } else if (data instanceof NativePointer) {
+            validateDataNative(offset, length, stride);
+        } else {
+            throw CompilerDirectives.shouldNotReachHere();
+        }
+    }
+
+    private static void validateDataLazy(int offset, int length, int stride) {
+        if (!Stride.isStride(stride) || offset != 0 || Integer.toUnsignedLong(length) << stride > Integer.MAX_VALUE) {
+            throw CompilerDirectives.shouldNotReachHere();
+        }
+    }
+
+    private static void validateDataNative(int offset, int length, int stride) {
+        if (!Stride.isStride(stride) || offset < 0 || Integer.toUnsignedLong(length) << stride > Integer.MAX_VALUE) {
+            throw CompilerDirectives.shouldNotReachHere();
+        }
+    }
+
+    private static boolean validateCodeRange(Encoding encoding, int codeRange) {
+        assert (codeRange & 0xff) == codeRange;
+        assert TSCodeRange.isCodeRange(codeRange);
+        assert !isAscii(encoding) || is7Bit(codeRange) || isBrokenFixedWidth(codeRange);
+        assert !isLatin1(encoding) || is7Bit(codeRange) || is8Bit(codeRange);
+        assert !isUTF8(encoding) || !is8Bit(codeRange) && !is16Bit(codeRange) && !isValidFixedWidth(codeRange) && !isBrokenFixedWidth(codeRange);
+        assert !isUTF16(encoding) || !isValidFixedWidth(codeRange) && !isBrokenFixedWidth(codeRange);
+        assert !isUTF32(encoding) || !isValidMultiByte(codeRange) && !isBrokenMultiByte(codeRange);
+        assert !isBytes(encoding) || is7Bit(codeRange) || isValidFixedWidth(codeRange);
+        return true;
+    }
+
+    /**
+     * Returns {@code true} if this string is empty. This method is allowed to be used on fast
+     * paths.
+     *
+     * @since 22.1
+     */
+    public final boolean isEmpty() {
+        return length() == 0;
+    }
+
+    /**
+     * Get this string's length in bytes. This method is allowed to be used on fast paths.
+     *
+     * @since 22.1
+     */
+    public final int byteLength(TruffleString.Encoding expectedEncoding) {
+        checkEncoding(expectedEncoding);
+        return length() << expectedEncoding.naturalStride;
+    }
+
+    /**
+     * Returns {@code true} if this string is compatible to the given encoding.
+     *
+     * @since 22.1
+     * @deprecated use {@link #isCompatibleToUncached(Encoding)} instead.
+     */
+    @Deprecated(since = "23.0")
+    public final boolean isCompatibleTo(TruffleString.Encoding expectedEncoding) {
+        return isCompatibleToUncached(expectedEncoding);
+    }
+
+    /**
+     * Returns {@code true} if this string is compatible to the given encoding. Compatible for
+     * {@link TruffleString} means it is byte-equivalent in both the encoding used to create this
+     * string and the given encoding. For {@link MutableTruffleString} this method only returned
+     * true if the passed encoding is the same encoding used to create this string.
+     *
+     * @since 23.0
+     */
+    @TruffleBoundary
+    public final boolean isCompatibleToUncached(TruffleString.Encoding expectedEncoding) {
+        if (isImmutable() && !isCompatibleToIntl(expectedEncoding)) {
+            getCodeRangeUncached(Encoding.get(encoding));
+        }
+        return isCompatibleToIntl(expectedEncoding);
+    }
+
+    /**
+     * Returns {@code true} if this string is <i>not</i> backed by a native pointer.
+     *
+     * @since 22.1
+     */
+    public final boolean isManaged() {
+        return !isNative();
+    }
+
+    /**
+     * Returns {@code true} if this string is backed by a native pointer.
+     *
+     * @since 22.1
+     */
+    public final boolean isNative() {
+        return data instanceof NativePointer;
+    }
+
+    /**
+     * Returns {@code true} if this string is immutable, i.e. an instance of {@link TruffleString}.
+     *
+     * @since 22.1
+     */
+    public final boolean isImmutable() {
+        return this instanceof TruffleString;
+    }
+
+    /**
+     * Returns {@code true} if this string is mutable, i.e. an instance of
+     * {@link MutableTruffleString}.
+     *
+     * @since 22.1
+     */
+    public final boolean isMutable() {
+        assert this instanceof TruffleString || this instanceof MutableTruffleString;
+        return !isImmutable();
+    }
+
+    final boolean isCompatibleToIntl(TruffleString.Encoding expectedEncoding) {
+        return isCompatibleToIntl(expectedEncoding.id, expectedEncoding.maxCompatibleCodeRange);
+    }
+
+    final boolean isCompatibleToIntl(int enc, int maxCompatibleCodeRange) {
+        // GR-31985: workaround: the binary OR avoids unnecessary loop unswitching on this check
+        return (this.encoding() == enc) | isCodeRangeCompatibleTo(codeRange(), maxCompatibleCodeRange);
+    }
+
+    final boolean isCodeRangeCompatibleTo(int codeRangeA, Encoding expectedEncoding) {
+        return isCodeRangeCompatibleTo(codeRangeA, expectedEncoding.maxCompatibleCodeRange);
+    }
+
+    final boolean isCodeRangeCompatibleTo(int codeRangeA, int maxCompatibleCodeRange) {
+        return (!DEBUG_STRICT_ENCODING_CHECKS && this instanceof TruffleString && TSCodeRange.isMoreRestrictiveAndNativeEndian(codeRangeA, maxCompatibleCodeRange));
+    }
+
+    /**
+     * Get this string's backing data. This may be a byte array, a {@link String}, a
+     * {@link NativePointer}, a {@link LazyLong}, or a {@link LazyConcat}.
+     */
+    final Object data() {
+        return data;
+    }
+
+    final void setData(byte[] array) {
+        if (offset() != 0 || length() << stride() != array.length) {
+            throw CompilerDirectives.shouldNotReachHere();
+        }
+        this.data = array;
+    }
+
+    /**
+     * Get this string's base offset in bytes. This property is used to accommodate string views /
+     * lazy strings, and also allow "storage agnostic" access to the string's content. All methods
+     * accessing {@link #data()} will shift their indices by this offset.
+     */
+    final int offset() {
+        return offset;
+    }
+
+    final int byteArrayOffset() {
+        assert data instanceof byte[] || data instanceof NativePointer || data instanceof LazyLong;
+        return data instanceof NativePointer ? 0 : offset();
+    }
+
+    /**
+     * Get this string's length in raw values (bytes/characters/integers...), where the actual
+     * bit-width of one value is defined by {@link #stride()}. This means that a UTF-8 string will
+     * report its length in 8-bit values, but a UTF-16 string may be reporting its length in 8-bit
+     * or 16-bit values, depending on whether the string was compressed to 8-bit values or not.
+     * Consequently, this behavior makes string compression transparent to the caller: a UTF-32
+     * string of codepoint-length of four will always report a "raw" length of four as well,
+     * regardless of whether those four codepoints are actually stored in 32-bit, 16-bit, or 8-bit
+     * array slots.
+     * <p>
+     * The length reported by this method may not reflect the underlying array's length, if this
+     * string is a string view / lazy substring.
+     */
+    final int length() {
+        return length;
+    }
+
+    /**
+     * Get the index representing a string encoding as defined in {@link Encodings}.
+     */
+    final int encoding() {
+        return encoding;
+    }
+
+    /**
+     * Get this string's stride as defined in {@link Stride}.
+     */
+    final int stride() {
+        return stride;
+    }
+
+    /**
+     * Get this string's flags byte.
+     */
+    final int flags() {
+        return flags;
+    }
+
+    final int codeRange() {
+        return Byte.toUnsignedInt(codeRange);
+    }
+
+    final int codePointLength() {
+        return codePointLength;
+    }
+
+    final void updateAttributes(int newCodePointLength, int newCodeRange) {
+        assert newCodePointLength >= 0;
+        assert TSCodeRange.isCodeRange(newCodeRange);
+        assert TSCodeRange.isPrecise(newCodeRange);
+        this.codePointLength = newCodePointLength;
+        this.codeRange = (byte) newCodeRange;
+    }
+
+    final void invalidateCodeRange() {
+        codeRange = TSCodeRange.getUnknownCodeRangeForEncoding(encoding());
+    }
+
+    final void invalidateCodePointLength() {
+        codePointLength = -1;
+    }
+
+    final boolean isCodePointLengthKnown() {
+        return codePointLength >= 0;
+    }
+
+    final void invalidateHashCode() {
+        hashCode = 0;
+    }
+
+    final int getHashCodeUnsafe() {
+        assert isHashCodeCalculated();
+        return hashCode;
+    }
+
+    final boolean isHashCodeCalculated() {
+        return hashCode != 0;
+    }
+
+    final int setHashCode(int hashCode) {
+        assert hashCode != 0 : "hashCode must not be zero";
+        return this.hashCode = hashCode;
+    }
+
+    // don't use this on fast path
+    final boolean isMaterialized() {
+        return data instanceof byte[] || isLazyLong() && ((AbstractTruffleString.LazyLong) data).bytes != null || isNative();
+    }
+
+    final boolean isLazyConcat() {
+        return data instanceof AbstractTruffleString.LazyConcat;
+    }
+
+    final boolean isLazyLong() {
+        return data instanceof AbstractTruffleString.LazyLong;
+    }
+
+    static TruffleStringIterator forwardIterator(AbstractTruffleString a, byte[] arrayA, long offsetA, int lengthA, int strideA, int codeRangeA, Encoding encoding) {
+        return forwardIterator(a, arrayA, offsetA, lengthA, strideA, codeRangeA, encoding, TruffleString.ErrorHandling.BEST_EFFORT);
+    }
+
+    static TruffleStringIterator forwardIterator(AbstractTruffleString a, byte[] arrayA, long offsetA, int lengthA, int strideA, int codeRangeA, Encoding encoding,
+                    TruffleString.ErrorHandling errorHandling) {
+        return new TruffleStringIterator(a, arrayA, offsetA, lengthA, strideA, codeRangeA, encoding, errorHandling, 0);
+    }
+
+    static TruffleStringIterator backwardIterator(AbstractTruffleString a, byte[] arrayA, long offsetA, int lengthA, int strideA, int codeRangeA, Encoding encoding) {
+        return backwardIterator(a, arrayA, offsetA, lengthA, strideA, codeRangeA, encoding, TruffleString.ErrorHandling.BEST_EFFORT);
+    }
+
+    static TruffleStringIterator backwardIterator(AbstractTruffleString a, byte[] arrayA, long offsetA, int lengthA, int strideA, int codeRangeA, Encoding encoding,
+                    TruffleString.ErrorHandling errorHandling) {
+        return new TruffleStringIterator(a, arrayA, offsetA, lengthA, strideA, codeRangeA, encoding, errorHandling, lengthA);
+    }
+
+    final void checkEncoding(TruffleString.Encoding expectedEncoding) {
+        if (!isCompatibleToIntl(expectedEncoding)) {
+            throw InternalErrors.wrongEncoding(expectedEncoding);
+        }
+    }
+
+    final void looseCheckEncoding(TruffleString.Encoding expectedEncoding, int codeRangeA) {
+        if (!isLooselyCompatibleTo(expectedEncoding.id, expectedEncoding.maxCompatibleCodeRange, codeRangeA)) {
+            throw InternalErrors.wrongEncoding(expectedEncoding);
+        }
+    }
+
+    final boolean isLooselyCompatibleTo(Encoding expectedEncoding) {
+        return isLooselyCompatibleTo(expectedEncoding.id, expectedEncoding.maxCompatibleCodeRange, codeRange());
+    }
+
+    final boolean isLooselyCompatibleTo(int expectedEncoding, int maxCompatibleCodeRange, int codeRangeA) {
+        return encoding() == expectedEncoding || TSCodeRange.isMoreRestrictiveAndNativeEndian(codeRangeA, maxCompatibleCodeRange);
+    }
+
+    static int rawIndex(int byteIndex, TruffleString.Encoding expectedEncoding) {
+        if (expectedEncoding.naturalStride == 1 && (byteIndex & 1) != 0) {
+            throw InternalErrors.illegalArgument("misaligned byte index %d on UTF-16 string", byteIndex);
+        } else if (expectedEncoding.naturalStride == 2 && (byteIndex & 3) != 0) {
+            throw InternalErrors.illegalArgument("misaligned byte index %d on UTF-32 string", byteIndex);
+        }
+        return byteIndex >> expectedEncoding.naturalStride;
+    }
+
+    static int rawIndexUTF16(int byteIndex) {
+        if ((byteIndex & 1) != 0) {
+            throw InternalErrors.illegalArgument("misaligned byte index %d on UTF-16 string", byteIndex);
+        }
+        return byteIndex >> Encoding.UTF_16.naturalStride;
+    }
+
+    static int rawIndexUTF32(int byteIndex) {
+        if ((byteIndex & 3) != 0) {
+            throw InternalErrors.illegalArgument("misaligned byte index %d on UTF-32 string", byteIndex);
+        }
+        return byteIndex >> Encoding.UTF_32.naturalStride;
+    }
+
+    static int byteIndex(int rawIndex, TruffleString.Encoding expectedEncoding) {
+        assert rawIndex < 0 || (rawIndex << expectedEncoding.naturalStride) >= 0;
+        assert rawIndex >= 0 || (rawIndex << expectedEncoding.naturalStride) < 0;
+        return rawIndex << expectedEncoding.naturalStride;
+    }
+
+    final void boundsCheck(Node node, byte[] arrayA, long offsetA, int index, Encoding expectedEncoding, InlinedConditionProfile calcCodePointLengthProfile) {
+        boundsCheckI(index, getCodePointLength(node, this, arrayA, offsetA, expectedEncoding, calcCodePointLengthProfile));
+    }
+
+    final void boundsCheck(Node node, byte[] arrayA, long offsetA, int fromIndex, int toIndex, Encoding expectedEncoding, InlinedConditionProfile calcCodePointLengthProfile) {
+        boundsCheckI(fromIndex, toIndex, getCodePointLength(node, this, arrayA, offsetA, expectedEncoding, calcCodePointLengthProfile));
+    }
+
+    final void boundsCheckRegion(Node node, byte[] arrayA, long offsetA, int fromIndex, int regionLength, Encoding expectedEncoding, InlinedConditionProfile calcCodePointLengthProfile) {
+        boundsCheckRegionI(fromIndex, regionLength, getCodePointLength(node, this, arrayA, offsetA, expectedEncoding, calcCodePointLengthProfile));
+    }
+
+    static void boundsCheckByteIndex(int lengthA, int strideA, int byteIndex) {
+        boundsCheckI(byteIndex, lengthA << strideA);
+    }
+
+    static void boundsCheckByteIndexUTF16(int lengthA, int byteIndex) {
+        boundsCheckI(byteIndex, lengthA << TruffleString.Encoding.UTF_16.naturalStride);
+    }
+
+    static void boundsCheckByteIndexUTF32(int lengthA, int byteIndex) {
+        boundsCheckI(byteIndex, lengthA << TruffleString.Encoding.UTF_32.naturalStride);
+    }
+
+    static void boundsCheckRawIndex(int lengthA, int index) {
+        boundsCheckI(index, lengthA);
+    }
+
+    static void boundsCheckRawLength(int lengthA, int index) {
+        if (Integer.compareUnsigned(index, lengthA) > 0) {
+            throw InternalErrors.indexOutOfBounds(lengthA, index);
+        }
+    }
+
+    static void boundsCheckRawRange(int lengthA, int fromIndex, int toIndex) {
+        boundsCheckI(fromIndex, toIndex, lengthA);
+    }
+
+    static void boundsCheckRawRegion(int lengthA, int fromIndex, int regionLength) {
+        boundsCheckRegionI(fromIndex, regionLength, lengthA);
+    }
+
+    static void boundsCheckI(int index, int arrayLength) {
+        assert arrayLength >= 0;
+        if (Integer.compareUnsigned(index, arrayLength) >= 0) {
+            throw InternalErrors.indexOutOfBounds(arrayLength, index);
+        }
+    }
+
+    static void boundsCheckI(int fromIndex, int toIndex, int arrayLength) {
+        assert arrayLength >= 0;
+        if (Integer.compareUnsigned(fromIndex, arrayLength) >= 0 || Integer.compareUnsigned(toIndex, arrayLength) > 0) {
+            throw InternalErrors.indexRegionOutOfBounds(arrayLength, fromIndex, toIndex);
+        }
+    }
+
+    static void boundsCheckRegionI(int fromIndex, int regionLength, int arrayLength) {
+        assert arrayLength >= 0;
+        if (Integer.toUnsignedLong(fromIndex) + Integer.toUnsignedLong(regionLength) > arrayLength) {
+            throw InternalErrors.regionOutOfBounds(arrayLength, fromIndex, regionLength);
+        }
+    }
+
+    static void checkByteLength(int byteLength, Encoding encoding) {
+        if (isUTF16(encoding) || isUTF16FE(encoding)) {
+            TruffleString.checkByteLengthUTF16(byteLength);
+        } else if (isUTF32(encoding) || isUTF32FE(encoding)) {
+            TruffleString.checkByteLengthUTF32(byteLength);
+        }
+    }
+
+    static void checkByteLengthUTF16(int byteLength) {
+        if ((byteLength & 1) != 0) {
+            throw InternalErrors.illegalByteArrayLength("UTF-16 string byte length (%d) is not a multiple of 2", byteLength);
+        }
+    }
+
+    static void checkByteLengthUTF32(int byteLength) {
+        if ((byteLength & 3) != 0) {
+            throw InternalErrors.illegalByteArrayLength("UTF-32 string byte length (%d) is not a multiple of 4", byteLength);
+        }
+    }
+
+    static void checkArrayRange(byte[] value, int byteOffset, int byteLength) {
+        checkArrayRange(value.length, byteOffset, byteLength);
+    }
+
+    static void checkArrayRange(int arrayLength, int byteOffset, int byteLength) {
+        if (Integer.toUnsignedLong(byteOffset) + Integer.toUnsignedLong(byteLength) > arrayLength) {
+            throw InternalErrors.regionOutOfBounds(arrayLength, byteOffset, byteLength);
+        }
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.FromByteArrayNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString asTruffleStringUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.AsTruffleStringNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.AsManagedNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString asManagedTruffleStringUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.AsManagedNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.AsManagedNode}.
+     *
+     * @since 23.0
+     */
+    @TruffleBoundary
+    public final TruffleString asManagedTruffleStringUncached(TruffleString.Encoding expectedEncoding, boolean cacheResult) {
+        return TruffleString.AsManagedNode.getUncached().execute(this, expectedEncoding, cacheResult);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link MutableTruffleString.AsMutableTruffleStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final MutableTruffleString asMutableTruffleStringUncached(TruffleString.Encoding expectedEncoding) {
+        return MutableTruffleString.AsMutableTruffleStringNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.AsManagedNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final MutableTruffleString asManagedMutableTruffleStringUncached(TruffleString.Encoding expectedEncoding) {
+        return MutableTruffleString.AsManagedNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.MaterializeNode}.
+     *
+     * @deprecated since 25.1, use {@link #materializeUncached(Encoding)} instead.
+     * @since 23.1
+     */
+    @Deprecated(since = "25.1")
+    @TruffleBoundary
+    public void materializeUncached(AbstractTruffleString a, Encoding expectedEncoding) {
+        TruffleString.MaterializeNode.getUncached().execute(a, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.MaterializeNode}.
+     *
+     * @since 25.1
+     */
+    @TruffleBoundary
+    public void materializeUncached(Encoding expectedEncoding) {
+        TruffleString.MaterializeNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.MaterializeSubstringNode}.
+     *
+     * @since 25.1
+     */
+    @TruffleBoundary
+    public TruffleString materializeSubstringUncached(Encoding expectedEncoding) {
+        return TruffleString.MaterializeSubstringNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.GetCodeRangeNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString.CodeRange getCodeRangeUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetCodeRangeNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.GetCodeRangeImpreciseNode}.
+     *
+     * @since 23.0
+     */
+    @TruffleBoundary
+    public final TruffleString.CodeRange getCodeRangeImpreciseUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetCodeRangeImpreciseNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.GetByteCodeRangeNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString.CodeRange getByteCodeRangeUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetByteCodeRangeNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodeRangeEqualsNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean codeRangeEqualsUncached(TruffleString.CodeRange otherCodeRange) {
+        return TruffleString.CodeRangeEqualsNode.getUncached().execute(this, otherCodeRange);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.IsValidNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean isValidUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.IsValidNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.GetStringCompactionLevelNode}.
+     *
+     * @since 23.0
+     */
+    @TruffleBoundary
+    public final TruffleString.CompactionLevel getStringCompactionLevelUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetStringCompactionLevelNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointLengthNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int codePointLengthUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CodePointLengthNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.HashCodeNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int hashCodeUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.HashCodeNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ReadByteNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int readByteUncached(int i, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ReadByteNode.getUncached().execute(this, i, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ReadCharUTF16Node}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int readCharUTF16Uncached(int i) {
+        return TruffleString.ReadCharUTF16Node.getUncached().execute(this, i);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CodePointIndexToByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int byteLengthOfCodePointUncached(int byteIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteLengthOfCodePointNode.getUncached().execute(this, byteIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CodePointIndexToByteIndexNode}.
+     *
+     * @since 22.3
+     */
+    @TruffleBoundary
+    public final int byteLengthOfCodePointUncached(int byteIndex, TruffleString.Encoding expectedEncoding, TruffleString.ErrorHandling errorHandling) {
+        return TruffleString.ByteLengthOfCodePointNode.getUncached().execute(this, byteIndex, expectedEncoding, errorHandling);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.ByteIndexToCodePointIndexNode}.
+     *
+     * @since 22.2
+     */
+    @TruffleBoundary
+    public final int byteIndexToCodePointIndexUncached(int byteOffset, int byteIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteIndexToCodePointIndexNode.getUncached().execute(this, byteOffset, byteIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CodePointIndexToByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int codePointIndexToByteIndexUncached(int byteOffset, int codepointIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CodePointIndexToByteIndexNode.getUncached().execute(this, byteOffset, codepointIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointAtIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int codePointAtIndexUncached(int i, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CodePointAtIndexNode.getUncached().execute(this, i, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointAtIndexNode}.
+     *
+     * @since 25.1
+     */
+    @TruffleBoundary
+    public final int codePointAtIndexUTF32Uncached(int i) {
+        return TruffleString.CodePointAtIndexUTF32Node.getUncached().execute(this, i);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointAtIndexNode}.
+     *
+     * @since 22.3
+     */
+    @TruffleBoundary
+    public final int codePointAtIndexUncached(int i, TruffleString.Encoding expectedEncoding, TruffleString.ErrorHandling errorHandling) {
+        return TruffleString.CodePointAtIndexNode.getUncached().execute(this, i, expectedEncoding, errorHandling);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointAtByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int codePointAtByteIndexUncached(int i, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CodePointAtByteIndexNode.getUncached().execute(this, i, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CodePointAtByteIndexNode}.
+     *
+     * @since 22.3
+     */
+    @TruffleBoundary
+    public final int codePointAtByteIndexUncached(int i, TruffleString.Encoding expectedEncoding, TruffleString.ErrorHandling errorHandling) {
+        return TruffleString.CodePointAtByteIndexNode.getUncached().execute(this, i, expectedEncoding, errorHandling);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ByteIndexOfAnyByteNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int byteIndexOfAnyByteUncached(int fromByteIndex, int maxByteIndex, byte[] values, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteIndexOfAnyByteNode.getUncached().execute(this, fromByteIndex, maxByteIndex, values, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CharIndexOfAnyCharUTF16Node}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int charIndexOfAnyCharUTF16Uncached(int fromCharIndex, int maxCharIndex, char[] values) {
+        return TruffleString.CharIndexOfAnyCharUTF16Node.getUncached().execute(this, fromCharIndex, maxCharIndex, values);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.IntIndexOfAnyIntUTF32Node}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int intIndexOfAnyIntUTF32Uncached(int fromIntIndex, int maxIntIndex, int[] values) {
+        return TruffleString.IntIndexOfAnyIntUTF32Node.getUncached().execute(this, fromIntIndex, maxIntIndex, values);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.IndexOfCodePointNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int indexOfCodePointUncached(int cp, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.IndexOfCodePointNode.getUncached().execute(this, cp, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ByteIndexOfCodePointNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int byteIndexOfCodePointUncached(int cp, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteIndexOfCodePointNode.getUncached().execute(this, cp, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.LastIndexOfCodePointNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int lastIndexOfCodePointUncached(int cp, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.LastIndexOfCodePointNode.getUncached().execute(this, cp, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.LastByteIndexOfCodePointNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int lastByteIndexOfCodePointUncached(int cp, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.LastByteIndexOfCodePointNode.getUncached().execute(this, cp, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.IndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int indexOfStringUncached(AbstractTruffleString b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.IndexOfStringNode.getUncached().execute(this, b, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ByteIndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int byteIndexOfStringUncached(AbstractTruffleString b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteIndexOfStringNode.getUncached().execute(this, b, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ByteIndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int byteIndexOfStringUncached(TruffleString.WithMask b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.ByteIndexOfStringNode.getUncached().execute(this, b.string, fromIndex, toIndex, b.mask, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ByteIndexOfStringSetNode}.
+     *
+     * @since 25.1
+     */
+    @TruffleBoundary
+    public final long byteIndexOfStringSetUncached(int fromByteIndex, int toByteIndex, TruffleString.StringSet stringSet) {
+        return TruffleString.ByteIndexOfStringSetNode.getUncached().execute(this, fromByteIndex, toByteIndex, stringSet);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.LastIndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int lastIndexOfStringUncached(AbstractTruffleString b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.LastIndexOfStringNode.getUncached().execute(this, b, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.LastByteIndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int lastByteIndexOfStringUncached(AbstractTruffleString b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.LastByteIndexOfStringNode.getUncached().execute(this, b, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.LastByteIndexOfStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int lastByteIndexOfStringUncached(TruffleString.WithMask b, int fromIndex, int toIndex, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.LastByteIndexOfStringNode.getUncached().execute(this, b, fromIndex, toIndex, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CompareBytesNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int compareBytesUncached(AbstractTruffleString b, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CompareBytesNode.getUncached().execute(this, b, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CompareCharsUTF16Node}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int compareCharsUTF16Uncached(AbstractTruffleString b) {
+        return TruffleString.CompareCharsUTF16Node.getUncached().execute(this, b);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CompareIntsUTF32Node}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int compareIntsUTF32Uncached(AbstractTruffleString b) {
+        return TruffleString.CompareIntsUTF32Node.getUncached().execute(this, b);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.RegionEqualNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean regionEqualsUncached(int fromIndexA, AbstractTruffleString b, int fromIndexB, int regionLength, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.RegionEqualNode.getUncached().execute(this, fromIndexA, b, fromIndexB, regionLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.RegionEqualByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean regionEqualByteIndexUncached(int fromByteIndexA, AbstractTruffleString b, int fromByteIndexB, int byteLength, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.RegionEqualByteIndexNode.getUncached().execute(this, fromByteIndexA, b, fromByteIndexB, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.RegionEqualByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean regionEqualByteIndexUncached(int fromByteIndexA, TruffleString.WithMask b, int fromByteIndexB, int byteLength, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.RegionEqualByteIndexNode.getUncached().execute(this, fromByteIndexA, b, fromByteIndexB, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ConcatNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString concatUncached(AbstractTruffleString b, TruffleString.Encoding expectedEncoding, boolean lazy) {
+        return TruffleString.ConcatNode.getUncached().execute(this, b, expectedEncoding, lazy);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.RepeatNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString repeatUncached(int n, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.RepeatNode.getUncached().execute(this, n, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.SubstringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString substringUncached(int fromIndex, int substringLength, TruffleString.Encoding expectedEncoding, boolean lazy) {
+        return TruffleString.SubstringNode.getUncached().execute(this, fromIndex, substringLength, expectedEncoding, lazy);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.SubstringByteIndexNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString substringByteIndexUncached(int fromByteIndex, int byteLength, TruffleString.Encoding expectedEncoding, boolean lazy) {
+        return TruffleString.SubstringByteIndexNode.getUncached().execute(this, fromByteIndex, byteLength, expectedEncoding, lazy);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.EqualNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final boolean equalsUncached(AbstractTruffleString b, TruffleString.Encoding expectedEncoding) {
+        return TruffleString.EqualNode.getUncached().execute(this, b, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ParseIntNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int parseIntUncached() throws TruffleString.NumberFormatException {
+        return parseIntUncached(10);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ParseIntNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final int parseIntUncached(int radix) throws TruffleString.NumberFormatException {
+        return TruffleString.ParseIntNode.getUncached().execute(this, radix);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ParseLongNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final long parseLongUncached() throws TruffleString.NumberFormatException {
+        return parseLongUncached(10);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ParseLongNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final long parseLongUncached(int radix) throws TruffleString.NumberFormatException {
+        return TruffleString.ParseLongNode.getUncached().execute(this, radix);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ParseDoubleNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final double parseDoubleUncached() throws TruffleString.NumberFormatException {
+        return TruffleString.ParseDoubleNode.getUncached().execute(this);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.GetInternalByteArrayNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final InternalByteArray getInternalByteArrayUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetInternalByteArrayNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.GetInternalNativePointerNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final Object getInternalNativePointerUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.GetInternalNativePointerNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CopyToByteArrayNode}.
+     *
+     * @since 22.3
+     */
+    @TruffleBoundary
+    public final byte[] copyToByteArrayUncached(Encoding expectedEncoding) {
+        return TruffleString.CopyToByteArrayNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CopyToByteArrayNode}.
+     *
+     * @deprecated since 22.3, use {@link #copyToByteArrayUncached(int, byte[], int, int, Encoding)}
+     *             instead.
+     *
+     * @since 22.1
+     */
+    @Deprecated(since = "22.3")
+    @TruffleBoundary
+    public final void copyToByteArrayNodeUncached(int byteFromIndexA, byte[] dst, int byteFromIndexDst, int byteLength, TruffleString.Encoding expectedEncoding) {
+        copyToByteArrayUncached(byteFromIndexA, dst, byteFromIndexDst, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CopyToByteArrayNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final void copyToByteArrayUncached(int byteFromIndexA, byte[] dst, int byteFromIndexDst, int byteLength, TruffleString.Encoding expectedEncoding) {
+        TruffleString.CopyToByteArrayNode.getUncached().execute(this, byteFromIndexA, dst, byteFromIndexDst, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CopyToNativeMemoryNode}.
+     *
+     * @deprecated since 22.3, use
+     *             {@link #copyToNativeMemoryUncached(int, Object, int, int, Encoding)} instead.
+     *
+     * @since 22.1
+     */
+    @Deprecated(since = "22.3")
+    @TruffleBoundary
+    public final void copyToNativeMemoryNodeUncached(int byteFromIndexA, Object pointerObject, int byteFromIndexDst, int byteLength, TruffleString.Encoding expectedEncoding) {
+        copyToNativeMemoryUncached(byteFromIndexA, pointerObject, byteFromIndexDst, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.CopyToNativeMemoryNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final void copyToNativeMemoryUncached(int byteFromIndexA, Object pointerObject, int byteFromIndexDst, int byteLength, TruffleString.Encoding expectedEncoding) {
+        TruffleString.CopyToNativeMemoryNode.getUncached().execute(this, byteFromIndexA, pointerObject, byteFromIndexDst, byteLength, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ToValidStringNode}.
+     *
+     * @since 23.1
+     */
+    @TruffleBoundary
+    public TruffleString toValidStringUncached(Encoding expectedEncoding) {
+        return TruffleString.ToValidStringNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ToJavaStringNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final String toJavaStringUncached() {
+        return TruffleString.ToJavaStringNode.getUncached().execute(this);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.SwitchEncodingNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString switchEncodingUncached(TruffleString.Encoding targetEncoding) {
+        return TruffleString.SwitchEncodingNode.getUncached().execute(this, targetEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.SwitchEncodingNode}.
+     *
+     * @since 23.1
+     */
+    @TruffleBoundary
+    public final TruffleString switchEncodingUncached(TruffleString.Encoding targetEncoding, TranscodingErrorHandler errorHandler) {
+        return TruffleString.SwitchEncodingNode.getUncached().execute(this, targetEncoding, errorHandler);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of {@link TruffleString.ForceEncodingNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleString forceEncodingUncached(TruffleString.Encoding expectedEncoding, TruffleString.Encoding targetEncoding) {
+        return TruffleString.ForceEncodingNode.getUncached().execute(this, expectedEncoding, targetEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CreateCodePointIteratorNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleStringIterator createCodePointIteratorUncached(TruffleString.Encoding expectedEncoding) {
+        return TruffleString.CreateCodePointIteratorNode.getUncached().execute(this, expectedEncoding);
+    }
+
+    /**
+     * Shorthand for calling the uncached version of
+     * {@link TruffleString.CreateBackwardCodePointIteratorNode}.
+     *
+     * @since 22.1
+     */
+    @TruffleBoundary
+    public final TruffleStringIterator createBackwardCodePointIteratorUncached(TruffleString.Encoding expectedEncoding) {
+        TruffleStringIterator it = TruffleString.CreateCodePointIteratorNode.getUncached().execute(this, expectedEncoding);
+        it.setRawIndex(length());
+        return it;
+    }
+
+    /**
+     * Returns {@code true} if this string is equal to {@code obj}. {@link TruffleString} does not
+     * attempt to automatically convert differently encoded strings during comparison, make sure to
+     * convert both strings to a common encoding before comparing them!
+     *
+     * @see TruffleString.EqualNode
+     * @since 22.1
+     */
+    @TruffleBoundary
+    @Override
+    public final boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof AbstractTruffleString b)) {
+            return false;
+        }
+        int enc = encoding();
+        if (enc != b.encoding()) {
+            if (!b.isLooselyCompatibleTo(enc, TruffleString.Encoding.getMaxCompatibleCodeRange(enc), b.codeRange())) {
+                enc = b.encoding();
+            }
+            if (!isLooselyCompatibleTo(enc, TruffleString.Encoding.getMaxCompatibleCodeRange(enc), codeRange())) {
+                return false;
+            }
+        }
+        return TruffleString.EqualNode.checkContentEqualsUncached(this, b);
+    }
+
+    /**
+     * Returns this string's hashcode. Note that the hashcode is dependent on the string's encoding,
+     * make sure to convert strings to a common encoding before comparing their hash codes!
+     *
+     * @see TruffleString.HashCodeNode
+     * @since 22.1
+     */
+    @TruffleBoundary
+    @Override
+    public final int hashCode() {
+        if (!isHashCodeCalculated()) {
+            return TruffleString.HashCodeNode.calculateHashCodeUncached(this);
+        }
+        return hashCode;
+    }
+
+    /**
+     * Returns a {@link String} representation of this string. Do not use this on fast paths.
+     *
+     * @see TruffleString.ToJavaStringNode
+     * @since 22.1
+     */
+    @TruffleBoundary
+    @Override
+    public final String toString() {
+        if (encoding == Encoding.BYTES.id) {
+            if (!is7Bit(codeRange())) {
+                StringBuilder sb = new StringBuilder(length);
+                TruffleStringIterator it = createCodePointIteratorUncached(Encoding.BYTES);
+                while (it.hasNext()) {
+                    int c = it.nextUncached(Encoding.BYTES);
+                    if (c <= 0x7f) {
+                        sb.append((char) c);
+                    } else {
+                        sb.append(String.format("\\x%02X", c));
+                    }
+                }
+                return sb.toString();
+            }
+        }
+        return toJavaStringUncached();
+    }
+
+    /**
+     * Returns debug information about this string. For debugging purposes only. The format of the
+     * information returned by this method is unspecified and may change at any time.
+     *
+     * @since 22.1
+     */
+    @SuppressWarnings("unused")
+    @TruffleBoundary
+    public final String toStringDebug() {
+        Object curData = data;
+        String dataString;
+        if (curData instanceof byte[] || curData instanceof NativePointer) {
+            dataString = String.format("\"%s\"", toJavaStringUncached());
+        } else if (curData instanceof LazyLong lazyLong) {
+            dataString = String.format("LazyLong(%d)", lazyLong.value);
+        } else {
+            LazyConcat lazyConcat = (LazyConcat) curData;
+            dataString = String.format("Concat(%s, %s)", lazyConcat.left.toStringDebug(), lazyConcat.right.toStringDebug());
+        }
+        return String.format("TString(%s, %s, off: %d, len: %d, str: %d, cpLen: %d, data: %s)",
+                        TruffleString.Encoding.get(encoding()), TSCodeRange.toString(codeRange()), offset(), length(), stride(), codePointLength(), dataString);
+    }
+
+    @TruffleBoundary
+    byte[] materializeLazy(Node node, Object thisData) {
+        if (thisData instanceof LazyConcat) {
+            // note: the write to data is racy, and we deliberately read it from the TString
+            // object again after the race to de-duplicate simultaneously generated arrays
+            setData(LazyConcat.flatten(node, (TruffleString) this));
+            return (byte[]) data;
+        } else {
+            LazyLong lazyLong = (LazyLong) thisData;
+            // same pattern as in #doLazyConcat: racy write to data.bytes and read the result
+            // again to de-duplicate
+            if (lazyLong.bytes == null) {
+                lazyLong.setBytes((TruffleString) this, NumberConversion.longToString(lazyLong.value, length()));
+            }
+            return lazyLong.bytes;
+        }
+    }
+
+    static final class LazyConcat {
+
+        private final TruffleString left;
+        private final TruffleString right;
+
+        LazyConcat(TruffleString left, TruffleString right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        @TruffleBoundary
+        static byte[] flatten(Node location, TruffleString a) {
+            byte[] dst = new byte[a.length() << a.stride()];
+            flatten(location, a, 0, a.length(), dst, 0, a.stride());
+            return dst;
+        }
+
+        @TruffleBoundary
+        private static void flatten(Node location, TruffleString src, int srcBegin, int srcEnd, byte[] dst, int dstBegin, int dstStride) {
+            TruffleString str = src;
+            int from = srcBegin;
+            int to = srcEnd;
+            int dstFrom = dstBegin;
+            for (;;) {
+                assert 0 <= from && from <= to && to <= str.length();
+                Object data = str.data();
+                if (data instanceof LazyConcat) {
+                    TruffleString left = ((LazyConcat) data).left;
+                    TruffleString right = ((LazyConcat) data).right;
+                    int mid = left.length();
+                    if (to - mid >= mid - from) {
+                        // right is longer, recurse left
+                        if (from < mid) {
+                            if (left.isLazyConcat()) {
+                                flatten(location, left, from, mid, dst, dstFrom, dstStride);
+                            } else {
+                                copy(location, left, dst, dstFrom, dstStride);
+                            }
+                            dstFrom += mid - from;
+                            from = 0;
+                        } else {
+                            from -= mid;
+                        }
+                        to -= mid;
+                        str = right;
+                    } else {
+                        // left is longer, recurse right
+                        if (to > mid) {
+                            if (right.isLazyConcat()) {
+                                flatten(location, right, 0, to - mid, dst, dstFrom + mid - from, dstStride);
+                            } else {
+                                copy(location, right, dst, dstFrom + mid - from, dstStride);
+                            }
+                            to = mid;
+                        }
+                        str = left;
+                    }
+                } else {
+                    copy(location, str, dst, dstFrom, dstStride);
+                    return;
+                }
+            }
+        }
+
+        @TruffleBoundary
+        private static void copy(Node location, TruffleString src, byte[] dst, int dstFrom, int dstStride) {
+            Object dataA = src.data();
+            try {
+                final byte[] arrayA;
+                final long addOffsetA;
+                if (dataA instanceof byte[]) {
+                    arrayA = (byte[]) dataA;
+                    addOffsetA = byteArrayBaseOffset();
+                } else if (dataA instanceof NativePointer) {
+                    arrayA = null;
+                    addOffsetA = NativePointer.unwrap(dataA);
+                } else {
+                    arrayA = src.materializeLazy(location, dataA);
+                    addOffsetA = byteArrayBaseOffset();
+                }
+                final long offsetA = src.offset() + addOffsetA;
+                TStringOps.arraycopyWithStride(location,
+                                arrayA, offsetA, src.stride(), 0,
+                                dst, byteArrayBaseOffset(), dstStride, dstFrom, src.length());
+            } finally {
+                Reference.reachabilityFence(dataA);
+            }
+        }
+    }
+
+    static final class LazyLong {
+
+        final long value;
+        byte[] bytes;
+
+        LazyLong(long value) {
+            this.value = value;
+        }
+
+        void setBytes(TruffleString a, byte[] bytes) {
+            if (a.offset() != 0 || a.length() != bytes.length) {
+                throw CompilerDirectives.shouldNotReachHere();
+            }
+            this.bytes = bytes;
+        }
+    }
+
+    static final class NativePointer {
+
+        /**
+         * The Interop object the long pointer was extracted from. We keep this reference in case
+         * the native pointer's lifetime depends on the pointer object's lifetime.
+         */
+        private final Object pointerObject;
+        /**
+         * The raw native pointer.
+         * <p>
+         * NOTE: any use of this pointer must be guarded by a reachability fence on
+         * {@link #pointerObject}!
+         */
+        final long pointer;
+        private byte[] bytes;
+        private volatile boolean byteArrayIsValid = false;
+
+        NativePointer(Object pointerObject, long pointer) {
+            this.pointerObject = pointerObject;
+            this.pointer = pointer;
+        }
+
+        static NativePointer create(Node nodeThis, Object pointerObject, Node interopLibrary, InlinedConditionProfile rawPointerProfile) {
+            if (!TStringAccessor.isNativeAccessAllowed(nodeThis)) {
+                throw InternalErrors.nativeAccessRequired();
+            }
+            final long nativePointer;
+            final Object ref;
+            if (rawPointerProfile.profile(nodeThis, pointerObject instanceof Long)) {
+                nativePointer = (long) pointerObject;
+                ref = null;
+            } else {
+                nativePointer = TStringAccessor.INTEROP.unboxPointer(interopLibrary, pointerObject);
+                ref = pointerObject;
+            }
+            return new NativePointer(ref, nativePointer);
+        }
+
+        static long unwrap(Object data) {
+            return ((NativePointer) data).pointer;
+        }
+
+        NativePointer copy() {
+            return new NativePointer(pointerObject, pointer);
+        }
+
+        Object getPointerObjectOrRawPointer() {
+            return pointerObject == null ? pointer : pointerObject;
+        }
+
+        byte[] materializeByteArray(AbstractTruffleString a) {
+            return materializeByteArray(a.offset(), a.length() << a.stride());
+        }
+
+        byte[] materializeByteArray(int byteOffset, int byteLength) {
+            if (!byteArrayIsValid) {
+                if (bytes == null) {
+                    bytes = new byte[byteLength];
+                }
+                try {
+                    TStringUnsafe.copyFromNative(pointer, byteOffset, bytes, 0, byteLength);
+                    byteArrayIsValid = true;
+                } finally {
+                    Reference.reachabilityFence(pointerObject);
+                }
+            }
+            return bytes;
+        }
+
+        void invalidateCachedByteArray() {
+            byteArrayIsValid = false;
+        }
+    }
+}

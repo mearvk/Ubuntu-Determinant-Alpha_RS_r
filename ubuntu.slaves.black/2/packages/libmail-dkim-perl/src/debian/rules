@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+
+PACKAGE = $(shell dh_listpackages)
+TMP     = $(CURDIR)/debian/$(PACKAGE)
+
+%:
+	dh $@
+
+override_dh_auto_test:
+	# no DNS queries
+	RES_OPTIONS=attempts:0 dh_auto_test
+
+override_dh_auto_install:
+	dh_auto_install
+	$(RM) -v $(TMP)/usr/share/man/man3/Mail::DKIM::PublicKey.3pm
+	install -d $(TMP)/usr/bin
+	sed -e '1s|.*|#!/usr/bin/perl|' scripts/dkimsign.pl > $(TMP)/usr/bin/dkimproxy-sign
+	sed -e '1s|.*|#!/usr/bin/perl|' scripts/dkimverify.pl > $(TMP)/usr/bin/dkimproxy-verify
+
+	# Remove any empty directories
+	find $(TMP)/usr -depth -type d -empty -exec rmdir '{}' ';'

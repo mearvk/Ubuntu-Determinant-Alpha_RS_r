@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+DH_FLAGS =
+
+# Ubuntu language pack support (dh_translations)
+ifeq ($(shell dpkg-vendor --is Ubuntu && echo yes),yes)
+	DH_FLAGS += --with translations
+endif
+
+%:
+	dh $@ $(DH_FLAGS)
+
+override_dh_auto_build:
+	dh_auto_build
+	# Adjust default/im-config
+	if dpkg-vendor --is ubuntu; then \
+		cp default/im-config-Ubuntu default/im-config ; \
+	else \
+		cp default/im-config-Debian default/im-config ; \
+	fi
+
+override_dh_install:
+	dh_install
+	# Adjust Desktop menu for Ubuntu.
+	if dpkg-vendor --is ubuntu; then \
+		echo "OnlyShowIn=KDE;LXQt;" >> debian/im-config/usr/share/applications/im-config.desktop ;\
+	fi
+
+override_dh_translations:
+	dh_translations --domain=im-config

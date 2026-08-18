@@ -1,0 +1,59 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          lircmd
+# Required-Start:    $local_fs $remote_fs $syslog lircd
+# Required-Stop:     $local_fs $remote_fs $syslog lircd
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts the LIRCMD mouse daemon.
+# Description:       LIRC mouse daemon translates infrared signals into mouse
+#                    events.
+### END INIT INFO
+
+# source generic LSB initscript helpers
+. /lib/lsb/init-functions
+
+# check if the lirc package is still installed and this not a stale conffile
+test -x /usr/sbin/lircmd || exit 0
+
+# sanity checks for starting lircmd
+if [ ! -f /etc/lirc/lircmd.conf ] || \
+   [ "$(grep -v -e ^[\ \t]*\# -e ^$ /etc/lirc/lircmd.conf | wc -l)" -eq 0 ]; then
+	exit 0
+fi
+
+
+case "$1" in
+	start)
+		# start lircmd
+		log_daemon_msg "Starting remote control mouse daemon" "LIRCMD"
+		start-stop-daemon --start --quiet --oknodo \
+			--exec /usr/sbin/lircmd < /dev/null
+		log_end_msg $?
+		;;
+	stop)
+		log_daemon_msg "Stopping remote control mouse daemon" "LIRCMD"
+		start-stop-daemon --stop --quiet \
+			--exec /usr/sbin/lircmd
+		log_end_msg $?
+		;;
+	reload|force-reload)
+		log_daemon_msg "Reload configuration for remote control mouse daemon" "LIRCMD"
+		start-stop-daemon --stop --quiet --signal 1 \
+			--exec /usr/sbin/lircmd
+		log_end_msg $?
+		;;
+	restart)
+		$0 stop
+		$0 start
+		;;
+	status)
+		status_of_proc /usr/sbin/lircmd lircmd || exit $?
+		;;
+	*)
+		echo "Usage: /etc/init.d/lircmd {start|stop|reload|restart|force-reload|status}"
+		exit 1
+		;;
+esac
+
+exit 0

@@ -1,0 +1,84 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+
+# package name
+p_jh                    := javahelp2
+p_doc                   := $(p_jh)-doc
+# debian dir for package
+d_jh                    := debian/$(p_jh)
+
+makebuilddir/$(p_jh)::
+	mkdir -p $(DEB_SRCDIR)/jhMaster/JavaHelp/src/new/javax/help/plaf/basic/images/
+	cd $(DEB_SRCDIR)/debian/icons/; \
+	for file in *.xpm; do \
+		fileTarget=`echo $$file|sed -e 's|.xpm|.png|g'`; \
+		convert $(DEB_SRCDIR)/$$file +set date:create +set date:modify -define png:exclude-chunk=time $(CURDIR)/jhMaster/JavaHelp/src/new/javax/help/plaf/basic/images/$$fileTarget; \
+	done
+
+build/$(p_jh):: stamp-build-$(p_jh)
+
+# This target is here to avoid multiple invocation of build target.
+# build/$(p_jh) is invoked 2 times when building binary packages.
+stamp-build-$(p_jh):
+	#Create symlink to required jars
+	mkdir -p $(DEB_SRCDIR)/javahelp_nbproject/lib
+	ln -s -f /usr/share/java/servlet-api-3.1.jar $(DEB_SRCDIR)/javahelp_nbproject/lib/servlet-api.jar
+	ln -s -f /usr/share/java/jsp-api-2.3.jar $(DEB_SRCDIR)/javahelp_nbproject/lib/jsp-api.jar
+	#Remove class uncompilable without JDIC
+	rm -f $(DEB_SRCDIR)/jhMaster/JavaHelp/src/new/javax/help/plaf/basic/BasicNativeContentViewerUI.java
+	#Build javahelp target 'release' is for jars, target 'javadoc' is for javadoc
+	ant -f $(DEB_SRCDIR)/javahelp_nbproject/build.xml -Djdic-jar-present=true -Djdic-zip-present=true \
+	-Ddist.javadoc.dir=dist/lib/api \
+	-Dservlet-jar-present=true -Dtomcat-zip-present=true release javadoc
+	touch $@
+
+install/$(p_jh)::
+	# maven
+	mh_installpom -p$(p_jh) debian/pom.xml
+	mh_installjar -p$(p_jh) -i$(DEB_UPSTREAM_VERSION) -l -njhall debian/pom.xml \
+		$(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jhall.jar
+	# other jars under /usr/share/java
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jhbasic.jar         $(d_jh)/usr/share/java/jhbasic-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jh-client.jar       $(d_jh)/usr/share/java/jh-client-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jh.jar              $(d_jh)/usr/share/java/jh-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jsearch-client.jar  $(d_jh)/usr/share/java/jsearch-client-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jsearch-indexer.jar $(d_jh)/usr/share/java/jsearch-indexer-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jsearch.jar         $(d_jh)/usr/share/java/jsearch-$(DEB_UPSTREAM_VERSION).jar
+	install -m 644 $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/jsearch-misc.jar    $(d_jh)/usr/share/java/jsearch-misc-$(DEB_UPSTREAM_VERSION).jar
+	dh_link -p$(p_jh) usr/share/java/jhall-$(DEB_UPSTREAM_VERSION).jar           usr/share/java/jhall.jar
+	dh_link -p$(p_jh) usr/share/java/jhbasic-$(DEB_UPSTREAM_VERSION).jar         usr/share/java/jhbasic.jar
+	dh_link -p$(p_jh) usr/share/java/jh-client-$(DEB_UPSTREAM_VERSION).jar       usr/share/java/jh-client.jar
+	dh_link -p$(p_jh) usr/share/java/jh-$(DEB_UPSTREAM_VERSION).jar              usr/share/java/jh.jar
+	dh_link -p$(p_jh) usr/share/java/jsearch-client-$(DEB_UPSTREAM_VERSION).jar  usr/share/java/jsearch-client.jar
+	dh_link -p$(p_jh) usr/share/java/jsearch-indexer-$(DEB_UPSTREAM_VERSION).jar usr/share/java/jsearch-indexer.jar
+	dh_link -p$(p_jh) usr/share/java/jsearch-$(DEB_UPSTREAM_VERSION).jar         usr/share/java/jsearch.jar
+	dh_link -p$(p_jh) usr/share/java/jsearch-misc-$(DEB_UPSTREAM_VERSION).jar    usr/share/java/jsearch-misc.jar
+	# copy the shell scripts
+	install -m 755 $(DEB_SRCDIR)/javahelp_nbproject/dist/bin/jhindexer $(d_jh)/usr/bin/
+	install -m 755 $(DEB_SRCDIR)/javahelp_nbproject/dist/bin/jhsearch $(d_jh)/usr/bin/
+
+install/$(p_doc)::
+	dh_installdocs -p$(p_doc) $(DEB_SRCDIR)/javahelp_nbproject/dist/lib/api
+
+clean::
+	# these files are left by cdbs (a bug?)
+	-rm -f *.cdbs-config_list
+	-rm -f stamp-build-$(p_jh)
+
+	rm -rf $(DEB_SRCDIR)/javahelp_nbproject/build
+	rm -rf $(DEB_SRCDIR)/javahelp_nbproject/dist
+	rm -rf $(DEB_SRCDIR)/javahelp_nbproject/lib
+	rm -rf $(DEB_SRCDIR)/JSearchClient_nbproject/build
+	rm -rf $(DEB_SRCDIR)/JSearchClient_nbproject/dist
+	rm -rf $(DEB_SRCDIR)/JSearchIndexer_nbproject/build
+	rm -rf $(DEB_SRCDIR)/JSearchIndexer_nbproject/dist
+	rm -f $(DEB_SRCDIR)/jhMaster/JavaHelp/src/new/javax/help/plaf/basic/images/*.png
+	
+	mh_clean
+
+get-orig-source:
+	uscan --repack
+

@@ -1,0 +1,52 @@
+From 79826d55b06a50ef1be2b723fe35a1e534cfbbaa Mon Sep 17 00:00:00 2001
+From: Jeff Moyer <jmoyer@redhat.com>
+Date: Mon, 29 Jul 2019 14:25:01 -0400
+Subject: [PATCH libaio 24/28] harness: skip 22.p if async_poll isn't supported
+
+Use the new skip error code instead of failing the test.  Also
+add in a Local variables: section for emacs.
+
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/22.t | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/harness/cases/22.t b/harness/cases/22.t
+index c7428a8..b13024e 100644
+--- a/harness/cases/22.t
++++ b/harness/cases/22.t
+@@ -83,6 +83,9 @@ int test_main(void)
+ 		io_prep_poll(&iocb, pipe1[0], POLLIN);
+ 		ret = io_submit(ctx, 1, iocbs);
+ 		if (ret != 1) {
++			/* if poll isn't supported, skip the test */
++			if (ret == -EINVAL)
++				return 3;
+ 			printf("child: io_submit failed\n");
+ 			return 1;
+ 		}
+@@ -120,7 +123,10 @@ int test_main(void)
+ 
+ 		ret = io_submit(ctx, 1, iocbs);
+ 		if (ret != 1) {
+-			printf("parent: io_submit failed\n");
++			/* if poll isn't supported, skip the test */
++			if (ret == -EINVAL)
++				return 3;
++			printf("parent: io_submit failed with %d\n", ret);
+ 			return 1;
+ 		}
+ 
+@@ -147,3 +153,9 @@ int test_main(void)
+ 		return 0;
+ 	}
+ }
++/*
++ * Local variables:
++ *  mode: c
++ *  c-basic-offset: 8
++ * End:
++ */
+-- 
+2.26.0.292.g33ef6b2f38
+

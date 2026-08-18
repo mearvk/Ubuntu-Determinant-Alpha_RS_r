@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+dirsrc := src/
+jsmin := $(patsubst %.js,%.min.js,$(wildcard $(dirsrc)*.js))
+jsminmap := $(patsubst %.js,%.min.js.map,$(wildcard $(dirsrc)*.js))
+destdir := $(CURDIR)/debian/builddir
+
+%.min.js: %.js
+	mkdir -p $(destdir)/dist
+	cp -f $< $(destdir)/dist
+	(set -e ;cd $(destdir)/dist ; \
+	 uglifyjs $(notdir $<)\
+		 -o $(@F) \
+		 --source-map)
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf $(destdir)
+	find $(srcdir) -name '*.min.js' -exec rm -f {} \;
+	find $(srcdir) -name '*.min.js.map' -exec rm -f {} \;
+
+override_dh_auto_build: $(jsmin)
+	dh_auto_build
+
+override_dh_auto_install:
+
+override_dh_installexamples:
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS) $(DEB_BUILD_PROFILES)))
+	dh_installexamples
+	sed -i 's,".*angular.min.js","angular.min.js",g' debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/angular.html
+	sed -i 's,".*angular.sprintf.js","angular.sprintf.js",g' debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/angular.html
+	sed -i 's,".*/sprintf.js","sprintf.js",g' debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/angular.html
+	ln -s ../../../javascript/angular.js/angular.min.js debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/angular.min.js
+	ln -s ../../../javascript/sprintf-js/sprintf.js debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/sprintf.js
+	ln -s ../../../javascript/sprintf-js/angular-sprintf.js debian/libjs-sprintf-js/usr/share/doc/libjs-sprintf-js/examples/angular-sprintf.js
+else
+	@echo '**********************************************************'
+	@echo 'Skip examples                                             '
+	@echo '**********************************************************'
+endif
+
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=libjs-sprintf-js

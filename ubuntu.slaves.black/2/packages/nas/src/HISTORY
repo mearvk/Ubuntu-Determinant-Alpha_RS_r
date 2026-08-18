@@ -1,0 +1,1737 @@
+$Id: HISTORY 293 2013-10-07 17:58:33Z jon13 $
+
+Version 1.9.4 (stable) 10/07/2013
+
+  - auerswald
+
+    - Fix several potential security issues in the NAS server reported
+      by Hamid Zamani <me@hamidx9.ir> to the NAS mailing list.
+
+      See http://radscan.com/pipermail/nas/2013-August/001270.html for
+      a description. In addition, CVE numbers have been defined for
+      these issues:
+
+      CVE-2013-4256
+      CVE-2013-4257
+      CVE-2013-4258
+
+    - Fixed some warnings while building some of the clients.
+
+    - narrow a possible race condition in
+      auvoxware.c:disableProcessFlow() reported by Paul Fox.
+
+  - steve_mcintyre
+
+    - add a format string to aulog.c (found using -Wformat-security
+      warnings) 
+
+    - Don't preprocess man pages
+
+  - Add proper includes in server/os/connection.c to prevent some
+    compile warnings and a possible server coredump under the right
+    conditions on x86_64 Linux systems.
+
+
+Version 1.9.3 (stable) 05/13/2011
+
+  - overdue 1.9.3 maint release
+
+  - Older X11 systems used to define SharedLibX and friends if the
+    installed X11 system was built with shared lib support.  Newer
+    X11's use SharedLibX11 instead.  Same for
+    {Normal|Debug|Profile}LibX.  So check for these and set
+    appropriately in NetAudio.tmpl.
+
+    Shared lib installations should deal with libXau dependancies
+    correctly now. 
+
+  - auerswald:
+
+    Added MacOS X aka Darwin to list of systems that need to
+    explicitely link libaudio.so against libXau. This enables building
+    of the shared library libaudio.so on MacOS X.
+
+    There is currently no NAS server for MacOS X.
+
+Version 1.9.2 (stable) 03/07/2009
+
+  - overdue 1.9.2 release.
+
+  - patch from Aleksey Cheusov:
+
+    "fix for "libpthread: Unlocking unlocked mutex" seen on NetBSD-4"
+
+    libaudio: OpenSvr.c: The server mutex was being unlocked, even
+    though it was never locked in the first place.
+
+  - Hugo Vanwoerkom reported thousands of diagnostics in his syslog:
+    "doSetup: elementRate == 0! Forcing to 5000".  Fix doSetup to only
+    warn about this when the debug level is above 10.
+
+  - auerswald:
+
+    document syslog usage
+
+    use syslog if running as a daemon, stderr otherwise
+
+    add syslog-usage-change to HISTORY file
+
+  - steve_mcintyre:
+
+    Minor man page fix ported from the Debian packages.
+
+    Multiple minor portability changes ported over from the Debian
+    packages. Cope with Hurd and GNU/KFreeBSD and other systems using
+    glibc
+
+  - apply patch from sourceforge user moinakg:
+
+    Libaudio is built with missing linker flags on OpenSolaris like
+    missing lXt, so it results in symbol not found errors at runtime.
+    I am including an Imakefile patch below that fixed this.
+
+Version 1.9.1 (stable) 11/10/2007
+
+  - per a request from Frank Büttner (fedora maintainer), and in the
+    interest of providing the 'least surprise' for a user, nasd will
+    no longer initialize the mixer settings at start up, by default.
+    The default value of 'InitMixer' is now set to 'NO' in the
+    /etc/nasd/conf file.
+
+    See https://bugzilla.redhat.com/show_bug.cgi?id=247468 for the
+    bug report.
+
+  - based on patch from Frank Büttner, nasd will create it's local
+    socket, and libaudio will look for it, in /var/run/nasd/audio*.
+    on Linux systems.  In reality, this should probably apply to all
+    'modern' unix systems (Solaris, *BSD, etc), but only Linux is
+    affected by this change now.
+
+    See https://bugzilla.redhat.com/show_bug.cgi?id=250453 for the bug
+    report. 
+
+    The downside is that /var/run is not writable by normal users, so
+    if a user is trying to run the nasd server, s/he will get an error
+    about being unable to bind to the socket, and nasd will not start.
+    The workaround is to run nasd with the '-pn' (partial network)
+    option.  This way, nasd will bind to a local TCP transport and
+    start successfully even if the local socket transport cannot be
+    initialized (though you will still see the error when nasd
+    starts).
+
+    Additionally, users on the local host trying to play sounds
+    through a server started this way may need to set their
+    AUDIOSERVER environment variable to 'localhost:0' for example,
+    rather than the default ':0' in order to play sounds.
+
+    Of course if nasd is started as root at system startup time, then
+    this is not a problem.
+
+  Version 1.9a (devel) 10/27/2007
+
+  - this is a possible 1.9.1 (stable) release in a couple weeks. 
+
+  - modify intervalProc to stop/start the timer around AuProcessData()
+    calls, rather than simply disable the signal handler.  This should
+    ensure that we never lose a timer signal, and seems to fix the
+    reported nasd hangs under newer linux kernels (2.6.21+).
+
+    The *BSD folks should make sure everything still works, it
+    should...
+
+  - rework signal handling in the voxware (OSS) server.  This also
+    allows DIA to block/unblock interrupts at he appropriate times
+    now.
+
+  - apply patch from Yarda that corrects a problem with blocking and
+    unblocking signals in IntervalProc() (auvoxware). [jet - this
+    patch was removed in the patches further up]
+
+  - remove mention of the auvoxware manpage from the filelist (for src
+    packaging), and remove the doc/html/auvoxware.1.html file.
+
+  - Apply patches from Erik Auerswald:
+
+    - the recent bug report from a fedora 7 user showed a small bug
+      with the input mixer code: If the input mixer cannot control the
+      input channels a wrong error message is printed. The attached
+      patch fixes this.
+
+    - remove auvoxware.man from the voxware Imakefile
+
+    - aupanel: add option -interval to synopsis section of man page
+
+    - add automatic querying of device attributes to aupanel with a
+      default query interval of 10 seconds
+
+    - make the nasd.conf man page formatting more consistent
+
+  - more cleanup and removal of old/useless files.
+
+  - remove useless nas.lsm file.
+
+  - sync up for copying repository to sourceforge.
+
+  - Patch from Stefan Huehner:
+
+    - remove SleepQueue functionality which is apparently not being
+      used anywhere.
+
+  - remove useless 'register' declarations
+
+  - convert Swap32Write for K&R to ANSI.  Also, define it's buffer
+    pointer as AuUint32 rather than 'long', which was wrong, but
+    worked accidentally.
+
+
+Version 1.9 (stable) 04/07/2007
+
+    - stable 1.9 release.  No code changes (other than RELEASE) since
+      1.8b devel release.
+
+    - In short: Fixes to several DOS attacks that could be carried out
+      aginst a nasd server, ANSI'fication of most of the server and
+      client code, and significant rework of input and output mixer
+      handling in the voxware (OSS) server.
+
+      Read below for more detail on the changes since the last stable
+      release (1.8).
+
+
+    Version 1.8b (devel) 03/25/2007
+    
+    - 1.8b devel release.  Final 1.9 in about 2 weeks, barring any
+      catastrophes.
+
+    - fix a variety of problems that could result in a denial of
+      service by crashing the nasd server.  These attacks were
+      researched by Luigi Auriemma, who also provided a description of
+      the attacks and an exploit program, 'nasbugs'.
+
+      I have added his emailed report and the test attack code to the
+      nas repository in contrib/nasbugs if you are interested.  Thanks
+      to Luigi for finding these problems.  It sucked fixing them :)
+
+      Here is a list of the bugs tested as output by the nasbugs
+      program:
+
+      1 = accept_att_local buffer overflow through USL connection
+      2 = server termination through unexistent ID in AddResource
+      3 = bcopy crash caused by integer overflow in ProcAuWriteElement
+      4 = invalid memory pointer caused by big num_actions in ProcAuSetElements
+      5 = another invalid memory pointer caused by big num_actions in
+          ProcAuSetElements 
+      6 = invalid memory pointer in compileInputs
+      7 = exploits bug 3 in read mode (requires something playing on
+          the server) 
+      8 = NULL pointer caused by too much connections
+
+      Note on bug #2, X11 display servers should be vulnerable to a
+      DOS of this type as well (causing fatal 'client not in use'
+      errors in AddResource()).
+
+      Note on bug #8, the nasd server will not be able to accept
+      further client connections when the client table is full, until
+      the rejected clients disconnect their end of the socket and the
+      neccessary fd's are freed up.  It's better than coring though.
+
+    - set the default open modes for the output audio device to
+      write-only, and for the input device, use read-only (already the
+      default).
+
+      These can still be changed in the nasd.conf file, if needed. 
+
+      Previously, the default was to open the output device
+      read-write, causing various issues with different
+      hardware/driver configurations.  There is no need to open this
+      device read-write anyway. 
+
+    - apply patch from Paul Fox, correcting a typo in auvoxware.c
+
+    - apply patch from Erik Auerswald
+
+      "With the attached patch the output and input device can be
+      disabled by specifying an empty string as device name. Yes, when
+      using an empty string for both devices there will be a NAS
+      server that can neither play nor record anything."
+
+
+    Version 1.8a (devel) 11/27/2006
+
+    - Updated the Amd.h (machine definition file) with modern X11
+      (X11R6.8) contents so it can build with Qt and other X11
+      software that makes use of X11's Xmd.h header file.  Problem
+      reported by Bernard Leak.
+
+    - ANSI'fication of DeleteTypes (dia/resource.c) and NoopDDA.
+      Add proper header #includes where needed.
+
+    - patch from Petr Salinge (via Steve McIntyre) adding GNU/kFreeBSD
+      support.
+
+    - Patches from Paul Fox:
+
+      - allow the specification of a scaling factor to apply to the
+        output gain
+
+      - add a proper return value in auvoxware.c:initMixer()
+
+      - mondo indentification of server/*
+
+    - Applied patches from Stefan Huehner:
+
+      - marks some read-only string and function parameters as 'const
+        char*' instead of 'char *'. In addition an unused buffer
+        'errfile' from aulog.c was removed.  As the two release.h
+        files are generated the NetAudio.tmpl was modified to emit the
+        'const char *' declaration.
+
+      - part two of the _.*Const removal patch. Some more defines of
+        _.*Const were removed which have been missed by the last patch
+        and the interval usage of _.*Const has been simplified to just
+        use const.
+
+      - removes more unused defines and functions in server/ .
+        Additionally a k&r style function was convertd to ansi c in
+        swaprep.c
+
+      - converts more function declarations and their prototypes
+        without parameters from () to the (void) form
+
+      - attached patch changes all of the conditional i.e. _AuConst
+        definitions to only list const in the externally visible
+        header files. This is to preserve compatibility if someone
+        uses these definitions while using the libaudio library.
+
+        [JET] The use of AuConst is deprecated (and is probably not
+              being used by anyone anyway).
+
+      - removes the defined VENDOR_STRING and VENDOR_RELEASE from
+        server/include/site.h as they aren't used in the 3 files
+        including site.h.  Additionally the inclusions of site.h was
+        removed from server/dia/main.c as none of its defines is used
+        in main.c
+
+      - removes the 2 unused functions:
+
+        - server/dia/dispatch.c: void UpdateCurrentTime()
+        - server/dia/dixutils.c: TimeStamp ClientTimeToServerTime
+
+          and it changes one more occurence of () to (void).
+
+      - corrects some function declarations by changing () to (void)
+
+      - removes some unsued variables in lib/audio/nameaddr.c and
+        and unused function in server/os/utils.c
+
+      - removed some old (and stupid) debug code for AIX: in
+        server/os/utils.c there is some code to redirect error logging
+        from stderr to and file in tmp on AIXV3. As OpenDebug isn't
+        called anywhere this is broken when AIXV3 is
+        defined. Additionally this logfile is fixed in /tmp which
+        permissions 00777
+
+      - removed the declaration of FreeResource from the opaque.h
+        header file. All files which include opaque.h don't use this
+        function and this declaration is copied from resource.h
+
+      - corrects several prototypes in resource.[ch] to match the
+        actual function definitions inside resource.c
+
+      - patch that modifies the two users of ostruct.h to directly
+        include os.h (which includes misc.h) and removes the
+        osstruct.h line in config/filelist. If an additional "svn
+        remove server/include/osstruct.h" is used we can get rid of
+        osstruct.h completely.
+
+      - removes servermd.h. removes the inclusion of servermd.h in 3
+        files and its reference in 'config/filelist'.
+
+      - clean up several of the client programs. Mostly adding const
+        to parameter/variable declarations. Additionally an unsused
+        variable was removed and some prototype in audemo.c were
+        fixed.
+
+      - remove some unused variables
+
+      - remove server/include/miscstruct.h
+
+      - various include file cleanups - removing unused
+        variables/structures, etc left over from X11.
+
+      - removing old 'const' determination, correcting some proper
+        uses of const.  'const' is expected to be supported by your
+        compiler.
+
+      - ANSIfication of various NAS components.
+
+      - remove unused portion of X11 server components (fonts, GC's,
+        etc).
+
+    - applied patches from Erik Auerswald:
+
+      - Add patch adding a proper 'reset' action to contrib/rc/nasd.
+
+      - a patch that:
+
+        Adds support for a different mixer for the input device to the
+        voxware server. Without this patch the mixer device specified
+        in the input section of the config file is not used.
+
+        To use the same mixer for input and output just specify the
+        same device in the input- and output-section of the config
+        file. The empty string "" can be used to specify no mixer
+        device for the input- or output-section.  This is documented
+        in the nasd.conf man page.
+
+        The outputsection keyword is added to the nasd.conf man page.
+
+        fixed a bug in the support of two devices: If two devices are
+        used, and the sample rate of the input device can be changed,
+        the wrong sample size would be set by openDevice().
+
+        remove the unused "stereodevs" variable.
+
+        NOTE: Prior to this patch, the mixer device parameter for the
+              input section was completely ignored.  The default value
+              for this ignored parameter was "/dev/mixer1".
+
+              With this patch, this parameter is honored.  If your
+              configuration depends on the input mixer being the same
+              as the output mixer, you will need to edit your
+              /etc/nas/nasd.conf and set the mixer parameter in the
+              inputsection to '/dev/mixer', or to whatever mixer
+              device your outputsection is using.
+
+              If your system contains a /dev/mixer1 device (the
+              default input mixer device), nasd will now use it.  This
+              is a good thing. :)
+
+      - preserve configuration of input device in the voxware server
+        when ReleaseDevice is on, and no flow is active.
+
+      - document nasd '-V' option in the man page
+
+      - opening the mixer device should be allowed to fail according
+        to http://radscan.com/nas/nas-ml/msg01121.html. But right now
+        it may only fail on startup, not when re-opening the audio
+        device. The attached patch corrects this issue.
+
+      - adding an option to aupanel to specify the initially
+        controlled device.
+
+      - keeping gain and input mode changes consistent between voxware
+        server and mixer if possible.
+
+      - changing recording level controls of the voxware server to use
+        IGain or RecLev when available and select only the specified
+        recording source.
+
+      - fixing MixerInit option of the voxware server.
+
+      - Adding a KeepMixer option (on by default) that causes NAS to
+        always keep the mixer device open so it can track external
+        changes to mixer settings.
+
+      - patch adding ReInitMixer option that init's the mixer to
+        defaults every time nasd re-opens the audio device.
+
+      - patches ANSI'fying the nas clients 
+
+      - extending the gainScale functionality to apply to the input
+        gain as well.
+
+
+Version 1.8 (stable) 06/03/2006
+
+        - time for another stable release.
+
+        - Correct problem in auvoxware, where if MixerInit is set to
+          false, remote volume (mixer) requests are ignored.
+          Reported by Paul Fox, with a fix determined by Steve
+          McIntyre and Erik Auerswald.
+
+        - Applied patch from Nicolas Escuder correcting a Cygwin
+          issue in auvoxware.c
+
+        - applied patch from Erik Auerswald adding a Mute button and
+          functionality to aupanel. 
+
+        - applied patch from Nicolas Franois  (via Steve McIntyre)
+          correcting some typos in the AuSetBucketAttributes and
+          AuSoundCreateFileFromBucket man pages.
+
+        - applied patch from 'Inma', correcting a connection hang in
+          Solaris 9.  This reworks some of the very old and primitive
+          fd_set stuff in Aulibint.c .
+
+        - updated config/config.sub and config.guess to properly
+          detect DragonFly systems.
+
+        - Applied patch from Mark Davies and Joerg Sonnenberger
+          correcting some BSD issues and adding DragonFly support.
+
+          The nasd.conf man page is always installed in
+          $FILEMANDIR for all systems.
+
+        - applied patch from Mark Davies correcting audio/Imakefile
+          to properly define BSD44SOCKETS on NetBSD systems.
+
+        - Applied patch from Steve McIntyre correcting CYWIN -> CYGWIN
+          typo in server/dda/voxware/auvoxware.c
+
+        - applied patch from Steve McIntyre Correcting some Gcc 4.0
+          and AMD64 issues.
+
+
+Version 1.7 (stable) 11/14/2004 
+
+        - 1.7 release :)
+
+        - fixed config/Imakefile so 'configure' command would work
+          under cygwin.  Tested clients/server under cygwin.
+
+        10/06/2004 
+
+        - 1.7 release candidate
+
+        - corrected a possible race condition in auvoxware that could
+          cause the server to hang under certain conditions.  I do not
+          know why I haven't seen this problem before, but I could
+          recreate it easily by killing auplay while playing a long
+          tune.
+
+          If the system restarts syscalls after a signal handler has
+          run, a situation could arise where the previous timer was
+          never disabled.  This could cause a previous ioctl(DSP_SYNC)
+          called from setSampleRate() to be constantly interrupted and
+          restarted, causing an apparent hang.
+         
+          Now we just turn off the timer as the first thing in
+          setSampleRate() so DSP_SYNC can actually finish.
+
+          We also turn off the timer when openDevice is called, so the
+          'wait for device to become available' code can work too.
+
+        - Patch from Tobias Diedrich that allows mixer init to
+          fail in the voxware server. 
+
+          Quote:
+
+          With this patch "aoss nasd" works, without it would fail
+          (aoss is the alsa oss wrapper script, which simply preloads
+          libaoss.so, a wrapper library similar to libaudiooss).
+
+          Combining this with the alsa dmix feature should allow nas
+          to coexist with other daemons like artsd.
+
+          See http://radscan.com/nas/nas-ml/msg01121.html for more
+          details.
+
+        - redid the FAQ in an attempt to make it more useful.  I'll
+          try to keep it up to date.
+
+        - updated libtool due to a problem(s) reported by Steve
+          McIntyre. 
+
+        08/20/2004
+
+        - clear CFLAGS before building config/config.h
+
+        - emit the release string to the log and stdout when
+          verbose is enabled.
+
+        - if '-V' specified, emit release string and stdout and exit.
+
+        - add a limit of 5 retries on failure to open input device.
+
+        - barring major problems, this is a release candidate.
+
+        06/20/2004 
+
+        - add autoconf/configure support for config/. Now, during the
+          'includes' phase of the nas build, configure will try to
+          figure out some things about your system and build a
+          config.h file that the rest of nas can use.   Prompted by
+          John Wehle's patch below.
+        
+          NOTE: you still build nas like always with the imake
+          facility.  configure in this case is only concerned with
+          locating various header files, functions, and the like.
+
+        - added FreeBSD 5.x patches from John Wehle correcting
+          malloc.h/stdlib.h use and other issues.  
+
+        - remove ioctl(devAudio, AUDIO_DRAIN, 0) call from
+          disableProcessFlow() in dda/sun/ausuni.c that seems to cause
+          problems (server hangs) with certain sun audio
+          hardware/kernel drivers. 
+
+        - applied patch from James Lee correcting a coredump in
+          audemo. 
+
+        - corrected problem with dia/auprocess.c that caused SIGFPE's
+          in nasd when an element with a samplerate of 0 was
+          processed. Thanks to Tobias Diedrich for a test case.
+
+        - removed some pre-R5 cruft from lib/audio/ConnSvr.c that
+          caused build problems on some solaris systems.
+
+        02/14/2004 
+
+        - Fixed up some Cygwin issues... All of the clients and the
+          server seem to compile and work fine now.  I tested both
+          local and remote, to and from unix and cygwin.
+
+        - Added patch from Steve McIntyre, adding a new '-config'
+          option to nasd.  This allows you to start nasd with
+          alternate configuration files rather than the default of
+          /etc/nas/nasd.conf.  Useful if you have multiple sound
+          devices. 
+
+        - Added 64bit fixes from Per Oyvind Karlsen
+
+        12/31/2003 
+
+        - corrected a coredump with the clients in 1.6a when using a
+          non-zero display number. GetAuthorization() was a bit
+          confused about the order of it's arguements...
+
+        12/24/2003 
+
+        - preparing a long overdue development release
+
+        - ANSI'ification of libaudio.  
+
+          There seemed to be some confusion with the order of
+          arguments to the AuSoundRecordToFile*() functions.  
+
+          The function declarations were made to match the prototype
+          definition and the man page.
+
+        - Modified Scott Presnell's patch to not enable BSD44SOCKETS
+          on Linux or SVR4 systems. There are some structure members
+          used that are not present on these (and perhaps other)
+          systems. 
+
+          If you run into compilarion problems with ConnSvr.c relating
+          to invalid structure members, look at the define of
+          BSD44SOCKETS in Imakefile and correct for your system as
+          needed.  Oh, send me the patch as well? :)
+
+        - auvoxware
+
+          - added some more useful debugging info.  If you get the old
+            'cannot create audio block connection info" try running
+            nasd with '-v -d 99' and see what the real error is.
+
+          - certain ioctl() requests are no longer fatal (like
+            SOUND_MIXER_WRITE_RECSRC and SOUND_MIXER_READ_RECSRC).
+            Recording may not work properly if these fail though.
+
+        9/14/2003 
+
+        - added patch from Marty Leisner cleaning up a couple of error
+          messages in server/os/connection.c
+
+        3/15/2003
+
+	- added a patch to the contrib section by Laurent Vivier - this
+          patch adds NAS support to the esound daemon on AIX systems.
+          Should be reasonably portable to other platforms as well.
+          
+          Rumor has it that the Ximian folks are adding this support
+          officially into esound.
+
+        3/15/03
+
+	- set timer in auvoxware.c to trigger when 50% of the samples
+          are predicted to be consumed... This hopefully will help
+          with underruns on some systems/OS's...  I'm not sure why
+          this is happening on those systems (it's not happened on any
+          of the systems I've used NAS on), so this should probably
+          be considered a harmless workaround.
+
+        3/4/03
+
+	- Patch from Scott Presnell to set BSD44SOCKETS properly for
+          libaudio. 
+
+        12/11/2002
+
+	- patch from Steve McIntyre correcting a typo in Xtutil.h
+
+
+Version 1.6 10/23/2002
+
+	- Release!
+
+	## 1.5h    10/12/2002
+
+	- Added SoundFileGetProc() to get access to the toSound and
+          fromSound procs in _SoundFileInfo[].  Needed for xemacs.
+
+	- Added AudioLibraryVersionMajor, AudioLibraryVersionMinor,
+          and AudioLibraryVersionTeeny to audiolib.h.  Somewhat more
+          informative than just the old AudioLibraryVersion which was
+          set at '2'.  
+
+	  The old AudioLibraryVersion define is still there however,
+          and is defined to be equal to AudioLibraryVersionMajor.
+
+	## 1.5g    10/7/2002
+
+	- changed inputsection defaults in nasd.conf.eg to 44.1Khz, 2
+          channel 16b sound.
+
+	  outputsection also defaults to 44.1Khz now, instead of 33Khz.
+
+	- began some CC ANSI'fication of libaudio.  So far only a
+          couple of files have been 'upgraded' just to see what the
+          implications are.  It's going to be a bitch ;-) And there is
+          the likelyhood of introducing errors, so I'll get a stable
+          release out first before finishing this task.  The result
+          however should be worth it.  I've a feeling a few obscure
+          bugs will be found and fixed doing this.
+
+	- some cleanup in server/os/utils.c and server/include/os.h.
+          removing K&R style prototype decls, #including unistd.h, and
+          setting Xalloc() et. al. to use proper void * rather than
+          unsigned longs.
+
+	- changed hardcoded '-L/usr/X11R6/lib' for REQUIRED libs in
+	  lib/audio/Imakefile to '-L$(USRLIBDIR)'
+
+	- it doesn't have the HPUX 11 build fixes - I think I will
+          really need access to a machine, or someone who does have
+          access to one and wants to fix the build, in order to solve
+          this... The bcopy problem seems to be in the HPUX X11
+          config/ stuff.
+
+	- We really should release this one unless there are big
+          problems. ;-)
+
+	8/26/2002
+
+	- time for another development update.  Should probably go
+          final with a 1.5.1 version soon...
+
+        7/23/2002
+
+	- removed fdset.h stuff for cygwin - no longer needed.
+
+	- auvoxware - added __CYGWIN__ checks (equal to linux)
+
+	- added __CYGWIN__ to dia/auservertype.h 
+
+	- changed server imake to build nasd.exe on cygwin rather than nasd.
+
+
+        7/20/2002
+
+	- added cygwinArchitecture to the server Imakefile so
+          auvoxware will be built on cygwin systems.
+
+	- Removed the SoundFileInfo[] array in sound.h so cygwin would
+          be happy.  Apps should not have been accessing that array
+          directly anyways.
+
+	  Added the following new functions to sound.c (that used to
+	  be macros in sound.h):
+
+	     SoundFileFormatString, SoundValidDataFormat,
+	     SoundFileFormatToString, SoundFileFormatToAbbrev,
+	     SoundFileFormatToSuffixes
+
+	  Assuming your code did not attempt to directly access
+	  SoundFileInfo[], no changes should be required.
+
+	  libaudio.so revision bumped to 2.3
+
+        7/15/2002
+
+	- patch from Nicholas Wourms.
+
+	  - fixed FIONREAD in Alibint.c for cygwin
+	  - fixed Imake for libaudio on cygwin
+
+        7/9/2002
+
+	- rename dia/nasconfig.* to dia/nasconf.* to avoid name
+          collision with NasConfig.h on windows systems.
+
+	## 1.5e    7/7/2002
+
+	- added patch from Nicolas Escuder that adds support for
+          Windows operating systems using Cygwin.  Even the NAS server
+          is now supported.  There are still issues with the clients. 
+
+	  I will provide a link on the nas-links page to precompiled
+	  windows binaries for libaudio.dll, nasd, and some clients -
+	  provided by Nicolas.
+
+	- based on idea from Nicolas, added background (-b) mode to
+          nasd, to force it to run in the background.  Actually, he
+          supplied a patch, but I just redid it to work properly with unix
+          systems.
+
+	  If you want to see error messages from nasd while starting
+	  up, do not run it in daemon mode or you won't see the error
+	  messages as stdout/stderr are closed.  Someday, I'll track
+	  down all of these and have them use osLogMsg(), which would
+	  work regardless.
+
+	- added NAS_AUDIOMSGFILE in config/NasConfig.h to specify
+          where audio messages are stored (ADMPATH in os/osinit.c).
+
+	- Yes, we are at 1.5e now. Sorry I didn't release 1.5b-d.  Was
+          a little busy with the day job ;-)
+	
+	## 1.5d    6/1/2002
+
+	- added .ps -> .pdf conversions in doc/pdf/
+
+	- added html versions of man pages in doc/html/
+
+	## 1.5b    3/16/2002
+
+        - added patch from Marco Molteni to add a '-local' option to
+	  nasd.  Specifying this option allows only local clients to
+	  connect.
+
+        - fix nasd.man to describe this and other supported options.
+
+        - moved allow_any_host into the NasConfig struct.  Along with
+          the new '-local' option.
+
+	## 1.5a    2/23/2002
+
+	- more STARTSERVER fixes - there was still one case where when
+          STARTSERVER was defined, nasd could be called with the wrong
+          display number due to a bug in _AuConnectServer.
+
+	- changed LEX/YACC DEBUG token to CDEBUG to avoid conflicts
+          when building nas with '-DDEBUG'
+
+	- DEFAULT_AUSERVER is now ":0" rather than
+          "tcp/localhost:8000".  A local socket connection will startup
+          faster than a tcp connection.
+	
+	- mutex.h
+		- corrected unixware 7.x build problem
+                  (XMUTEX_INITIALIZER) in mutex.h 
+		- added same check for sun/solaris boxes
+		- got rid of XUSE_MTSAFE_API - now controlled by
+                  NAS_USEMTSAFEAPI defined in config/NasConfig.h
+
+		  If you think you are having mutex problems, you can
+		  edit config/NasConfig.h and '#undef'
+		  NAS_USEMTSAFEAPI, then rebuild everthing.  This will
+		  turn off threadsafety in libaudio.
+
+	- added patch from Tobias Diedrich to fix deadlock in
+          AuNextEvent().
+
+	- added new mutex in audio/Alibint.c to protect
+          _AuReadEvents() since it can no longer rely on the server
+          lock as a result of Tobias's patch above.
+
+	- added new option, 'gain', to config file in the input/output
+          sections.  This sets the default gains when nasd starts up
+          (if MixerInit is enabled).  Only in voxware for now.
+
+        1/5/2002
+
+	added -lXt and -lXau to the lib dependancy for libaudio.so on
+	Linux systems per a request from Lorenzo Delana.
+
+        1/20/2002
+
+	- fixed bug in ConnSvr.c that could cause the wrong server
+          number to passed to nasd when STARTSERVER is defined.
+
+
+Version 1.5 12/26/2001
+
+	## 12/1/2001
+
+	- Corrected manpage html generation issue with the nasd.conf
+	  manpage via patch from Erik Inge Bolso
+
+
+	## 1.4.2d  11/25/2001
+
+	- implemented locking in libaudio via Xthread mutexes.  
+
+	  This is kind of a big change, but the result should be a
+	  threadsafe libaudio.  I used Xthreads, because then
+	  theoretically I shouldn't have to care about the system's
+	  actual thread implementation. Right?? I've tested so far on
+	  Linux (uses pthread_*) and Unixware 2.03 (uses thr_*).  So
+	  far so good.
+
+	- bumped up the libaudio rev to 2.2
+
+	## 1.4.2c  11/4/2001
+
+	- turned off streams support on SVR4 systems for libaudio.
+	  UNIX and TCPCONN work just fine.  The nasd server hasn't
+	  used streams support since the 1.3 timeframe anyway.  This
+	  will work around local connection issues on UnixWare and
+	  probably Intel Solaris as well.  
+
+	- added patches from Steve McIntyre to work around an XFree86
+	  issue, and prevent the HPUX server from being built on HPPA
+	  systems running Linux.
+
+	- add change to AuServerName() in libaudio to default to
+	  'tcp/localhost:8000' if neither AUDIOSERVER or DISPLAY are
+	  set as per a suggestion by Erik Inge Bolso.
+
+	## 1.4.2b  10/6/2001
+
+	- Added patches from Peter Berg Larsen to the Sun server that
+	  adds support for $AUDIODEV on Sun Ray platforms.
+
+	- Added patches from Peter Berg Larsen that corrects some
+	  issues dealing with dead clients, and improper server resets
+	  when persistent flows are still active.  Also, some
+	  uninitialized variables are now properly initialized.
+
+	## 1.4.2a  4/21/2001
+
+	- patch from Steve McIntyre to resolve man page issues, and
+	  add a libm dependancy to libaudio for linux platforms.
+
+	- patches from Philippe Jouguet
+
+		new options in nasd.conf for the voxware server:
+		- add 'mixer' device option to secify the mixer.
+		- add 'forcerate' option to force the sample rate
+		  to the current rate at all times
+		- add 'autoOpen' option to specify whether the audio
+		  devices are opened at init time.
+		- add 'readwrite' option to specify whether devices
+		  are opened read/write (default) or
+		  readonly/writeonly for the input and output devices,
+		  respectivly.
+
+
+	- added patch from Nick Ing-Simmons to pass the correct port
+	  offset when starting nasd within libaudio (if START_SERVER
+	  is defined at build time).
+
+	- always output verbose/debugging info to stderr if debugging
+          is enabled (even if you normally use syslog).  stderr is not
+          closed when debugging is turned on.
+
+
+Version 1.4.2 4/8/2001:
+
+        ## 1.4.1b 3/9/2001
+
+	- added patch from Paul Fox allowing auctl to set gains based
+		in an increment
+
+	- added a patch to lib/audio/wave.c from Philippe Jouguet that
+          corrects an infinite loop that can occur when auplay is fed
+          a corrupted wave file.
+
+	- added patches to auplay from Paul Fox.  auplay will now stop
+          the flow when a signal is caught.  Also a new option '-l'
+          allows auplay to play filenames specified on stdin.
+
+	- set libaudio's SO revision to 2.1 from 1.4 to avoid
+	  confusion with older apps built when the older libaudio
+          was at 2.0 (debian).
+
+	## 1.4.1a 12/10/2000
+
+	- autool - fixed -volume option
+
+	- added cast from a patch by Sun Ireland for their OpenOffice
+		(StarOffice) project.
+
+	- fixed libaudio to start up 'nasd' instead of 'au' when 
+		START_SERVER is defined.
+
+	- applied Erik Inge Bolso's patch for properly opening 2
+          channels instead of 3 for stereo output devices.
+
+	- added HPUX 10.20.x patches from Klaus Dittrich
+
+	- fixed problem in lib/audio/Alibint.c regarding ambiguous
+          casts with void pointers in the buffer padding code, and to
+          make it more portable with other operating systems/compilers
+          (HPUX 10.20, UW7).
+
+	- lib/audio/soundlib.c - fixed cases where a client (like
+          auplay) would hang if the element Import size matched the
+          complete datasize of a flow.  An EOF would never be sent.
+          Thanks to Shigeharu Takeno for providing a reproducible test
+          case.
+
+	- added Unixware 7.1 patches from Robert Roselius.
+
+ 	- added patch to sun/ausuni.c from John Wehle correcting a
+          problem on some solaris machines that don't allow sbpro
+          devices to be open for both reading and writing.
+
+	- add patches from Steve McIntyre for creating sticky socket
+          directories, and to close stdin, stdout, and stderr.
+
+	
+
+Version 1.4.1 9/4/2000:
+
+	- this release is really only neccessary if you are using the
+          NAS server on a Sun, and have frequent dropouts.  
+
+	- fix to the sun server from Charles Levert correcting a Sun
+          problem with 'late SIGPOLLS'.
+
+	- minor documentation fixes - new mailing list archive
+          location, etc.
+
+Version 1.4 2/27/2000:
+
+	- Release of 1.4
+
+	- Removes USE_BSD* dependancies on Linux builds.  
+
+	## 1.3e 02/12/2000:
+
+	- This is a pre-release 1.4 candidate.
+
+	- corrected a problem in the voxware server where when
+		ReleaseDevice was enabled, the device would be held
+		open when nasd was first started until the first
+		connection was made.
+
+	- added config/NetAudio.def to set various configurables like
+		NasConfigSearchPath.
+
+	- changed documentation regarding the new location of the web 
+		site (http://radscan.com/nas.html)
+
+	## 1.3d 01/05/2000:
+
+	- corrected some build problems on Sparc Solaris 2.6 with native 
+		compiler/X11 env
+
+	- corrected build problems on native Unixware compiler and X11R5
+		Note, to get this to work, you need 3 corrected
+		/usr/X/lib/config/ files from me...
+
+	- integrated config handling in all servers, based on a 
+		lex/yacc parser from Stephen Hocking that was in the 
+		voxware server.
+
+		- config file is /etc/nas/nasd.conf
+			an example config file (/etc/nas/nasd.conf.eg) 
+				is installed.
+		- parser errors are a bit more informative ;-)
+		- no more parser in voxware server... moved into dia/
+			for general purpose use.
+		- each server now has a config.c and config.h file that 
+			provides the ddaSetConfig() functionality required
+			of each server by dia/.  In the SGI case, 
+			it's just a stub. ddaSetConfig() ignores options
+			it doesn't understand (required behavior).
+		- server cmdline options '-v' (verbose) and '-d <num>'
+			(debug messages) added.  These override 
+			nasd.conf settings.
+		- hooks added to all servers in config.c - ddaProcessArg() 
+			and ddaUseMsg() for integrated arg handling.
+
+
+	- voxware server:
+		- release device functionality now controlled by
+			nasd.conf
+		- mixer init policy now controlled by nasd.conf
+
+	- sun server:
+		- added integrated sun (ausuni) module (now built by 
+			default) into the distribution.  
+		- release device functionality now controlled by
+			nasd.conf
+
+	- hpux server:
+		- added device release (ReleaseDevice) capability to hpux
+			server.  All servers except for sgi now
+			support this functionality.
+		- fixed sample rate change problem in hpux server
+		- separated hardware init code for ReleaseDevice 
+			functionality
+		- added new option in nasd.conf to select either the
+			EXT (external - headphones/speakers) or INT
+			(internal speaker) output device by default
+
+	- renamed generated server binary from au* to nasd for all
+			servers
+		- man pages updated (auserver.man and 
+				AUVoxConfig.man	respectively).
+
+	## 1.3c 10/24/99:
+
+	- Added patches from Mark Davies for NetBSD.  
+
+	- changed BIG_ENDIAN ->NAS_BIG_ENDIAN and LITTLE_ENDIAN to
+		NAS_LITTLE_ENDIAN per Mark's suggestion globally
+
+	- Added global NasConfig struct for configurables global to all 
+		servers.
+
+	- More prep work for unified arg/config handling
+
+	- Some bug fixed related to the 'mondo' patch.
+
+	- Replacement of PRMSG() macros with a varargs logging function:
+		osLogMsg(...).  If your working on a server and want to
+		use these, #include "aulog.h" (in 1.3c+) and go for it.
+
+	- I've added a NasConfig.h file to config/ that defines (or will)
+		a few things (like whether you want to use syslog,
+		etc).  Initially you will need to tweak this manually 
+		for your site... 
+
+	- Changes made to the way various include files are generated
+		during a build... Basically any module that contains
+		header files needed by other modules have the
+		appropriate header files exported into TOPLEV/include 
+		during the includes phase of the build using the imake
+		BuildIncludes() macros.  
+	
+	## 1.3b 9/4/1999:
+
+	- Addition of Steve McIntyre's Mondo patch.
+
+	## 1.3a 8/1/1999:
+
+	- First test version incorporating many patches from around
+		the planet, based on original 1.2p5 sources.
+
+#
+#
+############################################################################
+# the following is included for historical reasons, and concerns
+#  changes to 1.2p5 and earlier versions. 
+#
+# $NCDId: @(#)HISTORY,v 1.27 1996/09/05 18:46:47 greg Exp $
+#
+
+** 1.2 - PATCH 05 **
+
+Server
+	o voxware bug fixes, configuration file, and man pages.
+	  (Thanks to Stephen Hocking)
+
+	o fixed some HP server compilation problems.
+
+	o fix a potential problem when reading from a client.  under
+	  some circumstances the read pointer could be left on
+	  a non-sample size boundry resulting in white noise.
+
+	o add a bit to the component use field to indicate that using
+	  that component will override the use of other components.  This
+	  bit is used on input devices when the audio hardware does not	  support recording and playing simultaneously.
+
+	o fix a problem with limiting samples on waveform devices.  if you
+	  used anything other than AuUnlimitedSamples, bad things would
+	  happen.
+
+Library
+	o fixed a problem reading some wave files.
+
+Clients
+	o auphone - check for the exclusive use bit.
+
+	o auscope - display the exclusive use bit.
+
+Misc
+	o support library and client compilation under Windows NT with
+	  X11R6.1.
+
+** 1.2 - PATCH 04 **
+
+Server
+	o fixed a bug in the Sun dbri driver that caused the speaker
+	  to get turned off.  (Thanks to Charles Levert)
+
+	o fixed an ancient server bug that caused buffers to get
+	  corrupted when a flow is stopped and restarted.
+
+Clients
+	o some more minor bug fixes to auscope.
+
+** 1.2 - PATCH 03 **
+
+Server
+	o HPUX server now functional.  (Thanks to Jay Brister)
+
+	o Fix non-rentrant malloc problem for SGI server under
+	  IRIX (5.3).  (Thanks to Scott Byer)
+
+	o removed obsolete SVR4 voxware code.
+
+	o catch bad protocol requests.
+
+Library
+	o prevent AuSoundPlayFromFile() and AuSoundPlayFromData() from
+	  changing the line mode.  A bug introduced in patch 2.
+
+	o fixes for shared audio library under X11R6.  (Thanks to
+	  Bill Sebok)
+
+	o clean up some defines in the STARTSERVER code. (Thanks to
+	  Bill Sebok)
+
+	o added AuSoundRecordToDataLength() which can be used to find the
+	  length of data recorded when recording to memory.
+	  (Thanks to Jonathan Thompson)
+
+Clients
+	o minor bug fix to auscope.
+
+	o audemo - cut off filename extensions from the right instead
+	  of the left. (Thanks to Raymond Toy)
+
+Misc
+	o Updated SunOS 4.1.3 OpenWindows notes in BUILDNOTES.
+	  (Thanks to Curt Schroeder)
+
+	o Added notes and patch for running on a SS5 to BUILDNOTES.
+	  (Thanks to Mikael Pettersson and Curt Schroeder)
+
+	o Added note for building clients under AIX to BUILDNOTES.
+	  (Thanks to Harald Milz)
+
+	o Added note for building on DEC Alpha (OSF1 V3.2).
+	  (Thanks to Andrew Daviel)
+
+** 1.2 - PATCH 02 **
+
+Server
+	o caused the server to return to the lowest sampling rate when a
+	  flow terminates while playing multiple flows simultaneously.
+
+	o improved voxware dda driver.
+	  (Thanks to Stephen Hocking and Shawn M.)
+
+	o experimental HP dda driver.  (Thanks to William J. Hunter)
+
+	o add a -timeout option to the server to allow the server to
+	  terminate after a period of time with no clients.
+	  (Thanks to William L. Sebok)
+	  To enable this, you must build the NAS tree using the following:
+
+	  make WORLDOPTS='-k CDEBUGFLAGS="$(CDEBUGFLAGS) -DSTARTSERVER"' World
+
+Library
+	o fixed a bug in the wave file reader.
+
+	o fixed a bug in the aiff file reader.
+
+	o new soundlib/sound functions AuSoundPlay(), AuSoundRecord(),
+	  and SoundTellFile() with man pages.  (Thanks to Yoav Eilat)
+
+	o attempt to launch an NAS server on the local host if client
+          cannot initially connect to a local server.
+          (Thanks to William L. Sebok)
+	  To enable this, you must build the NAS tree using the following:
+
+	  make WORLDOPTS='-k CDEBUGFLAGS="$(CDEBUGFLAGS) -DSTARTSERVER"' World
+
+Clients
+	o add *input resources to all X clients to correct a problem
+	  with some window managers not giving focus.
+
+	o fixed bug in auscope when displaying actions or parameters.
+
+	o fixed typo in auscope that caused it not to work with Perl 5.
+
+	o added playRaw example client.
+
+
+** 1.2 - PATCH 01 **
+
+Server
+	o added output mode control (Speaker/Headphone/Line-Out) to the server
+	  and the Sun dda drivers. (thanks to Ian Donaldson)
+
+	o fix for multiple bundle elements in a flow. (thanks to Steven King)
+
+	o improved voxware dda driver.
+	  (thanks to Christian Schlichtherle and Stephen Hocking)
+
+	o the server now does a range check on the output data and
+	  clips correctly.  Due to the possible performance impact,
+	  this can be disabled by commenting out the #define
+	  OUTPUT_RANGE_CHECK in server/dia/auprocess.c.  ** ATTENTION
+	  DDA DEVELOPERS ** this fix required a change to all of the
+	  dda drivers.  The output minibufs must be twice as large as
+	  they were previously.  (thanks to Steven King)
+
+	o voxware dda driver - Fix problem (apparently from
+	  SoundPlayFromBucket) where tail of data was not flushed
+	  through card until start of next operation.  (Thanks to Paul
+	  F. Werkowski)
+
+	o only call dda set sample rate callback if the rate has changed.
+
+Library
+	o SVR3.2 with STREAMSCONN wouldn't work with XDMCP due to a
+   	  bug in nameserver.c.  (required XDMCP to be disabled; this
+   	  won't affect users of stock NAS 1.2 but would affect those
+   	  audio servers that implement XDMCP authorization checking)
+	  (thanks to Ian Donaldson)
+
+	o fatal errors now lookup AuErrorDB for more detail.
+   	  (like Xlib does with XErrorDB) (thanks to Ian Donaldson)
+
+	o Implementation of user callable error catching functions:
+		AuSetErrorHandler()
+		AuSetIOErrorHandler()
+	  (thanks to Ian Donaldson)
+
+	o added default error handler variables so you can catch errors
+	  during the initial server open.  (Thanks to Richard Caley)
+
+	o added some setjmp gunkus to Xtutil.c for use by error handlers.
+	  (Thanks to Richard Caley)
+
+	o C++ compatibility. (Thanks to Yoav Eilat)
+
+	o New SoundSeekFile() and SoundFlushFile() functions.
+	  (Thanks to Yoav Eilat)
+
+	o SoundNumSamples() value is now updated in SoundWriteFile().
+	  (Thanks to Yoav Eilat)
+
+Clients
+	o added re-written auscope.
+
+	o modified aupanel to support output mode controls.
+
+General
+	o made all the Imakefiles use an explicit path for NetAudio.tmpl
+	  to fix possible includes of the wrong NetAudio.tmpl.
+
+	o some notes on building under SunOS 4.1.3 OpenWindows from
+	  Ian Donaldson.
+
+	o new API man pages from Steven King.  (Thanks!)
+
+	o made man page installation use standard InstallManPage macro.
+
+	o use AuInstallScript macro to install scripts.
+
+	o fixed some build and install problems under FreeBSD 1.1.5.1.
+	  (Thanks to Paul F. Werkowski)
+
+** Release 1.2 **
+
+General
+	o A few cosmetic changes.
+
+** PATCH 02 **
+
+Server
+	o fixed a bug with monitor elements not returning the correct
+	  data.  This caused the meters in audemo to be broken.
+
+	o patches from Steven King
+
+	    - In server/os/connections.c, EstablishNewConnections
+              probably ought to check that newconn is less than
+              lastfdesc before it is used in the BITSET macro (this in
+              the mit X11r5 source, havent looked at r6 yet), tho
+              you'd need lots and lots of connections to tickle
+              this. Also in connections.c, CheckConnections should
+              probably check for EINTR if select returns an error, I
+              dont know if any implementation of select would actually
+              EINTR for if it got a SIGPOLL or SIGALRM if the timeout
+              is zero, but better safe than sorry.
+
+            - FallbackDefineSelf exists and is only referenced in
+              os/access.c. Its part of the localconn patch which
+              obviously isnt handling non 386 svr4's correctly.
+
+Library
+	o fixed a bug in AuSoundRecordToData().  The flow wasn't getting
+	  stopped when the recording was finished.
+
+	o fixed compile problem in ConnSvr.c under Dell 2.2 Xfree86-2.1.1.
+
+	o fixed compile problems under some X11R4s that don't define _Xconst.
+
+Clients
+	o fixed problem with audial -recognize messing with line mode and
+	  gain attributes without checking to see if the device was capable.
+
+	o fixed range/clipping problem in effectsAmplitude in auedit.
+
+General
+	o changed occurances of the name "NetAudio" to "Network Audio System"
+          or "NAS" due to a name conflict.
+
+	o patches from Ian Donaldson
+
+	    - Solaris 2 server failed to link because of undefined
+	      symbol FallbackDefineSelf().
+
+	    - Shared library compilation broke completely due to
+	      changes in NetAudio.tmpl and because the include of
+	      <Library.tmpl> was moved too high up in
+	      lib/audio/Imakefile, and missed out on the
+	      DoSharedLib/DoNormalLib flags etc.
+
+** PATCH 01 **
+
+Server
+	o fixed a couple of problems with speed changes in the
+	  SVR4 VOXware driver.
+
+** Release 1.2b BETA **
+
+Library
+	o fixed possible bogus free in sound.c.
+
+Clients
+	o fixed auwave dropping core (due to bugs in the slider widget).
+
+General
+	o lots of stuff from Steven King.  See CHANGES.sk below for details.
+
+	o The file server/PATCHES.sk contains patches from Steven King to
+	  improve the handling of audio clipping in the server. I've
+	  not applied them to the standard distribution yet because
+	  I'm concerned about their possible performance impact.
+
+	o added some documentation about actions.
+
+** PATCH 01 **
+
+Server
+	o fixed a bug with looping flows.
+
+Library
+	o fixed problem with X11R4 build.
+
+** Release 1.2a ALPHA **
+
+Server
+	o fixed a bug in ReadElement that would occasionally cause
+	  protocol errors during recording.
+
+	o wake up the server when there are events to send out.
+
+	o fixed a bug in readBucket() that caused noise at the end of
+	  a bucket.
+
+	o get rid of minibuf padding to eliminate clicks.
+
+	o optimized sample rate conversion.
+
+	o added FreeBSD/Linux VOXware driver (thanks to Amancio Hasty).
+
+	o added SVR4 VOXware driver (thanks to Stephen Hocking).
+
+	o added line mode control to Sun dbri driver.
+
+Library
+	o add AuXtAppRemoveAudioHandler().
+
+	o fixed memory leaks and other problems with the bucket attribute
+	  cache.
+
+	o fix some nits with waveform durations.
+
+Clients
+	o new auphone sample app.
+
+	o added some simple examples.
+
+General
+	o much cleaning and various OS support fixes from
+	  Ian M. Donaldson.  See CHANGES.labtam below for details.
+
+** Release ?.? ALPHA (Feburary 11, 1994) **
+
+Server
+	o fixed a bug where the last little bit of audio data would be
+	  lost.
+
+	o fixed a bug in readClient where the buffer was being incorrectly
+	  padded, possibly resulting in static at the end of the audio data.
+
+	o fixed two track monitor elements.
+
+	o Sun driver
+
+		- fixed a bug that could cause the output to get jumbled.
+
+		- wait for audio to drain after flows finish.
+
+		- Sparc 10 dbri driver.
+
+Library
+	o added API for set and get close down mode.
+
+	o added Amiga IFF/8SVX sound file support.
+
+	o close the sound file before the callback is called for
+	  AuSoundRecordToFile().
+
+	o make ListBuckets add to the bucket cache.
+
+	o added file format suffixes to the SoundFileInfo structure.
+
+	o added AuSetString() macro.
+
+	o fixed "strdup" bug in SoundCreate.
+
+	o re-arranged some utility routines into separate modules.
+	  (NOTE: possible incompatibility - AuMonitorRate and AuMonitorFormat
+	         are no longer externed in audioutil.h)
+
+	o add AuWaveFormToString() and AuStringToWaveForm().
+
+	o add AuSoundRecordToData().
+
+	o add stereo support for voc files (thanks to Steven King).
+
+Clients
+	o auedit
+
+		- deal with sound files with an unknown number of samples
+		  (like those from stdin).
+
+		- add record capability.
+
+	o utilities
+
+		- various new utilities.
+
+	o new auwave sample app.
+
+	o new slider widget for volume/gain controls.
+
+General
+	o re-worked the includes of NetAudio.tmpl so it will (hopefully)
+	  work on most platforms.
+
+	o builds under SVR3.2 (thanks to Steven King).
+
+** Release 1.1 **
+
+Server
+	o Protected malloc/free from audio signals.
+
+	o Fixed setting parameters of waveforms and buckets.
+
+	o New dia/dda interface.
+
+	o Fixed a bug where the flow was re-compiled after
+	  an event was requested even if that event didn't change
+	  the state of the flow.
+
+	o Fixed possible memory trashing in readClient.
+
+	o Sun driver
+
+		- Don't initialize output gain or internal/external speaker
+		  mode.
+
+		- Get rid of some 'clicks'.
+
+		- Deal with the situation when there are no physical outputs
+		  in a flow.  This fixes the core dumps when you record before
+		  having played anything.
+
+		- Fixed erroneous calling of AuProcessData() after changing
+		  gain values.
+
+		- Fixed various bugs in recording (how did it ever work?!)
+
+	o New SGI driver (thanks to Reiner Ernst)
+
+Library
+	o Fixed a bug in AuConvertShortToData().
+
+	o Fixed function prototypes in Xtutil.h.
+
+	o Fixed a problem in Xtutil.c where events would not get processed
+	  if they were enqueued while awaiting a reply.
+
+Clients
+	o auedit
+		Fixed a bug with temporary and backup file names.
+
+	o auconvert
+		Fixed a bug with converting raw data.
+
+General
+	o Solaris 2.2 support
+
+
+********************************************************************************
+			      CHANGES.labtam
+********************************************************************************
+
+Many thanks to Ian M. Donaldson at Labtam for the following:
+
+- Now compiles cleanly on all these without any compiler warnings
+  whatsoever (well the odd one or two under X11R4).
+
+	- Solaris 2.3 on SS1000 under Sun provided Open Windows 3.2
+	  Server untested.  
+	      (We only have a SS1000 running 2.3 which has no audio device)
+
+	  Porting required because Sun changed the audio interface
+	  slightly in Solaris 2 versus SunOS 4.
+
+	  Clients tested reasonably.
+
+	- AIX 3.2 on a RS6000/220 under IBM provided X11R4
+	  No server port done.  Don't have access to any IBM audio hardware.
+	  Clients tested reasonably.
+
+	- SunOS 4.1.2  on a Sun IPX under MIT provided X11R5.
+	  (no porting required specific to this platform)
+	  Both clients and server tested reasonably.
+
+	- SVR4.0/486  on one of our own computers under MIT provided X11R5.
+	  (as a guess comparable to Dell SVR4.0 or ESIX SVR4.0)
+	  We used native STREAMSCONN TLI TCP/IP transport.
+	  No server port done.  This computer never had audio hardware.
+	  Clients tested reasonably.
+
+	- SVR3.2/486  on one of our own computers under MIT provided X11R4.
+	  This O/S uses Lachman provided TCP/IP, and we used
+	  STREAMSCONN TLI TCP/IP transport.
+	  No server port done.  This computer never had audio hardware.
+	  Clients tested reasonably.
+
+	  Unfortuantely every SVR3.2 system has some different
+	  quirk since TCP was non-standard then.   No guarantees
+	  it will compile better on other types.
+
+- Bugfixes
+	- server had byte swapping  error that crashed playbucket(1)
+	  when client run from opposite endian host
+
+	- autool crashed on little endian host when volume slider was
+	  used when stopped (hung on big endian host)
+
+	- various signal mis-use.  Background processes from non-job
+	  control shells don't die when ^C hit anymore.
+
+	- "SVR4" is not a reliable symbol for use in Imakefiles; use SystemV4
+	  instead.  (broke audial).
+
+	- in Netaudio.tmpl, don't redefine MKDIRHIER or BINDIR by
+	  default as this breaks the bootstrap in subtle ways on 
+	  certain systems.  Audio clients now get installed in the
+	  same directory that X clients do rather than /usr/local/bin.
+
+	  On Solaris 2.3 with OpenWindows, this means /usr/openwin/bin,
+	  otherwise it usually means /usr/bin/X11.
+	  Similarly for header files, app-defaults and libraries.
+
+	- build will not fail on systems that don't have servers ported
+	  to them.  This allows the clients and libraries to be built
+	  on all platforms and servers on a subset.
+
+- libaudio is built as a shared library (currently rev 2.0) on systems
+  where libX11 is built shared.  In the list above that means
+  Solaris 2.3, SunOS 4.1, SVR4.0.
+  I used rev 1.0 for the September 93 netaudio release but changes
+  between then and netaudio 1.1 looked somewhat incompatable so I bumped
+  the revision number then.
+
+- X11R4 compatability re-added in so compiliation in those 
+  environments is now possible.
+
+- STREAMSCONN support for SVR3.2 and SVR4.0 for libaudio.  
+  This is a direct port from MIT X11R5 with the odd fix-tracker applied.
+  NB: Not done for auscope(1).  sockets used in that case.
+  (this is ok but if people want binary compatability from SVR3.2
+  to SVR4 sockets won't work because SVR3.2 has no standard socket ABI)
+
+- Better System-V and SVR4 support
+
+	- Use System-V reliable signals.  (ie: sigset(2)).  
+	  signal(2) is unreliable on System-V systems.
+	  Didn't bother with SVR4/POSIX signals; SVR3 signals work
+	  fine on SVR4 and are easier to understand and code.
+
+	- don't use libucb at all on SVR4.  This library is bad news
+	  on most SVR4 systems and should be avoided like the plague!
+
+- Better ANSI support (SVR4 + Solaris)
+
+	- use ANSI memcpy/memset exclusively on ANSI systems instead
+	  of bcopy/bzero
+
+	- eliminated all SVR4.0/486 cc's reported warnings of callback
+	  function type declaration mismatches.  (this is the bulk
+	  of the changes).  Solaris 2 cc doesn't report half these things
+	  unfortunately.
+
+- auscope(1) now has a '-n' flag so it can be run in background reliably.
+
+- 'make install' now fully installs correctly.  Even app-defaults!
+
+- 'make clean' now properly cleans
+
+********************************************************************************
+			      CHANGES.sk
+********************************************************************************
+
+Thanks to Steven King for the following:
+
+- building on ISC
+
+    I had a few problems building 1.2a on my system running ISC SVR3.2r4.0
+    with the imake enviroment provided by XFree86 (It looks to be more
+    work than its worth to get netaudio to build with the vendor supplied
+    X11R4).
+
+    In server/dia/au.h, ISC doesnt have memmove, however bcopy and friends
+    are in the normal library search path.
+
+    In lib/audio/Alibnet.h, the omission of the #define for _AuWriteV
+    resulted in link errors for all clients.
+
+    In lib/audio/Imakefile, the SYSV_DEFINES macro causes major grief if
+    one has installed XFree, I would expect this to be true for any SVR32
+    that has XFree.  Also, I found it usefull to include NetAudio.tmpl
+    after Library.tmp so that I could redefine things like CDEBUGFLAGS and
+    such in NetAudio.tmpl
+
+    In clients/audio/audemo/audemo.c, ISC needed sys/time.h included, I
+    suspect most SYSV's will as well.
+
+    In clients/audio/audial/audial.c, the compile breaks on the inclusion
+    of sys/file.h, I think this is a ISC 4.0 specific problem.
+
+- localconn patches
+
+    These patches are derived from the XFree86 2.0 release.  I pretty much
+    just merged the XFree patches into netaudio.  My principle interest
+    was in the streams localconn code for ISC; besides greatly improving
+    the performance for local clients, they allow the server to run with
+    the system at run level 2, or on systems where full networking isnt
+    availible (an extra $$$ option on ISC and lots of other PC sysVs).
+     In addition to the ISC code, theres also support for other systems, SVR4,
+    SCO, linux and net/free bsd, which may or may not be usefull depending
+    on the system (ie, is anyone doing an independent SCO port?).  There
+    is also alot of code for a minix and amoeba port.  I can pretty much
+    guarantee that this will not work, but I left it in as it doesnt affect
+    the other systems and might give a leg up to anyone attempting a minix
+    or amoeba port.
+
+- NetAudio.tmpl
+
+    Make clients get rebuilt after libaudio.a changes.

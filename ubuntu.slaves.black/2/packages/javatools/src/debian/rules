@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+POD2MAN=pod2man --stderr --utf8 -c Javahelper -r "$(DEB_VERSION)"
+
+MOD_PATH:=lib/Debian/Javahelper
+
+%:
+	dh $@
+
+jh_lib.sh: jh_lib.sh.in
+	sed 's,%JAVATOOLS_VERSION%,${DEB_VERSION},' < $< > $@
+
+override_dh_auto_build: jh_lib.sh
+	mkdir -p target/classes
+	javac -d target/classes -source 7 -target 7 src/main/java/org/debian/javatools/CheckProperty.java
+	jar -cvf target/javatools.jar -C target/classes/ .
+
+	mkdir tmp tmp.jarwrapper
+	# javahelper pod-based manpages
+	$(POD2MAN) jh_installeclipse tmp/jh_installeclipse.1
+	$(POD2MAN) jh_generateorbitdir tmp/jh_generateorbitdir.1
+	$(POD2MAN) jh_setupenvironment tmp/jh_setupenvironment.1
+	$(POD2MAN) jh_compilefeatures tmp/jh_compilefeatures.1
+	$(POD2MAN) jh_exec tmp/jh_exec.1
+	$(POD2MAN) jh_build tmp/jh_build.1
+	$(POD2MAN) jh_linkjars tmp/jh_linkjars.1
+	$(POD2MAN) jh_manifest tmp/jh_manifest.1
+	$(POD2MAN) jh_classpath tmp/jh_classpath.1
+	$(POD2MAN) jh_installjavadoc tmp/jh_installjavadoc.1
+	$(POD2MAN) jh_installlibs tmp/jh_installlibs.1
+	$(POD2MAN) -s 1 jh_clean.pod tmp/jh_clean.1
+	$(POD2MAN) $(MOD_PATH)/Eclipse.pm tmp/Debian::Javahelper::Eclipse.3
+	$(POD2MAN) $(MOD_PATH)/Java.pm tmp/Debian::Javahelper::Java.3
+	$(POD2MAN) $(MOD_PATH)/Manifest.pm tmp/Debian::Javahelper::Manifest.3
+	$(POD2MAN) $(MOD_PATH)/ManifestSection.pm tmp/Debian::Javahelper::ManifestSection.3
+	# jarwrapper pod-based manpages
+	$(POD2MAN) -s 1 jarwrapper.pod tmp.jarwrapper/jarwrapper.1
+	$(POD2MAN) -s 1 jardetector.pod tmp.jarwrapper/jardetector.1
+	markdown --html4tags tutorial.txt | \
+		cat tutorial-header.html - tutorial-footer.html > tutorial.html
+
+runtests: jh_lib.sh
+	prove -Ilib $(PAR_ARGS) t
+	cd tests && ./tests.sh
+
+override_dh_auto_test: runtests
+
+override_dh_auto_clean:
+	rm -f jh_lib.sh tutorial.html
+	rm -fr tmp tmp.jarwrapper target

@@ -1,0 +1,296 @@
+#!/usr/bin/make -f
+
+binaries := $(shell dh_listpackages)
+
+export DEB_BUILD_MAINT_OPTIONS=hardening=+bindnow
+
+# Ensure the build aborts when there are still references to undefined symbols
+DEB_LDFLAGS_MAINT_APPEND += -Wl,-z,defs
+
+# NB: do NOT use -Wl,--as-needed to build glib; for instance the link to
+# pthread is carefully crafted to allow dlopen()ing pthread-using libs; see
+# https://marc.info/?i=1257999019.21780.15.camel@marzipan aka
+# https://mail.gnome.org/archives/gtk-devel-list/2009-November/msg00096.html
+DEB_LDFLAGS_MAINT_APPEND += -Wl,--no-as-needed
+
+# Make the linker work a bit harder so dynamic loading can be done faster
+DEB_LDFLAGS_MAINT_APPEND += -Wl,-O1
+
+include /usr/share/dpkg/default.mk
+
+%:
+	dh $@
+
+ifneq ($(filter hppa,$(DEB_HOST_ARCH_CPU)),)
+stack_grows_up = true
+else
+stack_grows_up = false
+endif
+
+ifneq ($(filter kfreebsd,$(DEB_HOST_ARCH_OS)),)
+have_non_stub_xattr = false
+else
+have_non_stub_xattr = true
+endif
+
+export DH_MESON_CROSS_FILE = debian/cross.txt
+
+# We edit the debcrossgen output to work around unimplemented feature
+# request https://bugs.debian.org/912559
+override_dh_auto_configure:
+ifneq ($(DEB_HOST_ARCH),$(DEB_BUILD_ARCH))
+	/usr/share/meson/debcrossgen \
+		-o debian/cross.txt.in
+	debian/set-cross-properties \
+		have_c99_snprintf=true \
+		have_c99_vsnprintf=true \
+		have_strlcpy=false \
+		have_unix98_printf=true \
+		growing_stack=$(stack_grows_up) \
+		< debian/cross.txt.in > debian/cross.txt
+endif
+	dh_auto_configure \
+		--builddirectory=debian/build/deb \
+		-- \
+		$(DEB_CONFIGURE_EXTRA_FLAGS) \
+		$(DEB_CONFIGURE_FLAGS_deb) \
+		$(NULL)
+ifneq ($(filter %-udeb,$(binaries)),)
+	dh_auto_configure \
+		--builddirectory=debian/build/udeb \
+		-- \
+		$(DEB_CONFIGURE_EXTRA_FLAGS) \
+		$(DEB_CONFIGURE_FLAGS_udeb) \
+		$(NULL)
+endif
+
+override_dh_clean:
+	rm -rf $(CURDIR)/debian/build \
+	       $(CURDIR)/debian/install
+	dh_clean -Xorg.gtk.test.gschema.xml.orig -Xorg.gtk.test.gschema.override.orig
+
+
+override_dh_makeshlibs:
+	dh_makeshlibs -plibglib2.0-tests -n
+	dh_makeshlibs --remaining-packages --add-udeb=libglib2.0-udeb -Xlibgiofam.so -- -c4
+
+# (Ubuntu-specific)
+# Don't strip translations from the installed tests; makes them environment dependent.
+override_dh_translations:
+	dh_translations -Xinstalled-tests
+
+# Do not clutter $HOME with ~/.dbus-keyrings and avoid failure on the buildds
+# where creating /home/buildd/.dbus-keyrings fails
+export HOME=$(CURDIR)/debian/build
+
+# Make sure that everything that uses D-Bus is creating its own temporary
+# session rather than polluting the developer's (or failing, on buildds)
+export DBUS_SESSION_BUS_ADDRESS=this-should-not-be-used-and-will-fail:
+
+ifeq ($(DEB_HOST_ARCH_OS), linux)
+handle_test_failure := exit $$?
+else
+handle_test_failure := true
+endif
+
+# Upstream test timeouts assume an otherwise unloaded system, but that
+# isn't necessarily the case for a porterbox or multiple parallel builds
+test_timeout_multiplier = 3
+
+ifneq ($(filter arm hppa mips% sparc%,$(DEB_HOST_ARCH_CPU)),)
+$(info Slow architecture detected, increasing test timeout)
+test_timeout_multiplier = 5
+endif
+
+ifneq ($(filter m68k riscv64 sh4,$(DEB_HOST_ARCH_CPU)),)
+$(info Architecture with qemu buildds detected, increasing test timeout a lot)
+test_timeout_multiplier = 20
+endif
+
+override_dh_auto_test-arch:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	# Remove LD_PRELOAD so we don't run with fakeroot, which makes dbus-related tests fail
+	# First run the non-flaky tests, and fail the build if they fail (on linux)
+	env -u LD_PRELOAD \
+		DEB_BUILD_TIME_TESTS=1 \
+		LC_ALL=C.UTF-8 \
+		MESON_TESTTHREADS=1 \
+	debian/tests/run-with-locales \
+		--generate de_DE=ISO-8859-1 \
+		--generate de_DE.utf8 \
+		--generate de_DE@euro.utf8 \
+		--generate el_GR.utf8 \
+		--generate en_GB=ISO-8859-1 \
+		--generate en_GB.utf8 \
+		--generate en_US=ISO-8859-1 \
+		--generate en_US.utf8 \
+		--generate es_ES.utf8 \
+		--generate fa_IR=UTF-8 \
+		--generate fa_IR.utf8 \
+		--generate fr_FR.utf8 \
+		--generate hr_HR.utf8 \
+		--generate ja_JP.utf8 \
+		--generate ja_JP.EUC-JP \
+		--generate lt_LT.utf8 \
+		--generate pl_PL=ISO-8859-2 \
+		--generate pl_PL.ISO-8859-2 \
+		--generate pl_PL.utf8 \
+		--generate ru_RU=ISO-8859-5 \
+		--generate ru_RU.utf8 \
+		--generate sr_RS=UTF-8 \
+		--generate sr_RS@latin=UTF-8 \
+		--generate sv_SE=ISO-8859-1 \
+		--generate sv_SE.utf8 \
+		--generate tr_TR=ISO-8859-9 \
+		--generate tr_TR.utf8 \
+		--generate tt_RU=UTF-8 \
+		--generate tt_RU.utf8 \
+		--generate tt_RU@iqtelif=UTF-8 \
+		-- \
+	meson test -C debian/build/deb \
+		--no-rebuild \
+		--num-processes 1 \
+		--timeout-multiplier $(test_timeout_multiplier) \
+		--no-suite flaky \
+		--verbose \
+	|| $(handle_test_failure)
+	# and then run the flaky ones, but ignore them failing
+	env -u LD_PRELOAD \
+		DEB_BUILD_TIME_TESTS=1 \
+		LC_ALL=C.UTF-8 \
+		MESON_TESTTHREADS=1 \
+	meson test -C debian/build/deb \
+		--no-rebuild \
+		--num-processes 1 \
+		--timeout-multiplier $(test_timeout_multiplier) \
+		--suite flaky \
+		--verbose \
+	|| true
+endif
+
+# Skip most build-time tests if all we are building is documentation;
+# running them once per architecture is plenty. As an exception, do run the
+# documentation completeness checks, which won't normally be run on
+# architecture-specific buildds (except in Ubuntu).
+override_dh_auto_test-indep:
+	meson test -C debian/build/deb \
+		--no-rebuild \
+		--num-processes 1 \
+		--timeout-multiplier $(test_timeout_multiplier) \
+		--verbose \
+		gio-doc-check glib-doc-check gobject-doc-check \
+	|| $(handle_test_failure)
+
+# Let's get failing tests' stdout and stderr so we have some information when
+# a build fails
+export VERBOSE=1
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+enable_libmount := enabled
+enable_selinux := enabled
+else
+enable_libmount := disabled
+enable_selinux := disabled
+endif
+
+ifneq ($(filter hurd,$(DEB_HOST_ARCH_OS)),)
+use_fam := true
+else
+use_fam := false
+endif
+
+DEB_CONFIGURE_FLAGS_deb := \
+	--default-library both \
+	-Dfam=$(use_fam) \
+	-Dinstalled_tests=true \
+	-Dlibelf=enabled \
+	-Dlibmount=$(enable_libmount) \
+	-Dman=true \
+	-Dselinux=$(enable_selinux) \
+	-Dsystemtap=true \
+	-Dxattr=$(have_non_stub_xattr) \
+	$(NULL)
+
+ifneq ($(filter libglib2.0-doc,$(binaries)),)
+DEB_CONFIGURE_FLAGS_deb += -Dgtk_doc=true
+else
+DEB_CONFIGURE_FLAGS_deb += -Dgtk_doc=false
+endif
+
+DEB_CONFIGURE_FLAGS_udeb := \
+	--default-library shared \
+	-Dgtk_doc=false \
+	-Dinstalled_tests=false \
+	-Dlibmount=disabled \
+	-Dselinux=disabled \
+	-Dxattr=$(have_non_stub_xattr) \
+	$(NULL)
+
+override_dh_auto_build:
+	mkdir -p debian/tmp-xdg-runtime-dir
+	dh_auto_build --builddirectory=debian/build/deb
+ifneq ($(filter %-udeb,$(binaries)),)
+	dh_auto_build --builddirectory=debian/build/udeb
+endif
+
+override_dh_auto_install:
+	set -e; for script in postinst postrm triggers; do \
+		sed -e"s/#MULTIARCH#/$(DEB_HOST_MULTIARCH)/g" \
+		    -e"s/#ARCH#/$(DEB_HOST_ARCH)/g" \
+		    debian/libglib2.0-0.$$script.in \
+		    > debian/libglib2.0-0.$$script ; \
+	done
+ifneq ($(filter %-udeb,$(binaries)),)
+	dh_auto_install -plibglib2.0-udeb --builddirectory=debian/build/udeb --destdir=debian/install/udeb
+endif
+	dh_auto_install --remaining-packages --builddirectory=debian/build/deb --destdir=debian/install/deb
+
+override_dh_python3:
+	# dh_python3 can't process both a private directory and /usr/bin
+	# in the same invocation
+	dh_python3 -plibglib2.0-dev-bin /usr/share/glib-2.0/codegen
+	dh_python3 -plibglib2.0-tests --no-ext-rename /usr/libexec/installed-tests/glib
+	dh_python3
+
+override_dh_install:
+	# Unwanted bits from the .deb build
+	rm -fr debian/install/deb/usr/share/glib-2.0/codegen/__pycache__
+ifneq ($(filter %-udeb,$(binaries)),)
+	# Unwanted bits from the .udeb build
+	rm -f debian/install/udeb/usr/lib/*/*.so
+	rm -fr debian/install/udeb/usr/share/gdb
+	rm -fr debian/install/udeb/usr/share/gettext/its
+	rm -fr debian/install/udeb/usr/share/glib-2.0/codegen
+	rm -fr debian/install/udeb/usr/share/glib-2.0/gdb
+	rm -fr debian/install/udeb/usr/share/glib-2.0/valgrind
+	rm -fr debian/install/udeb/usr/share/man
+	dh_install -plibglib2.0-udeb --sourcedir=debian/install/udeb
+endif
+ifneq ($(filter %-tests,$(binaries)),)
+	sed -i -e '/^#!.*/,1 d' debian/install/deb/usr/libexec/installed-tests/glib/taptestrunner.py
+endif
+ifneq ($(filter hurd,$(DEB_HOST_ARCH_OS)),)
+	dh_install -plibglib2.0-0 --sourcedir=debian/install/deb usr/lib/${DEB_HOST_MULTIARCH}/gio/modules/libgiofam.so usr/lib/${DEB_HOST_MULTIARCH}/gio/modules
+endif
+	dh_install --remaining-packages --sourcedir=debian/install/deb
+	install -D -t debian/libglib2.0-0/usr/share/glib-2.0/ debian/clean-up-unmanaged-libraries
+	install -D -t debian/libglib2.0-0/usr/lib/${DEB_HOST_MULTIARCH}/glib-2.0/ debian/gio-launch-desktop
+
+override_dh_dwz:
+	dh_dwz -Nlibglib2.0-udeb
+
+# debhelper >= 13.4 makes all of /usr/libexec executable, which is not
+# quite right for installed-tests
+override_dh_fixperms:
+	dh_fixperms -Xusr/libexec/installed-tests
+ifneq ($(filter %-tests,$(binaries)),)
+	chmod --changes u=rw,og=r debian/libglib2.0-tests/usr/libexec/installed-tests/*/*.so
+	chmod --changes u=rw,og=r debian/libglib2.0-tests/usr/libexec/installed-tests/*/*/*.so
+	chmod --recursive --changes a+rX,u+w,og-w debian/libglib2.0-tests/usr/libexec/installed-tests
+endif
+
+override_dh_missing:
+	dh_missing --sourcedir=debian/install/deb
+ifneq ($(filter %-udeb,$(binaries)),)
+	dh_missing --sourcedir=debian/install/udeb
+endif

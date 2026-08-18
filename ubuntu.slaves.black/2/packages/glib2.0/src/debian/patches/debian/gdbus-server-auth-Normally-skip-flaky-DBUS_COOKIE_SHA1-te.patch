@@ -1,0 +1,35 @@
+From: Simon McVittie <smcv@debian.org>
+Date: Thu, 19 Nov 2020 10:44:39 +0000
+Subject: gdbus-server-auth: Normally skip flaky DBUS_COOKIE_SHA1 tests
+
+These intermittently fail on the buildds, but the failure cannot be
+reproduced in a debugging environment.
+
+We do not expect to use D-Bus over TCP on non-Windows platforms: we use
+an AF_UNIX socket, which is much more robust and secure. However, when
+using AF_UNIX, DBUS_COOKIE_SHA1 is unnecessary, because we can use the
+more reliable EXTERNAL authentication.
+
+Forwarded: not-needed
+---
+ gio/tests/gdbus-server-auth.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/gio/tests/gdbus-server-auth.c b/gio/tests/gdbus-server-auth.c
+index bd1443e..a231b0c 100644
+--- a/gio/tests/gdbus-server-auth.c
++++ b/gio/tests/gdbus-server-auth.c
+@@ -324,6 +324,13 @@ do_test_server_auth (InteropFlags flags)
+     }
+ #endif
+ 
++  if ((flags & (INTEROP_FLAGS_TCP | INTEROP_FLAGS_SHA1)) &&
++      g_getenv ("DEB_ALLOW_FLAKY_TESTS") == NULL)
++    {
++      g_test_skip ("https://gitlab.gnome.org/GNOME/glib/-/issues/2206");
++      goto out;
++    }
++
+   if (flags & INTEROP_FLAGS_ANONYMOUS)
+     server_flags |= G_DBUS_SERVER_FLAGS_AUTHENTICATION_ALLOW_ANONYMOUS;
+   if (flags & INTEROP_FLAGS_REQUIRE_SAME_USER)

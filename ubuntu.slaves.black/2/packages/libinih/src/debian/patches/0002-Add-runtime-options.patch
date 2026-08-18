@@ -1,0 +1,314 @@
+From 370c83655dcf6722649270ff2ca3b7c600b41217 Mon Sep 17 00:00:00 2001
+From: yangfl <yangfl@users.noreply.github.com>
+Date: Mon, 16 Dec 2019 18:13:11 +0800
+Subject: [PATCH 2/7] Add runtime options
+
+---
+ ini.c | 85 +++++++++++++++++++++++++++++++----------------------------
+ ini.h | 13 +++++++++
+ 2 files changed, 58 insertions(+), 40 deletions(-)
+
+diff --git a/ini.c b/ini.c
+index f8a3ea3..0c0318f 100644
+--- a/ini.c
++++ b/ini.c
+@@ -38,6 +38,19 @@ void* ini_realloc(void* ptr, size_t size);
+ #define MAX_SECTION 50
+ #define MAX_NAME 50
+ 
++bool ini_allow_multiline = INI_ALLOW_MULTILINE;
++bool ini_allow_bom = INI_ALLOW_BOM;
++char* ini_start_comment_prefixes = INI_START_COMMENT_PREFIXES;
++bool ini_allow_inline_comments = INI_ALLOW_INLINE_COMMENTS;
++char* ini_inline_comment_prefixes = INI_INLINE_COMMENT_PREFIXES;
++bool ini_use_stack = INI_USE_STACK;
++int ini_max_line = INI_MAX_LINE;
++bool ini_allow_realloc = INI_ALLOW_REALLOC;
++int ini_initial_alloc = INI_INITIAL_ALLOC;
++bool ini_stop_on_first_error = INI_STOP_ON_FIRST_ERROR;
++static bool ini_call_handler_on_new_section = false;
++bool ini_allow_no_value = INI_ALLOW_NO_VALUE;
++
+ /* Used by ini_parse_string() to keep track of string parsing state. */
+ typedef struct {
+     const char* ptr;
+@@ -66,18 +79,18 @@ static char* lskip(const char* s)
+    be prefixed by a whitespace character to register as a comment. */
+ static char* find_chars_or_comment(const char* s, const char* chars)
+ {
+-#if INI_ALLOW_INLINE_COMMENTS
++if (ini_allow_inline_comments) {
+     int was_space = 0;
+     while (*s && (!chars || !strchr(chars, *s)) &&
+-           !(was_space && strchr(INI_INLINE_COMMENT_PREFIXES, *s))) {
++           !(was_space && strchr(ini_inline_comment_prefixes, *s))) {
+         was_space = isspace((unsigned char)(*s));
+         s++;
+     }
+-#else
++} else {
+     while (*s && (!chars || !strchr(chars, *s))) {
+         s++;
+     }
+-#endif
++}
+     return (char*)s;
+ }
+ 
+@@ -98,17 +111,17 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+                      void* user)
+ {
+     /* Uses a fair bit of stack (use heap instead if you need to) */
+-#if INI_USE_STACK
+-    char line[INI_MAX_LINE];
+-    int max_line = INI_MAX_LINE;
+-#else
++    char line_buf[ini_use_stack ? ini_max_line : 0];
+     char* line;
+-    size_t max_line = INI_INITIAL_ALLOC;
+-#endif
+-#if INI_ALLOW_REALLOC && !INI_USE_STACK
++    size_t max_line;
++    if (ini_use_stack) {
++        line = line_buf;
++        max_line = ini_max_line;
++    } else {
++        max_line = ini_initial_alloc;
++    }
+     char* new_line;
+     size_t offset;
+-#endif
+     char section[MAX_SECTION] = "";
+     char prev_name[MAX_NAME] = "";
+ 
+@@ -119,12 +132,12 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+     int lineno = 0;
+     int error = 0;
+ 
+-#if !INI_USE_STACK
+-    line = (char*)ini_malloc(INI_INITIAL_ALLOC);
++if (!ini_use_stack) {
++    line = (char*)ini_malloc(ini_initial_alloc);
+     if (!line) {
+         return -2;
+     }
+-#endif
++}
+ 
+ #if INI_HANDLER_LINENO
+ #define HANDLER(u, s, n, v) handler(u, s, n, v, lineno)
+@@ -134,12 +147,12 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+ 
+     /* Scan through stream line by line */
+     while (reader(line, (int)max_line, stream) != NULL) {
+-#if INI_ALLOW_REALLOC && !INI_USE_STACK
++if (ini_allow_realloc && !ini_use_stack) {
+         offset = strlen(line);
+         while (offset == max_line - 1 && line[offset - 1] != '\n') {
+             max_line *= 2;
+-            if (max_line > INI_MAX_LINE)
+-                max_line = INI_MAX_LINE;
++            if (max_line > ini_max_line)
++                max_line = ini_max_line;
+             new_line = ini_realloc(line, max_line);
+             if (!new_line) {
+                 ini_free(line);
+@@ -148,35 +161,31 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+             line = new_line;
+             if (reader(line + offset, (int)(max_line - offset), stream) == NULL)
+                 break;
+-            if (max_line >= INI_MAX_LINE)
++            if (max_line >= ini_max_line)
+                 break;
+             offset += strlen(line + offset);
+         }
+-#endif
++}
+ 
+         lineno++;
+ 
+         start = line;
+-#if INI_ALLOW_BOM
+-        if (lineno == 1 && (unsigned char)start[0] == 0xEF &&
++        if (ini_allow_bom && lineno == 1 && (unsigned char)start[0] == 0xEF &&
+                            (unsigned char)start[1] == 0xBB &&
+                            (unsigned char)start[2] == 0xBF) {
+             start += 3;
+         }
+-#endif
+         start = lskip(rstrip(start));
+ 
+-        if (strchr(INI_START_COMMENT_PREFIXES, *start)) {
++        if (strchr(ini_start_comment_prefixes, *start)) {
+             /* Start-of-line comment */
+         }
+-#if INI_ALLOW_MULTILINE
+-        else if (*prev_name && *start && start > line) {
++        else if (ini_allow_multiline && *prev_name && *start && start > line) {
+             /* Non-blank line with leading whitespace, treat as continuation
+                of previous name's value (as per Python configparser). */
+             if (!HANDLER(user, section, prev_name, start) && !error)
+                 error = lineno;
+         }
+-#endif
+         else if (*start == '[') {
+             /* A "[section]" line */
+             end = find_chars_or_comment(start + 1, "]");
+@@ -184,10 +193,8 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+                 *end = '\0';
+                 strncpy0(section, start + 1, sizeof(section));
+                 *prev_name = '\0';
+-#if INI_CALL_HANDLER_ON_NEW_SECTION
+-                if (!HANDLER(user, section, NULL, NULL) && !error)
++                if (ini_call_handler_on_new_section && !HANDLER(user, section, NULL, NULL) && !error)
+                     error = lineno;
+-#endif
+             }
+             else if (!error) {
+                 /* No ']' found on section line */
+@@ -201,11 +208,11 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+                 *end = '\0';
+                 name = rstrip(start);
+                 value = end + 1;
+-#if INI_ALLOW_INLINE_COMMENTS
++            if (ini_allow_inline_comments) {
+                 end = find_chars_or_comment(value, NULL);
+                 if (*end)
+                     *end = '\0';
+-#endif
++            }
+                 value = lskip(value);
+                 rstrip(value);
+ 
+@@ -216,26 +223,24 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+             }
+             else if (!error) {
+                 /* No '=' or ':' found on name[=:]value line */
+-#if INI_ALLOW_NO_VALUE
++if (ini_allow_no_value) {
+                 *end = '\0';
+                 name = rstrip(start);
+                 if (!HANDLER(user, section, name, NULL) && !error)
+                     error = lineno;
+-#else
++} else {
+                 error = lineno;
+-#endif
++}
+             }
+         }
+ 
+-#if INI_STOP_ON_FIRST_ERROR
+-        if (error)
++        if (ini_stop_on_first_error && error)
+             break;
+-#endif
+     }
+ 
+-#if !INI_USE_STACK
++if (!ini_use_stack) {
+     ini_free(line);
+-#endif
++}
+ 
+     return error;
+ }
+diff --git a/ini.h b/ini.h
+index 78015d1..368f200 100644
+--- a/ini.h
++++ b/ini.h
+@@ -20,6 +20,7 @@ extern "C" {
+ #endif
+ 
+ #include <stdio.h>
++#include <stdbool.h>
+ 
+ /* Nonzero if ini_handler callback should accept lineno parameter. */
+ #ifndef INI_HANDLER_LINENO
+@@ -75,18 +76,21 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
+ #ifndef INI_ALLOW_MULTILINE
+ #define INI_ALLOW_MULTILINE 1
+ #endif
++extern bool ini_allow_multiline;
+ 
+ /* Nonzero to allow a UTF-8 BOM sequence (0xEF 0xBB 0xBF) at the start of
+    the file. See https://github.com/benhoyt/inih/issues/21 */
+ #ifndef INI_ALLOW_BOM
+ #define INI_ALLOW_BOM 1
+ #endif
++extern bool ini_allow_bom;
+ 
+ /* Chars that begin a start-of-line comment. Per Python configparser, allow
+    both ; and # comments at the start of a line by default. */
+ #ifndef INI_START_COMMENT_PREFIXES
+ #define INI_START_COMMENT_PREFIXES ";#"
+ #endif
++extern char* ini_start_comment_prefixes;
+ 
+ /* Nonzero to allow inline comments (with valid inline comment characters
+    specified by INI_INLINE_COMMENT_PREFIXES). Set to 0 to turn off and match
+@@ -94,20 +98,24 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
+ #ifndef INI_ALLOW_INLINE_COMMENTS
+ #define INI_ALLOW_INLINE_COMMENTS 1
+ #endif
++extern bool ini_allow_inline_comments;
+ #ifndef INI_INLINE_COMMENT_PREFIXES
+ #define INI_INLINE_COMMENT_PREFIXES ";"
+ #endif
++extern char* ini_inline_comment_prefixes;
+ 
+ /* Nonzero to use stack for line buffer, zero to use heap (malloc/free). */
+ #ifndef INI_USE_STACK
+ #define INI_USE_STACK 1
+ #endif
++extern bool ini_use_stack;
+ 
+ /* Maximum line length for any line in INI file (stack or heap). Note that
+    this must be 3 more than the longest line (due to '\r', '\n', and '\0'). */
+ #ifndef INI_MAX_LINE
+ #define INI_MAX_LINE 200
+ #endif
++extern int ini_max_line;
+ 
+ /* Nonzero to allow heap line buffer to grow via realloc(), zero for a
+    fixed-size buffer of INI_MAX_LINE bytes. Only applies if INI_USE_STACK is
+@@ -115,17 +123,20 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
+ #ifndef INI_ALLOW_REALLOC
+ #define INI_ALLOW_REALLOC 0
+ #endif
++extern bool ini_allow_realloc;
+ 
+ /* Initial size in bytes for heap line buffer. Only applies if INI_USE_STACK
+    is zero. */
+ #ifndef INI_INITIAL_ALLOC
+ #define INI_INITIAL_ALLOC 200
+ #endif
++extern int ini_initial_alloc;
+ 
+ /* Stop parsing on first error (default is to keep parsing). */
+ #ifndef INI_STOP_ON_FIRST_ERROR
+ #define INI_STOP_ON_FIRST_ERROR 0
+ #endif
++extern bool ini_stop_on_first_error;
+ 
+ /* Nonzero to call the handler at the start of each new section (with
+    name and value NULL). Default is to only call the handler on
+@@ -133,6 +144,7 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
+ #ifndef INI_CALL_HANDLER_ON_NEW_SECTION
+ #define INI_CALL_HANDLER_ON_NEW_SECTION 0
+ #endif
++//extern bool ini_call_handler_on_new_section;
+ 
+ /* Nonzero to allow a name without a value (no '=' or ':' on the line) and
+    call the handler with value NULL in this case. Default is to treat
+@@ -140,6 +152,7 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
+ #ifndef INI_ALLOW_NO_VALUE
+ #define INI_ALLOW_NO_VALUE 0
+ #endif
++extern bool ini_allow_no_value;
+ 
+ /* Nonzero to use custom ini_malloc, ini_free, and ini_realloc memory
+    allocation functions (INI_USE_STACK must also be 0). These functions must
+-- 
+2.29.2
+

@@ -1,0 +1,44 @@
+#! /usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DOPACKAGES = $(shell dh_listpackages)
+
+%:
+	dh $@ --builddirectory=build \
+		-O--dbgsym-migration="libidn2-0-dbg (<< 2.0.2-1~)" -X.la
+
+override_dh_autoreconf:
+ifneq ($(filter libidn2-doc,$(DOPACKAGES)),)
+	gtkdocize --copy --flavour no-tmpl
+endif
+	find . -name Makefile.in -delete
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+	rm -f doc/idn2.1
+endif
+	rm -f doc/libidn2.pdf
+	GTKDOCIZE=true dh_autoreconf
+
+CONFIGURE_FLAGS = \
+	--disable-rpath \
+	--with-packager=Debian \
+	--with-packager-bug-reports=https://bugs.debian.org/ \
+	--with-packager-version="$(DEB_VERSION)"
+ifneq ($(filter libidn2-doc,$(DOPACKAGES)),)
+CONFIGURE_FLAGS += --enable-gtk-doc --enable-gtk-doc-pdf
+else
+CONFIGURE_FLAGS += --disable-gtk-doc --disable-gtk-doc-pdf
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CONFIGURE_FLAGS)
+
+override_dh_auto_build:
+	dh_auto_build
+ifneq ($(filter libidn2-doc,$(DOPACKAGES)),)
+	make -C build/doc libidn2.pdf
+endif
+
+override_dh_compress:
+	dh_compress -Xlibidn2.pdf

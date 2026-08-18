@@ -1,0 +1,50 @@
+Description: Disables support for Java 6 and 7
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/build.xml
++++ b/build.xml
+@@ -220,6 +220,8 @@
+ 			<bootclasspath location="build/stubs" />
+ 			<src path="src/utils" />
+ 			<include name="lombok/javac/**" />
++			<exclude name="lombok/javac/**/java6/**" />
++			<exclude name="lombok/javac/**/java7/**" />
+ 			<classpath location="build/lombok-utils" />
+ 			<classpath refid="build.path" />
+ 		</ivy:compile>
+--- a/src/utils/lombok/javac/Javac.java
++++ b/src/utils/lombok/javac/Javac.java
+@@ -405,7 +405,7 @@
+ 		} catch (IllegalAccessException ignore) {}
+ 		
+ 		if (Javac.getJavaCompilerVersion() < 8) {
+-			return new JCNoType(((Integer) tag.value).intValue());
++			throw new UnsupportedOperationException("Java before version 8 isn't supported in Debian, please use Lombok binaries from upstream");
+ 		} else {
+ 			try {
+ 				if (CTC_VOID.equals(tag)) {
+@@ -425,24 +425,6 @@
+ 		}
+ 	}
+ 	
+-	private static class JCNoType extends Type implements NoType {
+-		public JCNoType(int tag) {
+-			super(tag, null);
+-		}
+-		
+-		@Override
+-		public TypeKind getKind() {
+-			if (tag == ((Integer) CTC_VOID.value).intValue()) return TypeKind.VOID;
+-			if (tag == ((Integer) CTC_NONE.value).intValue()) return TypeKind.NONE;
+-			throw new AssertionError("Unexpected tag: " + tag);
+-		}
+-		
+-		@Override
+-		public <R, P> R accept(TypeVisitor<R, P> v, P p) {
+-			return v.visitNoType(this, p);
+-		}
+-	}
+-	
+ 	private static final Field JCCOMPILATIONUNIT_ENDPOSITIONS, JCCOMPILATIONUNIT_DOCCOMMENTS;
+ 	static {
+ 		Field f = null;

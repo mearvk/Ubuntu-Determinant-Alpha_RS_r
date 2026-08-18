@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-simple</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-simple</refname>
+        <refpurpose>файл конфигурации для «простого» поставщика управления доступом SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки простого
+поставщика управления доступом для <citerefentry>
+<refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  Подробные сведения о синтаксисе доступны в разделе
+<quote>ФОРМАТ ФАЙЛА</quote> справочной страницы <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Простой поставщик доступа предоставляет или запрещает доступ на основании
+разрешающего или запрещающего списка имён пользователей или
+групп. Применяются следующие правила:
+            <itemizedlist>
+                <listitem>
+                    <para>Если все списки пусты, доступ предоставляется</para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Если предоставлен какой-либо список, используется порядок вычисления
+«allow,deny». Это означает, что любое соответствующее заданным условиям
+правило запрета будет превалировать над любым соответствующим заданным
+условиям правилом допуска.
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Если предоставлен один из или оба списка «allow», всем пользователям будет
+предоставлен доступ только в том случае, если они присутствуют в списке.
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        Если предоставлены только списки «deny», всем пользователям будет
+предоставлен доступ только в том случае, если они отсутствуют в списке.
+                    </para>
+                </listitem>
+            </itemizedlist>
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>ПАРАМЕТРЫ КОНФИГУРАЦИИ</title>
+        <para>Сведения о конфигурации домена SSSD доступны в разделе <quote>РАЗДЕЛЫ
+ДОМЕНА</quote> справочной страницы <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. <variablelist>
+                <varlistentry>
+                    <term>simple_allow_users (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список пользователей, которым разрешён вход.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>simple_deny_users (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список пользователей, которым явно запрещён вход.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>simple_allow_groups (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список групп, пользователям которых разрешён
+вход. Применимо только к группам внутри этого домена SSSD. Локальные группы
+не обрабатываются.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>simple_deny_groups (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список групп, пользователям которых явно запрещён
+доступ. Применимо только к группам внутри этого домена SSSD. Локальные
+группы не обрабатываются.
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+        <para>
+            Если не указывать никаких значений для какого-либо из списков, считается,
+что параметр не определён. Помните об этом при создании параметров простого
+поставщика с помощью автоматизированных сценариев.
+        </para>
+        <para>
+            Обратите внимание, что определение сразу и simple_allow_users, и
+simple_deny_users является ошибкой конфигурации.
+        </para>
+    </refsect1>
+
+    <refsect1 id='example'>
+        <title>ПРИМЕР</title>
+        <para>
+            В следующем примере предполагается, что конфигурация SSSD корректна и что
+example.com — один из доменов в разделе <replaceable>[sssd]</replaceable>. В
+примере показаны только параметры, специфичные для простого поставщика
+доступа.
+        </para>
+        <para>
+<programlisting>
+[domain/example.com]
+access_provider = simple
+simple_allow_users = user1, user2
+</programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='notes'>
+        <title>ПРИМЕЧАНИЯ</title>
+        <para>
+          Перед проверкой прав доступа разрешается вся иерархия участия в группах,
+следовательно, в списки доступа могут быть включены даже вложенные
+группы. Обратите внимание, что параметр
+<quote>ldap_group_nesting_level</quote> может повлиять на результаты,
+поэтому следует установить для него достаточное значение. См. <citerefentry>
+<refentrytitle>sssd-ldap</refentrytitle><manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

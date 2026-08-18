@@ -1,0 +1,66 @@
+From bd59be8e4e339870a1400f6866a7b73ca11f6460 Mon Sep 17 00:00:00 2001
+From: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Date: Wed, 12 Sep 2018 20:16:39 +0200
+Subject: [PATCH] configure, static linking: Fix SSL checks
+Origin: https://github.com/net-snmp/net-snmp/commit/bd59be8e4e339870a1400f6866a7b73ca11f6460
+
+During checking of DTLS_method, the stub program is linked only with -ssl
+libssl.a lacks some function from -lcrypto:
+RAND_*()
+ERR_*()
+BUF_MEM_*()
+etc.
+and -lz:
+- inflate()
+- deflate()
+
+Append -lcrypto and -lz to LIBS variable when checking DTLS_method.
+
+See also https://sourceforge.net/p/net-snmp/patches/1374/.
+
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+[bvanassche: Edited subject / rewrote this patch]
+
+schopin: Dropped the configure part of the patch as Debian/Ubuntu build
+as it didn't apply cleanly and the packaging uses autoreconf anyway.
+
+Bug-Ubuntu: https://bugs.launchpad.net/ubuntu/+source/net-snmp/+bug/1945960
+---
+ configure                   | 52 ++++++++++++++++++++++++++++++++++---
+ configure.d/config_os_libs2 | 14 +++++++---
+ 2 files changed, 58 insertions(+), 8 deletions(-)
+
+--- a/configure.d/config_os_libs2
++++ b/configure.d/config_os_libs2
+@@ -302,13 +302,19 @@
+         LIBS="$netsnmp_save_LIBS"
+ 
+         if test x$CRYPTO = x; then
+-            AC_CHECK_LIB([crypto], [EVP_md5], [CRYPTO="crypto"])
+-        fi
++            AC_CHECK_LIB([crypto], [EVP_md5],
++			 [CRYPTO="crypto"; LIBCRYPTO="-lcrypto"], [
++		AC_CHECK_LIB([crypto], [EVP_md5],
++			     [CRYPTO="crypto"; LIBCRYPTO="-lcrypto -lz"], [],
++			     [-lz])
++	    ])
++	else
++	    LIBCRYPTO="-l${CRYPTO}"
++	fi
+ 
+         if test x$CRYPTO != x; then
+             AC_DEFINE(HAVE_LIBCRYPTO, 1,
+                 [Define to 1 if you have the OpenSSL library (-lcrypto or -leay32).])
+-            LIBCRYPTO="-l${CRYPTO}"
+             netsnmp_save_LIBS="$LIBS"
+             LIBS="$LIBCRYPTO"
+             AC_CHECK_FUNCS([AES_cfb128_encrypt]dnl
+@@ -338,7 +344,7 @@
+             LIBS="$netsnmp_save_LIBS"
+         fi
+         netsnmp_save_LIBS="$LIBS"
+-        LIBS="-lssl"
++        LIBS="-lssl $LIBCRYPTO"
+         AC_CHECK_FUNCS([TLS_method TLSv1_method DTLS_method DTLSv1_method]dnl
+                        [SSL_library_init SSL_load_error_strings]dnl
+ 		       [ERR_get_error_all])

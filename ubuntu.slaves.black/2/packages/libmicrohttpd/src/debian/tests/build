@@ -1,0 +1,31 @@
+#!/bin/sh
+# autopkgtest check: Builds a small application against libmicrohttpd, checking
+# if it compiles, links and runs successfully.
+# Author: Martin Pitt <mpitt@debian.org>
+
+set -e
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE=${DEB_HOST_GNU_TYPE}-
+else
+    CROSS_COMPILE=
+fi
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+cat <<EOF > build_test.c
+#include <microhttpd.h>
+int main(int argc, char** argv) {
+    struct MHD_Daemon *d;
+    d = MHD_start_daemon (MHD_USE_DEBUG, 1234, NULL, NULL, NULL, "<html />", MHD_OPTION_END);
+    if (d != NULL)
+        MHD_stop_daemon (d);
+    return 0;
+}
+EOF
+${CROSS_COMPILE}gcc `${CROSS_COMPILE}pkg-config --cflags libmicrohttpd` -o build_test build_test.c `${CROSS_COMPILE}pkg-config --libs libmicrohttpd`
+echo "build: OK"
+[ -x build_test ]
+./build_test
+echo "run: OK"

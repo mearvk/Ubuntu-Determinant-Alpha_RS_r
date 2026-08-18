@@ -1,0 +1,131 @@
+#!/bin/sh
+
+# Apply KF5, Qt or custom coding style to all c, cpp and header files in and below the current directory
+#
+# The coding style is defined in http://techbase.kde.org/Policies/Kdelibs_Coding_Style
+#
+# Requirements:
+# - installed uncrustify >= 0.63
+#          Do not use an older version, it will lead to bad reformatting.
+# - $QT_NORMALIZE_TOOL pointing to qtrepotools/util/normalize/normalize (after compiling it)
+#
+# Report bugs in uncrustify at https://github.com/uncrustify/uncrustify/issues
+# Documentation of the uncrustify options at http://uncrustify.sourceforge.net/default.cfg
+#
+
+help() {
+  echo "`basename $0` [--qt] [--commit] - Apply KF5, Qt or custom coding style to all c, cpp and header files in and below the current directory"
+  echo "Simply chdir to the directory containing your code and run this program."
+  echo
+  echo "Options:"
+  echo "    --qt               - use Qt style (default is KDE Frameworks 5 style, which could be overriden by a file uncrustify.cfg in the current directory)"
+  echo "    --commit           - commit changes"
+  echo "    --ignore-connects  - do not reformat connects"
+  echo
+  echo
+}
+
+qt=0
+commit=0
+no_slots=1
+until [ -z "$1" ]; do
+  case $1 in
+    --qt)
+      qt=1
+      ;;
+    --commit)
+      commit=1
+      ;;
+    --ignore-connects)
+      ignore_connects=1
+      ;;
+    *)
+      help
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+files=`find -type f -name '*.c' -or -name '*.cpp' -or -name '*.cc' -or -name '*.h'`
+if [ -z "$files" ]; then
+  # nothing to do
+  exit 0
+fi
+
+if test -z "$QT_NORMALIZE_TOOL" && test "$ignore_connects" == "0"; then
+  echo "Please export QT_NORMALIZE_TOOL=<qt5>/qtrepotools/util/normalize/normalize"
+  exit 1
+fi
+
+cfg=uncrustify.cfg
+if ! test -f "$cfg"; then
+  if test "$qt" == "1"; then
+    cfgfile=uncrustify-qt.cfg
+  else
+    cfgfile=uncrustify-kf5.cfg
+  fi
+  cfg=`qtpaths --locate-file GenericDataLocation uncrustify/$cfgfile`
+  if test -z "$cfg"; then
+    cfg=$(dirname $0)/$cfgfile
+    if ! test -f "$cfg"; then
+      echo "Config file uncrustify/$cfgfile not found in prefix/share (GenericDataLocation) or $(dirname $0). Check that XDG_DATA_DIRS contains the install prefix for kde-dev-scripts."
+      exit 1
+    fi
+  fi
+fi
+
+uncrustify --no-backup -c "$cfg" $files
+
+# Watch out for things that lead to method implementations being parsed as if inside other methods,
+# e.g. due to '{' inside #ifdef and #else and '}' outside.
+grep '^\S* \S*::.*) {$' $files && echo "WARNING: check for wrong '{' placement in method definitions, in above grep results"
+
+# Remove old emacs mode-lines
+perl -pi -e 's/ *-\*- c-basic-offset: [1-8] -\*-//' $files
+
+# Remove old kate mode-lines
+perl -pi -e '$_ = "" if /kate: .*indent-width/ || /kate:.*tab-width/' $files
+
+# Remove old vim mode-lines
+perl -pi -e '$_ = "" if /\/\/.* vim:/' $files
+# They are often in a two-liner C comment, so we need a bit of perl magic to remove these
+perl - $files <<EOF
+  foreach my \$file (@ARGV) {
+   open F, "+<", \$file or do { print STDERR "open(\$file) failed : \"\$!\"\n"; next };
+   my \$str = join '', <F>;
+   if( \$str =~ m/vim:/ ) {
+     #print STDERR "Removing multi-line vim modeline from \$file\n";
+     \$str =~ s!/\*\**\s*\**\s*vim:[^\n]*\n\s*\*/!!smg;
+     seek F, 0, 0;
+     print F \$str;
+     truncate F, tell(F);
+   }
+   close F;
+  }
+EOF
+
+# Remove consecutive blank lines
+perl - $files <<EOF
+  foreach my \$file (@ARGV) {
+   open F, "+<", \$file or do { print STDERR "open(\$file) failed : \"\$!\"\n"; next };
+   my \$str = join '', <F>;
+   if (\$str =~ s/\s*\n\s*\n\s*\n\n*/\n\n/smg ) {
+     seek F, 0, 0;
+     print F \$str;
+     truncate F, tell(F);
+   }
+   close F;
+  }
+EOF
+
+# Normalize signals/slots
+if test -n "$QT_NORMALIZE_TOOL" && test "$ignore_connects" == "1"; then
+  $QT_NORMALIZE_TOOL --modify .
+fi
+
+if test "$commit" == "1"; then
+  git commit -q -a -m "Code reformatted using kde-dev-scripts/`basename $0`"
+fi
+
+#Use git blame -w `git rev-parse --short HEAD` to show authorship as it was before this commit."

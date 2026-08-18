@@ -1,0 +1,31 @@
+Description: Be quiet on access error 
+ SNMP agents can legitimately be not allowed to access mount points, such as
+ trying to get to things under /run/user. This patch changes a EACCES error to
+ a debug message.
+Author: Craig Small <csmall@debian.org>
+Origin: Debian
+Bug-Debian: https://bugs.debian.org/792832
+Reviewed-by: Craig Small <csmall@debian.org>
+Last-Update: 2021-09-20
+--- a/agent/mibgroup/hardware/fsys/fsys_mntent.c
++++ b/agent/mibgroup/hardware/fsys/fsys_mntent.c
+@@ -6,6 +6,7 @@
+ #include "hardware/fsys/hw_fsys_private.h"
+ 
+ #include <stdio.h>
++#include <errno.h>
+ #if HAVE_MNTENT_H
+ #include <mntent.h>
+ #endif
+@@ -269,7 +270,10 @@
+ 
+             if (!logged &&
+                 asprintf(&tmpbuf, "Cannot statfs %s", entry->path) >= 0) {
+-                snmp_log_perror(tmpbuf);
++		if (errno == EACCES)
++		    DEBUGMSGTL(("fsys", "%s\n", tmpbuf));
++		else
++                    snmp_log_perror(tmpbuf);
+                 free(tmpbuf);
+                 logged = 1;
+             }

@@ -1,0 +1,23 @@
+#/bin/sh
+
+set -e
+
+cp debian/tests/CMakeLists.txt test/cctest/
+cd test/cctest
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    cat <<EOF > toolchain.cmake
+set(CMAKE_C_COMPILER $DEB_HOST_GNU_TYPE-gcc)
+set(CMAKE_CXX_COMPILER $DEB_HOST_GNU_TYPE-g++)
+set(PKG_CONFIG_EXECUTABLE $DEB_HOST_GNU_TYPE-pkg-config)
+set(CMAKE_MODULE_PATH /usr/lib/$DEB_HOST_GNU_TYPE/cmake;/usr/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION};/usr/share/cmake)
+EOF
+    CCFILE=-DCMAKE_TOOLCHAIN_FILE=toolchain.cmake
+else
+    CCFILE=
+fi
+
+cmake "$CCFILE" -Bbuild \
+	-DCMAKE_CXX_FLAGS="$(dpkg-buildflags --get CXXFLAGS)" \
+	-DCMAKE_VERBOSE_MAKEFILE=ON
+cd build
+make all test

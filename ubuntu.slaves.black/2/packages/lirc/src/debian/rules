@@ -1,0 +1,90 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS      = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND     = -Wl,--as-needed
+
+%:
+	dh $@ --with python3
+
+override_dh_clean:
+	$(RM) debian/lirc.preinst
+	dh_clean
+
+override_dh_autoreconf:
+	dh_autoreconf $(CURDIR)/autogen.sh
+
+debian/lirc.preinst: debian/lirc.preinst.in
+	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
+
+override_dh_auto_configure: debian/lirc.preinst
+override_dh_auto_configure:
+ifeq ($(DEB_BUILD_ARCH_OS), linux)
+	dh_auto_configure -- \
+	    --enable-uinput --enable-devinput \
+	    --enable-silent-rules
+else
+	dh_auto_configure -- \
+	    --disable-uinput --disable-devinput \
+	    --enable-silent-rules
+endif
+
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l $(CURDIR)/debian/tmp/usr/lib/*/lirc/plugins
+
+override_dh_auto_install:
+	$(MAKE) V=0 DESTDIR=$(CURDIR)/debian/tmp install
+	py3clean debian/tmp
+	find debian/tmp -name *.la -delete
+	rm -f debian/tmp/usr/share/doc/lirc/lirc.org/api-docs/api-docs
+	chmod 755 debian/tmp/usr/share/lirc/python-pkg/lirc/lirctool
+ifeq ($(DEB_BUILD_ARCH_OS), linux)
+	mkdir -p debian/tmp/usr/lib/tmpfiles.d
+	echo "d /run/lirc  0755  root  root  10d" \
+	    > debian/tmp/usr/lib/tmpfiles.d/lirc.conf
+endif
+	# Temporary postinstall 0.9.4 script.
+	cp debian/lirc-old2new debian/tmp/usr/share/lirc
+
+override_dh_auto_test:
+ifneq "nocheck"  "$(findstring nocheck,$(DEB_BUILD_OPTIONS))"
+	tools/lirc-lsplugins -U plugins/.libs -s | tee summary
+	grep -q "Errors: 0" summary && rm summary
+	case $$(dpkg-architecture -qDEB_HOST_GNU_SYSTEM) in \
+	    kfreebsd* | gnu) \
+	        :  ;; \
+	    *)  \
+	        cd python-pkg/tests; \
+	        python3 -m unittest discover && rm backend.log \
+		;; \
+	esac
+endif
+
+override_dh_installsystemd:
+ifeq ($(DEB_BUILD_ARCH_OS), linux)
+	dh_installsystemd -p lirc lircd.socket
+	dh_installsystemd -p lirc --no-enable --no-start lircd.service
+	dh_installsystemd -p lirc --no-enable --no-start irexec.service
+	dh_installsystemd -p lirc --no-enable --no-start lircmd.service
+	dh_installsystemd -p lirc --no-enable --no-start lircd-uinput.service
+endif
+
+override_dh_install:
+	dh_install --fail-missing
+
+override_dh_installinit:
+	dh_installinit --package=lirc --name=lircd
+	dh_installinit --package=lirc --name=lircmd
+	dh_installinit
+
+override_dh_python3:
+	dh_python3
+	dh_python3 debian/tmp/usr/lib/*/python*/site-packages/lirc
+	dh_python3 debian/tmp/usr/lib/*/python*/site-packages/lirc-setup
+	dh_python3 debian/tmp/usr/share/lirc/python-pkg
+
+override_dh_fixperms-arch:
+	dh_fixperms
+	chmod 755 debian/lirc/usr/share/lirc/contrib/irman2lirc

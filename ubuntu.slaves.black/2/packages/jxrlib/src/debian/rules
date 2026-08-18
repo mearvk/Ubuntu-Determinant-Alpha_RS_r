@@ -1,0 +1,59 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/default.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CFLAGS_MAINT_APPEND  = -Wall -Wextra
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+VER_FULL = $(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@ --buildsystem=cmake
+
+CMAKE_EXTRA_FLAGS += \
+	-DJXRLIB_INSTALL_LIB_DIR="lib/$(DEB_HOST_MULTIARCH)"
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(CMAKE_EXTRA_FLAGS)
+
+pkg_bin=libjxr-tools
+pkg_lib=libjxr0
+pkg_dev=libjxr-dev
+
+override_dh_install:
+	# bin
+	dh_install -p$(pkg_bin) usr/bin
+	# lib
+	dh_install -p$(pkg_lib) usr/lib/$(DEB_HOST_MULTIARCH)/*.so.*
+	# dev
+	dh_install -p$(pkg_dev) usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/*.pc
+	dh_install -p$(pkg_dev) usr/lib/$(DEB_HOST_MULTIARCH)/*.so
+	dh_install -p$(pkg_dev) usr/include
+
+override_dh_clean:
+	dh_clean debian/JxrDecApp.1
+	dh_clean debian/JxrEncApp.1
+	dh_clean debian/JPEGXR_DPK_Spec_1.0.txt
+
+debian/JxrDecApp.1: debian/JxrDecApp.1.in
+	LD_PRELOAD= LD_LIBRARY_PATH=./debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH) help2man --version-string=$(VER_FULL) --include=$< --output=$@ --no-info ./debian/tmp/usr/bin/JxrDecApp
+
+debian/JxrEncApp.1: debian/JxrEncApp.1.in
+	LD_PRELOAD= LD_LIBRARY_PATH=./debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH) help2man --version-string=$(VER_FULL) --include=$< --output=$@ --no-info ./debian/tmp/usr/bin/JxrEncApp
+
+debian/JPEGXR_DPK_Spec_1.0.txt: doc/JPEGXR_DPK_Spec_1.0.doc
+	antiword $< > $@
+
+override_dh_installman: debian/JxrEncApp.1 debian/JxrDecApp.1
+	dh_installman -p$(pkg_bin) debian/JxrDecApp.1
+	dh_installman -p$(pkg_bin) debian/JxrEncApp.1
+
+override_dh_installdocs: debian/JPEGXR_DPK_Spec_1.0.txt
+	dh_installdocs doc/readme.txt
+	dh_installdocs debian/JPEGXR_DPK_Spec_1.0.txt
+	dh_installdocs
+
+get-orig-source:
+	uscan --download --force-download --rename

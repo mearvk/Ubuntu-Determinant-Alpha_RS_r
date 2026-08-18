@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export DEB_VERSION_UPSTREAM
+
+%:
+	dh $@ --buildsystem=gradle --with maven-repo-helper
+
+override_dh_auto_build:
+	dh_auto_build -- -p java8 assemble javadoc
+
+override_mh_install:
+	mh_install
+	mkdir -p debian/libintellij-annotations-java/usr/share/maven-repo/com/intellij/
+	cp -al debian/*/usr/share/maven-repo/org/jetbrains/* \
+		debian/*/usr/share/maven-repo/com/intellij/
+	sed -i \
+		-e 's,org\.jetbrains,com.intellij,g' \
+		-e 's,libjetbrains-annotations,libintellij-annotations,g' \
+		debian/*/usr/share/maven-repo/com/intellij/*/*/*pom
+

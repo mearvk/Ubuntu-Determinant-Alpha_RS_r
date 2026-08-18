@@ -1,0 +1,54 @@
+Author: Sven Joachim <svenjoac@gmx.de>
+Description: Omit -L part from ncurses6{w,}-config output
+ "ncurses6-config --libs" includes a "-L" part which is not needed
+ since the library is installed in a directory in the default linker
+ search path.
+ .
+ Upstream omits the -L part if $libdir is in a standard directory,
+ however the list of standard directories is determined at build time
+ and architecture dependent, breaking multiarch co-installability.
+ Until there is a way to obtain the multiarch path without running
+ dpkg-architecture our patch is not upstreamable.
+Bug-Debian: https://bugs.debian.org/638281
+Bug-Debian: https://bugs.debian.org/745479
+Forwarded: not-needed
+Last-Update: 2021-09-06
+
+---
+ misc/ncurses-config.in |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+--- a/misc/ncurses-config.in
++++ b/misc/ncurses-config.in
+@@ -41,7 +41,6 @@ exec_prefix="@exec_prefix@"
+ 
+ bindir="@bindir@"
+ includedir="@includedir@"
+-libdir="@libdir@"
+ datarootdir="@datarootdir@"
+ datadir="@datadir@"
+ mandir="@mandir@"
+@@ -117,13 +116,13 @@ do
+ 		lib_check=`echo "x$opt" | sed -e 's/^.-L//'`
+ 		[ -d "$lib_check" ] || continue
+ 		case "$lib_check" in
+-		@LD_SEARCHPATH@) # skip standard libdir
++		*) # skip standard libdir
+ 			if [ "$lib_check" = "$libdir" ]
+ 			then
+ 				lib_first=yes
+ 				IFS_save="$IFS"
+ 				IFS='|'
+-				LIBDIRS="@LD_SEARCHPATH@"
++				LIBDIRS=""
+ 				for lib_check in $LIBDIRS
+ 				do
+ 					if [ -d "$lib_check" ]
+@@ -271,7 +270,6 @@ ENDECHO
+ 		echo $INCS
+ 		;;
+ 	--libdir)
+-		echo "${libdir}"
+ 		;;
+ 	--mandir)
+ 		echo "${mandir}"

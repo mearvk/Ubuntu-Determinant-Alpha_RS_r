@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+DESTDIR=$(CURDIR)/debian/libjs-rickshaw/
+EXDIR=$(DESTDIR)/usr/share/doc/libjs-rickshaw/examples/
+
+override_dh_auto_build:
+	${MAKE} CSS_MIN=cleancss JS_MIN=uglifyjs JS_HINT=true
+
+override_dh_installexamples:
+	dh_installexamples
+	sed -i 's|../vendor/d3.*.js|/usr/share/javascript/d3/d3.js|' \
+		$(EXDIR)/*.html
+	sed -i 's|../rickshaw.*.js|/usr/share/javascript/rickshaw/rickshaw.js|' $(EXDIR)/*.html
+	install -m0644 $(CURDIR)/src/css/*.css $(EXDIR)/css/
+	sed -i 's|../src/||' $(EXDIR)/*.html
+
+override_dh_auto_test:
+	# needs nodeunit to be packaged
+
+dfsg:
+	rm $(CURDIR)/vendor/d3.min.js
+	rm $(CURDIR)/vendor/d3.v3.js
+	rm $(CURDIR)/vendor/d3.layout.min.js
+
+%:
+	dh $@
+
+.PHONY: override_dh_auto_build override_dh_installexamples \
+	override_dh_auto_test

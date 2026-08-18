@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-sudo</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-sudo</refname>
+        <refpurpose>Настройка sudo с помощью внутреннего сервера SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки <citerefentry>
+<refentrytitle>sudo</refentrytitle> <manvolnum>8</manvolnum> </citerefentry>
+для работы с <citerefentry> <refentrytitle>sssd</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>, а также кэширования правил sudo в
+SSSD.
+        </para>
+    </refsect1>
+
+    <refsect1 id='sudo'>
+        <title>Настройка sudo для совместной работы с SSSD</title>
+        <para>
+            Чтобы включить SSSD как источник правил sudo, добавьте
+<emphasis>sss</emphasis> в запись <emphasis>sudoers</emphasis> в файле
+<citerefentry> <refentrytitle>nsswitch.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            Например, чтобы настроить sudo на поиск правил сначала в стандартном файле
+<citerefentry> <refentrytitle>sudoers</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> (который должен содержать правила,
+которые применяются к локальным пользователям), а потом в SSSD, следует
+добавить в файл nsswitch.conf следующую строку:
+        </para>
+        <para>
+<programlisting>
+sudoers: files sss
+</programlisting>
+        </para>
+        <para>
+            Дополнительные сведения о настройке порядка поиска sudoers из файла
+nsswitch.conf, а также информация о схеме LDAP, используемой для сохранения
+правил sudo в каталоге, доступны на справочной странице <citerefentry>
+<refentrytitle>sudoers.ldap</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            <emphasis>Примечание</emphasis>: чтобы использовать в правилах sudo сетевые
+группы или группы узлов IPA, также потребуется корректно установить
+<citerefentry> <refentrytitle>nisdomainname</refentrytitle>
+<manvolnum>1</manvolnum> </citerefentry> в значение имени домена NIS
+(совпадает с именем домена IPA в случае использования групп узлов).
+        </para>
+    </refsect1>
+
+    <refsect1 id='sssd'>
+        <title>Настройка SSSD для получения правил sudo</title>
+        <para>
+            На стороне SSSD достаточно расширить список <emphasis>служб</emphasis>
+добавлением «sudo» в раздел [sssd] <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. Чтобы ускорить поиск LDAP, также можно указать базу поиска
+для правил sudo с помощью параметра
+<emphasis>ldap_sudo_search_base</emphasis>.
+        </para>
+        <para>
+            В следующем примере показано, как настроить SSSD на загрузку правил sudo с
+сервера LDAP.
+        </para>
+        <para>
+<programlisting>
+[sssd]
+config_file_version = 2
+services = nss, pam, sudo
+domains = EXAMPLE
+
+[domain/EXAMPLE]
+id_provider = ldap
+sudo_provider = ldap
+ldap_uri = ldap://example.com
+ldap_sudo_search_base = ou=sudoers,dc=example,dc=com
+</programlisting> <phrase
+condition="have_systemd"> Важно учитывать, что на платформах, где
+поддерживается systemd, не требуется добавлять поставщика данных «sudo» в
+список служб, так как он стал необязательным. Однако вместо этого следует
+включить sssd-sudo.socket.  </phrase>
+        </para>
+        <para>
+            Когда программа SSSD настроена на использование IPA в качестве поставщика
+ID, включение поставщика данных sudo выполняется автоматически. База поиска
+sudo настроена на использование собственного дерева LDAP IPA
+(cn=sudo,$SUFFIX). Если в sssd.conf определена какая-либо другая база
+поиска, будет использоваться это значение. Дерево совместимости
+(ou=sudoers,$SUFFIX) больше не является необходимым для работы sudo IPA.
+        </para>
+    </refsect1>
+
+    <refsect1 id='cache'>
+        <title>Механизм кэширования правил SUDO</title>
+        <para>
+            При разработке поддержки sudo в SSSD сложнее всего было сделать так, чтобы
+работа sudo c SSSD в качестве источника данных обеспечивала такие же
+скорость и взаимодействие с пользователем, что и sudo, при этом предоставляя
+настолько актуальный набор правил, насколько это возможно. Для этого в SSSD
+используются три вида обновлений: полное обновление, интеллектуальное
+обновление и обновление правил.
+        </para>
+        <para>
+            <emphasis>Интеллектуальное обновление</emphasis> периодически загружает
+правила, которые являются новыми или были изменены после последнего
+обновления. Основная задача — увеличивать базу данных путём получения
+небольших порций данных, что не создаёт большой сетевой трафик.
+        </para>
+        <para>
+            <emphasis>Полное обновление</emphasis> просто удаляет все правила sudo,
+которые хранятся в кэше, и заменяет их всеми правилами, которые хранятся на
+сервере. Это позволяет поддерживать согласованность кэша: удаляются все те
+правила, которые были удалены с сервера. Однако полное обновление может
+генерировать большое количества трафика, поэтому его следует выполнять
+только иногда (промежуток между обновлениями зависит от размера и
+стабильности правил sudo).
+        </para>
+        <para>
+            <emphasis>Обновление правил</emphasis> обеспечивает, что пользователю не
+будет предоставлено больше прав, чем определено. Это обновление выполняется
+при каждом запуске sudo пользователем. Обновление правил находит все
+правила, которые применяются к этому пользователю, проверяет срок их
+действия и повторно загружает их, если этот срок истёк. Если на сервере
+отсутствуют какие-либо из таких правил, SSSD выполнит общее полное
+обновление, так как могло быть удалено гораздо больше правил (применяемых к
+другим пользователям).
+        </para>
+        <para>
+            Если этот параметр включён, SSSD будет сохранять только правила, которые
+могут быть применены к этому компьютеру. Это те правила, которые содержат в
+атрибуте <emphasis>sudoHost</emphasis> одно из следующих значений:
+        </para>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    ключевое слово ALL
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    подстановочный знак
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    сетевая группа (в виде «+netgroup»)
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    имя узла или полное доменное имя компьютера
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    один из IP-адресов компьютера
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    один из IP-адресов сети (в виде «address/mask»)
+                </para>
+            </listitem>
+        </itemizedlist>
+        <para>
+            Предусмотрено много параметров, которыми можно воспользоваться для настройки
+поведения программы. Подробное описание доступно в разделах «ldap_sudo_*»
+<citerefentry> <refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> и «sudo_*» <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+    </refsect1>
+
+    <refsect1 id='performance'>
+        <title>Тонкая настройка производительности</title>
+        <para>
+            SSSD использует различные типы механизмов со сложными и простыми фильтрами
+LDAP для поддержания кэшированных правил sudo в актуальном состоянии. В
+стандартной конфигурации заданы значения, которые должны подойти большинству
+пользователей. Тем не менее, в последующих абзацах приводится несколько
+советов по тонкой настройке конфигурации.
+        </para>
+        <para>
+            1. <emphasis>Индексируйте атрибуты LDAP</emphasis>. Убедитесь, что
+выполняется индексирование следующих атрибутов LDAP: objectClass, cn,
+entryUSN и modifyTimestamp.
+        </para>
+        <para>
+            2. <emphasis>Задайте ldap_sudo_search_base</emphasis>. Укажите в качестве
+базы поиска контейнер, который содержит правила sudo, чтобы ограничить
+область поиска.
+        </para>
+        <para>
+            3. <emphasis>Задайте интервал полного и интеллектуального
+обновления</emphasis>. Если правила sudo меняются редко и не требуется
+быстро обновлять кэшированные правила на клиентах, можно увеличить значения
+<emphasis>ldap_sudo_full_refresh_interval</emphasis> и
+<emphasis>ldap_sudo_smart_refresh_interval</emphasis>. Также можно отключить
+интеллектуальное обновление: <emphasis>ldap_sudo_smart_refresh_interval =
+0</emphasis>.
+        </para>
+        <para>
+            4. Если имеется большое количество клиентов, можно увеличить значение
+<emphasis>ldap_sudo_random_offset</emphasis> для лучшего распределения
+нагрузки на сервер.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

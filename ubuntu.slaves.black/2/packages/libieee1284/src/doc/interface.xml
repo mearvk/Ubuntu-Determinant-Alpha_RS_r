@@ -1,0 +1,2228 @@
+<?xml version='1.0' ?> <!-- -*- xml -*- -->
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+ "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+<!ENTITY libieee1284 "libieee1284">
+<!ENTITY e1284ok "<errorcode>E1284_OK</errorcode>">
+<!ENTITY e1284nomem "<errorcode>E1284_NOMEM</errorcode>">
+<!ENTITY e1284notavail "<errorcode>E1284_NOTAVAIL</errorcode>">
+<!ENTITY e1284notimpl "<errorcode>E1284_NOTIMPL</errorcode>">
+<!ENTITY e1284init "<errorcode>E1284_INIT</errorcode>">
+<!ENTITY e1284negfailed "<errorcode>E1284_NEGFAILED</errorcode>">
+<!ENTITY e1284rejected "<errorcode>E1284_REJECTED</errorcode>">
+<!ENTITY e1284timedout "<errorcode>E1284_TIMEDOUT</errorcode>">
+<!ENTITY e1284sys "<errorcode>E1284_SYS</errorcode>">
+<!ENTITY e1284noid "<errorcode>E1284_NOID</errorcode>">
+<!ENTITY e1284invalidport "<errorcode>E1284_INVALIDPORT</errorcode>">
+]>
+<book id="index">
+  <bookinfo>
+    <title>Public interface of &libieee1284;</title>
+    <subtitle>API 3.2</subtitle>
+
+    <author>
+      <firstname>Tim</firstname>
+      <surname>Waugh</surname>
+      <affiliation>
+	<address><email>twaugh@redhat.com</email></address>
+      </affiliation>
+    </author>
+
+    <copyright>
+      <year>2001-2003</year>
+      <holder>Tim Waugh</holder>
+    </copyright>
+  </bookinfo>
+
+  <preface>
+    <title>Introduction</title>
+
+    <refentry>
+      <refmeta>
+	<refentrytitle>&libieee1284;</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>&libieee1284;</refname>
+	<refpurpose>IEEE1284 communications library</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<synopsis>
+    #include &lt;ieee1284.h&gt;
+    cc files... -lieee1284</synopsis>
+      </refsynopsisdiv>
+
+      <refsect1><title>Overview</title>
+
+	<para>The &libieee1284; library is a library for accessing
+          parallel port devices.</para>
+
+<!-- Commented out for stable release.
+
+ It is currently under development, and this is CVS ID
+<literal>$Id: interface.xml,v 1.19 2003/05/30 14:39:22 twaugh Exp $</literal>.
+  -->
+
+	<para>The model presented to the user is fairly abstract: a
+          list of parallel ports with arbitrary names, with functions
+          to access them in various ways ranging from bit operations
+          to block data transfer in one of the IEEE 1284 sanctioned
+          protocols.</para>
+
+	<para>Although the library resides in user space the speed
+          penalty may not be as bad as you initially think, since the
+          operating system may well provide assistance with block data
+          transfer operations; in fact, the operating system may even
+          use hardware assistance to get the job done.  So, using
+          &libieee1284;, ECP transfers using DMA are possible.</para>
+
+	<para>The normal sequence of events will be that the application
+          <orderedlist>
+	    <listitem>
+	      <para>calls <function>ieee1284_find_ports</function> to
+                get a list of available ports</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>then <function>ieee1284_get_deviceid</function> to
+                look for a device on each port that it is interested
+                in</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>and then <function>ieee1284_open</function> to
+                open each port it finds a device it can control
+                on.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>The list of ports returned from
+                <function>ieee1284_find_ports</function> can now be
+                disposed of using
+                <function>ieee1284_free_ports</function>.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>Then when it wants to control the device, it will
+                call <function>ieee1284_claim</function> to prevent
+                other drivers from using the port</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>then perhaps do some data transfers</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>and then <function>ieee1284_release</function>
+                when it is finished that that particular command.
+                This claim-control-release sequence will be repeated
+                each time it wants to tell the device to do
+                something.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para>Finally when the application is finished with the
+                device it will call
+                <function>ieee1284_close</function>.</para>
+	    </listitem>
+	  </orderedlist></para>
+
+	<para>Usually a port needs to be claimed before it can be
+          used.  This is to prevent multiple drivers from trampling on
+          each other if they both want to use the same port.  The
+          exception to this rule is the collection of IEEE 1284 Device
+          IDs, which has an implicit open-claim-release-close
+          sequence.  The reason for this is that it may be possible to
+          collect a Device ID from the operating system, without
+          bothering the device with it.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Configuration</title>
+
+	<para>When <function>ieee1284_find_ports</function> is first
+	  called, the library will look for a configuration file,
+	  <filename>/etc/ieee1284.conf</filename>.</para>
+
+	<para>Comments begin with a '#' character and extend to the
+	  end of the line.  Everything else is freely-formatted
+	  tokens.  A non-quoted (or double-quoted) backslash character
+	  '\' preserves the literal value of the next character, and
+	  single and double quotes may be used for preserving
+	  white-space.  Braces and equals signs are recognised as
+	  tokens, unless quoted or escaped.</para>
+
+	<para>The only configuration instruction that is currently
+	  recognised is <quote>disallow method ppdev</quote>, for
+	  preventing the use of the Linux ppdev driver.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Environment</title>
+
+	<para>You can enable debugging output from the library by
+	  setting the environment variable
+	  <envar>LIBIEEE1284_DEBUG</envar> to any value.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Files</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><filename>/etc/ieee1284.conf</filename></term>
+	    <listitem>
+	      <para>Configuration file.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>See Also</title>
+
+	<para><xref linkend="parport"/>,
+          <xref linkend="parport-list"/>,
+          <xref linkend="find-ports"/>,
+          <xref linkend="free-ports"/>,
+          <xref linkend="get-deviceid"/>,
+          <xref linkend="open"/>,
+          <xref linkend="close"/>,
+          <xref linkend="claim"/>,
+          <xref linkend="release"/>,
+          <xref linkend="data-pin-access"/>,
+          <xref linkend="status-pin-access"/>,
+          <xref linkend="control-line-access"/>,
+          <xref linkend="negotiation"/>,
+          <xref linkend="fwd-rev"/>,
+          <xref linkend="transfer"/>,
+          <xref linkend="irq"/>,
+          <xref linkend="timeout"/></para>
+      </refsect1>
+    </refentry>
+  </preface>
+
+  <reference>
+    <title>Structures</title>
+
+    <refentry id="parport">
+      <refmeta>
+	<refentrytitle>parport</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>parport</refname>
+	<refpurpose>representation of a parallel port</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<synopsis><![CDATA[#include <ieee1284.h>]]></synopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>A <structname>parport</structname> structure represents
+	a parallel port.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Structure members</title>
+
+	<para>The structure has the following members:</para>
+
+	<programlisting><![CDATA[struct parport {
+  /* An artibrary name for the port. */
+  const char *name;
+
+  /* The base address of the port, if that has any meaning, or zero. */
+  unsigned long base_addr;
+
+  /* The ECR address of the port, if that has any meaning, or zero. */
+  unsigned long hibase_addr;
+
+  /* The filename associated with this port,
+   * if that has any meaning, or NULL. */
+  const char *filename;
+};]]></programlisting>
+      </refsect1>
+    </refentry>
+
+    <refentry id="parport-list">
+      <refmeta>
+	<refentrytitle>parport_list</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>parport_list</refname>
+	<refpurpose>a collection of parallel ports</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<synopsis><![CDATA[#include <ieee1284.h>]]></synopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>A <structname>parport_list</structname> structure is
+	 just a vector of <structname>parport</structname>
+	 structures.</para>
+
+      </refsect1>
+
+      <refsect1>
+	<title>Structure members</title>
+
+	<para>The structure has the following members:</para>
+
+	<programlisting><![CDATA[struct parport_list {
+  /* Number of elements in the vector. */
+  int portc;
+
+  /* The ports. */
+  struct parport **portv;
+};]]></programlisting>
+      </refsect1>
+    </refentry>
+
+  </reference>
+
+  <reference>
+    <title>Functions</title>
+
+    <refentry id="find-ports">
+      <refmeta>
+	<refentrytitle>ieee1284_find_ports</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_find_ports</refname>
+	<refpurpose>find ports on the system</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int
+	    <function>ieee1284_find_ports</function></funcdef>
+	    <paramdef>struct parport_list
+              *<parameter>list</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>This function should be called before the other
+	 &libieee1284; functions.  This gives the library a chance to
+	 look around and see what's available, and gives the program a
+	 chance to choose a port to use.</para>
+
+	<para>The <parameter>list</parameter> is a pointer to a
+	 <structname>parport_list</structname> structure that will be
+	 filled in on success.</para>
+
+	<para>There are no <parameter>flags</parameter> defined; use
+	 zero for this parameter.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>Success. <parameter>list</parameter> is filled in
+	       and must be destroyed using
+	       <citerefentry>
+		  <refentrytitle>ieee1284_free_ports</refentrytitle>
+		  <manvolnum>3</manvolnum>
+		</citerefentry>.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284nomem;</term>
+	    <listitem>
+	      <para>There is not enough memory available.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notimpl;</term>
+	    <listitem>
+	      <para>One or more of the supplied flags is not
+	       supported in this implementation.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+    </refentry>
+
+    <refentry id="free-ports">
+      <refmeta>
+	<refentrytitle>ieee1284_free_ports</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_free_ports</refname>
+	<refpurpose>safely deallocate a port list</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_free_ports</function></funcdef>
+	    <paramdef>struct parport_list
+	      *<parameter>list</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>When the port list will no longer be used, the program
+	 should call <function>ieee1284_free_ports</function> giving
+	 it a pointer to the <structname>parport_list</structname>
+	 structure that holds the list of ports returned by
+	 <citerefentry>
+	    <refentrytitle>ieee1284_find_ports</refentrytitle>
+	    <manvolnum>3</manvolnum>
+         </citerefentry>.  The ports are reference counted with the
+	 <function>ieee1284_open</function> and
+	 <function>ieee1284_close</function> functions, and so the
+	 port list may be freed even if it contains pointers to ports
+	 that are still open.</para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="get-deviceid">
+      <refmeta>
+	<refentrytitle>ieee1284_get_deviceid</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_get_deviceid</refname>
+	<refpurpose>retrieve an IEEE 1284 Device ID</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_get_deviceid</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>daisy</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>This function is for retrieving the IEEE 1284 Device ID
+	 of the specified device.  The device is specified by the
+	 <parameter>port</parameter> to which it is attached, and
+	 optionally an address (<parameter>daisy</parameter>) on the
+	 daisy chain of devices on that port.</para>
+
+	<para><parameter>daisy</parameter> should be &minus;1 to
+	 indicate that the device is not participating in a IEEE
+	 1284.3 daisy chain, meaning it is the last (or only) device
+	 on the port, or should be a number from 0 to 3 inclusive to
+	 indicate that it has the specified daisy chain address (0 is
+	 next to the port).</para>
+
+	<para>The <parameter>flags</parameter> parameter should be a
+	 bitwise union of any flags that the program wants to use.
+	 Available flags are:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><constant>F1284_FRESH</constant></term>
+	    <listitem>
+	      <para>Guarantee a fresh Device ID.  A cached or
+	       OS-provided ID will not be used.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>The provided <parameter>buffer</parameter> must be at
+         least <parameter>len</parameter> bytes long, and will contain
+         the Device ID including the initial two-byte length field and
+         a terminating zero byte on successful return, or as much of
+         the above as will fit into the buffer.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>A return value less than zero indicates an error as
+	 below.  Otherwise, the return value is the number of bytes of
+	 <parameter>buffer</parameter> that have been filled.  A
+	 return value equal to the length of the buffer indicates that
+	 the Device ID may be longer than the buffer will
+	 allow.</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284noid;</term>
+	    <listitem>
+	      <para>The device did not provide an IEEE 1284 Device ID
+	       when interrogated (perhaps by the operating system if
+	       <constant>F1284_FRESH</constant> was not
+	       specified).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notimpl;</term>
+	    <listitem>
+	      <para>One or more of the supplied flags is not supported
+	       in this implementation, or if no flags were supplied
+	       then this function is not implemented for this type of
+	       port or this type of system.  This can also be returned
+	       if a daisy chain address is specified but daisy chain
+	       Device IDs are not yet supported.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para><constant>F1284_FRESH</constant> was specified
+	       and the library is unable to access the port to
+	       interrogate the device.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284nomem;</term>
+	    <listitem>
+	      <para>There is not enough memory.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284init;</term>
+	    <listitem>
+	      <para>There was a problem initializing the port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>Notes</title>
+
+	<para>Unless the <constant>F1284_FRESH</constant> flag is
+	 given, the library will try to find the device's ID as
+	 unobtrusively as possible.  First it will ask the operating
+	 system if it knows it, and then it will try actually asking
+	 the device for it.  Because of this, the Device ID may be
+	 partially computed (the length field, for example) or even
+	 partially missing if the operating system has only remembered
+	 some parts of the ID.  To guarantee that you are getting the
+	 bytes that the device sent, use
+	 <constant>F1284_FRESH</constant>.  Be aware that the
+	 operating system may allow any user to inspect the Device IDs
+	 that it provides, whereas device access is normally more
+	 restricted.</para>
+
+	<para>The initial two-byte length field is a big-endian 16 bit
+	 unsigned integer provided by the device and may not be
+	 accurate.  In particular, it is meant to indicate the length
+	 of the entire string including the length field itself;
+	 however, some manufacturers exclude the length field or just
+	 set the length field to some arbitrary number greater than
+	 the ID length.</para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="open">
+      <refmeta>
+	<refentrytitle>ieee1284_open</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_open</refname>
+	<refpurpose>open a port</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_open</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>int *<parameter>capabilities</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>In order to begin using a port it must be opened.  Any
+	 initial set-up of the port is done at this stage.  When an
+	 open port is no longer needed it should be closed with
+	 <citerefentry>
+	    <refentrytitle>ieee1284_close</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry>.</para>
+
+	<para>The possible <parameter>flags</parameter> are:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><constant>F1284_EXCL</constant></term>
+	    <listitem>
+	      <para>This device cannot share the port with any other
+	       device.  If this is the case it must be declared at
+	       this stage, so that other drivers trying to access the
+	       port know not to bother; otherwise they will wait until
+	       this driver releases the port, i.e. never.</para>
+
+	      <remark>The iopl/dev-port access methods don't support
+	       this yet, but the ppdev ones do.</remark>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>If <parameter>capabilities</parameter> is not
+	  <constant>NULL</constant> it must point to storage for an
+	  <type>int</type>, which will be treated as a set of flags,
+	  one per bit, which the library sets or clears as
+	  appropriate.  If a capability is present it will be used
+	  when asked for.  They are:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><constant>CAP1284_RAW</constant></term>
+	    <listitem>
+	      <para>Pin-level access is available.  If this capability
+	       is present then the following functions are effective:
+	       <function>ieee1284_write_data</function>,
+	       <function>ieee1284_read_status</function>,
+	       <function>ieee1284_wait_status</function>,
+	       <function>ieee1284_write_control</function>,
+	       <function>ieee1284_read_control</function>,
+	       <function>ieee1284_frob_control</function>.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_NIBBLE</constant></term>
+	    <listitem>
+	      <para>There is an implementation of nibble mode for this
+	       port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_BYTE</constant></term>
+	    <listitem>
+	      <para>There is an implementation of byte mode for this
+	       port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_COMPAT</constant></term>
+	    <listitem>
+	      <para>There is an implementation of compatibility mode
+	       for this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_ECP</constant></term>
+	    <listitem>
+	      <para>There is a hardware implementation of ECP mode for
+	       this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_ECPRLE</constant></term>
+	    <listitem>
+	      <para>There is an RLE-aware implementation of ECP mode
+	       for this port (the <constant>F1284_RLE</constant> flag
+	       is recognised by the ECP transfer functions).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_ECPSWE</constant></term>
+	    <listitem>
+	      <para>There is a software implementation of ECP mode for
+	       this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_BECP</constant></term>
+	    <listitem>
+	      <para>There is an implementation of bounded ECP mode for
+	       this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_EPP</constant></term>
+	    <listitem>
+	      <para>There is a hardware implementation of EPP mode for
+	       this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_EPPSWE</constant></term>
+	    <listitem>
+	      <para>There is a software implementation of EPP mode for
+	      this port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_IRQ</constant></term>
+	    <listitem>
+	      <para>An interrupt line is configured for this
+	       port and interrupt notifications can be received using
+               <citerefentry>
+		 <refentrytitle>ieee1284_get_irq_fd</refentrytitle>
+		 <manvolnum>3</manvolnum>
+	       </citerefentry>.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>CAP1284_DMA</constant></term>
+	    <listitem>
+	      <para>A DMA channel is configured for this port.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>The port is now opened.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284init;</term>
+	    <listitem>
+	      <para>There was a problem during port initialization.
+	       This could be because another driver has opened the
+	       port exclusively, or some other reason.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284nomem;</term>
+	    <listitem>
+	      <para>There is not enough memory.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>One or more of the supplied flags is not supported
+	       by this type of port.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, the <parameter>port</parameter>
+	       may already be open).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>There was a problem at the operating system
+	       level.  The global variable <varname>errno</varname>
+	       has been set appropriately.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>See also</title>
+
+	<para><citerefentry>
+	    <refentrytitle>ieee1284_close</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="close">
+      <refmeta>
+	<refentrytitle>ieee1284_close</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_close</refname>
+	<refpurpose>close an open port</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_close</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>To close an open port and free any resources associated
+	 with it, call <function>ieee1284_close</function>.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>The port is now closed.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (perhaps it is not open, for instance).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>There was a problem at the operating system
+	       level.  The global variable <varname>errno</varname>
+	       has been set appropriately.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>See also</title>
+
+	<para><citerefentry>
+	    <refentrytitle>ieee1284_open</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="ref">
+      <refmeta>
+	<refentrytitle>ieee1284_ref</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_ref</refname>
+	<refname>ieee1284_unref</refname>
+	<refpurpose>modify a port's reference count</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_ref</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_unref</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>If you want to free the port list from
+	 <function>ieee1284_find_ports</function> but open one of the
+	 ports later on, you will need to prevent it from being
+	 destroyed in <function>ieee1284_free_ports</function>.  Each
+	 port has a reference count, and you can use
+	 <function>ieee1284_ref</function> to increment it and
+	 <function>ieee1284_unref</function> to decrement it.</para>
+
+	<para>If you use <function>ieee1284_ref</function> at any
+	  stage, you must later call
+	  <function>ieee1284_unref</function> to relinquish the extra
+	  reference.  If you do not do this, the resources associated
+	  with the port will not be cleaned up.</para>
+
+	<para>If you have not previously used
+	  <function>ieee1284_ref</function> on a port, you must not
+	  use <function>ieee1284_unref</function> on it.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>These functions return the number of references held
+	  after the increment or decrement.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>See also</title>
+
+	<para><citerefentry>
+	    <refentrytitle>ieee1284_open</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="claim">
+      <refmeta>
+	<refentrytitle>ieee1284_claim</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_claim</refname>
+	<refpurpose>claim access to the port</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_claim</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>With the exception of <citerefentry>
+	    <refentrytitle>ieee1284_get_deviceid</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry>, <function>ieee1284_claim</function> must be
+	 called on an open port before any other &libieee1284;
+	 function for accessing a device on it.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>Success.  Note that, unless the
+	       <constant>F1284_EXCL</constant> flag was specified to
+	       start with, the port should be released within a
+	       <quote>reasonable</quote> amount of time.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284nomem;</term>
+	    <listitem>
+	      <para>There is not enough memory.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, it might not have been opened
+	       yet).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>There was a problem at the operating system
+	       level.  The global variable <varname>errno</varname>
+	       has been set appropriately.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>See also</title>
+
+	<para><citerefentry>
+	    <refentrytitle>ieee1284_release</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="release">
+      <refmeta>
+	<refentrytitle>ieee1284_release</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_release</refname>
+	<refpurpose>release a port</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_release</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>This function undoes the effect of
+          <citerefentry>
+	    <refentrytitle>ieee1284_claim</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry> by releasing the port for use by other
+	 drivers.  It is good practice to release the port whenever
+	 convenient.  If it is never convenient to do so, the
+	 <constant>F1284_EXCL</constant> flag should be specified at
+	 initialization.</para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="data-pin-access">
+      <refmeta>
+	<refentrytitle>ieee1284_data</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_read_data</refname>
+	<refname>ieee1284_write_data</refname>
+	<refname>ieee1284_data_dir</refname>
+	<refname>ieee1284_wait_data</refname>
+	<refpurpose>control the data lines</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_read_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_write_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>dt</parameter></paramdef>
+	  </funcprototype>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_data_dir</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>reverse</parameter></paramdef>
+	  </funcprototype>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_wait_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>mask</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>val</parameter></paramdef>
+	    <paramdef>struct timeval *<parameter>timeout</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>These functions manipulate the data lines of the
+	 parallel port associated with <parameter>port</parameter>
+	 (which must have been claimed using <citerefentry>
+	    <refentrytitle>ieee1284_claim</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry>).  The lines are represented by an 8-bit
+	 number (one line per bit) and a direction.  The data lines
+	 are driven as a group; they may be all host-driven
+	 (<firstterm>forward</firstterm> direction) or not
+	 (<firstterm>reverse</firstterm> direction).  When the
+	 peripheral is driving them the host must not.</para>
+
+	<para>For <function>ieee1284_data_dir</function> the
+	 <parameter>reverse</parameter> parameter should be zero to
+	 turn the data line drivers on and non-zero to turn them off.
+	 Some port types may be unable to switch off the data line
+	 drivers.</para>
+
+	<para>Setting the data lines may have side effects on some
+	 port types (for example, some Amiga ports pulse
+	 nStrobe).</para>
+
+	<para><function>ieee1284_wait_data</function> waits, up until
+	 the <parameter>timeout</parameter>, for the data bits
+	 specified in <parameter>mask</parameter> to have the
+	 corresponding values in <parameter>val</parameter>.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para><function>ieee1284_read_data</function> returns the
+	 8-bit number representing the data lines unless it is not
+	 possible to return such a value with this port type, in which
+	 case it returns an error code.  Possible error codes:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>Bi-directional data lines are not available on
+	       this system.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (perhaps it has not been claimed, for
+	       instance).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>There was an error at the operating system level,
+	       and <varname>errno</varname> has been set
+	       accordingly.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284timedout;</term>
+	    <listitem>
+	      <para>The <parameter>timeout</parameter> has
+	       elapsed.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>Whereas <function>ieee1284_read_data</function> may
+         return &e1284notavail; on its first invocation on the port,
+         if it does not do so then it cannot until
+         <function>ieee1284_close</function> is called for that
+         port.</para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="status-pin-access">
+      <refmeta>
+	<refentrytitle>ieee1284_status</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_read_status</refname>
+	<refname>ieee1284_wait_status</refname>
+	<refpurpose>analyse status lines</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_read_status</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_wait_status</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>mask</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>val</parameter></paramdef>
+	    <paramdef>struct timeval *<parameter>timeout</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>There are five status lines, one of which is usually
+	 inverted on PC-style ports.  Where they differ, &libieee1284;
+	 operates on the IEEE 1284 values, not the PC-style inverted
+	 values.  The status lines are represented by the following
+	 enumeration:</para>
+
+	<programlisting><![CDATA[enum ieee1284_status_bits
+{
+  S1284_NFAULT = 0x08,
+  S1284_SELECT = 0x10,
+  S1284_PERROR = 0x20,
+  S1284_NACK   = 0x40,
+  S1284_BUSY   = 0x80,
+  /* To convert those values into PC-style register values, use this: */
+  S1284_INVERTED = S1284_BUSY,
+};]]></programlisting>
+
+	<para>These functions all act on the parallel port associated
+	 with <parameter>port</parameter>, which must be
+	 claimed.</para>
+
+	<para>The purpose of <function>ieee1284_wait_status</function>
+	 is to wait until particular status lines have specified
+	 values.  Its <parameter>timeout</parameter> parameter may be
+	 modified on return.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>For <function>ieee1284_read_status</function>, the
+	 return value is a non-negative integer with bits set as
+	 appropriate representing the status lines.  A negative result
+	 indicates an error.</para>
+
+	<para>For <function>ieee1284_wait_status</function>, the
+	 return value is &e1284ok; if the status
+	 lines now reflect the desired values (i.e. status &amp;
+	 <parameter>mask</parameter> is <parameter>val</parameter>),
+	 or a negative result indicating an error.</para>
+
+	<para>Possible error codes:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284notimpl;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> lacks the
+	       required capability.  This could be due to a limitation
+	       of this version of &libieee1284;, or a hardware
+	       limitation.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>Access to the status lines is not available on this
+	       port type.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284timedout;</term>
+	    <listitem>
+	      <para>The <parameter>timeout</parameter> has
+	       elapsed.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps the
+	       <parameter>port</parameter> is not claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+
+      <refsect1>
+	<title>Notes</title>
+
+	<para>The nAck pin is often able to trigger interrupts on the
+	 host machine.  With operating system help these interrupts
+	 may be visible to the application via the file descriptor
+	 returned by <function>ieee1284_get_irq_fd</function>.</para>
+
+	<para>Under Linux, the conditions are that the parallel port
+	 driver knows which interrupt line to use and is using it, and
+	 that the relevant <filename>/dev/parport</filename> device
+	 node is accessible and backed by a device driver.</para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="control-line-access">
+      <refmeta>
+	<refentrytitle>ieee1284_control</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_read_control</refname>
+	<refname>ieee1284_write_control</refname>
+	<refname>ieee1284_frob_control</refname>
+	<refname>ieee1284_do_nack_handshake</refname>
+	<refpurpose>manipulate control lines</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_read_control</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_write_control</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>ct</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_frob_control</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>mask</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>val</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>int
+	      <function>ieee1284_do_nack_handshake</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>ct_before</parameter></paramdef>
+	    <paramdef>unsigned char <parameter>ct_after</parameter></paramdef>
+	    <paramdef>struct timeval *<parameter>timeout</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>There are four control lines, three of which are usually
+	 inverted on PC-style ports.  Where they differ, &libieee1284;
+	 operates on the IEEE 1284 values, not the PC-style inverted
+	 values.  The control lines are represented by the following
+	 enumeration:</para>
+
+	<programlisting><![CDATA[enum ieee1284_control_bits
+{
+  C1284_NSTROBE   = 0x01,
+  C1284_NAUTOFD   = 0x02,
+  C1284_NINIT     = 0x04,
+  C1284_NSELECTIN = 0x08,
+  /* To convert those values into PC-style register values, use this: */
+  C1284_INVERTED = (C1284_NSTROBE|
+                    C1284_NAUTOFD|
+                    C1284_NSELECTIN),
+};]]></programlisting>
+
+	<para>These functions all act on the parallel port associated
+	 with <parameter>port</parameter>, which must be
+	 claimed.</para>
+
+	<para>The current values on the control lines are available by
+	 calling <function>ieee1284_read_control</function>, and may
+	 be set by calling
+	 <function>ieee1284_write_control</function>.</para>
+
+	<para>To adjust the values on a set of control lines, use
+	 <function>ieee1284_frob_control</function>.  The effect of
+	 this can be expressed by: <literal>ctr = ((ctr &amp; ~mask) ^
+	 val)</literal>; that is, the bits in
+	 <parameter>mask</parameter> are unset, and then those in
+	 <parameter>val</parameter> are inverted.</para>
+
+	<para>The special function
+	 <function>ieee1284_do_nack_handshake</function> is for
+	 responding very quickly in a protocol where the peripheral
+	 sets nAck and the host must respond by setting a control
+	 line.  Its operation, which relies on the host machine
+	 knowing which interrupt nAck generates, is as follows:</para>
+
+	<procedure>
+	  <step>
+	    <para>Set the control lines as indicated in
+	      <parameter>ct_before</parameter>.</para>
+	  </step>
+
+	  <step>
+	    <para>Wait for nAck interrupt.  If
+	      <parameter>timeout</parameter> elapses, return
+	      &e1284timedout;.</para>
+	  </step>
+
+	  <step>
+	    <para>Set the control lines as indicated in
+	      <parameter>ct_after</parameter>.</para>
+	  </step>
+	</procedure>
+
+	<para>On Linux using the ppdev driver, this is performed by
+	 the device driver in the kernel, and so is faster than
+	 normally possible in a user-space library.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>The return value of
+	 <function>ieee1284_read_control</function>, if non-negative,
+	 is a number representing the value on the control lines.</para>
+
+	<para>Possible error codes for
+	  <function>ieee1284_read_control</function>:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>The control lines of this port are not accessible
+	       by the application.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps it is not
+	       claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>Possible error codes for
+	 <function>ieee1284_do_nack_handshake</function>:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>The handshake was successful.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>This operation is not available on this port type
+	       or system.  This could be because port interrupts are
+	       not available, or because the underlying device driver
+	       does not support the operation.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps it is not
+	       claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+    </refentry>
+
+    <refentry id="negotiation">
+      <refmeta>
+	<refentrytitle>ieee1284_negotiation</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_negotiate</refname>
+	<refname>ieee1284_terminate</refname>
+	<refpurpose>IEEE 1284 negotiation</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_negotiate</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>mode</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>void <function>ieee1284_terminate</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>These functions are for negotiating to and terminating
+	 from IEEE 1284 data transfer modes.  The default mode is
+	 called compatibility mode, or in other words normal printer
+	 protocol.  It is a host-to-peripheral mode only.  There are
+	 special modes that allow peripheral-to-host transfer as well,
+	 which may be negotiated to using
+	 <function>ieee1284_negotiate</function>.  IEEE 1284
+	 negotiation is a process by which the host requests a
+	 transfer mode and the peripheral accepts or rejects it.  An
+	 IEEE 1284-compliant device will require a successful
+	 negotiation to a particular mode before it is used for data
+	 transfer (but simpler devices may not if they only speak one
+	 transfer mode).</para>
+
+	<para>To terminate the special mode and go back to
+	 compatilibity mode use
+	 <function>ieee1284_terminate</function>.</para>
+
+	<para>These functions act on the parallel port associated with
+	 <parameter>port</parameter>, which must be claimed.</para>
+
+	<para>With a device strictly complying to IEEE 1284 you will
+	 need to call <function>ieee1284_terminate</function> in
+	 between any two calls to
+	 <function>ieee1284_negotiate</function> for modes other than
+	 <constant>M1284_COMPAT</constant>.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Available modes</title>
+
+	<refsect2>
+	  <title>Uni-directional modes</title>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para><constant>M1284_COMPAT</constant>: Compatibility
+	       mode.  Normal printer protocol.  This is not a
+	       negotiated mode, but is the default mode in absence of
+	       negotiation.  <userinput>ieee1284_negotiate(port,
+	       M1284_COMPAT)</userinput> is equivalent to
+	       <userinput>ieee1284_terminate(port)</userinput>.  This
+	       host-to-peripheral mode is used for sending data to
+	       printers, and is historically the mode that has been
+	       used for that before IEEE 1284.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para><constant>M1284_NIBBLE</constant>: Nibble mode.
+	       This peripheral-to-host mode uses the status lines to
+	       read data from the peripheral four bits at a time.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para><constant>M1284_BYTE</constant>: Byte mode.  This
+	       peripheral-to-host mode uses the data lines in reverse
+	       mode to read data from the peripheral a byte at a
+	       time.</para>
+	    </listitem>
+	  </itemizedlist>
+	</refsect2>
+
+	<refsect2>
+	  <title>Bi-directional modes</title>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para><constant>M1284_ECP</constant>: ECP mode.  On
+	       entry to ECP mode it is a host-to-peripheral
+	       (i.e. forward) mode, but it may be set to reverse mode
+	       using <citerefentry>
+		  <refentrytitle>ieee1284_ecp_fwd_to_rev</refentrytitle>
+		  <manvolnum>3</manvolnum>
+		</citerefentry>.  It is common
+	       for PC hardware to provide assistance with this mode by
+	       the use of a FIFO which the host (or, in reverse mode,
+	       the peripheral) may fill, so that the hardware can do
+	       the handshaking itself.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para><constant>M1284_EPP</constant>: EPP mode.  In this
+	       bi-directional mode the direction of data transfer is
+	       signalled at each byte.</para>
+	    </listitem>
+	  </itemizedlist>
+	</refsect2>
+
+	<refsect2>
+	  <title>Mode variations</title>
+
+	  <itemizedlist>
+	    <listitem>
+	      <para><constant>M1284_FLAG_DEVICEID</constant>: Device
+	       ID retrieval.  This flag may be combined with a nibble,
+	       byte, or ECP mode to notify the device that it should
+	       send its IEEE 1284 Device ID when asked for
+	       data.</para>
+	    </listitem>
+
+	    <listitem>
+	      <para><constant>M1284_BECP</constant>: Bounded ECP is a
+	       modification to ECP that makes it more robust at the
+	       point that the direction is changed. (Unfortunately it
+	       is not yet implemented in the Linux kernel
+	       driver.)</para>
+	    </listitem>
+
+	    <listitem>
+	      <para><constant>M1284_ECPRLE</constant>: ECP with run
+	       length encoding.  In this mode, consecutive data bytes
+	       of the same value may be transferred in only a few
+	       cycles.</para>
+	    </listitem>
+	  </itemizedlist>
+	</refsect2>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>The negotiation was successful.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notavail;</term>
+	    <listitem>
+	      <para>Negotiation is not available with this port
+	       type.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284rejected;</term>
+	    <listitem>
+	      <para>Negotiation was rejected by the peripheral.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284negfailed;</term>
+	    <listitem>
+	      <para>Negotiation failed for some reason.  Perhaps the
+	       device is not IEEE 1284 compliant.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>A system error occured during negotiation.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps the
+	       <parameter>port</parameter> is not claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+    </refentry>
+
+    <refentry id="fwd-rev">
+      <refmeta>
+	<refentrytitle>ieee1284_ecp_fwd_to_rev</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_ecp_fwd_to_rev</refname>
+	<refname>ieee1284_ecp_rev_to_fwd</refname>
+	<refpurpose>ECP direction switching</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_ecp_fwd_to_rev</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_ecp_rev_to_fwd</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>These functions are used to switch directions when in
+	 ECP mode.  On negotiation to ECP mode the direction is
+	 forward (in other words, host-to-peripheral).  Use
+	 <function>ieee1284_ecp_fwd_to_rev</function> to switch from
+	 forward to reverse, and
+	 <function>ieee1284_ecp_rev_to_fwd</function> to switch from
+	 reverse to forward.</para>
+
+	<para>They act on the parallel port associated with
+	 <parameter>port</parameter>, which must be claimed.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284ok;</term>
+	    <listitem>
+	      <para>Direction switched successfully.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284notimpl;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> lacks the
+	       required capability.  This could be due to a limitation
+	       of this version of &libieee1284;, or a hardware
+	       limitation.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps the
+	       <parameter>port</parameter> is not claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </refsect1>
+    </refentry>
+
+    <refentry id="transfer">
+      <refmeta>
+	<refentrytitle>ieee1284_transfer</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_nibble_read</refname>
+	<refname>ieee1284_compat_write</refname>
+	<refname>ieee1284_byte_read</refname>
+	<refname>ieee1284_epp_read_data</refname>
+	<refname>ieee1284_epp_write_data</refname>
+	<refname>ieee1284_epp_read_addr</refname>
+	<refname>ieee1284_epp_write_addr</refname>
+	<refname>ieee1284_ecp_read_data</refname>
+	<refname>ieee1284_ecp_write_data</refname>
+	<refname>ieee1284_ecp_read_addr</refname>
+	<refname>ieee1284_ecp_write_addr</refname>
+	<refpurpose>data transfer functions</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_nibble_read</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_compat_write</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>const char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t <function>ieee1284_byte_read</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_epp_read_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_epp_write_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>const char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_epp_read_addr</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_epp_write_addr</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>const char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_ecp_read_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_ecp_write_data</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>const char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_ecp_read_addr</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>ssize_t
+	      <function>ieee1284_ecp_write_addr</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>int <parameter>flags</parameter></paramdef>
+	    <paramdef>const char *<parameter>buffer</parameter></paramdef>
+	    <paramdef>size_t <parameter>len</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>This set of functions is for tranferring bytes in the
+	 relevant transfer mode.  For ECP and EPP modes two types of
+	 transfer are possible: <firstterm>data</firstterm> and
+	 <firstterm>address</firstterm> (usually referred to as
+	 <firstterm>channel</firstterm> in ECP).</para>
+
+	<para>The supplied <parameter>port</parameter> must be a
+	 claimed port.</para>
+
+	<para>The supplied <parameter>buffer</parameter> must be at
+	 least <parameter>len</parameter> bytes long.  When reading,
+	 the transferred data is stored in the buffer; when writing
+	 the data to be transferred is taken from the buffer.</para>
+
+	<para>For reads (peripheral to host): if no data is available
+	 and <constant>F1284_NONBLOCK</constant> is not in effect,
+	 the inactivity timer is started.  If data becomes available
+	 before the inactivity time-out elapses it is read; otherwise
+	 the return value will be &e1284timedout;.</para>
+
+	<para>For writes (host to peripheral): if the peripheral is
+	 not willing to accept data and
+	 <constant>F1284_NONBLOCK</constant> is not in effect, the
+	 inactivity timer is started.  If the peripheral indicates
+	 that it is willing to accept data before the inactivity
+	 time-out elapses it is sent; otherwise the return value will
+	 be &e1284timedout;</para>
+
+	<para>The <parameter>flags</parameter> may alter the behaviour
+	 slightly:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><constant>F1284_NONBLOCK</constant></term>
+	    <listitem>
+	      <para>For reads (peripheral to host): if no data is
+	       available, return immediately (with
+	       &e1284timedout;).</para>
+
+	      <para>For writes (host to peripheral): if the peripheral
+	       is not willing to accept data, return immediately (with
+	       &e1284timedout;).</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>F1284_SWE</constant></term>
+	    <listitem>
+	      <para>Don't use hardware assistance for the transfer,
+	       but instead set the parallel port pins according to the
+	       wire protocol.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>F1284_RLE</constant> (for ECP only)</term>
+	    <listitem>
+	      <para>Use run length encoding.  If the
+	       peripheral is in ECP mode with RLE, calls to
+	       <function>ieee1284_ecp_read_data</function>
+	       <emphasis>must</emphasis> set this flag in order for
+	       the RLE from the peripheral to be interpreted
+	       correctly, and calls to
+	       <function>ieee1284_ecp_write_data</function>
+	       <emphasis>may</emphasis> set this flag in order to take
+	       advantage of RLE.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term><constant>F1284_FASTEPP</constant> (for EPP only)</term>
+	    <listitem>
+	      <para>Use multi-byte transfers.  Several bytes at a time
+	        are transferred using hardware assistance, if
+	        supporting hardware is present.  The price of this
+	        increased speed is that the return value will be less
+	        reliable when this flag is used.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>For ECP mode, a given direction is in force at any
+	 particular time, and it is up to the application to ensure
+	 that it is only writing when in forward mode, and reading
+	 when in reverse mode.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>The return value is the number of bytes successfully
+	 transferred or, if negative, one of:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term>&e1284notimpl;</term>
+	    <listitem>
+	      <para>This transfer mode and flags combination is not
+	       yet implemented in &libieee1284;.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284timedout;</term>
+	    <listitem>
+	      <para>Timed out waiting for peripheral to
+	       handshake.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284nomem;</term>
+	    <listitem>
+	      <para>Not enough memory is available.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284sys;</term>
+	    <listitem>
+	      <para>There was a problem at the operating system
+	       level.  The global variable <varname>errno</varname>
+	       has been set appropriately.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
+	    <term>&e1284invalidport;</term>
+	    <listitem>
+	      <para>The <parameter>port</parameter> parameter is
+	       invalid (for instance, perhaps the
+	       <parameter>port</parameter> is not claimed).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+
+	<para>If any bytes are successfully transferred, that number
+	 is returned.  An error is returned only if no bytes are
+	 transferred.</para>
+
+	<para>For host-to-peripheral transfers, all data is at the
+	 peripheral by the time the call returns.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>See also</title>
+
+	<para><citerefentry>
+	    <refentrytitle>ieee1284_ecp_fwd_to_rev</refentrytitle>
+	    <manvolnum>3</manvolnum>
+	  </citerefentry></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="irq">
+      <refmeta>
+	<refentrytitle>ieee1284_get_irq_fd</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_get_irq_fd</refname>
+	<refname>ieee1284_clear_irq</refname>
+	<refpurpose>interrupt notification</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_get_irq_fd</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	  </funcprototype>
+
+	  <funcprototype>
+	    <funcdef>int <function>ieee1284_clear_irq</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter>,
+	     unsigned int *<parameter>count</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>If the <parameter>port</parameter> has a configured
+	 interrupt line and the port type supports interrupt
+	 notification, it is possible to obtain a file descriptor that
+	 may be used for
+	 <citerefentry>
+	    <refentrytitle>select</refentrytitle>
+	    <manvolnum>2</manvolnum>
+	 </citerefentry> or <citerefentry>
+	    <refentrytitle>poll</refentrytitle>
+	    <manvolnum>2</manvolnum>
+	 </citerefentry>.  Any event (readable, writable
+	 or exception) means that an interrupt has been
+	 triggered.  No operations other than
+	 <function>select</function> or <function>poll</function> may
+	 be performed on the file descriptor.</para>
+
+	<para>The port must be open in order to call
+	 <function>ieee1284_get_irq_fd</function>, and must be claimed
+	 when using <function>select</function> or
+	 <function>poll</function>.</para>
+
+	<para>The caller must not close the file descriptor, and may
+	 not use it at all when the port is not claimed.</para>
+
+	<para>When an interrupt has been detected, the caller must
+	 call <function>ieee1284_clear_irq</function> to clear the
+	 interrupt condition, at which point the number of interrupts
+	 raised can be obtained by supplying a
+	 non-<constant>NULL</constant>
+	 <parameter>count</parameter>.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>For <function>ieee1284_get_irq_fd</function>: If the
+	 return value is negative then it is an error code listed
+	 below.  Otherwise it is a valid file descriptor.
+
+	  <variablelist>
+	    <varlistentry>
+	      <term>&e1284notavail;</term>
+	      <listitem>
+		<para>No such file descriptor is available.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>&e1284invalidport;</term>
+	      <listitem>
+		<para>The <parameter>port</parameter> parameter is
+	         invalid (for instance, perhaps the
+	         <parameter>port</parameter> is not open).</para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist></para>
+
+	<para>For <function>ieee1284_clear_irq</function>:
+
+	  <variablelist>
+	    <varlistentry>
+	      <term>&e1284ok;</term>
+	      <listitem>
+		<para>The interrupt has been cleared.  If
+		 <parameter>count</parameter> was not
+		 <constant>NULL</constant> the count of interrupts has
+		 been atomically stored to
+		 <parameter>count</parameter> and reset.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>&e1284notavail;</term>
+	      <listitem>
+		<para>The <parameter>count</parameter> parameter was
+		 not <constant>NULL</constant> but interrupt counting
+		 is not supported on this type of port.  The interrupt
+		 has been cleared.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>&e1284sys;</term>
+	      <listitem>
+		<para>There was a problem clearing the
+		 interrupt.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>&e1284invalidport;</term>
+	      <listitem>
+		<para>The <parameter>port</parameter> parameter is
+	         invalid (for instance, perhaps the
+	         <parameter>port</parameter> is not claimed).</para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist></para>
+      </refsect1>
+    </refentry>
+
+    <refentry id="timeout">
+      <refmeta>
+	<refentrytitle>ieee1284_set_timeout</refentrytitle>
+	<manvolnum>3</manvolnum>
+      </refmeta>
+
+      <refnamediv>
+	<refname>ieee1284_set_timeout</refname>
+	<refpurpose>modify inactivity timeout</refpurpose>
+      </refnamediv>
+
+      <refsynopsisdiv>
+	<funcsynopsis>
+	  <funcsynopsisinfo>#include &lt;ieee1284.h&gt;</funcsynopsisinfo>
+	  <funcprototype>
+	    <funcdef>struct timeval
+	    *<function>ieee1284_set_timeout</function></funcdef>
+	    <paramdef>struct parport *<parameter>port</parameter></paramdef>
+	    <paramdef>struct timeval *<parameter>timeout</parameter></paramdef>
+	  </funcprototype>
+	</funcsynopsis>
+      </refsynopsisdiv>
+
+      <refsect1>
+	<title>Description</title>
+
+	<para>This function sets a new value for the inactivity
+	 timeout (used for block transfer functions), and returns the
+	 old value.</para>
+
+	<para>The <parameter>port</parameter> must be claimed.</para>
+
+	<para>The <parameter>timeout</parameter> parameter may be
+	 <constant>NULL</constant>, in which case the old value is
+	 left unchanged.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Return value</title>
+
+	<para>This function returns a pointer to a <structname>struct
+	 timeval</structname> representing the old value.  This uses
+	 the same storage as the <parameter>port</parameter>
+	 structure, and so is not valid after closing the port.</para>
+      </refsect1>
+
+      <refsect1>
+	<title>Notes</title>
+
+	<para>Note that this is an inactivity time-out, not an
+	 absolute time-out.  During a data transfer, if the peripheral
+	 is inactive for the length of time specified then the host
+	 gives up.</para>
+
+	<para>It is also advisory; no guarantee is made that the
+	 transfer will ever complete.</para>
+      </refsect1>
+    </refentry>
+  </reference>
+</book>

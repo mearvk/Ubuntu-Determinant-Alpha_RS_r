@@ -1,0 +1,54 @@
+Description: Fix a warning and correctly check for regular expressions
+ Regular expressions have become first-class objects under Perl 5.12.  This
+ patch restores the 5.10 behavior under 5.12, by having _get_type() return
+ 'SCALAR' when UNIVERSAL::isa($thingy,'Regexp') is true.
+Origin: other
+Bug: https://rt.cpan.org/Public/Bug/Display.html?id=56681
+Bug-Debian: https://bugs.debian.org/658614
+
+--- a/t/Devel-Cycle.t
++++ b/t/Devel-Cycle.t
+@@ -5,7 +5,7 @@
+ 
+ # change 'tests => 1' to 'tests => last_test_to_print';
+ 
+-use Test::More tests => 12;
++use Test::More tests => 13;
+ use Scalar::Util qw(weaken isweak);
+ BEGIN { use_ok('Devel::Cycle') };
+ 
+@@ -87,6 +87,7 @@
+ }
+ 
+ {
++    no warnings qw{ once };
+     *FOOBAR = *FOOBAR if 0; # cease -w
+     my $test2 = { glob => \*FOOBAR };
+ 
+@@ -101,6 +102,15 @@
+     is("@warnings", "", "Warn only once");
+ }
+ 
++{
++    my $test_re = qr{foo}xms;
++
++    my @warnings;
++    local $SIG{__WARN__} = sub { push @warnings, @_ };
++    find_cycle($test_re);
++    ok( !@warnings, 'No warnings on Regex' );
++}
++
+ package foo;
+ use overload q("") => sub{ return 1 };  # show false alarm
+ 
+--- a/lib/Devel/Cycle.pm
++++ b/lib/Devel/Cycle.pm
+@@ -215,7 +215,7 @@
+ sub _get_type {
+   my $thingy = shift;
+   return unless ref $thingy;
+-  return 'SCALAR' if UNIVERSAL::isa($thingy,'SCALAR') || UNIVERSAL::isa($thingy,'REF');
++  return 'SCALAR' if UNIVERSAL::isa($thingy,'SCALAR') || UNIVERSAL::isa($thingy,'REF') || UNIVERSAL::isa($thingy,'Regexp');
+   return 'ARRAY'  if UNIVERSAL::isa($thingy,'ARRAY');
+   return 'HASH'   if UNIVERSAL::isa($thingy,'HASH');
+   return 'CODE'   if UNIVERSAL::isa($thingy,'CODE');

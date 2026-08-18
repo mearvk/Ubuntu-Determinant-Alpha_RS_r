@@ -1,0 +1,69 @@
+* Test input
+
+** Structure
+
+New test cases for [[file:scan-copyright.t][scan_copyright.t]] are in 2 forms:
+- a =*.d= directory containing source files
+- a =*.in= file containing the output of =licensecheck= command
+
+** Creating a *.d directory
+
+You must use a =*.d= directory if copyright scanner extracts data from
+source file. This is currently the case for Rust, NodeJS, Perl and
+Raku modules.
+
+This directory must contain at least the file containing copyright data:
+
+| Language | file         |
+|----------+--------------|
+| NodeJS   | package.json |
+| Perl     | META.json    |
+| Raku     | META6.json   |
+| Rust     | Cargo.toml   |
+
+Then you can other source files to test copyright extracted from files using
+=licensecheck=
+
+** Creating a *.in file
+
+Say you want to create a =foo_test.in= file using data from package
+=foo=.
+
+You have to run a set of commands like:
+
+#+BEGIN_EXAMPLE
+  # create .in file
+  # in libconfig-model-dpkg-perl repo
+  export TEST=foo_test
+  export repo_dir=$PWD
+  cd path_to_foo
+  licensecheck --encoding utf8 --copyright --machine --shortname-scheme=debian,spdx --recursive . > $repo_dir/t/scanner/examples/$TEST.in
+#+END_EXAMPLE
+
+* Test output
+
+** Creating the *.out file
+
+This file contains the expected output of copyright scanner and must
+be created whether the test input is a =*.d= directory or a =*.in= file.
+
+#+BEGIN_EXAMPLE
+  # create .out file
+  cd - # back to libconfig-model-dpkg-perl repo
+  # use either $TEST.in or $TEST.d as scan-copyrights argument
+  perl -Ilib bin/scan-copyrights t/scanner/examples/$TEST.in > t/scanner/examples/$TEST.out
+#+END_EXAMPLE
+
+Be sure to check that the test output makes sense.
+
+** Updating the test case
+
+The =*.out= files may need to be regenerated if =lib/Dpkg/Copyright/Scanner.pm=
+is changed. To do so, use a command like:
+
+#+BEGIN_EXAMPLE
+  export TEST=bar
+  perl -Ilib bin/scan-copyrights t/scanner/examples/$TEST.in > t/scanner/examples/$TEST.out
+#+END_EXAMPLE
+
+Be sure to check that the updated output makes sense.

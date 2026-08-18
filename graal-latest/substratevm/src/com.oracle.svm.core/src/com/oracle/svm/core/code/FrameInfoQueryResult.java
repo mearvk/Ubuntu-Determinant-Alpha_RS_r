@@ -1,0 +1,481 @@
+/*
+ * Copyright (c) 2015, 2025, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.code;
+
+import static com.oracle.svm.shared.Uninterruptible.CALLED_FROM_UNINTERRUPTIBLE_CODE;
+
+import org.graalvm.nativeimage.c.function.CodePointer;
+import org.graalvm.word.impl.Word;
+
+import com.oracle.svm.core.CalleeSavedRegisters;
+import com.oracle.svm.core.ReservedRegisters;
+import com.oracle.svm.core.code.CodeInfoEncoder.Encoders;
+import com.oracle.svm.core.hub.DynamicHub;
+import com.oracle.svm.guest.staging.log.Log;
+import com.oracle.svm.core.meta.SharedMethod;
+import com.oracle.svm.shared.Uninterruptible;
+import com.oracle.svm.shared.util.SubstrateUtil;
+
+import jdk.graal.compiler.core.common.SuppressFBWarnings;
+import jdk.graal.compiler.nodes.FrameState;
+import jdk.vm.ci.code.Register;
+import jdk.vm.ci.code.StackSlot;
+import jdk.vm.ci.code.VirtualObject;
+import jdk.vm.ci.meta.Constant;
+import jdk.vm.ci.meta.JavaConstant;
+import jdk.vm.ci.meta.JavaKind;
+import jdk.vm.ci.meta.ResolvedJavaMethod;
+
+/**
+ * During a stack walk, this class holds information about a virtual Java frame. It is usually
+ * referenced by a physical Java frame, see {@link CodeInfoQueryResult}.
+ */
+public class FrameInfoQueryResult extends FrameSourceInfo {
+
+    public enum ValueType {
+        /**
+         * The {@link JavaKind#Illegal} value. The {@link ValueInfo#data} field is ignored.
+         */
+        Illegal(false),
+
+        /**
+         * A {@link StackSlot} value. The {@link ValueInfo#data} is the frame offset of the stack
+         * slot.
+         */
+        StackSlot(true),
+
+        /**
+         * A {@link Register} value. The {@link ValueInfo#data} is the frame offset of the stack
+         * slot in the callee where the register value was spilled to according to the
+         * {@link CalleeSavedRegisters}.
+         */
+        Register(true),
+
+        /**
+         * A reserved register that has a fixed value as defined in {@link ReservedRegisters}. The
+         * {@link ValueInfo#data} is the {@link Register#number}.
+         */
+        ReservedRegister(true),
+
+        /**
+         * A {@link Constant} value. The {@link ValueInfo#data} is the primitive data value of the
+         * constant for {@link JavaKind#isPrimitive()} values, or the index into the object constant
+         * array for {@link JavaKind#Object} values.
+         */
+        Constant(true),
+
+        /**
+         * A {@link Constant} that has the {@link Constant#isDefaultForKind() default} value. The
+         * {@link ValueInfo#data} field is ignored.
+         */
+        DefaultConstant(false),
+
+        /**
+         * A {@link VirtualObject}. The {@link ValueInfo#data} is the id of the virtual object,
+         * i.e., the index into the {@link #virtualObjects}.
+         */
+        VirtualObject(true);
+
+        final boolean hasData;
+
+        ValueType(boolean hasData) {
+            this.hasData = hasData;
+        }
+    }
+
+    public static final class ValueInfo {
+        protected ValueType type;
+        protected JavaKind kind;
+        protected boolean isCompressedReference; // for JavaKind.Object
+        protected boolean isEliminatedMonitor;
+        protected boolean isAutoBoxedPrimitive;
+        protected long data;
+        protected JavaConstant value;
+
+        public ValueInfo() {
+            clear();
+        }
+
+        /**
+         * Returns the type of the value, describing how to access the value.
+         */
+        @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+        public ValueType getType() {
+            return type;
+        }
+
+        /**
+         * Returns the kind of the value.
+         */
+        public JavaKind getKind() {
+            return kind;
+        }
+
+        /**
+         * When {@link #kind} is {@link JavaKind#Object}, indicates whether this value is a
+         * compressed or uncompressed reference.
+         */
+        @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+        public boolean isCompressedReference() {
+            return isCompressedReference;
+        }
+
+        /**
+         * When true, the value is a monitor (a {@link FrameInfoQueryResult#numLocks lock slot},
+         * located after the local variables and expression stack slots) that was eliminated and
+         * re-locking must be performed during deoptimization.
+         */
+        public boolean isEliminatedMonitor() {
+            return isEliminatedMonitor;
+        }
+
+        /**
+         * Returns true if this is an automatically boxed primitive (i.e., a method like
+         * {@link Integer#valueOf} should be used to produce the value).
+         */
+        public boolean isAutoBoxedPrimitive() {
+            return isAutoBoxedPrimitive;
+        }
+
+        /**
+         * Returns additional data for the value, according to the specification in
+         * {@link ValueType}.
+         */
+        @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+        public long getData() {
+            return data;
+        }
+
+        /**
+         * Returns the constant value. Only non-null if the {@link #getType type} is
+         * {@link ValueType#Constant} or {@link ValueType#DefaultConstant}.
+         */
+        public JavaConstant getValue() {
+            return value;
+        }
+
+        /**
+         * Copy {@code this} value info, with all fields unchanged except for the {@link #getKind()}
+         * replaced by the given {@code kind} and the {@link #getData()} adjusted (not replaced!) by
+         * the given {@code offset}. This is used to access element information for special compound
+         * objects like Vector API values.
+         */
+        public ValueInfo copyForElement(JavaKind javaKind, int offset) {
+            ValueInfo copy = new ValueInfo();
+            copy.type = type;
+            copy.kind = javaKind;
+            copy.isCompressedReference = isCompressedReference;
+            copy.isEliminatedMonitor = isEliminatedMonitor;
+            copy.isAutoBoxedPrimitive = isAutoBoxedPrimitive;
+            copy.data = data + offset;
+            copy.value = value;
+            return copy;
+        }
+
+        @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+        public void clear() {
+            type = null;
+            kind = null;
+            isCompressedReference = false;
+            isEliminatedMonitor = false;
+            isAutoBoxedPrimitive = false;
+            data = 0;
+            value = null;
+        }
+    }
+
+    protected FrameInfoQueryResult caller;
+    protected SharedMethod deoptMethod;
+    protected CodeInfo deoptMethodImageCodeInfo;
+    protected int deoptMethodOffset;
+    protected boolean isDeoptEntry;
+    protected int numLocals;
+    protected int numStack;
+    protected int numLocks;
+    protected ValueInfo[] valueInfos;
+    protected ValueInfo[][] virtualObjects;
+    protected int sourceMethodId;
+
+    /* These are used only for constructing/encoding the code and frame info, or as cache. */
+    private ResolvedJavaMethod sourceMethod;
+
+    private String sourceMethodSignature;
+
+    public FrameInfoQueryResult() {
+        /* super constructor will call init() */
+        super();
+    }
+
+    @Override
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public void init() {
+        super.init();
+        caller = null;
+        deoptMethod = null;
+        deoptMethodOffset = 0;
+        deoptMethodImageCodeInfo = SubstrateUtil.HOSTED ? null : Word.nullPointer();
+        isDeoptEntry = false;
+        numLocals = 0;
+        numStack = 0;
+        numLocks = 0;
+        valueInfos = null;
+        virtualObjects = null;
+        sourceMethodId = 0;
+        sourceMethod = null;
+        sourceMethodSignature = Encoders.INVALID_METHOD_SIGNATURE;
+    }
+
+    /**
+     * Returns the caller if this frame is an inlined method.
+     */
+    @Override
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public FrameInfoQueryResult getCaller() {
+        return caller;
+    }
+
+    /**
+     * Returns the deoptimization target method, or {@code null} if not available. In general this
+     * is optional metadata and should only be used for debug printing.
+     * <p>
+     * Runtime-installed interpreter frames are the qualified exception: the runtime frame-info
+     * encoder stores the {@link SharedMethod} whenever it has an interpreter counterpart, even
+     * when no AOT deoptimization target exists. Ristretto's lazy-deoptimization stub selector may
+     * therefore require a non-null Ristretto method after it has established that the instruction
+     * pointer belongs to installed code with an interpreter deoptimization target. Consumers must
+     * enforce that path-specific invariant rather than extending it to arbitrary AOT frame info.
+     */
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public SharedMethod getDeoptMethod() {
+        return deoptMethod;
+    }
+
+    /**
+     * Returns the encoded relative IP of the deoptimization target method in
+     * {@link #deoptMethodImageCodeInfo}. For uncompressed code this is the same as the offset
+     * relative to {@link CodeInfoAccess#getCodeStart code start}; compressed code adds the
+     * {@link CodeInfoAccess#relativeIP relative IP} bias used by code-info encodings. Together with
+     * the BCI it is used to find the corresponding bytecode frame in the target method. Note that
+     * there is no inlining in target methods, so the method + BCI is unique.
+     */
+    public int getDeoptMethodOffset() {
+        return deoptMethodOffset;
+    }
+
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    boolean isDeoptMethodImageCodeInfoNull() {
+        if (SubstrateUtil.HOSTED) {
+            return deoptMethodImageCodeInfo == null;
+        }
+        return deoptMethodImageCodeInfo.isNull();
+    }
+
+    public CodeInfo getDeoptMethodImageCodeInfo() {
+        if (deoptMethodOffset == 0) {
+            /*
+             * A runtime-compiled Ristretto frame can have no AOT deopt target, but still carry the
+             * method so stack walking can recover its interpreter source information.
+             */
+            assert deoptMethod == null || deoptMethod.getInterpreterMethod() != null;
+            return Word.nullPointer();
+        }
+        if (isDeoptMethodImageCodeInfoNull() && deoptMethod != null) {
+            deoptMethodImageCodeInfo = CodeInfoTable.getImageCodeInfo(deoptMethod);
+            assert !isDeoptMethodImageCodeInfoNull();
+        }
+        return deoptMethodImageCodeInfo;
+    }
+
+    /**
+     * Returns the entry point address of the deoptimization target method.
+     */
+    public CodePointer getDeoptMethodAddress() {
+        if (deoptMethodOffset == 0) {
+            return Word.nullPointer();
+        }
+        return CodeInfoAccess.absoluteIP(getDeoptMethodImageCodeInfo(), deoptMethodOffset);
+    }
+
+    /**
+     * Returns an encoding of the bytecode index itself plus the duringCall and rethrowException
+     * flags.
+     */
+    public long getEncodedBci() {
+        return encodedBci;
+    }
+
+    /**
+     * Returns the state of expression stack in the FrameState.
+     */
+    public FrameState.StackState getStackState() {
+        return FrameState.StackState.of(FrameInfoDecoder.decodeDuringCall(encodedBci), FrameInfoDecoder.decodeRethrowException(encodedBci));
+    }
+
+    /**
+     * Returns whether this frame records the post-invoke state that can carry a pending normal
+     * return value. Used while selecting the lazy-deoptimization stub before that value is rooted.
+     */
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public boolean isAfterPop() {
+        return (encodedBci & FrameInfoDecoder.ENCODED_BCI_DURING_CALL_MASK) != 0 &&
+                        (encodedBci & FrameInfoDecoder.ENCODED_BCI_RETHROW_EXCEPTION_MASK) == 0;
+    }
+
+    /**
+     * Returns true if this frame has been marked as a valid deoptimization entry point.
+     */
+    public boolean isDeoptEntry() {
+        return isDeoptEntry;
+    }
+
+    /**
+     * Returns the number of locals variables. See {@link #getValueInfos()} for description of array
+     * layout.
+     */
+    public int getNumLocals() {
+        return numLocals;
+    }
+
+    /**
+     * Returns the number of locked values. See {@link #getValueInfos()} for description of array
+     * layout.
+     */
+    public int getNumLocks() {
+        return numLocks;
+    }
+
+    /**
+     * Returns the number of stack values. See {@link #getValueInfos()} for description of array
+     * layout.
+     */
+    public int getNumStack() {
+        return numStack;
+    }
+
+    /**
+     * Returns whether any local value info is present.
+     */
+    public boolean hasLocalValueInfo() {
+        return valueInfos != null;
+    }
+
+    /**
+     * Returns array containing information about the local, stack, and lock values. The values are
+     * arranged in the order {locals, stack values, locks} and matches the order of
+     * {@code BytecodeFrame#values}. Trailing illegal values can be pruned, so the array size may
+     * not be equal to (numLocals + numStack + numLocks).
+     */
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public ValueInfo[] getValueInfos() {
+        return valueInfos;
+    }
+
+    /**
+     * Returns the virtual objects. This result is the same for all frames in the
+     * {@link #getCaller() inlining chain}.
+     */
+    public ValueInfo[][] getVirtualObjects() {
+        return virtualObjects;
+    }
+
+    @Override
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    protected void fillSourceFieldsIfMissing() {
+        if (sourceMethodId != 0 && sourceClass == Encoders.INVALID_CLASS) {
+            CodeInfoDecoder.fillSourceFields(this);
+        }
+    }
+
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    @SuppressFBWarnings(value = "ES_COMPARING_STRINGS_WITH_EQ", justification = "Identity comparison against sentinel string value")
+    void setSourceFields(Class<?> clazz, String methodName, String signature, int flags) {
+        assert sourceClass == Encoders.INVALID_CLASS && sourceMethodName == Encoders.INVALID_METHOD_NAME && sourceMethodSignature == Encoders.INVALID_METHOD_SIGNATURE &&
+                        sourceMethodFlags == Encoders.INVALID_METHOD_MODIFIERS;
+        this.sourceClass = clazz;
+        this.sourceMethodName = methodName;
+        this.sourceMethodSignature = signature;
+        this.sourceMethodFlags = flags;
+    }
+
+    ResolvedJavaMethod getSourceMethod() {
+        return sourceMethod;
+    }
+
+    void setSourceMethod(ResolvedJavaMethod method) {
+        assert method != null;
+        assert sourceMethod == null : sourceMethod;
+        sourceMethod = method;
+    }
+
+    /**
+     * Returns a unique identifier for the method which can be used to look it up in
+     * {@linkplain CodeInfoImpl#getMethodTable() method tables} of image code, taking into account a
+     * table's {@linkplain CodeInfoImpl#getMethodTableFirstId() starting id}. The identifier
+     * returned here is <em>different</em> from others, such as from {@code AnalysisMethod.getId()}.
+     */
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public int getSourceMethodId() {
+        return sourceMethodId;
+    }
+
+    @Uninterruptible(reason = CALLED_FROM_UNINTERRUPTIBLE_CODE, mayBeInlined = true)
+    public String getSourceMethodSignature() {
+        fillSourceFieldsIfMissing();
+        return sourceMethodSignature;
+    }
+
+    public Log log(Log log) {
+        fillSourceFieldsIfMissing();
+        String className = (sourceClass != null) ? sourceClass.getName() : "";
+        String methodName = (sourceMethodName != null) ? sourceMethodName : "";
+        log.string(className);
+        if (!(className.isEmpty() || methodName.isEmpty())) {
+            log.string(".");
+        }
+        log.string(methodName);
+        if (isDeoptEntry()) {
+            log.string("**");
+        }
+
+        log.string("(");
+        if (isNativeMethod()) {
+            log.string("Native Method");
+        } else {
+            String sourceFileName = sourceClass != null ? DynamicHub.fromClass(sourceClass).getSourceFileName() : null;
+            if (sourceFileName != null) {
+                if (sourceLineNumber >= 0) {
+                    log.string(sourceFileName).string(":").signed(sourceLineNumber);
+                } else {
+                    log.string(sourceFileName);
+                }
+            } else {
+                log.string("Unknown Source");
+            }
+        }
+        log.string(")");
+
+        return log;
+    }
+}

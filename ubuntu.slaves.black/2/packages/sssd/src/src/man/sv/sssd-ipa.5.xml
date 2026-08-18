@@ -1,0 +1,812 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-ipa</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-ipa</refname>
+        <refpurpose>SSSD IPA-leverantör</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av leverantören IPA till
+<citerefentry> <refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  För en detaljerad referens om syntaxen, se avsnittet
+<quote>FILFORMAT</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            IPA-leverantören är en bakände som används för att ansluta till en
+IPA-server.  (Se webbsidan freeipa.org för information om IPA-servrar.)
+Leverantören förutsätter att maskinen är inlagt i IPA-domänen;
+konfigurationen är nästan helt självupptäckande och hämtas direkt från
+servern.
+        </para>
+        <para>
+            IPA-leverantören gör att SSSD kan använda identitetsleverantören
+<citerefentry> <refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> och autentiseringsleverantören
+<citerefentry> <refentrytitle>sssd-krb5</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> med optimeringar för IPA-miljöer.
+IPA-leverantören tar samma alternativ som används av leverantörerna
+sssd-ldap och sssd-krb5 med några undantag.  Dock är det varken nödvändigt
+eller lämpligt att sätta dessa alternativ.
+        </para>
+        <para>
+            IPA-leverantören kopierar i huvudsak standardalternativen för de
+traditionella leverantörerna ldap och krb5 med några undantag.  Skillnaderna
+listas i avsnittet <quote>ÄNDRADE STANDARDINSTÄLLNINGAR</quote>.
+        </para>
+        <para>
+            Som en åtkomstleverantör använder leverantören IPA HBAC-regler (host-based
+access control, värdbaserad åtkomstkontroll).  Se freeipa.org för mer
+information om HBAC.  Ingen konfiguration av åtkomstleverantören behövs på
+klientsidan.
+        </para>
+        <para>
+            Om <quote>auth_provider=ipa</quote> eller <quote>access_provider=ipa</quote>
+konfigureras i sssd.conf måste id-leverantören också sättas till
+<quote>ipa</quote>.
+        </para>
+        <para>
+            IPA-leverantörer kommer använda PAC-respondenten om Kerberos-biljetter för
+användare för betrodda riken innehåller en PAC.  För att göra
+konfigurationen enklare startas PAC-respondenten automatiskt om
+ID-leverantören IPA är konfigurerad.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>Se <quote>DOMÄNSEKTIONER</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> för detaljer om konfigurationen av en SSSD-domän.
+<variablelist>
+                <varlistentry>
+                    <term>ipa_domain (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger namnet på IPA-domänen.  Detta är frivilligt.  Om det inte anges
+används namnet på den konfigurerade domänen.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_server, ipa_backup_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            Den kommaseparerade listan av IP-adresser eller värdnamn till IPA-servrar
+till vilka SSSD skall ansluta i prioritetsordning.  För mer information om
+reserver och serverredundans se avsnittet <quote>RESERVER</quote>.  Detta är
+frivilligt om automatupptäckt är aktiverat.  För mer information om
+tjänsteupptäckt, se avsnittet <quote>TJÄNSTEUPPTÄCKT</quote>.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hostname (sträng)</term>
+                    <listitem>
+                        <para>
+                            Valfri.  Kan sättas på maskiner där hostname(5) inte avspeglar det
+fullständigt kvalificerade namnet som används i IPA-domänen för att
+identifiera denna värd.  Värdnamnet måste vara fullständigt kvalificerat.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update (boolean)</term>
+                    <listitem>
+                        <para>
+                            Valfritt.  Detta alternativ säger till SSSD att automatiskt uppdatera
+DNS-servern som är inbyggd i FreeIPA med IP-adressen för denna klient.
+Uppdateringen säkras med GSS-TSIG.  IP-adressen för IPA-LDAP-förbindelsen
+används för uppdateringar, om det inte specificeras på annat sätt med
+alternativet <quote>dyndns_iface</quote>.
+                        </para>
+                        <para>
+                            OBS: på äldre system (såsom RHEL 5) måste standardriket för Kerberos sättas
+i /etc/krb5.conf för att detta beteende skall fungera pålitligt
+                        </para>
+                        <para>
+                            OBS: även om det fortfarande är möjligt att använda det gamla alternativet
+<emphasis>ipa_dyndns_update</emphasis> bör användare migrera till att
+använda <emphasis>dyndns_update</emphasis> i sin konfigurationsfil.
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_ttl (heltal)</term>
+                    <listitem>
+                        <para>
+                            TTL:en att använda för klientens DNS-post vid uppdatering.  Om dyndns_update
+är falsk har detta ingen effekt.  Detta kommer åsidosätta TTL på serversidan
+om det är satt av en administratör.
+                        </para>
+                        <para>
+                            OBS: även om det fortfarande är möjligt att använda det gamla alternativet
+<emphasis>ipa_dyndns_ttl</emphasis> bör användare migrera till att använda
+<emphasis>dyndns_ttl</emphasis> i sin konfigurationsfil.
+                        </para>
+                        <para>
+                            Standard: 1200 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_iface (sträng)</term>
+                    <listitem>
+                        <para>
+                            Valfri.  Endast tillämpligt när dyndns_update är sann.  Välj gränssnittet
+eller en lista av gränssnitt vars IP-adresser skall användas för dynamiska
+DNS-uppdateringar.  Specialvärdet <quote>*</quote> betyder att IP:n från
+alla gränssnitt skall användas.
+                        </para>
+                        <para>
+                            OBS: även om det fortfarande är möjligt att använda det gamla alternativet
+<emphasis>ipa_dyndns_iface</emphasis> bör användare migrera till att använda
+<emphasis>dyndns_iface</emphasis> i sin konfigurationsfil.
+                        </para>
+                        <para>
+                            Standard: använd IP-adresser för gränssnittet som används för IPA
+LDAP-förbindelsen
+                        </para>
+                        <para>
+                            Exempel: dyndns_iface = em1, vnet1, vnet2
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth (sträng)</term>
+                    <listitem>
+                        <para>
+                            Huruvida verktyget nsupdate skall använda GSS-TSIG-autentisering för säkra
+uppdateringar av DNS-servern, osäkra uppdateringar kan skickas genom att
+sätta detta alternativ till ”none”.
+                        </para>
+                        <para>
+                            Standard: GSS-TSIG
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth_ptr (sträng)</term>
+                    <listitem>
+                        <para>
+                            Huruvida verktyget nsupdate skall använda GSS-TSIG-autentisering för säkra
+PTR-uppdateringar av DNS-servern, osäkra uppdateringar kan skickas genom att
+sätta detta alternativ till ”none”.
+                        </para>
+                        <para>
+                            Standard: samma som dyndns_auth
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_enable_dns_sites (boolean)</term>
+                    <listitem>
+                        <para>
+                            Aktiverar DNS-sajter – platsbaserat tjänsteupptäckt.
+                        </para>
+                        <para>
+                            Om sant och tjänsteupptäckt (se stycket Tjänsteupptäckt i slutet av
+manualsidan) är aktiverat kommer SSSD först att försöka med platsbaserad
+upptäckt med en fråga som innehåller ”_location.hostname.example.com” och
+sedan falla tillbaka på traditionell SRV-upptäckt.  Om platsbaserad upptäckt
+lyckas betraktas IPA-servrarna som lokaliserats med platsbaserad upptäckt
+som primära servrar och IPA-servrarna som hittas med den traditionella
+SRV-upptäckten används som backup-servrar
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_refresh_interval (heltal)</term>
+                    <listitem>
+                        <para>
+                            Hur ofta bakänden skall utföra periodiska DNS-uppdateringar utöver den
+automatiska uppdateringen som utförs när bakänden kopplar upp.  Detta
+alternativ är valfritt och tillämpligt endast när dyndns_update är sann.
+                        </para>
+                        <para>
+                            Standard: 0 (avaktiverat)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_ptr (bool)</term>
+                    <listitem>
+                        <para>
+                            Huruvida PTR-posten också skall uppdateras explicit när klientens DNS-post
+uppdateras.  Tillämpligt endast när dyndns_update är sann.
+                        </para>
+                        <para>
+                            Detta alternativ är False i de flesta IPA-installationer eftersom
+IPA-servern genererar PTR-posterna automatiskt när framåtposterna ändras.
+                        </para>
+                        <para>
+                            Standard: False (avaktiverat)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_force_tcp (bool)</term>
+                    <listitem>
+                        <para>
+                            Huruvida nsupdate-verktyget som standard skall använda TCP för kommunikation
+med DNS-servern.
+                        </para>
+                        <para>
+                            Standard: False (låt nsupdate välja protokollet)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            DNS-servern som skall användas när en uppdatering av DNS utförs.  I de
+flesta uppsättningar rekommenderas det att låta detta alternativ vara osatt.
+                        </para>
+                        <para>
+                            Att sätta detta alternativ är meningsfullt i miljöer där DNS-servern är
+skild från identitetsservern.
+                        </para>
+                        <para>
+                            Observera att detta alternativ bara kommer användas i försök att falla
+tillbaka på när tidigare försök som använder automatiskt upptäckta
+inställningar misslyckas.
+                        </para>
+                        <para>
+                            Standard: Ingen (låt nsupdate välja servern)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_per_family (boolean)</term>
+                    <listitem>
+                        <para>
+                            DNS-uppdateringar utförs som standard i två steg – IPv4-uppdatering och
+sedan IPv6-uppdatering.  I några fall kan det vara önskvärt att utföra IPv4-
+och IPv6-uppdateringar i ett enda steg.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som sökbas för
+skrivbordsprofilrelaterade objekt.
+                        </para>
+                        <para>
+                            Standard: använd bas-DN
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry condition="with_subid">
+                    <term>ipa_subid_ranges_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig. Använd den givna strängen som sökbas för
+underordningsintervallsrelaterade objekt.
+                        </para>
+                        <para>
+                            Standard: värdet på <emphasis>cn=subids,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som sökbas för HBAC-relaterade objekt.
+                        </para>
+                        <para>
+                            Standard: använd bas-DN
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_host_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Undanbedes.  Använd ldap_host_search_base istället.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_selinux_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som en sökbas för
+SELinux-användaröversättningar.
+                        </para>
+                        <para>
+                            Se <quote>ldap_search_base</quote> för information om konfiguration av
+multipla sökbaser.
+                        </para>
+                        <para>
+                            Standard: värdet på <emphasis>ldap_search_base</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_subdomains_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som en sökbas för betrodda domäner.
+                        </para>
+                        <para>
+                            Se <quote>ldap_search_base</quote> för information om konfiguration av
+multipla sökbaser.
+                        </para>
+                        <para>
+                            Standard: värdet på <emphasis>cn=trusts,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_master_domain_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som en sökbas för huvuddomänobjekt.
+                        </para>
+                        <para>
+                            Se <quote>ldap_search_base</quote> för information om konfiguration av
+multipla sökbaser.
+                        </para>
+                        <para>
+                            Standard: värdet av <emphasis>cn=ad,cn=etc,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_views_search_base (sträng)</term>
+                    <listitem>
+                        <para>
+                            Frivillig.  Använd den givna strängen som en sökbas för vybehållare.
+                        </para>
+                        <para>
+                            Se <quote>ldap_search_base</quote> för information om konfiguration av
+multipla sökbaser.
+                        </para>
+                        <para>
+                            Standard: värdet av <emphasis>cn=views,cn=accounts,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_realm (sträng)</term>
+                    <listitem>
+                        <para>
+                            Namnet på Kerberos-riket.  Detta är frivilligt och som standard blir det
+värdet av <quote>ipa_domain</quote>.
+                        </para>
+                        <para>
+                            Namnet på Kerberos-riket har en speciell betydelse i IPA – det konverteras
+till bas-DN:en för att användas när LDAP-operationer utförs.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_confd_path (sträng)</term>
+                    <listitem>
+                        <para>
+                            Absolut sökväg till en katalog där SSSD skall placera konfigurationsstycken
+för Kerberos.
+                        </para>
+                        <para>
+                            För att förhindra att konfigurationsstycken skapas, sätt parametern till
+”none”.
+                        </para>
+                        <para>
+                            Standard: inte satt (underkatalogen krb5.include.d till SSSD:s
+pubconf-katalog)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_refresh (heltal)</term>
+                    <listitem>
+                        <para>
+                            Tiden mellan uppslagningar av skrivbordsprofilsregler mot IPA-servern.
+Detta kommer reducera tidsfördröjningen och lasten på IPA-servern om det
+görs många begäranden om skrivbordsprofiler under en kort tid.
+                        </para>
+                        <para>
+                            Standard: 5 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_request_interval (heltal)</term>
+                    <listitem>
+                        <para>
+                            Tiden mellan uppslagningar av skrivbordsprofilsregler mot IPA-servern ifall
+den senaste förfrågan inte returnerade någon regel.
+                        </para>
+                        <para>
+                            Standard: 60 (minuter)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_refresh (heltal)</term>
+                    <listitem>
+                        <para>
+                            Tiden mellan uppslagningar av HBAC-regler mot IPA-servern.  Detta kommer
+reducera tidsfördröjningen och lasten på IPA-servern om det görs många
+begäranden om åtkomstkontroll under en kort tid.
+                        </para>
+                        <para>
+                            Standard: 5 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_selinux (heltal)</term>
+                    <listitem>
+                        <para>
+                            Tiden mellan uppslagningar av SELinux-översättningar mot IPA-servern.  Detta
+kommer reducera tidsfördröjningen och lasten på IPA-servern om det görs
+många begäranden om användarinloggningar under en kort tid.
+                        </para>
+                        <para>
+                            Standard: 5 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_server_mode (boolean)</term>
+                    <listitem>
+			<para>
+                            Detta alternativ sätts automatiskt av IPA-installeraren (ipa-server-install)
+och markerar om SSSD kör på en IPA-server eller inte.
+                        </para>
+			<para>
+                            På en IPA-server kommer SSSD slå upp användare och grupper från betrodda
+domäner direkt medan på en klient kommer den att fråga en IPA-server.
+                        </para>
+                        <para>
+                            OBS: det finns för närvarande några antaganden som måste uppfyllas när SSSD
+kör på en IPA-server.
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        Alternativet <quote>ipa_server</quote> måste konfigureras till att peka på
+själva IPA-servern. Detta är redan standardvärdet som sätts av
+IPA-installeraren, så det behövs inga manuella ändringar.
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        Alternativet <quote>full_name_format</quote> får inte ändras till att bara
+skriva korta namn på användare från betrodda domäner.
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry condition="with_autofs">
+                    <term>ipa_automount_location (sträng)</term>
+                    <listitem>
+                        <para>
+                            Automonteringsplatsen denna IPA-klient kommer använda
+                        </para>
+                        <para>
+                            Standard: platsen som heter ”default”
+                        </para>
+                        <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/autofs_restart.xml" />
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+        <refsect2 id='views'>
+            <title>VYER OCH ÅSIDOSÄTTANDEN</title>
+            <para>
+                SSSD kan hantera vyer och åsidosättanden som erbjuds av FreeIPA 4.1 och
+senare versioner.  Eftersom alla sökvägar och objektklasser är fasta på
+serversidan finns det egentligen inget behov av att konfigurera något.  För
+fullständighets skull är de tillhörande alternativen listade här med sina
+standardvärden.  <variablelist>
+                    <varlistentry>
+                        <term>ipa_view_class (sträng)</term>
+                        <listitem>
+                            <para>
+                                Objektklass för vybehållaren.
+                            </para>
+                            <para>
+                                Standard: nsContainer
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_view_name (sträng)</term>
+                        <listitem>
+                            <para>
+                                Namn på attributet som har namnet på vyn.
+                            </para>
+                            <para>
+                                Standard: cn
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_override_object_class (sträng)</term>
+                        <listitem>
+                            <para>
+                                Objektklass för åsidosättande objekt.
+                            </para>
+                            <para>
+                                Standard: ipaOverrideAnchor
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_anchor_uuid (sträng)</term>
+                        <listitem>
+                            <para>
+                                Namn på attributet som innehåller referensen till originalobjektet i en
+fjärrdomän.
+                            </para>
+                            <para>
+                                Standard: ipaAnchorUUID
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_user_override_object_class (sträng)</term>
+                        <listitem>
+                            <para>
+                                Namn på objektklassen för användaråsidosättanden.  Det används för att
+avgöra om det funna åsidosättande objektet är relaterat till en användare
+eller en grupp.
+                            </para>
+                            <para>
+                                Användaråsidosättanden kan innehålla attribut givna av
+                                <itemizedlist>
+                                    <listitem>
+                                        <para>ldap_user_name</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_uid_number</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_gid_number</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_gecos</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_home_directory</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_shell</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_ssh_public_key</para>
+                                    </listitem>
+                                </itemizedlist>
+                            </para>
+                            <para>
+                                Standard: ipaUserOverride
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_group_override_object_class (sträng)</term>
+                        <listitem>
+                            <para>
+                                Namn på objektklassen för gruppåsidosättanden.  Det används för att avgöra
+om det funna åsidosättandeobjektet är relaterat till en användare eller en
+grupp.
+                            </para>
+                            <para>
+                                Gruppåsidosättanden kan innehålla attribut givna av
+                                <itemizedlist>
+                                    <listitem>
+                                        <para>ldap_group_name</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_group_gid_number</para>
+                                    </listitem>
+                                </itemizedlist>
+                            </para>
+                            <para>
+                                Standard: ipaGroupOverride
+                            </para>
+                        </listitem>
+                    </varlistentry>
+                </variablelist>
+            </para>
+        </refsect2>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ipa_modified_defaults.xml" />
+
+    <refsect1 id='subdomains_provider'>
+        <title>UNDERDOMÄNSLEVERANTÖR</title>
+        <para>
+            IPA-underdomänsleverantören beter sig något annorlunda om den konfigureras
+explicit eller implicit.
+        </para>
+        <para>
+            Om alternativet ”subdomains_provider = ipa” finns i domänavsnittet i
+sssd.conf konfigureras IPA-underdomänsleverantören explicit, och alla
+begäranden av underdomäner skickas till IPA-servern om nödvändigt.
+        </para>
+        <para>
+            Om alternativet ”subdomains_provider” inte är satt i domänavsnittet av
+sssd.conf men alternativet ”id_provider = ipa” finns konfigureras
+IPA-underdomänsleverantören implicit.  I det fallet, om en
+underdomänsbegäran misslyckas och indikerar att servern inte stödjer
+underdomäner, d.v.s. den är inte konfigurerad för förtroenden, avaktiveras
+IPA-underdomänsleverantören.  Efter en timma eller efter att
+IPA-leverantören blir uppkopplad aktiveras underdomänsleverantören igen.
+        </para>
+    </refsect1>
+
+    <refsect1 id='trusted_domains'>
+        <title>KONFIGURATION AV BETRODDA DOMÄNER</title>
+        <para>
+            Några konfigurationflaggor kan även sättas för betrodda domäner. En betrodd
+domämns konfiguration kan sättas med den betrodda domänens undersektion som
+visas i exemplet nedan. Alternativt kan flaggan
+<quote>subdomain_inherit</quote> användas i föräldradomänen. <programlisting>
+[domain/ipa.domain.com/ad.domain.com]
+ad_server = dc.ad.domain.com
+</programlisting>
+        </para>
+        <para>
+            För fler detaljer, se manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Olika konfigurationsalternativ kan ställas in för en betrodd domän beroende
+på huruvida man konfigurerar SSSD på en IPA-server eller en IPA-klient.
+        </para>
+        <refsect2 id='server_configuration'>
+            <title>ALTERNATIV ATT STÄLLA IN PÅ IPA-MASTRAR</title>
+            <para>
+                Följande alternativ kan sättas i ett underdomänsavsnitt på en IPA-master:
+                <itemizedlist>
+                    <listitem>
+                        <para>ad_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_backup_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_site</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_user_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_group_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>use_fully_qualified_names</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+        </refsect2>
+        <refsect2 id='client_configuration'>
+            <title>ALTERNATIV ATT STÄLLA IN PÅ IPA-KLIENTER</title>
+            <para>
+                Följande alternativ kan sättas i ett underdomänsavsnitt på en IPA-klient:
+                <itemizedlist>
+                    <listitem>
+                        <para>ad_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_site</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                Observera att om båda alternativen sätts evalueras endast
+<quote>ad_server</quote>.
+            </para>
+            <para>
+                Eftersom alla begäranden om en användar- eller en gruppidentitet från en
+betrodd domän startad från en IPA-klient löses upp av IPA-servern, påverkar
+alternativen <quote>ad_server</quote> och <quote>ad_site</quote> bara vilken
+AD DC autentiseringen kommer utföras emot.  I synnerhet kommer adresserna
+som löses upp från dessa listor att skrivas till
+<quote>kdcinfo</quote>-filer som läses av
+Kerberos-lokaliseringsinsticksmodulen.  För fler detaljer om
+Kerberos-lokaliseringsinsticksmodulen hänvisas till manualsidan
+<citerefentry> <refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.
+            </para>
+        </refsect2>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerat och att example.com
+är en av domänerna i avsnittet <replaceable>[sssd]</replaceable>.  Dessa
+exempel visar endast alternativ som är specifika för leverantören ipa.
+        </para>
+        <para>
+<programlisting>
+[domain/example.com]
+id_provider = ipa
+ipa_server = ipaserver.example.com
+ipa_hostname = minvärd.example.com
+</programlisting>
+        </para>
+    </refsect1>
+
+	<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

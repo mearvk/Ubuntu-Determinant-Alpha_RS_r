@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+
+%:
+	dh $@
+
+override_dh_auto_configure-arch:
+	dh_auto_configure -- --disable-html-docs --disable-doxygen
+
+override_dh_auto_build-indep:
+	$(MAKE) -C doc
+
+override_dh_auto_test-indep:
+	@echo Nothing to do for -indep
+
+override_dh_auto_install-indep:
+	install -d $(CURDIR)/debian/tmp
+	$(MAKE) -C doc -j1 install DESTDIR=$(CURDIR)/debian/tmp AM_UPDATE_INFO_DIR=no
+
+override_dh_install-arch:
+	dh_install -a
+	# W: libcppunit-1.14-0: dev-pkg-without-shlib-symlink usr/lib/x86_64-linux-gnu/libcppunit-1.14.so.0.0.0 usr/lib/x86_64-linux-gnu/libcppunit-1.14.so
+	dh_link -plibcppunit-dev /usr/lib/$(DEB_HOST_MULTIARCH)/libcppunit.so \
+		/usr/lib/$(DEB_HOST_MULTIARCH)/libcppunit-1.15.so
+
+override_dh_installdocs-indep:
+	# install doc/FAQ from here just because that's easier in indep-only builds
+	dh_installdocs --doc-main-package=libcppunit-doc -plibcppunit-doc \
+		debian/tmp/usr/share/cppunit/html doc/FAQ
+
+override_dh_installexamples-indep:
+	# clean the examples directory from built products that we do not want in the final binary package
+	$(MAKE) -C examples clean
+	dh_installexamples --doc-main-package=libcppunit-doc -plibcppunit-doc examples/* debian/examples/*
+	# remove cruft
+	rm -v debian/libcppunit-doc/usr/share/doc/libcppunit-doc/examples/simple/.gitignore
+	find debian/libcppunit-doc/usr/share/doc/libcppunit-doc/examples/ -type d -name .deps -prune -exec rm -rv {} +
+	# these Makefiles contains build host specific things, so people
+	# interested in them should run automake to regen them if they really want to.
+	find debian/libcppunit-doc/usr/share/doc/libcppunit-doc/examples/ -name Makefile -print -delete

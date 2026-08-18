@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+PACKAGE = $(shell dh_listpackages)
+TMP     = $(CURDIR)/debian/$(PACKAGE)
+
+%:
+	dh $@
+
+override_dh_auto_test:
+	DBICTEST_FORK_STRESS=1    \
+	DBICTEST_THREAD_STRESS=1  \
+	DBICTEST_STORAGE_STRESS=1 \
+	dh_auto_test
+
+override_dh_install:
+	dh_install
+	sed -i '1s|^#!/usr/bin/env perl|#!/usr/bin/perl|' $(TMP)/usr/bin/dbicadmin
+
+override_dh_installexamples:
+	dh_installexamples
+	find $(TMP)/usr/share/doc/$(PACKAGE) -type f -name "*.pl" -print0 | \
+		xargs -r0 sed -i -e '1s|^#!/usr/bin/env perl|#!/usr/bin/perl|'

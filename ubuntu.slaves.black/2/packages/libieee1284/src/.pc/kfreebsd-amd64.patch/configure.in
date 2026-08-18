@@ -1,0 +1,78 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(libieee1284, 0.2.11)
+AC_CONFIG_SRCDIR(libieee1284.spec.in)
+AM_INIT_AUTOMAKE([dist-bzip2 subdir-objects 1.6])
+AC_PREREQ(2.53)
+AM_CONFIG_HEADER(include/config.h)
+
+dnl Checks for programs.
+AC_PROG_CC
+AM_PROG_CC_C_O
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_LIBTOOL
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+
+AC_CHECK_HEADERS(sys/io.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+solaris_io=false
+case "{$host}" in
+*-*-linux*)
+        AC_DEFINE(HAVE_LINUX,1,enable ppdev access)
+;;
+*86-*-openbsd*)
+        AC_DEFINE(HAVE_OBSD_I386,1,enable OpenBSD i386 ioperm access)
+	LIBS="-li386"
+;;
+*86-*-freebsd* | *86-*-kfreebsd*)
+        AC_DEFINE(HAVE_FBSD_I386,1,enable FreeBSD /dev/io access)
+;;
+*86-*-solaris*)
+        AC_DEFINE(HAVE_SOLARIS,1,enable solaris iop access)
+	solaris_io=true
+;;
+*-*-cygwin*)
+        dnl Strip version number from uname and make sure we're on NT not 9x
+        case `uname -s | sed 's/-.*$//'` in
+        CYGWIN_NT*)
+                AC_CHECK_HEADER(w32api/windows.h, [
+      	                AC_DEFINE(HAVE_CYGWIN_NT,1,enable w32api access)
+	        ], AC_MSG_ERROR(You need the cygwin w32api files on NT)) 
+        ;;
+        *)
+      	        AC_DEFINE(HAVE_CYGWIN_9X,1,enable win95 access)
+        ;;
+        esac
+;;
+*-*-mingw*)
+dnl        AC_DEFINE(HAVE_CYGWIN_9X,1,enable win95 access)
+        AC_DEFINE(HAVE_CYGWIN_NT,1,enable w32api access)
+;;
+*)
+        AC_MSG_ERROR(Sorry.  $host is not supported yet)
+;;
+esac
+
+AM_CONDITIONAL(SOLARIS_IO, test x$solaris_io = xtrue)
+
+AC_ARG_WITH([python],
+	    AC_HELP_STRING([--with-python],
+			   [build python bindings]),
+	    [ac_cv_use_python=$withval], [ac_cv_use_python=yes])
+AC_CACHE_CHECK([whether to build python bindings],
+	       [ac_cv_use_python], [ac_cv_use_python=yes])
+AM_CONDITIONAL(PYTHON, test x$ac_cv_use_python = xyes)
+if test $ac_cv_use_python = yes; then
+AM_PATH_PYTHON
+fi
+
+dnl Checks for library functions.
+
+AC_CONFIG_FILES(Makefile libieee1284.spec)
+AC_OUTPUT

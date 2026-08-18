@@ -1,0 +1,32 @@
+From: Ben Hutchings <ben@decadent.org.uk>
+Date: Sun, 30 Jan 2022 23:59:18 +0100
+Subject: [klibc] Fix header installation from out-of-tree build
+Origin: https://git.kernel.org/pub/scm/libs/klibc/klibc.git/commit?id=8d6ee65cc8bd75bba8f51589c667ff7c5fd9b3b5
+Bug-Debian: https://bugs.debian.org/1004465
+
+In an out-of-tree build we currently only install the kernel UAPI
+headers and the generated <klibc/havesyscall.h>.  Add an extra
+command to copy headers from the source tree in an out-of-tree
+build.
+
+References: https://bugs.debian.org/1004465
+Reported-by: Thorsten Glaser <tg@mirbsd.de>
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+ scripts/Kbuild.install | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/scripts/Kbuild.install b/scripts/Kbuild.install
+index c2b63f10..0788637f 100644
+--- a/scripts/Kbuild.install
++++ b/scripts/Kbuild.install
+@@ -103,6 +103,9 @@ PHONY += header footer descend
+ 	$(Q)mkdir -p $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)lib
+ 	$(Q)mkdir -p $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)bin
+ 	$(Q)cp -rfL $(KLIBCKERNELSRC)/include/. $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)include/.
++ifneq ($(srctree),$(objtree))
++	$(Q)cp -rf $(srctree)/usr/include/. $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)include/.
++endif
+ 	$(Q)cp -rf usr/include/. $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)include/.
+ 	$(Q)chmod -R a+rX,go-w $(INSTALLROOT)$(INSTALLDIR)/$(KCROSS)include
+ 	$(Q)$(install-data) $(srctree)/klcc/klcc.1 $(INSTALLROOT)$(mandir)/man1/$(KCROSS)klcc.1

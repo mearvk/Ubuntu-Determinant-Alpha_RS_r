@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+ifndef UPVER
+UPVER := $(shell dpkg-parsechangelog | grep ^Version | cut -d\  -f2 | cut -d- -f1 | cut -d+ -f1)
+endif
+
+DEBVER := $(UPVER)+ds1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	#  Make input order deterministic (Closes: #817979)
+	find feature-detects -name '*.js' | LC_ALL=C sort | xargs cat > feature-detects.js
+	uglifyjs -o modernizr.min.js modernizr.js
+	uglifyjs -o feature-detects.min.js feature-detects.js

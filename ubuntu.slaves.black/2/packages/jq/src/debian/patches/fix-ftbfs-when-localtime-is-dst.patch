@@ -1,0 +1,68 @@
+Backport of the following upstream patch to fix fromdate when localtime
+is during daylight savings etc.
+
+From 3c5b1419a278dfb192666b33197dc182c670290d Mon Sep 17 00:00:00 2001
+From: Muh Muhten <muh.muhten@gmail.com>
+Date: Wed, 30 Jan 2019 00:41:47 -0500
+Subject: [PATCH] Unify timegm fallbacks into my_mktime
+
+my_timegm was introduced in 1900c7 to add a mktime fallback used in
+4a6241, the subsequently removed in c53823. As a result of this code
+shuffling, the jq mktime function (f_mktime) wound up using a fallback
+even on systems where timegm is available, with incorrect results in
+some time zones with DST, e.g.
+
+% TZ=America/New_York jq -n '"2018-08-31T00:00:00Z"|fromdate|todate'
+"2018-08-31T01:00:00Z"
+
+This undoes 1900c7 and moves the workaround it added into the #else of
+my_mktime.
+---
+ src/builtin.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
+
+--- a/src/builtin.c
++++ b/src/builtin.c
+@@ -1201,10 +1201,21 @@ static jv tm2jv(struct tm *tm) {
+  *
+  * Returns (time_t)-2 if mktime()'s side-effects cannot be corrected.
+  */
+-static time_t my_timegm(struct tm *tm) {
++static time_t my_mktime(struct tm *tm) {
+ #ifdef HAVE_TIMEGM
+   return timegm(tm);
+-#else /* HAVE_TIMEGM */
++#elif HAVE_TM_TM_GMT_OFF
++
++  time_t t = mktime(tm);
++  if (t == (time_t)-1)
++    return t;
++  return t + tm->tm_gmtoff;
++#elif HAVE_TM___TM_GMT_OFF
++  time_t t = mktime(tm);
++  if (t == (time_t)-1)
++    return t;
++  return t + tm->__tm_gmtoff;
++#else
+   char *tz;
+ 
+   tz = (tz = getenv("TZ")) != NULL ? strdup(tz) : NULL;
+@@ -1214,18 +1225,6 @@ static time_t my_timegm(struct tm *tm) {
+   if (tz != NULL)
+     setenv("TZ", tz, 1);
+   return t;
+-#endif /* !HAVE_TIMEGM */
+-}
+-static time_t my_mktime(struct tm *tm) {
+-  time_t t = mktime(tm);
+-  if (t == (time_t)-1)
+-    return t;
+-#ifdef HAVE_TM_TM_GMT_OFF
+-  return t + tm->tm_gmtoff;
+-#elif HAVE_TM___TM_GMT_OFF
+-  return t + tm->__tm_gmtoff;
+-#else
+-  return (time_t)-2; /* Not supported */
+ #endif
+ }
+ 

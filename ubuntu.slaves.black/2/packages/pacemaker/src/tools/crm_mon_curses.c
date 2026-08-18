@@ -1,0 +1,524 @@
+/*
+ * Copyright 2019-2021 the Pacemaker project contributors
+ *
+ * The version control history for this file may have further details.
+ *
+ * This source code is licensed under the GNU Lesser General Public License
+ * version 2.1 or later (LGPLv2.1+) WITHOUT ANY WARRANTY.
+ */
+
+#include <crm_internal.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <crm/crm.h>
+#include <crm/stonith-ng.h>
+#include <crm/fencing/internal.h>
+#include <crm/pengine/internal.h>
+#include <glib.h>
+#include <pcmki/pcmki_output.h>
+
+#include "crm_mon.h"
+
+#if CURSES_ENABLED
+
+GOptionEntry crm_mon_curses_output_entries[] = {
+    { NULL }
+};
+
+typedef struct curses_list_data_s {
+    unsigned int len;
+    char *singular_noun;
+    char *plural_noun;
+} curses_list_data_t;
+
+typedef struct private_data_s {
+    GQueue *parent_q;
+} private_data_t;
+
+static void
+curses_free_priv(pcmk__output_t *out) {
+    private_data_t *priv = out->priv;
+
+    if (priv == NULL) {
+        return;
+    }
+
+    g_queue_free(priv->parent_q);
+    free(priv);
+    out->priv = NULL;
+}
+
+static bool
+curses_init(pcmk__output_t *out) {
+    private_data_t *priv = NULL;
+
+    /* If curses_init was previously called on this output struct, just return. */
+    if (out->priv != NULL) {
+        return true;
+    } else {
+        out->priv = calloc(1, sizeof(private_data_t));
+        if (out->priv == NULL) {
+            return false;
+        }
+
+        priv = out->priv;
+    }
+
+    priv->parent_q = g_queue_new();
+
+    initscr();
+    cbreak();
+    noecho();
+
+    return true;
+}
+
+static void
+curses_finish(pcmk__output_t *out, crm_exit_t exit_status, bool print, void **copy_dest) {
+    CRM_ASSERT(out != NULL);
+
+    echo();
+    nocbreak();
+    endwin();
+}
+
+static void
+curses_reset(pcmk__output_t *out) {
+    CRM_ASSERT(out != NULL);
+
+    curses_free_priv(out);
+    curses_init(out);
+}
+
+static void
+curses_subprocess_output(pcmk__output_t *out, int exit_status,
+                         const char *proc_stdout, const char *proc_stderr) {
+    CRM_ASSERT(out != NULL);
+
+    if (proc_stdout != NULL) {
+        printw("%s\n", proc_stdout);
+    }
+
+    if (proc_stderr != NULL) {
+        printw("%s\n", proc_stderr);
+    }
+
+    clrtoeol();
+    refresh();
+}
+
+/* curses_version is defined in curses.h, so we can't use that name here.
+ * Note that this function prints out via text, not with curses.
+ */
+static void
+curses_ver(pcmk__output_t *out, bool extended) {
+    CRM_ASSERT(out != NULL);
+
+    if (extended) {
+        printf("Pacemaker %s (Build: %s): %s\n", PACEMAKER_VERSION, BUILD_VERSION, CRM_FEATURES);
+    } else {
+        printf("Pacemaker %s\n", PACEMAKER_VERSION);
+        printf("Written by Andrew Beekhof\n");
+    }
+}
+
+G_GNUC_PRINTF(2, 3)
+static void
+curses_error(pcmk__output_t *out, const char *format, ...) {
+    va_list ap;
+
+    CRM_ASSERT(out != NULL);
+
+    /* Informational output does not get indented, to separate it from other
+     * potentially indented list output.
+     */
+    va_start(ap, format);
+    vw_printw(stdscr, format, ap);
+    va_end(ap);
+
+    /* Add a newline. */
+    addch('\n');
+
+    clrtoeol();
+    refresh();
+    sleep(2);
+}
+
+G_GNUC_PRINTF(2, 3)
+static int
+curses_info(pcmk__output_t *out, const char *format, ...) {
+    va_list ap;
+
+    CRM_ASSERT(out != NULL);
+
+    if (out->is_quiet(out)) {
+        return pcmk_rc_no_output;
+    }
+
+    /* Informational output does not get indented, to separate it from other
+     * potentially indented list output.
+     */
+    va_start(ap, format);
+    vw_printw(stdscr, format, ap);
+    va_end(ap);
+
+    /* Add a newline. */
+    addch('\n');
+
+    clrtoeol();
+    refresh();
+    return pcmk_rc_ok;
+}
+
+static void
+curses_output_xml(pcmk__output_t *out, const char *name, const char *buf) {
+    CRM_ASSERT(out != NULL);
+    curses_indented_printf(out, "%s", buf);
+}
+
+G_GNUC_PRINTF(4, 5)
+static void
+curses_begin_list(pcmk__output_t *out, const char *singular_noun, const char *plural_noun,
+                  const char *format, ...) {
+    private_data_t *priv = NULL;
+    curses_list_data_t *new_list = NULL;
+    va_list ap;
+
+    CRM_ASSERT(out != NULL && out->priv != NULL);
+    priv = out->priv;
+
+    /* Empty formats can be used to create a new level of indentation, but without
+     * displaying some sort of list header.  In that case we need to not do any of
+     * this stuff. vw_printw will act weird if told to print a NULL.
+     */
+    if (format != NULL) {
+        va_start(ap, format);
+
+        curses_indented_vprintf(out, format, ap);
+        printw(":\n");
+
+        va_end(ap);
+    }
+
+    new_list = calloc(1, sizeof(curses_list_data_t));
+    new_list->len = 0;
+    new_list->singular_noun = singular_noun == NULL ? NULL : strdup(singular_noun);
+    new_list->plural_noun = plural_noun == NULL ? NULL : strdup(plural_noun);
+
+    g_queue_push_tail(priv->parent_q, new_list);
+}
+
+G_GNUC_PRINTF(3, 4)
+static void
+curses_list_item(pcmk__output_t *out, const char *id, const char *format, ...) {
+    va_list ap;
+
+    CRM_ASSERT(out != NULL);
+
+    va_start(ap, format);
+
+    if (id != NULL) {
+        curses_indented_printf(out, "%s: ", id);
+        vw_printw(stdscr, format, ap);
+    } else {
+        curses_indented_vprintf(out, format, ap);
+    }
+
+    addch('\n');
+    va_end(ap);
+
+    out->increment_list(out);
+}
+
+static void
+curses_increment_list(pcmk__output_t *out) {
+    private_data_t *priv = NULL;
+    gpointer tail;
+
+    CRM_ASSERT(out != NULL && out->priv != NULL);
+    priv = out->priv;
+
+    tail = g_queue_peek_tail(priv->parent_q);
+    CRM_ASSERT(tail != NULL);
+    ((curses_list_data_t *) tail)->len++;
+}
+
+static void
+curses_end_list(pcmk__output_t *out) {
+    private_data_t *priv = NULL;
+    curses_list_data_t *node = NULL;
+
+    CRM_ASSERT(out != NULL && out->priv != NULL);
+    priv = out->priv;
+
+    node = g_queue_pop_tail(priv->parent_q);
+
+    if (node->singular_noun != NULL && node->plural_noun != NULL) {
+        if (node->len == 1) {
+            curses_indented_printf(out, "%d %s found\n", node->len, node->singular_noun);
+        } else {
+            curses_indented_printf(out, "%d %s found\n", node->len, node->plural_noun);
+        }
+    }
+
+    free(node);
+}
+
+static bool
+curses_is_quiet(pcmk__output_t *out) {
+    CRM_ASSERT(out != NULL);
+    return out->quiet;
+}
+
+static void
+curses_spacer(pcmk__output_t *out) {
+    CRM_ASSERT(out != NULL);
+    addch('\n');
+}
+
+static void
+curses_progress(pcmk__output_t *out, bool end) {
+    CRM_ASSERT(out != NULL);
+
+    if (end) {
+        printw(".\n");
+    } else {
+        addch('.');
+    }
+}
+
+static void
+curses_prompt(const char *prompt, bool do_echo, char **dest)
+{
+    int rc = OK;
+
+    CRM_ASSERT(prompt != NULL);
+    CRM_ASSERT(dest != NULL);
+
+    /* This is backwards from the text version of this function on purpose.  We
+     * disable echo by default in curses_init, so we need to enable it here if
+     * asked for.
+     */
+    if (do_echo) {
+        rc = echo();
+    }
+
+    if (rc == OK) {
+        printw("%s: ", prompt);
+
+        if (*dest != NULL) {
+            free(*dest);
+        }
+
+        *dest = calloc(1, 1024);
+        /* On older systems, scanw is defined as taking a char * for its first argument,
+         * while newer systems rightly want a const char *.  Accomodate both here due
+         * to building with -Werror.
+         */
+        rc = scanw((NCURSES_CONST char *) "%1023s", *dest);
+        addch('\n');
+    }
+
+    if (rc < 1) {
+        free(*dest);
+        *dest = NULL;
+    }
+
+    if (do_echo) {
+        noecho();
+    }
+}
+
+pcmk__output_t *
+crm_mon_mk_curses_output(char **argv) {
+    pcmk__output_t *retval = calloc(1, sizeof(pcmk__output_t));
+
+    if (retval == NULL) {
+        return NULL;
+    }
+
+    retval->fmt_name = "console";
+    retval->request = argv == NULL ? NULL : g_strjoinv(" ", argv);
+
+    retval->init = curses_init;
+    retval->free_priv = curses_free_priv;
+    retval->finish = curses_finish;
+    retval->reset = curses_reset;
+
+    retval->register_message = pcmk__register_message;
+    retval->message = pcmk__call_message;
+
+    retval->subprocess_output = curses_subprocess_output;
+    retval->version = curses_ver;
+    retval->err = curses_error;
+    retval->info = curses_info;
+    retval->output_xml = curses_output_xml;
+
+    retval->begin_list = curses_begin_list;
+    retval->list_item = curses_list_item;
+    retval->increment_list = curses_increment_list;
+    retval->end_list = curses_end_list;
+
+    retval->is_quiet = curses_is_quiet;
+    retval->spacer = curses_spacer;
+    retval->progress = curses_progress;
+    retval->prompt = curses_prompt;
+
+    return retval;
+}
+
+G_GNUC_PRINTF(2, 0)
+void
+curses_formatted_vprintf(pcmk__output_t *out, const char *format, va_list args) {
+    vw_printw(stdscr, format, args);
+
+    clrtoeol();
+    refresh();
+}
+
+G_GNUC_PRINTF(2, 3)
+void
+curses_formatted_printf(pcmk__output_t *out, const char *format, ...) {
+    va_list ap;
+
+    va_start(ap, format);
+    curses_formatted_vprintf(out, format, ap);
+    va_end(ap);
+}
+
+G_GNUC_PRINTF(2, 0)
+void
+curses_indented_vprintf(pcmk__output_t *out, const char *format, va_list args) {
+    int level = 0;
+    private_data_t *priv = out->priv;
+
+    CRM_ASSERT(priv != NULL);
+
+    level = g_queue_get_length(priv->parent_q);
+
+    for (int i = 0; i < level; i++) {
+        printw("  ");
+    }
+
+    if (level > 0) {
+        printw("* ");
+    }
+
+    curses_formatted_vprintf(out, format, args);
+}
+
+G_GNUC_PRINTF(2, 3)
+void
+curses_indented_printf(pcmk__output_t *out, const char *format, ...) {
+    va_list ap;
+
+    va_start(ap, format);
+    curses_indented_vprintf(out, format, ap);
+    va_end(ap);
+}
+
+PCMK__OUTPUT_ARGS("maint-mode", "unsigned long long int")
+static int
+cluster_maint_mode_console(pcmk__output_t *out, va_list args) {
+    unsigned long long flags = va_arg(args, unsigned long long);
+
+    if (pcmk_is_set(flags, pe_flag_maintenance_mode)) {
+        curses_formatted_printf(out, "\n              *** Resource management is DISABLED ***\n");
+        curses_formatted_printf(out, "  The cluster will not attempt to start, stop or recover services\n");
+        return pcmk_rc_ok;
+    } else if (pcmk_is_set(flags, pe_flag_stop_everything)) {
+        curses_formatted_printf(out, "\n    *** Resource management is DISABLED ***\n");
+        curses_formatted_printf(out, "  The cluster will keep all resources stopped\n");
+        return pcmk_rc_ok;
+    } else {
+        return pcmk_rc_no_output;
+    }
+}
+
+PCMK__OUTPUT_ARGS("cluster-status", "pe_working_set_t *", "crm_exit_t",
+                  "stonith_history_t *", "gboolean", "unsigned int",
+                  "unsigned int", "const char *", "GList *", "GList *")
+static int
+cluster_status_console(pcmk__output_t *out, va_list args) {
+    int rc = pcmk_rc_no_output;
+
+    blank_screen();
+    rc = pcmk__cluster_status_text(out, args);
+    refresh();
+    return rc;
+}
+
+PCMK__OUTPUT_ARGS("stonith-event", "stonith_history_t *", "gboolean", "gboolean")
+static int
+stonith_event_console(pcmk__output_t *out, va_list args) {
+    stonith_history_t *event = va_arg(args, stonith_history_t *);
+    gboolean full_history = va_arg(args, gboolean);
+    gboolean later_succeeded = va_arg(args, gboolean);
+
+    crm_time_t *crm_when = crm_time_new(NULL);
+    char *buf = NULL;
+
+    crm_time_set_timet(crm_when, &(event->completed));
+    buf = crm_time_as_string(crm_when, crm_time_log_date | crm_time_log_timeofday | crm_time_log_with_timezone);
+
+    switch (event->state) {
+        case st_failed:
+            curses_indented_printf(out, "%s of %s failed: delegate=%s, client=%s, origin=%s, %s='%s'%s\n",
+                                   stonith_action_str(event->action), event->target,
+                                   event->delegate ? event->delegate : "",
+                                   event->client, event->origin,
+                                   full_history ? "completed" : "last-failed", buf,
+                                   later_succeeded ? " (a later attempt succeeded)" : "");
+            break;
+
+        case st_done:
+            curses_indented_printf(out, "%s of %s successful: delegate=%s, client=%s, origin=%s, %s='%s'\n",
+                                   stonith_action_str(event->action), event->target,
+                                   event->delegate ? event->delegate : "",
+                                   event->client, event->origin,
+                                   full_history ? "completed" : "last-successful", buf);
+            break;
+
+        default:
+            curses_indented_printf(out, "%s of %s pending: client=%s, origin=%s\n",
+                                   stonith_action_str(event->action), event->target,
+                                   event->client, event->origin);
+            break;
+    }
+
+    free(buf);
+    crm_time_free(crm_when);
+    return pcmk_rc_ok;
+}
+
+static pcmk__message_entry_t fmt_functions[] = {
+    { "cluster-status", "console", cluster_status_console },
+    { "maint-mode", "console", cluster_maint_mode_console },
+    { "stonith-event", "console", stonith_event_console },
+
+    { NULL, NULL, NULL }
+};
+
+#endif
+
+void
+crm_mon_register_messages(pcmk__output_t *out) {
+#if CURSES_ENABLED
+    pcmk__register_messages(out, fmt_functions);
+#endif
+}
+
+void
+blank_screen(void)
+{
+#if CURSES_ENABLED
+    int lpc = 0;
+
+    for (lpc = 0; lpc < LINES; lpc++) {
+        move(lpc, 0);
+        clrtoeol();
+    }
+    move(0, 0);
+    refresh();
+#endif
+}

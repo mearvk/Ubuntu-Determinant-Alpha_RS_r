@@ -1,0 +1,69 @@
+Description: Disables the nexus-publish plugin
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/build.gradle
++++ b/build.gradle
+@@ -11,7 +11,6 @@
+ }
+ 
+ plugins {
+-	id 'de.marcphilipp.nexus-publish' version '0.1.0' apply false
+ }
+ 
+ 
+@@ -212,7 +211,6 @@
+ 
+ 	if (subproj.name in mavenizedProjects) {
+ 
+-		apply from: "$rootDir/gradle/publishing.gradle"
+ 		apply from: "$rootDir/gradle/japicc.gradle"
+ 
+ 		javadoc {
+@@ -254,15 +252,6 @@
+ 			}
+ 		}
+ 
+-		publishing.publications.maven {
+-			from components.java
+-			artifact sourcesJar
+-			artifact javadocJar
+-			pom {
+-				description = "Module \"${project.name}\" of JUnit 5." as String
+-			}
+-		}
+-
+ 	} else {
+ 		jar.enabled = false
+ 		javadoc.enabled = false
+--- a/junit-bom/junit-bom.gradle
++++ b/junit-bom/junit-bom.gradle
+@@ -1,29 +1 @@
+ description = rootProject.description + ' (Bill of Materials)'
+-
+-apply from: "$rootDir/gradle/publishing.gradle"
+-
+-publishing.publications.maven.pom {
+-	packaging = 'pom'
+-	description = 'This Bill of Materials POM can be used to ease dependency management ' +
+-			'when referencing multiple JUnit artifacts using Gradle or Maven.'
+-	withXml {
+-		def root = asNode()
+-		root.get('dependencies').each { root.remove(it) }
+-		root.children().last() + {
+-			delegate.dependencyManagement {
+-				delegate.dependencies {
+-					parent.mavenizedProjects.sort()
+-						.findAll { name -> name != 'junit-platform-console-standalone' }
+-						.collect { name -> rootProject.project(name) }
+-						.each { project ->
+-							delegate.dependency {
+-								delegate.groupId(project.group)
+-								delegate.artifactId(project.name)
+-								delegate.version(project.version)
+-							}
+-						}
+-				}
+-			}
+-		}
+-	}
+-}

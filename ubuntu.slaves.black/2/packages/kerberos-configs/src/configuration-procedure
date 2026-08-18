@@ -1,0 +1,46 @@
+Goals: 
+
+1) Whenever possible we want to guess the correct configuration.
+2) At debconf priority greater than medium, we should not ask any questions unless  we cannot make a reasonable guess about the configuration.
+3) We always respect changes that the user makes to krb5.conf.
+4) If we can, we prefer to ask questions in the config phase.
+
+What we need to configure:
+
+1) default realm
+2) If not in DNS, the  kerberos KDCs for that realm
+3) If we're configuring the Kerberos KDCs we should go ahead and configure the admin server
+
+Complexities:
+
+1) We cannot depend on being able to query DNS in the config script
+2) We cannot have access to the krb5.conf file in the config script
+
+1)  If there are txt records for our domain or one of its non-trivial parents, then we have a good guess.
+2) If we already have a default realm set in krb5.conf we have an excellent guess.
+3) If the default krb5.conf template has our domain name, then it is a good guess.
+4) If we can find srv records for our guess, then it is good.
+5) If we can't check srv records  or both 3 and 4 fails, we should ask the user at config time at priority high
+
+What happens in the config script:
+
+0) If we've already succeeded then quit--this happens for the config script called by postinst a lot of the time
+1) If krb5.conf exists, read it and get the default realm.   If set, we have a good guess; skip to 8
+2) If we can find txt records that look like a Kerberos realm , then take them as our guess starting with our FQDN
+3) If we don't have a guess start with our dns domain name
+4) Have a set of realms in the default krb5.conf.  If our guess shows up in that hard-coded list, our guess is good; also deal with domain-realm mappings
+5)  If we can find srv records for  our guess then our guess is good
+6) If we don't have a good guess by this point and we don't have DNS tools then quit and let ourselves deal in postinst
+7) If our guess is good ask default_realm with guess as current value at medium else critical
+8) Check the last realm we asked about servers for.  If that's not the current default_realm, then db_reset the servers questions question
+9) If we found SRV records  or it is hard coded then ask whether we need to add servers to krb5.conf at low defaulting false  else low defaulting true
+9) If we decided we need to ask about servers do so at high
+
+
+In this design, postinst can just write out
+1) default realm
+2) If we have servers and the default realm doesn't have a section in krb5.conf then update it.
+
+Note that the above doesn't really support using debconf to change the
+servers of a realm.  I don't think the current design does either;
+that can be added as a future enhancement.

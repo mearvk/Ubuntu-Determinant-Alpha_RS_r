@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# Generate a isolinux/bios and efi ISO boot image
+
+set -e
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+OUT=$1
+BIOS=$2
+EFI=$3
+
+dir=$(mktemp -d $(dirname $OUT)/iso.dir.XXXXXX)
+cfg=${dir}/isolinux.cfg
+
+b=$(basename ${BIOS})
+g=${b%.lkrn}
+g=${g//[^a-z0-9]}
+g=${g:0:8}.krn
+# generate the config
+cat > ${cfg} <<EOF
+# These default options can be changed in the geniso script
+SAY iPXE ISO boot image
+TIMEOUT 0
+DEFAULT ${b}
+LABEL ${b}
+ KERNEL ${g}
+EOF
+cp ${BIOS} ${dir}/${g}
+
+# copy isolinux bootloader
+cp /usr/lib/ISOLINUX/isolinux.bin ${dir}
+cp /usr/lib/syslinux/modules/bios/ldlinux.c32 ${dir}
+
+# generate EFI boot image
+blocks=$((($(stat -c %s "$EFI") / 1024 + 55) / 32 * 32 ))
+mkfs.msdos -C ${dir}/efi.img $blocks >/dev/null
+mmd -i ${dir}/efi.img ::efi
+mmd -i ${dir}/efi.img ::efi/boot
+mcopy -o -i ${dir}/efi.img "$EFI" "::efi/boot/bootx64.efi"
+
+# generate the iso image
+xorriso -as mkisofs \
+	-r -J -preparer "iPXE build system" \
+	-appid "iPXE ${VERSION} - Open Source Network Boot Firmware" \
+	-publisher "http://ipxe.org/" \
+	-b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table \
+	-eltorito-alt-boot --efi-boot efi.img -no-emul-boot \
+	-output ${OUT} ${dir}
+
+isohybrid ${OUT}
+
+# clean up temporary dir
+rm -fr ${dir}

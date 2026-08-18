@@ -1,0 +1,76 @@
+From: Robert Luberda <robert@debian.org>
+Date: Fri, 4 Mar 2016 08:02:20 +0100
+Subject: Reproducible hashes
+
+Add a few more initializations of struct flagent variables
+and avoid setting strip and affix members to an empty string,
+but set them to NULL instead, to hopefully make builds of hashes
+reproducible.
+
+Bug-Debian: https://bugs.debian.org/778862
+---
+ parse.y | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/parse.y b/parse.y
+index cbea1e1..aa69421 100644
+--- a/parse.y
++++ b/parse.y
+@@ -1092,7 +1092,7 @@ rules		:	affix_rule
+ 			    if (centsize == 0)
+ 				{
+ 				curents = (struct flagent *)
+-				  malloc (TBLINC * (sizeof (struct flagent)));
++				  calloc (TBLINC, (sizeof (struct flagent)));
+ 				if (curents == NULL)
+ 				    {
+ 				    yyerror (PARSE_Y_NO_SPACE);
+@@ -1118,6 +1118,8 @@ rules		:	affix_rule
+ 				    yyerror (PARSE_Y_NO_SPACE);
+ 				    exit (1);
+ 				    }
++				memset((char*)curents + (centsize - TBLINC) * sizeof(struct flagent), 0,
++					TBLINC * sizeof(struct flagent));
+ 				}
+ 			    curents[centnum] = *$2;
+ 			    centnum++;
+@@ -1132,7 +1134,7 @@ affix_rule	:	cond_or_null '>' ichar_string
+ 			    $1->stripl = 0;
+ 			    $1->strip = NULL;
+ 			    $1->affl = icharlen ($3);
+-			    $1->affix = $3;
++			    $1->affix = $1->affl ? $3 : NULL;
+ 			    upcase ($3);
+ 			    /*
+ 			     * As a special optimization (and a
+@@ -1160,10 +1162,10 @@ affix_rule	:	cond_or_null '>' ichar_string
+ 			    int		    i;
+ 
+ 			    $1->stripl = icharlen ($4);
+-			    $1->strip = $4;
++			    $1->strip = $1->stripl ? $4 : NULL;
+ 			    upcase ($4);
+ 			    $1->affl = icharlen ($6);
+-			    $1->affix = $6;
++			    $1->affix = $1->affl ? $6 : NULL;
+ 			    upcase ($6);
+ 			    /*
+ 			     * Convert the syntax ". > -xxx,yyy" into
+@@ -1188,7 +1190,7 @@ affix_rule	:	cond_or_null '>' ichar_string
+ 			    int		    i;
+ 
+ 			    $1->stripl = icharlen ($4);
+-			    $1->strip = $4;
++			    $1->strip = $1->stripl ? $4 : NULL;
+ 			    upcase ($4);
+ 			    $1->affl = 0;
+ 			    $1->affix = NULL;
+@@ -1243,7 +1245,7 @@ cond_or_null	:	/* Empty */
+ 			    struct flagent *	ent;
+ 
+ 			    ent = (struct flagent *)
+-			      malloc (sizeof (struct flagent));
++			      calloc (1, sizeof (struct flagent));
+ 			    if (ent == NULL)
+ 				{
+ 				yyerror (PARSE_Y_NO_SPACE);

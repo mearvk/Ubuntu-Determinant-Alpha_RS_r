@@ -1,0 +1,834 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-ipa</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-ipa</refname>
+        <refpurpose>Поставщик данных IPA SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки поставщика
+данных IPA для <citerefentry> <refentrytitle>sssd</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.  Подробные сведения о синтаксисе
+доступны в разделе <quote>ФОРМАТ ФАЙЛА</quote> справочной страницы
+<citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            Поставщик данных IPA — это внутренний сервер, который используется для
+подключения к серверу IPA. (Сведения о серверах IPA доступны на веб-сайте
+freeipa.org.) Для работы этого поставщика требуется, чтобы компьютер был
+присоединён к домену IPA; настройка почти полностью автоматизирована,
+получение её данных выполняется непосредственно с сервера.
+        </para>
+        <para>
+            Поставщик данных IPA позволяет SSSD использовать поставщика данных
+идентификации <citerefentry> <refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> и поставщика данных проверки
+подлинности <citerefentry> <refentrytitle>sssd-krb5</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> с оптимизацией для сред
+IPA. Поставщик данных IPA принимает те же параметры, которые используются
+поставщиками sssd-ldap и sssd-krb5 providers, за некоторыми исключениями. Но
+установка этих параметров не является ни необходимой, ни рекомендуемой.
+        </para>
+        <para>
+            Поставщик данных IPA в основном копирует стандартные параметры традиционных
+поставщиков данных ldap и krb5, за некоторыми исключениями. Список различий
+доступен в разделе <quote>ИЗМЕНЁННЫЕ СТАНДАРТНЫЕ ПАРАМЕТРЫ</quote>.
+        </para>
+        <para>
+            Как поставщик доступа, поставщик данных IPA использует правила HBAC
+(управление доступом на основе узлов). Более подробные сведения о HBAC
+доступны на веб-сайте freeipa.org. Настройка поставщика доступа на стороне
+клиента не требуется.
+        </para>
+        <para>
+            Если в sssd.conf указано <quote>auth_provider=ipa</quote> или
+<quote>access_provider=ipa</quote>, параметр id_provider тоже необходимо
+установить в значение <quote>ipa</quote>.
+        </para>
+        <para>
+            Поставщик данных IPA будет использовать ответчик PAC, если билеты Kerberos
+пользователей из доверенных областей содержат PAC. Для упрощения настройки
+запуск ответчика PAC выполняется автоматически, если настроен поставщик
+идентификаторов IPA.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>ПАРАМЕТРЫ КОНФИГУРАЦИИ</title>
+        <para>Сведения о конфигурации домена SSSD доступны в разделе <quote>РАЗДЕЛЫ
+ДОМЕНА</quote> справочной страницы <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. <variablelist>
+                <varlistentry>
+                    <term>ipa_domain (строка)</term>
+                    <listitem>
+                        <para>
+                            Позволяет указать имя домена IPA. Это необязательно. Если имя не указано,
+используется имя домена в конфигурации.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_server, ipa_backup_server (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список IP-адресов или имён узлов серверов IPA, к
+которым SSSD следует подключаться в порядке приоритета. Дополнительные
+сведения об отработке отказа и избыточности сервера доступны в разделе
+<quote>ОТРАБОТКА ОТКАЗА</quote>. Этот параметр является необязательным, если
+включено автоматическое обнаружение служб. Дополнительные сведения об
+обнаружении служб доступны в разделе <quote>ОБНАРУЖЕНИЕ СЛУЖБ</quote>.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hostname (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Может быть указан на компьютерах, где hostname(5)
+не содержит полное имя, которое используется для идентификации этого узла в
+домене IPA. Имя узла должно быть полным.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Этот параметр указывает SSSD автоматически
+обновлять на сервере DNS, встроенном во FreeIPA, IP-адрес клиента. Защита
+обновления обеспечивается с помощью GSS-TSIG. Для обновления будет
+использован IP-адрес LDAP-соединения IPA, если с помощью параметра
+<quote>dyndns_iface</quote> не указано иное.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: на устаревших системах (например, RHEL 5) для корректной работы
+в этом режиме необходимо надлежащим образом задать стандартную область
+Kerberos в /etc/krb5.conf
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: прежнее имя параметра, <emphasis>ipa_dyndns_update</emphasis>,
+всё ещё можно использовать, но пользователям рекомендуется перейти на
+использование нового имени, <emphasis>dyndns_update</emphasis>, в файле
+конфигурации.
+                        </para>
+                        <para>
+                            По умолчанию: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_ttl (целое число)</term>
+                    <listitem>
+                        <para>
+                            Значение TTL, которое применяется при обновлении записи DNS клиента. Если
+параметр dyndns_update установлен в значение «false», этот параметр ни на
+что не влияет. Если администратором установлено значение TTL на стороне
+сервера, оно будет переопределено этим параметром.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: прежнее имя параметра, <emphasis>ipa_dyndns_ttl</emphasis>, всё
+ещё можно использовать, но пользователям рекомендуется перейти на
+использование нового имени, <emphasis>dyndns_ttl</emphasis>, в файле
+конфигурации.
+                        </para>
+                        <para>
+                            По умолчанию: 1200 (секунд)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_iface (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Применимо только тогда, когда параметр
+dyndns_update установлен в значение «true». Выберите интерфейс или список
+интерфейсов, IP-адреса которых должны использоваться для динамических
+обновлений DNS. Специальное значение <quote>*</quote> подразумевает, что
+следует использовать IP-адреса всех интерфейсов.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: прежнее имя параметра, <emphasis>ipa_dyndns_iface</emphasis>,
+всё ещё можно использовать, но пользователям рекомендуется перейти на
+использование нового имени, <emphasis>dyndns_iface</emphasis>, в файле
+конфигурации.
+                        </para>
+                        <para>
+                            По умолчанию: использовать IP-адреса интерфейса, который используется для
+подключения LDAP IPA
+                        </para>
+                        <para>
+                            Пример: dyndns_iface = em1, vnet1, vnet2
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth (строка)</term>
+                    <listitem>
+                        <para>
+                            Следует ли утилите nsupdate использовать проверку подлинности GSS-TSIG для
+защищённых обновлений сервера DNS. Незащищённые отправления можно
+отправлять, установив этот параметр в значение «none».
+                        </para>
+                        <para>
+                            По умолчанию: GSS-TSIG
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth_ptr (строка)</term>
+                    <listitem>
+                        <para>
+                            Следует ли утилите nsupdate использовать проверку подлинности GSS-TSIG для
+защищённых обновлений PTR сервера DNS. Незащищённые отправления можно
+отправлять, установив этот параметр в значение «none».
+                        </para>
+                        <para>
+                            По умолчанию: то же, что и dyndns_auth
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_enable_dns_sites (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Включить сайты DNS — обнаружение служб по расположению.
+                        </para>
+                        <para>
+                            Если параметр установлен в значение «true» и включено обнаружение служб
+(смотрите абзац об обнаружении служб в нижней части справочной страницы),
+SSSD сначала будет пробовать выполнить обнаружение на основе расположения с
+помощью запроса, который содержит «_location.hostname.example.com», а затем
+перейдёт к традиционному обнаружению SRV. Если обнаружение на основе
+расположения будет выполнено успешно, серверы IPA, обнаруженные с помощью
+обнаружения на основе расположения, будут считаться основными, а серверы
+IPA, обнаруженные с помощью традиционного обнаружения SRV, будут
+использоваться в качестве резервных
+                        </para>
+                        <para>
+                            По умолчанию: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_refresh_interval (целое число)</term>
+                    <listitem>
+                        <para>
+                            Как часто внутреннему серверу следует выполнять периодическое обновление DNS
+в дополнение к автоматическому обновлению, которое выполняется при переходе
+внутреннего сервера в сетевой режим. Этот параметр является необязательным и
+применяется только тогда, когда параметр dyndns_update установлен в значение
+«true».
+                        </para>
+                        <para>
+                            По умолчанию: 0 (отключено)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_ptr (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Следует ли также явно обновлять запись PTR при обновлении записей DNS
+клиента. Применимо только тогда, когда параметр dyndns_update установлен в
+значение «true».
+                        </para>
+                        <para>
+                            Этот параметр должен быть установлен в значение «False» в большинстве
+развёрнутых систем IPA, так как сервер IPA генерирует записи PTR
+автоматически при смене записей перенаправления.
+                        </para>
+                        <para>
+                            По умолчанию: false (отключено)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_force_tcp (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            Должна ли утилита nsupdate по умолчанию использовать TCP для обмена данными
+с сервером DNS.
+                        </para>
+                        <para>
+                            По умолчанию: false (разрешить nsupdate выбрать протокол)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_server (строка)</term>
+                    <listitem>
+                        <para>
+                            Сервер DNS, который следует использовать для выполнения обновления DNS. В
+большинстве конфигураций рекомендуется не устанавливать значение для этого
+параметра.
+                        </para>
+                        <para>
+                            Установка этого параметра имеет смысл для сред, в которых сервер DNS
+отличается от сервера данных идентификации.
+                        </para>
+                        <para>
+                            Обратите внимание, что этот параметр используется только для резервной
+попытки, которая выполняется тогда, когда предыдущая попытка с
+использованием автоматически определённых параметров завершилась неудачей.
+                        </para>
+                        <para>
+                            По умолчанию: none (разрешить nsupdate выбрать сервер)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_per_family (логическое значение)</term>
+                    <listitem>
+                        <para>
+                            По умолчанию обновление DNS выполняется за два шага: обновление IPv4, а
+затем обновление IPv4. В некоторых случаях может быть желательно выполнить
+обновление IPv4 и IPv6 за один шаг.
+                        </para>
+                        <para>
+                            По умолчанию: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска
+объектов, связанных с профилями рабочего стола.
+                        </para>
+                        <para>
+                            По умолчанию: использовать base DN
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry condition="with_subid">
+                    <term>ipa_subid_ranges_search_base (string)</term>
+                    <listitem>
+                        <para>
+                            Optional. Use the given string as search base for subordinate ranges related
+objects.
+                        </para>
+                        <para>
+                            Default: the value of <emphasis>cn=subids,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска
+объектов, связанных с HBAC.
+                        </para>
+                        <para>
+                            По умолчанию: использовать base DN
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_host_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Не рекомендуется. Используйте ldap_host_search_base.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_selinux_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска карт
+пользователей SELinux.
+                        </para>
+                        <para>
+                            Сведения о настройке нескольких баз поиска доступны в описании параметра
+<quote>ldap_search_base</quote>.
+                        </para>
+                        <para>
+                            По умолчанию: значение <emphasis>ldap_search_base</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_subdomains_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска
+доверенных доменов.
+                        </para>
+                        <para>
+                            Сведения о настройке нескольких баз поиска доступны в описании параметра
+<quote>ldap_search_base</quote>.
+                        </para>
+                        <para>
+                            По умолчанию: значение <emphasis>cn=trusts,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_master_domain_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска
+объекта главного домена.
+                        </para>
+                        <para>
+                            Сведения о настройке нескольких баз поиска доступны в описании параметра
+<quote>ldap_search_base</quote>.
+                        </para>
+                        <para>
+                            По умолчанию: значение <emphasis>cn=ad,cn=etc,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_views_search_base (строка)</term>
+                    <listitem>
+                        <para>
+                            Необязательный параметр. Использовать указанную строку как базу поиска
+контейнеров просмотра.
+                        </para>
+                        <para>
+                            Сведения о настройке нескольких баз поиска доступны в описании параметра
+<quote>ldap_search_base</quote>.
+                        </para>
+                        <para>
+                            По умолчанию: значение <emphasis>cn=views,cn=accounts,%basedn</emphasis>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_realm (строка)</term>
+                    <listitem>
+                        <para>
+                            Имя области Kerberos. Это необязательный параметр, по умолчанию он имеет
+значение <quote>ipa_domain</quote>.
+                        </para>
+                        <para>
+                            Имя области Kerberos имеет особое значение в IPA — оно преобразуется в base
+DN, которое следует использовать для выполнения действий LDAP.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>krb5_confd_path (строка)</term>
+                    <listitem>
+                        <para>
+                            Абсолютный путь к каталогу, в котором SSSD следует размещать фрагменты
+конфигурации Kerberos.
+                        </para>
+                        <para>
+                            Чтобы отключить создание фрагментов конфигурации, установите этот параметр в
+значение «none».
+                        </para>
+                        <para>
+                            По умолчанию: не задано (подкаталог krb5.include.d каталога pubconf SSSD)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_refresh (целое число)</term>
+                    <listitem>
+                        <para>
+                            Временной интервал между сеансами поиска правил профилей рабочего стола на
+сервере IPA. Это сократит задержки и нагрузку на сервер IPA, когда за
+короткое время поступает много запросов на профили рабочего стола.
+                        </para>
+                        <para>
+                            По умолчанию: 5 (секунд)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_deskprofile_request_interval (целое число)</term>
+                    <listitem>
+                        <para>
+                            Временной интервал между сеансами поиска правил профилей рабочего стола на
+сервере IPA, если при последнем запросе не было возвращено ни одного
+правила.
+                        </para>
+                        <para>
+                            По умолчанию: 60 (минут)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_refresh (целое число)</term>
+                    <listitem>
+                        <para>
+                            Временной интервал между сеансами поиска правил HBAC на сервере IPA. Это
+сократит задержки и нагрузку на сервер IPA, когда за короткое время
+поступает много запросов на управление доступом.
+                        </para>
+                        <para>
+                            По умолчанию: 5 (секунд)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_hbac_selinux (целое число)</term>
+                    <listitem>
+                        <para>
+                            Временной интервал между сеансами поиска карт SELinux на сервере IPA. Это
+сократит задержки и нагрузку на сервер IPA, когда за короткое время
+поступает много запросов на вход пользователей.
+                        </para>
+                        <para>
+                            По умолчанию: 5 (секунд)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ipa_server_mode (логическое значение)</term>
+                    <listitem>
+			<para>
+                            Значение этого параметра будет задано автоматически установщиком IPA
+(ipa-server-install). Оно определяет, работает SSSD на сервере IPA или нет.
+                        </para>
+			<para>
+                            На сервере IPA SSSD выполняет поиск пользователей и групп из доверенных
+доменов напрямую, но на клиенте SSSD отправит запрос серверу IPA.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: необходимо соблюсти несколько условий, если SSSD работает на
+сервере IPA.
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        Параметр <quote>ipa_server</quote> должен быть настроен так, чтобы он
+указывал на сам сервер IPA. Такое стандартное значение уже задано
+установщиком IPA, поэтому вносить изменения вручную не требуется.
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        Параметр <quote>full_name_format</quote> не должен быть настроен таким
+образом, чтобы отображались только краткие имена пользователей из доверенных
+доменов.
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            По умолчанию: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry condition="with_autofs">
+                    <term>ipa_automount_location (строка)</term>
+                    <listitem>
+                        <para>
+                            Расположение автоматического монтирования, которое будет использовать этот
+клиент IPA
+                        </para>
+                        <para>
+                            По умолчанию: расположение с именем «default»
+                        </para>
+                        <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/autofs_restart.xml" />
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+        <refsect2 id='views'>
+            <title>ПРЕДСТАВЛЕНИЯ И ПЕРЕОПРЕДЕЛЕНИЯ</title>
+            <para>
+                SSSD может обрабатывать представления и переопределения, которые
+предоставляет FreeIPA версии 4.1 и выше. Так как все пути и классы объектов
+зафиксированы на стороне сервера, в целом нет необходимости в дополнительной
+настройке. Для полноты картины далее перечислены соответствующие параметры и
+их стандартные значения. <variablelist>
+                    <varlistentry>
+                        <term>ipa_view_class (строка)</term>
+                        <listitem>
+                            <para>
+                                Класс объектов контейнера просмотра.
+                            </para>
+                            <para>
+                                По умолчанию: nsContainer
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_view_name (строка)</term>
+                        <listitem>
+                            <para>
+                                Имя атрибута, в котором хранится имя представления.
+                            </para>
+                            <para>
+                                По умолчанию: cn
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_override_object_class (строка)</term>
+                        <listitem>
+                            <para>
+                                Класс объектов объектов переопределения.
+                            </para>
+                            <para>
+                                По умолчанию: ipaOverrideAnchor
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_anchor_uuid (строка)</term>
+                        <listitem>
+                            <para>
+                                Имя атрибута, содержащего ссылку на исходный объект в удалённом домене.
+                            </para>
+                            <para>
+                                По умолчанию: ipaAnchorUUID
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_user_override_object_class (строка)</term>
+                        <listitem>
+                            <para>
+                                Имя класса объектов для переопределений пользователя. Используется для того,
+чтобы определить, связан ли найденный объект переопределения с пользователем
+или группой.
+                            </para>
+                            <para>
+                                Переопределения пользователя могут содержать атрибуты, указанные с помощью
+                                <itemizedlist>
+                                    <listitem>
+                                        <para>ldap_user_name</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_uid_number</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_gid_number</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_gecos</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_home_directory</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_shell</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_user_ssh_public_key</para>
+                                    </listitem>
+                                </itemizedlist>
+                            </para>
+                            <para>
+                                По умолчанию: ipaUserOverride
+                            </para>
+                        </listitem>
+                    </varlistentry>
+
+                    <varlistentry>
+                        <term>ipa_group_override_object_class (строка)</term>
+                        <listitem>
+                            <para>
+                                Имя класса объектов для переопределений группы. Используется для того, чтобы
+определить, связан ли найденный объект переопределения с пользователем или
+группой.
+                            </para>
+                            <para>
+                                Переопределения группы могут содержать атрибуты, указанные с помощью
+                                <itemizedlist>
+                                    <listitem>
+                                        <para>ldap_group_name</para>
+                                    </listitem>
+                                    <listitem>
+                                        <para>ldap_group_gid_number</para>
+                                    </listitem>
+                                </itemizedlist>
+                            </para>
+                            <para>
+                                По умолчанию: ipaGroupOverride
+                            </para>
+                        </listitem>
+                    </varlistentry>
+                </variablelist>
+            </para>
+        </refsect2>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ipa_modified_defaults.xml" />
+
+    <refsect1 id='subdomains_provider'>
+        <title>ПОСТАВЩИК ДАННЫХ ПОДДОМЕНОВ</title>
+        <para>
+            В зависимости от того, настроен ли поставщик данных поддоменов IPA явным или
+неявным образом, его поведение будет немного отличаться.
+        </para>
+        <para>
+            Если в разделе домена sssd.conf найден параметр «subdomains_provider = ipa»,
+поставщик данных поддоменов IPA настроен в явном виде, и при необходимости
+все запросы поддоменов отправляются серверу IPA.
+        </para>
+        <para>
+            Если в разделе домена sssd.conf не задан параметр «subdomains_provider», но
+имеется параметр «id_provider = ipa», поставщик данных поддоменов IPA
+настроен в неявном виде. В этом случае, если происходит ошибка запроса к
+поддомену, которая указывает на то, что сервер не поддерживает поддомены, то
+есть на нём не настроены отношения доверия, поставщик данных поддоменов IPA
+будет отключён. Через час или после того, как поставщик данных IPA выходит в
+сеть, поставщик данных поддоменов включается снова.
+        </para>
+    </refsect1>
+
+    <refsect1 id='trusted_domains'>
+        <title>КОНФИГУРАЦИЯ ДОВЕРЕННЫХ ДОМЕНОВ</title>
+        <para>
+            Для доверенного домена также можно задать некоторые параметры
+конфигурации. Настройку доверенного домена можно выполнить с помощью
+подраздела доверенного домена, как показано в примере ниже. Либо можно
+воспользоваться параметром <quote>subdomain_inherit</quote> в родительском
+домене. <programlisting>
+[domain/ipa.domain.com/ad.domain.com]
+ad_server = dc.ad.domain.com
+</programlisting>
+        </para>
+        <para>
+            Дополнительные сведения доступны на справочной странице <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Для доверенного домена можно выполнить тонкую настройку различных параметров
+конфигурации в соответствии с тем, где настраивается SSSD: на сервере IPA
+или на клиенте IPA.
+        </para>
+        <refsect2 id='server_configuration'>
+            <title>ПАРАМЕТРЫ, КОТОРЫЕ МОЖНО НАСТРОИТЬ НА ОСНОВНЫХ СЕРВЕРАХ IPA</title>
+            <para>
+                В разделе поддомена на основном сервере IPA можно настроить следующие
+параметры:
+                <itemizedlist>
+                    <listitem>
+                        <para>ad_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_backup_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_site</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_user_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>ldap_group_search_base</para>
+                    </listitem>
+                    <listitem>
+                        <para>use_fully_qualified_names</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+        </refsect2>
+        <refsect2 id='client_configuration'>
+            <title>ПАРАМЕТРЫ, КОТОРЫЕ МОЖНО НАСТРОИТЬ НА КЛИЕНТАХ IPA</title>
+            <para>
+                В разделе поддомена на клиенте IPA можно настроить следующие параметры:
+                <itemizedlist>
+                    <listitem>
+                        <para>ad_server</para>
+                    </listitem>
+                    <listitem>
+                        <para>ad_site</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                Обратите внимание: если заданы оба параметра, учитывается только
+<quote>ad_server</quote>.
+            </para>
+            <para>
+                Так как любой запрос идентификационных данных пользователя или группы из
+доверенного домена, который активирован клиентом IPA, разрешается сервером
+IPA, параметры <quote>ad_server</quote> и <quote>ad_site</quote> влияют
+только на то, на каком контроллере домена AD DC будет выполняться проверка
+подлинности. В частности, полученные из этих списков адреса будут записаны в
+файлы <quote>kdcinfo</quote>, чтение которых выполняет модуль локатора
+Kerberos. Дополнительные сведения о модуле локатора Kerberos доступны на
+справочной странице<citerefentry>
+<refentrytitle>sssd_krb5_locator_plugin</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>.
+            </para>
+        </refsect2>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <refsect1 id='example'>
+        <title>ПРИМЕР</title>
+        <para>
+            В следующем примере предполагается, что конфигурация SSSD корректна и что
+example.com — один из доменов в разделе <replaceable>[sssd]</replaceable>. В
+примере показаны только параметры, относящиеся к поставщику данных IPA.
+        </para>
+        <para>
+<programlisting>
+[domain/example.com]
+id_provider = ipa
+ipa_server = ipaserver.example.com
+ipa_hostname = myhost.example.com
+</programlisting>
+        </para>
+    </refsect1>
+
+	<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

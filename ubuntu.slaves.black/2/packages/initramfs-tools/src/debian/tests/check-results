@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+
+import json
+import os
+import sys
+
+in_error = False
+
+def error(msg):
+    print("ERROR: " + msg)
+    global in_error
+    in_error = True
+
+def has_link(name):
+    for l in links:
+        if l['ifname'] == name:
+            return
+    error("link {} not found".format(name))
+
+def has_an_ipv4_addr(name):
+    for l in addrs:
+        if l['ifname'] == name:
+            for addr in l['addr_info']:
+                if addr['family'] == 'inet' and addr['scope'] == 'global':
+                    print("found addr {} for {}".format(addr, name))
+                    return
+            error("{} appears to have no addresses".format(name))
+            return
+    error("link {} not found".format(name))
+
+def has_no_ipv4_addr(name):
+    for l in addrs:
+        if l['ifname'] == name:
+            for addr in l['addr_info']:
+                if addr['family'] == 'inet' and addr['scope'] == 'global':
+                    error("found addr {} for {}".format(addr, name))
+                    return
+            print("{} appears to have no addresses".format(name))
+            return
+    error("link {} not found".format(name))
+
+def has_ipv4_addr(name, wanted_addr):
+    for l in addrs:
+        if l['ifname'] == name:
+            for addr in l['addr_info']:
+                if addr['family'] == 'inet' and addr['scope'] == 'global':
+                    if addr['local'] == wanted_addr:
+                        print("found addr {} for {}".format(addr, name))
+                        return
+            error("{} appears not to have address {}".format(name, wanted_addr))
+            return
+    error("link {} not found".format(name))
+
+result_dir = sys.argv[1]
+with open(os.path.join(result_dir, 'link.json')) as fp:
+    links = json.load(fp)
+with open(os.path.join(result_dir, 'addr.json')) as fp:
+    addrs = json.load(fp)
+
+with open(os.path.join(result_dir, 'ps.txt'), encoding='utf-8', errors='replace') as fp:
+    ps_output = fp.read()
+
+if 'dhclient' in ps_output:
+    error("dhclient appears to be running")
+
+i = 2
+while i < len(sys.argv):
+    a = sys.argv[i]
+    i += 1
+    if a == 'has_link':
+        has_link(sys.argv[i])
+        i += 1
+    elif a == 'has_an_ipv4_addr':
+        has_an_ipv4_addr(sys.argv[i])
+        i += 1
+    elif a == 'has_no_ipv4_addr':
+        has_no_ipv4_addr(sys.argv[i])
+        i += 1
+    elif a == 'has_ipv4_addr':
+        has_ipv4_addr(sys.argv[i], sys.argv[i+1])
+        i += 2
+    else:
+        error("unknown check {}".format(a))
+
+if in_error:
+    sys.exit(1)

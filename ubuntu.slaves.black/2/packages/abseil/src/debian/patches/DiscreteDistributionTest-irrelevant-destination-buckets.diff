@@ -1,0 +1,63 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Don’t examine irrelevant destination buckets in DiscreteDistributionTest
+Forwarded: yes
+Applied-Upstream: https://github.com/abseil/abseil-cpp/commit/7ba826e50dff1878e6ecc6b9af44097c040c8968
+
+Abseil generates discrete distributions using Walker’s aliasing
+algorithm. This creates uniformly distributed buckets, each with a
+probability of sending traffic to a different bucket. Abseil represents
+a bucket as a pair
+
+    (probability of retaining traffic ×
+     alternate bucket if traffic is passed)
+
+and a distribution as a vector of such pairs. For example, {(0.3, 1),
+(1.0, 1)} represents a distribution with two buckets, the zeroth of
+which passes 70% of its traffic to bucket 1 and the first of which holds
+on to all its traffic.
+
+This representation is not unique: When a bucket retains traffic with
+probability 1, the alternate bucket is irrelevant. Continuing the
+example above, {(0.3, 1), (1.0, 0)} _also_ represents a two-bucket
+distribution where the zeroth bucket passes 70% of its traffic to the
+first and the first hangs on to all traffic. Exactly what representation
+Abseil generates for a given input is related to how much precision is
+used in intermediate floating-point operations, which is an
+architectural implementation detail. Remove sensitivity to that detail
+by not examining the alternate bucket when the retention probability is
+1.0.
+
+The author works at Google. Upstream applied this patch as Piper
+revision 372993410 and exported it to GitHub; the Applied-Upstream URL
+above points to the exported commit.
+
+--- a/absl/random/discrete_distribution_test.cc
++++ b/absl/random/discrete_distribution_test.cc
+@@ -99,6 +99,7 @@
+ }
+ 
+ TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
++  using testing::_;
+   using testing::Pair;
+ 
+   {
+@@ -111,8 +112,8 @@ TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
+     // Each bucket is p=1/3, so bucket 0 will send half it's traffic
+     // to bucket 2, while the rest will retain all of their traffic.
+     EXPECT_THAT(q, testing::ElementsAre(Pair(0.5, 2),  //
+-                                        Pair(1.0, 1),  //
+-                                        Pair(1.0, 2)));
++                                        Pair(1.0, _),  //
++                                        Pair(1.0, _)));
+   }
+ 
+   {
+@@ -135,7 +136,7 @@ TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
+ 
+     EXPECT_THAT(q, testing::ElementsAre(Pair(b0, 3),   //
+                                         Pair(b1, 3),   //
+-                                        Pair(1.0, 2),  //
++                                        Pair(1.0, _),  //
+                                         Pair(b3, 2),   //
+                                         Pair(b1, 3)));
+   }

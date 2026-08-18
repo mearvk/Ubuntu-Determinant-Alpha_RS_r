@@ -1,0 +1,90 @@
+From d466e564fa164ab50e8f49cd2f55d8be2c361e04 Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Thu, 30 Jan 2020 04:01:45 -0800
+Subject: [PATCH 13/13] x86/k7: Prepend X86_NOTRACK to indirect branches
+
+Since some K7 .asm files uses a trick to implment jump tables with LEA,
+prepend X86_NOTRACK to indirect branches to disable indirect branch
+tracking when Intel CET is enabled.
+
+	* mpn/x86/k7/aors_n.asm: Prepend X86_NOTRACK to indirect branches.
+	* mpn/x86/k7/mmx/lshift.asm: Likewise.
+	* mpn/x86/k7/mmx/rshift.asm: Likewise.
+	* mpn/x86/k7/mul_basecase.asm: Likewise.
+	* mpn/x86/k7/sqr_basecase.asm: Likewise.
+---
+ mpn/x86/k7/aors_n.asm       | 2 +-
+ mpn/x86/k7/mmx/lshift.asm   | 2 +-
+ mpn/x86/k7/mmx/rshift.asm   | 2 +-
+ mpn/x86/k7/mul_basecase.asm | 2 +-
+ mpn/x86/k7/sqr_basecase.asm | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/mpn/x86/k7/aors_n.asm b/mpn/x86/k7/aors_n.asm
+index bfdf3d40a..b3def5df6 100644
+--- a/mpn/x86/k7/aors_n.asm
++++ b/mpn/x86/k7/aors_n.asm
+@@ -188,7 +188,7 @@ L(here):
+ 	leal	ifelse(UNROLL_BYTES,256,128) (%edx,%edi,4), %edx
+ 	leal	ifelse(UNROLL_BYTES,256,128) (%ebp,%edi,4), %edi
+ 
+-	jmp	*%esi
++	X86_NOTRACK jmp	*%esi
+ 
+ 
+ ifdef(`PIC',`
+diff --git a/mpn/x86/k7/mmx/lshift.asm b/mpn/x86/k7/mmx/lshift.asm
+index 4140e82bb..77bc86ed2 100644
+--- a/mpn/x86/k7/mmx/lshift.asm
++++ b/mpn/x86/k7/mmx/lshift.asm
+@@ -280,7 +280,7 @@ L(here):
+ 	leal	ifelse(UNROLL_BYTES,256,128) -8(%edx,%eax,2), %edx
+ 	leal	ifelse(UNROLL_BYTES,256,128) (%edi,%eax,2), %edi
+ 	movl	PARAM_SIZE, %eax	C for use at end
+-	jmp	*%esi
++	X86_NOTRACK jmp	*%esi
+ 
+ 
+ ifdef(`PIC',`
+diff --git a/mpn/x86/k7/mmx/rshift.asm b/mpn/x86/k7/mmx/rshift.asm
+index 0da1f9341..8119adc1c 100644
+--- a/mpn/x86/k7/mmx/rshift.asm
++++ b/mpn/x86/k7/mmx/rshift.asm
+@@ -280,7 +280,7 @@ L(here):
+ 	leal	ifelse(UNROLL_BYTES,256,128) (%edi,%eax,2), %edi
+ 	movl	PARAM_SIZE, %eax	C for use at end
+ 
+-	jmp	*%esi
++	X86_NOTRACK jmp	*%esi
+ 
+ 
+ ifdef(`PIC',`
+diff --git a/mpn/x86/k7/mul_basecase.asm b/mpn/x86/k7/mul_basecase.asm
+index b96fda7e0..1e352cd6d 100644
+--- a/mpn/x86/k7/mul_basecase.asm
++++ b/mpn/x86/k7/mul_basecase.asm
+@@ -511,7 +511,7 @@ L(unroll_outer_entry):
+ 	cmovnz(	%eax, %ebx)
+ 
+ 	C Extra fetch of VAR_JMP is bad, but registers are tight
+-	jmp	*VAR_JMP
++	X86_NOTRACK jmp	*VAR_JMP
+ 
+ 
+ C -----------------------------------------------------------------------------
+diff --git a/mpn/x86/k7/sqr_basecase.asm b/mpn/x86/k7/sqr_basecase.asm
+index df47ee421..0f79ef015 100644
+--- a/mpn/x86/k7/sqr_basecase.asm
++++ b/mpn/x86/k7/sqr_basecase.asm
+@@ -425,7 +425,7 @@ define(cmovX,`ifelse(eval(UNROLL_COUNT%2),0,`cmovz($@)',`cmovnz($@)')')
+ 
+ 	movl	%eax, VAR_JMP
+ 
+-	jmp	*%eax
++	X86_NOTRACK jmp	*%eax
+ 
+ 
+ ifdef(`PIC',`
+-- 
+2.27.0
+

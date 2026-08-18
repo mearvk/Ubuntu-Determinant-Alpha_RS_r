@@ -1,0 +1,198 @@
+/*
+ * Copyright (c) 2021, 2021, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.invoke;
+
+import static com.oracle.svm.shared.util.VMError.shouldNotReachHere;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Executable;
+
+import org.graalvm.nativeimage.Platform.HOSTED_ONLY;
+import org.graalvm.nativeimage.Platforms;
+
+import com.oracle.svm.core.ForeignSupport;
+import com.oracle.svm.core.hub.RuntimeClassLoading;
+import com.oracle.svm.core.methodhandles.MethodHandleInterpreterUtils;
+import com.oracle.svm.shared.AlwaysInline;
+
+import jdk.vm.ci.meta.JavaKind;
+import sun.invoke.util.Wrapper;
+
+public class MethodHandleUtils {
+    public static final String JLI_PACKAGE = "java.lang.invoke";
+
+    public static Object cast(Object obj, Class<?> type) {
+        Wrapper destinationWrapper;
+        if (type.isPrimitive()) {
+            destinationWrapper = Wrapper.forPrimitiveType(type);
+        } else if (Wrapper.isWrapperType(type)) {
+            /* Null values should remain null and not be converted to the wrapper's zero value. */
+            destinationWrapper = obj == null ? Wrapper.OBJECT : Wrapper.forWrapperType(type);
+        } else {
+            destinationWrapper = Wrapper.OBJECT;
+        }
+        return destinationWrapper.cast(obj, type);
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static long longUnbox(Object retVal, MethodHandle methodHandle) {
+        return longUnbox(retVal, methodHandle.type().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static long longUnboxCrema(Object retVal, MethodHandle methodHandle) {
+        Target_java_lang_invoke_MemberName vmEntry = MethodHandleInterpreterUtils.extractVMEntry(methodHandle);
+        return longUnbox(retVal, vmEntry.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static long longUnbox(Object retVal, Target_java_lang_invoke_MemberName memberName) {
+        return longUnbox(retVal, memberName.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static long longUnboxForeign(Object retVal, Object nativeEntryPoint) {
+        MethodType methodType = ForeignSupport.singleton().getMethodTypeFromNativeEntryPoint(nativeEntryPoint);
+        return longUnbox(retVal, methodType.returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    private static long longUnbox(Object retVal, Class<?> returnType) {
+        switch (Wrapper.forPrimitiveType(returnType)) {
+            case BOOLEAN:
+                return (boolean) retVal ? 1L : 0L;
+            case BYTE:
+                return (byte) retVal;
+            case SHORT:
+                return (short) retVal;
+            case CHAR:
+                return (char) retVal;
+            case INT:
+                return (int) retVal;
+            case LONG:
+                return (long) retVal;
+            default:
+                throw shouldNotReachHere("Unexpected type for unbox function");
+        }
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static int intUnbox(Object retVal, MethodHandle methodHandle) {
+        return intUnbox(retVal, methodHandle.type().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static int intUnboxCrema(Object retVal, MethodHandle methodHandle) {
+        Target_java_lang_invoke_MemberName vmEntry = MethodHandleInterpreterUtils.extractVMEntry(methodHandle);
+        return intUnbox(retVal, vmEntry.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static int intUnbox(Object retVal, Target_java_lang_invoke_MemberName memberName) {
+        return intUnbox(retVal, memberName.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static int intUnboxForeign(Object retVal, Object nativeEntryPoint) {
+        MethodType methodType = ForeignSupport.singleton().getMethodTypeFromNativeEntryPoint(nativeEntryPoint);
+        return intUnbox(retVal, methodType.returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static int intUnbox(Object retVal, Class<?> returnType) {
+        switch (Wrapper.forPrimitiveType(returnType)) {
+            case BOOLEAN:
+                return (boolean) retVal ? 1 : 0;
+            case BYTE:
+                return (byte) retVal;
+            case SHORT:
+                return (short) retVal;
+            case CHAR:
+                return (char) retVal;
+            case INT:
+                return (int) retVal;
+            default:
+                throw shouldNotReachHere("Unexpected type for unbox function");
+        }
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static short shortUnbox(Object retVal, MethodHandle methodHandle) {
+        return shortUnbox(retVal, methodHandle.type().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static short shortUnboxCrema(Object retVal, MethodHandle methodHandle) {
+        Target_java_lang_invoke_MemberName vmEntry = MethodHandleInterpreterUtils.extractVMEntry(methodHandle);
+        return shortUnbox(retVal, vmEntry.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static short shortUnbox(Object retVal, Target_java_lang_invoke_MemberName memberName) {
+        return shortUnbox(retVal, memberName.getMethodType().returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static short shortUnboxForeign(Object retVal, Object nativeEntryPoint) {
+        MethodType methodType = ForeignSupport.singleton().getMethodTypeFromNativeEntryPoint(nativeEntryPoint);
+        return shortUnbox(retVal, methodType.returnType());
+    }
+
+    @AlwaysInline("constant fold as much as possible in signature polymorphic wrappers")
+    public static short shortUnbox(Object retVal, Class<?> returnType) {
+        switch (Wrapper.forPrimitiveType(returnType)) {
+            case BOOLEAN:
+                return (boolean) retVal ? (short) 1 : (short) 0;
+            case BYTE:
+                return (byte) retVal;
+            case SHORT:
+                return (short) retVal;
+            default:
+                throw shouldNotReachHere("Unexpected type for unbox function");
+        }
+    }
+
+    /**
+     * Returns the resolved member if runtime class loading is enabled. Otherwise, always returns
+     * {@code null}.
+     */
+    public static ResolvedMember getResolvedMember(Target_java_lang_invoke_MemberName memberName) {
+        if (RuntimeClassLoading.isSupported()) {
+            return memberName.resolved;
+        }
+        return null;
+    }
+
+    @Platforms(HOSTED_ONLY.class)
+    public static Executable getUnboxMethod(JavaKind returnKind, boolean crema, Class<?>... parameterTypes) throws NoSuchMethodException {
+        return MethodHandleUtils.class.getMethod(returnKind + (crema ? "UnboxCrema" : "Unbox"), parameterTypes);
+    }
+
+    @Platforms(HOSTED_ONLY.class)
+    public static Executable getUnboxForeignMethod(JavaKind returnKind) throws NoSuchMethodException {
+        return MethodHandleUtils.class.getMethod(returnKind + "UnboxForeign", Object.class, Object.class);
+    }
+}

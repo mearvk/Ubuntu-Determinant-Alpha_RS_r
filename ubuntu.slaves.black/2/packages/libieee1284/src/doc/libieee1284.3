@@ -1,0 +1,122 @@
+.\"     Title: libieee1284
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Introduction
+.\"    Source: 
+.\"
+.TH "LIBIEEE1284" "3" "09/18/2007" "" "Introduction"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+libieee1284 \- IEEE1284 communications library
+.SH "SYNOPSIS"
+.sp
+.RS 4
+.nf
+    #include <ieee1284.h>
+    cc files... \-lieee1284
+.fi
+.RE
+.SH "OVERVIEW"
+.PP
+The libieee1284 library is a library for accessing parallel port devices.
+.PP
+The model presented to the user is fairly abstract: a list of parallel ports with arbitrary names, with functions to access them in various ways ranging from bit operations to block data transfer in one of the IEEE 1284 sanctioned protocols.
+.PP
+Although the library resides in user space the speed penalty may not be as bad as you initially think, since the operating system may well provide assistance with block data transfer operations; in fact, the operating system may even use hardware assistance to get the job done. So, using libieee1284, ECP transfers using DMA are possible.
+.PP
+The normal sequence of events will be that the application
+.RS 4
+\h'-04' 1.\h'+02'calls
+\fBieee1284_find_ports\fR
+to get a list of available ports
+.RE
+.RS 4
+\h'-04' 2.\h'+02'then
+\fBieee1284_get_deviceid\fR
+to look for a device on each port that it is interested in
+.RE
+.RS 4
+\h'-04' 3.\h'+02'and then
+\fBieee1284_open\fR
+to open each port it finds a device it can control on.
+.RE
+.RS 4
+\h'-04' 4.\h'+02'The list of ports returned from
+\fBieee1284_find_ports\fR
+can now be disposed of using
+\fBieee1284_free_ports\fR.
+.RE
+.RS 4
+\h'-04' 5.\h'+02'Then when it wants to control the device, it will call
+\fBieee1284_claim\fR
+to prevent other drivers from using the port
+.RE
+.RS 4
+\h'-04' 6.\h'+02'then perhaps do some data transfers
+.RE
+.RS 4
+\h'-04' 7.\h'+02'and then
+\fBieee1284_release\fR
+when it is finished that that particular command. This claim\-control\-release sequence will be repeated each time it wants to tell the device to do something.
+.RE
+.RS 4
+\h'-04' 8.\h'+02'Finally when the application is finished with the device it will call
+\fBieee1284_close\fR.
+.RE
+.PP
+Usually a port needs to be claimed before it can be used. This is to prevent multiple drivers from trampling on each other if they both want to use the same port. The exception to this rule is the collection of IEEE 1284 Device IDs, which has an implicit open\-claim\-release\-close sequence. The reason for this is that it may be possible to collect a Device ID from the operating system, without bothering the device with it.
+.SH "CONFIGURATION"
+.PP
+When
+\fBieee1284_find_ports\fR
+is first called, the library will look for a configuration file,
+\fI/etc/ieee1284.conf\fR.
+.PP
+Comments begin with a '#' character and extend to the end of the line. Everything else is freely\-formatted tokens. A non\-quoted (or double\-quoted) backslash character '\e' preserves the literal value of the next character, and single and double quotes may be used for preserving white\-space. Braces and equals signs are recognised as tokens, unless quoted or escaped.
+.PP
+The only configuration instruction that is currently recognised is
+\(lqdisallow method ppdev\(rq, for preventing the use of the Linux ppdev driver.
+.SH "ENVIRONMENT"
+.PP
+You can enable debugging output from the library by setting the environment variable
+\fBLIBIEEE1284_DEBUG\fR
+to any value.
+.SH "FILES"
+.PP
+\fI/etc/ieee1284.conf\fR
+.RS 4
+Configuration file.
+.RE
+.SH "SEE ALSO"
+.PP
+parport(3),
+parport_list(3),
+ieee1284_find_ports(3),
+ieee1284_free_ports(3),
+ieee1284_get_deviceid(3),
+ieee1284_open(3),
+ieee1284_close(3),
+ieee1284_claim(3),
+ieee1284_release(3),
+ieee1284_data(3),
+ieee1284_status(3),
+ieee1284_control(3),
+ieee1284_negotiation(3),
+ieee1284_ecp_fwd_to_rev(3),
+ieee1284_transfer(3),
+ieee1284_get_irq_fd(3),
+ieee1284_set_timeout(3)
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

@@ -1,0 +1,108 @@
+From: Markus Koschany <apo@debian.org>
+Date: Mon, 20 Sep 2021 20:31:06 +0200
+Subject: disable-zstd
+
+Forwarded: no
+---
+ pom.xml                                                |  2 ++
+ .../compress/compressors/CompressorStreamFactory.java  | 18 ------------------
+ .../compress/compressors/DetectCompressorTestCase.java |  6 ------
+ 3 files changed, 2 insertions(+), 24 deletions(-)
+
+diff --git a/pom.xml b/pom.xml
+index 64470f3..4946125 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -369,9 +369,11 @@ Brotli, Zstandard and ar, cpio, jar, tar, zip, dump, 7z, arj.
+         <configuration>
+           <excludes>
+             <exclude>**/brotli/**</exclude>
++            <exclude>**/zstandard/**</exclude>
+           </excludes>
+           <testExcludes>
+             <testExclude>**/brotli/**</testExclude>
++            <testExclude>**/zstandard/**</testExclude>
+           </testExcludes>
+         </configuration>
+       </plugin>
+diff --git a/src/main/java/org/apache/commons/compress/compressors/CompressorStreamFactory.java b/src/main/java/org/apache/commons/compress/compressors/CompressorStreamFactory.java
+index 85e7a81..9b862d3 100644
+--- a/src/main/java/org/apache/commons/compress/compressors/CompressorStreamFactory.java
++++ b/src/main/java/org/apache/commons/compress/compressors/CompressorStreamFactory.java
+@@ -54,9 +54,6 @@ import org.apache.commons.compress.compressors.xz.XZCompressorInputStream;
+ import org.apache.commons.compress.compressors.xz.XZCompressorOutputStream;
+ import org.apache.commons.compress.compressors.xz.XZUtils;
+ import org.apache.commons.compress.compressors.z.ZCompressorInputStream;
+-import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
+-import org.apache.commons.compress.compressors.zstandard.ZstdCompressorOutputStream;
+-import org.apache.commons.compress.compressors.zstandard.ZstdUtils;
+ import org.apache.commons.compress.utils.IOUtils;
+ import org.apache.commons.compress.utils.Lists;
+ import org.apache.commons.compress.utils.ServiceLoaderIterator;
+@@ -509,10 +506,6 @@ public class CompressorStreamFactory implements CompressorStreamProvider {
+             return LZ4_FRAMED;
+         }
+ 
+-        if (ZstdUtils.matches(signature, signatureLength)) {
+-            return ZSTANDARD;
+-        }
+-
+         throw new CompressorException("No Compressor found for the stream signature.");
+     }
+     /**
+@@ -583,13 +576,6 @@ public class CompressorStreamFactory implements CompressorStreamProvider {
+                 return new XZCompressorInputStream(in, actualDecompressConcatenated, memoryLimitInKb);
+             }
+ 
+-            if (ZSTANDARD.equalsIgnoreCase(name)) {
+-                if (!ZstdUtils.isZstdCompressionAvailable()) {
+-                    throw new CompressorException("Zstandard compression is not available." + YOU_NEED_ZSTD_JNI);
+-                }
+-                return new ZstdCompressorInputStream(in);
+-            }
+-
+             if (LZMA.equalsIgnoreCase(name)) {
+                 if (!LZMAUtils.isLZMACompressionAvailable()) {
+                     throw new CompressorException("LZMA compression is not available" + YOU_NEED_XZ_JAVA);
+@@ -701,10 +687,6 @@ public class CompressorStreamFactory implements CompressorStreamProvider {
+             if (LZ4_FRAMED.equalsIgnoreCase(name)) {
+                 return new FramedLZ4CompressorOutputStream(out);
+             }
+-
+-            if (ZSTANDARD.equalsIgnoreCase(name)) {
+-                return new ZstdCompressorOutputStream(out);
+-            }
+         } catch (final IOException e) {
+             throw new CompressorException("Could not create CompressorOutputStream", e);
+         }
+diff --git a/src/test/java/org/apache/commons/compress/compressors/DetectCompressorTestCase.java b/src/test/java/org/apache/commons/compress/compressors/DetectCompressorTestCase.java
+index cfa11e7..ea2d9b1 100644
+--- a/src/test/java/org/apache/commons/compress/compressors/DetectCompressorTestCase.java
++++ b/src/test/java/org/apache/commons/compress/compressors/DetectCompressorTestCase.java
+@@ -38,7 +38,6 @@ import org.apache.commons.compress.compressors.deflate.DeflateCompressorInputStr
+ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+ import org.apache.commons.compress.compressors.pack200.Pack200CompressorInputStream;
+ import org.apache.commons.compress.compressors.xz.XZCompressorInputStream;
+-import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
+ import org.apache.commons.compress.utils.ByteUtils;
+ import org.junit.Test;
+ 
+@@ -115,10 +114,6 @@ public final class DetectCompressorTestCase {
+         assertNotNull(zlib);
+         assertTrue(zlib instanceof DeflateCompressorInputStream);
+ 
+-        final CompressorInputStream zstd = getStreamFor("bla.tar.zst");
+-        assertNotNull(zstd);
+-        assertTrue(zstd instanceof ZstdCompressorInputStream);
+-
+         try {
+             factory.createCompressorInputStream(new ByteArrayInputStream(ByteUtils.EMPTY_BYTE_ARRAY));
+             fail("No exception thrown for an empty input stream");
+@@ -139,7 +134,6 @@ public final class DetectCompressorTestCase {
+         assertEquals(CompressorStreamFactory.LZMA, detect("bla.tar.lzma"));
+         assertEquals(CompressorStreamFactory.SNAPPY_FRAMED, detect("bla.tar.sz"));
+         assertEquals(CompressorStreamFactory.Z, detect("bla.tar.Z"));
+-        assertEquals(CompressorStreamFactory.ZSTANDARD, detect("bla.tar.zst"));
+ 
+         //make sure we don't oom on detect
+         assertEquals(CompressorStreamFactory.Z, detect("COMPRESS-386"));

@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+
+# Copyright (c) 2005 by Matthias Urlichs <smurf@smurf.noris.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of Version 2 of the GNU General Public License as
+# published by the Free Software Foundation. See the file COPYING.txt
+# or (on Debian systems) /usr/share/common-licenses/GPL-2 for details.
+
+"""\
+This script analyzes an X11 keymap and prints the equivalent console
+keymap name, based on a decision tree.
+"""
+
+from __future__ import print_function
+
+from keymapper.parse.x11 import parse_file as parse_x11
+from keymapper.fakequery import FakeQuery
+from keymapper.script import Script, DupMap, NoMap
+from optparse import OptionParser
+
+import io
+import sys
+
+import keymapper.tree
+
+if sys.version_info[0] >= 3:
+    # Force encoding to UTF-8 even in non-UTF-8 locales.
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.detach(), encoding="UTF-8", line_buffering=True
+    )
+    sys.stderr = io.TextIOWrapper(
+        sys.stderr.detach(), encoding="UTF-8", line_buffering=True
+    )
+else:
+    import codecs
+
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout)
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr)
+
+keymapper.tree.trace = 1
+
+parser = OptionParser(usage="%prog tree_file x11name...", version="%prog 0.1")
+parser.remove_option("-h")
+# parser.remove_option("--help")
+parser.add_option("-?", "--help", action="help", help="show this help text")
+parser.add_option(
+    "-v", "--verbose", action="count", dest="verbose", help="be more verbose"
+)
+parser.add_option(
+    "-g",
+    "--graph",
+    action="store_const",
+    dest="format",
+    const="graphviz",
+    help="generate a hopefully-nice-looking .dot file",
+)
+(opts, args) = parser.parse_args()
+
+with io.open(args[0], encoding="utf-8") as f:
+    script = Script(f, verbose=opts.verbose)
+rev = {}
+
+
+def rev_add(b, a):
+    if a not in rev:
+        rev[a] = set()
+    rev[a].add(b)
+
+
+for x11map in args[1:]:
+    km = parse_x11(x11map)
+    if km is None:
+        continue
+    try:
+        consolemap = script.run(FakeQuery(km, verbose=opts.verbose))
+    except DupMap as err:
+        for m in err.args[0]:
+            rev_add(km.name, m)
+    except NoMap:
+        print("# %s could not be mapped." % (km.name,))
+    else:
+        rev_add(km.name, consolemap)
+
+for a, b in sorted(rev.items()):
+    print(a, " ".join(sorted(b)))

@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+UPSTREAM_VERSION := $(shell dpkg-parsechangelog  | sed -n '/^Version:/s/^[^:]*: \(.*\)-.*$$/\1/p')
+
+%:
+	dh --with javahelper $@
+
+override_dh_auto_clean:
+	dh_auto_clean
+	-rm -rf dist
+	mh_clean
+
+override_dh_install:
+	mh_installpom -plibjcsp-java debian/pom.xml
+	mh_installjar -plibjcsp-java -l debian/pom.xml dist/jcsp-*/jcsp.jar
+	jh_installlibs  --upstream-version=${UPSTREAM_VERSION} dist/jcsp-*/jcsp-core.jar
+	dh_install
+
+override_dh_compress:
+	dh_compress -X.java
+
+get-orig-source:
+	cd $(dir $(firstword $(MAKEFILE_LIST)))../ && \
+	uscan \
+		--verbose \
+		--no-symlink \
+		--destdir $(CURDIR)      \
+		--watchfile debian/watch \
+		--force-download

@@ -1,0 +1,104 @@
+.\"     Title: ieee1284_get_deviceid
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Functions
+.\"    Source: 
+.\"
+.TH "IEEE1284_GET_DEVICEI" "3" "09/18/2007" "" "Functions"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+ieee1284_get_deviceid \- retrieve an IEEE 1284 Device ID
+.SH "SYNOPSIS"
+.sp
+.ft B
+.nf
+#include <ieee1284.h>
+.fi
+.ft
+.HP 30
+.BI "ssize_t ieee1284_get_deviceid(struct\ parport\ *" "port" ", int\ " "daisy" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.SH "DESCRIPTION"
+.PP
+This function is for retrieving the IEEE 1284 Device ID of the specified device. The device is specified by the
+\fIport\fR
+to which it is attached, and optionally an address (\fIdaisy\fR) on the daisy chain of devices on that port.
+.PP
+\fIdaisy\fR
+should be −1 to indicate that the device is not participating in a IEEE 1284.3 daisy chain, meaning it is the last (or only) device on the port, or should be a number from 0 to 3 inclusive to indicate that it has the specified daisy chain address (0 is next to the port).
+.PP
+The
+\fIflags\fR
+parameter should be a bitwise union of any flags that the program wants to use. Available flags are:
+.PP
+\fBF1284_FRESH\fR
+.RS 4
+Guarantee a fresh Device ID. A cached or OS\-provided ID will not be used.
+.RE
+.PP
+The provided
+\fIbuffer\fR
+must be at least
+\fIlen\fR
+bytes long, and will contain the Device ID including the initial two\-byte length field and a terminating zero byte on successful return, or as much of the above as will fit into the buffer.
+.SH "RETURN VALUE"
+.PP
+A return value less than zero indicates an error as below. Otherwise, the return value is the number of bytes of
+\fIbuffer\fR
+that have been filled. A return value equal to the length of the buffer indicates that the Device ID may be longer than the buffer will allow.
+.PP
+\fBE1284_NOID\fR
+.RS 4
+The device did not provide an IEEE 1284 Device ID when interrogated (perhaps by the operating system if
+\fBF1284_FRESH\fR
+was not specified).
+.RE
+.PP
+\fBE1284_NOTIMPL\fR
+.RS 4
+One or more of the supplied flags is not supported in this implementation, or if no flags were supplied then this function is not implemented for this type of port or this type of system. This can also be returned if a daisy chain address is specified but daisy chain Device IDs are not yet supported.
+.RE
+.PP
+\fBE1284_NOTAVAIL\fR
+.RS 4
+\fBF1284_FRESH\fR
+was specified and the library is unable to access the port to interrogate the device.
+.RE
+.PP
+\fBE1284_NOMEM\fR
+.RS 4
+There is not enough memory.
+.RE
+.PP
+\fBE1284_INIT\fR
+.RS 4
+There was a problem initializing the port.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid.
+.RE
+.SH "NOTES"
+.PP
+Unless the
+\fBF1284_FRESH\fR
+flag is given, the library will try to find the device's ID as unobtrusively as possible. First it will ask the operating system if it knows it, and then it will try actually asking the device for it. Because of this, the Device ID may be partially computed (the length field, for example) or even partially missing if the operating system has only remembered some parts of the ID. To guarantee that you are getting the bytes that the device sent, use
+\fBF1284_FRESH\fR. Be aware that the operating system may allow any user to inspect the Device IDs that it provides, whereas device access is normally more restricted.
+.PP
+The initial two\-byte length field is a big\-endian 16 bit unsigned integer provided by the device and may not be accurate. In particular, it is meant to indicate the length of the entire string including the length field itself; however, some manufacturers exclude the length field or just set the length field to some arbitrary number greater than the ID length.
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

@@ -1,0 +1,1265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-ad</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-ad</refname>
+        <refpurpose>SSSD Active Directory-leverantör</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver konfigurationen av leverantören AD till
+<citerefentry> <refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  För en detaljerad referens om syntaxen, se avsnittet
+<quote>FILFORMAT</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Leverantören AD är en bakände som används för att ansluta till en Active
+Directory-server.  Leverantören kräver att maskinen läggs in i AD-domänen
+och att en keytab är tillgänglig.  Bakändekommunikationen sker över en
+GSSAPI-krypterad kanal, SSL/TLS-alternativ skall inte användas tillsammans
+med AD-leverantören och kommer ersättas av Kerberos-användning.
+        </para>
+        <para>
+            AD-leverantören stödjer anslutning till Active Directory 2008 R2 eller
+senare.  Tidigare versioner kan fungera, men stödjs inte.
+        </para>
+        <para>
+            AD-leverantören kan användas för att få användarinformation och autentisera
+användare från betrodda domäner.  För närvarande känns endast betrodda
+domäner i samma skog igen.  Dessutom automatupptäcks alltid servrar från
+betrodda domäner.
+        </para>
+        <para>
+            AD-leverantören gör att SSSD kan använda identitetsleverantören
+<citerefentry> <refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> och autentiseringsleverantören
+<citerefentry> <refentrytitle>sssd-krb5</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> med optimeringar för Active
+Directory-miljöer.  AD-leverantören tar samma alternativ som används av
+leverantörerna sssd-ldap och sssd-krb5 med några undantag.  Dock är det
+varken nödvändigt eller lämpligt att sätta dessa alternativ.
+        </para>
+        <para>
+            AD-leverantören kopierar i huvudsak standardalternativen för de
+traditionella leverantörerna ldap och krb5 med några undantag.  Skillnaderna
+listas i avsnittet <quote>ÄNDRADE STANDARDINSTÄLLNINGAR</quote>.
+        </para>
+        <para>
+            AD-leverantören kan även användas som en åtkomst-, chpass-, sudo- och
+autofs-leverantör.  Ingen konfiguration av åtkomstleverantören behövs på
+klientsidan.
+        </para>
+        <para>
+            Om <quote>auth_provider=ad</quote> eller <quote>access_provider=ad</quote>
+konfigureras i sssd.conf måste id-leverantören också sättas till
+<quote>ad</quote>.
+        </para>
+        <para>
+            Som standard kommer AD-leverantören översätta AID- och GID-värden från
+parametern objectSID i Active Directory.  För detaljer om detta se avsnittet
+<quote>ID-ÖVERSÄTTNING</quote> nedan.  Om du vill avaktivera ID-översättning
+och istället lita på POSIX-attribut definierade i Active Directory skall du
+sätta <programlisting>
+ldap_id_mapping = False
+            </programlisting>.  Om POSIX-attribut skall
+användas rekommenderas det av prestandaskäl att attributen även replikeras
+till den globala katalogen.  Om POSIX-attribut replikeras kommer SSSD
+försöka att hitta domänen för den begärda numeriska ID:n med hjälp av den
+globala katalogen och endast söka i den domänen.  Om POSIX-attribut däremot
+inte replikeras till den globala katalogen måste SSSD söka i alla domänerna
+i skogen sekventiellt.  Observera att alternativet
+<quote>cache_first</quote> också kan vara till hjälp för att snabba upp
+domänlösa sökningar.  Observera att om endast en delmängd av
+POSIX-attributen finns i den globala katalogen läses för närvarande inte de
+attribut som inte replikeras från LDAP-porten.
+        </para>
+        <para>
+            Användare, grupper och andra enheter som servas av SSSD behandlas alltid som
+skiftlägesokänsliga i AD-leverantören för kompatibilitet med Active
+Directorys LDAP-implementation.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>Se <quote>DOMÄNSEKTIONER</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> för detaljer om konfigurationen av en SSSD-domän.
+<variablelist>
+                <varlistentry>
+                    <term>ad_domain (sträng)</term>
+                    <listitem>
+                        <para>
+                            Anger namnet på Active Directory-domänen.  Detta är frivilligt.  Om det inte
+anges används namnet på den konfigurerade domänen.
+                        </para>
+                        <para>
+                            För att fungera ordentligt skall detta alternativ anges som den gemena
+versionen av den långa versionen av Active Directorys domän.
+                        </para>
+                        <para>
+                            Det korta domännamnet (även känt som NetBIOS-namnet eller det platta namnet)
+detekteras automatiskt av SSSD.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_enabled_domains (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av aktiverade Active Directory-domäner.  Om det
+tillhandahålls kommer SSSD ignorera eventuella domäner som inte räknas upp i
+detta alternativ.  Om det lämnas osatt kommer alla domäner från AD-skogen
+vara tillgängliga.
+                        </para>
+                        <para>
+                            För att fungera ordentligt bör detta alternativ anges helt i gemener och som
+det fullständigt kvalificerade namnet på Active Directory-domänen.  Till
+exempel: <programlisting>
+ad_enabled_domains = marknad.example.com, tekn.example.com
+                            </programlisting>
+                        </para>
+                        <para>
+                            Det korta domännamnet (även känt som NetBIOS-namnet eller det platta namnet)
+kommer detekteras automatiskt av SSSD.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_server, ad_backup_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            Den kommaseparerade listan av värdnamn till AD-servrar till vilka SSSD skall
+ansluta i prioritetsordning.  För mer information om reserver och
+serverredundans se avsnittet <quote>RESERVER</quote>.
+                        </para>
+                        <para>
+                            Detta är frivilligt om automatupptäckt är aktiverat.  För mer information om
+tjänsteupptäckt se avsnittet <quote>TJÄNSTEUPPTÄCKT</quote>.
+                        </para>
+                        <para>
+                            Observera: betrodda domäner kommer alltid automatiskt upptäcka servrar även
+om den primära servern definieras uttryckligen i alternativet ad_server.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_hostname (sträng)</term>
+                    <listitem>
+                        <para>
+                            Valfri. På maskiner där hostname(5) inte avspeglar det fullständigt
+kvalificerade namnet kommer sssd försöka expandera det korta namnet. Om det
+inte är möjligt eller det korta namnet verkligen skall användas istället,
+sätt då denna parameter uttryckligen.
+                        </para>
+                        <para>
+                            Detta fält används för att avgöra värd-huvudmannen som används i keytab:en
+och utföra dynamiska DNS-uppdateringar. Det måste stämma med värdnamnet som
+keytab:en gavs ut för.
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_enable_dns_sites (boolean)</term>
+                    <listitem>
+                        <para>
+                            Aktiverar DNS-sajter – platsbaserat tjänsteupptäckt.
+                        </para>
+                        <para>
+                            Om sant och tjänsteupptäckt (se stycket Tjänsteupptäckt i slutet av
+manualsidan) är aktiverat kommer SSSD först att försöka hitta en Active
+Directory-server att ansluta till med Active Directory Site Discovery och
+sedan falla tillbaka på traditionell SRV-upptäckt om ingen AD-sajt hittas.
+Konfigurationen av DNS SRV, inklusive upptäcktsdomänen, används också under
+sajtupptäckten.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_access_filter (sträng)</term>
+                    <listitem>
+                        <para>
+                            Detta alternativ anger LDAP:s åtkomstkontrollfilter som användaren måste
+matcha för att tillåtas åtkomst.  Observera att alternativet
+<quote>access_provider</quote> måste vara uttryckligen satt till
+<quote>ad</quote> för att detta alternativ skall ha någon effekt.
+                        </para>
+                        <para>
+                            Alternativet stödjer också att ange olika filter per domän eller skog.
+Detta utökade filter skulle bestå av: <quote>NYCKELORD:NAMN:FILTER</quote>.
+Nyckelordet kan vara antingen <quote>DOM</quote>, <quote>FOREST</quote>
+eller utelämnas.
+                        </para>
+                        <para>
+                            Om nyckelordet är lika med <quote>DOM</quote> eller saknas anger
+<quote>NAMN</quote> domänen eller underdomänen filtret gäller för.  Om
+nyckelordet är lika med <quote>FOREST</quote> är filtret lika för alla
+domäner från skogen som anges av <quote>NAMN</quote>.
+                        </para>
+                        <para>
+                            Flera filter kan avgränsas med tecknet <quote>?</quote>, i likhet med hur
+sökbaser fungerar.
+                        </para>
+                        <para>
+                            Nästade gruppmedlemskap måste sökas efter med en speciell OID
+<quote>:1.2.840.113556.1.4.1941:</quote> utöver den fullständiga syntaxen
+DOM:domän.example.com: för att säkerställa att tolken inte försöker tolka
+kolontecknen som hör till OID:n.  Om man inte använder denna OID kommer
+nästade gruppmedlemskap inte slås upp.  Se användningsexempel nedan och se
+här för ytterligare information om OID:n: <ulink
+url="https://msdn.microsoft.com/en-us/library/cc223367.aspx"> [MS-ADTS]
+avsnittet LDAP-utökningar</ulink>
+                        </para>
+                        <para>
+                            Den mest specifika matchningen används alltid.  Till exempel, om
+alternativet angav filter för en domän användaren är medlem i och ett
+globalt filter skulle det domänspecifika filtret tillämpas.  Om det finns
+fler matchningar med samma specifikation används den första.
+                        </para>
+                        <para>
+                            Exempel:
+                        </para>
+                        <programlisting>
+# tillämpa endast filtret på en domän som heter dom1:
+dom1:(memberOf=cn=admins,ou=groups,dc=dom1,dc=com)
+
+# tillämpa endast filtret på en domän som heter dom2:
+DOM:dom2:(memberOf=cn=admins,ou=groups,dc=dom2,dc=com)
+
+# tillämpa endast filtret på en skog som heter EXAMPLE.COM:
+FOREST:EXAMPLE.COM:(memberOf=cn=admins,ou=groups,dc=example,dc=com)
+
+# tillämpa filtret på en medlem av en nästad grupp i dom1:
+DOM:dom1:(memberOf:1.2.840.113556.1.4.1941:=cn=nestedgroup,ou=groups,dc=example,dc=com)
+                        </programlisting>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_site (sträng)</term>
+                    <listitem>
+                        <para>
+                          Ange en AD-sajt som klienten skall försöka ansluta till.  Om detta
+alternativ inte anges kommer AD-sajten att automatupptäckas.
+                        </para>
+                        <para>
+                            Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_enable_gc (boolean)</term>
+                    <listitem>
+                        <para>
+                            Som standard ansluter SSSD till den globala katalogen först för att hämta
+användare från betrodda domäner och använder LDAP-porten för att hämta
+gruppmedlemskap som en reserv.  Att avaktivera detta alternativ gör att SSSD
+endast ansluter till LDAP-porten på den aktuella AD-servern.
+                        </para>
+                        <para>
+                            Observera att att avaktivera stöd för den globala katalogen inte avaktiverar
+att hämta användare från betrodda domäner. SSSD skulle ansluta till
+LDAP-porten på den betrodda domänen istället. Dock måste den globala
+katalogen användas för att slå upp gruppmedlemskap över domäner.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_access_control (sträng)</term>
+                    <listitem>
+                        <para>
+                            Detta alternativ anger arbetsläget för GPO-baserad
+åtkomstkontrollsfunktionalitet: huruvida det arbetar i avaktiverat läge,
+tvingande läge eller tillåtande läge.  Observera att alternativet
+<quote>access_provider</quote> måste vara uttryckligen satt till
+<quote>ad</quote> för att detta alternativ skall ha någon effekt.
+                        </para>
+                        <para>
+                            Funktionalitet för GPO-baserad åtkomststyrning använder
+GPO-policyinställningar för att avgöra huruvida en viss användare tillåts
+logga in på värden eller inte. För mer information om de stödda
+policyinställningarna se flaggan  <quote>ad_gpo_map</quote>.
+                        </para>
+                        <para>
+                            Observera att den aktuella versionen av SSSD inte stöjder Active Directorys
+inbyggda grupper. Inbyggda grupper (såsom administratörer med SID
+S-1-5-32-544) i GPO-åtkomststyrningsregler kommer ignoreras av SSSD. Se
+uppströms ärendehanterare https://github.com/SSSD/sssd/issues/5063 .
+                        </para>
+                        <para>
+                            Före åtkomstkontroll utförs tillämpar SSSD säkerhetsfiltrering enligt
+gruppolicy på GPO:erna. För varje enskild användares inloggning kontrolleras
+tillämpligheten av GPO:erna som är länkade till värden. För att en GPO skall
+vara tillämplig på en användare måste användaren eller åtminstone en av de
+grupper den tillhör ha följande rättigheter på GPO:n:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        Läs: användaren eller en av dess grupper måste ha läsrättigheter till
+egenskaperna hos GPO:n (RIGHT_DS_READ_PROPERTY)
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        Verkställ gruppolicy: användaren eller åtminstone en av dess grupper måste
+ha tillåtelse att verkställa GPO:n (RIGHT_DS_CONTROL_ACCESS).
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            Som standard fins en autentiserad användares grupp på en GPO och denna grupp
+har både Läs- och Verkställ gruppolicy-åtkomsträttigheter. Eftersom
+autentisering av en användare måste ha fullgjorts framgångsrikt före
+GPO-säkerhetsfiltrering och åtkomstkontroll börjar gäller alltid även den
+autentiserade användarens grupprättigheter på GPO:n för användaren.
+                        </para>
+                        <para>
+                            OBS: Om åtgärdsläget är satt till tvingande är det möjligt att användarna
+som tidigare var tillåtna inloggningsåtkomst nu kommer nekast
+inloggningsåtkomst (som det dikteras av GPO-policyinställningar). För att
+möjliggöra en smidig övergång för administratörer finns ett tillåtande läge
+tillgängligt som inte kommer genomdriva åtkomststyrningsreglerna, utan
+kommer beräkna deom och skriva ut ett syslog-meddelande om åtkomst skulle ha
+nekats. Genom att granska loggarna kan administratörer sedan göra de
+nödvändiga ändringarna före läget ställs in som tvingande. För att logga
+felsökningsnivå av GPO-baserad åtkomstkontroll krävs ”trace functions” (se
+manualsidan <citerefentry><refentrytitle>sssctl</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry>).
+                        </para>
+                        <para>
+                            Det finns tre stödda värden för detta alternativ:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        disabled: GPO-baserade åtkomstkontrollsregler varken evalueras eller
+påtvingas.
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        enforcing: GPO-baserade åtkomstkontrollregler evalueras och påtvingas.
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        permissive: GPO-baserade åtkomstkontrollregler evalueras men påtvingas
+inte.  Istället skickas ett syslog-meddelande ut som indikerar att
+användaren skulle ha nekats åtkomst om detta alternativs värde vore satt
+till enforcing.
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para condition="gpo_default_permissive">
+                            Standard: permissive
+                        </para>
+                        <para condition="gpo_default_enforcing">
+                            Standard: enforcing
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_implicit_deny (boolean)</term>
+                    <listitem>
+                        <para>
+                            Normalt när inga tillämpliga GPO:er finns tillåts användarna åtkomst.  När
+detta alternativ är satt till True kommer användare att tillåtas åtkomst
+endast när det uttryckligen tillåts av en GPO-regel.  Annars kommer
+användare nekas åtkomst.  Detta kan användas för att stärka säkerheten men
+var försiktig när detta alternativ används för det kan neka åtkomst även
+till användare i den inbyggda administratörsgruppen om inga GPO-regler är
+tillämpliga på dem.
+                        </para>
+
+                        <para>
+                            Standard: False
+                        </para>
+
+                        <para>
+                            Följande 2 tabeller bör illustrera när en användare tillåts eller nekas
+baserat på de tillåtande eller nekande inloggningsrättigheterna definierade
+på serversidan och inställningen av ad_gpo_implicit_deny.
+                        </para>
+                        <informaltable frame='all'>
+                        <tgroup cols='3'>
+                        <colspec colname='c1' align='center'/>
+                        <colspec colname='c2' align='center'/>
+                        <colspec colname='c3' align='center'/>
+                        <thead>
+                        <row><entry namest='c1' nameend='c3' align='center'>
+                            ad_gpo_implicit_deny = False (standard)</entry></row>
+                        <row><entry>tillåtelseregler</entry><entry>nekanderegler</entry>
+                            <entry>resultat</entry></row>
+                        </thead>
+                        <tbody>
+                        <row><entry>saknas</entry><entry>saknas</entry>
+                            <entry><para>alla användare tillåts</para>
+                            </entry></row>
+                        <row><entry>saknas</entry><entry>finns</entry>
+                            <entry><para>endast användare som inte finns i nekanderegler tillåts</para></entry></row>
+                        <row><entry>finns</entry><entry>saknas</entry>
+                            <entry><para>endast användare i tillåtelseregler tillåts</para></entry></row>
+                        <row><entry>finns</entry><entry>finns</entry>
+                            <entry><para>endast användare i tillåtelse och inte i nekanderegler tillåts</para></entry></row>
+                        </tbody></tgroup></informaltable>
+
+                        <informaltable frame='all'>
+                        <tgroup cols='3'>
+                        <colspec colname='c1' align='center'/>
+                        <colspec colname='c2' align='center'/>
+                        <colspec colname='c3' align='center'/>
+                        <thead>
+                        <row><entry namest='c1' nameend='c3' align='center'>
+                            ad_gpo_implicit_deny = True</entry></row>
+                        <row><entry>tillåtelseregler</entry><entry>nekanderegler</entry>
+                            <entry>resultat</entry></row>
+                        </thead>
+                        <tbody>
+                        <row><entry>saknas</entry><entry>saknas</entry>
+                            <entry><para>inga användare tillåts</para>
+                            </entry></row>
+                        <row><entry>saknas</entry><entry>finns</entry>
+                            <entry><para>inga användare tillåts</para>
+                            </entry></row>
+                        <row><entry>finns</entry><entry>saknas</entry>
+                            <entry><para>endast användare i tillåtelseregler tillåts</para></entry></row>
+                        <row><entry>finns</entry><entry>finns</entry>
+                            <entry><para>endast användare i tillåtelse och inte i nekanderegler tillåts</para></entry></row>
+                        </tbody></tgroup></informaltable>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_ignore_unreadable (boolean)</term>
+                    <listitem>
+                        <para>
+                            Normalt när några gruppolicybehållare (AD-objekt) av några tillämpliga
+gruppolicyobjekt inte är läsbara av SSSD så nekas användare åtkomst.  Detta
+alternativ tillåter att man ignorerar gruppolicybehållare och med dem
+tillhörande policyer om deras attribut i gruppolicybehållare inte är läsbara
+för SSSD.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+
+
+                <varlistentry>
+                    <term>ad_gpo_cache_timeout (heltal)</term>
+                    <listitem>
+                        <para>
+                            Tiden mellan uppslagningar av GPO-policyfiler mot AD-servern.  Detta kommer
+reducera tidsfördröjningen och lasten på AD-servern om det görs många
+begäranden om åtkomstkontroll under en kort tid.
+                        </para>
+                        <para>
+                            Standard: 5 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_interactive (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad
+åtkomstkontroll beräknas baserat på policyinställningarna
+InteractiveLogonRight och DenyInteractiveLogonRight. Endast de GPO:er
+beräknas för vilka användaren har Läs- eller Verkställ
+gruppolicy-rättigheter (se flaggan <quote>ad_gpo_access_control</quote>). Om
+en beräknad GPO innehåller inställningen neka interaktiv inloggning för
+användaren eller en av dess grupper nekas användaren lokal åtkomst. Om ingen
+av de evaluerade GPO:erna har en interaktiv inloggningsrättighet definierad
+ges användaren lokal åtkomst. Om åtminstone en beräknad GPO innehåller
+inställningen interaktiv inloggningsrättighet ges användaren lokal åtkomst
+endast om denne eller åtminstone en av dess grupper är del av den
+policyinställningen.
+                        </para>
+                        <para>
+                            Obs: när man använder gruppolicyhanteringsredigeraren kallas detta värde
+”Tillåt inloggning lokalt” och ”Neka inloggning lokalt”.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat PAM-tjänstenamn till
+standarduppsättningen genom att använda <quote>+tjänstenamn</quote> eller
+att uttryckligen ta bort ett PAM-tjänstenamn från standarduppsättningen
+genom att använda <quote>-tjänstenamn</quote>.  Till exempel, för att byta
+ut ett standard-PAM-tjänstenamn för denna inloggningsrätt
+(t.ex. <quote>login</quote>) mot ett anpassat PAM-tjänstenamn
+(t.ex. <quote>min_pam-tjänst</quote>) skulle man använda följande
+konfiguration: <programlisting>
+ad_gpo_map_interactive = +min_pam-tjänst, -login
+                            </programlisting>
+                        </para>
+                        <para>
+                            Standard: standarduppsättningen av PAM-tjänstenamn innefattar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        login
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        su
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        su-l
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        gdm-fingerprint
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        gdm-password
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        gdm-smartcard
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        kdm
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        lightdm
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        lxdm
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        sddm
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        unity
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        xdm
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_remote_interactive (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad
+åtkomstkontroll beräknas baserat på policyinställningarna
+RemoteInteractiveLogonRight och DenyRemoteInteractiveLogonRight. Endast de
+GPO:er beräknas för vilka användaren har Läs- eller Verkställ
+gruppolicy-rättigheter (se flaggan <quote>ad_gpo_access_control</quote>). Om
+en beräknad GPO innehåller inställningen neka fjärrinloggning för användaren
+eller en av dess grupper nekas användaren interaktiv fjärråtkomst. Om ingen
+av de evaluerade GPO:erna har en interaktiv inloggningsrättighet definierad
+ges användaren interaktiv fjärråtkomst. Om åtminstone en beräknad GPO
+innehåller inställningen interaktiv fjärrinloggningsrättighet ges användaren
+fjärråtkomst endast om denne eller åtminstone en av dess grupper är del av
+den policyinställningen.
+                        </para>
+                        <para>
+                            Obs: när man använder gruppolicyhanteringsredigeraren kallas detta värde
+”Tillåt inloggning via fjärrskrivbordstjänster” och ”Neka inloggning via
+fjärrinloggningstjänster”.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat PAM-tjänstenamn till
+standarduppsättningen genom att använda <quote>+tjänstenamn</quote> eller
+att uttryckligen ta bort ett PAM-tjänstenamn från standarduppsättningen
+genom att använda <quote>-tjänstenamn</quote>.  Till exempel, för att byta
+ut ett standard-PAM-tjänstenamn för denna inloggningsrätt
+(t.ex. <quote>sshd</quote>) mot ett anpassat PAM-tjänstenamn
+(t.ex. <quote>min_pam-tjänst</quote>) skulle man använda följande
+konfiguration: <programlisting>
+ad_gpo_map_remote_interactive = +min_pam-tjänst, -sshd
+                            </programlisting>
+                        </para>
+                        <para>
+                            Standard: standarduppsättningen av PAM-tjänstenamn innefattar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        sshd
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        cockpit
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_network (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad
+åtkomstkontroll beräknas baserat på policyinställningarna NetworkLogonRight
+och DenyNetworkLogonRight. Endast de GPO:er beräknas för vilka användaren
+har Läs- eller Verkställ gruppolicy-rättigheter (se flaggan
+<quote>ad_gpo_access_control</quote>). Om en beräknad GPO innehåller
+inställningen neka nätverksinloggning för användaren eller en av dess
+grupper nekas användaren nätverksåtkomst. Om ingen av de evaluerade GPO:erna
+har en nätverksinloggningsrättighet definierad ges användaren
+inloggningsåtkomst. Om åtminstone en beräknad GPO innehåller inställningen
+nätverksinloggningsrättighet ges användaren inloggningsåtkomst endast om
+denne eller åtminstone en av dess grupper är del av den policyinställningen.
+                        </para>
+                        <para>
+                            Obs: när man använder gruppolicyhanteringsredigeraren kallas detta värde
+”Kom åt denna dator från nätverket” och ”Neka åtkomst till denna dator från
+nätverket”.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat PAM-tjänstenamn till
+standarduppsättningen genom att använda <quote>+tjänstenamn</quote> eller
+att uttryckligen ta bort ett PAM-tjänstenamn från standarduppsättningen
+genom att använda <quote>-tjänstenamn</quote>.  Till exempel, för att byta
+ut ett standard-PAM-tjänstenamn för denna inloggningsrätt
+(t.ex. <quote>ftp</quote>) mot ett anpassat PAM-tjänstenamn
+(t.ex. <quote>min_pam-tjänst</quote>) skulle man använda följande
+konfiguration: <programlisting>
+ad_gpo_map_network = +min_pam-tjänst, -ftp
+                            </programlisting>
+                        </para>
+                        <para>
+                            Standard: standarduppsättningen av PAM-tjänstenamn innefattar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        ftp
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        samba
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_batch (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad
+åtkomstkontroll beräknas baserat på policyinställningarna BatchLogonRight
+och DenyBatchLogonRight. Endast de GPO:er beräknas för vilka användaren har
+Läs- eller Verkställ gruppolicy-rättigheter (se flaggan
+<quote>ad_gpo_access_control</quote>). Om en beräknad GPO innehåller
+inställningen neka satsvis inloggning för användaren eller en av dess
+grupper nekas användaren satsvis inloggningsåtkomst. Om ingen av de
+evaluerade GPO:erna har en satsvis inloggningsrättighet definierad ges
+användaren inloggningsåtkomst. Om åtminstone en beräknad GPO innehåller
+inställningen satsvis inloggningsrättighet ges användaren inloggningsåtkomst
+endast om denne eller åtminstone en av dess grupper är del av den
+policyinställningen.
+                        </para>
+                        <para>
+                            Obs: när man använder gruppolicyhanteringsredigeraren kallas detta värde
+”Tillåt inloggning som ett batch-jobb” och ”Neka inloggning som ett
+batch-jobb”.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat PAM-tjänstenamn till
+standarduppsättningen genom att använda <quote>+tjänstenamn</quote> eller
+att uttryckligen ta bort ett PAM-tjänstenamn från standarduppsättningen
+genom att använda <quote>-tjänstenamn</quote>.  Till exempel, för att byta
+ut ett standard-PAM-tjänstenamn för denna inloggningsrätt
+(t.ex. <quote>crond</quote>) mot ett anpassat PAM-tjänstenamn
+(t.ex. <quote>min_pam-tjänst</quote>) skulle man använda följande
+konfiguration: <programlisting>
+ad_gpo_map_batch = +min_pam-tjänst, -crond
+                            </programlisting>
+                        </para>
+                        <para>Obs: cron-tjänstenamn kan skilja beroende på vilken Linuxdistribution som
+används.</para>
+                        <para>
+                            Standard: standarduppsättningen av PAM-tjänstenamn innefattar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        crond
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_service (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad
+åtkomstkontroll beräknas baserat på policyinställningarna ServiceLogonRight
+och DenyServiceLogonRight. Endast de GPO:er beräknas för vilka användaren
+har Läs- eller Verkställ gruppolicy-rättigheter (se flaggan
+<quote>ad_gpo_access_control</quote>). Om en beräknad GPO innehåller
+inställningen neka tjänsteinloggning för användaren eller en av dess grupper
+nekas användaren tjänsteinloggningsåtkomst. Om ingen av de evaluerade
+GPO:erna har en tjänsteinloggningsrättighet definierad ges användaren
+inloggningsåtkomst. Om åtminstone en beräknad GPO innehåller inställningen
+tjänsteinloggningsrättighet ges användaren inloggningsåtkomst endast om
+denne eller åtminstone en av dess grupper är del av den policyinställningen.
+                        </para>
+                        <para>
+                            Obs: när man använder gruppolicyhanteringsredigeraren kallas detta värde
+”Tillåt inloggning som en tjänst” och ”Neka inloggning som en tjänst”.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett PAM-tjänstenamn till standarduppsättningen
+genom att använda <quote>+tjänstenamn</quote>.  Eftersom
+standarduppsättningen är tom är det inte möjligt att ta bort ett
+PAM-tjänstenamn från standarduppsättningen.  Till exempel, för att lägga
+till ett anpassat PAM-tjänstenamn (t.ex. <quote>min_pam-tjänst</quote>)
+skulle man använda följande konfiguration: <programlisting>
+ad_gpo_map_service = +min_pam-tjänst
+                            </programlisting>
+                        </para>
+                        <para>
+                          Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_permit (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad åtkomst
+alltid tillåts, oavsett några andra GPO-inloggningsrättigheter.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett annat PAM-tjänstenamn till
+standarduppsättningen genom att använda <quote>+tjänstenamn</quote> eller
+att uttryckligen ta bort ett PAM-tjänstenamn från standarduppsättningen
+genom att använda <quote>-tjänstenamn</quote>.  Till exempel, för att byta
+ut ett standard-PAM-tjänstenamn för ovillkorligt tillåten åtkomst
+(t.ex. <quote>sudo</quote>) mot ett anpassat PAM-tjänstenamn
+(t.ex. <quote>min_pam-tjänst</quote>) skulle man använda följande
+konfiguration: <programlisting>
+ad_gpo_map_permit = +min_pam-tjänst, -sudo
+                            </programlisting>
+                        </para>
+                        <para>
+                            Standard: standarduppsättningen av PAM-tjänstenamn innefattar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        polkit-1
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        sudo
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        sudo-i
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        systemd-user
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_map_deny (sträng)</term>
+                    <listitem>
+                        <para>
+                            En kommaseparerad lista av PAM-tjänstenamn för vilka GPO-baserad åtkomst
+alltid nekas, oavsett några andra GPO-inloggningsrättigheter.
+                        </para>
+                        <para>
+                            Det är möjligt att lägga till ett PAM-tjänstenamn till standarduppsättningen
+genom att använda <quote>+tjänstenamn</quote>.  Eftersom
+standarduppsättningen är tom är det inte möjligt att ta bort ett
+PAM-tjänstenamn från standarduppsättningen.  Till exempel, för att lägga
+till ett anpassat PAM-tjänstenamn (t.ex. <quote>min_pam-tjänst</quote>)
+skulle man använda följande konfiguration: <programlisting>
+ad_gpo_map_deny = +min_pam-tjänst
+                            </programlisting>
+                        </para>
+                        <para>
+                          Standard: inte satt
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_gpo_default_right (sträng)</term>
+                    <listitem>
+                        <para>
+                            Detta alternativ definierar hur åtkomstkontroll beräknas för PAM-tjänstenamn
+som inte är uttryckligen listade i en av alternativen ad_gpo_map_*.  Detta
+alternativ kan anges på två olika sätt.  Antingen kan detta alternativ
+sättas till att ange standardinloggningsrättigheter.  Till exempel, om detta
+alternativ är satt till ”interactive” betyder det att omappade
+PAM-tjänstenamn kommer bearbetas baserat på policyinställningarna
+InteractiveLogonRight och DenyInteractiveLogonRight.  Alternativt kan detta
+alternativ sättas till att antingen alltid tillåta eller alltid neka åtkomst
+för omappade PAM-tjänstenamn.
+                        </para>
+                        <para>
+                            Värden som stödjs för detta alternativ inkluderar:
+                            <itemizedlist>
+                                <listitem>
+                                    <para>
+                                        interactive
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        remote_interactive
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        network
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        batch
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        service
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        permit
+                                    </para>
+                                </listitem>
+                                <listitem>
+                                    <para>
+                                        deny
+                                    </para>
+                                </listitem>
+                            </itemizedlist>
+                        </para>
+                        <para>
+                            Standard: deny
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_maximum_machine_account_password_age (heltal)</term>
+                    <listitem>
+                        <para>
+                            SSSD kommer en gång om dagen kontrollera om maskinkontolösenordet är äldre
+än den givna åldern i dagar och försöka förnya det.  Ett värde på 0 kommer
+förhindra förnyelseförsöket.
+                        </para>
+                        <para>
+                            Standard: 30 dagar
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_machine_account_password_renewal_opts (sträng)</term>
+                    <listitem>
+                        <para>
+                            Detta alternativ skall endast användas för att testa
+maskinkontoförnyelsefunktionen.  Alternativet förväntar sig 2 heltal
+separerade av ett kolon (”:”).  Det första heltalet anger intervallet i
+sekunder hur ofta funktionen körs.  Det andra anger den initiala tidsgränsen
+i sekunder före funktionen körs för första gången efter uppstart.
+                        </para>
+                        <para>
+                            Standard: 86400:750 (24h och 15m)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_update_samba_machine_account_password (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om aktiverat kommer lösenordet i Sambas databas också uppdateras när SSSD
+förnyar maskinkontolösenordet. Detta förhindrar Sambas exemplar av
+maskinkontolösenordet från att bli inaktuellt när det är uppsatt att använda
+AD för autentisering.
+                        </para>
+                        <para>
+                            Standard: false
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_use_ldaps (bool)</term>
+                    <listitem>
+                        <para>
+                            Som standard använder SSSD den enkla LDAP-porten 389 porten 3628 för den
+globala katalogen. Om denna flagga är satt till sant kommer SSSD använda
+LDAPS-porten 636 och porten 3629 för den globala katalogen med
+LDAPS-skydd. Eftersom AD inte tillåter att ha flera krypteringsnivåer på en
+ensam förbindelse och vi fortfarande vill använda SASL/GSSAPI eller
+SASL/GSS-SPNEGO till autentisering är SASL-säkerhetsegenskapen maxssf satt
+till 0 (noll) för dessa förbindelser.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>ad_allow_remote_domain_local_groups (boolean)</term>
+                    <listitem>
+                        <para>
+                            Om detta alternativ är satt till <quote>sant</quote> kommer SSSD inte att
+filtrera ut domänlokala grupper från fjärrdomäner i AD-skogen. Som standard
+filtreras de ut t.ex. när man följer en nästad grupphierarki i fjärrdomäner
+för att de inte är giltiga i den lokala domänen. För att vara kompatibel med
+andra lösningar som gör AD-användare och -grupper tillgängliga i
+Linuxklienter lades detta alternativ till.
+                        </para>
+                        <para>
+                            Observera att sätta detta alternativ till <quote>sant</quote> kommer strida
+mot avsikten med domänlokala grupper i Active Directory och <emphasis>SKALL
+ENDAST ANVÄNDAS FÖR ATT MÖJLIGGÖRA MIGRERING FRÅN ANDRA
+LÖSNINGAR</emphasis>. Även om grruppen finns och användaren kan vara medlem
+av gruppen är avsikten att gruppen endast skall användas i domänen den är
+definierad och inte i några andra. Eftersom det endast finns en typ av
+POSIX-grupper är det enda sättet att uppnå detta på Linuxsidan att ignorera
+dessa grupper. Detta görs också av Active Directory som kan ses i PAC:en i
+Kerberosbiljetten för en lokal tjänst sller i tokenGroups-begäranden där
+också de domänlokala fjärrgrupperna saknas.
+                        </para>
+                        <para>
+                            Givet ovanstående kommentarer, om detta alternativ är satt till
+<quote>sant</quote> måste tokenGroups-begäranden avaktiveras genom att sätta
+<quote>ldap_use_tokengroups</quote> till <quote>falskt</quote> för att få
+konsistenta gruppmedlemskap för en användare. Dessutom skall uppslagningar i
+Global Catalog också hoppas över genom att sätta <quote>ad_enable_gc</quote>
+till <quote>falskt</quote>. Slutligen kan det vara nödvändigt att ändra
+<quote>ldap_group_nesting_level</quote> om de domänlokala fjärrgurpperna
+endast finns med en djupare nästningsnivå.
+                        </para>
+                        <para>
+                            Standard: False
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update (boolean)</term>
+                    <listitem>
+                        <para>
+                            Valfritt.  Detta alternativ säger till SSSD att automatiskt uppdatera
+DNS-servern i Active Directory med IP-adressen för denna klient.
+Uppdateringen säkras med GSS-TSIG.  Som en konsekvens av det behöver Active
+Directory-administratören bara tillåta säkra uppdateringar för DNS-zonen.
+IP-adressen för AD-LDAP-förbindelsen används för uppdateringar, om det inte
+specificeras på annat sätt med alternativet <quote>dyndns_iface</quote>.
+                        </para>
+                        <para>
+                            OBS: på äldre system (såsom RHEL 5) måste standardriket för Kerberos sättas
+i /etc/krb5.conf för att detta beteende skall fungera pålitligt
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_ttl (heltal)</term>
+                    <listitem>
+                        <para>
+                            TTL:en att använda för klientens DNS-post vid uppdatering.  Om dyndns_update
+är falsk har detta ingen effekt.  Detta kommer åsidosätta TTL på serversidan
+om det är satt av en administratör.
+                        </para>
+                        <para>
+                            Standard: 3600 (sekunder)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_iface (sträng)</term>
+                    <listitem>
+                        <para>
+                            Valfri.  Endast tillämpligt när dyndns_update är sann.  Välj gränssnittet
+eller en lista av gränssnitt vars IP-adresser skall användas för dynamiska
+DNS-uppdateringar.  Specialvärdet <quote>*</quote> betyder att IP:n från
+alla gränssnitt skall användas.
+                        </para>
+                        <para>
+                            Standard: använd IP-adresser för gränssnittet som används för AD
+LDAP-förbindelsen
+                        </para>
+                        <para>
+                            Exempel: dyndns_iface = em1, vnet1, vnet2
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_refresh_interval (heltal)</term>
+                    <listitem>
+                        <para>
+                            Hur ofta bakänden skall utföra periodiska DNS-uppdateringar utöver den
+automatiska uppdateringen som utförs när bakänden kopplar upp.  Detta
+alternativ är valfritt och tillämpligt endast när dyndns_update är sann.
+Observera att det lägsta möjliga värdet är 60 sekunder, ifall ett värde
+mindre än 60 ges kommer parametern endast anta det lägsta värdet.
+                        </para>
+                        <para>
+                            Standard: 86400 (24 timmar)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_ptr (bool)</term>
+                    <listitem>
+                        <para>
+                            Huruvida PTR-posten också skall uppdateras explicit när klientens DNS-post
+uppdateras.  Tillämpligt endast när dyndns_update är sann.
+                        </para>
+                        <para>
+                            Standard: True
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_force_tcp (bool)</term>
+                    <listitem>
+                        <para>
+                            Huruvida nsupdate-verktyget som standard skall använda TCP för kommunikation
+med DNS-servern.
+                        </para>
+                        <para>
+                            Standard: False (låt nsupdate välja protokollet)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth (sträng)</term>
+                    <listitem>
+                        <para>
+                            Huruvida verktyget nsupdate skall använda GSS-TSIG-autentisering för säkra
+uppdateringar av DNS-servern, osäkra uppdateringar kan skickas genom att
+sätta detta alternativ till ”none”.
+                        </para>
+                        <para>
+                            Standard: GSS-TSIG
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_auth_ptr (sträng)</term>
+                    <listitem>
+                        <para>
+                            Huruvida verktyget nsupdate skall använda GSS-TSIG-autentisering för säkra
+PTR-uppdateringar av DNS-servern, osäkra uppdateringar kan skickas genom att
+sätta detta alternativ till ”none”.
+                        </para>
+                        <para>
+                            Standard: samma som dyndns_auth
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_server (sträng)</term>
+                    <listitem>
+                        <para>
+                            DNS-servern som skall användas när en uppdatering av DNS utförs.  I de
+flesta uppsättningar rekommenderas det att låta detta alternativ vara osatt.
+                        </para>
+                        <para>
+                            Att sätta detta alternativ är meningsfullt i miljöer där DNS-servern är
+skild från identitetsservern.
+                        </para>
+                        <para>
+                            Observera att detta alternativ bara kommer användas i försök att falla
+tillbaka på när tidigare försök som använder automatiskt upptäckta
+inställningar misslyckas.
+                        </para>
+                        <para>
+                            Standard: Ingen (låt nsupdate välja servern)
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>dyndns_update_per_family (boolean)</term>
+                    <listitem>
+                        <para>
+                            DNS-uppdateringar utförs som standard i två steg – IPv4-uppdatering och
+sedan IPv6-uppdatering.  I några fall kan det vara önskvärt att utföra IPv4-
+och IPv6-uppdateringar i ett enda steg.
+                        </para>
+                        <para>
+                            Standard: true
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/override_homedir.xml" />
+                <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/homedir_substring.xml" />
+
+                <varlistentry>
+                    <term>krb5_confd_path (sträng)</term>
+                    <listitem>
+                        <para>
+                            Absolut sökväg till en katalog där SSSD skall placera konfigurationsstycken
+för Kerberos.
+                        </para>
+                        <para>
+                            För att förhindra att konfigurationsstycken skapas, sätt parametern till
+”none”.
+                        </para>
+                        <para>
+                            Standard: inte satt (underkatalogen krb5.include.d till SSSD:s
+pubconf-katalog)
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ad_modified_defaults.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/failover.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/service_discovery.xml" />
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/ldap_id_mapping.xml" />
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerat och att example.com
+är en av domänerna i avsnittet <replaceable>[sssd]</replaceable>.  Detta
+exempel visar endast alternativ som är specifika för leverantören AD.
+        </para>
+        <para>
+<programlisting>
+[domain/EXEMPEL]
+id_provider = ad
+auth_provider = ad
+access_provider = ad
+chpass_provider = ad
+
+ad_server = dc1.example.com
+ad_hostname = client.example.com
+ad_domain = example.com
+</programlisting>
+        </para>
+    </refsect1>
+
+    <refsect1 id='notes'>
+        <title>NOTER</title>
+        <para>
+            Leverantören AD av åtkomstkontroll kontrollerar om kontot har gått ut.  Det
+har samma effekt som följande konfiguration av LDAP-leverantören:
+<programlisting>
+access_provider = ldap
+ldap_access_order = expire
+ldap_account_expire_policy = ad
+</programlisting>
+        </para>
+        <para>
+            Dock, om inte åtkomstleverantören <quote>ad</quote> är konfigurerad explicit
+är standardåtkomstleverantören <quote>permit</quote>.  Observera att om man
+konfigurerar en annan åtkomstleverantör än <quote>ad</quote> behöver man
+sätta alla anslutningsparametrarna (såsom LDAP URI:er och
+krypteringsdetaljer) manuellt.
+        </para>
+        <para>
+            När autofs-leverantören är satt till <quote>ad</quote> används
+översättningen av schemaattribut enligt RFC2307 (nisMap, nisObject, …), för
+att dessa attribut inkluderas i standardschemat för Active Directory.
+        </para>
+        <para>
+        </para>
+    </refsect1>
+
+	<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

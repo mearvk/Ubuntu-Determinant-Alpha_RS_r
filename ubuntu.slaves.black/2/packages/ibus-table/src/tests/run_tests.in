@@ -1,0 +1,62 @@
+#!@PYTHON_BIN@
+
+# ibus-table - The Tables engine for IBus
+#
+# Copyright (c) 2018 Mike FABIAN <mfabian@redhat.com>
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library.  If not, see  <http://www.gnu.org/licenses/>
+
+import sys
+import os
+import unittest
+
+# pip3 install tap.py --user
+IMPORT_TAP_SUCCESSFUL = False
+try:
+    from tap import TAPTestRunner
+    IMPORT_TAP_SUCCESSFUL = True
+except (ImportError,):
+    pass
+
+if 'IBUS_TABLE_LOCATION' in os.environ:
+    location_path = os.environ['IBUS_TABLE_LOCATION']
+    if location_path != None and location_path != '':
+        engine_path = os.path.join(location_path, 'engine')
+        sys.path.append(engine_path)
+sys.path.append('@PKGDATADIR@/engine')
+
+# -- Load and run our unit tests ---------------------------------------------
+pattern = 'test*.py'
+start_dir = os.path.dirname(__file__)
+if len(sys.argv) > 1:
+    pattern = sys.argv[-1]
+    dir = os.path.dirname(pattern)
+    pattern = os.path.basename(pattern)
+    if dir != '.':
+        start_dir = os.path.join(start_dir, dir)
+loader = unittest.TestLoader()
+suite = loader.discover(start_dir=start_dir, pattern=pattern)
+
+if IMPORT_TAP_SUCCESSFUL:
+    runner = TAPTestRunner(stream=sys.stderr, verbosity=255)
+    runner.set_outdir('.')
+    runner.set_format('Hi: {method_name} - {short_description}')
+    runner.set_combined(True)
+else:
+    runner = unittest.TextTestRunner(stream=sys.stderr, verbosity=255)
+
+result = runner.run(suite)
+
+if result.failures or result.errors:
+    sys.exit(1)

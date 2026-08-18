@@ -1,0 +1,776 @@
+Description: Preserves some of the methods from the Files, ByteStreams
+ and CharStreams classes that were removed in Guava 18. This patch can be
+ removed once closure-compiler and gradle switch to Guava 18 or higher.
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/guava/src/com/google/common/io/ByteSink.java
++++ b/guava/src/com/google/common/io/ByteSink.java
+@@ -46,7 +46,7 @@
+  * @author Colin Decker
+  */
+ @GwtIncompatible
+-public abstract class ByteSink {
++public abstract class ByteSink implements OutputSupplier<OutputStream> {
+ 
+   /** Constructor for use by subclasses. */
+   protected ByteSink() {}
+@@ -70,6 +70,21 @@
+   public abstract OutputStream openStream() throws IOException;
+ 
+   /**
++   * This method is a temporary method provided for easing migration from suppliers to sources and
++   * sinks.
++   *
++   * @since 15.0
++   * @deprecated This method is only provided for temporary compatibility with the
++   *     {@link OutputSupplier} interface and should not be called directly. Use
++   *     {@link #openStream} instead. This method is scheduled for removal in Guava 18.0.
++   */
++  @Override
++  @Deprecated
++  public final OutputStream getOutput() throws IOException {
++    return openStream();
++  }
++
++  /**
+    * Opens a new buffered {@link OutputStream} for writing to this sink. The returned stream is not
+    * required to be a {@link BufferedOutputStream} in order to allow implementations to simply
+    * delegate to {@link #openStream()} when the stream returned by that method does not benefit from
+--- a/guava/src/com/google/common/io/ByteSource.java
++++ b/guava/src/com/google/common/io/ByteSource.java
+@@ -61,7 +61,7 @@
+  * @author Colin Decker
+  */
+ @GwtIncompatible
+-public abstract class ByteSource {
++public abstract class ByteSource implements InputSupplier<InputStream> {
+ 
+   /** Constructor for use by subclasses. */
+   protected ByteSource() {}
+@@ -90,6 +90,21 @@
+   public abstract InputStream openStream() throws IOException;
+ 
+   /**
++   * This method is a temporary method provided for easing migration from suppliers to sources and
++   * sinks.
++   *
++   * @since 15.0
++   * @deprecated This method is only provided for temporary compatibility with the
++   *     {@link InputSupplier} interface and should not be called directly. Use {@link #openStream}
++   *     instead. This method is scheduled for removal in Guava 18.0.
++   */
++  @Override
++  @Deprecated
++  public final InputStream getInput() throws IOException {
++    return openStream();
++  }
++
++  /**
+    * Opens a new buffered {@link InputStream} for reading from this source. The returned stream is
+    * not required to be a {@link BufferedInputStream} in order to allow implementations to simply
+    * delegate to {@link #openStream()} when the stream returned by that method does not benefit from
+--- a/guava/src/com/google/common/io/ByteStreams.java
++++ b/guava/src/com/google/common/io/ByteStreams.java
+@@ -21,6 +21,8 @@
+ 
+ import com.google.common.annotations.Beta;
+ import com.google.common.annotations.GwtIncompatible;
++import com.google.common.base.Function;
++import com.google.common.collect.Iterables;
+ import com.google.common.math.IntMath;
+ import com.google.errorprone.annotations.CanIgnoreReturnValue;
+ import java.io.ByteArrayInputStream;
+@@ -91,6 +93,38 @@
+   private ByteStreams() {}
+ 
+   /**
++   * Returns a factory that will supply instances of
++   * {@link ByteArrayInputStream} that read from the given byte array.
++   *
++   * @param b the input buffer
++   * @return the factory
++   * @deprecated Use {@link ByteSource#wrap(byte[])} instead. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
++      byte[] b) {
++    return asInputSupplier(ByteSource.wrap(b));
++  }
++
++  /**
++   * Returns a factory that will supply instances of
++   * {@link ByteArrayInputStream} that read from the given byte array.
++   *
++   * @param b the input buffer
++   * @param off the offset in the buffer of the first byte to read
++   * @param len the maximum number of bytes to read from the buffer
++   * @return the factory
++   * @deprecated Use {@code ByteSource.wrap(b).slice(off, len)} instead. This
++   *     method is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
++      final byte[] b, final int off, final int len) {
++    return asInputSupplier(ByteSource.wrap(b).slice(off, len));
++  }
++
++  /**
+    * Copies all bytes from the input stream to the output stream. Does not close or flush either
+    * stream.
+    *
+@@ -926,4 +960,141 @@
+     }
+     return total;
+   }
++
++  /**
++   * Returns an {@link InputSupplier} that returns input streams from the
++   * an underlying supplier, where each stream starts at the given
++   * offset and is limited to the specified number of bytes.
++   *
++   * @param supplier the supplier from which to get the raw streams
++   * @param offset the offset in bytes into the underlying stream where
++   *     the returned streams will start
++   * @param length the maximum length of the returned streams
++   * @throws IllegalArgumentException if offset or length are negative
++   * @deprecated Use {@link ByteSource#slice(int, int)} instead. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<InputStream> slice(
++      final InputSupplier<? extends InputStream> supplier,
++      final long offset,
++      final long length) {
++    return asInputSupplier(asByteSource(supplier).slice(offset, length));
++  }
++
++  /**
++   * Joins multiple {@link InputStream} suppliers into a single supplier.
++   * Streams returned from the supplier will contain the concatenated data from
++   * the streams of the underlying suppliers.
++   *
++   * <p>Only one underlying input stream will be open at a time. Closing the
++   * joined stream will close the open underlying stream.
++   *
++   * <p>Reading from the joined stream will throw a {@link NullPointerException}
++   * if any of the suppliers are null or return null.
++   *
++   * @param suppliers the suppliers to concatenate
++   * @return a supplier that will return a stream containing the concatenated
++   *     stream data
++   * @deprecated Use {@link ByteSource#concat(Iterable)} instead. This method
++   *     is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<InputStream> join(
++      final Iterable<? extends InputSupplier<? extends InputStream>> suppliers) {
++    checkNotNull(suppliers);
++    Iterable<ByteSource> sources = Iterables.transform(suppliers,
++        new Function<InputSupplier<? extends InputStream>, ByteSource>() {
++          @Override
++          public ByteSource apply(InputSupplier<? extends InputStream> input) {
++            return asByteSource(input);
++          }
++        });
++    return asInputSupplier(ByteSource.concat(sources));
++  }
++
++  /**
++   * Varargs form of {@link #join(Iterable)}.
++   *
++   * @deprecated Use {@link ByteSource#concat(ByteSource[])} instead. This
++   *     method is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  @SuppressWarnings("unchecked") // suppress "possible heap pollution" warning in JDK7
++  public static InputSupplier<InputStream> join(
++      InputSupplier<? extends InputStream>... suppliers) {
++    return join(Arrays.asList(suppliers));
++  }
++
++  /**
++   * Returns a view of the given {@code InputStream} supplier as a
++   * {@code ByteSource}.
++   *
++   * <p>This method is a temporary method provided for easing migration from
++   * suppliers to sources and sinks.
++   *
++   * @since 15.0
++   * @deprecated Convert all {@code InputSupplier<? extends InputStream>}
++   *     implementations to extend {@link ByteSource} or provide a method for
++   *     viewing the object as a {@code ByteSource}. This method is scheduled
++   *     for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static ByteSource asByteSource(
++      final InputSupplier<? extends InputStream> supplier) {
++    checkNotNull(supplier);
++    return new ByteSource() {
++      @Override
++      public InputStream openStream() throws IOException {
++        return supplier.getInput();
++      }
++
++      @Override
++      public String toString() {
++        return "ByteStreams.asByteSource(" + supplier + ")";
++      }
++    };
++  }
++
++  /**
++   * Returns a view of the given {@code OutputStream} supplier as a
++   * {@code ByteSink}.
++   *
++   * <p>This method is a temporary method provided for easing migration from
++   * suppliers to sources and sinks.
++   *
++   * @since 15.0
++   * @deprecated Convert all {@code OutputSupplier<? extends OutputStream>}
++   *     implementations to extend {@link ByteSink} or provide a method for
++   *     viewing the object as a {@code ByteSink}. This method is scheduled
++   *     for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static ByteSink asByteSink(
++      final OutputSupplier<? extends OutputStream> supplier) {
++    checkNotNull(supplier);
++    return new ByteSink() {
++      @Override
++      public OutputStream openStream() throws IOException {
++        return supplier.getOutput();
++      }
++
++      @Override
++      public String toString() {
++        return "ByteStreams.asByteSink(" + supplier + ")";
++      }
++    };
++  }
++
++  @SuppressWarnings("unchecked") // used internally where known to be safe
++  static <S extends InputStream> InputSupplier<S> asInputSupplier(
++      final ByteSource source) {
++    return (InputSupplier) checkNotNull(source);
++  }
++
++  @SuppressWarnings("unchecked") // used internally where known to be safe
++  static <S extends OutputStream> OutputSupplier<S> asOutputSupplier(
++      final ByteSink sink) {
++    return (OutputSupplier) checkNotNull(sink);
++  }
+ }
+--- a/guava/src/com/google/common/io/CharSink.java
++++ b/guava/src/com/google/common/io/CharSink.java
+@@ -51,7 +51,7 @@
+  * @author Colin Decker
+  */
+ @GwtIncompatible
+-public abstract class CharSink {
++public abstract class CharSink implements OutputSupplier<Writer> {
+ 
+   /** Constructor for use by subclasses. */
+   protected CharSink() {}
+@@ -67,6 +67,21 @@
+   public abstract Writer openStream() throws IOException;
+ 
+   /**
++   * This method is a temporary method provided for easing migration from suppliers to sources and
++   * sinks.
++   *
++   * @since 15.0
++   * @deprecated This method is only provided for temporary compatibility with the
++   *     {@link OutputSupplier} interface and should not be called directly. Use
++   *     {@link #openStream} instead. This method is scheduled for removal in Guava 18.0.
++   */
++  @Override
++  @Deprecated
++  public final Writer getOutput() throws IOException {
++    return openStream();
++  }
++
++  /**
+    * Opens a new buffered {@link Writer} for writing to this sink. The returned stream is not
+    * required to be a {@link BufferedWriter} in order to allow implementations to simply delegate to
+    * {@link #openStream()} when the stream returned by that method does not benefit from additional
+--- a/guava/src/com/google/common/io/CharSource.java
++++ b/guava/src/com/google/common/io/CharSource.java
+@@ -69,7 +69,7 @@
+  * @author Colin Decker
+  */
+ @GwtIncompatible
+-public abstract class CharSource {
++public abstract class CharSource implements InputSupplier<Reader> {
+ 
+   /** Constructor for use by subclasses. */
+   protected CharSource() {}
+@@ -101,6 +101,21 @@
+   public abstract Reader openStream() throws IOException;
+ 
+   /**
++   * This method is a temporary method provided for easing migration from suppliers to sources and
++   * sinks.
++   *
++   * @since 15.0
++   * @deprecated This method is only provided for temporary compatibility with the
++   *     {@link InputSupplier} interface and should not be called directly. Use {@link #openStream}
++   *     instead. This method is scheduled for removal in Guava 18.0.
++   */
++  @Override
++  @Deprecated
++  public final Reader getInput() throws IOException {
++    return openStream();
++  }
++
++  /**
+    * Opens a new {@link BufferedReader} for reading from this source. This method returns a new,
+    * independent reader each time it is called.
+    *
+--- a/guava/src/com/google/common/io/CharStreams.java
++++ b/guava/src/com/google/common/io/CharStreams.java
+@@ -23,9 +23,15 @@
+ import java.io.Closeable;
+ import java.io.EOFException;
+ import java.io.IOException;
++import java.io.InputStream;
++import java.io.InputStreamReader;
++import java.io.OutputStream;
++import java.io.OutputStreamWriter;
+ import java.io.Reader;
++import java.io.StringReader;
+ import java.io.Writer;
+ import java.nio.CharBuffer;
++import java.nio.charset.Charset;
+ import java.util.ArrayList;
+ import java.util.List;
+ import org.checkerframework.checker.nullness.qual.Nullable;
+@@ -58,6 +64,57 @@
+   private CharStreams() {}
+ 
+   /**
++   * Returns a factory that will supply instances of {@link StringReader} that
++   * read a string value.
++   *
++   * @param value the string to read
++   * @return the factory
++   * @deprecated Use {@link CharSource#wrap(CharSequence)} instead. This method
++   *     is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<StringReader> newReaderSupplier(
++      final String value) {
++    return asInputSupplier(CharSource.wrap(value));
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link InputStreamReader},
++   * using the given {@link InputStream} factory and character set.
++   *
++   * @param in the factory that will be used to open input streams
++   * @param charset the charset used to decode the input stream; see {@link
++   *     Charsets} for helpful predefined constants
++   * @return the factory
++   * @deprecated Use {@link ByteSource#asCharSource(Charset)} instead. This
++   *     method is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<InputStreamReader> newReaderSupplier(
++      final InputSupplier<? extends InputStream> in, final Charset charset) {
++    return asInputSupplier(
++        ByteStreams.asByteSource(in).asCharSource(charset));
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link OutputStreamWriter},
++   * using the given {@link OutputStream} factory and character set.
++   *
++   * @param out the factory that will be used to open output streams
++   * @param charset the charset used to encode the output stream; see {@link
++   *     Charsets} for helpful predefined constants
++   * @return the factory
++   * @deprecated Use {@link ByteSink#asCharSink(Charset)} instead. This method
++   *     is scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static OutputSupplier<OutputStreamWriter> newWriterSupplier(
++      final OutputSupplier<? extends OutputStream> out, final Charset charset) {
++    return asOutputSupplier(
++        ByteStreams.asByteSink(out).asCharSink(charset));
++  }
++
++  /**
+    * Copies all characters between the {@link Readable} and {@link Appendable} objects. Does not
+    * close or flush either object.
+    *
+@@ -183,6 +240,49 @@
+   }
+ 
+   /**
++   * Reads the first line from a {@link Readable} & {@link Closeable} object
++   * supplied by a factory. The line does not include line-termination
++   * characters, but does include other leading and trailing whitespace.
++   *
++   * @param supplier the factory to read from
++   * @return the first line, or null if the reader is empty
++   * @throws IOException if an I/O error occurs
++   * @deprecated Use {@link CharSource#readFirstLine()} instead. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static <R extends Readable & Closeable> String readFirstLine(
++      InputSupplier<R> supplier) throws IOException {
++    return asCharSource(supplier).readFirstLine();
++  }
++
++  /**
++   * Reads all of the lines from a {@link Readable} & {@link Closeable} object
++   * supplied by a factory. The lines do not include line-termination
++   * characters, but do include other leading and trailing whitespace.
++   *
++   * @param supplier the factory to read from
++   * @return a mutable {@link List} containing all the lines
++   * @throws IOException if an I/O error occurs
++   * @deprecated Use {@link CharSource#readLines()} instead, but note that it
++   *     returns an {@code ImmutableList}. This method is scheduled for removal
++   *     in Guava 18.0.
++   */
++  @Deprecated
++  public static <R extends Readable & Closeable> List<String> readLines(
++      InputSupplier<R> supplier) throws IOException {
++    Closer closer = Closer.create();
++    try {
++      R r = closer.register(supplier.getInput());
++      return readLines(r);
++    } catch (Throwable e) {
++      throw closer.rethrow(e);
++    } finally {
++      closer.close();
++    }
++  }
++
++  /**
+    * Reads all of the lines from a {@link Readable} object. The lines do not include
+    * line-termination characters, but do include other leading and trailing whitespace.
+    *
+@@ -349,4 +449,103 @@
+     }
+     return new AppendableWriter(target);
+   }
++
++  // TODO(cgdecker): Remove these once Input/OutputSupplier methods are removed
++
++  static Reader asReader(final Readable readable) {
++    checkNotNull(readable);
++    if (readable instanceof Reader) {
++      return (Reader) readable;
++    }
++    return new Reader() {
++      @Override
++      public int read(char[] cbuf, int off, int len) throws IOException {
++        return read(CharBuffer.wrap(cbuf, off, len));
++      }
++
++      @Override
++      public int read(CharBuffer target) throws IOException {
++        return readable.read(target);
++      }
++
++      @Override
++      public void close() throws IOException {
++        if (readable instanceof Closeable) {
++          ((Closeable) readable).close();
++        }
++      }
++    };
++  }
++
++  /**
++   * Returns a view of the given {@code Readable} supplier as a
++   * {@code CharSource}.
++   *
++   * <p>This method is a temporary method provided for easing migration from
++   * suppliers to sources and sinks.
++   *
++   * @since 15.0
++   * @deprecated Convert all {@code InputSupplier<? extends Readable>}
++   *     implementations to extend {@link CharSource} or provide a method for
++   *     viewing the object as a {@code CharSource}. This method is scheduled
++   *     for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static CharSource asCharSource(
++      final InputSupplier<? extends Readable> supplier) {
++    checkNotNull(supplier);
++    return new CharSource() {
++      @Override
++      public Reader openStream() throws IOException {
++        return asReader(supplier.getInput());
++      }
++
++      @Override
++      public String toString() {
++        return "CharStreams.asCharSource(" + supplier + ")";
++      }
++    };
++  }
++
++  /**
++   * Returns a view of the given {@code Appendable} supplier as a
++   * {@code CharSink}.
++   *
++   * <p>This method is a temporary method provided for easing migration from
++   * suppliers to sources and sinks.
++   *
++   * @since 15.0
++   * @deprecated Convert all {@code OutputSupplier<? extends Appendable>}
++   *     implementations to extend {@link CharSink} or provide a method for
++   *     viewing the object as a {@code CharSink}. This method is scheduled
++   *     for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static CharSink asCharSink(
++      final OutputSupplier<? extends Appendable> supplier) {
++    checkNotNull(supplier);
++    return new CharSink() {
++      @Override
++      public Writer openStream() throws IOException {
++        return asWriter(supplier.getOutput());
++      }
++
++      @Override
++      public String toString() {
++        return "CharStreams.asCharSink(" + supplier + ")";
++      }
++    };
++  }
++
++  @SuppressWarnings("unchecked") // used internally where known to be safe
++  static <R extends Reader> InputSupplier<R> asInputSupplier(
++      CharSource source) {
++    return (InputSupplier) checkNotNull(source);
++  }
++
++  @SuppressWarnings("unchecked") // used internally where known to be safe
++  static <W extends Writer> OutputSupplier<W> asOutputSupplier(
++      CharSink sink) {
++    return (OutputSupplier) checkNotNull(sink);
++  }
+ }
+--- a/guava/src/com/google/common/io/Files.java
++++ b/guava/src/com/google/common/io/Files.java
+@@ -222,6 +222,114 @@
+   }
+ 
+   /**
++   * Returns a factory that will supply instances of {@link FileInputStream}
++   * that read from a file.
++   *
++   * @param file the file to read from
++   * @return the factory
++   * @deprecated Use {@link #asByteSource(File)}. This method is scheduled for
++   *     removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<FileInputStream> newInputStreamSupplier(
++      final File file) {
++    return ByteStreams.asInputSupplier(asByteSource(file));
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link FileOutputStream}
++   * that write to a file.
++   *
++   * @param file the file to write to
++   * @return the factory
++   * @deprecated Use {@link #asByteSink(File)}. This method is scheduled for
++   *     removal in Guava 18.0.
++   */
++  @Deprecated
++  public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
++      File file) {
++    return newOutputStreamSupplier(file, false);
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link FileOutputStream}
++   * that write to or append to a file.
++   *
++   * @param file the file to write to
++   * @param append if true, the encoded characters will be appended to the file;
++   *     otherwise the file is overwritten
++   * @return the factory
++   * @deprecated Use {@link #asByteSink(File, FileWriteMode...)}, passing
++   *     {@link FileWriteMode#APPEND} for append. This method is scheduled for
++   *     removal in Guava 18.0.
++   */
++  @Deprecated
++  public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
++      final File file, final boolean append) {
++    return ByteStreams.asOutputSupplier(asByteSink(file, modes(append)));
++  }
++
++  private static FileWriteMode[] modes(boolean append) {
++    return append
++        ? new FileWriteMode[]{ FileWriteMode.APPEND }
++        : new FileWriteMode[0];
++  }
++
++  /**
++   * Returns a factory that will supply instances of
++   * {@link InputStreamReader} that read a file using the given character set.
++   *
++   * @param file the file to read from
++   * @param charset the charset used to decode the input stream; see {@link
++   *     Charsets} for helpful predefined constants
++   * @return the factory
++   * @deprecated Use {@link #asCharSource(File, Charset)}. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static InputSupplier<InputStreamReader> newReaderSupplier(File file,
++      Charset charset) {
++    return CharStreams.asInputSupplier(asCharSource(file, charset));
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link OutputStreamWriter}
++   * that write to a file using the given character set.
++   *
++   * @param file the file to write to
++   * @param charset the charset used to encode the output stream; see {@link
++   *     Charsets} for helpful predefined constants
++   * @return the factory
++   * @deprecated Use {@link #asCharSink(File, Charset)}. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
++      Charset charset) {
++    return newWriterSupplier(file, charset, false);
++  }
++
++  /**
++   * Returns a factory that will supply instances of {@link OutputStreamWriter}
++   * that write to or append to a file using the given character set.
++   *
++   * @param file the file to write to
++   * @param charset the charset used to encode the output stream; see {@link
++   *     Charsets} for helpful predefined constants
++   * @param append if true, the encoded characters will be appended to the file;
++   *     otherwise the file is overwritten
++   * @return the factory
++   * @deprecated Use {@link #asCharSink(File, Charset, FileWriteMode...)},
++   *     passing {@link FileWriteMode#APPEND} for append. This method is
++   *     scheduled for removal in Guava 18.0.
++   */
++  @Deprecated
++  public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
++      Charset charset, boolean append) {
++    return CharStreams.asOutputSupplier(asCharSink(file, charset, modes(append)));
++  }
++
++  /**
+    * Reads all bytes from a file into a byte array.
+    *
+    * <p><b>{@link java.nio.file.Path} equivalent:</b> {@link java.nio.file.Files#readAllBytes}.
+--- /dev/null
++++ b/guava/src/com/google/common/io/InputSupplier.java
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2007 The Guava Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.common.io;
++
++import java.io.IOException;
++
++/**
++ * A factory for readable streams of bytes or characters.
++ *
++ * @author Chris Nokleberg
++ * @since 1.0
++ * @deprecated For {@code InputSupplier<? extends InputStream>}, use
++ *     {@link ByteSource} instead. For {@code InputSupplier<? extends Reader>},
++ *     use {@link CharSource}. Implementations of {@code InputSupplier} that
++ *     don't fall into one of those categories do not benefit from any of the
++ *     methods in {@code common.io} and should use a different interface. This
++ *     interface is scheduled for removal in December 2015.
++ */
++@Deprecated
++public interface InputSupplier<T> {
++
++  /**
++   * Returns an object that encapsulates a readable resource.
++   * <p>
++   * Like {@link Iterable#iterator}, this method may be called repeatedly to
++   * get independent channels to the same underlying resource.
++   * <p>
++   * Where the channel maintains a position within the resource, moving that
++   * cursor within one channel should not affect the starting position of
++   * channels returned by other calls.
++   */
++  T getInput() throws IOException;
++}
+--- /dev/null
++++ b/guava/src/com/google/common/io/OutputSupplier.java
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2007 The Guava Authors
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.google.common.io;
++
++import java.io.IOException;
++
++/**
++ * A factory for writable streams of bytes or characters.
++ *
++ * @author Chris Nokleberg
++ * @since 1.0
++ * @deprecated For {@code OutputSupplier<? extends OutputStream>}, use
++ *     {@link ByteSink} instead. For {@code OutputSupplier<? extends Writer>},
++ *     use {@link CharSink}. Implementations of {@code OutputSupplier} that
++ *     don't fall into one of those categories do not benefit from any of the
++ *     methods in {@code common.io} and should use a different interface. This
++ *     interface is scheduled for removal in December 2015.
++ */
++@Deprecated
++public interface OutputSupplier<T> {
++
++  /**
++   * Returns an object that encapsulates a writable resource.
++   * <p>
++   * Like {@link Iterable#iterator}, this method may be called repeatedly to
++   * get independent channels to the same underlying resource.
++   * <p>
++   * Where the channel maintains a position within the resource, moving that
++   * cursor within one channel should not affect the starting position of
++   * channels returned by other calls.
++   */
++  T getOutput() throws IOException;
++}

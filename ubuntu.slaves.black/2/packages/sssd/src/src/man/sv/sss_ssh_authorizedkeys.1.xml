@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sss_ssh_authorizedkeys</refentrytitle>
+        <manvolnum>1</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sss_ssh_authorizedkeys</refname>
+        <refpurpose>hämta auktoriserade OpenSSH-nycklar</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>sss_ssh_authorizedkeys</command> <arg choice='opt'>
+<replaceable>flaggor</replaceable> </arg> <arg
+choice='plain'><replaceable>ANVÄNDARE</replaceable></arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            <command>sss_ssh_authorizedkeys</command> hämtar publika SSH-nycklar för
+användaren <replaceable>ANVÄNDARE</replaceable> och skriver ut dem i
+formatet för OpenSSH authorized_keys (se avsnittet
+<quote>AUTHORIZED_KEYS-FILFORMAT</quote> i
+<citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> för mer information).
+        </para>
+        <para>
+            <citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> kan konfigureras till att använda
+<command>sss_ssh_authorizedkeys</command> för autentisering med användares
+publika nyckel om den är kompilerad med stöd för alternativet
+<quote>AuthorizedKeysCommand</quote>.  Se manualsidan <citerefentry>
+<refentrytitle>sshd_config</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för mer detaljer om detta
+alternativ.
+        </para>
+        <para>
+            Om <quote>AuthorizedKeysCommand</quote> stödjs kan
+<citerefentry><refentrytitle>sshd</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> konfigureras för att använda den
+genom att lägga in följande direktiv <citerefentry>
+<refentrytitle>sshd_config</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry>: <programlisting>
+  AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+  AuthorizedKeysCommandUser nobody
+</programlisting>
+        </para>
+
+    <refsect2 id='cert_keys'>
+        <title>NYCKLAR FRÅN CERTIFIKAT</title>
+        <para>
+            Utöver de publika SSH-nycklarna för användaren
+<replaceable>ANVÄNDARE</replaceable> kan
+<command>sss_ssh_authorizedkeys</command> även returnera publika SSH-nycklar
+härledda från den publika nyckeln i ett X.509-certifikat.
+        </para>
+        <para>
+            För att aktivera detta måste alternativet
+<quote>ssh_use_certificate_keys</quote> sättas till true (standard) i
+avsnittet [ssh] av <filename>sssd.conf</filename>.  Om användarposten
+innehåller certifikat (se <quote>ldap_user_certificate</quote> i
+<citerefentry><refentrytitle>sssd-ldap</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för detaljer) eller det finns ett
+certifikat i en åsidosättande post för användaren (se
+<citerefentry><refentrytitle>sss_override</refentrytitle>
+<manvolnum>8</manvolnum></citerefentry> eller
+<citerefentry><refentrytitle>sssd-ipa</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för detaljer) och certifikatet är
+giltigt kommer SSSD extrahera den publika nyckeln från certifikatet och
+konvertera den till formatet som sshd förväntar sig.
+        </para>
+        <para>
+            Vid sidan av <quote>ssh_use_certificate_keys</quote> kan alternativen
+            <itemizedlist>
+                <listitem><para>ca_db</para></listitem>
+                <listitem><para>p11_child_timeout</para></listitem>
+                <listitem><para>certificate_verification</para></listitem>
+            </itemizedlist>
+            användas för att styra hur certifikaten valideras (se
+<citerefentry><refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum></citerefentry> för detaljer).
+        </para>
+        <para>
+            Valideringen är fördelen med att använda X.509-certifikat istället för att
+använda SSH-nycklar direkt för att det t.ex. ger en bättre kontroll över
+livslängden hos nycklarna.  När ssh-klienten är konfigurerad att använda de
+privata nycklarna från ett smartkort med hjälp av det delade
+PKCS#11-biblioteket (se <citerefentry><refentrytitle>ssh</refentrytitle>
+<manvolnum>1</manvolnum></citerefentry> för detaljer) kan det vara
+irriterande att autentiseringen fortfarande fungerar även om det tillhörande
+X.509-certifikatet på smartkortet redan har gått ut eftersom varken
+<command>ssh</command> eller <command>sshd</command> kommer titta på
+certifikatet över huvud taget.
+        </para>
+        <para>
+            Det måste påpekas att den härledda publika SSH-nyckeln fortfarande kan
+läggas till i användarens fil <filename>authorized_keys</filename> för att
+gå runt certifikatvalideringen om konfigurationen av <command>sshd</command>
+tillåter detta.
+        </para>
+    </refsect2>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>FLAGGOR</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>-d</option>,<option>--domain</option>
+<replaceable>DOMÄN</replaceable>
+                </term>
+                <listitem>
+                    <para>
+                        Sök efter användares publika nycklar i SSSD-domänen
+<replaceable>DOMÄN</replaceable>.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/param_help.xml" />
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='exit_status'>
+        <title>SLUTSTATUS</title>
+        <para>
+            Om det lyckas returneras 0 som slutstatus.  Annars returneras 1.
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

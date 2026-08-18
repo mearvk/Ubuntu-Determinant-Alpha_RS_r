@@ -1,0 +1,43 @@
+Author: Apollon Oikonomopoulos <apoikos@debian.org>
+Description: Do not build hibernate, prometheus and micrometer bindings
+Last-Update: 2017-09-13
+Forwarded: no (debain-specific)
+--- a/pom.xml
++++ b/pom.xml
+@@ -367,6 +367,11 @@
+                   <source>1.8</source>
+                   <target>1.8</target>
+                   <compilerArgs>-Xlint</compilerArgs>
++		  <excludes>
++		      <exclude>**/com/zaxxer/hikari/metrics/prometheus/**</exclude>
++		      <exclude>**/com/zaxxer/hikari/metrics/micrometer/**</exclude>
++		      <exclude>**/com/zaxxer/hikari/hibernate/**</exclude>
++		  </excludes>
+                </configuration>
+             </plugin>
+ 
+--- a/src/main/java/com/zaxxer/hikari/pool/HikariPool.java
++++ b/src/main/java/com/zaxxer/hikari/pool/HikariPool.java
+@@ -24,12 +24,10 @@
+ import com.zaxxer.hikari.metrics.PoolStats;
+ import com.zaxxer.hikari.metrics.dropwizard.CodahaleHealthChecker;
+ import com.zaxxer.hikari.metrics.dropwizard.CodahaleMetricsTrackerFactory;
+-import com.zaxxer.hikari.metrics.micrometer.MicrometerMetricsTrackerFactory;
+ import com.zaxxer.hikari.util.ConcurrentBag;
+ import com.zaxxer.hikari.util.ConcurrentBag.IBagStateListener;
+ import com.zaxxer.hikari.util.SuspendResumeLock;
+ import com.zaxxer.hikari.util.UtilityElf.DefaultThreadFactory;
+-import io.micrometer.core.instrument.MeterRegistry;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+@@ -276,9 +274,6 @@
+       if (metricRegistry != null && safeIsAssignableFrom(metricRegistry, "com.codahale.metrics.MetricRegistry")) {
+          setMetricsTrackerFactory(new CodahaleMetricsTrackerFactory((MetricRegistry) metricRegistry));
+       }
+-      else if (metricRegistry != null && safeIsAssignableFrom(metricRegistry, "io.micrometer.core.instrument.MeterRegistry")) {
+-         setMetricsTrackerFactory(new MicrometerMetricsTrackerFactory((MeterRegistry) metricRegistry));
+-      }
+       else {
+          setMetricsTrackerFactory(null);
+       }

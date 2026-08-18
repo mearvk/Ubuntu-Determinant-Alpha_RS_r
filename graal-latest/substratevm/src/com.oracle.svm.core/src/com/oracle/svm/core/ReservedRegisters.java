@@ -1,0 +1,123 @@
+/*
+ * Copyright (c) 2020, 2025, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core;
+
+import org.graalvm.nativeimage.ImageSingletons;
+import org.graalvm.nativeimage.Isolate;
+import org.graalvm.nativeimage.IsolateThread;
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.Platforms;
+
+import com.oracle.svm.core.graal.nodes.ReadReservedRegisterFixedNode;
+import com.oracle.svm.core.graal.nodes.ReadReservedRegisterFloatingNode;
+import com.oracle.svm.core.meta.SharedMethod;
+
+import jdk.graal.compiler.api.replacements.Fold;
+import jdk.graal.compiler.nodes.StructuredGraph;
+import jdk.vm.ci.code.Register;
+import jdk.vm.ci.code.RegisterValue;
+import jdk.vm.ci.meta.JavaValue;
+
+public abstract class ReservedRegisters {
+
+    @Fold
+    public static ReservedRegisters singleton() {
+        return ImageSingletons.lookup(ReservedRegisters.class);
+    }
+
+    protected final Register frameRegister;
+    protected final Register threadRegister;
+    protected final Register heapBaseRegister;
+    protected final Register codeBaseRegister;
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    protected ReservedRegisters(Register frameRegister, Register threadRegister, Register heapBaseRegister, Register codeBaseRegisterCandidate) {
+        this.frameRegister = frameRegister;
+        this.threadRegister = threadRegister;
+        this.heapBaseRegister = heapBaseRegister;
+        this.codeBaseRegister = SubstrateOptions.useRelativeCodePointers() ? codeBaseRegisterCandidate : null;
+    }
+
+    /**
+     * Returns the register used as the frame pointer.
+     */
+    public Register getFrameRegister() {
+        return frameRegister;
+    }
+
+    /**
+     * Returns the register that contains the current {@link IsolateThread}; or null if no thread
+     * register is used.
+     */
+    public Register getThreadRegister() {
+        return threadRegister;
+    }
+
+    /** Returns the register holding the heap base address of the current {@link Isolate}. */
+    public Register getHeapBaseRegister() {
+        return heapBaseRegister;
+    }
+
+    /**
+     * Returns the register holding the code base address for method pointers, or {@code null} if no
+     * code base register is used.
+     */
+    public Register getCodeBaseRegister() {
+        return codeBaseRegister;
+    }
+
+    /**
+     * Returns true if the provided value is a {@link RegisterValue} for a reserved register that is
+     * allowed to be in a frame state, i.e., for a reserved register that can be handled by
+     * deoptimization.
+     */
+    public boolean isAllowedInFrameState(JavaValue value) {
+        if (value instanceof RegisterValue rv) {
+            Register r = rv.getRegister();
+            return r.equals(threadRegister) || r.equals(heapBaseRegister) || r.equals(codeBaseRegister);
+        }
+        return false;
+    }
+
+    public boolean isReservedRegister(Register r) {
+        return r.equals(frameRegister) || r.equals(heapBaseRegister) || r.equals(threadRegister) || r.equals(codeBaseRegister);
+    }
+
+    /**
+     * Determines whether a graph must use fixed read nodes for a reserved register or can use
+     * floating reads instead.
+     *
+     * A floating node to access the register is more efficient: it allows value numbering of
+     * multiple accesses, including floating nodes that use it as an input. But for deoptimization
+     * target methods, we must not do value numbering because there is no proxying at deoptimization
+     * entry points for this node, so the value is not restored during deoptimization.
+     *
+     * @see ReadReservedRegisterFixedNode
+     * @see ReadReservedRegisterFloatingNode
+     */
+    public boolean mustUseFixedRead(StructuredGraph graph) {
+        return graph.method() instanceof SharedMethod m && m.isDeoptTarget();
+    }
+}

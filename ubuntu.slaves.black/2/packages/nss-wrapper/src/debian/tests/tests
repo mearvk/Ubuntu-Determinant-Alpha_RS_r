@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e -u
+cp -a . "$ADTTMP"
+cd "$ADTTMP"
+rm -rf obj debian
+mkdir obj
+cd obj
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    cat <<EOF > "$ADTTMP/toolchain.cmake"
+set(CMAKE_C_COMPILER $DEB_HOST_GNU_TYPE-gcc)
+set(CMAKE_CXX_COMPILER $DEB_HOST_GNU_TYPE-g++)
+set(PKG_CONFIG_EXECUTABLE $DEB_HOST_GNU_TYPE-pkg-config)
+EOF
+    CCFILE=-DCMAKE_TOOLCHAIN_FILE="$ADTTMP/toolchain.cmake"
+else
+    CCFILE=
+fi
+
+cmake "$CCFILE" -DUNIT_TESTING=1 .. 
+make -C tests/
+cd tests
+sed -e 's#\(LD_PRELOAD=\)[^;]*/\(libnss_wrapper.so\)#\1\2#' -i CTestTestfile.cmake
+make test

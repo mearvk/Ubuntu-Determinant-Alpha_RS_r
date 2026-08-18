@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildtools.mk
+export DEB_CFLAGS_MAINT_APPEND = -fno-lto
+export DEB_CXXFLAGS_MAINT_APPEND = -fno-lto
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+else
+NUMJOBS = 1
+endif
+
+CONFIGURE_OPTIONS = $(if $(filter linux,$(DEB_HOST_ARCH_OS)),--alsa --dbus)
+CONFIGURE_OPTIONS += $(if $(filter amd64 i386 powerpc,$(DEB_HOST_ARCH)),--firewire)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	python3 ./waf configure \
+		--prefix=/usr --classic \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		$(CONFIGURE_OPTIONS) \
+		CC='$(CC)' CXX='$(CXX)' PKGCONFIG='$(PKG_CONFIG)'
+
+override_dh_auto_build:
+	python3 ./waf -v build --jobs=$(NUMJOBS)
+
+override_dh_auto_install:
+	python3 ./waf -v install --destdir=debian/tmp
+
+override_dh_auto_clean:
+	test -s ./waf && python3 ./waf -v distclean || true
+	find . -name "*.pyc" -delete
+
+override_dh_makeshlibs:
+	dh_makeshlibs -Xinprocess -Xjack_alsa -Xjack_dummy
+
+override_dh_python3:
+	dh_python3 -pjackd2

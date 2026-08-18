@@ -1,0 +1,71 @@
+From: Milad Fa <46688537+miladfarca@users.noreply.github.com>
+Subject: Fix Randen and PCG on Big Endian platforms (#1031)
+Forwarded: https://github.com/abseil/abseil-cpp/pull/1031
+Origin: upstream, https://github.com/abseil/abseil-cpp/commit/022527c50e0e2bc937f9fa3c516e3e36cbba0845
+
+--- a/absl/random/internal/explicit_seed_seq.h
++++ b/absl/random/internal/explicit_seed_seq.h
+@@ -74,7 +74,7 @@
+   template <typename OutIterator>
+   void generate(OutIterator begin, OutIterator end) {
+     for (size_t index = 0; begin != end; begin++) {
+-      *begin = state_.empty() ? 0 : little_endian::FromHost32(state_[index++]);
++      *begin = state_.empty() ? 0 : state_[index++];
+       if (index >= state_.size()) {
+         index = 0;
+       }
+--- a/absl/random/internal/randen_engine.h
++++ b/absl/random/internal/randen_engine.h
+@@ -121,6 +121,13 @@   void reseed(SeedSequence& seq) {
+       const size_t requested_entropy = (entropy_size == 0) ? 8u : entropy_size;
+       std::fill(std::begin(buffer) + requested_entropy, std::end(buffer), 0);
+       seq.generate(std::begin(buffer), std::begin(buffer) + requested_entropy);
++#ifdef ABSL_IS_BIG_ENDIAN
++      // Randen expects the seed buffer to be in Little Endian; reverse it on
++      // Big Endian platforms.
++      for (sequence_result_type& e : buffer) {
++        e = absl::little_endian::FromHost(e);
++      }
++#endif
+       // The Randen paper suggests preferentially initializing even-numbered
+       // 128-bit vectors of the randen state (there are 16 such vectors).
+       // The seed data is merged into the state offset by 128-bits, which
+--- a/absl/random/internal/randen_slow.cc
++++ b/absl/random/internal/randen_slow.cc
+@@ -395,6 +395,23 @@
+   }
+ }
+ 
++// Enables native loads in the round loop by pre-swapping.
++inline ABSL_RANDOM_INTERNAL_ATTRIBUTE_ALWAYS_INLINE void SwapEndian(
++    absl::uint128* state) {
++#ifdef ABSL_IS_BIG_ENDIAN
++  for (uint32_t block = 0; block < RandenTraits::kFeistelBlocks; ++block) {
++    uint64_t new_lo = absl::little_endian::ToHost64(
++        static_cast<uint64_t>(state[block] >> 64));
++    uint64_t new_hi = absl::little_endian::ToHost64(
++        static_cast<uint64_t>((state[block] << 64) >> 64));
++    state[block] = (static_cast<absl::uint128>(new_hi) << 64) | new_lo;
++  }
++#else
++  // Avoid warning about unused variable.
++  (void)state;
++#endif
++}
++
+ }  // namespace
+ 
+ namespace absl {
+@@ -439,8 +456,12 @@ void RandenSlow::Generate(const void* keys_void, void* state_void) {
+ 
+   const absl::uint128 prev_inner = state[0];
+ 
++  SwapEndian(state);
++
+   Permute(state, keys);
+ 
++  SwapEndian(state);
++
+   // Ensure backtracking resistance.
+   *state ^= prev_inner;
+ }

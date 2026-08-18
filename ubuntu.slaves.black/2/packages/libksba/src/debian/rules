@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+bindnow
+export DEB_CFLAGS_MAINT_APPEND := -Wall
+export DEB_CXXFLAGS_MAINT_APPEND := -Wall
+export DPKG_GENSYMBOLS_CHECK_LEVEL := 4
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory=build --verbose -- \
+		--enable-ld-version-script --enable-static \
+		--enable-build-timestamp=$(SOURCE_DATE_EPOCH)
+
+%:
+	dh $@ --builddirectory=build
+
+### "arch-independent" Windows builds: ###
+
+WIN_FLAGS=LDFLAGS="-Xlinker --no-insert-timestamp" CFLAGS="-g -Os" CPPFLAGS=
+
+override_dh_auto_build-indep:
+	for cpu in i686 x86_64; do \
+	 mkdir -p build-$$cpu-w64-mingw32 && \
+	 cd build-$$cpu-w64-mingw32 && $(WIN_FLAGS) ../configure \
+	    --prefix=/usr/$$cpu-w64-mingw32 \
+	    --with-prefix=/usr/$$cpu-w64-mingw32 \
+	    --with-libgpg-error-prefix=/usr/$$cpu-w64-mingw32 \
+	    --enable-static \
+	    --enable-build-timestamp=$(SOURCE_DATE_EPOCH) \
+	    --host $$cpu-w64-mingw32 && \
+	  $(WIN_FLAGS) $(MAKE) \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+
+override_dh_auto_install-indep:
+	for cpu in i686 x86_64; do \
+	  cd build-$$cpu-w64-mingw32 && \
+	  $(MAKE) install DESTDIR=$(shell pwd)/debian/tmp \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+	find debian/tmp -name lib*.la -type f -delete

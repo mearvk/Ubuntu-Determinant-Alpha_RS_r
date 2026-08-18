@@ -1,0 +1,68 @@
+From: Optical Media Tools Team <pkg-opt-media-team@lists.alioth.debian.org>
+Date: Tue, 30 Jan 2018 13:51:00 +0900
+Subject: New option "--force-progress-bar"
+
+---
+ main.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/main.c b/main.c
+index ed485d2..d7b4b09 100644
+--- a/main.c
++++ b/main.c
+@@ -213,6 +213,8 @@ VERSION"\n"
+ "  -q --quiet                      : quiet operation\n"
+ "  -e --stderr-progress            : force output of progress information to\n"
+ "                                    stderr (for wrapper scripts)\n"
++"  -E --force-progress-bar         : force output of progress bar even if\n"
++"                                    stderr is not a terminal\n"
+ "  -l --log-summary [<file>]       : save result summary to file, default\n"
+ "                                    filename cdparanoia.log\n"
+ "  -L --log-debug   [<file>]       : save detailed device autosense and\n"
+@@ -341,6 +343,7 @@ VERSION"\n"
+ long callbegin;
+ long callend;
+ long callscript=0;
++long force_progress_bar=0;
+ 
+ static char *callback_strings[16]={"wrote",
+                                    "finished",
+@@ -407,13 +410,13 @@ static void callback(long inpos, int function){
+     }
+   }
+ 
+-  if(!quiet){
++  if(force_progress_bar || !quiet){
+     long test;
+     osector=inpos;
+     sector=inpos/CD_FRAMEWORDS;
+     
+     if(printit==-1){
+-      if(isatty(STDERR_FILENO)){
++      if(force_progress_bar || isatty(STDERR_FILENO)){
+ 	printit=1;
+       }else{
+ 	printit=0;
+@@ -607,10 +610,11 @@ static void callback(long inpos, int function){
+     memset(dispcache,' ',graph);
+ }
+ 
+-const char *optstring = "escCn:o:O:d:g:k:S:prRwafvqVQhZz::YXWBi:Tt:l::L::A";
++const char *optstring = "eEscCn:o:O:d:g:k:S:prRwafvqVQhZz::YXWBi:Tt:l::L::A";
+ 
+ struct option options [] = {
+ 	{"stderr-progress",no_argument,NULL,'e'},
++	{"force-progress-bar",no_argument,NULL,'E'},
+ 	{"search-for-drive",no_argument,NULL,'s'},
+ 	{"force-cdrom-little-endian",no_argument,NULL,'c'},
+ 	{"force-cdrom-big-endian",no_argument,NULL,'C'},
+@@ -786,6 +790,9 @@ int main(int argc,char *argv[]){
+       callscript=1;
+       fprintf(stderr,"Sending all callbacks to stderr for wrapper script\n");
+       break;
++    case 'E':
++      force_progress_bar=1;
++      break;
+     case 'V':
+       fprintf(stderr,VERSION);
+       fprintf(stderr,"\n");

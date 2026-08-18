@@ -1,0 +1,41 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+EXAMPLEDIR = $(CURDIR)/debian/libjs-codemirror/usr/share/doc/libjs-codemirror/examples
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	rollup -c
+
+override_dh_auto_test:
+	# Browser only library, so require test not required
+
+override_dh_install:
+	dh_install
+	find $(CURDIR)/debian/libjs-codemirror/ -name "LICENSE*" -delete
+	find $(CURDIR)/debian/libjs-codemirror/usr/share/javascript/ -name "*.htm*" -delete
+	find $(CURDIR)/debian/libjs-codemirror/usr/share/javascript/ -type f | xargs chmod a-x
+	# These are provided as symbolic links
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/addon
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/keymap
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/lib
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/mode
+	# Uses external resources or useful for development only
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/bin
+	rm -rf $(CURDIR)/debian/libjs-codemirror/usr/share/nodejs/codemirror/demo
+	# typescript files end up executable
+	find $(CURDIR)/debian/libjs-codemirror -name '*.ts' -exec chmod 644 {} \;
+
+override_dh_installexamples:
+	# don't install demos which depend on external resources for functionality;
+	# none are completely available as packages as of 2019-02-18 and depending on
+	# outside resources defeats the point of installed documentation
+	dh_installexamples -Xlint -Xmerge -Xtern -Xwidget
+	# fix src='../foo' paths in examples
+	sed -ri 's#[.][.]/(lib|addon|mode|keymap)/#/usr/share/javascript/codemirror/\1/#g' $(EXAMPLEDIR)/*.html
+	sed -i 's#[.][.]/doc/#../html/#g' $(EXAMPLEDIR)/*.html

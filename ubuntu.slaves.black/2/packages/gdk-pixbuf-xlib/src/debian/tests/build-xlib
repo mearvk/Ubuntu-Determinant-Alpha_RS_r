@@ -1,0 +1,35 @@
+#!/bin/sh
+# autopkgtest check: Builds a small application against libgdk-pixbuf2.0
+# (deprecated Xlib part), checking it compiles, links and runs successfully.
+# Authors: Rafał Cieślak, Simon McVittie
+
+set -eu
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+cd "$WORKDIR"
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+cat <<EOF > build_test.c
+#include <stddef.h>
+#include <gdk-pixbuf-xlib/gdk-pixbuf-xlib.h>
+
+int main (void)
+{
+	Display *dpy = XOpenDisplay (NULL);
+	gdk_pixbuf_xlib_init (dpy, 0);
+}
+EOF
+
+# Deliberately word-splitting, that's how pkg-config works:
+# shellcheck disable=SC2046
+"${CROSS_COMPILE}gcc" -o build_test build_test.c -Wall -Werror $("${CROSS_COMPILE}pkg-config" --cflags --libs gdk-pixbuf-xlib-2.0 x11)
+echo "build: OK"
+[ -x build_test ]
+xvfb-run -a -s "-screen 0 1024x768x24" ./build_test
+echo "run: OK"

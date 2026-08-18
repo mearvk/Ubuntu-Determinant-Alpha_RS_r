@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+
+ADDONS := $(notdir $(wildcard src/addons/*))
+
+%:
+	dh $@ --with nodejs
+
+override_dh_auto_build:
+	# requires node-pty bindings, embedded but build fails
+	rm src/Terminal.integration.ts
+	tsc --skipLibCheck --project .
+	for addon in $(ADDONS); do tsc --skipLibCheck --project src/addons/$$addon; done
+	touch lib/addons/index.js
+	mkdir -p dist
+	cd dist && rollup ../lib/xterm.js -o xterm.js -f umd -n Terminal
+	cd dist && for addon in $(ADDONS); do mkdir -p addons/$$addon && rollup ../lib/addons/$$addon/$$addon.js -o addons/$$addon/$$addon.js -n $$addon; done
+
+	rm -f dist/addons/index.js
+	cd src && find . -name '*.css' -exec cp -v --parents '{}' ../lib \;
+	cd src && find . -name '*.css' -exec cp -v --parents '{}' ../dist \;
+
+override_dh_auto_test:
+# These tests depend on jsdom which can't (yet) be installed in Debian
+# They pass when run locally though
+	rm -f lib/Linkifier.test.js lib/utils/CharMeasure.test.js
+	# This component is not built (build fails)
+	rm -f node_modules/node-pty
+	mocha lib/
+
+# Upstream does not have tests for the browserified version, but you can test
+# that manually by running this:
+run-demo:
+	test -e build || ln -sf dist build
+	python -m SimpleHTTPServer & x=$$!; \
+	chromium --temp-profile 'http://localhost:8000/demo/index.html'; kill $$!
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf node_modules lib dist build
+
+override_dh_link:
+# Deduplicate, link via dh_link
+	rm -rf debian/node-xterm/usr/share/nodejs/xterm/lib/addons
+	dh_link
+
+get-orig-source:
+	uscan --download-current-version --force-download --no-symlink

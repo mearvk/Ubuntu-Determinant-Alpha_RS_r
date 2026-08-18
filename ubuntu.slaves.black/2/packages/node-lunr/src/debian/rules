@@ -1,0 +1,66 @@
+#!/usr/bin/make -f
+
+# generate documentation unless nodoc requested
+ifeq (,$(filter nodoc,$(DEB_BUILD_OPTIONS)))
+DOCS = README.html README.txt
+CHANGELOGS = CHANGELOG.html CHANGELOG.txt
+endif
+
+# normalize output with TAP where possible unless terse requested
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
+MOCHA = mocha --reporter tap
+else
+MOCHA = mocha --reporter dot --no-colors
+endif
+
+%:
+	dh $@
+
+override_dh_auto_build: \
+ debian/js/lunr.min.js.gz \
+ $(DOCS) $(CHANGELOGS)
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	MOCHA="$(MOCHA)" make test
+endif
+
+# install core documentation with all binary packages
+override_dh_installdocs:
+	dh_installdocs -- $(DOCS)
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- $(CHANGELOGS)
+
+override_dh_auto_clean:
+	rm -f lunr.js
+
+override_dh_clean:
+	dh_clean -- $(DOCS) $(CHANGELOGS)
+
+# use staging dir for browser library (easier to install and clean)
+debian/js/lunr.js:
+	make lunr.js
+	mkdir --parents debian/js
+	cp --force --target-directory debian/js lunr.js
+
+# optimize JavaScript for browser use
+# * include source-map
+debian/js/%.min.js: debian/js/%.js
+	uglifyjs --compress --mangle --comments \
+		--source-map "base='$(abspath $(dir $@))',url='$(notdir $@).map'" \
+		--output $@ \
+		-- $<
+
+%.html: %.md
+	pandoc --from gfm-raw_html --to html --standalone --output $@ $<
+
+%.txt: %.md
+	pandoc --from gfm-raw_html --to plain --output $@ $<
+
+# pre-compress for browser use
+%.gz: %
+	pigz --force --keep -11 -- $<
+	brotli --force --keep --best --suffix=.brotli -- $<
+
+.SECONDARY:

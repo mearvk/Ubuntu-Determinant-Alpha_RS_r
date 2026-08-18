@@ -1,0 +1,102 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+LIB_VERSION = 40
+
+MIB_MODULES = smux ucd-snmp/dlmod mibII/mta_sendmail disman/event-mib
+EXCL_MIB_MODULES =
+
+MIBS_DIR="/usr/share/snmp/mibs:/usr/share/snmp/mibs/iana:/usr/share/snmp/mibs/ietf"
+
+ifeq (linux,$(DEB_BUILD_ARCH_OS))
+MIB_MODULES += ucd-snmp/diskio ucd-snmp/lmsensorsMib etherlike-mib/dot3StatsTable
+DEB_DH_GENCONTROL_ARGS=-- -Vos-specific-dev="libsensors4-dev"
+else
+ifeq (kfreebsd,$(DEB_BUILD_ARCH_OS))
+DEB_DH_GENCONTROL_ARGS=-- -Vos-specific-dev="libkvm-dev"
+CFLAGS += $(shell pkg-config --cflags libbsd-overlay)
+LDFLAGS += $(shell pkg-config --libs libbsd-overlay)
+endif
+endif
+ifeq (hurd,$(DEB_BUILD_ARCH_OS))
+EXCL_MIB_MODULES += mibII
+else
+MIB_MODULES += host
+endif
+
+%:
+	dh $@ --with apport
+
+# The net-snmp Makefiles cannot handle parallel builds
+override_dh_auto_build:
+	dh_auto_build --no-parallel
+
+override_dh_auto_configure:
+	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --mandir=/usr/share/man \
+	  --with-persistent-directory=/var/lib/snmp \
+	  --enable-ucd-snmp-compatibility \
+	  --with-cflags="$(CFLAGS) -DNETSNMP_USE_INLINE" \
+	  --with-ldflags="$(LDFLAGS)" \
+	  --with-perl-modules="INSTALLDIRS=vendor" --enable-as-needed \
+	  --with-logfile=none \
+	  --without-rpm --with-libwrap --with-openssl \
+	  --without-dmalloc --without-efence --without-rsaref \
+	  --with-sys-contact="root" --with-sys-location="Unknown" \
+	  --with-mib-modules="$(MIB_MODULES)" \
+	  --with-out-mib-modules="$(EXCL_MIB_MODULES)" \
+	  --with-transports="TLSTCP DTLSUDP" \
+	  --with-security-modules="tsm" \
+	  --enable-mfd-rewrites \
+	  --with-mnttab=/etc/mtab \
+	  --with-mibdirs="\$$HOME/.snmp/mibs:$(MIBS_DIR)" \
+	  --with-mysql \
+	  --with-systemd \
+	  --enable-blumenthal-aes \
+	  UNAMEPROG=/bin/uname \
+	  PSPROG=/bin/ps \
+	  --with-defaults
+# --with-dnssec-local-validation  # not enabled since libval doesn't exist in Debian yet
+
+override_dh_clean:
+	dh_clean
+	rm -rf `find . -name .libs` \
+	       dist/generation-scripts/gen-variables \
+	       perl/SNMP/t/snmptest.cmd \
+	       perl/TrapReceiver/const-c.inc \
+	       perl/TrapReceiver/const-xs.inc
+
+override_dh_makeshlibs:
+	dh_makeshlibs -plibsnmp$(LIB_VERSION) -VUpstream-Version
+	dh_makeshlibs -plibnetsnmptrapd$(LIB_VERSION) -VUpstream-Version
+
+override_dh_install-arch:
+	dh_install
+
+override_dh_installdocs:
+	dh_installdocs -plibsnmp-perl -ptkmib -plibsnmp-base -plibsnmp$(LIB_VERSION)
+	dh_installdocs --link-doc=libsnmp$(LIB_VERSION) \
+		       -plibsnmp-dev \
+		       -plibnetsnmptrapd$(LIB_VERSION) \
+		       -psnmpd \
+		       -psnmptrapd \
+		       -psnmp
+
+override_dh_fixperms-arch:
+	dh_fixperms
+	chmod -x debian/libsnmp-dev/etc/snmp/*.conf
+	chmod 600 debian/snmpd/etc/snmp/snmp*d.conf
+
+.PHONY: override_dh_apport
+override_dh_apport:
+	dh_apport -psnmpd
+
+override_dh_auto_test:
+	# prevent test since it fails with network configuration under pbuilder/etc.
+	true
+
+override_dh_installinit:
+	dh_installinit -psnmptrapd --no-enable --no-start
+	dh_installinit -Nsnmptrapd

@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+VERSION=$(shell dpkg-parsechangelog | sed -rne 's,^Version: ([^-]+).*,\1,p')
+
+%:
+	dh $@ --buildsystem ant
+
+override_dh_auto_build:
+	dh_auto_build -- -buildfile janino-dist/build.xml build
+
+override_dh_auto_install:
+	mh_installpom -plibjanino-java --no-parent --has-package-version -e$(VERSION) commons-compiler/pom.xml
+	mh_installjar -plibjanino-java --java-lib -e$(VERSION) commons-compiler/pom.xml janino-dist/build/commons-compiler.jar
+	
+	mh_installpom -plibjanino-java --no-parent --has-package-version -e$(VERSION) commons-compiler-jdk/pom.xml
+	mh_installjar -plibjanino-java --java-lib -e$(VERSION) commons-compiler-jdk/pom.xml janino-dist/build/commons-compiler-jdk.jar
+	
+	mh_installpom -plibjanino-java --no-parent --has-package-version -e$(VERSION) janino/pom.xml
+	mh_installjar -plibjanino-java --java-lib -e$(VERSION) janino/pom.xml janino-dist/build/janino.jar
+	
+	jh_manifest -plibjanino-java
+
+override_dh_auto_clean:
+	-rm -rf janino-dist/build janino-dist/mirror
+	mh_clean
+
+get-orig-source::
+	uscan --force-download

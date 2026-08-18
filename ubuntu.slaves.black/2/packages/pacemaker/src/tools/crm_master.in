@@ -1,0 +1,92 @@
+#!@BASH_PATH@
+#
+# Copyright 2009-2021 the Pacemaker project contributors
+#
+# The version control history for this file may have further details.
+#
+# This source code is licensed under the GNU General Public License version 2
+# or later (GPLv2+) WITHOUT ANY WARRANTY.
+#
+
+USAGE_TEXT="Usage: crm_master <command> [<options>]
+
+This command is deprecated. Use crm_attribute with the --promotion option
+instead."
+
+exit_usage() {
+	if [ $# -gt 0 ]; then
+		echo "error:" "$@" >&2
+	fi
+	echo
+	echo "$USAGE_TEXT"
+	exit 1
+}
+
+SHORTOPTS_DEPRECATED="U:Q"
+LONGOPTS_DEPRECATED="uname:,get-value,delete-attr,attr-value:,attr-id:"
+SHORTOPTS="VqGv:DN:l:i:r:"
+LONGOPTS="help,version,verbose,quiet,query,update:,delete,node:,lifetime:,id:,resource:"
+
+TEMP=$(@GETOPT_PATH@ -o ${SHORTOPTS}${SHORTOPTS_DEPRECATED} \
+	--long ${LONGOPTS},${LONGOPTS_DEPRECATED} \
+	-n crm_master -- "$@")
+if [ $? -ne 0 ]; then
+	exit_usage
+fi
+
+eval set -- "$TEMP" # Quotes around $TEMP are essential
+
+# Explicitly set the (usual default) lifetime, so the attribute gets set as a
+# node attribute and not a cluster property.
+options="--lifetime forever"
+
+while true ; do
+	case "$1" in
+		--help) 
+			echo "crm_master - Query, update, or delete a resource's promotion score"
+			echo
+			echo "$USAGE_TEXT"
+			exit 0
+			;;
+		--version)
+			crm_attribute --version
+			exit 0
+			;;
+		--verbose|-V|--quiet|-q|--query|-G|--delete|-D)
+			options="$options $1"
+			shift
+			;;
+		--update|-v|--node|-N|--lifetime|-l|--id|-i)
+			options="$options $1 $2"
+			shift
+			shift
+			;;
+		-r|--resource)
+			OCF_RESOURCE_INSTANCE=$2;
+			shift
+			shift
+			;;
+		--get-value|--delete-attr|-Q) # deprecated
+			options="$options $1"
+			shift
+			;;
+		--uname|-U|--attr-value|--attr-id) # deprecated
+			options="$options $1 $2"
+			shift
+			shift
+			;;
+		--)
+			shift
+			break
+			;;
+		*)
+			exit_usage "unknown option '$1'"
+			;;
+	esac
+done
+
+if [ -z "$OCF_RESOURCE_INSTANCE" ]; then
+	exit_usage "No resource specified"
+fi
+
+crm_attribute -n master-$OCF_RESOURCE_INSTANCE $options

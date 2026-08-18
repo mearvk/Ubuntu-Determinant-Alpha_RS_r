@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ -B bdir
+
+override_dh_auto_configure-arch:
+	dh_auto_configure -- \
+		-DFMT_DOC=off -DFMT_PEDANTIC=on -DCMAKE_POSITION_INDEPENDENT_CODE=on \
+		-DBUILD_SHARED_LIBS=on
+
+override_dh_auto_configure-indep:
+
+override_dh_auto_build-indep:
+	mkdir -p bdir/doxyxml
+	doxygen debian/doxygen.conf
+	sphinx-build -Dbreathe_projects.format=../bdir/doxyxml \
+		-Dversion=$(DEB_VERSION) -Drelease=$(DEB_VERSION) -Aversion=$(DEB_VERSION) -Aversions=$(DEB_VERSION) \
+		-b html doc/ bdir/libfmt-doc
+	lessc --clean-css --include-path=/usr/share/javascript/bootstrap/less \
+		doc/fmt.less bdir/libfmt-doc/_static/fmt.css
+	ln -sf /usr/share/javascript/bootstrap/js/bootstrap.min.js bdir/libfmt-doc/_static/bootstrap.min.js
+
+override_dh_auto_test-indep:
+
+override_dh_auto_install-indep:
+	mkdir -p debian/tmp/usr/share/doc
+	cp -vr bdir/libfmt-doc debian/tmp/usr/share/doc/
+
+override_dh_install-indep:
+	dh_install
+	dh_sphinxdoc

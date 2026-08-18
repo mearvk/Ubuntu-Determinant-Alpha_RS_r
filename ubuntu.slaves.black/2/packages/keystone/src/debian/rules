@@ -1,0 +1,63 @@
+#!/usr/bin/make -f
+
+# Verbose mode
+#export DH_VERBOSE=1
+
+export PYBUILD_NAME=keystone
+
+SHELL := /bin/sh -e
+
+DEBVERS ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//' -e 's/[+].*//' -e 's/~git.*//g' -e 's/+git.*//g' -e 's/~/./g')
+export PBR_VERSION=$(VERSION)
+
+include /usr/share/openstack-pkg-tools/pkgos.make
+
+%:
+	dh $@ --with apache2,python3 --buildsystem=pybuild
+
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+override_dh_auto_test:
+	mkdir -p $(CURDIR)/keystone/tests/tmp
+	PYTHONPATH=$(CURDIR) pkgos-dh_auto_test --no-py2 'keystone\.tests\.unit.(?!(.*test_sql_upgrade.FullMigration.*))'
+endif
+
+override_dh_auto_build:
+	dh_auto_build
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	mkdir -p $(CURDIR)/doc/build/html
+	mkdir -p $(CURDIR)/doc/build/man
+	sphinx-build -b man doc/source doc/build/man
+	sphinx-build -b html doc/source doc/build/html
+endif
+
+override_dh_install:
+	rm -rf $(CURDIR)/debian/python3-keystone/usr/etc
+	dh_install
+	dh_missing --fail-missing
+	install -D -m 0600 $(CURDIR)/etc/logging.conf.sample  $(CURDIR)/debian/keystone-common/etc/keystone/logging.conf
+	PYTHONPATH=$(CURDIR) oslo-config-generator --config-file=config-generator/keystone.conf \
+		--output-file=$(CURDIR)/debian/keystone-common/etc/keystone/keystone.conf
+	PYTHONPATH=$(CURDIR) oslopolicy-sample-generator --config-file=config-generator/keystone-policy-generator.conf \
+		--output-file=$(CURDIR)/debian/keystone-common/etc/keystone/keystone.policy.yaml
+	crudini --merge $(CURDIR)/debian/keystone-common/etc/keystone/keystone.conf < $(CURDIR)/debian/keystone.conf.dist
+
+override_dh_clean:
+	rm -rf $(CURDIR)/build $(CURDIR)/keystone.egg-info $(CURDIR)/.cache
+	rm -rf $(CURDIR)/keystone/tests/tmp
+	rm -rf $(CURDIR)/.testrepository
+	rm -rf $(CURDIR)/debian/tmp
+	rm -rf $(CURDIR)/doc/build
+	# NOTE(adam_g) The following stuff is built in /doc/source.  Safe for now, but
+	# should be fixed upstream or updated here post-essex 
+	rm -rf $(CURDIR)/doc/source/keystone*.rst
+	rm -rf $(CURDIR)/doc/source/modules.rst
+	rm -f debian/*.init debian/*.service debian/*.upstart
+	dh_clean
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf .eggs .testrepository
+
+override_dh_python3:
+	dh_python3 --shebang=/usr/bin/python3

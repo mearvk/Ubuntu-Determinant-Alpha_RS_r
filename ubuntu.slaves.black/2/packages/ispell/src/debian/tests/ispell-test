@@ -1,0 +1,70 @@
+#!/bin/sh
+# vim:ts=2:et:sw=2:sts=2
+#
+# Simple tests for ispell source package.
+#
+# (C) 2021 Robert Luberda <robert@debian.org>
+#
+
+set -e
+
+export LC_ALL=C
+export PATH=/usr/bin:$PATH
+
+
+die()
+{
+  echo "$0 [$(basename $(pwd))] ERROR: $@" >&2
+  exit 1
+}
+
+[ "$1" ] || die "Missing required argument"
+
+datadir=$(readlink -f $(dirname $0)/data)
+
+init="no"
+if [ "$1" = "--init-all" ]; then
+  init="yes"
+  set -- $(find "$datadir" -name input.txt -printf "%h\0" | xargs -0n 1 basename)
+fi
+
+run_single()
+{
+  local testdir="$1"
+  echo "Running ispell check in $testdir"
+
+  cd "$datadir/$testdir" || die "Cannot change directory to $datadir/$testdir"
+  mkdir -p actual-output
+  cd actual-output
+  wc -l ../input.txt > NUM_LINES.txt
+
+  for lang in american british; do
+    for suff in "" -small -large -huge -insane; do
+      dict="$lang$suff"
+      ispell -d "$dict" -l < ../input.txt > "$dict.txt" \
+        || die "ispell command failed for dictionary $dict"
+      wc -l $dict.txt >> NUM_LINES.txt
+      [ -s "$dict.txt" ] || rm -f "$dict.txt"
+    done
+  done
+
+  cd ..
+
+  if [ "$init" = "yes" ]; then
+    rm -rf expected-output
+    mv actual-output expected-output
+    return 0
+  fi
+
+  # TODO: most probably the test should fail only when new words appear
+  # in the output (what means that ispell fails to recognize words that
+  # it used to recognize); removal of words could be a warning.
+  diff -x NUM_LINES.txt -Nur expected-output actual-output \
+    || die "Ispell behaviour has changed, see the diff output above"
+
+  rm -rf actual-output
+}
+
+for name in "$@"; do
+  run_single "$name"
+done

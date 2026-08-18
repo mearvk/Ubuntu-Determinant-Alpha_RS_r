@@ -1,0 +1,45 @@
+From b7e04d72bda89f22ce013030358e6743417f7fea Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Sat, 20 Jul 2019 21:21:02 +0200
+Subject: [PATCH libaio 23/28] harness: Handle -ENOTSUP from io_submit() with
+ RWF_NOWAIT
+
+On filesystems such as tmpfs the syscall might return -ENOTSUP instead
+of EINVAL when it does not support the RWF_NOWAIT flag.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+[JEM: skip the test instead of returning success]
+[JEM: make the error message differentiate between kernel and fs support]
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/21.t | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/harness/cases/21.t b/harness/cases/21.t
+index ba988ed..4164c02 100644
+--- a/harness/cases/21.t
++++ b/harness/cases/21.t
+@@ -108,13 +108,15 @@ test_main()
+ 	ret = io_submit(ctx, 1, &iocbp);
+ 
+ 	/*
+-	 * io_submit will return -EINVAL if RWF_NOWAIT is not supported.
++	 * io_submit will return -EINVAL if RWF_NOWAIT is not supported by
++	 * the kernel, and EOPNOTSUPP if it's not supported by the fs.
+ 	 */
+ 	if (ret != 1) {
+-		if (ret == -EINVAL) {
+-			fprintf(stderr, "RWF_NOWAIT not supported by kernel.\n");
+-			/* just return success */
+-			return 0;
++		if (ret == -EINVAL || ret == -ENOTSUP) {
++			fprintf(stderr, "RWF_NOWAIT not supported by %s.\n",
++				ret == -EINVAL ? "kernel" : "file system");
++			/* skip this test */
++			return 3;
+ 		}
+ 		errno = -ret;
+ 		perror("io_submit");
+-- 
+2.26.0.292.g33ef6b2f38
+

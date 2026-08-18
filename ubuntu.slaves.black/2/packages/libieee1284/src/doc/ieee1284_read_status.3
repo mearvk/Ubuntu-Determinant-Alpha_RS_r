@@ -1,0 +1,112 @@
+.\"     Title: ieee1284_status
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Functions
+.\"    Source: 
+.\"
+.TH "IEEE1284_STATUS" "3" "09/18/2007" "" "Functions"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+ieee1284_read_status, ieee1284_wait_status \- analyse status lines
+.SH "SYNOPSIS"
+.sp
+.ft B
+.nf
+#include <ieee1284.h>
+.fi
+.ft
+.HP 25
+.BI "int ieee1284_read_status(struct\ parport\ *" "port" ");"
+.HP 25
+.BI "int ieee1284_wait_status(struct\ parport\ *" "port" ", unsigned\ char\ " "mask" ", unsigned\ char\ " "val" ", struct\ timeval\ *" "timeout" ");"
+.SH "DESCRIPTION"
+.PP
+There are five status lines, one of which is usually inverted on PC\-style ports. Where they differ, libieee1284 operates on the IEEE 1284 values, not the PC\-style inverted values. The status lines are represented by the following enumeration:
+.sp
+.RS 4
+.nf
+enum ieee1284_status_bits
+{
+  S1284_NFAULT = 0x08,
+  S1284_SELECT = 0x10,
+  S1284_PERROR = 0x20,
+  S1284_NACK   = 0x40,
+  S1284_BUSY   = 0x80,
+  /* To convert those values into PC\-style register values, use this: */
+  S1284_INVERTED = S1284_BUSY,
+};
+.fi
+.RE
+.PP
+These functions all act on the parallel port associated with
+\fIport\fR, which must be claimed.
+.PP
+The purpose of
+\fBieee1284_wait_status\fR
+is to wait until particular status lines have specified values. Its
+\fItimeout\fR
+parameter may be modified on return.
+.SH "RETURN VALUE"
+.PP
+For
+\fBieee1284_read_status\fR, the return value is a non\-negative integer with bits set as appropriate representing the status lines. A negative result indicates an error.
+.PP
+For
+\fBieee1284_wait_status\fR, the return value is
+\fBE1284_OK\fR
+if the status lines now reflect the desired values (i.e. status &
+\fImask\fR
+is
+\fIval\fR), or a negative result indicating an error.
+.PP
+Possible error codes:
+.PP
+\fBE1284_NOTIMPL\fR
+.RS 4
+The
+\fIport\fR
+lacks the required capability. This could be due to a limitation of this version of libieee1284, or a hardware limitation.
+.RE
+.PP
+\fBE1284_NOTAVAIL\fR
+.RS 4
+Access to the status lines is not available on this port type.
+.RE
+.PP
+\fBE1284_TIMEDOUT\fR
+.RS 4
+The
+\fItimeout\fR
+has elapsed.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid (for instance, perhaps the
+\fIport\fR
+is not claimed).
+.RE
+.SH "NOTES"
+.PP
+The nAck pin is often able to trigger interrupts on the host machine. With operating system help these interrupts may be visible to the application via the file descriptor returned by
+\fBieee1284_get_irq_fd\fR.
+.PP
+Under Linux, the conditions are that the parallel port driver knows which interrupt line to use and is using it, and that the relevant
+\fI/dev/parport\fR
+device node is accessible and backed by a device driver.
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

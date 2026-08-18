@@ -1,0 +1,24 @@
+#!/bin/sh
+
+set -e
+
+rm -f /etc/init.d/lirc
+
+if which systemd-tmpfiles >/dev/null; then
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/lirc.conf || :
+fi
+
+# distutils' sysconfig.get_python_lib is broken - #911038. Furthermore, the
+# first iteration of this fix did not remove the links in postrm. So:
+find /usr/lib/python3/dist-packages -maxdepth 1 -type l -name lirc -delete
+find /usr/lib/python3/dist-packages -maxdepth 1 -type l -name lirc-setup -delete
+ln -s /usr/lib/*/python*/site-packages/lirc \
+    /usr/lib/python3/dist-packages
+ln -s /usr/lib/*/python*/site-packages/lirc-setup \
+    /usr/lib/python3/dist-packages
+
+# Recompile Python bytecode as needed
+py3compile /usr/lib/*/python3.*/site-packages/lirc
+py3compile /usr/lib/*/python3.*/site-packages/lirc-setup
+
+#DEBHELPER#

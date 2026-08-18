@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --buildsystem=maven --with javahelper
+
+override_dh_auto_build:
+	dh_auto_build -- -f jaxb-ri/pom.xml package javadoc:aggregate -DskipTests
+
+override_dh_auto_test:
+	dh_auto_test -- -f jaxb-ri/pom.xml test
+
+override_dh_auto_install:
+	dh_auto_install -- -f jaxb-ri/pom.xml
+
+override_dh_install:
+	dh_install
+	chmod +x debian/jaxb/usr/share/jaxb/bin/*.sh
+
+override_dh_auto_clean:
+	dh_auto_clean -- -f jaxb-ri/pom.xml clean
+
+override_dh_gencontrol:
+	dh_gencontrol
+
+	# src:libcodemodel-java was at version 2.6 before src:jaxb took over the package.
+	# To avoid introducing an epoch the jaxb version is appended to the former
+	# libcodemodel-java version until jaxb > 2.6 is released.
+	dh_gencontrol -plibcodemodel-java -- -v2.6+jaxb$(DEB_VERSION)

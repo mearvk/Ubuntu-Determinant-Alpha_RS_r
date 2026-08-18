@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=ant
+
+override_dh_auto_build:
+	mkdir -p osgi/framework/libs
+	ln -s /usr/share/java/asm-all.jar osgi/framework/libs/asm-3.2.jar
+	mkdir -p osgi/annotations
+	ln -s /usr/share/java/osgi.annotation.jar osgi/annotations/osgi.annotation-6.0.1.jar
+
+	dh_auto_build -- -f ant/bundletasks.xml build_bundle_tasks -Dasm.jar=/usr/share/java/asm-all.jar
+	dh_auto_build -- -f osgi/framework/build.xml jar
+
+override_dh_auto_clean:
+	-rm -Rf ant/classes
+	-rm -Rf ant/lib
+	-rm -Rf osgi/framework/libs/*.jar
+	-rm -Rf osgi/annotations/*.jar
+	-rm -f osgi/framework/resources/tstamp
+	-rm -f osgi/framework/resources/version
+	-rm -f osgi/framework/resources/exports
+	-rm -fr api/ osgi/out
+	-rm -f osgi/jars/framework-*.jar
+	-rm -f osgi/framework.jar
+	-rm -f framework.html
+
+get-orig-source:
+	uscan --force-download --rename --repack --compression xz

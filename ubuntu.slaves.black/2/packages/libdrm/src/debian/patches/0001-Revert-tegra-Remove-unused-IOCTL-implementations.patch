@@ -1,0 +1,160 @@
+From f50a1aaf40153e8f457d23047330886a74899715 Mon Sep 17 00:00:00 2001
+From: Timo Aaltonen <tjaalton@debian.org>
+Date: Thu, 15 Dec 2022 15:17:19 +0200
+Subject: [PATCH] Revert "tegra: Remove unused IOCTL implementations"
+
+This reverts commit bec2a28e98f430f4a82b085b4d1c69a98988359f.
+---
+ tegra/tegra-symbols.txt |  4 ++
+ tegra/tegra.c           | 95 +++++++++++++++++++++++++++++++++++++++++
+ tegra/tegra.h           | 13 ++++++
+ 3 files changed, 112 insertions(+)
+
+diff --git a/tegra/tegra-symbols.txt b/tegra/tegra-symbols.txt
+index 1a75c3d2..ddac5ffe 100644
+--- a/tegra/tegra-symbols.txt
++++ b/tegra/tegra-symbols.txt
+@@ -1,11 +1,15 @@
+ drm_tegra_bo_export
++drm_tegra_bo_get_flags
+ drm_tegra_bo_get_handle
++drm_tegra_bo_get_tiling
+ drm_tegra_bo_get_name
+ drm_tegra_bo_import
+ drm_tegra_bo_map
+ drm_tegra_bo_new
+ drm_tegra_bo_open
+ drm_tegra_bo_ref
++drm_tegra_bo_set_flags
++drm_tegra_bo_set_tiling
+ drm_tegra_bo_unmap
+ drm_tegra_bo_unref
+ drm_tegra_bo_wrap
+diff --git a/tegra/tegra.c b/tegra/tegra.c
+index 6a51c431..5b97cd66 100644
+--- a/tegra/tegra.c
++++ b/tegra/tegra.c
+@@ -352,3 +352,98 @@ free:
+     free(bo);
+     return err;
+ }
++
++drm_public int drm_tegra_bo_get_flags(struct drm_tegra_bo *bo, uint32_t *flags)
++{
++    struct drm_tegra_gem_get_flags args;
++    struct drm_tegra *drm = bo->drm;
++    int err;
++
++    if (!bo)
++        return -EINVAL;
++
++    memset(&args, 0, sizeof(args));
++    args.handle = bo->handle;
++
++    err = drmCommandWriteRead(drm->fd, DRM_TEGRA_GEM_GET_FLAGS, &args,
++                              sizeof(args));
++    if (err < 0)
++        return -errno;
++
++    if (flags)
++        *flags = args.flags;
++
++    return 0;
++}
++
++drm_public int drm_tegra_bo_set_flags(struct drm_tegra_bo *bo, uint32_t flags)
++{
++    struct drm_tegra_gem_get_flags args;
++    struct drm_tegra *drm = bo->drm;
++    int err;
++
++    if (!bo)
++        return -EINVAL;
++
++    memset(&args, 0, sizeof(args));
++    args.handle = bo->handle;
++    args.flags = flags;
++
++    err = drmCommandWriteRead(drm->fd, DRM_TEGRA_GEM_SET_FLAGS, &args,
++                              sizeof(args));
++    if (err < 0)
++        return -errno;
++
++    return 0;
++}
++
++drm_public int
++drm_tegra_bo_get_tiling(struct drm_tegra_bo *bo,
++                        struct drm_tegra_bo_tiling *tiling)
++{
++    struct drm_tegra_gem_get_tiling args;
++    struct drm_tegra *drm = bo->drm;
++    int err;
++
++    if (!bo)
++        return -EINVAL;
++
++    memset(&args, 0, sizeof(args));
++    args.handle = bo->handle;
++
++    err = drmCommandWriteRead(drm->fd, DRM_TEGRA_GEM_GET_TILING, &args,
++                              sizeof(args));
++    if (err < 0)
++        return -errno;
++
++    if (tiling) {
++        tiling->mode = args.mode;
++        tiling->value = args.value;
++    }
++
++    return 0;
++}
++
++drm_public int
++drm_tegra_bo_set_tiling(struct drm_tegra_bo *bo,
++                        const struct drm_tegra_bo_tiling *tiling)
++{
++    struct drm_tegra_gem_set_tiling args;
++    struct drm_tegra *drm = bo->drm;
++    int err;
++
++    if (!bo)
++        return -EINVAL;
++
++    memset(&args, 0, sizeof(args));
++    args.handle = bo->handle;
++    args.mode = tiling->mode;
++    args.value = tiling->value;
++
++    err = drmCommandWriteRead(drm->fd, DRM_TEGRA_GEM_SET_TILING, &args,
++                              sizeof(args));
++    if (err < 0)
++        return -errno;
++
++    return 0;
++}
+diff --git a/tegra/tegra.h b/tegra/tegra.h
+index 8f3c0554..192ea031 100644
+--- a/tegra/tegra.h
++++ b/tegra/tegra.h
+@@ -124,4 +124,17 @@ int drm_tegra_syncpoint_new(struct drm_tegra *drm,
+ int drm_tegra_syncpoint_free(struct drm_tegra_syncpoint *syncpt);
+ int drm_tegra_fence_wait(struct drm_tegra_fence *fence, unsigned long timeout);
+ 
++int drm_tegra_bo_get_flags(struct drm_tegra_bo *bo, uint32_t *flags);
++int drm_tegra_bo_set_flags(struct drm_tegra_bo *bo, uint32_t flags);
++
++struct drm_tegra_bo_tiling {
++    uint32_t mode;
++    uint32_t value;
++};
++
++int drm_tegra_bo_get_tiling(struct drm_tegra_bo *bo,
++                            struct drm_tegra_bo_tiling *tiling);
++int drm_tegra_bo_set_tiling(struct drm_tegra_bo *bo,
++                            const struct drm_tegra_bo_tiling *tiling);
++
+ #endif /* __DRM_TEGRA_H__ */
+-- 
+2.37.2
+

@@ -1,0 +1,115 @@
+From: Ilya Leoshkevich <iii@linux.ibm.com>
+Date: Tue, 1 Mar 2022 12:33:00 +0100
+Subject: [PATCH] Fix for IBM Z compressBound()
+Description: compressBound() returns an incorrect result on z15
+Symptom: Passing the result of compressBound() to compress()
+         results in an error code.
+Problem: compressBound() is not adjusted for DFLTCC.
+Solution: Adjust compressBound() for DFLTCC like it's already done
+          for deflateBound(). Since zlib project does not accept
+          patches at the moment, the fix has been integrated into
+          the DFLTCC pull request:
+          https://github.com/madler/zlib/pull/410
+          The commitid is b25781e735363e04f6c56e21431c47e4afc50b17.
+Resolves: #2056899
+Version: 1.2.11-32
+Signed-off-by: ￼Ilya Leoshkevich <iii@linux.ibm.com>
+
+Author: Ilya Leoshkevich <iii@linux.ibm.com>
+Origin: upstream, https://github.com/madler/zlib/commit/b25781e735363e04f6c56e21431c47e4afc50b17
+Bug-IBM: BZ 194923
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1961427
+Forwarded: not-needed
+Reviewed-by: Frank Heimes <frank.heimes@canonical.com>
+Last-Update: 2022-07-21
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+
+---
+
+--- a/compress.c
++++ b/compress.c
+@@ -5,9 +5,15 @@
+ 
+ /* @(#) $Id$ */
+ 
+-#define ZLIB_INTERNAL
++#include "zutil.h"
+ #include "zlib.h"
+ 
++#ifdef DFLTCC
++#  include "contrib/s390/dfltcc.h"
++#else
++#define DEFLATE_BOUND_COMPLEN(source_len) 0
++#endif
++
+ /* ===========================================================================
+      Compresses the source buffer into the destination buffer. The level
+    parameter has the same meaning as in deflateInit.  sourceLen is the byte
+@@ -81,6 +87,12 @@
+ uLong ZEXPORT compressBound (sourceLen)
+     uLong sourceLen;
+ {
++    uLong complen = DEFLATE_BOUND_COMPLEN(sourceLen);
++
++    if (complen > 0)
++	/* Architecture-specific code provided an upper bound. */
++	return complen + ZLIB_WRAPLEN;
++
+     return sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
+            (sourceLen >> 25) + 13;
+ }
+--- a/contrib/s390/dfltcc.h
++++ b/contrib/s390/dfltcc.h
+@@ -12,6 +12,28 @@
+ voidpf ZLIB_INTERNAL dfltcc_alloc_window OF((z_streamp strm, uInt items,
+                                              uInt size));
+ void ZLIB_INTERNAL dfltcc_free_window OF((z_streamp strm, voidpf w));
++#define DFLTCC_BLOCK_HEADER_BITS 3
++#define DFLTCC_HLITS_COUNT_BITS 5
++#define DFLTCC_HDISTS_COUNT_BITS 5
++#define DFLTCC_HCLENS_COUNT_BITS 4
++#define DFLTCC_MAX_HCLENS 19
++#define DFLTCC_HCLEN_BITS 3
++#define DFLTCC_MAX_HLITS 286
++#define DFLTCC_MAX_HDISTS 30
++#define DFLTCC_MAX_HLIT_HDIST_BITS 7
++#define DFLTCC_MAX_SYMBOL_BITS 16
++#define DFLTCC_MAX_EOBS_BITS 15
++#define DFLTCC_MAX_PADDING_BITS 7
++#define DEFLATE_BOUND_COMPLEN(source_len) \
++    ((DFLTCC_BLOCK_HEADER_BITS + \
++      DFLTCC_HLITS_COUNT_BITS + \
++      DFLTCC_HDISTS_COUNT_BITS + \
++      DFLTCC_HCLENS_COUNT_BITS + \
++      DFLTCC_MAX_HCLENS * DFLTCC_HCLEN_BITS + \
++      (DFLTCC_MAX_HLITS + DFLTCC_MAX_HDISTS) * DFLTCC_MAX_HLIT_HDIST_BITS + \
++      (source_len) * DFLTCC_MAX_SYMBOL_BITS + \
++      DFLTCC_MAX_EOBS_BITS + \
++      DFLTCC_MAX_PADDING_BITS) >> 3)
+ int ZLIB_INTERNAL dfltcc_can_inflate OF((z_streamp strm));
+ typedef enum {
+     DFLTCC_INFLATE_CONTINUE,
+--- a/contrib/s390/dfltcc_deflate.h
++++ b/contrib/s390/dfltcc_deflate.h
+@@ -46,8 +46,7 @@
+ #define DEFLATE_BOUND_ADJUST_COMPLEN(strm, complen, source_len) \
+     do { \
+         if (dfltcc_can_deflate((strm))) \
+-            (complen) = (3 + 5 + 5 + 4 + 19 * 3 + (286 + 30) * 7 + \
+-                         (source_len) * 16 + 15 + 7) >> 3; \
++            (complen) = DEFLATE_BOUND_COMPLEN(source_len); \
+     } while (0)
+ #define DEFLATE_NEED_CONSERVATIVE_BOUND(strm) (dfltcc_can_deflate((strm)))
+ #define DEFLATE_HOOK dfltcc_deflate
+--- a/zutil.h
++++ b/zutil.h
+@@ -80,6 +80,8 @@
+ 
+ #define PRESET_DICT 0x20 /* preset dictionary flag in zlib header */
+ 
++#define ZLIB_WRAPLEN 6 /* zlib format overhead */
++
+         /* target dependencies */
+ 
+ #if defined(MSDOS) || (defined(WINDOWS) && !defined(WIN32))

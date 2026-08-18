@@ -1,0 +1,115 @@
+From: Markus Koschany <apo@debian.org>
+Date: Sat, 7 Jan 2017 00:18:56 +0100
+Subject: 002 random build failure
+
+---
+ build.xml                                          | 17 ++++++------
+ .../generator/ReflectiveFactoryReaderTest.java     | 32 +---------------------
+ 2 files changed, 10 insertions(+), 39 deletions(-)
+
+diff --git a/build.xml b/build.xml
+index 4f9dc35..ce0c88b 100644
+--- a/build.xml
++++ b/build.xml
+@@ -56,7 +56,7 @@
+         <mkdir dir="build/temp/hamcrest-library/generated-code"/>
+         <java-to-jar srcdir="hamcrest-library/src/main/java"
+                      modulename="hamcrest-library"
+-                     classpath="build/hamcrest-core-${version}.jar"/>
++                     classpath="/usr/share/java/hamcrest-core.jar"/>
+         <!-- Generate one class with all static imports -->
+         <java classname="org.hamcrest.generator.config.XmlConfigurator"
+               fork="yes"
+@@ -74,22 +74,22 @@
+         <!-- Append to library jar -->
+         <java-to-jar srcdir="build/temp/hamcrest-library/generated-code"
+                      modulename="hamcrest-library"
+-                     classpath="build/hamcrest-core-${version}.jar"/>
++                     classpath="/usr/share/java/hamcrest-core.jar"/>
+     </target>
+ 
+     <target name="integration" depends="core, library" description="Build integration with external tools">
+         <java-to-jar srcdir="hamcrest-integration/src/main/java"
+                      modulename="hamcrest-integration"
+-                     classpath="build/hamcrest-core-${version}.jar;
+-                                build/hamcrest-library-${version}.jar"/>
++                     classpath="/usr/share/java/hamcrest-core.jar;
++                                /usr/share/java/hamcrest-library.jar"/>
+     </target>
+     
+     <target name="unit-test" depends="core, library, integration, generator" description="Build and run unit tests.">
+         <java-to-jar srcdir="hamcrest-unit-test/src/main/java" modulename="hamcrest-unit-test"
+-                     classpath="build/hamcrest-core-${version}.jar;
+-                                build/hamcrest-library-${version}.jar;
+-                                build/hamcrest-integration-${version}.jar;
+-                                build/hamcrest-generator-${version}.jar"/>
++            classpath="/usr/share/java/hamcrest-core.jar;
++            build/hamcrest-library-${version}.jar;
++            build/hamcrest-integration-${version}.jar;
++            build/hamcrest-generator-${version}.jar"/>
+         <junit printsummary="no" fork="no" haltonfailure="${haltonfailure}">
+             <formatter type="brief" usefile="no"/>
+             <classpath>
+@@ -295,6 +295,7 @@
+                         <include name="junit4.jar"/>
+                         <include name="easymock.jar"/>
+                         <include name="jmock.jar"/>
++                        <include name="hamcrest-core.jar"/>
+                     </fileset>
+                 </classpath>
+             </javac>
+diff --git a/hamcrest-unit-test/src/main/java/org/hamcrest/generator/ReflectiveFactoryReaderTest.java b/hamcrest-unit-test/src/main/java/org/hamcrest/generator/ReflectiveFactoryReaderTest.java
+index 5bf6038..d8d195e 100644
+--- a/hamcrest-unit-test/src/main/java/org/hamcrest/generator/ReflectiveFactoryReaderTest.java
++++ b/hamcrest-unit-test/src/main/java/org/hamcrest/generator/ReflectiveFactoryReaderTest.java
+@@ -30,23 +30,6 @@ public class ReflectiveFactoryReaderTest extends TestCase {
+ 
+     }
+ 
+-    public void testIteratesOverFactoryMethods() {
+-        Iterable<FactoryMethod> reader = new ReflectiveFactoryReader(SimpleSetOfMatchers.class);
+-        Iterator<FactoryMethod> methods = reader.iterator();
+-
+-        assertTrue("Expected first method", methods.hasNext());
+-        FactoryMethod firstMethod = methods.next();
+-        assertEquals("firstMethod", firstMethod.getName());
+-        assertEquals(SimpleSetOfMatchers.class.getName().replace('$', '.'), firstMethod.getMatcherClass());
+-
+-        assertTrue("Expected second method", methods.hasNext());
+-        FactoryMethod secondMethod = methods.next();
+-        assertEquals("secondMethod", secondMethod.getName());
+-        assertEquals(SimpleSetOfMatchers.class.getName().replace('$', '.'), secondMethod.getMatcherClass());
+-
+-        assertFalse("Expected no more methods", methods.hasNext());
+-    }
+-
+     public static class MatchersWithDodgySignatures {
+ 
+         @Factory
+@@ -79,19 +62,6 @@ public class ReflectiveFactoryReaderTest extends TestCase {
+ 
+     }
+ 
+-    public void testOnlyReadsPublicStaticAnnotatedMethodsThatReturnNonVoid() {
+-        Iterable<FactoryMethod> reader = new ReflectiveFactoryReader(MatchersWithDodgySignatures.class);
+-        Iterator<FactoryMethod> methods = reader.iterator();
+-
+-        assertTrue("Expected first method", methods.hasNext());
+-        assertEquals("goodMethod", methods.next().getName());
+-
+-        assertTrue("Expected second method", methods.hasNext());
+-        assertEquals("anotherGoodMethod", methods.next().getName());
+-
+-        assertFalse("Expected no more methods", methods.hasNext());
+-    }
+-
+     public static class GenerifiedMatchers {
+ 
+         @Factory
+@@ -266,4 +236,4 @@ public class ReflectiveFactoryReaderTest extends TestCase {
+         return null;
+     }
+ 
+-}
+\ No newline at end of file
++}

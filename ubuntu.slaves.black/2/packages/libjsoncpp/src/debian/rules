@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+%:
+	dh $@ --buildsystem=cmake
+
+ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+CONFIGURE_FLAGS += -DJSONCPP_WITH_TESTS=Off
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+			-DBUILD_STATIC_LIBS=OFF \
+			-DBUILD_OBJECT_LIBS=OFF \
+			-DCMAKE_INSTALL_INCLUDEDIR=include/jsoncpp \
+			$(CONFIGURE_FLAGS)
+
+override_dh_auto_test:
+	dh_auto_test --max-parallel=1
+
+override_dh_auto_build-indep:
+	ln -s obj-*/version .
+	python3 doxybuild.py --doxygen=/usr/bin/doxygen
+	rm version
+	dh_auto_build
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf dist
+	rm -f devtools/*.pyc
+	rm -f doc/doxyfile
+	rm -f doc/*.db

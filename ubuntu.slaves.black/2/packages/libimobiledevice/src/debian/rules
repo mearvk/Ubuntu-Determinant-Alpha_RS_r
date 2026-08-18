@@ -1,0 +1,46 @@
+#!/usr/bin/make -f
+
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed -Wl,-O1 -Wl,-z,defs
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+
+configure_flags += \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--enable-dev-tools \
+		--disable-silent-rules
+
+%:
+	dh $@ --with=python3
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(configure_flags) PYTHON=/usr/bin/python3 CYTHON=/usr/bin/cython3
+
+override_dh_auto_build-indep:
+	dh_auto_build
+	make docs
+	# remove doxygen jquery.js, we link to doxygen-provided file
+	rm -f $(CURDIR)/docs/html/jquery.js
+
+override_dh_install:
+	#Remove .la files.
+	rm -rf $(CURDIR)/debian/tmp/usr/lib/*/*.la
+	rm -rf $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/imobiledevice/*.la
+	rm -rf $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/*.la
+	#Remove .a files from python bindings.
+	rm -rf $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/imobiledevice/*.a
+	rm -rf $(CURDIR)/debian/tmp/usr/lib/python*/*-packages/*.a
+	#Remove installed man pages, installed by *.manpages
+	rm -f $(CURDIR)/debian/tmp/usr/share/man/man1/*.1
+	# Provide compatibility symlink for a while; upstream added -1.0 for 1.3.0
+	ln -s libimobiledevice-1.0.so.6 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libimobiledevice.so.6
+	ln -s libimobiledevice-1.0.so.6.0.0 debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libimobiledevice.so.6.0.0
+	ln -s libimobiledevice-1.0.so debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libimobiledevice.so
+	ln -s libimobiledevice-1.0.a debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/libimobiledevice.a
+	ln -s libimobiledevice-1.0.pc debian/tmp/usr/lib/$(DEB_TARGET_MULTIARCH)/pkgconfig/libimobiledevice.pc
+	dh_install
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+override_dh_makeshlibs:
+	dh_makeshlibs -- -c4

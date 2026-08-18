@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+# -*- Makefile -*-
+
+include /usr/share/dpkg/pkg-info.mk
+
+export PYBUILD_NAME=mecab
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+%:
+	dh $@ --with python3,ruby
+
+override_dh_auto_configure:
+	dh_auto_configure -- --with-perl5=/usr/bin/perl --libexecdir=/usr/lib/
+	mkdir -p java/org/chasen/mecab
+	for lang in perl python ruby java; do cp -rp $(CURDIR)/debian/$$lang $(CURDIR); $(MAKE) -C swig $$lang; done
+	dh_auto_configure --sourcedirectory=python --buildsystem=pybuild
+	dh_auto_configure --sourcedirectory=ruby --buildsystem=ruby
+
+override_dh_auto_build:
+	dh_auto_build -- CXXFLAGS+=-g
+	dh_auto_build --sourcedirectory=python --buildsystem=pybuild
+	dh_auto_build --sourcedirectory=ruby --buildsystem=ruby
+	$(MAKE) -C java
+
+override_dh_auto_install:
+	dh_auto_install
+	# delayed perl configuration since it needs mecab.so to link
+	dh_auto_configure --sourcedirectory=perl
+	dh_auto_build --sourcedirectory=perl
+	chrpath -d $(CURDIR)/perl/blib/arch/auto/MeCab/MeCab.so
+	dh_auto_install --sourcedirectory=perl --destdir=debian/libmecab-perl
+	dh_auto_install --sourcedirectory=python --buildsystem=pybuild
+	dh_auto_install --buildsystem=ruby
+	mkdir -p $(CURDIR)/debian/libmecab-java/usr/share/java
+	cp -p java/MeCab.jar $(CURDIR)/debian/libmecab-java/usr/share/java/MeCab-$(DEB_VERSION_UPSTREAM).jar
+	mkdir -p $(CURDIR)/debian/libmecab-jni/usr/lib/jni
+	cp -p java/libMeCab.so $(CURDIR)/debian/libmecab-jni/usr/lib/jni

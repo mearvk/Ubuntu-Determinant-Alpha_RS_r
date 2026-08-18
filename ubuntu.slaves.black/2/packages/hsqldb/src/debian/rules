@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+%:
+	dh $@ --with javahelper,maven_repo_helper --buildsystem=ant
+
+override_dh_auto_build:
+	dh_auto_build -- \
+		-f hsqldb/build/build.xml \
+		-Dant.build.javac.target=1.9 \
+		-Dant.build.javac.source=1.9 \
+		hsqldb hsqldbutil
+	$(MAKE) -C debian/bin all
+
+override_dh_installchangelogs:
+	dh_installchangelogs hsqldb/doc-src/changelist_2_0.txt
+
+override_dh_auto_clean:
+	dh_auto_clean -- \
+		-f hsqldb/build/build.xml
+
+override_dh_clean:
+	dh_clean
+	rm -f hsqldb/lib/hsqldb*.jar
+	$(MAKE) -C debian/bin clean
+	mkdir -p hsqldb/doc-src
+
+override_jh_classpath:
+	jh_classpath
+	jh_classpath -plibhsqldb-java --classpath=/usr/share/java/servlet-api.jar \
+		hsqldb/lib/hsqldb.jar

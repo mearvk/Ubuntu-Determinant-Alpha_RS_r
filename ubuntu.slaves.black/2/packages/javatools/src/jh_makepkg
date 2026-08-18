@@ -1,0 +1,416 @@
+#!/bin/bash --
+
+# options:
+#    make, ant, byhand
+#    app, library
+
+COMPAT=10
+STANDARDS=4.1.2
+
+set -e
+
+. /usr/share/javahelper/jh_lib.sh
+
+syntax()
+{
+   echo -e "Usage: jh_makepkg [options]"
+   echo -e "Options:"
+   echo -e "\t-h --help: show this text"
+   echo -e "\t-V --version: show the version"
+   echo -e "\t-p<name> --package=<name>: Set the name of the package (defaults to directory name without version)"
+   echo -e "\t-m<name> --maintainer=<name>: Set the maintainer name (defaults to DEBFULLNAME, NAME, or the user's full name)"
+   echo -e "\t-e<email> --email=<email>: Set the maintainer email (defaults to DEBEMAIL EMAIL or user@host)"
+   echo -e "\t-v<version> --upstream=<version>: Set the upstream version (defaults to the directory name after a -)"
+   echo -e "\t-c --clean: Tidy up common problems with Java source packages. Removes .class, .jar files and pre-built javadoc trees before creating the orig.tar.gz"
+   echo -e "\tPick One:"
+   echo -e "\t-l --library: This is a library package"
+   echo -e "\t-a --app: This is an application package"
+   echo -e "\tPick One:"
+   echo -e "\t-t --ant: Builds with ant"
+   echo -e "\t-k --makefiles: Builds with make"
+   echo -e "\t-n --none: Create own buildsystem"
+   echo -e "\tPick One:"
+   echo -e "\t-d --default: Build with default free platform compiler"
+   echo -e "\t-o --openjdk: Build with openjdk 6"
+   echo -e "\t-o7 --openjdk7: Build with openjdk 7"
+   echo -e "\t-o8 --openjdk8: Build with openjdk 8"
+   echo -e "\t-o9 --openjdk9: Build with openjdk 9"
+   echo -e "\t-o10 --openjdk10: Build with openjdk 10"
+   echo -e "\t-o11 --openjdk11: Build with openjdk 11"
+   echo -e "Environment Variables:"
+   echo -e "\tDEBEMAIL: Default maintainer email address"
+   echo -e "\tEMAIL: Default maintainer email address"
+   echo -e "\tDEBFULLNAME: Default maintainer name"
+   echo -e "\tNAME: Default maintainer name"
+   exit 1
+}
+
+ARGS="c clean p package m maintainer e email v upstream l library a app t ant k makefile n none o openjdk o7 openjdk7 o8 openjdk8 o9 openjdk9 o10 openjdk10 o11 openjdk11 d default" parseargs "$@"
+
+BUILDDIR="`pwd`"
+
+if [ -z "`getarg v upstream`" ]; then
+   VERSION="`basename "$BUILDDIR" | sed -n 's/^.*-//p'`"
+else
+   VERSION="`getarg v upstream`"
+fi
+if [ -z "`getarg p package`" ]; then
+   PACKAGE="`basename "$BUILDDIR" | sed -n 's/\(-.*\)\{0,1\}$//p'`"
+else
+   PACKAGE="`getarg p package`"
+fi
+
+if [ -z "$VERSION" ]; then
+   echo "Can't determine version from directory name `basename "$BUILDDIR"`, maybe it is not in the form package-version?"
+   exit 1
+fi
+
+if [ -z "$PACKAGE" ]; then
+   echo "Can't determine package name from directory name `basename "$BUILDDIR"`, maybe it is not in the form package-version?"
+   exit 1
+fi
+
+if [ ! -f ../${PACKAGE}_${VERSION}.orig.tar.gz ]; then
+
+   if [ -n "`getarg c clean`" ]; then
+      echo "Cleaning up source tree before creating orig.tar.gz"
+      find . -name '*.class' -print0 | xargs -0 rm -f
+      find . -name '*.jar' -print0 | xargs -0 rm -f
+      IFS='
+'
+      for doctree in `find . -name allclasses-frame.html`; do
+         TREE="`dirname $doctree`"
+         rm -rf "$TREE"/*
+      done
+      find * -type d -print0 | xargs -0 rmdir -p --ignore-fail-on-non-empty
+   fi
+
+   echo "Creating package $PACKAGE version $VERSION."
+   echo
+   echo "Building from source in $BUILDDIR"
+
+   cd ..
+   echo "Creating orig source tarball: ${PACKAGE}_${VERSION}.orig.tar.gz"
+   tar zcf "${PACKAGE}_${VERSION}.orig.tar.gz" "`basename "$BUILDDIR"`"
+   cd "$BUILDDIR"
+
+fi
+
+if [ -n "`getarg e email`" ]; then
+   DEBEMAIL="`getarg e email`"
+fi
+
+if [ -z "$DEBEMAIL" ]; then
+   DEBEMAIL="$EMAIL"
+fi
+
+if [ -z "$DEBEMAIL" ] && [ -f /etc/mailname ]; then
+   DEBEMAIL="`whoami`@`cat /etc/mailname`"
+fi
+
+if [ -z "$DEBEMAIL" ]; then
+   DEBEMAIL="`whoami`@`hostname --fqdn`"
+fi
+
+if [ -n "`getarg m maintainer`" ]; then
+   DEBFULLNAME="`getarg m maintainer`"
+fi
+
+if [ -z "$DEBFULLNAME" ]; then
+   DEBFULLNAME="$NAME"
+fi
+
+if [ -z "$DEBFULLNAME" ] ; then
+   DEBFULLNAME="$(getent passwd $(whoami) | cut -d: -f5 | cut -d, -f1)"
+fi
+
+echo "Packager: $DEBFULLNAME <$DEBEMAIL>"
+echo
+
+if [ -n "`getarg a app`" ]; then
+   TYPE="app"
+elif [ -n "`getarg l library`" ]; then
+   TYPE="lib"
+else
+   echo "What type of package is it? Application, or Library?"
+   echo "Select:"
+   echo -e "\t[A] Application (Default)"
+   echo -e "\t[L] Library"
+   echo -n "[Al] $ "
+   read t
+   echo
+   case $t in
+      "L"|"l")
+         TYPE="lib"
+         echo "Selected: Library"
+         ;;
+      *)
+         TYPE="app"
+         echo "Selected: Application"
+         ;;
+   esac
+fi
+case $TYPE in
+   "app")
+      SECTION=misc
+      SRCPACKAGE="$PACKAGE"
+      BINPACKAGE="$PACKAGE"
+   ;;
+   "lib")
+      SECTION=java
+      SRCPACKAGE="$PACKAGE"
+      BINPACKAGE="$PACKAGE"
+      if ! echo $BINPACKAGE | grep "^lib" >/dev/null; then
+         BINPACKAGE="lib$BINPACKAGE"
+      fi
+      if ! echo $BINPACKAGE | grep -- "-java$" >/dev/null; then
+         BINPACKAGE="$BINPACKAGE-java"
+      fi
+   ;;
+esac
+
+if [ -n "`getarg t ant`" ]; then
+   BUILD="ant"
+elif [ -n "`getarg k makefiles`" ]; then
+   BUILD="make"
+elif [ -n "`getarg n none`" ]; then
+   BUILD="byhand"
+else
+   echo "What type of build system does it have? Ant, Makefiles, or None?"
+   echo "Select:"
+   echo -e "\t[A] Ant"
+   echo -e "\t[M] Makefiles"
+   echo -e "\t[N] None---make one for me (Default)"
+   echo -n "[Namv] $ "
+   read t
+   echo
+   case $t in
+      "A"|"a")
+         BUILD="ant"
+         echo "Selected: Ant"
+         ;;
+      "M"|"m")
+         BUILD="make"
+         echo "Selected: Makefiles"
+         ;;
+      *)
+         BUILD="byhand"
+         echo "Selected: No upstream build system"
+         ;;
+   esac
+fi
+case $BUILD in
+   "make")
+   ;;
+   "ant")
+      DEPENDS="$DEPENDS, ant"
+   ;;
+   "byhand")
+   ;;
+esac
+
+if [ -n "`getarg d default`" ]; then
+   COMP="default"
+elif [ -n "`getarg o openjdk`" ]; then
+   COMP="open"
+elif [ -n "`getarg o7 openjdk7`" ]; then
+   COMP="open7"
+elif [ -n "`getarg o8 openjdk8`" ]; then
+   COMP="open8"
+elif [ -n "`getarg o9 openjdk9`" ]; then
+   COMP="open9"
+elif [ -n "`getarg o10 openjdk10`" ]; then
+   COMP="open10"
+elif [ -n "`getarg o11 openjdk11`" ]; then
+   COMP="open11"
+else
+   echo "Which Java runtime does it need? Which free runtime?"
+   echo "Select:"
+   echo -e "\t[F] Default Free compiler/runtime (Default)"
+   echo -e "\t[o] OpenJDK 6"
+   echo -e "\t[o7] OpenJDK 7"
+   echo -e "\t[o8] OpenJDK 8"
+   echo -e "\t[o9] OpenJDK 9"
+   echo -e "\t[o10] OpenJDK 10"
+   echo -e "\t[o11] OpenJDK 11"
+   echo -n "[FGoo7o8o9o10o11] $ "
+   read t
+   echo
+   case $t in
+      "O"|"o")
+         COMP="open"
+         echo "Selected: OpenJDK 6"
+         ;;
+      "O7"|"o7")
+         COMP="open7"
+         echo "Selected: OpenJDK 7"
+         ;;
+      "O8"|"o8")
+         COMP="open8"
+         echo "Selected: OpenJDK 8"
+         ;;
+      "O9"|"o9")
+         COMP="open9"
+         echo "Selected: OpenJDK 9"
+         ;;
+      "O10"|"o10")
+         COMP="open10"
+         echo "Selected: OpenJDK 10"
+         ;;
+      "O11"|"o11")
+         COMP="open11"
+         echo "Selected: OpenJDK 11"
+         ;;
+      *)
+         COMP="default"
+         echo "Selected: Default Free compiler"
+         ;;
+   esac
+fi
+
+case $COMP in
+   "default")
+      COMPILER=default-jdk
+      JAVA_HOME=/usr/lib/jvm/default-java
+   ;;
+   "open")
+      COMPILER=openjdk-6-jdk
+      JAVA_HOME="/usr/lib/jvm/java-6-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open
+   ;;
+   "open7")
+      COMPILER=openjdk-7-jdk
+      JAVA_HOME="/usr/lib/jvm/java-7-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open7
+   ;;
+   "open8")
+      COMPILER=openjdk-8-jdk
+      JAVA_HOME="/usr/lib/jvm/java-8-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open8
+   ;;
+   "open9")
+      COMPILER=openjdk-9-jdk
+      JAVA_HOME="/usr/lib/jvm/java-9-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open9
+   ;;
+   "open10")
+      COMPILER=openjdk-10-jdk
+      JAVA_HOME="/usr/lib/jvm/java-10-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open10
+   ;;
+   "open11")
+      COMPILER=openjdk-11-jdk
+      JAVA_HOME="/usr/lib/jvm/java-11-openjdk-\$(shell dpkg-architecture -qDEB_HOST_ARCH)"
+      JVM=open11
+   ;;
+esac
+
+YEAR=$(date +%Y)
+mkdir -p debian
+mkdir debian/source
+echo '3.0 (quilt)' > debian/source/format
+cat > debian/control <<END
+Source: $SRCPACKAGE
+Section: ${CONTRIB}$SECTION
+Priority: optional
+Maintainer: $DEBFULLNAME <$DEBEMAIL>
+Build-Depends: debhelper (>= $COMPAT), $COMPILER, javahelper (>= $JAVATOOLS_VERSION) $DEPENDS
+Standards-Version: $STANDARDS
+Homepage: <homepage>
+
+Package: $BINPACKAGE
+Architecture: all
+Depends: \${java:Depends}, \${misc:Depends}
+Recommends: \${java:Recommends}
+Description: Short Description
+ Long Description
+END
+
+if [ "$TYPE" = "lib" ] ; then
+   # add doc package template
+   cat >> debian/control <<END
+
+Package: $BINPACKAGE-doc
+Architecture: all
+Section: doc
+Depends: \${java:Depends}, \${misc:Depends}
+Recommends: \${java:Recommends}
+Description: Short Description - doc
+ Long Description
+ .
+ This package contains the Javadoc API
+END
+
+fi
+
+cat > debian/copyright <<END
+Format: [URI OF THE FORMAT SPECIFICATION, SUCH AS http://www.debian.org/doc/packaging-manuals/copyright-format/<VERSION>/]
+Upstream-Name: [THE NAME UPSTREAM USES FOR THE SOFTWARE]
+Upstream-contact: [THE PREFERRED ADDRESS(ES) TO REACH THE UPSTREAM PROJECT]
+Source: [AN EXPLANATION FROM WHERE THE UPSTREAM SOURCE CAME FROM. TYPICALLY AN URL]
+[OTHER FIELDS]
+
+Files: *
+Copyright: Copyright $YEAR John Doe <jdoe@example.com>
+License: [STANDARD ABBREVIATION -- SEE "Short names" SECTION OF SPECIFICATION]
+ [LICENSE TEXT]
+
+Files: debian/*
+Copyright: Copyright $YEAR $DEBFULLNAME <$DEBEMAIL>
+License: [STANDARD ABBREVIATION]
+ [LICENSE TEXT]
+
+[OTHER FILE PARAGRAPHS]
+END
+
+echo $COMPAT > debian/compat
+
+EDITOR=true DEBFULLNAME="$DEBFULLNAME" DEBEMAIL="$DEBEMAIL" dch --create --package $SRCPACKAGE --newversion ${VERSION}-1 --distribution unstable --urgency low
+
+cat > debian/rules <<END
+#!/usr/bin/make -f
+
+export JAVA_HOME=${JAVA_HOME}
+
+# Put depended upon jars in here
+# export CLASSPATH=
+
+%:
+    dh \$@ --with javahelper
+
+END
+
+case $BUILD in
+   "ant")
+   ;;
+   "make")
+   ;;
+   "byhand")
+      echo ${SRCPACKAGE}.jar src > debian/javabuild
+   ;;
+esac
+
+case $TYPE in
+   "app")
+      echo "$SRCPACKAGE.jar usr/share/$BINPACKAGE" > debian/$BINPACKAGE.install
+      cat >> debian/$BINPACKAGE.manifest <<END
+usr/share/$BINPACKAGE/$SRCPACKAGE.jar:
+ Main-Class: <Main Class>
+ Debian-Java-Home: $JAVA_HOME
+END
+      echo "usr/share/$BINPACKAGE/$SRCPACKAGE.jar usr/bin/$SRCPACKAGE" > debian/$BINPACKAGE.links
+   ;;
+   "lib")
+      echo "$SRCPACKAGE.jar" > debian/$BINPACKAGE.jlibs
+      if [ "$BUILD" = "byhand" ]; then
+          echo "internal" > debian/$BINPACKAGE-doc.javadoc
+      else
+          echo "<javadoc build dir here>" > debian/$BINPACKAGE-doc.javadoc
+      fi
+   ;;
+esac
+
+chmod +x debian/rules
+
+echo "Packaging created. You will have to edit most or all of the files in debian/ before it works"
+

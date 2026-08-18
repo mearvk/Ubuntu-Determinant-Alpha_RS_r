@@ -1,0 +1,83 @@
+From: Markus Koschany <apo@debian.org>
+Date: Wed, 3 Oct 2018 15:42:47 +0200
+Subject: build
+--- a/build.xml
++++ b/build.xml
+@@ -39,6 +39,16 @@
+ 		<fileset dir="lib/build">
+ 			<include name="*.jar" />
+ 		</fileset>
++		<fileset dir="/usr/share/java">
++			<include name="eclipse-core-jobs.jar" />
++			<include name="eclipse-core-runtime.jar" />
++			<include name="eclipse-core-resources.jar" />
++			<include name="eclipse-jdt-core.jar" />
++			<include name="eclipse-jdt-core-manipulation.jar" />
++			<include name="eclipse-jdt-ui.jar" />
++			<include name="eclipse-jface-text.jar" />
++			<include name="equinox-common.jar" />
++		</fileset>
+ 	</path>
+ 	
+ 	<path id="runtime.path">
+@@ -89,14 +99,14 @@
+ 		<fail>A new version of ivyplusplus was required and has been downloaded. Rerun the script to continue.</fail>
+ 	</target>
+ 	
+-	<target name="ensure-ipp" depends="load-ipp, redownload-ipp" />
++	<target name="ensure-ipp" />
+ 	
+ 	<target name="config-ivy" depends="ensure-ipp" unless="ivy.config">
+ 		<ivy:configure file="buildScripts/ivysettings.xml" />
+ 		<property name="ivy.config" value="true" />
+ 	</target>
+ 	
+-	<target name="deps" depends="ensureBuildDeps, ensureRuntimeDeps, ensureTestDeps, contrib" description="Downloads all dependencies." />
++	<target name="deps" depends="" description="Do not download anything" />
+ 	
+ 	<target name="contrib" depends="config-ivy" description="Downloads various non-crucial documentation, sources, etc that are useful when developing lombok.ast.">
+ 		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="contrib, ecj7, ecj8, ecj9" />
+@@ -119,8 +129,6 @@
+ 	</target>
+ 	
+ 	<target name="ensureRuntimeDeps" depends="config-ivy">
+-		<ivy:resolve file="buildScripts/ivy.xml" refresh="true" conf="runtime" />
+-		<ivy:retrieve />
+ 	</target>
+ 	
+ 	<target name="ensureTestDeps" depends="config-ivy">
+@@ -157,7 +165,7 @@
+ 		<echo level="info">Lombok version: ${lombok.version} (${lombok.fullversion})</echo>
+ 	</target>
+ 	
+-	<target name="-unpackLibs" depends="ensureRuntimeDeps">
++	<target name="-unpackLibs" depends="">
+ 		<ivy:cachedunjar dest="build/lombok" marker="build/unpackDeps.marker">
+ 			<path refid="runtime.path" />
+ 		</ivy:cachedunjar>
+@@ -170,7 +178,7 @@
+ 		<fail if="java.version.insufficient">To compile lombok, you need JDK9 or higher; lombok requires this version because it's rather difficult to produce lombok builds that are compatible on JDK9 without at least building with JDK9. Sorry about that.</fail>
+ 	</target>
+ 	
+-	<target name="compile" depends="version, ensureBuildDeps, -unpackLibs, -ensureJdk9" description="Compiles the code.">
++	<target name="compile" depends="-unpackLibs, -ensureJdk9" description="Compiles the code.">
+         <fail>
+ For compiling with Java9 'modulepath' an Ant version 1.9.7+ or 1.10.0+ is required. 
+ Your current version is:
+@@ -287,6 +295,7 @@
+ 			<include name="lombok/javac/**" />
+ 			<include name="lombok/delombok/**" />
+ 			<classpath location="build/lombok" />
++			<classpath location="build/stubsstubs" />
+ 			<classpath refid="build.path" />
+ 		</ivy:compile>
+ 		<delete dir="build/lombok-proc-result" quiet="true" />
+@@ -325,7 +334,7 @@
+ 		</ant>
+ 	</target>
+ 	
+-	<target name="dist" description="Builds THE lombok.jar file which contains everything." depends="version, compile, -latestChanges">
++	<target name="dist" description="Builds THE lombok.jar file which contains everything." depends="version, compile">
+ 		<mkdir dir="dist" />
+ 		<copy file="doc/changelog.markdown" tofile="build/changelog.txt" />
+ 		<tstamp>

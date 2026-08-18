@@ -1,0 +1,45 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Format: 3.0 (quilt)
+Source: libcommons-collections3-java
+Binary: libcommons-collections3-java, libcommons-collections3-java-doc
+Architecture: all
+Version: 3.2.2-2
+Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Uploaders:  Varun Hiremath <varun@debian.org>, Emmanuel Bourg <ebourg@apache.org>
+Homepage: http://commons.apache.org/collections/
+Standards-Version: 4.2.1
+Vcs-Browser: https://salsa.debian.org/java-team/libcommons-collections3-java
+Vcs-Git: https://salsa.debian.org/java-team/libcommons-collections3-java.git
+Build-Depends: ant, ant-optional, debhelper (>= 11), default-jdk, default-jdk-doc, junit, maven-repo-helper
+Package-List:
+ libcommons-collections3-java deb java optional arch=all
+ libcommons-collections3-java-doc deb doc optional arch=all
+Checksums-Sha1:
+ a44e73e271adad45a7c7fcc402cfa2731dd0d2b7 387932 libcommons-collections3-java_3.2.2.orig.tar.xz
+ 51ef3d6b32a37c29e177d9565be4e08773b9e685 7512 libcommons-collections3-java_3.2.2-2.debian.tar.xz
+Checksums-Sha256:
+ 04747f22038291c79ae0059dcec184ea2a40b7aaf5ed55e9c50fe2b646ebd771 387932 libcommons-collections3-java_3.2.2.orig.tar.xz
+ 375971ff566427c871558dc72732a1618e524e2549974c62df971d10684df637 7512 libcommons-collections3-java_3.2.2-2.debian.tar.xz
+Files:
+ f0bf895c8676a16eea69c9f8f3c3b0d3 387932 libcommons-collections3-java_3.2.2.orig.tar.xz
+ 7f8f4af7b6ef277b40ce85e428c83594 7512 libcommons-collections3-java_3.2.2-2.debian.tar.xz
+
+-----BEGIN PGP SIGNATURE-----
+
+iQJGBAEBCgAwFiEEuM5N4hCA3PkD4WxA9RPEGeS50KwFAlvhwWESHGVib3VyZ0Bh
+cGFjaGUub3JnAAoJEPUTxBnkudCs7ZwQAJB7eyM0Uwbjjl2dduJ6KLP0p3nR4C7h
+44gMWPxIu6m4ZIc5amBsjVMgdzbC9ocRrkywBav+Wd38rJmU/0Xx/E3xxF4RWSao
+dgI/UR3bVi/vUdrcO+oiiMQkP2iTwLwyhf07sx8DwnT/jF5EmthZd6P1mmeE7BKA
+1NuXPan2gZ8tWcmlYz8f9FqyHeQIMMyTOwIncwdNQ1A+X2dYfczmGS59idd+wATT
+szRfNHnzhVsQiBQe2nz2BwtZl4Jo1EEHgSnNVjhbaA8nFGvn7aUAh6LbDFzhPAfC
+GE6rnpfMQszE5UhjvrdPTTlOjZQ/9J14jnDl7WIr+33xRTWc2sK0MbYYoruTuFVP
+KwSZrXN+tbuurmgJlHfLkRBmSHaevtnxjpkDMdaCzlDzVaH37/yw/Z+hD5APLG+s
+EknUqF7IzM6mZlVI9Rl7Ij+XnjxRLhtIFXGaiFleZRUK/tgDiTy3PP6uTM1rV6Vb
++Wtcd5wfKO9zwc/g7zVVzotEqiVcD+t68kpYIGbqvksDKa9WqXIMf1kmePNus7aA
+bHJeW+orl/yVb6B9MgShSAeqaaht5bOg3efaq2r14mdf9rEfx0T2Jlj4vqzFy9ie
+IsGGI/M2NGLJpxdOYTAHFXgCwjx5ZofmNcMyhnO88OAQJW/YyM3BlHp7YakTQ06z
+HBAR4psoE/cY
+=lG0F
+-----END PGP SIGNATURE-----

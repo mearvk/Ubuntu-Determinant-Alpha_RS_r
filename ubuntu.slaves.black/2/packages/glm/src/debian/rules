@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	dh_auto_configure -- -DCMAKE_INSTALL_LIBDIR="lib" \
+		-DGLM_TEST_ENABLE=ON
+else
+	dh_auto_configure -- -DCMAKE_INSTALL_LIBDIR="lib" \
+		-DGLM_TEST_ENABLE=OFF
+endif
+
+override_dh_install:
+	dh_install
+	find debian -name CMakeLists.txt -delete
+
+override_dh_auto_build:
+	dh_auto_build
+	cd doc; doxygen man.doxy
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf doc/html
+
+# NOTE: This override may be removed in the future if upstream decides to use
+# the enable_testing() command in CMake.
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	make -C obj-* test
+endif

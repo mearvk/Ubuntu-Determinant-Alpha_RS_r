@@ -1,0 +1,81 @@
+From 6cd92a8216afcd1d3f6ff90cc150ba150800b11d Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Wed, 21 Aug 2019 05:29:50 +0200
+Subject: [PATCH libaio 27/28] harness: Print better error messages on error
+ conditions in 22.t
+
+These should help diagnose problems when dealing with error failures.
+In particular this helped distinguish the problem with io_pgetevents()
+not being implemented and it failing due to the sigset_t layout bug.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+[JEM: fix up 80 columns violations]
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/22.t | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/harness/cases/22.t b/harness/cases/22.t
+index b13024e..c47140d 100644
+--- a/harness/cases/22.t
++++ b/harness/cases/22.t
+@@ -76,7 +76,7 @@ int test_main(void)
+ 
+ 		ret = io_setup(1, &ctx);
+ 		if (ret) {
+-			printf("child: io_setup failed\n");
++			printf("child: io_setup failed: %s\n", strerror(-ret));
+ 			return 1;
+ 		}
+ 
+@@ -86,7 +86,7 @@ int test_main(void)
+ 			/* if poll isn't supported, skip the test */
+ 			if (ret == -EINVAL)
+ 				return 3;
+-			printf("child: io_submit failed\n");
++			printf("child: io_submit failed: %s\n", strerror(-ret));
+ 			return 1;
+ 		}
+ 
+@@ -99,7 +99,8 @@ int test_main(void)
+ 		} while (ret == 0);
+ 
+ 		if (ret != -EINTR) {
+-			printf("child: io_pgetevents did not set errno to EINTR\n");
++			printf("child: io_pgetevents did not set errno to "
++			       "EINTR: %s\n", strerror(-ret));
+ 			return 1;
+ 		}
+ 
+@@ -117,7 +118,7 @@ int test_main(void)
+ 
+ 		ret = io_setup(1, &ctx);
+ 		if (ret) {
+-			printf("parent: io_setup failed\n");
++			printf("parent: io_setup failed: %s\n", strerror(-ret));
+ 			return 1;
+ 		}
+ 
+@@ -126,7 +127,8 @@ int test_main(void)
+ 			/* if poll isn't supported, skip the test */
+ 			if (ret == -EINVAL)
+ 				return 3;
+-			printf("parent: io_submit failed with %d\n", ret);
++			printf("parent: io_submit failed with %d: %s\n",
++			       ret, strerror(-ret));
+ 			return 1;
+ 		}
+ 
+@@ -134,7 +136,8 @@ int test_main(void)
+ 
+ 		ret = io_pgetevents(ctx, 1, 1, &ev, NULL, &sigmask);
+ 		if (ret < 0) {
+-			printf("parent: io_pgetevents failed\n");
++			printf("parent: io_pgetevents failed: %s\n",
++			       strerror(-ret));
+ 			return 1;
+ 		}
+ 		if (ret != 1) {
+-- 
+2.26.0.292.g33ef6b2f38
+

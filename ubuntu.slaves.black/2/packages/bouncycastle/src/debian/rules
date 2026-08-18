@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export CLASSPATH=/usr/share/java/javax.mail.jar
+
+%:
+	dh $@ --buildsystem=ant --with maven-repo-helper --with javahelper
+
+override_dh_auto_build:
+	mkdir -p core/src/test/data
+	for component in core prov tls pkix pg mail; do mkdir -p $${component}/src/test/resources; done;
+	dh_auto_build -- -f ant/jdk15+.xml build-provider build -Djunit.jar.home=/usr/share/java/junit4.jar
+
+override_dh_auto_install:
+	dh_auto_install
+	dh_installdirs -plibbcprov-java etc/java/security/security.d
+	touch debian/libbcprov-java/etc/java/security/security.d/2000-org.bouncycastle.jce.provider.BouncyCastleProvider
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- docs/releasenotes.html
+
+override_dh_auto_clean:
+	dh_auto_clean -- -f ant/jdk15+.xml
+
+get-orig-pom:
+	mkdir -p debian/poms
+	for pom in bcprov bcpg bcmail bcpkix bctls; do \
+		wget -O debian/poms/$${pom}.pom -U NoAgent-1.0 \
+			https://repo1.maven.org/maven2/org/bouncycastle/$${pom}-jdk15on/$(DEB_VERSION_UPSTREAM)/$${pom}-jdk15on-$(DEB_VERSION_UPSTREAM).pom ; \
+	done ;

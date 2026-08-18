@@ -1,0 +1,159 @@
+.\"     Title: ieee1284_transfer
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Functions
+.\"    Source: 
+.\"
+.TH "IEEE1284_TRANSFER" "3" "09/18/2007" "" "Functions"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+ieee1284_nibble_read, ieee1284_compat_write, ieee1284_byte_read, ieee1284_epp_read_data, ieee1284_epp_write_data, ieee1284_epp_read_addr, ieee1284_epp_write_addr, ieee1284_ecp_read_data, ieee1284_ecp_write_data, ieee1284_ecp_read_addr, ieee1284_ecp_write_addr \- data transfer functions
+.SH "SYNOPSIS"
+.sp
+.ft B
+.nf
+#include <ieee1284.h>
+.fi
+.ft
+.HP 29
+.BI "ssize_t ieee1284_nibble_read(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 30
+.BI "ssize_t ieee1284_compat_write(struct\ parport\ *" "port" ", int\ " "flags" ", const\ char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 27
+.BI "ssize_t ieee1284_byte_read(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 31
+.BI "ssize_t ieee1284_epp_read_data(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 32
+.BI "ssize_t ieee1284_epp_write_data(struct\ parport\ *" "port" ", int\ " "flags" ", const\ char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 31
+.BI "ssize_t ieee1284_epp_read_addr(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 32
+.BI "ssize_t ieee1284_epp_write_addr(struct\ parport\ *" "port" ", int\ " "flags" ", const\ char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 31
+.BI "ssize_t ieee1284_ecp_read_data(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 32
+.BI "ssize_t ieee1284_ecp_write_data(struct\ parport\ *" "port" ", int\ " "flags" ", const\ char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 31
+.BI "ssize_t ieee1284_ecp_read_addr(struct\ parport\ *" "port" ", int\ " "flags" ", char\ *" "buffer" ", size_t\ " "len" ");"
+.HP 32
+.BI "ssize_t ieee1284_ecp_write_addr(struct\ parport\ *" "port" ", int\ " "flags" ", const\ char\ *" "buffer" ", size_t\ " "len" ");"
+.SH "DESCRIPTION"
+.PP
+This set of functions is for tranferring bytes in the relevant transfer mode. For ECP and EPP modes two types of transfer are possible:
+data
+and
+address
+(usually referred to as
+channel
+in ECP).
+.PP
+The supplied
+\fIport\fR
+must be a claimed port.
+.PP
+The supplied
+\fIbuffer\fR
+must be at least
+\fIlen\fR
+bytes long. When reading, the transferred data is stored in the buffer; when writing the data to be transferred is taken from the buffer.
+.PP
+For reads (peripheral to host): if no data is available and
+\fBF1284_NONBLOCK\fR
+is not in effect, the inactivity timer is started. If data becomes available before the inactivity time\-out elapses it is read; otherwise the return value will be
+\fBE1284_TIMEDOUT\fR.
+.PP
+For writes (host to peripheral): if the peripheral is not willing to accept data and
+\fBF1284_NONBLOCK\fR
+is not in effect, the inactivity timer is started. If the peripheral indicates that it is willing to accept data before the inactivity time\-out elapses it is sent; otherwise the return value will be
+\fBE1284_TIMEDOUT\fR
+.PP
+The
+\fIflags\fR
+may alter the behaviour slightly:
+.PP
+\fBF1284_NONBLOCK\fR
+.RS 4
+For reads (peripheral to host): if no data is available, return immediately (with
+\fBE1284_TIMEDOUT\fR).
+.sp
+For writes (host to peripheral): if the peripheral is not willing to accept data, return immediately (with
+\fBE1284_TIMEDOUT\fR).
+.RE
+.PP
+\fBF1284_SWE\fR
+.RS 4
+Don't use hardware assistance for the transfer, but instead set the parallel port pins according to the wire protocol.
+.RE
+.PP
+\fBF1284_RLE\fR (for ECP only)
+.RS 4
+Use run length encoding. If the peripheral is in ECP mode with RLE, calls to
+\fBieee1284_ecp_read_data\fR
+\fImust\fR
+set this flag in order for the RLE from the peripheral to be interpreted correctly, and calls to
+\fBieee1284_ecp_write_data\fR
+\fImay\fR
+set this flag in order to take advantage of RLE.
+.RE
+.PP
+\fBF1284_FASTEPP\fR (for EPP only)
+.RS 4
+Use multi\-byte transfers. Several bytes at a time are transferred using hardware assistance, if supporting hardware is present. The price of this increased speed is that the return value will be less reliable when this flag is used.
+.RE
+.PP
+For ECP mode, a given direction is in force at any particular time, and it is up to the application to ensure that it is only writing when in forward mode, and reading when in reverse mode.
+.SH "RETURN VALUE"
+.PP
+The return value is the number of bytes successfully transferred or, if negative, one of:
+.PP
+\fBE1284_NOTIMPL\fR
+.RS 4
+This transfer mode and flags combination is not yet implemented in libieee1284.
+.RE
+.PP
+\fBE1284_TIMEDOUT\fR
+.RS 4
+Timed out waiting for peripheral to handshake.
+.RE
+.PP
+\fBE1284_NOMEM\fR
+.RS 4
+Not enough memory is available.
+.RE
+.PP
+\fBE1284_SYS\fR
+.RS 4
+There was a problem at the operating system level. The global variable
+\fIerrno\fR
+has been set appropriately.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid (for instance, perhaps the
+\fIport\fR
+is not claimed).
+.RE
+.PP
+If any bytes are successfully transferred, that number is returned. An error is returned only if no bytes are transferred.
+.PP
+For host\-to\-peripheral transfers, all data is at the peripheral by the time the call returns.
+.SH "SEE ALSO"
+.PP
+\fBieee1284_ecp_fwd_to_rev\fR(3)
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

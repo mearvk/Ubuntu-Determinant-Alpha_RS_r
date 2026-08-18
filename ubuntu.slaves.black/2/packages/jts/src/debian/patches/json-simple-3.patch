@@ -1,0 +1,181 @@
+Description: Migrate away from deprecated json-simple 1.x classes
+ See json-simple 2.0.0 changelog:
+ > * Deprecated JSONParse and JSONValue in favor of Jsoner.
+ > * Deprecated JSONStreamAware and JSONAware in favor of Jsonable.
+ > * Deprecated JSONObject in favor of JsonObject.
+ > * Deprecated JSONArray in favor of JsonArray.
+ .
+ This patch uses the new json-simple Json* classes. It is compatible with
+ both 2.x and 3.x json-simple releases, with a few ajustments regarding
+ backward incompatible changes in json-simple 3.x:
+ - The package name, changed to com.github.cliftonlabs.json_simple
+ - The exception DeserializationExcetpion renamed as JsonException
+ These two changes are handled using place-holders @JSON_SIMPLE_PACKAGE@
+ and @JSON_EXCEPTION@ which are substituted at build time by debian/rules.
+ .
+ With these tricks the package is compatible with json-simple 2.x and 3.x.
+Author: Gilles Filippini <pini@debian.org>
+Bug-Debian: https://bugs.debian.org/960652
+Forwarded: not-needed
+
+--- a/modules/io/common/src/main/java/org/locationtech/jts/io/geojson/GeoJsonReader.java
++++ b/modules/io/common/src/main/java/org/locationtech/jts/io/geojson/GeoJsonReader.java
+@@ -19,7 +19,7 @@ import java.util.Collections;
+ import java.util.List;
+ import java.util.Map;
+ 
+-import org.json.simple.parser.JSONParser;
++import @JSON_SIMPLE_PACKAGE@.Jsoner;
+ import org.locationtech.jts.geom.CoordinateSequence;
+ import org.locationtech.jts.geom.Geometry;
+ import org.locationtech.jts.geom.GeometryFactory;
+@@ -110,15 +110,12 @@ public class GeoJsonReader {
+   @SuppressWarnings("unchecked")
+   public Geometry read(Reader reader) throws ParseException {
+     Map<String, Object> geometryMap = null;
+-    JSONParser parser = new JSONParser();
+     try {
+-      Object obj =  parser.parse(reader);
++      Object obj =  Jsoner.deserialize(reader);
+       geometryMap = (Map<String, Object>) obj;
+     } catch (ClassCastException e) {
+       throw new ParseException("Could not parse Geometry from Json string.");
+-    }catch (org.json.simple.parser.ParseException e) {
+-      throw new ParseException(e);
+-    } catch (IOException e) {
++    } catch (@JSON_SIMPLE_PACKAGE@.@JSON_EXCEPTION@ e) {
+       throw new ParseException(e);
+     }
+     
+--- a/modules/io/common/src/main/java/org/locationtech/jts/io/geojson/GeoJsonWriter.java
++++ b/modules/io/common/src/main/java/org/locationtech/jts/io/geojson/GeoJsonWriter.java
+@@ -11,8 +11,8 @@
+  */
+ package org.locationtech.jts.io.geojson;
+ 
+-import org.json.simple.JSONAware;
+-import org.json.simple.JSONObject;
++import @JSON_SIMPLE_PACKAGE@.Jsonable;
++import @JSON_SIMPLE_PACKAGE@.JsonObject;
+ import org.locationtech.jts.geom.CoordinateSequence;
+ import org.locationtech.jts.geom.Geometry;
+ import org.locationtech.jts.geom.GeometryCollection;
+@@ -128,14 +128,14 @@ public class GeoJsonWriter {
+    *           throws an IOException when unable to write the JSON string
+    */
+   public void write(Geometry geometry, Writer writer) throws IOException {
+-    Map<String, Object> map = create(geometry, isEncodeCRS);
+-    JSONObject.writeJSONString(map, writer);
++    JsonObject map = create(geometry, isEncodeCRS);
++    map.toJson(writer);
+     writer.flush();
+   }
+ 
+-  private Map<String, Object> create(Geometry geometry, boolean encodeCRS) {
++  private JsonObject create(Geometry geometry, boolean encodeCRS) {
+ 
+-    Map<String, Object> result = new LinkedHashMap<String, Object>();
++    JsonObject result = new JsonObject();
+     result.put(GeoJsonConstants.NAME_TYPE, geometry.getGeometryType());
+ 
+     if (geometry instanceof Point) {
+@@ -145,11 +145,13 @@ public class GeoJsonWriter {
+       final String jsonString = coordinateSequence.size() == 0
+           ? JSON_ARRAY_EMPTY : getJsonString(coordinateSequence);
+ 
+-      result.put(GeoJsonConstants.NAME_COORDINATES, new JSONAware() {
++      result.put(GeoJsonConstants.NAME_COORDINATES, new Jsonable() {
+ 
+-        public String toJSONString() {
++        public String toJson() {
+           return jsonString;
+         }
++        public void toJson(Writer out) {
++        }
+       });
+ 
+     } else if (geometry instanceof LineString) {
+@@ -159,11 +161,13 @@ public class GeoJsonWriter {
+       final String jsonString = coordinateSequence.size() == 0
+           ? JSON_ARRAY_EMPTY : getJsonString(coordinateSequence);
+ 
+-      result.put(GeoJsonConstants.NAME_COORDINATES, new JSONAware() {
++      result.put(GeoJsonConstants.NAME_COORDINATES, new Jsonable() {
+ 
+-        public String toJSONString() {
++        public String toJson() {
+           return jsonString;
+         }
++        public void toJson(Writer out) {
++        }
+       });
+ 
+     } else if (geometry instanceof Polygon) {
+@@ -230,27 +234,31 @@ public class GeoJsonWriter {
+     return result;
+   }
+ 
+-  private List<JSONAware> makeJsonAware(Polygon poly) {
+-    ArrayList<JSONAware> result = new ArrayList<JSONAware>();
++  private List<Jsonable> makeJsonAware(Polygon poly) {
++    ArrayList<Jsonable> result = new ArrayList<Jsonable>();
+ 
+     {
+       final String jsonString = getJsonString(poly.getExteriorRing()
+           .getCoordinateSequence());
+-      result.add(new JSONAware() {
++      result.add(new Jsonable() {
+ 
+-        public String toJSONString() {
++        public String toJson() {
+           return jsonString;
+         }
++        public void toJson(Writer out) {
++        }
+       });
+     }
+     for (int i = 0; i < poly.getNumInteriorRing(); i++) {
+       final String jsonString = getJsonString(poly.getInteriorRingN(i)
+           .getCoordinateSequence());
+-      result.add(new JSONAware() {
++      result.add(new Jsonable() {
+ 
+-        public String toJSONString() {
++        public String toJson() {
+           return jsonString;
+         }
++        public void toJson(Writer out) {
++        }
+       });
+     }
+ 
+@@ -272,21 +280,25 @@ public class GeoJsonWriter {
+         LineString lineString = (LineString) geometry;
+         final String jsonString = getJsonString(lineString
+             .getCoordinateSequence());
+-        list.add(new JSONAware() {
++        list.add(new Jsonable() {
+ 
+-          public String toJSONString() {
++          public String toJson() {
+             return jsonString;
+           }
++          public void toJson(Writer out) {
++          }
+         });
+       } 
+       else if (geometry instanceof Point) {
+         Point point = (Point) geometry;
+         final String jsonString = getJsonString(point.getCoordinateSequence());
+-        list.add(new JSONAware() {
++        list.add(new Jsonable() {
+ 
+-          public String toJSONString() {
++          public String toJson() {
+             return jsonString;
+           }
++          public void toJson(Writer out) {
++          }
+         });
+       }
+     }

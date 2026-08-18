@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+export BUILD_DATE=$(shell date --date='@${SOURCE_DATE_EPOCH}' --utc +'%Y-%m-%d %H:%M:%S')
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Replace the missing groovy-maven-plugin
+	mkdir -p common/target
+	groovy -Dcollection.template.dir=common/src/main/templates \
+	       -Dcollection.template.test.dir=common/src/test/templates \
+	       -Dcollection.src.dir=common/target/generated-sources/collections/java \
+	       -Dcollection.testsrc.dir=common/target/generated-test-sources/collections/java \
+	       common/src/main/script/codegen.groovy
+
+	dh_auto_build -- package -Dbuild.date='${BUILD_DATE}'
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f common/dependency-reduced-pom.xml

@@ -1,0 +1,47 @@
+From d2029c6693561b555723b228c9172fd2dc02646e Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Wed, 21 Aug 2019 05:29:52 +0200
+Subject: [PATCH libaio 28/28] harness: Skip the test if io_pgetevents() is not
+ implemented
+
+Either the kernel or the syscall wrapper will return -ENOSYS when this
+syscall is not implemented. So we should cope with this in the test
+suite and SKIP the test case.
+
+This is currently the case for alpha and ia64, even though they have
+already been wired up very recently in the kernel mainline.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ harness/cases/22.t | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/harness/cases/22.t b/harness/cases/22.t
+index c47140d..d6a8986 100644
+--- a/harness/cases/22.t
++++ b/harness/cases/22.t
+@@ -98,6 +98,10 @@ int test_main(void)
+ 			ret = io_pgetevents(ctx, 1, 1, &ev, &to, &sigmask);
+ 		} while (ret == 0);
+ 
++		/* SKIP if the syscall has not been implemented. */
++		if (ret == -ENOSYS)
++			return 3;
++
+ 		if (ret != -EINTR) {
+ 			printf("child: io_pgetevents did not set errno to "
+ 			       "EINTR: %s\n", strerror(-ret));
+@@ -135,6 +139,9 @@ int test_main(void)
+ 		kill(p, SIGUSR1);
+ 
+ 		ret = io_pgetevents(ctx, 1, 1, &ev, NULL, &sigmask);
++		/* SKIP if the syscall has not been implemented. */
++		if (ret == -ENOSYS)
++			return 3;
+ 		if (ret < 0) {
+ 			printf("parent: io_pgetevents failed: %s\n",
+ 			       strerror(-ret));
+-- 
+2.26.0.292.g33ef6b2f38
+

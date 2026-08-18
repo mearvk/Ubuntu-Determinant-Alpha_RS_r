@@ -1,0 +1,79 @@
+Description: Also check for term.h and handle its presence
+
+--- a/configure.ac.footer
++++ b/configure.ac.footer
+@@ -67,7 +67,7 @@
+ fi
+ 
+ # Header-checks
+-AC_CHECK_HEADERS(syslog.h linux/input.h linux/joystick.h ncurses.h ncurses/curses.h curses.h)
++AC_CHECK_HEADERS(syslog.h linux/input.h linux/joystick.h ncurses.h ncurses/curses.h curses.h term.h)
+ AC_CHECK_HEADERS(sys/sysmacros.h linux/major.h linux/tty.h)
+ 
+ # Required headers
+@@ -130,7 +130,7 @@
+         else :; fi
+     done
+     SHARED_LIBS="$LIBS $TERMLIBS -lc"
+-    LIBS=$SAVELIBS ;;
++    LIBS="$LIBS $SAVELIBS" ;;
+ esac    
+ 
+ GPMXTERM=
+--- a/src/lib/liblow.c
++++ b/src/lib/liblow.c
+@@ -46,6 +46,12 @@
+ #include <sys/kd.h>        /* KDGETMODE */
+ #include <termios.h>       /* winsize */
+ 
++#ifdef HAVE_TERM_H
++#include <curses.h>
++#include <term.h>
++#undef buttons
++#endif /* HAVE_TERM_H */
++
+ #include "headers/gpmInt.h"
+ #include "headers/message.h"
+ 
+@@ -190,24 +196,40 @@
+ int Gpm_Open(Gpm_Connect *conn, int flag)
+ {
+    char *tty = NULL;
+-   char *term = NULL;
+    int i;
+    struct sockaddr_un addr;
+    struct winsize win;
+    Gpm_Stst *new = NULL;
+    char* sock_name = 0;
++#ifdef HAVE_TERM_H
++   char *mousecap;
++   int terror;
++#else /* ! HAVE_TERM_H */
++   char *term;
++#endif /* HAVE_TERM_H */
+    static char *consolename = NULL;
+    int gpm_is_disabled = 0;
+ 
+    /*....................................... First of all, check xterm */
+ 
++#ifdef HAVE_TERM_H
++   if (setupterm((char *) 0, 1, &terror) == 0 && terror == 1
++       && (mousecap=tigetstr("kmous")) && mousecap != (char *)-1
++       && mousecap[0]) {
++     del_curterm(cur_term);
++#else /* ! HAVE_TERM_H */
+    if ((term=(char *)getenv("TERM")) && !strncmp(term,"xterm",5)) {
++#endif
+       if(gpm_tried) return gpm_fd; /* no stack */
+       gpm_fd=-2;
+       GPM_XTERM_ON;
+       gpm_flag=1;
+       return gpm_fd;
+    }
++#ifdef HAVE_TERM_H
++   if (cur_term)
++     del_curterm(cur_term);
++#endif /* HAVE_TERM_H */
+    /*....................................... No xterm, go on */
+ 
+    /* check whether we know what name the console is: what's with the lib??? */

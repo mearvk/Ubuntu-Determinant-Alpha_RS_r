@@ -1,0 +1,93 @@
+Description: Sharness: Remove tests to/from invalid files
+ On FreeBSD (12.1, 11.4, 11.3) and NetBSD (9.0, 8.1, 7.2), the following
+ test fails when run with "root=/tmp/munge-test-$$":
+ 0012-munge-cmdline.t 24 - munge --input from invalid file
+ This test attempts to read data for a credential payload from the file
+ "." -- i.e., a directory, and not a regular file.  It is expected
+ to fail, and on most platforms it does.  However, it unexpectedly
+ succeeds if the input file is on a FreeBSD ufs or NetBSD ffs filesystem
+ (where it uses the directory file contents as the payload data),
+ but fails if the input file is on an nfs or tmpfs filesystem on
+ those platforms.  Note that this test fails as expected on OpenBSD
+ ffs and nfs filesystems.
+ This passed testing for 0.5.14 because the test suite ran in an
+ nfs directory.  But recent testing with "root=/tmp/munge-test-$$"
+ uncovered the failure since the "root" variable moved the input file
+ to a different filesystem.
+ Since the munge and unmunge client executables do not explicitly
+ check whether the input or output files are regular files, remove the
+ sharness checks that test for an expected failure when specifying an
+ invalid input, metadata, or output file.
+Author: Chris Dunlap <cdunlap@llnl.gov>
+Origin: upstream, https://github.com/dun/munge/commit/cfbb14558ceda9dd42b23a2e4c166a07b73a3223
+Last-Update: 2020-10-14
+Forwarded: not-needed
+
+--- a/t/0012-munge-cmdline.t
++++ b/t/0012-munge-cmdline.t
+@@ -109,10 +109,6 @@ test_expect_success 'munge --input from /dev/null' '
+     test ! -s out.$$
+ '
+ 
+-test_expect_success 'munge --input from invalid file' '
+-    test_must_fail "${MUNGE}" --socket="${MUNGE_SOCKET}" --input=.
+-'
+-
+ test_expect_success 'munge --input from missing file' '
+     test_must_fail "${MUNGE}" --socket="${MUNGE_SOCKET}" \
+             --input=missing.file.$$
+@@ -141,10 +137,6 @@ test_expect_success 'munge --output to /dev/null' '
+     test ! -s out.$$
+ '
+ 
+-test_expect_success 'munge --output to invalid file' '
+-    test_must_fail "${MUNGE}" --socket="${MUNGE_SOCKET}" --no-input --output=.
+-'
+-
+ for OPT_LIST_CIPHERS in '-C' '--list-ciphers'; do
+     test_expect_success "munge ${OPT_LIST_CIPHERS}" '
+         "${MUNGE}" "${OPT_LIST_CIPHERS}" |
+diff --git a/t/0013-unmunge-cmdline.t b/t/0013-unmunge-cmdline.t
+index c034109..07ce8eb 100755
+--- a/t/0013-unmunge-cmdline.t
++++ b/t/0013-unmunge-cmdline.t
+@@ -80,10 +80,6 @@ test_expect_success 'unmunge --input from /dev/null' '
+     test_must_fail "${UNMUNGE}" --socket="${MUNGE_SOCKET}" --input=/dev/null
+ '
+ 
+-test_expect_success 'unmunge --input from invalid file' '
+-    test_must_fail "${UNMUNGE}" --socket="${MUNGE_SOCKET}" --input=.
+-'
+-
+ test_expect_success 'unmunge --input from missing file' '
+     test_must_fail "${UNMUNGE}" --socket="${MUNGE_SOCKET}" \
+             --input=missing.file.$$
+@@ -126,12 +122,6 @@ test_expect_success 'unmunge --metadata to /dev/null with payload on stdout' '
+     test "$(cat out.$$)" = "${PAYLOAD}"
+ '
+ 
+-test_expect_success 'unmunge --metadata to invalid file' '
+-    local PAYLOAD=xyzzy-$$ &&
+-    "${MUNGE}" --socket="${MUNGE_SOCKET}" --string="${PAYLOAD}" |
+-    test_must_fail "${UNMUNGE}" --socket="${MUNGE_SOCKET}" --metadata=.
+-'
+-
+ for OPT_OUTPUT in '-o' '--output'; do
+     test_expect_success "unmunge ${OPT_OUTPUT}" '
+         local PAYLOAD=xyzzy-$$ &&
+@@ -160,12 +150,6 @@ test_expect_success 'unmunge --output to /dev/null with metadata on stdout' '
+     grep -q -v "${PAYLOAD}" meta.$$
+ '
+ 
+-test_expect_success 'unmunge --output to invalid file' '
+-    local PAYLOAD=xyzzy-$$ &&
+-    "${MUNGE}" --socket="${MUNGE_SOCKET}" --string="${PAYLOAD}" |
+-    test_must_fail "${UNMUNGE}" --socket="${MUNGE_SOCKET}" --output=.
+-'
+-
+ for OPT_LIST_KEYS in '-K' '--list-keys'; do
+     test_expect_success "unmunge ${OPT_LIST_KEYS}" '
+         "${UNMUNGE}" "${OPT_LIST_KEYS}" |
+-- 
+2.31.0
+

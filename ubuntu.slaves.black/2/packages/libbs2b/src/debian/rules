@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+
+LDFLAGS += -Wl,--as-needed
+
+%:
+	dh $@ --parallel --with autoreconf
+
+
+PROJECT="bs2b/libbs2b"
+PACKAGE=libbs2b
+VERSION=$(shell dpkg-parsechangelog | sed -ne 's/^Version: \(.*\)+.*/\1/p')
+TARBALL=$(PACKAGE)_$(VERSION).orig.tar.gz
+
+
+get-orig-source:
+	wget -c http://downloads.sourceforge.net/project/$(PROJECT)/$(VERSION)/$(PACKAGE)-$(VERSION).tar.gz
+	tar zxf $(PACKAGE)-$(VERSION).tar.gz
+	find $(PACKAGE)-$(VERSION)/win32/* -type d -exec rm -rf {} +
+	mv $(PACKAGE)-$(VERSION) $(PACKAGE)_$(VERSION)+dfsg.orig
+	tar zcf ../$(PACKAGE)_$(VERSION)+dfsg.orig.tar.gz $(PACKAGE)_$(VERSION)+dfsg.orig
+	rm -r $(PACKAGE)_$(VERSION)+dfsg.orig $(PACKAGE)-$(VERSION).tar.gz
+
+override_dh_auto_configure:
+	dh_auto_configure -- --libdir="\$${prefix}/lib/$(DEB_HOST_MULTIARCH)"
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -f config.log

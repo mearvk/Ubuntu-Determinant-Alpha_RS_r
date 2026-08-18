@@ -1,0 +1,141 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Skip floating-point edge-case tests when using an x87
+Forwarded: yes
+Applied-Upstream: https://github.com/abseil/abseil-cpp/commit/311bbd2e50ea35e921a08186840d3b6ca279e880
+
+32-bit Intel CPUs use 80-bit floats for intermediate values, which can
+change the results of floating point computations from what we normally
+expect. Identify tests that are sensitive to the x87, and skip them when
+we’re on 32-bit Intel.
+
+The author works at Google. Upstream applied this patch as Piper
+revision 378722613 and exported it to GitHub; the Applied-Upstream URL
+above points to the exported commit.
+
+--- a/absl/random/beta_distribution_test.cc
++++ b/absl/random/beta_distribution_test.cc
+@@ -15,6 +15,7 @@
+ #include "absl/random/beta_distribution.h"
+ 
+ #include <algorithm>
++#include <cfloat>
+ #include <cstddef>
+ #include <cstdint>
+ #include <iterator>
+@@ -558,6 +559,14 @@
+ // dependencies of the distribution change, such as RandU64ToDouble, then this
+ // is also likely to change.
+ TEST(BetaDistributionTest, AlgorithmBounds) {
++#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
++  // We're using an x87-compatible FPU, and intermediate operations are
++  // performed with 80-bit floats. This produces slightly different results from
++  // what we expect below.
++  GTEST_SKIP()
++      << "Skipping the test because we detected x87 floating-point semantics";
++#endif
++
+   {
+     absl::random_internal::sequence_urbg urbg(
+         {0x7fbe76c8b4395800ull, 0x8000000000000000ull});
+--- a/absl/random/distributions_test.cc
++++ b/absl/random/distributions_test.cc
+@@ -14,6 +14,7 @@
+ 
+ #include "absl/random/distributions.h"
+ 
++#include <cfloat>
+ #include <cmath>
+ #include <cstdint>
+ #include <random>
+@@ -224,6 +225,15 @@
+ TEST_F(RandomDistributionsTest, UniformNonsenseRanges) {
+   // The ranges used in this test are undefined behavior.
+   // The results are arbitrary and subject to future changes.
++
++#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
++  // We're using an x87-compatible FPU, and intermediate operations can be
++  // performed with 80-bit floats. This produces slightly different results from
++  // what we expect below.
++  GTEST_SKIP()
++      << "Skipping the test because we detected x87 floating-point semantics";
++#endif
++
+   absl::InsecureBitGen gen;
+ 
+   // <uint>
+--- a/absl/random/exponential_distribution_test.cc
++++ b/absl/random/exponential_distribution_test.cc
+@@ -15,6 +15,7 @@
+ #include "absl/random/exponential_distribution.h"
+ 
+ #include <algorithm>
++#include <cfloat>
+ #include <cmath>
+ #include <cstddef>
+ #include <cstdint>
+@@ -384,6 +385,15 @@
+ TEST(ExponentialDistributionTest, AlgorithmBounds) {
+   // Relies on absl::uniform_real_distribution, so some of these comments
+   // reference that.
++
++#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
++  // We're using an x87-compatible FPU, and intermediate operations can be
++  // performed with 80-bit floats. This produces slightly different results from
++  // what we expect below.
++  GTEST_SKIP()
++      << "Skipping the test because we detected x87 floating-point semantics";
++#endif
++
+   absl::exponential_distribution<double> dist;
+ 
+   {
+--- a/absl/random/uniform_real_distribution_test.cc
++++ b/absl/random/uniform_real_distribution_test.cc
+@@ -14,6 +14,7 @@
+ 
+ #include "absl/random/uniform_real_distribution.h"
+ 
++#include <cfloat>
+ #include <cmath>
+ #include <cstdint>
+ #include <iterator>
+@@ -70,6 +71,14 @@
+ TYPED_TEST_SUITE(UniformRealDistributionTest, RealTypes);
+ 
+ TYPED_TEST(UniformRealDistributionTest, ParamSerializeTest) {
++#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
++  // We're using an x87-compatible FPU, and intermediate operations are
++  // performed with 80-bit floats. This produces slightly different results from
++  // what we expect below.
++  GTEST_SKIP()
++      << "Skipping the test because we detected x87 floating-point semantics";
++#endif
++
+   using param_type =
+       typename absl::uniform_real_distribution<TypeParam>::param_type;
+ 
+--- a/absl/time/duration_test.cc
++++ b/absl/time/duration_test.cc
+@@ -17,6 +17,7 @@
+ #endif
+ 
+ #include <chrono>  // NOLINT(build/c++11)
++#include <cfloat>
+ #include <cmath>
+ #include <cstdint>
+ #include <ctime>
+@@ -1390,6 +1391,14 @@
+ // Seconds(point) returns a duration near point * Seconds(1.0). (They may
+ // not be exactly equal due to fused multiply/add contraction.)
+ TEST(Duration, ToDoubleSecondsCheckEdgeCases) {
++#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
++  // We're using an x87-compatible FPU, and intermediate operations can be
++  // performed with 80-bit floats. This means the edge cases are different than
++  // what we expect here, so just skip this test.
++  GTEST_SKIP()
++      << "Skipping the test because we detected x87 floating-point semantics";
++#endif
++
+   constexpr uint32_t kTicksPerSecond = absl::time_internal::kTicksPerSecond;
+   constexpr auto duration_tick = absl::time_internal::MakeDuration(0, 1u);
+   int misses = 0;

@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	mkdir -p external
+	mkdir -p external/sizzle/dist
+	ln -s /usr/share/javascript/sizzle/sizzle.js external/sizzle/dist
+	grunt qunit_fixture
+	grunt build:*:* uglify remove_map_comment dist:*
+	for f in dist/*.min.js dist/*.map; do \
+		pigz --force --keep -11 $$f; \
+		brotli --force --keep --best --suffix=.brotli -- $$f; \
+	done
+
+override_dh_install:
+	dh_install
+	rm -f debian/node-jquery/usr/share/nodejs/jquery/dist/jquery.min.*

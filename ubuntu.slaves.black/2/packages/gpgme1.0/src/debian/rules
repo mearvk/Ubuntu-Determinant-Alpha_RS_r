@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export QT_SELECT := qt5
+
+include /usr/share/dpkg/architecture.mk
+
+# python3.X, see pybuild for their meaning.
+export _PYTHON_HOST_PLATFORM:=${DEB_HOST_ARCH_OS}-${DEB_HOST_ARCH}
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+	export _PYTHON_SYSCONFIGDATA_NAME:=_sysconfigdata__${DEB_HOST_ARCH_OS}_${DEB_HOST_MULTIARCH}
+endif
+
+%:
+	dh $@ --builddirectory=build --with python3
+
+override_dh_auto_configure:
+	dh_auto_configure --builddirectory=build -- \
+	    --enable-static \
+	    --enable-languages="python cpp qt" \
+	    --infodir=/usr/share/info
+
+override_dh_missing:
+	dh_missing -X.la -Xinfo/dir -X.pyc -Xinstall_files.txt -X__pycache__
+
+override_dh_auto_test:
+ifeq (, $(filter nocheck, $(DEB_BUILD_OPTIONS)))
+	dh_auto_test
+	./debian/tests/checky2106 || true
+endif
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V
+
+override_dh_installdocs:
+	dh_installdocs -X.md5

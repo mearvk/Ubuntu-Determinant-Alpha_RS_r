@@ -1,0 +1,52 @@
+[Unit]
+Description=Pacemaker Remote executor daemon
+Documentation=man:pacemaker-remoted
+Documentation=https://clusterlabs.org/pacemaker/doc/
+
+# See main pacemaker unit file for descriptions of why these are needed
+After=network.target
+After=time-sync.target
+After=dbus.service
+Wants=dbus.service
+After=resource-agents-deps.target
+Wants=resource-agents-deps.target
+After=syslog.service
+After=rsyslog.service
+
+[Install]
+Alias=pacemaker-remote.service
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+KillMode=process
+NotifyAccess=none
+EnvironmentFile=-@CONFIGDIR@/pacemaker
+EnvironmentFile=-@CONFIGDIR@/sbd
+
+# Not actually success, but fatal failure -- this ensures no respawn
+SuccessExitStatus=100
+
+ExecStart=@sbindir@/pacemaker-remoted
+
+# Systemd v227 and above can limit the number of processes spawned by a
+# service. That is a bad idea for an HA cluster resource manager, so disable it
+# by default. The administrator can create a local override if they really want
+# a limit. If your systemd version does not support TasksMax, and you want to
+# get rid of the resulting log warnings, comment out this option.
+TasksMax=infinity
+
+# If connected to the cluster and when the service functions properly, it will
+# wait to exit until the cluster notifies it all resources on the remote node
+# have been stopped.  The default of 30min should cover most typical cluster
+# configurations, but it may need an increase to adapt to local conditions
+# (e.g. a large, clustered database could conceivably take longer to stop).
+TimeoutStopSec=30min
+TimeoutStartSec=30s
+
+# Restart options include: no, on-success, on-failure, on-abort or always
+Restart=on-failure
+
+# crm_perror() writes directly to stderr, so ignore it here
+# to avoid double-logging with the wrong format
+StandardError=null

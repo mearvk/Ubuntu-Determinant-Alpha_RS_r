@@ -1,0 +1,82 @@
+apply from: "$rootDir/gradle/publishMaven.gradle"
+
+
+displayName = "Json Path"
+
+description = "Java port of Stefan Goessner JsonPath."
+
+jar {
+    baseName 'json-path'
+    manifest {
+        attributes 'Implementation-Title': 'json-path', 'Implementation-Version': version
+    }
+}
+
+dependencies {
+    compile libs.jsonSmart
+    compile libs.slf4jApi
+    compile libs.jacksonDatabind, optional
+    compile libs.gson, optional
+
+    testCompile libs.test
+}
+
+task distZip(type: Zip, dependsOn: assemble) {
+    classifier = 'with-dependencies'
+
+    from('build/docs') {
+        into 'api'
+    }
+    from(sourcesJar) {
+        into 'source'
+    }
+    from(jar) {
+        into 'lib'
+    }
+    from(project.configurations.compile) {
+        into 'lib'
+        exclude { it.file.name.contains('gson') || it.file.name.contains('jackson') }
+    }
+    from(project.configurations.compile) {
+        into 'lib-optional/jackson'
+        include { it.file.name.contains('jackson') }
+    }
+    from(project.configurations.compile) {
+        into 'lib-optional/gson'
+        include { it.file.name.contains('gson') }
+    }
+}
+
+task distTar(type: Tar, dependsOn: assemble) {
+    classifier = 'with-dependencies'
+    compression = Compression.GZIP
+    extension = 'tar.gz'
+
+    from('build/docs') {
+        into 'api'
+    }
+    from(sourcesJar) {
+        into 'source'
+    }
+    from(jar) {
+        into 'lib'
+    }
+    from(project.configurations.compile) {
+        into 'lib'
+        exclude { it.file.name.contains('gson') || it.file.name.contains('jackson') }
+    }
+    from(project.configurations.compile) {
+        into 'lib-optional/jackson'
+        include { it.file.name.contains('jackson') }
+    }
+    from(project.configurations.compile) {
+        into 'lib-optional/gson'
+        include { it.file.name.contains('gson') }
+    }
+}
+
+task dist(){
+
+}
+dist.dependsOn distZip
+dist.dependsOn distTar

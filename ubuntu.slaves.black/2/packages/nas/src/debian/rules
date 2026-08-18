@@ -1,0 +1,40 @@
+#! /usr/bin/make -f
+# debian/rules file for NAS
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+instdirs=BINDIR=/usr/bin USRLIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) MANPATH=/usr/share/man INCDIR=/usr/include PROJECTMANSUFFIX=nas ETCDIR=/etc/nas
+
+%:
+	dh $@ --with=autoreconf --with=autotools_dev
+
+override_dh_auto_configure:
+	xmkmf -a
+
+override_dh_auto_build:
+	dh_auto_build -- EXTRA_LDOPTIONS="$$LDFLAGS" \
+		CCOPTIONS="$$CFLAGS $$CPPFLAGS -fcommon" \
+		LDFLAGS_DEF="$$LDFLAGS"
+
+override_dh_installdocs:
+	dh_installdocs -A README FAQ TODO
+ifneq (,$(filter nas-doc, $(shell dh_listpackages)))
+	install -m644 doc/README debian/nas-doc/usr/share/doc/nas/README.DOC
+endif
+
+override_dh_installchangelogs:
+	dh_installchangelogs HISTORY
+
+override_dh_auto_install:
+	top=`pwd`; $(MAKE) install install.man $(instdirs) DESTDIR=$$top/debian/tmp
+
+override_dh_install:
+	dh_install --fail-missing
+	rm -f debian/libaudio-dev/usr/include/audio/release.h
+	rm -f debian/nas-bin/usr/bin/nasd \
+	      debian/nas-bin/usr/share/man/man1/nasd.1nas \
+	      debian/nas-bin/usr/share/man/man1/nas.1nas
+ifneq (,$(filter nas, $(shell dh_listpackages)))
+	cp debian/nas/usr/share/nas/nasd.conf.eg debian/nas/etc/nas/nasd.conf
+	install -m 644 debian/start-nas.man debian/nas/usr/share/man/man1/start-nas.1nas
+endif

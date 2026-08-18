@@ -1,0 +1,200 @@
+#!/bin/sh
+#
+# Copyright 2010-2021 the Pacemaker project contributors
+#
+# The version control history for this file may have further details.
+#
+# This source code is licensed under the GNU General Public License version 2
+# or later (GPLv2+) WITHOUT ANY WARRANTY.
+
+SSHOPTS="-l root -o PasswordAuthentication=no -o ConnectTimeout=5"
+
+msg() {
+	echo "$@" >&2
+}
+usage() {
+	echo "usage: $0 <dir>"
+	echo "	dir: working directory (with the control file)"
+	exit 0
+}
+
+[ $# -eq 0 ] && usage
+WORKDIR=$1
+test -d "$WORKDIR" || usage
+
+CTSCTRL=~/.cts
+CTRL=$WORKDIR/control
+CSV=$WORKDIR/bench.csv
+STATS=$WORKDIR/bench.stats
+
+test -f $CTRL && . $CTRL
+
+@datadir@/@PACKAGE@/tests/cts/cluster_test 500 || {
+	msg "cluster_test failed"
+	exit 1
+}
+
+test -f $CTSCTRL ||  {
+	msg no CTS control file $CTSCTRL
+	exit 1
+}
+. $CTSCTRL
+
+: ${CTS_logfacility:=local7}
+: ${CTS_stack:=corosync}
+: ${CTS_logfile:="@CRM_LOG_DIR@/ha-log-bench"}
+: ${CTS_adv:="--schema pacemaker-1.2 --clobber-cib -r"}
+: ${RUNS:=3}
+: ${CTSTESTS:="--benchmark"}
+: ${CTSDIR:="@datadir@/@PACKAGE@/tests/cts"}
+: ${CTS_node_list:=""}
+: ${CTS_boot:=""}
+: ${CTS_stonith:=""}
+: ${CTS_stonith_args:=""}
+
+[ -n "$CTS_node_list" ] || {
+	msg no node list specified
+	exit 1
+}
+
+case "$CTS_stack" in
+corosync) CRM_REPORT_OPTS="--corosync";;
+*) msg "$CTS_stack: cluster stack not recognized"; exit 1;;
+esac
+
+CTSOPTS="--stack $CTS_stack --at-boot $CTS_boot $CTS_adv"
+CTSOPTS="$CTSOPTS --facility $CTS_logfacility --logfile $CTS_logfile"
+
+if [ "x$CTS_stonith" != "x" ]; then
+	CTSOPTS="$CTSOPTS --stonith-type $CTS_stonith"
+	[ "x$CTS_stonith_args" != "x" ] &&
+		CTSOPTS="$CTSOPTS --stonith-params \"$CTS_stonith_args\""
+else
+	CTSOPTS="$CTSOPTS --stonith 0"
+fi
+
+CTSOPTS="$CTSOPTS $CTSTESTS"
+
+fibonacci() {
+	F_LIMIT=$1
+	F_N=2
+	F_N_PREV=1
+	while [ $F_N -le $F_LIMIT ]; do
+		echo $F_N
+		F_N_TMP=$F_N
+		F_N=$((F_N+F_N_PREV))
+		F_N_PREV=$F_N_TMP
+	done
+	[ $F_N_PREV -ne $F_LIMIT ] && echo $F_LIMIT
+}
+[ "$SERIES" ] ||
+	SERIES=$(fibonacci "$(echo $CTS_node_list | wc -w)")
+
+get_nodes() {
+	GN_C_NODES=$(echo $CTS_node_list | awk -v n="$1" '
+		{ for( i=1; i<=NF; i++ ) node[cnt++]=$i }
+		END{for( i=0; i<n; i++ ) print node[i] }
+	')
+	if [ "$(echo $GN_C_NODES | wc -w)" != "$1" ]; then
+		msg "not enough nodes in $CTSCTRL"
+		exit 1
+	fi
+	echo $GN_C_NODES
+}
+node_cleanup() {
+	msg "CIB cleanup ($nodes)"
+	for NC_N in $nodes; do
+		ssh $SSHOPTS $NC_N 'rm @CRM_CONFIG_DIR@/*'
+	done
+}
+testnum() {
+	printf '%03d' $1
+}
+mkreports() {
+	msg "Creating reports for the CTS run"
+	MKR_CTS_DIR=$1
+	grep "Running test " $MKR_CTS_DIR/ctsrun.out | tr -d \[\] |
+	awk '{print $6,$NF}' |
+	while read type num; do
+		teststg="`testnum $num`-$type"
+		(
+		cd $MKR_CTS_DIR || return
+		crm_report $CRM_REPORT_OPTS -f "cts:$num" -n "$nodes" "$(pwd)/$teststg" < /dev/null
+		)
+	done
+}
+runcts() {
+	RC_ODIR="$1"
+	msg "Running CTS"
+	python "$CTSDIR/CTSlab.py" $CTSOPTS --nodes "$nodes" > "$RC_ODIR/ctsrun.out" 2>&1 &
+	ctspid=$!
+	tail -f "$RC_ODIR/ctsrun.out" &
+	tailpid=$!
+	wait $ctspid
+	kill $tailpid >/dev/null 2>&1
+}
+
+bench_re='CTS:.*runtime:'
+diginfo() {
+	DI_CTS_DIR="$1"
+	DI_S="$2"
+	filter="$3"
+	(
+	cd "$DI_CTS_DIR" || return
+	for r in [0-9]*.tar.bz2; do
+		tar xjf $r
+		DI_D=$(basename "$r" .tar.bz2)
+		for DI_V in $(grep "$bench_re" "$DI_D/ha-log.txt" | eval "$filter"); do
+			DI_S="$DI_S,$DI_V"
+		done
+		rm -r "$DI_D"
+	done
+	echo $DI_S
+	)
+}
+printheader() {
+	diginfo $1 "" "awk '{print \$(NF-2)}'"
+}
+printstats() {
+	diginfo $1 "$clusize" "awk '{print \$(NF)}'"
+}
+printmedians() {
+	PM_F="$1"
+	PM_S="$clusize"
+	PM_MIDDLE=$((RUNS/2 + 1))
+	set $(head -1 "$PM_F" | sed 's/,/ /g')
+	PM_COLS=$#
+	for PM_I in $(seq 2 $PM_COLS); do
+		PM_V=$(awk -v i=$PM_I -F, '{print $i}' < $PM_F | sort -n | head -$PM_MIDDLE | tail -1)
+		PM_S="$PM_S,$PM_V"
+	done
+	echo $PM_S
+}
+
+rm -f $CSV
+tmpf=`mktemp`
+test -f "$tmpf" || {
+	msg "can't create temporary file"
+	exit 1
+}
+trap "rm -f $tmpf" 0
+for clusize in $SERIES; do
+	nodes=`get_nodes $clusize`
+	outdir=$WORKDIR/$clusize
+	rm -rf $outdir
+	mkdir -p $outdir
+	rm -f $tmpf
+	node_cleanup
+	for i in `seq $RUNS`; do
+		true > $CTS_logfile
+		mkdir -p $outdir/$i
+		runcts $outdir/$i
+		mkreports $outdir/$i
+		printstats $outdir/$i >> $tmpf
+	done
+	[ -f "$CSV" ] || printheader $outdir/1 > $CSV
+	printmedians $tmpf >> $CSV
+	cat $tmpf >> $STATS
+	msg "Statistics for $clusize-node cluster saved"
+done
+msg "Tests done for series $SERIES, output in $CSV and $STATS"

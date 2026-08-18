@@ -1,0 +1,46 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Round floats using round(x), not static_cast<int>(x + 0.5)
+Forwarded: yes
+Applied-Upstream: https://github.com/abseil/abseil-cpp/commit/d96e287417766deddbff2d01b96321288c59491e
+
+Adding 0.5 to an IEEE float may cause one bit of precision loss, which
+is enough to change the result in certain cases. For example,
+
+    static_cast<int>(std::round(0.49999999999999994)) == 0
+    static_cast<int>(0.49999999999999994 + 0.5) == 1
+
+The author works at Google. Upstream applied this patch as Piper
+revision 369926519 and exported it to GitHub; the Applied-Upstream URL
+above points to the exported commit.
+
+--- a/absl/time/duration_test.cc
++++ b/absl/time/duration_test.cc
+@@ -1320,7 +1320,7 @@ TEST(Duration, SmallConversions) {
+ 
+   EXPECT_EQ(absl::ZeroDuration(), absl::Seconds(0));
+   // TODO(bww): Is the next one OK?
+-  EXPECT_EQ(absl::ZeroDuration(), absl::Seconds(0.124999999e-9));
++  EXPECT_EQ(absl::ZeroDuration(), absl::Seconds(std::nextafter(0.125e-9, 0)));
+   EXPECT_EQ(absl::Nanoseconds(1) / 4, absl::Seconds(0.125e-9));
+   EXPECT_EQ(absl::Nanoseconds(1) / 4, absl::Seconds(0.250e-9));
+   EXPECT_EQ(absl::Nanoseconds(1) / 2, absl::Seconds(0.375e-9));
+@@ -1330,7 +1330,7 @@ TEST(Duration, SmallConversions) {
+   EXPECT_EQ(absl::Nanoseconds(1), absl::Seconds(0.875e-9));
+   EXPECT_EQ(absl::Nanoseconds(1), absl::Seconds(1.000e-9));
+ 
+-  EXPECT_EQ(absl::ZeroDuration(), absl::Seconds(-0.124999999e-9));
++  EXPECT_EQ(absl::ZeroDuration(), absl::Seconds(std::nextafter(-0.125e-9, 0)));
+   EXPECT_EQ(-absl::Nanoseconds(1) / 4, absl::Seconds(-0.125e-9));
+   EXPECT_EQ(-absl::Nanoseconds(1) / 4, absl::Seconds(-0.250e-9));
+   EXPECT_EQ(-absl::Nanoseconds(1) / 2, absl::Seconds(-0.375e-9));
+--- a/absl/time/time.h
++++ b/absl/time/time.h
+@@ -1352,7 +1352,7 @@
+ inline Duration MakePosDoubleDuration(double n) {
+   const int64_t int_secs = static_cast<int64_t>(n);
+   const uint32_t ticks = static_cast<uint32_t>(
+-      (n - static_cast<double>(int_secs)) * kTicksPerSecond + 0.5);
++      std::round((n - static_cast<double>(int_secs)) * kTicksPerSecond));
+   return ticks < kTicksPerSecond
+              ? MakeDuration(int_secs, ticks)
+              : MakeDuration(int_secs + 1, ticks - kTicksPerSecond);

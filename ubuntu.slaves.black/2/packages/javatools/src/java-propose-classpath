@@ -1,0 +1,73 @@
+#!/bin/bash --
+
+set -e
+
+. /usr/share/javahelper/jh_lib.sh
+
+syntax()
+{
+   echo "Usage: java-propose-classpath [-c<class> | <jars...>]"
+   exit 1
+}
+
+dodepends()
+{
+   classes="$@"
+   depends=
+   for j in /usr/share/java/*.jar ; do
+      if [ "$j" != "${SRC}" ] && [ -f "$j" ]; then
+         if jar tf "$j" $classes | grep . >/dev/null; then
+            depends="$depends $j"
+         fi
+      fi
+   done
+
+   echo -n "${SRC}: "
+   realdepends=
+   if [ -n "$depends" ]; then
+      for j in $depends; do
+         realdepends="$realdepends
+`readlink -f "$j"`"
+      done
+   fi
+   echo "$realdepends" | LC_ALL=C sort -biu | xargs
+}
+
+ARGS="c" parseargs "$@"
+
+if [ "$ARGC" = "0" ] && [ -z "`getarg c`" ]; then
+   syntax
+fi
+
+if [ -n "`getarg c`" ]; then
+
+   export SRC=""
+   dodepends `getarg c | sed 's,\.,/,g'`
+
+else
+
+   for (( i=0; i < "$ARGC"; i++ )); do
+      JAR="`readlink -f "${ARGV[$i]}"`"
+
+      TEMPDIR="`mktemp -d`"
+      OLDDIR="`pwd`"
+      cd "$TEMPDIR"
+      jar xf "$JAR" >/dev/null
+
+      classes="`find -name '*.class' -exec jcf-dump --print-constants java.lang.Object \{\} \; | grep 'Class name:' | cut -d'"' -f2| sed 's/\[\[*L\(.*\);/\1/;s/$/.class/' | LC_ALL=C sort -u | grep -v ^java[/\.]`"
+
+      cd "$OLDDIR"
+      rm -rf "$TEMPDIR"
+
+      classes2=
+      for j in $classes; do
+         if [ ! -f $j ]; then
+            classes2="$classes2 $j"
+         fi
+      done
+
+      export SRC="${ARGV[$i]}"
+      dodepends $classes2
+
+   done
+fi

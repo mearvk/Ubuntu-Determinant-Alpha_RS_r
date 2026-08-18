@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+# hardening flags
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+export DEB_CFLAGS_MAINT_APPEND = -Wall -g
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,-z,defs
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_auto_configure:
+	mkdir -p debian/build debian/build-ncurses
+	tar -cf - --exclude=debian/build* --exclude=.pc . | tar -xf - -C debian/build
+	cd debian/build && dh_auto_configure -- --disable-curses
+	tar -cf - --exclude=debian/build* --exclude=.pc . | tar -xf - -C debian/build-ncurses
+	cd debian/build-ncurses && dh_auto_configure -- --enable-curses LDFLAGS="-lncurses"
+
+override_dh_auto_build:
+	cd debian/build && dh_auto_build
+	cd debian/build-ncurses && dh_auto_build
+
+override_dh_auto_test:
+	cd debian/build && dh_auto_test
+	cd debian/build-ncurses && dh_auto_test
+
+override_dh_install:
+	${MAKE} -C debian/build					\
+		DESTDIR=$(shell pwd)/debian/tmp install
+	${MAKE} -C debian/build-ncurses				\
+		DESTDIR=$(shell pwd)/debian/tmp-ncurses install
+	dh_install -plibcunit1 -plibcunit1-dev		\
+		--sourcedir=debian/tmp
+	dh_install -plibcunit1-ncurses -plibcunit1-ncurses-dev		\
+		--sourcedir=debian/tmp-ncurses
+	dh_install -plibcunit1-doc		\
+		--sourcedir=debian/tmp-ncurses
+
+override_dh_installman:
+	dh_installman -plibcunit1-dev
+	dh_installman -plibcunit1-ncurses-dev
+
+override_dh_installexamples:
+	dh_installexamples
+	find debian/libcunit1-doc/usr/share/doc/libcunit1-doc/examples -type f | xargs -r chmod u=rw,g=r,o=r
+
+override_dh_strip:
+	dh_strip -plibcunit1 -plibcunit1-ncurses
+	dh_strip --remaining-packages
+
+override_dh_clean:
+	dh_clean debian/build/ debian/build-ncurses/ debian/tmp/ debian/tmp-ncurses/

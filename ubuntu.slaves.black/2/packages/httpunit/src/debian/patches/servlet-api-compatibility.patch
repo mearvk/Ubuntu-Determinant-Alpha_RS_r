@@ -1,0 +1,302 @@
+Description: Fixes the compatibility with the latest version of the Servlet API in Debian
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: no
+--- a/src/com/meterware/servletunit/ServletUnitHttpRequest.java
++++ b/src/com/meterware/servletunit/ServletUnitHttpRequest.java
+@@ -31,12 +31,19 @@
+ import java.net.MalformedURLException;
+ import java.util.*;
+ 
++import javax.servlet.AsyncContext;
++import javax.servlet.DispatcherType;
++import javax.servlet.ServletContext;
++import javax.servlet.ServletRequest;
++import javax.servlet.ServletResponse;
+ import javax.servlet.http.HttpServletRequest;
+ import javax.servlet.http.Cookie;
++import javax.servlet.http.HttpServletResponse;
+ import javax.servlet.http.HttpSession;
+ import javax.servlet.ServletInputStream;
+ import javax.servlet.RequestDispatcher;
+ import javax.servlet.ServletException;
++import javax.servlet.http.Part;
+ 
+ 
+ /**
+@@ -755,6 +762,70 @@
+         return 0;  //To change body of implemented methods use File | Settings | File Templates.
+     }
+ 
++//--------------------------------------- methods added to ServletRequest in Servlet API 3.0 ----------------------------
++
++    public boolean authenticate(HttpServletResponse response) throws IOException, ServletException {
++        return false;
++    }
++
++    public void login(String username, String password) throws ServletException {
++
++    }
++
++    public void logout() throws ServletException {
++
++    }
++
++    public Collection<Part> getParts() throws IOException, ServletException {
++        return null;
++    }
++
++    public Part getPart(String name) throws IOException, ServletException {
++        return null;
++    }
++
++    public ServletContext getServletContext() {
++        return null;
++    }
++
++    public AsyncContext startAsync() throws IllegalStateException {
++        return null;
++    }
++
++    public AsyncContext startAsync(ServletRequest servletRequest, ServletResponse servletResponse) throws IllegalStateException {
++        return null;
++    }
++
++    public boolean isAsyncStarted() {
++        return false;
++    }
++
++    public boolean isAsyncSupported() {
++        return false;
++    }
++
++    public AsyncContext getAsyncContext() {
++        return null;
++    }
++
++    public DispatcherType getDispatcherType() {
++        return null;
++    }
++
++//--------------------------------------- methods added to ServletRequest in Servlet API 3.1 ----------------------------
++
++    public String changeSessionId() {
++        return null;
++    }
++
++    public <T extends javax.servlet.http.HttpUpgradeHandler> T upgrade(Class<T> handlerClass) throws IOException, ServletException {
++        return null;
++    }
++
++    public long getContentLengthLong() {
++        return Long.parseLong(getHeader("Content-Length"));
++    }
++
+ //--------------------------------------------- package members ----------------------------------------------
+ 
+ 
+--- a/src/com/meterware/servletunit/ServletUnitHttpResponse.java
++++ b/src/com/meterware/servletunit/ServletUnitHttpResponse.java
+@@ -463,7 +463,7 @@
+     /**
+      * Returns the status of this response.
+      **/
+-    int getStatus() {
++    public int getStatus() {
+         return _status;
+     }
+ 
+@@ -536,6 +536,26 @@
+         return _contentType;
+     }
+ 
++//--------------------------------------- methods added to ServletRequest in Servlet API 3.0 ----------------------------
++
++    public String getHeader(String name) {
++        Collection<String> values = getHeaders(name);
++        return values != null && !values.isEmpty() ? values.iterator().next() : null;
++    }
++
++    public Collection<String> getHeaders(String name) {
++        return (Collection<String>) _headers.get(name);
++    }
++
++    public Collection<String> getHeaderNames() {
++        return new ArrayList<String>(_headers.keySet());
++    }
++
++//--------------------------------------- methods added to ServletRequest in Servlet API 3.1 ----------------------------
++
++    public void setContentLengthLong(long len) {
++        setHeader("Content-Length", Long.toString(len));
++    }
+ 
+ //------------------------------------------- private members ------------------------------------
+ 
+@@ -618,4 +638,11 @@
+     }
+ 
+     private ByteArrayOutputStream _stream;
++
++    public boolean isReady() {
++        return true;
++    }
++
++    public void setWriteListener(javax.servlet.WriteListener listener) {
++    }
+ }
+--- a/src/com/meterware/servletunit/ServletUnitServletContext.java
++++ b/src/com/meterware/servletunit/ServletUnitServletContext.java
+@@ -28,13 +28,21 @@
+ import java.net.URL;
+ import java.net.URLConnection;
+ import java.util.Enumeration;
++import java.util.EventListener;
+ import java.util.Hashtable;
++import java.util.Map;
+ import java.util.Set;
+ import java.util.Vector;
+ 
++import javax.servlet.Filter;
++import javax.servlet.FilterRegistration;
++import javax.servlet.Servlet;
+ import javax.servlet.ServletContext;
+ import javax.servlet.ServletException;
+-
++import javax.servlet.ServletRegistration;
++import javax.servlet.SessionCookieConfig;
++import javax.servlet.SessionTrackingMode;
++import javax.servlet.descriptor.JspConfigDescriptor;
+ 
+ 
+ /**
+@@ -365,6 +373,112 @@
+         return null;
+     }
+ 
++//-------------------------------------- servlet-api 3.0 additions -----------------------------------------------
++
++    public int getEffectiveMajorVersion() {
++        return 0;
++    }
++
++    public int getEffectiveMinorVersion() {
++        return 0;
++    }
++
++    public boolean setInitParameter(String name, String value) {
++        return false;
++    }
++
++    public ServletRegistration.Dynamic addServlet(String servletName, String className) {
++        return null;
++    }
++
++    public ServletRegistration.Dynamic addServlet(String servletName, Servlet servlet) {
++        return null;
++    }
++
++    public ServletRegistration.Dynamic addServlet(String servletName, Class<? extends Servlet> servletClass) {
++        return null;
++    }
++
++    public <T extends Servlet> T createServlet(Class<T> clazz) throws ServletException {
++        return null;
++    }
++
++    public ServletRegistration getServletRegistration(String servletName) {
++        return null;
++    }
++
++    public Map<String, ? extends ServletRegistration> getServletRegistrations() {
++        return null;
++    }
++
++    public FilterRegistration.Dynamic addFilter(String filterName, String className) {
++        return null;
++    }
++
++    public FilterRegistration.Dynamic addFilter(String filterName, Filter filter) {
++        return null;
++    }
++
++    public FilterRegistration.Dynamic addFilter(String filterName, Class<? extends Filter> filterClass) {
++        return null;
++    }
++
++    public <T extends Filter> T createFilter(Class<T> clazz) throws ServletException {
++        return null;
++    }
++
++    public FilterRegistration getFilterRegistration(String filterName) {
++        return null;
++    }
++
++    public Map<String, ? extends FilterRegistration> getFilterRegistrations() {
++        return null;
++    }
++
++    public SessionCookieConfig getSessionCookieConfig() {
++        return null;
++    }
++
++    public void setSessionTrackingModes(Set<SessionTrackingMode> sessionTrackingModes) {
++    }
++
++    public Set<SessionTrackingMode> getDefaultSessionTrackingModes() {
++        return null;
++    }
++
++    public Set<SessionTrackingMode> getEffectiveSessionTrackingModes() {
++        return null;
++    }
++
++    public void addListener(String className) {
++    }
++
++    public <T extends EventListener> void addListener(T t) {
++    }
++
++    public void addListener(Class<? extends EventListener> listenerClass) {
++    }
++
++    public <T extends EventListener> T createListener(Class<T> clazz) throws ServletException {
++        return null;
++    }
++
++    public JspConfigDescriptor getJspConfigDescriptor() {
++        return null;
++    }
++
++    public ClassLoader getClassLoader() {
++        return null;
++    }
++
++    public void declareRoles(String... roleNames) {
++    }
++
++//-------------------------------------- servlet-api 3.1 additions -----------------------------------------------
++
++    public String getVirtualServerName() {
++        return null;
++    }
+ 
+ //------------------------------------------- package members ----------------------------------------------------
+ 
+--- a/src/com/meterware/servletunit/ServletInputStreamImpl.java
++++ b/src/com/meterware/servletunit/ServletInputStreamImpl.java
+@@ -44,4 +44,15 @@
+         return _baseStream.read();
+     }
+ 
++    public boolean isFinished() {
++        return _baseStream.available() <= 0;
++    }
++
++    public boolean isReady() {
++        return true;
++    }
++
++    public void setReadListener(javax.servlet.ReadListener listener) {
++
++    }
+ }

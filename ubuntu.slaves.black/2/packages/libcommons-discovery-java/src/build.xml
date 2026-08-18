@@ -1,0 +1,232 @@
+<!--
+ Licensed to the Apache Software Foundation (ASF) under one or more
+ contributor license agreements.  See the NOTICE file distributed with
+ this work for additional information regarding copyright ownership.
+ The ASF licenses this file to You under the Apache License, Version 2.0
+ (the "License"); you may not use this file except in compliance with
+ the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<project name="Discovery" default="compile" basedir=".">
+
+
+<!--
+        "Discovery" component of the Apache Commons Subproject
+        $Id: build.xml 676755 2008-07-14 22:44:17Z dennisl $
+-->
+
+
+<!-- ========== Initialize Properties ===================================== -->
+
+
+  <property file="build.properties"/>                <!-- Component local   -->
+  <property file="../build.properties"/>             <!-- Commons local     -->
+  <property file="${user.home}/build.properties"/>   <!-- User local        -->
+
+
+<!-- ========== External Dependencies ===================================== -->
+
+
+  <!-- The directories corresponding to your necessary dependencies -->
+  <property name="junit.jar"               value="lib/junit-3.8.1.jar"/>
+  <property name="logger.jar"               value="lib/commons-logging-1.1.jar"/>
+
+
+<!-- ========== Component Declarations ==================================== -->
+
+
+  <!-- The name of this component -->
+  <property name="component.name"          value="commons-discovery"/>
+
+  <!-- The primary package name of this component -->
+  <property name="component.package"       value="org.apache.commons.discovery"/>
+
+  <!-- The title of this component -->
+  <property name="component.title"         value="Commons Discovery"/>
+
+  <!-- The current version number of this component -->
+  <property name="component.version"       value="0.5-SNAPSHOT"/>
+
+  <!-- The base directory for compilation targets -->
+  <property name="build.home"              value="target"/>
+
+  <!-- The base directory for component configuration files -->
+  <property name="conf.home"               value="src/conf"/>
+
+  <!-- The base directory for distribution targets -->
+  <property name="dist.home"               value="dist"/>
+
+  <!-- The base directory for component sources -->
+  <property name="source.home"             value="src/java"/>
+
+  <!-- The base directory for unit test sources -->
+  <property name="test.home"               value="src/test"/>
+
+<!-- ========== Compiler Defaults ========================================= -->
+
+
+  <!-- Should Java compilations set the 'debug' compiler option? -->
+  <property name="compile.debug"           value="true"/>
+
+  <!-- Should Java compilations set the 'deprecation' compiler option? -->
+  <property name="compile.deprecation"     value="false"/>
+
+  <!-- Should Java compilations set the 'optimize' compiler option? -->
+  <property name="compile.optimize"        value="true"/>
+
+  <!-- Construct compile classpath -->
+  <path id="compile.classpath">
+    <pathelement location="${build.home}/classes"/>
+    <pathelement location="${logger.jar}"/>
+  </path>
+
+  <!-- Construct unit test classpath -->
+  <path id="test.classpath">
+    <pathelement location="${build.home}/classes"/>
+
+    <!-- test depends on the order of the following 3 lines: -->
+    <pathelement location="${build.home}/test-classes"/>
+    <pathelement location="${build.home}/testAlt1"/>
+    <pathelement location="${build.home}/testAlt2"/>
+
+    <pathelement location="${logger.jar}"/>
+    <pathelement location="${junit.jar}"/>
+  </path>
+
+  <!-- Should all tests fail if one does? -->
+  <property name="test.failonerror"        value="true"/>
+
+  <!-- The test runner to execute -->
+  <property name="test.runner"             value="junit.textui.TestRunner"/>
+
+<!-- ========== Executable Targets ======================================== -->
+
+
+  <target name="init" description="Initialize and evaluate conditionals">
+    <echo message="-------- ${component.title} ${component.version} --------"/>
+    <filter  token="name"                  value="${component.name}"/>
+    <filter  token="package"               value="${component.package}"/>
+    <filter  token="version"               value="${component.version}"/>
+    <filter  token="title"                 value="${component.title}"/>
+  </target>
+
+
+  <target name="prepare" depends="init" description="Prepare build directory">
+    <mkdir dir="${build.home}"/>
+    <mkdir dir="${build.home}/classes"/>
+    <mkdir dir="${build.home}/conf"/>
+    <mkdir dir="${build.home}/docs"/>
+    <mkdir dir="${build.home}/docs/api"/>
+    <mkdir dir="${build.home}/test-classes"/>
+    <tstamp/>
+    <copy todir="${build.home}/conf" filtering="on">
+      <fileset dir="${conf.home}" includes="*.MF"/>
+    </copy>
+  </target>
+
+ 
+  <target name="compile" depends="prepare" description="Compile shareable components">
+    <javac  srcdir="${source.home}"
+           destdir="${build.home}/classes"
+             debug="${compile.debug}"
+       deprecation="${compile.deprecation}"
+          optimize="${compile.optimize}">
+      <classpath refid="compile.classpath"/>
+    </javac>
+    <copy    todir="${build.home}/classes" filtering="on">
+      <fileset dir="${source.home}" excludes="**/*.java"/>
+    </copy>
+  </target>
+
+
+  <target name="clean"
+   description="Clean build and distribution directories">
+    <delete    dir="${build.home}"/>
+    <delete    dir="${dist.home}"/>
+  </target>
+
+
+  <target name="all" depends="clean,compile"
+   description="Clean and compile all components"/>
+
+
+  <target name="javadoc" depends="compile"
+   description="Create component Javadoc documentation">
+    <mkdir      dir="${dist.home}"/>
+    <mkdir      dir="${dist.home}/docs"/>
+    <mkdir      dir="${dist.home}/docs/api"/>
+    <javadoc sourcepath="${source.home}"
+                destdir="${dist.home}/docs/api"
+           packagenames="org.apache.commons.*"
+                 author="true"
+                private="false"
+                version="true"
+               doctitle="&lt;h1&gt;${component.title}&lt;/h1&gt;"
+            windowtitle="${component.title} (Version ${component.version})"
+                 bottom="Copyright (c) 2002 - Apache Software Foundation">
+      <classpath refid="compile.classpath"/>
+    </javadoc>
+  </target>
+
+  <target name="jar" depends="compile"
+   description="Create the jar file">
+    <mkdir      dir="${build.home}/classes/META-INF"/>
+    <copy      file="LICENSE.txt"
+             tofile="${build.home}/classes/META-INF/LICENSE.txt"/>
+    <copy      file="NOTICE.txt"
+             tofile="${build.home}/classes/META-INF/NOTICE.txt"/>
+    <mkdir      dir="${dist.home}"/>
+    <jar   jarfile="${dist.home}/${component.name}.jar"
+           basedir="${build.home}/classes"
+          manifest="${build.home}/conf/MANIFEST.MF"/>
+  </target>
+
+  <target name="dist" depends="jar,javadoc"
+   description="Create binary distribution">
+    <!-- TODO: top level files like LICENSE and README -->
+    <copy      file="LICENSE.txt"
+              todir="${dist.home}"/>
+    <copy      file="NOTICE.txt"
+              todir="${dist.home}"/>
+  </target>
+
+<!-- ========== Testing section ======================================== -->
+
+  <target name="compile.tests" depends="compile" description="Compile unit test cases">
+    <javac  srcdir="${test.home}"
+           destdir="${build.home}/test-classes"
+             debug="${compile.debug}"
+       deprecation="${compile.deprecation}"
+          optimize="${compile.optimize}">
+      <classpath refid="test.classpath"/>
+    </javac>
+    <copy    todir="${build.home}/test-classes" filtering="on">
+      <fileset dir="${test.home}" excludes="**/*.java"/>
+    </copy>
+    <copy    todir="${build.home}/testAlt1" filtering="on">
+      <fileset dir="${test.home}/../testAlt1" excludes="**/*.java"/>
+    </copy>
+    <copy    todir="${build.home}/testAlt2" filtering="on">
+      <fileset dir="${test.home}/../testAlt2" excludes="**/*.java"/>
+    </copy>
+  </target>
+
+  <target name="test.discovery" depends="compile.tests"
+   description="Run basic Service unit tests ...">
+    <echo message="Running basic Service tests ..."/>
+    <java classname="${test.runner}" fork="yes"
+        failonerror="${test.failonerror}">
+      <arg value="org.apache.commons.discovery.test.TestAll"/>
+      <classpath refid="test.classpath"/>
+    </java>
+  </target>
+
+
+</project>

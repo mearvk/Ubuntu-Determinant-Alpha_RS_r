@@ -1,0 +1,133 @@
+/*
+ * Copyright (c) 2024, 2024, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package com.oracle.svm.core.configure;
+
+import org.graalvm.nativeimage.Platform;
+import org.graalvm.nativeimage.Platforms;
+import org.graalvm.nativeimage.dynamicaccess.AccessCondition;
+
+/**
+ * A image-heap stored {@link ConditionalRuntimeValue#value} that is guarded by run-time computed
+ * conditions.
+ * </p>
+ * The conditions are stored in {@link ConditionalRuntimeValue#dynamicAccessMetadata} as an array to
+ * save space in the image heap. This is subject to further optimizations.
+ *
+ * @param <T> type of the stored value.
+ */
+public final class ConditionalRuntimeValue<T> {
+    final RuntimeDynamicAccessMetadata dynamicAccessMetadata;
+    volatile T value;
+
+    private static final Object NULL_VALUE = new Object();
+
+    /**
+     * Stores always-available, non-preserved values directly and wraps only values that need
+     * dynamic-access metadata. All helper methods in this class treat direct values as
+     * semantically equivalent to {@link RuntimeDynamicAccessMetadata#alwaysAvailable(boolean)
+     * alwaysAvailable(false)}. Preserved values must therefore stay wrapped even when they are
+     * otherwise always available.
+     */
+    public static <T> Object create(RuntimeDynamicAccessMetadata dynamicAccessMetadata, T value) {
+        Object storedValue = value == null ? NULL_VALUE : value;
+        if (dynamicAccessMetadata == null || dynamicAccessMetadata.isAlwaysAvailable() && !dynamicAccessMetadata.isPreserved()) {
+            return storedValue;
+        }
+        return new ConditionalRuntimeValue<>(dynamicAccessMetadata, value);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T getValue(Object valueOrConditional) {
+        if (valueOrConditional instanceof ConditionalRuntimeValue<?> conditional) {
+            return ((ConditionalRuntimeValue<T>) conditional).getValue();
+        }
+        return valueOrConditional == NULL_VALUE ? null : (T) valueOrConditional;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T getValueUnconditionally(Object valueOrConditional) {
+        if (valueOrConditional instanceof ConditionalRuntimeValue<?> conditional) {
+            return ((ConditionalRuntimeValue<T>) conditional).getValueUnconditionally();
+        }
+        return valueOrConditional == NULL_VALUE ? null : (T) valueOrConditional;
+    }
+
+    public static RuntimeDynamicAccessMetadata getDynamicAccessMetadata(Object valueOrConditional) {
+        return valueOrConditional instanceof ConditionalRuntimeValue<?> conditional ? conditional.getDynamicAccessMetadata() : RuntimeDynamicAccessMetadata.alwaysAvailable(false);
+    }
+
+    public static boolean isSatisfied(Object valueOrConditional) {
+        return !(valueOrConditional instanceof ConditionalRuntimeValue<?> conditional) || conditional.getDynamicAccessMetadata().satisfied();
+    }
+
+    public static boolean isPreserved(Object valueOrConditional) {
+        return valueOrConditional instanceof ConditionalRuntimeValue<?> conditional && conditional.getDynamicAccessMetadata().isPreserved();
+    }
+
+    /**
+     * Adds a condition to a wrapped value. Direct values are intentionally left unchanged because
+     * they represent values that are already unconditionally available and not preserved.
+     */
+    public static Object withCondition(Object valueOrConditional, AccessCondition condition, boolean preserved) {
+        if (!(valueOrConditional instanceof ConditionalRuntimeValue<?>)) {
+            return valueOrConditional;
+        }
+        Object value = getValueUnconditionally(valueOrConditional);
+        RuntimeDynamicAccessMetadata currentMetadata = getDynamicAccessMetadata(valueOrConditional);
+        RuntimeDynamicAccessMetadata newMetadata = RuntimeDynamicAccessMetadata.addCondition(currentMetadata, condition, preserved);
+        return create(newMetadata, value);
+    }
+
+    public static Object withValue(Object valueOrConditional, Object newValue) {
+        return create(getDynamicAccessMetadata(valueOrConditional), newValue);
+    }
+
+    public ConditionalRuntimeValue(RuntimeDynamicAccessMetadata dynamicAccessMetadata, T value) {
+        this.dynamicAccessMetadata = dynamicAccessMetadata;
+        this.value = value;
+    }
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    public T getValueUnconditionally() {
+        return value;
+    }
+
+    public RuntimeDynamicAccessMetadata getDynamicAccessMetadata() {
+        return dynamicAccessMetadata;
+    }
+
+    public T getValue() {
+        if (dynamicAccessMetadata.satisfied()) {
+            return value;
+        } else {
+            return null;
+        }
+    }
+
+    @Platforms(Platform.HOSTED_ONLY.class)
+    public void updateValue(T newValue) {
+        this.value = newValue;
+    }
+}

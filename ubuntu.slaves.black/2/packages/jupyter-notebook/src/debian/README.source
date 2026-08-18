@@ -1,0 +1,60 @@
+jupyter-notebook packaging
+--------------------------
+
+The upstream tarball from github is used instead of the pypi tarball, since the
+latter does not contain required source (eg, less files) but does contain
+bundled JS libraries and minified source which would in any case need removing.
+
+There are two testsuites - one in python testing server responses and one in
+javascript using browser emulation to test the web application. The former is
+run during build, but the latter requires phantomjs and casperjs (unpackaged)
+so is not currently run. (The <nocheck> option is supported, which should
+significantly shorten the build-depends).
+
+All javascript resources are symlinked from libjs-* packages,
+both at build and runtime. In some cases the naming used by jupyter is not a
+match to the libjs packages and individual files are symlinked instead of
+directories - see d/rules.
+
+codemirror
+----------
+
+The build tree includes (`tools/patches/codemirror.js`) a replacement copy of
+the main codemirror 5.22.2 source file, with a upstream patch applied. The
+version of codemirror in debian at the time of writing is currently rather
+behind this version, so this patch isn't used. Revisit when libjs-codemirror
+is updated.
+
+dependencies
+------------
+
+There is an explicit dependency on python{,3}-terminado which is listed as a
+platform-specific requirement in setup.py, which it appears pybuild doesn't
+interpret.
+
+requirejs-plugins
+-----------------
+
+The single file `json.js` from requirejs-plugins (unpackaged) is pulled in. This
+is included in missing-sources/requirejs-plugins/src/json.js (from
+https://github.com/millermedeiros/requirejs-plugins.git commit 71956b1). This
+file is in source form (rather than being in any way transpiled).
+
+create-react-class
+------------------
+
+We bundle a copy of the source of create-react-class, from git repository
+https://github.com/facebook/react, branch 15-stable, path react/addons/create-react-class,
+revision 5634f0d (v15.6.2) (it was dropped from react 16 onwards, and is
+no longer maintained, which suggests it isn't a good fit for an independent package).
+
+This lives in debian/missing-sources/create-react-class
+
+Built-Using
+-----------
+
+A subset of the libjs-* packages depended upon are combined into a minified
+amalgamation at build time (see tools/build-main.js). These are listed in
+Built-Using for the relevant binary packages. Note while the javascript is
+amalgamated, other resources (eg, CSS) for these packages are still loaded
+from separate files.

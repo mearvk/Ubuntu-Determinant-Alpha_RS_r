@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+
+POM_VERSION          := 2.6
+MAVEN_REPO           := http://repository.sonatype.org/service/local/repositories/central/content
+
+%:
+	dh $@ --buildsystem=ant --sourcedirectory=build --with maven-repo-helper
+
+override_dh_auto_build:
+	dh_auto_build -- jxlall
+
+override_dh_auto_clean:
+	mkdir -p build/out
+	dh_auto_clean -- init clean
+	rm -Rf docs
+
+get-orig-source:
+	uscan --upstream-version 0 --rename
+
+get-orig-pom:
+	wget -O debian/pom.xml $(MAVEN_REPO)/net/sourceforge/jexcelapi/jxl/$(POM_VERSION)/jxl-$(POM_VERSION).pom
+	perl -p -i -e 's/<version>$(POM_VERSION)/<version>$(DEB_UPSTREAM_VERSION)/' debian/pom.xml

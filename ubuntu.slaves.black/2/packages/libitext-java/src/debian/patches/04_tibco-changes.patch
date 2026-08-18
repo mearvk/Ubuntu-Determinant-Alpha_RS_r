@@ -1,0 +1,313 @@
+Description: Modifications made by TIBCO Software for JasperReports >= 6.2 :
+ #1 Fix for transparency issue with setClip method in PdfGraphics2D
+ #2 Fix for transparency bleeding for Batik gradients
+ #3 Fix for stroke opacity state in the create() method of PdfGraphics2D
+ #4 Method to directly write AWT GlyphVectors to PDF for Indic scripts support
+ #5 No character spacing in justified lines with a single word
+Origin: other, http://jaspersoft.artifactoryonline.com/jaspersoft/third-party-ce-artifacts/com/lowagie/itext/2.1.7.js5/itext-2.1.7.js5-sources.jar
+Forwarded: no
+--- a/core/com/lowagie/text/pdf/FontDetails.java
++++ b/core/com/lowagie/text/pdf/FontDetails.java
+@@ -245,6 +245,43 @@
+         return b;
+     }
+     
++    // TIBCO Software #4 : Part 1 - START
++	byte[] convertToBytes(GlyphVector glyphVector) {
++		if (fontType != BaseFont.FONT_TYPE_TTUNI || symbolic) {
++			throw new UnsupportedOperationException("Only supported for True Type Unicode fonts");
++		}
++
++		char[] glyphs = new char[glyphVector.getNumGlyphs()];
++		int glyphCount = 0;
++		for (int i = 0; i < glyphs.length; i++) {
++			int code = glyphVector.getGlyphCode(i);
++			if (code == 0xFFFE || code == 0xFFFF) {// considered non-glyphs by AWT
++				continue;
++			}
++
++			glyphs[glyphCount++] = (char) code;// FIXME supplementary plane?
++
++			Integer codeKey = new Integer(code);
++			if (!longTag.containsKey(codeKey)) {
++				int glyphWidth = ttu.getGlyphWidth(code);
++				Integer charCode = ttu.getCharacterCode(code);
++				int[] metrics = charCode != null 
++						? new int[] { code, glyphWidth, charCode.intValue() }
++						: new int[] { code, glyphWidth };
++				longTag.put(codeKey, metrics);
++			}
++		}
++
++		String s = new String(glyphs, 0, glyphCount);
++		try {
++			byte[] b = s.getBytes(CJKFont.CJK_ENCODING);
++			return b;
++		} catch (UnsupportedEncodingException e) {
++			throw new ExceptionConverter(e);
++		}
++	}
++    // TIBCO Software #4 : Part 1 - END
++    
+     /**
+      * Writes the font definition to the document.
+      * @param writer the <CODE>PdfWriter</CODE> of this document
+--- a/core/com/lowagie/text/pdf/PdfContentByte.java
++++ b/core/com/lowagie/text/pdf/PdfContentByte.java
+@@ -49,8 +49,10 @@
+ 
+ package com.lowagie.text.pdf;
+ import java.awt.Color;
++import java.awt.font.GlyphVector;
+ import java.awt.geom.AffineTransform;
+ import java.awt.print.PrinterJob;
++import java.io.IOException;
+ import java.util.ArrayList;
+ import java.util.HashMap;
+ import java.util.Iterator;
+@@ -1433,6 +1435,14 @@
+         content.append("Tj").append_i(separator);
+     }
+ 
++    // TIBCO Software #4 : Part 1 - START
++	public void showText(GlyphVector glyphVector) {
++		byte[] b = state.fontDetails.convertToBytes(glyphVector);
++		escapeString(b, content);
++		content.append("Tj").append_i(separator);
++	}
++    // TIBCO Software #4 : Part 1 - END
++
+     /**
+      * Constructs a kern array for a text in a certain font
+      * @param text the text
+@@ -3014,6 +3024,13 @@
+      * @param struc the tagging structure
+      */
+     public void beginMarkedContentSequence(PdfStructureElement struc) {
++        // TIBCO Software #4 : Part 1 - START
++    	PdfDictionary dict = new PdfDictionary();
++    	beginMarkedContentSequence(struc, dict);
++    }
++
++    public void beginMarkedContentSequence(PdfStructureElement struc, PdfDictionary dict) {
++        // TIBCO Software #4 : Part 1 - END
+         PdfObject obj = struc.get(PdfName.K);
+         int mark = pdf.getMarkPoint();
+         if (obj != null) {
+@@ -3042,7 +3059,16 @@
+         }
+         pdf.incMarkPoint();
+         mcDepth++;
+-        content.append(struc.get(PdfName.S).getBytes()).append(" <</MCID ").append(mark).append(">> BDC").append_i(separator);
++        // TIBCO Software #4 : Part 1 - START
++		dict.put(PdfName.MCID, new PdfNumber(mark));
++		content.append(struc.get(PdfName.S).getBytes()).append(" ");
++		try {
++			dict.toPdf(writer, content);
++		} catch (IOException e) {
++			throw new ExceptionConverter(e);
++		}
++		content.append(" BDC").append_i(separator);
++        // TIBCO Software #4 : Part 1 - END
+     }
+ 
+     /**
+--- a/core/com/lowagie/text/pdf/PdfDocument.java
++++ b/core/com/lowagie/text/pdf/PdfDocument.java
+@@ -1397,7 +1397,13 @@
+                         hangingCorrection = width - oldWidth;
+                     }
+                 }
+-                float baseFactor = width / (ratio * numberOfSpaces + lineLen - 1);
++                
++                // TIBCO Software #5 : Part 1 - START
++                // if there's a single word on the line and we are using NO_SPACE_CHAR_RATIO,
++                // we don't want any character spacing
++                float baseFactor = (numberOfSpaces == 0 && ratio == PdfWriter.NO_SPACE_CHAR_RATIO) 
++                		? 0f : width / (ratio * numberOfSpaces + lineLen - 1);
++                // TIBCO Software #5 : Part 1 - END
+                 baseWordSpacing = ratio * baseFactor;
+                 baseCharacterSpacing = baseFactor;
+                 lastBaseFactor = baseFactor;
+--- a/core/com/lowagie/text/pdf/PdfGraphics2D.java
++++ b/core/com/lowagie/text/pdf/PdfGraphics2D.java
+@@ -189,6 +189,9 @@
+      * Constructor for PDFGraphics2D.
+      *
+      */
++    // TIBCO Software #4 : Part 1 - START
++    protected
++    // TIBCO Software #4 : Part 1 - END
+     PdfGraphics2D(PdfContentByte cb, float width, float height, FontMapper fontMapper, boolean onlyShapes, boolean convertImagesToJPEG, float quality) {
+         super();
+         dg2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+@@ -909,6 +912,9 @@
+         g2.paint = this.paint;
+         g2.fillGState = this.fillGState;
+         g2.currentFillGState = this.currentFillGState;
++        // TIBCO Software #3 : Part 1 - START
++        g2.currentStrokeGState = this.currentStrokeGState;
++        // TIBCO Software #3 : Part 1 - END
+         g2.strokeGState = this.strokeGState;
+         g2.background = this.background;
+         g2.mediaTracker = this.mediaTracker;
+@@ -1086,7 +1092,9 @@
+             followPath(s, CLIP);
+         }
+         paintFill = paintStroke = null;
+-        currentFillGState = currentStrokeGState = 255;
++        // TIBCO Software #1 : Part 1 - START
++        currentFillGState = currentStrokeGState = -1; // 255;
++        // TIBCO Software #1 : Part 1 - END
+         oldStroke = strokeOne;
+     }
+     
+@@ -1487,7 +1495,9 @@
+         } catch (Exception ex) {
+             throw new IllegalArgumentException();
+         }
+-        if (currentFillGState != 255) {
++        // TIBCO Software #1 : Part 2 - START
++        if (currentFillGState != 255 && currentFillGState != -1) {
++        // TIBCO Software #1 : Part 2 - END
+             PdfGState gs = fillGState[currentFillGState];
+             cb.setGState(gs);
+         }        
+@@ -1613,8 +1623,21 @@
+                 PdfPatternPainter pattern = cb.createPattern(width, height);
+                 image.setAbsolutePosition(0,0);
+                 pattern.addImage(image);
+-                if (fill)
++                // TIBCO Software #2 : Part 1 - START
++                if (fill) {
++                    if (currentFillGState != 255) {
++                        currentFillGState = 255;
++                        PdfGState gs = fillGState[255];
++                        if (gs == null) {
++                            gs = new PdfGState();
++                            gs.setFillOpacity(1);
++                            fillGState[255] = gs;
++                        }
++                        cb.setGState(gs);
++                    }
+                     cb.setPatternFill(pattern);
++                }
++                // TIBCO Software #2 : Part 1 - END
+                 else
+                     cb.setPatternStroke(pattern);
+             } catch (Exception ex) {
+--- a/core/com/lowagie/text/pdf/TrueTypeFont.java
++++ b/core/com/lowagie/text/pdf/TrueTypeFont.java
+@@ -671,7 +671,9 @@
+                 readCMaps();
+                 readKerning();
+                 readBbox();
+-                GlyphWidths = null;
++                // TIBCO Software #4 : Part 1 - START
++                //GlyphWidths = null;
++                // TIBCO Software #4 : Part 1 - END
+             }
+         }
+         finally {
+--- a/core/com/lowagie/text/pdf/TrueTypeFontUnicode.java
++++ b/core/com/lowagie/text/pdf/TrueTypeFontUnicode.java
+@@ -50,9 +50,13 @@
+ package com.lowagie.text.pdf;
+ 
+ import java.io.IOException;
++import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.Comparator;
+ import java.util.HashMap;
++import java.util.Iterator;
++import java.util.List;
++import java.util.Map;
+ 
+ import com.lowagie.text.DocumentException;
+ import com.lowagie.text.Utilities;
+@@ -70,6 +74,10 @@
+      */    
+     boolean vertical = false;
+     
++    // TIBCO Software #4 : Part 1 - START
++    HashMap inverseCmap;
++    // TIBCO Software #4 : Part 1 - END
++    
+     /**
+      * Creates a new TrueType font addressed by Unicode characters. The font
+      * will always be embedded.
+@@ -116,6 +124,33 @@
+         vertical = enc.endsWith("V");
+     }
+     
++    // TIBCO Software #4 : Part 1 - START
++	void readCMaps() throws DocumentException, IOException {
++		super.readCMaps();
++
++		HashMap cmap = null;
++		if (cmapExt != null) {
++			cmap = cmapExt;
++		} else if (cmap31 != null) {
++			cmap = cmap31;
++		}
++
++		if (cmap != null) {
++			inverseCmap = new HashMap();
++			for (Iterator iterator = cmap.entrySet().iterator(); iterator.hasNext();) {
++				Map.Entry entry = (Map.Entry) iterator.next();
++				Integer code = (Integer) entry.getKey();
++				int[] metrics = (int[]) entry.getValue();
++				inverseCmap.put(new Integer(metrics[0]), code);
++			}
++		}
++	}
++    
++	protected Integer getCharacterCode(int code) {
++		return inverseCmap == null ? null : (Integer) inverseCmap.get(new Integer(code));
++    }
++    // TIBCO Software #4 : Part 1 - END
++    
+     /**
+      * Gets the width of a <CODE>char</CODE> in normalized 1000 units.
+      * @param char1 the unicode <CODE>char</CODE> to get the width of
+@@ -173,6 +208,9 @@
+      * @return the stream representing this CMap or <CODE>null</CODE>
+      */    
+     private PdfStream getToUnicode(Object metrics[]) {
++        // TIBCO Software #4 : Part 1 - START
++    	metrics = filterCmapMetrics(metrics);
++        // TIBCO Software #4 : Part 1 - END
+         if (metrics.length == 0)
+             return null;
+         StringBuffer buf = new StringBuffer(
+@@ -214,6 +252,30 @@
+         return stream;
+     }
+     
++    // TIBCO Software #4 : Part 1 - START
++	private Object[] filterCmapMetrics(Object[] metrics) {
++		if (metrics.length == 0) {
++			return metrics;
++		}
++
++		List cmapMetrics = new ArrayList(metrics.length);
++		for (int i = 0; i < metrics.length; i++) {
++			int metric[] = (int[]) metrics[i];
++			// PdfContentByte.showText(GlyphVector) uses glyphs that might not map to a character.
++			// the glyphs are included in the metrics array, but we need to exclude them from the cmap.
++			if (metric.length >= 3) {
++				cmapMetrics.add(metric);
++			}
++		}
++
++		if (cmapMetrics.size() == metrics.length) {
++			return metrics;
++		}
++
++		return cmapMetrics.toArray();
++	}
++    // TIBCO Software #4 : Part 1 - END
++    
+     private static String toHex4(int n) {
+         String s = "0000" + Integer.toHexString(n);
+         return s.substring(s.length() - 4);

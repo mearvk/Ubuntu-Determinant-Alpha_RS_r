@@ -1,0 +1,223 @@
+Description: Restore removed methods and classes to preserve the backward compatibility
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/core/src/main/java/org/bouncycastle/asn1/x509/AlgorithmIdentifier.java
++++ b/core/src/main/java/org/bouncycastle/asn1/x509/AlgorithmIdentifier.java
+@@ -77,6 +77,12 @@
+         return algorithm;
+     }
+ 
++    @Deprecated
++    public ASN1ObjectIdentifier getObjectId()
++    {
++        return algorithm;
++    }
++
+     public ASN1Encodable getParameters()
+     {
+         return parameters;
+--- /dev/null
++++ b/core/src/main/java/org/bouncycastle/asn1/DERBoolean.java
+@@ -0,0 +1,22 @@
++package org.bouncycastle.asn1;
++
++/**
++ * @deprecated use ASN1Boolean
++ */
++public class DERBoolean
++    extends ASN1Boolean
++{
++    /**
++     * @deprecated use getInstance(boolean) method.
++     * @param value
++     */
++    public DERBoolean(boolean value)
++    {
++        super(value);
++    }
++
++    DERBoolean(byte[] value)
++    {
++        super(value);
++    }
++}
+--- a/core/src/main/java/org/bouncycastle/asn1/ASN1Boolean.java
++++ b/core/src/main/java/org/bouncycastle/asn1/ASN1Boolean.java
+@@ -99,6 +99,16 @@
+         }
+     }
+ 
++    ASN1Boolean(byte[] value)
++    {
++        this.value = fromOctetString(value).value;
++    }
++
++    public ASN1Boolean(boolean value)
++    {
++        this.value = (value) ? TRUE_VALUE : FALSE_VALUE;
++    }
++
+     private ASN1Boolean(byte value)
+     {
+         this.value = value;
+--- a/core/src/main/java/org/bouncycastle/math/ec/ECPoint.java
++++ b/core/src/main/java/org/bouncycastle/math/ec/ECPoint.java
+@@ -474,6 +474,11 @@
+         return sb.toString();
+     }
+ 
++    public byte[] getEncoded()
++    {
++        return getEncoded(false);
++    }
++
+     /**
+      * Get an encoding of the point value, optionally in compressed format.
+      * 
+--- a/core/src/main/java/org/bouncycastle/asn1/DEROutputStream.java
++++ b/core/src/main/java/org/bouncycastle/asn1/DEROutputStream.java
+@@ -6,10 +6,10 @@
+ /**
+  * Stream that outputs encoding based on distinguished encoding rules.
+  */
+-class DEROutputStream
++public class DEROutputStream
+     extends ASN1OutputStream
+ {
+-    DEROutputStream(OutputStream os)
++    public DEROutputStream(OutputStream os)
+     {
+         super(os);
+     }
+--- /dev/null
++++ b/core/src/main/java/org/bouncycastle/asn1/DERInteger.java
+@@ -0,0 +1,30 @@
++package org.bouncycastle.asn1;
++
++import java.math.BigInteger;
++
++/**
++ * @deprecated  Use ASN1Integer instead of this,
++ */
++public class DERInteger
++    extends ASN1Integer
++{
++    /**
++     * Constructor from a byte array containing a signed representation of the number.
++     *
++     * @param bytes a byte array containing the signed number.A copy is made of the byte array.
++     */
++    public DERInteger(byte[] bytes)
++    {
++        super(bytes, true);
++    }
++
++    public DERInteger(BigInteger value)
++    {
++        super(value);
++    }
++
++    public DERInteger(long value)
++    {
++        super(value);
++    }
++}
+--- /dev/null
++++ b/core/src/main/java/org/bouncycastle/asn1/DEREnumerated.java
+@@ -0,0 +1,37 @@
++package org.bouncycastle.asn1;
++
++import java.math.BigInteger;
++
++/**
++ * @deprecated Use ASN1Enumerated instead of this.
++ */
++public class DEREnumerated
++    extends ASN1Enumerated
++{
++    /**
++     * @param bytes the value of this enumerated as an encoded BigInteger (signed).
++     * @deprecated use ASN1Enumerated
++     */
++    DEREnumerated(byte[] bytes)
++    {
++        super(bytes);
++    }
++
++    /**
++     * @param value the value of this enumerated.
++     * @deprecated use ASN1Enumerated
++     */
++    public DEREnumerated(BigInteger value)
++    {
++        super(value);
++    }
++
++    /**
++     * @param value the value of this enumerated.
++     * @deprecated use ASN1Enumerated
++     */
++    public DEREnumerated(int value)
++    {
++        super(value);
++    }
++}
+--- /dev/null
++++ b/core/src/main/java/org/bouncycastle/asn1/DERObjectIdentifier.java
+@@ -0,0 +1,24 @@
++package org.bouncycastle.asn1;
++
++/**
++ *
++ * @deprecated Use ASN1ObjectIdentifier instead of this,
++ */
++public class DERObjectIdentifier
++    extends ASN1ObjectIdentifier
++{
++    public DERObjectIdentifier(String identifier)
++    {
++        super(identifier);
++    }
++
++    DERObjectIdentifier(byte[] bytes)
++    {
++        super(bytes);
++    }
++
++    DERObjectIdentifier(ASN1ObjectIdentifier oid, String branch)
++    {
++        super(oid, branch);
++    }
++}
+--- a/core/src/main/java/org/bouncycastle/asn1/DERNull.java
++++ b/core/src/main/java/org/bouncycastle/asn1/DERNull.java
+@@ -14,7 +14,7 @@
+ 
+     private static final byte[]  zeroBytes = new byte[0];
+ 
+-    private DERNull()
++    public DERNull()
+     {
+     }
+ 
+--- a/prov/src/main/java/org/bouncycastle/x509/CertPathValidatorUtilities.java
++++ b/prov/src/main/java/org/bouncycastle/x509/CertPathValidatorUtilities.java
+@@ -123,6 +123,18 @@
+         return null == validityDate ? currentDate : validityDate;
+     }
+ 
++    protected static Date getValidDate(PKIXParameters paramsPKIX)
++    {
++        Date validDate = paramsPKIX.getDate();
++
++        if (validDate == null)
++        {
++            validDate = new Date();
++        }
++
++        return validDate;
++    }
++
+     protected static X500Principal getSubjectPrincipal(X509Certificate cert)
+     {
+         return cert.getSubjectX500Principal();

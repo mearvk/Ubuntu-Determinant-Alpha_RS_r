@@ -1,0 +1,218 @@
+.\"****************************************************************************
+.\" Written by Chris Dunlap <cdunlap@llnl.gov>.
+.\" Copyright (C) 2007-2020 Lawrence Livermore National Security, LLC.
+.\" Copyright (C) 2002-2007 The Regents of the University of California.
+.\" UCRL-CODE-155910.
+.\"
+.\" This file is part of the MUNGE Uid 'N' Gid Emporium (MUNGE).
+.\" For details, see <https://dun.github.io/munge/>.
+.\"
+.\" MUNGE is free software: you can redistribute it and/or modify it under
+.\" the terms of the GNU General Public License as published by the Free
+.\" Software Foundation, either version 3 of the License, or (at your option)
+.\" any later version.  Additionally for the MUNGE library (libmunge), you
+.\" can redistribute it and/or modify it under the terms of the GNU Lesser
+.\" General Public License as published by the Free Software Foundation,
+.\" either version 3 of the License, or (at your option) any later version.
+.\"
+.\" MUNGE is distributed in the hope that it will be useful, but WITHOUT
+.\" ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+.\" FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+.\" and GNU Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" and GNU Lesser General Public License along with MUNGE.  If not, see
+.\" <http://www.gnu.org/licenses/>.
+.\"****************************************************************************
+
+.TH MUNGED 8 "@DATE@" "@PACKAGE@-@VERSION@" "MUNGE Uid 'N' Gid Emporium"
+
+.SH NAME
+munged \- MUNGE daemon
+
+.SH SYNOPSIS
+.B munged
+[\fIOPTION\fR]...
+
+.SH DESCRIPTION
+The \fBmunged\fR daemon is responsible for authenticating local MUNGE
+clients and servicing their credential encode & decode requests.
+.PP
+All \fBmunged\fR daemons within a security realm share a common key.
+All hosts within this realm are expected to have common users/UIDs and
+groups/GIDs.  The key is used to cryptographically protect the credentials;
+it is created with the \fBmungekey\fR command.
+.PP
+When a credential is created, \fBmunged\fR embeds metadata within it
+including the effective UID and GID of the requesting client (as determined
+by \fBmunged\fR) and the current time (as determined by the local clock).
+It then compresses the data, computes a message authentication code, encrypts
+the data, and base64-encodes the result before returning the credential to
+the client.
+.PP
+When a credential is validated, \fBmunged\fR first checks the message
+authentication code to ensure the credential has not been subsequently
+altered.  Next, it checks the embedded UID/GID restrictions to determine
+whether the requesting client is allowed to decode it.  Then, it checks
+the embedded encode time against the current time; if this difference
+exceeds the embedded time-to-live, the credential has expired.  Finally,
+it checks whether this credential has been previously decoded on this host;
+if so, the credential has been replayed.  If all checks pass, the credential
+metadata and payload are returned to the client.
+
+.SH OPTIONS
+.TP
+.BI "\-h, \-\-help"
+Display a summary of the command-line options.
+.TP
+.BI "\-L, \-\-license"
+Display license information.
+.TP
+.BI "\-V, \-\-version"
+Display version information.
+.TP
+.BI "\-f, \-\-force"
+Force the daemon to run if at all possible.  This overrides warnings for an
+existing local domain socket, a lack of entropy for the PRNG, and insecure
+file/directory permissions.  Use with caution as overriding these warnings
+can affect security.
+.TP
+.BI "\-F, \-\-foreground"
+Run the daemon in the foreground.
+.TP
+.BI "\-M, \-\-mlockall"
+Lock all current and future pages in the virtual memory address space.
+Access to locked pages will never be delayed by a page fault.  This can
+improve performance and help the daemon remain responsive when the system
+is under heavy memory pressure.  This typically requires root privileges
+or the CAP_IPC_LOCK capability.
+.TP
+.BI "\-s, \-\-stop"
+Stop the daemon bound to the socket and wait for it to shut down.  Use with
+the \fB\-\-socket\fR option to target a daemon bound to a non-default
+socket location.  This option exits with a zero status if the specified
+daemon was successfully stopped, or a non-zero status otherwise.
+.TP
+.BI "\-S, \-\-socket " path
+Specify the local domain socket for communicating with clients.
+.TP
+.BI "\-v, \-\-verbose"
+Be verbose.
+.TP
+.BI "\-\-auth\-server\-dir " directory
+Specify an alternate directory in which the daemon will create the pipe used
+to authenticate clients.  The recommended permissions for this directory
+are 0711.  This option is only valid on platforms where client authentication
+is performed via a file-descriptor passing mechanism.
+.TP
+.BI "\-\-auth\-client\-dir " directory
+Specify an alternate directory in which clients will create the file used
+to authenticate themselves to the daemon.  The recommended permissions
+for this directory are 1733.  This option is only valid on platforms where
+client authentication is performed via a file-descriptor passing mechanism.
+.TP
+.BI "\-\-benchmark"
+Disable recurring timers in order to reduce some noise while benchmarking.
+This affects the PRNG entropy pool, supplementary group mapping, and
+credential replay hash.  Do not enable this option when running in production.
+.TP
+.BI "\-\-group\-check\-mtime " boolean
+Specify whether the modification time of \fI/etc/group\fR should be checked
+before updating the supplementary group membership mapping.  If this value
+is non-zero, the check will be enabled and the mapping will not be updated
+unless the file has been modified since the last update.
+.TP
+.BI "\-\-group\-update\-time " integer
+Specify the number of seconds between updates to the supplementary group
+membership mapping; this mapping is used when restricting credentials by GID.
+A value of 0 causes it to be computed initially but never updated (unless
+triggered by a \fBSIGHUP\fR).  A value of \-1 causes it to be disabled.
+.TP
+.BI "\-\-key\-file " path
+Specify an alternate pathname to the key file.
+.TP
+.BI "\-\-log\-file " path
+Specify an alternate pathname to the log file.
+.TP
+.BI "\-\-max\-ttl " integer
+Specify the maximum allowable time-to-live value (in seconds) for a credential.
+This setting has an upper-bound imposed by the hard-coded MUNGE_MAXIMUM_TTL
+value.  Reducing it will limit the maximum growth of the credential replay
+cache.  This is viable if clocks within the MUNGE realm can be kept in sync
+with minimal skew.
+.TP
+.BI "\-\-num\-threads " integer
+Specify the number of threads to spawn for processing credential requests.
+.TP
+.BI "\-\-origin " address
+Specify the origin address that will be encoded into credential metadata.
+This can be a hostname or IPv4 address; it can also be the name of a local
+network interface, in which case the first IPv4 address found assigned to
+that interface will be used.  The default value is the IPv4 address of the
+hostname returned by \fBgethostname()\fR.  Failure to lookup the address will
+result in an error; if overridden, the origin will be set to the null address.
+.TP
+.BI "\-\-pid\-file " path
+Specify an alternate pathname for storing the Process ID of the daemon.
+.TP
+.BI "\-\-seed\-file " path
+Specify an alternate pathname to the PRNG seed file.
+.TP
+.BI "\-\-syslog"
+Redirect log messages to syslog when the daemon is running in the background.
+.TP
+.BI "\-\-trusted\-group " group
+Specify the group name or GID of the "trusted group".  This is used for
+permission checks on a directory hierarchy.  Directories with group write
+permissions are allowed if they are owned by the trusted group (or the sticky
+bit is set).
+
+.SH SIGNALS
+.TP
+.B SIGHUP
+Immediately update the supplementary group membership mapping instead of
+waiting for the next scheduled update; this mapping is used when restricting
+credentials by GID.
+.TP
+.B SIGTERM
+Terminate the daemon.
+
+.\" .SH FILES
+
+.SH NOTES
+All clocks within a security realm must be kept in sync within the credential
+time-to-live setting.
+.PP
+While \fBmunged\fR prevents a given credential from being decoded on a
+particular host more than once, nothing prevents a credential from being
+decoded on multiple hosts within the security realm before it expires.
+
+.SH AUTHOR
+Chris Dunlap <cdunlap@llnl.gov>
+
+.SH COPYRIGHT
+Copyright (C) 2007-2020 Lawrence Livermore National Security, LLC.
+.br
+Copyright (C) 2002-2007 The Regents of the University of California.
+.PP
+MUNGE is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+.PP
+Additionally for the MUNGE library (libmunge), you can redistribute it
+and/or modify it under the terms of the GNU Lesser General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+.SH "SEE ALSO"
+.BR munge (1),
+.BR remunge (1),
+.BR unmunge (1),
+.BR munge (3),
+.BR munge_ctx (3),
+.BR munge_enum (3),
+.BR munge (7),
+.BR mungekey (8).
+.PP
+\fBhttps://dun.github.io/munge/\fR

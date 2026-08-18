@@ -1,0 +1,41 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against libiptcdata, to verify that
+# the headers and pkg-config file are installed correctly
+# (C) 2013 Vibhav Pant
+# Author: Vibhav Pant <vibhavp@ubuntu.com>
+
+set -e
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+MYDIR=$(dirname $(readlink -f $0))
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+cat <<EOF > libiptcdata_test.c
+#include <libiptcdata/iptc-jpeg.h>
+#include <stdio.h>
+#include <assert.h>
+
+int main(void)
+{
+	unsigned char buf[256*256];
+	FILE *file;
+
+	file = fopen("$WORKDIR/sample.jpeg", "r");
+	assert(iptc_jpeg_read_ps3(file, buf, sizeof(buf)) == 0);
+	assert(buf != NULL);
+	return 0;
+}
+EOF
+
+${CROSS_COMPILE}gcc -o libiptcdata_test libiptcdata_test.c -liptcdata -Wall -Werror
+echo "build: OK"
+uudecode -o $WORKDIR/sample.jpeg $MYDIR/sample.jpeg.base64
+[ -x libiptcdata_test ]
+./libiptcdata_test
+echo "run: OK"

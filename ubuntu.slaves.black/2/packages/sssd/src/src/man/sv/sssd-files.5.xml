@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-files</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Filformat och konventioner</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-files</refname>
+        <refpurpose>SSSD:s filleverantör</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            Denna manualsida beskriver filleverantören till <citerefentry>
+<refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>.  För en detaljerad referens om syntaxen, se avsnittet
+<quote>FILFORMAT</quote> i manualsidan <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Filleverantören speglar innehållet i filerna <citerefentry>
+<refentrytitle>passwd</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> och <citerefentry> <refentrytitle>group</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.  Syftet med filleverantören är att
+göra användarna och grupperna som traditionellt bara är tillgängliga via
+NSS-gränssnitt även tillgängliga via SSSD-gränssnitten såsom <citerefentry>
+<refentrytitle>sssd-ifp</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Ett annat skäl är att tillhandahålla effektiv cachning av lokala användare
+och grupper.
+        </para>
+        <para>
+            Observera att en del distributioner aktiverar fildomänen automatiskt, och
+lägger domänen före alla explicit konfigurerade domäner.  Se
+enable_files_domain i <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            SSSD hanterar aldrig uppslagning av användaren/gruppen ”root”.
+Uppslagningen av AID/GID 0 hanteras inte heller av SSSD.  Sådana begäranden
+skickas till nästa NSS-modul (vanligen filer).
+        </para>
+        <para>
+            När SSSD inte kör eller svarar returnerar nss_sss koden UNAVAIL som får
+begäran att skickas vidare till nästa modul.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>KONFIGURATIONSALTERNATIV</title>
+        <para>
+            Utöver de alternativ som räknas upp nedan kan generella SSSD-domänalternativ
+sättas där de är tillämpliga.  Se <quote>DOMÄNSEKTIONER</quote> i
+manualsidan <citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för detaljer om konfigurationen av
+en SSSD-domän.  Men syftet med leverantören files är att exponera samma data
+som UNIX-filerna, bara via gränssnitten för SSSD.  Därför stödjs inte alla
+generella domänalternativ.  På samma sätt har några globala alternativ,
+såsom att åsidosätta skalet i avsnittet <quote>nss</quote> för alla domäner
+ingen effekt på domänen files om det inte anges uttryckligen per domän.
+<variablelist>
+                <varlistentry>
+                    <term>passwd_files (sträng)</term>
+                    <listitem>
+                        <para>
+                            Kommaseparerad lista av ett eller flera namn på lösenordsfiler att läsa och
+räkna upp av filleverantören, inotify-övervakningsvakter kommer att sättas
+på varje fil för att upptäcka ändringar dynamiskt.
+                        </para>
+                        <para>
+                            Standard: /etc/passwd
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>group_files (sträng)</term>
+                    <listitem>
+                        <para>
+                            Kommaseparerad lista av ett eller flera namn på gruppfiler att läsa och
+räkna upp av filleverantören, inotify-övervakningsvakter kommer att sättas
+på varje fil för att upptäcka ändringar dynamiskt.
+                        </para>
+                        <para>
+                            Standard: /etc/group
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>fallback_to_nss (boolean)</term>
+                    <listitem>
+                        <para>
+                            Under uppdatering av interna data kommer SSSD att returnera ett fel och låta
+klienten fortsätta med nästa NSS-modul. Detta hjälper till att undvika
+fördröjningar vid användning systemet standardfiler
+<filename>/etc/passwd</filename> och <filename>/etc/group</filename> och när
+NSS-konfigurationen har ”sss” före ”files” för avbildningarna ”passwd” och
+”group”.
+                        </para>
+                        <para>
+                            Om filleverantören är konfigurerad att övervaka andra filer är det vettigt
+att sätta detta alternativ till ”False” för att undvika inkonsistent
+beteende eftersom det i allmänhet inte skulle finnas någon annan NSS-modul
+som kan användas att falla tillbaka på.
+                        </para>
+                        <para>
+                            Standard: True
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+        </para>
+    </refsect1>
+
+    <refsect1 id='example'>
+        <title>EXEMPEL</title>
+        <para>
+            Följande exempel antar att SSSD är korrekt konfigurerat och att files är en
+av domänerna i avsnittet <replaceable>[sssd]</replaceable>.
+        </para>
+        <para>
+<programlisting>
+[domain/files]
+id_provider = files
+</programlisting>
+        </para>
+        <para>
+            För att dra nytta av SSSD:s cachning av lokala användare och grupper måste
+modulen nss_sss listas före modulen nss_files i /etc/nsswitch.conf.
+        </para>
+        <para>
+<programlisting>
+passwd:     sss files
+group:      sss files
+</programlisting>
+        </para>
+    </refsect1>
+
+        <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

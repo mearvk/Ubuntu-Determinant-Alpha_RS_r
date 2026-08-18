@@ -1,0 +1,33 @@
+Description: Zero named color strings before writing them
+ For each named colors (namedColor2Type) a prefix, a suffix and the
+ color root name get written. These three strings are 32-characters long.
+ In order to avoid capturing unitialized memory—which is not good for
+ privacy and prevent getting the same bytes for the same profile—the
+ placeholder allocated on the stack are zero'ed before a copy of the
+ actual string is made.
+ .
+Author: Jérémy Bobbio <lunar@debian.org>, Thomas Weber <tweber@debian.org>
+Bug-Debian: http://bugs.debian.org/815248
+Forwarded: https://github.com/mm2/Little-CMS/issues/70
+--- a/src/cmstypes.c
++++ b/src/cmstypes.c
+@@ -3168,6 +3168,10 @@
+     if (!_cmsWriteUInt32Number(io, nColors)) return FALSE;
+     if (!_cmsWriteUInt32Number(io, NamedColorList ->ColorantCount)) return FALSE;
+ 
++    // Ensure we don't write unitialized memory.
++    memset(prefix, 0, sizeof(prefix));
++    memset(suffix, 0, sizeof(suffix));
++
+     strncpy(prefix, (const char*) NamedColorList->Prefix, 32);
+     strncpy(suffix, (const char*) NamedColorList->Suffix, 32);
+ 
+@@ -3182,6 +3186,8 @@
+        cmsUInt16Number Colorant[cmsMAXCHANNELS];
+        char Root[cmsMAX_PATH];
+ 
++	// Ensure we don't write unitialized memory.
++        memset(Root, 0, sizeof(Root));
+         if (!cmsNamedColorInfo(NamedColorList, i, Root, NULL, NULL, PCS, Colorant)) return 0;
+         Root[32] = 0;
+         if (!io ->Write(io, 32 , Root)) return FALSE;

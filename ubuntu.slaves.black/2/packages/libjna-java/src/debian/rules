@@ -1,0 +1,59 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+DEB_HOST_MULTIARCH = $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	#ant -f build.xml -Dmaven-release=true clean
+	find -name build -type d | xargs -r rm -Rf
+	rm -f build.number
+	rm -rf build doc
+	rm -rf contrib/platform/build
+	rm -rf contrib/platform/dist
+	rm -Rf contrib/ntservice/dist
+	rm -f dist/*
+	rm -f lib/*.jar
+	mh_clean
+	dh_clean
+
+override_dh_auto_build:
+	ln -s /usr/share/java/ant.jar lib/ant.jar
+	ln -s /usr/share/java/asm.jar lib/asm.jar
+	ant -f build.xml \
+	    -Dcompatibility=8 \
+	    -Dcflags_extra.native="" \
+	    -Ddynlink.native=true \
+	    -Dnomixedjar.native=true \
+	    -Djni.md5="" \
+	    -Djar.compress=true \
+	    -Dmaven-release=true \
+	    -Dbuild-native=true \
+	    -Dyear=$(shell date --date='@$(SOURCE_DATE_EPOCH)' --utc +'%Y') \
+	    jar javadoc contrib-jars native
+
+# install. using platform.jar is a silly idea in /usr/share/java/ as it's bound to collide
+override_dh_auto_install:
+	mh_installpom -plibjna-java -e$(DEB_VERSION_UPSTREAM) pom-jna.xml
+	mh_installjar -plibjna-java -e$(DEB_VERSION_UPSTREAM) --java-lib --usj-name=jna pom-jna.xml build/jna.jar
+
+	mh_installpom -plibjna-platform-java -e$(DEB_VERSION_UPSTREAM) pom-jna-platform.xml
+	mh_installjar -plibjna-platform-java -e$(DEB_VERSION_UPSTREAM) --java-lib --usj-name=jna-platform pom-jna-platform.xml contrib/platform/dist/jna-platform.jar
+
+	dh_install -plibjna-jni build/native*/libjnidispatch.system.so usr/lib/$(DEB_HOST_MULTIARCH)/jni
+
+override_dh_installchangelogs:
+	dh_installchangelogs -- CHANGES.md
+
+override_dh_makeshlibs:
+	# don't call dh_makeshlibs
+
+override_dh_compress:
+	dh_compress -X.java
+
+binary: binary-arch binary-indep

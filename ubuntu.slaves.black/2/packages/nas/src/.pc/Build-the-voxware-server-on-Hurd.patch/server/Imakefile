@@ -1,0 +1,231 @@
+/*
+ * Copyright 1993 Network Computing Devices, Inc.
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and
+ * its documentation for any purpose is hereby granted without fee, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation, and that the name Network Computing Devices, Inc. not be
+ * used in advertising or publicity pertaining to distribution of this 
+ * software without specific, written prior permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED `AS-IS'.  NETWORK COMPUTING DEVICES, INC.,
+ * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING WITHOUT
+ * LIMITATION ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE, OR NONINFRINGEMENT.  IN NO EVENT SHALL NETWORK
+ * COMPUTING DEVICES, INC., BE LIABLE FOR ANY DAMAGES WHATSOEVER, INCLUDING
+ * SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF USE, DATA,
+ * OR PROFITS, EVEN IF ADVISED OF THE POSSIBILITY THEREOF, AND REGARDLESS OF
+ * WHETHER IN AN ACTION IN CONTRACT, TORT OR NEGLIGENCE, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * 
+ * $NCDId: @(#)Imakefile,v 1.17 1995/12/06 01:33:07 greg Exp $
+ */
+
+XCOMM $NCDId: @(#)Imakefile,v 1.17 1995/12/06 01:33:07 greg Exp $
+
+#include "../config/NetAudio.def"
+#include "../config/NetAudio.tmpl"
+
+#define StdSubdirs dia os
+#define StdLibs $(DIA) 
+
+      OTHEREXTS = 
+      OTHERDEPDIRS =
+
+        DEPDIRS =
+     NONPEXEXTS = 
+     EXTENSIONS = 
+         XAULIB = 
+       XDMCPLIB = 
+             OS = os/libos.a $(XAULIB) $(XDMCPLIB)
+        BSDEMUL = $(LIBSRC)/Berk/Berklib.o
+            MFB =
+            CFB =
+           CFB8 =
+             MI =
+            DIX =
+            DIA = dia/libdia.a
+           FONT = 
+#if SystemV4 && !defined(SGIArchitecture)
+# if defined(SYSV386) || defined(i386SVR4Architecture)
+#  if defined(USLArchitecture)
+        SYSLIBS = -lgen -lsocket -lc 
+#  else
+        SYSLIBS = -lc /usr/ucblib/libucb.a -L/usr/X386/lib
+#  endif
+
+# endif
+#else
+        SYSLIBS =
+#endif
+
+#ifdef NetBSDArchitecture
+        SYSLIBS = -lossaudio
+#endif
+
+           CBRT =
+
+XCOMM
+XCOMM This turns off the default rule for compiling .c files because
+XCOMM this makefile does not really know how to build it.  This is really
+XCOMM just a hack because of the Sun version of make and nfs.
+XCOMM
+.c.o:
+
+/*****************************************************************************
+ *		  ALL definitions, add one for each server                   *
+ *****************************************************************************/
+
+#ifdef SunArchitecture
+#define CanBuildAuServer	YES
+ALL1 = nasd
+#define BuildSunServer
+#endif
+
+#ifdef SGIArchitecture
+#define CanBuildAuServer	YES
+ALL1 = nasd
+#define BuildSGIServer
+#endif
+
+#if defined(HPArchitecture) && !defined(LinuxArchitecture) && !defined(GNUArchitecture)
+#define CanBuildAuServer        YES
+ALL1 = nasd
+#define BuildHPServer
+#endif
+
+
+#if defined(i386SVR4Architecture) || defined(__FreeBSD_kernel__) || defined(__FreeBSD__) || defined(FreeBSDArchitecture) || defined(LinuxArchitecture) || defined(i386BsdArchitecture) || defined(USLArchitecture) || defined(cygwinArchitecture) || defined(__DragonFly__)
+# define CanBuildAuServer	YES
+
+#if !defined(GNUMachArchitecture)
+# if defined(cygwinArchitecture)
+ALL1 = nasd.exe
+# else
+ALL1 = nasd
+# endif
+
+# define BuildVoxServer
+# endif
+#endif
+
+ALL = $(ALL1)
+
+all:: $(ALL)
+
+#ifdef CanBuildAuServer
+
+/*****************************************************************************
+ *		  Build rule blocks, add one for each server                 *
+ *****************************************************************************/
+
+#ifdef BuildSunServer
+XCOMM
+XCOMM Sun server
+XCOMM
+SUNDIRS = StdSubdirs dda/sun
+SUNLIBS = StdLibs dda/sun/libsun.a  $(OS)
+SUNSYSLIBS = $(SYSLIBS)
+
+/* next 8 lines are for Solaris 2 OpenWindows imake config support */
+MAPFILE=			
+OWVERSIONFILE=owversion
+SYSLIBS=
+ausun: owversion
+owversion:
+	echo OpenWindows 3.x > $@
+clean::
+	rm -f owversion
+
+ServerTarget(nasd,$(SUNDIRS),$(SUNOBJS),$(SUNLIBS),$(SUNSYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(SUNDIRS)
+#endif
+
+#ifdef BuildSGIServer
+XCOMM
+XCOMM SGI server
+XCOMM
+SGIDIRS = StdSubdirs dda/sgi
+SGILIBS = StdLibs dda/sgi/libsgi.a $(OS)
+SGISYSLIBS = $(SYSLIBS) -laudio
+
+ServerTarget(nasd,$(SGIDIRS),$(SGIOBJS),$(SGILIBS),$(SGISYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(SGIDIRS)
+#endif
+
+#ifdef BuildVoxServer
+XCOMM
+XCOMM voxware server
+XCOMM
+VOXWAREDIRS = StdSubdirs dda/voxware
+VOXWARELIBS = StdLibs dda/voxware/libvoxware.a $(OS)
+VOXWARESYSLIBS = $(SYSLIBS)
+
+ServerTarget(nasd,$(VOXWAREDIRS),$(VOXWAREOBJS),$(VOXWARELIBS),$(VOXWARESYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(VOXWAREDIRS)
+#endif
+
+#ifdef BuildHPServer
+XCOMM
+XCOMM HP server
+XCOMM
+HPDIRS = StdSubdirs dda/hpux
+HPLIBS = StdLibs dda/hpux/libhpux.a $(OS)
+HPSYSLIBS = $(SYSLIBS) -lc
+
+ServerTarget(nasd,$(HPDIRS),$(HPOBJS),$(HPLIBS),$(HPSYSLIBS))
+
+InstallMultipleFlags($(ALL),$(BINDIR),$(INSTPGMFLAGS))
+
+SUBDIRS = $(HPDIRS)
+#endif
+
+#define IHaveSubdirs
+#define PassCDebugFlags AuPassCDebugFlags
+
+DependSubdirs($(SUBDIRS))
+
+#if ProjectX < 5
+/*
+ * ForceSubdirs - force make to build subdirectories
+ */
+#ifndef ForceSubdirs
+#define ForceSubdirs(dirs)						@@\
+dirs: FRC								@@\
+	@cd $@ ; echo "making all in $(CURRENT_DIR)/$@..."; \		@@\
+	$(MAKE) $(MFLAGS) PassCDebugFlags all				@@\
+									@@\
+FRC:
+#endif /* ForceSubdirs */
+#endif /* Project X < 5 */
+
+ForceSubdirs($(DEPDIRS) $(SUBDIRS))
+
+clean::
+	$(RM) $(ALL)
+
+ ETCDIR = NasConfigSearchPath
+
+InstallManPage(nasd,$(MANDIR))
+#ifdef InstallGenManPage
+InstallGenManPage(nasd.conf,$(FILEMANDIR),$(FILEMANSUFFIX))
+#else
+InstallManPage(nasd.conf,$(FILEMANDIR))
+#endif
+InstallNonExecFile(nasd.conf.eg,$(ETCDIR))
+
+#else /* CanBuildAuServer */
+
+depend::
+#endif /* CanBuildAuServer */
+

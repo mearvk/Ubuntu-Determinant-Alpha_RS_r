@@ -1,0 +1,47 @@
+#!/bin/sh
+# TODO
+# - fix checking of .a libs; problem is that "nm -g --defined-only" lists
+#   internal symbols; this can be solved by using objdump, but it's probably
+#   good enough to just run the tests on the shared lib
+
+if test x"$srcdir" != x""; then
+    builddir="."	# running from make check, but it does not define that
+else
+    srcdir=`echo "$0" | sed s,[^/]*$,,`
+    test "$srcdir" = "$0" && srcdir=.
+    test -z "$srcdir" && srcdir=.
+    builddir="$srcdir"	# running manually, have to assume
+fi
+
+srcdir=`cd $srcdir;pwd`
+builddir=`cd $builddir;pwd`
+
+error=0
+
+# check_bad_public_symbols <symbol prefix> <lib file> [<lib file>...]
+#
+# checks public symbols in shared libs:
+# - allow prefix_anything
+# - reject _prefixanything
+# - allow _anything
+# - reject anything else
+#
+# NB: skips missing files
+check_bad_public_symbols() {
+    symbols_prefix="$1"
+    shift
+    lib_files=`ls "$@" 2>/dev/null`
+    [ -z "$lib_files" ] && return
+    bad_globals=`nm -g --defined-only $lib_files |
+        awk '{if ($3) print $3}' |
+        sed -n "/^${symbols_prefix}_/ d; /^_${symbols_prefix}/ { p; d }; /^_/ d; p"`
+    [ -z "$bad_globals" ] && return
+    error=1
+    echo BAD GLOBAL SYMBOLS in $lib_files:
+    echo "$bad_globals"
+}
+
+check_bad_public_symbols mpeg2 $builddir/../libmpeg2/.libs/libmpeg2.so
+check_bad_public_symbols mpeg2convert $builddir/../libmpeg2/convert/.libs/libmpeg2convert.so
+
+exit $error

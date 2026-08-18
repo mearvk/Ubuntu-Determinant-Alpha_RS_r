@@ -1,0 +1,61 @@
+# vim:syntax=apparmor
+# Last Modified: Fri Jun  6 13:51:00 2020
+# Author: Jamie Strandboge <jamie@ubuntu.com>
+
+#include <tunables/global>
+
+/usr/sbin/slapd {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/p11-kit>
+
+  #include <abstractions/ssl_keys>
+  #include <abstractions/ssl_certs>
+
+  /etc/sasldb2 r,
+
+  capability dac_override,
+  capability net_bind_service,
+  capability setgid,
+  capability setuid,
+
+  /etc/gai.conf r,
+  /etc/hosts.allow r,
+  /etc/hosts.deny r,
+
+  # ldap files
+  /etc/ldap/** kr,
+  /etc/ldap/slapd.d/** rw,
+
+  # kerberos/gssapi
+  /dev/tty rw,
+  /etc/gss/mech.d/   r,
+  /etc/gss/mech.d/* kr,
+  /etc/krb5.keytab kr,
+  /etc/krb5/user/*/client.keytab kr,
+  owner /tmp/krb5cc_* rwk,
+  owner /var/tmp/krb5_*.rcache2 rwk,
+  /var/tmp/ rw,
+  /var/tmp/** rw,
+
+  # the databases and logs
+  /var/lib/ldap/ r,
+  /var/lib/ldap/** rwk,
+
+  # lock file
+  /var/lib/ldap/alock kw,
+
+  # pid files and sockets
+  /{,var/}run/slapd/* w,
+  /{,var/}run/slapd/ldapi rw,
+  /{,var/}run/nslcd/socket rw,
+  /{,var/}run/saslauthd/mux rw,
+
+  /usr/lib/ldap/ r,
+  /usr/lib/ldap/* mr,
+
+  /usr/sbin/slapd mr,
+
+  # Site-specific additions and overrides. See local/README for details.
+  #include <local/usr.sbin.slapd>
+}

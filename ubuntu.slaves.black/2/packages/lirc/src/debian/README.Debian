@@ -1,0 +1,171 @@
+## 0.9.4 disruptive update
+
+The configuration is so much changed that updating  from 0.9.0 requires
+manual intervention. This could be done using the update scripts or as
+a completely manual process. Many users will always need some manual steps.
+
+The outcome of the process is up to four different services by
+default controlled by systemd.
+
+
+### The changes
+
+  - The hardware.conf file is not supported, obsoleted by a new
+    lirc_options.conf file and systemd unit definitions.
+
+  - The former single lirc service is replaced with the three systemd
+    services lircd.service, lircmd.service and irexec.service. There is
+    no counterpart to the 0.9.0 'lirc' service which covered all of these.
+    Using a separate transmitter device requires yet another service.
+
+  - 0.9.4 defaults to using systemd for controlling the services. This
+    is not just start/stop functionality, systemd is used to implement
+    new features and to address shortcomings in 0.9.0. However, traditional
+    systemV scripts are also installed and could be used although this
+    is less tested and not really documented.
+
+  - Up to 0.9.0 lirc had a small set of often used remote definitions files
+    as part of the package at /usr/share/lirc/remotes. These are dropped
+    from 0.9.4, see "The lircd.conf file"  below.
+
+  - Previous lirc package installed a udev rule which autostarted lircd
+    when a new /dev/lirc* device was created, typically when connecting
+    some kind of USB device. This rule is no longer present, users
+    depending on lircd needs to start this service explicitly.
+
+
+### Using the update script
+
+A new update scripts can create the lirc_options.conf file using values
+in the existing hardware.conf. If you want to make a non-destructive test
+to inspect the results use:
+
+    $ cp -ar /etc/lirc .
+    $ LIRC_DRYRUN=1 /usr/share/lirc/lirc-old2new ./lirc
+
+This will update the files in ./lirc and also just echo the systemctl
+commands instead of executing them. To perform the update use:
+
+    $ sudo /usr/share/lirc/lirc-old2new
+
+This will use the files in /etc/lirc, updating lirc_options.conf using data
+in hardware conf. It will also start and enable lircd.service, lircmd.service
+and irexec.service if the corresponding services was enabled in 0.9.0.
+
+After running script check results using
+
+    $ cat /etc/lirc/lirc_options.conf
+    $ systemctl status lircd.socket
+    $ systemctl status lircmd.service
+    $ systemctl status irexec.service
+
+Note that configurations using a separate transmitter device needs to be
+handled manually, see below.
+
+You also might need to review your /etc/lirc/lircd.conf file, also below.
+
+
+### Manual updating
+
+The manual process is not that hard. The first step is to update
+lirc_options.conf using the values in hardware.conf. Usually, this is just
+'device' and 'driver' but you might have a different setup. Note that the
+default driver is 'default' in 0.9.0 whereas it's 'devinput' in 0.9.4.
+
+The [modinit] section contains a single value 'code = '. This is code which
+is run by lircd-setup as root before lircd is started. Typical use is
+e. g., modprobe(1) and setserial(1) invocations. If in doubts, leave this
+as-is.
+
+When the lirc_options is in shape, enable the different services. Note
+that most users only run one or two of these.
+
+*lircd* requires /etc/lirc/lircd.conf. In an upgrade scenario, this is
+already in place and you could enable, start and check lircd using:
+
+    $ sudo systemctl enable lircd.socket
+    $ sudo systemctl start lircd.socket
+    $ systemctl status lircd.socket
+
+*irexec* requires /etc/lirc/irexec.lircrc. In an upgrade scenario you should
+have the old configuration file lircrc available if irexec is used. Do:
+
+    $ sudo cp /etc/lirc/lircrc /etc/lirc/irexec.lircrc
+    $ sudo systemctl enable irexec.service
+    $ sudo systemctl start irexec.service
+    $ systemctl status irexec.service
+
+*lircmd* requires lircmd.conf. In an upgrade scenario this should already
+be in place if this service is used. Enable, start and check using
+
+    $ sudo systemctl enable lircmd.service
+    $ sudo systemctl start lircmd.service
+    $ systemctl status lircmd.service
+
+
+### The /etc/lirc/lircd.conf file and /usr/share/lirc/remotes
+
+If you just have copied a remote file and used it as is or with modifications
+the file needs no changes.
+
+However, if you have included files from /usr/share/lirc/remotes these are
+not available after update. If you need these files for this or other
+reasons, they can be restored by installing the lirc-compat-remotes package.
+
+The default configuration file is available as /etc/lirc/lircd.conf.dist.
+This file just includes all files in the /etc/lirc/lircd.conf.d. If you
+include files from e. g., /usr/share/lirc/remotes the easiest path is
+to copy the files to /etc/lircd.conf.d and use the default lircd.conf.
+
+Note that from 0.9.4 all lircd.conf files are supposed to have names like
+mceusb.lircd.conf, with a '.lircd.conf' suffix.
+
+
+### Using a separate transmitter
+
+Using a separate transmitter requires setting up yet another service (i. e.,
+a separate lircd instance). This is done by creating a new file like
+/etc/systemd/system/lircd-tx.service. An example:
+
+    [Unit]
+    Description=LIRC Infrared Signal Decoder (transmitting)
+    After=network.target
+
+    [Service]
+    Type=simple
+    ExecStart=/usr/sbin/lircd --driver=iguanaIR \
+                              --device=/var/run/iguanaIR/0 \
+                              --output=/var/run/lirc/lircd-tx \
+                              --pidfile=/run/lirc/dont-use-lircd-tx.pid \
+                              --nodaemon \
+                              --allow-simulate
+
+    [Install]
+    WantedBy=multi-user.target
+
+The service will use the defaults from the lirc_options.conf file. The
+--device, --output and --pidfile must be unique and thus cannot use these
+defaults. A configuration file might or might not be needed; the example
+uses the default /etc/lirc/lircd.conf.
+
+Once in place this service can be controlled like other services:
+
+    $ sudo systemctl enable lircd-tx.service
+    $ sudo systemctl start lircd-tx.service
+    $ systemctl status lircd-tx.service
+
+
+### Re-enabling the udev autostart rule.
+
+The udev rule which autostarts lirc is still available in
+/usr/share/lirc/contrib/85-lirc.rules. This can be copied to
+/etc/udev/rules.d to re-enable the hotplugging lirc restart. However,
+here are dragons:
+
+    - The rule is not compatible with the systemd configuration, the
+      sysV scripts must be used to control lirc.
+    - The rule is known to cause subtle bugs such as lp: #499588.
+    - The rule has never worked for other devices then /dev/lirc* ones.
+    - The rule has never worked with multiple /dev/lirc* devices.
+
+-- Alec Leamas <al@jessie.nowhere.net>  Wed, 2 Nov 2016 19:02:10 +0100

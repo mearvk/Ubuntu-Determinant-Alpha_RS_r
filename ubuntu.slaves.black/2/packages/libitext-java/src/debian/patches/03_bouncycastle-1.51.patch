@@ -1,0 +1,197 @@
+From: Markus Koschany <apo@debian.org>
+Date: Wed, 2 Dec 2015 20:56:51 +0100
+Subject: bouncycastle 1.51
+
+Fix FTBFS with bouncycastle 1.51.
+Forwarded: no
+---
+ .../lowagie/text/pdf/OcspClientBouncyCastle.java   | 47 +++++++++++++---------
+ core/com/lowagie/text/pdf/PdfPKCS7.java            | 19 ++++++---
+ core/com/lowagie/text/pdf/PdfReader.java           | 10 +++--
+ 3 files changed, 46 insertions(+), 30 deletions(-)
+
+diff --git a/core/com/lowagie/text/pdf/OcspClientBouncyCastle.java b/core/com/lowagie/text/pdf/OcspClientBouncyCastle.java
+index 982d708..74978c9 100644
+--- a/core/com/lowagie/text/pdf/OcspClientBouncyCastle.java
++++ b/core/com/lowagie/text/pdf/OcspClientBouncyCastle.java
+@@ -59,20 +59,29 @@ import java.math.BigInteger;
+ import java.net.HttpURLConnection;
+ import java.net.URL;
+ import java.security.Security;
++import java.security.cert.CertificateEncodingException;
+ import java.security.cert.X509Certificate;
+ import java.util.Vector;
+ import org.bouncycastle.asn1.DEROctetString;
+ import org.bouncycastle.asn1.ocsp.OCSPObjectIdentifiers;
++import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
++import org.bouncycastle.asn1.x509.Extension;
++import org.bouncycastle.asn1.x509.Extensions;
+ import org.bouncycastle.asn1.x509.X509Extension;
+ import org.bouncycastle.asn1.x509.X509Extensions;
+-import org.bouncycastle.ocsp.BasicOCSPResp;
+-import org.bouncycastle.ocsp.CertificateID;
+-import org.bouncycastle.ocsp.CertificateStatus;
+-import org.bouncycastle.ocsp.OCSPException;
+-import org.bouncycastle.ocsp.OCSPReq;
+-import org.bouncycastle.ocsp.OCSPReqGenerator;
+-import org.bouncycastle.ocsp.OCSPResp;
+-import org.bouncycastle.ocsp.SingleResp;
++import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
++import org.bouncycastle.cert.ocsp.BasicOCSPResp;
++import org.bouncycastle.cert.ocsp.CertificateID;
++import org.bouncycastle.cert.ocsp.CertificateStatus;
++import org.bouncycastle.cert.ocsp.OCSPException;
++import org.bouncycastle.cert.ocsp.OCSPReq;
++import org.bouncycastle.cert.ocsp.OCSPReqBuilder;
++import org.bouncycastle.cert.ocsp.OCSPResp;
++import org.bouncycastle.cert.ocsp.SingleResp;
++import org.bouncycastle.operator.DigestCalculator;
++import org.bouncycastle.operator.DigestCalculatorProvider;
++import org.bouncycastle.operator.OperatorException;
++import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
+ 
+ /**
+  * OcspClient implementation using BouncyCastle.
+@@ -107,28 +116,26 @@ public class OcspClientBouncyCastle implements OcspClient {
+      * @throws OCSPException
+      * @throws IOException
+      */
+-    private static OCSPReq generateOCSPRequest(X509Certificate issuerCert, BigInteger serialNumber) throws OCSPException, IOException {
++    private static OCSPReq generateOCSPRequest(X509Certificate issuerCert, BigInteger serialNumber) throws OCSPException, IOException, OperatorException, CertificateEncodingException {
+         //Add provider BC
+         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+         
++        JcaDigestCalculatorProviderBuilder digestCalculatorProviderBuilder = new JcaDigestCalculatorProviderBuilder();
++        DigestCalculatorProvider digestCalculatorProvider = digestCalculatorProviderBuilder.build();
++        DigestCalculator digestCalculator = digestCalculatorProvider.get(CertificateID.HASH_SHA1);
+         // Generate the id for the certificate we are looking for
+-        CertificateID id = new CertificateID(CertificateID.HASH_SHA1, issuerCert, serialNumber);
++        CertificateID id = new CertificateID(digestCalculator, new JcaX509CertificateHolder(issuerCert), serialNumber);
+         
+         // basic request generation with nonce
+-        OCSPReqGenerator gen = new OCSPReqGenerator();
++        OCSPReqBuilder gen = new OCSPReqBuilder();
+         
+         gen.addRequest(id);
+         
+         // create details for nonce extension
+-        Vector oids = new Vector();
+-        Vector values = new Vector();
++        Extension ext = new Extension(OCSPObjectIdentifiers.id_pkix_ocsp_nonce, false, new DEROctetString(new DEROctetString(PdfEncryption.createDocumentId()).getEncoded()));
++        gen.setRequestExtensions(new Extensions(new Extension[]{ext}));
+         
+-        oids.add(OCSPObjectIdentifiers.id_pkix_ocsp_nonce);
+-        values.add(new X509Extension(false, new DEROctetString(new DEROctetString(PdfEncryption.createDocumentId()).getEncoded())));
+-        
+-        gen.setRequestExtensions(new X509Extensions(oids, values));
+-        
+-        return gen.generate();
++        return gen.build();
+     }
+     
+     /**
+@@ -167,7 +174,7 @@ public class OcspClientBouncyCastle implements OcspClient {
+                     if (status == CertificateStatus.GOOD) {
+                         return basicResponse.getEncoded();
+                     }
+-                    else if (status instanceof org.bouncycastle.ocsp.RevokedStatus) {
++                    else if (status instanceof org.bouncycastle.cert.ocsp.RevokedStatus) {
+                         throw new IOException("OCSP Status is revoked!");
+                     }
+                     else {
+diff --git a/core/com/lowagie/text/pdf/PdfPKCS7.java b/core/com/lowagie/text/pdf/PdfPKCS7.java
+index ccb1653..d99d730 100644
+--- a/core/com/lowagie/text/pdf/PdfPKCS7.java
++++ b/core/com/lowagie/text/pdf/PdfPKCS7.java
+@@ -109,10 +109,15 @@ import org.bouncycastle.asn1.cms.ContentInfo;
+ import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+ import org.bouncycastle.asn1.tsp.MessageImprint;
+ import org.bouncycastle.asn1.x509.X509Extensions;
+-import org.bouncycastle.ocsp.BasicOCSPResp;
+-import org.bouncycastle.ocsp.CertificateID;
+-import org.bouncycastle.ocsp.SingleResp;
+ import org.bouncycastle.tsp.TimeStampToken;
++import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
++import org.bouncycastle.cms.SignerInformationVerifier;
++import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
++import org.bouncycastle.cert.ocsp.BasicOCSPResp;
++import org.bouncycastle.cert.ocsp.CertificateID;
++import org.bouncycastle.cert.ocsp.SingleResp;
++import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
++import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
+ 
+ /**
+  * This class does all the processing related to signing and verifying a PKCS#7
+@@ -899,7 +904,7 @@ public class PdfPKCS7 {
+                     if (!keystore.isCertificateEntry(alias))
+                         continue;
+                     X509Certificate certStoreX509 = (X509Certificate)keystore.getCertificate(alias);
+-                    if (ocsp.verify(certStoreX509.getPublicKey(), provider))
++                    if (ocsp.isSignatureValid(new JcaContentVerifierProviderBuilder().setProvider(provider).build(certStoreX509.getPublicKey())))
+                         return true;
+                 }
+                 catch (Exception ex) {
+@@ -929,7 +934,8 @@ public class PdfPKCS7 {
+                     if (!keystore.isCertificateEntry(alias))
+                         continue;
+                     X509Certificate certStoreX509 = (X509Certificate)keystore.getCertificate(alias);
+-                    ts.validate(certStoreX509, provider);
++                    SignerInformationVerifier siv = new JcaSimpleSignerInfoVerifierBuilder().setProvider(provider).build(certStoreX509);
++                    ts.validate(siv);
+                     return true;
+                 }
+                 catch (Exception ex) {
+@@ -992,7 +998,8 @@ public class PdfPKCS7 {
+             CertificateID cid = sr.getCertID();
+             X509Certificate sigcer = getSigningCertificate();
+             X509Certificate isscer = cs[1];
+-            CertificateID tis = new CertificateID(CertificateID.HASH_SHA1, isscer, sigcer.getSerialNumber());
++            CertificateID tis = new CertificateID(
++               new JcaDigestCalculatorProviderBuilder().build().get(CertificateID.HASH_SHA1), new JcaX509CertificateHolder(isscer), sigcer.getSerialNumber());
+             return tis.equals(cid);
+         }
+         catch (Exception ex) {
+diff --git a/core/com/lowagie/text/pdf/PdfReader.java b/core/com/lowagie/text/pdf/PdfReader.java
+index 8699f22..ca4c207 100644
+--- a/core/com/lowagie/text/pdf/PdfReader.java
++++ b/core/com/lowagie/text/pdf/PdfReader.java
+@@ -67,6 +67,7 @@ import java.util.zip.InflaterInputStream;
+ import java.util.Stack;
+ import java.security.Key;
+ import java.security.MessageDigest;
++import java.security.PrivateKey;
+ import java.security.cert.Certificate;
+ 
+ import com.lowagie.text.ExceptionConverter;
+@@ -80,6 +81,7 @@ import com.lowagie.text.pdf.internal.PdfViewerPreferencesImp;
+ 
+ import org.bouncycastle.cms.CMSEnvelopedData;
+ import org.bouncycastle.cms.RecipientInformation;
++import org.bouncycastle.cms.jcajce.JceKeyTransEnvelopedRecipient;
+ 
+ /** Reads a PDF document.
+  * @author Paulo Soares (psoares@consiste.pt)
+@@ -713,13 +715,13 @@ public class PdfReader implements PdfViewerPreferences {
+                 try {
+                     data = new CMSEnvelopedData(recipient.getBytes());
+ 
+-                    Iterator recipientCertificatesIt = data.getRecipientInfos().getRecipients().iterator();
++                    Iterator<RecipientInformation> recipientCertificatesIt = data.getRecipientInfos().getRecipients().iterator();
+ 
+                     while (recipientCertificatesIt.hasNext()) {
+-                        RecipientInformation recipientInfo = (RecipientInformation)recipientCertificatesIt.next();
++                        RecipientInformation recipientInfo = recipientCertificatesIt.next();
+ 
+                         if (recipientInfo.getRID().match(certificate) && !foundRecipient) {
+-                         envelopedData = recipientInfo.getContent(certificateKey, certificateKeyProvider);
++                            envelopedData = recipientInfo.getContent(new JceKeyTransEnvelopedRecipient((PrivateKey) certificateKey).setProvider(certificateKeyProvider));
+                          foundRecipient = true;
+                         }
+                     }
+@@ -3493,4 +3495,4 @@ public class PdfReader implements PdfViewerPreferences {
+     	if (!encrypted || !ownerPasswordUsed) return null;
+     	return decrypt.computeUserPassword(password);
+     }
+-}
+\ No newline at end of file
++}

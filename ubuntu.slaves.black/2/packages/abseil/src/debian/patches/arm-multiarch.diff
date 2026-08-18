@@ -1,0 +1,25 @@
+From: Benjamin Barenblat <bbaren@google.com>
+Subject: Disable SysinfoTest.NominalCPUFrequency on armel/armhf
+
+NominalCPUFrequency has different behavior on 32-bit and 64-bit ARM
+kernels. The Debian arm64 buildds assume they can build 32-bit ARM
+packages, but if they do, the NominalCPUFrequency test will fail.
+Disable the test when building for 32-bit ARM.
+
+--- a/absl/base/internal/sysinfo_test.cc
++++ b/absl/base/internal/sysinfo_test.cc
+@@ -43,7 +43,13 @@
+ // POWER is particularly problematic here; some Linux kernels expose the CPU
+ // frequency, while others do not. Since we can't predict a priori what a given
+ // machine is going to do, just disable this test on POWER on Linux.
++//
++// Debian also disables this test on armel and armhf, since tests for those
++// platforms could either be run on a 32-bit ARM system (where
++// NominalCPUFrequency returns a reasonable value) or a 64-bit ARM system (where
++// it does not).
+-#if !(defined(__linux) && (defined(__ppc64__) || defined(__PPC64__)))
++#if !(defined(__linux) && \
++      (defined(__ppc64__) || defined(__PPC64__) || defined(__arm__)))
+ TEST(SysinfoTest, NominalCPUFrequency) {
+   // Linux only exposes the CPU frequency on certain architectures, and
+   // Emscripten doesn't expose it at all.

@@ -1,0 +1,496 @@
+#
+# Copyright (c) 1996, 2018, Oracle and/or its affiliates. All rights reserved.
+# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+# This code is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 only, as
+# published by the Free Software Foundation.  Oracle designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
+#
+# This code is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# version 2 for more details (a copy is included in the LICENSE file that
+# accompanied this code).
+#
+# You should have received a copy of the GNU General Public License version
+# 2 along with this work; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+# or visit www.oracle.com if you need additional information or have any
+# questions.
+#
+
+# include host-specific defs, if any
+-include Defs-$(shell hostname).gmk
+
+# TOPDIR = .. # now set in Makefile
+ABSTOPDIR = $(shell cd $(TOPDIR); pwd)
+
+# clobber settings from user's environment
+JAVA_HOME=
+CLASSPATH=
+JAVA_COMPILER=
+LD_LIBRARY_PATH=
+
+
+
+#----------------------------------------------------------------------
+#
+# Support for Cygwin and MSYS2 (which may identify as MSYS, MINGW32 or MINGW64 (the default))
+
+SYSTEM_UNAME := $(shell uname)
+
+# Where is unwanted output to be delivered?
+# On Windows, MKS uses the special file "NUL", cygwin uses the customary unix file.
+ifeq ($(SYSTEM_UNAME), Windows_NT)
+DEV_NULL = NUL
+else
+DEV_NULL = /dev/null 
+endif
+
+ifneq (,$(findstring CYGWIN,$(SYSTEM_UNAME)))
+USING_CYGWIN = true
+USING_CYGWIN_OR_USING_MSYS = true
+endif
+
+ifneq (,$(findstring MSYS,$(SYSTEM_UNAME))$(findstring MINGW,$(SYSTEM_UNAME)))
+USING_MSYS = true
+USING_CYGWIN_OR_USING_MSYS = true
+endif
+
+ifdef USING_CYGWIN_OR_USING_MSYS
+define FullPath
+$(shell cygpath -a -m $1 2> $(DEV_NULL))
+endef
+define PosixPath
+$(shell cygpath -a -u $1 2> $(DEV_NULL))
+endef
+else
+define FullPath
+$(abspath $1)
+endef
+define PosixPath
+$1
+endef
+endif
+
+ifndef BUILDDIR
+  BUILDDIR = $(TOPDIR)/build
+endif
+override BUILDDIR := $(call FullPath, $(BUILDDIR))
+
+
+#----------------------------------------------------------------------
+#
+# Parameters to control what to build and test with.
+
+#----- Java:  http://openjdk.java.net/  http://jdk.java.net/
+#
+# Explicit JDK versions, for use as needed by tests, all optional for build.
+# At a minimum, JDKHOME must be set, either directly or indirectly. (See below).
+
+ifndef JDK5HOME
+  ifdef SLASHJAVA
+    JDK5HOME = $(SLASHJAVA)/re/jdk/1.5.0/archive/fcs/binaries/linux-i586
+  endif
+endif
+JDK5HOME := $(call FullPath,$(JDK5HOME))
+
+ifndef JDK6HOME
+  ifdef SLASHJAVA
+    JDK6HOME = $(SLASHJAVA)/re/jdk/1.6.0/archive/fcs/binaries/linux-i586
+  endif
+endif
+JDK6HOME := $(call FullPath,$(JDK6HOME))
+
+ifndef JDK7HOME
+  ifdef SLASHJAVA
+    JDK7HOME = $(SLASHJAVA)/re/jdk/1.7.0/archive/fcs/binaries/linux-i586
+  endif
+endif
+JDK7HOME := $(call FullPath,$(JDK7HOME))
+
+ifndef JDK8HOME
+  ifdef SLASHJAVA
+    JDK8HOME = $(SLASHJAVA)/re/jdk/1.8.0/promoted/latest/binaries/linux-i586
+  endif
+endif
+JDK8HOME := $(call FullPath,$(JDK8HOME))
+
+ifndef JDK9HOME
+  ifdef SLASHJAVA
+    JDK9HOME = $(SLASHJAVA)/re/jdk/9/promoted/latest/binaries/linux-i586
+  endif
+endif
+JDK9HOME := $(call FullPath,$(JDK9HOME))
+
+# The JDK used to build jtreg and to run most tests.
+# It should be set to JDK 8 or later.
+# If not set, it defaults to $(JDK8HOME), or to $(J2SEHOME) for backwards
+# compatibility
+
+ifndef JDKHOME
+  ifdef JDK8HOME
+    JDKHOME = $(JDK8HOME)
+  else
+    ifdef J2SEHOME
+      JDKHOME = $(J2SEHOME)
+    endif
+  endif
+endif
+
+# derived values
+JDKJAVA = $(JDKHOME)/bin/java
+JDKJAVAC = $(JDKHOME)/bin/javac
+JAR = $(JDKHOME)/bin/jar
+
+# Only use -source -target, to support legacy platforms, when building with JDK 8
+# Otherwise, use default values for $JDKHOME/bin/javac
+SUPPORT_OLD_SOURCE_TARGET = $(shell $(JDKJAVAC) -version 2>&1 | grep '[8]' > /dev/null && echo true )
+ifneq ($(SUPPORT_OLD_SOURCE_TARGET),)
+    OLD_JAVAC_SOURCE_TARGET = -source 1.2 -target 1.1
+    AGENT_JAVAC_SOURCE_TARGET = -source 5 -target 5
+    TOOL_JAVAC_SOURCE_TARGET = -source 8 -target 8
+    REGTEST_TOOL_PATCH_JAVA_BASE_OPTIONS =
+else
+    EXTRA_LINT_OPTS = -rawtypes,-unchecked
+    REGTEST_TOOL_PATCH_JAVA_BASE_OPTIONS = --patch-module java.base=$(JAVADIR)
+endif 
+
+ifdef JDK5HOME
+    JDK5_BOOTCLASSPATH = -bootclasspath $(JDK5HOME)/jre/lib/rt.jar
+endif
+ifdef JDK8HOME
+    JDK8_BOOTCLASSPATH = -bootclasspath $(JDK8HOME)/jre/lib/rt.jar
+endif
+
+# for files needed to run othervm tests on oldest supported platforms
+REGTEST_OLD_JAVAC = $(JDKHOME)/bin/javac
+REGTEST_OLD_JAVAC_OPTIONS = \
+	$(OLD_JAVAC_SOURCE_TARGET) $(JDK5_BOOTCLASSPATH) -Xlint:all,-options,-deprecation,$(EXTRA_LINT_OPTS) -Werror
+
+# for files needed to run agentvm tests (on platforms back to JDK 1.5)
+REGTEST_AGENT_JAVAC = $(JDKHOME)/bin/javac
+REGTEST_AGENT_JAVAC_OPTIONS = \
+	$(AGENT_JAVAC_SOURCE_TARGET) $(JDK5_BOOTCLASSPATH) -Xlint:all,-options,-deprecation,$(EXTRA_LINT_OPTS) -Werror
+
+# for files needed for jtreg tool
+REGTEST_TOOL_JAVAC = $(JDKHOME)/bin/javac
+REGTEST_TOOL_JAVAC_OPTIONS = \
+	$(TOOL_JAVAC_SOURCE_TARGET) $(JDK8_BOOTCLASSPATH) -Xlint:all,-options,-deprecation -Werror
+
+#----- JavaTest: https://wiki.openjdk.java.net/display/CodeTools/JT+Harness
+#
+# At a minimum, JAVATEST_JAR must be set, either directly or indirectly.
+# If not set explicitly, it defaults to values derived from JAVATEST_HOME,
+# JTHARNESS_HOME or SLASH_JAVA.
+# Set JTHARNESS_LICENSE and JTHARNESS_COPYRIGHT to include license and
+# copyright files in the product image. If not set explicitly, these 
+# default to values derived from JAVATEST_HOME, JTHARNESS_HOME or SLASH_JAVA.
+
+ifndef JTHARNESS_HOME
+  ifdef SLASHJAVA
+    JTHARNESS_HOME = $(SLASHJAVA)/re/jtharness/6.0/promoted/ea/b11/binaries/
+  endif
+endif 
+
+ifndef JAVATEST_HOME
+  ifdef JTHARNESS_HOME
+    JAVATEST_HOME = $(JTHARNESS_HOME)
+  else
+    ifdef SLASHJAVA
+      JAVATEST_HOME = $(SLASHJAVA)/re/javatest/6.0/promoted/latest/binaries/javatest/
+    endif
+  endif
+endif
+
+ifndef JAVATEST_JAR
+  ifdef JAVATEST_HOME
+    JAVATEST_JAR = $(JAVATEST_HOME)/lib/javatest.jar
+  endif
+endif
+JAVATEST_JAR := $(call FullPath,$(JAVATEST_JAR))
+
+ifndef JTHARNESS_LICENSE
+  JTHARNESS_LICENSE = $(wildcard $(JTHARNESS_HOME)/legal/license.txt)
+endif
+JTHARNESS_LICENSE := $(call FullPath,$(JTHARNESS_LICENSE))
+
+ifndef JTHARNESS_COPYRIGHT
+  JTHARNESS_COPYRIGHT = $(wildcard $(JTHARNESS_HOME)/legal/copyright.txt)
+endif
+JTHARNESS_COPYRIGHT := $(call FullPath,$(JTHARNESS_COPYRIGHT))
+
+#----- JCov 3.0:  https://wiki.openjdk.java.net/display/CodeTools/jcov
+#
+# JCov is optional. 
+# If provided, coverage-collection features in jtreg will be enabled.
+#
+# To include support for JCov, JCOV_JAR and JCOV_NETWORK_SAVER_JAR
+# must be set. If not set explicitly, these default to values derived
+# from JCOV_HOME or SLASH_JAVA.
+# Set JCOV_LICENSE to include the license file in the product image.
+# If not set explicitly, this defaults to a value derived from JCOV_HOME 
+# or SLASH_JAVA.
+
+ifndef JCOV_HOME
+  ifdef SLASHJAVA
+    JCOV_HOME = $(SLASHJAVA)/re/jcov/3.0/promoted/fcs/latest/binaries/jcov_3.0/
+  endif
+endif
+
+ifndef JCOV_JAR
+  ifdef JCOV_HOME
+    JCOV_JAR = $(JCOV_HOME)/lib/jcov.jar
+  endif
+endif
+JCOV_JAR := $(call FullPath,$(JCOV_JAR))
+
+ifndef JCOV_NETWORK_SAVER_JAR
+  ifdef JCOV_HOME
+    JCOV_NETWORK_SAVER_JAR = $(JCOV_HOME)/lib/jcov_network_saver.jar
+  endif
+endif
+JCOV_NETWORK_SAVER_JAR := $(call FullPath,$(JCOV_NETWORK_SAVER_JAR))
+
+ifndef JCOV_LICENSE
+  ifdef JCOV_HOME
+    JCOV_LICENSE = $(wildcard $(JCOV_HOME)/LICENSE)
+  endif
+endif
+JCOV_LICENSE := $(call FullPath,$(JCOV_LICENSE))
+
+JCOV = $(JDK6HOME)/bin/java -jar $(JCOV_JAR)
+
+#----- AsmTools 7.0:  https://wiki.openjdk.java.net/display/CodeTools/asmtools
+#
+# AsmTools is required, to support the execution of tests using
+# *.jasm and *.jcod files.
+#
+# ASMTOOLS_JAR must be set, either directly or indirectly.
+# If not set explicitly, it defaults to a value derived from
+# ASMTOOLS_HOME or SLASHJAVA.
+# Set ASMTOOLS_LICENSE to include the license file in the product image.
+# If not set explicitly, this defaults to a value derived from 
+# ASMTOOLS_HOME or SLASH_JAVA.
+
+ifndef ASMTOOLS_HOME
+  ifdef SLASHJAVA
+    ASMTOOLS_HOME = $(SLASHJAVA)/re/asmtools/7.0/promoted/opensource/ea/b08/binaries/asmtools-7.0/
+  endif
+endif
+
+ifndef ASMTOOLS_JAR
+  ASMTOOLS_JAR = $(ASMTOOLS_HOME)/lib/asmtools.jar
+endif
+ASMTOOLS_JAR := $(call FullPath,$(ASMTOOLS_JAR))
+
+ifndef ASMTOOLS_LICENSE
+  ASMTOOLS_LICENSE = $(wildcard $(ASMTOOLS_HOME)/LICENSE)
+endif
+ASMTOOLS_LICENSE := $(call FullPath,$(ASMTOOLS_LICENSE))
+
+#----- JUnit 4.10: http://www.junit.org/
+# https://sourceforge.net/projects/junit/files/junit/4.10/junit-4.10.jar/download
+#
+# JUnit is required, to support the execution of tests using JUnit
+#
+# JUNIT_JAR must be set, either directly or indirectly.
+# If not set explicitly, it defaults to a value derived from
+# JUNIT_HOME or SLASHJAVA.
+# Set JUNIT_LICENSE to include the license file in the product image.
+# If not set explicitly, this defaults to a value derived from 
+# JUNIT_HOME or SLASH_JAVA.
+
+ifndef JUNIT_HOME
+  ifdef SLASHJAVA
+    JUNIT_HOME = $(SLASHJAVA)/devtools/share/junit/junit-4.10/
+  endif
+endif
+
+ifndef JUNIT_JAR
+  ifdef JUNIT_HOME
+    JUNIT_JAR = $(JUNIT_HOME)/junit-4.10.jar
+  endif
+endif
+JUNIT_JAR := $(call FullPath,$(JUNIT_JAR))
+
+ifndef JUNIT_LICENSE
+  ifdef JUNIT_HOME
+    JUNIT_LICENSE = $(wildcard $(JUNIT_HOME)/LICENSE.txt)
+  endif
+endif
+JUNIT_LICENSE := $(call FullPath,$(JUNIT_LICENSE))
+
+#----- TestNG 6.9.5: see http://www.testng.org/
+# http://testng.org/doc/download.html
+#
+# TestNG is required, to support the execution of tests using TestNG
+#
+# TESTNG_JAR must be set, either directly or indirectly.
+# If not set explicitly, it defaults to a value derived from
+# TESTNG_HOME or SLASHJAVA.
+# Set TESTNG_LICENSE to include the license file in the product image.
+# If not set explicitly, this defaults to a value derived from 
+# TESTNG_HOME or SLASH_JAVA.
+
+ifndef TESTNG_HOME
+  ifdef SLASHJAVA
+    TESTNG_HOME = $(SLASHJAVA)/devtools/share/testng/testng-6.9.5
+  endif
+endif
+TESTNG_HOME := $(call FullPath,$(TESTNG_HOME))
+
+ifndef TESTNG_JAR
+  ifdef TESTNG_HOME
+    TESTNG_JAR = $(TESTNG_HOME)/testng-6.9.5.jar
+  endif
+endif
+TESTNG_JAR := $(call FullPath,$(TESTNG_JAR))
+
+ifndef TESTNG_LICENSE
+  TESTNG_LICENSE = $(wildcard $(TESTNG_HOME)/LICENSE.txt)
+endif
+TESTNG_LICENSE := $(call FullPath,$(JUNIT_LICENSE))
+
+# TestNG requires jcommander, which may or may not be bundled with TESTNG_JAR.
+# If it is not, set JCOMMANDER_JAR to an appropriate version
+ifndef JCOMMANDER_JAR
+  ifdef TESTNG_HOME
+    JCOMMANDER_JAR = $(wildcard $(TESTNG_HOME)/jcommander-1.48.jar)
+  endif
+endif
+ifdef JCOMMANDER_JAR
+    JCOMMANDER_JAR := $(call FullPath,$(JCOMMANDER_JAR))
+endif
+
+# Newer versions of TestNG require Google Guice
+ifdef GOOGLE_GUICE_JAR
+    GOOGLE_GUICE_JAR := $(call FullPath,$(GOOGLE_GUICE_JAR))
+endif
+
+# Newer versions of JUnit require Hamcrest
+ifdef HAMCREST_JAR
+    HAMCREST_JAR := $(call FullPath,$(HAMCREST_JAR))
+endif
+
+#----- Ant:  http://ant.apache.org/
+#
+# Ant is required, to support the provision of a <jtreg> Ant task
+#
+# ANT_JAR must be set, either directly or indirectly.
+# If not set explicitly, it defaults to a value derived from
+# ANTHOME or SLASHJAVA. The jar file is just used when building
+# jtreg, and is not included in the product image.
+
+ifndef ANTHOME
+  ifdef SLASHJAVA
+    ANTHOME = $(SLASHJAVA)/devtools/share/ant/1.9.4
+  endif
+endif
+
+ifndef ANT_JAR
+  ifdef ANTHOME
+    ANT_JAR = $(ANTHOME)/lib/ant.jar
+  endif
+endif
+ANT_JAR := $(call FullPath,$(ANT_JAR))
+
+ifdef ANTHOME
+  ANT = $(ANTHOME)/bin/ant
+endif
+
+#----- Unix commands
+
+AWK     = /usr/bin/awk
+CAT 	= /bin/cat
+CHMOD 	= /bin/chmod
+CP 	= /bin/cp
+DIFF 	= /usr/bin/diff
+ECHO	= /bin/echo
+FIND	= /usr/bin/find
+GREP 	:= $(shell if [ -r /bin/grep ]; then echo /bin/grep ; else echo /usr/bin/grep ; fi )
+LN	= /bin/ln
+LS	= /bin/ls
+MKDIR 	= /bin/mkdir
+MV 	= /bin/mv
+PANDOC  = $(shell if [ -r /usr/bin/pandoc ]; then \
+		echo /usr/bin/pandoc ; \
+	elif [ -r /usr/local/bin/pandoc ]; then \
+		echo /usr/local/bin/pandoc ; \
+	else \
+		echo /bin/echo "pandoc not available" ; \
+	fi )
+PERL	= /usr/bin/perl
+PRINTF  = /usr/bin/printf
+RM 	= /bin/rm -rf
+SED 	:= $(shell if [ -r /bin/sed ]; then echo /bin/sed ; else echo /usr/bin/sed ; fi )
+SH 	= /bin/sh
+SORT    = /usr/bin/sort
+TEST 	= /usr/bin/test
+TIDY 	= /usr/bin/tidy
+TOUCH 	= /usr/bin/touch
+UNZIP 	= /usr/bin/unzip
+WC 	= /usr/bin/wc
+ZIP 	= /usr/bin/zip
+
+
+#----------------------------------------------------------------------
+#
+# Identification of parts of the system
+SRCDIR = $(TOPDIR)/src
+JAVADIR = $(SRCDIR)/share/classes
+SRCDOCDIR = $(SRCDIR)/share/doc
+SRCJTDOCDIR = $(SRCDIR)/share/doc/javatest
+SRCJTREGDOCDIR = $(SRCDIR)/share/doc/javatest/regtest
+SRCSHAREBINDIR = $(SRCDIR)/share/bin
+TESTDIR = $(TOPDIR)/test
+
+CLASSDIR = $(BUILDDIR)/classes
+ABSCLASSDIR = $(cd $(CLASSDIR); pwd)
+
+IMAGES_DIR = $(BUILDDIR)/images
+JTREG_IMAGEDIR = $(IMAGES_DIR)/jtreg
+JTREG_IMAGEDOCDIR = $(JTREG_IMAGEDIR)/doc
+JTREG_IMAGEJARDIR = $(JTREG_IMAGEDIR)/lib
+ABS_JTREG_IMAGEJARDIR = $(shell cd $(JTREG_IMAGEJARDIR); pwd)
+
+# source bundle locations
+IMAGESRC_SRCDIR = $(IMAGESRC_TOPDIR)/src/share/classes
+
+#----------------------------------------------------------------------
+#
+# Version tags
+#
+# BUILD_* variables are normally set (overridden) by RE builds
+BUILD_VERSION = 5.2
+BUILD_MILESTONE = dev
+BUILD_NUMBER = b00
+
+# don't eval dates here directly, because that leads to unstable builds
+#BUILD_YEAR:sh = /bin/date +"%Y"
+BUILD_YEAR_CMD = /bin/date '+%Y'
+#BUILD_DOCDATE:sh = /bin/date +"%B %d, %Y"
+BUILD_DOCDATE_CMD = /bin/date  +'%B %d, %Y'
+#BUILD_ZIPDATE:sh = /bin/date '+%d %h %Y' 
+BUILD_ZIPDATE_CMD = /bin/date  '+%d %h %Y' 
+BUILD_NONFCS_MILESTONE_sh = echo $(BUILD_MILESTONE) | sed -e 's/[fF][cC][sS]//'
+BUILD_NONFCS_MILESTONE = $(BUILD_NONFCS_MILESTONE_sh:sh)
+
+# munge the BUILD values suitable for use in the bundle name
+ZIPSFX_VERSION_sh = echo '$(BUILD_VERSION)' | sed -e 's|\([^0-9][^0-9]*\)|_|g'
+ZIPSFX_MILESTONE_sh = echo '$(BUILD_MILESTONE)'
+ZIPSFX_BUILD_sh = echo '$(BUILD_NUMBER)'
+ZIPSFX_NEWBUILD_sh = echo '$(BUILD_NUMBER)' | sed -e 's|[^[0-9]||g' | xargs printf "%d"
+ZIPSFX_DATE_sh = echo "`$(BUILD_ZIPDATE_CMD)`" | /usr/bin/tr -s '[A-Z] ' '[a-z]_'
+
+VERBOSE_ZIP_SUFFIX = $(shell $(ZIPSFX_VERSION_sh))-$(shell $(ZIPSFX_MILESTONE_sh))-bin-$(shell $(ZIPSFX_BUILD_sh))-$(shell $(ZIPSFX_DATE_sh))
+
+ifdef BUILD_MILESTONE
+NEW_VERBOSE_ZIP_SUFFIX = $(BUILD_VERSION)-$(BUILD_MILESTONE)+$(shell $(ZIPSFX_NEWBUILD_sh))_bin
+else
+NEW_VERBOSE_ZIP_SUFFIX = $(BUILD_VERSION)+$(shell $(ZIPSFX_NEWBUILD_sh))_bin
+endif

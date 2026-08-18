@@ -1,0 +1,118 @@
+commit 91b9e44910f4fe4fb420a4064a646e2247c6de0e
+Author: Joshua Hursey <jhursey@us.ibm.com>
+Date: Sat, 29 Jan 2022 11:08:30 +0100
+Description: 
+
+    core+levelzero: Set ZES_ENABLE_SYSMAN via setenv instead of putenv
+    
+    Setting `ZES_ENABLE_SYSMAN` via `putenv` placed a constant string
+    in the environ array which cannot be touched. If the user is
+    manipulating that environ array then touching this envar will
+    result in a segv.
+    - Instead of using `putenv` use `setenv` which will put a copy
+      of the constant string in the `environ` array allowing the
+      end user to manipulate that array as needed.
+    - Note that I could not find a `setenv` function for windows
+      so I left a comment and did not touch that code.
+    
+    Signed-off-by: Joshua Hursey <jhursey@us.ibm.com>
+    
+    Also change the putenv() inside topology-levelzero.c for consistency
+    and update some comments.
+    
+    Signed-off-by: Brice Goglin <Brice.Goglin@inria.fr>
+    (cherry picked from commit fe363de1647013c190ac3e9d25bb1d7d3fbe574d)
+
+Bug: https://github.com/open-mpi/hwloc/pull/514
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1968742
+Origin: backport, https://github.com/open-mpi/hwloc/commit/91b9e44910f4fe4fb420a4064a646e2247c6de0e
+Last-Update: 2022-06-16
+
+Index: hwloc-2.7.0/NEWS
+===================================================================
+--- hwloc-2.7.0.orig/NEWS	2022-06-16 15:34:51.785173529 +1200
++++ hwloc-2.7.0/NEWS	2022-06-16 15:34:51.781173537 +1200
+@@ -1,5 +1,5 @@
+ Copyright © 2009 CNRS
+-Copyright © 2009-2021 Inria.  All rights reserved.
++Copyright © 2009-2022 Inria.  All rights reserved.
+ Copyright © 2009-2013 Université Bordeaux
+ Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
+ Copyright © 2020 Hewlett Packard Enterprise.  All rights reserved.
+@@ -17,6 +17,13 @@
+ 0.9.
+ 
+ 
++Version 2.7.1
++-------------
++* Use setenv() instead of putenv() when trying to force enable oneAPI L0
++  support, to avoid breaking applications that touch the environment,
++  thanks to Josh Hursey for the patch.
++
++
+ Version 2.7.0
+ -------------
+ * Backends
+Index: hwloc-2.7.0/hwloc/topology-levelzero.c
+===================================================================
+--- hwloc-2.7.0.orig/hwloc/topology-levelzero.c	2022-06-16 15:34:51.785173529 +1200
++++ hwloc-2.7.0/hwloc/topology-levelzero.c	2022-06-16 15:34:51.781173537 +1200
+@@ -342,7 +342,12 @@
+    */
+   env = getenv("ZES_ENABLE_SYSMAN");
+   if (!env) {
+-    putenv((char *) "ZES_ENABLE_SYSMAN=1");
++    /* setenv() is safer than putenv() but not available on Windows */
++#ifdef HWLOC_WIN_SYS
++    putenv("ZES_ENABLE_SYSMAN=1")
++#else
++    setenv("ZES_ENABLE_SYSMAN", "1", 1);
++#endif
+     /* we'll warn in hwloc__levelzero_properties_get() if we fail to get zes devices */
+     sysman_maybe_missing = 1;
+   } else if (!atoi(env)) {
+Index: hwloc-2.7.0/hwloc/topology.c
+===================================================================
+--- hwloc-2.7.0.orig/hwloc/topology.c	2022-06-16 15:34:51.785173529 +1200
++++ hwloc-2.7.0/hwloc/topology.c	2022-06-16 15:34:51.785173529 +1200
+@@ -3,6 +3,7 @@
+  * Copyright © 2009-2021 Inria.  All rights reserved.
+  * Copyright © 2009-2012, 2020 Université Bordeaux
+  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
++ * Copyright © 2022 IBM Corporation.  All rights reserved.
+  * See COPYING in top-level directory.
+  */
+ 
+@@ -60,21 +61,21 @@
+  *
+  * L0 seems to be using getenv() to check this variable on Windows
+  * (at least in the Intel Compute-Runtime of March 2021),
+- * so use putenv() to set the variable.
++ * but setenv() doesn't seem to exist on Windows, hence use putenv() to set the variable.
+  *
+  * For the record, Get/SetEnvironmentVariable() is not exactly the same as getenv/putenv():
+  * - getenv() doesn't see what was set with SetEnvironmentVariable()
+  * - GetEnvironmentVariable() doesn't see putenv() in cygwin (while it does in MSVC and MinGW).
+  * Hence, if L0 ever switches from getenv() to GetEnvironmentVariable(),
+  * it will break in cygwin, we'll have to use both putenv() and SetEnvironmentVariable().
+- * Hopefully L0 will be provide a way to enable Sysman without env vars before it happens.
++ * Hopefully L0 will provide a way to enable Sysman without env vars before it happens.
+  */
+ #if HWLOC_HAVE_ATTRIBUTE_CONSTRUCTOR
+ static void hwloc_constructor(void) __attribute__((constructor));
+ static void hwloc_constructor(void)
+ {
+   if (!getenv("ZES_ENABLE_SYSMAN"))
+-    putenv((char *) "ZES_ENABLE_SYSMAN=1");
++    setenv("ZES_ENABLE_SYSMAN", "1", 1);
+ }
+ #endif
+ #ifdef HWLOC_WIN_SYS
+@@ -82,6 +83,7 @@
+ {
+   if (fdwReason == DLL_PROCESS_ATTACH) {
+     if (!getenv("ZES_ENABLE_SYSMAN"))
++      /* Windows does not have a setenv, so use putenv. */
+       putenv((char *) "ZES_ENABLE_SYSMAN=1");
+   }
+   return TRUE;

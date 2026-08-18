@@ -1,0 +1,115 @@
+.\"     Title: ieee1284_get_irq_fd
+.\"    Author: Tim Waugh <twaugh@redhat.com>
+.\" Generator: DocBook XSL Stylesheets v1.72.0 <http://docbook.sf.net/>
+.\"      Date: 09/18/2007
+.\"    Manual: Functions
+.\"    Source: 
+.\"
+.TH "IEEE1284_GET_IRQ_FD" "3" "09/18/2007" "" "Functions"
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+ieee1284_get_irq_fd, ieee1284_clear_irq \- interrupt notification
+.SH "SYNOPSIS"
+.sp
+.ft B
+.nf
+#include <ieee1284.h>
+.fi
+.ft
+.HP 24
+.BI "int ieee1284_get_irq_fd(struct\ parport\ *" "port" ");"
+.HP 23
+.BI "int ieee1284_clear_irq(struct\ parport\ *" "port" ",\ unsigned\ int\ *" "count" ");"
+.SH "DESCRIPTION"
+.PP
+If the
+\fIport\fR
+has a configured interrupt line and the port type supports interrupt notification, it is possible to obtain a file descriptor that may be used for
+\fBselect\fR(2)
+or
+\fBpoll\fR(2). Any event (readable, writable or exception) means that an interrupt has been triggered. No operations other than
+\fBselect\fR
+or
+\fBpoll\fR
+may be performed on the file descriptor.
+.PP
+The port must be open in order to call
+\fBieee1284_get_irq_fd\fR, and must be claimed when using
+\fBselect\fR
+or
+\fBpoll\fR.
+.PP
+The caller must not close the file descriptor, and may not use it at all when the port is not claimed.
+.PP
+When an interrupt has been detected, the caller must call
+\fBieee1284_clear_irq\fR
+to clear the interrupt condition, at which point the number of interrupts raised can be obtained by supplying a non\-\fBNULL\fR
+\fIcount\fR.
+.SH "RETURN VALUE"
+.PP
+For
+\fBieee1284_get_irq_fd\fR: If the return value is negative then it is an error code listed below. Otherwise it is a valid file descriptor.
+.PP
+\fBE1284_NOTAVAIL\fR
+.RS 4
+No such file descriptor is available.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid (for instance, perhaps the
+\fIport\fR
+is not open).
+.RE
+.PP
+For
+\fBieee1284_clear_irq\fR:
+.PP
+\fBE1284_OK\fR
+.RS 4
+The interrupt has been cleared. If
+\fIcount\fR
+was not
+\fBNULL\fR
+the count of interrupts has been atomically stored to
+\fIcount\fR
+and reset.
+.RE
+.PP
+\fBE1284_NOTAVAIL\fR
+.RS 4
+The
+\fIcount\fR
+parameter was not
+\fBNULL\fR
+but interrupt counting is not supported on this type of port. The interrupt has been cleared.
+.RE
+.PP
+\fBE1284_SYS\fR
+.RS 4
+There was a problem clearing the interrupt.
+.RE
+.PP
+\fBE1284_INVALIDPORT\fR
+.RS 4
+The
+\fIport\fR
+parameter is invalid (for instance, perhaps the
+\fIport\fR
+is not claimed).
+.RE
+.SH "AUTHOR"
+.PP
+\fBTim Waugh\fR <\&twaugh@redhat.com\&>
+.sp -1n
+.IP "" 4
+Author.
+.SH "COPYRIGHT"
+Copyright \(co 2001\-2003 Tim Waugh
+.br
+

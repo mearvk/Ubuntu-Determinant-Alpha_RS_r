@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>SSSD manualsidor</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+                href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>pam_sss_gss</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>pam_sss_gss</refname>
+        <refpurpose>PAM-modul för SSSD GSSAPI-autentisering</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>pam_sss_gss.so</command> <arg choice='opt'>
+<replaceable>felsökning</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>BESKRIVNING</title>
+        <para>
+            <command>pam_sss_gss.so</command> autentiserar användaren över GSSAPI i
+samarbete med SSSD.
+        </para>
+        <para>
+            Denna modul kommer försöka autentisera användaren med det värdbaserade
+GSSAPI-tjänstenamnet värd@värdnamn vilket översätts till
+Kerberos-huvudmannen värd/värdnamn@RIKE. Delen <emphasis>RIKE</emphasis> av
+Kerberos-huvudmannanamnet härleds av Kerberos interna mekanismer och det kan
+sättas uttryckligen i konfigurationen av sektionen [domain_realm] i
+/etc/krb5.conf.
+        </para>
+        <para>
+            SSSD används för att tillhandahålla det önskade tjänstenamnet och för att
+validera användarens kreditiv med GSSAPI-anrop. Om tjänstebiljetten redan är
+tillgänglig i Kerberos kreditiv-cache eller om användarens
+biljettgivarbiljett kan användas för att få det korrekta tjänstebiljetten, i
+så fall kommer användaren autentiseras.
+        </para>
+        <para>
+            Om <option>pam_gssapi_check_upn</option> är sant (standard) kräver SSSD att
+kreditiven som använts till att få denna tjänstebiljett kan associeras med
+användaren. Detta betydera tt huvudmannen som äger Kerberos-kreditiven måste
+stämma med användarens huvudmannanamn så som det definieras i LDAP.
+        </para>
+        <para>
+            För att aktivera GSSAPI-autentisering i SSSD, sätt alternativet
+<option>pam_gssapi_services</option> i [pam] eller domänsektionen i
+sssd.conf. Tjänstekreditiven behöver lagras i SSSD:s keytab (de finns där
+redan om man använder leverantören ipa eller ad). Keytab-platsen kan anges
+med alternativet <option>krb5_keytab</option>. Se <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> och <citerefentry> <refentrytitle>sssd-krb5</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> för fler detaljer om dessa
+alternativ.
+        </para>
+        <para>
+            Några Kerberos-installationer tillåter associationen av
+autentiseringsindikatorer med en viss förautentiseringsmetod använd för att
+hämta biljettgivarbiljetten av användaren. <command>pam_sss_gss.so</command>
+gör att man kan kräva närvaron av autentiseringsindikatorer i
+tjänstebiljetten för en viss PAM-tjänst kan nås.
+        </para>
+        <para>
+            Om <option>pam_gssapi_indicators_map</option> är satt i sektionen [pam]
+eller domänsektionen i sssd.conf kommer SSSD utföra en kontroll av närvaron
+av några konfigurerade indikatorer i tjänstebiljetten.
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>FLAGGOR</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>debug</option>
+                </term>
+                <listitem>
+                    <para>Skriv ut felsökningsinformation.</para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='module_types_provides'>
+        <title>TILLHANDAHÅLLNA MODULTYPER</title>
+        <para>Endast modulen <option>auth</option> tillhandahålls.</para>
+    </refsect1>
+
+    <refsect1 id="return_values">
+        <title>RETURVÄRDEN</title>
+        <variablelist>
+            <varlistentry>
+                <term>PAM_SUCCESS</term>
+                <listitem>
+                    <para>
+                        PAM-åtgärden avslutades framgångsrikt.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_USER_UNKNOWN</term>
+                <listitem>
+                    <para>
+                        Användaren är inte känd av autentiseringstjänsten eller så stödjs inte
+autentisering med GSSAPI.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTH_ERR</term>
+                <listitem>
+                    <para>
+                        Autentiseringsfel.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHINFO_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Kan inte komma åt autentiseringsinformationen. Detta kan bero på ett
+nätverks- eller hårdvarufel.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SYSTEM_ERR</term>
+                <listitem>
+                    <para>
+                        Ett systemfel uppstod. SSSD-loggfilerna kan innehålla ytterligare
+information om felet.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='examples'>
+        <title>EXEMPEL</title>
+        <para>
+            Det huvudsakliga användningsfallet är att tillhandahålla lösenordsfri
+autentisering i sudo men utan behovet av att avaktivera autentisering
+helt. För att uppnå detta, aktivera först GSSAPI-autentisering av sudo i
+sssd.conf:
+        </para>
+        <programlisting>
+[domain/MINDOMÄN]
+pam_gssapi_services = sudo, sudo-i
+        </programlisting>
+        <para>
+            Aktivera sedan modulen i den önskande PAM-stacken (t.ex. /etc/pam.d/sudo och
+/etc/pam.d/sudo-i).
+        </para>
+        <programlisting>
+…
+auth sufficient pam_sss_gss.so
+…
+        </programlisting>
+    </refsect1>
+
+    <refsect1 id='troubleshooting'>
+        <title>FELSÖKNING</title>
+        <para>
+            SSSD-loggar, pam_sss_gss felsökningsutmatning och syslog kan innehålla
+användbar information om felet. Här är några vanliga problem:
+        </para>
+        <para>
+            1. Jag har miljövariabeln KRB5CCNAME satt och autentiseringen fungerar inte:
+beroende på din sudo-versionär det möjligt att sudo inte skickar denna
+variabel till PAM-miljön. Försök lägga till KRB5CCNAME till
+<option>env_keep</option> i /etc/sudoers eller i dina LDAP-sudo-reglers
+standardalternativ.
+        </para>
+        <para>
+            2. Autentiseringen fungerar inte och syslog innehåller ”Server not found in
+Kerberos database”: Kerberos kan förmodligen inte lösa upp det korrekta
+riket för tjänstebiljetten baserat på värdnamnet. Försök att lägga till
+värdnamnet direk till <option>[domain_realm[</option> i /etc/krb5.conf så
+här:
+        </para>
+        <para>
+            3. Autentiseringen fungerar inte och syslog innehåller ”No Kerberos
+credentials available”: du har inte några kreditiv som kan användas för att
+få den önskade tjänstebiljetten. Använd kinit eller autentisera över SSSD
+för att få dessa kreditiv.
+        </para>
+        <para>
+            4. Autentisering fungerar inte och SSSD sssd-pam-loggen innehåller ”User
+with UPN [$UPN] was not found.” eller ”UPN [$UPN] does not match target user
+[$username].”: du använder kreditiv som inte kan kopplas till användaren som
+autentiseras. Försök att använda kswitch för att välja en annan huvudman, se
+till att du autentiserade med SSSD eller överväg att avaktivera
+<option>pam_gssapi_check_upn</option>.
+        </para>
+        <programlisting>
+[domain_realm]
+.myhostname = MITTRIKE
+        </programlisting>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

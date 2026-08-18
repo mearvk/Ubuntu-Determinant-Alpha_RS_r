@@ -1,0 +1,28 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+-include /usr/share/dpkg/buildflags.mk
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+    NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+    MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+override_dh_auto_configure:
+	cd docs && rake manpage > ../jq.1
+	dh_auto_configure -- --disable-static
+
+override_dh_install:
+	find debian/tmp -name '*.la' -print -delete
+	dh_install
+
+override_dh_auto_test:
+	VERBOSE=1 dh_auto_test
+
+override_dh_auto_clean:
+	dh_auto_clean
+	test ! -f ./jq.1.old || mv ./jq.1.old jq.1
+
+%:
+	dh $@

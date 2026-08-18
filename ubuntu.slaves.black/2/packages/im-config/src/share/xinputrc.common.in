@@ -1,0 +1,167 @@
+# Common shell routine used by im-config
+# /usr/share/im-config/xinputrc.common
+# (C) Osamu Aoki <osamu@debian.org>, GPL-2+
+# vim: set sts=4 sw=4 expandtab:
+#
+#############################################################
+# Common variables used by im-config and its hook script
+#############################################################
+IM_CONFIG_VERSION=@@VERSION@@
+IM_CONFIG_DATA=/usr/share/im-config/data
+IM_CONFIG_XINPUTRC_USR=$HOME/.xinputrc
+IM_CONFIG_XINPUTRC_SYS=/etc/X11/xinit/xinputrc
+IM_CONFIG_DEFAULT=/etc/default/im-config
+IM_CONFIG_VERBOSE=false
+. gettext.sh
+TEXTDOMAIN="im-config"
+export TEXTDOMAIN
+TEXTDOMAINDIR="/usr/share/locale/"
+export TEXTDOMAINDIR
+IM_CONFIG_CURRENT_DESKTOP=$XDG_CURRENT_DESKTOP
+# hack since LXQt sets XDG_CURRENT_DESKTOP late - https://github.com/lxqt/lxqt/issues/1830
+# Upstream claims that the issue was fixed in lxqt-session 0.17.0. However, Lubuntu 21.10
+# uses 0.17.1 but it still does not work. So let's keep this hack for now.
+if [ -z "$IM_CONFIG_CURRENT_DESKTOP" ] && [ "$DESKTOP_SESSION" = 'lxqt' -o "$DESKTOP_SESSION" = 'Lubuntu' ]; then
+    IM_CONFIG_CURRENT_DESKTOP=LXQt
+fi
+
+if [ -r $IM_CONFIG_DEFAULT ]; then
+    . $IM_CONFIG_DEFAULT
+fi
+IM_CONFIG_LC_CTYPE=$(locale | sed -nr 's/LC_CTYPE=\"?([a-zA-Z_]*).*/\1/p')
+IM_CONFIG_PREFERRED=$(echo "$IM_CONFIG_PREFERRED_RULE"| sed -rn "s/(^|.*:)${IM_CONFIG_LC_CTYPE},([^:]*)($|:.*$)/\2/p")
+#############################################################
+# Common functions used by im-config hook script (any mode)
+#############################################################
+# run selected input method script
+# run_im <config>
+run_im () {
+    IM_CONFIG_CODE="run_im"
+    if [ -r $IM_CONFIG_DATA/[012345678]?_$1.rc ]; then
+        . $IM_CONFIG_DATA/[012345678]?_$1.rc
+        IM_CONFIG_NAME=$1
+        if $IM_CONFIG_VERBOSE ; then
+            eval_gettext "I: Script for \$IM_CONFIG_NAME started at \$IM_CONFIG_CODE." >&2
+            echo >&2
+        fi
+    else
+        IM_CONFIG_NAME=$1
+        eval_gettext "E: Script for \$IM_CONFIG_NAME not found at \$IM_CONFIG_CODE." >&2
+        echo >&2
+    fi
+}
+
+#############################################################
+# Package status function used by im-config and auto mode
+#############################################################
+# package_status <packagename>
+# return TRUE if in properly installed
+package_status () {
+    PACKAGE_NAME="$1"
+    if [ "$( LC_ALL=C dpkg-query -l "$PACKAGE_NAME" 2>/dev/null | \
+        sed -n '6s/\([^ ]*\) .*$/\1/p' )" = "ii" ]; then
+        # return TRUE
+        return 0
+    else
+        return 1
+    fi
+}
+#############################################################
+# Common functions used by auto mode
+#############################################################
+# name_im <full_path>
+name_im () {
+    local x
+    x=${1#$IM_CONFIG_DATA/??_}
+    x=${x%.rc}
+    x=${x%.conf}
+    echo -n $x
+}
+# avail_auto <config>
+#   configuration availability for auto mode
+#   define package_auto for 10-79*.conf
+avail_auto () {
+    if [ -r $IM_CONFIG_DATA/??_$1.conf ]; then
+        . $IM_CONFIG_DATA/??_$1.conf
+        package_auto
+    else
+        IM_CONFIG_CODE="avail_auto"
+        IM_CONFIG_NAME=$1
+        eval_gettext "E: Configuration for \$IM_CONFIG_NAME not found at \$IM_CONFIG_CODE." >&2
+        echo >&2
+        # return FALSE
+        return 1
+    fi
+}
+
+# autobase_im
+#   echo automatic IM configuration name (without considering locale)
+autobase_im () {
+# auto mode uses first available script in 10-79
+# 78 is for "none" (i.e., no im-config hooks are used), and always available and break
+# 79 is for "xim", and never reached
+    for IM_CONFIG_SCRIPT_PATH in $IM_CONFIG_DATA/[1234567]*.rc ; do
+        IM_CONFIG_SCRIPT=$(name_im $IM_CONFIG_SCRIPT_PATH)
+        if avail_auto $IM_CONFIG_SCRIPT ; then
+            echo -n "$IM_CONFIG_SCRIPT"
+            break
+        fi
+    done
+}
+
+# automatic_im
+#   echo automatic IM configuration name
+automatic_im () {
+    if find_match "$IM_CONFIG_CURRENT_DESKTOP" "$DESKTOP_SETUP_IBUS" ; then
+        autobase_im
+    elif [ "$IM_CONFIG_PREFERRED" != "" ] && avail_auto "$IM_CONFIG_PREFERRED" ; then
+        echo -n "$IM_CONFIG_PREFERRED"
+    else
+        autobase_im
+    fi
+}
+
+# mode_cjkv
+#   echo cjkv IM configuration name
+mode_cjkv () {
+    if find_match "$IM_CONFIG_CURRENT_DESKTOP" "$CJKV_DEFAULT_DESKTOP" ; then
+        # locale aware IM activation
+        if find_match "$IM_CONFIG_LC_CTYPE" "$CJKV_LOCALES" ; then
+            echo -n "auto"
+        else
+            echo -n "none"
+        fi
+    else
+        # locale unaware IM activation (fall back to auto)
+        echo -n "auto"
+    fi
+}
+#############################################################
+# Common functions used by auto, cjkv and ibus mode
+#############################################################
+# find_match
+#   find match of $1 (dynamic value) in $2 (static list)
+#     return 0=TRUE if match found or $2="*"
+#     return 1=FALSE if match not found or
+#                       match found with "-" preceded choices in $2
+find_match () {
+    # local: Non-POSIX per shellcheck but usable on dash/bash/zsh/...
+    local OLDIFS="$IFS" R=1 X Y
+    IFS=':'
+    if [ -n "$1" ] && [ -n "$2" ]; then
+        for X in $1; do
+            for Y in $2; do
+                if [ "*" = "$Y" ]; then
+                    R=0
+                    break 2
+                elif [ "$X" = "$Y" ]; then
+                    R=0
+                    break 2
+                fi
+            done
+        done
+    fi
+    IFS="$OLDIFS"
+    return "$R"
+}
+

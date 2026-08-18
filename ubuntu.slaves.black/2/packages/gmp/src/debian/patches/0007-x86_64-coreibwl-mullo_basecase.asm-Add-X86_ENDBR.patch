@@ -1,0 +1,170 @@
+From 1b0c215a8b9149d1df81f1ae0f5762f77bb0d2b3 Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Wed, 29 Jan 2020 10:28:17 -0800
+Subject: [PATCH 07/13] x86_64/coreibwl/mullo_basecase.asm: Add X86_ENDBR
+
+Add X86_ENDBR to indirect branch targets.  Since adding X86_ENDBR makes
+one byte displacement of "jrcxz L(end)" out of range, move L(end) closer
+to "jrcxz L(end)".
+
+	* mpn/x86_64/coreibwl/mullo_basecase.asm: Add X86_ENDBR to
+	indirect branch targets.  Move L(end) closer to "jrcxz L(end)".
+---
+ mpn/x86_64/coreibwl/mullo_basecase.asm | 58 ++++++++++++++++----------
+ 1 file changed, 37 insertions(+), 21 deletions(-)
+
+diff --git a/mpn/x86_64/coreibwl/mullo_basecase.asm b/mpn/x86_64/coreibwl/mullo_basecase.asm
+index b3e435b35..d7f3bd55e 100644
+--- a/mpn/x86_64/coreibwl/mullo_basecase.asm
++++ b/mpn/x86_64/coreibwl/mullo_basecase.asm
+@@ -134,13 +134,15 @@ ifdef(`PIC',
+ 	jmp	*(%r10,%rax,8)
+ ')
+ 
+-L(mf0):	mulx(	(up), %r10, %r8)
++L(mf0):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	56(up), up
+ 	lea	-8(rp), rp
+ 	lea	L(f7)(%rip), jmpreg
+ 	jmp	L(mb0)
+ 
+-L(mf3):	mulx(	(up), %r9, %rax)
++L(mf3):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	16(up), up
+ 	lea	16(rp), rp
+ 	jrcxz	L(mc)
+@@ -157,38 +159,44 @@ L(mc):	mulx(	-8,(up), %r10, %r8)
+ 	mov	%r9, (rp)
+ 	jmp	L(c2)
+ 
+-L(mf4):	mulx(	(up), %r10, %r8)
++L(mf4):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	24(up), up
+ 	lea	24(rp), rp
+ 	inc	R32(n)
+ 	lea	L(f3)(%rip), jmpreg
+ 	jmp	L(mb4)
+ 
+-L(mf5):	mulx(	(up), %r9, %rax)
++L(mf5):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	32(up), up
+ 	lea	32(rp), rp
+ 	inc	R32(n)
+ 	lea	L(f4)(%rip), jmpreg
+ 	jmp	L(mb5)
+ 
+-L(mf6):	mulx(	(up), %r10, %r8)
++L(mf6):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	40(up), up
+ 	lea	40(rp), rp
+ 	inc	R32(n)
+ 	lea	L(f5)(%rip), jmpreg
+ 	jmp	L(mb6)
+ 
+-L(mf7):	mulx(	(up), %r9, %rax)
++L(mf7):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	48(up), up
+ 	lea	48(rp), rp
+ 	lea	L(f6)(%rip), jmpreg
+ 	jmp	L(mb7)
+ 
+-L(mf1):	mulx(	(up), %r9, %rax)
++L(mf1):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	L(f0)(%rip), jmpreg
+ 	jmp	L(mb1)
+ 
+-L(mf2):	mulx(	(up), %r10, %r8)
++L(mf2):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	8(up), up
+ 	lea	8(rp), rp
+ 	lea	L(f1)(%rip), jmpreg
+@@ -235,17 +243,26 @@ L(mend):mov	%r10, -8(rp)
+ 	shr	$3, R32(nn)
+ 	jmp	L(ent)
+ 
+-L(f0):	mulx(	(up), %r10, %r8)
++L(f0):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	-8(up), up
+ 	lea	-8(rp), rp
+ 	lea	L(f7)(%rip), jmpreg
+ 	jmp	L(b0)
+ 
+-L(f1):	mulx(	(up), %r9, %rax)
++L(f1):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	-1(nn), R32(nn)
+ 	lea	L(f0)(%rip), jmpreg
+ 	jmp	L(b1)
+ 
++L(f7):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
++	lea	-16(up), up
++	lea	-16(rp), rp
++	lea	L(f6)(%rip), jmpreg
++	jmp	L(b7)
++
+ L(end):	adox(	(rp), %r9)
+ 	mov	%r9, (rp)
+ 	adox(	%rcx, %rax)		C relies on rcx = 0
+@@ -261,13 +278,8 @@ L(ent):	mulx(	8,(up), %r10, %r8)	C r8 unused (use imul?)
+ 	or	R32(nn), R32(n)		C copy count, clear CF,OF (n = 0 prior)
+ 	jmp	*jmpreg
+ 
+-L(f7):	mulx(	(up), %r9, %rax)
+-	lea	-16(up), up
+-	lea	-16(rp), rp
+-	lea	L(f6)(%rip), jmpreg
+-	jmp	L(b7)
+-
+-L(f2):	mulx(	(up), %r10, %r8)
++L(f2):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	8(up), up
+ 	lea	8(rp), rp
+ 	mulx(	(up), %r9, %rax)
+@@ -313,25 +325,29 @@ L(b3):	adox(	48,(rp), %r9)
+ 	mulx(	(up), %r9, %rax)
+ 	jmp	L(top)
+ 
+-L(f6):	mulx(	(up), %r10, %r8)
++L(f6):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	40(up), up
+ 	lea	-24(rp), rp
+ 	lea	L(f5)(%rip), jmpreg
+ 	jmp	L(b6)
+ 
+-L(f5):	mulx(	(up), %r9, %rax)
++L(f5):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	32(up), up
+ 	lea	-32(rp), rp
+ 	lea	L(f4)(%rip), jmpreg
+ 	jmp	L(b5)
+ 
+-L(f4):	mulx(	(up), %r10, %r8)
++L(f4):	X86_ENDBR
++	mulx(	(up), %r10, %r8)
+ 	lea	24(up), up
+ 	lea	-40(rp), rp
+ 	lea	L(f3)(%rip), jmpreg
+ 	jmp	L(b4)
+ 
+-L(f3):	mulx(	(up), %r9, %rax)
++L(f3):	X86_ENDBR
++	mulx(	(up), %r9, %rax)
+ 	lea	16(up), up
+ 	lea	-48(rp), rp
+ 	jrcxz	L(cor)
+-- 
+2.27.0
+

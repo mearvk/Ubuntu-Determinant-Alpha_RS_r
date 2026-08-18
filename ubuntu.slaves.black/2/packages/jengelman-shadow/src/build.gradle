@@ -1,0 +1,89 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
+
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.1'
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:4.7.5"
+        classpath "com.gradle.publish:plugin-publish-plugin:0.10.0"
+        classpath 'org.ajoberstar:grgit:2.1.1'
+        classpath 'org.ajoberstar:gradle-git-publish:0.3.3'
+        classpath "com.moowork.gradle:gradle-node-plugin:1.2.0"
+    }
+}
+
+plugins {
+    id 'groovy'
+    id 'project-report'
+    id 'java-gradle-plugin'
+}
+
+// Remove the gradleApi so it isn't merged into the jar file.
+configurations.compile.dependencies.remove dependencies.gradleApi()
+
+gradlePlugin {
+    automatedPublishing = false
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+
+apply from: file('gradle/dependencies.gradle')
+
+repositories {
+    jcenter()
+}
+
+test {
+    if (System.env.CI == 'true') {
+        testLogging.showStandardStreams = true
+        minHeapSize "1g"
+        maxHeapSize "1g"
+    }
+}
+
+jar {
+    from rootProject.file('LICENSE')
+    from rootProject.file('NOTICE')
+}
+
+
+shadowJar {
+    classifier = ''
+}
+
+
+sourceCompatibility = '1.7'
+targetCompatibility = '1.7'
+
+task downloadDependencies(type: Exec) {
+    dependsOn configurations.testRuntime
+    commandLine 'echo', 'Downloaded all dependencies'
+}
+
+tasks.build.dependsOn tasks.shadowJar
+
+project.tasks.withType(JavaCompile) {
+    // This will be the default in Gradle 5.0
+    if (!options.compilerArgs.contains("-processor")) {
+        options.compilerArgs << '-proc:none'
+    }
+}
+
+project.tasks.withType(GroovyCompile) {
+    // This will be the default in Gradle 5.0
+    if (!options.compilerArgs.contains("-processor")) {
+        options.compilerArgs << '-proc:none'
+    }
+}
+
+task relocateShadowJar(type: ConfigureShadowRelocation) {
+    target = tasks.shadowJar
+}
+
+tasks.shadowJar.dependsOn tasks.relocateShadowJar

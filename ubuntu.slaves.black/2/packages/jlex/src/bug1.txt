@@ -1,0 +1,153 @@
+
+The file in the bug report below has some errors and tries to reference
+some features that are not actually in JavaLex, but it seems to illustrate
+a problem with regular expression parsing.  
+
+For instance, the following line has some problems.
+
+ONECHAR      [^\\"']|(\\.)|(\[0123]?{OCTNUMBER}{0,2})|{UNICODE_CHARACTER}
+
+1) A '\' must precede the '"' in the first [ ... ].
+2) A '\' must precede the '\' before the second [ ... ].
+3) The {0,2} is not supported.  It means the number of occurances
+of a macro (?), a feature not supported by Java-Lex.
+
+ONECHAR      [^\\\"']|(\\.)|(\\[0123]?{OCTNUMBER})|{UNICODE_CHARACTER}
+
+But there still appear to be some problems parsing the (very complex)
+FLOAT macro.  This bug does not result in incorrect lexers being generated
+but rather in Java-Lex incorrectly asserting a parse error during generation
+of the lexer source file.  This makes the bug in a sense easy to recognize,
+since the processing and compilation of the lex file will not 
+go to completion.
+ 
+				-- Elliot
+
+============================================================================
+
+From glunz@zfe.siemens.deWed Sep 11 14:59:23 1996
+Date: Fri, 26 Jul 1996 13:59:56 +0200 (MET DST)
+From: Wolfgang Glunz <glunz@zfe.siemens.de>
+To: ejberk@Princeton.EDU
+Subject: Problem with JavaLex
+
+Hello,
+
+First of all thanks for the effort you put into the development of JavaLex.
+Unfortunately I have a problem where I don't know how to proceed.
+
+I tried the following .lex file:
+
+
+%%
+
+%{
+/* this goes into the lexer class */
+%}
+
+%line
+%notunix
+
+%state INCOMMENT
+
+IDENTIFIER          [A-Za-z_$][A-Za-z_$0-9]*
+DIGIT               [0-9]
+HEXDIGIT            [A-Fa-f0-9]
+OCTDIGIT            [0-7]
+DECNUMBER           [1-9]{DIGIT}*
+HEXNUMBER           0[Xx]{HEXDIGIT}+
+OCTNUMBER           0{OCTDIGIT}*
+DECLONG             {DECNUMBER}[Ll]
+HEXLONG             {HEXNUMBER}[Ll]
+OCTLONG             {OCTNUMBER}[Ll]
+EXPONENT            [Ee][+-]?{DIGIT}+
+FLOATBASE           ([+-])?((({DIGIT}+\.{DIGIT}*)|({DIGIT}*\.{DIGIT}+)){EXPONENT}?)|({DIGIT}+{EXPONENT})
+DOUBLE              ({FLOATBASE}[Dd]?)|({DIGIT}+[Dd])
+FLOAT               (({FLOATBASE})|({DIGIT}+))[Ff]
+UNICODE_CHARACTER   \\u{HEXDIGIT}{4}
+ONECHAR             [^\\"']|(\\.)|(\[0123]?{OCTNUMBER}{0,2})|{UNICODE_CHARACTER}
+CHARLITCHAR         {ONECHAR}|\"
+CHARACTER           "'"{CHARLITCHAR}"'"
+STRINGCHAR          {ONECHAR}|"'"
+WASSTRING              \"({STRINGCHAR})*\"
+STRING              "SSSS"
+CHAR_OP             ([-;{},;()[\].&|!~=+*/%<>^?:])
+WHITESPACE          [ \n\r\t]+
+
+
+%%
+
+<INCOMMENT>"/*" { }
+<INCOMMENT>"*/" { BEGIN(INITIAL); }
+<INCOMMENT>.    { }
+<INCOMMENT>\n   { }
+"/*"            { BEGIN(INCOMMENT); }
+"//".*          { }
+{WHITESPACE}    { }
+{DECLONG}       { }
+{HEXLONG}       { }
+{OCTLONG}       { }
+{DECNUMBER}     { }
+{HEXNUMBER}     { }
+{OCTNUMBER}     { }
+{CHARACTER}     { }
+{FLOAT}         { }
+{DOUBLE}        { }
+
+
+I switched debugging on in JavaLex and get the following output:
+(tail only)
+Entering dodash [lexeme: +] [token: 17]
+Lexeme: -       Token: 10       Index: 52
+Lexeme: ]       Token: 5        Index: 53
+Lexeme: ?       Token: 15       Index: 54
+expanded escape: [0-9]
+((([+-])?((([0-9]+\.[0-9]*)|([0-9]*\.[0-9]+))[Ee][+-]?[0-9]+?)|({DIGIT}+{EXPONENT}))|({DIGIT}+))[Ff]
+   { }
+ 
+Lexeme: [       Token: 6        Index: 55
+Lexeme: 0       Token: 12       Index: 56
+Lexeme: -       Token: 10       Index: 57
+Lexeme: 9       Token: 12       Index: 58
+Lexeme: ]       Token: 5        Index: 59
+Leaving dodash [lexeme:]] [token:5]
+Lexeme: +       Token: 17       Index: 60
+Leaving term [lexeme:+] [token:17]
+Lexeme: ?       Token: 15       Index: 61
+Leaving factor [lexeme:?] [token:15]
+Error: Parse error at line 54.
+Error Description: + ? or * must follow an expression or subexpression.
+java.lang.Error: Parse error.
+        at CError.parse_error(JavaLex.java:4227)
+        at CMakeNfa.first_in_cat(JavaLex.java:1764)
+        at CMakeNfa.cat_expr(JavaLex.java:1727)
+        at CMakeNfa.expr(JavaLex.java:1674)
+        at CMakeNfa.term(JavaLex.java:1856)
+        at CMakeNfa.factor(JavaLex.java:1800)
+        at CMakeNfa.cat_expr(JavaLex.java:1724)
+        at CMakeNfa.expr(JavaLex.java:1674)
+        at CMakeNfa.rule(JavaLex.java:1608)
+        at CMakeNfa.machine(JavaLex.java:1560)
+        at CMakeNfa.thompson(JavaLex.java:1453)
+        at CLexGen.userRules(JavaLex.java:5441)
+        at CLexGen.generate(JavaLex.java:4584)
+        at JavaLex.main(JavaLex.java:3367)
+
+
+
+Two questions:
+
+1. The error message says that a + ? or * must follow an expression. Is it not possible to
+write (expression)|(expression) ?
+2. JavaLex seems to expand the macros only partially. Why so ?
+
+	Any help is appreciated,
+
+		Wolfgang
+
+-- 
+Wolfgang Glunz             email: Wolfgang.Glunz@zfe.siemens.de
+Siemens AG, ZFE T SE 2     WWW:   <URL:http://pizpalue.zfe.siemens.de/~wogl/> 
+					(Siemens only)
+81730 Muenchen / Germany   Phone: +49 89 63649492
+Otto Hahn Ring 6           Fax:   +49 89 63640898

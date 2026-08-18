@@ -1,0 +1,164 @@
+		  Including Kerberos in Your Package
+
+Introduction
+
+    This document has been prepared by the maintainers of Kerberos
+    implementations in Debian as guidelines for adding Kerberos support to
+    packages in Debian.  It does not currently represent policy, but by
+    following these guidelines you will help create a consistent user
+    experience and will minimize the likelihood of problems as Kerberos
+    implementations change.
+
+Information About Kerberos
+
+    The primary version of Kerberos is version 5, which is an IETF
+    standards-track protocol with support for multiple cryptosystems,
+    ticket forwarding, and multi-homed machines.  An older version,
+    version 4, is also in gradually diminishing use.  Version 4 is not
+    supported in Debian. 
+
+    In addition there are two other related security technologies.
+    The Generic Security Services API (GSSAPI) is an IETF
+    standards-track API for including security mechanisms into
+    programs.  There is a Kerberos version 5 GSSAPI mechanism (RFC
+    4121), so programs that support GSSAPI can use Kerberos and other
+    authentication systems.  Also, the Simple Authentication and
+    Security Layer (SASL, described by RFC 4222) provides support for
+    using any GSSAPI security mechanism, including Kerberos, in
+    applications.  Use of GSSAPI for network authentication by
+    Kerberos programs (possibly inside a SASL negotiation), instead of
+    using the native Kerberos calls, is recommended.  For more details
+    on integrating Kerberos and related technologies into an
+    application that does not support it, see
+    http://www.kerberos.org/software/appskerberos.pdf .
+
+    There are three implementations of Kerberos in Debian.  The krb5
+    source package is MIT's reference implementation of Kerberos version
+    5.  Heimdal is the
+    Swedish Royal Institute of Technology's Kerberos version 5
+    implementation.  Shishi is a separate implementation of Kerberos as
+    part of the GNU project.  The basic MIT and Heimdal libraries mostly
+    share a common API.  Shishi has a completely different API.  
+
+    To get development files for Heimdal install heimdal-dev.  To get
+    development files for the MIT implementation install libkrb5-dev.
+
+
+Is Kerberos Useful for My Package?
+
+    These guidelines are targeted at people who are trying to determine
+    whether to enable Kerberos support already present in their upstream
+    package.  If you are considering adding security support to a program
+    that does not currently have it in the upstream source, then you are
+    strongly encouraged to ask for advice.  Security is hard and we'd like
+    to try and help you benefit from the mistakes of others rather than
+    repeating them.  You should generally prefer to add SASL support
+    rather than direct Kerberos support.
+	
+    Many programs use Kerberos as a way to perform initial
+    authentication or to check a password against a Kerberos server.
+    For example an IMAP server or web application might read a
+    password over an SSL-encrypted channel and try to authenticate
+    that password against Kerberos.  In Debian, the libpam-krb5 and
+    libpam-heimdal modules provide a better approach to the same
+    problem.  You should enable PAM support in your application and
+    attempt to disable any code that uses Kerberos to get a ticket
+    from a plaintext password.  If you need to leave this
+    functionality enabled for some reason, please get it reviewed by
+    someone familiar with the Kerberos API: getting initial tickets
+    correctly without creating a security hole can be problematic.
+    See http://www.kerberos.org/software/rolekerberos.pdf for a
+    discussion of the various uses of Kerberos and for how Kerberos
+    interacts with PAM.  Note that some applications support SASL or a
+    direct Kerberos mechanism for doing a password-less authentication
+    over the network but also include Kerberos initial ticket support.
+    For such applications, you probably want to disable the initial
+    ticket handling, but use the SASL or networked Kerberos support.
+
+Kerberos Behavior
+
+    Applications in Debian that support Kerberos should in general obey
+    the following guidelines:
+
+    1) Where practical, Kerberos support should be built in the main
+       Debian package rather than providing a separate Kerberos package.
+
+    2) Non-Kerberized functionality should not be adversely affected by
+       the Kerberos functionality.  For example building Kerberos into a
+       package should not suddenly cause previous authentication systems
+       to stop working.
+
+    3) Applications that function without Kerberos support should not
+       depend on Kerberos being configured.  If the Kerberos configuration
+       files are not found, the application should simply disable
+       Kerberos.  It is important to test that the application works
+       without Kerberos configuration files; if the application fails to
+       check error returns, it may segfault.
+
+    4) If Kerberos is installed and configured, the application should
+       work with Kerberos with as little effort on the part of the user as
+       possible.  For example, in an ideal situation, installing a
+       networked application onto a computer with working Kerberos
+       configuration files and a Kerberos keytab for the appropriate
+       service should be sufficient for Kerberos authentication to work.
+
+    5) There should be a way for a user to disable plaintext or
+       unencrypted operation.  For example, I should be able to configure
+       an IMAP server to require the Kerberos SASL mechanism and refuse
+       the plaintext login command.
+
+    6) There should be a way for a user to disable Kerberos for some
+       particular service that would normally use it without disabling
+       Kerberos for other services.
+
+Choosing an Implementation
+
+    As mentioned there are three implementations of Kerberos in Debian.
+    One, Shishi, is still under development and uses a different API, so
+    supporting it in software not written specifically to use Shishi is
+    generally not possible.  For most applications that support Kerberos,
+    the choice will be between MIT's implementation and Heimdal.
+
+    Software that uses SASL via the Cyrus SASL library won't have to make
+    this choice.  In that case, all Kerberos support is done via the Cyrus
+    SASL library's modules, and modules for both MIT and Heimdal are
+    provided in Debian.  This allows the individual Debian system
+    administrator to choose which implementation to use on each system and
+    is one of several reasons why supporting Kerberos via SASL is
+    preferred.
+
+    For software that uses the Kerberos APIs directly, the choice of
+    which implementation to use is up to you, the maintainer of a package
+    adding Kerberos support.  You should try to make your package work
+    both with the MIT implementation and with Heimdal depending on which
+    source package is used to build your package.  However you will need
+    to pick an implementation to use for your uploads to Debian.  Here are
+    some issues you should consider when picking an implementation.
+
+    1) Legal considerations may force you to use a particular
+       implementation.  Currently the only known concern is that Heimdal
+       links against OpenSSL (libssl), which is GPL-incompatible.  This
+       means that GPL-licensed code without an exemption for linking
+       against OpenSSL should use the MIT Kerberos implementation.
+
+    2) The MIT Kerberos libraries are of standard priority in Debian since
+       they're required for NFS v4 support.  This means that most Debian
+       systems will already have MIT Kerberos (libkrb5-3) installed, so
+       using MIT Kerberos will mean your package will have to pull in
+       fewer extra dependencies.
+
+    3) Otherwise it is your choice as maintainer.  If you use a particular
+       implementation of Kerberos on a regular basis, then build your
+       packages with that.  Otherwise consider which implementation of
+       Kerberos will be easiest to get working and will work best for your
+       package.  If you don't have a clear choice, MIT Kerberos is
+       generally preferred since it's usually already installed and since
+       most Kerberos software in Debian is built with it.
+
+    The runtime libraries for MIT Kerberos and Heimdal (and Shishi) can be
+    installed simultaneously and use symbol versioning, so it should be
+    safe to mix the libraries on one system.  However, the development
+    packages for MIT Kerberos and Heimdal provide the same header files
+    and conflict with each other.  It is therefore not possible to build
+    binary packages against both libraries from a single Debian source
+    package.

@@ -1,0 +1,76 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+export DEB_CXXFLAGS_MAINT_APPEND += -O2
+export DEB_CXXFLAGS_MAINT_STRIP += -O3
+
+# Get compilation flags from dpkg-buildflags
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+# The buildtools.mk script was introduced along with dpkg-dev 1.19.0.
+# Fixes FTCBFS. See https://bugs.debian.org/842600
+DPKG_EXPORT_BUILDTOOLS=1
+-include /usr/share/dpkg/buildtools.mk
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+%:
+	dh $@
+
+SO=3
+VERS=$(SO).1
+
+SRC=$(sort $(wildcard double-conversion/*.cc))
+OBJ=$(SRC:.cc=.o)
+
+TEST_SRC=$(sort $(wildcard test/cctest/*.cc))
+TEST_OBJ=$(TEST_SRC:.cc=.o)
+
+CPPFLAGS += -Idouble-conversion/ -I.
+
+debian/shared_dir debian/static_dir:
+	mkdir -p $(subst _dir,,$(@))
+	touch $@
+
+$(subst double-conversion/,debian/static/,$(OBJ)): \
+  debian/static/%.o : double-conversion/%.cc debian/static_dir
+
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+$(subst double-conversion/,debian/shared/,$(OBJ)): \
+  debian/shared/%.o : double-conversion/%.cc debian/shared_dir
+
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $< -o $@
+
+libdouble-conversion.so: libdouble-conversion.so.$(SO)
+	ln -snf $< $@
+
+libdouble-conversion.so.$(SO): libdouble-conversion.so.$(VERS)
+	ln -snf $< $@
+
+libdouble-conversion.so.$(VERS): $(subst double-conversion/,debian/shared/,$(OBJ))
+	$(CXX) $(LDFLAGS) -shared -Wl,-soname=libdouble-conversion.so.$(SO) -o $@ $^
+
+libdouble-conversion.a: $(subst double-conversion/,debian/static/,$(OBJ))
+	ar r $@ $^
+
+run_tests: $(TEST_OBJ) libdouble-conversion.a
+	$(CXX) $(LDFLAGS) -o run_tests $^
+
+override_dh_auto_build: libdouble-conversion.so libdouble-conversion.a run_tests
+	sed -e 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' \
+		< debian/double-conversion.pc.in > debian/double-conversion.pc
+
+override_dh_auto_clean:
+	rm -f libdouble-conversion.* run_tests test/cctest/*.o
+	rm -rf debian/shared debian/static
+	rm -f debian/static_dir debian/shared_dir
+	-$(RM) debian/*.pc
+
+override_dh_missing:
+	dh_missing --fail-missing

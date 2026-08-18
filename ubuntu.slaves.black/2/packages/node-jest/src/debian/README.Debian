@@ -1,0 +1,53 @@
+# USING JEST IN DEBIAN PACKAGING
+
+# Changes added to jest package in default configuration:
+
+ * jest package excludes <rootdir>.pc/ directory to avoid problems when
+   upstream tests are patched (default value of --modulePathIgnorePatterns)
+ * jest package includes Debian nodejs directories
+   (default values of --modulePaths)
+
+# Usage notes:
+
+ * when upstream installed snapshots in its test files, it may generate
+   false-positive autopkgtest regressions (test succeeds but output changed).
+   To avoid this, use the "-u" option: this updates snapshots and so avoid
+   these kind of errors
+ * always use the "--ci" option when jest is used in Debian packaging and/or
+   autopkgtest. It prevents snapshot from being written
+ * when your package contains component, it is recommended to set a path
+   to jest to avoid launching component test that may be incompatible
+   (component tests can be launched using
+   debian/nodejs/<component>/test). Example:
+
+     $ jest test/
+
+ * pkg-js-autopkgtest
+   * jest needs often babel configuration file. Since version 0.9.48,
+     pkg-js-autopkgtest automatically installs .babelrc and babel.config.json
+     in test directory (and installed package.json. If your package uses
+     another file, set a debian/tests/pkg-js/files (see below)
+   * jest tests often need sources files. Use debian/tests/pkg-js/files in
+     this case.
+   * debian/tests/pkg-js/files example (remember that when this file exists,
+     only the mentioned files and package files are installed in test
+     directory):
+
+       babel.config.json
+       src/
+       test/
+
+# Switching from ava to jest:
+
+ava is not packaged. You can easily replace it by jest using jest-codemods.
+Simply launch this and follow instructions:
+
+    $ npx jest-codemods
+
+Note that you will probably need a .babelrc or babel.config.json. Example:
+
+    {
+      "presets": [ "@babel/preset-env" ],
+      "plugins": [ "@babel/plugin-transform-runtime" ]
+    }
+

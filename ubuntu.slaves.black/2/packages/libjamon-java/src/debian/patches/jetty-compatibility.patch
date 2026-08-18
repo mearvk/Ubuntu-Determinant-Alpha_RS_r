@@ -1,0 +1,48 @@
+--- a/src/java/com/jamonapi/http/JAMonJettyHandler.java
++++ b/src/java/com/jamonapi/http/JAMonJettyHandler.java
+@@ -11,10 +11,10 @@
+ import javax.servlet.http.HttpServletResponse;
+ 
+ 
+-import org.mortbay.jetty.HttpConnection;
+-import org.mortbay.jetty.Request;
+-import org.mortbay.jetty.Response;
+-import org.mortbay.jetty.handler.HandlerWrapper;
++import org.eclipse.jetty.server.HttpConnection;
++import org.eclipse.jetty.server.Request;
++import org.eclipse.jetty.server.Response;
++import org.eclipse.jetty.server.handler.HandlerWrapper;
+ 
+ 
+ public class JAMonJettyHandler extends HandlerWrapper implements HttpMonManage{
+@@ -29,15 +29,15 @@
+     }
+     
+     /** Monitor the request and call any other requests in the decorator chain */
+-    public void handle(String target, HttpServletRequest request, HttpServletResponse response, int dispatch) throws IOException, ServletException  {
+-        final Request baseRequest = (request instanceof Request) ? ((Request)request) : HttpConnection.getCurrentConnection().getRequest();
+-        final Response baseResponse = (response instanceof Response) ? ((Response)response) : HttpConnection.getCurrentConnection().getResponse();
++    public void handle(String target, Request baseRequest_, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException  {
++        final Request baseRequest = (request instanceof Request) ? ((Request)request) : HttpConnection.getCurrentConnection().getHttpChannel().getRequest();
++        final Response baseResponse = (response instanceof Response) ? ((Response)response) : HttpConnection.getCurrentConnection().getHttpChannel().getResponse();
+ 
+         HttpMon httpMon=null;
+         try {
+            httpMon=httpMonFactory.start(baseRequest, baseResponse);           
+ 
+-           super.handle(target, request, response, dispatch);
++           super.handle(target, baseRequest_, request, response);
+         } catch (Throwable e) {
+             httpMon.throwException(e);
+          } finally {
+--- a/src/java/com/jamonapi/http/JettyHttpMonItem.java
++++ b/src/java/com/jamonapi/http/JettyHttpMonItem.java
+@@ -5,7 +5,7 @@
+  */
+ import com.jamonapi.Monitor;
+ import com.jamonapi.MonitorFactory;
+-import org.mortbay.jetty.Request;
++import org.eclipse.jetty.server.Request;
+ 
+ 
+ class JettyHttpMonItem extends HttpMonItem {

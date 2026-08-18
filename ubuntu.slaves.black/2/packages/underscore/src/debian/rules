@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# build minified browser library
+# * include source-map
+# * include pre-compressed gzip and brotli files
+%.min.js: %.js
+	uglifyjs --compress --mangle \
+		--source-map \
+		--output $@ \
+		$<
+ifeq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+	pigz --force --keep -11 -- $@ $*.min.js.map
+	brotli --force --keep --best -- $@ $*.min.js.map
+endif
+
+override_dh_auto_build: underscore.min.js
+	rollup -c
+	rollup -c rollup.config2.js
+	terser underscore-umd.js -c evaluate=false --comments '/    .*/' -m \
+		--source-map content=underscore-umd.js.map \
+		-o underscore-umd-min.js
+	terser underscore-esm.js -c evaluate=false --comments '/    .*/' -m \
+		--source-map content=underscore-esm.js.map \
+		-o underscore-umd-esm.js
+
+# install core documentation with all binary packages
+override_dh_installdocs:
+	dh_installdocs -- README.md index.html

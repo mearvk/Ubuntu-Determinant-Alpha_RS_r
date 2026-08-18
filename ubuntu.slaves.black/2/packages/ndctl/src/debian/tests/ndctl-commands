@@ -1,0 +1,45 @@
+#!/bin/sh
+
+set -e
+
+result=0
+# In version 60.1 of this package, there are 22 commands.
+# We don't want this test to fail if newer versions don't have
+# exactly that count, but we don't also want to miss suddenly
+# a bunch of commands disappearing because of a build problem.
+# This sounds like a good number to check for:
+command_count_threshold=10
+
+commands=$(ndctl --list-cmds) || result=$?
+if [ "${result}" -ne "0" ]; then
+    echo "ERROR: ndctl --list-cmds failed with exit code: ${result}. Output:"
+    echo "${commands}"
+    exit "${result}"
+fi
+
+echo "Available commands from ndctl --list-cmds:"
+echo "${commands}"
+lines=$(echo "${commands}" | wc -l)
+if [ "${lines}" -lt "${command_count_threshold}" ]; then
+    echo "ERROR: Something is possibly wrong with --list-cmds' output."
+    echo "Got less than 10 lines. If that is correct, adjust the threshold"
+    echo "in this test please."
+    exit 1
+fi
+
+echo "Checking we have a working version command:"
+version=$(ndctl version) || result=$?
+if [ "${result}" -ne "0" ]; then
+    echo "ERROR: ndctl version failed with exit code ${result}. Output:"
+    echo "${version}"
+    exit "${result}"
+fi
+
+if [ -z "${version}" ]; then
+    echo "ERROR: the version command returned an empty string instead"
+    echo "of a version string"
+    exit 1
+fi
+echo "Version: ${version}"
+
+exit 0

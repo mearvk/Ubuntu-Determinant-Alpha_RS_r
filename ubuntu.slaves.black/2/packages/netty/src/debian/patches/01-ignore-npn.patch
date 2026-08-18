@@ -1,0 +1,74 @@
+Description: Disable the NPN/ALPN support since it relies on jetty npn-api and alpn-api which aren't available in Debian
+Author: Emmanuel Bourg <ebourg@apache.org>
+Forwarded: not-needed
+--- a/pom.xml
++++ b/pom.xml
+@@ -906,6 +906,7 @@
+         </configuration>
+       </plugin>
+       <!-- Download the npn-boot.jar in advance to add it to the boot classpath. -->
++<!--
+       <plugin>
+         <artifactId>maven-dependency-plugin</artifactId>
+         <executions>
+@@ -923,6 +924,7 @@
+           </execution>
+         </executions>
+       </plugin>
++-->
+       <plugin>
+         <artifactId>maven-surefire-plugin</artifactId>
+         <configuration>
+--- a/handler/pom.xml
++++ b/handler/pom.xml
+@@ -100,5 +100,21 @@
+       <scope>test</scope>
+     </dependency>
+   </dependencies>
++
++  <build>
++    <plugins>
++      <plugin>
++        <groupId>org.apache.maven.plugins</groupId>
++        <artifactId>maven-compiler-plugin</artifactId>
++        <configuration>
++          <excludes>
++            <exclude>**/*Alpn*.java</exclude>
++            <exclude>**/*Npn*.java</exclude>
++          </excludes>
++        </configuration>
++      </plugin>
++    </plugins>
++  </build>
++
+ </project>
+ 
+--- a/handler/src/main/java/io/netty/handler/ssl/JdkSslContext.java
++++ b/handler/src/main/java/io/netty/handler/ssl/JdkSslContext.java
+@@ -382,6 +382,7 @@
+         switch(config.protocol()) {
+         case NONE:
+             return JdkDefaultApplicationProtocolNegotiator.INSTANCE;
++/*
+         case ALPN:
+             if (isServer) {
+                 switch(config.selectorFailureBehavior()) {
+@@ -426,6 +427,7 @@
+                     .append(config.selectorFailureBehavior()).append(" failure behavior").toString());
+                 }
+             }
++*/
+         default:
+             throw new UnsupportedOperationException(new StringBuilder("JDK provider does not support ")
+             .append(config.protocol()).append(" protocol").toString());
+--- a/handler/src/main/java/io/netty/handler/ssl/SslProvider.java
++++ b/handler/src/main/java/io/netty/handler/ssl/SslProvider.java
+@@ -44,7 +44,7 @@
+     public static boolean isAlpnSupported(final SslProvider provider) {
+         switch (provider) {
+             case JDK:
+-                return JdkAlpnApplicationProtocolNegotiator.isAlpnSupported();
++                return false;
+             case OPENSSL:
+             case OPENSSL_REFCNT:
+                 return OpenSsl.isAlpnSupported();

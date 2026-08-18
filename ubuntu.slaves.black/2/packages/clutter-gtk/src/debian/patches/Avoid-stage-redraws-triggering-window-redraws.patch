@@ -1,0 +1,116 @@
+Description: Fix high CPU usage (particularly in Wayland sessions)
+ Hardware redraws of the clutter stage were unexpectedly triggering software
+ redraws of the backing window and its decorations. On _every_ frame.
+ .
+ This halves the CPU usage of totem and gnome-maps.
+Author: Daniel van Vugt <daniel.van.vugt@canonical.com>
+Bug-Ubuntu: https://bugs.launchpad.net/bugs/1698282
+Bug: https://bugzilla.gnome.org/show_bug.cgi?id=787001
+Forwarded: yes
+Last-Update: 2017-09-26
+
+---
+ clutter-gtk/gtk-clutter-embed.c | 66 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 65 insertions(+), 1 deletion(-)
+
+diff --git a/clutter-gtk/gtk-clutter-embed.c b/clutter-gtk/gtk-clutter-embed.c
+index e8c31d4..d9e1aee 100644
+--- a/clutter-gtk/gtk-clutter-embed.c
++++ b/clutter-gtk/gtk-clutter-embed.c
+@@ -418,6 +418,10 @@ gtk_clutter_embed_draw (GtkWidget *widget, cairo_t *cr)
+ #if defined(CLUTTER_WINDOWING_GDK)
+   GtkClutterEmbedPrivate *priv = GTK_CLUTTER_EMBED (widget)->priv;
+ 
++  /* This is probably unnecessary. clutter_stage_ensure_redraw is more of a
++   * scheduling/queuing thing and is already called by
++   * gtk_clutter_embed_queue_draw_region below.
++   */
+   if (clutter_check_windowing_backend (CLUTTER_WINDOWING_GDK))
+     clutter_stage_ensure_redraw (CLUTTER_STAGE (priv->stage));
+ #endif
+@@ -425,6 +429,62 @@ gtk_clutter_embed_draw (GtkWidget *widget, cairo_t *cr)
+   return GTK_WIDGET_CLASS (gtk_clutter_embed_parent_class)->draw (widget, cr);
+ }
+ 
++static void
++gtk_clutter_embed_queue_draw_region (GtkWidget *widget,
++                                     const cairo_region_t *region)
++{
++  GtkClutterEmbedPrivate *priv = GTK_CLUTTER_EMBED (widget)->priv;
++
++#if defined(CLUTTER_WINDOWING_GDK)
++  if (clutter_check_windowing_backend (CLUTTER_WINDOWING_GDK))
++    {
++      GdkWindow *window = gtk_widget_get_window (widget);
++      GdkWindow *native = NULL;
++
++      /* Try to be more efficient than the default queue_draw_region. The
++       * default implementation will invalidate our parent widgets/window too
++       * since embed is using a non-native window. So it would trigger a full
++       * window/decoration redraw (in software on Wayland!) every time we want
++       * to just redraw the clutter stage. That's obviously bad and incurs high
++       * CPU. So instead we have a look inside the widget to see if it still
++       * contains a trivial single native window for the clutter stage. If so
++       * then just redraw that, avoiding a full redraw of app window backing
++       * and decorations.
++       */
++      if (gdk_window_has_native (window))
++        native = window;
++      else
++        {
++          GList *children = gdk_window_get_children (window);
++          if (children)
++            {
++              GdkWindow *single_child = children->data && !children->next ?
++                                        GDK_WINDOW (children->data) : NULL;
++              if (single_child && gdk_window_has_native (single_child))
++                native = single_child;
++            }
++        }
++
++      if (native)
++        {
++          /* Now do as gtk_widget_real_queue_draw_region does. Although this
++           * may be overkill. Doing nothing is probably fine too.
++           */
++          gdk_window_invalidate_region (native, region, TRUE);
++        }
++      else
++        {
++          GTK_WIDGET_CLASS (gtk_clutter_embed_parent_class)->queue_draw_region (widget, region);
++        }
++    }
++#endif
++
++  /* Ensuring a redraw is more analogous to queuing than actually drawing, so
++   * set up the stage redraw here.
++   */
++  clutter_stage_ensure_redraw (CLUTTER_STAGE (priv->stage));
++}
++
+ static void
+ gtk_clutter_embed_realize (GtkWidget *widget)
+ {
+@@ -1066,6 +1126,7 @@ gtk_clutter_embed_class_init (GtkClutterEmbedClass *klass)
+   widget_class->style_updated = gtk_clutter_embed_style_updated;
+   widget_class->size_allocate = gtk_clutter_embed_size_allocate;
+   widget_class->draw = gtk_clutter_embed_draw;
++  widget_class->queue_draw_region = gtk_clutter_embed_queue_draw_region;
+   widget_class->realize = gtk_clutter_embed_realize;
+   widget_class->unrealize = gtk_clutter_embed_unrealize;
+   widget_class->show = gtk_clutter_embed_show;
+@@ -1151,7 +1212,10 @@ gtk_clutter_embed_init (GtkClutterEmbed *embed)
+   /* we accept key focus */
+   gtk_widget_set_can_focus (widget, TRUE);
+ 
+-  /* we own the whole drawing of this widget, including the background */
++  /* We own the whole drawing of this widget, including the background.
++   * This call is actually ignored by GTK for most classes including our own,
++   * but it's still good to declare your intentions...
++   */
+   gtk_widget_set_app_paintable (widget, TRUE);
+ 
+   /* this widget should expand in both directions */
+-- 
+2.14.1
+

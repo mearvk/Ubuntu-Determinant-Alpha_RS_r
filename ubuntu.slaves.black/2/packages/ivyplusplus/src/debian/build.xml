@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="com.zwitserloot.ivyplusplus" default="dist">
+
+  <path id="build.path">
+    <fileset dir="/usr/share/java">
+      <include name="ant.jar" />
+      <include name="bcpg.jar" />
+      <include name="bcprov.jar" />
+      <include name="com.zwitserloot.cmdreader.jar" />
+      <include name="eclipse-jdt-core.jar" />
+      <include name="ivy.jar" />
+      <include name="lombok.jar" />
+    </fileset>
+  </path>
+
+  <target name="compile">
+    <mkdir dir="build/pack" />
+    <javac destdir="build/pack" encoding="UTF-8" release="8">
+      <src path="src" />
+      <exclude name="com/zwitserloot/ivyplusplus/eclipse/**" />
+      <exclude name="com/zwitserloot/ivyplusplus/intellij/**" />
+      <exclude name="com/zwitserloot/ivyplusplus/mavencentral/**" />
+      <exclude name="com/zwitserloot/ivyplusplus/ssh/**" />
+      <classpath refid="build.path" />
+    </javac>
+  </target>
+
+  <!-- this breaks on bouncycastle > 1.46 -->
+  <target name="isolateBridges" depends="compile">
+    <mkdir dir="build/runtimedeps" />
+    <jar jarfile="build/runtimedeps/ipp-bc-bridges.jar">
+      <fileset dir="build/pack">
+    <include name="com/zwitserloot/ivyplusplus/mavencentral/CreateSigningKey_.class" />
+    <include name="com/zwitserloot/ivyplusplus/mavencentral/CreateDetachedSignatures_.class" />
+      </fileset>
+    </jar>
+    <delete file="build/pack/com/zwitserloot/ivyplusplus/mavencentral/CreateSigningKey_.class" />
+    <delete file="build/pack/com/zwitserloot/ivyplusplus/mavencentral/CreateDetachedSignatures_.class" />
+  </target>
+
+  <target name="dist" depends="compile, stripeIvy">
+    <taskdef name="jarjar" classname="com.tonicsystems.jarjar.JarJarTask" classpath="/usr/share/java/jarjar.jar" />
+    <jarjar jarfile="dist/ivyplusplus-${ivyplusplus.version}.jar">
+      <fileset dir="build/pack" />
+      <fileset dir="src" includes="com/zwitserloot/ivyplusplus/**/*.template" />
+      <zipfileset src="/usr/share/java/com.zwitserloot.cmdreader.jar" />
+      <!-- fileset dir="build/runtimedeps" /-->
+      <rule pattern="com.zwitserloot.cmdreader.**" result="com.zwitserloot.ivyplusplus.libs.com.zwitserloot.cmdreader.@1" />
+      <manifest>
+    <attribute name="Main-Class" value="com.zwitserloot.ivyplusplus.createProject.CreateProject" />
+    <attribute name="ivyplusplus-version" value="${ivyplusplus.version}" />
+      </manifest>
+    </jarjar>
+  </target>
+
+  <target name="stripeIvy">
+    <delete quiet="true" file="build/pack/com/zwitserloot/ivyplusplus/antlib.xml" />
+    <mkdir dir="build/pack" />
+    <copy file="src/com/zwitserloot/ivyplusplus/antlib.xml" tofile="build/pack/com/zwitserloot/ivyplusplus/antlib.xml" />
+    <loadresource property="include.ivy">
+      <file file="debian/include-ivy.xml" />
+    </loadresource>
+    <replace file="build/pack/com/zwitserloot/ivyplusplus/antlib.xml"
+         token="-- insert here -->"
+         value="-- include ivy -->${include.ivy}" />
+  </target>
+</project>

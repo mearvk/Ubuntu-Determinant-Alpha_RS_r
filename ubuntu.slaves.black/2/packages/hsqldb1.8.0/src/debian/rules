@@ -1,0 +1,59 @@
+#!/usr/bin/make -f
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/ant.mk
+include /usr/share/cdbs/1/rules/simple-patchsys.mk
+
+include /usr/share/dpkg/architecture.mk
+
+JAVA_HOME = /usr/lib/jvm/default-java
+DEB_JARS = servlet-api
+DEB_ANT_BUILDFILE = build/build.xml
+DEB_ANT_BUILD_TARGET = hsqldb hsqldbutil
+DEB_ANT_ARGS += -Dant.build.javac.target=1.5 -Dant.build.javac.source=1.5
+
+DEB_INSTALL_DOCS_ALL = -X .cvsignore
+DEB_INSTALL_CHANGELOGS_ALL = changelog.combined
+
+common-build-indep:: changelog.combined NEWS
+
+define combine-changelog
+( \
+    set -e; \
+    set `echo $^ | tr ' ' '\n' | sort -r`; \
+    for f; do \
+        if [ $$f != $$1 ]; then \
+            echo; echo; \
+            for i in `seq 80`; do echo -n '='; done; \
+            echo; echo; \
+        fi; \
+        fold -s $$f; \
+   done \
+) >$@
+endef
+
+changelog.combined: $(wildcard doc/changelist_*.txt)
+	$(combine-changelog)
+
+NEWS: $(wildcard doc/changelog_*.txt)
+	$(combine-changelog)
+
+
+define install-jar
+install -m 644 -D lib/$(1).jar $(DEB_FINALDIR)/usr/share/java/$(1)1.8.0-$(DEB_UPSTREAM_VERSION).jar
+dh_link /usr/share/java/$(1)1.8.0-$(DEB_UPSTREAM_VERSION).jar /usr/share/java/$(1)1.8.0.jar
+endef
+
+install/libhsqldb1.8.0-java:: DEB_FINALDIR=$(CURDIR)/debian/libhsqldb1.8.0-java/
+install/libhsqldb1.8.0-java::
+	$(call install-jar,hsqldb)
+	$(call install-jar,hsqldbutil)
+	jh_classpath -plibhsqldb1.8.0-java --classpath=/usr/share/java/servlet-api-3.1.jar \
+		$(CURDIR)/debian/libhsqldb1.8.0-java/usr/share/java/hsqldb1.8.0-$(DEB_UPSTREAM_VERSION).jar
+
+clean::
+	rm -f lib/hsqldb*.jar
+	$(MAKE) -C debian/bin clean
+	rm -f changelog.combined NEWS
+	mh_clean
+

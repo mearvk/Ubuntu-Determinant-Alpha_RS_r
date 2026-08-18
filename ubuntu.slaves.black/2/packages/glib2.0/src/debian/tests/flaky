@@ -1,0 +1,72 @@
+#!/bin/sh
+# autopkgtest check: Run the installed-tests to verify glib works correctly
+# This part runs tests that have been marked as opt-in due to being flaky
+# on at least some architectures.
+# (C) 2013 Canonical Ltd.
+# (C) 2019 Collabora Ltd.
+
+set -eu
+NULL=
+
+export DEB_ALLOW_FLAKY_TESTS=1
+
+# Disable gvfs if it happens to be installed. We want to test the built-in
+# stuff
+export GIO_USE_VFS=local
+export GIO_USE_VOLUME_MONITOR=unix
+
+export XDG_RUNTIME_DIR="$AUTOPKGTEST_TMP"
+
+printf "Running as: "; id -a
+printf "passwd entry: "; getent passwd "$(id -u)" || echo "(exit status $?)"
+printf "group entry: "; getent group "$(id -g)" || echo "(exit status $?)"
+echo "Environment:"
+env | LC_ALL=C sort -u
+
+exec dbus-run-session -- \
+xvfb-run -a \
+debian/tests/run-with-locales \
+	--generate de_DE=ISO-8859-1 \
+	--generate de_DE.utf8 \
+	--generate de_DE@euro.utf8 \
+	--generate el_GR.utf8 \
+	--generate en_GB=ISO-8859-1 \
+	--generate en_GB.utf8 \
+	--generate en_US=ISO-8859-1 \
+	--generate en_US.utf8 \
+	--generate es_ES.utf8 \
+	--generate fa_IR=UTF-8 \
+	--generate fa_IR.utf8 \
+	--generate fr_FR.utf8 \
+	--generate hr_HR.utf8 \
+	--generate ja_JP.utf8 \
+	--generate ja_JP.EUC-JP \
+	--generate lt_LT.utf8 \
+	--generate pl_PL=ISO-8859-2 \
+	--generate pl_PL.ISO-8859-2 \
+	--generate pl_PL.utf8 \
+	--generate ru_RU=ISO-8859-5 \
+	--generate ru_RU.utf8 \
+	--generate sr_RS=UTF-8 \
+	--generate sr_RS@latin=UTF-8 \
+	--generate sv_SE=ISO-8859-1 \
+	--generate sv_SE.utf8 \
+	--generate tr_TR=ISO-8859-9 \
+	--generate tr_TR.utf8 \
+	--generate tt_RU=UTF-8 \
+	--generate tt_RU.utf8 \
+	--generate tt_RU@iqtelif=UTF-8 \
+	-- \
+gnome-desktop-testing-runner \
+	glib/closure-refcount.test \
+	glib/debugcontroller.test \
+	glib/gdbus-server-auth.test \
+	glib/gdbus-threading.test \
+	glib/gmenumodel.test \
+	glib/mainloop.test \
+	glib/memory-monitor-dbus.test \
+	glib/socket.test \
+	glib/testfilemonitor.test \
+	glib/timeout.test \
+	glib/timer.test \
+	${NULL}

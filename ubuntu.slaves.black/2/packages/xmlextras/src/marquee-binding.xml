@@ -1,0 +1,503 @@
+<?xml version="1.0"?>
+<!--
+
+/*
+ * This script was created by Erik Arvidsson (erik@eae.net)
+ * for WebFX (http://webfx.eae.net)
+ * Copyright 2001
+ * 
+ * For usage see license at http://webfx.eae.net/license.html	
+ *
+ * Created:		2001-12-06
+ *
+ */ 
+-->
+<bindings xmlns="http://www.mozilla.org/xbl"
+xmlns:html="http://www.w3.org/1999/xhtml">
+
+<binding id="marquee" applyauthorstyles="true">
+<content>
+	<html:span style="position: relative; white-space: nowrap; float: left; clear: both; width: auto; height: auto; display: inline; padding: 0; margin: 0; border: 0; border-bottom: 1px solid transparent; background: transparent;">
+		<children/>
+	</html:span>
+</content>
+	<implementation>
+		<constructor>
+			//<![CDATA[
+
+var element = this;			
+
+this.__marquee__ = new (function () {
+	
+	// variable to use inside anonymous functions
+	var __marquee__		= this;
+
+	// define the properties and find the initial value
+	var _scrollDelay	= Number( getPropAttr("scrollDelay", 85) );
+	var _scrollAmount	= Number( getPropAttr("scrollAmount", 6) );
+	var _loop			= Number( getPropAttr("loop", -1) );
+	var _direction		= getPropAttr("direction", "left");
+	var _behavior		= getPropAttr("behavior", "scroll");
+
+	var innerContainer	= document.getAnonymousNodes(element)[0];
+	var isStopped		= true;
+	var oldDirection	= null;
+	var timer;
+	var reverse			= false;	// used in conjunction with alternate when going back
+	var inlineEventListeners = {};	// used to keep track of attrib/properties as event listeners
+	// init of inline event listeners done after this.?etInlineEventListener is defined
+	
+	// returns the value of the  dom attribute
+	function getPropAttr(sProp, vDefault) {
+		var domAttr = element.getAttribute(sProp)
+		if (domAttr != null && domAttr != "") return domAttr;
+		return vDefault;
+	}
+	
+	// init and start once this js thread is done
+	window.setTimeout(function () {
+		init();
+		__marquee__.start();
+	}, 1);
+	
+	// called when direction is changed and when the element is first initiated	
+	function init() {
+		innerContainer.style.whiteSpace = (_direction == "left" || _direction == "right") ? "nowrap" : "inherit";
+		switch (_direction) {
+			case "left":
+				/* minus paddings and borders */
+				innerContainer.style.top = "0px";
+				if (oldDirection != "right") {
+					innerContainer.style.left = (_behavior == "scroll" ? element.offsetWidth : (element.offsetWidth >= innerContainer.offsetWidth ? element.offsetWidth - innerContainer.offsetWidth : 0)) + "px";
+					fireEvent("start");
+				}
+				break;
+							
+			case "right":
+				innerContainer.style.top = "0px";
+				if (oldDirection != "left") {
+					innerContainer.style.left = (_behavior == "scroll" ? -innerContainer.offsetWidth : 0) + "px";	
+					fireEvent("start");
+				}
+				break;
+							
+			case "down":
+				innerContainer.style.left = "0px";
+				if (oldDirection != "up") {
+					innerContainer.style.top = (_behavior == "scroll" ? -innerContainer.offsetHeight : 0) + "px";
+					fireEvent("start");
+				}
+				break;
+							
+			case "up":
+				innerContainer.style.left = "0px";
+				if (oldDirection != "down") {
+					innerContainer.style.top = (_behavior == "scroll" ? element.offsetHeight : (element.offsetHeight >= innerContainer.offsetHeight ? element.offsetHeight - innerContainer.offsetHeight: 0)) + "px";
+					fireEvent("start");
+				}
+
+				break;
+		}
+	};
+				
+	this.start = function () {
+		if (isStopped) {
+			isStopped = false;
+			timer = window.setTimeout(updatePosition, _scrollDelay);		
+		}
+	};
+				
+	this.stop = function () {
+		if ( !isStopped ) {
+			isStopped = true;
+			if (timer != null)
+				window.clearTimeout(timer);
+		}
+	};
+
+	// This function handles the positioning of the content.
+	function updatePosition() {
+					
+		if (isStopped) return;
+		
+		if (_behavior == "scroll") {
+			switch (_direction) {
+				case "left":
+					var left = parseInt(innerContainer.style.left);//offsetLeft;
+					if (left + innerContainer.offsetWidth <= 0) {
+						innerContainer.style.left = element.offsetWidth + "px";					
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("start");
+					}
+					else
+						innerContainer.style.left = left - _scrollAmount + "px";
+					break;
+								
+				case "right":
+					var left = parseInt(innerContainer.style.left);//offsetLeft;
+					if (left >= element.offsetWidth) {	// padding & border
+						innerContainer.style.left = -innerContainer.offsetWidth + "px";
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("start");
+					}
+					else
+						innerContainer.style.left = left + _scrollAmount + "px";
+					break;
+								
+				case "up":
+					var top = parseInt(innerContainer.style.top);
+					if (top + innerContainer.offsetHeight <= 0) {
+						innerContainer.style.top = element.offsetHeight + "px";
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+
+						if (_loop > 1 || _loop == -1)
+							fireEvent("start");
+					}
+					else
+						innerContainer.style.top = top - _scrollAmount + "px";
+					break;
+								
+				case "down":
+					var top = parseInt(innerContainer.style.top);
+					if (top >= element.offsetHeight) {	// padding & border
+						innerContainer.style.top = -innerContainer.offsetHeight + "px";
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("start");
+					}
+					else
+						innerContainer.style.top = top + _scrollAmount + "px";
+					break;
+			}	
+		}
+		else {	// _behavior == "alternate"
+		
+			switch (_direction) {
+				case "left":
+					var left = parseInt(innerContainer.style.left);
+					var width = element.offsetWidth;
+					var innerWidth = innerContainer.offsetWidth;
+					if (left <= 0 && left + innerWidth <= width && !reverse) {
+						reverse = true;
+						fireEvent("bounce");
+					}
+					else if (left + innerWidth >= width && left >= 0 && reverse) {
+						reverse = false;
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("bounce");
+					}
+					
+					var larger = innerWidth > width;
+					var max =  larger ? 0 : width - innerWidth;
+					var min = !larger ? 0 : width - innerWidth;
+					
+					innerContainer.style.left = Math.min(max, Math.max(min, left + (reverse ? 1 : -1) * _scrollAmount)) + "px";
+					break;
+								
+				case "right":
+					var left = parseInt(innerContainer.style.left);
+					var width = element.offsetWidth;
+					var innerWidth = innerContainer.offsetWidth;
+					if (left <= 0 && left + innerWidth <= width && reverse) {
+						reverse = false;
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("bounce");
+					}
+					else if (left + innerWidth >= width && left >= 0 && !reverse) {
+						reverse = true;
+						fireEvent("bounce");
+					}
+					
+					var larger = innerWidth > width;
+					var max =  larger ? 0 : width - innerWidth;
+					var min = !larger ? 0 : width - innerWidth;
+					
+					innerContainer.style.left = Math.min(max, Math.max(min, left + (!reverse ? 1 : -1) * _scrollAmount)) + "px";
+					break;
+								
+				case "up":
+					var top = parseInt(innerContainer.style.top);
+					var height = element.offsetHeight;
+					var innerHeight = innerContainer.offsetHeight;
+					
+					if (top <= 0 && top + innerHeight <= height && !reverse) {
+						reverse = true;
+						fireEvent("bounce");
+					}
+					else if (top + innerHeight >= height && top >= 0 && reverse) {
+						reverse = false;
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("bounce");
+					}
+					
+					var larger = innerHeight > height;
+					var max =  larger ? 0 : height - innerHeight;
+					var min = !larger ? 0 : height - innerHeight;
+					
+					innerContainer.style.top = Math.min(max, Math.max(min, top + (reverse ? 1 : -1) * _scrollAmount)) + "px";
+					break;
+								
+				case "down":
+					var top = parseInt(innerContainer.style.top);
+					var height = element.offsetHeight;
+					var innerHeight = innerContainer.offsetHeight;
+					
+					if (top <= 0 && top + innerHeight <= height && reverse) {
+						reverse = false;
+						if (_loop == 1)
+							__marquee__.stop();
+						else if (_loop > 1)
+							_loop--;
+						
+						if (_loop > 1 || _loop == -1)
+							fireEvent("bounce");
+					}
+					else if (top + innerHeight >= height && top >= 0 && !reverse) {
+						reverse = true;
+						fireEvent("bounce");
+					}
+					
+					var larger = innerHeight > height;
+					var max =  larger ? 0 : height - innerHeight;
+					var min = !larger ? 0 : height - innerHeight;
+					
+					innerContainer.style.top = Math.min(max, Math.max(min, top + (reverse ? -1 : 1) * _scrollAmount)) + "px";
+					break;
+			}
+		}
+		timer = window.setTimeout(updatePosition, _scrollDelay);
+	}
+	
+	function fireEvent(sType) {
+		var e = document.createEvent("Events");
+		e.initEvent(sType, false, false);
+		element.dispatchEvent(e);
+	}
+	
+	this.getLoop			= function () { return _loop; };
+	this.setLoop			= function (nLoop) {
+		var n = Number(nLoop);
+		if (!isNaN(n) && n > 0) {
+			_loop = n;
+			element.__marquee__setAttribute("loop", n);
+		}
+		else
+			throw new Error("Invalid argument for Marquee::loop");
+	};
+	
+	this.getScrollDelay		= function () { return _scrollDelay; };
+	this.setScrollDelay		= function (nScrollDelay) {
+		var n = Number(nScrollDelay);
+		if (!isNaN(n) && n > 0) {
+			_scrollDelay = n;
+			element.__marquee__setAttribute("scrollDelay", n);
+		}
+		else
+			throw new Error("Invalid argument for Marquee::scrollDelay");
+	};
+	
+	this.getScrollAmount	= function () { return _scrollAmount; };
+	this.setScrollAmount	= function (nScrollAmount) {
+		var n = Number(nScrollAmount);
+		if (!isNaN(n) && n >= 0) {
+			_scrollAmount = n;
+			element.__marquee__setAttribute("scrollAmount", n);
+		}
+		else
+			throw new Error("Invalid argument for Marquee::scrollAmount");
+	};
+	
+	this.getDirection		= function () { return _direction; };
+	this.setDirection		= function (sDirection) {
+		var s = String(sDirection).toLowerCase();
+		if (_direction == s) return;
+		switch (s) {
+			case "left":
+			case "right":
+			case "up":
+			case "down":
+				break;
+			default:
+				throw new Error("Invalid argument for Marquee::direction");
+		}
+		oldDirection = _direction;
+		_direction = s;
+		element.__marquee__setAttribute("direction", s);
+		
+		init();
+	};
+	
+	this.getBehavior		= function () { return _behavior; };
+	this.setBehavior		= function (sBehavior) {
+		var s = String(sBehavior).toLowerCase();
+		if (_behavior == s) return;
+		switch (s) {
+			case "scroll":
+			case "alternate":
+				break;
+			default:
+				throw new Error("Invalid argument for Marquee::behavior");
+		}
+		var oldBehavior = _behavior;
+		_behavior = s;		
+		element.__marquee__setAttribute("behavior", s);
+		if (oldBehavior == "alternate" && s == "scroll" && reverse) {	// reinit
+			init();
+		}
+	};
+	
+	this.setInlineEventListener	= function (sType, v) {
+		if ( !(sType in inlineEventListeners) ) {
+			element.removeEventListener(sType, inlineEventListeners[sType], false);
+			delete inlineEventListeners[sType];
+		}
+		
+		var f;
+		if (typeof v == "function")
+			f = v;
+		else if (typeof v == "string")
+			f = new Function("event", v);
+
+		if (f != undefined) {
+			inlineEventListeners[sType] = f;
+			element.addEventListener(sType, f, false);
+		}
+	};
+	this.getInlineEventListener	= function (sType) {
+		return inlineEventListeners[sType];
+	};
+
+	// init event listeners	
+	var _onbounce = getPropAttr("onbounce", null);
+	var _onstart = getPropAttr("onstart", null);
+	if (_onbounce != null)
+		this.setInlineEventListener("bounce", _onbounce);
+	if (_onstart != null)
+		this.setInlineEventListener("start", _onstart);
+});
+
+// override setAttribute and getAttribute to allow XBL to work as one expects
+
+element.__marquee__setAttribute = element.setAttribute;		// backup original
+element.setAttribute = function (sAttrName, sAttrValue) {
+	switch (sAttrName.toLowerCase()) {
+		case "loop":
+			this.__marquee__.setLoop(sAttrValue);
+			break;
+		case "scrollamount":
+			this.__marquee__.setScrollAmount(sAttrValue);
+			break;
+		case "scrolldelay":
+			this.__marquee__.setScrollDelay(sAttrValue);
+			break;
+		case "behavior":
+			this.__marquee__.setBehavior(sAttrValue);
+			break;
+		case "direction":
+			this.__marquee__.setDirection(sAttrValue);
+			break;
+		case "onbounce":
+			this.__marquee__.setInlineEventListener("bounce", sAttrValue);
+			break;
+		case "onstart":
+			this.__marquee__.setInlineEventListener("start", sAttrValue);
+			break;
+	}
+	return this.__marquee__setAttribute(sAttrName, sAttrValue);
+};
+
+
+element.__marquee__getAttribute = element.getAttribute;		// backup original
+element.getAttribute = function (sAttrName) {
+	switch (sAttrName.toLowerCase()) {
+		case "loop":
+			return this.__marquee__.getLoop();
+		case "scrollamount":
+			return this.__marquee__.getScrollAmount();
+		case "scrolldelay":
+			return this.__marquee__.getScrollDelay();
+		case "behavior":
+			return this.__marquee__.setBehavior();
+		case "direction":
+			return this.__marquee__.setDirection();
+		case "onbounce":
+			return this.__marquee__.getInlineEventListener("bounce");
+		case "onstart":
+			return this.__marquee__.getInlineEventListener("start");
+
+	}
+	return this.__marquee__getAttribute(sAttrName);
+};
+
+			//]]>
+		</constructor>
+		<method name="stop">
+			<body>
+				this.__marquee__.stop();
+			</body>
+		</method>
+		<method name="start">
+			<body>
+				this.__marquee__.start();
+			</body>
+		</method>
+
+		<property name="loop"
+			onset="this.__marquee__.setLoop(val); return this.__marquee__.getLoop();"
+			onget="return this.__marquee__.getLoop();"/>
+		<property name="scrollAmount"
+			onset="this.__marquee__.setScrollAmount(val); return this.__marquee__.getScrollAmount();"
+			onget="return this.__marquee__.getScrollAmount();"/>
+		<property name="scrollDelay"
+			onset="this.__marquee__.setScrollDelay(val); return this.__marquee__.getScrollDelay();"
+			onget="return this.__marquee__.getScrollDelay();"/>
+		<property name="behavior"
+			onset="this.__marquee__.setBehavior(val); return this.__marquee__.getBehavior();"
+			onget="return this.__marquee__.getBehavior();"/>
+		<property name="direction"
+			onset="this.__marquee__.setDirection(val); return this.__marquee__.getDirection();"
+			onget="return this.__marquee__.getDirection();"/>
+			
+		<property name="onbounce"
+			onset="this.__marquee__.setInlineEventListener('bounce', val); return this.__marquee__.getInlineEventListener('bounce');"
+			onget="return this.__marquee__.getInlineEventListener('bounce');"/>
+		<property name="onstart"
+			onset="this.__marquee__.setInlineEventListener('start', val); return this.__marquee__.getInlineEventListener('start');"
+			onget="return this.__marquee__.getInlineEventListener('start');"/>
+			
+	</implementation>
+</binding>
+
+</bindings>

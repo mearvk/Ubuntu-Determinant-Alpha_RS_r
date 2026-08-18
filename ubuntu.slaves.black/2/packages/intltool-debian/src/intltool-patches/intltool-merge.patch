@@ -1,0 +1,288 @@
+Index: intltool-merge.in.in
+===================================================================
+RCS file: /cvs/gnome/intltool/intltool-merge.in.in,v
+retrieving revision 1.114
+diff -u -r1.114 intltool-merge.in.in
+--- intltool-merge.in.in	23 May 2006 21:08:36 -0000	1.114
++++ intltool-merge.in.in	10 Jul 2006 19:40:52 -0000
+@@ -40,7 +40,6 @@
+ ## Loaded modules
+ use strict; 
+ use Getopt::Long;
+-use Text::Wrap;
+ use File::Basename;
+ 
+ my $must_end_tag      = -1;
+@@ -155,7 +154,6 @@
+ elsif ($RFC822DEB_STYLE_ARG && @ARGV > 2) 
+ {
+ 	&preparation;
+-	&print_message;
+ 	&rfc822deb_merge_translations;
+ 	&finalize;
+ } 
+@@ -1213,9 +1211,6 @@
+ 
+     my $source;
+ 
+-    $Text::Wrap::huge = 'overflow';
+-    $Text::Wrap::break = qr/\n|\s(?=\S)/;
+-
+     {
+        local $/; # slurp mode
+        open INPUT, "<$FILE" or die "can't open $FILE: $!";
+@@ -1226,93 +1221,173 @@
+     open OUTPUT, ">${OUTFILE}" or die;
+     binmode (OUTPUT) if $^O eq 'MSWin32';
+ 
+-    while ($source =~ /(^|\n+)(_*)([^:\s]+)(:[ \t]*)(.*?)(?=\n[\S\n]|$)/sg)
++    my $last = 0;
++    while ($source =~ /\G(.*?)(^|\n)(_+)([^:\s]+)(:[ \t]*)(.*?)(?=\n[\S\n]|$)/sg)
+     {
+-	    my $sep = $1;
+-	    my $non_translated_line = $3.$4;
+-	    my $string = $5;
+-	    my $underscore = length($2);
+-	    next if $underscore eq 0 && $non_translated_line =~ /^#/;
+-	    #  Remove [] dummy strings
+-	    my $stripped = $string;
+-	    $stripped =~ s/\[\s[^\[\]]*\],/,/g if $underscore eq 2;
+-	    $stripped =~ s/\[\s[^\[\]]*\]$//;
+-	    $non_translated_line .= $stripped;
++        $last = pos($source);
++        my ($pre, $newline, $underscore, $tag, $space, $text) = ($1, $2, $3, $4, $5, $6);
++        my $non_translated_line = $tag.$space;
++        $underscore = length($underscore);
++        #  Print untranslated fields
++        my $untranslated_fields = $pre;
++        $untranslated_fields =~ s/\n#.*//g;
++        $untranslated_fields =~ s/^#.*(\n|$)//;
++        print OUTPUT $untranslated_fields;
++        #  Remove [] dummy strings
++        my $stripped = $text;
++        $stripped =~ s/\[\s[^\[\]]*\],/,/g
++            if $underscore == 2;
++        $stripped =~ s/\[\s[^\[\]]*\]$//;
++        $non_translated_line .= $stripped;
+ 
+-	    print OUTPUT $sep.$non_translated_line;
++        print OUTPUT $newline.$non_translated_line;
+     
+-	    if ($underscore) 
+-	    {
+-	        my @str_list = rfc822deb_split($underscore, $string);
++        if ($underscore) 
++        {
++            my @str_list = rfc822deb_split($underscore, $text);
++            my $partial = 0;
+ 
+-	        for my $lang (sort keys %po_files_by_lang) 
++            #  Process pseudo-comments
++            my @tfields = ();
++            if ($pre =~ m/^#flag:/m)
++            {
++                my @c = split (/\n#flag:/, $pre);
++                #  The first field is null
++                shift (@c);
++                for (@c)
+                 {
+-                    my $is_translated = 1;
+-                    my $str_translated = '';
+-                    my $first = 1;
+-                
+-                    for my $str (@str_list) 
++                    if (s/^comment(!?):(\S+)(?=\n|$)//s)
+                     {
+-                        my $translation = $translations{$lang, $str};
+-                    
+-                        if (!$translation) 
+-                        {
+-                            $is_translated = 0;
+-                            last;
+-                        }
++                        # This command is ignored by intltool-merge
++                    }
++                    elsif (s/^translate(!?):(\S+)(?=\n|$)//s)
++                    {
++                        rfc822deb_parse_spec($2, $1, 1+$#str_list, 0, 1, \@tfields);
++                    }
++                    elsif (s/^partial(?=\n|$)//s)
++                    {
++                        $partial = 1;
++                    }
++                    else
++                    {
++                        die "Unknown directive: $_\n\nAborting!\n";
++                    }
++                }
++            }
++            #  By default, print all msgids
++            rfc822deb_parse_spec('*', '', 1+$#str_list, 0, 1, \@tfields)
++                if $#tfields == -1;
+ 
+-	                #  $translation may also contain [] dummy
+-                        #  strings, mostly to indicate an empty string
+-	                $translation =~ s/\[\s[^\[\]]*\]$//;
+-                        
+-                        if ($first) 
+-                        {
+-                            if ($underscore eq 2)
+-                            {
+-                                $str_translated .= $translation;
+-                            }
+-                            else
+-                            {
+-                                $str_translated .=
+-                                    Text::Tabs::expand($translation) .
+-                                    "\n";
+-                            }
+-                        } 
+-                        else 
++            for my $lang (sort keys %po_files_by_lang) 
++            {
++                my $is_translated = 1;
++                my $str_translated = '';
++                my $cnt = 0;
++            
++                for my $str (@str_list) 
++                {
++                    $cnt++;
++                    my $translation;
++                    if ($tfields[$cnt] && $str ne '')
++                    {
++                        $translation = $translations{$lang, $str};
++                        if (!$translation) 
+                         {
+-                            if ($underscore eq 2)
++                            if ($partial)
+                             {
+-                                $str_translated .= ', ' . $translation;
++                                $translation = $str;
+                             }
+                             else
+                             {
+-                                $str_translated .= Text::Tabs::expand(
+-                                    Text::Wrap::wrap(' ', ' ', $translation)) .
+-                                    "\n .\n";
++                                $is_translated = 0;
++                                last;
+                             }
+                         }
+-                        $first = 0;
++                    }
++                    else
++                    {
++                        $translation = $str;
++                    }
+ 
+-                        #  To fix some problems with Text::Wrap::wrap
+-                        $str_translated =~ s/(\n )+\n/\n .\n/g;
++                    #  $translation may also contain [] dummy
++                    #  strings, mostly to indicate an empty string
++                    $translation =~ s/\[\s[^\[\]]*\]$//;
++
++                    #  Escape commas
++                    $translation =~ s/,/\\,/g
++                        if $underscore == 2;
++                    
++                    if ($cnt == 1) 
++                    {
++                        print STDERR "WARNING: $lang: spurious newline removed\n"
++                            if $translation =~ s/\n/ /g;
++                        $str_translated .= $translation;
++                    } 
++                    else 
++                    {
++                        if ($underscore == 2)
++                        {
++                            $str_translated .= ', ' . $translation;
++                        }
++                        else
++                        {
++                            $translation =~ s/\n/\n /g;
++                            $str_translated .= "\n ." unless $cnt == 2;
++                            $str_translated .= "\n " . $translation unless $str eq '';
++                        }
+                     }
+-                    next unless $is_translated;
++                }
++                next unless $is_translated;
+ 
+-                    $str_translated =~ s/\n \.\n$//;
+-                    $str_translated =~ s/\s+$//;
++                $str_translated =~ s/\s+$//;
++                $str_translated = ' '.$str_translated if length ($str_translated) && $str_translated !~ /^\n/s;
+ 
+-                    $_ = $non_translated_line;
+-                    s/^(\w+):\s*.*/$sep${1}-$lang.$encodings{$lang}: $str_translated/s;
+-                    print OUTPUT;
+-                }
+-	    }
++                $_ = $non_translated_line;
++                s/^(\w+):\s*.*/$newline${1}-$lang.$encodings{$lang}:$str_translated/s;
++                print OUTPUT;
++            }
++        }
+     }
+-    print OUTPUT "\n";
++    my $tail = substr($source, $last);
++    $tail .= "\n" unless $tail =~ m/\n$/s;
++    $tail =~ s/^#.*\n//mg;
++
++    print OUTPUT $tail;
+ 
+     close OUTPUT;
+     close INPUT;
+ }
+ 
++sub rfc822deb_parse_spec {
++    my $spec = shift;
++    my $negate = shift;
++    my $len = shift;
++    my $notfound = shift;
++    my $found = shift;
++    my $ref = shift;
++    $spec = ','.$spec.',';
++    #  Replace '*' by all values
++    my $all = '1-'.$len;
++    $spec =~ s/\*/$all/g;
++    #  Expand ranges
++    $spec =~ s/(\d+)-(\d+)/join(",", ($1..$2))/eg;
++    if ($#{$ref} == -1)
++    {
++        for my $cnt (1..$len)
++        {
++            $ref->[$cnt] = $notfound;
++        }
++    }
++    for my $cnt (1..$len)
++    {
++        if ($spec =~ m/,$cnt,/ && !$negate) {
++            $ref->[$cnt] .= $found;
++        } elsif ($spec !~ m/,$cnt,/ && $negate) {
++            $ref->[$cnt] .= $found;
++        }
++    }
++}
++
+ sub rfc822deb_split 
+ {
+     # Debian defines a special way to deal with rfc822-style files:
+@@ -1327,7 +1402,16 @@
+     my $type = shift;
+     my $text = shift;
+     $text =~ s/^[ \t]//mg;
+-    return (split(/, */, $text, 0)) if $type ne 1;
++    if ($type ne 1)
++    {
++        my @values = ();
++        for my $value (split(/(?<!\\), */, $text, 0))
++        {
++            $value =~ s/\\,/,/g;
++            push @values, $value;
++        }
++        return @values;
++    }
+     return ($text) if $text !~ /\n/;
+ 
+     $text =~ s/([^\n]*)\n//;

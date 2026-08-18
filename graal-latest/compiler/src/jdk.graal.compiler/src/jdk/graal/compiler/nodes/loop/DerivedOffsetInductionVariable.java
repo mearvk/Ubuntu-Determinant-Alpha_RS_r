@@ -1,0 +1,402 @@
+/*
+ * Copyright (c) 2012, 2026, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
+ */
+package jdk.graal.compiler.nodes.loop;
+
+import java.util.Collection;
+
+import jdk.graal.compiler.core.common.type.IntegerStamp;
+import jdk.graal.compiler.core.common.type.Stamp;
+import jdk.graal.compiler.debug.Assertions;
+import jdk.graal.compiler.debug.GraalError;
+import jdk.graal.compiler.nodes.LogicNode;
+import jdk.graal.compiler.nodes.NodeView;
+import jdk.graal.compiler.nodes.ValueNode;
+import jdk.graal.compiler.nodes.calc.AddNode;
+import jdk.graal.compiler.nodes.calc.BinaryArithmeticNode;
+import jdk.graal.compiler.nodes.calc.IntegerConvertNode;
+import jdk.graal.compiler.nodes.calc.NegateNode;
+import jdk.graal.compiler.nodes.calc.SubNode;
+import jdk.graal.compiler.phases.common.util.LoopUtility;
+import jdk.graal.compiler.replacements.nodes.arithmetic.IntegerAddExactOverflowNode;
+import jdk.graal.compiler.replacements.nodes.arithmetic.IntegerSubExactOverflowNode;
+import jdk.vm.ci.code.CodeUtil;
+
+public class DerivedOffsetInductionVariable extends DerivedInductionVariable {
+
+    /**
+     * Tracks whether the base IV is the right-hand operand (the subtrahend) of a subtraction.
+     *
+     * <pre>
+     * for (int i = 0; i < limit; i++) {
+     *     int beforeExit = i - 1;       // baseIsSubtrahend = false
+     *     int reverseIndex = limit - i; // baseIsSubtrahend = true
+     * }
+     * </pre>
+     *
+     * {@code beforeExit} is the direct {@code base - offset} case. {@code reverseIndex} is the
+     * opposite {@code offset - base} case, where the same base {@code i} sits on the right-hand
+     * side instead.
+     *
+     * <pre>
+     * for (int i = 0; i < limit; i++) {
+     *     int reverseIndex = limit - i;            // 10, 9, 8, ...
+     *     int nextReverseIndex = limit - (i + 1); // 9, 8, 7, ...
+     *     int copiedNextReverseIndex = (limit - 1) - i; // 9, 8, 7, ...
+     * }
+     * </pre>
+     *
+     * {@code nextReverseIndex} is just the next-iteration value of {@code reverseIndex}.
+     * {@code copiedNextReverseIndex} is that same value after it is copied back to the current
+     * iteration. The node shape changed, but the meaning did not: it is still the copied form of
+     * {@code limit - i}. We therefore keep the original orientation in {@code baseIsSubtrahend} so
+     * copied forms preserve {@code (limit - 1) - i} instead of silently flipping to
+     * {@code i - (limit - 1)}.
+     */
+    protected final boolean baseIsSubtrahend;
+    protected final ValueNode offset;
+    protected final BinaryArithmeticNode<?> value;
+
+    public DerivedOffsetInductionVariable(Loop loop, InductionVariable base, ValueNode offset, BinaryArithmeticNode<?> value) {
+        this(loop, base, offset, value, inferBaseIsSubtrahend(base, value));
+    }
+
+    DerivedOffsetInductionVariable(Loop loop, InductionVariable base, ValueNode offset, BinaryArithmeticNode<?> value, boolean baseIsSubtrahend) {
+        super(loop, base);
+        this.baseIsSubtrahend = baseIsSubtrahend;
+        this.offset = offset;
+        this.value = value;
+    }
+
+    private static boolean inferBaseIsSubtrahend(InductionVariable base, BinaryArithmeticNode<?> value) {
+        if (value instanceof AddNode) {
+            // Example: i + 1
+            return false;
+        }
+        if (value instanceof SubNode sub) {
+            if (base.valueNode() == sub.getX()) {
+                // Example: i - 1
+                return false;
+            }
+            if (base.valueNode() == sub.getY()) {
+                // Example: limit - i
+                return true;
+            }
+        }
+        throw GraalError.shouldNotReachHere(
+                        Assertions.errorMessageContext("base", base, "baseValue", base.valueNode(), "value", value, "valueX", value.getX(), "valueY", value.getY()));
+    }
+
+    @Override
+    public boolean structuralIntegrityValid() {
+        return super.structuralIntegrityValid() && offset.isAlive() && value.isAlive();
+    }
+
+    public ValueNode getOffset() {
+        return offset;
+    }
+
+    @Override
+    public Direction direction() {
+        Direction baseDirection = base.direction();
+        if (baseDirection == null) {
+            return null;
+        }
+        if (value instanceof SubNode && baseIsSubtrahend) {
+            return baseDirection.opposite();
+        }
+        return baseDirection;
+    }
+
+    @Override
+    public ValueNode valueNode() {
+        return value;
+    }
+
+    @Override
+    public boolean isConstantInit() {
+        try {
+            if (offset.isConstant() && base.isConstantInit()) {
+                constantInitSafe();
+                return true;
+            }
+        } catch (ArithmeticException e) {
+            // fall through to return false
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isConstantStride() {
+        if (isMaskedNegateStride()) {
+            if (base.isConstantStride()) {
+                try {
+                    LoopUtility.multiplyExact(IntegerStamp.getBits(offset.stamp(NodeView.DEFAULT)), base.constantStride(), -1);
+                    return true;
+                } catch (ArithmeticException e) {
+                    return false;
+                }
+            }
+        }
+        return base.isConstantStride();
+    }
+
+    @Override
+    public long constantInit() {
+        return constantInitSafe();
+    }
+
+    private long constantInitSafe() throws ArithmeticException {
+        return opSafe(base.constantInit(), offset.asJavaConstant().asLong());
+    }
+
+    @Override
+    public long constantStride() {
+        return constantStrideSafe();
+    }
+
+    private long constantStrideSafe() throws ArithmeticException {
+        if (isMaskedNegateStride()) {
+            return LoopUtility.multiplyExact(IntegerStamp.getBits(offset.stamp(NodeView.DEFAULT)), base.constantStride(), -1);
+        }
+        return base.constantStride();
+    }
+
+    /**
+     * Determine if the current induction variable's stride is actually one that represents a
+     * negation instead of a normal offset calculation. For example
+     *
+     * <pre>
+     * int i = 0;
+     * while (i < limit) {
+     *     int reversIv = off - i;
+     *     i++;
+     * }
+     * </pre>
+     *
+     * here {@code reverseIv} stride node is actually {@code i} negated since the IV is not
+     * {@code i op off} but {@code off op i} where {@code op} is a subtraction.
+     */
+    private boolean isMaskedNegateStride() {
+        return value instanceof SubNode && baseIsSubtrahend;
+    }
+
+    @Override
+    public boolean isConstantExtremum() {
+        try {
+            if (offset.isConstant() && base.isConstantExtremum()) {
+                constantExtremumSafe();
+                return true;
+            }
+        } catch (ArithmeticException e) {
+            // fall through to return false
+        }
+        return false;
+    }
+
+    @Override
+    public long constantExtremum() {
+        return constantExtremumSafe();
+    }
+
+    private long constantExtremumSafe() throws ArithmeticException {
+        return opSafe(base.constantExtremum(), offset.asJavaConstant().asLong());
+    }
+
+    @Override
+    public ValueNode initNode() {
+        return op(base.initNode(), offset);
+    }
+
+    @Override
+    public ValueNode strideNode() {
+        if (value instanceof SubNode && baseIsSubtrahend) {
+            return graph().addOrUniqueWithInputs(NegateNode.create(base.strideNode(), NodeView.DEFAULT));
+        }
+        return base.strideNode();
+    }
+
+    @Override
+    public ValueNode extremumNode(boolean assumeLoopEntered, Stamp stamp) {
+        return op(base.extremumNode(assumeLoopEntered, stamp), IntegerConvertNode.convert(offset, stamp, graph(), NodeView.DEFAULT));
+    }
+
+    @Override
+    public ValueNode extremumNode(boolean assumeLoopEntered, Stamp stamp, ValueNode maxTripCount) {
+        return op(base.extremumNode(assumeLoopEntered, stamp, maxTripCount), IntegerConvertNode.convert(offset, stamp, graph(), NodeView.DEFAULT));
+    }
+
+    @Override
+    protected ValueNode collectLocalExtremumOverflowConditions(boolean assumeLoopEntered, Stamp stamp, ValueNode effectiveMaxTripCount, ValueNode baseExtremum,
+                    Collection<LogicNode> conditions) {
+        GraalError.guarantee(stamp instanceof IntegerStamp, "Expected integer stamp for %s but got %s", this, stamp);
+        GraalError.guarantee(baseExtremum != null, "Expected base extremum for %s", this);
+        ValueNode offsetValue = offset;
+        if (!offsetValue.stamp(NodeView.DEFAULT).isCompatible(stamp)) {
+            offsetValue = IntegerConvertNode.convert(offsetValue, stamp, graph(), NodeView.DEFAULT);
+        }
+        if (value instanceof AddNode) {
+            LogicNode addOverflow = IntegerAddExactOverflowNode.create(baseExtremum, offsetValue);
+            if (!addOverflow.isContradiction()) {
+                conditions.add(graph().addOrUniqueWithInputs(addOverflow));
+            }
+        } else {
+            GraalError.guarantee(value instanceof SubNode, "Expected subtraction-based offset induction variable for %s but got %s", this, value);
+            SubNode sub = (SubNode) value;
+            if (base.valueNode() == sub.getX()) {
+                LogicNode subOverflow = IntegerSubExactOverflowNode.create(baseExtremum, offsetValue);
+                if (!subOverflow.isContradiction()) {
+                    conditions.add(graph().addOrUniqueWithInputs(subOverflow));
+                }
+            } else {
+                LogicNode subOverflow = IntegerSubExactOverflowNode.create(offsetValue, baseExtremum);
+                if (!subOverflow.isContradiction()) {
+                    conditions.add(graph().addOrUniqueWithInputs(subOverflow));
+                }
+            }
+        }
+        return op(baseExtremum, offsetValue);
+    }
+
+    @Override
+    public ValueNode exitValueNode() {
+        return op(base.exitValueNode(), offset);
+    }
+
+    private long opSafe(long b, long o) throws ArithmeticException {
+        // we can use offset bits in this method because all operands (init, scale, stride and
+        // extremum) have by construction equal bit sizes
+        if (value instanceof AddNode) {
+            return LoopUtility.addExact(IntegerStamp.getBits(offset.stamp(NodeView.DEFAULT)), b, o);
+        }
+        if (value instanceof SubNode) {
+            if (baseIsSubtrahend) {
+                return LoopUtility.subtractExact(IntegerStamp.getBits(offset.stamp(NodeView.DEFAULT)), o, b);
+            }
+            return LoopUtility.subtractExact(IntegerStamp.getBits(offset.stamp(NodeView.DEFAULT)), b, o);
+        }
+        throw GraalError.shouldNotReachHereUnexpectedValue(value); // ExcludeFromJacocoGeneratedReport
+    }
+
+    public ValueNode op(ValueNode b, ValueNode o) {
+        return op(b, o, true);
+    }
+
+    public ValueNode op(ValueNode b, ValueNode o, boolean gvn) {
+        if (value instanceof AddNode) {
+            return MathUtil.add(graph(), b, o, gvn);
+        }
+        if (value instanceof SubNode) {
+            if (baseIsSubtrahend) {
+                return MathUtil.sub(graph(), o, b, gvn);
+            }
+            return MathUtil.sub(graph(), b, o, gvn);
+        }
+        throw GraalError.shouldNotReachHereUnexpectedValue(value); // ExcludeFromJacocoGeneratedReport
+    }
+
+    @Override
+    public void deleteUnusedNodes() {
+    }
+
+    @Override
+    public boolean isConstantScale(InductionVariable ref) {
+        return super.isConstantScale(ref) || base.isConstantScale(ref);
+    }
+
+    @Override
+    public long constantScale(InductionVariable ref) {
+        assert isConstantScale(ref);
+        if (this == ref) {
+            return 1;
+        }
+        long baseScale = base.constantScale(ref);
+        if (value instanceof SubNode && baseIsSubtrahend) {
+            /*
+             * For `offset - base*scale`, the negated scale must be sign extended to the
+             * IV's arithmetic width to preserve the wrapping semantics (-Integer.MIN_VALUE == Integer.MIN_VALUE)
+             */
+            int bits = IntegerStamp.getBits(valueNode().stamp(NodeView.DEFAULT));
+            return CodeUtil.signExtend(-baseScale, bits);
+        }
+        return baseScale;
+    }
+
+    @Override
+    public boolean offsetIsZero(InductionVariable ref) {
+        if (this == ref) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public ValueNode offsetNode(InductionVariable ref) {
+        assert !offsetIsZero(ref);
+        if (!base.offsetIsZero(ref)) {
+            return null;
+        }
+        // In the affine form iv = scale * ref + offset, base - offset contributes -offset.
+        if (value instanceof SubNode && !baseIsSubtrahend) {
+            return graph().addOrUniqueWithInputs(NegateNode.create(offset, NodeView.DEFAULT));
+        }
+        return offset;
+    }
+
+    @Override
+    public String toString(IVToStringVerbosity verbosity) {
+        if (verbosity == IVToStringVerbosity.FULL) {
+            return String.format("DerivedOffsetInductionVariable base (%s) %s %s", base, value.getNodeClass().shortName(), offset);
+        } else {
+            return String.format("(%s) %s %s", base, value.getNodeClass().shortName(), offset);
+        }
+    }
+
+    @Override
+    public ValueNode copyValue(InductionVariable newBase) {
+        return copyValue(newBase, true);
+    }
+
+    @Override
+    public ValueNode copyValue(InductionVariable newBase, boolean gvn) {
+        return op(newBase.valueNode(), offset, gvn);
+    }
+
+    @Override
+    public InductionVariable copy(InductionVariable newBase, ValueNode newValue) {
+        if (newValue instanceof BinaryArithmeticNode<?>) {
+            return new DerivedOffsetInductionVariable(loop, newBase, offset, (BinaryArithmeticNode<?>) newValue, baseIsSubtrahend);
+        } else if (newValue instanceof NegateNode) {
+            return new DerivedScaledInductionVariable(loop, newBase, (NegateNode) newValue);
+        } else {
+            assert newValue instanceof IntegerConvertNode<?> : "Expected integer convert operation. New baseIV=" + newBase + " newValue=" + newValue;
+            return new DerivedConvertedInductionVariable(loop, newBase, newValue.stamp(NodeView.DEFAULT), newValue);
+        }
+    }
+
+    @Override
+    public ValueNode entryTripValue() {
+        return op(getBase().entryTripValue(), offset);
+    }
+}

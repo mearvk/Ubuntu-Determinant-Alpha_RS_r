@@ -1,0 +1,33 @@
+#!/bin/sh
+# autopkgtest check: Build and run a program against fribidi, to verify that the
+# headers and pkg-config file are installed correctly
+
+set -e
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CC="$DEB_HOST_GNU_TYPE-gcc"
+    PKGCONFIG="$DEB_HOST_GNU_TYPE-pkg-config"
+else
+    CC=gcc
+    PKGCONFIG=pkg-config
+fi
+
+WORKDIR=$(mktemp -d)
+trap "rm -rf $WORKDIR" 0 INT QUIT ABRT PIPE TERM
+cd $WORKDIR
+cat <<EOF > fribiditest.c
+#include <fribidi.h>
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+  printf("%s\n", fribidi_version_info);
+  return 0;
+}
+EOF
+
+"$CC" -o fribiditest fribiditest.c `"$PKGCONFIG" --cflags --libs fribidi`
+echo "build: OK"
+[ -x fribiditest ]
+./fribiditest
+echo "run: OK"

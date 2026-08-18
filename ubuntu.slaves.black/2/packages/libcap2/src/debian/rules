@@ -1,0 +1,84 @@
+#!/usr/bin/make -f
+
+# Pass this as version-info to dh_makeshlibs
+SHLIBS_MINVER = 1:2.33
+
+# Exports DEB_{BUILD,HOST}_* flags
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+
+# Support cross-compiling
+ifneq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+CC := $(DEB_HOST_GNU_TYPE)-gcc
+endif
+
+# One upstream target, "_makenames", requires the BUILD compiler instead of HOST
+BUILD_CC ?= cc
+export BUILD_LDFLAGS = $(shell dpkg-architecture -a$(DEB_BUILD_ARCH) -c dpkg-buildflags --get LDFLAGS)
+export BUILD_CPPFLAGS = $(shell dpkg-architecture -a$(DEB_BUILD_ARCH) -c dpkg-buildflags --get CPPFLAGS)
+
+# Upstream's way of setting optimization
+ifneq (,$(filter noopt, $(DEB_BUILD_OPTIONS)))
+COPTS = COPTS=-O0
+endif
+
+%:
+	dh ${@}
+
+
+override_dh_auto_build:
+	dh_auto_build -- CC=$(CC) BUILD_CC=$(BUILD_CC) $(COPTS)
+
+
+override_dh_installdirs:
+	dh_installdirs
+	# While the PAM module and the library are in /lib, according to the
+	# FHS, development files must go into usr/lib/<triplet>.
+	mkdir -p debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)
+
+
+override_dh_auto_install:
+	dh_auto_install -- \
+		lib=lib/$(DEB_HOST_MULTIARCH) \
+		PKGCONFIGDIR=/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig \
+		RAISE_SETFCAP=no
+
+	# libcap-dev:
+	#   Move the development files from lib/ to usr/lib. dh_link will
+	#   later correct the link for us (from relative to absolute).
+	cd debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH) && \
+		mv    ../../../lib/$(DEB_HOST_MULTIARCH)/*.a . && \
+		ln -s ../../../lib/$(DEB_HOST_MULTIARCH)/libcap.so.*.* libcap.so
+	sed -i -e 's#^libdir=.*#libdir=/usr/lib/$(DEB_HOST_MULTIARCH)#' \
+		debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/libcap.pc
+
+	# Remove unwanted/unused files (because of --fail-missing)
+	rm -f debian/tmp/lib/$(DEB_HOST_MULTIARCH)/*.so
+
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+ ifeq ($(DEB_RULES_REQUIRES_ROOT),dpkg/target-subcommand)
+  ifeq (,$(findstring fakeroot,$(DEB_GAIN_ROOT_CMD)))
+	make test
+  else
+	@echo 'Warning: Tests require real root, not fakeroot.  Skipping.' >&2
+  endif
+ else ifeq (0,$(shell id -u))
+	make test
+ else
+	@echo 'Warning: Tests require root.  Skipping.' >&2
+ endif
+endif
+
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+
+override_dh_makeshlibs:
+	dh_makeshlibs -V'libcap2 (>= $(SHLIBS_MINVER))' -plibcap2 \
+		--add-udeb=libcap2-udeb -- -c4
+	dh_makeshlibs --remaining-packages -- -c4

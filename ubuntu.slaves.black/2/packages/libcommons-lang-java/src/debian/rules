@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+export JAVA_HOME=/usr/lib/jvm/default-java
+export CLASSPATH=$(shell for jar in `cat debian/build-classpath`; do if [ -f "$$jar" ]; then echo -n "$${jar}:"; fi; done)
+
+%:
+	dh $@ --buildsystem=ant --with maven_repo_helper
+
+override_dh_auto_build:
+	ANT_ARGS="-Dbasedir=$(realpath .) -Dcompile.excludes='**/enum/*' -Djavadoc.excludepackagenames='org/apache/commons/lang/enum/*' -Djdk.javadoc=file:///usr/share/doc/default-jdk-doc/api/ jar javadoc javadoc-jar" dh_auto_build
+	cat debian/commons-lang.bnd | sed s/VERSION/$(DEB_VERSION_UPSTREAM)/ > debian/.commons-lang-versioned.bnd
+	echo debian/.commons-lang-versioned.bnd >> debian/.mh_clean
+	bnd wrap --properties debian/.commons-lang-versioned.bnd --output target/commons-lang.bnd.jar target/commons-lang-$(DEB_VERSION_UPSTREAM).jar

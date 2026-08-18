@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+                href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>pam_sss_gss</refentrytitle>
+        <manvolnum>8</manvolnum>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>pam_sss_gss</refname>
+        <refpurpose>Модуль PAM для проверки подлинности с помощью GSSAPI в SSSD</refpurpose>
+    </refnamediv>
+
+    <refsynopsisdiv id='synopsis'>
+        <cmdsynopsis>
+<command>pam_sss_gss.so</command> <arg choice='opt'>
+<replaceable>debug</replaceable> </arg></cmdsynopsis>
+    </refsynopsisdiv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            <command>pam_sss_gss.so</command> выполняет проверку подлинности
+пользователя с помощью GSSAPI совместно с SSSD.
+        </para>
+        <para>
+            Этот модуль пытается проверить подлинность пользователя с помощью имени
+серверной службы GSSAPI host@hostname, при разрешении которого получается
+участник Kerberos host/hostname@REALM. Часть <emphasis>REALM</emphasis>
+имени участника Kerberos определяется с помощью внутренних механизмов
+Kerberos. Её можно указать в явном виде в конфигурации раздела
+[domain_realm] в /etc/krb5.conf.
+        </para>
+        <para>
+            SSSD используется для предоставления имени нужной службы и проверки учётных
+данных пользователя с помощью вызовов GSSAPI. Если билет службы уже
+присутствует в кэше учётных данных Kerberos или если билет пользователя на
+получение билетов может быть использован для получения билета
+соответствующей службы, проверка подлинности пользователя будет выполнена.
+        </para>
+        <para>
+            Если параметр <option>pam_gssapi_check_upn</option> установлен в значение
+«True» (по умолчанию), SSSD будет требоваться возможность сопоставления
+пользователю тех учётных данных, которые были использованы для получения
+билетов службы. Это означает, что участник, который является владельцем
+учётных данных Kerberos, должен соответствовать имени
+участника-пользователя, определённому в LDAP.
+        </para>
+        <para>
+            Чтобы включить в SSSD проверку подлинности с помощью GSSAPI, задайте
+параметр <option>pam_gssapi_services</option> в разделе [pam] или домена
+sssd.conf. Учётные данные службы должны храниться в таблице ключей SSSD (она
+уже присутствует, если используется поставщик данных IPA или
+AD). Расположение таблицы ключей можно указать с помощью параметра
+<option>krb5_keytab</option>. Подробные сведения об этих параметрах доступны
+на справочных страницах <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry> и <citerefentry> <refentrytitle>sssd-krb5</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            Некоторых развёрнутые системы Kerberos позволяют связывать индикаторы
+проверки подлинности с определённым способом предварительной проверки
+подлинности, используемым для получения пользователем билета на получение
+билетов. <command>pam_sss_gss.so</command> позволяет принудительно
+установить обязательность наличия индикаторов проверки подлинности в билетах
+службы для получения возможности доступа к определённой службе PAM.
+        </para>
+        <para>
+            Если параметр <option>pam_gssapi_indicators_map</option> задан в разделе
+[pam] или домена sssd.conf, SSSD будет проверять билет службы на наличие
+настроенных индикаторов.
+        </para>
+    </refsect1>
+
+    <refsect1 id='options'>
+        <title>ОПЦИИ</title>
+        <variablelist remap='IP'>
+            <varlistentry>
+                <term>
+                    <option>debug</option>
+                </term>
+                <listitem>
+                    <para>Вывести данные отладки.</para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='module_types_provides'>
+        <title>ПРЕДОСТАВЛЯЕМЫЕ ТИПЫ МОДУЛЕЙ</title>
+        <para>Предоставляется только модуль типа <option>auth</option>.</para>
+    </refsect1>
+
+    <refsect1 id="return_values">
+        <title>ВОЗВРАЩАЕМЫЕ ЗНАЧЕНИЯ</title>
+        <variablelist>
+            <varlistentry>
+                <term>PAM_SUCCESS</term>
+                <listitem>
+                    <para>
+                        Операция PAM успешно завершена.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_USER_UNKNOWN</term>
+                <listitem>
+                    <para>
+                        Пользователь неизвестен службе проверки подлинности или не поддерживается
+проверка подлинности с помощью GSSAPI.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTH_ERR</term>
+                <listitem>
+                    <para>
+                        Сбой при проверке подлинности.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_AUTHINFO_UNAVAIL</term>
+                <listitem>
+                    <para>
+                        Не удалось получить доступ к данным проверки подлинности. Это может быть
+связано со сбоем сети или оборудования.
+                    </para>
+                </listitem>
+            </varlistentry>
+            <varlistentry>
+                <term>PAM_SYSTEM_ERR</term>
+                <listitem>
+                    <para>
+                        Произошла системная ошибка. В журнале SSSD могут быть дополнительные
+сведения об этой ошибке.
+                    </para>
+                </listitem>
+            </varlistentry>
+        </variablelist>
+    </refsect1>
+
+    <refsect1 id='examples'>
+        <title>ПРИМЕРЫ</title>
+        <para>
+            Основной вариант использования — обеспечить проверку подлинности без пароля
+в sudo, но без необходимости отключать проверку подлинности полностью. Для
+достижения такого результата следует сначала включить проверку подлинности с
+помощью GSSAPI для sudo в sssd.conf:
+        </para>
+        <programlisting>
+[domain/MYDOMAIN]
+pam_gssapi_services = sudo, sudo-i
+        </programlisting>
+        <para>
+            А затем следует включить модуль в нужном стеке PAM (например,
+/etc/pam.d/sudo и /etc/pam.d/sudo-i).
+        </para>
+        <programlisting>
+...
+auth sufficient pam_sss_gss.so
+...
+        </programlisting>
+    </refsect1>
+
+    <refsect1 id='troubleshooting'>
+        <title>УСТРАНЕНИЕ НЕПОЛАДОК</title>
+        <para>
+            Журнал SSSD, отладочный вывод pam_sss_gss и системный журнал могут содержать
+полезные сведения об ошибке. Вот некоторые распространённые проблемы:
+        </para>
+        <para>
+            1. Переменная среды KRB5CCNAME задана, и проверка подлинности не работает: в
+зависимости от используемой версии sudo, возможно, что sudo не передаёт эту
+переменную среде PAM. Попробуйте добавить KRB5CCNAME в раздел
+<option>env_keep</option> в /etc/sudoers или в стандартные параметры правил
+sudo для LDAP.
+        </para>
+        <para>
+            2. Проверка подлинности не работает, и в системном журнале есть запись
+«Server not found in Kerberos database»: вероятно, Kerberos не удалось
+определить корректную область для билета службы на основе имени
+узла. Попробуйте добавить имя узла непосредственно в раздел
+<option>[domain_realm]</option> в /etc/krb5.conf следующим образом:
+        </para>
+        <para>
+            3. Проверка подлинности не работает, и в системном журнале есть запись «No
+Kerberos credentials available»: отсутствуют учётные данные, которые можно
+было бы использовать для получения необходимого билета службы. Используйте
+kinit или пройдите проверку подлинности с помощью SSSD для получения этих
+учётных данных.
+        </para>
+        <para>
+            4. Проверка подлинности не работает, и в журнале sssd-pam SSSD есть запись
+«User with UPN [$UPN] was not found.» или «UPN [$UPN] does not match target
+user [$username].»: используются учётные данные, которые нельзя сопоставить
+тому пользователю, проверка подлинности которого проводится. Попробуйте
+использовать kswitch для выбора другого участника, убедитесь, что проверка
+подлинности с помощью SSSD пройдена, или отключите
+<option>pam_gssapi_check_upn</option>.
+        </para>
+        <programlisting>
+[domain_realm]
+.myhostname = MYREALM
+        </programlisting>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

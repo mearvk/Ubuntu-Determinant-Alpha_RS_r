@@ -1,0 +1,300 @@
+.\" ----------------------------------------------------------------------------
+.\" Update the date below if you make any significant change.
+.\" Make sure there are no errors with:
+.\" groff -z -wall -b -e -t mpathpersist/mpathpersist.8
+.\"
+.\" ----------------------------------------------------------------------------
+.
+.TH MPATHPERSIST 8 2019-05-27 "Linux"
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH NAME
+.\" ----------------------------------------------------------------------------
+.
+mpathpersist \- Manages SCSI persistent reservations on dm multipath devices.
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH SYNOPSIS
+.\" ----------------------------------------------------------------------------
+.
+.B mpathpersist
+.RB [\| OPTIONS \|]
+.I device
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH DESCRIPTION
+.\" ----------------------------------------------------------------------------
+.
+This utility is used to manage SCSI persistent reservations on Device Mapper
+Multipath devices. To be able to use this functionality, the \fIreservation_key\fR
+attribute must be defined in the \fI/etc/multipath.conf\fR file. Otherwise the
+\fBmultipathd\fR daemon will not check for persistent reservation for newly
+discovered paths or reinstated paths.
+.
+.LP
+\fBmpathpersist\fR supports the same command-line options as the
+\fBsg_persist\fR utility.
+.
+Consult the \fBsg_persist (8)\fR manual page for an in-depth discussion of the
+various options.
+.
+.\" ----------------------------------------------------------------------------
+.SH OPTIONS
+.\" ----------------------------------------------------------------------------
+.
+.TP
+.BI \-verbose|\-v " level"
+Verbosity:
+.RS
+.TP 5
+.I 0
+Critical messages.
+.TP
+.I 1
+Error messages.
+.TP
+.I 2
+Warning messages.
+.TP
+.I 3
+Informational messages.
+.TP
+.I 4
+Informational messages with trace enabled.
+.RE
+.
+.TP
+.BI \--device=\fIDEVICE\fB|\-d " DEVICE"
+Query or change DEVICE.
+.
+.TP
+.BI \--batch-file=\fIDEVICE\fB|\-f " FILE"
+Read commands from \fIFILE\fR. See section \(dqBATCH FILES\(dq below. This
+option can be given at most once.
+.
+.TP
+.B \--help|\-h
+Output this usage message.
+.
+.TP
+.B \--hex|\-H
+Output response in hex.
+.
+.TP
+.B \--in|\-i
+Request PR In command.
+.
+.TP
+.B \--out|\-o
+Request PR Out command.
+.
+.TP
+.B \--param-alltgpt|\-Y
+PR Out parameter 'ALL_TG_PT'.
+.
+.TP
+.B \--param-aptpl|\-Z
+PR Out parameter 'APTPL'.
+.
+.TP
+.B \--read-keys|\-k
+PR In: Read Keys.
+.
+.TP
+.BI \--param-rk=\fIRK\fB|\-K " RK"
+PR Out parameter reservation key (RK is in hex, up to 8 bytes).
+.
+.TP
+.BI \--param-sark=\fISARK\fB|\-S " SARK"
+PR Out parameter service action reservation key (SARK is in hex).
+.
+.TP
+.B \--preempt|\-P
+PR Out: Preempt.
+.
+.TP
+.B \--clear|\-C
+PR Out: Clear registrations.
+.
+.TP
+.B \--preempt-abort|\-A
+PR Out: Preempt and Abort.
+.
+.TP
+.BI \--prout-type=\fITYPE\fB|\-T " TYPE"
+PR Out command type.
+.
+.TP
+.B \--read-full-status|\-s
+PR In: Read Full Status.
+.
+.TP
+.B \--read-keys|\-k
+PR In: Read Keys.
+.
+.TP
+.B \--read-reservation|\-r
+PR In: Read Reservation.
+.
+.TP
+.B \--register|\-G
+PR Out: Register.
+.
+.TP
+.B \--register-ignore|\-I
+PR Out: Register and Ignore.
+.
+.TP
+.B \--release|\-L
+PR Out: Release.
+.
+.TP
+.B \--report-capabilities|\-c
+PR In: Report Capabilities.
+.
+.TP
+.B \--reserve|\-R
+PR Out: Reserve.
+.
+.TP
+.BI \--transport-id=\fITIDS\fB|\-X " TIDS"
+TransportIDs can be mentioned in several forms.
+.
+.TP
+.BI \--alloc-length=\fILEN\fB|\-l " LEN"
+PR In: maximum allocation length. LEN is a decimal number between 0 and 8192.
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH EXAMPLE
+.\" ----------------------------------------------------------------------------
+.
+.PP
+Register the key \(dq123abc\(dq for the /dev/mapper/mpath9 device:
+.RS
+\fBmpathpersist --out --register --param-sark=\fI123abc /dev/mapper/mpath9\fR
+.RE
+.PP
+Read registered reservation keys for the /dev/mapper/mpath9 device:
+.RS
+\fBmpathpersist -i -k \fI/dev/mapper/mpath9\fR
+.RE
+.PP
+Create a reservation for the /dev/mapper/mpath9 device with the given
+reservation key:
+.RS
+\fBmpathpersist --out --reserve --param-rk=\fI123abc \fB--prout-type=\fI8 \fB-d \fI/dev/mapper/mpath9\fR
+.RE
+.PP
+Read the reservation status of the /dev/mapper/mpath9 device:
+.RS
+\fBmpathpersist -i -s -d \fI/dev/mapper/mpath9\fR
+.RE
+.PP
+Release the previously created reservation (note that the prout-type needs to
+be the same as above):
+.RS
+\fBmpathpersist --out --release --param-rk=\fI123abc \fB--prout-type=\fI8 \fB-d \fI/dev/mapper/mpath9\fR
+.RE
+.PP
+Remove the current key registered for this host (i.e. reset it to 0):
+.RS
+\fBmpathpersist --out --register-ignore -K \fI123abc\fB -S \fI0\fB \fI/dev/mapper/mpath9\fR
+.RE
+.PP
+Remove current reservation, and unregister all registered keys from all I_T nexuses:
+.RS
+\fBmpathpersist -oCK \fI123abc \fI/dev/mapper/mpath9\fR
+.RE
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH BATCH FILES
+.\" ----------------------------------------------------------------------------
+.
+.PP
+The option \fI--batch-file\fR (\fI-f\fR) sets an input file to be processed
+by \fBmpathpersist\fR. Grouping commands in batch files can provide a speed
+improvement in particular on large installments, because \fBmpathpersist\fR
+needs to scan existing paths and maps only once during startup.
+.
+.PP
+The input file is a text file that is parsed
+line by line. Every line of the file is interpreted as a command line
+(i.e. list of options and parameters) for \fBmpathpersist\fR. Options
+and parameters are separated by one or more whitespace characters (space or TAB).
+Lines can, but do not have to, begin with the word \(dqmpathpersist\(dq.
+The \(dq#\(dq character, either at the beginning of the line or following
+some whitespace, denotes the start of a comment that lasts until the end of the
+line. Empty lines are allowed. Continuation of mpathpersist commands over
+multiple lines is not supported.
+.
+.PP
+All options listed in this man page, except \fI-f\fR and
+\fI-v\fR, are allowed in batch files. Both short and long option formats may be used.
+Using the \fI-f\fR option inside the batch file is an error. The \fI-v\fR
+option is ignored in batch files.
+.
+.PP
+The multipath map on which to act must be specified on every input line, e.g. using the \fI-d\fR option.
+Commands acting on different multipath maps may be combined in a
+batch file, and multiple commands may act on the same multipath
+map. Commands are executed one by one, so
+that commands further down in the file see status changes caused by previous
+commands.
+If \fBmpathpersist\fR encounters an error while processing a line in the
+batch file, batch file processing is \fBnot\fR aborted; subsequent commands
+are executed nonetheless. The exit status of \fBmpathpersist\fR is the status
+of the first failed command, or 0 if all commands succeeded.
+.
+.PP
+If other options and parameters are used along with
+\fI-f\fR on the \fBmpathpersist\fR command line, the command line will be executed first, followed
+by the commands from the batch file.
+.
+.PP
+Below is an example of a valid batch input file.
+.
+.PP
+.RS
+.EX
+# This is an mpathpersist input file.
+# Short and long forms of the same command
+-i -k /dev/dm-1 # short form, this comment is ignored
+mpathpersist --in --read-keys --device=/dev/dm-1
+
+# Mixing of long and short options, variable white space
+  --out  --register    -S  abcde     /dev/dm-1
+
+# Mixing of commands for different maps
+-ir /dev/dm-0
+-ir /dev/dm-1
+
+mpathpersist --out --param-rk abcde --reserve --prout-type 5 /dev/dm-1
+# This should now show a reservation
+-ir /dev/dm-1
+-oCK abcde /dev/dm-1
+--in --read-reservation /dev/dm-1
+.EE
+.RE
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH "SEE ALSO"
+.\" ----------------------------------------------------------------------------
+.
+.BR multipath (8),
+.BR multipathd (8),
+.BR sg_persist (8).
+.
+.
+.\" ----------------------------------------------------------------------------
+.SH AUTHORS
+.\" ----------------------------------------------------------------------------
+.
+\fImultipath-tools\fR was developed by Christophe Varoqui <christophe.varoqui@opensvc.com>
+and others.
+.\" EOF

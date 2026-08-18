@@ -1,0 +1,8 @@
+########### install files ###############
+
+INSTALL( DIRECTORY male1 DESTINATION ${KDE_INSTALL_DATADIR}/kajongg/voices/ PATTERN .svn EXCLUDE )
+INSTALL( DIRECTORY male2 DESTINATION ${KDE_INSTALL_DATADIR}/kajongg/voices/ PATTERN .svn EXCLUDE )
+INSTALL( DIRECTORY female1 DESTINATION ${KDE_INSTALL_DATADIR}/kajongg/voices/ PATTERN .svn EXCLUDE )
+INSTALL( DIRECTORY female2 DESTINATION ${KDE_INSTALL_DATADIR}/kajongg/voices/ PATTERN .svn EXCLUDE )
+
+add_subdirectory(de)

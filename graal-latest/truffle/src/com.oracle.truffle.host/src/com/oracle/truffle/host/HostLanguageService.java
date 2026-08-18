@@ -1,0 +1,248 @@
+/*
+ * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * The Universal Permissive License (UPL), Version 1.0
+ *
+ * Subject to the condition set forth below, permission is hereby granted to any
+ * person obtaining a copy of this software, associated documentation and/or
+ * data (collectively the "Software"), free of charge and under any and all
+ * copyright rights in the Software, and any and all patent rights owned or
+ * freely licensable by each licensor hereunder covering either (i) the
+ * unmodified Software as contributed to or provided by such licensor, or (ii)
+ * the Larger Works (as defined below), to deal in both
+ *
+ * (a) the Software, and
+ *
+ * (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+ * one is included with the Software each a "Larger Work" to which the Software
+ * is contributed by such licensors),
+ *
+ * without restriction, including without limitation the rights to copy, create
+ * derivative works of, display, perform, and distribute the Software and make,
+ * use, sell, offer for sale, import, export, have made, and have sold the
+ * Software and the Larger Work(s), and to sublicense the foregoing rights on
+ * either these or other terms.
+ *
+ * This license is subject to the following condition:
+ *
+ * The above copyright notice and either this complete permission notice or at a
+ * minimum a reference to the UPL must be included in all copies or substantial
+ * portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+package com.oracle.truffle.host;
+
+import java.lang.reflect.Type;
+import java.util.function.Predicate;
+
+import org.graalvm.polyglot.HostAccess.MutableTargetMapping;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl.APIAccess;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl.AbstractHostLanguageService;
+import org.graalvm.polyglot.proxy.Proxy;
+
+import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.TruffleFile;
+import com.oracle.truffle.api.TruffleOptions;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.nodes.Node;
+import com.oracle.truffle.host.HostAdapterFactory.AdapterResult;
+import com.oracle.truffle.host.HostLanguage.HostLanguageException;
+import com.oracle.truffle.host.HostMethodScope.ScopedObject;
+
+public class HostLanguageService extends AbstractHostLanguageService {
+
+    final HostLanguage language;
+    private final APIAccess api;
+
+    HostLanguageService(AbstractPolyglotImpl polyglot, HostLanguage language) {
+        super(polyglot);
+        api = polyglot.getAPIAccess();
+        this.language = language;
+    }
+
+    @Override
+    public void release() {
+    }
+
+    @Override
+    public void initializeHostContext(Object internalContext, Object receiver, Object hostAccess, ClassLoader cl, Predicate<String> clFilter, boolean hostCLAllowed, boolean hostLookupAllowed) {
+        HostContext context = (HostContext) receiver;
+        ClassLoader useCl = cl;
+        if (useCl == null) {
+            useCl = TruffleOptions.AOT ? null : Thread.currentThread().getContextClassLoader();
+        }
+        language.initializeHostAccess(hostAccess);
+        context.initialize(internalContext, useCl, clFilter, hostCLAllowed, hostLookupAllowed, hostAccess != null ? api.getMutableTargetMappings(hostAccess) : new MutableTargetMapping[0]);
+    }
+
+    @Override
+    public void addToHostClassPath(Object receiver, Object truffleFile) {
+        HostContext context = (HostContext) receiver;
+        context.addToHostClasspath((TruffleFile) truffleFile);
+    }
+
+    @Override
+    public Object findDynamicClass(Object receiver, String classValue) {
+        HostContext context = (HostContext) receiver;
+        Class<?> found = context.findClass(classValue);
+        if (found == null) {
+            return null;
+        }
+        return HostObject.forClass(found, context);
+    }
+
+    @Override
+    public void throwHostLanguageException(String message) {
+        throw new HostLanguageException(message);
+    }
+
+    @Override
+    public Object findStaticClass(Object receiver, String classValue) {
+        HostContext context = (HostContext) receiver;
+        Class<?> found = context.findClass(classValue);
+        if (found == null) {
+            return null;
+        }
+        return HostObject.forStaticClass(found, context);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T toHostType(Object hostNode, Object targetNode, Object hostContext, Object value, Class<T> targetType, Type genericType) {
+        HostContext context = (HostContext) hostContext;
+        HostToTypeNode node = (HostToTypeNode) hostNode;
+        if (node == null) {
+            node = HostToTypeNodeGen.getUncached();
+        }
+        return (T) node.execute((Node) targetNode, context, value, targetType, genericType, true);
+    }
+
+    @Override
+    public Object asHostStaticClass(Object context, Class<?> value) {
+        return HostObject.forStaticClass(value, (HostContext) context);
+    }
+
+    @Override
+    public Object toGuestValue(Object node, Object hostValue, boolean asValue) {
+        assert validHostValue(node, hostValue) : "polyglot unboxing should be a no-op at this point.";
+        if (HostContext.isGuestPrimitive(hostValue)) {
+            return hostValue;
+        } else if (hostValue instanceof Proxy) {
+            return HostProxy.toProxyGuestObject(HostContext.get((Node) node), hostValue);
+        } else if (!asValue && hostValue instanceof ScopedObject) {
+            return ((ScopedObject) hostValue).unwrapForGuest();
+        } else if (hostValue instanceof TruffleObject) {
+            return hostValue;
+        } else if (hostValue instanceof Class) {
+            return HostObject.forClass((Class<?>) hostValue, HostContext.get((Node) node));
+        } else if (hostValue == null) {
+            return HostObject.NULL;
+        } else {
+            return HostObject.forObject(hostValue, HostContext.get((Node) node));
+        }
+    }
+
+    private boolean validHostValue(Object node, Object hostValue) {
+        Object unboxed = language.access.toGuestValue(node, language.api, hostValue);
+        return unboxed == hostValue;
+    }
+
+    @Override
+    public Object unboxProxyObject(Object hostValue) {
+        return HostProxy.toProxyHostObject(language, hostValue);
+    }
+
+    @Override
+    public Object toHostObject(Object hostContext, Object value) {
+        HostContext context = (HostContext) hostContext;
+        return HostObject.forObject(value, context);
+    }
+
+    @Override
+    public Object asHostDynamicClass(Object context, Class<?> value) {
+        return null;
+    }
+
+    @Override
+    public boolean isHostProxy(Object value) {
+        return HostProxy.isProxyGuestObject(language, value);
+    }
+
+    @Override
+    public Object createHostAdapter(Object context, Object[] hostTypes, Object classOverrides) {
+        CompilerAsserts.neverPartOfCompilation();
+        HostContext hostContext = (HostContext) context;
+        Class<?>[] javaTypes = new Class<?>[hostTypes.length];
+        for (int i = 0; i < hostTypes.length; i++) {
+            Object type = hostTypes[i];
+            if (type instanceof HostObject) {
+                HostObject hostType = (HostObject) type;
+                if (hostType.isDefaultClass()) {
+                    javaTypes[i] = hostType.asClass();
+                    continue;
+                }
+            }
+            throw HostEngineException.illegalArgument(hostContext.getHostClassCache().polyglotHostAccess, "Types must be host symbols or host classes.");
+        }
+        AdapterResult adapter = HostAdapterFactory.getAdapterClassFor(hostContext, javaTypes, classOverrides);
+        if (!adapter.isSuccess()) {
+            throw adapter.throwException();
+        }
+        return HostObject.forStaticClass(adapter.getAdapterClass(), hostContext);
+    }
+
+    @Override
+    public RuntimeException toHostException(Object context, Throwable exception) {
+        HostContext hostContext = (HostContext) context;
+        return HostException.wrap(exception, hostContext);
+    }
+
+    @Override
+    public Object migrateValue(Object targetContext, Object value, Object valueContext) {
+        assert targetContext != valueContext;
+        if (value instanceof TruffleObject) {
+            if (HostObject.isInstance(language, value)) {
+                return HostObject.withContext(language, value, (HostContext) HostAccessor.ENGINE.getHostContext(targetContext));
+            } else if (value instanceof HostProxy) {
+                return HostProxy.withContext(value, (HostContext) HostAccessor.ENGINE.getHostContext(targetContext));
+            } else if (valueContext == null) {
+                /*
+                 * The only way this can happen is with Value.asValue(TruffleObject). If it happens
+                 * otherwise, its wrong.
+                 */
+                return value;
+            } else {
+                // cannot migrate
+                return null;
+            }
+        } else {
+            assert InteropLibrary.isValidValue(value);
+            return value;
+        }
+    }
+
+    @Override
+    public void pin(Object receiver) {
+        HostMethodScope.pin(receiver);
+    }
+
+    @Override
+    public void hostExit(int exitCode) {
+        System.exit(exitCode);
+    }
+
+    @Override
+    public boolean allowsPublicAccess() {
+        return api.allowsPublicAccess(language.hostClassCache.hostAccess);
+    }
+}

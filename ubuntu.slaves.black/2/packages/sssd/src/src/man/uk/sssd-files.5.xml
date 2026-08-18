@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Сторінки підручника SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-files</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Формати файлів та правила</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-files</refname>
+        <refpurpose>Засіб надання файлів SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИС</title>
+        <para>
+            На цій сторінці довідника описано налаштування засобу обробки файлів для
+<citerefentry> <refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum>
+</citerefentry>. Щоб дізнатися більше про синтаксис налаштування, зверніться
+до розділу «ФОРМАТ ФАЙЛА» сторінки довідника <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Засіб надання даних файлів створює дзеркальну копію вмісту файлів
+<citerefentry> <refentrytitle>passwd</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry> і <citerefentry>
+<refentrytitle>group</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>. Метою роботи засобу надання даних файлів є забезпечення
+доступу до даних користувачів і груп, які традиційно доступні за допомогою
+інтерфейсів NSS, також за допомогою інтерфейсів SSSD, зокрема <citerefentry>
+<refentrytitle>sssd-ifp</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            Іншою причиною може бути потреба у забезпеченні ефективного кешування даних
+локальних користувачів і груп.
+        </para>
+        <para>
+            Будь ласка, зауважте, що у деяких дистрибутивах домен files увімкнено
+автоматично, оскільки цей домен додано до будь-якого із явно визначених
+доменів. Див. enable_files_domain у <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>.
+        </para>
+        <para>
+            SSSD ніколи не виконує визначення для користувача або групи «root». Крім
+того, SSSD не обробляє запити щодо визначення UID/GID 0. Такі запити
+передаються наступному модулю NSS (зазвичай, files).
+        </para>
+        <para>
+            Якщо SSSD не запущено або програма не відповідає, nss_sss повертає код
+UNAVAIL, що спричиняє передавання запиту наступному модулю.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>ПАРАМЕТРИ НАЛАШТУВАННЯ</title>
+        <para>
+            Окрім параметрів із наведеного нижче списку, можна встановлювати, де це є
+відповідним, загальні параметри домену SSSD. Зверніться до розділу
+<quote>РОЗДІЛИ ДОМЕНІВ</quote> сторінки підручника <citerefentry>
+<refentrytitle>sssd.conf</refentrytitle> <manvolnum>5</manvolnum>
+</citerefentry>, щоб дізнатися більше про налаштовування домені SSSD. Втім,
+призначенням надавача даних files є надання тих самих даних, які
+встановлюються для файлів UNIX, просто за допомогою інтерфейсів SSSD. Тому
+передбачено підтримку не усіх загальних параметрів доменів. Так само, деякі
+загальні параметри, зокрема перевизначення командної оболонки у розділі
+<quote>nss</quote> для усіх доменів, ні на що не впливають у домені files,
+якщо їх не вказано явним чином для окремих доменів. <variablelist>
+                <varlistentry>
+                    <term>passwd_files (рядок)</term>
+                    <listitem>
+                        <para>
+                            Список з однієї чи декількох відокремлених комами назв файлів паролів, які
+слід прочитати і нумерувати засобу надання даних файлів. Для кожного
+вказаного файла буде встановлено спостереження за допомогою inotify для
+динамічного виявлення внесених до нього змін.
+                        </para>
+                        <para>
+                            Типове значення: /etc/passwd
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>group_files (рядок)</term>
+                    <listitem>
+                        <para>
+                            Список з однієї чи декількох відокремлених комами назв файлів груп, які слід
+прочитати і нумерувати засобу надання даних файлів. Для кожного вказаного
+файла буде встановлено спостереження за допомогою inotify для динамічного
+виявлення внесених до нього змін.
+                        </para>
+                        <para>
+                            Типове значення: /etc/group
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>fallback_to_nss (булеве значення)</term>
+                    <listitem>
+                        <para>
+                            Під час оновлення внутрішніх даних SSSD поверне повідомлення про помилку і
+надасть змогу клієнту продовжити роботу з наступним модулем NSS. Це
+допомагає уникнути затримок при використанні типових файлів системи
+<filename>/etc/passwd</filename> і
+<filename>/etc/group</filename>. Налаштування NSS містять «sss» до «files»
+для прив'язок «passwd» і «group».
+                        </para>
+                        <para>
+                            Якщо надавача даних файлів налаштовано на спостереження за іншими файлами,
+має сенс встановлення для цього параметра значення False для уникнення
+несумісної поведінки, оскільки, загалом, не буде іншого модуля NSS, яким
+можна буде скористатися як резервним.
+                        </para>
+                        <para>
+                            Типове значення: True
+                        </para>
+                    </listitem>
+                </varlistentry>
+
+            </variablelist>
+        </para>
+    </refsect1>
+
+    <refsect1 id='example'>
+        <title>ПРИКЛАД</title>
+        <para>
+            У наведеному нижче прикладі припускається, що SSSD налаштовано належним
+чином, а files встановлено на один з доменів з розділу
+<replaceable>[sssd]</replaceable>.
+        </para>
+        <para>
+<programlisting>
+[domain/files]
+id_provider = files
+</programlisting>
+        </para>
+        <para>
+            Для балансування кешування даних локальних користувачів та груп у SSSD
+модуль nss_sss має перебувати у списку файла /etc/nsswitch.conf вище за
+модуль nss_files.
+        </para>
+        <para>
+<programlisting>
+passwd:     sss files
+group:      sss files
+</programlisting>
+        </para>
+    </refsect1>
+
+        <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

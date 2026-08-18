@@ -1,0 +1,259 @@
+.TH DLM_TOOL 8 2012-04-05 dlm dlm
+
+.SH NAME
+dlm_tool \- a utility for the dlm and dlm_controld daemon
+
+.SH SYNOPSIS
+.B dlm_tool
+[COMMAND] [OPTIONS]
+[
+.I name
+]
+
+.SH COMMANDS 
+
+.B ls
+.br
+	Display dlm_controld internal lockspace state.
+
+.B status
+.br
+	Dump dlm_controld daemon state.
+
+.B dump
+.br
+	Dump dlm_controld debug buffer.
+
+.B dump_config
+.br
+	Dump dlm_controld config settings.
+
+.B reload_config
+.br
+	Reload dlm_controld config settings from dlm.conf.
+
+.BI set_config " setting" = "value"
+.br
+	Set dlm_controld config settings in the currently running daemon.
+
+.BI fence_ack " nodeid"
+.br
+	Cancel a waiting fencing operation and consider it successful.
+
+.B log_plock
+.br
+	Dump dlm_controld plock debug buffer.
+
+.BI plocks " lockspace_name"
+.br
+	Dump posix locks from dlm_controld for the lockspace.
+
+.BI join " lockspace_name"
+.br
+	Join a lockspace.
+
+.BI leave " lockspace_name"
+.br
+	Leave a lockspace.
+
+.BI joinleave " lockspace_name"
+.br
+	Join then immediately leave a lockspace (for testing only.)
+
+.BI lockdebug " lockspace_name"
+.br
+	Complete display of locks from the lockspace.
+
+.BI lockdump " lockspace_name"
+.br
+	Minimal display of locks from the lockspace (deprecated).
+
+.BI run " command"
+.br
+	Run command and check for result (for lvmlockd only.)
+
+.BI run_start " command"
+.br
+	Run command and don't check for result.
+
+.BI run_check " uuid"
+.br
+	Check status of a command that was run.
+
+.BI run_cancel " uuid"
+.br
+	Cancel a command that was run and is not yet done.
+
+.BI run_list
+.br
+	Dump a list of running commands.
+
+
+.SH OPTIONS
+
+.B \-n
+Show all node information from dlm_tool ls.
+
+.B \-d
+0|1 Resource directory off/on in join, default 0
+
+.B \-e
+0|1 Exclusive create off/on in join, default 0
+
+.B \-f
+0|1 FS (filesystem) flag off/on in join, default 0
+
+.BI \-i " sec"
+Seconds to wait in run_check.
+
+.BI \-m " mode"
+Permission mode for lockspace device (octal), default 0600
+
+.B \-s
+Summary following lockdebug output (experiemental)
+
+.B \-v
+Verbose lockdebug or status output
+
+.B \-w
+Wide lockdebug output
+
+.B \-M
+Include MSTCPY locks in lockdump output
+
+.B \-h
+Print help, then exit
+
+.B \-V
+Print program version information, then exit
+
+
+.SH USAGE
+
+.SS fence_ack
+
+See dlm_tool status for information about waiting fencing operations for
+specific nodeid's.
+
+.SS set_config
+
+dlm_tool set_config can change certain config settings in the currently
+running dlm_controld.  Supported options:
+
+.nf
+daemon_debug
+log_debug
+debug_logfile
+plock_debug
+plock_rate_limit
+drop_resources_time
+drop_resources_count
+drop_resources_age
+post_join_delay
+enable_quorum_fencing
+enable_quorum_lockspace
+repeat_failed_fencing
+.fi
+
+Special cases to revert a previous set_config and restore the previous
+value (from default or dlm.conf):
+
+\fBdlm_tool set_config\fP \fIsetting\fP=\fBrestore\fP
+.br
+restores a single setting.
+
+\fBdlm_tool set_config restore_all\fP
+.br
+restores all settings.
+
+.SS dump_config
+
+A config setting may have been set from: the default, the dlm_controld
+command line, dlm.conf at startup, dlm.conf from reload_config, dlm_tool
+set_config.  The dump_config output indicates how values were set:
+
+.TP
+setting=value
+default value.
+
+.TP
+setting=value (cli option)
+Set from a dlm_controld command line option.
+
+.TP
+setting=value (dlm.conf)
+Set from dlm.conf (at startup or reload.)
+
+.TP
+setting=value (set_config)
+Set from dlm_tool set_config.
+
+
+.SH EXAMPLES
+
+.SS dump_config
+
+.nf
+$ dlm_tool dump_config | head -n 5
+daemon_debug=1 (set_config)
+foreground=0
+log_debug=1 (dlm.conf)
+timewarn=0
+protocol=detect
+.fi
+
+In this case, daemon_debug is set by set_config, log_debug is set from
+dlm.conf, foreground, timewarn and protocol are using default values.
+
+.SS set_config
+
+.nf
+$ dlm_tool dump_config | grep log_debug
+log_debug=1 (dlm.conf)
+
+$ dlm_tool set_config "log_debug=0"
+set_config done
+
+$ dlm_tool dump_config | grep log_debug
+log_debug=0 (set_config)
+
+$ dlm_tool set_config "log_debug=restore"
+set_config done
+
+$ dlm_tool dump_config | grep log_debug
+log_debug=1 (dlm.conf)
+.fi
+
+log_debug is set by dlm.conf (value is 1), then run set_config to change
+to 0, then use restore to restore to dlm.conf setting.
+
+
+.SS set_config
+
+.nf
+$ dlm_tool dump_config | grep _debug
+daemon_debug=0
+log_debug=1 (dlm.conf)
+plock_debug=0
+
+$ dlm_tool set_config "daemon_debug=1 log_debug=1 plock_debug=1"
+set_config done
+
+$ dlm_tool dump_config | grep _debug
+daemon_debug=1 (set_config)
+log_debug=1 (set_config)
+plock_debug=1 (set_config)
+
+$ dlm_tool set_config "restore_all"
+set_config done
+
+$ dlm_tool dump_config | grep _debug
+daemon_debug=0
+log_debug=1 (dlm.conf)
+plock_debug=0
+.fi
+
+
+.SH SEE ALSO
+.BR dlm_controld (8),
+.BR dlm.conf (5)

@@ -1,0 +1,104 @@
+From: Markus Koschany <apo@debian.org>
+Date: Sun, 18 Mar 2018 19:17:08 +0100
+Subject: snakeyaml 1.20
+
+Port to snakeyaml 1.20.
+
+Forwarded: no
+---
+ .../jackson/dataformat/yaml/YAMLGenerator.java     | 23 +++++++++++-----------
+ .../dataformat/yaml/snakeyaml/error/Mark.java      |  3 ---
+ 2 files changed, 12 insertions(+), 14 deletions(-)
+
+diff --git a/src/main/java/com/fasterxml/jackson/dataformat/yaml/YAMLGenerator.java b/src/main/java/com/fasterxml/jackson/dataformat/yaml/YAMLGenerator.java
+index 9c527cf..88d009e 100644
+--- a/src/main/java/com/fasterxml/jackson/dataformat/yaml/YAMLGenerator.java
++++ b/src/main/java/com/fasterxml/jackson/dataformat/yaml/YAMLGenerator.java
+@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
+ 
+ import org.yaml.snakeyaml.DumperOptions;
+ import org.yaml.snakeyaml.DumperOptions.FlowStyle;
++import org.yaml.snakeyaml.DumperOptions.ScalarStyle;
+ import org.yaml.snakeyaml.emitter.Emitter;
+ import org.yaml.snakeyaml.events.*;
+ 
+@@ -152,19 +153,19 @@ public class YAMLGenerator extends GeneratorBase
+     protected DumperOptions _outputOptions;
+ 
+     // for field names, leave out quotes
+-    private final static Character STYLE_NAME = null;
++    private final static DumperOptions.ScalarStyle STYLE_NAME = DumperOptions.ScalarStyle.PLAIN;
+ 
+     // numbers, booleans, should use implicit
+-    private final static Character STYLE_SCALAR = null;
++    private final static DumperOptions.ScalarStyle STYLE_SCALAR = DumperOptions.ScalarStyle.PLAIN;
+     // Strings quoted for fun
+-    private final static Character STYLE_QUOTED = Character.valueOf('"');
++    private final static DumperOptions.ScalarStyle STYLE_QUOTED = DumperOptions.ScalarStyle.DOUBLE_QUOTED;
+     // Strings in literal (block) style
+-    private final static Character STYLE_LITERAL = Character.valueOf('|');
++    private final static DumperOptions.ScalarStyle STYLE_LITERAL = DumperOptions.ScalarStyle.LITERAL;
+ 
+     // Which flow style to use for Base64? Maybe basic quoted?
+-    private final static Character STYLE_BASE64 = Character.valueOf('"');
++    private final static DumperOptions.ScalarStyle STYLE_BASE64 = DumperOptions.ScalarStyle.DOUBLE_QUOTED;
+ 
+-    private final static Character STYLE_PLAIN = null;
++    private final static DumperOptions.ScalarStyle STYLE_PLAIN = DumperOptions.ScalarStyle.PLAIN;
+ 
+     /*
+     /**********************************************************
+@@ -412,7 +413,7 @@ public class YAMLGenerator extends GeneratorBase
+     {
+         _verifyValueWrite("start an array");
+         _writeContext = _writeContext.createChildArrayContext();
+-        Boolean style = _outputOptions.getDefaultFlowStyle().getStyleBoolean();
++        DumperOptions.FlowStyle style =  _outputOptions.getDefaultFlowStyle();
+         String yamlTag = _typeId;
+         boolean implicit = (yamlTag == null);
+         String anchor = _objectId;
+@@ -440,7 +441,7 @@ public class YAMLGenerator extends GeneratorBase
+     {
+         _verifyValueWrite("start an object");
+         _writeContext = _writeContext.createChildObjectContext();
+-        Boolean style = _outputOptions.getDefaultFlowStyle().getStyleBoolean();
++        DumperOptions.FlowStyle style = _outputOptions.getDefaultFlowStyle();
+         String yamlTag = _typeId;
+         boolean implicit = (yamlTag == null);
+         String anchor = _objectId;
+@@ -477,7 +478,7 @@ public class YAMLGenerator extends GeneratorBase
+             return;
+         }
+         _verifyValueWrite("write String value");
+-        Character style = STYLE_QUOTED;
++        DumperOptions.ScalarStyle style = STYLE_QUOTED;
+         if (Feature.MINIMIZE_QUOTES.enabledIn(_formatFeatures) && !isBooleanContent(text)) {
+           // If this string could be interpreted as a number, it must be quoted.
+             if (Feature.ALWAYS_QUOTE_NUMBERS_AS_STRINGS.enabledIn(_formatFeatures)
+@@ -749,12 +750,12 @@ public class YAMLGenerator extends GeneratorBase
+     // Implicit means that (type) tags won't be shown, right?
+     private final static ImplicitTuple DEFAULT_IMPLICIT = new ImplicitTuple(true, true);
+ 
+-    protected void _writeScalar(String value, String type, Character style) throws IOException
++    protected void _writeScalar(String value, String type, DumperOptions.ScalarStyle style) throws IOException
+     {
+         _emitter.emit(_scalarEvent(value, style));
+     }
+ 
+-    protected ScalarEvent _scalarEvent(String value, Character style)
++    protected ScalarEvent _scalarEvent(String value, DumperOptions.ScalarStyle style)
+     {
+         String yamlTag = _typeId;
+         if (yamlTag != null) {
+diff --git a/src/main/java/com/fasterxml/jackson/dataformat/yaml/snakeyaml/error/Mark.java b/src/main/java/com/fasterxml/jackson/dataformat/yaml/snakeyaml/error/Mark.java
+index 1fdef64..5cd5e61 100644
+--- a/src/main/java/com/fasterxml/jackson/dataformat/yaml/snakeyaml/error/Mark.java
++++ b/src/main/java/com/fasterxml/jackson/dataformat/yaml/snakeyaml/error/Mark.java
+@@ -40,7 +40,4 @@ public class Mark
+         return _source.getLine();
+     }
+ 
+-    public int getIndex() {
+-        return _source.getIndex();
+-    }
+ }

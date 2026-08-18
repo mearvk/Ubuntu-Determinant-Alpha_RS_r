@@ -1,0 +1,32 @@
+---
+include:
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/recipes/debian.yml
+
+variables:
+  SALSA_CI_PIUPARTS_ARGS: --scriptsdir $CI_PROJECT_DIR/piuparts_scriptdir
+
+# salsaci calls piuparts with a package as a filename in contrast to
+# piuparts.d.o which calls piuparts with package=version. This means that the
+# shell parameter expansion ${PIUPARTS_OBJECTS%%=*} in
+# /etc/piuparts/scripts/pre_remove_exceptions never matches and thus
+# APT::Get::allow-remove-essential will not get enabled for "init"
+piuparts:
+  extends: .test-piuparts
+  before_script:
+    - mkdir -p $CI_PROJECT_DIR/piuparts_scriptdir
+    - |
+        cat > $CI_PROJECT_DIR/piuparts_scriptdir/pre_remove_exceptions2 <<EOT
+        #!/bin/sh
+        set -exu
+        echo 'Debug: pre_remove_exceptions2'
+        echo 'APT::Get::allow-remove-essential "true";' >> /etc/apt/apt.conf.d/piuparts-allow-remove-essential
+        EOT
+    - chmod +x $CI_PROJECT_DIR/piuparts_scriptdir/pre_remove_exceptions2
+    - |
+        cat > $CI_PROJECT_DIR/piuparts_scriptdir/post_remove_exceptions2 <<EOT
+        #!/bin/sh
+        set -exu
+        echo 'Debug: post_remove_exceptions2'
+        rm -f /etc/apt/apt.conf.d/piuparts-allow-remove-essential
+        EOT
+    - chmod +x $CI_PROJECT_DIR/piuparts_scriptdir/post_remove_exceptions2

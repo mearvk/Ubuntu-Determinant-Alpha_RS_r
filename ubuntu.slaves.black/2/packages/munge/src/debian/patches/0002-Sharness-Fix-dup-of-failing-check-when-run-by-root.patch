@@ -1,0 +1,47 @@
+Description: Sharness: Fix dup of failing check when run by root
+ When the test suite is run by root, the following two failures occur in
+ "0103-munged-security-logfile.t":
+ .
+ 10 - logfile not writable by user failure
+ 31 - logfile failure writes single message to stderr
+ .
+ This second test, "logfile failure writes single message to stderr",
+ checks for a regression of a duplicate error message being written to
+ stderr by forcing an expected failure -- namely, setting the logfile
+ perms to 0400 and expecting an error when opening the logfile because
+ the user does not have write-permissions.  This expected failure is
+ the check being performed in the first test, "logfile not writable
+ by user failure".
+ .
+ Fix the test for "logfile failure writes single message to stderr"
+ by forcing a different error that is not affected by root privileges.
+ In particular, set the logfile perms to 0602 which will fail because
+ the logfile is now writable by other; this will fail regardless of
+ whether or not the user is root.
+Author: Chris Dunlap <cdunlap@llnl.gov>
+Origin: upstream, https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=982564
+Last-Update: 2021-02-15
+Forwarded: not-needed
+
+--- a/t/0103-munged-security-logfile.t
++++ b/t/0103-munged-security-logfile.t
+@@ -343,14 +343,16 @@ test_expect_success 'logfile dir writable by other with sticky bit' '
+     chmod 0755 "${MUNGE_LOGDIR}"
+ '
+ 
+-# Check for a regression of a duplicate error message being written to stderr
+-#   for a failure to open the logfile.
++# Check for a regression of a duplicate error message being written to stderr.
++# To generate an error, test for the logfile being writable by other since this
++#   will not be affected by root privileges.
++#
+ ##
+ test_expect_success 'logfile failure writes single message to stderr' '
+     local ERR NUM &&
+     rm -f "${MUNGE_LOGFILE}" &&
+     touch "${MUNGE_LOGFILE}" &&
+-    chmod 0400 "${MUNGE_LOGFILE}" &&
++    chmod 0602 "${MUNGE_LOGFILE}" &&
+     test_must_fail munged_start_daemon t-keep-logfile 2>err.$$ &&
+     cat err.$$ &&
+     ERR=$(sed -n -e "s/.*Error: //p" err.$$ | sort | uniq -c | sort -n -r) &&

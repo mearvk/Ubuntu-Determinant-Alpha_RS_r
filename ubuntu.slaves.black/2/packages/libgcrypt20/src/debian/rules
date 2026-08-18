@@ -1,0 +1,61 @@
+#! /usr/bin/make -f
+# Build the libgcrypt package for Debian.
+
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+export DEB_BUILD_MAINT_OPTIONS := hardening=+bindnow
+
+include /usr/share/dpkg/pkg-info.mk
+
+override_dh_auto_configure:
+	# unbreak arch-only builds when texi is patched.
+	if test doc/gcrypt.texi -nt doc/version.texi ; then \
+		touch --reference=doc/version.texi doc/gcrypt.texi ; \
+		fi
+	dh_auto_configure --verbose --builddirectory=build -- \
+		--enable-noexecstack \
+		--enable-ld-version-script --enable-static
+
+override_dh_auto_build-indep:
+	# use current version in /usr/share/texmf/tex/texinfo/, see #803081
+	rm -f build-aux/texinfo.tex
+	cd build/doc && $(MAKE) stamp-vti
+	cd build/doc && $(MAKE) pdf html
+	for cpu in i686 x86_64; do \
+	  mkdir -p build-$$cpu-w64-mingw32 && \
+	  cd build-$$cpu-w64-mingw32 && \
+	  env -u CFLAGS -u CPPFLAGS -u CXXFLAGS -u DFLAGS \
+	    -u FCFLAGS -u FFLAGS -u GCJFLAGS -u LDFLAGS -u OBJCFLAGS \
+	    -u OBJCXXFLAGS \
+	    PKG_CONFIG_LIBDIR=/usr/$$cpu-w64-mingw32/pkgconfig \
+	  ../configure \
+	    --enable-static \
+	    --prefix=/usr/$$cpu-w64-mingw32 \
+	    --host=$$cpu-w64-mingw32 --build=$(DEB_HOST_GNU_TYPE) \
+	    LDFLAGS="-Xlinker --insert-timestamp=$(SOURCE_DATE_EPOCH)" \
+	  && \
+	  $(MAKE) \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+
+debian/tmp/usr/include/gcrypt.h:
+	dh_auto_install --verbose --builddirectory=build
+
+override_dh_auto_install-indep:	debian/tmp/usr/include/gcrypt.h
+	for cpu in i686 x86_64; do \
+	  cd build-$$cpu-w64-mingw32 && \
+	  $(MAKE) install DESTDIR=$(shell pwd)/debian/tmp \
+	  || exit 1 ; \
+	  cd .. ; \
+	done
+	find debian/tmp -name libgcrypt.la -type f -delete
+
+override_dh_installinfo:
+	dh_installinfo
+	if test -e debian/libgcrypt20-doc ; then \
+		cd debian/libgcrypt20-doc/usr/share/info && \
+		sed -i -e 's:image src="\([^"]*.png"\):image src="/usr/share/doc/libgcrypt20-doc/html/\1:g' *.info* ; \
+	fi
+
+%:
+	dh $@ --builddirectory=build

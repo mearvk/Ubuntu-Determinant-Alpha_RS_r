@@ -1,0 +1,84 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export NO_PKG_MANGLE=1
+export LC_ALL=C.UTF-8
+export PYTHONWARNINGS=d
+
+export PYBUILD_TEST_ARGS=--verbose --ignore tests/test_api_translator.py
+export PYBUILD_INSTALL_ARGS_python3=--install-scripts usr/share/sphinx/scripts/python3
+
+locales = $(notdir $(patsubst %/LC_MESSAGES,%,$(wildcard sphinx/locale/*/LC_MESSAGES)))
+
+debroot = debian/tmp/
+py3_libdir = /usr/lib/python3/dist-packages
+py3_builddir = $(shell pybuild --print build_dir --interpreter python3)
+javascript_path = /usr/share/javascript/sphinxdoc/1.0/
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_build:
+	ln -sf /usr/share/javascript/jquery/jquery.js sphinx/themes/basic/static/jquery.js
+	ln -sf /usr/share/javascript/underscore/underscore.js sphinx/themes/basic/static/underscore.js
+	dh_auto_build
+ifeq "$(filter nodoc,$(DEB_BUILD_OPTIONS))" ""
+	PYTHONPATH=$(py3_builddir) python3 ./sphinx/cmd/build.py -T doc build/html/
+	find build/html/ -name '*.txt' -or -name '*.html' | xargs -L1 sed -i \
+		's!http://docutils.sourceforge.net/docs/!file:///usr/share/doc/docutils-doc/docs/!g'
+	PYTHONPATH=$(py3_builddir) python3 ./sphinx/cmd/build.py -T -b man doc build/man
+endif
+	PYTHONPATH=$(py3_builddir) python3 setup.py compile_catalog
+
+override_dh_auto_install:
+	pybuild --install -p 3
+	# move static files outside dist-packages
+	sed -i -e "s!^package_dir = .*!package_dir = '/usr/share/sphinx'!" \
+		$(debroot)$(py3_libdir)/sphinx/__init__.py
+	cd $(debroot) && mv -t usr/share/sphinx/ \
+		.$(py3_libdir)/sphinx/templates \
+		.$(py3_libdir)/sphinx/texinputs \
+		.$(py3_libdir)/sphinx/themes
+	mkdir -p $(debroot)/usr/share/sphinx/ext/autosummary/
+	cd $(debroot) && mv -t usr/share/sphinx/ext/autosummary/ \
+		.$(py3_libdir)/sphinx/ext/autosummary/templates
+	mkdir -p $(debroot)/usr/share/sphinx/search/
+	cd $(debroot) && mv -t usr/share/sphinx/search/ \
+		.$(py3_libdir)/sphinx/search/minified-js \
+		.$(py3_libdir)/sphinx/search/non-minified-js
+	set -e -x; \
+	cd $(debroot) && \
+		for lang in $(locales); \
+		do \
+			install -m 644 -D .$(py3_libdir)/sphinx/locale/$$lang/LC_MESSAGES/sphinx.js \
+				usr/share/sphinx/locale/$$lang/sphinx.js; \
+			install -m 644 -D .$(py3_libdir)/sphinx/locale/$$lang/LC_MESSAGES/sphinx.mo \
+				usr/share/locale/$$lang/LC_MESSAGES/sphinx.mo; \
+		done
+	cd $(debroot)$(py3_libdir)/sphinx/locale && rm -rf sphinx.pot */
+	# Move JavaScript code to libjs-sphinxdoc:
+	PYTHONPATH=$(py3_builddir) debian/dh-sphinxdoc/install-js debian/libjs-sphinxdoc$(javascript_path)
+	rm -f $(debroot)/usr/share/sphinx/themes/bizstyle/static/css3-mediaqueries_src.js
+	set -e; \
+	for js in $$(find $(debroot)/usr/share/sphinx/themes/ -name '*.js' -a '!' -name 'websupport.js'); do \
+		mv $$js debian/libjs-sphinxdoc/$(javascript_path); \
+		ln -sf "$(javascript_path)/$${js##*/}" $$js; \
+	done
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGES
+
+override_dh_installdocs:
+	dh_installdocs
+ifeq "$(filter nodoc,$(DEB_BUILD_OPTIONS))" ""
+	./debian/dh-sphinxdoc/dh_sphinxdoc -p sphinx-doc /usr/share/doc/sphinx-doc/html/
+endif
+
+override_dh_installman:
+	cd debian/dh-sphinxdoc/ && pod2man -c Debhelper -r '' dh_sphinxdoc dh_sphinxdoc.1
+ifeq "$(filter nodoc,$(DEB_BUILD_OPTIONS))" ""
+	dh_installman
+endif
+
+override_dh_compress:
+	dh_compress -X.py -X.rst -X.json -X.txt

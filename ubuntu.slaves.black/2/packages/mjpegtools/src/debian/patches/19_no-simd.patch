@@ -1,0 +1,76 @@
+Description: Test for SIMD instructions at run-time only if configured.
+ Do not attempt to use e.g. CPU detection if the result does not matter
+ anyway; fixes FTBFS on architectures with slightly different asm, such
+ as x32.
+Author: Thorsten Glaser <t.glaser@tarent.de>
+Forwarded: no
+Bug-Debian: coming
+Last-Update: 2015-08-28
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -386,6 +386,8 @@ AC_SUBST(PROGRAM_NOPIC)
+ 
+ if test "$enable_simd_accel" != "false" -a "$enable_simd_accel" != "no"
+ then
++  AC_DEFINE(HAVE_SIMD_ACCEL, 1, [use SIMD multimedia instructions if possible])
++
+   if test x$have_x86cpu = xtrue
+   then
+       AC_MSG_CHECKING([if C compiler accepts inline MMX assembly])
+--- a/utils/cpu_accel.c
++++ b/utils/cpu_accel.c
+@@ -38,7 +38,7 @@
+ #include <malloc.h>
+ #endif
+ 
+-#ifdef HAVE_ALTIVEC
++#if defined(HAVE_SIMD_ACCEL) && defined(HAVE_ALTIVEC)
+ extern int altivec_copy_v0();
+ #endif
+ 
+@@ -77,7 +77,7 @@ extern int altivec_copy_v0();
+ 
+ static char *parse_next(char **, const char *);
+ 
+-#ifdef HAVE_X86CPU 
++#if defined(HAVE_SIMD_ACCEL) && defined(HAVE_X86CPU)
+ 
+ /* Some miscelaneous stuff to allow checking whether SSE instructions cause
+    illegal instruction errors.
+@@ -208,7 +208,7 @@ static int x86_accel (void)
+ #endif
+ 
+ 
+-#ifdef HAVE_ALTIVEC
++#if defined(HAVE_SIMD_ACCEL) && defined(HAVE_ALTIVEC)
+ /* AltiVec optimized library for MJPEG tools MPEG-1/2 Video Encoder
+  * Copyright (C) 2002  James Klicman <james@klicman.org>
+  *
+@@ -263,7 +263,7 @@ noAltiVec:
+ 
+ int32_t cpu_accel (void)
+ {
+-#ifdef HAVE_X86CPU 
++#if defined(HAVE_SIMD_ACCEL) && defined(HAVE_X86CPU)
+     static int got_accel = 0;
+     static int accel;
+ 
+@@ -273,7 +273,7 @@ int32_t cpu_accel (void)
+     }
+ 
+     return accel;
+-#elif defined(HAVE_ALTIVEC)
++#elif defined(HAVE_SIMD_ACCEL) && defined(HAVE_ALTIVEC)
+     return detect_altivec();
+ #else
+     return 0;
+@@ -356,7 +356,7 @@ void *bufalloc( size_t size )
+ 
+ 	if( !bufalloc_init )
+ 	{
+-#ifdef HAVE_X86CPU 
++#if defined(HAVE_SIMD_ACCEL) && defined(HAVE_X86CPU)
+ 		if( (cpu_accel() &  (ACCEL_X86_SSE|ACCEL_X86_3DNOW)) != 0 )
+ 		{
+ 			simd_alignment = 64;

@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+include /usr/share/dpkg/default.mk
+export JAVA_HOME=/usr/lib/jvm/default-java
+
+PACKAGE := $(DEB_SOURCE)
+JAR_NAME := jsr305
+
+%:
+	dh $@ --with javahelper -Nlibjsr305-java-doc
+
+override_jh_build:
+	jh_build --no-javadoc jsr305.jar ri/src
+
+override_dh_auto_clean:
+	dh_auto_clean
+	mh_clean
+	-rm -f debian/pom.xml
+
+get-orig-source:
+	cd $(dir $(firstword $(MAKEFILE_LIST)))../ && \
+	./debian/orig-tar.sh
+
+override_jh_installlibs:
+	cp ri/pom.xml debian/pom.xml
+	mh_installpom -p$(PACKAGE) --no-parent \
+		--rules=debian/maven-compat.rules debian/pom.xml
+	mh_installjar -p$(PACKAGE) --rules=debian/maven-compat.rules \
+		debian/pom.xml $(JAR_NAME).jar
+	dh_link -p$(PACKAGE) /usr/share/java/$(JAR_NAME).jar \
+		usr/share/maven-repo/org/$(JAR_NAME)/$(JAR_NAME)/0.1-SNAPSHOT/$(JAR_NAME)-0.1-SNAPSHOT.jar
+	cp ri/pom.xml debian/pom.xml
+	mh_installpom -p$(PACKAGE) --no-parent \
+		--rules=debian/maven-debian.rules debian/pom.xml
+	mh_installjar -p$(PACKAGE) --rules=debian/maven-debian.rules \
+		debian/pom.xml $(JAR_NAME).jar
+	dh_link -p$(PACKAGE) /usr/share/java/$(JAR_NAME).jar \
+		usr/share/maven-repo/com/google/code/findbugs/$(JAR_NAME)/debian/$(JAR_NAME)-debian.jar
+	mh_installpoms -p$(PACKAGE)
+	mh_installjar -p$(PACKAGE) --usj-version=$(DEB_VERSION_UPSTREAM) \
+		-l ri/pom.xml $(JAR_NAME).jar

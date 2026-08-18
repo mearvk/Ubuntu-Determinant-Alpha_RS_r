@@ -1,0 +1,4 @@
+#define ROM_BANNER_TIMEOUT 0
+
+#define NET_PROTO_IPV6
+#define DOWNLOAD_PROTO_NFS

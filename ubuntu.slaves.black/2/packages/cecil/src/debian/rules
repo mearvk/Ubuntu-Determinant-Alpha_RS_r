@@ -1,0 +1,39 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/cli-common/cli.make
+
+UPVERSION = $(shell dpkg-parsechangelog | grep ^Vers | cut -d\  -f2 | sed 's,-.*,,')
+
+override_dh_auto_build:
+	xbuild /property:Configuration=net_4_0_Release
+
+	sed -e 's;@prefix@;/usr;g' \
+		-e 's;^Version:.*;Version:\ $(UPVERSION);g' \
+		debian/mono-cecil.pc.in > Mono.Cecil/mono-cecil.pc
+
+override_dh_clean:
+	rm -f Mono.Cecil/mono-cecil.pc
+	find . -type d -name obj -exec rm -rf {} \;
+	dh_clean
+
+# these are miscalculated, they pick up the private-yet-GAC Cecil from src:mono
+# so manually define deps instead.
+override_dh_clideps:
+
+# no clilibs — private library
+override_dh_makeclilibs:
+
+%:
+	dh $@
+
+get-orig-source:
+	[ -d ../tarballs ] || mkdir ../tarballs
+	uscan \
+		--force-download \
+		--download-version $(UPVERSION) \
+		--destdir ../tarballs \
+		--rename --verbose

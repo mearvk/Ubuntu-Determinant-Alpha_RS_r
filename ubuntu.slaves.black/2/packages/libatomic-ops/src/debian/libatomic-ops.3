@@ -1,0 +1,115 @@
+.\" Copyright 2005 Ian Wienand, Gelato@UNSW
+.\" 
+.TH "LIBATOMIC-OPS" "3" "May 17, 2005" "Ian Wienand" ""
+.SH "NAME"
+libatomic\-ops \- Library providing user level atomic operations
+.SH "SYNOPSIS"
+.B #include <atomic_ops.h>
+.sp
+.B cc ... \-latomic_ops
+.sp
+Note that all operations have an additional barrier option that can be set explicitly.
+.sp
+.B void AO_load(AO_t *addr)
+.br 
+.B void AO_store(AO_t *addr, AO_t val)
+.sp
+.B int AO_test_and_set (AO_t *addr)
+.sp
+.B AO_t AO_fetch_and_add(AO_t *addr, AO_t incr)
+.br 
+.B AO_t AO_fetch_and_add1(AO_t *addr)
+.br 
+.B AO_t AO_fetch_and_sub1(AO_t *addr)
+.sp
+.B void AO_or(AO_t *p, AO_t incr)
+.br 
+.B int AO_compare_and_swap(AO_t *addr, AO_t old, AO_t new_val)
+.SH "DESCRIPTION"
+.B libatomic\-ops
+offers a programming interface to a comprehensive range of atomic operations at user level.
+
+We define various atomic operations on memory in a machine\-specific way.  Unfortunately, this is complicated by the fact that these may or may not be combined with various memory barriers.  Thus the actual operations we define have the form 
+.B AO_<atomic\-op>_<barrier>
+for all plausible combinations of <atomic\-op> and <barrier>.
+
+The valid barrier suffixes are
+.TP 
+.B _release 
+Earlier operations may not be delayed past it.
+.TP 
+.B _acquire 
+Later operations may not move ahead of it.
+.TP 
+.B _read  
+Subsequent reads must follow this operation and preceding reads.
+.TP 
+.B _write
+Earlier writes precede both this operation and later writes.
+.TP 
+.B _full  
+Ordered with respect to both earlier and later memops.
+.TP 
+.B _release_write 
+Ordered with respect to earlier writes.
+.TP 
+.B _acquire_read
+Ordered with repsect to later reads.
+
+.LP 
+This of course results in a mild combinatorial explosion.
+
+The library will find the least expensive way to implement your operations on the 
+applicable hardware.  In many cases that will involve, for example, 
+a stronger memory barrier, or a combination of hardware primitives.                        
+
+Note that atomicity guarantees are valid only if both readers and 
+writers use AO_ operations to access the shared value, while ordering 
+constraints are intended to apply all memory operations.  
+If a location can potentially be accessed simultaneously from 
+multiple threads, and one of those accesses may be a write access, 
+then all such accesses to that location should be 
+through AO_ primitives. However if AO_ operations enforce sufficient 
+ordering to ensure that a location x cannot be accessed concurrently, or can only 
+be read concurrently, then x can be accessed via ordinary references and assignments.
+
+All operations operate on an
+.B AO_t
+value, which is the natural word size for the architecture.
+
+.B AO_load
+and
+.B AO_store
+load and store the specified pointer address.
+
+.B AO_test_and_set
+atomically replaces an address with
+.B AO_TS_SET
+and returns the prior value.  An
+.B AO_TS_t location can be reset with the 
+.B AO_CLEAR
+macro, which usually uses
+.B AO_store_release
+
+.B AO_fetch_and_add
+takes an address and a value to add.
+
+.B AO_fetch_and_add1 
+and
+.B AO_fetch_and_sub1
+are provided since they may have faster implemenations on some hardware
+
+.B AO_or
+atomically ors an 
+.I AO_t
+value into a memory location, but does not provide 
+access to the original
+
+.B AO_compare_and_swap
+takes an address, an old value and a new value and returns an int.
+.I non\-zero
+indicates the compare and swap succeeded.
+.SH "SEE ALSO"
+libatomic\-stack(3), libatomic\-malloc(3)
+.SH "AUTHOR"
+This manual page was written by Ian Wienand <ianw@gelato.unsw.edu.au>, based on comments in the source code.  It was written for the Debian project (but may be used by others).

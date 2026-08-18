@@ -1,0 +1,245 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+jh_installeclipse - Installs eclipse features built by pde-build into package build directories
+
+=cut
+
+use strict;
+use warnings;
+use autodie;
+
+use Debian::Debhelper::Dh_Lib;
+
+use Debian::Javahelper::Eclipse qw(:constants install_zipped_feature);
+
+=head1 SYNOPSIS
+
+B<jh_installeclipse> [S<I<debhelper options>>] [B<--install-name=>I<name>] [B<--pde-build-dir=>I<dir>] [S<I<feature [...]>>]
+
+=head1 DESCRIPTION
+
+jh_installeclipse is a javahelper program that handles installing
+eclipse features built by pde-build into package build
+directories. These features can be specified either in the package's
+eh-install file or via command-line.
+
+jh_installeclipse uses debhelper behind the scenes and are therefore
+subject to the compat level (e.g. when parsing eh-install files).
+
+jh_installeclipse will replace all the embedded orbit depends imported
+by jh_generateorbitdeps with symlinks post install. The symlinked jar
+files will also be used to populate ${orbit:Depends} variable.
+
+=head1 FILES
+
+=over 4
+
+=item debian/I<package>.eh-install
+
+List the eclipse features to install into each package and optionally
+under which name. The format is a set of lines, where each line lists
+a file or files to install, and at the end of the line tells the name
+it should be installed under. You may use wildcards in the names of
+the files to install.
+
+If name is not present, eh_install will either use the install name
+given on the command line or attempt to guess it from the package
+name. It is perfectly legal for two or more features to be installed
+under the same name.
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--install-name=>I<name>
+
+Specifies the name to install under if it is not given in the file. It
+is perfectly legal to install more than one feature under the same
+name.
+
+=item B<--pde-build-dir=>I<dir>
+
+Specifies the directory from where pde-build was run. Defaults to
+"debian/.eclipse_build".
+
+=back
+
+=cut
+
+my %archpackages;
+my $pdebdir = undef;
+my $fallback = undef;
+my $orbitcfile = generated_file('_source', 'javahelper.orbitdeps', 0);
+my @orbitdeps = ();
+my %needed;
+init(options => {
+    'pde-build-dir=s' => \$pdebdir,
+    'install-name=s' => \$fallback
+});
+
+# Use default value if none are given.
+$pdebdir = 'debian/.eclipse-build' unless(defined($pdebdir));
+$pdebdir =~ s@/*$@@; # remove trailing slash, looks better.
+# Append the actual output dir.
+$pdebdir = "$pdebdir/build/rpmBuild";
+
+if( -e $orbitcfile) {
+    # Read the orbit data from jh_generateorbitdir
+    open(my $fd, '<', $orbitcfile);
+    while( my $line = <$fd>){
+        my ($sysjar, $orbjar);
+        chomp($line);
+        ($sysjar, $orbjar, undef) = split(/\s*+,\s*+/o, $line);
+        push(@orbitdeps, {${\EOB_SYM_NAME} => $orbjar, ${\EOB_SYS_JAR} => $sysjar});
+    }
+    close($fd);
+}
+
+# gather a hash of arch dependent packages; their stuff is installed
+# under lib rather than share.
+foreach my $arch (getpackages('arch')){
+    $archpackages{$arch} = 1;
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}) {
+    my $installfile = pkgfile($package, 'eh-install');
+    my $dropins;
+    my $defdname = $fallback;
+    my @infiles;
+    next if($installfile eq q{});
+    $defdname = $1 if($package =~ m/^eclipse-(.+)/o);
+    $dropins = get_dropins_path($package);
+    @infiles = filedoublearray($installfile);
+    if (($package eq $dh{FIRSTPACKAGE} || $dh{PARAMS_ALL}) && @ARGV) {
+        push @infiles, [@ARGV];
+    }
+    foreach my $line (@infiles) {
+        my ($zipglob, $dname, $other) = @$line;
+        error("Trailing text in $installfile ($other)")
+            if(defined($other) && length($other) > 0);
+        $dname = $defdname unless(defined($dname) && length($dname) > 0);
+        error("Missing (and could not guess) eclipse-name for $zipglob for $package - please provide a default.")
+            unless(defined($dname) && length($dname) > 0);
+        foreach my $zip (glob("$pdebdir/$zipglob")){
+            foreach my $ext ((q{}, '.zip', '.ZIP')){
+                # Guess common extensions - mostly for the "non-globable cases".
+                if( -e "$zip${ext}"){
+                    $zip = "$zip${ext}";
+                    last;
+                }
+            }
+            install_zipped_feature($zip, "$dropins/$dname", \@orbitdeps,
+                                   $package, \%needed);
+        }
+    }
+}
+while ( my ($sysjar, $users) = each(%needed) ){
+    my ($pkg, $ver) = find_dependency($sysjar);
+    if(!defined($pkg)){
+        warning("Cannot determine the package providing $sysjar.");
+        next;
+    }
+    $ver =~ s/-1$//o;
+    foreach my $pack (keys(%$users)){
+        addsubstvar($pack, 'orbit:Depends', $pkg, ">= $ver");
+    }
+}
+
+foreach my $package (@{$dh{DOPACKAGES}}){
+        my $ext=pkgext($package);
+        my $substvars="debian/${ext}substvars";
+        if (! -e $substvars || system('grep', '-q', '^orbit:Depends=', $substvars) != 0) {
+                complex_doit("echo orbit:Depends= >> $substvars");
+        }
+}
+
+exit(0);
+
+# Determines where to install something for a given package.
+sub get_dropins_path{
+    my $package = shift;
+    my $prefix = tmpdir($package) . '/usr/';
+    $prefix .= exists($archpackages{$package})?'lib':'share';
+    return "$prefix/eclipse/dropins";
+}
+
+sub find_dependency{
+    my $sysjar = shift;
+    my $deppkg = undef;
+    my $depver = undef;
+    my %pkgtable;
+    verbose_print("dpkg -S $sysjar");
+    open(my $fd, '-|', 'dpkg', '-S', $sysjar);
+    while( my $input = <$fd> ){
+        my ($p, $f);
+        chomp($input);
+        ($p, $f) = split(/\s*+:\s*+/o, $input);
+        if($f eq $sysjar){
+            $pkgtable{$p} = 1;
+        }
+    }
+    close($fd);
+    if(scalar(keys(%pkgtable)) > 0){
+        verbose_print('dpkg -l');
+        open(my $dfd, '-|', 'dpkg', '-l');
+        while( chomp(my $line = <$dfd>) ){
+            my ($pname, $version);
+            next if ($line !~ m/^.i/o);
+            (undef, $pname, $version, undef) = split(/\s++/o, $line);
+            if(exists($pkgtable{$pname})){
+                $deppkg = $pname;
+                $depver = $version;
+            }
+        }
+        close($dfd);
+    }
+    return ($deppkg, $depver);
+}
+
+=head1 EXAMPLE
+
+Suppose your package builds org.eclipse.emf and org.eclipse.xsd and you want
+to put org.eclipse.emf into eclipse-emf and org.eclipse.xsd into eclipse-xsd.
+Then make debian/eclipse-emf.eh-install contain:
+
+  org.eclipse.emf
+
+and debian/eclipse-xsd.eh-install contain:
+
+  org.eclipse.xsd
+
+jh_installeclipse will then install org.eclipse.emf into
+usr/share/eclipse/dropins/emf/ and xsd into
+usr/share/eclipse/dropins/xsd/.
+
+In case your package is not called eclipse-I<name>, or you want to install
+two different features into the same package, you will have to provide a
+name. Suppose you wanted to install both eclipse above into a single
+package called foo, then debian/foo.eh-install should contain:
+
+  org.eclipse.emf emf
+  org.eclipse.xsf xsd
+
+=head1 SEE ALSO
+
+L<debhelper(7)>
+
+This program is a part of javahelper and uses debhelper as backend. There are
+also tutorials in /usr/share/doc/javahelper.
+
+=head1 AUTHOR
+
+Niels Thykier <niels@thykier.net>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2010 by Niels Thykier
+
+This tool is free software; you may redistribute it and/or modify
+it under the terms of GNU GPL 2.
+
+=cut

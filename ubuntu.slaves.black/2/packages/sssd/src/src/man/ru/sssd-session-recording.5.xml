@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DocBook V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<reference>
+<title>Справка по SSSD</title>
+<refentry>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/upstream.xml" />
+
+    <refmeta>
+        <refentrytitle>sssd-session-recording</refentrytitle>
+        <manvolnum>5</manvolnum>
+        <refmiscinfo class="manual">Форматы файлов и рекомендации</refmiscinfo>
+    </refmeta>
+
+    <refnamediv id='name'>
+        <refname>sssd-session-recording</refname>
+        <refpurpose>Настройка записи сеансов с помощью SSSD</refpurpose>
+    </refnamediv>
+
+    <refsect1 id='description'>
+        <title>ОПИСАНИЕ</title>
+        <para>
+            На этой справочной странице представлено описание настройки <citerefentry>
+<refentrytitle>sssd</refentrytitle> <manvolnum>8</manvolnum> </citerefentry>
+для работы с <citerefentry> <refentrytitle>tlog-rec-session</refentrytitle>
+<manvolnum>8</manvolnum> </citerefentry>, частью пакета tlog, для реализации
+записи сеансов пользователей на текстовых терминалах. Подробные сведения о
+синтаксисе доступны в разделе <quote>ФОРМАТ ФАЙЛА</quote> справочной
+страницы <citerefentry> <refentrytitle>sssd.conf</refentrytitle>
+<manvolnum>5</manvolnum> </citerefentry>.
+        </para>
+        <para>
+            SSSD можно настроить на включение записи всего, что определённые
+пользователи видят или набирают во время сеансов работы на текстовых
+терминалах. Например, можно записывать данные входа пользователей с помощью
+терминала или SSH. Сам сервис SSSD ничего не записывает, но обеспечивает
+запуск tlog-rec-session при входе пользователя, чтобы эта программа вела
+запись согласно своим параметрам конфигурации.
+        </para>
+        <para>
+            Для пользователей, для которых включена запись сеансов, SSSD заменяет
+оболочку пользователя на tlog-rec-session в ответах NSS и добавляет
+переменную, которая указывает исходную оболочку для среды пользователя, при
+настройке сеанса PAM. Таким образом обеспечивается запуск tlog-rec-session
+вместо оболочки пользователя и предоставление данных о том, какую командную
+оболочку следует запустить после настройки записи.
+        </para>
+    </refsect1>
+
+    <refsect1 id='configuration-options'>
+        <title>ПАРАМЕТРЫ КОНФИГУРАЦИИ</title>
+            <para>
+                Эти параметры можно использовать для настройки записи сеансов.
+            </para>
+            <variablelist>
+                <varlistentry>
+                    <term>scope (строка)</term>
+                    <listitem>
+                        <para>
+                            Одна из следующих строк, которые определяют область записи сеанса:
+<variablelist>
+                                <varlistentry>
+                                    <term>«none»</term>
+                                    <listitem>
+                                        <para>
+                                            Пользователи не записываются.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>«some»</term>
+                                    <listitem>
+                                        <para>
+                                            Записываются пользователи и группы, указанные с помощью параметров
+<replaceable>users</replaceable> и <replaceable>groups</replaceable>.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                                <varlistentry>
+                                    <term>«all»</term>
+                                    <listitem>
+                                        <para>
+                                            Записываются все пользователи.
+                                        </para>
+                                    </listitem>
+                                </varlistentry>
+                            </variablelist>
+                        </para>
+                        <para>
+                            По умолчанию: «none»
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>users (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список пользователей, для которых включена запись
+сеансов. Соответствие списку устанавливается по именам пользователей,
+возвращённым NSS, то есть после возможной замены пробелов, смены регистра и
+так далее.
+                        </para>
+                        <para>
+                            По умолчанию: пусто. Не соответствует ни одному пользователю.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>groups (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список групп, для участников которых включена запись
+сеансов. Соответствие списку устанавливается по именам групп, возвращённым
+NSS, то есть после возможной замены пробелов, смены регистра и так далее.
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: использование этого параметра (его установка в одно из значений)
+значительно сказывается на производительности, поскольку при каждом
+некэшированном запросе данных пользователя требуется выполнить получение и
+установление соответствия групп, участником которых он является.
+                        </para>
+                        <para>
+                            По умолчанию: пусто. Не соответствует ни одной группе.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>exclude_users (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список пользователей, которые исключаются из записи;
+применимо только при «scope=all».
+                        </para>
+                        <para>
+                            По умолчанию: пусто. Не исключается ни один пользователь.
+                        </para>
+                    </listitem>
+                </varlistentry>
+                <varlistentry>
+                    <term>exclude_groups (строка)</term>
+                    <listitem>
+                        <para>
+                            Разделённый запятыми список групп, участники которых исключаются из записи;
+применимо только при «scope=all».
+                        </para>
+                        <para>
+                            ПРИМЕЧАНИЕ: использование этого параметра (его установка в одно из значений)
+значительно сказывается на производительности, поскольку при каждом
+некэшированном запросе данных пользователя требуется выполнить получение и
+установление соответствия групп, участником которых он является.
+                        </para>
+                        <para>
+                            По умолчанию: пусто. Не исключается ни одна группа.
+                        </para>
+                    </listitem>
+                </varlistentry>
+            </variablelist>
+    </refsect1>
+
+    <refsect1 id='example'>
+        <title>ПРИМЕР</title>
+        <para>
+            Следующий фрагмент sssd.conf включает запись сеансов для пользователей
+«contractor1» и «contractor2», а также группы «students».
+        </para>
+        <para>
+<programlisting>
+[session_recording]
+scope = some
+users = contractor1, contractor2
+groups = students
+</programlisting>
+        </para>
+    </refsect1>
+
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="include/seealso.xml" />
+
+</refentry>
+</reference>

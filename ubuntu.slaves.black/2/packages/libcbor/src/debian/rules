@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure-arch:
+	dh_auto_configure -- -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release -DWITH_TESTS=ON
+override_dh_auto_configure-indep:
+override_dh_auto_build-indep:
+	mkdir -p doc/build/doxygen
+	doxygen
+	make -C doc html
+	# Nothing is using MathJax
+	find doc/build/html -type f -print0 | xargs -0 sed -i '/ajax\/libs\/mathjax/d'
+override_dh_auto_install-indep:

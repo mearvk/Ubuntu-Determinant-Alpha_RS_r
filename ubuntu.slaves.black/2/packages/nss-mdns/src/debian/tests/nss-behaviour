@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -e
+
+. debian/tests/lib.sh
+
+distinctive_hostname="nss-mdns-test-$(dbus-uuidgen)"
+
+echo >> /etc/hosts
+echo "127.1.2.3 $distinctive_hostname.invalid" >> /etc/hosts
+
+assert_succeeds perl -i -pe 's/^hosts:.*/hosts: files dns/' /etc/nsswitch.conf
+
+assert_succeeds getent hosts "$distinctive_hostname.invalid"
+assert_status 2 getent hosts "$distinctive_hostname.nonexistent.invalid"
+
+# we assume there is no libnss_sorcery.so.2, libnss_wizardry.so.2 or
+# libnss_guesswork.so.2
+assert_succeeds perl -i -pe 's/^hosts:.*/hosts: sorcery [NOTFOUND=return] wizardry files dns guesswork/' /etc/nsswitch.conf
+
+# not having those modules does not break name resolution, which means
+# it's OK for nss-mdns to leave the missing mdns module configured until
+# purged
+assert_succeeds getent hosts "$distinctive_hostname.invalid"
+assert_status 2 getent hosts "$distinctive_hostname.nonexistent.invalid"
+
+finish
+
+# vim:set sw=4 sts=4 et:

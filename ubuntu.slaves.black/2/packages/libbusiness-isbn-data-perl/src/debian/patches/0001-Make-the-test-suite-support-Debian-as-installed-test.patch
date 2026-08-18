@@ -1,0 +1,67 @@
+From: Florian Schlichting <fsfs@debian.org>
+Subject: [PATCH] Make the test suite support Debian as-installed testing
+ ("autopkgtest")
+
+When running as-installed tests, the module gets loaded from the system
+paths. As-installed testing is detected by the existence of the AUTOPKGTEST_TMP
+environment variable.
+
+As we no longer ship a RangeMessage.xml in the package, disable the
+included_range_message test. However env_range_message works well with
+our smoke-files. Skip renaming files in blib, which are not present in
+the testbed.
+
+Bug-Debian: https://bugs.debian.org/765167
+Forwarded: not-needed
+Last-Update: 2021-08-22
+---
+ t/check_data_structure.t | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+--- a/t/check_data_structure.t
++++ b/t/check_data_structure.t
+@@ -10,6 +10,7 @@
+ 	};
+ 
+ subtest 'included_range_message' => sub {
++	plan skip_all => "Debian doesn't include a RangeMessage.xml that could be tested here";
+ 	# Test with included RangeMessage.xml in the same spot as the module
+ 	like( $Business::ISBN::country_data{_source}, qr/RangeMessage\.xml/ );
+ 	like( $Business::ISBN::country_data{_source}, qr/blib/ );
+@@ -55,14 +56,14 @@
+ 	my $file = catfile( qw(blib lib Business ISBN RangeMessage.xml) );
+ 	my $out_of_the_way = $file . '.hidden';
+ 
+-	rename $file => $out_of_the_way;
++	rename $file => $out_of_the_way unless $ENV{AUTOPKGTEST_TMP};
+ 
+ 	ok( ! -e $file, 'RangeMessage.xml is out of the way' );
+ 	local %Business::ISBN::country_data = Business::ISBN::Data::_get_data();
+ 
+ 	like( $Business::ISBN::country_data{_source}, qr/\bData\.pm/, 'Data source is the default data structure' );
+ 
+-	rename $out_of_the_way => $file;
++	rename $out_of_the_way => $file unless $ENV{AUTOPKGTEST_TMP};
+ 	};
+ 
+ subtest 'default_data' => sub {
+--- a/t/default_data.t
++++ b/t/default_data.t
+@@ -29,7 +29,7 @@
+ 	my $file = catfile( qw(blib lib Business ISBN RangeMessage.xml) );
+ 	my $out_of_the_way = $file . '.hidden';
+ 
+-	ok( rename($file => $out_of_the_way), 'Renamed file' );
++	ok( rename($file => $out_of_the_way), 'Renamed file' ) unless $ENV{AUTOPKGTEST_TMP};
+ 
+ 	subtest 'compile' => sub {
+ 		my @modules = qw( Business::ISBN::Data );
+@@ -48,7 +48,7 @@
+ 			}
+ 		};
+ 
+-	rename $out_of_the_way => $file;
++	rename $out_of_the_way => $file unless $ENV{AUTOPKGTEST_TMP};
+ 	}
+ 
+ done_testing();

@@ -1,0 +1,130 @@
+From af47e22f2e9892bc84985be055bf22725ef44972 Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Wed, 29 Jan 2020 20:10:12 -0800
+Subject: [PATCH 10/13] x86/aors_n.asm: Add X86_ENDBR to indirect jump targets
+
+x86/aors_n.asm uses a trick to implment jump tables with LEA.  We can't
+use conditional branches nor normal jump tables since jump table entries
+use EFLAGS set by jump table index.  This patch adds X86_ENDBR to indirect
+jump targets and adjust destination for X86_ENDBR.
+
+	* mpn/x86/aors_n.asm: Save and restore %ebx if X86_ENDBR is
+	endbr32.  Add X86_ENDBR to indirect jump targets and adjust
+	jump destination for X86_ENDBR.
+---
+ mpn/x86/aors_n.asm | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/mpn/x86/aors_n.asm b/mpn/x86/aors_n.asm
+index 95d006a5a..94fa16ed8 100644
+--- a/mpn/x86/aors_n.asm
++++ b/mpn/x86/aors_n.asm
+@@ -80,6 +80,9 @@ deflit(`FRAME',0)
+ 	movl	PARAM_SRC2,%edx
+ 	movl	PARAM_SIZE,%ecx
+ 
++ifelse(X86_ENDBR,`endbr32',
++`	pushl	%ebx		FRAME_pushl()')
++
+ 	movl	%ecx,%eax
+ 	shrl	$3,%ecx			C compute count for unrolled loop
+ 	negl	%eax
+@@ -92,6 +95,10 @@ deflit(`FRAME',0)
+ 	subl	%eax,%edx		C ... enter the loop
+ 	shrl	$2,%eax			C restore previous value
+ 
++	C Count for 4-byte endbr32.
++ifelse(X86_ENDBR,`endbr32',
++`	leal	-4(,%eax,4),%ebx')
++
+ ifdef(`PIC',`
+ 	C Calculate start address in loop for PIC.  Due to limitations in
+ 	C old gas, LF(M4_function_n,oop)-L(0a)-3 cannot be put into the leal
+@@ -105,6 +112,10 @@ L(0a):	leal	(%eax,%eax,8),%eax
+ 	leal	L(oop)-3(%eax,%eax,8),%eax
+ ')
+ 
++	C Adjust for endbr32
++ifelse(X86_ENDBR,`endbr32',
++`	addl	%ebx,%eax')
++
+ 	C These lines initialize carry from the 5th parameter.  Should be
+ 	C possible to simplify.
+ 	pushl	%ebp		FRAME_pushl()
+@@ -129,6 +140,9 @@ deflit(`FRAME',0)
+ 	movl	PARAM_SRC2,%edx
+ 	movl	PARAM_SIZE,%ecx
+ 
++ifelse(X86_ENDBR,`endbr32',
++`	pushl	%ebx		FRAME_pushl()')
++
+ 	movl	%ecx,%eax
+ 	shrl	$3,%ecx			C compute count for unrolled loop
+ 	negl	%eax
+@@ -141,6 +155,10 @@ deflit(`FRAME',0)
+ 	subl	%eax,%edx		C ... enter the loop
+ 	shrl	$2,%eax			C restore previous value
+ 
++	C Count for 4-byte endbr32.
++ifelse(X86_ENDBR,`endbr32',
++`	leal	-4(,%eax,4),%ebx')
++
+ ifdef(`PIC',`
+ 	C Calculate start address in loop for PIC.  Due to limitations in
+ 	C some assemblers, L(oop)-L(0b)-3 cannot be put into the leal
+@@ -153,6 +171,10 @@ L(0b):	leal	(%eax,%eax,8),%eax
+ 	C Calculate start address in loop for non-PIC.
+ 	leal	L(oop)-3(%eax,%eax,8),%eax
+ ')
++	C Adjust for endbr32
++ifelse(X86_ENDBR,`endbr32',
++`	addl	%ebx,%eax')
++
+ 	jmp	*%eax			C jump into loop
+ 
+ L(oopgo):
+@@ -165,24 +187,31 @@ L(oopgo):
+ L(oop):	movl	(%esi),%eax
+ 	M4_inst	(%edx),%eax
+ 	movl	%eax,(%edi)
++	X86_ENDBR
+ 	movl	4(%esi),%eax
+ 	M4_inst	4(%edx),%eax
+ 	movl	%eax,4(%edi)
++	X86_ENDBR
+ 	movl	8(%esi),%eax
+ 	M4_inst	8(%edx),%eax
+ 	movl	%eax,8(%edi)
++	X86_ENDBR
+ 	movl	12(%esi),%eax
+ 	M4_inst	12(%edx),%eax
+ 	movl	%eax,12(%edi)
++	X86_ENDBR
+ 	movl	16(%esi),%eax
+ 	M4_inst	16(%edx),%eax
+ 	movl	%eax,16(%edi)
++	X86_ENDBR
+ 	movl	20(%esi),%eax
+ 	M4_inst	20(%edx),%eax
+ 	movl	%eax,20(%edi)
++	X86_ENDBR
+ 	movl	24(%esi),%eax
+ 	M4_inst	24(%edx),%eax
+ 	movl	%eax,24(%edi)
++	X86_ENDBR
+ 	movl	28(%esi),%eax
+ 	M4_inst	28(%edx),%eax
+ 	movl	%eax,28(%edi)
+@@ -195,6 +224,9 @@ L(oop):	movl	(%esi),%eax
+ 	sbbl	%eax,%eax
+ 	negl	%eax
+ 
++ifelse(X86_ENDBR,`endbr32',
++`	popl	%ebx')
++
+ 	popl	%esi
+ 	popl	%edi
+ 	ret
+-- 
+2.27.0
+

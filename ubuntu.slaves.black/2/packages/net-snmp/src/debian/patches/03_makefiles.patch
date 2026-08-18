@@ -1,0 +1,62 @@
+Description: Update Makefiles
+ Makefile patch to include libwrap and libsensors libraries and install
+ extra MIB files.
+Author: Net-SNMP Packaging Team <pkg-net-snmp-devel@lists.alioth.debian.org>
+Reviewed-by: Craig Small <csmall@debian.org>
+Last-Update: 2021-09-20
+---
+ Makefile.in       | 4 ++--
+ Makefile.top      | 1 +
+ local/Makefile.in | 2 +-
+ mibs/Makefile.in  | 6 +++---
+ 4 files changed, 7 insertions(+), 6 deletions(-)
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -173,7 +173,7 @@
+ #
+ # override LD_RUN_PATH to avoid dependencies on the build directory
+ perlmodules: perlmakefiles subdirs
+-	@(cd perl ; $(MAKE) LD_RUN_PATH="$(libdir):`$(PERL) -e 'use Config; print qq($$Config{archlibexp}/CORE);'`") ; \
++	@(cd perl ; $(MAKE) LD_RUN_PATH="") ; \
+         if test $$? != 0 ; then \
+            exit 1 ; \
+         fi
+--- a/Makefile.top
++++ b/Makefile.top
+@@ -28,6 +28,7 @@
+ snmplibdir	= $(datadir)/snmp
+ mibdir		= $(snmplibdir)/mibs
+ persistentdir	= @PERSISTENT_DIRECTORY@
++sysconfdir	= @sysconfdir@
+ DESTDIR         = @INSTALL_PREFIX@
+ INSTALL_PREFIX  = $(DESTDIR)
+ 
+--- a/local/Makefile.in
++++ b/local/Makefile.in
+@@ -101,7 +101,7 @@
+ 
+ mib2c.made: $(srcdir)/mib2c
+ 	if test "x$(PERL)" != "x" ; then \
+-	  $(PERL) -p -e 's%^#!.*/perl.*%#!$(PERL)%;s#/usr/local/share/snmp#$(snmplibdir)#;' ${srcdir}/mib2c > mib2c.made; \
++	  $(PERL) -p -e 's%^#!.*/perl.*%#!$(PERL)%;s#/usr/local/share/snmp#$(snmplibdir)#;s#/usr/local/etc/snmp#$(SNMPCONFPATH)#;' ${srcdir}/mib2c > mib2c.made; \
+ 	else \
+ 	  touch mib2c.made; \
+         fi
+--- a/mibs/Makefile.in
++++ b/mibs/Makefile.in
+@@ -47,11 +47,11 @@
+ UCDMIBS = UCD-SNMP-MIB.txt UCD-DEMO-MIB.txt UCD-IPFWACC-MIB.txt \
+ 	UCD-DLMOD-MIB.txt UCD-DISKIO-MIB.txt
+ 
++EXTRAMIBS = GNOME-SMI LM-SENSORS-MIB
++
+ DEFAULTMIBS = @default_mibs_install@
+ 
+-MIBS	= $(V1MIBS) $(V2MIBS) $(V3MIBS) $(RFCMIBS) \
+-	$(AGENTMIBS) $(IANAMIBS) \
+-	$(NETSNMPMIBS) $(UCDMIBS) $(DEFAULTMIBS)
++MIBS	=  $(NETSNMPMIBS) $(UCDMIBS) $(DEFAULTMIBS) $(EXTRAMIBS)
+ 
+ all: standardall
+ 

@@ -1,0 +1,363 @@
+package org.multiverse.stms.gamma;
+
+import org.multiverse.api.*;
+import org.multiverse.api.exceptions.*;
+import org.multiverse.api.callables.*;
+import org.multiverse.stms.gamma.transactions.*;
+import java.util.concurrent.Callable;
+import java.util.logging.Logger;
+
+import static java.lang.String.format;
+import static org.multiverse.api.TxnThreadLocal.*;
+
+/**
+ * The {@link TxnExecutor} made for the GammaStm.
+ *
+ * This code is generated.
+ *
+ * @author Peter Veentjer
+ */
+public final class ${txnExecutor.name} extends AbstractGammaTxnExecutor{
+    private static final Logger logger = Logger.getLogger(${txnExecutor.name}.class.getName());
+
+#if(!${txnExecutor.lean})
+    private final PropagationLevel propagationLevel;
+#end
+
+    public ${txnExecutor.name}(final GammaTxnFactory txnFactory) {
+        super(txnFactory);
+#if(!${txnExecutor.lean})
+        this.propagationLevel = txnConfig.propagationLevel;
+#end
+    }
+
+    @Override
+    public GammaTxnFactory getTxnFactory(){
+        return txnFactory;
+    }
+
+#foreach($callable in $callables)
+    @Override
+    public final ${callable.typeParameter} ${callable.type} executeChecked(
+        final ${callable.name}${callable.typeParameter} callable)throws Exception{
+
+        try{
+#if(${callable.type} eq 'void')
+            execute(callable);
+#else
+            return execute(callable);
+#end
+        }catch(InvisibleCheckedException e){
+            throw e.getCause();
+        }
+    }
+
+#if(${txnExecutor.lean})
+    @Override
+    public final ${callable.typeParameter} ${callable.type} execute(final ${callable.name}${callable.typeParameter} callable){
+
+        if(callable == null){
+            throw new NullPointerException();
+        }
+
+        final TxnThreadLocal.Container transactionContainer = getThreadLocalTxnContainer();
+        GammaTxnPool pool = (GammaTxnPool) transactionContainer.txPool;
+        if (pool == null) {
+            pool = new GammaTxnPool();
+            transactionContainer.txPool = pool;
+        }
+
+        GammaTxn tx = (GammaTxn)transactionContainer.txn;
+        if(tx == null || !tx.isAlive()){
+            tx = null;
+        }
+
+        Throwable cause = null;
+        try{
+            if(tx != null && tx.isAlive()){
+#if(${callable.type} eq 'void')
+                callable.call(tx);
+                return;
+#else
+                return callable.call(tx);
+#end
+            }
+
+            tx = txnFactory.newTransaction(pool);
+            transactionContainer.txn=tx;
+#transactionLogic()
+        }
+
+#else ## end of txnExecutor.lean
+    public ${callable.typeParameter} ${callable.type} execute(final ${callable.name}${callable.typeParameter} callable){
+
+        if(callable == null){
+            throw new NullPointerException();
+        }
+
+        TxnThreadLocal.Container transactionContainer = getThreadLocalTxnContainer();
+        GammaTxnPool pool = (GammaTxnPool) transactionContainer.txPool;
+        if (pool == null) {
+            pool = new GammaTxnPool();
+            transactionContainer.txPool = pool;
+        }
+
+        GammaTxn tx = (GammaTxn)transactionContainer.txn;
+        if(tx == null || !tx.isAlive()){
+            tx = null;
+        }
+
+        try{
+            switch (propagationLevel) {
+                case Requires:
+                    if (tx == null) {
+                        if (TRACING_ENABLED) {
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'Requires' propagation level and no txn found, starting a new txn",
+                                    txnConfig.familyName));
+                            }
+                        }
+
+                        tx = txnFactory.newTransaction(pool);
+                        transactionContainer.txn = tx;
+#if($callable.type eq 'void')
+                        execute(tx, transactionContainer,pool, callable);
+                        return;
+#else
+                        return execute(tx, transactionContainer, pool, callable);
+#end
+                    } else {
+                        if (TRACING_ENABLED) {
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'Requires' propagation level, and existing txn [%s] found",
+                                        txnConfig.familyName, tx.getConfig().getFamilyName()));
+                                }
+                            }
+
+#if($callable.type eq 'void')
+                        callable.call(tx);
+                        return;
+#else
+                        return callable.call(tx);
+#end
+                    }
+                case Mandatory:
+                    if (tx == null) {
+                        if (TRACING_ENABLED) {
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'Mandatory' propagation level, and no txn is found",
+                                        txnConfig.familyName));
+                                }
+                            }
+                            throw new TxnMandatoryException(
+                                format("No txn is found for TxnExecutor '%s' with 'Mandatory' propagation level",
+                                    txnConfig.familyName));
+                        }
+
+                    if (TRACING_ENABLED) {
+                        if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                            logger.info(
+                                format("[%s] Has 'Mandatory' propagation level and txn [%s] found",
+                                    txnConfig.familyName, tx.getConfig().getFamilyName()));
+                        }
+                    }
+#if($callable.type eq 'void')
+                    callable.call(tx);
+                    return;
+#else
+                    return callable.call(tx);
+#end
+                case Never:
+                    if (tx != null) {
+                        if (TRACING_ENABLED) {
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'Never' propagation level, but txn [%s] is found",
+                                        txnConfig.familyName, tx.getConfig().getFamilyName()));
+                            }
+                        }
+
+                        throw new TxnNotAllowedException(
+                            format("No txn is allowed for TxnExecutor '%s' with propagation level 'Never'"+
+                                ", but txn '%s' was found",
+                                    txnConfig.familyName, tx.getConfig().getFamilyName())
+                            );
+                    }
+
+                    if (TRACING_ENABLED) {
+                        if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                            logger.info(
+                                format("[%s] Has 'Never' propagation level and no txn is found",
+                                    txnConfig.familyName));
+                        }
+                    }
+#if($callable.type eq 'void')
+                    callable.call(null);
+                    return;
+#else
+                    return callable.call(null);
+#end
+                case RequiresNew:
+                    if (tx == null) {
+                        if(TRACING_ENABLED){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'RequiresNew' propagation level and no txn is found, starting new txn",
+                                        txnConfig.familyName));
+                            }
+                        }
+
+                        tx = txnFactory.newTransaction(pool);
+                        transactionContainer.txn = tx;
+#if($callable.type eq 'void')
+                        execute(tx, transactionContainer, pool, callable);
+                        return;
+#else
+                        return execute(tx, transactionContainer, pool, callable);
+#end
+                    } else {
+                        if(TRACING_ENABLED){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'RequiresNew' propagationLevel and existing txn [%s] was found",
+                                        txnConfig.familyName, tx.getConfig().getFamilyName()));
+                            }
+                        }
+
+                        GammaTxn suspendedTransaction = tx;
+                        tx = txnFactory.newTransaction(pool);
+                        transactionContainer.txn = tx;
+                        try {
+#if($callable.type eq 'void')
+                            execute(tx, transactionContainer, pool, callable);
+                            return;
+#else
+                            return execute(tx, transactionContainer, pool, callable);
+#end
+                        } finally {
+                            transactionContainer.txn = suspendedTransaction;
+                        }
+                    }
+                case Supports:
+                    if(TRACING_ENABLED){
+                        if(tx!=null){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'RequiresNew' propagationLevel and existing txn [%s] was found",
+                                        txnConfig.familyName, tx.getConfig().getFamilyName()));
+                            }
+                        }else{
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(
+                                    format("[%s] Has 'RequiresNew' propagationLevel and existing txn [%s] was found",
+                                        txnConfig.familyName, tx.getConfig().getFamilyName()));
+                            }
+                        }
+                    }
+
+#if($callable.type eq 'void')
+                    callable.call(tx);
+                    return;
+#else
+                    return callable.call(tx);
+#end
+                default:
+                    throw new IllegalStateException();
+            }
+        }catch(RuntimeException e){
+            throw e;
+        }catch(Exception e){
+            throw new InvisibleCheckedException(e);
+        }
+    }
+
+    private ${callable.typeParameter} ${callable.type} execute(
+        GammaTxn tx, final TxnThreadLocal.Container transactionContainer, GammaTxnPool pool, final ${callable.name}${callable.typeParameter} callable)throws Exception{
+        Error cause = null;
+
+        try{
+#transactionLogic()
+        }
+
+    #end ##end of txnExecutor.lean
+#end ##end of for loop over closures
+#macro( transactionLogic )
+            boolean abort = true;
+            try {
+                do {
+                    try {
+                        cause = null;
+#if(${callable.type} eq 'void')
+                        callable.call(tx);
+#else
+                        ${callable.type} result = callable.call(tx);
+#end
+                        tx.commit();
+                        abort = false;
+#if(${callable.type} eq 'void')
+                        return;
+#else
+                        return result;
+#end
+                    } catch (RetryError e) {
+                        if(TRACING_ENABLED){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(format("[%s] Encountered a retry",
+                                    txnConfig.familyName));
+                            }
+                        }
+                        tx.awaitUpdate();
+                    } catch (SpeculativeConfigurationError e) {
+                        if(TRACING_ENABLED){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(format("[%s] Encountered a speculative configuration error",
+                                    txnConfig.familyName));
+                            }
+                        }
+
+                        abort = false;
+                        GammaTxn old = tx;
+                        tx = txnFactory.upgradeAfterSpeculativeFailure(tx,pool);
+                        pool.put(old);
+                        transactionContainer.txn = tx;
+                    } catch (ReadWriteConflict e) {
+                        cause = e;
+                        if(TRACING_ENABLED){
+                            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                                logger.info(format("[%s] Encountered a read or write conflict",
+                                    txnConfig.familyName));
+                            }
+                        }
+
+                        backoffPolicy.delayUninterruptible(tx.getAttempt());
+                    }
+                } while (tx.softReset());
+            } finally {
+                if (abort) {
+                    tx.abort();
+                }
+
+                pool.put(tx);
+                transactionContainer.txn = null;
+            }
+        }catch(RuntimeException e){
+            throw e;
+        }catch(Exception e){
+            throw new InvisibleCheckedException(e);
+        }
+
+        if(TRACING_ENABLED){
+            if (txnConfig.getTraceLevel().isLoggableFrom(TraceLevel.Coarse)) {
+                logger.info(format("[%s] Maximum number of %s retries has been reached",
+                    txnConfig.familyName, txnConfig.getMaxRetries()));
+            }
+        }
+
+        throw new TooManyRetriesException(
+            format("[%s] Maximum number of %s retries has been reached",
+                txnConfig.getFamilyName(), txnConfig.getMaxRetries()), cause);
+#end ##end of macro
+}

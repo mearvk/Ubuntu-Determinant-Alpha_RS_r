@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+
+export JAVA_HOME := /usr/lib/jvm/default-java
+export CLASSPATH := /usr/share/java/easymock.jar:/usr/share/java/jmock.jar:/usr/share/java/qdox.jar:/usr/share/java/ant-junit.jar:/usr/share/java/junit4.jar
+DEB_UPSTREAM_VERSION := 1.3
+DEB_ANT_BUILD_TARGET := bigjar unit-test javadoc
+ANT_OPTS := -Dant.build.javac.source=1.5 -Dant.build.javac.target=1.5 -Dversion=$(DEB_UPSTREAM_VERSION)
+POMS := core generator integration library all
+
+%:
+	dh $@ --with maven-repo-helper
+
+override_dh_auto_build:
+	ant $(ANT_OPTS) $(DEB_ANT_BUILD_TARGET)
+
+override_dh_install:
+	# Add OSGi-metadata to the manifests.
+	# This is needed for eclipse.
+	for manifest in debian/manifest/*.mf ; do \
+		base=`basename $$manifest .mf` ; \
+		f=`ls build/hamcrest-$$base-$(DEB_UPSTREAM_VERSION).jar` ; \
+		if [ -n "$$f" ]; then \
+		   echo `basename "$$f"` "[ok]" ; \
+		   jar umf $$manifest $$f ; \
+		else \
+		   echo "No file like 'build/hamcrest-$$base-$(DEB_UPSTREAM_VERSION).jar' existing." ; \
+		fi ; \
+	done
+	for pom in $(POMS); do \
+		pomfile=hamcrest-$$pom-$(DEB_UPSTREAM_VERSION).pom; \
+		mh_installpom -o -e$(DEB_UPSTREAM_VERSION) \
+		-plibhamcrest-java $$pomfile; \
+		mh_installjar -l -e$(DEB_UPSTREAM_VERSION) -j$(DEB_UPSTREAM_VERSION) \
+		-plibhamcrest-java $$pomfile build/hamcrest-$$pom-$(DEB_UPSTREAM_VERSION).jar; \
+	done
+	dh_install -plibhamcrest-java build/hamcrest-unit-test-$(DEB_UPSTREAM_VERSION).jar usr/share/java
+	dh_install
+
+override_dh_link:
+	dh_link
+	dh_link -plibhamcrest-java usr/share/java/hamcrest-unit-test-$(DEB_UPSTREAM_VERSION).jar usr/share/java/hamcrest-unit-test.jar
+
+override_dh_auto_clean:
+	ant clean
+
+override_dh_clean:
+	dh_clean
+	rm -fr debian/.mh/
+	find . -name "*.jar" -delete
+	mkdir -p lib/integration

@@ -1,0 +1,799 @@
+From a311701ea7eebff003e88694a391d810485f36e0 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <guillem@hadrons.org>
+Date: Sat, 20 Jul 2019 21:18:11 +0200
+Subject: [PATCH libaio 13/28] man: Fix markup
+
+- Remove unnecessary macro argument quoting.
+- Variables, pathnames in italics.
+- Keywords in bold.
+- Man page references in bold, followed by the man page number.
+- Fix TP/TQ macro usage.
+
+Signed-off-by: Guillem Jover <guillem@hadrons.org>
+Signed-off-by: Jeff Moyer <jmoyer@redhat.com>
+---
+ man/io.3               | 38 ++++++++++++++-------------
+ man/io_cancel.3        | 23 ++++++++++------
+ man/io_fsync.3         |  9 ++++---
+ man/io_getevents.3     | 33 ++++++++++++++++-------
+ man/io_prep_fsync.3    | 59 ++++++++++++++++++++++++++++++------------
+ man/io_prep_pread.3    | 19 +++++---------
+ man/io_prep_pwrite.3   | 14 ++++------
+ man/io_queue_init.3    | 34 +++++++++++++++---------
+ man/io_queue_release.3 | 16 +++++++-----
+ man/io_queue_run.3     | 18 ++++++++-----
+ man/io_queue_wait.3    | 25 +++++++++++-------
+ man/io_set_callback.3  |  5 ++--
+ man/io_submit.3        | 26 +++++++++++--------
+ 13 files changed, 195 insertions(+), 124 deletions(-)
+
+diff --git a/man/io.3 b/man/io.3
+index 922fbca..f40da41 100644
+--- a/man/io.3
++++ b/man/io.3
+@@ -10,16 +10,18 @@ io \- Asynchronous IO
+ .sp
+ .fi
+ .SH DESCRIPTION
+-The libaio library defines a new set of I/O operations which can
++The
++.B libaio
++library defines a new set of I/O operations which can
+ significantly reduce the time an application spends waiting at I/O.  The
+ new functions allow a program to initiate one or more I/O operations and
+ then immediately resume normal work while the I/O operations are
+ executed in parallel.  
+ 
+ These functions are part of the library with realtime functions named
+-.IR libaio .
++.BR libaio .
+ They are not actually part of the
+-.IR "libc" 
++.B libc
+ binary.
+ The implementation of these functions can be done using support in the
+ kernel.
+@@ -27,9 +29,9 @@ kernel.
+ All IO operations operate on files which were opened previously.  There
+ might be arbitrarily many operations running for one file.  The
+ asynchronous I/O operations are controlled using a data structure named
+-.IR "struct iocb"
++.B struct iocb
+ It is defined in
+-.IR "libaio.h"
++.I libaio.h
+ as follows.
+ 
+ .nf
+@@ -74,7 +76,7 @@ struct iocb {
+ 
+ .fi
+ .TP
+-.IR "int aio_fildes"
++.BI int " aio_fildes"
+ This element specifies the file descriptor to be used for the
+ operation.  It must be a legal descriptor, otherwise the operation will
+ fail.
+@@ -82,55 +84,55 @@ fail.
+ The device on which the file is opened must allow the seek operation.
+ I.e., it is not possible to use any of the IO operations on devices
+ like terminals where an 
+-.IR "lseek"
++.BR lseek (2)
+ call would lead to an error.
+ .TP
+-.IR "long u.c.offset"
++.BI long " u.c.offset"
+ This element specifies the offset in the file at which the operation (input
+ or output) is performed.  Since the operations are carried out in arbitrary
+ order and more than one operation for one file descriptor can be
+ started, one cannot expect a current read/write position of the file
+ descriptor.
+ .TP
+-.IR "void *buf"
++.BI "void *" buf
+ This is a pointer to the buffer with the data to be written or the place
+ where the read data is stored.
+ .TP
+-.IR "long u.c.nbytes"
++.BI long " u.c.nbytes"
+ This element specifies the length of the buffer pointed to by 
+ .IR io_buf .
+ .TP
+-.IR "int aio_reqprio"
++.BI int " aio_reqprio"
+ Is not currently used.
+ .TP
+ .B "IO_CMD_PREAD"
+ Start a read operation.  Read from the file at position
+-.IR "u.c.offset"
++.I u.c.offset
+ and store the next 
+-.IR "u.c.nbytes"
++.I u.c.nbytes
+ bytes in the
+ buffer pointed to by 
+ .IR buf .
+ .TP
+ .B "IO_CMD_PWRITE"
+ Start a write operation.  Write 
+-.IR "u.c.nbytes" 
++.I u.c.nbytes
+ bytes starting at
+-.IR "buf"
++.I buf
+ into the file starting at position 
+ .IR u.c.offset .
+ .TP
+ .B "IO_CMD_NOP"
+ Do nothing for this control block.  This value is useful sometimes when
+ an array of 
+-.IR "struct iocb"
++.B struct iocb
+ values contains holes, i.e., some of the
+ values must not be handled although the whole array is presented to the
+-.IR "io_submit"
++.BR io_submit (3)
+ function.
+ .TP 
+ .B "IO_CMD_FSYNC"
+-.TP
++.TQ
+ .B "IO_CMD_POLL"
+ This is experimental.
+ .SH EXAMPLE
+diff --git a/man/io_cancel.3 b/man/io_cancel.3
+index a4683be..3ca629b 100644
+--- a/man/io_cancel.3
++++ b/man/io_cancel.3
+@@ -9,7 +9,7 @@ io_cancel \- Cancel io requests
+ .B #include <libaio.h>
+ .sp
+ .br
+-.BI "int io_cancel(io_context_t ctx, struct iocb *iocb)"
++.BI "int io_cancel(io_context_t " ctx ", struct iocb *" iocb ");"
+ .br
+ .sp
+ struct iocb {
+@@ -21,8 +21,11 @@ struct iocb {
+ };
+ .fi
+ .SH DESCRIPTION
+-Attempts to cancel an iocb previously passed to io_submit.  If
+-the operation is successfully cancelled, the resulting event is
++Attempts to cancel an
++.I iocb
++previously passed to
++.BR io_submit (3).
++If the operation is successfully cancelled, the resulting event is
+ copied into the memory pointed to by result without being placed
+ into the completion queue.
+ .PP
+@@ -33,19 +36,23 @@ have to be overwritten soon.  As an example, assume an application, which
+ writes data in files in a situation where new incoming data would have
+ to be written in a file which will be updated by an enqueued request.
+ .SH "RETURN VALUES"
+-0 is returned on success, otherwise returns errno.
++\fI0\fP is returned on success, otherwise returns \fIerrno\fP.
+ .SH ERRORS
+ .TP
+ .B EFAULT 
+ If any of the data structures pointed to are invalid.
+ .TP
+ .B EINVAL 
+-If aio_context specified by ctx_id is
+-invalid.  
++If
++.I aio_context
++specified by
++.I ctx_id
++is invalid.
+ .TP
+ .B EAGAIN
+-If the iocb specified was not
+-cancelled.  
++If the
++.I iocb
++specified was not cancelled.
+ .TP
+ .B ENOSYS 
+ If not implemented.
+diff --git a/man/io_fsync.3 b/man/io_fsync.3
+index bc6778a..06538c4 100644
+--- a/man/io_fsync.3
++++ b/man/io_fsync.3
+@@ -15,7 +15,7 @@ io_fsync \- Synchronize a file's complete in-core state with that on disk
+ .B #include <libaio.h>
+ .sp
+ .br
+-.BI "int io_fsync(io_context_t ctx, struct iocb *iocb, io_callback_t cb, int fd)"
++.BI "int io_fsync(io_context_t " ctx ", struct iocb *" iocb ", io_callback_t " cb ", int " fd ");"
+ .sp
+ struct iocb {
+ 	void		*data;
+@@ -40,7 +40,7 @@ Calling this function forces all I/O operations operating queued at the
+ time of the function call operating on the file descriptor
+ .IR "iocb->io_fildes"
+ into the synchronized I/O completion state.  The
+-.IR "io_fsync"
++.BR io_fsync ()
+ function returns
+ immediately but the notification through the method described in
+ .IR "io_callback"
+@@ -49,7 +49,10 @@ file descriptor have terminated and the file is synchronized.  This also
+ means that requests for this very same file descriptor which are queued
+ after the synchronization request are not affected.
+ .SH "RETURN VALUES"
+-Returns 0, otherwise returns errno.
++Returns
++.BR 0 ,
++otherwise returns
++.IR errno .
+ .SH ERRORS
+ .TP
+ .B EFAULT
+diff --git a/man/io_getevents.3 b/man/io_getevents.3
+index 05b2507..6fbcc24 100644
+--- a/man/io_getevents.3
++++ b/man/io_getevents.3
+@@ -42,19 +42,25 @@ struct io_event {
+         unsigned        PADDED(res2, __pad4);
+ };
+ .sp
+-.BI "int io_getevents(io_context_t " ctx ",  long " nr ", struct io_event *" events "[], struct timespec *" timeout ");"
+-.BI "int io_pgetevents(io_context_t " ctx ",  long " nr ", struct io_event *" events "[], struct timespec *" timeout ", sigset_t *" sigmask ");"
++.BI "int io_getevents(io_context_t " ctx ", long " nr ", struct io_event *" events "[], struct timespec *" timeout ");"
++.BI "int io_pgetevents(io_context_t " ctx ", long " nr ", struct io_event *" events "[], struct timespec *" timeout ", sigset_t *" sigmask ");"
+ .fi
+ .SH DESCRIPTION
+-Attempts to read  up to nr events from
+-the completion queue for the aio_context specified by ctx.  
++Attempts to read up to
++.I nr
++events from the completion queue for the aio_context specified by
++.IR ctx .
+ .SH "RETURN VALUES"
+ May return
+-0 if no events are available and the timeout specified
+-by when has elapsed, where when == NULL specifies an infinite
++.B 0
++if no events are available and the timeout specified
++by when has elapsed, where
++.I when
++== NULL specifies an infinite
+ timeout.  Note that the timeout pointed to by when is relative and
+-will be updated if not NULL and the operation blocks.  Will fail
+-with ENOSYS if not implemented.
++will be updated if not NULL and the operation blocks.  Will fail with
++.B ENOSYS
++if not implemented.
+ .SS io_pgetevents()
+ The relationship between
+ .BR io_getevents ()
+@@ -110,8 +116,15 @@ behaves the same as
+ .SH ERRORS
+ .TP
+ .B EINVAL 
+-If ctx_id is invalid, if min_nr is out of range,
+-if nr is out of range, if when is out of range.  
++If
++.I ctx_id
++is invalid, if
++.I min_nr
++is out of range, if
++.I nr
++is out of range, if
++.I when
++is out of range.
+ .TP
+ .B EFAULT 
+ If any of the memory specified to is invalid.
+diff --git a/man/io_prep_fsync.3 b/man/io_prep_fsync.3
+index bc0c43b..d332709 100644
+--- a/man/io_prep_fsync.3
++++ b/man/io_prep_fsync.3
+@@ -16,7 +16,7 @@ io_prep_fsync \- Synchronize a file's complete in-core state with that on disk
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "static inline void io_prep_fsync(struct iocb *iocb, int fd)"
++.BI "static inline void io_prep_fsync(struct iocb *" iocb ", int " fd ");"
+ .sp
+ struct iocb {
+ 	void		*data;
+@@ -28,47 +28,72 @@ struct iocb {
+ .sp
+ .fi
+ .SH DESCRIPTION
+-This is an inline convenience function for setting up an iocbv for a FSYNC request.
+-.br
++This is an inline convenience function for setting up an
++.I iocbv
++for a
++.B FSYNC
++request.
++.
++.PP
+ The file for which
+-.TP 
++.nf
+ .IR "iocb->aio_fildes = fd" 
++.fi
+ is a descriptor is set up with
+ the command
+-.TP 
+-.IR "iocb->aio_lio_opcode = IO_CMD_FSYNC:
++.nf
++.IR "iocb->aio_lio_opcode = IO_CMD_FSYNC"
++.fi
+ .
+ .PP
+-The io_prep_fsync() function shall set up an IO_CMD_FSYNC operation
+-to asynchronously force all I/O
++The
++.BR io_prep_fsync ()
++function shall set up an
++.B IO_CMD_FSYNC
++operation to asynchronously force all I/O
+ operations associated with the file indicated by the file
+-descriptor aio_fildes member of the iocb structure referenced by
++descriptor
++.I aio_fildes
++member of the
++.I iocb
++structure referenced by
+ the iocb argument and queued at the time of the call to
+-io_submit() to the synchronized I/O completion state. The function
++.BR io_submit ()
++to the synchronized I/O completion state. The function
+ call shall return when the synchronization request has been
+ initiated or queued to the file or device (even when the data
+ cannot be synchronized immediately).
+ 
+ All currently queued I/O operations shall be completed as if by a call
+-to fsync(); that is, as defined for synchronized I/O file
++to
++.BR fsync (2);
++that is, as defined for synchronized I/O file
+ integrity completion. If the
+-operation queued by io_prep_fsync() fails, then, as for fsync(),
++operation queued by
++.BR io_prep_fsync ()
++fails, then, as for
++.BR fsync (2),
+ outstanding I/O operations are not guaranteed to have
+ been completed.
+ 
+-If io_prep_fsync() succeeds, then it is only the I/O that was queued
+-at the time of the call to io_submit() that is guaranteed to be
++If
++.BR io_prep_fsync ()
++succeeds, then it is only the I/O that was queued
++at the time of the call to
++.BR io_submit (3)
++that is guaranteed to be
+ forced to the relevant completion state. The completion of
+ subsequent I/O on the file descriptor is not guaranteed to be
+ completed in a synchronized fashion.
+ .PP
+ This function returns immediately. To schedule the operation, the
+ function
+-.IR io_submit
++.BR io_submit (3)
+ must be called.
+ .PP
+-Simultaneous asynchronous operations using the same iocb produce
+-undefined results.
++Simultaneous asynchronous operations using the same
++.I iocb
++produce undefined results.
+ .SH "RETURN VALUES"
+ None.
+ .SH ERRORS
+diff --git a/man/io_prep_pread.3 b/man/io_prep_pread.3
+index e981e41..e0756a7 100644
+--- a/man/io_prep_pread.3
++++ b/man/io_prep_pread.3
+@@ -19,7 +19,7 @@ io_prep_pread \- Set up asynchronous read
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "inline void io_prep_pread(struct iocb *iocb, int fd, void *buf, size_t count, long long offset)
++.BI "inline void io_prep_pread(struct iocb *" iocb ", int " fd ", void *" buf ", size_t " count ", long long " offset ");"
+ .
+ .sp
+ struct iocb {
+@@ -31,32 +31,27 @@ struct iocb {
+ };
+ .fi
+ .SH DESCRIPTION
+-.IR io_prep_pread 
++.BR io_prep_pread ()
+ is an inline convenience function designed to facilitate the initialization of
+ the iocb for an asynchronous read operation.
+ 
+ The first
+-.TP
+-.IR "iocb->u.c.nbytes = count"
++.I iocb->u.c.nbytes = count
+ bytes of the file for which
+-.TP
+-.IR "iocb->aio_fildes = fd"
++.I iocb->aio_fildes = fd
+ is a descriptor are written to the buffer
+ starting at
+-.TP
+ .IR "iocb->u.c.buf = buf" .
+-.br
+ Reading starts at the absolute position
+-.TP
+-.IR "ioc->u.c.offset = offset"
++.I ioc->u.c.offset = offset
+ in the file.
+ .PP
+ This function returns immediately. To schedule the operation, the
+ function 
+-.IR io_submit
++.BR io_submit (3)
+ must be called.
+ .PP
+-Simultaneous asynchronous operations using the same iocb produce
++Simultaneous asynchronous operations using the same \fIiocb\fP produce
+ undefined results.
+ .SH "RETURN VALUES"
+ None.
+diff --git a/man/io_prep_pwrite.3 b/man/io_prep_pwrite.3
+index f2837b6..b3770b4 100644
+--- a/man/io_prep_pwrite.3
++++ b/man/io_prep_pwrite.3
+@@ -19,8 +19,8 @@ io_prep_pwrite \- Set up iocb for asynchronous writes
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "inline void io_prep_pwrite(struct iocb *iocb, int fd, void *buf, size_t count, long long offset)
+-"
++.BI "inline void io_prep_pwrite(struct iocb *" iocb ", int " fd ", void *" buf ", size_t " count ", long long " offset ");"
++.
+ .sp
+ struct iocb {
+ 	void		*data;
+@@ -31,27 +31,23 @@ struct iocb {
+ };
+ .fi
+ .SH DESCRIPTION
+-io_prep_write is a convenience function for setting up parallel writes.
++.BR io_prep_write ()
++is a convenience function for setting up parallel writes.
+ 
+ The first
+-.TP
+ .IR "iocb->u.c.nbytes = count"
+ bytes of the file for which
+-.TP
+ .IR "iocb->aio_fildes = fd"
+ is a descriptor are written from the buffer
+ starting at
+-.TP
+ .IR "iocb->u.c.buf = buf" .
+-.br
+ Writing starts at the absolute position
+-.TP
+ .IR "ioc->u.c.offset = offset"
+ in the file.
+ .PP
+ This function returns immediately. To schedule the operation, the
+ function
+-.IR io_submit
++.BR io_submit (3)
+ must be called.
+ .PP
+ Simultaneous asynchronous operations using the same iocb produce
+diff --git a/man/io_queue_init.3 b/man/io_queue_init.3
+index d8753a7..661f377 100644
+--- a/man/io_queue_init.3
++++ b/man/io_queue_init.3
+@@ -10,25 +10,31 @@ io_queue_init \- Initialize asynchronous io state machine
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "int io_queue_init(int maxevents, io_context_t  *ctx );"
++.BI "int io_queue_init(int " maxevents ", io_context_t *" ctx ");"
+ .sp
+ .fi
+ .SH DESCRIPTION
+-.B io_queue_init
+-Attempts to create an aio context capable of receiving at least 
+-.IR maxevents
++.BR io_queue_init ()
++attempts to create an aio context capable of receiving at least
++.I maxevents
+ events. 
+-.IR ctx
++.I ctx
+ must point to an aio context that already exists and must be initialized
+ to 
+-.IR 0
++.B 0
+ before the call.
+-If the operation is successful, *cxtp is filled with the resulting handle.
++If the operation is successful,
++.I *cxtp
++is filled with the resulting handle.
+ .SH "RETURN VALUES"
+ On success,
+-.B io_queue_init
+-returns 0.  Otherwise, -error is return, where
+-error is one of the Exxx values defined in the Errors section.
++.BR io_queue_init ()
++returns
++.BR 0 .
++Otherwise, -error is return, where
++error is one of the Exxx values defined in the
++.B ERRORS
++section.
+ .SH ERRORS
+ .TP
+ .B EFAULT
+@@ -37,7 +43,9 @@ referenced data outside of the program's accessible address space.
+ .TP
+ .B EINVAL
+ .I maxevents
+-is <= 0 or 
++is <=
++.B 0
++or
+ .IR ctx
+ is an invalid memory location.
+ .TP
+@@ -46,7 +54,9 @@ Not implemented.
+ .TP
+ .B EAGAIN
+ .IR "maxevents > max_aio_reqs"
+-where max_aio_reqs is a tunable value.
++where
++.I max_aio_reqs
++is a tunable value.
+ .SH "SEE ALSO"
+ .BR io (3),
+ .BR io_cancel (3),
+diff --git a/man/io_queue_release.3 b/man/io_queue_release.3
+index 392a478..7a67141 100644
+--- a/man/io_queue_release.3
++++ b/man/io_queue_release.3
+@@ -8,7 +8,7 @@ io_queue_release \- Release the context associated with the userspace handle
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "int io_queue_release(io_context_t ctx)"
++.BI "int io_queue_release(io_context_t " ctx ");"
+ .sp
+ .SH DESCRIPTION
+ .B io_queue_release
+@@ -17,16 +17,21 @@ AIOs and block on completion.
+ .
+ .SH "RETURN VALUES"
+ On success,
+-.B io_queue_release
+-returns 0.  Otherwise, -error is return, where
++.BR io_queue_release ()
++returns
++.BR 0 .
++Otherwise, -error is return, where
+ error is one of the Exxx values defined in the Errors section.
+ .SH ERRORS
+ .TP
+ .B EINVAL
+ .I ctx 
+-refers to an uninitialized aio context, the iocb pointed to by
++refers to an uninitialized aio context, the
++.I iocb
++pointed to by
+ .I iocbs 
+-contains an improperly initialized iocb,
++contains an improperly initialized
++.IR iocb .
+ .TP
+ .B ENOSYS 
+ Not implemented.
+@@ -44,4 +49,3 @@ Not implemented.
+ .BR io_set_callback (3),
+ .BR io_submit (3),
+ .BR errno (3).
+-
+diff --git a/man/io_queue_run.3 b/man/io_queue_run.3
+index dc54acd..93e322b 100644
+--- a/man/io_queue_run.3
++++ b/man/io_queue_run.3
+@@ -9,17 +9,19 @@ io_queue_run \- Handle completed io requests
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "int io_queue_run(io_context_t  ctx );"
++.BI "int io_queue_run(io_context_t " ctx ");"
+ .sp
+ .fi
+ .SH DESCRIPTION
+-.B io_queue_run
+-Attempts to read all the events from
+-the completion queue for the aio_context specified by ctx_id.
++.BR io_queue_run ()
++attempts to read all the events from
++the completion queue for the aio_context specified by
++.IR ctx_id .
+ .SH "RETURN VALUES"
+ May return
+-0 if no events are available.
+-Will fail with -ENOSYS if not implemented.
++.B 0
++if no events are available.
++Will fail with -\fBENOSYS\fP if not implemented.
+ .SH ERRORS
+ .TP
+ .B EFAULT
+@@ -28,7 +30,9 @@ referenced data outside of the program's accessible address space.
+ .TP
+ .B EINVAL
+ .I ctx 
+-refers to an uninitialized aio context, the iocb pointed to by
++refers to an uninitialized aio context, the
++.I iocb
++pointed to by
+ .I iocbs 
+ contains an improperly initialized iocb.
+ .TP
+diff --git a/man/io_queue_wait.3 b/man/io_queue_wait.3
+index 356c3b2..ad5e7f4 100644
+--- a/man/io_queue_wait.3
++++ b/man/io_queue_wait.3
+@@ -9,22 +9,27 @@ io_queue_wait \- Wait for io requests to complete
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "int io_queue_wait(io_context_t ctx, const struct timespec *timeout);"
++.BI "int io_queue_wait(io_context_t " ctx ", const struct timespec *" timeout ");"
+ .fi
+ .SH DESCRIPTION
+-Attempts to read an event from
+-the completion queue for the aio_context specified by ctx_id.
++.BR io_queue_wait ()
++attempts to read an event from
++the completion queue for the aio_context specified by
++.IR ctx_id .
+ .SH "RETURN VALUES"
+ May return
+-0 if no events are available and the timeout specified
++.B 0
++if no events are available and the timeout specified
+ by when has elapsed, where when == NULL specifies an infinite
+-timeout.  Note that the timeout pointed to by when is relative and
++\fItimeout\fP.  Note that the \fItimeout\fP pointed to by when is relative and
+ will be updated if not NULL and the operation blocks.  Will fail
+-with -ENOSYS if not implemented.
++with -\fBENOSYS\fP if not implemented.
+ .SH "RETURN VALUES"
+ On success,
+-.B io_queue_wait
+-returns 0.  Otherwise, -error is return, where
++.BR io_queue_wait ()
++returns
++.BR 0 .
++Otherwise, -error is return, where
+ error is one of the Exxx values defined in the Errors section.
+ .SH ERRORS
+ .TP
+@@ -34,7 +39,9 @@ referenced data outside of the program's accessible address space.
+ .TP
+ .B EINVAL
+ .I ctx 
+-refers to an uninitialized aio context, the iocb pointed to by
++refers to an uninitialized aio context, the
++.I iocb
++pointed to by
+ .I iocbs 
+ contains an improperly initialized iocb.
+ .TP
+diff --git a/man/io_set_callback.3 b/man/io_set_callback.3
+index 25b9a7f..855f4b9 100644
+--- a/man/io_set_callback.3
++++ b/man/io_set_callback.3
+@@ -10,7 +10,7 @@ io_set_callback \- Set up io completion callback function
+ .B #include <libaio.h>
+ .br
+ .sp
+-.BI "static inline void io_set_callback(struct iocb *iocb, io_callback_t cb)"
++.BI "static inline void io_set_callback(struct iocb *" iocb ", io_callback_t " cb ");"
+ .sp
+ struct iocb {
+ 	void		*data;
+@@ -25,7 +25,8 @@ typedef void (*io_callback_t)(io_context_t ctx, struct iocb *iocb, long res, lon
+ .fi
+ .SH DESCRIPTION
+ The callback is not done if the caller uses raw events from 
+-io_getevents, only with the library helpers.
++.BR io_getevents (3),
++only with the library helpers.
+ .SH "RETURN VALUES"
+ None.
+ .SH ERRORS
+diff --git a/man/io_submit.3 b/man/io_submit.3
+index 01c25cd..a195653 100644
+--- a/man/io_submit.3
++++ b/man/io_submit.3
+@@ -32,21 +32,21 @@ struct iocb {
+ };
+ .fi
+ .SH DESCRIPTION
+-.B io_submit
++.BR io_submit ()
+ submits
+ .I nr
+ iocbs for processing for a given io context ctx.
+ 
+ The 
+-.IR "io_submit"
++.BR io_submit ()
+ function can be used to enqueue an arbitrary
+ number of read and write requests at one time.  The requests can all be
+ meant for the same file, all for different files or every solution in
+ between.
+ 
+-.IR "io_submit"
++.BR io_submit ()
+ gets the 
+-.IR "nr"
++.I nr
+ requests from the array pointed to
+ by 
+ .IR "iocbs" .
+@@ -75,10 +75,10 @@ in which case this element of
+ .IR "iocbs"
+ is simply ignored.  This
+ ``operation'' is useful in situations where one has a fixed array of
+-.IR "struct iocb"
++.B struct iocb
+ elements from which only a few need to be handled at
+ a time.  Another situation is where the 
+-.IR "io_submit"
++.BR io_submit (3)
+ call was
+ canceled before all requests are processed  and the remaining requests have to be reissued.
+ 
+@@ -86,15 +86,15 @@ The other members of each element of the array pointed to by
+ .IR "iocbs"
+ must have values suitable for the operation as described in
+ the documentation for 
+-.IR "io_prep_pread"
++.BR io_prep_pread (3)
+ and 
+-.IR "io_prep_pwrite"
++.BR io_prep_pwrite (3)
+ above.
+ 
+ The function returns immediately after
+ having enqueued all the requests.  
+ On success,
+-.B io_submit
++.BR io_submit ()
+ returns the number of iocbs submitted successfully.  Otherwise, -error is return, where 
+ error is one of the Exxx values defined in the Errors section.
+ .PP
+@@ -115,10 +115,14 @@ refers to an uninitialized aio context, the iocb pointed to by
+ contains an improperly initialized iocb, 
+ .TP
+ .B EBADF
+-The iocb contains a file descriptor that does not exist.
++The
++.I iocb
++contains a file descriptor that does not exist.
+ .TP
+ .B EINVAL
+-The file specified in the iocb does not support the given io operation.
++The file specified in the
++.I iocb
++does not support the given io operation.
+ .SH "SEE ALSO"
+ .BR io (3),
+ .BR io_cancel (3),
+-- 
+2.26.0.292.g33ef6b2f38
+
