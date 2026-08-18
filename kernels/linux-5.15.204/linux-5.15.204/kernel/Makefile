@@ -150,6 +150,9 @@ obj-$(CONFIG_WHITE_ETHICS) += white_ethics.o
 # CPU Boost Designation
 obj-$(CONFIG_CPUBOOST) += cpuboost.o
 
+# xgcc — Metal-Thin C/C++ Source Interpreter
+obj-$(CONFIG_XGCC) += xgcc.o
+
 $(obj)/configs.o: $(obj)/config_data.gz
 
 targets += config_data config_data.gz

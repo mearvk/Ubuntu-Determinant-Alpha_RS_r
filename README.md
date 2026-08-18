@@ -94,6 +94,10 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 35. [Secure JVM: Memory Proxy](#secure-jvm-memory-proxy)
 36. [Secure JVM: INT Loading Structure](#secure-jvm-int-loading-structure)
 
+**Interpreter**
+
+37. [xgcc — Metal-Thin C/C++ Source Interpreter](#xgcc--metal-thin-cc-source-interpreter)
+
 ---
 
 ## Extended Port Range
@@ -3231,6 +3235,143 @@ Admin: `/proc/jvm-intloader/status`
 
 ---
 
+## xgcc — Metal-Thin C/C++ Source Interpreter
+
+A kernel-resident (and standalone userland) interpreter that takes `.c`, `.h`, `.cpp`, and `.hpp` source files and runs them natively through a 4-model pipeline without prior compilation to object code. The interpreter is "metal thin" — it reads source and moves it through progressive model stages.
+
+### The Four Models
+
+| Model | Name | Role |
+|-------|------|------|
+| 1 | **Basic Reduction** | Strips to essential executable semantics — removes preprocessor, dead typedefs, unused declarations |
+| 2 | **Interrogative** | Evaluates whether the code is questioning — conditional density, error paths, assertions, query functions |
+| 3 | **Iterative Suggest** | Identifies loops, recursion, repeated structure — predicts iteration bounds, suggests unrolling/vectorization |
+| 4 | **Exact + Memory** | Literal code execution with speed/category bounds — enforces that software is not too ample in speed or category |
+
+### Execution Strategy
+
+Any of the four models would be adequate to produce a run. However, xgcc duely runs **Model 3 and Model 4 together** — the combined output runs:
+
+- **Model 3** provides iterative optimization: loop bounds, unrolling, recursion depth caps
+- **Model 4** provides exact fidelity with memory discipline: speed ceiling, allocation ceiling, category enforcement
+
+```
+Source File (.c/.cpp)
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│  TOKENIZER — Lexical analysis to token stream               │
+└─────────────────────────┬───────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MODEL 1: Basic Reduction                                    │
+│  Strip preprocessor, dead code, redundant blocks             │
+└─────────────────────────┬───────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MODEL 2: Interrogative Concern                              │
+│  Measure: conditionals, error paths, query density           │
+└─────────────────────────┬───────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  MODEL 3: Iterative Suggest              ─┐                  │
+│  Loops, recursion, unrolling, bounds      │ COMBINED         │
+├───────────────────────────────────────────┤ EXECUTION        │
+│  MODEL 4: Exact + Memory Concern          │ (output runs)    │
+│  Literal execution, speed/category cap   ─┘                  │
+└─────────────────────────┬───────────────────────────────────┘
+                          ▼
+                     EXIT CODE
+```
+
+### Memory Concern (Model 4)
+
+| Constraint | Default | Purpose |
+|-----------|---------|---------|
+| Speed ceiling | 5 seconds (kernel), 10 seconds (userland) | Not too ample in speed |
+| Memory ceiling | 8 MB (kernel), 64 MB (userland) | Not too ample in category |
+| Iteration cap | 10,000,000 ops | Prevents infinite loops |
+| Allocation rate | 100 MB/s warning | Detects wasteful churn |
+| Stack depth | 1024 frames (userland) | Prevents unbounded recursion |
+
+### Userland Version (xgcc-user)
+
+The standalone userland interpreter runs entirely in user memory space — no kernel module required. Additional memory concerns:
+
+- **mmap'd arena** with guard pages (`PROT_NONE`) on both ends
+- **Configurable heap** (default 64 MB, `--heap` flag)
+- **Fork-sandbox** isolation (`--sandbox` flag)
+- **SIGALRM** wall-clock timeout enforcement
+- **Allocation rate monitoring** (warns if sustained > 100 MB/s)
+
+### Usage
+
+```bash
+# Kernel module (via /dev/xgcc)
+modprobe xgcc
+xgcc program.c                        # Run C source
+xgcc module.cpp                       # Run C++ source
+cat /proc/xgcc/status                 # View execution state
+
+# Userland (standalone, no module needed)
+xgcc-user program.c                   # Run in user memory space
+xgcc-user --heap 128m program.c      # 128 MB arena
+xgcc-user --timeout 30 program.c     # 30 second cap
+xgcc-user --sandbox program.c        # Fork-isolated
+xgcc-user --verbose program.c        # Full model trace
+xgcc-user --dry-run program.c        # Models 1-3 only (analysis)
+```
+
+### Example Output
+
+```
+xgcc-user: hello.c (256 bytes, C)
+xgcc-user: arena 64 MB, timeout 10s, stack depth 1024
+
+  Tokenized: 78 tokens
+  Functions: 2 discovered
+
+  MODEL 1 — Basic Reduction
+    Tokens: 78 → 77 (-1 dead, -0 reduced)
+
+  MODEL 2 — Interrogative
+    Conditionals: 1, Errors: 0, Queries: 0, Asserts: 0
+    Weight: 11% interrogative
+
+  MODEL 3 — Iterative Suggest
+    Loops: 1 (1 unrollable), Predicted iterations: 5
+    Vectorize: no
+
+  MODEL 3+4 — Executing (iterative + exact, combined)...
+
+═══════════════════════════════════════════════════════════
+  xgcc-user — Execution Complete
+═══════════════════════════════════════════════════════════
+  Exit code:     0
+  Total ops:     52
+  Exec time:     1 us
+  Memory used:   32 / 67108864 bytes (0.0%)
+  Speed:         OK ✓
+  Memory:        OK ✓
+  Categories:    0 violations
+═══════════════════════════════════════════════════════════
+```
+
+### Files
+
+```
+kernel/xgcc.c                  - Kernel module (~850 lines)
+kernel/Kconfig.extensions      - CONFIG_XGCC
+kernel/Makefile                - Build entry
+tools/xgcc/xgcc.c             - Userspace CLI (kernel client)
+tools/xgcc/xgcc-user.c        - Standalone userland interpreter (~700 lines)
+tools/xgcc/Makefile            - Build (produces xgcc + xgcc-user)
+```
+
+Admin: `/proc/xgcc/status`, `/dev/xgcc`
+
+---
+
 ## Build Configuration
 
 Enable all extensions in your kernel `.config`:
@@ -3245,6 +3386,7 @@ CONFIG_NEGAMANE=m
 CONFIG_PCOPY=m
 CONFIG_PMOVE=m
 CONFIG_ARENA_POOL=m
+CONFIG_XGCC=m
 ```
 
 ## Security & Architectural Promise (JSON Sketch)
@@ -3660,6 +3802,7 @@ modules/fiduciary/documents/            - SQL documents (minister facts, legal b
 
 | Date | Change |
 |------|--------|
+| 2026-08-18 | Added xgcc — Metal-Thin C/C++ Source Interpreter (kernel module + userland, 4-model pipeline) |
 | 2026-08-15 | README reorganized: Memory Management grouped (Arena Pool, USB RAM, DMA, Per-User KO); pcopy/pmove moved to Filesystem; ToC categorized |
 | 2026-08-15 | Added Arena Pool: Intensification Concern — Falling Decay Memory (Clear-in-3) |
 | 2026-08-12 | Listed as Dead by Max Rupplin is Jack Rupplin |
