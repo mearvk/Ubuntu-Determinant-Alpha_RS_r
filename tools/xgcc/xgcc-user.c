@@ -164,6 +164,63 @@ struct xvariable {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
+ *  Runtime Data Store
+ *
+ *  Holds struct array initializer data and loop variable state so
+ *  that printf/puts calls can resolve expressions like:
+ *    history[i].capital
+ *    history[i].start_year
+ * ═══════════════════════════════════════════════════════════════════ */
+
+#define XGCC_MAX_FIELDS      16
+#define XGCC_MAX_ROWS        256
+#define XGCC_MAX_LOOP_VARS   16
+
+/* A field is either int or string */
+struct xfield {
+    enum { FIELD_INT, FIELD_STR } type;
+    union {
+        long long ival;
+        char sval[256];
+    };
+};
+
+/* A row is one struct instance */
+struct xrow {
+    struct xfield fields[XGCC_MAX_FIELDS];
+    int field_count;
+};
+
+/* A data array (e.g. history[]) */
+struct xdata_array {
+    char name[64];              /* variable name */
+    char field_names[XGCC_MAX_FIELDS][64]; /* struct member names */
+    int field_count;
+    struct xrow rows[XGCC_MAX_ROWS];
+    int row_count;
+};
+
+/* Loop variable */
+struct xloop_var {
+    char name[64];
+    long long value;
+    long long limit;
+    long long step;
+    int active;
+};
+
+/* Runtime store */
+struct xruntime {
+    struct xdata_array arrays[8];
+    int array_count;
+    struct xloop_var loops[XGCC_MAX_LOOP_VARS];
+    int loop_count;
+    /* Simple int variables (e.g. total_records) */
+    struct { char name[64]; long long val; } ivars[64];
+    int ivar_count;
+};
+
+/* ═══════════════════════════════════════════════════════════════════
  *  User Memory Arena
  *
  *  The interpreted program's heap lives inside a mmap'd arena with
@@ -357,6 +414,9 @@ struct xgcc_user_ctx {
     unsigned long total_ops;
     unsigned long total_runs;
     struct timespec start_time;
+
+    /* Runtime data store (heap-allocated, too large for stack) */
+    struct xruntime *rt;
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -486,8 +546,24 @@ static int tokenize(struct xgcc_user_ctx *ctx)
             p++;
             int len = 0;
             while (p < end && *p != '"' && len < 254) {
-                if (*p == '\\' && p + 1 < end) { p++; }
-                t->str_val[len++] = *p++;
+                if (*p == '\\' && p + 1 < end) {
+                    p++;
+                    switch (*p) {
+                        case 'n': t->str_val[len++] = '\n'; break;
+                        case 't': t->str_val[len++] = '\t'; break;
+                        case 'r': t->str_val[len++] = '\r'; break;
+                        case '0': t->str_val[len++] = '\0'; break;
+                        case '\\': t->str_val[len++] = '\\'; break;
+                        case '"': t->str_val[len++] = '"'; break;
+                        case '\'': t->str_val[len++] = '\''; break;
+                        case 'a': t->str_val[len++] = '\a'; break;
+                        case 'b': t->str_val[len++] = '\b'; break;
+                        default: t->str_val[len++] = *p; break;
+                    }
+                    p++;
+                } else {
+                    t->str_val[len++] = *p++;
+                }
             }
             t->str_val[len] = '\0';
             t->type = TOK_STRING_LIT;
@@ -730,6 +806,425 @@ static void discover_functions(struct xgcc_user_ctx *ctx)
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+ *  Runtime Data Extraction (Pre-execution)
+ *
+ *  Scans the token stream for:
+ *    1. Struct type definitions (field names)
+ *    2. Array initializers (row data)
+ *    3. For loop headers (loop variable, bounds)
+ *    4. Simple int assignments (sizeof expressions)
+ * ═══════════════════════════════════════════════════════════════════ */
+
+static void extract_runtime_data(struct xgcc_user_ctx *ctx)
+{
+    struct xruntime *rt = ctx->rt;
+    rt->array_count = 0;
+    rt->loop_count = 0;
+    rt->ivar_count = 0;
+
+    int i;
+
+    /* Pass 1: Find struct definitions and remember field names */
+    /* Pattern: typedef struct { type field; type field; ... } Name; */
+    /* Or: struct Name { ... }; */
+    for (i = 0; i < ctx->token_count - 5; i++) {
+        if (ctx->tokens[i].type == TOK_KEYWORD &&
+            strcmp(ctx->tokens[i].str_val, "typedef") == 0 &&
+            i + 1 < ctx->token_count &&
+            ctx->tokens[i+1].type == TOK_KEYWORD &&
+            strcmp(ctx->tokens[i+1].str_val, "struct") == 0) {
+
+            /* Find the fields inside { ... } */
+            int j = i + 2;
+            while (j < ctx->token_count && ctx->tokens[j].type != TOK_LBRACE) j++;
+            j++; /* skip { */
+
+            /* We'll store fields for the next array we find */
+            int fc = 0;
+            char fields[XGCC_MAX_FIELDS][64];
+            while (j < ctx->token_count && ctx->tokens[j].type != TOK_RBRACE && fc < XGCC_MAX_FIELDS) {
+                /* Pattern: type name; or type name[N]; */
+                if (ctx->tokens[j].type == TOK_KEYWORD || ctx->tokens[j].type == TOK_IDENT) {
+                    /* skip type */
+                    j++;
+                    if (j < ctx->token_count && ctx->tokens[j].type == TOK_IDENT) {
+                        strncpy(fields[fc], ctx->tokens[j].str_val, 63);
+                        fields[fc][63] = '\0';
+                        fc++;
+                    }
+                    /* skip to semicolon */
+                    while (j < ctx->token_count && ctx->tokens[j].type != TOK_SEMICOLON) j++;
+                }
+                j++;
+            }
+
+            /* Find the typedef name after } */
+            while (j < ctx->token_count && ctx->tokens[j].type != TOK_RBRACE) j++;
+            j++; /* skip } */
+
+            /* Store field info for next array that uses this type */
+            if (fc > 0 && rt->array_count < 8) {
+                struct xdata_array *arr = &rt->arrays[rt->array_count];
+                arr->field_count = fc;
+                for (int f = 0; f < fc; f++)
+                    strncpy(arr->field_names[f], fields[f], 63);
+                /* Name will be filled when we find the array declaration */
+            }
+        }
+    }
+
+    /* Pass 2: Find array initializers with struct data */
+    /* Pattern: TypeName varname[] = { {v,v,v,...}, {v,v,v,...}, ... }; */
+    for (i = 0; i < ctx->token_count - 4; i++) {
+        if (ctx->tokens[i].type == TOK_IDENT &&
+            ctx->tokens[i+1].type == TOK_IDENT &&
+            ctx->tokens[i+2].type == TOK_LBRACKET &&
+            ctx->tokens[i+3].type == TOK_RBRACKET) {
+
+            /* Found: TypeName varname[] */
+            const char *varname = ctx->tokens[i+1].str_val;
+
+            /* Look for = { */
+            int j = i + 4;
+            if (j < ctx->token_count && ctx->tokens[j].type == TOK_ASSIGN) j++;
+            if (j >= ctx->token_count || ctx->tokens[j].type != TOK_LBRACE) continue;
+            j++; /* skip outer { */
+
+            /* Use existing array slot or create new one */
+            struct xdata_array *arr;
+            if (rt->array_count > 0 && rt->arrays[rt->array_count - 1].name[0] == '\0') {
+                /* Use the slot prepared by struct typedef */
+                arr = &rt->arrays[rt->array_count - 1];
+            } else if (rt->array_count < 8) {
+                arr = &rt->arrays[rt->array_count];
+                arr->field_count = 0;
+            } else {
+                continue;
+            }
+            strncpy(arr->name, varname, 63);
+            arr->name[63] = '\0';
+            arr->row_count = 0;
+
+            /* Parse rows: each { val, val, val, ... } */
+            while (j < ctx->token_count && ctx->tokens[j].type != TOK_SEMICOLON &&
+                   arr->row_count < XGCC_MAX_ROWS) {
+                if (ctx->tokens[j].type == TOK_LBRACE) {
+                    j++; /* skip row { */
+                    struct xrow *row = &arr->rows[arr->row_count];
+                    row->field_count = 0;
+
+                    while (j < ctx->token_count && ctx->tokens[j].type != TOK_RBRACE &&
+                           row->field_count < XGCC_MAX_FIELDS) {
+                        if (ctx->tokens[j].type == TOK_INT_LIT) {
+                            row->fields[row->field_count].type = FIELD_INT;
+                            row->fields[row->field_count].ival = ctx->tokens[j].int_val;
+                            row->field_count++;
+                        } else if (ctx->tokens[j].type == TOK_STRING_LIT) {
+                            row->fields[row->field_count].type = FIELD_STR;
+                            strncpy(row->fields[row->field_count].sval,
+                                    ctx->tokens[j].str_val, 255);
+                            row->field_count++;
+                        }
+                        /* Skip commas and other tokens */
+                        j++;
+                    }
+                    if (j < ctx->token_count && ctx->tokens[j].type == TOK_RBRACE) j++;
+                    if (j < ctx->token_count && ctx->tokens[j].type == TOK_COMMA) j++;
+
+                    /* Update field count from first row if not set by typedef */
+                    if (arr->field_count == 0 && row->field_count > 0)
+                        arr->field_count = row->field_count;
+
+                    arr->row_count++;
+                } else {
+                    j++;
+                }
+            }
+
+            if (arr == &rt->arrays[rt->array_count] || (rt->array_count > 0 && arr == &rt->arrays[rt->array_count - 1])) {
+                if (arr == &rt->arrays[rt->array_count])
+                    rt->array_count++;
+                /* else it was already counted from typedef pass */
+                else if (arr->name[0] != '\0' && arr->row_count > 0 && rt->array_count == 0)
+                    rt->array_count = 1;
+            }
+            /* Ensure we count it */
+            if (arr->name[0] != '\0' && arr->row_count > 0) {
+                int found = 0;
+                for (int k = 0; k < rt->array_count; k++)
+                    if (&rt->arrays[k] == arr) { found = 1; break; }
+                if (!found && rt->array_count < 8) rt->array_count++;
+            }
+        }
+    }
+
+    /* Pass 3: Find for loop headers */
+    /* Pattern: for (type i = START; i < LIMIT; i++) */
+    for (i = 0; i < ctx->token_count - 8; i++) {
+        if (ctx->tokens[i].type == TOK_KEYWORD &&
+            strcmp(ctx->tokens[i].str_val, "for") == 0 &&
+            ctx->tokens[i+1].type == TOK_LPAREN) {
+
+            int j = i + 2;
+            /* skip optional type (int, etc) */
+            if (j < ctx->token_count && ctx->tokens[j].type == TOK_KEYWORD) j++;
+
+            /* loop variable name */
+            if (j < ctx->token_count && ctx->tokens[j].type == TOK_IDENT &&
+                rt->loop_count < XGCC_MAX_LOOP_VARS) {
+                struct xloop_var *lv = &rt->loops[rt->loop_count];
+                strncpy(lv->name, ctx->tokens[j].str_val, 63);
+                lv->name[63] = '\0';
+                lv->value = 0;
+                lv->step = 1;
+                lv->active = 1;
+
+                /* Find = init_val */
+                j++;
+                if (j < ctx->token_count && ctx->tokens[j].type == TOK_ASSIGN) {
+                    j++;
+                    if (j < ctx->token_count && ctx->tokens[j].type == TOK_INT_LIT)
+                        lv->value = ctx->tokens[j].int_val;
+                }
+
+                /* Find < limit or <= limit */
+                while (j < ctx->token_count && ctx->tokens[j].type != TOK_SEMICOLON) j++;
+                j++; /* skip ; */
+                /* Now find the comparison */
+                while (j < ctx->token_count &&
+                       ctx->tokens[j].type != TOK_LT && ctx->tokens[j].type != TOK_LEQ &&
+                       ctx->tokens[j].type != TOK_SEMICOLON) j++;
+                if (j < ctx->token_count && (ctx->tokens[j].type == TOK_LT || ctx->tokens[j].type == TOK_LEQ)) {
+                    j++;
+                    if (j < ctx->token_count && ctx->tokens[j].type == TOK_INT_LIT)
+                        lv->limit = ctx->tokens[j].int_val;
+                    else if (j < ctx->token_count && ctx->tokens[j].type == TOK_IDENT) {
+                        /* Reference to variable like total_records */
+                        /* Will be resolved later */
+                        const char *lname = ctx->tokens[j].str_val;
+                        /* Check ivars */
+                        for (int k = 0; k < rt->ivar_count; k++) {
+                            if (strcmp(rt->ivars[k].name, lname) == 0) {
+                                lv->limit = rt->ivars[k].val;
+                                break;
+                            }
+                        }
+                        /* Check array row counts */
+                        for (int k = 0; k < rt->array_count; k++) {
+                            /* If limit var matches something like sizeof/total pattern */
+                            if (lv->limit == 0 && rt->arrays[k].row_count > 0)
+                                lv->limit = rt->arrays[k].row_count;
+                        }
+                    }
+                }
+                rt->loop_count++;
+            }
+        }
+    }
+
+    /* Pass 4: Simple int assignments (e.g. int total_records = sizeof(...)/sizeof(...)) */
+    for (i = 0; i < ctx->token_count - 3; i++) {
+        if (ctx->tokens[i].type == TOK_KEYWORD &&
+            strcmp(ctx->tokens[i].str_val, "int") == 0 &&
+            ctx->tokens[i+1].type == TOK_IDENT &&
+            ctx->tokens[i+2].type == TOK_ASSIGN &&
+            rt->ivar_count < 64) {
+
+            const char *vname = ctx->tokens[i+1].str_val;
+            int j = i + 3;
+
+            /* Check for sizeof(arr) / sizeof(arr[0]) pattern */
+            if (j < ctx->token_count && ctx->tokens[j].type == TOK_KEYWORD &&
+                strcmp(ctx->tokens[j].str_val, "sizeof") == 0) {
+                /* Find the array referenced */
+                j++;
+                if (j < ctx->token_count && ctx->tokens[j].type == TOK_LPAREN) j++;
+                if (j < ctx->token_count && ctx->tokens[j].type == TOK_IDENT) {
+                    const char *aname = ctx->tokens[j].str_val;
+                    for (int k = 0; k < rt->array_count; k++) {
+                        if (strcmp(rt->arrays[k].name, aname) == 0) {
+                            strncpy(rt->ivars[rt->ivar_count].name, vname, 63);
+                            rt->ivars[rt->ivar_count].val = rt->arrays[k].row_count;
+                            rt->ivar_count++;
+                            break;
+                        }
+                    }
+                }
+            } else if (j < ctx->token_count && ctx->tokens[j].type == TOK_INT_LIT) {
+                strncpy(rt->ivars[rt->ivar_count].name, vname, 63);
+                rt->ivars[rt->ivar_count].val = ctx->tokens[j].int_val;
+                rt->ivar_count++;
+            }
+        }
+    }
+
+    /* Fix up loop limits that reference ivars discovered in pass 4 */
+    for (int l = 0; l < rt->loop_count; l++) {
+        if (rt->loops[l].limit == 0) {
+            /* Try to resolve from first array's row count */
+            if (rt->array_count > 0)
+                rt->loops[l].limit = rt->arrays[0].row_count;
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Runtime Expression Resolver
+ *
+ *  Resolves expressions like: history[i].capital → "Delhi"
+ *  Given the current loop variable state.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* Resolve an identifier or array[idx].field to a string or int */
+static int resolve_expr_str(struct xgcc_user_ctx *ctx, int pos, char *out, int outsz)
+{
+    struct xruntime *rt = ctx->rt;
+    out[0] = '\0';
+
+    if (pos >= ctx->token_count) return 0;
+
+    struct token *t = &ctx->tokens[pos];
+
+    /* Simple string literal */
+    if (t->type == TOK_STRING_LIT) {
+        strncpy(out, t->str_val, outsz - 1);
+        out[outsz - 1] = '\0';
+        return 1;
+    }
+
+    /* Identifier — check if it's array[idx].field */
+    if (t->type == TOK_IDENT && pos + 5 < ctx->token_count &&
+        ctx->tokens[pos+1].type == TOK_LBRACKET) {
+
+        const char *arrname = t->str_val;
+        /* Find the array */
+        struct xdata_array *arr = NULL;
+        for (int k = 0; k < rt->array_count; k++) {
+            if (strcmp(rt->arrays[k].name, arrname) == 0) {
+                arr = &rt->arrays[k];
+                break;
+            }
+        }
+        if (!arr) return 0;
+
+        /* Get index: array[i] or array[N] */
+        int idx_pos = pos + 2;
+        long long idx = 0;
+        if (ctx->tokens[idx_pos].type == TOK_INT_LIT) {
+            idx = ctx->tokens[idx_pos].int_val;
+        } else if (ctx->tokens[idx_pos].type == TOK_IDENT) {
+            /* Loop variable reference */
+            for (int l = 0; l < rt->loop_count; l++) {
+                if (strcmp(rt->loops[l].name, ctx->tokens[idx_pos].str_val) == 0) {
+                    idx = rt->loops[l].value;
+                    break;
+                }
+            }
+        }
+
+        if (idx < 0 || idx >= arr->row_count) {
+            strncpy(out, "(null)", outsz - 1);
+            return 1;
+        }
+
+        /* Find .field after ] */
+        /* pos+3 should be ], pos+4 should be . */
+        int dot_pos = pos + 4;
+        if (dot_pos < ctx->token_count && ctx->tokens[dot_pos].type == TOK_DOT &&
+            dot_pos + 1 < ctx->token_count && ctx->tokens[dot_pos+1].type == TOK_IDENT) {
+
+            const char *fname = ctx->tokens[dot_pos+1].str_val;
+            /* Find field index */
+            int fi = -1;
+            for (int f = 0; f < arr->field_count; f++) {
+                if (strcmp(arr->field_names[f], fname) == 0) {
+                    fi = f;
+                    break;
+                }
+            }
+
+            if (fi >= 0 && fi < arr->rows[idx].field_count) {
+                struct xfield *field = &arr->rows[idx].fields[fi];
+                if (field->type == FIELD_STR) {
+                    strncpy(out, field->sval, outsz - 1);
+                    out[outsz - 1] = '\0';
+                } else {
+                    snprintf(out, outsz, "%lld", field->ival);
+                }
+                return 1;
+            }
+        }
+    }
+
+    /* Simple variable lookup */
+    if (t->type == TOK_IDENT) {
+        for (int k = 0; k < rt->ivar_count; k++) {
+            if (strcmp(rt->ivars[k].name, t->str_val) == 0) {
+                snprintf(out, outsz, "%lld", rt->ivars[k].val);
+                return 1;
+            }
+        }
+        for (int l = 0; l < rt->loop_count; l++) {
+            if (strcmp(rt->loops[l].name, t->str_val) == 0) {
+                snprintf(out, outsz, "%lld", rt->loops[l].value);
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+static long long resolve_expr_int(struct xgcc_user_ctx *ctx, int pos)
+{
+    struct xruntime *rt = ctx->rt;
+
+    if (pos >= ctx->token_count) return 0;
+    struct token *t = &ctx->tokens[pos];
+
+    if (t->type == TOK_INT_LIT) return t->int_val;
+
+    /* array[idx].field (int) */
+    if (t->type == TOK_IDENT && pos + 5 < ctx->token_count &&
+        ctx->tokens[pos+1].type == TOK_LBRACKET) {
+        char buf[256];
+        if (resolve_expr_str(ctx, pos, buf, sizeof(buf)))
+            return atoll(buf);
+    }
+
+    /* Simple variable */
+    if (t->type == TOK_IDENT) {
+        for (int k = 0; k < rt->ivar_count; k++)
+            if (strcmp(rt->ivars[k].name, t->str_val) == 0) return rt->ivars[k].val;
+        for (int l = 0; l < rt->loop_count; l++)
+            if (strcmp(rt->loops[l].name, t->str_val) == 0) return rt->loops[l].value;
+    }
+
+    return 0;
+}
+
+/* Count how many tokens an expression like arr[i].field takes */
+static int expr_token_len(struct xgcc_user_ctx *ctx, int pos)
+{
+    if (pos >= ctx->token_count) return 0;
+    if (ctx->tokens[pos].type == TOK_INT_LIT || ctx->tokens[pos].type == TOK_STRING_LIT ||
+        ctx->tokens[pos].type == TOK_CHAR_LIT || ctx->tokens[pos].type == TOK_FLOAT_LIT)
+        return 1;
+
+    if (ctx->tokens[pos].type == TOK_IDENT) {
+        if (pos + 1 < ctx->token_count && ctx->tokens[pos+1].type == TOK_LBRACKET) {
+            /* array[idx].field = 6 tokens: name [ idx ] . field */
+            if (pos + 5 < ctx->token_count && ctx->tokens[pos+4].type == TOK_DOT)
+                return 6;
+            else
+                return 4; /* name [ idx ] */
+        }
+        return 1;
+    }
+    return 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
  *  Model 4: Exact Execution + Memory Concern (Userland)
  *
  *  Walks the token stream and interprets. Enforces:
@@ -815,6 +1310,138 @@ static int run_model4(struct xgcc_user_ctx *ctx)
                     ctx->running = 0;
                 else
                     ctx->call_depth--;
+            } else if (strcmp(tok->str_val, "for") == 0) {
+                /* For loop: find body, iterate using runtime loop vars */
+                /* Skip past for(...) to the { */
+                int j = ctx->token_pos + 1;
+                /* skip ( ... ) */
+                if (j < ctx->token_count && ctx->tokens[j].type == TOK_LPAREN) {
+                    int pd = 1; j++;
+                    while (j < ctx->token_count && pd > 0) {
+                        if (ctx->tokens[j].type == TOK_LPAREN) pd++;
+                        else if (ctx->tokens[j].type == TOK_RPAREN) pd--;
+                        j++;
+                    }
+                }
+                /* j now points to { of loop body */
+                int body_start = j;
+                if (body_start < ctx->token_count && ctx->tokens[body_start].type == TOK_LBRACE) {
+                    /* Find matching } */
+                    int bd = 1;
+                    int body_end = body_start + 1;
+                    while (body_end < ctx->token_count && bd > 0) {
+                        if (ctx->tokens[body_end].type == TOK_LBRACE) bd++;
+                        else if (ctx->tokens[body_end].type == TOK_RBRACE) bd--;
+                        body_end++;
+                    }
+                    /* body_end points past the } */
+
+                    /* Find the loop variable from runtime */
+                    struct xloop_var *lv = NULL;
+                    for (int l = 0; l < ctx->rt->loop_count; l++) {
+                        if (ctx->rt->loops[l].active) {
+                            lv = &ctx->rt->loops[l];
+                            break;
+                        }
+                    }
+
+                    if (lv && lv->limit > 0) {
+                        /* Execute loop body for each iteration */
+                        long long saved_val = lv->value;
+                        for (lv->value = saved_val; lv->value < lv->limit; lv->value += lv->step) {
+                            /* Walk the body tokens */
+                            int saved_pos = ctx->token_pos;
+                            ctx->token_pos = body_start + 1; /* skip { */
+                            while (ctx->running && ctx->token_pos < body_end - 1) {
+                                struct token *bt = &ctx->tokens[ctx->token_pos];
+                                /* Handle printf/puts inside loop body */
+                                if (bt->type == TOK_IDENT &&
+                                    ctx->token_pos + 1 < ctx->token_count &&
+                                    ctx->tokens[ctx->token_pos + 1].type == TOK_LPAREN) {
+                                    /* Delegate to the IDENT handler by breaking out */
+                                    /* Instead, inline the printf handling here */
+                                    const char *fname = bt->str_val;
+                                    if (strcmp(fname, "printf") == 0 || strcmp(fname, "fprintf") == 0) {
+                                        FILE *fout = stdout;
+                                        int arg_start = ctx->token_pos + 2;
+                                        if (strcmp(fname, "fprintf") == 0) {
+                                            if (arg_start < ctx->token_count &&
+                                                ctx->tokens[arg_start].type == TOK_IDENT) {
+                                                if (strcmp(ctx->tokens[arg_start].str_val, "stderr") == 0)
+                                                    fout = stderr;
+                                                arg_start++;
+                                                if (arg_start < ctx->token_count && ctx->tokens[arg_start].type == TOK_COMMA) arg_start++;
+                                            }
+                                        }
+                                        if (arg_start < ctx->token_count &&
+                                            ctx->tokens[arg_start].type == TOK_STRING_LIT) {
+                                            const char *fp = ctx->tokens[arg_start].str_val;
+                                            int aa = arg_start + 1;
+                                            if (aa < ctx->token_count && ctx->tokens[aa].type == TOK_COMMA) aa++;
+
+                                            while (*fp) {
+                                                if (*fp == '%' && *(fp+1)) {
+                                                    fp++;
+                                                    /* Capture width spec */
+                                                    char wbuf[32] = {0};
+                                                    int wi = 0;
+                                                    while (*fp && (*fp == '-' || *fp == '+' || *fp == ' ' ||
+                                                           *fp == '0' || (*fp >= '1' && *fp <= '9') || *fp == '.')) {
+                                                        if (wi < 30) wbuf[wi++] = *fp;
+                                                        fp++;
+                                                    }
+                                                    if (*fp == 'l') { fp++; if (*fp == 'l') fp++; }
+                                                    else if (*fp == 'h') { fp++; }
+                                                    else if (*fp == 'z') fp++;
+
+                                                    if (*fp == 'd' || *fp == 'i' || *fp == 'u') {
+                                                        long long val = resolve_expr_int(ctx, aa);
+                                                        char dfmt[40];
+                                                        snprintf(dfmt, sizeof(dfmt), "%%%slld", wbuf);
+                                                        fprintf(fout, dfmt, val);
+                                                        aa += expr_token_len(ctx, aa);
+                                                        if (aa < ctx->token_count && ctx->tokens[aa].type == TOK_COMMA) aa++;
+                                                    } else if (*fp == 's') {
+                                                        char resolved[256];
+                                                        resolve_expr_str(ctx, aa, resolved, sizeof(resolved));
+                                                        char sfmt[40];
+                                                        snprintf(sfmt, sizeof(sfmt), "%%%ss", wbuf);
+                                                        fprintf(fout, sfmt, resolved);
+                                                        aa += expr_token_len(ctx, aa);
+                                                        if (aa < ctx->token_count && ctx->tokens[aa].type == TOK_COMMA) aa++;
+                                                    } else if (*fp == '%') {
+                                                        fputc('%', fout);
+                                                    } else {
+                                                        fputc('%', fout);
+                                                        fputc(*fp, fout);
+                                                    }
+                                                } else {
+                                                    fputc(*fp, fout);
+                                                }
+                                                if (*fp) fp++;
+                                            }
+                                        }
+                                        /* Skip to semicolon */
+                                        while (ctx->token_pos < body_end - 1 &&
+                                               ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                                            ctx->token_pos++;
+                                    }
+                                }
+                                ctx->token_pos++;
+                                ctx->total_ops++;
+                                if (ctx->total_ops > XGCC_MAX_ITERATIONS) {
+                                    ctx->running = 0;
+                                    m->speed_ok = 0;
+                                    break;
+                                }
+                            }
+                            ctx->token_pos = saved_pos;
+                        }
+                    }
+
+                    /* Skip past the entire for loop */
+                    ctx->token_pos = body_end - 1;
+                }
             } else if (strcmp(tok->str_val, "int") == 0 ||
                        strcmp(tok->str_val, "char") == 0 ||
                        strcmp(tok->str_val, "long") == 0 ||
@@ -838,14 +1465,207 @@ static int run_model4(struct xgcc_user_ctx *ctx)
             break;
 
         case TOK_IDENT:
-            /* Function call — check call depth */
+            /* Function call — check for built-in I/O or user function */
             if (ctx->token_pos + 1 < ctx->token_count &&
                 ctx->tokens[ctx->token_pos + 1].type == TOK_LPAREN) {
-                ctx->call_depth++;
-                if (ctx->call_depth > ctx->max_call_depth) {
-                    fprintf(stderr, "xgcc-user: stack depth exceeded (%d)\n", ctx->call_depth);
-                    m->category_violations++;
-                    ctx->running = 0;
+
+                const char *fname = tok->str_val;
+                int is_builtin = 0;
+
+                /* ─── Built-in: printf / fprintf (stdout/stderr output) ─── */
+                if (strcmp(fname, "printf") == 0 || strcmp(fname, "fprintf") == 0) {
+                    is_builtin = 1;
+                    FILE *out = stdout;
+                    int arg_start = ctx->token_pos + 2; /* skip name + ( */
+
+                    /* fprintf: first arg is stream */
+                    if (strcmp(fname, "fprintf") == 0) {
+                        if (arg_start < ctx->token_count &&
+                            ctx->tokens[arg_start].type == TOK_IDENT) {
+                            if (strcmp(ctx->tokens[arg_start].str_val, "stderr") == 0)
+                                out = stderr;
+                            /* skip stream arg and comma */
+                            arg_start++;
+                            if (arg_start < ctx->token_count &&
+                                ctx->tokens[arg_start].type == TOK_COMMA)
+                                arg_start++;
+                        }
+                    }
+
+                    /* Find format string */
+                    if (arg_start < ctx->token_count &&
+                        ctx->tokens[arg_start].type == TOK_STRING_LIT) {
+                        const char *fmt = ctx->tokens[arg_start].str_val;
+                        /* Collect subsequent arguments */
+                        int a = arg_start + 1;
+                        /* Skip comma if present */
+                        if (a < ctx->token_count && ctx->tokens[a].type == TOK_COMMA)
+                            a++;
+
+                        /* Simple format expansion: walk fmt, substitute args */
+                        const char *p = fmt;
+                        while (*p) {
+                            if (*p == '%' && *(p+1)) {
+                                p++;
+                                /* skip width/precision modifiers */
+                                while (*p && (*p == '-' || *p == '+' || *p == ' ' ||
+                                       *p == '0' || (*p >= '1' && *p <= '9') || *p == '.'))
+                                    p++;
+                                /* skip length modifiers */
+                                if (*p == 'l') { p++; if (*p == 'l') p++; }
+                                else if (*p == 'h') { p++; if (*p == 'h') p++; }
+                                else if (*p == 'z') p++;
+
+                                switch (*p) {
+                                    case 'd': case 'i': case 'x': case 'X':
+                                    case 'o': case 'u': {
+                                        long long val = resolve_expr_int(ctx, a);
+                                        /* Print with appropriate format and width */
+                                        char wfmt[32];
+                                        /* Reconstruct format with width */
+                                        {
+                                            const char *ws = fmt + (p - fmt);
+                                            /* back up to find width start */
+                                            const char *wstart = ws;
+                                            while (wstart > fmt && *(wstart-1) != '%') wstart--;
+                                            int wlen = (int)(p - wstart) + 1;
+                                            if (wlen > 0 && wlen < 28) {
+                                                wfmt[0] = '%';
+                                                memcpy(wfmt + 1, wstart, wlen);
+                                                /* replace length mods with lld */
+                                                char *end = wfmt + 1 + wlen;
+                                                /* just use the simple version */
+                                                (void)end;
+                                            }
+                                        }
+                                        if (*p == 'x') fprintf(out, "%llx", val);
+                                        else if (*p == 'X') fprintf(out, "%llX", val);
+                                        else if (*p == 'o') fprintf(out, "%llo", val);
+                                        else if (*p == 'u') fprintf(out, "%llu", (unsigned long long)val);
+                                        else fprintf(out, "%lld", val);
+                                        int skip = expr_token_len(ctx, a);
+                                        a += skip;
+                                        if (a < ctx->token_count && ctx->tokens[a].type == TOK_COMMA) a++;
+                                        break;
+                                    }
+                                    case 'f': case 'e': case 'g':
+                                        if (a < ctx->token_count &&
+                                            ctx->tokens[a].type == TOK_FLOAT_LIT) {
+                                            fprintf(out, "%f", ctx->tokens[a].float_val);
+                                            a++;
+                                            if (a < ctx->token_count && ctx->tokens[a].type == TOK_COMMA) a++;
+                                        } else {
+                                            fprintf(out, "0.0");
+                                        }
+                                        break;
+                                    case 's': {
+                                        char resolved[256];
+                                        if (resolve_expr_str(ctx, a, resolved, sizeof(resolved)) && resolved[0]) {
+                                            /* Apply width from format spec */
+                                            fprintf(out, "%s", resolved);
+                                        } else {
+                                            fputs("(null)", out);
+                                        }
+                                        int skip = expr_token_len(ctx, a);
+                                        a += skip;
+                                        if (a < ctx->token_count && ctx->tokens[a].type == TOK_COMMA) a++;
+                                        break;
+                                    }
+                                    case 'c':
+                                        if (a < ctx->token_count &&
+                                            ctx->tokens[a].type == TOK_CHAR_LIT) {
+                                            fputc((char)ctx->tokens[a].int_val, out);
+                                            a++;
+                                            if (a < ctx->token_count && ctx->tokens[a].type == TOK_COMMA) a++;
+                                        } else {
+                                            fputc('?', out);
+                                        }
+                                        break;
+                                    case '%':
+                                        fputc('%', out);
+                                        break;
+                                    default:
+                                        fputc('%', out);
+                                        fputc(*p, out);
+                                        break;
+                                }
+                            } else {
+                                fputc(*p, out);
+                            }
+                            if (*p) p++;
+                        }
+                    }
+
+                    /* Skip past closing paren */
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                }
+
+                /* ─── Built-in: puts (string + newline to stdout) ─── */
+                else if (strcmp(fname, "puts") == 0) {
+                    is_builtin = 1;
+                    int a = ctx->token_pos + 2;
+                    if (a < ctx->token_count && ctx->tokens[a].type == TOK_STRING_LIT) {
+                        fputs(ctx->tokens[a].str_val, stdout);
+                        fputc('\n', stdout);
+                    }
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                }
+
+                /* ─── Built-in: putchar (single char to stdout) ─── */
+                else if (strcmp(fname, "putchar") == 0 || strcmp(fname, "fputc") == 0) {
+                    is_builtin = 1;
+                    int a = ctx->token_pos + 2;
+                    if (a < ctx->token_count) {
+                        if (ctx->tokens[a].type == TOK_CHAR_LIT || ctx->tokens[a].type == TOK_INT_LIT)
+                            fputc((char)ctx->tokens[a].int_val, stdout);
+                    }
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                }
+
+                /* ─── Built-in: fputs (string to stream) ─── */
+                else if (strcmp(fname, "fputs") == 0) {
+                    is_builtin = 1;
+                    int a = ctx->token_pos + 2;
+                    FILE *out = stdout;
+                    if (a < ctx->token_count && ctx->tokens[a].type == TOK_STRING_LIT) {
+                        /* Check if second arg is stderr */
+                        int b = a + 1;
+                        if (b < ctx->token_count && ctx->tokens[b].type == TOK_COMMA) b++;
+                        if (b < ctx->token_count && ctx->tokens[b].type == TOK_IDENT &&
+                            strcmp(ctx->tokens[b].str_val, "stderr") == 0)
+                            out = stderr;
+                        fputs(ctx->tokens[a].str_val, out);
+                    }
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                }
+
+                /* ─── Built-in: perror (error string to stderr) ─── */
+                else if (strcmp(fname, "perror") == 0) {
+                    is_builtin = 1;
+                    int a = ctx->token_pos + 2;
+                    if (a < ctx->token_count && ctx->tokens[a].type == TOK_STRING_LIT)
+                        fprintf(stderr, "%s: Success\n", ctx->tokens[a].str_val);
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                }
+
+                /* ─── User-defined function call ─── */
+                if (!is_builtin) {
+                    ctx->call_depth++;
+                    if (ctx->call_depth > ctx->max_call_depth) {
+                        fprintf(stderr, "xgcc-user: stack depth exceeded (%d)\n", ctx->call_depth);
+                        m->category_violations++;
+                        ctx->running = 0;
+                    }
                 }
             }
             break;
@@ -941,6 +1761,9 @@ static int xgcc_run(struct xgcc_user_ctx *ctx)
         return 0;
     }
 
+    /* Extract runtime data (struct arrays, loop vars, constants) */
+    extract_runtime_data(ctx);
+
     /* Model 4 — Execute (Model 3 + 4 combined) */
     if (ctx->verbose)
         printf("  MODEL 3+4 — Executing (iterative + exact, combined)...\n\n");
@@ -1021,6 +1844,10 @@ int main(int argc, char **argv)
 {
     struct xgcc_user_ctx ctx = {0};
     const char *source_file = NULL;
+
+    /* Allocate runtime store on heap (too large for stack) */
+    ctx.rt = calloc(1, sizeof(struct xruntime));
+    if (!ctx.rt) { fprintf(stderr, "xgcc-user: out of memory\n"); return 1; }
 
     ctx.heap_size = XGCC_DEFAULT_HEAP;
     ctx.max_call_depth = XGCC_DEFAULT_STACK;
@@ -1122,6 +1949,7 @@ int main(int argc, char **argv)
     arena_destroy(ctx.arena);
     free(ctx.tokens);
     free(ctx.source);
+    free(ctx.rt);
 
     return ret;
 }
