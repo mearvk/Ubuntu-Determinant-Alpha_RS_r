@@ -56,6 +56,7 @@
 #include <setjmp.h>
 #include <time.h>
 #include <errno.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -76,6 +77,12 @@
 #define XGCC_MAX_ITERATIONS   10000000
 #define XGCC_GUARD_PAGE_SIZE  4096
 #define XGCC_ALLOC_RATE_WARN  (100 * 1024 * 1024)   /* 100 MB/s */
+
+/* Import/library limits */
+#define XGCC_MAX_INCLUDES     128                    /* max #include files */
+#define XGCC_MAX_LIBRARIES    32                     /* max .so libraries */
+#define XGCC_MAX_LIB_SYMBOLS  512                    /* max resolved symbols */
+#define XGCC_INCLUDE_PATH_MAX 4096
 
 /* ═══════════════════════════════════════════════════════════════════
  *  Token Types
@@ -326,6 +333,383 @@ static int arena_check_rate(struct user_arena *a)
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+ *  Import & Library System
+ *
+ *  Handles #include directives by:
+ *    1. Resolving header file paths (system and local)
+ *    2. Mapping headers to suggested .so libraries
+ *    3. Loading .so libraries via dlopen
+ *    4. Resolving symbols via dlsym for runtime dispatch
+ *
+ *  Standard include → .so mapping:
+ *    <stdio.h>      → libc.so.6
+ *    <stdlib.h>     → libc.so.6
+ *    <string.h>     → libc.so.6
+ *    <math.h>       → libm.so.6
+ *    <pthread.h>    → libpthread.so.0
+ *    <dlfcn.h>      → libdl.so.2
+ *    <unistd.h>     → libc.so.6
+ *    <fcntl.h>      → libc.so.6
+ *    <sys/*.h>      → libc.so.6
+ *    <errno.h>      → libc.so.6
+ *    <signal.h>     → libc.so.6
+ *    <time.h>       → librt.so.1
+ *    <curl/curl.h>  → libcurl.so.4
+ *    <openssl/*.h>  → libssl.so, libcrypto.so
+ *    <zlib.h>       → libz.so.1
+ *    <pcre.h>       → libpcre.so.3
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* Include file tracking */
+struct xgcc_include {
+    char path[256];          /* the include path as written */
+    int is_system;           /* 1 for <...>, 0 for "..." */
+    int resolved;            /* 1 if file was found/readable */
+    char resolved_path[XGCC_INCLUDE_PATH_MAX]; /* full path on disk */
+    char suggested_lib[64];  /* mapped .so library name */
+};
+
+/* Loaded library handle */
+struct xgcc_library {
+    char name[64];           /* e.g. "libm.so.6" */
+    void *handle;            /* dlopen handle */
+    int ref_count;           /* how many includes reference this */
+};
+
+/* Resolved external symbol */
+struct xgcc_lib_symbol {
+    char name[64];           /* symbol name (function/variable) */
+    void *addr;              /* dlsym resolved address */
+    int lib_index;           /* index into libraries[] */
+    int is_function;         /* 1 for function, 0 for data */
+};
+
+/* Import manager */
+struct xgcc_import_mgr {
+    struct xgcc_include includes[XGCC_MAX_INCLUDES];
+    int include_count;
+
+    struct xgcc_library libraries[XGCC_MAX_LIBRARIES];
+    int library_count;
+
+    struct xgcc_lib_symbol symbols[XGCC_MAX_LIB_SYMBOLS];
+    int symbol_count;
+
+    /* Search paths for includes */
+    char *include_paths[32];
+    int include_path_count;
+};
+
+/* Header-to-library mapping table */
+struct header_lib_map {
+    const char *header_pattern;  /* partial match on include path */
+    const char *library;         /* .so to load */
+};
+
+static const struct header_lib_map header_lib_table[] = {
+    { "stdio.h",       "libc.so.6" },
+    { "stdlib.h",      "libc.so.6" },
+    { "string.h",      "libc.so.6" },
+    { "strings.h",     "libc.so.6" },
+    { "unistd.h",      "libc.so.6" },
+    { "fcntl.h",       "libc.so.6" },
+    { "errno.h",       "libc.so.6" },
+    { "signal.h",      "libc.so.6" },
+    { "ctype.h",       "libc.so.6" },
+    { "locale.h",      "libc.so.6" },
+    { "setjmp.h",      "libc.so.6" },
+    { "stdarg.h",      "libc.so.6" },
+    { "assert.h",      "libc.so.6" },
+    { "limits.h",      "libc.so.6" },
+    { "dirent.h",      "libc.so.6" },
+    { "sys/",          "libc.so.6" },
+    { "netinet/",      "libc.so.6" },
+    { "arpa/",         "libc.so.6" },
+    { "netdb.h",       "libc.so.6" },
+    { "math.h",        "libm.so.6" },
+    { "complex.h",     "libm.so.6" },
+    { "fenv.h",        "libm.so.6" },
+    { "tgmath.h",      "libm.so.6" },
+    { "pthread.h",     "libpthread.so.0" },
+    { "semaphore.h",   "libpthread.so.0" },
+    { "dlfcn.h",       "libdl.so.2" },
+    { "time.h",        "librt.so.1" },
+    { "mqueue.h",      "librt.so.1" },
+    { "aio.h",         "librt.so.1" },
+    { "curl/",         "libcurl.so.4" },
+    { "openssl/",      "libssl.so" },
+    { "zlib.h",        "libz.so.1" },
+    { "pcre.h",        "libpcre.so.3" },
+    { "pcre2.h",       "libpcre2-8.so.0" },
+    { "png.h",         "libpng16.so.16" },
+    { "jpeglib.h",     "libjpeg.so.8" },
+    { "sqlite3.h",     "libsqlite3.so.0" },
+    { "ncurses.h",     "libncurses.so.6" },
+    { "curses.h",      "libncurses.so.6" },
+    { "readline/",     "libreadline.so.8" },
+    { "glib.h",        "libglib-2.0.so.0" },
+    { "json-c/",       "libjson-c.so.5" },
+    { "yaml.h",        "libyaml-0.so.2" },
+    { "xml2/",         "libxml2.so.2" },
+    { "expat.h",       "libexpat.so.1" },
+    { NULL, NULL }
+};
+
+/* Initialize the import manager */
+static struct xgcc_import_mgr *import_mgr_create(void)
+{
+    struct xgcc_import_mgr *mgr = calloc(1, sizeof(struct xgcc_import_mgr));
+    if (!mgr) return NULL;
+
+    /* Set default include search paths */
+    mgr->include_paths[0] = "/usr/include";
+    mgr->include_paths[1] = "/usr/local/include";
+    mgr->include_paths[2] = "/usr/include/x86_64-linux-gnu";
+    mgr->include_paths[3] = "/usr/include/linux";
+    mgr->include_path_count = 4;
+
+    return mgr;
+}
+
+/* Map a header path to its suggested .so library */
+static const char *import_suggest_library(const char *header_path)
+{
+    const struct header_lib_map *entry;
+    for (entry = header_lib_table; entry->header_pattern; entry++) {
+        if (strstr(header_path, entry->header_pattern))
+            return entry->library;
+    }
+    return NULL;
+}
+
+/* Resolve include path on disk */
+static int import_resolve_path(struct xgcc_import_mgr *mgr,
+                               struct xgcc_include *inc,
+                               const char *source_dir)
+{
+    char trypath[XGCC_INCLUDE_PATH_MAX];
+    struct stat st;
+
+    /* For quoted includes, try source directory first */
+    if (!inc->is_system && source_dir) {
+        snprintf(trypath, sizeof(trypath), "%s/%s", source_dir, inc->path);
+        if (stat(trypath, &st) == 0 && S_ISREG(st.st_mode)) {
+            strncpy(inc->resolved_path, trypath, XGCC_INCLUDE_PATH_MAX - 1);
+            inc->resolved = 1;
+            return 0;
+        }
+    }
+
+    /* Search include paths */
+    for (int i = 0; i < mgr->include_path_count; i++) {
+        snprintf(trypath, sizeof(trypath), "%s/%s", mgr->include_paths[i], inc->path);
+        if (stat(trypath, &st) == 0 && S_ISREG(st.st_mode)) {
+            strncpy(inc->resolved_path, trypath, XGCC_INCLUDE_PATH_MAX - 1);
+            inc->resolved = 1;
+            return 0;
+        }
+    }
+
+    /* Not found on disk — still map to library */
+    inc->resolved = 0;
+    return -1;
+}
+
+/* Load a .so library (deduplicating) */
+static int import_load_library(struct xgcc_import_mgr *mgr, const char *libname)
+{
+    if (!libname) return -1;
+
+    /* Check if already loaded */
+    for (int i = 0; i < mgr->library_count; i++) {
+        if (strcmp(mgr->libraries[i].name, libname) == 0) {
+            mgr->libraries[i].ref_count++;
+            return i;
+        }
+    }
+
+    if (mgr->library_count >= XGCC_MAX_LIBRARIES) return -1;
+
+    /* Try to dlopen */
+    void *handle = dlopen(libname, RTLD_LAZY | RTLD_GLOBAL);
+    if (!handle) {
+        /* Try without version suffix */
+        char basename[64];
+        strncpy(basename, libname, sizeof(basename) - 1);
+        char *dot = strrchr(basename, '.');
+        if (dot && dot != basename && *(dot-1) != 'o') {
+            /* Strip trailing version numbers: libm.so.6 -> libm.so */
+            char *p = basename;
+            char *so_pos = strstr(p, ".so");
+            if (so_pos) {
+                so_pos[3] = '\0';
+                handle = dlopen(basename, RTLD_LAZY | RTLD_GLOBAL);
+            }
+        }
+    }
+
+    struct xgcc_library *lib = &mgr->libraries[mgr->library_count];
+    strncpy(lib->name, libname, 63);
+    lib->name[63] = '\0';
+    lib->handle = handle;  /* may be NULL if not found — that's OK */
+    lib->ref_count = 1;
+
+    return mgr->library_count++;
+}
+
+/* Resolve a symbol from loaded libraries */
+static void *import_resolve_symbol(struct xgcc_import_mgr *mgr, const char *name)
+{
+    /* Check cache first */
+    for (int i = 0; i < mgr->symbol_count; i++) {
+        if (strcmp(mgr->symbols[i].name, name) == 0)
+            return mgr->symbols[i].addr;
+    }
+
+    /* Search loaded libraries */
+    void *addr = NULL;
+    int lib_idx = -1;
+
+    for (int i = 0; i < mgr->library_count; i++) {
+        if (!mgr->libraries[i].handle) continue;
+        dlerror(); /* clear */
+        addr = dlsym(mgr->libraries[i].handle, name);
+        if (addr && !dlerror()) {
+            lib_idx = i;
+            break;
+        }
+    }
+
+    /* Also try RTLD_DEFAULT (symbols in global scope including libc) */
+    if (!addr) {
+        dlerror();
+        addr = dlsym(RTLD_DEFAULT, name);
+        if (dlerror()) addr = NULL;
+    }
+
+    /* Cache the result */
+    if (addr && mgr->symbol_count < XGCC_MAX_LIB_SYMBOLS) {
+        struct xgcc_lib_symbol *sym = &mgr->symbols[mgr->symbol_count++];
+        strncpy(sym->name, name, 63);
+        sym->name[63] = '\0';
+        sym->addr = addr;
+        sym->lib_index = lib_idx;
+        sym->is_function = 1; /* assume function for now */
+    }
+
+    return addr;
+}
+
+/* Helper: find if a library is loaded */
+static void *import_find_library_handle(struct xgcc_import_mgr *mgr, const char *libname)
+{
+    for (int i = 0; i < mgr->library_count; i++) {
+        if (strcmp(mgr->libraries[i].name, libname) == 0)
+            return mgr->libraries[i].handle;
+    }
+    return NULL;
+}
+
+/* Process all #include directives from source (pre-tokenization scan) */
+static int import_process_includes(struct xgcc_import_mgr *mgr,
+                                   const char *source, size_t source_len,
+                                   const char *source_dir, int verbose)
+{
+    const char *p = source;
+    const char *end = source + source_len;
+
+    while (p < end && mgr->include_count < XGCC_MAX_INCLUDES) {
+        /* Find lines starting with # */
+        while (p < end && *p != '#') {
+            /* Skip to next line */
+            while (p < end && *p != '\n') p++;
+            if (p < end) p++;
+        }
+        if (p >= end) break;
+
+        p++; /* skip # */
+        /* Skip whitespace after # */
+        while (p < end && (*p == ' ' || *p == '\t')) p++;
+
+        /* Check for "include" */
+        if (p + 7 < end && strncmp(p, "include", 7) == 0) {
+            p += 7;
+            while (p < end && (*p == ' ' || *p == '\t')) p++;
+
+            struct xgcc_include *inc = &mgr->includes[mgr->include_count];
+
+            if (*p == '<') {
+                /* System include */
+                p++;
+                int len = 0;
+                while (p < end && *p != '>' && *p != '\n' && len < 255) {
+                    inc->path[len++] = *p++;
+                }
+                inc->path[len] = '\0';
+                inc->is_system = 1;
+                if (p < end && *p == '>') p++;
+            } else if (*p == '"') {
+                /* Local include */
+                p++;
+                int len = 0;
+                while (p < end && *p != '"' && *p != '\n' && len < 255) {
+                    inc->path[len++] = *p++;
+                }
+                inc->path[len] = '\0';
+                inc->is_system = 0;
+                if (p < end && *p == '"') p++;
+            } else {
+                /* Skip malformed include */
+                while (p < end && *p != '\n') p++;
+                continue;
+            }
+
+            /* Resolve on disk */
+            import_resolve_path(mgr, inc, source_dir);
+
+            /* Suggest and load library */
+            const char *lib = import_suggest_library(inc->path);
+            if (lib) {
+                strncpy(inc->suggested_lib, lib, 63);
+                inc->suggested_lib[63] = '\0';
+                import_load_library(mgr, lib);
+            }
+
+            if (verbose) {
+                printf("  #include %c%s%c → %s",
+                       inc->is_system ? '<' : '"',
+                       inc->path,
+                       inc->is_system ? '>' : '"',
+                       inc->resolved ? "found" : "header not on disk");
+                if (inc->suggested_lib[0])
+                    printf(" [%s%s]", inc->suggested_lib,
+                           import_find_library_handle(mgr, inc->suggested_lib) ? " ✓" : " (not installed)");
+                printf("\n");
+            }
+
+            mgr->include_count++;
+        }
+
+        /* Skip to end of line */
+        while (p < end && *p != '\n') p++;
+        if (p < end) p++;
+    }
+
+    return mgr->include_count;
+}
+
+/* Destroy the import manager (close all dlopen handles) */
+static void import_mgr_destroy(struct xgcc_import_mgr *mgr)
+{
+    if (!mgr) return;
+    for (int i = 0; i < mgr->library_count; i++) {
+        if (mgr->libraries[i].handle)
+            dlclose(mgr->libraries[i].handle);
+    }
+    free(mgr);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
  *  Model Structures (same as kernel version)
  * ═══════════════════════════════════════════════════════════════════ */
 
@@ -396,6 +780,9 @@ struct xgcc_user_ctx {
 
     /* User memory arena */
     struct user_arena *arena;
+
+    /* Import/library manager */
+    struct xgcc_import_mgr *imports;
 
     /* Models */
     struct model_reduction m1;
@@ -1660,11 +2047,101 @@ static int run_model4(struct xgcc_user_ctx *ctx)
 
                 /* ─── User-defined function call ─── */
                 if (!is_builtin) {
-                    ctx->call_depth++;
-                    if (ctx->call_depth > ctx->max_call_depth) {
-                        fprintf(stderr, "xgcc-user: stack depth exceeded (%d)\n", ctx->call_depth);
-                        m->category_violations++;
-                        ctx->running = 0;
+                    /* Try resolving from loaded .so libraries */
+                    if (ctx->imports) {
+                        void *sym_addr = import_resolve_symbol(ctx->imports, fname);
+                        if (sym_addr) {
+                            is_builtin = 1; /* Treat as handled */
+                            /*
+                             * For now, we acknowledge the symbol is resolved.
+                             * Full FFI dispatch (building argument frames and calling
+                             * through function pointers) requires libffi or manual
+                             * ABI handling. We log that the symbol is available.
+                             *
+                             * Functions that match common patterns get special handling:
+                             */
+
+                            /* --- math.h functions (double -> double) --- */
+                            if (strcmp(fname, "sqrt") == 0 || strcmp(fname, "sin") == 0 ||
+                                strcmp(fname, "cos") == 0 || strcmp(fname, "tan") == 0 ||
+                                strcmp(fname, "log") == 0 || strcmp(fname, "exp") == 0 ||
+                                strcmp(fname, "fabs") == 0 || strcmp(fname, "ceil") == 0 ||
+                                strcmp(fname, "floor") == 0 || strcmp(fname, "round") == 0) {
+                                /* Dispatch: double fn(double) */
+                                typedef double (*math_fn_t)(double);
+                                math_fn_t mfn = (math_fn_t)sym_addr;
+                                int a = ctx->token_pos + 2;
+                                double arg = 0.0;
+                                if (a < ctx->token_count) {
+                                    if (ctx->tokens[a].type == TOK_FLOAT_LIT)
+                                        arg = ctx->tokens[a].float_val;
+                                    else if (ctx->tokens[a].type == TOK_INT_LIT)
+                                        arg = (double)ctx->tokens[a].int_val;
+                                }
+                                double result = mfn(arg);
+                                /* Store result — for now just print if verbose */
+                                if (ctx->verbose)
+                                    printf("  [lib] %s(%f) = %f\n", fname, arg, result);
+                                (void)result;
+                            }
+                            /* --- string.h functions --- */
+                            else if (strcmp(fname, "strlen") == 0) {
+                                typedef size_t (*strlen_fn_t)(const char *);
+                                strlen_fn_t sfn = (strlen_fn_t)sym_addr;
+                                int a = ctx->token_pos + 2;
+                                if (a < ctx->token_count && ctx->tokens[a].type == TOK_STRING_LIT) {
+                                    size_t result = sfn(ctx->tokens[a].str_val);
+                                    if (ctx->verbose)
+                                        printf("  [lib] strlen(\"%s\") = %zu\n",
+                                               ctx->tokens[a].str_val, result);
+                                    (void)result;
+                                }
+                            }
+                            else if (strcmp(fname, "atoi") == 0) {
+                                typedef int (*atoi_fn_t)(const char *);
+                                atoi_fn_t afn = (atoi_fn_t)sym_addr;
+                                int a = ctx->token_pos + 2;
+                                if (a < ctx->token_count && ctx->tokens[a].type == TOK_STRING_LIT) {
+                                    int result = afn(ctx->tokens[a].str_val);
+                                    if (ctx->verbose)
+                                        printf("  [lib] atoi(\"%s\") = %d\n",
+                                               ctx->tokens[a].str_val, result);
+                                    (void)result;
+                                }
+                            }
+                            else if (strcmp(fname, "abs") == 0) {
+                                typedef int (*abs_fn_t)(int);
+                                abs_fn_t afn = (abs_fn_t)sym_addr;
+                                int a = ctx->token_pos + 2;
+                                int arg = 0;
+                                if (a < ctx->token_count && ctx->tokens[a].type == TOK_INT_LIT)
+                                    arg = (int)ctx->tokens[a].int_val;
+                                int result = afn(arg);
+                                if (ctx->verbose)
+                                    printf("  [lib] abs(%d) = %d\n", arg, result);
+                                (void)result;
+                            }
+                            else {
+                                /* Generic: symbol resolved but no specific dispatch yet */
+                                if (ctx->verbose)
+                                    printf("  [lib] %s() — resolved at %p (no dispatch)\n",
+                                           fname, sym_addr);
+                            }
+
+                            /* Skip to semicolon */
+                            while (ctx->token_pos < ctx->token_count &&
+                                   ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                                ctx->token_pos++;
+                        }
+                    }
+
+                    if (!is_builtin) {
+                        ctx->call_depth++;
+                        if (ctx->call_depth > ctx->max_call_depth) {
+                            fprintf(stderr, "xgcc-user: stack depth exceeded (%d)\n", ctx->call_depth);
+                            m->category_violations++;
+                            ctx->running = 0;
+                        }
                     }
                 }
             }
@@ -1712,6 +2189,31 @@ static int xgcc_run(struct xgcc_user_ctx *ctx)
         printf("xgcc-user: arena %zu MB, timeout %ds, stack depth %d\n",
                ctx->heap_size / (1024*1024), ctx->timeout_sec, ctx->max_call_depth);
         printf("\n");
+    }
+
+    /* Process #include directives and load suggested .so libraries */
+    if (ctx->imports) {
+        /* Determine source directory for local include resolution */
+        char source_dir[XGCC_INCLUDE_PATH_MAX] = ".";
+        if (ctx->filename) {
+            strncpy(source_dir, ctx->filename, sizeof(source_dir) - 1);
+            char *slash = strrchr(source_dir, '/');
+            if (slash) *slash = '\0';
+            else strcpy(source_dir, ".");
+        }
+
+        if (ctx->verbose)
+            printf("  IMPORTS — Resolving #include directives and libraries:\n");
+
+        import_process_includes(ctx->imports, ctx->source, ctx->source_len,
+                                source_dir, ctx->verbose);
+
+        if (ctx->verbose) {
+            printf("\n  Summary: %d includes, %d libraries loaded, %d symbols cached\n\n",
+                   ctx->imports->include_count,
+                   ctx->imports->library_count,
+                   ctx->imports->symbol_count);
+        }
     }
 
     /* Tokenize */
@@ -1922,6 +2424,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Create import/library manager */
+    ctx.imports = import_mgr_create();
+    if (!ctx.imports) {
+        fprintf(stderr, "xgcc-user: failed to create import manager\n");
+        arena_destroy(ctx.arena);
+        free(ctx.source);
+        return 1;
+    }
+
     /* Sandbox mode: fork and run in child */
     int ret;
     if (ctx.sandbox) {
@@ -1946,6 +2457,7 @@ int main(int argc, char **argv)
     }
 
     /* Cleanup */
+    import_mgr_destroy(ctx.imports);
     arena_destroy(ctx.arena);
     free(ctx.tokens);
     free(ctx.source);

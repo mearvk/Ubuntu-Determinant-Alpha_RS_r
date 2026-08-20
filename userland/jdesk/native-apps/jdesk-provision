@@ -339,6 +339,33 @@ provision_packages() {
 
                 install_github_package "$name" "$github_repo" "$github_asset" "$extract_to" "$binary" "$version_pin"
                 ;;
+            script)
+                local install_script
+                install_script=$(jq -r ".packages[$i].install_script // empty" "$MANIFEST")
+                binary=$(jq -r ".packages[$i].binary // empty" "$MANIFEST")
+
+                # Check if already installed
+                if [ -n "$binary" ] && [ -f "$binary" ]; then
+                    success "$name already installed"
+                    ((SKIPPED++))
+                else
+                    # Run the provision script
+                    local script_path="$SCRIPT_DIR/$install_script"
+                    if [ -x "$script_path" ]; then
+                        info "Installing $name via script ($install_script)..."
+                        if bash "$script_path"; then
+                            success "$name installed via script"
+                            ((INSTALLED++))
+                        else
+                            warn "$name: script install failed (check $LOG_FILE)"
+                            ((FAILED++))
+                        fi
+                    else
+                        warn "$name: install script not found or not executable: $script_path"
+                        ((FAILED++))
+                    fi
+                fi
+                ;;
             *)
                 warn "$name: unknown source type '$source'"
                 ((FAILED++))

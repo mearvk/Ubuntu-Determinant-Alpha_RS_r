@@ -18,7 +18,7 @@ xgcc: xgcc.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 xgcc-user: xgcc-user.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lrt
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lrt -ldl
 
 install: $(TARGETS)
 	install -Dm755 xgcc $(DESTDIR)$(PREFIX)/bin/xgcc

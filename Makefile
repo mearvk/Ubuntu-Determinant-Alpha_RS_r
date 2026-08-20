@@ -57,6 +57,7 @@ PREFIX        := /usr
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
         tools-xgcc tools-xgcc-install \
+        jdesk-install \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
 
@@ -655,6 +656,62 @@ desktop:
 	fi
 
 # ==============================================================================
+# JDesk Desktop Environment — Stage provisioner and native library
+# ==============================================================================
+
+jdesk-install:
+	@echo "=== Installing JDesk Desktop Framework ==="
+	@if [ ! -d "$(ROOTFS_DIR)/usr" ]; then \
+		echo "  ERROR: rootfs not found. Run 'make rootfs' first."; exit 1; \
+	fi
+	@# Install native library (libjdesk.so)
+	@install -d $(ROOTFS_DIR)/usr/local/lib
+	@if [ -f "$(USERLAND_DIR)/jdesk/native/linux/libjdesk.so" ]; then \
+		install -m 755 $(USERLAND_DIR)/jdesk/native/linux/libjdesk.so $(ROOTFS_DIR)/usr/local/lib/; \
+		echo "  ✓ libjdesk.so installed"; \
+	else \
+		echo "  NOTE: libjdesk.so not built — run: make -C $(USERLAND_DIR)/jdesk/native/linux"; \
+	fi
+	@# Install native launcher binary
+	@install -d $(ROOTFS_DIR)/usr/local/bin
+	@if [ -f "$(USERLAND_DIR)/jdesk/native/linux/jdesk-bin" ]; then \
+		install -m 755 $(USERLAND_DIR)/jdesk/native/linux/jdesk-bin $(ROOTFS_DIR)/usr/local/bin/jdesk; \
+		echo "  ✓ jdesk launcher installed to /usr/local/bin/jdesk"; \
+	fi
+	@# Stage the provisioner and its manifest for first-boot use
+	@install -d $(ROOTFS_DIR)/opt/jdesk/native-apps
+	@install -d $(ROOTFS_DIR)/opt/jdesk/native-apps/kali-tools
+	@install -d $(ROOTFS_DIR)/opt/jdesk/native-apps/scripts
+	@install -m 755 $(USERLAND_DIR)/jdesk/native-apps/jdesk-provision $(ROOTFS_DIR)/opt/jdesk/native-apps/
+	@install -m 644 $(USERLAND_DIR)/jdesk/native-apps/jdesk-packages.json $(ROOTFS_DIR)/opt/jdesk/native-apps/
+	@install -m 755 $(USERLAND_DIR)/jdesk/native-apps/scripts/predictive-install.sh $(ROOTFS_DIR)/opt/jdesk/native-apps/scripts/
+	@install -m 755 $(USERLAND_DIR)/jdesk/native-apps/kali-tools/kali-provision $(ROOTFS_DIR)/opt/jdesk/native-apps/kali-tools/
+	@echo "  ✓ jdesk-provision + jdesk-packages.json staged"
+	@# Install icons, manifests, profiles
+	@install -d $(ROOTFS_DIR)/opt/jdesk/icons
+	@install -d $(ROOTFS_DIR)/opt/jdesk/manifests
+	@install -d $(ROOTFS_DIR)/opt/jdesk/profiles
+	@cp $(USERLAND_DIR)/jdesk/native-apps/icons/*.svg $(ROOTFS_DIR)/opt/jdesk/icons/ 2>/dev/null || true
+	@cp $(USERLAND_DIR)/jdesk/native-apps/manifests/*.jdesk-app $(ROOTFS_DIR)/opt/jdesk/manifests/ 2>/dev/null || true
+	@cp $(USERLAND_DIR)/jdesk/native-apps/profiles/*.xml $(ROOTFS_DIR)/opt/jdesk/profiles/ 2>/dev/null || true
+	@echo "  ✓ Icons, manifests, profiles installed"
+	@# Create systemd service for first-boot provisioning
+	@install -d $(ROOTFS_DIR)/etc/systemd/system
+	@if [ -f "$(USERLAND_DIR)/jdesk/native-apps/jdesk-provision.service" ]; then \
+		install -m 644 $(USERLAND_DIR)/jdesk/native-apps/jdesk-provision.service $(ROOTFS_DIR)/etc/systemd/system/; \
+		echo "  ✓ jdesk-provision.service installed (first-boot auto)"; \
+	fi
+	@# Symlink provisioner to sbin
+	@install -d $(ROOTFS_DIR)/usr/local/sbin
+	@ln -sf /opt/jdesk/native-apps/jdesk-provision $(ROOTFS_DIR)/usr/local/sbin/jdesk-provision
+	@echo "  ✓ /usr/local/sbin/jdesk-provision → provisioner"
+	@echo ""
+	@echo "  JDesk staged for first-boot provisioning."
+	@echo "  Native apps (Writer, IDE, Browser, Files, Kali, etc.) install on first boot."
+	@echo "  Manual: sudo jdesk-provision"
+	@echo "  Full:   sudo jdesk-provision --full"
+
+# ==============================================================================
 # JWSTF / NitroWebExpress — Java Web Server Install
 # ==============================================================================
 
@@ -699,7 +756,7 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
 
-rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop jwstf-install initramfs grub
+rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop jdesk-install jwstf-install initramfs grub
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════╗"
 	@echo "║  FULL SYSTEM ASSEMBLED                                      ║"
@@ -727,6 +784,7 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-f
 	@echo "    ✓ Dave (system intelligence, 75-book library)"
 	@echo "    ✓ chkrootkit (rootkit detection)"
 	@echo "    ✓ rkhunter (Rootkit Hunter)"
+	@echo "    ✓ JDesk desktop framework (first-boot provisioner)"
 	@echo "    ✓ Initramfs with custom module loading"
 	@echo "    ✓ GRUB bootloader configuration"
 

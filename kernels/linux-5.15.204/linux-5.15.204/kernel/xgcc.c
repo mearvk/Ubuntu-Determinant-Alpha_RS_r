@@ -76,6 +76,10 @@ MODULE_VERSION("1.0");
 #define XGCC_SPEED_CEILING_US   5000000             /* 5 second execution cap */
 #define XGCC_MEMORY_CEILING     (8 * 1024 * 1024)   /* 8 MB allocation cap */
 
+/* Import/library tracking limits */
+#define XGCC_MAX_INCLUDES       128
+#define XGCC_MAX_KLIB_SYMBOLS   256
+
 /* Model identifiers */
 #define XGCC_MODEL_REDUCTION    1
 #define XGCC_MODEL_INTERROGATIVE 2
@@ -203,6 +207,215 @@ struct xgcc_model_exact {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
+ *  Import Tracking & Kernel Symbol Resolution
+ *
+ *  The kernel version cannot dlopen .so files, but it can:
+ *    1. Track #include directives from submitted source
+ *    2. Map includes to known library categories
+ *    3. Resolve function calls to kernel-exported symbols
+ *       (via kallsyms / symbol_get when available)
+ *    4. Map standard libc functions to kernel equivalents where
+ *       possible (e.g. printk for printf, kmalloc for malloc)
+ *    5. Report which .so libraries would be needed for userland
+ *       execution of this source
+ *
+ *  The suggested_libs[] array tells userland what to link against.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* Tracked include directive */
+struct xgcc_include_entry {
+    char path[128];
+    int is_system;          /* 1 for <...>, 0 for "..." */
+    char suggested_lib[64]; /* .so this maps to */
+};
+
+/* Kernel-equivalent function mapping */
+struct xgcc_kfunc_map {
+    const char *userland_name;  /* e.g. "printf" */
+    const char *kernel_name;    /* e.g. "printk" */
+    int available;              /* 1 if kernel symbol exists */
+};
+
+/* Known mappings: userland function → kernel equivalent */
+static const struct xgcc_kfunc_map kfunc_table[] = {
+    { "printf",   "printk",      1 },
+    { "fprintf",  "printk",      1 },
+    { "sprintf",  "sprintf",     1 },
+    { "snprintf", "snprintf",    1 },
+    { "puts",     "printk",      1 },
+    { "malloc",   "kmalloc",     1 },
+    { "calloc",   "kcalloc",     1 },
+    { "realloc",  "krealloc",    1 },
+    { "free",     "kfree",       1 },
+    { "memcpy",   "memcpy",      1 },
+    { "memset",   "memset",      1 },
+    { "memmove",  "memmove",     1 },
+    { "memcmp",   "memcmp",      1 },
+    { "strcmp",   "strcmp",       1 },
+    { "strncmp",  "strncmp",     1 },
+    { "strcpy",   "strcpy",      1 },
+    { "strncpy",  "strncpy",     1 },
+    { "strlen",   "strlen",      1 },
+    { "strstr",   "strstr",      1 },
+    { "strchr",   "strchr",      1 },
+    { "strrchr",  "strrchr",     1 },
+    { "strtol",   "simple_strtol", 1 },
+    { "strtoul",  "simple_strtoul", 1 },
+    { "atoi",     "simple_strtol", 1 },
+    { "abs",      "abs",         1 },
+    { "exit",     NULL,          0 },  /* no kernel equivalent */
+    { "sleep",    "msleep",      1 },
+    { "usleep",   "usleep_range", 1 },
+    { NULL, NULL, 0 }
+};
+
+/* Header → library mapping (same as userland, for reporting) */
+static const struct {
+    const char *pattern;
+    const char *library;
+} kheader_lib_table[] = {
+    { "stdio.h",     "libc.so.6" },
+    { "stdlib.h",    "libc.so.6" },
+    { "string.h",    "libc.so.6" },
+    { "unistd.h",    "libc.so.6" },
+    { "fcntl.h",     "libc.so.6" },
+    { "errno.h",     "libc.so.6" },
+    { "signal.h",    "libc.so.6" },
+    { "ctype.h",     "libc.so.6" },
+    { "sys/",        "libc.so.6" },
+    { "math.h",      "libm.so.6" },
+    { "pthread.h",   "libpthread.so.0" },
+    { "time.h",      "librt.so.1" },
+    { "dlfcn.h",     "libdl.so.2" },
+    { "curl/",       "libcurl.so.4" },
+    { "openssl/",    "libssl.so" },
+    { "zlib.h",      "libz.so.1" },
+    { "sqlite3.h",   "libsqlite3.so.0" },
+    { "ncurses.h",   "libncurses.so.6" },
+    { NULL, NULL }
+};
+
+/* Import tracking state */
+struct xgcc_import_state {
+    struct xgcc_include_entry includes[XGCC_MAX_INCLUDES];
+    int include_count;
+
+    /* Deduplicated list of suggested .so libraries */
+    char suggested_libs[32][64];
+    int lib_count;
+
+    /* Resolved kernel function mappings for this source */
+    struct {
+        char userland_name[64];
+        char kernel_name[64];
+        int resolved;
+    } resolved_symbols[XGCC_MAX_KLIB_SYMBOLS];
+    int resolved_count;
+};
+
+/* Process includes from source text */
+static int xgcc_process_includes(struct xgcc_import_state *state, const char *source, size_t len)
+{
+    const char *p = source;
+    const char *end = source + len;
+
+    state->include_count = 0;
+    state->lib_count = 0;
+    state->resolved_count = 0;
+
+    while (p < end && state->include_count < XGCC_MAX_INCLUDES) {
+        /* Find # at start of line (or after whitespace) */
+        while (p < end && *p != '#') {
+            while (p < end && *p != '\n') p++;
+            if (p < end) p++;
+        }
+        if (p >= end) break;
+        p++; /* skip # */
+
+        /* Skip whitespace */
+        while (p < end && (*p == ' ' || *p == '\t')) p++;
+
+        /* Check for "include" */
+        if (p + 7 < end && strncmp(p, "include", 7) == 0) {
+            p += 7;
+            while (p < end && (*p == ' ' || *p == '\t')) p++;
+
+            struct xgcc_include_entry *inc = &state->includes[state->include_count];
+
+            if (*p == '<') {
+                p++;
+                int l = 0;
+                while (p < end && *p != '>' && *p != '\n' && l < 127)
+                    inc->path[l++] = *p++;
+                inc->path[l] = '\0';
+                inc->is_system = 1;
+                if (p < end && *p == '>') p++;
+            } else if (*p == '"') {
+                p++;
+                int l = 0;
+                while (p < end && *p != '"' && *p != '\n' && l < 127)
+                    inc->path[l++] = *p++;
+                inc->path[l] = '\0';
+                inc->is_system = 0;
+                if (p < end && *p == '"') p++;
+            } else {
+                while (p < end && *p != '\n') p++;
+                continue;
+            }
+
+            /* Map to library */
+            inc->suggested_lib[0] = '\0';
+            {
+                int k;
+                for (k = 0; kheader_lib_table[k].pattern; k++) {
+                    if (strstr(inc->path, kheader_lib_table[k].pattern)) {
+                        strncpy(inc->suggested_lib, kheader_lib_table[k].library, 63);
+                        break;
+                    }
+                }
+            }
+
+            /* Add to deduplicated library list */
+            if (inc->suggested_lib[0]) {
+                int dup = 0, k;
+                for (k = 0; k < state->lib_count; k++) {
+                    if (strcmp(state->suggested_libs[k], inc->suggested_lib) == 0) {
+                        dup = 1;
+                        break;
+                    }
+                }
+                if (!dup && state->lib_count < 32) {
+                    strncpy(state->suggested_libs[state->lib_count],
+                            inc->suggested_lib, 63);
+                    state->lib_count++;
+                }
+            }
+
+            state->include_count++;
+        }
+
+        while (p < end && *p != '\n') p++;
+        if (p < end) p++;
+    }
+
+    return state->include_count;
+}
+
+/* Resolve a userland function name to kernel equivalent */
+static const char *xgcc_resolve_kfunc(const char *name)
+{
+    const struct xgcc_kfunc_map *entry;
+    for (entry = kfunc_table; entry->userland_name; entry++) {
+        if (strcmp(entry->userland_name, name) == 0) {
+            if (entry->available && entry->kernel_name)
+                return entry->kernel_name;
+            return NULL;
+        }
+    }
+    return NULL;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
  *  Main Interpreter Context
  * ═══════════════════════════════════════════════════════════════════ */
 
@@ -242,6 +455,9 @@ struct xgcc_context {
     /* Configuration */
     int active_models;      /* bitmask: which models to run */
     int verbose;
+
+    /* Import tracking */
+    struct xgcc_import_state *imports;
 
     /* Statistics */
     unsigned long start_time_ns;
@@ -794,6 +1010,66 @@ static int xgcc_model4_exact(struct xgcc_context *ctx)
             }
             break;
 
+        case TOK_IDENT:
+            /* Function call detection: IDENT followed by LPAREN */
+            if (tok->str_val &&
+                ctx->token_pos + 1 < ctx->token_count &&
+                ctx->tokens[ctx->token_pos + 1].type == TOK_LPAREN) {
+
+                const char *fname = tok->str_val;
+
+                /* Try to resolve via kernel function mapping */
+                const char *kfunc = xgcc_resolve_kfunc(fname);
+                if (kfunc) {
+                    /* Known mapping — record resolution */
+                    if (ctx->imports &&
+                        ctx->imports->resolved_count < XGCC_MAX_KLIB_SYMBOLS) {
+                        int idx = ctx->imports->resolved_count;
+                        strncpy(ctx->imports->resolved_symbols[idx].userland_name, fname, 63);
+                        strncpy(ctx->imports->resolved_symbols[idx].kernel_name, kfunc, 63);
+                        ctx->imports->resolved_symbols[idx].resolved = 1;
+                        ctx->imports->resolved_count++;
+                    }
+
+                    /* Dispatch known kernel builtins */
+                    if (strcmp(kfunc, "printk") == 0) {
+                        /* printf/puts → printk: find format string */
+                        int a = ctx->token_pos + 2;
+                        if (a < ctx->token_count &&
+                            ctx->tokens[a].type == TOK_STRING_LIT &&
+                            ctx->tokens[a].str_val) {
+                            pr_info("xgcc [output]: %s", ctx->tokens[a].str_val);
+                        }
+                    }
+                    /* Skip to semicolon */
+                    while (ctx->token_pos < ctx->token_count &&
+                           ctx->tokens[ctx->token_pos].type != TOK_SEMICOLON)
+                        ctx->token_pos++;
+                } else {
+                    /* Unknown function — check if it's user-defined */
+                    int found_user_func = 0;
+                    int fi;
+                    for (fi = 0; fi < ctx->func_count; fi++) {
+                        if (strcmp(ctx->functions[fi].name, fname) == 0) {
+                            found_user_func = 1;
+                            break;
+                        }
+                    }
+                    if (!found_user_func) {
+                        /* Unresolved external call — record as needing library */
+                        if (ctx->imports &&
+                            ctx->imports->resolved_count < XGCC_MAX_KLIB_SYMBOLS) {
+                            int idx = ctx->imports->resolved_count;
+                            strncpy(ctx->imports->resolved_symbols[idx].userland_name, fname, 63);
+                            ctx->imports->resolved_symbols[idx].kernel_name[0] = '\0';
+                            ctx->imports->resolved_symbols[idx].resolved = 0;
+                            ctx->imports->resolved_count++;
+                        }
+                    }
+                }
+            }
+            break;
+
         case TOK_LBRACE:
             ctx->scope_depth++;
             break;
@@ -903,6 +1179,19 @@ static int xgcc_execute(struct xgcc_context *ctx)
     pr_info("xgcc: executing %s (%zu bytes, %s)\n",
             ctx->filename, ctx->source_len,
             ctx->is_cpp ? "C++" : "C");
+
+    /* Phase 0: Process #include directives and map to libraries */
+    if (ctx->imports) {
+        xgcc_process_includes(ctx->imports, ctx->source, ctx->source_len);
+        pr_info("xgcc: imports — %d includes, %d suggested libraries\n",
+                ctx->imports->include_count, ctx->imports->lib_count);
+        {
+            int i;
+            for (i = 0; i < ctx->imports->lib_count; i++) {
+                pr_info("xgcc:   suggested .so: %s\n", ctx->imports->suggested_libs[i]);
+            }
+        }
+    }
 
     /* Phase 1: Tokenize */
     ret = xgcc_tokenize(ctx);
@@ -1091,6 +1380,33 @@ static int xgcc_status_show(struct seq_file *m, void *v)
     seq_puts(m, "\n");
 
     seq_puts(m, "  EXECUTION: Model 3 + Model 4 combined\n");
+
+    /* Import/library information */
+    if (xgcc_ctx->imports && xgcc_ctx->imports->include_count > 0) {
+        seq_puts(m, "\n");
+        seq_puts(m, "  IMPORTS & LIBRARIES\n");
+        seq_printf(m, "    #include directives:  %d\n", xgcc_ctx->imports->include_count);
+        seq_printf(m, "    Suggested .so libs:   %d\n", xgcc_ctx->imports->lib_count);
+        {
+            int i;
+            for (i = 0; i < xgcc_ctx->imports->lib_count && i < 16; i++)
+                seq_printf(m, "      [%d] %s\n", i + 1, xgcc_ctx->imports->suggested_libs[i]);
+        }
+        seq_printf(m, "    Resolved symbols:     %d\n", xgcc_ctx->imports->resolved_count);
+        {
+            int i;
+            for (i = 0; i < xgcc_ctx->imports->resolved_count && i < 16; i++) {
+                if (xgcc_ctx->imports->resolved_symbols[i].resolved)
+                    seq_printf(m, "      %s → %s ✓\n",
+                               xgcc_ctx->imports->resolved_symbols[i].userland_name,
+                               xgcc_ctx->imports->resolved_symbols[i].kernel_name);
+                else
+                    seq_printf(m, "      %s → (unresolved, needs .so)\n",
+                               xgcc_ctx->imports->resolved_symbols[i].userland_name);
+            }
+        }
+    }
+
     seq_puts(m, "═══════════════════════════════════════════════════════\n");
 
     mutex_unlock(&xgcc_mutex);
@@ -1133,6 +1449,14 @@ static int __init xgcc_init(void)
         goto err_alloc;
     }
 
+    /* Allocate import tracking state */
+    xgcc_ctx->imports = kzalloc(sizeof(struct xgcc_import_state), GFP_KERNEL);
+    if (!xgcc_ctx->imports) {
+        pr_err("xgcc: failed to allocate import state\n");
+        ret = -ENOMEM;
+        goto err_alloc;
+    }
+
     /* Default: run Model 3 + Model 4 together */
     xgcc_ctx->active_models = (1 << XGCC_MODEL_ITERATIVE) | (1 << XGCC_MODEL_EXACT);
     xgcc_ctx->filename = "(none)";
@@ -1156,6 +1480,7 @@ static int __init xgcc_init(void)
     return 0;
 
 err_alloc:
+    if (xgcc_ctx->imports) kfree(xgcc_ctx->imports);
     if (xgcc_ctx->stack) vfree(xgcc_ctx->stack);
     if (xgcc_ctx->functions) vfree(xgcc_ctx->functions);
     if (xgcc_ctx->variables) vfree(xgcc_ctx->variables);
@@ -1176,6 +1501,7 @@ static void __exit xgcc_exit(void)
 
     /* Free context */
     if (xgcc_ctx) {
+        if (xgcc_ctx->imports) kfree(xgcc_ctx->imports);
         if (xgcc_ctx->source) vfree(xgcc_ctx->source);
         if (xgcc_ctx->tokens) {
             int i;
