@@ -15,6 +15,9 @@ A cross-platform desktop environment framework that closely resembles the Linux 
 | Files | `JDeskFiles` | File manager (PCManFM-Qt backend) |
 | Software | `JDeskSoftware` | Package manager GUI |
 | Launcher | `JDeskLauncher` | Application launcher |
+| Kali | `JDeskKali` | Penetration testing toolkit (nmap, nikto, sqlmap, john, hydra, aircrack-ng) |
+| GIMP | — | Image editor (native ELF, optional) |
+| VLC | — | Media player (native ELF, optional) |
 
 ### IDE — IntelliJ IDEA Parity
 
@@ -176,6 +179,37 @@ userland/jdesk/
 └── resources/
     └── icons/                   - SVG icon set
 ```
+
+## First-Boot Provisioning
+
+Native applications are **not stored in the git repository**. They are installed at first boot via `jdesk-provision`:
+
+```bash
+sudo jdesk-provision            # Install core + standard (default)
+sudo jdesk-provision --full     # Include optional packages (GIMP, VLC, Wine)
+sudo jdesk-provision --status   # Show what's installed
+```
+
+**14 packages** in manifest (`jdesk-packages.json`):
+
+| Priority | Package | Source | Size |
+|----------|---------|--------|------|
+| core | LibreOffice Writer | apt | 350 MB |
+| core | VSCodium IDE | github | 300 MB |
+| core | Chromium Browser | apt | 180 MB |
+| core | PCManFM-Qt Files | apt | 45 MB |
+| core | Bash Terminal | apt | 2 MB |
+| core | OpenSSH Client | apt | 5 MB |
+| core | GNU Coreutils | apt | 15 MB |
+| standard | Git | apt | 40 MB |
+| standard | cURL | apt | 3 MB |
+| standard | Telnet | apt | 1 MB |
+| standard | Kali Security Tools | script | 250 MB |
+| optional | Wine (Windows PE) | apt | 400 MB |
+| optional | GIMP | apt | 120 MB |
+| optional | VLC Media Player | apt | 90 MB |
+
+Predictive installer (`predictive-install.sh`) orders by tier/utility/size ratio and respects available disk space.
 
 ## Native API Overview
 

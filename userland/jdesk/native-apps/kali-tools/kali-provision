@@ -28,13 +28,21 @@ set -euo pipefail
 #  Configuration
 # ===========================================================================
 
-KALI_DIR="/opt/jdesk/apps/kali"
+# Accept install base dir as argument (from jdesk-provision), default to /opt/jdesk/apps
+INSTALL_BASE="${1:-/opt/jdesk/apps}"
+KALI_DIR="$INSTALL_BASE/kali"
 BIN_DIR="$KALI_DIR/bin"
 VENV_DIR="$KALI_DIR/venv"
 SCRIPTS_DIR="$KALI_DIR/scripts"
 WORDLISTS_DIR="$KALI_DIR/wordlists"
 MSF_DIR="$KALI_DIR/metasploit"
-LOG_FILE="/var/log/kali-provision.log"
+
+if [ "$(id -u)" -eq 0 ]; then
+    LOG_FILE="/var/log/kali-provision.log"
+else
+    LOG_FILE="$KALI_DIR/kali-provision.log"
+    mkdir -p "$KALI_DIR" 2>/dev/null || true
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -77,8 +85,14 @@ banner() {
 
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
+        # Allow non-root if installing to a user-writable path
+        if [ -w "$(dirname "$KALI_DIR")" ] || mkdir -p "$KALI_DIR" 2>/dev/null; then
+            warn "Running without root — apt installs will be skipped, local tools only."
+            return 0
+        fi
         fail "This script requires Grade 3+ privilege (sudo)."
         echo "  Usage: sudo kali-provision"
+        echo "  Or pass a writable install dir: kali-provision /path/to/dir"
         exit 1
     fi
 }
@@ -119,14 +133,14 @@ install_apt_tools() {
     for tool in "${apt_tools[@]}"; do
         if dpkg -s "$tool" &>/dev/null; then
             success "$tool (already installed)"
-            ((SKIPPED++))
+            ((SKIPPED++)) || true
         else
             if apt-get install -y -qq "$tool" 2>/dev/null; then
                 success "$tool (installed via apt)"
-                ((INSTALLED++))
+                ((INSTALLED++)) || true
             else
                 fail "$tool (apt install failed)"
-                ((FAILED++))
+                ((FAILED++)) || true
             fi
         fi
     done
@@ -161,14 +175,14 @@ install_pip_tools() {
     for tool in "${pip_tools[@]}"; do
         if "$VENV_DIR/bin/pip" show "$tool" &>/dev/null; then
             success "$tool (already installed in venv)"
-            ((SKIPPED++))
+            ((SKIPPED++)) || true
         else
             if "$VENV_DIR/bin/pip" install "$tool" -q 2>/dev/null; then
                 success "$tool (installed via pip)"
-                ((INSTALLED++))
+                ((INSTALLED++)) || true
             else
                 fail "$tool (pip install failed)"
-                ((FAILED++))
+                ((FAILED++)) || true
             fi
         fi
     done
@@ -192,14 +206,14 @@ install_github_binaries() {
             curl -sL "$chisel_url" | gunzip > "$BIN_DIR/chisel"
             chmod +x "$BIN_DIR/chisel"
             success "chisel (downloaded from GitHub)"
-            ((INSTALLED++))
+            ((INSTALLED++)) || true
         else
             fail "chisel (could not find release URL)"
-            ((FAILED++))
+            ((FAILED++)) || true
         fi
     else
         success "chisel (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
     fi
     
     # ffuf
@@ -213,14 +227,14 @@ install_github_binaries() {
             curl -sL "$ffuf_url" | tar xz -C "$BIN_DIR" ffuf 2>/dev/null
             chmod +x "$BIN_DIR/ffuf"
             success "ffuf (downloaded from GitHub)"
-            ((INSTALLED++))
+            ((INSTALLED++)) || true
         else
             fail "ffuf (could not find release URL)"
-            ((FAILED++))
+            ((FAILED++)) || true
         fi
     else
         success "ffuf (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
     fi
 }
 
@@ -235,20 +249,20 @@ install_git_tools() {
     if [ ! -f "$KALI_DIR/sqlmap/sqlmap.py" ]; then
         git clone --depth=1 https://github.com/sqlmapproject/sqlmap.git "$KALI_DIR/sqlmap" 2>/dev/null
         success "sqlmap (cloned)"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         success "sqlmap (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
     fi
     
     # Responder
     if [ ! -f "$KALI_DIR/responder/Responder.py" ]; then
         git clone --depth=1 https://github.com/lgandx/Responder.git "$KALI_DIR/responder" 2>/dev/null
         success "responder (cloned)"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         success "responder (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
     fi
     
     # linpeas
@@ -257,10 +271,10 @@ install_git_tools() {
             -o "$SCRIPTS_DIR/linpeas.sh"
         chmod +x "$SCRIPTS_DIR/linpeas.sh"
         success "linpeas (downloaded)"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         success "linpeas (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
     fi
 }
 
@@ -273,7 +287,7 @@ install_metasploit() {
     
     if [ -f "$MSF_DIR/msfconsole" ] || command -v msfconsole &>/dev/null; then
         success "metasploit (already installed)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
         return
     fi
     
@@ -290,10 +304,10 @@ install_metasploit() {
             ln -sf /opt/metasploit-framework/bin/msfdb "$BIN_DIR/msfdb"
         fi
         success "metasploit (installed)"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         fail "metasploit (installer failed — install manually)"
-        ((FAILED++))
+        ((FAILED++)) || true
     fi
     
     rm -f /tmp/msfinstall
@@ -308,7 +322,7 @@ install_wordlists() {
     
     if [ -d "$WORDLISTS_DIR/Discovery" ]; then
         success "wordlists (already present)"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
         return
     fi
     
@@ -338,10 +352,10 @@ SPARSE
 
     if git pull --depth=1 origin main -q 2>/dev/null; then
         success "wordlists (SecLists partial — core lists)"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         warn "wordlists — git pull failed. Try: sudo kali-provision --wordlists"
-        ((FAILED++))
+        ((FAILED++)) || true
     fi
     
     cd - >/dev/null
@@ -585,12 +599,12 @@ main() {
     # Full installation
     create_dirs
     install_apt_tools
-    setup_python_venv
-    install_pip_tools
-    install_github_binaries
-    install_git_tools
-    install_metasploit
-    install_wordlists
+    setup_python_venv || warn "Python venv setup failed (install python3-venv to enable pip tools)"
+    install_pip_tools || warn "Pip tools skipped (no venv)"
+    install_github_binaries || warn "Some GitHub binaries failed"
+    install_git_tools || warn "Some git-clone tools failed"
+    install_metasploit || warn "Metasploit install incomplete"
+    install_wordlists || warn "Wordlists install incomplete"
     create_wrapper_scripts
     create_terminal_integration
     

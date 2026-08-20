@@ -6,36 +6,33 @@
 # Downloads and installs native binaries for the JDesk desktop environment.
 # All binaries are governed by the JVM Memory Proxy when launched.
 #
-# Disk Allocation: 12 GB (increased for full source installs)
+# Disk Allocation: 3 GB (native binaries + runtimes)
 #
 # Breakdown:
-#   IntelliJ Community source:  ~2,500 MB (github.com/JetBrains/intellij-community)
-#   Chromium source:            ~5,500 MB (github.com/chromium/chromium)
-#   Linux ELF natives:            ~400 MB (Writer, Terminal, Files)
+#   Linux ELF natives:            ~900 MB (Writer, IDE, Browser, Files, GIMP, VLC)
+#   Kali Security Tools:          ~250 MB (nmap, nikto, sqlmap, john, hydra)
 #   Wine runtime:                 ~400 MB (for Windows PE execution)
 #   Darling runtime:              ~300 MB (for macOS Mach-O execution)
-#   Windows app space:            ~450 MB
-#   macOS app space:              ~350 MB
 #   Icons + metadata:              ~50 MB
-#   Headroom/updates:           ~1,550 MB
+#   Headroom/updates:             ~550 MB
 #   ─────────────────────────────
-#   TOTAL:                      ~12,000 MB ≈ 12 GB
+#   TOTAL:                       ~2,450 MB ≈ 3 GB
 #
-# Why source installs:
-#   IntelliJ and Chromium are included as full source to provide:
-#   - License compliance (Apache-2.0 / BSD-3-Clause source availability)
-#   - Offline build capability (clients can compile without network)
-#   - Customization (build with custom flags or patches)
-#   - Verification (users can audit the code they are running)
-#   - Backend intelligence (IntelliJ for JDesk IDE, Chromium for Dave AI)
+# IntelliJ and Chromium source trees live in the git repo (userland/) —
+# this script only installs runtime binaries and symlinks from apt/github.
 #
 # Copyright (C) 2026 MEARVK LLC
 # Author: Maximilian Eric Alexander Rupplin von Keffikon
 
 set -euo pipefail
 
-INSTALL_DIR="${1:-/opt/jdesk/apps}"
-MIN_SPACE_MB=12288
+# Default to local project directory for testing; use /opt/jdesk/apps for production
+if [ "$(id -u)" -eq 0 ]; then
+    INSTALL_DIR="${1:-/opt/jdesk/apps}"
+else
+    INSTALL_DIR="${1:-$(cd "$(dirname "$0")" && pwd)/native-apps/_install}"
+fi
+MIN_SPACE_MB=3072
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "═══════════════════════════════════════════════════════════"
@@ -50,19 +47,34 @@ echo ""
 
 echo "[1/6] Checking disk space..."
 
-# Ensure install directory exists for df check
-mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+# Ensure install directory exists for df check; fall back to parent if mkdir fails
+if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+    # Can't create /opt/jdesk/apps without sudo — check /opt or / instead
+    CHECK_DIR="$(dirname "$INSTALL_DIR")"
+    while [ ! -d "$CHECK_DIR" ] && [ "$CHECK_DIR" != "/" ]; do
+        CHECK_DIR="$(dirname "$CHECK_DIR")"
+    done
+else
+    CHECK_DIR="$INSTALL_DIR"
+fi
 
-AVAIL_MB=$(df -BM "$INSTALL_DIR" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'M' || echo "")
+AVAIL_MB=$(df -BM "$CHECK_DIR" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'M' || echo "")
 
 if [ -n "$AVAIL_MB" ] && [ "$AVAIL_MB" -lt "$MIN_SPACE_MB" ]; then
     echo "  ERROR: Insufficient disk space."
     echo "  Available: ${AVAIL_MB} MB"
-    echo "  Required:  ${MIN_SPACE_MB} MB (12 GB)"
+    echo "  Required:  ${MIN_SPACE_MB} MB (3 GB)"
     echo ""
-    echo "  The base allocation has been increased to 12 GB to accommodate"
-    echo "  full source installs of IntelliJ (~2.5 GB) and Chromium (~5.5 GB)"
-    echo "  plus all three OS native stacks (Linux + Wine + Darling)."
+    echo "  The 3 GB allocation covers:"
+    echo "    Linux native binaries:  ~900 MB (Writer, IDE, Browser, Files, GIMP, VLC)"
+    echo "    Kali Security Tools:    ~250 MB"
+    echo "    Wine runtime:           ~400 MB (optional, for Windows PE)"
+    echo "    Darling runtime:        ~300 MB (optional, for macOS Mach-O)"
+    echo "    Icons + metadata:       ~ 50 MB"
+    echo "    Headroom:               ~550 MB"
+    echo ""
+    echo "  IntelliJ and Chromium source trees are already in the repo —"
+    echo "  they do NOT need to be downloaded again."
     exit 1
 fi
 
@@ -178,8 +190,34 @@ else
     echo "    (Manual install: sudo /opt/jdesk/native-apps/kali-tools/kali-provision)"
 fi
 
+# --- GIMP Image Editor ---
+echo "  → GIMP (image editor, ~120 MB)"
+mkdir -p "$INSTALL_DIR/graphics"
+if ! command -v gimp &>/dev/null; then
+    apt-get install -y --no-install-recommends gimp 2>/dev/null || \
+        echo "    (Manual install: apt install gimp)"
+fi
+GIMP_BIN=$(command -v gimp 2>/dev/null || echo "/usr/bin/gimp")
+if [ -f "$GIMP_BIN" ]; then
+    ln -sf "$GIMP_BIN" "$INSTALL_DIR/graphics/gimp"
+    echo "    Installed: $INSTALL_DIR/graphics/gimp → $GIMP_BIN"
+fi
+
+# --- VLC Media Player ---
+echo "  → VLC (media player, ~90 MB)"
+mkdir -p "$INSTALL_DIR/media"
+if ! command -v vlc &>/dev/null; then
+    apt-get install -y --no-install-recommends vlc 2>/dev/null || \
+        echo "    (Manual install: apt install vlc)"
+fi
+VLC_BIN=$(command -v vlc 2>/dev/null || echo "/usr/bin/vlc")
+if [ -f "$VLC_BIN" ]; then
+    ln -sf "$VLC_BIN" "$INSTALL_DIR/media/vlc"
+    echo "    Installed: $INSTALL_DIR/media/vlc → $VLC_BIN"
+fi
+
 echo ""
-echo "  Linux natives installed (~877 MB + ~250 MB Kali)"
+echo "  Linux natives installed (~877 MB + ~250 MB Kali + ~210 MB GIMP/VLC)"
 echo ""
 
 # ============================================================================
@@ -260,12 +298,15 @@ echo "════════════════════════�
 echo "  JDesk Native Applications — Installation Complete"
 echo "═══════════════════════════════════════════════════════════════════"
 echo ""
-echo "  Base allocation:     12 GB (full source installs for IDE and Browser)"
+echo "  Base allocation:     3 GB (native binaries + runtimes)"
 echo ""
 echo "  Installed:"
 echo "    ✓ IntelliJ source     (~2.5 GB) [github.com/JetBrains/intellij-community]"
 echo "    ✓ Chromium source     (~5.5 GB) [github.com/chromium/chromium]"
 echo "    ✓ Linux ELF binaries  (~400 MB) [Writer, Terminal, Files]"
+echo "    ✓ Kali Security Tools (~250 MB) [nmap, nikto, sqlmap, john, hydra]"
+echo "    ✓ GIMP image editor   (~120 MB) [GNU Image Manipulation Program]"
+echo "    ✓ VLC media player    (~ 90 MB) [audio/video playback]"
 echo "    ✓ Wine runtime        (~400 MB) [for Windows .exe]"
 echo "    ✓ Darling runtime     (~300 MB) [for macOS Mach-O]"
 echo "    ✓ Desktop icons (SVG)"
@@ -279,6 +320,8 @@ echo "    📝 VSCodium  — Lightweight code editor (ELF)"
 echo "    🌐 Browser   — Chromium (ELF)"
 echo "    🖥️  Terminal  — JDesk Terminal (ELF + Java)"
 echo "    🛡️  Kali      — Kali Security Tools (Terminal + Shell)"
+echo "    🎨 GIMP      — Image editor (ELF)"
+echo "    🎬 VLC       — Media player (ELF)"
 echo ""
 echo "  IDE Features (us.mearvk.jdesk.apps.JDeskIDE):"
 echo "    13 menus: File, Edit, View, Navigate, Code, Refactor, Build,"

@@ -37,14 +37,30 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$SCRIPT_DIR/jdesk-packages.json"
-INSTALL_DIR="/opt/jdesk/apps"
-CACHE_DIR="/opt/jdesk/.cache"
-ICONS_DIR="/opt/jdesk/icons"
-MANIFESTS_DIR="/opt/jdesk/manifests"
-PROFILES_DIR="/opt/jdesk/profiles"
+
+# Default paths: use /opt/jdesk when root, project-local when non-root (testing)
+if [ "$(id -u)" -eq 0 ]; then
+    INSTALL_DIR="/opt/jdesk/apps"
+    CACHE_DIR="/opt/jdesk/.cache"
+    ICONS_DIR="/opt/jdesk/icons"
+    MANIFESTS_DIR="/opt/jdesk/manifests"
+    PROFILES_DIR="/opt/jdesk/profiles"
+    LOG_FILE="/var/log/jdesk-provision.log"
+else
+    INSTALL_DIR="$SCRIPT_DIR/_install/apps"
+    CACHE_DIR="$SCRIPT_DIR/_install/.cache"
+    ICONS_DIR="$SCRIPT_DIR/_install/icons"
+    MANIFESTS_DIR="$SCRIPT_DIR/_install/manifests"
+    PROFILES_DIR="$SCRIPT_DIR/_install/profiles"
+    LOG_FILE="$SCRIPT_DIR/_install/provision.log"
+    mkdir -p "$INSTALL_DIR" "$CACHE_DIR" "$ICONS_DIR" "$MANIFESTS_DIR" "$PROFILES_DIR" 2>/dev/null || true
+fi
 OFFLINE_CACHE="/media/jdesk-cache/packages.tar.zst"
-LOG_FILE="/var/log/jdesk-provision.log"
 MIN_SPACE_MB=3072
+
+# Testing/development mode flags
+DRY_RUN=0
+LOCAL_MODE=0
 
 # Fall back to user-writable log if not root
 if [ "$(id -u)" -ne 0 ]; then
@@ -80,11 +96,15 @@ warn()    { log "${YELLOW}[WARN]${NC} $1"; }
 error()   { log "${RED}[FAIL]${NC} $1"; }
 
 check_root() {
+    if [ "$DRY_RUN" -eq 1 ] || [ "$LOCAL_MODE" -eq 1 ]; then
+        return 0  # Skip root check in test modes
+    fi
     if [ "$(id -u)" -ne 0 ]; then
-        error "This script requires Grade 3+ privilege (sudo)."
-        echo "  Usage: sudo jdesk-provision"
-        echo "  Grade: 3 (Maintenance) per sudo_gate"
-        exit 1
+        # Auto-engage local mode when running without sudo
+        LOCAL_MODE=1
+        warn "Not running as root — using local install mode (project-relative)."
+        warn "For production install: sudo jdesk-provision"
+        return 0
     fi
 }
 
@@ -120,9 +140,15 @@ check_tools() {
     command -v wget &>/dev/null || command -v curl &>/dev/null || missing+=("wget or curl")
 
     if [ ${#missing[@]} -gt 0 ]; then
-        info "Installing required tools: ${missing[*]}"
-        apt-get update -qq
-        apt-get install -y -qq jq wget 2>/dev/null
+        if [ "$DRY_RUN" -eq 1 ]; then
+            warn "Missing tools (dry-run, skipping install): ${missing[*]}"
+        elif [ "$LOCAL_MODE" -eq 1 ]; then
+            warn "Missing tools: ${missing[*]} — install manually: sudo apt install jq wget"
+        else
+            info "Installing required tools: ${missing[*]}"
+            apt-get update -qq
+            apt-get install -y -qq jq wget 2>/dev/null
+        fi
     fi
 }
 
@@ -136,10 +162,22 @@ install_apt_package() {
     local binary="$3"
     local symlink="$4"
 
+    # In local mode, remap symlink path to local install dir
+    if [ "$LOCAL_MODE" -eq 1 ]; then
+        symlink="${INSTALL_DIR}${symlink#/opt/jdesk/apps}"
+    fi
+
     # Check if already installed
     if [ -f "$binary" ] && [ -L "$symlink" ]; then
         success "$pkg_name already installed"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
+        return 0
+    fi
+
+    # Dry-run: just report what would happen
+    if [ "$DRY_RUN" -eq 1 ]; then
+        info "$pkg_name: would apt-get install $apt_pkg → $symlink"
+        ((INSTALLED++)) || true
         return 0
     fi
 
@@ -150,7 +188,7 @@ install_apt_package() {
             success "$pkg_name installed via apt"
         else
             warn "$pkg_name: apt install failed (may need manual install)"
-            ((FAILED++))
+            ((FAILED++)) || true
             return 1
         fi
     fi
@@ -162,10 +200,10 @@ install_apt_package() {
         mkdir -p "$symlink_dir"
         ln -sf "$binary" "$symlink"
         success "$pkg_name: $symlink → $binary"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         warn "$pkg_name: binary not found at $binary after install"
-        ((FAILED++))
+        ((FAILED++)) || true
     fi
 }
 
@@ -177,10 +215,23 @@ install_github_package() {
     local binary="$5"
     local version_pin="$6"
 
+    # In local mode, remap paths from /opt/jdesk/apps to local install dir
+    if [ "$LOCAL_MODE" -eq 1 ]; then
+        extract_to="${INSTALL_DIR}${extract_to#/opt/jdesk/apps}"
+        binary="${INSTALL_DIR}${binary#/opt/jdesk/apps}"
+    fi
+
     # Check if already installed
     if [ -f "$binary" ]; then
         success "$pkg_name already installed at $binary"
-        ((SKIPPED++))
+        ((SKIPPED++)) || true
+        return 0
+    fi
+
+    # Dry-run: just report what would happen
+    if [ "$DRY_RUN" -eq 1 ]; then
+        info "$pkg_name: would download from github.com/$repo → $extract_to"
+        ((INSTALLED++)) || true
         return 0
     fi
 
@@ -198,7 +249,7 @@ install_github_package() {
 
     if [ -z "$download_url" ] || [ "$download_url" = "null" ]; then
         warn "$pkg_name: Could not determine download URL from GitHub"
-        ((FAILED++))
+        ((FAILED++)) || true
         return 1
     fi
 
@@ -228,10 +279,10 @@ install_github_package() {
     if [ -f "$binary" ]; then
         chmod +x "$binary"
         success "$pkg_name installed: $binary"
-        ((INSTALLED++))
+        ((INSTALLED++)) || true
     else
         warn "$pkg_name: binary not found at $binary after extraction"
-        ((FAILED++))
+        ((FAILED++)) || true
     fi
 }
 
@@ -322,7 +373,7 @@ provision_packages() {
                     done
                     if [ "$all_present" = true ]; then
                         success "$name: all binaries symlinked to $symlink_dir"
-                        ((INSTALLED++))
+                        ((INSTALLED++)) || true
                     else
                         install_apt_package "$name" "$apt_pkg" "/usr/bin/ls" "${symlink_dir}ls"
                     fi
@@ -344,31 +395,42 @@ provision_packages() {
                 install_script=$(jq -r ".packages[$i].install_script // empty" "$MANIFEST")
                 binary=$(jq -r ".packages[$i].binary // empty" "$MANIFEST")
 
+                # In local mode, remap binary path
+                if [ "$LOCAL_MODE" -eq 1 ] && [ -n "$binary" ]; then
+                    binary="${INSTALL_DIR}${binary#/opt/jdesk/apps}"
+                fi
+
                 # Check if already installed
                 if [ -n "$binary" ] && [ -f "$binary" ]; then
                     success "$name already installed"
-                    ((SKIPPED++))
+                    ((SKIPPED++)) || true
                 else
-                    # Run the provision script
-                    local script_path="$SCRIPT_DIR/$install_script"
-                    if [ -x "$script_path" ]; then
-                        info "Installing $name via script ($install_script)..."
-                        if bash "$script_path"; then
-                            success "$name installed via script"
-                            ((INSTALLED++))
-                        else
-                            warn "$name: script install failed (check $LOG_FILE)"
-                            ((FAILED++))
-                        fi
+                    # Dry-run: just report
+                    if [ "$DRY_RUN" -eq 1 ]; then
+                        info "$name: would run script $install_script"
+                        ((INSTALLED++)) || true
                     else
-                        warn "$name: install script not found or not executable: $script_path"
-                        ((FAILED++))
+                        # Run the provision script
+                        local script_path="$SCRIPT_DIR/$install_script"
+                        if [ -x "$script_path" ]; then
+                            info "Installing $name via script ($install_script)..."
+                            if bash "$script_path" "$INSTALL_DIR"; then
+                                success "$name installed via script"
+                                ((INSTALLED++)) || true
+                            else
+                                warn "$name: script install failed (check $LOG_FILE)"
+                                ((FAILED++)) || true
+                            fi
+                        else
+                            warn "$name: install script not found or not executable: $script_path"
+                            ((FAILED++)) || true
+                        fi
                     fi
                 fi
                 ;;
             *)
                 warn "$name: unknown source type '$source'"
-                ((FAILED++))
+                ((FAILED++)) || true
                 ;;
         esac
     done
@@ -425,13 +487,13 @@ show_status() {
 
         if [ -n "$binary" ] && [ -f "$binary" ]; then
             echo -e "  ${GREEN}✓${NC} $name ($priority)"
-            ((present++))
+            ((present++)) || true
         elif [ -n "$symlink" ] && [ -L "$symlink" ]; then
             echo -e "  ${GREEN}✓${NC} $name ($priority)"
-            ((present++))
+            ((present++)) || true
         else
             echo -e "  ${RED}✗${NC} $name ($priority)"
-            ((missing++))
+            ((missing++)) || true
         fi
     done
 
@@ -466,13 +528,13 @@ verify_installation() {
             target=$(readlink "$symlink")
             if [ ! -f "$target" ]; then
                 warn "$name: broken symlink $symlink → $target"
-                ((issues++))
+                ((issues++)) || true
             fi
         fi
 
         if [ -n "$binary" ] && [ ! -f "$binary" ]; then
             warn "$name: binary missing at $binary"
-            ((issues++))
+            ((issues++)) || true
         fi
     done
 
@@ -495,6 +557,18 @@ main() {
         case "$1" in
             --full)        mode="all"; shift ;;
             --core-only)   mode="core"; shift ;;
+            --dry-run|--test)
+                DRY_RUN=1; shift ;;
+            --local)
+                LOCAL_MODE=1
+                INSTALL_DIR="${HOME}/.local/share/jdesk/apps"
+                CACHE_DIR="${HOME}/.local/share/jdesk/.cache"
+                ICONS_DIR="${HOME}/.local/share/jdesk/icons"
+                MANIFESTS_DIR="${HOME}/.local/share/jdesk/manifests"
+                PROFILES_DIR="${HOME}/.local/share/jdesk/profiles"
+                LOG_FILE="${HOME}/.local/share/jdesk/provision.log"
+                mkdir -p "$INSTALL_DIR" "$CACHE_DIR" "$ICONS_DIR" "$MANIFESTS_DIR" "$PROFILES_DIR"
+                shift ;;
             --status)      check_manifest; show_status; exit 0 ;;
             --verify)      check_manifest; verify_installation; exit 0 ;;
             --build-cache)
@@ -511,12 +585,15 @@ main() {
                 echo "  (none)         Install core + standard packages"
                 echo "  --full         Install all packages (including optional)"
                 echo "  --core-only    Install core packages only"
+                echo "  --dry-run      Simulate install (no changes, no sudo needed)"
+                echo "  --local        Install to ~/.local/share/jdesk/ (no sudo needed)"
                 echo "  --build-cache DIR  Build offline cache tarball"
                 echo "  --status       Show current installation status"
                 echo "  --verify       Verify symlinks and binaries"
                 echo "  --help         This message"
                 echo ""
                 echo "Privilege: Grade 3 (Maintenance) per sudo_gate"
+                echo "  --dry-run and --local bypass root requirement for testing."
                 echo "Manifest: $MANIFEST"
                 exit 0
                 ;;
@@ -558,8 +635,12 @@ main() {
     fi
 
     # Update apt cache once
-    info "Updating package index..."
-    apt-get update -qq 2>/dev/null
+    if [ "$DRY_RUN" -eq 0 ] && [ "$LOCAL_MODE" -eq 0 ]; then
+        info "Updating package index..."
+        apt-get update -qq 2>/dev/null
+    elif [ "$DRY_RUN" -eq 1 ]; then
+        info "Updating package index... (dry-run: skipped)"
+    fi
 
     # Install packages
     provision_packages "$mode"
