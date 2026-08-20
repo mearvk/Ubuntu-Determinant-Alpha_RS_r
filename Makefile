@@ -754,7 +754,50 @@ $(ROOTFS_DIR): $(ROOTFS_TAR)
 	@echo "=== Extracting Ubuntu Base rootfs ==="
 	mkdir -p $(ROOTFS_DIR)
 	fakeroot tar -xzf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
+	@echo "=== Creating /user hierarchy ==="
+	mkdir -p $(ROOTFS_DIR)/user
+	mkdir -p $(ROOTFS_DIR)/user/bin
+	mkdir -p $(ROOTFS_DIR)/user/lib
+	mkdir -p $(ROOTFS_DIR)/user/lib/games
+	mkdir -p $(ROOTFS_DIR)/user/lib/ide
+	mkdir -p $(ROOTFS_DIR)/user/lib/mysql
+	mkdir -p $(ROOTFS_DIR)/user/lib/browser
+	mkdir -p $(ROOTFS_DIR)/user/lib/python
+	mkdir -p $(ROOTFS_DIR)/user/share
+	mkdir -p $(ROOTFS_DIR)/user/share/accounts
+	mkdir -p $(ROOTFS_DIR)/user/share/mail
+	mkdir -p $(ROOTFS_DIR)/user/share/icons
+	mkdir -p $(ROOTFS_DIR)/user/share/themes
+	mkdir -p $(ROOTFS_DIR)/user/share/fonts
+	mkdir -p $(ROOTFS_DIR)/user/share/db
+	mkdir -p $(ROOTFS_DIR)/user/include
+	mkdir -p $(ROOTFS_DIR)/user/etc
+	mkdir -p $(ROOTFS_DIR)/user/etc/mysql
+	mkdir -p $(ROOTFS_DIR)/user/etc/mail
+	mkdir -p $(ROOTFS_DIR)/user/local
+	mkdir -p $(ROOTFS_DIR)/user/local/bin
+	mkdir -p $(ROOTFS_DIR)/user/local/lib
+	mkdir -p $(ROOTFS_DIR)/user/local/share
+	@echo "=== Creating /deck hierarchy ==="
+	mkdir -p $(ROOTFS_DIR)/deck
+	mkdir -p $(ROOTFS_DIR)/deck/bin
+	mkdir -p $(ROOTFS_DIR)/deck/lib
+	mkdir -p $(ROOTFS_DIR)/deck/share
+	mkdir -p $(ROOTFS_DIR)/deck/include
+	mkdir -p $(ROOTFS_DIR)/deck/local
+	mkdir -p $(ROOTFS_DIR)/deck/local/bin
+	mkdir -p $(ROOTFS_DIR)/deck/local/lib
+	mkdir -p $(ROOTFS_DIR)/deck/local/share
+	@echo "=== Adding /user and /deck to PATH ==="
+	mkdir -p $(ROOTFS_DIR)/etc/profile.d
+	printf '# /user hierarchy — owner/operator software\nexport PATH="/usr/local/bin:/user/local/bin:/user/bin:$$PATH"\nexport LD_LIBRARY_PATH="/user/lib:/user/local/lib:$$LD_LIBRARY_PATH"\n' \
+		> $(ROOTFS_DIR)/etc/profile.d/user-path.sh
+	chmod 644 $(ROOTFS_DIR)/etc/profile.d/user-path.sh
+	printf '# /deck hierarchy\nexport PATH="/deck/local/bin:/deck/bin:$$PATH"\nexport LD_LIBRARY_PATH="/deck/lib:/deck/local/lib:$$LD_LIBRARY_PATH"\n' \
+		> $(ROOTFS_DIR)/etc/profile.d/deck-path.sh
+	chmod 644 $(ROOTFS_DIR)/etc/profile.d/deck-path.sh
 	@echo "Rootfs extracted to $(ROOTFS_DIR)"
+	@echo "/user and /deck hierarchies created (parallel to /usr)"
 
 rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-from-source tools-all-install desktop jdesk-install jwstf-install initramfs grub
 	@echo ""
@@ -785,6 +828,8 @@ rootfs-full: rootfs kernel-install x11-install wallpapers-install java-install-f
 	@echo "    ✓ chkrootkit (rootkit detection)"
 	@echo "    ✓ rkhunter (Rootkit Hunter)"
 	@echo "    ✓ JDesk desktop framework (first-boot provisioner)"
+	@echo "    ✓ /user hierarchy (owner/operator software space)"
+	@echo "    ✓ /deck hierarchy (professional system software)"
 	@echo "    ✓ Initramfs with custom module loading"
 	@echo "    ✓ GRUB bootloader configuration"
 

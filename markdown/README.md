@@ -50,12 +50,13 @@ A custom Linux kernel (5.15.204) with extensions for extended port addressing, h
 10. [System Accounts & nnet Identity](#system-accounts--nnet-identity)
 11. [NEGAMANE — Immutable Filesystem Brand](#negamane--immutable-filesystem-brand)
 12. [Parallel Copy/Move (pcopy/pmove)](#parallel-copymove-pcopypmove)
+13. [/user — Personal Software Hierarchy](#user--personal-software-hierarchy)
 
 **System Services**
 
-13. [Terminal Chat System](#terminal-chat-system)
-14. [Cron Callback Extension](#cron-callback-extension)
-15. [CPU Boost Designation](#cpu-boost-designation)
+14. [Terminal Chat System](#terminal-chat-system)
+15. [Cron Callback Extension](#cron-callback-extension)
+16. [CPU Boost Designation](#cpu-boost-designation)
 16. [White Ethics Installer Grade](#white-ethics-installer-grade)
 
 **Security**
@@ -1141,6 +1142,149 @@ fs/pmove/Kconfig               - CONFIG_PCOPY (pmove variant)
 fs/pmove/Makefile              - Kernel build entry
 tools/pcopy/pcopy.c            - Userspace CLI tool (~400 lines)
 tools/pcopy/Makefile           - Build/install (produces pcopy + pmove symlink)
+```
+
+---
+
+## /user — Personal Software Hierarchy
+
+A top-level directory (`/user`) parallel to `/usr` for personal software installations. While `/usr` is system-managed (apt/dpkg, NEGAMANE-branded, OS infrastructure), `/user` is for software the owner/operator installs on a personal basis.
+
+### What Goes in /user
+
+| Category | Examples | Install Path |
+|----------|----------|--------------|
+| Creative tools | GIMP, Blender, Inkscape, Audacity | `/user/bin/` |
+| Email clients | Thunderbird, Evolution, personal mail configs | `/user/bin/`, `/user/share/mail/` |
+| Games | Steam, personal game installs, emulators | `/user/bin/`, `/user/lib/games/` |
+| IDEs | IntelliJ IDEA, Eclipse, VS Code, NetBeans | `/user/bin/`, `/user/lib/ide/` |
+| Personal databases | Personal MySQL instance, SQLite DBs | `/user/lib/mysql/`, `/user/share/db/` |
+| Personal accounts | Email account configs, credentials, keys | `/user/share/accounts/` |
+| Media | Music players, video editors, photo managers | `/user/bin/` |
+| Browsers (personal) | Firefox personal profile, Chromium extensions | `/user/lib/browser/` |
+| Productivity | LibreOffice, personal office tools | `/user/bin/` |
+| Communication | Discord, Signal, Telegram, IRC clients | `/user/bin/` |
+
+### What Stays in /usr
+
+| Category | Examples | Why |
+|----------|----------|-----|
+| OS infrastructure | systemd, dbus, udev, coreutils | System cannot boot without them |
+| System libraries | glibc, libssl, libpam | Depended on by the OS itself |
+| Package-managed tools | apt, dpkg, gcc, make | Managed by the package system |
+| Kernel support | module-init-tools, kmod | Kernel infrastructure |
+| Security daemons | ClamAV, rkhunter, chkrootkit | System protection |
+| System services | MySQL (system instance), Postfix, Dovecot | Infrastructure services |
+| Dave AI | Dave intelligence framework | Kernel-adjacent intelligence |
+
+### Directory Structure
+
+```
+/user/
+├── bin/             Personal executables (GIMP, Thunderbird, games)
+├── lib/             Personal shared libraries and runtime data
+│   ├── games/       Game data and engines
+│   ├── ide/         IDE installations (IntelliJ, Eclipse, etc.)
+│   ├── mysql/       Personal MySQL data directory
+│   ├── browser/     Browser profiles and extensions
+│   └── python/      Personal Python packages (virtualenvs)
+├── share/           Personal shared data
+│   ├── accounts/    Email accounts, personal service configs
+│   ├── mail/        Local mail storage (personal accounts)
+│   ├── icons/       Personal icon themes
+│   ├── themes/      Personal desktop themes
+│   ├── fonts/       User-installed fonts
+│   └── db/          Personal databases (SQLite, etc.)
+├── include/         Personal development headers
+├── etc/             Personal configuration files
+│   ├── mysql/       Personal MySQL config (my.cnf)
+│   └── mail/        Personal mail client config
+└── local/           Personal locally-compiled software
+    ├── bin/
+    ├── lib/
+    └── share/
+```
+
+### PATH Integration
+
+`/user/bin` and `/user/local/bin` are in the system PATH via `/etc/profile.d/user-path.sh`:
+
+```bash
+export PATH="/usr/local/bin:/user/local/bin:/user/bin:$PATH"
+export LD_LIBRARY_PATH="/user/lib:/user/local/lib:$LD_LIBRARY_PATH"
+```
+
+Priority order: `/usr/local/bin` → `/user/local/bin` → `/user/bin` → `/usr/bin` → `/bin`
+
+### Permission Class
+
+| Path | Permission | Who |
+|------|-----------|-----|
+| `/usr` | System (root + package manager) | apt/dpkg only |
+| `/user` | Trusted / Genius | Owner/operator |
+| `/home` | User (per-account) | Individual user |
+
+The owner can freely install, modify, and remove anything in `/user` without needing package system involvement. Grade 1+ (Elevated) permission is sufficient.
+
+### Install Behavior
+
+New personal software installations are routed to `/user` by default:
+
+```bash
+# Personal MySQL instance (separate from system MySQL)
+mysql-user-install --datadir=/user/lib/mysql --port=3307
+
+# Personal IDE
+install-ide intellij /user/lib/ide/intellij/
+ln -s /user/lib/ide/intellij/bin/idea.sh /user/bin/idea
+
+# Personal email client
+apt-personal install thunderbird    # Routes to /user/bin/thunderbird
+
+# Personal game
+install-game /user/lib/games/factorio/
+ln -s /user/lib/games/factorio/bin/factorio /user/bin/factorio
+```
+
+### Survival Across OS Updates
+
+`/user` is preserved during OS reinstall or upgrade:
+- The installer partitions `/user` on a separate partition (or marks it preserve)
+- `/usr` is wiped and rebuilt from packages
+- `/user` remains intact — personal software, databases, accounts all survive
+- After upgrade, `/user/bin` is automatically back in PATH
+
+### Distinction from /home
+
+| Aspect | `/user` | `/home` |
+|--------|---------|---------|
+| Contains | Software, libraries, executables | Documents, downloads, personal files |
+| Structure | FHS-like (bin/lib/share) | Per-user directories |
+| Scope | System-wide (single owner) | Per-account |
+| Purpose | Run programs | Store data |
+
+### NEGAMANE
+
+`/user` is NOT NEGAMANE-branded by default. The owner can opt-in to brand specific entries:
+
+```bash
+negamane /user/lib/mysql/       # Protect personal DB from accidental deletion
+negamane /user/share/accounts/  # Protect email account configs
+```
+
+### JDesk Integration
+
+JDesk desktop icons for personal software resolve to `/user/bin/`:
+- Double-clicking GIMP on the desktop launches `/user/bin/gimp`
+- The JDesk app manifest for personal apps uses `installBase=/user`
+- JDesk Software Center distinguishes "system install" (`/usr`) from "personal install" (`/user`)
+
+### Files
+
+```
+/etc/profile.d/user-path.sh    - PATH/LD_LIBRARY_PATH setup for /user
+Makefile (rootfs target)        - Creates /user hierarchy at install time
+markdown/FILESYSTEM.md          - Full filesystem layout specification
 ```
 
 ---
