@@ -11,15 +11,17 @@ This OS maintains three parallel user-space hierarchies:
 
 | Path   | Purpose |
 |--------|---------|
-| `/usr` | System programs and libraries — standard FHS, managed by the package system |
-| `/user`| User-facing programs, personal tools, and MEARVK-specific runtime — managed by the owner/operator |
+| `/usr` | What the machine considers on behalf of the user — system-managed, machine-curated |
+| `/user`| Directly for the user, by the user, for the future user — binaries, libraries, structs, organizations for building things |
 | `/deck`| Professional-grade system software — databases, IDEs, creative tools, audio, security, scanning, heuristics, network-aware programs |
 
 All three exist at the root level. `/usr` retains its standard Linux meaning. `/user` and `/deck` are new.
 
 ---
 
-## /usr — System (Standard FHS)
+## /usr — Machine on Behalf of the User
+
+Software in `/usr` is what **the machine considers on behalf of the user**. These are programs the system runs, manages, and maintains so that the user's environment functions. The user does not directly curate `/usr` — the machine does, through the package system. The machine installs, updates, and removes `/usr` contents to serve the user's needs without requiring the user's direct involvement.
 
 The traditional Unix system directory. Contains:
 
@@ -43,36 +45,23 @@ Rules:
 - NEGAMANE-branded entries are immutable
 - Permission class: system-level access required for modification
 - Standard FHS semantics apply
+- The machine decides what lives here — the user benefits passively
 
 ---
 
-## /user — Owner/Operator Space
+## /user — Directly for the User, by the User, for the Future User
 
-A new top-level directory for user-facing, human-curated, and MEARVK-specific software. Distinct from `/home` (which is per-user data) and `/usr` (which is system-managed packages).
+Software in `/user` exists **on direct behalf of the user**. These are binaries, libraries, structs, and organizations that the user actively chose, built, or curated. `/user` is where you build things for the future — for the future version of yourself, for the next project, for what comes next.
 
-This is where **personal software** lives: GIMP, email clients, games, IDEs, personal MySQL instances, personal email accounts, and anything the owner installs on a personal basis. The system installer and JDesk Software Center route personal installs here by default.
+This is not the machine acting on your behalf. This is **you** acting on your behalf.
 
 ```
 /user/
-├── bin/          Personal executables (GIMP, Thunderbird, games, IDEs)
-├── lib/          Personal libraries and runtime data
-│   ├── games/    Game data and engines
-│   ├── ide/      IDE installations (IntelliJ, Eclipse, etc.)
-│   ├── mysql/    Personal MySQL data directory
-│   ├── browser/  Browser profiles and extensions
-│   └── python/   Personal Python packages (virtualenvs)
-├── share/        Personal shared data
-│   ├── accounts/ Email accounts, personal service configs
-│   ├── mail/     Local mail storage (personal accounts)
-│   ├── icons/    Personal icon themes
-│   ├── themes/   Personal desktop themes
-│   ├── fonts/    User-installed fonts
-│   └── db/       Personal databases (SQLite, etc.)
-├── include/      Personal development headers
-├── etc/          Personal configuration files
-│   ├── mysql/    Personal MySQL config (my.cnf)
-│   └── mail/     Personal mail client config
-├── local/        Personal locally-compiled software
+├── bin/          User-installed executables (personal tools, scripts)
+├── lib/          User libraries (custom .so/.a, JDesk extensions)
+├── share/        User-shared data (custom themes, documentation, assets)
+├── include/      User headers (for personal development projects)
+├── local/        User's locally compiled software
 │   ├── bin/
 │   ├── lib/
 │   └── share/
@@ -84,6 +73,7 @@ Rules:
 - Permission class: Trusted or Genius (owner-operator level)
 - Intended for software that the system owner chose to install outside the package system
 - `/user/bin` is added to PATH after `/usr/local/bin` and before `/usr/bin`
+- Binaries, libraries, structs, organizations — all for building the future
 
 ---
 
