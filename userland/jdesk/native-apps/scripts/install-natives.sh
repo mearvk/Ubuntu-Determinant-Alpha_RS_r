@@ -92,9 +92,9 @@ fi
 # --- VSCodium / IntelliJ (IDE backend) ---
 echo "  → IDE Backend: IntelliJ IDEA Community Edition (source, ~2.5 GB)"
 mkdir -p "$INSTALL_DIR/ide"
-FETCH_INTELLIJ="$(cd "$(dirname "$0")" && pwd)/native-apps/scripts/fetch-intellij-source.sh"
+FETCH_INTELLIJ="$SCRIPT_DIR/fetch-intellij-source.sh"
 if [ ! -x "$FETCH_INTELLIJ" ]; then
-    FETCH_INTELLIJ="$(cd "$(dirname "$0")" && pwd)/scripts/fetch-intellij-source.sh"
+    FETCH_INTELLIJ="$SCRIPT_DIR/../scripts/fetch-intellij-source.sh"
 fi
 if [ -x "$FETCH_INTELLIJ" ]; then
     echo "    Fetching IntelliJ Community source..."
@@ -123,9 +123,9 @@ echo "    Source: github.com/JetBrains/intellij-community (Apache-2.0)"
 # --- Chromium Browser ---
 echo "  → Chromium Browser (source, ~5.5 GB)"
 mkdir -p "$INSTALL_DIR/chromium"
-FETCH_CHROMIUM="$(cd "$(dirname "$0")" && pwd)/native-apps/scripts/fetch-chromium-source.sh"
+FETCH_CHROMIUM="$SCRIPT_DIR/fetch-chromium-source.sh"
 if [ ! -x "$FETCH_CHROMIUM" ]; then
-    FETCH_CHROMIUM="$(cd "$(dirname "$0")" && pwd)/scripts/fetch-chromium-source.sh"
+    FETCH_CHROMIUM="$SCRIPT_DIR/../scripts/fetch-chromium-source.sh"
 fi
 if [ -x "$FETCH_CHROMIUM" ]; then
     echo "    Fetching Chromium source..."

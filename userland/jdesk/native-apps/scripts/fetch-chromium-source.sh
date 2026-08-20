@@ -28,7 +28,8 @@ CLONE_DEPTH=10
 BRANCH="main"
 
 # Check if OS-level chromium source already exists
-OS_CHROMIUM_SRC="$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd)/userland/chromium/chromium-src"
+# From native-apps/scripts/ → ../../.. gets to userland/, then chromium/chromium-src
+OS_CHROMIUM_SRC="$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd)/chromium/chromium-src"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
