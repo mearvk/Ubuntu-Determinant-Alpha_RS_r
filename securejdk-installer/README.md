@@ -2,6 +2,18 @@
 
 A JavaFX-based installer and configuration front end for **Secure JDK 28**.
 
+## Product identity and attribution
+
+The Secure JDK 28 installer carries the following product identity in its interface and release materials:
+
+**MEARVK LLC 2028 ©**
+
+Graal-related software is kept as a separate attribution/value line rather than being represented as MEARVK-owned technology:
+
+**Graal software — All applicable Graal trademarks and notices included © 2026**
+
+The exact trademark, copyright, and third-party notice language must be reviewed against the components actually redistributed in each production build. Copyright and trademark notices should not be interpreted as transferring ownership of third-party marks.
+
 ## Product intent
 
 The installer is intentionally more than a file copier. It provides a branded configuration aperture for the Secure JDK 28 product, including installation target selection, PATH and `JAVA_HOME` configuration, security posture selection, JavaFX integration, **Total** installation review, **Memory Management** profiles, an **Aperture** for advanced configuration, installation progress, and a staged manifest.
@@ -9,8 +21,6 @@ The installer is intentionally more than a file copier. It provides a branded co
 The visual treatment uses a restrained United States-inspired palette: navy, white, and red, with the product name as the primary visual mark.
 
 ## Native product names
-
-The native distribution names are deliberately simple:
 
 ```text
 Windows x64:
@@ -36,8 +46,6 @@ The Linux distribution is therefore intended to be launched as:
 ./SecureJDK28.sans
 ```
 
-The accompanying tarball preserves the application image and launcher together.
-
 ## Native packaging architecture
 
 ```text
@@ -56,10 +64,19 @@ securejdk-installer/
     │       ├── InstallerEngine.java
     │       └── SecureJdkInstallerApp.java
     └── resources/
+        ├── branding.properties
         └── securejdk.css
 ```
 
-The repository also contains `.github/workflows/securejdk28-native.yml`, which builds the native packages on their target operating systems. This is important because `jpackage` produces platform-specific application packages and the native package must be built on the corresponding platform. Oracle's packaging documentation identifies Windows `exe`/`msi`, Linux `deb`/`rpm`, and macOS `pkg`/`dmg` as supported native package formats and notes that packaging is performed on the target platform. citeturn0search2turn0search1
+The repository also contains `.github/workflows/securejdk28-native.yml`, which builds native packages on target operating systems.
+
+## Branding implementation
+
+The JavaFX installer displays **MEARVK LLC 2028 ©** in the primary product chrome and installation summary. The separate Graal attribution appears as a distinct notice:
+
+> Graal software — All applicable Graal trademarks and notices included © 2026
+
+The source also stores these values in `branding.properties` so future native packaging, installer manifests, About dialogs, and release documentation can consume the same canonical product strings.
 
 ## Build
 
@@ -83,38 +100,6 @@ Native builds:
 # macOS
 ./packaging/build-macos.sh
 ```
-
-`jpackage` creates a self-contained application image containing the application launcher and runtime dependencies; it can then create platform-specific installable packages. citeturn0search0turn0search2
-
-## Native outputs
-
-### Linux
-
-`build-linux.sh` creates:
-
-```text
-SecureJDK28.sans
-SecureJDK28/
-SecureJDK28-linux-x86_64.tar.gz
-```
-
-The `.sans` file is the ELF application launcher. The complete application image is required for normal operation because it contains the packaged runtime and application resources.
-
-### Windows
-
-`build-windows.ps1` creates:
-
-```text
-SecureJDK28.exe
-```
-
-The Windows build requests a Start Menu entry, desktop shortcut, and directory chooser through `jpackage`.
-
-### macOS
-
-`build-macos.sh` creates both an application image and a DMG. The GitHub Actions matrix builds both Apple Silicon and Intel variants.
-
-Production macOS distribution should add Apple code signing and notarization. `jpackage` supports macOS package customization and signing-related options, but release signing credentials belong in the protected build environment rather than this repository. citeturn0search1
 
 ## Installation engine boundary
 
@@ -169,3 +154,4 @@ Before commercial distribution, the repository should include the exact Secure J
 8. Add signed and notarized macOS releases.
 9. Add reproducible native build metadata and artifact hashes.
 10. Connect the final installer to the Secure JDK 28 distribution manifest.
+11. Perform a final trademark/copyright notice review before commercial release.
