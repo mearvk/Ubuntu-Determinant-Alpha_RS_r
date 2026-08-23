@@ -2,15 +2,61 @@
 
 JSpec is the execution motor for the `/cmd` desktop/executable series. Linux is the first native target, with Windows PE/COFF planned against the same contract.
 
+## Professional executable architecture
+
+The JSpec Professional model keeps the familiar native executable path while adding a deliberately small, controlled pre-run layer:
+
+```text
+                         JSpec Professional
+                                │
+                         desktop / shell
+                                │
+                           cmd icon/link
+                                │
+                                ▼
+                         JSpec pre-runner
+                                │
+                                ▼
+                            .alpha
+                     JSpec executable identity
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                 Linux v1               Windows v2
+                    │                       │
+                  .elf                    .exe
+                  (ELF)                 (PE/COFF)
+                    │                       │
+                    ▼                       ▼
+               Linux OS loader       Windows OS loader
+                 execve()             CreateProcessW()
+                    │                       │
+                    └───────────┬───────────┘
+                                │
+                                ▼
+                          target program
+                                │
+                                ▼
+                          cmd / result
+```
+
+The executable-family order is intentionally:
+
+1. **`.alpha`** — JSpec Professional identity and pre-run contract.
+2. **`.elf`** — Linux/Unix native executable family.
+3. **`.exe`** — Windows PE/COFF executable family.
+
+`.alpha` does not replace the native binary format. On Linux v1 it is an ELF executable carrying the `.alpha` filename identity. The OS therefore retains its established loader while JSpec and the desktop linking system share a higher-level executable identity.
+
 ## `.alpha` native executable
 
 The JSpec Professional executable identity is **`.alpha`**. On Linux v1, `.alpha` is not a second binary container: it is a normal **ELF executable carrying the `.alpha` filename identity**. This is deliberate. The OS retains its established executable loader while JSpec gains a distinct executable family with minimal overhead.
 
-The model is:
+The launch model is:
 
-`cmd icon/link -> JSpec pre-runner -> .alpha -> Linux ELF loader -> target`
+`cmd icon/link -> JSpec pre-runner -> .alpha -> native OS loader -> target`
 
-This gives the JSpec interpretive/pre-runner and the desktop linking system a common identity while keeping the kernel path conventional. The `.alpha` launcher uses direct `execve()` and does not invoke a shell.
+This gives the JSpec interpretive/pre-runner and the desktop linking system a common identity while keeping the kernel path conventional. The `.alpha` launcher uses direct `execve()` on Linux and does not invoke a shell.
 
 ## Design principles
 
