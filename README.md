@@ -421,6 +421,114 @@ The numerical and historical layer is intentionally separate from the semantic l
 
 ---
 
+## Total — Proffer Moderator Layer
+
+**Total** is the proposed privileged moderator layer between the operating-system kernel and ordinary userland software. It runs on top of the kernel as a native C/C++ executable or service, while exposing a Proffer-oriented integration surface to SecureJDK 28 and Graal.
+
+The intended stack is:
+
+```text
+Userland applications
+        │
+        ▼
+Total — privileged Proffer moderator
+        │
+        ▼
+Operating-system kernel
+```
+
+Total is **not a replacement for the kernel** and is not automatically available as an unrestricted API to ordinary userland programs. It provides a controlled exception path for approved runtimes, administrators, diagnostics, and explicitly authorized services.
+
+### Native and boot integration
+
+Total is intended to ship with the **SecureJDK 28 / Graal family** and may require root or administrator privileges to install. It can register as a protected OS service and load during system boot or service initialization, subject to platform-specific boot ordering and failure semantics.
+
+Its native implementation is intentional: memory observation, resource accounting, process supervision, and early system integration should not fundamentally depend on a higher-level Java process being available first.
+
+### Memory footprint moderation
+
+Total provides a higher-level memory policy and observation boundary around mechanisms including `malloc`, `free`, Java heap allocation, native allocations, mapped memory, committed/reserved virtual memory, and process working-set behavior.
+
+It does **not** replace `malloc`, `free`, the JVM garbage collector, or the kernel's virtual-memory manager. Instead, it accounts for and moderates resource conditions through explicit policy. Memory pressure can produce bounded actions such as telemetry, runtime notification, reclamation requests, cache reduction, configured ceilings, or an explicitly authorized process disposition.
+
+### Configuration and desktop treatment
+
+Total is primarily configuration-driven. A versioned configuration can specify boot behavior, memory policy, Java/Graal integration, application treatment, trusted descriptors, brand-inference conservatism, and the fallback policy for unknown software.
+
+It also models desktop products and their assisting software as a relationship graph:
+
+```text
+Brand / Product
+   ├── primary application
+   ├── helper
+   ├── service
+   ├── database
+   ├── runtime
+   └── protection component
+```
+
+Examples include databases such as MySQL, background services, launchers, runtime agents, plugin hosts, update services, and software-integrity/protection components.
+
+Brand or product association must be based on **trusted descriptors and corroborating evidence**, such as signatures, publisher identity, package provenance, manifests, verified paths, declared relationships, and cryptographic hashes. A filename or shared name alone is not sufficient. Unknown or conflicting software remains unknown rather than being silently assigned a brand.
+
+### SecureJDK/Graal execution preference
+
+Programs installed in the SecureJDK/Graal environment may, when compatible and configured, run through a Total-aware Java runtime profiling path. This is the project's intended **smooth, low-friction JVM profiling path**: trusted software should receive continuous resource awareness without unnecessary disruption.
+
+Software that does not qualify for the Java/Graal path can continue to run through the normal OS memory manager and native process model:
+
+```text
+trusted + compatible → Total/JVM-aware path
+unknown / incompatible → OS-default path
+explicitly restricted → declared restriction policy
+```
+
+Total must never require native or unrelated software to masquerade as Java software merely to obtain ordinary OS execution.
+
+### Premium product quality
+
+Total is intended as a **premium SecureJDK/Graal product-quality component**. Premium means integrated engineering quality, not unrestricted privilege. Its structure should follow established best practices for least privilege, explicit authorization, memory safety, deterministic configuration, signed updates, auditability, rollback, provenance, compatibility, bounded resource use, secure failure behavior, and testability.
+
+The project phrase **"best of known software tradeables as structure for INT"** is interpreted as a requirement to make resource, security, compatibility, and performance tradeoffs explicit rather than hiding them inside the moderator.
+
+### Proffer boundary
+
+A Total decision can carry:
+
+```text
+subject
+origin
+reason
+capability
+trust-domain
+policy
+authorization
+resource state
+provenance
+integrity
+disposition
+```
+
+The Proffer is a decision/interface record. It must not itself become an unrestricted capability token.
+
+### Access and security principles
+
+1. Observation does not imply authorization.
+2. Software identity requires trusted evidence.
+3. Unknown software remains unknown rather than being assigned a brand by guesswork.
+4. Memory pressure is a resource condition, not a judgment about a person.
+5. Kernel authority remains distinct from Total authority.
+6. Total cannot silently grant capabilities to applications.
+7. Configuration and policy versions must be attributable.
+8. Privileged actions require an explicit authorization path.
+9. Failure behavior must be bounded and documented.
+
+### Current status
+
+Total is presently a **design-level architectural component**. The detailed specification is maintained in [`markdown/TOTAL.md`](markdown/TOTAL.md). The next implementation stage is a native service skeleton with configuration, process registration, secure logging, and narrowly scoped memory observation before automated treatment policies are introduced.
+
+---
+
 ## Design Principle
 
 > **The vocabulary is stable. The model is explicit. The data is sourced. The uncertainty is visible. The security decision is attributable.**
@@ -429,8 +537,12 @@ The UTF-4088 extension applies the same principle to symbol selection: historica
 
 JSpec applies the same principle to graphics: **the Pixel Map is canonical, the raster is derived, and the codec is an implementation detail.**
 
+Total applies it to operating-system resource moderation: **the kernel remains authoritative, Total moderates through explicit policy, and userland capability remains attributable.**
+
 ## Status
 
 This is an experimental engineering and research framework. The “300-IQ” designation is a stylistic description of intended breadth and depth of reasoning, not a scientific performance claim. UTF-4088 is experimental and is not a replacement for Unicode.
 
 JSpec Pixel Format (`.jpix`) is likewise an experimental specification at this stage. The Pixel Map, boundary, topology, transparency, cohesive transformation, trimming, canonical representation, 48-bit RGB baseline, deterministic rendering, and optional codec concepts are the current design basis. The binary container/header layout remains subject to implementation and versioning.
+
+Total is also experimental at this stage. Its native service, boot integration, OS-specific privilege model, memory observation mechanisms, descriptor registry, Java/Graal hooks, and policy engine remain implementation work and must be validated independently on each supported operating system.
