@@ -1,26 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Aptitude prototype: context-aware Linux installation planner.
-# Dry-run is the default. State-changing operations require `apply`.
+# Aptitude prototype: context-aware Linux installation planner and integrity monitor.
+# Inspection is read-only. State-changing operations require explicit `apply`.
+# Continuous monitoring is opt-in and uses a bounded scan interval.
+
+SCAN_INTERVAL_SECONDS=3
+SCAN_CYCLES=1000
+STATE_DIR="${APTITUDE_STATE_DIR:-/var/lib/aptitude}"
+MANIFEST="${APTITUDE_MANIFEST:-$STATE_DIR/sha256.manifest}"
+QUARANTINE="${APTITUDE_QUARANTINE:-$STATE_DIR/quarantine}"
 
 usage() {
   cat <<'EOF'
-Aptitude — context-aware installer
+Aptitude — context-aware installer and integrity monitor
 
 Usage:
   aptitude inspect ARTIFACT
   aptitude plan ARTIFACT
   aptitude apply ARTIFACT
   aptitude verify NAME
+  aptitude manifest ROOT
+  aptitude check ROOT
+  aptitude monitor ROOT
+  aptitude repair FILE
 
-The prototype discovers host surfaces and produces a plan. `apply` is
-intentionally conservative and currently performs only a verified staging
-operation; privileged service changes are not performed implicitly.
+Integrity policy:
+  SHA-256 is the default content-integrity mechanism for tracked software.
+  The monitor is opt-in and defaults to 3 seconds between checks, up to 1000
+  cycles (about 50 minutes). It is intentionally bounded to avoid an endless
+  resource-consuming loop. RAM/system load should be sampled before scans.
 EOF
 }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+sample_resources() {
+  local mem_available load
+  mem_available="unknown"
+  load="unknown"
+  [[ -r /proc/meminfo ]] && mem_available=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
+  [[ -r /proc/loadavg ]] && load=$(awk '{print $1}' /proc/loadavg)
+  echo "resource.mem_available_kb=$mem_available"
+  echo "resource.load_1m=$load"
+}
 
 artifact_info() {
   local file="$1"
@@ -46,22 +69,10 @@ surfaces() {
   echo "kernel=$(uname -r)"
   echo "arch=$(uname -m)"
   for surface in systemctl crontab at getent ldconfig java javac; do
-    if need_cmd "$surface"; then
-      echo "surface.$surface=available"
-    else
-      echo "surface.$surface=unavailable"
-    fi
+    if need_cmd "$surface"; then echo "surface.$surface=available"; else echo "surface.$surface=unavailable"; fi
   done
-  if [[ -d /run/systemd/system ]]; then
-    echo "surface.systemd_runtime=available"
-  else
-    echo "surface.systemd_runtime=unavailable"
-  fi
-  if [[ -d /sys/fs/cgroup ]]; then
-    echo "surface.cgroup=available"
-  else
-    echo "surface.cgroup=unavailable"
-  fi
+  [[ -d /run/systemd/system ]] && echo "surface.systemd_runtime=available" || echo "surface.systemd_runtime=unavailable"
+  [[ -d /sys/fs/cgroup ]] && echo "surface.cgroup=available" || echo "surface.cgroup=unavailable"
 }
 
 inspect() {
@@ -69,6 +80,8 @@ inspect() {
   artifact_info "$1"
   echo '--- HOST SURFACES ---'
   surfaces
+  echo '--- RESOURCES ---'
+  sample_resources
 }
 
 plan() {
@@ -95,12 +108,10 @@ plan() {
 apply() {
   local file="$1"
   echo 'Aptitude apply: conservative prototype'
-  echo '---------------------------------------'
   plan "$file"
   echo
   echo 'apply_status=not_applied'
   echo 'reason=prototype refuses implicit privileged or persistent system changes'
-  echo 'next=review the plan and implement a signed adapter for the desired surface'
 }
 
 verify() {
@@ -114,6 +125,66 @@ verify() {
   fi
 }
 
+manifest_root() {
+  local root="$1"
+  [[ -d "$root" ]] || { echo "root not found: $root" >&2; exit 2; }
+  mkdir -p "$(dirname "$MANIFEST")"
+  : > "$MANIFEST"
+  # Root, moderate/system, and userland software can all be tracked. Exclusions
+  # are limited to volatile pseudo-filesystems and Aptitude's own state.
+  find "$root" -xdev -type f \
+    -not -path "$STATE_DIR/*" \
+    -not -path '/proc/*' -not -path '/sys/*' -not -path '/dev/*' \
+    -print0 | sort -z | xargs -0 sha256sum > "$MANIFEST"
+  chmod 0644 "$MANIFEST" || true
+  echo "manifest=$MANIFEST"
+  echo "files=$(wc -l < "$MANIFEST")"
+}
+
+check_manifest() {
+  [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; exit 2; }
+  echo 'APTITUDE SHA-256 INTEGRITY CHECK'
+  echo '================================'
+  sha256sum -c "$MANIFEST" --quiet && echo 'integrity=clean' || {
+    echo 'integrity=changes_or_damage_detected'
+    return 1
+  }
+}
+
+repair_file() {
+  local file="$1"
+  [[ -f "$file" ]] || { echo "file not found: $file" >&2; exit 2; }
+  mkdir -p "$QUARANTINE"
+  local stamp target
+  stamp=$(date +%Y%m%d-%H%M%S)
+  target="$QUARANTINE/$(basename "$file").$stamp"
+  cp -a -- "$file" "$target"
+  echo "quarantine_copy=$target"
+  echo "current_sha256=$(sha256sum "$file" | awk '{print $1}')"
+  echo 'repair_status=quarantined_only'
+  echo 'note=trusted restoration source must be selected and verified before replacement'
+}
+
+monitor() {
+  local root="$1" cycle=1
+  [[ -d "$root" ]] || { echo "root not found: $root" >&2; exit 2; }
+  echo "monitor_interval_seconds=$SCAN_INTERVAL_SECONDS"
+  echo "monitor_cycles=$SCAN_CYCLES"
+  while (( cycle <= SCAN_CYCLES )); do
+    echo "--- check $cycle/$SCAN_CYCLES $(date -Is) ---"
+    sample_resources
+    # Avoid making a scan more expensive when memory is critically constrained.
+    if [[ -r /proc/meminfo ]] && awk '/MemAvailable:/ {exit !($2 > 262144)}' /proc/meminfo; then
+      manifest_root "$root" >/dev/null
+      check_manifest || true
+    else
+      echo 'scan=deferred_due_to_low_available_memory'
+    fi
+    (( cycle++ ))
+    (( cycle <= SCAN_CYCLES )) && sleep "$SCAN_INTERVAL_SECONDS"
+  done
+}
+
 case "${1:-}" in
   inspect|plan|apply)
     [[ $# -eq 2 ]] || { usage; exit 2; }
@@ -122,6 +193,22 @@ case "${1:-}" in
   verify)
     [[ $# -eq 2 ]] || { usage; exit 2; }
     verify "$2"
+    ;;
+  manifest)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    manifest_root "$2"
+    ;;
+  check)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    check_manifest
+    ;;
+  monitor)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    monitor "$2"
+    ;;
+  repair)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    repair_file "$2"
     ;;
   *)
     usage
