@@ -1,0 +1,66 @@
+name: Generate JSpec cmd icons
+
+on:
+  push:
+    paths:
+      - '.github/workflows/generate-cmd-icons.yml'
+      - 'cmd/icons/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate icon family
+        run: |
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+
+          out = Path('cmd/icons')
+          out.mkdir(parents=True, exist_ok=True)
+          S = 512
+          master = Image.new('RGBA', (S, S), (0, 0, 0, 0))
+          d = ImageDraw.Draw(master)
+          margin, radius = 24, 92
+          d.rounded_rectangle((margin, margin, S-margin, S-margin), radius=radius,
+                              fill=(25, 75, 135, 255), outline=(210, 225, 240, 255), width=5)
+          d.rounded_rectangle((92, 116, 420, 386), radius=38,
+                              fill=(15, 27, 43, 255), outline=(120, 165, 205, 255), width=4)
+          d.line([(132, 184), (180, 238), (132, 292)], fill=(245, 248, 252, 255), width=18, joint='curve')
+          d.line((220, 294, 365, 294), fill=(245, 248, 252, 255), width=18)
+          d.arc((346, 145, 402, 201), -75, 75, fill=(115, 205, 255, 255), width=8)
+
+          master.save(out / 'cmd-master.png', 'PNG', optimize=True)
+          for size in (48, 32, 24, 16, 12):
+              icon = master.resize((size, size), Image.Resampling.LANCZOS)
+              icon.save(out / f'cmd-{size}x{size}.png', 'PNG', optimize=True)
+              bg = Image.new('RGB', (size, size), (255, 255, 255))
+              bg.paste(icon, mask=icon.getchannel('A'))
+              bg.save(out / f'cmd-{size}x{size}.jpg', 'JPEG', quality=95, subsampling=0, optimize=True)
+              bg.save(out / f'cmd-{size}x{size}.jpeg', 'JPEG', quality=95, subsampling=0, optimize=True)
+
+          # Remove connector upload-test artifacts if present.
+          for name in ('UPLOAD-TEST.txt',):
+              p = out / name
+              if p.exists():
+                  p.unlink()
+          PY
+
+      - name: Commit generated icon assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cmd/icons
+          git diff --cached --quiet && exit 0
+          git commit -m 'Generate JSpec cmd desktop icon assets'
+          git push
