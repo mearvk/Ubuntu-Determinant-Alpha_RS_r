@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Aptitude prototype: context-aware Linux installation planner and integrity monitor.
 # Inspection is read-only. State-changing operations require explicit `apply`.
-# Continuous monitoring is opt-in and uses a bounded scan interval.
+# Continuous monitoring is opt-in and bounded.
 
 SCAN_INTERVAL_SECONDS="${APTITUDE_SCAN_INTERVAL_SECONDS:-3}"
 SCAN_CYCLES="${APTITUDE_SCAN_CYCLES:-1000}"
@@ -128,18 +128,16 @@ manifest_root() {
   mkdir -p "$(dirname "$MANIFEST")"
   local tmp_manifest
   tmp_manifest=$(mktemp "${MANIFEST}.XXXXXX")
-  trap 'rm -f -- "$tmp_manifest"' RETURN
-
   if ! find "$root" -xdev -type f \
     -not -path "$STATE_DIR/*" \
     -not -path '/proc/*' -not -path '/sys/*' -not -path '/dev/*' \
     -print0 | sort -z | xargs -0 -r sha256sum > "$tmp_manifest"; then
+    rm -f -- "$tmp_manifest"
     echo 'manifest_status=failed' >&2
     return 1
   fi
   chmod 0644 "$tmp_manifest"
   mv -f -- "$tmp_manifest" "$MANIFEST"
-  trap - RETURN
   echo "manifest=$MANIFEST"
   echo "files=$(wc -l < "$MANIFEST")"
 }
@@ -196,9 +194,25 @@ case "${1:-}" in
     [[ $# -eq 2 ]] || { usage; exit 2; }
     "$1" "$2"
     ;;
-  verify|manifest|check|monitor|repair)
+  verify)
     [[ $# -eq 2 ]] || { usage; exit 2; }
-    "${1}_dispatch" "$2" 2>/dev/null || "$1" "$2"
+    verify "$2"
+    ;;
+  manifest)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    manifest_root "$2"
+    ;;
+  check)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    check_manifest "$2"
+    ;;
+  monitor)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    monitor "$2"
+    ;;
+  repair)
+    [[ $# -eq 2 ]] || { usage; exit 2; }
+    repair_file "$2"
     ;;
   *)
     usage
