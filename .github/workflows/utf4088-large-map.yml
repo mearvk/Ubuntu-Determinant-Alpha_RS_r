@@ -1,0 +1,64 @@
+name: UTF-4088 Large Sampling Map
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'utf-4088/algebra/**'
+      - '.github/workflows/utf4088-large-map.yml'
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build sampler
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -O3 -Wall -Wextra -pedantic \
+            utf-4088/algebra/glyph8x12.cpp \
+            utf-4088/algebra/large_sampling_map.cpp \
+            -o large_sampling_map
+
+      - name: Run 100M deterministic sample
+        run: |
+          set -euo pipefail
+          ./large_sampling_map 100000000 utf4088-large-sampling-map.csv 2>&1 | tee utf4088-large-sampling-result.txt
+
+      - name: Validate output
+        run: |
+          set -euo pipefail
+          test -s utf4088-large-sampling-map.csv
+          test -s utf4088-large-sampling-map-summary.csv
+          test -s utf4088-large-sampling-result.txt
+          grep -q '^samples=100000000$' utf4088-large-sampling-result.txt
+          python3 - <<'PY'
+          import csv
+          with open('utf4088-large-sampling-map.csv', newline='') as f:
+              rows = sum(1 for _ in f) - 1
+          assert rows == 100_000_000, rows
+          PY
+
+      - name: Upload sampling map
+        uses: actions/upload-artifact@v4
+        with:
+          name: utf4088-large-sampling-map-${{ github.sha }}
+          path: |
+            utf4088-large-sampling-map.csv
+            utf4088-large-sampling-map-summary.csv
+            utf4088-large-sampling-result.txt
+          retention-days: 30
+
+      - name: Upload feasibility source record
+        uses: actions/upload-artifact@v4
+        with:
+          name: utf4088-large-sampling-source-${{ github.sha }}
+          path: |
+            utf-4088/algebra/large_sampling_map.cpp
+            utf-4088/algebra/LARGE-SAMPLING-MAP.md
+            utf-4088/algebra/glyph8x12.hpp
+            utf-4088/algebra/glyph8x12.cpp
+          retention-days: 30
