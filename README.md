@@ -110,6 +110,58 @@ and the methodology/results are stored in:
 
 The distinction is intentional: the 9,261 candidates are **distributed character candidates**, not claims that 9,261 new human-language meanings have been established. Interpretation continues through the curated 16,606-symbol layer, historical corpus, graph semantics, and neural relayer.
 
+### Model-Cycle Success Ratio
+
+The current project milestone is recorded as a **modest, measurable success**: the system has a defined relationship between the number of inputs presented to the distribution process and the number of candidate symbols produced by the model.
+
+The primary cycle ratio is:
+
+```text
+R = N_valid / N_inputs
+```
+
+where `N_valid` is the number of candidates surviving the declared model filters. For density experiments, the local response coefficient is represented as:
+
+```text
+K = dR / dD
+```
+
+where `D` is normalized primer/distribution density. These are experimental model metrics. They should be reported with the sampling size, seed, model version, filter version, and confidence information rather than treated as universal constants.
+
+The project also retains a **300-IQ** design-scale vocabulary. Here, IQ is explicitly a metaphor for breadth/depth of systems reasoning and **not a measurement of human or machine intelligence**. It does not substitute for accuracy, statistical significance, semantic validation, or engineering quality.
+
+The milestone record is:
+
+`/utf-4088/semantics/MODEL-CYCLE-SUCCESS.md`
+
+### Polygraph-5 Semantic Falloff
+
+Semantic evidence uses the experimental primary falloff model:
+
+```text
+F5(d) = exp(-5*d/r0)
+```
+
+where `r0` is the versioned standard reference radius. Falloff is a distribution weight, not a hard character-capacity limit. Evidence below the configured semantic threshold is insufficient by itself to establish a character's meaning.
+
+The versioned definition is:
+
+`/utf-4088/semantics/character_meanings.json`
+
+### Branch Graph Vocabulary
+
+The semantic layer supports broad branch nominations including:
+
+```text
+ANIMAL · HUMAN · HUMAN_GRAPH · PSYCHOLOGY · COGNITION
+EMOTION · DEVELOPMENT · FOOD · NUTRITION · RELATIONSHIP
+INTIMACY · REPRODUCTIVE · SEXUAL_WELLBEING · THERAPY
+SELF_REGULATION · SOCIAL · ETHICS · ENVIRONMENT · TEMPORAL
+CAUSAL · IMPROVEMENT · META_GRAPH
+```
+
+These are computational semantic categories. They can overlap through weighted nomination vectors rather than forcing every character into a single branch. Sensitive human concepts are represented as domain vocabulary and must not be converted into unsupported judgments about an actual person's identity, worth, intelligence, morality, or status.
+
 ### Determinism
 
 For a fixed canonical input, model version, graph state, historical prior, primer-density version, and registry version, the selection process is intended to be reproducible. Neural synthesis therefore requires versioned weights and deterministic decoding if idempotence is required.
