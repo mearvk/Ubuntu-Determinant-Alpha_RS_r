@@ -1,7 +1,7 @@
 #include "glyph8x12.hpp"
+#include <array>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -14,7 +14,6 @@ std::uint64_t mix(std::uint64_t x) {
     return x ^ (x >> 31);
 }
 
-// 96-bit glyphs are sampled as three independent 32-bit words.
 std::array<std::uint32_t,3> sample96(std::uint64_t& state) {
     std::array<std::uint32_t,3> a{};
     for (auto& x : a) { state = mix(state); x = static_cast<std::uint32_t>(state); }
@@ -34,10 +33,10 @@ utf4088::Glyph8x12 to_glyph(const std::array<std::uint32_t,3>& a) {
 int main(int argc, char** argv) {
     const std::uint64_t samples = argc > 1 ? std::stoull(argv[1]) : 1000000ULL;
     const std::string output = argc > 2 ? argv[2] : "utf4088-space-sample.csv";
-    std::uint64_t state = 0x4088'8x12ULL; // replaced below by portable literal
-    state = 0x40880812ULL;
+    std::uint64_t state = 0x40880812ULL;
     Stats s{};
     std::ofstream out(output);
+    if (!out) return 2;
     out << "sample,black_pixels,components,connected,edges,transitions,signature\n";
     for (std::uint64_t i=0; i<samples; ++i) {
         const auto bits=sample96(state);
@@ -47,7 +46,7 @@ int main(int argc, char** argv) {
         if (m.black_pixels) ++s.nonempty;
         if (m.connected) ++s.connected;
         if (m.connected && m.black_pixels >= 4 && m.black_pixels <= 48) ++s.sparse_connected;
-        ++s.unique; // sampled 96-bit states are overwhelmingly collision-free; exact identity is the three-word state.
+        ++s.unique;
         out << i << ',' << m.black_pixels << ',' << m.connected_components << ','
             << (m.connected ? 1 : 0) << ',' << m.edge_count << ','
             << m.transitions << ',' << m.signature << '\n';
