@@ -12,6 +12,85 @@ The project calls this framing **Proffer**.
 
 ---
 
+## JSpec Pixel Format (`.jpix`)
+
+JSpec Pixel Format is an experimental pixel-native image representation in which the fundamental object is a **Pixel Map**, rather than an image assumed to occupy a rectangular canvas.
+
+The central rule is:
+
+> **The Pixel Map is the object. A rectangle is only a storage or rendering envelope when one is required by an implementation.**
+
+A Pixel Map consists of explicitly mapped pixels together with their geometry, boundary, transparency, adjacency/topology, orientation, and transformation semantics. The map may have a square, rectangular, rounded, jagged, irregular, or otherwise non-rectangular outer boundary. No particular outer rectangle is intrinsic to the image.
+
+### Pixel Map semantics
+
+Each mapped pixel has a defined coordinate and pixel value. Transparency is meaningful data: an explicitly mapped transparent pixel is distinct from space that is not mapped at all. This allows holes, antialiased boundaries, cutouts, transparent interiors, and other exact image geometry to be represented without confusing them with unused canvas area.
+
+The outermost mapped pixels define the **boundary** of the object. The implementation may calculate an **extent** as the minimum envelope needed to store or render the map, but calculating that envelope does not redefine the object as a rectangle.
+
+The principal vocabulary is:
+
+```text
+Pixel Map       the image as a geometric collection of pixels
+Mapped Pixel    a pixel explicitly belonging to the object
+Transparent Pixel  a mapped pixel with zero or partial alpha
+Boundary        the outermost mapped pixels of the object
+Extent          the minimum implementation envelope enclosing the map
+Cohesion        transforms operate on the complete map as one object
+Topology        connectivity and internal regions/holes of the map
+Transform       a deterministic operation applied to the complete map
+Trim            removal of non-mapped storage space
+Render          conversion of a Pixel Map into a conventional raster
+```
+
+### Boundary and exact geometry
+
+The boundary is first-class information. A `trim` operation therefore means **remove storage space that is not part of the Pixel Map while preserving every mapped pixel**, rather than merely performing a conventional rectangular crop.
+
+The geometry can consequently be represented conceptually as:
+
+```text
+Pixel Map
+   │
+   ├── exact pixels
+   ├── exact boundary
+   ├── transparency
+   ├── topology
+   └── optional storage envelope
+```
+
+For the JSpec desktop icon system, this permits a source icon to retain its complete purple perimeter, soft shadow, antialiasing, and internal transparent regions without requiring arbitrary transparent margins around the object.
+
+### Cohesive movement and scaling
+
+Pixels in a JPIX object **move together** under a declared transformation:
+
+```text
+PixelMap → Transform → PixelMap'
+```
+
+Scaling, translation, rotation, and other transformations therefore operate on the complete geometric object and preserve its declared pixel relationships and topology to the degree supported by the selected rasterization method.
+
+A rendered 48×48, 32×32, 24×24, 16×16, or 12×12 icon is consequently a derived rasterization of the same Pixel Map, rather than an unrelated image. The project currently favors deterministic high-quality 2D reconstruction such as Lanczos when deriving these small icon representations.
+
+### Deterministic pixel integrity
+
+A future JPIX implementation should make dimensions, pixel format, alpha semantics, geometry, and canonical pixel ordering explicit. A canonical pixel hash can then identify the exact raster state:
+
+```text
+Pixel Map
+    ↓
+canonical pixel ordering
+    ↓
+cryptographic pixel hash
+```
+
+This gives JSpec a stronger distinction between **the canonical pixel object** and interchange formats such as PNG or JPEG. PNG/JPEG remain useful render/export representations; `.jpix` is intended to preserve the exact pixel-map semantics that JSpec cares about.
+
+The first `.jpix` implementation is intentionally expected to remain small: explicit dimensions and pixel format, exact raster data, alpha semantics, boundary/extent information, and deterministic integrity information. Compression and additional pixel planes can be added without changing the underlying Pixel Map definition.
+
+---
+
 ## The 300-IQ Framing
 
 “300 IQ” is used here as a project metaphor for **high-dimensional systems reasoning**, not as a scientific measurement of intelligence.
@@ -223,3 +302,5 @@ The UTF-4088 extension applies the same principle to symbol selection: historica
 ## Status
 
 This is an experimental engineering and research framework. The “300-IQ” designation is a stylistic description of intended breadth and depth of reasoning, not a scientific performance claim. UTF-4088 is experimental and is not a replacement for Unicode.
+
+JSpec Pixel Format (`.jpix`) is likewise an experimental specification at this stage. The Pixel Map, boundary, topology, transparency, cohesive transformation, trimming, and deterministic-rendering concepts are the current design basis; the binary container/header layout remains subject to implementation and versioning.
