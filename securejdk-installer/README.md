@@ -4,23 +4,48 @@ A JavaFX-based installer and configuration front end for **Secure JDK 28**.
 
 ## Product intent
 
-The installer is intentionally more than a file copier. It provides a branded configuration aperture for the Secure JDK 28 product, including:
-
-- installation target selection;
-- PATH and `JAVA_HOME` configuration;
-- security posture selection;
-- JavaFX integration;
-- **Total** installation review;
-- **Memory Management** profiles;
-- an **Aperture** for advanced configuration;
-- installation progress and a staged manifest.
+The installer is intentionally more than a file copier. It provides a branded configuration aperture for the Secure JDK 28 product, including installation target selection, PATH and `JAVA_HOME` configuration, security posture selection, JavaFX integration, **Total** installation review, **Memory Management** profiles, an **Aperture** for advanced configuration, installation progress, and a staged manifest.
 
 The visual treatment uses a restrained United States-inspired palette: navy, white, and red, with the product name as the primary visual mark.
 
-## Source layout
+## Native product names
+
+The native distribution names are deliberately simple:
+
+```text
+Windows x64:
+    SecureJDK28.exe
+
+Linux x86_64:
+    SecureJDK28.sans
+
+macOS Apple Silicon:
+    SecureJDK28.dmg / SecureJDK28.app
+
+macOS Intel:
+    SecureJDK28.dmg / SecureJDK28.app
+```
+
+### Linux `.sans`
+
+`SecureJDK28.sans` is **not a script or a renamed text launcher**. The packaging step copies the ELF launcher produced by `jpackage` and gives it the Secure JDK `.sans` product suffix. It remains an executable ELF binary. The complete self-contained application image is distributed beside it in `SecureJDK28/`.
+
+The Linux distribution is therefore intended to be launched as:
+
+```bash
+./SecureJDK28.sans
+```
+
+The accompanying tarball preserves the application image and launcher together.
+
+## Native packaging architecture
 
 ```text
 securejdk-installer/
+├── packaging/
+│   ├── build-linux.sh
+│   ├── build-windows.ps1
+│   └── build-macos.sh
 ├── pom.xml
 ├── README.md
 └── src/main/
@@ -34,17 +59,62 @@ securejdk-installer/
         └── securejdk.css
 ```
 
+The repository also contains `.github/workflows/securejdk28-native.yml`, which builds the native packages on their target operating systems. This is important because `jpackage` produces platform-specific application packages and the native package must be built on the corresponding platform. Oracle's packaging documentation identifies Windows `exe`/`msi`, Linux `deb`/`rpm`, and macOS `pkg`/`dmg` as supported native package formats and notes that packaging is performed on the target platform. citeturn0search2turn0search1
+
 ## Build
 
-The project targets JDK 28 and uses OpenJFX as the JavaFX layer. JavaFX is kept as an explicit dependency because JavaFX is a separate OpenJFX technology rather than an assumed component of every OpenJDK distribution.
+The project targets JDK 28 and uses OpenJFX as the JavaFX layer.
 
-With JDK 28 and Maven installed:
+Interactive development:
 
 ```bash
 mvn clean javafx:run
 ```
 
-For a production image, the next implementation phase should use `jlink`/`jpackage` or an equivalent platform packaging pipeline and bundle the exact approved JavaFX runtime for each supported operating system.
+Native builds:
+
+```bash
+# Linux
+./packaging/build-linux.sh
+
+# Windows PowerShell
+./packaging/build-windows.ps1
+
+# macOS
+./packaging/build-macos.sh
+```
+
+`jpackage` creates a self-contained application image containing the application launcher and runtime dependencies; it can then create platform-specific installable packages. citeturn0search0turn0search2
+
+## Native outputs
+
+### Linux
+
+`build-linux.sh` creates:
+
+```text
+SecureJDK28.sans
+SecureJDK28/
+SecureJDK28-linux-x86_64.tar.gz
+```
+
+The `.sans` file is the ELF application launcher. The complete application image is required for normal operation because it contains the packaged runtime and application resources.
+
+### Windows
+
+`build-windows.ps1` creates:
+
+```text
+SecureJDK28.exe
+```
+
+The Windows build requests a Start Menu entry, desktop shortcut, and directory chooser through `jpackage`.
+
+### macOS
+
+`build-macos.sh` creates both an application image and a DMG. The GitHub Actions matrix builds both Apple Silicon and Intel variants.
+
+Production macOS distribution should add Apple code signing and notarization. `jpackage` supports macOS package customization and signing-related options, but release signing credentials belong in the protected build environment rather than this repository. citeturn0search1
 
 ## Installation engine boundary
 
@@ -85,19 +155,17 @@ An aperture setting is configuration visibility; it is not an authorization mech
 
 The product concept currently assumes a **$25 USD per-copy target** for an individual U.S. edition. That figure is a product/business assumption, not an assertion that OpenJDK itself requires a purchase fee.
 
-Before commercial distribution, the repository should include the exact Secure JDK license, third-party notices, OpenJDK attribution, JavaFX/OpenJFX licensing notices, update policy, support terms, and any trademark guidance applicable to the final brand.
+Before commercial distribution, the repository should include the exact Secure JDK license, third-party notices, OpenJDK attribution, JavaFX/OpenJFX licensing notices, update policy, support terms, and trademark guidance applicable to the final brand.
 
-OpenJDK materials commonly use GPLv2 with the Classpath Exception for relevant OpenJDK components, but the exact licenses of every redistributed component must be checked against the actual Secure JDK build. Java SE/JDK 28 specifications are separately documented by OpenJDK. 
-
-## Production milestones
+## Production release requirements
 
 1. Replace staging with signed Secure JDK artifact installation.
-2. Add platform-specific detection for Linux, Windows, and macOS.
-3. Add checksum/signature verification before payload extraction.
-4. Implement real PATH/JAVA_HOME integration with rollback.
-5. Implement the Memory Management profile compiler.
-6. Implement Aperture schemas and validation.
-7. Add uninstall/repair/upgrade flows.
-8. Package with `jpackage` for supported platforms.
-9. Add automated installer tests and reproducible build metadata.
+2. Add checksum/signature verification before payload extraction.
+3. Implement real PATH/JAVA_HOME integration with rollback.
+4. Implement the Memory Management profile compiler.
+5. Implement Aperture schemas and validation.
+6. Add uninstall/repair/upgrade flows.
+7. Add signed Windows release binaries.
+8. Add signed and notarized macOS releases.
+9. Add reproducible native build metadata and artifact hashes.
 10. Connect the final installer to the Secure JDK 28 distribution manifest.
