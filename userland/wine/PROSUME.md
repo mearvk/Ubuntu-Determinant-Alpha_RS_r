@@ -39,6 +39,6 @@ The surrounding SecureJDK/installer work can consume the resulting assessment as
 
 ## Existing Wine source
 
-The bundled source identifies itself as Wine 9.0 and retains the upstream build model. fileciteturn14file0 The upstream README describes Wine as a loader plus Winelib, with Windows API calls implemented using Unix/X11/Mac equivalents. fileciteturn13file0
+The bundled source identifies itself as Wine 9.0 and retains the upstream build model. The upstream README describes Wine as a loader plus Winelib, with Windows API calls implemented using Unix/X11/Mac equivalents.
 
 This project layer therefore sits **beside** the Wine implementation rather than pretending that Wine itself is a universal binary converter.
