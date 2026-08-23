@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Aptitude prototype: context-aware Linux installation planner and integrity monitor.
+# Aptitude prototype: context-aware installer and integrity monitor.
 # Inspection is read-only. State-changing operations require explicit `apply`.
 # Continuous monitoring is opt-in and bounded.
 
@@ -21,7 +21,7 @@ Usage:
   aptitude apply ARTIFACT
   aptitude verify NAME
   aptitude manifest ROOT
-  aptitude check ROOT
+  aptitude check
   aptitude monitor ROOT
   aptitude repair FILE
 
@@ -179,7 +179,7 @@ monitor() {
   while (( cycle <= SCAN_CYCLES )); do
     echo "--- check $cycle/$SCAN_CYCLES $(date -Is) ---"
     sample_resources
-    if [[ -r /proc/meminfo ]] && awk '/MemAvailable:/ {exit !($2 > 262144)}' /proc/meminfo; then
+    if [[ -r /proc/meminfo ]] && awk '/MemAvailable:/ {found=1; exit !($2 > 262144)} END {if (!found) exit 1}' /proc/meminfo; then
       check_manifest || true
     else
       echo 'scan=deferred_due_to_low_available_memory'
@@ -203,8 +203,8 @@ case "${1:-}" in
     manifest_root "$2"
     ;;
   check)
-    [[ $# -eq 2 ]] || { usage; exit 2; }
-    check_manifest "$2"
+    [[ $# -eq 1 ]] || { usage; exit 2; }
+    check_manifest
     ;;
   monitor)
     [[ $# -eq 2 ]] || { usage; exit 2; }
