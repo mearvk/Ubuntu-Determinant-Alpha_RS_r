@@ -55,6 +55,10 @@ American English ↔ Korean ↔ Germanic
 The character pipeline is:
 
 ```text
+whole alphabets / historical corpus
+        ↓
+time + cause + 3D primer density
+        ↓
 4D field (x,y,pressure,voltage)
         ↓
 historical context prior
@@ -74,13 +78,41 @@ The historical layer uses dated source provenance where available. Historical gl
 
 ### Historical Context Prior
 
-The resolver now supports a continuous historical prior over time and place. A context near Korea in 1888 increases the relative weight of the Korean historical corpus; a context near Germany in 1872 increases the Germanic historical weight; a modern United States context increases the modern American-English weight.
+The resolver supports a continuous historical prior over time and place. A context near Korea in 1888 increases the relative weight of the Korean historical corpus; a context near Germany in 1872 increases the Germanic historical weight; a modern United States context increases the modern American-English weight.
 
 The prior is a smooth probabilistic weighting, not a claim that geography or historical date intrinsically determines meaning.
 
+### Normal Distributive 3D Primer
+
+The UTF-4088 sampler now includes a normal-distributive 3D advancement layer. The three modeled coordinates are **time**, **cause**, and **primer density**. The fourth dimension remains available for later field selection.
+
+The first reproducible 5,000,000-sample run produced **9,261 distributed candidates**, or **0.18522%** of draws. The measured first-order density coefficient is:
+
+```text
+K_density = 0.00143137448
+```
+
+with the fitted relationship:
+
+```text
+selection_rate ≈ 0.00143137448 * D - 0.00008256960
+```
+
+where `D` is the normalized primer-density coordinate. This coefficient is an empirical parameter of the current experiment, not a physical or linguistic constant. Increasing `D` concentrates sampling in the corpus-defined advancement region and therefore increases expected candidate yield.
+
+The raw data is stored in:
+
+`/utf-4088/algebra/normal_distributive_sampling.csv`
+
+and the methodology/results are stored in:
+
+`/utf-4088/algebra/NORMAL-DISTRIBUTIVE-RESULT.md`
+
+The distinction is intentional: the 9,261 candidates are **distributed character candidates**, not claims that 9,261 new human-language meanings have been established. Interpretation continues through the curated 16,606-symbol layer, historical corpus, graph semantics, and neural relayer.
+
 ### Determinism
 
-For a fixed canonical input, model version, graph state, historical prior, and registry version, the selection process is intended to be reproducible. Neural synthesis therefore requires versioned weights and deterministic decoding if idempotence is required.
+For a fixed canonical input, model version, graph state, historical prior, primer-density version, and registry version, the selection process is intended to be reproducible. Neural synthesis therefore requires versioned weights and deterministic decoding if idempotence is required.
 
 ---
 
