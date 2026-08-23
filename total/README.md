@@ -1,10 +1,8 @@
 # Total Native Moderator
 
-**Total** is the native C implementation of the project's moderator layer. It is designed to run above the Linux kernel and below ordinary userland policy, with optional controlled cooperation with SecureJDK 28 and Graal.
+**Total** is the native C implementation of the project's moderator layer. It runs above Linux kernel facilities and below ordinary userland policy, with controlled cooperation from SecureJDK 28 and Graal.
 
-## Three-tier proving model
-
-Total participates in a three-tier proving surface:
+## First-edition native architecture
 
 ```text
                  TOP
@@ -23,161 +21,158 @@ Total participates in a three-tier proving surface:
        Linux kernel / hardware
 ```
 
-The tiers are logically aware of one another while retaining separate authority. Ground establishes operating-system facts, Total converts evidence into resource and policy decisions, and Top supplies managed-runtime semantics and application evidence.
+The tiers are logically aware of one another while retaining separate authority. Ground establishes operating-system facts, Total mediates evidence/resource policy, and Top supplies managed-runtime and application semantics.
 
-See `markdown/THREE_TIER.md` for the complete proving-surface model.
+See `markdown/THREE_TIER.md` for the full proving-surface model.
 
 ## Evidence surface
 
-Total is designed to accept a variable set of controlled evidence inputs at startup. A deployment may expose **3 through 1000 input channels**, depending on configuration, hardware, policy, and service profile.
+Total accepts a variable set of controlled evidence inputs at startup. A deployment may expose **3 through 1000 input channels**, depending on configuration, hardware, policy, and service profile.
 
-Potential inputs include process/thread state, memory pressure, allocation observations, executable/library descriptors, package metadata, JVM/Graal runtime events, trusted software descriptors, signed configuration, filesystem provenance, service lifecycle events, application self-description, cgroup/PSI observations, integrity measurements, resource requests, and diagnostic/test evidence.
-
-Evidence follows the conceptual path:
+Evidence follows:
 
 `input → normalization → provenance → validation → policy → action → observation → retained evidence`
 
-An input is not trusted merely because it exists. Its source and provenance determine what it may influence.
+The existence of an input is not proof of truth. Source, provenance, validation, authorization, and policy determine what an input may influence.
 
-## Position
+## Native interfaces — first edition
 
 ```text
-Applications / userland
-        │
-        │ controlled interface
-        ▼
-SecureJDK 28 / Graal
-        │
-        │ Proffer / JVM assistance
-        ▼
-      Total
- native C/C++ moderator
-        │
-        │ OS interfaces
-        ▼
-Linux kernel / VM / scheduler / security
+total/include/total_domain.h  → domain/evidence vocabulary
+total/include/total_policy.h  → versioned policy-provider ABI
+total/include/total_input.h   → bounded startup input registry
 ```
 
-Total is **not a replacement for the kernel**, Linux virtual memory, `malloc`, `free`, or the JVM garbage collector. Its initial role is observation, admission accounting, policy coordination, and controlled resource moderation. Strong intervention should be added only behind explicit policy, authorization, and tests.
+The input registry supports a configured capacity from **3 through 1000** using caller-owned storage in the bootstrap layer.
 
-## Root service function
+See `total/include/README.md` for ABI notes.
 
-The functions of Total are inward and main: they drive toward the service rather than becoming unrelated application logic.
+### Evidence is not authority
+
+A validated evidence record crossed the native validation boundary; it does **not** automatically authorize a transaction, service, person, or policy action.
+
+```text
+evidence → validation/provenance → policy provider → explicit decision → Total action
+```
+
+The privileged native layer verifies mechanisms and enforces explicit policy. It does not invent social or business authority.
+
+## Domain-service adapters
+
+Total supports a common architectural surface for banking, hospitality/hotels, regulated adult services, and other regulated commerce:
+
+`identify → describe → authorize → transact → observe → retain → audit`
+
+The domain application remains responsible for its business semantics. Total supplies evidence, provenance, resource policy, and controlled mediation.
+
+For regulated adult services, applicable evidence may include legally required eligibility verification, provider authorization, consent state where the application records it, licensing, jurisdictional restrictions, payment provenance, and audit evidence. **Consent must never be inferred from payment, identity, presence, or prior behavior.**
+
+See `markdown/DOMAIN_SERVICES.md`.
+
+## Versioned policy boundary
+
+`total_policy.h` defines the first policy-provider ABI without embedding jurisdiction-specific law into the privileged core. The context carries a policy identifier, version, jurisdiction, and evaluation time; decisions are `DENY`, `ALLOW`, or `REVIEW`.
+
+Production policy providers will eventually require authenticated policy bundles, capability scopes, provenance, compatibility checks, and audit references.
+
+## Input multiplexer
+
+```text
+startup configuration → 3 … 1000 input slots → normalized evidence → validation/provenance → policy
+```
+
+The 1000-input figure is an architectural ceiling for this interface, not a recommendation that every deployment activate every source.
+
+## Root service and manager
 
 The common root function is:
 
 `observe → understand → admit → serve → measure → correct`
 
-Related functions should be **memmerable**: implementations in Ground, Total, and Top should remain recognizable as implementations of the same root operation even when their local mechanisms differ.
+Related functions should be **memmerable** across Ground, Total, and Top: recognizably the same root operation despite different local mechanisms.
 
-## The manager
+Total is the middle-tier **manager / manager / memory manager** for policy coordination, native service execution, memory footprint, admission, accounting, pressure, and safe release/reclamation coordination.
 
-Total provides the middle-tier manager in three related senses:
+## Memory direction
 
-- **manager** — policy and coordination;
-- **manager** — the native service performing the work;
-- **memory manager** — memory footprint, admission, accounting, pressure, and safe release/reclamation coordination.
+The intended progression is:
 
-The manager observes and mediates; it does not silently seize ownership of arbitrary application allocations.
+`observe → account → admit → pressure → release`
 
-## Initial native implementation
+The first edition remains conservative: observe/account first, then add stronger intervention only behind explicit policy, tests, capability controls, and OS primitives such as cgroups and PSI.
 
-The first native skeleton provides:
+Total is not a replacement for Linux virtual memory, `malloc`, `free`, or JVM garbage collection.
 
-- a C ABI in `include/total.h`;
-- Linux `/proc/self/status` memory observation;
-- configurable soft/hard memory limits;
-- admission accounting for managed reservations;
-- a long-running moderator process;
-- a configuration file at `/etc/total/total.conf` by convention;
-- an example configuration;
-- a small standalone `Makefile`.
+## Trusted software descriptors
 
-The current implementation intentionally does **not** seize ownership of arbitrary application allocations. Applications remain governed by their normal allocator and the operating system. This gives Total a safe foundation on which future memory-pressure, JVM-assistance, application-descriptor, and service-management policies can be built.
-
-## Installation model
-
-A future package should install approximately:
+Software identity should derive from trusted descriptors, package metadata, signatures, executable identity, dependency metadata, provenance, and administrator policy. Branding alone is insufficient.
 
 ```text
-/usr/bin/total
-/etc/total/total.conf
-/usr/lib/.../SecureJDK-28 integration
-/usr/lib/.../Graal integration
+package + signer + executable + dependencies + administrator policy
+                              ↓
+                   trusted software descriptor
+                              ↓
+                    Total treatment profile
 ```
 
-System-wide installation may require root/administrator privileges. Boot integration should eventually use the host's native service manager, normally systemd on Linux, rather than embedding boot behavior into the executable itself.
+This permits database services, helpers, launchers, runtime components, payment processors, protection systems, and related software to be treated as a group without treating a familiar name as proof.
 
-## Configuration
+## JVM and native paths
 
-See `total.conf.example`. Configuration is intentionally simple during the bootstrap phase. A future schema can be versioned and expanded for application policies, trusted software descriptors, JVM/Graal cooperation, memory-pressure thresholds, service priorities, desktop application treatment, provenance requirements, audit/telemetry policy, and capability restrictions.
-
-## Trusted application treatment
-
-Total may eventually recognize installed software through **trusted descriptors, package metadata, signatures, provenance, and explicit administrator policy**. A display name or brand alone is not sufficient evidence.
-
-This permits an application and its assisting software—for example a database service, helper process, launcher, runtime component, or protection service—to be represented as a related software group without blindly trusting a string such as `mysql`.
-
-The preferred model is:
+Supported Java software may use:
 
 ```text
-package identity
-   + signer/provenance
-   + executable identity
-   + dependency metadata
-   + administrator policy
-          ↓
-   trusted software descriptor
-          ↓
-   Total treatment profile
+Java → SecureJDK 28 / Graal → Proffer/JVM interface → Total → Linux
 ```
 
-## JVM and native execution paths
+Native applications may continue through the ordinary allocator and VM path. Total must not silently impose JVM assumptions on native applications.
 
-The intended default for supported Java software is:
+Future SecureJDK/Graal IPC must be authenticated and capability-limited. A Java assertion is evidence, not privileged authority.
 
-```text
-Java application
-      ↓
-SecureJDK 28 / Graal
-      ↓
-JVM profiler / Proffer interface
-      ↓
-Total policy assistance
-      ↓
-Linux
-```
+## Tests
 
-Software that does not participate in the supported JVM path may continue to execute through the ordinary OS memory manager:
+`total/tests/total_domain_test.c` is the first native fixture, documented in `total/tests/README.md`.
 
-```text
-native application
-      ↓
-libc / allocator
-      ↓
-Linux VM
-```
+Current coverage includes valid evidence, missing provenance, failed integrity, and expired evidence. Future coverage should include registry boundaries, malformed input, duplicate IDs, concurrency, ownership/lifetime, cryptographic provenance, policy providers, and authenticated JVM IPC.
 
-Total should not silently impose JVM assumptions on native applications.
+Passing these tests is **not production certification**.
 
-## Variance
+## Installation and configuration
 
-Minor implementation variance between tiers, platforms, or service versions is permitted where it does not violate root invariants. This intentional **color** lets the framework remain practical across a future Linux ecosystem without requiring identical implementations everywhere.
+A future package may install `/usr/bin/total`, `/etc/total/total.conf`, and SecureJDK/Graal integration. System-wide installation may require administrator privileges. Boot integration should use the host's native service manager, normally systemd.
 
-Material variance must be surfaced as evidence and versioned policy. Variance must not silently alter authority, provenance, memory-safety guarantees, or proof meaning.
+Configuration should eventually cover input sources, trusted software descriptors, policy providers, JVM/Graal cooperation, memory thresholds, service priorities, application treatment, provenance, audit/telemetry, and capabilities.
 
-## Future Linux framework
+## Variance and color
 
-The Linux implementation is deliberately designed as a foundation for a larger system. Future modules can add cgroup-aware memory moderation, PSI/memory-pressure observation, process/service grouping, systemd integration, eBPF-assisted observation where appropriate, secure IPC with SecureJDK/Graal, signed policy bundles, application lifecycle treatment, controlled reclamation/throttling, provenance-aware software identity, boot-time initialization, and administrator/user capability separation.
-
-The architectural goal is a **grand, future Linux framework without making the bootstrap daemon itself grandiose**: the native core should remain small, auditable, deterministic, and explicit about what authority it has.
+Minor implementation variance is permitted when root invariants remain intact. This intentional **color** supports portability without demanding identical implementations everywhere. Material variance must be surfaced as evidence and versioned policy.
 
 ## Security boundary
 
-Total is privileged infrastructure. It therefore follows least privilege, explicit authorization, bounded observation, fail-safe defaults, and auditable policy as design requirements.
+Total is privileged infrastructure and therefore follows least privilege, explicit authorization, bounded observation, data minimization, fail-safe defaults, and auditable policy.
 
-Observation does not imply authorization; software identity is not inferred from branding alone; memory intervention requires explicit policy; userland exceptions must be capability-controlled; SecureJDK/Graal cooperation must use an authenticated interface; and malformed configuration must fail closed rather than invent policy.
+Observation does not imply authorization. Memory intervention requires explicit policy. Userland exceptions must be capability-controlled. SecureJDK/Graal cooperation must be authenticated. Malformed configuration must fail closed.
 
-## Status
+## First-edition status
 
-This directory is the **native bootstrap implementation**. It is an architectural foundation, not yet a production kernel-integrated memory-management replacement. The next engineering phase should add tests, systemd packaging, secure IPC, cgroup integration, and a formal policy schema before enabling stronger intervention.
+**Implemented:**
+
+- common domain/evidence C vocabulary;
+- versioned policy ABI definition;
+- bounded 3–1000 input registry;
+- initial domain evidence tests;
+- native interface documentation;
+- domain-service architecture.
+
+**Still to implement:**
+
+- production policy-provider implementation;
+- cryptographic provenance;
+- formal input-source adapters;
+- authenticated IPC;
+- cgroup/PSI memory controls;
+- SecureJDK/Graal bridge;
+- systemd packaging;
+- broader CI/integration testing.
+
+The distinction is deliberate: **specified does not mean implemented, and implemented does not mean production-certified.**
