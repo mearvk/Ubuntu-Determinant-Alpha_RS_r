@@ -12,6 +12,89 @@ The project calls this framing **Proffer**.
 
 ---
 
+## Total: Three-Tier Native Moderator
+
+**Total** is the project's native C/C++ moderator layer. It sits between Linux kernel state and ordinary userland policy, with controlled cooperation from SecureJDK 28 and Graal.
+
+```text
+                 TOP
+        SecureJDK 28 / Graal
+       managed semantics
+                │
+       authenticated evidence
+                ▼
+              MIDDLE
+               Total
+        native moderation
+                │
+       kernel / OS evidence
+                ▼
+              GROUND
+       Linux kernel / hardware
+```
+
+The three tiers are logically aware of one another while retaining separate authority. Ground establishes operating-system facts. Total mediates evidence, resource policy, provenance, and service behavior. Top supplies managed-runtime and application semantics.
+
+The native Total bootstrap lives under `/total/`. It is deliberately conservative: it observes Linux memory state, maintains controlled admission accounting, and provides a foundation for future systemd, cgroup, PSI, eBPF, SecureJDK/Graal IPC, provenance, and policy modules. It does not replace Linux virtual memory, `malloc`, `free`, or JVM garbage collection.
+
+### Evidence surface
+
+Total has an extensible input surface. A deployment may expose **3 through 1000 input channels at startup**, according to configuration, hardware, policy, and service profile. Potential evidence includes process/thread state, memory pressure, allocation observations, executable/library descriptors, package metadata, JVM/Graal runtime events, trusted software descriptors, signed configuration, filesystem provenance, service lifecycle events, application self-description, cgroup/PSI observations, integrity measurements, resource requests, and diagnostic/test evidence.
+
+Evidence follows:
+
+```text
+input → normalization → provenance → validation → policy
+      → action → observation → retained evidence
+```
+
+The existence of an input is not proof of truth. Provenance, validation, authorization, and policy determine what an input may influence.
+
+### Root service function and manager
+
+The inward/main service function is:
+
+```text
+observe → understand → admit → serve → measure → correct
+```
+
+Related functions across Ground, Total, and Top should remain **memmerable**: recognizable as implementations of the same root operation even when their local mechanisms differ.
+
+Total is the middle-tier **manager / manager / memory manager**: policy coordination, native service execution, and memory/resource accounting. It observes and mediates without silently seizing ownership of arbitrary application allocations.
+
+Minor implementation variance between tiers and platforms is permitted where it preserves the root invariants. This intentional **color** must not silently alter authority, provenance, memory-safety guarantees, or proof meaning.
+
+See [`markdown/THREE_TIER.md`](markdown/THREE_TIER.md) for the detailed proving-surface specification.
+
+---
+
+## Domain Services
+
+The same three-tier mechanism can support applications operating in regulated or sensitive commercial domains through explicit **domain-service adapters**. Initial examples include:
+
+- **Banking** — transaction provenance, payment authorization, service permissions, audit evidence, and integrity state.
+- **Hospitality / hotels** — property identity, reservation state, payment authorization, service lifecycle, and operational evidence.
+- **Regulated adult services** — provider authorization, eligibility/age verification where legally required, consent state where the application records it, payment provenance, licensing, jurisdictional restrictions, and audit evidence.
+- **Other regulated commerce** — licensing, eligibility, authorization, provenance, compliance, and audit evidence.
+
+The common domain surface is:
+
+```text
+identify → describe → authorize → transact → observe → retain → audit
+```
+
+The domain application remains the business authority. Total supplies infrastructure for evidence, provenance, resource policy, and controlled mediation.
+
+For sensitive services, the architecture follows data minimization, least privilege, purpose limitation, bounded retention, authenticated evidence, and explicit authorization. In particular, **consent must never be inferred from payment, identity, presence, or prior behavior**.
+
+> **Total proves and mediates the mechanism; it does not decide a person's worth, humanity, consent, or dignity.**
+
+Software identity is likewise based on trusted descriptors, signatures, package provenance, executable identity, dependency metadata, and administrator policy—not branding alone.
+
+The full domain-adapter specification is in [`markdown/DOMAIN_SERVICES.md`](markdown/DOMAIN_SERVICES.md).
+
+---
+
 ## JSpec Pixel Format (`.jpix`)
 
 JSpec Pixel Format is an experimental pixel-native image representation built around a **Pixel Map**. It deliberately does not make the rectangular raster the semantic definition of an image.
@@ -190,30 +273,9 @@ The project currently favors deterministic high-quality 2D reconstruction such a
 
 ### Deterministic pixel integrity
 
-A future `.jpix` implementation should make pixel format, alpha semantics, coordinate ordering, boundary information, and canonical pixel ordering explicit. A canonical pixel hash can then identify the exact canonical pixel state:
+A future `.jpix` implementation should make pixel format, alpha semantics, coordinate ordering, boundary information, and canonical pixel ordering explicit. A canonical pixel hash can then identify the exact canonical pixel state.
 
-```text
-Pixel Map
-    ↓
-canonical pixel ordering
-    ↓
-cryptographic pixel hash
-```
-
-This permits a JSpec runtime to distinguish an exact canonical object from an exported or recompressed raster.
-
-The initial binary format should remain intentionally small. A practical first version needs only:
-
-```text
-magic/version
-pixel-map geometry
-pixel format
-alpha semantics
-canonical pixel data
-boundary/extent information
-integrity information
-optional codec/render metadata
-```
+The initial binary format should remain intentionally small: magic/version, pixel-map geometry, pixel format, alpha semantics, canonical pixel data, boundary/extent information, integrity information, and optional codec/render metadata.
 
 Compression, additional pixel planes, depth, masks, and cached raster representations can be added through versioned extensions without changing the fundamental Pixel Map definition.
 
@@ -403,146 +465,36 @@ input → transition → scatter → norm/opportunity observation
 
 Such observation should be minimized, access-controlled, provenance-tagged, and explicitly separated from authorization. Observability does not itself grant permission to inspect or act on memory.
 
-The minimum observable record should contain only the information needed to reproduce the model result: model version, timestamp/tick, transition identifier, bounded scatter metric, and provenance hash. Raw memory contents should not be required for the norming calculation.
+The minimum observable record should contain only the information needed to reproduce the model result: model version, timestamp/tick, transition identifier, bounded scatter metric, and relevant provenance/version identifiers.
 
 ---
 
-## SecureJDK Product Quality
+## SecureJDK 28 and Graal
 
-SecureJDK is intended to treat this vocabulary as a native product-quality direction, not merely an application-level convention. Awareness remains distinct from authorization: knowing what a capability is must never, by itself, grant that capability.
+The project treats the current OpenJDK/Graal variant as **SecureJDK 28** and intends the security and provenance model to be native to the runtime rather than a bolt-on application library.
 
-## Graal
-
-Graal provides a natural analysis boundary because reachability already asks which program elements become part of the executable world. The project aims for a common semantic vocabulary while keeping compiler implementation technically independent from the conceptual model.
-
-## Hardened Data
-
-The numerical and historical layer is intentionally separate from the semantic layer. `/hardened/proffer-datums.json` can contain geometry, metrology, historical observations, economic series, uncertainty, provenance, and model parameters without turning an individual datum into an immutable claim about reality.
-
----
-
-## Total — Proffer Moderator Layer
-
-**Total** is the proposed privileged moderator layer between the operating-system kernel and ordinary userland software. It runs on top of the kernel as a native C/C++ executable or service, while exposing a Proffer-oriented integration surface to SecureJDK 28 and Graal.
-
-The intended stack is:
+The intended layering is:
 
 ```text
-Userland applications
-        │
-        ▼
-Total — privileged Proffer moderator
-        │
-        ▼
-Operating-system kernel
+Application
+    ↓
+SecureJDK 28
+    ↓
+Graal runtime / compiler
+    ↓
+Proffer + Total assistance
+    ↓
+Linux
 ```
 
-Total is **not a replacement for the kernel** and is not automatically available as an unrestricted API to ordinary userland programs. It provides a controlled exception path for approved runtimes, administrators, diagnostics, and explicitly authorized services.
+SecureJDK is expected to preserve ordinary Java compatibility where practical while adding explicit provenance, policy, resource, and integrity hooks. Graal participates as the execution/compiler layer and should be able to consume the same evidence model without becoming the final authority over kernel resources.
 
-### Native and boot integration
+### Total integration
 
-Total is intended to ship with the **SecureJDK 28 / Graal family** and may require root or administrator privileges to install. It can register as a protected OS service and load during system boot or service initialization, subject to platform-specific boot ordering and failure semantics.
+Supported Java programs may run through the SecureJDK/Graal path with Total providing policy assistance and memory/resource observation. Native programs may continue to use the ordinary OS allocator and VM path. Participation in the managed path should be explicit and authenticated.
 
-Its native implementation is intentional: memory observation, resource accounting, process supervision, and early system integration should not fundamentally depend on a higher-level Java process being available first.
+### Repository status
 
-### Memory footprint moderation
+The project is experimental. Native Total, UTF-4088, JPIX, SecureJDK/Graal integration, and domain-service adapters should not be treated as production-certified merely because the architecture is complete on paper. The project prioritizes deterministic behavior, evidence, provenance, reproducibility, and auditable policy as it progresses toward a larger Linux framework.
 
-Total provides a higher-level memory policy and observation boundary around mechanisms including `malloc`, `free`, Java heap allocation, native allocations, mapped memory, committed/reserved virtual memory, and process working-set behavior.
-
-It does **not** replace `malloc`, `free`, the JVM garbage collector, or the kernel's virtual-memory manager. Instead, it accounts for and moderates resource conditions through explicit policy. Memory pressure can produce bounded actions such as telemetry, runtime notification, reclamation requests, cache reduction, configured ceilings, or an explicitly authorized process disposition.
-
-### Configuration and desktop treatment
-
-Total is primarily configuration-driven. A versioned configuration can specify boot behavior, memory policy, Java/Graal integration, application treatment, trusted descriptors, brand-inference conservatism, and the fallback policy for unknown software.
-
-It also models desktop products and their assisting software as a relationship graph:
-
-```text
-Brand / Product
-   ├── primary application
-   ├── helper
-   ├── service
-   ├── database
-   ├── runtime
-   └── protection component
-```
-
-Examples include databases such as MySQL, background services, launchers, runtime agents, plugin hosts, update services, and software-integrity/protection components.
-
-Brand or product association must be based on **trusted descriptors and corroborating evidence**, such as signatures, publisher identity, package provenance, manifests, verified paths, declared relationships, and cryptographic hashes. A filename or shared name alone is not sufficient. Unknown or conflicting software remains unknown rather than being silently assigned a brand.
-
-### SecureJDK/Graal execution preference
-
-Programs installed in the SecureJDK/Graal environment may, when compatible and configured, run through a Total-aware Java runtime profiling path. This is the project's intended **smooth, low-friction JVM profiling path**: trusted software should receive continuous resource awareness without unnecessary disruption.
-
-Software that does not qualify for the Java/Graal path can continue to run through the normal OS memory manager and native process model:
-
-```text
-trusted + compatible → Total/JVM-aware path
-unknown / incompatible → OS-default path
-explicitly restricted → declared restriction policy
-```
-
-Total must never require native or unrelated software to masquerade as Java software merely to obtain ordinary OS execution.
-
-### Premium product quality
-
-Total is intended as a **premium SecureJDK/Graal product-quality component**. Premium means integrated engineering quality, not unrestricted privilege. Its structure should follow established best practices for least privilege, explicit authorization, memory safety, deterministic configuration, signed updates, auditability, rollback, provenance, compatibility, bounded resource use, secure failure behavior, and testability.
-
-The project phrase **"best of known software tradeables as structure for INT"** is interpreted as a requirement to make resource, security, compatibility, and performance tradeoffs explicit rather than hiding them inside the moderator.
-
-### Proffer boundary
-
-A Total decision can carry:
-
-```text
-subject
-origin
-reason
-capability
-trust-domain
-policy
-authorization
-resource state
-provenance
-integrity
-disposition
-```
-
-The Proffer is a decision/interface record. It must not itself become an unrestricted capability token.
-
-### Access and security principles
-
-1. Observation does not imply authorization.
-2. Software identity requires trusted evidence.
-3. Unknown software remains unknown rather than being assigned a brand by guesswork.
-4. Memory pressure is a resource condition, not a judgment about a person.
-5. Kernel authority remains distinct from Total authority.
-6. Total cannot silently grant capabilities to applications.
-7. Configuration and policy versions must be attributable.
-8. Privileged actions require an explicit authorization path.
-9. Failure behavior must be bounded and documented.
-
-### Current status
-
-Total is presently a **design-level architectural component**. The detailed specification is maintained in [`markdown/TOTAL.md`](markdown/TOTAL.md). The next implementation stage is a native service skeleton with configuration, process registration, secure logging, and narrowly scoped memory observation before automated treatment policies are introduced.
-
----
-
-## Design Principle
-
-> **The vocabulary is stable. The model is explicit. The data is sourced. The uncertainty is visible. The security decision is attributable.**
-
-The UTF-4088 extension applies the same principle to symbol selection: historical context may influence a distribution, graph structure provides observable evidence, and final selection remains a deterministic, versioned computation.
-
-JSpec applies the same principle to graphics: **the Pixel Map is canonical, the raster is derived, and the codec is an implementation detail.**
-
-Total applies it to operating-system resource moderation: **the kernel remains authoritative, Total moderates through explicit policy, and userland capability remains attributable.**
-
-## Status
-
-This is an experimental engineering and research framework. The “300-IQ” designation is a stylistic description of intended breadth and depth of reasoning, not a scientific performance claim. UTF-4088 is experimental and is not a replacement for Unicode.
-
-JSpec Pixel Format (`.jpix`) is likewise an experimental specification at this stage. The Pixel Map, boundary, topology, transparency, cohesive transformation, trimming, canonical representation, 48-bit RGB baseline, deterministic rendering, and optional codec concepts are the current design basis. The binary container/header layout remains subject to implementation and versioning.
-
-Total is also experimental at this stage. Its native service, boot integration, OS-specific privilege model, memory observation mechanisms, descriptor registry, Java/Graal hooks, and policy engine remain implementation work and must be validated independently on each supported operating system.
+For current repository maturity and remaining engineering work, see [`markdown/PROGRESS.md`](markdown/PROGRESS.md).
