@@ -1,0 +1,39 @@
+name: Windows Support
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-native-and-aptitude:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect Windows host
+        shell: pwsh
+        run: |
+          Write-Host "Windows: $([System.Environment]::OSVersion.Version)"
+          Write-Host "Architecture: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+          Get-Command powershell -ErrorAction Stop
+          Get-Command schtasks -ErrorAction Stop
+          Get-Command sc.exe -ErrorAction Stop
+
+      - name: Validate aptitude PowerShell adapter
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $script = 'aptitude/src/aptitude.ps1'
+          if (-not (Test-Path $script)) { throw "Missing $script" }
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script), [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | Format-List | Out-String | Write-Error }
+          & $script inspect $script
+
+      - name: Validate Windows documentation
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'windows/README.md')) { throw 'Missing windows/README.md' }
+          Select-String -Path 'windows/README.md' -Pattern 'Service Control Manager','Task Scheduler','WinGet','MSI','PE/COFF' -AllMatches | Out-Null
