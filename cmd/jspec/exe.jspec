@@ -1,0 +1,103 @@
+{
+  "jspec": "1.0",
+  "title": "JSpec Professional Series Executable Contract",
+  "status": "draft",
+  "purpose": "Define a calm, deterministic execution layer that can stand immediately before a command-line or desktop executable while preserving the executable's cause, identity, arguments, exit status, and OS-native execution semantics.",
+  "professional_series": {
+    "name": "JSpec Professional",
+    "principles": [
+      "preserve-cause",
+      "preserve-performance",
+      "preserve-identity",
+      "deterministic-handoff",
+      "OS-native-execution",
+      "quiet-by-default"
+    ]
+  },
+  "execution_model": {
+    "layers": [
+      "desktop-or-shell-launch",
+      "jspec-preflight",
+      "operating-system-loader",
+      "target-executable",
+      "jspec-postflight"
+    ],
+    "rule": "JSpec is a motor around execution, not a replacement for the target executable.",
+    "handoff": "After validation, JSpec delegates to the OS using native process execution and waits for the target result when configured to do so.",
+    "cause": "The original executable remains the authoritative program of record; JSpec must not silently rewrite its arguments, environment, working directory, or exit code."
+  },
+  "formats": {
+    "linux_v1": {
+      "binary_format": "ELF",
+      "launcher": "native-posix",
+      "handoff": "execve/execvp",
+      "desktop": "freedesktop-.desktop-compatible"
+    },
+    "windows_v2": {
+      "binary_format": "PE/COFF",
+      "target": ".exe",
+      "launcher": "native-windows",
+      "handoff": "CreateProcessW",
+      "desktop": "Windows Shell integration"
+    }
+  },
+  "exe_contract": {
+    "identity": ["path", "format", "architecture", "entrypoint"],
+    "execution": ["argv", "environment", "working_directory", "stdio"],
+    "result": ["exit_code", "termination_signal", "execution_time"],
+    "integrity": ["optional_sha256", "optional_signature", "optional_policy_id"]
+  },
+  "arming": {
+    "mode": "pre-launch",
+    "trigger": "desktop-or-shell-launch",
+    "proximity": "UI implementations may provide hover/proximity presentation, but execution arming must occur at activation time and must never depend on pointer timing.",
+    "preflight": [
+      "resolve target",
+      "identify executable format",
+      "verify architecture compatibility",
+      "validate policy",
+      "prepare inherited execution context"
+    ]
+  },
+  "cooling": {
+    "default": "calm",
+    "visuals": "presentation-only",
+    "motion": "bounded and non-blocking",
+    "color": "theme-controlled",
+    "rule": "Color and movement must never alter executable semantics or scheduling correctness."
+  },
+  "security": {
+    "default": "fail-closed-on-invalid-target",
+    "no_shell_reinterpretation": true,
+    "no_argument_mutation": true,
+    "no_privilege_escalation": true,
+    "no_hidden_network_requirement": true,
+    "signature_policy": "optional",
+    "hash_policy": "optional"
+  },
+  "performance": {
+    "goal": "minimal launch overhead",
+    "steady_state": "JSpec should not remain resident unless explicitly configured as a supervisor.",
+    "measurement": "record preflight and handoff latency when telemetry is enabled"
+  },
+  "compatibility": {
+    "legacy_pro_code": "retain the predictable command/executable model while adding a controlled preflight contract",
+    "jdk_jvm_layer": "JSpec may be implemented beside or below a JVM/JDK distribution as a native execution service, without requiring Java for the Linux v1 launcher.",
+    "future": ["PE/COFF", "Windows Shell", "signed executable policy", "GUI launcher", "JVM-integrated runtime"]
+  },
+  "exit_semantics": {
+    "pass_through": true,
+    "rule": "Unless policy explicitly states otherwise, JSpec returns the target process exit status unchanged."
+  },
+  "configuration": {
+    "format": "JSpec",
+    "required": ["target"],
+    "optional": ["policy", "integrity", "theme", "telemetry", "supervision"],
+    "example": {
+      "target": "/usr/bin/cmd",
+      "policy": "professional-default",
+      "integrity": {"required": false},
+      "theme": {"mode": "cool-calm"}
+    }
+  }
+}
