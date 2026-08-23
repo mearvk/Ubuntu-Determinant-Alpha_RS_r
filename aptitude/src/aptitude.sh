@@ -5,8 +5,8 @@ set -euo pipefail
 # Inspection is read-only. State-changing operations require explicit `apply`.
 # Continuous monitoring is opt-in and uses a bounded scan interval.
 
-SCAN_INTERVAL_SECONDS=3
-SCAN_CYCLES=1000
+SCAN_INTERVAL_SECONDS="${APTITUDE_SCAN_INTERVAL_SECONDS:-3}"
+SCAN_CYCLES="${APTITUDE_SCAN_CYCLES:-1000}"
 STATE_DIR="${APTITUDE_STATE_DIR:-/var/lib/aptitude}"
 MANIFEST="${APTITUDE_MANIFEST:-$STATE_DIR/sha256.manifest}"
 QUARANTINE="${APTITUDE_QUARANTINE:-$STATE_DIR/quarantine}"
@@ -27,18 +27,15 @@ Usage:
 
 Integrity policy:
   SHA-256 is the default content-integrity mechanism for tracked software.
-  The monitor is opt-in and defaults to 3 seconds between checks, up to 1000
-  cycles (about 50 minutes). It is intentionally bounded to avoid an endless
-  resource-consuming loop. RAM/system load should be sampled before scans.
+  `manifest` creates a baseline; `check` verifies that baseline without
+  rewriting it. The monitor is opt-in and bounded.
 EOF
 }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 sample_resources() {
-  local mem_available load
-  mem_available="unknown"
-  load="unknown"
+  local mem_available="unknown" load="unknown"
   [[ -r /proc/meminfo ]] && mem_available=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
   [[ -r /proc/loadavg ]] && load=$(awk '{print $1}' /proc/loadavg)
   echo "resource.mem_available_kb=$mem_available"
@@ -116,12 +113,12 @@ apply() {
 
 verify() {
   local name="$1"
-  if [[ -x "$(command -v "$name" 2>/dev/null || true)" ]]; then
+  if [[ -n "$(command -v "$name" 2>/dev/null || true)" ]]; then
     echo "verified=$name"
     "$name" --version 2>&1 | head -n 2 || true
   else
     echo "not_found=$name"
-    exit 1
+    return 1
   fi
 }
 
@@ -129,26 +126,34 @@ manifest_root() {
   local root="$1"
   [[ -d "$root" ]] || { echo "root not found: $root" >&2; exit 2; }
   mkdir -p "$(dirname "$MANIFEST")"
-  : > "$MANIFEST"
-  # Root, moderate/system, and userland software can all be tracked. Exclusions
-  # are limited to volatile pseudo-filesystems and Aptitude's own state.
-  find "$root" -xdev -type f \
+  local tmp_manifest
+  tmp_manifest=$(mktemp "${MANIFEST}.XXXXXX")
+  trap 'rm -f -- "$tmp_manifest"' RETURN
+
+  if ! find "$root" -xdev -type f \
     -not -path "$STATE_DIR/*" \
     -not -path '/proc/*' -not -path '/sys/*' -not -path '/dev/*' \
-    -print0 | sort -z | xargs -0 sha256sum > "$MANIFEST"
-  chmod 0644 "$MANIFEST" || true
+    -print0 | sort -z | xargs -0 -r sha256sum > "$tmp_manifest"; then
+    echo 'manifest_status=failed' >&2
+    return 1
+  fi
+  chmod 0644 "$tmp_manifest"
+  mv -f -- "$tmp_manifest" "$MANIFEST"
+  trap - RETURN
   echo "manifest=$MANIFEST"
   echo "files=$(wc -l < "$MANIFEST")"
 }
 
 check_manifest() {
-  [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; exit 2; }
+  [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; return 2; }
   echo 'APTITUDE SHA-256 INTEGRITY CHECK'
   echo '================================'
-  sha256sum -c "$MANIFEST" --quiet && echo 'integrity=clean' || {
-    echo 'integrity=changes_or_damage_detected'
-    return 1
-  }
+  if sha256sum -c "$MANIFEST" --quiet; then
+    echo 'integrity=clean'
+    return 0
+  fi
+  echo 'integrity=changes_or_damage_detected'
+  return 1
 }
 
 repair_file() {
@@ -168,14 +173,15 @@ repair_file() {
 monitor() {
   local root="$1" cycle=1
   [[ -d "$root" ]] || { echo "root not found: $root" >&2; exit 2; }
+  [[ "$SCAN_INTERVAL_SECONDS" =~ ^[0-9]+$ ]] || { echo 'APTITUDE_SCAN_INTERVAL_SECONDS must be an integer' >&2; exit 2; }
+  [[ "$SCAN_CYCLES" =~ ^[0-9]+$ ]] || { echo 'APTITUDE_SCAN_CYCLES must be an integer' >&2; exit 2; }
   echo "monitor_interval_seconds=$SCAN_INTERVAL_SECONDS"
   echo "monitor_cycles=$SCAN_CYCLES"
+  [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST; run 'manifest ROOT' first" >&2; exit 2; }
   while (( cycle <= SCAN_CYCLES )); do
     echo "--- check $cycle/$SCAN_CYCLES $(date -Is) ---"
     sample_resources
-    # Avoid making a scan more expensive when memory is critically constrained.
     if [[ -r /proc/meminfo ]] && awk '/MemAvailable:/ {exit !($2 > 262144)}' /proc/meminfo; then
-      manifest_root "$root" >/dev/null
       check_manifest || true
     else
       echo 'scan=deferred_due_to_low_available_memory'
@@ -190,25 +196,9 @@ case "${1:-}" in
     [[ $# -eq 2 ]] || { usage; exit 2; }
     "$1" "$2"
     ;;
-  verify)
+  verify|manifest|check|monitor|repair)
     [[ $# -eq 2 ]] || { usage; exit 2; }
-    verify "$2"
-    ;;
-  manifest)
-    [[ $# -eq 2 ]] || { usage; exit 2; }
-    manifest_root "$2"
-    ;;
-  check)
-    [[ $# -eq 2 ]] || { usage; exit 2; }
-    check_manifest
-    ;;
-  monitor)
-    [[ $# -eq 2 ]] || { usage; exit 2; }
-    monitor "$2"
-    ;;
-  repair)
-    [[ $# -eq 2 ]] || { usage; exit 2; }
-    repair_file "$2"
+    "${1}_dispatch" "$2" 2>/dev/null || "$1" "$2"
     ;;
   *)
     usage
