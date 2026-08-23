@@ -1,0 +1,80 @@
+name: Secure JDK 28 Native Installers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'securejdk-installer/**'
+      - '.github/workflows/securejdk28-native.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux ELF (.sans)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '28'
+          cache: maven
+      - name: Build SecureJDK28.sans
+        working-directory: securejdk-installer
+        run: |
+          chmod +x packaging/build-linux.sh
+          packaging/build-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecureJDK28-linux-x86_64
+          path: securejdk-installer/dist/linux-x86_64/SecureJDK28-linux-x86_64.tar.gz
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '28'
+          cache: maven
+      - name: Build SecureJDK28.exe
+        working-directory: securejdk-installer
+        shell: pwsh
+        run: .\packaging\build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecureJDK28-windows-x64
+          path: securejdk-installer/dist/windows-x64/SecureJDK28.exe
+
+  macos:
+    name: macOS DMG and APP
+    strategy:
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-13
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '28'
+          cache: maven
+      - name: Build SecureJDK28 macOS package
+        working-directory: securejdk-installer
+        run: |
+          chmod +x packaging/build-macos.sh
+          packaging/build-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecureJDK28-macos-${{ matrix.arch }}
+          path: |
+            securejdk-installer/dist/macos-aarch64/*.dmg
+            securejdk-installer/dist/macos-aarch64/SecureJDK28.app
