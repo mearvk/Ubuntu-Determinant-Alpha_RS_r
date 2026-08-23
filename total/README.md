@@ -2,6 +2,30 @@
 
 **Total** is the native C implementation of the project's moderator layer. It runs above Linux kernel facilities and below ordinary userland policy, with controlled cooperation from SecureJDK 28 and Graal.
 
+## United States legal baseline — first and final
+
+For a United States deployment, Total is subordinate to applicable United States law. The project treats the United States statutory framework as the **clean governing baseline** for lawful deployment, while recognizing that federal statutes are only one part of the legal environment.
+
+The United States Code is an official consolidation/codification of general and permanent federal laws. It does not itself contain every applicable regulation, court decision, treaty, or state/local law. Therefore Total does not claim that a deployment is automatically lawful merely because it operates in the United States.
+
+The governing architecture is:
+
+```text
+applicable United States law
+            ↓
+   reviewed/versioned policy
+            ↓
+         Total ABI
+            ↓
+     explicit decision
+            ↓
+      controlled action
+```
+
+**Evidence is not authority.** Total does not create law, interpret itself as sovereign authority, or turn identity, payment, software branding, or configuration into legal authorization.
+
+The complete baseline is `markdown/US_STATUTORY_POSTURE.md`.
+
 ## First-edition native architecture
 
 ```text
@@ -162,7 +186,8 @@ Observation does not imply authorization. Memory intervention requires explicit 
 - bounded 3–1000 input registry;
 - initial domain evidence tests;
 - native interface documentation;
-- domain-service architecture.
+- domain-service architecture;
+- United States statutory-posture baseline.
 
 **Still to implement:**
 
