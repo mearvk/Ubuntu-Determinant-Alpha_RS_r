@@ -13,6 +13,9 @@ import javafx.stage.Stage;
 import java.nio.file.Path;
 
 public final class SecureJdkInstallerApp extends Application {
+    private static final String BRAND_LEGAL = "MEARVK LLC 2028 ©";
+    private static final String GRAAL_NOTICE = "Graal software — All applicable Graal trademarks and notices included © 2026";
+
     private final InstallerConfig config = new InstallerConfig();
     private final InstallerEngine engine = new InstallerEngine();
     private final StackPane content = new StackPane();
@@ -20,14 +23,19 @@ public final class SecureJdkInstallerApp extends Application {
     private final ProgressBar progress = new ProgressBar(0);
     private final Label status = new Label("Ready");
 
-    private int pageIndex = 0;
-
     @Override
     public void start(Stage stage) {
         BorderPane shell = new BorderPane();
         shell.getStyleClass().add("shell");
 
-        VBox brand = new VBox(4, new Label("SECURE JDK 28"), new Label("American-grade Java configuration"));
+        Label product = new Label("SECURE JDK 28");
+        Label descriptor = new Label("American-grade Java configuration");
+        Label legal = new Label(BRAND_LEGAL);
+        legal.getStyleClass().add("brand-legal");
+        Label graal = new Label(GRAAL_NOTICE);
+        graal.getStyleClass().add("brand-graal");
+
+        VBox brand = new VBox(3, product, descriptor, legal, graal);
         brand.getStyleClass().add("brand");
         shell.setTop(brand);
 
@@ -48,7 +56,7 @@ public final class SecureJdkInstallerApp extends Application {
 
         Scene scene = new Scene(shell, 920, 620);
         scene.getStylesheets().add(getClass().getResource("/securejdk.css").toExternalForm());
-        stage.setTitle("Secure JDK 28 Installer");
+        stage.setTitle("Secure JDK 28 Installer — MEARVK LLC");
         stage.setScene(scene);
         stage.setMinWidth(760);
         stage.setMinHeight(520);
@@ -56,17 +64,19 @@ public final class SecureJdkInstallerApp extends Application {
     }
 
     private void showWelcome() {
-        pageIndex = 0;
         section.setText("Welcome");
         VBox box = page("Secure JDK 28", "A configurable Java runtime and development environment with a clear security posture.");
         Label price = new Label("Target edition price: $25 USD per copy");
         price.getStyleClass().add("price");
-        box.getChildren().addAll(price, spacer(), buttonBar("Begin", e -> showInstallation()));
+        Label legal = new Label(BRAND_LEGAL);
+        legal.getStyleClass().add("status");
+        Label graal = new Label(GRAAL_NOTICE);
+        graal.getStyleClass().add("status");
+        box.getChildren().addAll(price, legal, graal, spacer(), buttonBar("Begin", e -> showInstallation()));
         content.getChildren().setAll(box);
     }
 
     private void showInstallation() {
-        pageIndex = 1;
         section.setText("Installation Target");
         TextField location = new TextField(config.getInstallDirectory().toString());
         Button browse = new Button("Browse…");
@@ -93,7 +103,6 @@ public final class SecureJdkInstallerApp extends Application {
     }
 
     private void showSecurity() {
-        pageIndex = 2;
         section.setText("Security");
         ToggleGroup group = new ToggleGroup();
         RadioButton standard = radio("Standard — recommended", "Standard", group);
@@ -110,7 +119,6 @@ public final class SecureJdkInstallerApp extends Application {
     }
 
     private void showMemory() {
-        pageIndex = 3;
         section.setText("Memory Management");
         ComboBox<String> memory = new ComboBox<>();
         memory.getItems().addAll("Automatic", "Developer Workstation", "Server", "High-Memory Workstation", "Custom");
@@ -122,7 +130,6 @@ public final class SecureJdkInstallerApp extends Application {
     }
 
     private void showAperture() {
-        pageIndex = 4;
         section.setText("Aperture");
         CheckBox advanced = check("Open advanced configuration controls", false, config::setAdvancedAperture);
         CheckBox desktop = check("Create desktop/start-menu integration", true, config::setDesktopIntegration);
@@ -132,7 +139,6 @@ public final class SecureJdkInstallerApp extends Application {
     }
 
     private void showTotal() {
-        pageIndex = 5;
         section.setText("Total");
         VBox box = page("Installation Total", "Everything selected for this Secure JDK 28 installation.");
         box.getChildren().addAll(
@@ -141,6 +147,8 @@ public final class SecureJdkInstallerApp extends Application {
                 summary("Memory", config.getMemoryProfile()),
                 summary("Security", config.isHardenedSecurity() ? "Hardened defaults" : "Standard"),
                 summary("JavaFX", config.isInstallJavaFx() ? "Included" : "Not selected"),
+                summary("Brand", BRAND_LEGAL),
+                summary("Graal", GRAAL_NOTICE),
                 spacer(),
                 buttonBar("Install Secure JDK 28", e -> install()));
         content.getChildren().setAll(box);
@@ -165,7 +173,7 @@ public final class SecureJdkInstallerApp extends Application {
         progress.setProgress(1);
         section.setText("Complete");
         VBox box = page("Secure JDK 28 is staged", "The installer has prepared the selected installation structure and configuration manifest.");
-        box.getChildren().addAll(summary("JAVA_HOME", config.getInstallDirectory().toString()), summary("Profile", config.getProfile()), spacer(), buttonBar("Finish", e -> content.getScene().getWindow().hide()));
+        box.getChildren().addAll(summary("JAVA_HOME", config.getInstallDirectory().toString()), summary("Profile", config.getProfile()), summary("Brand", BRAND_LEGAL), spacer(), buttonBar("Finish", e -> content.getScene().getWindow().hide()));
         content.getChildren().setAll(box);
     }
 
