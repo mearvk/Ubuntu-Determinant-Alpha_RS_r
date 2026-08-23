@@ -107,6 +107,54 @@ while the physical representation can be optimized for dense or sparse regions.
 
 This keeps the semantic model exact without sacrificing the project's requirement for **economy of method, low overhead, weight, and congruency**.
 
+### 48-bit color baseline and dimensional storage
+
+For the initial JPIX baseline, assume **48-bit color depth as 16 bits per channel for three RGB channels**. This is a color payload of **6 bytes per mapped pixel** before alpha, metadata, geometry, integrity data, or compression.
+
+For a dense rectangular rendering of width `W` and height `H`:
+
+```text
+raw_pixel_bytes = W × H × 6
+```
+
+When both dimensions grow together as `n × n`:
+
+```text
+raw_pixel_bytes = 6n²
+```
+
+Thus file payload grows linearly with the number of pixels, while doubling both width and height produces four times as many pixels and approximately four times the raw color payload.
+
+Reference sizes for dense 48-bit RGB storage are:
+
+```text
+12×12       144 pixels          864 B
+16×16       256 pixels        1,536 B
+24×24       576 pixels        3,456 B
+32×32     1,024 pixels        6,144 B
+48×48     2,304 pixels       13,824 B
+128×128  16,384 pixels       98,304 B
+256×256  65,536 pixels      393,216 B
+512×512 262,144 pixels        1.50 MiB
+1024×1024 1,048,576 pixels    6.00 MiB
+2048×2048 4,194,304 pixels   24.0 MiB
+4096×4096 16,777,216 pixels  96.0 MiB
+```
+
+These are **raw pixel-payload estimates**, not complete `.jpix` file sizes. A real file also includes its header, boundary/extent representation, optional alpha, metadata, integrity information, and any selected codec or compression.
+
+Because JPIX is a Pixel Map rather than a mandatory rectangle, sparse or irregular objects need not be represented as every pixel in their enclosing extent. A sparse representation may approach a form such as:
+
+```text
+sparse_payload ≈ 6N + G
+```
+
+where `N` is the number of mapped pixels and `G` is geometry/coordinate overhead. Dense maps are better served by dense arrays or tiles; sparse maps may be better served by coordinate runs, sparse records, or other compact structures. The implementation should select the representation according to mapped-pixel density rather than forcing every image into one storage strategy.
+
+For the small desktop icons currently being developed, dense storage is likely preferable: a 48×48 icon requires only **13,824 bytes of raw 48-bit RGB color payload** before other fields.
+
+If alpha is enabled as a separate 16-bit channel, add **2 bytes per mapped pixel**, making the corresponding RGBA payload 8 bytes per pixel. Alpha remains an explicit extension to the 48-bit RGB color baseline rather than changing the meaning of the baseline itself.
+
 ### Raster and codec representations
 
 JPIX should not attempt to replace JPEG's photographic transform/compression model or PNG's mature lossless raster model.
@@ -385,4 +433,4 @@ JSpec applies the same principle to graphics: **the Pixel Map is canonical, the 
 
 This is an experimental engineering and research framework. The “300-IQ” designation is a stylistic description of intended breadth and depth of reasoning, not a scientific performance claim. UTF-4088 is experimental and is not a replacement for Unicode.
 
-JSpec Pixel Format (`.jpix`) is likewise an experimental specification at this stage. The Pixel Map, boundary, topology, transparency, cohesive transformation, trimming, canonical representation, deterministic rendering, and optional codec concepts are the current design basis. The binary container/header layout remains subject to implementation and versioning.
+JSpec Pixel Format (`.jpix`) is likewise an experimental specification at this stage. The Pixel Map, boundary, topology, transparency, cohesive transformation, trimming, canonical representation, 48-bit RGB baseline, deterministic rendering, and optional codec concepts are the current design basis. The binary container/header layout remains subject to implementation and versioning.
