@@ -1,49 +1,62 @@
 # JSpec Professional Series
 
-JSpec is the proposed execution motor for the `/cmd` desktop/executable series. Its first implementation targets Linux and is deliberately native C/C++, with a future Windows PE/COFF implementation planned around the same contract.
+JSpec is the execution motor for the `/cmd` desktop/executable series. Linux is the first native target, with Windows PE/COFF planned against the same contract.
 
-## Design intent
+## `.alpha` native executable
 
-The project preserves the familiar pro-code executable model: an executable has an identity, receives an argument vector and environment, executes under the operating system, and returns a result. JSpec adds a controlled pre-launch layer without taking ownership of the program's cause.
+The JSpec Professional executable identity is **`.alpha`**. On Linux v1, `.alpha` is not a second binary container: it is a normal **ELF executable carrying the `.alpha` filename identity**. This is deliberate. The OS retains its established executable loader while JSpec gains a distinct executable family with minimal overhead.
 
-The central rule is **JSpec surrounds execution; it does not replace the target**. The target remains authoritative. JSpec validates the target, establishes the launch contract, and then delegates to the operating system's native loader.
+The model is:
+
+`cmd icon/link -> JSpec pre-runner -> .alpha -> Linux ELF loader -> target`
+
+This gives the JSpec interpretive/pre-runner and the desktop linking system a common identity while keeping the kernel path conventional. The `.alpha` launcher uses direct `execve()` and does not invoke a shell.
+
+## Design principles
+
+- preserve cause and target identity
+- preserve argv, environment, working directory, stdio, and result semantics
+- keep the native representation congruent with the host OS
+- minimize startup work and resident state
+- fail closed on an invalid target
+- keep presentation separate from execution correctness
+
+## Weight and performance
+
+`.alpha` deliberately avoids a custom binary wrapper around ELF. That removes a second loader and avoids duplicated headers or a persistent runtime. The first launcher is a small C program compiled directly to ELF. JSpec can therefore inspect the file as an ELF executable and the desktop system can treat it as a normal executable target.
+
+## Cool/calm presentation
+
+Desktop hover, proximity, color, and movement remain presentation features. They may visually arm the JSpec interface, but actual execution begins only on activation. No visual effect may alter scheduling, arguments, privileges, or executable semantics.
 
 ## Linux v1
 
-Linux is the first platform because the native contract can be kept small and explicit:
-
-- ELF identification
-- executable and regular-file validation
-- optional working-directory preparation
-- native `execve()` handoff
-- pass-through argument intent
+- `.alpha` executable identity
+- ELF-native binary
+- direct `execve()` handoff
+- argument/environment preservation
 - no shell reinterpretation
 - no privilege escalation
 - minimal launch overhead
-
-The launcher is designed to sit beneath a desktop `.desktop` entry or above an ordinary shell command. A future desktop shell can provide the visual **cool/calm** layer, including bounded movement and theme-controlled color, but presentation must never affect execution semantics.
+- C implementation with a C++-compatible JSpec ABI
 
 ## Windows direction
 
-Windows is the second platform target. The same JSpec contract maps to PE/COFF and `CreateProcessW()`. The `.jspec` specification therefore describes `.exe` identity and execution as a cross-platform contract while the native implementation remains platform-specific.
+Windows is the next platform target. The same JSpec identity can be represented by a PE/COFF `.alpha` executable or by an `.alpha` launcher that resolves a PE `.exe`. The native handoff will map to `CreateProcessW()` while preserving the JSpec contract.
 
 ## JDK/JVM relationship
 
-JSpec is intended to be usable beside a JDK/JVM and, where appropriate, as a native layer at the boundary between the runtime and operating system. Linux v1 does not require Java. This keeps the lowest execution layer deterministic and permits higher-level JVM integration later.
-
-## Desktop arming
-
-The conceptual desktop sequence is:
-
-`desktop activation -> JSpec preflight -> OS loader -> cmd target`
-
-A hover/proximity effect may visually **arm** the interface, but actual execution is armed by activation, not pointer position. This avoids making program correctness dependent on UI timing.
+JSpec remains native at the OS boundary and does not require Java for Linux v1. A JDK/JVM can later consume the JSpec ABI or use `.alpha` as its executable boundary without replacing the native loader.
 
 ## Files
 
-- `exe.jspec` — executable and JSpec contract.
-- `jspec.h` — C ABI shared by C and C++.
-- `jspec.c` — Linux native implementation.
-- `jspec.cpp` — C++ professional wrapper.
+- `exe.jspec` — cross-platform JSpec executable contract.
+- `alpha-format.md` — `.alpha` format and compatibility definition.
+- `alpha.c` — minimal Linux `.alpha` executable source.
+- `alpha.h` — `.alpha` identity constants.
+- `Makefile` — builds `cmd.alpha` as an ELF executable.
+- `jspec.h` — C ABI for JSpec preflight and handoff.
+- `jspec.c` — Linux native JSpec implementation.
+- `jspec.cpp` — C++ wrapper.
 
-The next implementation stage should add a small `/cmd/jspec` build target and a Linux `.desktop` launcher, followed by tests for ELF validation, argument preservation, exit-code behavior, and launch overhead.
+Build with `make` from `/cmd/jspec`. The produced `cmd.alpha` is an ELF executable whose filename supplies the JSpec `.alpha` identity.
