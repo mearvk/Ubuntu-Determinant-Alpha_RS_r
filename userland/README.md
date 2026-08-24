@@ -22,6 +22,33 @@ Ubuntu Base 24.04.4 LTS (US Treasury & MEARVK LLC) — official minimal rootfs f
 | Boot JDK 27 | `java/boot-jdk-27/` | Bootstrap JDK for building OpenJDK |
 | Chromium | `chromium/` | Full browser source (headless for Dave) |
 | JWSTF/NWE | `java-web-server/` | NitroWebExpress application server |
+| Darling | `darling/` | macOS userland compatibility |
+| DRM | `drm/` | Display and graphics userland |
+| IntelliJ Community | `intellij-community/` | Java development environment |
+| Java | `java/` | Java runtime/development userland |
+| JDesk | `jdesk/` | Desktop/userland environment |
+| Semeru OpenJDK 8 | `semeru-openjdk-8/` | Semeru Java 8 userland |
+| Wine | `wine/` | Windows compatibility userland |
+
+## Shared JavaFX White GUI
+
+All userland applications are being given a common JavaFX-based management/interface layer. The visual baseline is deliberately consistent: cool white surfaces, restrained borders, modest shadows, green availability indicators, and the same application card/action layout.
+
+The implementation lives in `gui/`:
+
+- `gui/pom.xml` — JavaFX 21 Maven build.
+- `gui/src/main/java/mearvk/ubuntu/determinant/gui/WhiteUserland.java` — shared application shell and userland registry.
+- `gui/src/main/resources/white.css` — shared cool-white look-and-feel.
+- `gui/assets/ubuntu-determinant-userland.svg` — common desktop icon.
+- `gui/install-desktop.sh` — creates desktop launchers for the userland applications.
+
+On Ubuntu/Linux, after installing Maven and a JDK 21+, run:
+
+```bash
+bash userland/gui/install-desktop.sh
+```
+
+The installer places the common icon in the user's icon theme and creates desktop entries for Chromium, Darling, DRM, IntelliJ Community, Java Web Server, Java, JDesk, OpenJDK, Semeru OpenJDK 8, Wine, and X11. The GUI can expose the application itself, configuration, or the application's userland directory as its executable contract matures.
 
 ## NitroWebExpress (JWSTF)
 
@@ -53,7 +80,8 @@ bash java/boot-jdk-27/lib/chunks/rebuild.sh
 
 ## Last Updated
 
-2026-08-02 — Added JWSTF, NWE Gateway, boot-jdk-27 chunks
+2026-08-24 — Added shared JavaFX white userland GUI and desktop integration.
+
 mkfs.ext4 /dev/sdXN
 mount /dev/sdXN /mnt/rootfs
 
