@@ -1,0 +1,41 @@
+name: XMC integrated build
+
+on:
+  push:
+    paths:
+      - 'tools/xmc/**'
+      - 'testing-inputs/**'
+      - '.github/workflows/xmc-build.yml'
+  pull_request:
+    paths:
+      - 'tools/xmc/**'
+      - 'testing-inputs/**'
+      - '.github/workflows/xmc-build.yml'
+  workflow_dispatch:
+
+jobs:
+  xmc-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build XMC and ASYSMA tools
+        working-directory: tools/xmc
+        run: make clean all
+      - name: Run integrated XMC process test
+        working-directory: tools/xmc
+        run: make process-test
+      - name: Compile persistent Java input
+        working-directory: tools/xmc
+        run: ./xmc --verbose ../../testing-inputs/java/XmcDesktopProbe.java
+      - name: Verify integrated artifacts
+        working-directory: testing-inputs/java
+        run: |
+          test -s XmcDesktopProbe.xclass
+          test -s XmcDesktopProbe.asysma
+          test -s XmcDesktopProbe.asysma.desktop
+          grep -q 'application/x-asysma' XmcDesktopProbe.asysma.desktop
+      - name: Clean generated test artifacts
+        working-directory: testing-inputs/java
+        if: always()
+        run: rm -f *.xclass *.asysma *.desktop
