@@ -4,6 +4,15 @@ $Prefix = if ($env:PREFIX) { $env:PREFIX } else { Join-Path $env:ProgramFiles 'U
 $Cc = if ($env:CC) { $env:CC } else { 'cc' }
 New-Item -ItemType Directory -Force -Path $Prefix | Out-Null
 
+$XmcDir = Join-Path $Root 'tools\xmc'
+if (Test-Path (Join-Path $XmcDir 'Makefile')) {
+  Write-Host 'building xmc'
+  & make -C $XmcDir clean all
+  if ($LASTEXITCODE -ne 0) { throw 'xmc build failed' }
+  & make -C $XmcDir PREFIX=$Prefix install
+  if ($LASTEXITCODE -ne 0) { throw 'xmc install failed' }
+}
+
 function Build-Tool([string]$Name) {
   $Dir = Join-Path $Root "tools\$Name"
   $Source = Join-Path $Dir "$Name.c"
@@ -14,7 +23,6 @@ function Build-Tool([string]$Name) {
   if ($LASTEXITCODE -ne 0) { throw "build failed: $Name" }
 }
 
-Build-Tool 'xmc'
 Build-Tool 'limit'
 Build-Tool 'size'
 Build-Tool 'ctrmsctl'
