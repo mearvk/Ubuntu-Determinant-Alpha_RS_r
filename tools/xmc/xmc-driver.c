@@ -5,7 +5,6 @@
  * composes the successful compilation into an ASYSMA application package so
  * that `xmc SOURCE.java` is the single user-facing operation.
  */
-#define _GNU_SOURCE
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -63,7 +62,6 @@ int main(int argc, char **argv) {
     if (source_index < 0) { usage(argv[0]); return 2; }
     const char *source = argv[source_index];
 
-    /* Preserve the complete compiler command for the core compiler. */
     char **core_argv = calloc((size_t)argc + 1, sizeof(char *));
     if (!core_argv) { perror("xmc: calloc"); return 1; }
     core_argv[0] = core;
