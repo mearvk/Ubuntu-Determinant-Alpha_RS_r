@@ -8,63 +8,59 @@ CFLAGS  ?= -Wall -Wextra -Werror -O2 -std=c11 -D_GNU_SOURCE \
 LDFLAGS ?= -lm
 PREFIX  ?= /usr/local
 
-BIN     = xmc
-PACKER  = asysma_pack
-DRIVER  = xmc-build
-DESKTOP = xmc-install-desktop.sh
-SRC     = xmc.c
-PACKSRC = asysma_pack.c
-OBJ     = $(SRC:.c=.o)
-PACKOBJ = $(PACKSRC:.c=.o)
+BIN        = xmc
+CORE       = xmc-core
+DRIVER_SRC = xmc-driver.c
+PACKER     = asysma_pack
+DRIVER     = xmc-build
+DESKTOP    = xmc-install-desktop.sh
+SRC        = xmc.c
+PACKSRC    = asysma_pack.c
 
 .PHONY: all clean install uninstall test process-test
 
-# A normal XMC build produces the compiler, packager, and unified driver.
-# The unified driver gives developers one compile action that emits both
-# .xclass and a localized .asysma beside the input source.
+# Public xmc is now the integrated compiler/package driver.
 all: $(BIN) $(PACKER) $(DRIVER)
 
-$(BIN): $(SRC)
+$(CORE): $(SRC)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(PACKER): $(PACKSRC)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
+$(BIN): $(DRIVER_SRC) $(CORE) $(PACKER)
+	$(CC) $(CFLAGS) -o $@ $(DRIVER_SRC) $(LDFLAGS)
+
 $(DRIVER):
 	chmod +x $@
 
 clean:
-	rm -f $(BIN) $(PACKER) $(OBJ) $(PACKOBJ) *.xclass *.asysma
+	rm -f $(BIN) $(CORE) $(PACKER) *.o *.xclass *.asysma
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	install -m 0755 $(CORE) $(DESTDIR)$(PREFIX)/bin/$(CORE)
 	install -m 0755 $(PACKER) $(DESTDIR)$(PREFIX)/bin/$(PACKER)
 	install -m 0755 $(DRIVER) $(DESTDIR)$(PREFIX)/bin/$(DRIVER)
-	install -m 0755 $(DESKTOP) $(DESTDIR)$(PREFIX)/bin/$(DESKTOP)
+	install -m 0755 xmc-asysma-launcher.sh $(DESTDIR)$(PREFIX)/bin/xmc-asysma-launcher.sh
+	install -d $(DESTDIR)$(PREFIX)/share/icons $(DESTDIR)$(PREFIX)/share/mime/packages
+	install -m 0644 xmc-icon.svg $(DESTDIR)$(PREFIX)/share/icons/xmc-asysma.svg
+	install -m 0644 asysma-mime.xml $(DESTDIR)$(PREFIX)/share/mime/packages/asysma.xml
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) \
-	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) \
-	      $(DESTDIR)$(PREFIX)/bin/$(DRIVER) \
-	      $(DESTDIR)$(PREFIX)/bin/$(DESKTOP)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) $(DESTDIR)$(PREFIX)/bin/$(CORE) \
+	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) $(DESTDIR)$(PREFIX)/bin/$(DRIVER) \
+	      $(DESTDIR)$(PREFIX)/bin/xmc-asysma-launcher.sh \
+	      $(DESTDIR)$(PREFIX)/share/icons/xmc-asysma.svg \
+	      $(DESTDIR)$(PREFIX)/share/mime/packages/asysma.xml
 
-# Original lightweight smoke test.
 test: all
-	@echo "--- xmc unified dual-output smoke test ---"
-	@printf '%s\n' \
-	 'public class TestClass implements Runnable {' \
-	 '    private int count;' \
-	 '    public void run() { System.out.println("hello"); }' \
-	 '    public int getCount() { return count; }' \
-	 '    private void helper() { if (count > 0) count--; }' \
-	 '}' > /tmp/TestClass.java
-	./$(DRIVER) --verbose /tmp/TestClass.java
-	@echo "--- Generated artifacts ---"
-	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma
-	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma
+	@printf '%s\n' 'public class TestClass { public static void main(String[] a) {} }' > /tmp/TestClass.java
+	./$(BIN) --verbose /tmp/TestClass.java
+	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
+	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
 
-# Full Java/C/C++ and desktop-localization rehearsal.
 process-test: all
-	@chmod +x $(DESKTOP) tools/xmc/tests/run-xmc-process.sh 2>/dev/null || true
+	@chmod +x $(DESKTOP) tests/run-xmc-process.sh 2>/dev/null || true
 	@./tests/run-xmc-process.sh
