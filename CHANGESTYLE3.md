@@ -115,9 +115,9 @@ Use source notices, Git history, signed-off contributions, SPDX records, contrib
 
 ## 8. Organization / company co-frame
 
-An organization or company may be a useful **co-frame** for understanding a hardware family, software subsystem, maintainer relationship, development tree, or historical contribution. Public Internet evidence can help locate such relationships, and Linux's own documentation includes vendor- and organization-associated driver families and maintainer entries. 
+An organization or company may be a useful **co-frame** for understanding a hardware family, software subsystem, maintainer relationship, development tree, or historical contribution. Public Internet evidence can help locate such relationships.
 
-However, the organization relationship must remain separate from the file-level authorship conclusion. The following evidence ladder is preferred:
+The organization relationship must remain separate from the file-level authorship conclusion. The preferred evidence ladder is:
 
 ```text
 1. organization name appears
@@ -139,15 +139,63 @@ hardware -> software -> organization/company -> jurisdiction
 
 Each edge is independently evaluated. A company associated with hardware does not automatically establish that it authored all software for the hardware. A company name does not establish an individual's nationality, citizenship, employment, institutional endorsement, or legal status.
 
-Similarly, an Internet listing can be a discovery or corroboration source without becoming dispositive evidence. Reviewers should distinguish **found online**, **documented by the project**, and **independently substantiated**.
+An Internet listing can be a discovery or corroboration source without becoming dispositive evidence. Reviewers should distinguish **found online**, **documented by the project**, and **independently substantiated**.
 
-## 10. Presence Concord
+## 10. Noun / company recognition completion
+
+The driver tree now has a dedicated recognition vocabulary under:
+
+```text
+kernels/linux-5.15.204/linux-5.15.204/drivers/noun/company/
+```
+
+The canonical recognition key is the two-noun tuple:
+
+```text
+(noun/type, company)
+```
+
+where `noun/type` identifies the hardware or software class and `company` identifies the recognized company associated with that class. A time derivative may add a generation or era:
+
+```text
+(noun/type, company, generation/era, evidence)
+```
+
+The directory grammar is:
+
+```text
+noun/
+  company/
+    <noun-type>/
+      README.md
+      <company>.md
+      <company>-<generation-or-era>.md
+```
+
+The recognition path is:
+
+```text
+noun/type
+ -> company association
+ -> device family
+ -> vendor/device identifier
+ -> circuit/controller
+ -> driver
+ -> kernel subsystem
+ -> verification
+```
+
+The recognition register has been populated for the principal driver hardware categories identified by `drivers/LISTABLES.md`, with company-specific records added where the repository provides corresponding driver, identifier, subsystem, or comparable technical evidence. Examples include network/Intel and AMD, GPU/AMD, Intel, and NVIDIA, and storage/Intel and QLogic.
+
+These records are **recognition records**, not assertions that a company authored every driver in a category. Exact file provenance remains the controlling evidence for authorship.
+
+## 11. Presence Concord
 
 Presence is an evidence-bearing connection between an identity and attributable material. It can support a provenance record without being treated as a legal determination of citizenship, personhood, professional status, or institutional affiliation.
 
 The public repository should record only the degree of provenance needed for legitimate engineering and reproducibility purposes. Sensitive evidence may remain privately held under appropriate access control.
 
-## 11. United States / institutional references
+## 12. United States / institutional references
 
 A source's existence in a U.S. repository, an author's name appearing in historical material, or a project's study of software does not by itself establish a U.S. legal status, Harvard affiliation, professional credential, or institutional endorsement.
 
@@ -165,13 +213,13 @@ The categories should not be merged merely because they appear related.
 
 The project may conduct serious software study and engineering work at a standard comparable to advanced academic research. That is a statement about the **quality and method of the project's work**, not a claim that a university, professor, court, government agency, company, or other institution has endorsed the project.
 
-## 12. Privacy and guarded records
+## 13. Privacy and guarded records
 
 Public source and README files should contain only information appropriate for provenance and reproducibility. Keep credentials, private correspondence, psychological material, confidential legal advice, security-sensitive findings, payment/contract details, and other restricted evidence outside public source documentation unless lawful disclosure and authorization are established.
 
 Where a public record needs to demonstrate that private evidence exists, use a non-sensitive reference, evidence identifier, or hash rather than publishing the evidence itself.
 
-## 13. Driver application
+## 14. Driver application
 
 For kernel drivers and headers, apply ChangeStyle3 at the smallest useful level:
 
@@ -188,15 +236,15 @@ file
   -> concord
 ```
 
-Directory READMEs provide subsystem context. `drivers/DOCUMENTATION.md` provides the master lower-grade/provenance register. `drivers/LISTABLES.md` provides the hardware/category and organization co-frame vocabulary. The four security registers provide the broader Origin/Custody/Modification/Attention framework.
+Directory READMEs provide subsystem context. `drivers/DOCUMENTATION.md` provides the master lower-grade/provenance register. `drivers/LISTABLES.md` provides the hardware/category and organization co-frame vocabulary. `drivers/noun/company/` provides the normalized noun/company recognition records and time derivatives. The four security registers provide the broader Origin/Custody/Modification/Attention framework.
 
-## 14. Evidence maturity
+## 15. Evidence maturity
 
 For substantial authorship questions, the preferred review resembles a mature research proposal: establish the proposition, collect primary evidence, distinguish observation from inference, identify competing explanations, document limitations, and state what additional evidence would alter the conclusion.
 
 No psychological publication or personal dossier is required merely to establish ordinary software provenance.
 
-## 15. Release rule
+## 16. Release rule
 
 Before a significant release, the project should be able to explain:
 
@@ -207,12 +255,13 @@ what was changed
 who is credited
 what license applies
 what organizations are technically associated, if relevant
+what hardware/category recognition exists
 what the project controls
 what was tested
 what remains uncertain
 what evidence supports each material claim
 ```
 
-## 16. Final principle
+## 17. Final principle
 
-**Preserve the original content. Improve the implementation. Record the change. Maintain attribution. Use organizational context as a co-frame, not as a shortcut to authorship. Control what we legitimately control. Keep private evidence private. Do not convert project responsibility into unsupported claims of historical authorship or external authority.**
+**Preserve the original content. Improve the implementation. Record the change. Maintain attribution. Use organizational and noun/category context as recognition co-frames, not as shortcuts to authorship. Control what we legitimately control. Keep private evidence private. Do not convert project responsibility into unsupported claims of historical authorship or external authority.**
