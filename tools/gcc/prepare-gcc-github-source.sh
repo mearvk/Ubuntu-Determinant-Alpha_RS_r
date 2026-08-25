@@ -1,6 +1,6 @@
 #!/bin/sh
-# Scan the GCC source already pulled into this MEARVK checkout.
-# This script does not clone GCC, contact gcc-mirror, or push anything.
+# Scan the GCC source already pulled into the local MEARVK checkout.
+# This script never clones GCC, never contacts gcc-mirror, and never pushes.
 set -eu
 
 MEARVK_REPO="mearvk/Ubuntu.Determinant.Beta.Restricted"
@@ -15,17 +15,21 @@ usage() {
     cat <<EOF
 Usage: $0 [--refresh] [--prepare]
 
-The GCC source is assumed to have already been pulled into this MEARVK
-repository. The script scans what is present locally and prepares a clean
-source-only copy if requested.
+The GCC source is assumed to have already been pulled into this local
+MEARVK checkout. The script scans the local source and can prepare a clean
+source-only copy.
 
-  --refresh   fast-forward this existing MEARVK checkout from origin
+  --refresh   fetch/fast-forward from the Beta repository explicitly
   --prepare   create tools/gcc/gcc-github-latest-import from the local GCC tree
 
 Environment:
   MAX_BLOB_MB   large-file review threshold (default: 90)
 
-No GCC upstream repository is contacted. No push is performed.
+Safety:
+  - No GCC upstream repository is contacted.
+  - The existing origin URL is never used for --refresh.
+  - --refresh explicitly fetches Beta from MEARVK_URL.
+  - No push is performed.
 EOF
 }
 
@@ -54,25 +58,31 @@ command -v git >/dev/null 2>&1 || {
 ORIGIN=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)
 ORIGIN_CLEAN=$(printf '%s' "$ORIGIN" | sed -E 's#https://[^@/]+@#https://#')
 
-case "$ORIGIN_CLEAN" in
-    "$MEARVK_URL"|git@github.com:mearvk/Ubuntu.Determinant.Beta.Restricted.git)
-        ;;
-    *)
-        echo "error: this checkout is not $MEARVK_REPO" >&2
-        echo "origin=$ORIGIN_CLEAN" >&2
-        exit 1
-        ;;
-esac
-
-if [ "$REFRESH" -eq 1 ]; then
-    echo "Refreshing existing MEARVK checkout only."
-    BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short -q HEAD || echo main)
-    git -C "$REPO_ROOT" fetch --prune origin
-    git -C "$REPO_ROOT" pull --ff-only origin "$BRANCH"
+# The checkout can have an old/mispointed origin. Do not reject the local
+# master clone merely because origin says Alpha. For --refresh, Beta is used
+# explicitly below, so we cannot accidentally refresh from Alpha.
+if [ "$ORIGIN_CLEAN" != "$MEARVK_URL" ] &&
+   [ "$ORIGIN_CLEAN" != "git@github.com:mearvk/Ubuntu.Determinant.Beta.Restricted.git" ]; then
+    echo "warning: local origin is not the Beta repository:" >&2
+    echo "  $ORIGIN_CLEAN" >&2
+    echo "warning: local files will still be scanned." >&2
+    echo "warning: --refresh will explicitly fetch Beta, not this origin." >&2
 fi
 
-# Locate the GCC source already present in this checkout. Prefer the actual
-# extracted source tree; otherwise accept the previously prepared tree.
+if [ "$REFRESH" -eq 1 ]; then
+    echo "Refreshing from Beta explicitly: $MEARVK_URL"
+
+    BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short -q HEAD || echo main)
+
+    # Fetch Beta directly without changing the user's origin configuration.
+    # This avoids accidentally pulling Alpha when origin is still configured
+    # to point there.
+    git -C "$REPO_ROOT" fetch --prune "$MEARVK_URL" "$BRANCH"
+
+    git -C "$REPO_ROOT" merge --ff-only FETCH_HEAD
+fi
+
+# Locate GCC source already present locally.
 if [ -f "$SCRIPT_DIR/gcc-16.2.0/configure" ]; then
     SOURCE_PATH="$SCRIPT_DIR/gcc-16.2.0"
 elif [ -f "$SCRIPT_DIR/gcc-github-latest/configure" ]; then
@@ -82,7 +92,7 @@ elif [ -f "$SCRIPT_DIR/gcc-github-latest-import/configure" ]; then
 else
     echo "error: GCC source was not found under $SCRIPT_DIR" >&2
     echo "Expected gcc-16.2.0/, gcc-github-latest/, or gcc-github-latest-import/." >&2
-    echo "The source must already have been pulled into this MEARVK checkout." >&2
+    echo "The GCC source must already have been pulled into this MEARVK checkout." >&2
     exit 1
 fi
 
@@ -95,9 +105,8 @@ MAX_BYTES=$((MAX_BLOB_MB * 1024 * 1024))
 LARGE_LIST=$(mktemp)
 trap 'rm -f "$LARGE_LIST"' EXIT
 
-# Inspect the files that would be committed from tools/gcc. This deliberately
-# measures the working tree, not an unrelated GCC upstream history.
-git -C "$REPO_ROOT" ls-files -z "$SCRIPT_DIR" 2>/dev/null |
+# Scan tracked files under tools/gcc.
+git -C "$REPO_ROOT" ls-files -z "tools/gcc" |
 while IFS= read -r -d '' path; do
     [ -f "$REPO_ROOT/$path" ] || continue
     SIZE=$(wc -c < "$REPO_ROOT/$path" | tr -d ' ')
@@ -106,8 +115,7 @@ while IFS= read -r -d '' path; do
     fi
 done > "$LARGE_LIST" || true
 
-# Include untracked GCC source files in the scan. This is important because
-# the user has already pulled the source and may not have staged it yet.
+# Also scan untracked GCC files because the source may not yet be staged.
 find "$SOURCE_PATH" -type f -not -path '*/.git/*' -print0 |
 while IFS= read -r -d '' file; do
     SIZE=$(wc -c < "$file" | tr -d ' ')
@@ -116,7 +124,7 @@ while IFS= read -r -d '' file; do
             "$REPO_ROOT"/*) REL=${file#"$REPO_ROOT"/} ;;
             *) REL=$file ;;
         esac
-        if ! grep -Fq "	$REL" "$LARGE_LIST" 2>/dev/null; then
+        if ! grep -Fq "$(printf '\t%s' "$REL")" "$LARGE_LIST" 2>/dev/null; then
             printf '%s\t%s\n' "$SIZE" "$REL"
         fi
     fi
@@ -130,14 +138,15 @@ if git lfs version >/dev/null 2>&1; then
     LFS_PRESENT=1
 fi
 
-TRACKED_COUNT=$(git -C "$REPO_ROOT" ls-files "$SCRIPT_DIR" | wc -l | tr -d ' ')
-STATUS=$(git -C "$REPO_ROOT" status --short -- "$SCRIPT_DIR")
+TRACKED_COUNT=$(git -C "$REPO_ROOT" ls-files "tools/gcc" | wc -l | tr -d ' ')
+STATUS=$(git -C "$REPO_ROOT" status --short -- "tools/gcc")
 
-# Detect GitHub's 100 MiB per-file hard rejection boundary conservatively.
 OVER_GITHUB_LIMIT=0
 if [ "$LARGE_COUNT" -gt 0 ]; then
-    while IFS="	" read -r bytes path; do
-        [ "$bytes" -ge $((100 * 1024 * 1024)) ] && OVER_GITHUB_LIMIT=$((OVER_GITHUB_LIMIT + 1))
+    while IFS="$(printf '\t')" read -r bytes path; do
+        if [ "$bytes" -ge $((100 * 1024 * 1024)) ]; then
+            OVER_GITHUB_LIMIT=$((OVER_GITHUB_LIMIT + 1))
+        fi
     done < "$LARGE_LIST"
 fi
 
@@ -145,7 +154,8 @@ fi
     echo "MEARVK GCC source readiness report"
     echo "=================================="
     echo "repository=$MEARVK_REPO"
-    echo "origin=$ORIGIN_CLEAN"
+    echo "configured_origin=$ORIGIN_CLEAN"
+    echo "refresh_source=$MEARVK_URL"
     echo "source=$SOURCE_PATH"
     echo "source_name=$SOURCE_NAME"
     echo "source_files=$SOURCE_FILES"
@@ -173,8 +183,16 @@ fi
     echo "provenance=MEARVK repository"
     echo "external_gcc_pull=disabled"
     echo "destination_push=disabled"
-    echo "review_required=$([ "$LARGE_COUNT" -gt 0 ] && echo yes || echo no)"
-    echo "lfs_review=$([ "$OVER_GITHUB_LIMIT" -gt 0 ] && echo yes || echo no)"
+    if [ "$LARGE_COUNT" -gt 0 ]; then
+        echo "review_required=yes"
+    else
+        echo "review_required=no"
+    fi
+    if [ "$OVER_GITHUB_LIMIT" -gt 0 ]; then
+        echo "lfs_review=yes"
+    else
+        echo "lfs_review=no"
+    fi
 } > "$REPORT"
 
 cat "$REPORT"
@@ -186,6 +204,7 @@ if [ "$PREPARE" -eq 1 ]; then
         tar -xf - -C "$IMPORT_DIR"
     echo
     echo "Prepared source-only copy: $IMPORT_DIR"
+    echo "No .git metadata is included."
 fi
 
 if [ "$OVER_GITHUB_LIMIT" -gt 0 ]; then
