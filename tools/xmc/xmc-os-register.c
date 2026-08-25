@@ -25,21 +25,41 @@ int xmc_register_asysma(const char *desktop_file, const char *program_name,
     (void)desktop_file; (void)program_name; (void)icon_path;
     return run(cmd) == 0 ? 0 : -1;
 #else
-    char mime_dir[4096], mime_file[4096], desktop_dir[4096], installed_desktop[4096], cmd[8192];
+    char mime_dir[4096], mime_file[4096], icon_dir[4096], icon_file[4096];
+    char desktop_dir[4096], installed_desktop[4096], cmd[8192];
     const char *home = getenv("HOME");
     if (!home || !desktop_file || !program_name) return -1;
     snprintf(mime_dir, sizeof mime_dir, "%s/.local/share/mime/packages", home);
     snprintf(mime_file, sizeof mime_file, "%s/xmc-asysma.xml", mime_dir);
+    snprintf(icon_dir, sizeof icon_dir, "%s/.local/share/icons/hicolor/scalable/apps", home);
+    snprintf(icon_file, sizeof icon_file, "%s/xmc-asysma.svg", icon_dir);
     snprintf(desktop_dir, sizeof desktop_dir, "%s/.local/share/applications", home);
     snprintf(installed_desktop, sizeof installed_desktop, "%s/xmc-asysma.desktop", desktop_dir);
-    if (snprintf(cmd, sizeof cmd, "mkdir -p '%s' '%s'", mime_dir, desktop_dir) >= (int)sizeof cmd || run(cmd) != 0) return -1;
+
+    if (snprintf(cmd, sizeof cmd, "mkdir -p '%s' '%s' '%s'", mime_dir, icon_dir, desktop_dir) >= (int)sizeof cmd || run(cmd) != 0) return -1;
+
     FILE *m = fopen(mime_file, "w");
     if (!m) return -1;
-    fprintf(m, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\"><mime-type type=\"application/x-asysma\"><comment>ASYSMA application</comment><glob pattern=\"*.asysma\"/><icon name=\"xmc-asysma\"/></mime-type></mime-info>\n");
+    fputs("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+          "<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n"
+          "  <mime-type type=\"application/x-asysma\">\n"
+          "    <comment>ASYSMA Application Package</comment>\n"
+          "    <icon name=\"xmc-asysma\"/>\n"
+          "    <glob pattern=\"*.asysma\"/>\n"
+          "    <magic priority=\"80\"><match type=\"string\" offset=\"0\" value=\"ASYSMA\\x00\\x01\"/></magic>\n"
+          "  </mime-type>\n</mime-info>\n", m);
     fclose(m);
+
+    if (!icon_path) return -1;
+    if (snprintf(cmd, sizeof cmd, "cp '%s' '%s'", icon_path, icon_file) >= (int)sizeof cmd || run(cmd) != 0) return -1;
     if (snprintf(cmd, sizeof cmd, "cp '%s' '%s'", desktop_file, installed_desktop) >= (int)sizeof cmd || run(cmd) != 0) return -1;
-    if (snprintf(cmd, sizeof cmd, "if command -v update-mime-database >/dev/null 2>&1; then update-mime-database '%s/.local/share/mime' >/dev/null 2>&1; fi; if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database '%s' >/dev/null 2>&1; fi; if command -v xdg-mime >/dev/null 2>&1; then xdg-mime default xmc-asysma.desktop application/x-asysma >/dev/null 2>&1; fi", home, desktop_dir) >= (int)sizeof cmd) return -1;
-    (void)icon_path; (void)executable_path;
+    if (snprintf(cmd, sizeof cmd,
+        "if command -v update-mime-database >/dev/null 2>&1; then update-mime-database '%s/.local/share/mime' >/dev/null 2>&1; fi; "
+        "if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database '%s' >/dev/null 2>&1; fi; "
+        "if command -v xdg-mime >/dev/null 2>&1; then xdg-mime default xmc-asysma.desktop application/x-asysma >/dev/null 2>&1; fi; "
+        "if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -f -t '%s/.local/share/icons/hicolor' >/dev/null 2>&1 || true; fi",
+        home, desktop_dir, home) >= (int)sizeof cmd) return -1;
+    (void)executable_path;
     return run(cmd) == 0 ? 0 : -1;
 #endif
 }
