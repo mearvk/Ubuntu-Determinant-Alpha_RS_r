@@ -9,6 +9,34 @@
 
 `xmc` compiles Java (`.java`) or Python (`.py`) source files into the SecureJDK 28 XML class file format (`.xclass`). The `.xclass` format carries rich metadata beyond binary `.class`: provenance, design intent, security grades, dependencies, quality assessments, and contracts.
 
+## Unified XMC + ASYSMA output
+
+Use `xmc-build SOURCE` for the developer-facing combined path:
+
+```text
+SOURCE.java
+    │
+    ├── xmc ────────→ SOURCE.xclass
+    │
+    └── ASYSMA pack → SOURCE.asysma
+```
+
+Both artifacts are deliberately **localized beside the source file**. This makes the compiler's output location deterministic and easy to inspect or archive.
+
+The `.asysma` file is an application/container artifact, not an OS-native executable by itself. Linux, Windows, and macOS still require their own native executable/loader when a package contains native code. The ASYSMA manifest records the declared entry mode and payloads.
+
+## Desktop launcher
+
+For Linux desktop environments, install a per-source launcher with:
+
+```bash
+xmc-install-desktop.sh /path/to/MyClass.java
+```
+
+This creates a small `.desktop` file beside the source and installs a copy under the user's local application directory. Selecting it invokes `xmc-build` for that exact source, so the resulting `.xclass` and `.asysma` remain localized beside the input.
+
+The launcher does not claim that `.asysma` is directly executable by the operating system; it is a controlled developer entry point into the XMC build process.
+
 ## What xmc Produces
 
 For each class found in source, xmc generates an `.xclass` file containing:
@@ -43,43 +71,42 @@ The xmc binary adjusts quality scoring based on international law or conduct fra
 | International | `intl` | Balanced universal assessment | UN Charter, Universal Declaration |
 | Commonwealth | `cw` | Representation, accountability, precedent | Common Law, Magna Carta, Westminster |
 
-## INT Tiers & Wet Structure
-
-Each class is assigned to one of four tiers (mirroring `jvmINTLoader.hpp`):
-
-| Tier | Name | Inference Rule |
-|------|------|----------------|
-| 1 | Module System | Default; self-supporting foundation |
-| 2 | Setup Technology | Lateral count > 3; connective tissue |
-| 3 | Modulator Technocator | INT complexity > 50 or artistry > 70 |
-| 4 | Technology Mind Control | INT complexity > 80; executive concern |
-
-Wet structure scores (0-100 each) describe internal character:
-- **module** — foundation weight, self-support
-- **demange** — pre-artistic form, the seed (abstracts, interfaces)
-- **demart** — chemistry before wisdom, preparation (complex reactions)
-- **artistry** — full craft expression, realized form (balanced, elegant)
-
 ## Usage
 
 ```bash
-xmc MyClass.java                          # Java → .xclass (US Standard)
-xmc --frame=eu UserService.java           # EU conduct frame
-xmc --frame=intl --verbose App.py         # International + details
-xmc --tier=3 --color=blue ArtEngine.java  # Force tier/color
-xmc --sign-as="mearvk - Installer Tech 2" Main.java
-xmc --no-sign --dry-run Test.py           # Parse without output
+xmc MyClass.java
+xmc --frame=eu UserService.java
+xmc --frame=intl --verbose App.py
+xmc-build --verbose MyClass.java
+xmc-install-desktop.sh MyClass.java
 ```
 
-## Build
+## Process rehearsal
+
+The repository now includes representative inputs under `tools/xmc/tests/`:
+
+- `java/XmcDesktopProbe.java` — class fields, constructor, conditional mutation, and `main`.
+- `java/XmcControlFlowProbe.java` — interface implementation, loop, branching, and method analysis.
+- `native/xmc_native_probe.c` — C native payload.
+- `native/xmc_native_probe.cpp` — C++ native payload.
+- `run-xmc-process.sh` — builds native probes, runs XMC on the Java inputs, verifies localized `.xclass`/`.asysma`, packages a native+Java ASYSMA, and verifies desktop launcher installation.
+
+Run the complete rehearsal with:
 
 ```bash
-make          # Build xmc binary
-make test     # Smoke test (Java + Python)
-make install  # Install to /usr/local/bin/
+make process-test
 ```
 
-## Security Concerns (from javac study)
+## Build and install
+
+```bash
+make
+make test
+make process-test
+make install
+```
+
+## Security Concerns
 
 | Concern | Mitigation |
 |---------|-----------|
@@ -94,19 +121,20 @@ make install  # Install to /usr/local/bin/
 
 ## Files
 
-```
-tools/xmc/xmc.c      - Compiler source (~1800 lines, C11)
-tools/xmc/Makefile    - Build/install/test
-tools/xmc/README.md   - This file
+```text
+tools/xmc/xmc.c
+ tools/xmc/asysma_pack.c
+tools/xmc/xmc-build
+tools/xmc/xmc-install-desktop.sh
+tools/xmc/Makefile
+tools/xmc/tests/java/
+tools/xmc/tests/native/
+tools/xmc/tests/run-xmc-process.sh
 ```
 
 ## Integration
 
-Output `.xclass` files are consumed by:
-- `jvmINTLoader` — structural placement at tier level
-- `classLoadGuard` — quality and quantity gate at load time
-- `xmlConfigReader` — validates .xclass integrity at JVM startup
-- `jvmCodex` — registers as codex entries if shape qualifies
+Output `.xclass` files are consumed by the repository's managed-runtime integration. ASYSMA is the packaging layer for Java/XMC metadata and explicitly declared native payloads; it does not replace the host operating system's executable loader.
 
 ## Copyright
 
