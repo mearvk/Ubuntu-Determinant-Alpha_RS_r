@@ -4,9 +4,31 @@
 
 It scans the selected directory (non-recursively by default), recognizes common ELF, PE, and Mach-O binaries, and reports metadata fields useful for software provenance review.
 
-## Build
+## Build with the derived GCC
 
-Linux:
+The repository now contains a GCC 16.2.0 source tree with the MEARVK-META metadata extension. Use `./build.sh` to prefer a locally built derived compiler:
+
+```sh
+./build.sh
+```
+
+The script searches the repository for a locally built GCC 16.2.0 compiler first. `MEARVK_GCC=/path/to/gcc ./build.sh` can select a specific compiler. If the derived compiler is not built yet, the script falls back to the platform `gcc` and explicitly reports that metadata emission is unavailable.
+
+When supported, the build uses:
+
+```text
+-fme-metadata
+-fme-metadata-edition=Ubuntu.Determinant.Beta.Restricted
+-fme-metadata-version=1.01
+-fme-metadata-company=MEARVK
+-fme-metadata-source=tools/limit/limit.c
+```
+
+The metadata identifies build provenance; it is not a legal ownership, fiduciary, or execution authorization claim.
+
+## Build directly
+
+Linux/macOS:
 
 ```sh
 cc -std=c11 -Wall -Wextra -O2 -o limit limit.c
@@ -16,12 +38,6 @@ Windows (MinGW):
 
 ```sh
 gcc -std=c11 -Wall -Wextra -O2 -o limit.exe limit.c
-```
-
-macOS:
-
-```sh
-cc -std=c11 -Wall -Wextra -O2 -o limit limit.c
 ```
 
 ## Use
@@ -34,7 +50,7 @@ cc -std=c11 -Wall -Wextra -O2 -o limit limit.c
 
 ## Metadata contract
 
-The initial implementation reports:
+The implementation reports:
 
 - binary name
 - path
@@ -47,9 +63,15 @@ The initial implementation reports:
 - fiduciary
 - metadata source
 
-`edition`, `version`, `company`, and `fiduciary` are intentionally reported as `unavailable` until platform-specific metadata readers are added. The program must never invent these values.
+Values that are not present remain `unavailable`. The program never invents them.
 
-"Registry" is treated as platform metadata rather than one universal database. A future platform adapter can read Windows version resources/registry values, macOS bundle `Info.plist` and LaunchServices metadata, and Linux desktop/package metadata. The scanner is read-only and does not alter registries or application databases.
+`registry` is treated as platform metadata rather than one universal database. Future platform adapters may read Windows version resources/registry values, macOS bundle metadata, and Linux desktop/package metadata. The scanner remains read-only.
+
+## Engineering records
+
+- `limit.hss` — semantic specification
+- `limit.hsss` — source/structure record
+- `1-2-3-4.mmd` — ordered engineering/provenance record
 
 ## Versioning
 
