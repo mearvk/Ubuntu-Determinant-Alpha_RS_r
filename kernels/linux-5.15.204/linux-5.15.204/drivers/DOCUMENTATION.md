@@ -24,6 +24,73 @@ Presence
   -> Concord
 ```
 
+## Noun / Company recognition
+
+The driver tree now contains a parallel recognition register at:
+
+```text
+noun/company/<noun-type>/<company>.md
+```
+
+Here **noun = hardware/software type** and **company = recognized company associated with that type**. The tuple `(Noun, Company)` is a recognition key, not an automatic ownership or authorship claim.
+
+The base grammar and evidence rules are defined in `noun/company/README.md`. Time derivatives may add generation/era information when the kernel actually contains corresponding identifiers or implementations.
+
+## Populated noun categories
+
+The recognition tree has been populated from the LISTABLES taxonomy with category records for:
+
+- CPU / processor
+- Memory
+- Firmware / platform
+- PCI / PCIe
+- USB
+- Storage
+- Network
+- Graphics / GPU
+- Input / HID
+- Audio
+- Camera / media
+- Serial / terminal
+- I2C / SPI
+- GPIO
+- Clock / reset
+- Power
+- Thermal
+- Watchdog
+- RTC / time
+- Hardware security
+- Virtualization
+- InfiniBand / fabric
+- CAN / field bus
+- Industrial I/O
+- LEDs / indicators
+- HID / specialty input
+- Bluetooth
+- Fibre Channel
+- Thunderbolt / USB4
+- FPGA / programmable logic
+- Accelerator
+- Miscellaneous
+
+These category records are recognition scaffolds. They do not assert that every listed hardware class is enabled in the current kernel configuration.
+
+## Company-specific derivatives currently registered
+
+The following records have been created where the kernel family has a corresponding vendor/device or driver relationship requiring a more specific recognition key:
+
+| Tuple | Record | Status |
+|---|---|---|
+| `(Network, Intel)` | `noun/company/network/Intel.md` | Vendor/category derivative; file-level provenance remains authoritative. |
+| `(Network, AMD)` | `noun/company/network/AMD.md` | Vendor/category derivative; exact family review remains. |
+| `(GPU, AMD)` | `noun/company/gpu/AMD.md` | Vendor/category derivative; exact ASIC/file review remains. |
+| `(GPU, Intel)` | `noun/company/gpu/Intel.md` | Vendor/category derivative; exact generation/file review remains. |
+| `(GPU, NVIDIA)` | `noun/company/gpu/NVIDIA.md` | Vendor/category derivative; open-source Nouveau scope distinguished. |
+| `(Storage, Intel)` | `noun/company/storage/Intel.md` | Vendor/category derivative; exact controller/file review remains. |
+| `(Storage, QLogic)` | `noun/company/storage/QLogic.md` | Historical/vendor category derivative; exact source lineage remains. |
+
+Additional company records should be created only after confirming a corresponding device identifier, source implementation, maintainer record, or other reliable kernel evidence.
+
 ## Grading policy
 
 The 1–5 grade is a **software artifact and evidence-quality grade**. It is not an intelligence score, citizenship score, psychological assessment, legal status, or judgment of an individual.
