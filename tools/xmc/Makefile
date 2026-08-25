@@ -33,7 +33,7 @@ $(PACKER): $(PACKSRC) asysma_native_layout.h
 	$(CC) $(COMMON_CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(BOOTSTRAP): $(BOOT_SRC) asysma_native_layout.h
-	$(CC) $(COMMON_CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(COMMON_CFLAGS) -o $@ $(BOOT_SRC)
 
 $(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
 	$(CC) $(COMMON_CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(LDFLAGS)
@@ -49,6 +49,8 @@ install: all
 	install -m 0755 $(BOOTSTRAP) $(DESTDIR)$(PREFIX)/bin/$(BOOTSTRAP)
 	install -d $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps
 	install -m 0644 xmc-icon.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xmc-asysma.svg
+	install -d $(DESTDIR)$(PREFIX)/share/mime/packages
+	install -m 0644 asysma-mime.xml $(DESTDIR)$(PREFIX)/share/mime/packages/xmc-asysma.xml
 
 clean-user-integration:
 	@true
@@ -56,7 +58,8 @@ clean-user-integration:
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) $(DESTDIR)$(PREFIX)/bin/$(CORE) \
 	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) $(DESTDIR)$(PREFIX)/bin/$(BOOTSTRAP) \
-	      $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xmc-asysma.svg
+	      $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xmc-asysma.svg \
+	      $(DESTDIR)$(PREFIX)/share/mime/packages/xmc-asysma.xml
 
 test: all
 	@printf '%s\n' 'public class TestClass { public static void main(String[] a) {} }' > /tmp/TestClass.java
