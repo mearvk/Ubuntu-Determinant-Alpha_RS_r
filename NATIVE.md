@@ -289,7 +289,116 @@ verify
 only then consider physical media
 ```
 
-## 12. Probabilistic status
+## 12. Probabilistic OS eventuring and AI maturity assessment
+
+The `.asysma` system should treat **entering or inspecting an operating system as an evidence-gathering event**, not as an assumption that the host has a known level of capability or maturity.
+
+The term **eventuring** here means a controlled sequence of observation and capability tests performed through supported interfaces:
+
+```text
+enter observation boundary
+        ↓
+identify OS / version / kernel
+        ↓
+measure stability and capabilities
+        ↓
+observe security and privilege boundaries
+        ↓
+identify installed/runtime AI-related facilities
+        ↓
+classify evidence and uncertainty
+        ↓
+adapt the control plan
+```
+
+### System-control grain
+
+The control plane should estimate the **grain** at which it can safely operate:
+
+| Grain | Meaning |
+|---|---|
+| G0 | Identification only. No modification. |
+| G1 | User-space observation and ordinary queries. |
+| G2 | Controlled user-space operations through documented APIs. |
+| G3 | Privileged service, storage, process, or configuration operations. |
+| G4 | System reorganization such as boot, partition, or core-component changes. |
+| G5 | Recovery/replacement operations requiring exceptional authorization and verification. |
+
+The observed grain is **probabilistic** until capability tests establish what the host actually permits. A detected capability is not itself authorization to exercise it.
+
+### AI maturity awareness
+
+The `.asysma` layer may inspect for **observable AI-related maturity**, but should not attempt to infer intelligence, consciousness, human qualities, or psychological status from a machine.
+
+Relevant observable signals may include:
+
+- installed AI/ML runtimes;
+- hardware acceleration interfaces;
+- GPU/NPU/accelerator availability;
+- model-serving services;
+- inference APIs;
+- supported compute frameworks;
+- sandboxing and permission boundaries around AI services;
+- local versus remote model interfaces;
+- resource quotas;
+- logging and audit capabilities;
+- update and rollback mechanisms;
+- declared system integration points.
+
+The result should be a **technical maturity profile**, not a judgment about the operating system as a person or intelligent entity.
+
+### AI-event adaptation
+
+If AI-related components or events are detected, the control plane should adapt according to evidence and constraints:
+
+```text
+not detected
+    → ordinary OS profile
+
+detected but unidentified
+    → constrained observation
+
+detected and identified
+    → capability-specific profile
+
+detected with privileged integration
+    → stronger authorization and audit
+
+detected with uncertain behavior
+    → isolate / observe / do not assume
+```
+
+The system should preserve the distinction between:
+
+```text
+AI capability
+AI event
+AI service
+AI hardware
+AI policy
+AI security boundary
+```
+
+One does not prove the others.
+
+### Grace and constraint model
+
+Every adaptive decision should carry:
+
+```text
+instance
+capability
+confidence
+constraint
+required privilege
+allowed action
+fallback
+verification
+```
+
+This permits graceful degradation when the host lacks a capability or presents an unfamiliar architecture.
+
+## 13. Probabilistic status
 
 These are **probabilistic engineering premises** rather than claims of completed implementation:
 
@@ -299,12 +408,15 @@ These are **probabilistic engineering premises** rather than claims of completed
 | Java 21 can serve as a thin control-plane runtime | High | Runtime launch, JavaFX startup, and representative installer operations |
 | A `.asysma` entry point can provide a single controlled system-contract boundary | Moderate | Native adapter prototype, capability enumeration, Linux/Windows tests |
 | OS/version/kernel/stability discovery can be performed through supported interfaces | High | Host probes with reproducible results and negative tests |
+| System-control grain can be estimated from observable host capabilities | Moderate | Cross-platform capability tests and privilege-boundary tests |
+| AI-related OS maturity can be described from observable technical evidence | Moderate | Reproducible inventory, service/interface discovery, and hardware/runtime tests |
+| AI events can be safely accommodated through capability/constraint profiles | Conditional | Event simulation, isolation tests, policy tests, and recovery tests |
 | The same Java installer architecture can operate on Linux and Windows | Moderate–High | Native adapter tests on both platforms |
 | The installer can run inside a VM | High | QEMU/Hyper-V/other supported VM validation |
 | The installer can safely write a named partition | Conditional | Privileged native implementation, device validation, destructive-operation confirmation, and recovery testing |
 | The installer can create a complete production ISO | Conditional | End-to-end ISO build, BIOS/UEFI boot, filesystem, installer, and post-install tests |
 
-## 13. Concernability
+## 14. Concernability
 
 The primary concerns are not Java itself but the **native boundary** around it:
 
@@ -334,13 +446,15 @@ Particular attention is required for:
 - firmware mode;
 - VM device exposure;
 - network acquisition;
+- AI-service discovery and isolation;
+- unexpected AI-related processes or services;
 - interrupted installation;
 - rollback and recovery;
 - untrusted ISO input.
 
-The GUI must never treat a detected device as permission to modify it. Discovery and authorization are separate stages.
+The GUI must never treat a detected device or AI capability as permission to modify or invoke it. **Discovery, capability, authorization, execution, and verification are separate stages.**
 
-## 14. Measurement rule
+## 15. Measurement rule
 
 The 2 GB premise must eventually become a measured engineering result. Record at least:
 
@@ -355,8 +469,11 @@ The 2 GB premise must eventually become a measured engineering result. Record at
 - installer size;
 - free operational space;
 - peak RAM during installation;
-- installed disk footprint.
+- installed disk footprint;
+- OS capability-detection results;
+- AI-runtime/hardware detection results where applicable;
+- false-positive and false-negative rates for capability classification.
 
-## 15. Final design principle
+## 16. Final design principle
 
-**Keep the native platform modest. Keep Java thin. Give the Java rider one controlled system-contract connection. Let that contract understand OS/version, kernel, stability, capabilities, resource and process operations, persistence, security, and layer depth. Keep organization distinct from reorganization. Keep privileged operations explicit. Measure rather than assume. Use the VM as the safe proving ground. Treat the 2 GB figure and `.asysma` architecture as engineering hypotheses until reproducibly demonstrated.**
+**Keep the native platform modest. Keep Java thin. Give the Java rider one controlled system-contract connection. Let that contract understand OS/version, kernel, stability, capabilities, resource and process operations, persistence, security, layer depth, and observable AI-related maturity. Treat entry into an OS as probabilistic evidence gathering. Distinguish capability from authorization, event from interpretation, and AI integration from claims about intelligence. Keep organization distinct from reorganization. Keep privileged operations explicit. Measure rather than assume. Use the VM as the safe proving ground. Treat the 2 GB figure, `.asysma` architecture, system-control grain, and AI-event adaptation model as engineering hypotheses until reproducibly demonstrated.**
