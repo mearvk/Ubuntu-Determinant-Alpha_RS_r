@@ -77,6 +77,27 @@ icon_revision = four-trimmed-transparent-v2
 
 The concrete class name is subject to the final JDesk build/package structure.
 
+## XMC integration
+
+The repository's existing XMC implementation is located at `tools/xmc/` and is documented as the **XML Metaclass Compiler**, targeting SecureJDK 28 `.xclass` metadata. Its documented relationship to this bridge is:
+
+```text
+JDesk Java source
+       |
+       +--> javac --> .class
+       |
+       +--> XMC --> .xclass metadata
+                         |
+native component + manifest + integrity metadata
+       |                 |
+       +---------> ASYSMA packager
+                         |
+                         v
+                    JDesk.asysma
+```
+
+XMC should initially remain a metadata/compiler stage. It must not be assumed to generate native machine code merely because the ASYSMA package also contains a native component.
+
 ## Safety rules
 
 1. Do not replace the operating system loader.
@@ -86,26 +107,6 @@ The concrete class name is subject to the final JDesk build/package structure.
 5. Verify native payload integrity before execution.
 6. Check CPU capabilities before optimized native execution.
 7. Treat Java runtime selection as an explicit policy decision.
-8. Keep native and Java responsibilities separated.
+8. Keep native, Java, XMC, and packaging responsibilities separated.
 9. Preserve normal OS process termination semantics.
 10. Fail closed when a mandatory contract is unsupported.
-
-## Relationship to XMC
-
-If an XMC compiler/packager is introduced, JDesk is an appropriate first application target because it exercises both sides of the ASYSMA model:
-
-```text
-Java classes
-     +
-native component
-     +
-manifest / integrity metadata
-     |
-     v
-XMC / ASYSMA packager
-     |
-     v
-JDesk.asysma
-```
-
-XMC should package existing native and Java outputs initially rather than silently generating machine code without an explicit compiler specification.
