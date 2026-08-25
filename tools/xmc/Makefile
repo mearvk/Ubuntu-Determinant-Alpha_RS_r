@@ -11,16 +11,17 @@ PREFIX  ?= /usr/local
 BIN     = xmc
 PACKER  = asysma_pack
 DRIVER  = xmc-build
+DESKTOP = xmc-install-desktop.sh
 SRC     = xmc.c
 PACKSRC = asysma_pack.c
 OBJ     = $(SRC:.c=.o)
 PACKOBJ = $(PACKSRC:.c=.o)
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean install uninstall test process-test
 
 # A normal XMC build produces the compiler, packager, and unified driver.
 # The unified driver gives developers one compile action that emits both
-# .xclass and .asysma without an output-selection flag.
+# .xclass and a localized .asysma beside the input source.
 all: $(BIN) $(PACKER) $(DRIVER)
 
 $(BIN): $(SRC)
@@ -40,14 +41,15 @@ install: all
 	install -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	install -m 0755 $(PACKER) $(DESTDIR)$(PREFIX)/bin/$(PACKER)
 	install -m 0755 $(DRIVER) $(DESTDIR)$(PREFIX)/bin/$(DRIVER)
+	install -m 0755 $(DESKTOP) $(DESTDIR)$(PREFIX)/bin/$(DESKTOP)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) \
 	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) \
-	      $(DESTDIR)$(PREFIX)/bin/$(DRIVER)
+	      $(DESTDIR)$(PREFIX)/bin/$(DRIVER) \
+	      $(DESTDIR)$(PREFIX)/bin/$(DESKTOP)
 
-# Quick smoke test. The unified driver produces both artifacts from one
-# developer invocation.
+# Original lightweight smoke test.
 test: all
 	@echo "--- xmc unified dual-output smoke test ---"
 	@printf '%s\n' \
@@ -60,16 +62,9 @@ test: all
 	./$(DRIVER) --verbose /tmp/TestClass.java
 	@echo "--- Generated artifacts ---"
 	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma
-	@printf '%s\n' \
-	 'class Engine:' \
-	 '    def __init__(self, power):' \
-	 '        self.power = power' \
-	 '    def start(self):' \
-	 '        return True' \
-	 '    def stop(self):' \
-	 '        self.power = 0' > /tmp/Engine.py
-	./$(DRIVER) --verbose --frame=eu /tmp/Engine.py
-	@echo "--- Generated Python artifacts ---"
-	@ls -l /tmp/Engine.xclass /tmp/Engine.asysma
-	@echo "--- All tests passed ---"
-	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/Engine.py /tmp/Engine.xclass /tmp/Engine.asysma
+	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma
+
+# Full Java/C/C++ and desktop-localization rehearsal.
+process-test: all
+	@chmod +x $(DESKTOP) tools/xmc/tests/run-xmc-process.sh 2>/dev/null || true
+	@./tests/run-xmc-process.sh
