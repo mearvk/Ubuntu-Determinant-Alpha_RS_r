@@ -6,15 +6,50 @@ ASYSMA is a versioned application/container format for a small native bootstrap,
 
 The initial runtime target is x86-64 Intel/AMD on Linux, Windows, and macOS, with SecureJDK 28 as the reference Java runtime.
 
+## Execution model
+
+An ASYSMA package may be:
+
+```text
+JAVA
+NATIVE
+NATIVE_THEN_JAVA
+```
+
+`JAVA` starts the managed Java entry through SecureJDK 28.
+
+`NATIVE` starts an explicitly declared native entry.
+
+`NATIVE_THEN_JAVA` starts the native bootstrap first, establishes the Direct/host-profile and policy boundary, and then transfers execution to the Java entry.
+
+The native component is always explicit in the manifest when present.
+
+## Java compiler relationship
+
+The ordinary Java compiler remains responsible for Java source to JVM class-file compilation:
+
+```text
+Java source -> javac -> .class
+```
+
+ASYSMA packaging is a separate concern:
+
+```text
+.class + metadata + optional native payload
+                    -> ASYSMA packer -> .asysma
+```
+
+A future SecureJDK tool may provide a convenient source-to-ASYSMA workflow, but ASYSMA does not require `javac` itself to become a native compiler.
+
 ## Layout
 
 ```text
 Header
 Manifest
 Integrity descriptor
-Native platform payload(s)
+Native platform payload(s), when declared
 ASYSMA policy
-Java/application payload
+Java/class payload(s), when declared
 Optional resources
 ```
 
@@ -48,11 +83,47 @@ native_bootstrap
 host_profile
 java_runtime
 entry_type
+java_entry
+native_entry
+native_architecture
 icon_family
 icon_revision
 ```
 
-## Runtime sequence
+`entry_type` is one of:
+
+```text
+JAVA
+NATIVE
+NATIVE_THEN_JAVA
+```
+
+A `NATIVE_THEN_JAVA` package must explicitly identify both its native component and Java entry.
+
+## Runtime sequences
+
+### JAVA
+
+```text
+OS loader
+  -> ASYSMA launcher
+  -> integrity/policy
+  -> SecureJDK 28
+  -> Java application
+```
+
+### NATIVE
+
+```text
+OS loader
+  -> native bootstrap
+  -> Direct adapter
+  -> host profile
+  -> integrity/policy
+  -> native application
+```
+
+### NATIVE_THEN_JAVA
 
 ```text
 OS loader
@@ -76,6 +147,8 @@ CMD was the original program identity; ASYSMA initially inherits that icon set.
 ## Security
 
 Unknown host observations are distinct from native contract failures. No ASYSMA component may elevate privileges, disable OS security controls, or create an unkillable process. Native payloads must validate all offsets, sizes, architecture fields, and handoff structures before use.
+
+Native execution must never be silently inferred from the presence of Java classes. A native component is an explicit package capability and must pass the applicable integrity and policy gates.
 
 ## Compatibility
 
