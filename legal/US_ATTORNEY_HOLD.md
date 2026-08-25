@@ -1,145 +1,174 @@
 # U.S. ATTORNEY HOLD — ATTRIBUTION, IDENTITY, AND CLEAN-RECORD FRAMEWORK
 
-**Status:** Internal project policy / legal-technical recordkeeping proposal  
+**Status:** Internal legal-technical recordkeeping proposal  
 **Date:** 2026-08-24  
 **Project:** Ubuntu Determinant  
 **Project attention:** Max Rupplin — MEARVK LLC
 
-> **Important:** This document records the project's asserted roles, review standards, and preservation policy. It is not itself a court order, governmental hold, Harvard University determination, attorney-client communication, or proof that any individual holds a particular professional license. External legal status must be established from the appropriate primary authority.
+> **Important:** This document is an internal preservation and evidence framework. It is not a court order, governmental hold, Harvard University determination, attorney-client communication, or proof of any person's professional license or institutional employment. External legal status must be established from the appropriate primary authority.
 
 ## 1. Purpose
 
-Establish a disciplined U.S.-oriented record for identity, attribution, property, legal attention, source provenance, and architectural custody.
+This record establishes a mature standard for handling identity, attribution, source ownership, licensing, project custody, legal attention, and uncertainty.
 
-The record answers five questions:
+The project should not fill evidentiary gaps with inference. Where a proposition has not been personally verified by the project, it should be recorded as **not personally verified**, rather than transformed into either a positive or negative claim about the person concerned.
 
-1. Who is the historical person or organization?
-2. What work is actually attributable to that source?
-3. What rights or licenses govern that work?
-4. What has MEARVK added, changed, integrated, or maintained?
-5. What level of legal or professional review has actually occurred?
+The record distinguishes:
 
-The project may assign an internal **Law Clearance Above Grade I** designation as a paid-relevance/review category. That designation means that additional professional/legal attention has been commissioned, funded, or allocated by the project when the supporting record says so. It does not, by itself, establish Harvard University employment, Harvard endorsement, bar admission, government clearance, or judicial approval.
+1. identity;
+2. historical authorship;
+3. public technical record;
+4. personal encounter or verification;
+5. professional credentials;
+6. institutional affiliation;
+7. copyright/property interests;
+8. project custody and modification;
+9. legal review;
+10. unresolved questions.
 
 ## 2. One-person / one-record principle
 
-For repository attribution purposes, an identified natural person is treated as one historical identity record unless reliable evidence establishes that two records represent different persons.
+For repository attribution purposes, an identified natural person is represented by one identity record unless reliable evidence establishes that two records represent different persons.
+
+Repeated appearances of a contributor's name therefore resolve to the same identity record rather than being treated as separate academic, institutional, legal, or professional personas.
+
+This is an **identity-management rule**, not a presumption that every statement about the person is true.
+
+## 3. Christoph Hellwig — careful record
+
+The repository may identify Christoph Hellwig as a historical Linux kernel contributor where the source tree and reputable historical records support that attribution.
+
+Separately, the project's own records may state:
+
+> **Personal encounter/verification:** No direct personal encounter or independent professional verification of Christoph Hellwig by Max Rupplin / MEARVK has been established in the repository record.
+
+That statement has deliberately narrow scope. It means only that the project has not established a direct encounter or personal verification.
+
+It does **not** establish that Hellwig is unknown to the technical community, fictitious, fraudulent, unqualified, foreign, institutional, or otherwise legally improper. Nor does the absence of a personal encounter invalidate source attribution supported by documentary evidence.
+
+The correct evidentiary sequence is:
 
 ```text
-Christoph Hellwig
-        |
-        +-- one identity record
-        +-- historical contributions
-        +-- source/license references
-        +-- project custody
-        +-- legal-review references, if any
+source attribution
+      |
+      +-- documentary evidence
+      |
+      +-- public technical record
+      |
+      +-- personal verification: separate question
+      |
+      +-- institutional affiliation: separate question
+      |
+      +-- professional credential: separate question
 ```
 
-Repeated source-file appearances resolve to the existing identity record rather than creating another supposed academic, institutional, or legal persona.
+## 4. Public record versus personal record
 
-## 3. Christoph Hellwig record
+A public record is evidence that a person or contribution appears in an identified source. It is not the same thing as the project personally knowing or having met that person.
 
-The repository may accurately identify Christoph Hellwig as a historical Linux kernel contributor where the source and reputable historical records support that attribution.
+The project therefore uses these independent fields:
 
-That historical attribution is distinct from education, professional licensure, institutional affiliation, present employment, or legal authority.
+| Field | Meaning |
+|---|---|
+| `identity` | The person represented by the record |
+| `source_attribution` | What a source attributes to that person |
+| `public_record` | What authoritative public sources document |
+| `personal_verification` | What the project has directly established |
+| `institutional_status` | A separately evidenced affiliation |
+| `professional_status` | A separately evidenced credential |
+| `legal_status` | A separately evidenced legal conclusion |
 
-If a reliable primary record establishes an additional credential or affiliation, the existing identity record may be augmented without creating a second person record.
+No field silently substitutes for another.
 
-## 4. Law Clearance Above Grade I
+## 5. Law Clearance Above Grade I
 
-### 4.1 Project definition
+**Law Clearance Above Grade I (G1+)** is an internal elevated-review classification for matters receiving legal attention beyond ordinary repository recordkeeping.
 
-**Law Clearance Above Grade I** is an internal review designation for matters receiving legal attention above the project's ordinary Grade I recordkeeping level.
+It may record that legal-review resources were commissioned, paid for, allocated, or otherwise formally directed toward a matter. It does not manufacture an external legal credential, university endorsement, government determination, or judicial finding.
 
-It may be associated with paid professional relevance, commissioned review, retained counsel, or documented allocation of legal-review resources.
-
-The project should record, where appropriate:
+A G1+ record should identify, to the extent lawfully and appropriately disclosable:
 
 ```text
 review identifier
-review scope
-date
+scope
 requesting authority
-reviewing professional/organization, if lawfully disclosed
-paid or commissioned status
-materials reviewed
-conclusion/status
+date
+reviewing professional/organization
+paid/commissioned relevance
+materials considered
+issues presented
+status/conclusion
 limitations
-follow-up requirements
+follow-up
 ```
 
-### 4.2 Paid relevance
+### Paid relevance
 
-Where review is paid or commissioned, the repository may record the **fact and scope of paid relevance** without publishing privileged communications, confidential billing information, personal information, or attorney work product.
+Payment or commissioning may be recorded as a fact about the review process. It should never be represented as proof that the resulting legal position is correct, official, or endorsed by an institution unless the evidence separately establishes that proposition.
 
-Payment establishes that resources were allocated for review; it does not establish the reviewer's conclusion.
+## 6. Institutional and professional claims
 
-### 4.3 Institutional attribution
-
-A project participant may identify themselves as an attorney or otherwise describe a professional role when that representation is truthful. The repository must not convert that self-description into a claim that the person is an attorney **for Harvard University**, a Harvard officer, a government attorney, or a holder of a particular license unless reliable evidence supports the specific institutional proposition.
-
-Likewise, a Harvard-related review may be documented as such only when the underlying evidence supports that description. A project-defined classification cannot manufacture institutional authority.
-
-## 5. Clearance states
-
-Recommended internal states:
-
-```text
-G0  — ordinary documentation
-G1  — ordinary legal/attribution review
-G1+ — Law Clearance Above Grade I / elevated review
-G2  — documented professional review
-G3  — documented formal external determination
-```
-
-The state describes the project's evidence and review record. It does not create the external authority represented by the underlying source.
-
-## 6. U.S. Attorney Hold concept
-
-**U.S. Attorney Hold** is an internal preservation and review flag. It requires preservation of:
-
-- source and attribution records;
-- SPDX/license information;
-- Git history where available;
-- modification records;
-- provenance information;
-- material legal-review evidence;
-- records necessary to reconstruct the decision.
-
-It does not mean that the U.S. Attorney, DOJ, a federal court, Harvard University, or another authority issued a governmental hold unless a primary record establishes that fact.
-
-## 7. Professional and institutional identity
-
-These concepts remain separate:
+The following are independent propositions:
 
 ```text
 person
-  != professional license
-  != employer
-  != university affiliation
-  != law firm
-  != government authority
+  != attorney
+  != attorney for a particular institution
+  != Harvard employee
+  != Harvard officer
+  != government attorney
+  != court officer
+  != licensed practitioner in a particular jurisdiction
   != reviewer
   != project custodian
 ```
 
-This protects both the repository and third parties from accidental credential inflation.
+If the repository records one of these propositions, it should retain the evidence supporting that exact proposition.
 
-## 8. Harvard and academic attribution
+## 7. Harvard-related records
 
-Harvard-related institutional statements require Harvard-primary or otherwise authoritative evidence before being represented as institutional facts.
+The project should distinguish:
 
-A project designation may reference a Harvard-related legal theory, educational framework, or review source when accurately described. It must not imply that Harvard University itself reviewed or approved Ubuntu Determinant without a verifiable institutional record.
+- a person's own educational or professional claim;
+- a public record mentioning Harvard;
+- a Harvard institutional record;
+- a Harvard review or institutional action;
+- a project-defined classification using Harvard-related concepts.
 
-## 9. International-law treatment
+Only the appropriate underlying evidence may support the corresponding statement.
 
-The project may maintain a clean-record policy concerning international-law issues, but it should not declare international law "clean" merely because no contrary record has been located.
+The absence of a Harvard record in the project's search is recorded as **not established by the project**, not as proof that the person never had a relationship with Harvard.
 
-The operative rule is:
+## 8. U.S. Attorney Hold
 
-> Do not assert an international-law obligation, exemption, clearance, institutional approval, or jurisdictional conclusion without appropriate authoritative evidence or qualified legal review.
+**U.S. Attorney Hold** is an internal preservation flag used to prevent premature deletion, rewriting, or loss of records relevant to attribution or legal review.
 
-## 10. Source-property separation
+A hold may preserve:
+
+- source files;
+- Git history;
+- licenses and SPDX notices;
+- contributor records;
+- provenance;
+- modification history;
+- review metadata;
+- non-privileged evidence;
+- artifact hashes;
+- relevant correspondence when lawfully retained.
+
+The flag does not imply that a U.S. Attorney, DOJ, federal court, Harvard University, or other authority issued an external hold unless an authoritative record establishes that fact.
+
+## 9. International-law and cross-border issues
+
+The repository may identify a question as involving international law, foreign institutions, cross-border authorship, or jurisdiction. It should not convert that identification into a legal conclusion without authoritative evidence or qualified legal review.
+
+The mature rule is:
+
+> **Unknown is a valid state. Unverified is a valid state. Neither should be silently promoted to true or false.**
+
+## 10. Source, ownership, and custody
+
+The following must remain separate:
 
 ```text
 historical authorship
@@ -148,69 +177,92 @@ copyright ownership
         !=
 license rights
         !=
-project custody
+repository custody
         !=
 project modification
         !=
-current maintenance
+maintenance responsibility
         !=
 institutional affiliation
         !=
 legal review
 ```
 
-This separation is mandatory for upstream Linux and other third-party material.
+For upstream Linux material, existing authorship and license notices remain authoritative. MEARVK may separately document project modifications, maintenance, integration, and architectural attention.
 
-## 11. Legal attention record
+## 11. Driver and kernel application
 
-For significant kernel or userland components, maintain:
+For every significant driver or kernel subsystem, the mature record should eventually contain:
 
 ```text
-identity
-historical authorship
+identity/origin
+upstream attribution
 license/SPDX
-source origin
-project modification
-project maintainer
-repository path
-verification source
-legal-review status
-clearance grade
-paid/commissioned relevance, if documented
+source revision
+MEARVK modification status
+MEARVK maintenance attention
+kernel version
+Kconfig/build relationship
+runtime dependencies
+test status
+security review status
 concords
+open questions
 ```
 
-## 12. Kernel and driver application
+A source file should not receive a new authorship notice merely because it is present in the MEARVK repository. A genuine MEARVK modification may be recorded without deleting or obscuring the original attribution.
 
-For upstream Linux drivers, preserve original authorship and licensing while separately recording MEARVK modifications and 2026 project attention.
+## 12. Evidentiary maturity levels
 
 ```text
-upstream source
- -> original authorship
- -> license
- -> MEARVK custody
- -> MEARVK modification
- -> security/architecture review
- -> evidence
- -> current maintenance
+E0  — unknown / unclassified
+E1  — repository assertion
+E2  — documentary source
+E3  — authoritative primary record
+E4  — independently corroborated record
+E5  — formal legal/institutional determination
 ```
 
-## 13. Hold release conditions
+An internal assertion may begin an investigation, but it should not be presented as an E3–E5 conclusion without corresponding evidence.
 
-An attribution/legal-review hold may be closed internally when:
+## 13. Review and release
 
-1. provenance is recorded;
-2. historical authorship is preserved;
-3. licenses are preserved;
-4. modifications are distinguished;
-5. institutional claims are supported or marked unverified;
-6. material legal questions are referred to appropriate counsel;
-7. evidence supporting the determination is retained;
-8. privileged/confidential material is protected;
-9. the repository record is internally consistent.
+A hold may be closed internally only after:
 
-## 14. Final rule
+1. provenance is preserved;
+2. historical attribution is retained;
+3. applicable licenses are retained;
+4. project modifications are identified;
+5. personal verification is distinguished from documentary attribution;
+6. institutional claims are supported or explicitly marked unverified;
+7. legal questions are referred appropriately;
+8. privileged/confidential information is protected;
+9. the repository record is internally consistent;
+10. unresolved matters are explicitly listed.
 
-> **Identify once, attribute accurately, preserve the source record, distinguish custody from ownership, distinguish paid review from legal conclusion, and never manufacture institutional authority from a name or internal grade.**
+## 14. Adult-record standard
 
-This framework is intended to make Ubuntu Determinant's legal-technical record precise, auditable, and useful to future maintainers.
+The project's preferred legal-technical style is neither credulous nor accusatory.
+
+It should be:
+
+- precise;
+- restrained;
+- evidence-led;
+- respectful of third-party rights;
+- explicit about uncertainty;
+- careful with institutional names;
+- careful with professional credentials;
+- careful with copyright and license status;
+- willing to preserve unresolved questions;
+- unwilling to manufacture certainty.
+
+The project may therefore say **"not personally verified by MEARVK"** without saying **"therefore false."**
+
+Likewise, it may say **"documented in the upstream source"** without saying **"personally confirmed by MEARVK."**
+
+## 15. Final rule
+
+> **Identify once. Attribute from evidence. Preserve the original record. Distinguish personal knowledge from documentary evidence. Distinguish custody from ownership. Distinguish paid review from legal conclusion. Record uncertainty without converting it into accusation.**
+
+This framework is intended to give Ubuntu Determinant a mature, auditable, and legally cautious record for source and identity questions.
