@@ -498,3 +498,27 @@ Supported Java programs may run through the SecureJDK/Graal path with Total prov
 The project is experimental. Native Total, UTF-4088, JPIX, SecureJDK/Graal integration, and domain-service adapters should not be treated as production-certified merely because the architecture is complete on paper. The project prioritizes deterministic behavior, evidence, provenance, reproducibility, and auditable policy as it progresses toward a larger Linux framework.
 
 For current repository maturity and remaining engineering work, see [`markdown/PROGRESS.md`](markdown/PROGRESS.md).
+
+---
+
+## Native Utilities: `size` and `limit`
+
+The repository now includes small native utilities under `/tools` for direct inspection of the local system.
+
+### `size`
+
+`/tools/size/` provides a portable C implementation for recursively measuring the **logical byte size of a parent folder and all regular files beneath it**. It reports exact bytes plus a human-readable binary-unit value and accepts multiple paths.
+
+```text
+size tools/xmc tools/gcc tools/limit
+```
+
+The utility is read-only. POSIX symbolic links are not followed; Windows reparse points are not recursively followed. Its result is logical file length, not filesystem allocation, so it deliberately does not claim to measure disk blocks, snapshots, compression, or other filesystem overhead.
+
+The initial utility version is `size 1.00`. See [`tools/size/README.md`](tools/size/README.md).
+
+### `limit`
+
+`/tools/limit/` inventories executable formats and available application identity metadata. It complements `size`: `size` answers **how much file data exists**, while `limit` answers **what executable identity and metadata can be established**.
+
+Together they provide a simple native inspection surface for source/build/output directories and installed binaries.
