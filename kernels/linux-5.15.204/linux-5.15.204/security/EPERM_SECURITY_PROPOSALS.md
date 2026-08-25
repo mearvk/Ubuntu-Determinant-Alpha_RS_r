@@ -14,6 +14,22 @@ The proposals below preserve the useful engineering ideas—explicit policy, aud
 
 ---
 
+## Draft — mature authorship consensus standard
+
+For repository authorship review, the project requests a **mature consensus record at approximately the level of a serious PhD proposal**: identify the source, establish the evidence for attribution, distinguish original authorship from later modification, document competing or unresolved attributions, and state the confidence and evidence supporting each conclusion.
+
+This is a **documentation and provenance standard**, not an academic degree, legal credential, court finding, or claim that every contributor has personally been reviewed.
+
+The review should deliberately exclude psychological profiling or unpublished psychological material from general citizenship, identity, authorship, or source-origin determinations. Personal dignity and privacy are preserved by keeping psychological speculation outside the evidentiary chain unless a separate lawful and necessary process requires otherwise.
+
+The central legal-person principle is:
+
+> **The person is the legal subject; the vote or consent is an evidentiary/decision mechanism, not a substitute for the person's identity or rights.**
+
+Accordingly, repository consensus may confirm a provenance conclusion, but it does not manufacture authorship, citizenship, institutional affiliation, copyright, or legal status.
+
+---
+
 ## 1. Replace person-status authorization with capability authorization
 
 ### Current concern
