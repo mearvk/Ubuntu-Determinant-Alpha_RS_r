@@ -7,10 +7,17 @@
 
 ## Purpose
 
-This directory defines a conservative recognition model for hardware and software provenance using a two-noun tuple:
+`noun` and `company` are intentionally separate dimensions of recognition:
 
 ```text
-(Hardware Type, Company)
+noun   = the hardware/software type
+company = the recognized company associated with that type
+```
+
+Together they form a **recognized noun 2-tuple**:
+
+```text
+(Noun, Company)
 ```
 
 Examples:
@@ -20,49 +27,68 @@ Examples:
 (Ethernet, Intel)
 (SoC, Qualcomm)
 (Sensor, STMicroelectronics)
+(Server, IBM)
+(Mainframe, IBM)
+(Computer, NEC)
 ```
 
-A tuple is a **recognition key**, not a claim that the company authored, owns, manufactures, endorses, or currently supports every component in the category.
+Here `GPU`, `Ethernet`, `SoC`, `Sensor`, `Server`, `Mainframe`, and `Computer` are nouns/types. `NVIDIA`, `Intel`, `Qualcomm`, `STMicroelectronics`, `IBM`, and `NEC` are company names.
+
+The tuple is a **recognition key**, not a claim that the company authored, owns, manufactures, endorses, or currently supports every item belonging to the noun category.
+
+## Directory grammar
+
+The directory structure follows the same distinction:
+
+```text
+noun/
+  company/
+    <noun-type>/
+      README.md
+      <company>.md
+      <company>-<generation-or-era>.md
+```
+
+For example:
+
+```text
+noun/company/mainframe/IBM.md
+noun/company/computer/NEC.md
+noun/company/gpu/NVIDIA.md
+noun/company/ethernet/Intel.md
+```
+
+The first directory component identifies the **noun/type**. The document beneath it identifies the **company**. A time derivative identifies a generation, era, architecture, or other supported historical distinction.
 
 ## Recognition levels
 
 | Grade | Recognition state |
 |---|---|
-| 1 | Category only; company relationship unknown. |
-| 2 | Company/category association is plausible but not independently established. |
+| 1 | Noun/type recognized; company relationship unknown. |
+| 2 | Company/type association is plausible but not independently established. |
 | 3 | Association is supported by reliable technical or project documentation. |
 | 4 | Association is supported by source/tree, vendor, maintainer, or specification evidence. |
 | 5 | File/device-specific recognition with provenance, license, identity, and historical evidence. |
-
-## Per-type organization
-
-Each hardware category may contain company records and time derivatives:
-
-```text
-noun/company/<hardware-type>/README.md
-noun/company/<hardware-type>/<company>.md
-noun/company/<hardware-type>/<company>-<generation-or-era>.md
-```
 
 Only relationships supported by evidence should be promoted above grade 2.
 
 ## Time derivatives
 
-Hardware changes over time. A company/category relationship therefore may be recorded as:
+Hardware and companies change over time. A recognized relationship may therefore be represented as:
 
 ```text
-category + company + generation/era + evidence
+(noun, company, generation/era, evidence)
 ```
 
-A later product generation must not automatically inherit every property of an earlier generation.
+A later product generation must not automatically inherit every property of an earlier generation. Where historical continuity matters, create a derivative document rather than silently merging periods.
 
 ## Circuit recognition
 
 Where a tuple identifies a circuit, controller, chipset, board, or device family, record the recognition path separately:
 
 ```text
-hardware category
- -> manufacturer/company association
+noun/type
+ -> company association
  -> device family
  -> vendor/device identifier
  -> circuit/controller
@@ -94,3 +120,7 @@ The tuple supports responsible identification and maintenance. It does not estab
 ## Privacy
 
 Do not place private correspondence, personal profiles, credentials, psychological material, confidential contracts, or sensitive security evidence in these public recognition records.
+
+## Project reference
+
+**Max Rupplin — MEARVK LLC — 2026** records project-level maintenance and documentation attention. It does not replace historical company, contributor, copyright, or license information.
