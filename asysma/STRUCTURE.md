@@ -11,6 +11,8 @@ asysma/
 ├── native/
 │   ├── x86_64/
 │   │   ├── common/
+│   │   │   ├── README.md
+│   │   │   └── white_direct_bootstrap.asm
 │   │   ├── linux/
 │   │   ├── windows/
 │   │   └── macos/
@@ -36,7 +38,13 @@ The native layer is deliberately divided into:
 - **macOS:** Mach-O/ABI/native API implementation;
 - **Direct:** Ubuntu White's common project-level native contract.
 
-The Direct contract should cover common operations without pretending that the three operating systems have identical ABIs or security models.
+### Common assembly proposition
+
+`native/x86_64/common/white_direct_bootstrap.asm` is the common rehearsal source. It contains no OS-specific syscall and no Linux/Windows/macOS conditional branch. It establishes CPU evidence with `CPUID` and then invokes an opaque Direct host-adapter callback.
+
+This means the **assembly source is common**, while the operating system still necessarily supplies its native executable format, process loader, ABI, and host adapter. A single source can be assembled for all three environments; a single byte-for-byte native executable cannot ordinarily serve as a native application for ELF, PE/COFF, and Mach-O simultaneously.
+
+The design therefore avoids requiring the common assembly compiler/source to encode OS policy. OS-specific knowledge is isolated in the small adapter/link boundary.
 
 ## Resulting package/executable relationship
 
