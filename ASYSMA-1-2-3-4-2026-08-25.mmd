@@ -12,6 +12,8 @@ flowchart TD
     P -->|NATIVE| X[Native Application]
     P -->|NATIVE_THEN_JAVA| T[Native Bootstrap] --> J
     J --> APP[Java Application]
+    B --> S[Filesystem Size Observation]
+    S --> I[Evidence / Provenance]
 ```
 
 ## 1 — Native Foundation
@@ -32,6 +34,9 @@ Known observations include:
 - available memory
 - available storage
 - required runtime capabilities
+- logical size of relevant files and directory trees
+
+The repository's `/tools/size/` utility supplies a simple read-only measurement for the last item. It recursively sums regular-file byte lengths beneath a supplied parent directory. It does not treat directory-entry size, filesystem allocation blocks, snapshots, compression, or symbolic-link targets as ordinary file payload.
 
 Integrity and policy remain separate concerns. A valid signature or hash does not by itself grant authorization.
 
@@ -85,6 +90,18 @@ A future SecureJDK 28 toolchain may provide a convenient source-to-ASYSMA workfl
 
 The reference managed runtime for the initial profile is SecureJDK 28.
 
+## Size and evidence relationship
+
+`size` is an observational utility, not an authorization mechanism. Its result can be retained as provenance-tagged build or package evidence when an application or ASYSMA workflow needs to establish the measured logical extent of a directory tree.
+
+The evidence relationship is:
+
+```text
+filesystem → size observation → normalized evidence → integrity/provenance record
+```
+
+A size observation must not be interpreted as proof of authenticity by itself. Hashes, signatures, ownership/permissions, package provenance, and policy remain distinct evidence classes.
+
 ## Current implementation concerns
 
 1. Freeze the binary ASYSMA header encoding.
@@ -95,7 +112,9 @@ The reference managed runtime for the initial profile is SecureJDK 28.
 6. Define the XMC compiler/packaging role if the repository's XMC component is introduced.
 7. Preserve the CMD-origin icon identity for initial ASYSMA packages.
 8. Keep format, Direct interface, native bootstrap, Java bridge, and SecureJDK versions independently negotiable.
+9. Preserve `size` as a small, read-only cross-platform filesystem measurement utility.
+10. Keep size, integrity, identity, and authorization as separate evidence categories.
 
 ## Status
 
-This dated record captures the design state for 2026-08-25. It is a design/engineering record, not a claim that every binary runtime component listed above has already been implemented.
+This dated record captures the design state for 2026-08-25. The `size` utility is implemented as a native C source component; this record does not claim that every ASYSMA runtime component listed above has already been implemented.
