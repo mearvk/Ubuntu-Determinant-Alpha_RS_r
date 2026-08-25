@@ -5,6 +5,7 @@
  * composes the successful compilation into an ASYSMA application package so
  * that `xmc SOURCE.java` is the single user-facing operation.
  */
+#include "xmc-version.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -14,7 +15,7 @@
 #include <unistd.h>
 
 static void usage(const char *p) {
-    fprintf(stderr, "usage: %s [xmc-options] SOURCE.java\n", p);
+    fprintf(stderr, "usage: %s [--version] [xmc-options] SOURCE.java\n", p);
 }
 
 static int run(char *const argv[]) {
@@ -40,6 +41,10 @@ static int is_java(const char *path) {
 }
 
 int main(int argc, char **argv) {
+    if (argc == 2 && (!strcmp(argv[1], "--version") || !strcmp(argv[1], "-V"))) {
+        printf("xmc %s\n", XMC_VERSION);
+        return 0;
+    }
     if (argc < 2) { usage(argv[0]); return 2; }
 
     char self[PATH_MAX];
@@ -68,7 +73,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) core_argv[i] = argv[i];
     core_argv[argc] = NULL;
 
-    fprintf(stdout, "xmc: integrated ASYSMA mode\n");
+    fprintf(stdout, "xmc %s: integrated ASYSMA mode\n", XMC_VERSION);
     int rc = run(core_argv);
     free(core_argv);
     if (rc != 0) {
