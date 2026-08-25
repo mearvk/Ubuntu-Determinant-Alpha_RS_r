@@ -3,6 +3,9 @@
  * The compiler core produces .xclass; this driver composes the result into
  * an ASYSMA artifact with a target-native bootstrap as its executable prefix.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
 #include "xmc-version.h"
 #include "xmc-os-register.h"
 #include <errno.h>
@@ -13,6 +16,9 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 static void usage(const char *p) { fprintf(stderr,"usage: %s [--version] [xmc-options] SOURCE.java\n",p); }
 static int run(char *const argv[]) {
@@ -62,7 +68,7 @@ int main(int argc,char **argv){
     rc=run(pack_argv); if(rc!=0){fprintf(stderr,"xmc: .xclass succeeded but ASYSMA composition failed\n");return rc;}
     FILE *d=fopen(desktop,"w"); if(!d){perror(desktop);return 1;}
     fprintf(d,"[Desktop Entry]\nType=Application\nName=%s (ASYSMA)\nComment=Run the compiled ASYSMA application\nIcon=xmc-asysma\nExec=%s %%U\nTerminal=false\nMimeType=application/x-asysma;\nCategories=Development;\nStartupNotify=true\n",class_name,launcher); fclose(d);
-    if(xmc_register_asysma(desktop,class_name,"xmc-asysma",asysma)!=0){
+    if(xmc_register_asysma(desktop,class_name,icon,asysma)!=0){
         fprintf(stderr,"xmc: warning: unable to register application/x-asysma with the user desktop environment\n");
     } else {
         fprintf(stdout,"xmc: registered application/x-asysma for the current user\n");
