@@ -1,41 +1,37 @@
 #!/bin/sh
-# Pull the GCC source already mirrored in the MEARVK repository, inspect it
-# for Git/Git LFS push readiness, and optionally prepare a clean source copy.
-# This script NEVER pulls from or pushes to gcc-mirror/gcc.
+# Scan the GCC source already pulled into this MEARVK checkout.
+# This script does not clone GCC, contact gcc-mirror, or push anything.
 set -eu
 
+MEARVK_REPO="mearvk/Ubuntu.Determinant.Beta.Restricted"
 MEARVK_URL="https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git"
-MEARVK_PATH="tools/gcc"
-SOURCE_DIR="gcc-github-latest"
-IMPORT_DIR="gcc-github-latest-import"
-REPORT="gcc-github-latest-readiness.txt"
-MAX_BLOB_MB="${MAX_BLOB_MB:-90}"
-
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
-cd "$REPO_ROOT"
+REPORT="$SCRIPT_DIR/gcc-github-latest-readiness.txt"
+IMPORT_DIR="$SCRIPT_DIR/gcc-github-latest-import"
+MAX_BLOB_MB="${MAX_BLOB_MB:-90}"
 
 usage() {
     cat <<EOF
 Usage: $0 [--refresh] [--prepare]
 
-Pull/scan the GCC source already present in the MEARVK repository.
+The GCC source is assumed to have already been pulled into this MEARVK
+repository. The script scans what is present locally and prepares a clean
+source-only copy if requested.
 
-  --refresh   fetch the MEARVK repository and refresh the local source view
-  --prepare   create a source-only import copy under tools/gcc/$IMPORT_DIR
+  --refresh   fast-forward this existing MEARVK checkout from origin
+  --prepare   create tools/gcc/gcc-github-latest-import from the local GCC tree
 
 Environment:
-  MAX_BLOB_MB   review threshold for one Git blob (default: 90)
+  MAX_BLOB_MB   large-file review threshold (default: 90)
 
-Safety:
-  This script pulls only from:
-    $MEARVK_URL
-  It never pulls from gcc-mirror/gcc and never pushes anything.
+No GCC upstream repository is contacted. No push is performed.
 EOF
 }
 
 REFRESH=0
 PREPARE=0
+
 for arg in "$@"; do
     case "$arg" in
         --refresh) REFRESH=1 ;;
@@ -45,166 +41,164 @@ for arg in "$@"; do
     esac
 done
 
-if ! command -v git >/dev/null 2>&1; then
+command -v git >/dev/null 2>&1 || {
     echo "error: git is required" >&2
     exit 1
-fi
+}
 
-# Verify that the caller is operating on the intended repository.
-if [ ! -d "$REPO_ROOT/.git" ]; then
-    echo "error: repository root not found: $REPO_ROOT" >&2
+[ -d "$REPO_ROOT/.git" ] || {
+    echo "error: not a Git checkout: $REPO_ROOT" >&2
     exit 1
-fi
+}
 
 ORIGIN=$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)
-if [ -n "$ORIGIN" ]; then
-    case "$ORIGIN" in
-        "$MEARVK_URL"|git@github.com:mearvk/Ubuntu.Determinant.Beta.Restricted.git) ;;
-        *)
-            echo "error: repository origin is not the expected MEARVK repository:" >&2
-            echo "  $ORIGIN" >&2
-            echo "expected: $MEARVK_URL" >&2
-            exit 1
-            ;;
-    esac
-fi
+ORIGIN_CLEAN=$(printf '%s' "$ORIGIN" | sed -E 's#https://[^@/]+@#https://#')
+
+case "$ORIGIN_CLEAN" in
+    "$MEARVK_URL"|git@github.com:mearvk/Ubuntu.Determinant.Beta.Restricted.git)
+        ;;
+    *)
+        echo "error: this checkout is not $MEARVK_REPO" >&2
+        echo "origin=$ORIGIN_CLEAN" >&2
+        exit 1
+        ;;
+esac
 
 if [ "$REFRESH" -eq 1 ]; then
-    echo "Refreshing the MEARVK repository only: $MEARVK_URL"
-    git -C "$REPO_ROOT" fetch --prune origin
+    echo "Refreshing existing MEARVK checkout only."
     BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short -q HEAD || echo main)
+    git -C "$REPO_ROOT" fetch --prune origin
     git -C "$REPO_ROOT" pull --ff-only origin "$BRANCH"
 fi
 
-# The expected GCC source may be an extracted release tree, a Git checkout,
-# or a source import already committed under tools/gcc. Find the first useful
-# GCC source root without contacting an external GCC repository.
-if [ -d "$SCRIPT_DIR/gcc-16.2.0/.git" ] || [ -f "$SCRIPT_DIR/gcc-16.2.0/configure" ]; then
-    SOURCE_DIR="gcc-16.2.0"
-elif [ -d "$SCRIPT_DIR/gcc-github-latest/.git" ]; then
-    SOURCE_DIR="gcc-github-latest"
+# Locate the GCC source already present in this checkout. Prefer the actual
+# extracted source tree; otherwise accept the previously prepared tree.
+if [ -f "$SCRIPT_DIR/gcc-16.2.0/configure" ]; then
+    SOURCE_PATH="$SCRIPT_DIR/gcc-16.2.0"
 elif [ -f "$SCRIPT_DIR/gcc-github-latest/configure" ]; then
-    SOURCE_DIR="gcc-github-latest"
+    SOURCE_PATH="$SCRIPT_DIR/gcc-github-latest"
+elif [ -f "$SCRIPT_DIR/gcc-github-latest-import/configure" ]; then
+    SOURCE_PATH="$SCRIPT_DIR/gcc-github-latest-import"
 else
-    echo "error: no GCC source tree found under $SCRIPT_DIR" >&2
-    echo "Expected gcc-16.2.0/ or gcc-github-latest/." >&2
-    echo "Pull/commit the GCC source into this MEARVK repository first." >&2
+    echo "error: GCC source was not found under $SCRIPT_DIR" >&2
+    echo "Expected gcc-16.2.0/, gcc-github-latest/, or gcc-github-latest-import/." >&2
+    echo "The source must already have been pulled into this MEARVK checkout." >&2
     exit 1
 fi
 
-SOURCE_PATH="$SCRIPT_DIR/$SOURCE_DIR"
-
-# If the source itself is a Git checkout, inspect its current tree. Otherwise
-# inspect every file that Git sees in the MEARVK repository under tools/gcc.
-if [ -d "$SOURCE_PATH/.git" ]; then
-    SOURCE_COMMIT=$(git -C "$SOURCE_PATH" rev-parse HEAD 2>/dev/null || echo unknown)
-    SOURCE_BRANCH=$(git -C "$SOURCE_PATH" symbolic-ref --short -q HEAD 2>/dev/null || echo detached)
-    SOURCE_FILES=$(git -C "$SOURCE_PATH" ls-files | wc -l | tr -d ' ')
-    SOURCE_BLOBS=$(git -C "$SOURCE_PATH" rev-list --objects HEAD | wc -l | tr -d ' ')
-    SCAN_ROOT="$SOURCE_PATH"
-else
-    SOURCE_COMMIT="repository-import"
-    SOURCE_BRANCH="main"
-    SOURCE_FILES=$(find "$SOURCE_PATH" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')
-    SOURCE_BLOBS="not-applicable"
-    SCAN_ROOT="$SOURCE_PATH"
-fi
+SOURCE_NAME=$(basename "$SOURCE_PATH")
+SOURCE_FILES=$(find "$SOURCE_PATH" -type f -not -path '*/.git/*' | wc -l | tr -d ' ')
+SOURCE_DIRS=$(find "$SOURCE_PATH" -type d -not -path '*/.git/*' | wc -l | tr -d ' ')
+SOURCE_BYTES=$(du -sk "$SOURCE_PATH" | awk '{print $1 * 1024}')
 
 MAX_BYTES=$((MAX_BLOB_MB * 1024 * 1024))
 LARGE_LIST=$(mktemp)
 trap 'rm -f "$LARGE_LIST"' EXIT
 
-# Scan Git blobs when the source has its own Git history; otherwise scan the
-# MEARVK repository's tracked files. The latter is the relevant pre-push view.
-if [ -d "$SOURCE_PATH/.git" ]; then
-    git -C "$SOURCE_PATH" rev-list --objects HEAD |
-    while read -r object path; do
-        [ -n "$object" ] || continue
-        SIZE=$(git -C "$SOURCE_PATH" cat-file -s "$object")
-        if [ "$SIZE" -ge "$MAX_BYTES" ]; then
-            printf '%s\t%s\t%s\n' "$SIZE" "$object" "$path"
-        fi
-    done | sort -nr > "$LARGE_LIST"
-else
-    git -C "$REPO_ROOT" ls-files -z "$MEARVK_PATH" |
-    while IFS= read -r -d '' path; do
-        SIZE=$(wc -c < "$REPO_ROOT/$path" | tr -d ' ')
-        if [ "$SIZE" -ge "$MAX_BYTES" ]; then
-            printf '%s\t%s\n' "$SIZE" "$path"
-        fi
-    done > "$LARGE_LIST"
-fi
+# Inspect the files that would be committed from tools/gcc. This deliberately
+# measures the working tree, not an unrelated GCC upstream history.
+git -C "$REPO_ROOT" ls-files -z "$SCRIPT_DIR" 2>/dev/null |
+while IFS= read -r -d '' path; do
+    [ -f "$REPO_ROOT/$path" ] || continue
+    SIZE=$(wc -c < "$REPO_ROOT/$path" | tr -d ' ')
+    if [ "$SIZE" -ge "$MAX_BYTES" ]; then
+        printf '%s\t%s\n' "$SIZE" "$path"
+    fi
+done > "$LARGE_LIST" || true
 
+# Include untracked GCC source files in the scan. This is important because
+# the user has already pulled the source and may not have staged it yet.
+find "$SOURCE_PATH" -type f -not -path '*/.git/*' -print0 |
+while IFS= read -r -d '' file; do
+    SIZE=$(wc -c < "$file" | tr -d ' ')
+    if [ "$SIZE" -ge "$MAX_BYTES" ]; then
+        case "$file" in
+            "$REPO_ROOT"/*) REL=${file#"$REPO_ROOT"/} ;;
+            *) REL=$file ;;
+        esac
+        if ! grep -Fq "	$REL" "$LARGE_LIST" 2>/dev/null; then
+            printf '%s\t%s\n' "$SIZE" "$REL"
+        fi
+    fi
+done >> "$LARGE_LIST"
+
+sort -nr "$LARGE_LIST" -o "$LARGE_LIST"
 LARGE_COUNT=$(wc -l < "$LARGE_LIST" | tr -d ' ')
+
 LFS_PRESENT=0
 if git lfs version >/dev/null 2>&1; then
     LFS_PRESENT=1
 fi
 
-TRACKED_GCC_COUNT=$(git -C "$REPO_ROOT" ls-files "$MEARVK_PATH" | wc -l | tr -d ' ')
-WORKTREE_STATUS=$(git -C "$REPO_ROOT" status --short -- "$MEARVK_PATH")
+TRACKED_COUNT=$(git -C "$REPO_ROOT" ls-files "$SCRIPT_DIR" | wc -l | tr -d ' ')
+STATUS=$(git -C "$REPO_ROOT" status --short -- "$SCRIPT_DIR")
+
+# Detect GitHub's 100 MiB per-file hard rejection boundary conservatively.
+OVER_GITHUB_LIMIT=0
+if [ "$LARGE_COUNT" -gt 0 ]; then
+    while IFS="	" read -r bytes path; do
+        [ "$bytes" -ge $((100 * 1024 * 1024)) ] && OVER_GITHUB_LIMIT=$((OVER_GITHUB_LIMIT + 1))
+    done < "$LARGE_LIST"
+fi
 
 {
     echo "MEARVK GCC source readiness report"
     echo "=================================="
-    echo "repository=$MEARVK_URL"
-    echo "repository_root=$REPO_ROOT"
+    echo "repository=$MEARVK_REPO"
+    echo "origin=$ORIGIN_CLEAN"
     echo "source=$SOURCE_PATH"
-    echo "source_commit=$SOURCE_COMMIT"
-    echo "source_branch=$SOURCE_BRANCH"
+    echo "source_name=$SOURCE_NAME"
     echo "source_files=$SOURCE_FILES"
-    echo "source_objects=$SOURCE_BLOBS"
-    echo "me ar vk tracked tools/gcc files=$TRACKED_GCC_COUNT" | tr -d ' ' || true
-    echo "large_files_or_blobs_over_${MAX_BLOB_MB}MiB=$LARGE_COUNT"
+    echo "source_directories=$SOURCE_DIRS"
+    echo "source_bytes=$SOURCE_BYTES"
+    echo "tracked_tools_gcc_files=$TRACKED_COUNT"
     echo "git_lfs_available=$LFS_PRESENT"
+    echo "large_files_over_${MAX_BLOB_MB}MiB=$LARGE_COUNT"
+    echo "files_at_or_over_100MiB=$OVER_GITHUB_LIMIT"
+    echo
     echo "working_tree_status_begin"
-    printf '%s\n' "$WORKTREE_STATUS"
+    printf '%s\n' "$STATUS"
     echo "working_tree_status_end"
     echo
-    echo "Large file/blob candidates"
-    echo "--------------------------"
+    echo "large_file_candidates_begin"
     if [ "$LARGE_COUNT" -eq 0 ]; then
         echo "none"
     else
         cat "$LARGE_LIST"
     fi
+    echo "large_file_candidates_end"
     echo
-    echo "Readiness rules"
-    echo "---------------"
-    echo "1. Source provenance is the MEARVK repository, not gcc-mirror/gcc."
-    echo "2. No external GCC remote is contacted by this script."
-    echo "3. Review every large file/blob before committing the GCC source."
-    echo "4. Git LFS is optional and must match the destination repository policy."
-    echo "5. Do not commit upstream .git metadata into the MEARVK source tree."
-    echo "6. This script never performs a push."
-} > "$SCRIPT_DIR/$REPORT"
+    echo "readiness"
+    echo "---------"
+    echo "provenance=MEARVK repository"
+    echo "external_gcc_pull=disabled"
+    echo "destination_push=disabled"
+    echo "review_required=$([ "$LARGE_COUNT" -gt 0 ] && echo yes || echo no)"
+    echo "lfs_review=$([ "$OVER_GITHUB_LIMIT" -gt 0 ] && echo yes || echo no)"
+} > "$REPORT"
 
-cat "$SCRIPT_DIR/$REPORT"
+cat "$REPORT"
 
 if [ "$PREPARE" -eq 1 ]; then
-    rm -rf "$SCRIPT_DIR/$IMPORT_DIR"
-    mkdir -p "$SCRIPT_DIR/$IMPORT_DIR"
+    rm -rf "$IMPORT_DIR"
+    mkdir -p "$IMPORT_DIR"
+    tar -C "$SOURCE_PATH" --exclude='.git' -cf - . |
+        tar -xf - -C "$IMPORT_DIR"
+    echo
+    echo "Prepared source-only copy: $IMPORT_DIR"
+fi
 
-    if [ -d "$SOURCE_PATH/.git" ]; then
-        git -C "$SOURCE_PATH" archive --format=tar HEAD |
-            tar -xf - -C "$SCRIPT_DIR/$IMPORT_DIR"
-    else
-        # Copy the source while explicitly excluding any nested Git metadata.
-        tar -C "$SOURCE_PATH" \
-            --exclude='.git' \
-            -cf - . |
-            tar -xf - -C "$SCRIPT_DIR/$IMPORT_DIR"
-    fi
-
-    printf '\nPrepared source-only import: %s\n' "$SCRIPT_DIR/$IMPORT_DIR"
-    printf 'No upstream .git metadata is included.\n'
+if [ "$OVER_GITHUB_LIMIT" -gt 0 ]; then
+    echo
+    echo "STATUS=REVIEW_REQUIRED_GITHUB_FILE_LIMIT"
+    exit 3
 fi
 
 if [ "$LARGE_COUNT" -gt 0 ]; then
     echo
-    echo "STATUS=REVIEW_REQUIRED"
+    echo "STATUS=REVIEW_REQUIRED_LARGE_FILES"
     exit 3
 fi
 
 echo
-echo "STATUS=READY_FOR_MANUAL_REVIEW"
+echo "STATUS=READY_FOR_MANUAL_REVIEW_AND_PUSH"
