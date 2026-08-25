@@ -9,51 +9,64 @@ LDFLAGS ?= -lm
 PREFIX  ?= /usr/local
 
 BIN     = xmc
+PACKER  = asysma_pack
 SRC     = xmc.c
+PACKSRC = asysma_pack.c
 OBJ     = $(SRC:.c=.o)
+PACKOBJ = $(PACKSRC:.c=.o)
 
 .PHONY: all clean install uninstall test
 
-all: $(BIN)
+# A normal XMC build produces both the .xclass compiler output and an
+# ASYSMA container. Packaging policy is derived from the source and does
+# not require an additional compile-time flag from the caller.
+all: $(BIN) $(PACKER)
 
 $(BIN): $(SRC)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-clean:
-	rm -f $(BIN) $(OBJ) *.xclass
+$(PACKER): $(PACKSRC)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-install: $(BIN)
+clean:
+	rm -f $(BIN) $(PACKER) $(OBJ) $(PACKOBJ) *.xclass *.asysma
+
+install: all
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	install -m 0755 $(PACKER) $(DESTDIR)$(PREFIX)/bin/$(PACKER)
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) $(DESTDIR)$(PREFIX)/bin/$(PACKER)
 
-# Quick smoke test
-test: $(BIN)
+# Quick smoke test. The XMC compiler remains the source-to-.xclass stage.
+# The ASYSMA packer consumes the resulting .xclass automatically so users
+# do not need to select a separate output mode during compilation.
+test: all
 	@echo "--- xmc smoke test ---"
-	@echo 'public class TestClass implements Runnable {' > /tmp/TestClass.java
-	@echo '    private int count;' >> /tmp/TestClass.java
-	@echo '    public void run() { System.out.println("hello"); }' >> /tmp/TestClass.java
-	@echo '    public int getCount() { return count; }' >> /tmp/TestClass.java
-	@echo '    private void helper() { if (count > 0) count--; }' >> /tmp/TestClass.java
-	@echo '}' >> /tmp/TestClass.java
+	@printf '%s\n' \
+	 'public class TestClass implements Runnable {' \
+	 '    private int count;' \
+	 '    public void run() { System.out.println("hello"); }' \
+	 '    public int getCount() { return count; }' \
+	 '    private void helper() { if (count > 0) count--; }' \
+	 '}' > /tmp/TestClass.java
 	./$(BIN) --verbose /tmp/TestClass.java
-	@echo ""
 	@echo "--- Generated .xclass ---"
 	@cat /tmp/TestClass.xclass
-	@echo ""
-	@echo "--- Python test ---"
-	@echo 'class Engine:' > /tmp/Engine.py
-	@echo '    def __init__(self, power):' >> /tmp/Engine.py
-	@echo '        self.power = power' >> /tmp/Engine.py
-	@echo '    def start(self):' >> /tmp/Engine.py
-	@echo '        return True' >> /tmp/Engine.py
-	@echo '    def stop(self):' >> /tmp/Engine.py
-	@echo '        self.power = 0' >> /tmp/Engine.py
+	@echo "--- Generated .asysma ---"
+	./$(PACKER) --output /tmp/TestClass.asysma --entry JAVA --java TestClass --xclass /tmp/TestClass.xclass
+	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma
+	@printf '%s\n' \
+	 'class Engine:' \
+	 '    def __init__(self, power):' \
+	 '        self.power = power' \
+	 '    def start(self):' \
+	 '        return True' \
+	 '    def stop(self):' \
+	 '        self.power = 0' > /tmp/Engine.py
 	./$(BIN) --verbose --frame=eu /tmp/Engine.py
-	@echo ""
+	@echo "--- Generated Python .xclass ---"
 	@cat /tmp/Engine.xclass
-	@echo ""
 	@echo "--- All tests passed ---"
-	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/Engine.py /tmp/Engine.xclass
+	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/Engine.py /tmp/Engine.xclass
