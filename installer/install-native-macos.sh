@@ -6,7 +6,13 @@ LIBEXEC="${LIBEXEC:-/usr/local/lib/ubuntu-determinant}"
 CC="${CC:-cc}"
 mkdir -p "$PREFIX" "$LIBEXEC"
 
-for name in xmc limit size ctrmsctl; do
+if [[ -f "$ROOT/tools/xmc/Makefile" ]]; then
+  echo "building and installing xmc"
+  make -C "$ROOT/tools/xmc" clean all
+  make -C "$ROOT/tools/xmc" PREFIX="$PREFIX" install
+fi
+
+for name in limit size ctrmsctl; do
   dir="$ROOT/tools/$name"
   src="$dir/$name.c"
   if [[ ! -f "$src" ]]; then echo "skip: $name source not present"; continue; fi
