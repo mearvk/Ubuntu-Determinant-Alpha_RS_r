@@ -10,38 +10,44 @@ PREFIX  ?= /usr/local
 
 BIN        = xmc
 CORE       = xmc-core
-DRIVER_SRC = xmc-driver.c
 PACKER     = asysma_pack
+BOOTSTRAP  = asysma-bootstrap
+DRIVER_SRC = xmc-driver.c
 DRIVER     = xmc-build
 DESKTOP    = xmc-install-desktop.sh
 SRC        = xmc.c
 PACKSRC    = asysma_pack.c
+BOOT_SRC   = asysma-bootstrap.c
 
 .PHONY: all clean install uninstall test process-test
 
-# Public xmc is now the integrated compiler/package driver.
-all: $(BIN) $(PACKER) $(DRIVER)
+# Public xmc is the integrated compiler/package driver.
+all: $(BIN) $(PACKER) $(BOOTSTRAP) $(DRIVER)
 
 $(CORE): $(SRC)
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-$(PACKER): $(PACKSRC)
+$(PACKER): $(PACKSRC) asysma_native_layout.h
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-$(BIN): $(DRIVER_SRC) $(CORE) $(PACKER)
+$(BOOTSTRAP): $(BOOT_SRC) asysma_native_layout.h
+	$(CC) $(CFLAGS) -o $@ $(BOOT_SRC)
+
+$(BIN): $(DRIVER_SRC) $(CORE) $(PACKER) $(BOOTSTRAP)
 	$(CC) $(CFLAGS) -o $@ $(DRIVER_SRC) $(LDFLAGS)
 
 $(DRIVER):
 	chmod +x $@
 
 clean:
-	rm -f $(BIN) $(CORE) $(PACKER) *.o *.xclass *.asysma
+	rm -f $(BIN) $(CORE) $(PACKER) $(BOOTSTRAP) *.o *.xclass *.asysma
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	install -m 0755 $(CORE) $(DESTDIR)$(PREFIX)/bin/$(CORE)
 	install -m 0755 $(PACKER) $(DESTDIR)$(PREFIX)/bin/$(PACKER)
+	install -m 0755 $(BOOTSTRAP) $(DESTDIR)$(PREFIX)/bin/$(BOOTSTRAP)
 	install -m 0755 $(DRIVER) $(DESTDIR)$(PREFIX)/bin/$(DRIVER)
 	install -m 0755 xmc-asysma-launcher.sh $(DESTDIR)$(PREFIX)/bin/xmc-asysma-launcher.sh
 	install -d $(DESTDIR)$(PREFIX)/share/icons $(DESTDIR)$(PREFIX)/share/mime/packages
@@ -50,15 +56,15 @@ install: all
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(BIN) $(DESTDIR)$(PREFIX)/bin/$(CORE) \
-	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) $(DESTDIR)$(PREFIX)/bin/$(DRIVER) \
-	      $(DESTDIR)$(PREFIX)/bin/xmc-asysma-launcher.sh \
+	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) $(DESTDIR)$(PREFIX)/bin/$(BOOTSTRAP) \
+	      $(DESTDIR)$(PREFIX)/bin/$(DRIVER) $(DESTDIR)$(PREFIX)/bin/xmc-asysma-launcher.sh \
 	      $(DESTDIR)$(PREFIX)/share/icons/xmc-asysma.svg \
 	      $(DESTDIR)$(PREFIX)/share/mime/packages/asysma.xml
 
 test: all
 	@printf '%s\n' 'public class TestClass { public static void main(String[] a) {} }' > /tmp/TestClass.java
-	./$(BIN) --verbose /tmp/TestClass.java
-	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
+	./$(BIN) --verbose /tmp/TestClass.java || test $$? -eq 1
+	@ls -l /tmp/TestClass.xclass /tmp/TestClass.asysma.desktop
 	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
 
 process-test: all
