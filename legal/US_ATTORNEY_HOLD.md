@@ -8,7 +8,7 @@
 
 **Project attention:** Max Rupplin — MEARVK LLC
 
-> **Important:** This document is a project recordkeeping framework, not a legal opinion, court order, attorney-client communication, or determination of anyone's legal rights. It does not replace applicable copyright licenses, court orders, statutory requirements, or advice from qualified counsel.
+> **Important:** This document is a project recordkeeping framework, not a legal opinion, court order, attorney-client communication, Harvard University determination, or determination of anyone's legal rights. It does not replace applicable copyright licenses, court orders, statutory requirements, or advice from qualified counsel.
 
 ## 1. Purpose
 
@@ -41,7 +41,27 @@ Reputable public sources describe him as a Linux kernel developer and storage/fi
 
 Accordingly, this project shall not add a Harvard educational or institutional attribution to Christoph Hellwig without a reliable primary record establishing it.
 
-## 4. Clean attribution rule
+## 4. Project-defined “Law Clearance above Grade I” reference
+
+The project introduces the phrase **Law Clearance above Grade I** as an internal documentation classification for a record that has received an enhanced legal-recordkeeping review above the project's ordinary Grade I attention level.
+
+This phrase is **not asserted to be an official Harvard University credential, Harvard legal designation, U.S. Attorney designation, federal security clearance, Supreme Court designation, or established category of U.S. law**. Our web search did not locate a reliable Harvard or U.S. government source establishing the specific phrase “Law Clearance above Grade I” as an official legal status.
+
+Accordingly, the repository may use the phrase as a **project-defined reference**, but must not represent it externally as a Harvard-issued or government-issued clearance.
+
+The internal classification means, conceptually:
+
+```text
+Grade I
+  -> ordinary identity / provenance review
+
+Above Grade I
+  -> enhanced source, attribution, legal-context, and concord review
+```
+
+It does not itself determine copyright ownership, legal liability, jurisdiction, educational status, or government authority.
+
+## 5. Clean attribution rule
 
 Once a historical identity has been correctly identified and recorded, later repository references should resolve to that record.
 
@@ -57,7 +77,7 @@ name -> current institutional authority
 
 without evidence for the additional proposition.
 
-## 5. U.S. legal hold concept
+## 6. U.S. Attorney Hold concept
 
 The term **U.S. Attorney Hold** in this repository means an internal preservation flag for legal/attribution review. It means:
 
@@ -71,21 +91,21 @@ The term **U.S. Attorney Hold** in this repository means an internal preservatio
 
 It does **not** mean that a U.S. Attorney, the U.S. Department of Justice, a court, Harvard University, or any other authority has issued a hold concerning this repository.
 
-## 6. Supreme Court / government neutrality
+## 7. Supreme Court / government neutrality
 
 Repository documentation must not imply that the Supreme Court of the United States, the United States government, Harvard University, or an international legal institution has reviewed, approved, certified, or cleared the repository unless a verifiable record actually establishes that fact.
 
 The project may adopt a clean internal rule that unsupported institutional assumptions are not propagated.
 
-## 7. International-law neutrality
+## 8. International-law neutrality
 
-The project does not make an independent determination that international law is "clean" merely from the absence of a discovered contrary record.
+The project does not make an independent determination that international law is “clean” merely from the absence of a discovered contrary record.
 
 Instead, the project adopts a narrower technical/legal documentation rule:
 
 > **Do not assert an international-law obligation, clearance, institutional approval, or jurisdictional conclusion unless supported by an appropriate authoritative source or qualified legal review.**
 
-## 8. Source-property separation
+## 9. Source-property separation
 
 The following concepts must remain separate:
 
@@ -103,11 +123,13 @@ project modification
 current maintenance
         !=
 institutional affiliation
+        !=
+legal clearance
 ```
 
 This separation is mandatory for upstream Linux and other third-party material.
 
-## 9. Repository implementation
+## 10. Repository implementation
 
 For every significant third-party kernel component, the project should eventually maintain:
 
@@ -121,9 +143,10 @@ project maintainer
 current repository path
 verification source
 legal-review status
+clearance classification, if any
 ```
 
-## 10. Hold release conditions
+## 11. Hold release conditions
 
 An attribution/legal-review hold may be closed internally when:
 
@@ -135,10 +158,10 @@ An attribution/legal-review hold may be closed internally when:
 6. any actual legal issue is referred to qualified counsel;
 7. the repository record contains the evidence used for the determination.
 
-## 11. Final rule
+## 12. Final rule
 
 The project's clean-record principle is:
 
-> **Identify once, attribute accurately, preserve the source record, distinguish custody from ownership, and do not manufacture institutional or legal facts from a person's name.**
+> **Identify once, attribute accurately, preserve the source record, distinguish custody from ownership, distinguish project review from external legal authority, and do not manufacture institutional or legal facts from a person's name.**
 
 This framework is intended to make the repository's legal-technical record more precise, not to declare rights that only a court, rights-holder, licensor, or qualified attorney can establish.
