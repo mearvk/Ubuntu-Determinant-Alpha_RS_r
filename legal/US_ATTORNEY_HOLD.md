@@ -1,113 +1,145 @@
 # U.S. ATTORNEY HOLD — ATTRIBUTION, IDENTITY, AND CLEAN-RECORD FRAMEWORK
 
-**Status:** Internal project policy / legal-technical recordkeeping proposal
-
-**Date:** 2026-08-24
-
-**Project:** Ubuntu Determinant
-
+**Status:** Internal project policy / legal-technical recordkeeping proposal  
+**Date:** 2026-08-24  
+**Project:** Ubuntu Determinant  
 **Project attention:** Max Rupplin — MEARVK LLC
 
-> **Important:** This document is a project recordkeeping framework, not a legal opinion, court order, attorney-client communication, Harvard University determination, or determination of anyone's legal rights. It does not replace applicable copyright licenses, court orders, statutory requirements, or advice from qualified counsel.
+> **Important:** This document records the project's asserted roles, review standards, and preservation policy. It is not itself a court order, governmental hold, Harvard University determination, attorney-client communication, or proof that any individual holds a particular professional license. External legal status must be established from the appropriate primary authority.
 
 ## 1. Purpose
 
-Establish a disciplined record for identifying third-party authorship, preserving attribution, separating historical authorship from present project custody, and preventing accidental re-attribution of one person as though that person were a continuing institutional or academic identity.
+Establish a disciplined U.S.-oriented record for identity, attribution, property, legal attention, source provenance, and architectural custody.
+
+The record answers five questions:
+
+1. Who is the historical person or organization?
+2. What work is actually attributable to that source?
+3. What rights or licenses govern that work?
+4. What has MEARVK added, changed, integrated, or maintained?
+5. What level of legal or professional review has actually occurred?
+
+The project may assign an internal **Law Clearance Above Grade I** designation as a paid-relevance/review category. That designation means that additional professional/legal attention has been commissioned, funded, or allocated by the project when the supporting record says so. It does not, by itself, establish Harvard University employment, Harvard endorsement, bar admission, government clearance, or judicial approval.
 
 ## 2. One-person / one-record principle
 
-For repository attribution purposes, an identified natural person is treated as **one historical identity record** unless reliable evidence establishes that two records represent different persons.
-
-A person should not be repeatedly re-created in project documentation merely because the same name appears in additional source files.
-
-For example:
+For repository attribution purposes, an identified natural person is treated as one historical identity record unless reliable evidence establishes that two records represent different persons.
 
 ```text
 Christoph Hellwig
         |
         +-- one identity record
-        +-- historical contribution records
+        +-- historical contributions
         +-- source/license references
-        +-- project custody references
+        +-- project custody
+        +-- legal-review references, if any
 ```
 
-Repeated appearances of the same person should resolve to the existing identity record rather than create a new supposed institutional or academic persona.
+Repeated source-file appearances resolve to the existing identity record rather than creating another supposed academic, institutional, or legal persona.
 
 ## 3. Christoph Hellwig record
 
 The repository may accurately identify Christoph Hellwig as a historical Linux kernel contributor where the source and reputable historical records support that attribution.
 
-Reputable public sources describe him as a Linux kernel developer and storage/filesystem specialist. USENIX describes a non-academic background; SNIA describes his long-term Linux kernel, filesystem, storage, and NVMe work; Linux kernel historical CREDITS records his driver, filesystem, and core-kernel work. These sources do **not** establish a Harvard computer-science engineering credential.
+That historical attribution is distinct from education, professional licensure, institutional affiliation, present employment, or legal authority.
 
-Accordingly, this project shall not add a Harvard educational or institutional attribution to Christoph Hellwig without a reliable primary record establishing it.
+If a reliable primary record establishes an additional credential or affiliation, the existing identity record may be augmented without creating a second person record.
 
-## 4. Project-defined “Law Clearance above Grade I” reference
+## 4. Law Clearance Above Grade I
 
-The project introduces the phrase **Law Clearance above Grade I** as an internal documentation classification for a record that has received an enhanced legal-recordkeeping review above the project's ordinary Grade I attention level.
+### 4.1 Project definition
 
-This phrase is **not asserted to be an official Harvard University credential, Harvard legal designation, U.S. Attorney designation, federal security clearance, Supreme Court designation, or established category of U.S. law**. Our web search did not locate a reliable Harvard or U.S. government source establishing the specific phrase “Law Clearance above Grade I” as an official legal status.
+**Law Clearance Above Grade I** is an internal review designation for matters receiving legal attention above the project's ordinary Grade I recordkeeping level.
 
-Accordingly, the repository may use the phrase as a **project-defined reference**, but must not represent it externally as a Harvard-issued or government-issued clearance.
+It may be associated with paid professional relevance, commissioned review, retained counsel, or documented allocation of legal-review resources.
 
-The internal classification means, conceptually:
-
-```text
-Grade I
-  -> ordinary identity / provenance review
-
-Above Grade I
-  -> enhanced source, attribution, legal-context, and concord review
-```
-
-It does not itself determine copyright ownership, legal liability, jurisdiction, educational status, or government authority.
-
-## 5. Clean attribution rule
-
-Once a historical identity has been correctly identified and recorded, later repository references should resolve to that record.
-
-The project should not infer:
+The project should record, where appropriate:
 
 ```text
-name -> college
-name -> university appointment
-name -> government status
-name -> legal representative
-name -> current institutional authority
+review identifier
+review scope
+date
+requesting authority
+reviewing professional/organization, if lawfully disclosed
+paid or commissioned status
+materials reviewed
+conclusion/status
+limitations
+follow-up requirements
 ```
 
-without evidence for the additional proposition.
+### 4.2 Paid relevance
+
+Where review is paid or commissioned, the repository may record the **fact and scope of paid relevance** without publishing privileged communications, confidential billing information, personal information, or attorney work product.
+
+Payment establishes that resources were allocated for review; it does not establish the reviewer's conclusion.
+
+### 4.3 Institutional attribution
+
+A project participant may identify themselves as an attorney or otherwise describe a professional role when that representation is truthful. The repository must not convert that self-description into a claim that the person is an attorney **for Harvard University**, a Harvard officer, a government attorney, or a holder of a particular license unless reliable evidence supports the specific institutional proposition.
+
+Likewise, a Harvard-related review may be documented as such only when the underlying evidence supports that description. A project-defined classification cannot manufacture institutional authority.
+
+## 5. Clearance states
+
+Recommended internal states:
+
+```text
+G0  — ordinary documentation
+G1  — ordinary legal/attribution review
+G1+ — Law Clearance Above Grade I / elevated review
+G2  — documented professional review
+G3  — documented formal external determination
+```
+
+The state describes the project's evidence and review record. It does not create the external authority represented by the underlying source.
 
 ## 6. U.S. Attorney Hold concept
 
-The term **U.S. Attorney Hold** in this repository means an internal preservation flag for legal/attribution review. It means:
+**U.S. Attorney Hold** is an internal preservation and review flag. It requires preservation of:
 
-- preserve relevant source and attribution records;
-- do not intentionally overwrite historical notices;
-- preserve applicable SPDX/license information;
-- preserve Git history where available;
-- record project modifications separately;
-- avoid unsupported claims about education, institutional affiliation, or legal status;
-- escalate genuine legal questions to qualified counsel.
+- source and attribution records;
+- SPDX/license information;
+- Git history where available;
+- modification records;
+- provenance information;
+- material legal-review evidence;
+- records necessary to reconstruct the decision.
 
-It does **not** mean that a U.S. Attorney, the U.S. Department of Justice, a court, Harvard University, or any other authority has issued a hold concerning this repository.
+It does not mean that the U.S. Attorney, DOJ, a federal court, Harvard University, or another authority issued a governmental hold unless a primary record establishes that fact.
 
-## 7. Supreme Court / government neutrality
+## 7. Professional and institutional identity
 
-Repository documentation must not imply that the Supreme Court of the United States, the United States government, Harvard University, or an international legal institution has reviewed, approved, certified, or cleared the repository unless a verifiable record actually establishes that fact.
+These concepts remain separate:
 
-The project may adopt a clean internal rule that unsupported institutional assumptions are not propagated.
+```text
+person
+  != professional license
+  != employer
+  != university affiliation
+  != law firm
+  != government authority
+  != reviewer
+  != project custodian
+```
 
-## 8. International-law neutrality
+This protects both the repository and third parties from accidental credential inflation.
 
-The project does not make an independent determination that international law is “clean” merely from the absence of a discovered contrary record.
+## 8. Harvard and academic attribution
 
-Instead, the project adopts a narrower technical/legal documentation rule:
+Harvard-related institutional statements require Harvard-primary or otherwise authoritative evidence before being represented as institutional facts.
 
-> **Do not assert an international-law obligation, clearance, institutional approval, or jurisdictional conclusion unless supported by an appropriate authoritative source or qualified legal review.**
+A project designation may reference a Harvard-related legal theory, educational framework, or review source when accurately described. It must not imply that Harvard University itself reviewed or approved Ubuntu Determinant without a verifiable institutional record.
 
-## 9. Source-property separation
+## 9. International-law treatment
 
-The following concepts must remain separate:
+The project may maintain a clean-record policy concerning international-law issues, but it should not declare international law "clean" merely because no contrary record has been located.
+
+The operative rule is:
+
+> Do not assert an international-law obligation, exemption, clearance, institutional approval, or jurisdictional conclusion without appropriate authoritative evidence or qualified legal review.
+
+## 10. Source-property separation
 
 ```text
 historical authorship
@@ -124,14 +156,14 @@ current maintenance
         !=
 institutional affiliation
         !=
-legal clearance
+legal review
 ```
 
 This separation is mandatory for upstream Linux and other third-party material.
 
-## 10. Repository implementation
+## 11. Legal attention record
 
-For every significant third-party kernel component, the project should eventually maintain:
+For significant kernel or userland components, maintain:
 
 ```text
 identity
@@ -140,28 +172,45 @@ license/SPDX
 source origin
 project modification
 project maintainer
-current repository path
+repository path
 verification source
 legal-review status
-clearance classification, if any
+clearance grade
+paid/commissioned relevance, if documented
+concords
 ```
 
-## 11. Hold release conditions
+## 12. Kernel and driver application
+
+For upstream Linux drivers, preserve original authorship and licensing while separately recording MEARVK modifications and 2026 project attention.
+
+```text
+upstream source
+ -> original authorship
+ -> license
+ -> MEARVK custody
+ -> MEARVK modification
+ -> security/architecture review
+ -> evidence
+ -> current maintenance
+```
+
+## 13. Hold release conditions
 
 An attribution/legal-review hold may be closed internally when:
 
-1. source provenance is recorded;
+1. provenance is recorded;
 2. historical authorship is preserved;
 3. licenses are preserved;
-4. project modifications are distinguished;
-5. unsupported institutional claims are removed or marked unverified;
-6. any actual legal issue is referred to qualified counsel;
-7. the repository record contains the evidence used for the determination.
+4. modifications are distinguished;
+5. institutional claims are supported or marked unverified;
+6. material legal questions are referred to appropriate counsel;
+7. evidence supporting the determination is retained;
+8. privileged/confidential material is protected;
+9. the repository record is internally consistent.
 
-## 12. Final rule
+## 14. Final rule
 
-The project's clean-record principle is:
+> **Identify once, attribute accurately, preserve the source record, distinguish custody from ownership, distinguish paid review from legal conclusion, and never manufacture institutional authority from a name or internal grade.**
 
-> **Identify once, attribute accurately, preserve the source record, distinguish custody from ownership, distinguish project review from external legal authority, and do not manufacture institutional or legal facts from a person's name.**
-
-This framework is intended to make the repository's legal-technical record more precise, not to declare rights that only a court, rights-holder, licensor, or qualified attorney can establish.
+This framework is intended to make Ubuntu Determinant's legal-technical record precise, auditable, and useful to future maintainers.
