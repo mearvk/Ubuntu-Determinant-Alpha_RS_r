@@ -1,8 +1,27 @@
 /* XMC OS registration helper. User-scoped; no privilege escalation. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+
+#define XMC_PATH_MAX 4096
 
 static int run(const char *cmd) { return system(cmd); }
+
+static int join_path(char *out, size_t cap, const char *dir, const char *name) {
+    size_t a, b;
+    if (!out || !dir || !name) return -1;
+    a = strlen(dir); b = strlen(name);
+    if (a > cap - 1 || b > cap - 1 - a - 1) return -1;
+    if (a > 0 && dir[a - 1] == '/') {
+        if (a + b + 1 > cap) return -1;
+        memcpy(out, dir, a); memcpy(out + a, name, b + 1);
+    } else {
+        if (a + 1 + b + 1 > cap) return -1;
+        memcpy(out, dir, a); out[a] = '/'; memcpy(out + a + 1, name, b + 1);
+    }
+    return 0;
+}
 
 int xmc_register_asysma(const char *desktop_file, const char *program_name,
                         const char *icon_path, const char *executable_path) {
@@ -25,16 +44,17 @@ int xmc_register_asysma(const char *desktop_file, const char *program_name,
     (void)desktop_file; (void)program_name; (void)icon_path;
     return run(cmd) == 0 ? 0 : -1;
 #else
-    char mime_dir[4096], mime_file[4096], icon_dir[4096], icon_file[4096];
-    char desktop_dir[4096], installed_desktop[4096], cmd[8192];
+    char mime_dir[XMC_PATH_MAX], mime_file[XMC_PATH_MAX];
+    char icon_dir[XMC_PATH_MAX], icon_file[XMC_PATH_MAX];
+    char desktop_dir[XMC_PATH_MAX], installed_desktop[XMC_PATH_MAX], cmd[8192];
     const char *home = getenv("HOME");
     if (!home || !desktop_file || !program_name) return -1;
-    snprintf(mime_dir, sizeof mime_dir, "%s/.local/share/mime/packages", home);
-    snprintf(mime_file, sizeof mime_file, "%s/xmc-asysma.xml", mime_dir);
-    snprintf(icon_dir, sizeof icon_dir, "%s/.local/share/icons/hicolor/scalable/apps", home);
-    snprintf(icon_file, sizeof icon_file, "%s/xmc-asysma.svg", icon_dir);
-    snprintf(desktop_dir, sizeof desktop_dir, "%s/.local/share/applications", home);
-    snprintf(installed_desktop, sizeof installed_desktop, "%s/xmc-asysma.desktop", desktop_dir);
+    if (join_path(mime_dir, sizeof mime_dir, home, ".local/share/mime/packages") != 0 ||
+        join_path(mime_file, sizeof mime_file, mime_dir, "xmc-asysma.xml") != 0 ||
+        join_path(icon_dir, sizeof icon_dir, home, ".local/share/icons/hicolor/scalable/apps") != 0 ||
+        join_path(icon_file, sizeof icon_file, icon_dir, "xmc-asysma.svg") != 0 ||
+        join_path(desktop_dir, sizeof desktop_dir, home, ".local/share/applications") != 0 ||
+        join_path(installed_desktop, sizeof installed_desktop, desktop_dir, "xmc-asysma.desktop") != 0) return -1;
 
     if (snprintf(cmd, sizeof cmd, "mkdir -p '%s' '%s' '%s'", mime_dir, icon_dir, desktop_dir) >= (int)sizeof cmd || run(cmd) != 0) return -1;
 
