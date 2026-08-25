@@ -1,9 +1,20 @@
 # xmc — XML Metaclass Compiler
 
-**Version:** 1.0.0  
+**Version:** 2.01  
 **Edition:** Galactic Cherry Marvell 98  
 **Target:** SecureJDK 28 (.xclass format)  
 **License:** GPL-2.0 WITH Classpath-exception-2.0
+
+## Versioning
+
+XMC uses a two-part version counter: **MAJOR.MINOR**.
+
+- **Starting version:** `2.01`
+- **Minor code change:** increment the minor number (`2.01` → `2.02` → `2.03`).
+- **Major architectural or compatibility change:** increment the major number and reset the minor sequence as appropriate (`2.99` → `3.01`).
+- The version is defined centrally in `xmc-version.h` and is exposed by the integrated `xmc` binary with `xmc --version` or `xmc -V`.
+
+Every future XMC source revision should update this counter according to the rule above when the revision constitutes a released code change.
 
 ## Overview
 
@@ -11,31 +22,37 @@
 
 ## Unified XMC + ASYSMA output
 
-Use `xmc-build SOURCE` for the developer-facing combined path:
+The integrated `xmc` binary is now the developer-facing combined path:
 
 ```text
 SOURCE.java
     │
-    ├── xmc ────────→ SOURCE.xclass
+    ├── xmc-core ────→ SOURCE.xclass
     │
-    └── ASYSMA pack → SOURCE.asysma
+    └── ASYSMA pack ─→ SOURCE.asysma
+                         │
+                         └── SOURCE.asysma.desktop
 ```
 
-Both artifacts are deliberately **localized beside the source file**. This makes the compiler's output location deterministic and easy to inspect or archive.
+Run:
+
+```bash
+xmc SOURCE.java
+```
+
+The generated `.xclass`, `.asysma`, and desktop launcher are deliberately **localized beside the source file**. This makes the compiler's output location deterministic and easy to inspect or archive.
 
 The `.asysma` file is an application/container artifact, not an OS-native executable by itself. Linux, Windows, and macOS still require their own native executable/loader when a package contains native code. The ASYSMA manifest records the declared entry mode and payloads.
 
 ## Desktop launcher
 
-For Linux desktop environments, install a per-source launcher with:
+The integrated compiler composes the XMC application icon identity into ASYSMA and emits a per-source desktop launcher. The launcher invokes the ASYSMA runtime adapter rather than falsely treating the package bytes as ELF, PE/COFF, or Mach-O.
+
+For Linux desktop installation of a source-specific application entry point, the repository also provides:
 
 ```bash
 xmc-install-desktop.sh /path/to/MyClass.java
 ```
-
-This creates a small `.desktop` file beside the source and installs a copy under the user's local application directory. Selecting it invokes `xmc-build` for that exact source, so the resulting `.xclass` and `.asysma` remain localized beside the input.
-
-The launcher does not claim that `.asysma` is directly executable by the operating system; it is a controlled developer entry point into the XMC build process.
 
 ## What xmc Produces
 
@@ -74,6 +91,7 @@ The xmc binary adjusts quality scoring based on international law or conduct fra
 ## Usage
 
 ```bash
+xmc --version
 xmc MyClass.java
 xmc --frame=eu UserService.java
 xmc --frame=intl --verbose App.py
@@ -83,13 +101,13 @@ xmc-install-desktop.sh MyClass.java
 
 ## Process rehearsal
 
-The repository now includes representative inputs under `tools/xmc/tests/`:
+The repository includes representative inputs under `testing-inputs/` for persistent manual testing and under `tools/xmc/tests/` for the automated rehearsal:
 
-- `java/XmcDesktopProbe.java` — class fields, constructor, conditional mutation, and `main`.
-- `java/XmcControlFlowProbe.java` — interface implementation, loop, branching, and method analysis.
-- `native/xmc_native_probe.c` — C native payload.
-- `native/xmc_native_probe.cpp` — C++ native payload.
-- `run-xmc-process.sh` — builds native probes, runs XMC on the Java inputs, verifies localized `.xclass`/`.asysma`, packages a native+Java ASYSMA, and verifies desktop launcher installation.
+- `testing-inputs/java/XmcDesktopProbe.java` — simple Java application entry.
+- `testing-inputs/java/XmcControlFlowProbe.java` — deterministic Java control-flow input.
+- `testing-inputs/native/xmc_native_probe.c` — C native payload.
+- `testing-inputs/native/xmc_native_probe.cpp` — C++ native payload.
+- `tools/xmc/tests/run-xmc-process.sh` — builds native probes, runs XMC on Java inputs, verifies localized `.xclass`/`.asysma`, packages a native+Java ASYSMA, and verifies desktop launcher installation.
 
 Run the complete rehearsal with:
 
@@ -123,13 +141,17 @@ make install
 
 ```text
 tools/xmc/xmc.c
- tools/xmc/asysma_pack.c
+tools/xmc/xmc-driver.c
+tools/xmc/xmc-version.h
+tools/xmc/asysma_pack.c
 tools/xmc/xmc-build
 tools/xmc/xmc-install-desktop.sh
 tools/xmc/Makefile
 tools/xmc/tests/java/
 tools/xmc/tests/native/
 tools/xmc/tests/run-xmc-process.sh
+testing-inputs/java/
+testing-inputs/native/
 ```
 
 ## Integration
