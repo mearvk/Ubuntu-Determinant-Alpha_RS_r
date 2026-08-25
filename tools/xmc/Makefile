@@ -22,7 +22,7 @@ BOOT_SRC   = asysma-bootstrap.c
 COMMON_CPPFLAGS = $(CPPFLAGS) -DXMC_INSTALL_PREFIX=\"$(PREFIX)\"
 COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS)
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean install uninstall test process-test clean-user-integration
 
 all: $(BIN) $(PACKER) $(BOOTSTRAP)
 
@@ -65,3 +65,7 @@ test: all
 	@printf '%s\n' 'public class TestClass { public static void main(String[] a) {} }' > /tmp/TestClass.java
 	./$(BIN) /tmp/TestClass.java || test $$? -eq 1
 	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
+
+process-test: all
+	@chmod +x ./tests/run-xmc-process.sh
+	@./tests/run-xmc-process.sh
