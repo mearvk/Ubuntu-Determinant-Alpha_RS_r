@@ -1,0 +1,64 @@
+#!/bin/sh
+# XMC unified build driver.
+# One source argument produces both .xclass and .asysma outputs.
+# No output-selection flag is required.
+set -eu
+
+XMC_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+XMC="$XMC_DIR/xmc"
+PACKER="$XMC_DIR/asysma_pack"
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: xmc-build [xmc-options] SOURCE" >&2
+    exit 2
+fi
+
+# Find the final source argument. XMC options may precede it.
+SOURCE=""
+for arg in "$@"; do
+    case "$arg" in
+        --frame=*|--tier=*|--color=*|--sign-as=*|--verbose|--dry-run)
+            ;;
+        --*)
+            ;;
+        *)
+            SOURCE="$arg"
+            ;;
+    esac
+done
+
+if [ -z "$SOURCE" ] || [ ! -f "$SOURCE" ]; then
+    echo "xmc-build: source file not found: $SOURCE" >&2
+    exit 2
+fi
+
+if [ ! -x "$XMC" ] || [ ! -x "$PACKER" ]; then
+    echo "xmc-build: XMC tools are not built; run 'make' in $XMC_DIR" >&2
+    exit 1
+fi
+
+# Preserve all XMC analysis options and let XMC produce the .xclass.
+"$XMC" "$@"
+
+BASE=${SOURCE%.*}
+XCLASS="$BASE.xclass"
+ASYSMA="$BASE.asysma"
+
+if [ ! -f "$XCLASS" ]; then
+    echo "xmc-build: XMC did not produce $XCLASS" >&2
+    exit 1
+fi
+
+# The default Java entry is the first class name represented by the xclass
+# output. For a source file named Foo.java this is Foo. The packager remains
+# explicit about the entry mode internally; the developer does not select it.
+NAME=$(basename "$BASE")
+
+"$PACKER" \
+    --output "$ASYSMA" \
+    --entry JAVA \
+    --java "$NAME" \
+    --xclass "$XCLASS"
+
+echo "xmc-build: produced $XCLASS"
+echo "xmc-build: produced $ASYSMA"
