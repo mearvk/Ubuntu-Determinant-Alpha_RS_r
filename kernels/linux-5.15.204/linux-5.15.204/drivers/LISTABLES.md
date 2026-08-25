@@ -49,6 +49,65 @@ These are review categories, not claims that every device in a category is curre
 | Accelerator | AI, crypto, compute accelerators | workload/performance behavior | device APIs, command queues, DMA/MMIO |
 | Miscellaneous | vendor-specific devices | observed device behavior | documented vendor ABI or kernel subsystem |
 
+## Organization / company co-frame
+
+Linux driver provenance can also contain **organization and company associations**. These are useful as a secondary frame for review because kernel subsystem documentation and maintainer records sometimes identify vendor-specific driver families, maintainers, or development trees. The Linux documentation, for example, groups networking device-driver documentation by organizations such as AMD/Pensando, Intel, Marvell, Mellanox, Microsoft, Qualcomm, STMicroelectronics, Texas Instruments, Toshiba, and others. citeturn0search0turn0search2
+
+The existence of a company name in source, documentation, an email address, a maintainer entry, device name, or directory does **not by itself prove copyright ownership, present employment, legal control, national status, endorsement, or authorship of every file in the associated subsystem**. The Linux maintainer documentation itself shows that subsystem responsibility can involve individual maintainers, vendor trees, reviewers, and broader project infrastructure. citeturn0search1turn0search3
+
+### Sorted organization register — review seed
+
+The following is an alphabetized **review-seed list**, not a claim that each organization owns the corresponding driver code. It is intentionally limited to organizations visibly represented in current Linux driver documentation or maintainer material examined for this taxonomy.
+
+| Organization / company | Typical driver or hardware relevance | Evidence relationship | Review treatment |
+|---|---|---|---|
+| **3Com** | Ethernet/networking | Historical device-driver documentation | Treat as historical/vendor association; verify file-level provenance. |
+| **AMD** | CPU, GPU, networking, I/O, platform | Maintainer and driver records | Strong vendor association in multiple subsystems; verify individual files. |
+| **Aquantia** | Ethernet | Networking driver documentation | Vendor/device-family association; preserve upstream attribution. |
+| **Broadcom** | Networking, SoC, GPIO, USB, storage, firmware | Maintainer records and driver paths | Broad vendor footprint; do not generalize authorship across subsystems. |
+| **Chelsio** | Ethernet/network adapters | Networking documentation | Vendor/device-family association. |
+| **Cirrus Logic** | Audio and related hardware | Networking/device-driver documentation index and kernel subsystems | Verify exact subsystem and source history. |
+| **Google** | Networking and platform/hardware work | Linux driver documentation | Organization association only; inspect exact files. |
+| **Huawei** | Networking/platform hardware | Linux driver documentation | Vendor association; independent provenance review required. |
+| **Intel** | CPU/platform, networking, graphics, storage and other hardware | Linux driver documentation and maintainer records | Major vendor association; file-level attribution remains authoritative. |
+| **Marvell** | Networking, storage, wireless and related hardware | Maintainer records and driver paths | Vendor association; acquisitions/business units can complicate historical attribution. |
+| **Mellanox** | Networking/InfiniBand | Linux driver documentation | Historical/vendor association; current corporate context may differ. |
+| **Microsoft** | Networking, virtualization, platform hardware | Linux driver documentation | Organization association; distinguish upstream contributors from corporate ownership claims. |
+| **Netronome** | Networking/accelerators | Linux driver documentation | Vendor/device-family association. |
+| **Neterion** | Ethernet | Linux driver documentation | Historical/vendor association. |
+| **Pensando** | Networking/DSC accelerators | Linux driver documentation; AMD/Pensando maintainer material | Vendor/product association; distinguish AMD corporate context from historical project authorship. |
+| **Qualcomm** | ARM SoCs, networking, wireless, buses | Maintainer and driver documentation | Major vendor association; verify exact source lineage. |
+| **QLogic** | Networking/storage | Linux driver documentation | Historical/vendor association; corporate history should be treated separately. |
+| **Realtek** | Networking, audio, wireless and peripherals | Kernel hardware/vendor subsystems | Vendor/device-family association; verify exact source. |
+| **STMicroelectronics** | Embedded SoCs, buses, sensors and peripherals | Linux driver documentation | Vendor association. |
+| **Texas Instruments** | Embedded SoCs, power, buses and peripherals | Linux driver documentation | Vendor association. |
+| **Toshiba** | Storage, platform and other hardware | Linux driver documentation | Vendor association; verify exact source history. |
+
+### Organization evidence levels
+
+Use the following evidence ladder before turning an organization name into a provenance conclusion:
+
+1. **Name occurrence** — organization name appears somewhere.
+2. **Technical association** — name matches a device, subsystem, directory, or product family.
+3. **Documentation association** — official kernel documentation connects the organization to a driver family.
+4. **Maintainer/contributor association** — Linux maintainer or contribution records identify relevant people or trees.
+5. **File-specific provenance** — the exact source file has reliable attribution/license/history evidence.
+
+Only level 5 should be treated as strong evidence for an individual file's authorship or provenance. Levels 1–4 are useful co-frames, not substitutes for file-level evidence.
+
+## Organization / national co-co-frame
+
+A second-order relationship may be represented as:
+
+```text
+hardware
+   -> software
+      -> organization/company
+         -> jurisdiction or national context
+```
+
+Each arrow is independently evaluated. A company associated with a device does not automatically establish that the software is authored by the company, nor does a company's jurisdiction establish the jurisdiction of an individual contributor.
+
 ## Inductive review
 
 **Induct** asks: *What can responsibly be concluded from observed evidence?*
@@ -115,12 +174,14 @@ Reviewers should use calibrated qualifiers rather than turning uncertain observa
 
 ## Noun corners — areas where review attention can turn
 
-“ Noun corners” are the concrete subjects that can hide an otherwise reasonable-looking concern. Reviewers should check them deliberately rather than letting a polished source surface distract from them.
+“Noun corners” are the concrete subjects that can hide an otherwise reasonable-looking concern. Reviewers should check them deliberately rather than letting a polished source surface distract from them.
 
 | Concern corner | Questions |
 |---|---|
 | **Origin** | Where did this code or hardware description originate? |
 | **Authorship** | What evidence supports the credited author? |
+| **Organization** | Which company, project, foundation, or institution is technically associated, and what is the evidence level? |
+| **Jurisdiction** | Is national/legal context actually established, or merely inferred from an organization name? |
 | **License** | What license/SPDX expression actually applies? |
 | **Interface** | What ABI/API/bus contract does the component rely upon? |
 | **Dependency** | What other kernel or firmware component must exist? |
@@ -145,6 +206,8 @@ Reviewers should use calibrated qualifiers rather than turning uncertain observa
 A reviewer should actively separate **appearance** from **evidence**. The following are common distractions:
 
 - an impressive author name without source evidence;
+- a company name without a file-specific provenance link;
+- a national or institutional association inferred from a company name;
 - a clean code style without complete provenance;
 - a complex file that is merely generated;
 - a simple file performing a security-critical operation;
@@ -183,4 +246,4 @@ US-oriented ethical control means responsible software stewardship: accurate att
 
 ## Final reviewer rule
 
-> **Classify first. Observe second. Reduce where the interface permits. Qualify uncertainty. Inspect the corners. Preserve attribution. Test the claim. Record what the project actually controls.**
+> **Classify first. Observe second. Identify organizational context. Verify each relationship independently. Reduce where the interface permits. Qualify uncertainty. Inspect the corners. Preserve attribution. Test the claim. Record what the project actually controls.**
