@@ -113,13 +113,41 @@ Do not infer authorship from:
 
 Use source notices, Git history, signed-off contributions, SPDX records, contributor records, project history, or other reliable evidence.
 
-## 8. Presence Concord
+## 8. Organization / company co-frame
+
+An organization or company may be a useful **co-frame** for understanding a hardware family, software subsystem, maintainer relationship, development tree, or historical contribution. Public Internet evidence can help locate such relationships, and Linux's own documentation includes vendor- and organization-associated driver families and maintainer entries. 
+
+However, the organization relationship must remain separate from the file-level authorship conclusion. The following evidence ladder is preferred:
+
+```text
+1. organization name appears
+2. technical/device association
+3. official/project documentation association
+4. maintainer/contributor/tree association
+5. file-specific provenance and license evidence
+```
+
+Only level 5 should ordinarily be treated as strong evidence for an individual file's authorship or provenance. Levels 1–4 are **co-frames**, not substitutes for source-level evidence.
+
+## 9. Organization / jurisdiction co-co-frame
+
+Where useful, the relationship may be modeled as:
+
+```text
+hardware -> software -> organization/company -> jurisdiction
+```
+
+Each edge is independently evaluated. A company associated with hardware does not automatically establish that it authored all software for the hardware. A company name does not establish an individual's nationality, citizenship, employment, institutional endorsement, or legal status.
+
+Similarly, an Internet listing can be a discovery or corroboration source without becoming dispositive evidence. Reviewers should distinguish **found online**, **documented by the project**, and **independently substantiated**.
+
+## 10. Presence Concord
 
 Presence is an evidence-bearing connection between an identity and attributable material. It can support a provenance record without being treated as a legal determination of citizenship, personhood, professional status, or institutional affiliation.
 
 The public repository should record only the degree of provenance needed for legitimate engineering and reproducibility purposes. Sensitive evidence may remain privately held under appropriate access control.
 
-## 9. United States / institutional references
+## 11. United States / institutional references
 
 A source's existence in a U.S. repository, an author's name appearing in historical material, or a project's study of software does not by itself establish a U.S. legal status, Harvard affiliation, professional credential, or institutional endorsement.
 
@@ -129,20 +157,21 @@ Where the project records U.S. or institutional relevance, it should distinguish
 technical evidence
 legal evidence
 institutional evidence
+organizational association
 project interpretation
 ```
 
 The categories should not be merged merely because they appear related.
 
-The project may conduct serious software study and engineering work at a standard comparable to advanced academic research. That is a statement about the **quality and method of the project's work**, not a claim that a university, professor, court, government agency, or other institution has endorsed the project.
+The project may conduct serious software study and engineering work at a standard comparable to advanced academic research. That is a statement about the **quality and method of the project's work**, not a claim that a university, professor, court, government agency, company, or other institution has endorsed the project.
 
-## 10. Privacy and guarded records
+## 12. Privacy and guarded records
 
 Public source and README files should contain only information appropriate for provenance and reproducibility. Keep credentials, private correspondence, psychological material, confidential legal advice, security-sensitive findings, payment/contract details, and other restricted evidence outside public source documentation unless lawful disclosure and authorization are established.
 
 Where a public record needs to demonstrate that private evidence exists, use a non-sensitive reference, evidence identifier, or hash rather than publishing the evidence itself.
 
-## 11. Driver application
+## 13. Driver application
 
 For kernel drivers and headers, apply ChangeStyle3 at the smallest useful level:
 
@@ -150,6 +179,7 @@ For kernel drivers and headers, apply ChangeStyle3 at the smallest useful level:
 file
   -> source form
   -> original provenance
+  -> organization co-frame (if relevant)
   -> license
   -> modification
   -> dependency
@@ -158,15 +188,15 @@ file
   -> concord
 ```
 
-Directory READMEs provide subsystem context. `drivers/DOCUMENTATION.md` provides the master lower-grade/provenance register. The four security registers provide the broader Origin/Custody/Modification/Attention framework.
+Directory READMEs provide subsystem context. `drivers/DOCUMENTATION.md` provides the master lower-grade/provenance register. `drivers/LISTABLES.md` provides the hardware/category and organization co-frame vocabulary. The four security registers provide the broader Origin/Custody/Modification/Attention framework.
 
-## 12. Evidence maturity
+## 14. Evidence maturity
 
 For substantial authorship questions, the preferred review resembles a mature research proposal: establish the proposition, collect primary evidence, distinguish observation from inference, identify competing explanations, document limitations, and state what additional evidence would alter the conclusion.
 
 No psychological publication or personal dossier is required merely to establish ordinary software provenance.
 
-## 13. Release rule
+## 15. Release rule
 
 Before a significant release, the project should be able to explain:
 
@@ -176,12 +206,13 @@ what was created
 what was changed
 who is credited
 what license applies
+what organizations are technically associated, if relevant
 what the project controls
 what was tested
 what remains uncertain
 what evidence supports each material claim
 ```
 
-## 14. Final principle
+## 16. Final principle
 
-**Preserve the original content. Improve the implementation. Record the change. Maintain attribution. Control what we legitimately control. Keep private evidence private. Do not convert project responsibility into unsupported claims of historical authorship or external authority.**
+**Preserve the original content. Improve the implementation. Record the change. Maintain attribution. Use organizational context as a co-frame, not as a shortcut to authorship. Control what we legitimately control. Keep private evidence private. Do not convert project responsibility into unsupported claims of historical authorship or external authority.**
