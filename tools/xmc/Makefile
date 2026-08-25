@@ -13,6 +13,8 @@ CORE       = xmc-core
 PACKER     = asysma_pack
 BOOTSTRAP  = asysma-bootstrap
 DRIVER_SRC = xmc-driver.c
+REG_SRC    = xmc-os-register.c
+REG_HDR    = xmc-os-register.h
 DRIVER     = xmc-build
 DESKTOP    = xmc-install-desktop.sh
 SRC        = xmc.c
@@ -22,6 +24,8 @@ BOOT_SRC   = asysma-bootstrap.c
 .PHONY: all clean install uninstall test process-test
 
 # Public xmc is the integrated compiler/package driver.
+# The OS registration helper is linked into xmc so every ASYSMA build has
+# access to the Linux/Windows/macOS registration handshake.
 all: $(BIN) $(PACKER) $(BOOTSTRAP) $(DRIVER)
 
 $(CORE): $(SRC)
@@ -33,8 +37,8 @@ $(PACKER): $(PACKSRC) asysma_native_layout.h
 $(BOOTSTRAP): $(BOOT_SRC) asysma_native_layout.h
 	$(CC) $(CFLAGS) -o $@ $(BOOT_SRC)
 
-$(BIN): $(DRIVER_SRC) $(CORE) $(PACKER) $(BOOTSTRAP)
-	$(CC) $(CFLAGS) -o $@ $(DRIVER_SRC) $(LDFLAGS)
+$(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
+	$(CC) $(CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(LDFLAGS)
 
 $(DRIVER):
 	chmod +x $@
