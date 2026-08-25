@@ -9,6 +9,12 @@ CFLAGS="${CFLAGS:--O2 -Wall -Wextra -Werror -std=c11}"
 
 mkdir -p "$LIBEXEC"
 
+if [[ -f "$ROOT/tools/xmc/Makefile" ]]; then
+  echo "building and installing xmc"
+  make -C "$ROOT/tools/xmc" clean all
+  make -C "$ROOT/tools/xmc" PREFIX="$PREFIX" install
+fi
+
 build_tool() {
   local name="$1"
   local dir="$ROOT/tools/$name"
@@ -20,7 +26,6 @@ build_tool() {
   rm -f "$LIBEXEC/$name.new"
 }
 
-build_tool xmc
 build_tool limit
 build_tool size
 build_tool ctrmsctl
