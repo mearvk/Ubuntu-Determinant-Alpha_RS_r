@@ -4,6 +4,7 @@
  * an ASYSMA artifact with a target-native bootstrap as its executable prefix.
  */
 #include "xmc-version.h"
+#include "xmc-os-register.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -60,7 +61,12 @@ int main(int argc,char **argv){
         "--xclass",xclass,"--bootstrap",bootstrap,"--icon",icon,"--icon-sha256",icon_sha,NULL};
     rc=run(pack_argv); if(rc!=0){fprintf(stderr,"xmc: .xclass succeeded but ASYSMA composition failed\n");return rc;}
     FILE *d=fopen(desktop,"w"); if(!d){perror(desktop);return 1;}
-    fprintf(d,"[Desktop Entry]\nType=Application\nName=%s (ASYSMA)\nComment=Run the compiled ASYSMA application\nIcon=%s\nExec=%s %%U\nTerminal=false\nMimeType=application/x-asysma;\nCategories=Development;\nStartupNotify=true\n",class_name,icon,launcher); fclose(d);
+    fprintf(d,"[Desktop Entry]\nType=Application\nName=%s (ASYSMA)\nComment=Run the compiled ASYSMA application\nIcon=xmc-asysma\nExec=%s %%U\nTerminal=false\nMimeType=application/x-asysma;\nCategories=Development;\nStartupNotify=true\n",class_name,launcher); fclose(d);
+    if(xmc_register_asysma(desktop,class_name,"xmc-asysma",asysma)!=0){
+        fprintf(stderr,"xmc: warning: unable to register application/x-asysma with the user desktop environment\n");
+    } else {
+        fprintf(stdout,"xmc: registered application/x-asysma for the current user\n");
+    }
     printf("xmc: %s.xclass\n",class_name); printf("xmc: %s.asysma\n",class_name); printf("xmc: %s.asysma.desktop\n",class_name); printf("xmc: icon SHA-256 %s\n",icon_sha);
     return 0;
 }
