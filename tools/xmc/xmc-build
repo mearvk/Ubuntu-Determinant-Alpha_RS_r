@@ -1,29 +1,24 @@
 #!/bin/sh
 # XMC unified build driver.
-# One source argument produces both .xclass and .asysma outputs.
-# No output-selection flag is required.
+# One source argument produces .xclass and a fully composed .asysma package.
 set -eu
 
 XMC_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 XMC="$XMC_DIR/xmc"
 PACKER="$XMC_DIR/asysma_pack"
+ICON="$XMC_DIR/xmc-icon.svg"
 
 if [ "$#" -lt 1 ]; then
     echo "usage: xmc-build [xmc-options] SOURCE" >&2
     exit 2
 fi
 
-# Find the final source argument. XMC options may precede it.
 SOURCE=""
 for arg in "$@"; do
     case "$arg" in
-        --frame=*|--tier=*|--color=*|--sign-as=*|--verbose|--dry-run)
-            ;;
-        --*)
-            ;;
-        *)
-            SOURCE="$arg"
-            ;;
+        --frame=*|--tier=*|--color=*|--sign-as=*|--verbose|--dry-run) ;;
+        --*) ;;
+        *) SOURCE="$arg" ;;
     esac
 done
 
@@ -31,34 +26,56 @@ if [ -z "$SOURCE" ] || [ ! -f "$SOURCE" ]; then
     echo "xmc-build: source file not found: $SOURCE" >&2
     exit 2
 fi
-
 if [ ! -x "$XMC" ] || [ ! -x "$PACKER" ]; then
     echo "xmc-build: XMC tools are not built; run 'make' in $XMC_DIR" >&2
     exit 1
 fi
 
-# Preserve all XMC analysis options and let XMC produce the .xclass.
 "$XMC" "$@"
 
 BASE=${SOURCE%.*}
 XCLASS="$BASE.xclass"
 ASYSMA="$BASE.asysma"
+NAME=$(basename "$BASE")
 
 if [ ! -f "$XCLASS" ]; then
     echo "xmc-build: XMC did not produce $XCLASS" >&2
     exit 1
 fi
+if [ ! -f "$ICON" ]; then
+    echo "xmc-build: missing application icon: $ICON" >&2
+    exit 1
+fi
 
-# The default Java entry is the first class name represented by the xclass
-# output. For a source file named Foo.java this is Foo. The packager remains
-# explicit about the entry mode internally; the developer does not select it.
-NAME=$(basename "$BASE")
+# Compose the package with the stable application icon identity. The current
+# packer accepts the icon as metadata and keeps the package portable.
+ICON_SHA=$(sha256sum "$ICON" 2>/dev/null | awk '{print $1}' || true)
+[ -n "$ICON_SHA" ] || ICON_SHA="unavailable"
 
 "$PACKER" \
     --output "$ASYSMA" \
     --entry JAVA \
     --java "$NAME" \
-    --xclass "$XCLASS"
+    --xclass "$XCLASS" \
+    --icon "$ICON" \
+    --icon-sha256 "$ICON_SHA"
+
+# Generate the local clickable launcher alongside the compiled artifact.
+LAUNCHER="$BASE.asysma-launcher.desktop"
+cat > "$LAUNCHER" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$NAME (ASYSMA)
+Comment=Run the compiled ASYSMA application
+Icon=$ICON
+Exec=$XMC_DIR/xmc-asysma-launcher.sh $ASYSMA
+Terminal=false
+Categories=Development;
+StartupNotify=true
+EOF
+chmod 0644 "$LAUNCHER"
 
 echo "xmc-build: produced $XCLASS"
 echo "xmc-build: produced $ASYSMA"
+echo "xmc-build: composed icon SHA-256 $ICON_SHA"
+echo "xmc-build: produced clickable launcher $LAUNCHER"
