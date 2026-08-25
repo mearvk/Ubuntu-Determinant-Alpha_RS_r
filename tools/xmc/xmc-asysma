@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+# Unified developer driver: emit XMC metadata and ASYSMA packaging without
+# requiring an output-mode choice. The underlying xmc remains responsible
+# for .xclass generation; asysma_pack creates the container.
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: xmc-asysma SOURCE [native-payload]" >&2
+    exit 2
+fi
+
+src=$1
+native=${2-}
+base=${src##*/}
+base=${base%.*}
+
+./xmc "$src"
+xclass="${base}.xclass"
+
+if [ ! -f "$xclass" ]; then
+    echo "xmc did not produce $xclass" >&2
+    exit 1
+fi
+
+if [ -n "$native" ]; then
+    ./asysma_pack --output "${base}.asysma" \
+        --entry NATIVE_THEN_JAVA \
+        --java "$base" \
+        --xclass "$xclass" \
+        --native "$native"
+else
+    ./asysma_pack --output "${base}.asysma" \
+        --entry JAVA \
+        --java "$base" \
+        --xclass "$xclass"
+fi
+
+echo "XMC outputs: $xclass ${base}.asysma"
