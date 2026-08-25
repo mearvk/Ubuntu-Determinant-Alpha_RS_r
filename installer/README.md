@@ -6,9 +6,37 @@
 
 ## Purpose
 
-`installer/` is the native professional installation interface for Ubuntu White Edition. It is designed to run from an existing Linux installation, from Windows with a supported Linux/virtualization backend, or inside a virtual machine.
+`installer/` is the master installation interface for Ubuntu White Edition and the repository's recent native tools. It keeps the JavaFX control surface separate from platform-specific native installation work.
 
-The interface is deliberately separate from the existing Galactic Cherry installer scripts. The repository already has an ISO-generation path and an Ubuntu graphical installer integration; this layer provides a clean, white, JavaFX control surface over those capabilities rather than duplicating their low-level implementation. The existing top-level build already exposes `rootfs`, `initramfs`, `grub`, and `iso` assembly stages. fileciteturn195file0L2-L2
+## Master installation
+
+The current native tool set is maintained by `installer/install-manifest.txt` and includes:
+
+- `xmc` — XMC compiler and ASYSMA packaging path;
+- `limit` — executable identity/metadata inspection;
+- `size` — recursive logical filesystem-size measurement;
+- `ctrmsctl` — read-only disk/filesystem observation service;
+- GCC source download/extraction helpers.
+
+Use the platform master installer:
+
+```text
+Linux:   ./installer/install-all.sh
+Windows: .\installer\install-all.ps1
+macOS:   ./installer/install-all-macos.sh
+```
+
+The master installer first invokes the native installer for the host. When Java and Maven are available, it also builds the JavaFX installer package.
+
+### Native installers
+
+```text
+installer/install-native.sh
+installer/install-native.ps1
+installer/install-native-macos.sh
+```
+
+These compile the repository's native C utilities locally. XMC is built through its own `tools/xmc/Makefile`, preserving its multi-binary contract (`xmc`, `xmc-core`, `asysma_pack`, and related launcher/assets) rather than treating `xmc-driver.c` as a standalone executable. The XMC Makefile explicitly defines the integrated compiler/package installation targets. fileciteturn79file0L2-L2
 
 ## Operating modes
 
@@ -25,47 +53,32 @@ Partition operations must never be inferred from a directory name. The UI must d
 
 ## Professional launcher
 
-The launcher is Java/JavaFX-oriented. The current repository already contains Java build infrastructure and a boot JDK 27 tree, while the Java userland documentation identifies the project's Java source/build environment. fileciteturn196file0L2-L2
+The launcher is Java/JavaFX-oriented. The master install scripts build the native inspection/observation utilities first and then build the JavaFX package when its toolchain is available.
 
-The installer should therefore use a small JavaFX launcher and delegate privileged/platform-specific work to explicit adapters rather than embedding shell commands throughout the GUI.
+The installer should use a small JavaFX launcher and delegate privileged/platform-specific work to explicit adapters rather than embedding shell commands throughout the GUI.
 
 ```text
 JavaFX Launcher
     |
     +-- Host Detector
+    +-- Native Tool Installer
+    +-- XMC / ASYSMA Adapter
+    +-- Limit / Size Inspection
+    +-- CTRMS Observation Adapter
     +-- ISO Builder Adapter
     +-- Rootfs Adapter
     +-- Partition Adapter
     +-- VM Adapter
-    +-- Windows/WSL Adapter
     +-- Verification / Audit
 ```
-
-## White interface
-
-The visual standard is intentionally restrained:
-
-- white primary surface;
-- dark neutral text;
-- restrained gray borders;
-- clear status indicators;
-- large, readable primary actions;
-- no decorative security claims;
-- explicit destructive-action warnings;
-- keyboard accessibility;
-- no hidden elevation.
-
-## Existing build integration
-
-The existing repository already provides `scripts/gen-iso.sh`, which creates a hybrid BIOS/UEFI ISO from the assembled root filesystem and validates kernel/initramfs prerequisites. The professional installer should invoke that established contract rather than silently implementing a second ISO builder. fileciteturn200file0L2-L2
-
-The existing `scripts/install-ubuntu-installer.sh` also provides a full Ubuntu Desktop Provision/Subiquity installer integration. It remains an existing implementation and is not silently replaced by this JavaFX control layer. fileciteturn199file0L2-L3
 
 ## Security boundary
 
 The JavaFX process should normally run unprivileged. Operations requiring root/administrator access must cross a small, auditable helper boundary.
 
 The GUI must not execute arbitrary user-entered shell strings. All operations should use typed arguments and allow-listed commands.
+
+`limit`, `size`, and the CTRMS observation surface remain read-only inspection/measurement functions. `ctrmsctl` may install its systemd service when running on a systemd host, but the service itself is an observation component rather than an authorization mechanism.
 
 ## State model
 
@@ -82,6 +95,10 @@ DISCOVER
 
 No install operation should jump directly from discovery to execution.
 
+## Existing build integration
+
+The existing ISO and Ubuntu installer paths remain the established image/provisioning contracts. This master installer adds the recent native-tool installation layer rather than silently replacing those paths.
+
 ## Project reference
 
-**Max Rupplin — MEARVK LLC — 2026** records project-level development and maintenance attention. Upstream kernel, Ubuntu, Java, JavaFX, QEMU, and other third-party attribution remains governed by their applicable licenses and provenance.
+**Max Rupplin — MEARVK LLC — 2026** records project-level development and maintenance attention. Upstream kernel, Ubuntu, GCC, Java, JavaFX, QEMU, and other third-party attribution remains governed by their applicable licenses and provenance.
