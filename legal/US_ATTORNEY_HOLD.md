@@ -13,20 +13,21 @@ This record establishes a mature standard for handling identity, attribution, so
 
 The project should not fill evidentiary gaps with inference. Where a proposition has not been personally verified by the project, it should be recorded as **not personally verified**, rather than transformed into either a positive or negative claim about the person concerned.
 
-The record distinguishes:
+## 2. Draft — mature authorship consensus
 
-1. identity;
-2. historical authorship;
-3. public technical record;
-4. personal encounter or verification;
-5. professional credentials;
-6. institutional affiliation;
-7. copyright/property interests;
-8. project custody and modification;
-9. legal review;
-10. unresolved questions.
+For authorship and provenance review, the project requests a **mature consensus record at the level of a serious PhD proposal**: source identification, evidence for attribution, distinction between original work and later modification, competing or unresolved attributions, and an explicit confidence/evidence statement.
 
-## 2. One-person / one-record principle
+This is a project documentation standard. It is not a degree, legal credential, court finding, or institutional certification.
+
+The review should **not use unpublished psychological documents or psychological profiling as evidence for general citizenship, identity, authorship, or source-origin review**. Such material is outside this provenance standard and should not be introduced merely to increase confidence in an authorship conclusion.
+
+The central principle is:
+
+> **The person is the legal subject. A vote, consensus, or review result is a decision/evidence mechanism; it is not a substitute for the person's identity, rights, or underlying source evidence.**
+
+Consensus may strengthen confidence in a provenance conclusion, but it does not manufacture copyright, citizenship, institutional affiliation, professional credentials, or legal status.
+
+## 3. One-person / one-record principle
 
 For repository attribution purposes, an identified natural person is represented by one identity record unless reliable evidence establishes that two records represent different persons.
 
@@ -34,7 +35,7 @@ Repeated appearances of a contributor's name therefore resolve to the same ident
 
 This is an **identity-management rule**, not a presumption that every statement about the person is true.
 
-## 3. Christoph Hellwig — careful record
+## 4. Christoph Hellwig — careful record
 
 The repository may identify Christoph Hellwig as a historical Linux kernel contributor where the source tree and reputable historical records support that attribution.
 
@@ -62,7 +63,7 @@ source attribution
       +-- professional credential: separate question
 ```
 
-## 4. Public record versus personal record
+## 5. Public record versus personal record
 
 A public record is evidence that a person or contribution appears in an identified source. It is not the same thing as the project personally knowing or having met that person.
 
@@ -80,7 +81,7 @@ The project therefore uses these independent fields:
 
 No field silently substitutes for another.
 
-## 5. Law Clearance Above Grade I
+## 6. Law Clearance Above Grade I
 
 **Law Clearance Above Grade I (G1+)** is an internal elevated-review classification for matters receiving legal attention beyond ordinary repository recordkeeping.
 
@@ -106,7 +107,7 @@ follow-up
 
 Payment or commissioning may be recorded as a fact about the review process. It should never be represented as proof that the resulting legal position is correct, official, or endorsed by an institution unless the evidence separately establishes that proposition.
 
-## 6. Institutional and professional claims
+## 7. Institutional and professional claims
 
 The following are independent propositions:
 
@@ -125,7 +126,7 @@ person
 
 If the repository records one of these propositions, it should retain the evidence supporting that exact proposition.
 
-## 7. Harvard-related records
+## 8. Harvard-related records
 
 The project should distinguish:
 
@@ -139,7 +140,7 @@ Only the appropriate underlying evidence may support the corresponding statement
 
 The absence of a Harvard record in the project's search is recorded as **not established by the project**, not as proof that the person never had a relationship with Harvard.
 
-## 8. U.S. Attorney Hold
+## 9. U.S. Attorney Hold
 
 **U.S. Attorney Hold** is an internal preservation flag used to prevent premature deletion, rewriting, or loss of records relevant to attribution or legal review.
 
@@ -158,7 +159,7 @@ A hold may preserve:
 
 The flag does not imply that a U.S. Attorney, DOJ, federal court, Harvard University, or other authority issued an external hold unless an authoritative record establishes that fact.
 
-## 9. International-law and cross-border issues
+## 10. International-law and cross-border issues
 
 The repository may identify a question as involving international law, foreign institutions, cross-border authorship, or jurisdiction. It should not convert that identification into a legal conclusion without authoritative evidence or qualified legal review.
 
@@ -166,7 +167,7 @@ The mature rule is:
 
 > **Unknown is a valid state. Unverified is a valid state. Neither should be silently promoted to true or false.**
 
-## 10. Source, ownership, and custody
+## 11. Source, ownership, and custody
 
 The following must remain separate:
 
@@ -190,7 +191,7 @@ legal review
 
 For upstream Linux material, existing authorship and license notices remain authoritative. MEARVK may separately document project modifications, maintenance, integration, and architectural attention.
 
-## 11. Driver and kernel application
+## 12. Driver and kernel application
 
 For every significant driver or kernel subsystem, the mature record should eventually contain:
 
@@ -208,11 +209,12 @@ test status
 security review status
 concords
 open questions
+consensus/evidence level
 ```
 
 A source file should not receive a new authorship notice merely because it is present in the MEARVK repository. A genuine MEARVK modification may be recorded without deleting or obscuring the original attribution.
 
-## 12. Evidentiary maturity levels
+## 13. Evidentiary maturity levels
 
 ```text
 E0  — unknown / unclassified
@@ -225,7 +227,7 @@ E5  — formal legal/institutional determination
 
 An internal assertion may begin an investigation, but it should not be presented as an E3–E5 conclusion without corresponding evidence.
 
-## 13. Review and release
+## 14. Review and release
 
 A hold may be closed internally only after:
 
@@ -238,9 +240,10 @@ A hold may be closed internally only after:
 7. legal questions are referred appropriately;
 8. privileged/confidential information is protected;
 9. the repository record is internally consistent;
-10. unresolved matters are explicitly listed.
+10. unresolved matters are explicitly listed;
+11. the authorship consensus record identifies its evidence and limitations.
 
-## 14. Adult-record standard
+## 15. Adult-record standard
 
 The project's preferred legal-technical style is neither credulous nor accusatory.
 
@@ -261,8 +264,8 @@ The project may therefore say **"not personally verified by MEARVK"** without sa
 
 Likewise, it may say **"documented in the upstream source"** without saying **"personally confirmed by MEARVK."**
 
-## 15. Final rule
+## 16. Final rule
 
-> **Identify once. Attribute from evidence. Preserve the original record. Distinguish personal knowledge from documentary evidence. Distinguish custody from ownership. Distinguish paid review from legal conclusion. Record uncertainty without converting it into accusation.**
+> **Identify once. Attribute from evidence. Preserve the original record. Distinguish personal knowledge from documentary evidence. Distinguish custody from ownership. Distinguish paid review from legal conclusion. Keep psychological material outside ordinary provenance review. Let the person remain the legal subject; let consensus remain an evidence and decision mechanism.**
 
 This framework is intended to give Ubuntu Determinant a mature, auditable, and legally cautious record for source and identity questions.
