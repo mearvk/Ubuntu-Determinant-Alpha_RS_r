@@ -24,22 +24,41 @@ NATIVE_THEN_JAVA
 
 The native component is always explicit in the manifest when present.
 
-## Java compiler relationship
+## Compiler and packaging relationship
 
-The ordinary Java compiler remains responsible for Java source to JVM class-file compilation:
+The repository contains an existing XMC implementation at `tools/xmc/`.
+
+XMC is the **XML Metaclass Compiler**. Its documented target is the SecureJDK 28 `.xclass` format. `tools/xmc/xmc.c` is the compiler source and the repository also contains a built `xmc` executable.
+
+The current documented compilation relationship is:
+
+```text
+Java / Python source
+        |
+        v
+       XMC
+        |
+        v
+     .xclass
+        |
+        v
+SecureJDK 28 structural loaders
+```
+
+XMC is therefore not the same thing as `javac` and is not currently defined as the ASYSMA binary packer. `javac` remains responsible for ordinary Java bytecode compilation:
 
 ```text
 Java source -> javac -> .class
 ```
 
-ASYSMA packaging is a separate concern:
+ASYSMA packaging remains a separate concern:
 
 ```text
-.class + metadata + optional native payload
-                    -> ASYSMA packer -> .asysma
+.class + .xclass + metadata + optional native payload
+                         -> ASYSMA packager -> .asysma
 ```
 
-A future SecureJDK tool may provide a convenient source-to-ASYSMA workflow, but ASYSMA does not require `javac` itself to become a native compiler.
+A future SecureJDK/XMC toolchain may automate this pipeline, but the format specifications must keep compilation, metadata generation, packaging, and execution as separately auditable stages.
 
 ## Layout
 
@@ -50,6 +69,7 @@ Integrity descriptor
 Native platform payload(s), when declared
 ASYSMA policy
 Java/class payload(s), when declared
+Optional XMC/.xclass metadata
 Optional resources
 ```
 
@@ -86,6 +106,7 @@ entry_type
 java_entry
 native_entry
 native_architecture
+xmc_metadata
 icon_family
 icon_revision
 ```
@@ -136,6 +157,12 @@ OS loader
   -> Java application
 ```
 
+## XMC metadata stage
+
+When `.xclass` metadata is included, ASYSMA records its presence and integrity but does not silently reinterpret it as native machine code. The SecureJDK 28 structural loaders remain responsible for the documented `.xclass` loading path.
+
+The repository's XMC documentation describes bounded parsing, no source execution during compilation, path validation, symlink protections, bounded input, and SHA-256 provenance metadata. Those protections are useful reference requirements for any future ASYSMA metadata ingestion path.
+
 ## Initial icon identity
 
 The first ASYSMA release uses the original CMD icon family:
@@ -148,8 +175,8 @@ CMD was the original program identity; ASYSMA initially inherits that icon set.
 
 Unknown host observations are distinct from native contract failures. No ASYSMA component may elevate privileges, disable OS security controls, or create an unkillable process. Native payloads must validate all offsets, sizes, architecture fields, and handoff structures before use.
 
-Native execution must never be silently inferred from the presence of Java classes. A native component is an explicit package capability and must pass the applicable integrity and policy gates.
+Native execution must never be silently inferred from the presence of Java classes or `.xclass` metadata. A native component is an explicit package capability and must pass the applicable integrity and policy gates.
 
 ## Compatibility
 
-Format, Direct interface, bootstrap, and Java bridge versions are independent. A reader must reject unsupported mandatory features rather than guessing their meaning.
+Format, Direct interface, bootstrap, Java bridge, XMC metadata, and SecureJDK versions are independent. A reader must reject unsupported mandatory features rather than guessing their meaning.
