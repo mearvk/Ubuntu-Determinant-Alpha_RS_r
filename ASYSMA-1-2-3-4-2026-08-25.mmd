@@ -1,0 +1,101 @@
+# ASYSMA 1-2-3-4 Design Record — 2026-08-25
+
+```mermaid
+flowchart TD
+    A[1 — Native Foundation] --> B[2 — Host and Integrity]
+    B --> C[3 — Execution Bridge]
+    C --> D[4 — Java / Application]
+    A --> N[Native OS representation]
+    N --> B
+    B --> P{Entry Type}
+    P -->|JAVA| J[SecureJDK 28]
+    P -->|NATIVE| X[Native Application]
+    P -->|NATIVE_THEN_JAVA| T[Native Bootstrap] --> J
+    J --> APP[Java Application]
+```
+
+## 1 — Native Foundation
+
+The initial ASYSMA execution model targets modern x86-64 Intel/AMD systems and relies on the operating system's native executable loader. ASYSMA does not replace ELF, PE/COFF, or Mach-O.
+
+The native bootstrap is intentionally small. It establishes the platform handoff and provides the boundary into the ASYSMA runtime rather than attempting to become a second operating system.
+
+## 2 — Host and Integrity
+
+After native startup, ASYSMA establishes a host profile and evaluates package integrity before application execution.
+
+Known observations include:
+
+- CPU architecture
+- operating-system family
+- operating-system version
+- available memory
+- available storage
+- required runtime capabilities
+
+Integrity and policy remain separate concerns. A valid signature or hash does not by itself grant authorization.
+
+Malformed offsets, sizes, architecture fields, or handoff structures must cause controlled refusal rather than execution.
+
+## 3 — Execution Bridge
+
+ASYSMA supports three explicit entry modes:
+
+```text
+JAVA
+NATIVE
+NATIVE_THEN_JAVA
+```
+
+### JAVA
+
+```text
+.asysma → integrity/policy → SecureJDK 28 → Java
+```
+
+### NATIVE
+
+```text
+.asysma → native bootstrap → Direct/host profile → policy → native application
+```
+
+### NATIVE_THEN_JAVA
+
+```text
+.asysma → native bootstrap → Direct/host profile → integrity/policy → SecureJDK 28 → Java
+```
+
+A native component is always declared explicitly. Java classes do not silently confer native execution capability.
+
+## 4 — Java and Application Layer
+
+The ordinary Java compilation contract remains:
+
+```text
+Java source → javac → .class
+```
+
+ASYSMA packaging is a subsequent step:
+
+```text
+.class + metadata + optional native payload → ASYSMA packager → .asysma
+```
+
+A future SecureJDK 28 toolchain may provide a convenient source-to-ASYSMA workflow without requiring `javac` itself to become a native compiler.
+
+The reference managed runtime for the initial profile is SecureJDK 28.
+
+## Current implementation concerns
+
+1. Freeze the binary ASYSMA header encoding.
+2. Define the concrete integrity/cryptographic profile.
+3. Implement the ASYSMA reader and bounds checker.
+4. Implement the packer for `.class` and native payloads.
+5. Implement native-to-Java handoff.
+6. Define the XMC compiler/packaging role if the repository's XMC component is introduced.
+7. Preserve the CMD-origin icon identity for initial ASYSMA packages.
+8. Keep format, Direct interface, native bootstrap, Java bridge, and SecureJDK versions independently negotiable.
+
+## Status
+
+This dated record captures the design state for 2026-08-25. It is a design/engineering record, not a claim that every binary runtime component listed above has already been implemented.
