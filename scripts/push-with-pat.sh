@@ -17,16 +17,18 @@ if [[ -z "${GITHUB_USER}" || -z "${GITHUB_PAT}" ]]; then
 fi
 
 # Do not persist the PAT in Git config, shell history, or the repository.
-# Supply credentials only to this single push operation.
+# Git invokes this helper with a prompt string. Keep credentials in the
+# environment only for this push and remove the helper afterward.
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS="$(mktemp)"
+export GITHUB_USER GITHUB_PAT
 trap 'rm -f "$GIT_ASKPASS"; unset GITHUB_PAT GITHUB_USER' EXIT
 
 cat > "$GIT_ASKPASS" <<'ASKPASS'
 #!/usr/bin/env bash
 case "$1" in
-  *Username*) printf '%s\n' "$GITHUB_USER" ;;
-  *Password*) printf '%s\n' "$GITHUB_PAT" ;;
+  *Username*) printf '%s\n' "${GITHUB_USER}" ;;
+  *Password*|*password*|*PAT*|*token*) printf '%s\n' "${GITHUB_PAT}" ;;
   *) printf '\n' ;;
 esac
 ASKPASS
@@ -38,6 +40,18 @@ if git remote get-url origin >/dev/null 2>&1; then
 else
   git remote add origin "$REMOTE_URL"
 fi
+
+# Verify that origin points to the intended repository without exposing
+# credentials. The PAT is supplied only through GIT_ASKPASS.
+ORIGIN_URL="$(git remote get-url origin)"
+case "$ORIGIN_URL" in
+  https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git|https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted)
+    ;;
+  *)
+    echo "origin does not point to $REMOTE_URL" >&2
+    exit 1
+    ;;
+esac
 
 echo 'Pushing current branch with PAT authentication...'
 git push origin HEAD
