@@ -1,15 +1,19 @@
-.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link
+.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test
 
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic
 TARGET := desktop_install_probe
 SRC := desktop_install_probe.c
+NXTT_TARGET := nxtt
+NXTT_SRC := nxtt-uninstaller.c
 
 USER_ROOT ?= /user
 USR_ROOT ?= /usr
 DECK_ROOT ?= /deck
 INSTALL_CHOICE ?= user-bin
 FRONT_LINK ?= ../../desktop_install_probe
+NXTT_BIN := $(USER_ROOT)/bin
+NXTT_RUNNABLES := $(USER_ROOT)/runnables
 
 USER_BIN := $(USER_ROOT)/bin
 USER_RUNNABLES := $(USER_ROOT)/runnables
@@ -18,10 +22,13 @@ USR_RUNNABLES := $(USR_ROOT)/runnables
 DECK_BIN := $(DECK_ROOT)/bin
 DECK_RUNNABLES := $(DECK_ROOT)/runnables
 
-all: $(TARGET)
+all: $(TARGET) $(NXTT_TARGET)
 
 $(TARGET): $(SRC) desktop_install_probe.h
 	$(CC) $(CFLAGS) -o $@ $(SRC)
+
+$(NXTT_TARGET): $(NXTT_SRC)
+	$(CC) $(CFLAGS) -o $@ $(NXTT_SRC)
 
 install: $(TARGET)
 	@case "$(INSTALL_CHOICE)" in \
@@ -62,6 +69,23 @@ install-deck-runnables: $(TARGET)
 	install -m 0755 $(TARGET) $(DECK_RUNNABLES)/$(TARGET)
 	@$(MAKE) update-front-link TARGET_DIR=$(DECK_RUNNABLES)
 
+nxtt: $(NXTT_TARGET)
+
+nxtt-install: $(NXTT_TARGET)
+	install -d $(NXTT_BIN) $(NXTT_RUNNABLES)
+	install -m 0755 $(NXTT_TARGET) $(NXTT_BIN)/$(NXTT_TARGET)
+	install -m 0755 $(NXTT_TARGET) $(NXTT_RUNNABLES)/$(NXTT_TARGET)
+	@echo "Installed $(NXTT_TARGET) to $(NXTT_BIN) and $(NXTT_RUNNABLES)"
+
+nxtt-uninstall:
+	rm -f $(NXTT_BIN)/$(NXTT_TARGET) $(NXTT_RUNNABLES)/$(NXTT_TARGET)
+
+nxtt-test: $(NXTT_TARGET)
+	./$(NXTT_TARGET) >/dev/null
+
+nxtt-clean:
+	rm -f $(NXTT_TARGET)
+
 update-path:
 	@if [ -n "$(DIR)" ] && [ -n "$$HOME" ]; then \
 		profile="$$HOME/.profile"; \
@@ -92,7 +116,7 @@ update-front-link:
 	fi
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(NXTT_TARGET)
 
 uninstall:
 	rm -f $(USER_BIN)/$(TARGET) $(USER_RUNNABLES)/$(TARGET) \
