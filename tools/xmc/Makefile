@@ -20,13 +20,13 @@ PACKSRC    = asysma_pack.c
 BOOT_SRC   = asysma-bootstrap.c
 
 COMMON_CPPFLAGS = $(CPPFLAGS) -DXMC_INSTALL_PREFIX=\"$(PREFIX)\"
-COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS)
+COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS) -include BUILD-POSIX-COMPAT.h
 
 .PHONY: all clean install uninstall test process-test clean-user-integration
 
 all: $(BIN) $(PACKER) $(BOOTSTRAP)
 
-$(CORE): $(SRC)
+$(CORE): $(SRC) BUILD-POSIX-COMPAT.h
 	$(CC) $(COMMON_CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(PACKER): $(PACKSRC) asysma_native_layout.h
