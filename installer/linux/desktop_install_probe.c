@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include "desktop_install_probe.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +12,7 @@ static int is_dir(const char *p) { struct stat s; return stat(p, &s) == 0 && S_I
 
 static int run_clone(const char *dst) {
     char cmd[PATH_MAX + 256];
-    snprintf(cmd, sizeof cmd, "git clone --depth 1 https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git '%s'", dst);
+    snprintf(cmd, sizeof cmd, "git clone --depth 1 '%s' '%s'", DIP_REPOSITORY_URL, dst);
     puts("[run] cloning repository");
     return system(cmd);
 }
@@ -22,7 +23,7 @@ static int locate_repo(char *out, size_t n) {
     if (is_dir(".git") && realpath(".", out)) return 0;
     if (is_dir("Ubuntu.Determinant.Beta.Restricted/.git") && realpath("Ubuntu.Determinant.Beta.Restricted", out)) return 0;
     if (home) {
-        snprintf(p, sizeof p, "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
+        snprintf(p, sizeof p, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH);
         if (is_dir(p) && realpath(p, out)) return 0;
     }
     (void)n;
@@ -39,21 +40,21 @@ int main(int argc, char **argv) {
 
     if (locate_repo(repo, sizeof repo) != 0) {
         if (!home) { fputs("[error] HOME is unavailable.\n", stderr); return 2; }
-        snprintf(repo, sizeof repo, "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
+        snprintf(repo, sizeof repo, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH);
         printf("[info] clone not found: %s\n", repo);
         if (run_clone(repo) != 0) { fputs("[error] clone failed; no installation performed.\n", stderr); return 3; }
         if (!realpath(repo, repo)) { fputs("[error] cloned path cannot be resolved.\n", stderr); return 3; }
     }
 
     printf("[ok] Git clone: %s\n", repo);
-    snprintf(manifest, sizeof manifest, "%s/installer/install-manifest.txt", repo);
-    snprintf(script, sizeof script, "%s/installer/install-native.sh", repo);
+    snprintf(manifest, sizeof manifest, "%s/%s", repo, DIP_INSTALL_MANIFEST);
+    snprintf(script, sizeof script, "%s/%s", repo, DIP_NATIVE_INSTALLER);
 
     if (!exists(manifest) && !exists(script)) {
         fputs("[error] no recognized install set found.\n", stderr); return 4;
     }
     printf("[ok] Install manifest: %s%s\n", manifest, exists(manifest) ? "" : " (not present; script found)");
-    printf("[ok] Desktop preview: %s/installer/DESKTOP_PREVIEW_STEP_1.md\n", repo);
+    printf("[ok] Desktop preview: %s/%s\n", repo, DIP_PREVIEW_DOCUMENT);
 
     if (!install) {
         puts("[dry-run] discovery complete; nothing installed.");
