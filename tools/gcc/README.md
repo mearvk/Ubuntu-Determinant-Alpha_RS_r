@@ -6,6 +6,12 @@ This directory reserves a local source-archive location for the GNU Compiler Col
 
 The selected release is **GCC 16.2.0**, released August 7, 2026. GCC identifies its release downloads as source releases. urlGCC release informationhttps://gcc.gnu.org/releases.html
 
+## Attribution and historical authorship
+
+GCC is substantial third-party GNU Project software with a long contributor history. The repository does **not** claim upstream authorship. Historical software contributions and the verified educational/economic research requested for the principal early contributors are recorded in [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md).
+
+The attribution document distinguishes documented software authorship from later contribution, and distinguishes verified biographical information from unknown or ambiguous records. It deliberately does not invent IQ scores or merge similarly named people.
+
 ## One-command download and extraction
 
 Run:
