@@ -16,7 +16,6 @@ if [[ -z "$GITHUB_USER" || -z "$GITHUB_PAT" ]]; then
 fi
 
 # Keep the PAT out of the remote URL, Git config, shell history, and disk.
-# A temporary credential-helper process supplies it directly to Git.
 export GITHUB_USER GITHUB_PAT
 export GIT_TERMINAL_PROMPT=0
 
@@ -38,9 +37,11 @@ esac
 
 echo 'Pushing current branch with PAT authentication...'
 
-# The ! helper is process-local and disappears when this Git command exits.
-# GitHub accepts the PAT as the HTTPS password; no password is used.
-git -c credential.helper='!f() { printf "username=%s\\npassword=%s\\n" "$GITHUB_USER" "$GITHUB_PAT"; }; f' \
+# Git credential protocol helper. GitHub uses the PAT as the HTTPS password.
+# This helper is configured only for this Git invocation.
+CREDENTIAL_HELPER='!f() { printf "protocol=https\\nhost=github.com\\npath=mearvk/Ubuntu.Determinant.Beta.Restricted.git\\nusername=%s\\npassword=%s\\n\\n" "$GITHUB_USER" "$GITHUB_PAT"; }; f'
+
+git -c credential.helper="$CREDENTIAL_HELPER" \
     -c credential.useHttpPath=true \
     push origin HEAD
 
