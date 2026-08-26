@@ -6,43 +6,26 @@ REMOTE_URL="https://github.com/${REPO}.git"
 
 printf 'GitHub username: '
 read -r GITHUB_USER
-
 printf 'GitHub PAT (input hidden): '
 read -rs GITHUB_PAT
 printf '\n'
 
-if [[ -z "${GITHUB_USER}" || -z "${GITHUB_PAT}" ]]; then
+if [[ -z "$GITHUB_USER" || -z "$GITHUB_PAT" ]]; then
   echo 'Username and PAT are required.' >&2
   exit 1
 fi
 
-# Do not persist the PAT in Git config, shell history, or the repository.
-# Git invokes this helper with a prompt string. Keep credentials in the
-# environment only for this push and remove the helper afterward.
-export GIT_TERMINAL_PROMPT=0
-export GIT_ASKPASS="$(mktemp)"
+# Keep the PAT out of the remote URL, Git config, shell history, and disk.
+# A temporary credential-helper process supplies it directly to Git.
 export GITHUB_USER GITHUB_PAT
-trap 'rm -f "$GIT_ASKPASS"; unset GITHUB_PAT GITHUB_USER' EXIT
+export GIT_TERMINAL_PROMPT=0
 
-cat > "$GIT_ASKPASS" <<'ASKPASS'
-#!/usr/bin/env bash
-case "$1" in
-  *Username*) printf '%s\n' "${GITHUB_USER}" ;;
-  *Password*|*password*|*PAT*|*token*) printf '%s\n' "${GITHUB_PAT}" ;;
-  *) printf '\n' ;;
-esac
-ASKPASS
-chmod 700 "$GIT_ASKPASS"
-
-# Use the existing origin when available; otherwise create it.
 if git remote get-url origin >/dev/null 2>&1; then
   echo 'Using existing origin remote.'
 else
   git remote add origin "$REMOTE_URL"
 fi
 
-# Verify that origin points to the intended repository without exposing
-# credentials. The PAT is supplied only through GIT_ASKPASS.
 ORIGIN_URL="$(git remote get-url origin)"
 case "$ORIGIN_URL" in
   https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git|https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted)
@@ -54,6 +37,13 @@ case "$ORIGIN_URL" in
 esac
 
 echo 'Pushing current branch with PAT authentication...'
-git push origin HEAD
+
+# The ! helper is process-local and disappears when this Git command exits.
+# GitHub accepts the PAT as the HTTPS password; no password is used.
+git -c credential.helper='!f() { printf "username=%s\\npassword=%s\\n" "$GITHUB_USER" "$GITHUB_PAT"; }; f' \
+    -c credential.useHttpPath=true \
+    push origin HEAD
+
+unset GITHUB_PAT GITHUB_USER
 
 echo 'Push completed. The PAT was not written to Git configuration.'
