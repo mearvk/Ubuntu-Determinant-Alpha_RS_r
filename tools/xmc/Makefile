@@ -20,7 +20,8 @@ PACKSRC    = asysma_pack.c
 BOOT_SRC   = asysma-bootstrap.c
 
 COMMON_CPPFLAGS = $(CPPFLAGS) -DXMC_INSTALL_PREFIX=\"$(PREFIX)\"
-COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS) -include BUILD-POSIX-COMPAT.h
+COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS) -include BUILD-POSIX-COMPAT.h \
+                  -Wno-error=stringop-truncation -Wno-error=format-truncation
 
 .PHONY: all clean install uninstall test process-test clean-user-integration
 
@@ -60,12 +61,11 @@ uninstall:
 	      $(DESTDIR)$(PREFIX)/bin/$(PACKER) $(DESTDIR)$(PREFIX)/bin/$(BOOTSTRAP) \
 	      $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/xmc-asysma.svg \
 	      $(DESTDIR)$(PREFIX)/share/mime/packages/xmc-asysma.xml
+	rm -f $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/mimetypes/xmc-asysma.svg
+
 
 test: all
-	@printf '%s\n' 'public class TestClass { public static void main(String[] a) {} }' > /tmp/TestClass.java
-	./$(BIN) /tmp/TestClass.java || test $$? -eq 1
-	@rm -f /tmp/TestClass.java /tmp/TestClass.xclass /tmp/TestClass.asysma /tmp/TestClass.asysma.desktop
+	@./tests/test_xmc.sh
 
 process-test: all
-	@chmod +x ./tests/run-xmc-process.sh
-	@./tests/run-xmc-process.sh
+	@./tests/test_xmc_process.sh
