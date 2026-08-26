@@ -12,7 +12,11 @@ static int is_dir(const char *p) { struct stat s; return stat(p, &s) == 0 && S_I
 
 static int run_clone(const char *dst) {
     char cmd[PATH_MAX + 256];
-    snprintf(cmd, sizeof cmd, "git clone --depth 1 '%s' '%s'", DIP_REPOSITORY_URL, dst);
+    int written = snprintf(cmd, sizeof cmd, "git clone --depth 1 '%s' '%s'", DIP_REPOSITORY_URL, dst);
+    if (written < 0 || (size_t)written >= sizeof cmd) {
+        fputs("[error] clone command path is too long.\n", stderr);
+        return -1;
+    }
     puts("[run] cloning repository");
     return system(cmd);
 }
@@ -20,14 +24,34 @@ static int run_clone(const char *dst) {
 static int locate_repo(char *out, size_t n) {
     const char *home = getenv("HOME");
     char p[PATH_MAX];
-    if (is_dir(".git") && realpath(".", out)) return 0;
-    if (is_dir("Ubuntu.Determinant.Beta.Restricted/.git") && realpath("Ubuntu.Determinant.Beta.Restricted", out)) return 0;
-    if (home) {
-        snprintf(p, sizeof p, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH);
-        if (is_dir(p) && realpath(p, out)) return 0;
+    char resolved[PATH_MAX];
+
+    if (is_dir(".git") && realpath(".", resolved)) {
+        if (strlen(resolved) >= n) return -1;
+        strcpy(out, resolved);
+        return 0;
     }
-    (void)n;
+    if (is_dir("Ubuntu.Determinant.Beta.Restricted/.git") &&
+        realpath("Ubuntu.Determinant.Beta.Restricted", resolved)) {
+        if (strlen(resolved) >= n) return -1;
+        strcpy(out, resolved);
+        return 0;
+    }
+    if (home) {
+        if (snprintf(p, sizeof p, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH) >= (int)sizeof p)
+            return -1;
+        if (is_dir(p) && realpath(p, resolved)) {
+            if (strlen(resolved) >= n) return -1;
+            strcpy(out, resolved);
+            return 0;
+        }
+    }
     return -1;
+}
+
+static int join_path(char *out, size_t n, const char *base, const char *leaf) {
+    int written = snprintf(out, n, "%s/%s", base, leaf);
+    return written >= 0 && (size_t)written < n ? 0 : -1;
 }
 
 int main(int argc, char **argv) {
@@ -40,15 +64,25 @@ int main(int argc, char **argv) {
 
     if (locate_repo(repo, sizeof repo) != 0) {
         if (!home) { fputs("[error] HOME is unavailable.\n", stderr); return 2; }
-        snprintf(repo, sizeof repo, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH);
+        if (snprintf(repo, sizeof repo, "%s/%s", home, DIP_DEFAULT_CLONE_SUBPATH) >= (int)sizeof repo) {
+            fputs("[error] clone destination path is too long.\n", stderr); return 2;
+        }
         printf("[info] clone not found: %s\n", repo);
         if (run_clone(repo) != 0) { fputs("[error] clone failed; no installation performed.\n", stderr); return 3; }
-        if (!realpath(repo, repo)) { fputs("[error] cloned path cannot be resolved.\n", stderr); return 3; }
+        {
+            char resolved[PATH_MAX];
+            if (!realpath(repo, resolved) || strlen(resolved) >= sizeof repo) {
+                fputs("[error] cloned path cannot be resolved.\n", stderr); return 3;
+            }
+            strcpy(repo, resolved);
+        }
     }
 
     printf("[ok] Git clone: %s\n", repo);
-    snprintf(manifest, sizeof manifest, "%s/%s", repo, DIP_INSTALL_MANIFEST);
-    snprintf(script, sizeof script, "%s/%s", repo, DIP_NATIVE_INSTALLER);
+    if (join_path(manifest, sizeof manifest, repo, DIP_INSTALL_MANIFEST) != 0 ||
+        join_path(script, sizeof script, repo, DIP_NATIVE_INSTALLER) != 0) {
+        fputs("[error] install-set path is too long.\n", stderr); return 4;
+    }
 
     if (!exists(manifest) && !exists(script)) {
         fputs("[error] no recognized install set found.\n", stderr); return 4;
