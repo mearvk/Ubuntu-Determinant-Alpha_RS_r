@@ -1,10 +1,10 @@
-# SCIENTOLOGICAL — A Concesto of Gods, Norms, Ethics, Colleges, and Reads
+# SCIENTOLOGICAL — A Concesto of Gods, Norms, Ethics, Colleges, Reads & Market Life
 
-> **Scope:** This is a historical, philosophical, and educational document. “Scientological” here names the proposed **concesto**: a made-in-the-middle account of man, ethics, learning, institutions, and the names attached to ideas. It is not presented as scientific proof of supernatural beings, nor as an endorsement of every claim made by any religious or philosophical movement.
+> **Scope:** This is a historical, philosophical, and educational document. “Scientological” here names the proposed **concesto**: a made-in-the-middle account of man, ethics, learning, institutions, relationships, and the names attached to ideas. It is not presented as scientific proof of supernatural beings, nor as an endorsement of every claim made by any religious or philosophical movement.
 
 ## 1. The Concesto
 
-A **concesto** is the middle-made account: neither gossip nor an attempt to possess every private fact, but a structured record of the facts, names, readings, institutions, arguments, and ethical norms needed to understand a subject.
+A **concesto** is the middle-made account: neither gossip nor an attempt to possess every private fact, but a structured record of the facts, names, readings, institutions, arguments, ethical norms, and ordinary social practices needed to understand a subject.
 
 The governing rule is:
 
@@ -251,8 +251,69 @@ His ethical standing is earned in the middle of ordinary life.
 
 The concesto therefore rejects both worship of the individual and reduction of the individual to gossip.
 
-## 13. Golden Ethical Rule
+## 13. Market Norms, Friendship, Pleasure, and Consent
 
-> **Know what is claimed. Know who said it. Know what evidence supports it. Know what remains uncertain. Act toward other people with dignity while preserving their freedom to disagree.**
+Ordinary American life contains lawful markets and voluntary social relationships. These may be studied as **market-and-social norms**, but they should not be confused with moral perfection or with universal standards for every person.
 
-That is the proposed ethical foundation for the 1992 two-year norming primer and for the broader study of Gods, norms of man, colleges, reads, institutions, and the free civic life of the United States.
+Relevant examples include:
+
+- consensual friendship;
+- voluntary association;
+- dating and adult romantic relationships;
+- lawful entertainment and hospitality;
+- restaurants and public dining;
+- advertising and consumer choice;
+- gifts, services, and ordinary commercial exchange;
+- lawful adult pleasure where all participants are consenting adults.
+
+The ethical baseline is **consent, capacity, honesty, safety, reciprocity, and freedom from coercion**. Marketing may describe or encourage a product or experience, but marketing does not manufacture consent and cannot convert coercion into an ethical transaction.
+
+### Public pleasure and the restaurant norm
+
+Restaurants provide a useful example of ordinary public life: people eat, converse, meet friends, celebrate, conduct business, and experience pleasure in a shared civic environment. No spiritual or ethical status is required to participate.
+
+A person's private theology—including a belief that one's “karma” or spiritual standing is unusually high—does not establish a special right to public space or to exemption from ordinary social norms.
+
+This framework may use a **Ka-God** or similar phrase as a symbolic/metaphorical category in a story, but it must be labeled as such rather than treated as a factual supernatural rank.
+
+### Market-norm equation
+
+For analytical purposes:
+
+`Social Market Norm = voluntary exchange + informed consent + lawful conduct + reciprocal benefit`
+
+and:
+
+`Ethical Public Pleasure = consent + dignity + safety + freedom + consideration of others`
+
+These are project heuristics, not government statistics or scientific laws.
+
+## 14. Norming Units and the “Man 8 / Self 2-1-1” Convention
+
+The project may retain the proposed phrases **“Man 8”** and **“native ethics self 2-1-1”** as internal symbolic labels. They are not standardized anthropological, psychological, medical, or legal classifications.
+
+A proposed interpretation is:
+
+- **Man 8** — a high-order grounded adult-development/story unit;
+- **Self 2-1-1** — a compact ethics/self-governance structure: responsibility, restraint, and reciprocity;
+- **two US norms carried** — a symbolic capacity/load unit rather than literal human body-weight equivalence;
+- **18 bodies per lifetime norm** — a cumulative influence/load metaphor, not a physiological measurement;
+- **18+ Manning-style norms** — an aggregate narrative influence category;
+- **1 in 44,000** — a proposed rarity parameter that requires empirical data before being treated as a probability;
+- **440+ US grounding norms** — an exceptional aggregate-scale story variable, not a population statistic.
+
+The model therefore preserves the vocabulary while preventing symbolic quantities from being mistaken for facts about human biology, intelligence, sexuality, or civic rank.
+
+## 15. Long Norms and the Free Person
+
+A person may develop through a long sequence of ordinary life experiences: childhood, education, friendship, work, love, family, civic responsibility, failure, recovery, and old age.
+
+The ethical objective is not to produce a “giant” person who stands above other citizens. It is to produce a person capable of **standing among other free persons without requiring their submission**.
+
+That distinction is essential to the American freedom principle.
+
+## 16. Golden Ethical Rule
+
+> **Know what is claimed. Know who said it. Know what evidence supports it. Know what remains uncertain. Act toward other people with dignity while preserving their freedom to disagree, associate, form friendships, pursue lawful pleasure, and participate in the ordinary market of American life.**
+
+That is the proposed ethical foundation for the 1992 two-year norming primer and for the broader study of Gods, norms of man, colleges, reads, institutions, market life, consensual relationships, and the free civic life of the United States.
