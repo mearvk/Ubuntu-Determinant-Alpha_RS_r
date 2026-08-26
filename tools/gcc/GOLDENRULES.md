@@ -32,7 +32,7 @@ Political conditions may be recorded as period metadata—tax policy, research f
 
 ## 3. Deliberated software-norm IQ model — project convention only
 
-The project now permits a **deliberated IQ-equivalent scale** for scenario modeling, at the user's requested thresholds. This is **not a claim about the actual IQ of any GCC contributor** and must never be presented as a measured psychological result.
+The project permits a **deliberated IQ-equivalent scale** for scenario modeling at selected thresholds. This is **not a claim about the actual IQ of any GCC contributor** and must never be presented as a measured psychological result.
 
 | Career / influence band | Project norm | Interpretation |
 |---|---:|---|
@@ -82,16 +82,14 @@ The 2020–2024 Census profile reports a **median owner-occupied housing value o
 
 Cary's FY2026 budget reports **529 miles of maintained streets**, **493 miles of sidewalk**, **108 miles of greenway**, and **28 miles of bike lanes** estimated for FY2026. FY2024 had 519 street miles and 300 miles rated good or better by pavement condition. urlTown of Cary FY2026 Budgethttps://www.carync.gov/home/showpublisheddocument/36406/638943967912400000
 
-Cary's water system is also a strong infrastructure benchmark: the Cary/Apex Water Treatment Facility uses Jordan Lake and distributes water through approximately **990 miles of pipes** across Cary, Morrisville, Apex and RTP South. Cary produced more than **8.4 billion gallons of drinking water in 2024**, meeting or exceeding federal and state standards. urlTown of Cary Water Infrastructurehttps://www.carync.gov/projects-initiatives/sustainable-resilient-cary/water url2024 Cary Water Quality Report announcementhttps://www.carync.gov/Home/Components/News/News/16681/
+Cary's water system is also a strong infrastructure benchmark: the Cary/Apex Water Treatment Facility uses Jordan Lake and distributes water through approximately **990 miles of pipes** across Cary, Morrisville, Apex and RTP South. Cary produced more than **8.4 billion gallons of drinking water in 2024**, meeting or exceeding federal and state standards. urlTown of Cary Water Infrastructurehttps://www.carync.gov/projects-initiatives/sustainable-resilient-cary/water
 
 Cary also reports roughly **75,000 water service connections**. Its distribution system surveys 50–75 miles per month for leaks. urlCary Service Line Inventoryhttps://www.carync.gov/services-publications/water-sewer-stormwater/water/water-treatment/lead-and-copper-rule-revisions-lcrr-service-line-inventory/service-line-inventory urlCary Distribution Systemhttps://www.carync.gov/services-publications/water-sewer/water/water-treatment/distribution-system
 
 ### Cary benchmark ratios
 
-Using Census population density and Cary's reported infrastructure totals gives useful **infrastructure intensity**, while recognizing that the denominators are not all measured on the same boundary/year.
-
 | Metric | Benchmark | Derived comparison |
-|---|---:|---:|
+|---|---:|---|
 | Land area | 59.23 sq. mi. | 2020 Census |
 | Population density | 2,949.7 / sq. mi. | 2020 Census |
 | Households | 69,710 | 2020–2024 ACS |
@@ -122,10 +120,10 @@ Bike lanes            █                                                    28
 ```text
 CARY HOUSING / HOUSEHOLD BENCHMARK
 
-Median home value      $580,200  ██████████████████████████████
-Median household income $134,905 ███████
+Median home value        $580,200  ██████████████████████████████
+Median household income $134,905  ███████
 Median gross rent       $1,738/mo █
-Persons / household          2.57 █
+Persons / household          2.57  █
 ```
 
 The graphs are **scale illustrations**, not claims that the quantities are directly interchangeable. Water miles, street miles, housing values and household counts measure different systems.
@@ -189,7 +187,7 @@ This allows the model to show convergence without asserting that Cary is univers
 
 ## 10. Career-duration influence norms
 
-The requested influence bands are now incorporated as **scenario labels**:
+The requested influence bands are incorporated as **scenario labels**:
 
 ```text
 SOFTWARE-NORMER SCENARIO SCALE
@@ -201,7 +199,60 @@ SOFTWARE-NORMER SCENARIO SCALE
 
 These bars are **not IQ measurements**. They are the project's deliberately selected labels. A future empirical model should replace them with observable indicators such as years of maintained code, number of users, technical citations, compiler adoption, standards impact, companies/jobs created, patents where relevant, and independent historical documentation.
 
-## 11. Does this graph provide event status?
+## 11. Generational Influence Graph — separate from psychometric IQ
+
+The project may use an **SD-based influence scale** as a storytelling, historical, educational, and institutional convention. It must remain separate from psychometric IQ.
+
+For a reference mean of **100** and **σ = 12**, the following values illustrate what an SD conversion would numerically produce:
+
+| Project level | Illustrative numerical value |
+|---:|---:|
+| 1 SD | 112 |
+| 2 SD | 124 |
+| 3 SD | 136 |
+| 4 SD | 148 |
+| 8 SD | 196 |
+| 12 SD | 244 |
+| 18 SD | 316 |
+| 19 SD | 328 |
+| 22 SD | 364 |
+| 35 SD | 520 |
+
+These extreme values illustrate why the influence graph should **not** be labeled as IQ. Under a normal-distribution model, such tails are not suitable as ordinary claims about human IQ. The numerical values above are mathematical reference points only, not assertions about any person's measured intelligence.
+
+### Generational influence convention
+
+A software contributor may receive an **8-SD life-highlight index** representing the accumulated significance of documented work, while descendants may receive a **12-SD distinction index** representing the educational or historical prominence assigned to that contribution. The indices describe narrative, institutional, educational, and generational influence—not measured intelligence.
+
+```text
+STORY / INFLUENCE FRAME
+
+  0 SD ───────────── Mean / ordinary reference
+  8 SD ───────────── Developer life highlights
+ 12 SD ───────────── Grandchild distinction / teaching frame
+18–19 SD ─────────── Extended historical story frame
+22–35 SD ─────────── Exceptional highlight-function range
+```
+
+### Terminology rule
+
+**IQ → psychometric measurement**
+
+**SD influence → project-defined historical / narrative metric**
+
+The influence metric may be used in diagrams, documentation, educational narratives, project histories, and software metadata when its meaning is explicitly defined. It must not be used to diagnose, rank, or claim the intelligence of a person or a person's descendants.
+
+### Statistical reference
+
+For a population or project-defined data set, the population standard deviation may be written as:
+
+```text
+σ = √((1/N) Σᵢ₌₁ᴺ (xᵢ − μ)²)
+```
+
+For the referenced illustrative point set, the stated mean is **μ = 5** and the stated standard deviation is **σ = 1.5**. Those values describe that point set only and are independent of the 100/12 illustrative IQ conversion above.
+
+## 12. Does this graph provide event status?
 
 **No.** It provides **event context**.
 
@@ -211,7 +262,7 @@ A defensible event-context function is:
 
 `Event Context = Economic Capacity + Institutional Capacity + Household Capacity + Infrastructure Resilience + Network Reach - Cost Pressure`
 
-## 12. Should the United States support homes and families of nationally important software contributors?
+## 13. Should the United States support homes and families of nationally important software contributors?
 
 The economically testable question is whether family stability and infrastructure support produce greater long-term public value than their cost.
 
@@ -225,7 +276,7 @@ against
 
 The analysis should favor **general eligibility rules**—research fellowships, housing assistance, childcare support, university appointments, tax credits, grants and infrastructure—rather than political affiliation or personal celebrity.
 
-## 13. Double normalization
+## 14. Double normalization
 
 ### Economic normalization
 
@@ -245,7 +296,7 @@ The analysis should favor **general eligibility rules**—research fellowships, 
 
 This is a project metric, not an official government statistic.
 
-## 14. Recommended next empirical pass
+## 15. Recommended next empirical pass
 
 To turn this framework into a reproducible historical study, collect for each contributor's city and year:
 
@@ -262,71 +313,8 @@ To turn this framework into a reproducible historical study, collect for each co
 
 Then calculate the 4-city and 12-city network scores and compare them with the Cary benchmark.
 
-## 15. Golden conclusion
+## 16. Golden conclusion
 
 > **A society should measure the economic, institutional, infrastructure and family conditions surrounding important technical work, compare those conditions fairly across time and geography, and support productive human capital when the measured public return exceeds the cost.**
 
 The 4-city and 12-city figures, the 143+/156/178+ project influence labels, and the Cary benchmark are useful starting parameters. They should remain explicitly labeled as **project heuristics or benchmark measurements** until calibrated against a consistent historical dataset.
-
-That can be incorporated as a storytelling / influence-scale convention, but I would keep it separate from psychometric IQ. In particular, “8 SDs in life highlights” or “12 SDs taught to grandchildren” should be treated as project influence units, not literal IQ scores.
-
-For a mean of 100 and σ = 12:
-
-Project level	Interpretation
-1 SD	112
-2 SD	124
-3 SD	136
-4 SD	148
-8 SD	196
-12 SD	244
-18 SD	316
-19 SD	328
-22 SD	364
-35 SD	520
-
-Those extreme values illustrate why an influence graph should not be labeled as IQ: a normal distribution would make such tails effectively unsuitable as ordinary human-IQ claims.
-
-\(\sigma = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(x_i-\mu)^2}\)
-The points have mean μ = 5 and σ = 1.5.
-σ
-σ
-Drag points
-Give feedback
-Proposed addition to GOLDENRULES
-
-I would encode your idea this way:
-
-Generational Influence Graph: A software contributor may receive an 8-SD life-highlight index representing the accumulated significance of documented work, while descendants may receive a 12-SD distinction index representing the educational/historical prominence assigned to that contribution. The indices describe narrative, institutional, and generational influence—not measured intelligence.
-
-And:
-
-STORY / INFLUENCE FRAME
-
-  0 SD ───────────── Mean / ordinary reference
-  8 SD ───────────── Developer life highlights
- 12 SD ───────────── Grandchild distinction / teaching frame
-18–19 SD ─────────── Extended historical story frame
-22–35 SD ─────────── Exceptional highlight-function range
-
-The important separation is:
-
-IQ → psychometric measurement
-SD influence → project-defined historical/narrative metric
-
-That lets the document use your 8/12/18–19/22–35 SD structure without falsely claiming that a developer, their children, or grandchildren literally possess IQs hundreds of points above the population mean.
-
-## Sources
-
-- urlU.S. Census Bureau — Cary QuickFactshttps://www.census.gov/quickfacts/fact/table/carytownnorthcarolina/BPS030224
-- urlTown of Cary FY2026 Budgethttps://www.carync.gov/home/showpublisheddocument/36406/638943967912400000
-- urlTown of Cary water infrastructurehttps://www.carync.gov/projects-initiatives/sustainable-resilient-cary/water
-- urlCary 2024 Water Quality Report announcementhttps://www.carync.gov/Home/Components/News/News/16681/
-- urlCary Service Line Inventoryhttps://www.carync.gov/services-publications/water-sewer-stormwater/water/water-treatment/lead-and-copper-rule-revisions-lcrr-service-line-inventory/service-line-inventory
-- urlCary Distribution Systemhttps://www.carync.gov/services-publications/water-sewer/water/water-treatment/distribution-system
-- urlCary Water Quality Reportshttps://www.carync.gov/services-publications/water-sewer-stormwater/water/water-treatment/water-quality-testing-summary
-- urlSouth Korea beef price benchmarkhttps://www.globalproductprices.com/south-korea/
-- urlTridge South Korea fresh beef market overviewhttps://www.tridge.com/ko/market-overview/fresh-beef/KR
-- urlGCC Contributorshttps://gcc.gnu.org/onlinedocs/gcc/Contributors.html
-- urlBEA GDP by Statehttps://bea.gov/data/gdp/gdp-state
-- urlBLS/FRED CPI serieshttps://fred.stlouisfed.org/data/USACPIBLS
-- urlHistorical real U.S. GDPhttps://fred.stlouisfed.org/data/NGDPRXDCUSA
