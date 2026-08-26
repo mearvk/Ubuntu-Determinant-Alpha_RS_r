@@ -1,7 +1,4 @@
 #define _POSIX_C_SOURCE 200809L
-
-#include <dirent.h>
-#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,121 +6,64 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static int exists(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0;
+static int exists(const char *p) { struct stat s; return stat(p, &s) == 0; }
+static int is_dir(const char *p) { struct stat s; return stat(p, &s) == 0 && S_ISDIR(s.st_mode); }
+
+static int run_clone(const char *dst) {
+    char cmd[PATH_MAX + 256];
+    snprintf(cmd, sizeof cmd, "git clone --depth 1 https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git '%s'", dst);
+    puts("[run] cloning repository");
+    return system(cmd);
 }
 
-static int is_dir(const char *path) {
-    struct stat st;
-    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-static int run_command(const char *command) {
-    printf("[run] %s\n", command);
-    fflush(stdout);
-    return system(command);
-}
-
-static int find_install_set(const char *repo, char *out, size_t out_size) {
-    const char *candidates[] = {
-        "installer/install-manifest.txt",
-        "installer/install-all.sh",
-        "installer/install-native.sh",
-        "installer/README.md"
-    };
-
-    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
-        int n = snprintf(out, out_size, "%s/%s", repo, candidates[i]);
-        if (n > 0 && (size_t)n < out_size && exists(out)) {
-            return 0;
-        }
-    }
-    return -1;
-}
-
-static int find_repo(char *out, size_t out_size) {
+static int locate_repo(char *out, size_t n) {
     const char *home = getenv("HOME");
-    const char *candidates[] = {
-        ".",
-        "./Ubuntu.Determinant.Beta.Restricted",
-        "~/src/Ubuntu.Determinant.Beta.Restricted"
-    };
-    char expanded[PATH_MAX];
-
-    (void)candidates;
-
-    if (is_dir(".git")) {
-        if (realpath(".", out) != NULL) return 0;
+    char p[PATH_MAX];
+    if (is_dir(".git") && realpath(".", out)) return 0;
+    if (is_dir("Ubuntu.Determinant.Beta.Restricted/.git") && realpath("Ubuntu.Determinant.Beta.Restricted", out)) return 0;
+    if (home) {
+        snprintf(p, sizeof p, "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
+        if (is_dir(p) && realpath(p, out)) return 0;
     }
-
-    if (is_dir("Ubuntu.Determinant.Beta.Restricted/.git")) {
-        if (realpath("Ubuntu.Determinant.Beta.Restricted", out) != NULL) return 0;
-    }
-
-    if (home != NULL) {
-        snprintf(expanded, sizeof(expanded), "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
-        if (is_dir(expanded) && is_dir("/dev/null")) {
-            if (realpath(expanded, out) != NULL) return 0;
-        }
-    }
-
+    (void)n;
     return -1;
-}
-
-static int clone_repo(const char *destination) {
-    char command[PATH_MAX + 256];
-    snprintf(command, sizeof(command),
-             "git clone --depth 1 https://github.com/mearvk/Ubuntu.Determinant.Beta.Restricted.git '%s'",
-             destination);
-    return run_command(command);
 }
 
 int main(int argc, char **argv) {
-    char repo[PATH_MAX];
-    char install_set[PATH_MAX];
+    char repo[PATH_MAX], manifest[PATH_MAX], script[PATH_MAX];
     const char *home = getenv("HOME");
-    int do_install = argc > 1 && strcmp(argv[1], "--install") == 0;
+    int install = argc > 1 && strcmp(argv[1], "--install") == 0;
 
     puts("Ubuntu Determinant — Linux Desktop Install Probe");
-    puts("Step 1: locate the Git clone, then locate the primed install set.");
+    puts("Step 1: locate Git clone → locate install set → optionally run installer.");
 
-    if (find_repo(repo, sizeof(repo)) != 0) {
-        if (home == NULL) {
-            fputs("[error] HOME is not set; cannot select a clone destination.\n", stderr);
-            return 2;
-        }
-        snprintf(repo, sizeof(repo), "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
-        printf("[info] Git clone not found.\n[info] Clone target: %s\n", repo);
-        if (clone_repo(repo) != 0) {
-            fputs("[error] Git clone failed. No installation action was taken.\n", stderr);
-            return 3;
-        }
+    if (locate_repo(repo, sizeof repo) != 0) {
+        if (!home) { fputs("[error] HOME is unavailable.\n", stderr); return 2; }
+        snprintf(repo, sizeof repo, "%s/src/Ubuntu.Determinant.Beta.Restricted", home);
+        printf("[info] clone not found: %s\n", repo);
+        if (run_clone(repo) != 0) { fputs("[error] clone failed; no installation performed.\n", stderr); return 3; }
+        if (!realpath(repo, repo)) { fputs("[error] cloned path cannot be resolved.\n", stderr); return 3; }
     }
 
     printf("[ok] Git clone: %s\n", repo);
+    snprintf(manifest, sizeof manifest, "%s/installer/install-manifest.txt", repo);
+    snprintf(script, sizeof script, "%s/installer/install-native.sh", repo);
 
-    if (find_install_set(repo, install_set, sizeof(install_set)) != 0) {
-        fputs("[error] No recognized installer set was found.\n", stderr);
-        return 4;
+    if (!exists(manifest) && !exists(script)) {
+        fputs("[error] no recognized install set found.\n", stderr); return 4;
     }
+    printf("[ok] Install manifest: %s%s\n", manifest, exists(manifest) ? "" : " (not present; script found)");
+    printf("[ok] Desktop preview: %s/installer/DESKTOP_PREVIEW_STEP_1.md\n", repo);
 
-    printf("[ok] Install set: %s\n", install_set);
-    printf("[ok] Profile preview: %s/installer/DESKTOP_PREVIEW_STEP_1.md\n", repo);
-
-    if (!do_install) {
-        puts("[dry-run] Repository and install set found; nothing was installed.");
-        puts("[dry-run] Run with --install to execute installer/install-native.sh when present.");
+    if (!install) {
+        puts("[dry-run] discovery complete; nothing installed.");
+        puts("[dry-run] use --install to execute the repository's native Linux installer.");
         return 0;
     }
 
-    char native_script[PATH_MAX];
-    snprintf(native_script, sizeof(native_script), "%s/installer/install-native.sh", repo);
-    if (!exists(native_script)) {
-        fputs("[error] Native Linux installer is not present.\n", stderr);
-        return 5;
-    }
-
-    printf("[install] Executing: %s\n", native_script);
-    return run_command("/bin/sh -c 'exec \"$1\"' sh");
+    if (!exists(script)) { fputs("[error] installer/install-native.sh is absent.\n", stderr); return 5; }
+    printf("[install] %s\n", script);
+    execl("/bin/sh", "sh", script, (char *)NULL);
+    perror("execl");
+    return 6;
 }
