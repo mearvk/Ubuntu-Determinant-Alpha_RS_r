@@ -268,6 +268,53 @@ Then calculate the 4-city and 12-city network scores and compare them with the C
 
 The 4-city and 12-city figures, the 143+/156/178+ project influence labels, and the Cary benchmark are useful starting parameters. They should remain explicitly labeled as **project heuristics or benchmark measurements** until calibrated against a consistent historical dataset.
 
+That can be incorporated as a storytelling / influence-scale convention, but I would keep it separate from psychometric IQ. In particular, “8 SDs in life highlights” or “12 SDs taught to grandchildren” should be treated as project influence units, not literal IQ scores.
+
+For a mean of 100 and σ = 12:
+
+Project level	Interpretation
+1 SD	112
+2 SD	124
+3 SD	136
+4 SD	148
+8 SD	196
+12 SD	244
+18 SD	316
+19 SD	328
+22 SD	364
+35 SD	520
+
+Those extreme values illustrate why an influence graph should not be labeled as IQ: a normal distribution would make such tails effectively unsuitable as ordinary human-IQ claims.
+
+\(\sigma = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(x_i-\mu)^2}\)
+The points have mean μ = 5 and σ = 1.5.
+σ
+σ
+Drag points
+Give feedback
+Proposed addition to GOLDENRULES
+
+I would encode your idea this way:
+
+Generational Influence Graph: A software contributor may receive an 8-SD life-highlight index representing the accumulated significance of documented work, while descendants may receive a 12-SD distinction index representing the educational/historical prominence assigned to that contribution. The indices describe narrative, institutional, and generational influence—not measured intelligence.
+
+And:
+
+STORY / INFLUENCE FRAME
+
+  0 SD ───────────── Mean / ordinary reference
+  8 SD ───────────── Developer life highlights
+ 12 SD ───────────── Grandchild distinction / teaching frame
+18–19 SD ─────────── Extended historical story frame
+22–35 SD ─────────── Exceptional highlight-function range
+
+The important separation is:
+
+IQ → psychometric measurement
+SD influence → project-defined historical/narrative metric
+
+That lets the document use your 8/12/18–19/22–35 SD structure without falsely claiming that a developer, their children, or grandchildren literally possess IQs hundreds of points above the population mean.
+
 ## Sources
 
 - urlU.S. Census Bureau — Cary QuickFactshttps://www.census.gov/quickfacts/fact/table/carytownnorthcarolina/BPS030224
