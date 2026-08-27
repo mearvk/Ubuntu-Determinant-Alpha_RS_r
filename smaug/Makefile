@@ -4,7 +4,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic -fPIC
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic -fPIC
 LDFLAGS ?=
 
-CPP_SOURCES := Smaug.cpp SmaugOS.cpp SmaugAIv2.cpp SmaugCastle.cpp SmaugEmerald.cpp SmaugSmite.cpp SmaugAtom.cpp SmaugInput.cpp SmaugSystemStore.cpp SmaugInputSource.cpp SmaugOvertine.cpp SmaugDrakeFirecaster.cpp
+CPP_SOURCES := Smaug.cpp SmaugOS.cpp SmaugAIv2.cpp SmaugCastle.cpp SmaugEmerald.cpp SmaugSmite.cpp SmaugAtom.cpp SmaugInput.cpp SmaugSystemStore.cpp SmaugInputSource.cpp SmaugOvertine.cpp SmaugDrakeFirecaster.cpp SmaugAdminGate.cpp
 CPP_OBJECTS := $(CPP_SOURCES:.cpp=.o)
 C_SOURCES := smaug.c SmaugCompanions.c
 C_OBJECTS := $(C_SOURCES:.c=.o)
