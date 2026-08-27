@@ -43,7 +43,7 @@ $(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
 	$(CC) $(COMMON_CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(LDFLAGS)
 
 check-version:
-	@./tests/test_version.sh
+	@sh ./tests/test_version.sh
 
 clean:
 	rm -f $(BIN) $(CORE) $(PACKER) $(BOOTSTRAP) *.o
@@ -76,11 +76,11 @@ sanitize-test:
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o xmc-core-sanitize $(SRC) $(SANITIZER_LDFLAGS); \
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma_pack-sanitize $(PACKSRC) $(SANITIZER_LDFLAGS); \
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma-bootstrap-sanitize $(BOOT_SRC) $(SANITIZER_LDFLAGS); \
-	./tests/test_sanitized.sh ./xmc-core-sanitize; \
+	sh ./tests/test_sanitized.sh ./xmc-core-sanitize; \
 	rm -f xmc-core-sanitize asysma_pack-sanitize asysma-bootstrap-sanitize
 
 test: all check-version
-	@./tests/test_xmc.sh
+	@sh ./tests/test_xmc.sh
 
 process-test: all
-	@./tests/test_xmc_process.sh
+	@sh ./tests/test_xmc_process.sh
