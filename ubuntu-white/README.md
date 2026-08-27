@@ -1,6 +1,6 @@
-# UBUNTU WHITE — DESKTOP LOOK AND FEEL
+# Ubuntu White — Desktop Look and Feel
 
-## LOOK AND FEEL
+## Look and Feel
 
 `ubuntu-white` is a light, high-legibility desktop theme inspired by the open-source Ubuntu/GNOME desktop experience shown in the project reference image. It is an independent project style specification, not a claim of official Ubuntu branding or an attempt to reproduce proprietary artwork.
 
@@ -16,9 +16,9 @@ The visual target is:
 - clear focus, selection, disabled, and error states;
 - keyboard accessibility and visible focus indicators.
 
-## RELATIONSHIP TO THE INSTALLER
+## Relationship to the Installer
 
-The repository's Aptitude layer already treats desktop integration as a detectable installation surface and follows an evidence → plan → authorization → apply → verify model. The `ubuntu-white` package is therefore designed as a **THEME PAYLOAD**, not an installer that silently changes a machine.
+The repository's Aptitude layer already treats desktop integration as a detectable installation surface and follows an evidence → plan → authorization → apply → verify model. The `ubuntu-white` package is therefore designed as a **Theme Payload**, not an installer that silently changes a machine.
 
 A future installer should:
 
@@ -30,13 +30,13 @@ A future installer should:
 6. verify the resulting theme registration;
 7. provide rollback to the previous theme where practical.
 
-## ICON SYSTEM
+## Icon System
 
 Icons are SVG-based and intentionally simple: white surfaces, dark-grey geometry, consistent stroke weight, generous negative space, and labels in the UI where ambiguity would otherwise result. The set begins with Home, Documents, Downloads, Music, Pictures, Videos, Public, Templates, Network, Terminal, Settings, Applications, and Trash.
 
 The design should remain usable at 16, 24, 32, 48, and 64 px. SVG remains the source of truth so raster sizes can be generated without losing geometry.
 
-## FONT AND ERGONOMICS
+## Font and Ergonomics
 
 Preferred UI stack:
 
@@ -44,11 +44,11 @@ Preferred UI stack:
 
 The theme favors approximately 1.45–1.55 line height, generous padding, consistent 8 px spacing increments, and 40–44 px minimum primary interactive targets where the host toolkit permits it.
 
-## LEGAL AND MORAL LABEL
+## Legal and Moral Label
 
-This work style is labelled **MORAL AND GUIDED BY LAW AND MORALS**. This is a project design value, not a claim that the theme itself creates legal rights or determines legal outcomes. Project-defined terminology does not replace statutory definitions.
+This work style is labelled **Moral and Guided by Law and Morals**. This is a project design value, not a claim that the theme itself creates legal rights or determines legal outcomes. Project-defined terminology does not replace statutory definitions.
 
-## `.HSSS`
+## `.hsss`
 
 The companion `.hsss` file is deliberately named **`.hsss`**, not `.hss`. Here it means **Human/System Style Specification**: a compact, human-readable declaration of visual intent, ergonomics, accessibility, provenance, and moral/legal design constraints.
 
