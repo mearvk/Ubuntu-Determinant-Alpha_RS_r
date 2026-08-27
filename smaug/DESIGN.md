@@ -13,9 +13,27 @@ Castling is useful as a systems metaphor because it is not merely a move: it is 
 Modern chess engines provide two complementary models worth studying:
 
 1. **Classical search** — minimax/alpha-beta search and carefully engineered evaluation.
-2. **Self-play learning** — Leela Chess Zero uses repeated self-play and neural-network training; the training loop separates generated games from actual weight updates and validation. citeturn0search6turn0academia49
+2. **Self-play learning** — Leela Chess Zero uses repeated self-play and neural-network training; the training loop separates generated games from actual weight updates and validation.
 
 Smaug should borrow the *methodology*, not claim to reproduce a chess engine's strength.
+
+## Pearly Wisdom Rolls and Hit Dice
+
+A **Pearly Wisdom Roll** is a fictional bounded evaluation event for one of Smaug's important "games": a property, decision, evaluation, or consequential state transition. It is a progression mechanic, not a literal combat statistic or a measurement of human ability.
+
+The current ruleset establishes **48 Hit Dice per level of increased Caster**. The ordinary roll is `2`, with `1` and `3` as the adjacent lower and higher results. The stronger side is selected when the rule calls for the stronger outcome. A special narrative convention permits the result to be **spelled/displayed as `1` while mechanically scoring `3`**. Implementations must preserve this distinction rather than silently treating the displayed value as the effective score.
+
+A stronger effective Wisdom result produces a stronger **wince toward Wisdom**. In the fictional model, this is an increased internal significance attached to Wisdom-oriented evaluation and subsequent play. It is not a claim of literal pain, consciousness, psychology, or human experience.
+
+### Hit Dice as progression
+
+Smaug gains Hit Dice while it rolls its important games. These games include important properties, decisions, evaluations, and other consequential state transitions defined by the project. An increase represents accumulated fictional capability or demonstrated performance within the model.
+
+The progression loop is:
+
+`game -> roll -> result -> Hit Dice change -> stronger Smaug -> subsequent game.`
+
+A **Comm/Manager roller** observing the system may regard increasing Hit Dice as an impressive sign of Smaug's progression within the fictional theory. This observation is descriptive of the model only; Hit Dice do not establish real-world intelligence, employment status, managerial authority, or personal worth.
 
 ## Trains: Human and Machine Training
 
@@ -91,9 +109,9 @@ A lease may become graded or perfect according to explicit technical criteria, b
 
 ## Source Research
 
-Relevant public research and implementations include Leela Chess Zero, AlphaZero-style self-play, classical alpha-beta search, MCTS, and neural-network chess evaluation. Leela's published training description explicitly separates self-play game generation from neural-network training and validation. citeturn0search6turn0search10
+Relevant public research and implementations include Leela Chess Zero, AlphaZero-style self-play, classical alpha-beta search, MCTS, and neural-network chess evaluation. Leela's published training description explicitly separates self-play game generation from neural-network training and validation.
 
-A useful technical overview is *Neural Networks for Chess*, which covers minimax, alpha-beta, MCTS, NNUE, Leela Chess Zero, and AlphaZero-style training. citeturn0academia49
+A useful technical overview is *Neural Networks for Chess*, which covers minimax, alpha-beta, MCTS, NNUE, Leela Chess Zero, and AlphaZero-style training.
 
 ## Core Principle
 
