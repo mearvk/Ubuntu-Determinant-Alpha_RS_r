@@ -1,29 +1,38 @@
+CC ?= cc
 CXX ?= c++
-CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic
+CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic -fPIC
+CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wpedantic -fPIC
 LDFLAGS ?=
 
-TARGET := smaug-check
-SOURCES := Smaug.cpp SmaugOS.cpp SmaugAIv2.cpp SmaugCastle.cpp SmaugEmerald.cpp SmaugSmite.cpp SmaugAtom.cpp SmaugInput.cpp SmaugSystemStore.cpp
-OBJECTS := $(SOURCES:.cpp=.o)
+CPP_SOURCES := Smaug.cpp SmaugOS.cpp SmaugAIv2.cpp SmaugCastle.cpp SmaugEmerald.cpp SmaugSmite.cpp SmaugAtom.cpp SmaugInput.cpp SmaugSystemStore.cpp
+CPP_OBJECTS := $(CPP_SOURCES:.cpp=.o)
+C_OBJECTS := smaug.o
+OBJECTS := $(CPP_OBJECTS) $(C_OBJECTS)
+LIB := libsmaug_system.so
 
-.PHONY: all check clean
+.PHONY: all check shared clean
 
-all: $(TARGET)
+all: shared
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJECTS)
+shared: $(LIB)
+
+$(LIB): $(OBJECTS)
+	$(CXX) -shared -o $@ $(OBJECTS) $(LDFLAGS)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Compile-only quality gate: does not require linking or external AI/database libs.
+smaug.o: smaug.c Smaug.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Quality gate: compile every translation unit without linking or loading a model.
 check:
-	$(CXX) $(CXXFLAGS) -fsyntax-only $(SOURCES)
+	$(CC) $(CFLAGS) -fsyntax-only smaug.c
+	$(CXX) $(CXXFLAGS) -fsyntax-only $(CPP_SOURCES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(LIB)
 
-# Optional future database backend:
-# SMAUG_MYSQL_CXXFLAGS and SMAUG_MYSQL_LDFLAGS can be supplied by a local
-# MySQL connector package. The default build intentionally has no database
-# dependency and uses FileStore for inspectable local field output.
+# Optional MySQL backend can be supplied later without making the portable
+# inspection library depend on a database client. FileStore remains the
+# default inspectable backend.
