@@ -1,9 +1,22 @@
 #include "SmaugAIv2.hpp"
 
-#include <functional>
+#include <cstdint>
 #include <sstream>
+#include <string>
 
 namespace smaug::ai {
+namespace {
+
+std::uint64_t stable_hash(const std::string& text) noexcept {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const unsigned char byte : text) {
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+} // namespace
 
 Engine::Engine(CapabilityProfile profile) : profile_(profile) {}
 
@@ -14,8 +27,9 @@ Observation Engine::observe(const ProgramIdentity& program) const {
     material << program.path << '\n' << program.format << '\n'
              << program.hash << '\n' << program.architecture << '\n'
              << program.compiler << '\n' << program.version;
-    observation.digest = std::to_string(std::hash<std::string>{}(material.str()));
-    observation.id = std::hash<std::string>{}(observation.digest);
+    const std::string canonical = material.str();
+    observation.digest = std::to_string(stable_hash(canonical));
+    observation.id = stable_hash(observation.digest);
     observation.executed = false;
     return observation;
 }
