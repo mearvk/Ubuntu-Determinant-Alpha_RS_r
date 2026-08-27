@@ -86,15 +86,16 @@ public final class IsolationDesktop extends Application {
             Path.of("..", "..", "..", "images", BACKGROUND_NAME)
         };
         for (Path candidate : candidates) {
-            if (Files.isRegularFile(candidate)) return new Image(candidate.toAbsolutePath().toUri().toString(), true);
+            if (Files.isRegularFile(candidate)) return new Image(candidate.toAbsolutePath().toUri().toString());
         }
         var resource = getClass().getResource("/images/" + BACKGROUND_NAME);
-        return resource == null ? null : new Image(resource.toExternalForm(), true);
+        return resource == null ? null : new Image(resource.toExternalForm());
     }
 
     private Path iconPath(String filename) {
         Path[] candidates = {
             Path.of("ubuntu-white", "icons", filename),
+            Path.of("..", "ubuntu-white", "icons", filename),
             Path.of("..", "..", "ubuntu-white", "icons", filename),
             Path.of("..", "..", "..", "ubuntu-white", "icons", filename),
             Path.of("..", "icons", "ubuntu-white", filename)
@@ -106,9 +107,9 @@ public final class IsolationDesktop extends Application {
     private ImageView loadIcon(String filename) {
         Path path = iconPath(filename);
         if (path == null) return null;
-        ImageView view = new ImageView(new Image(path.toUri().toString(), true));
-        view.setFitWidth(48);
-        view.setFitHeight(48);
+        ImageView view = new ImageView(new Image(path.toUri().toString()));
+        view.setFitWidth(64);
+        view.setFitHeight(64);
         view.setPreserveRatio(true);
         return view;
     }
@@ -123,19 +124,18 @@ public final class IsolationDesktop extends Application {
             background.setSmooth(true);
             background.setMouseTransparent(true);
             background.setManaged(false);
-            // Natural-size wallpaper: never stretch it to the fullscreen frame.
-            desktop.widthProperty().addListener((obs, oldV, newV) -> centerWallpaper(background, desktop));
-            desktop.heightProperty().addListener((obs, oldV, newV) -> centerWallpaper(background, desktop));
             desktop.getChildren().add(background);
-            Platform.runLater(() -> centerWallpaper(background, desktop));
+            desktop.widthProperty().addListener((obs, oldV, newV) -> fitWallpaperToFrame(background, desktop));
+            desktop.heightProperty().addListener((obs, oldV, newV) -> fitWallpaperToFrame(background, desktop));
+            Platform.runLater(() -> fitWallpaperToFrame(background, desktop));
         }
 
         GridPane icons = new GridPane();
-        icons.setHgap(24);
-        icons.setVgap(22);
+        icons.setHgap(34);
+        icons.setVgap(28);
         icons.setAlignment(Pos.TOP_LEFT);
-        icons.setTranslateX(38);
-        icons.setTranslateY(32);
+        icons.setTranslateX(42);
+        icons.setTranslateY(34);
         for (int i = 0; i < DESKTOP_ITEMS.length; i++) {
             icons.add(createDesktopIcon(DESKTOP_ITEMS[i]), i / 5, i % 5);
         }
@@ -151,25 +151,37 @@ public final class IsolationDesktop extends Application {
         installExitKeys(root);
     }
 
-    private void centerWallpaper(ImageView background, StackPane desktop) {
-        background.setTranslateX((desktop.getWidth() - background.getBoundsInParent().getWidth()) / 2.0);
-        background.setTranslateY((desktop.getHeight() - background.getBoundsInParent().getHeight()) / 2.0);
+    /** Fill the frame without distortion: preserve the source aspect ratio and crop overflow. */
+    private void fitWallpaperToFrame(ImageView background, StackPane desktop) {
+        double frameW = desktop.getWidth();
+        double frameH = desktop.getHeight();
+        if (frameW <= 0 || frameH <= 0) return;
+        double imageW = background.getImage().getWidth();
+        double imageH = background.getImage().getHeight();
+        if (imageW <= 0 || imageH <= 0) return;
+        double scale = Math.max(frameW / imageW, frameH / imageH);
+        double renderedW = imageW * scale;
+        double renderedH = imageH * scale;
+        background.setFitWidth(renderedW);
+        background.setFitHeight(renderedH);
+        background.setTranslateX((frameW - renderedW) / 2.0);
+        background.setTranslateY((frameH - renderedH) / 2.0);
     }
 
     private VBox createDesktopIcon(String name) {
         ImageView image = loadIcon(ICONS.get(name));
         Label label = new Label(name);
         label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
-        VBox icon = new VBox(4);
+        VBox icon = new VBox(5);
         if (image != null) icon.getChildren().add(image);
         else {
             Label missing = new Label("□");
-            missing.setStyle("-fx-text-fill: white; -fx-font-size: 34px;");
+            missing.setStyle("-fx-text-fill: white; -fx-font-size: 42px;");
             icon.getChildren().add(missing);
         }
         icon.getChildren().add(label);
         icon.setAlignment(Pos.CENTER);
-        icon.setPrefWidth(92);
+        icon.setPrefWidth(110);
         return icon;
     }
 
