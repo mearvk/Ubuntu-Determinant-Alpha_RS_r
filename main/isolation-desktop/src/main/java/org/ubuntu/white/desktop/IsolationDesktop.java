@@ -19,10 +19,16 @@ import javafx.util.Duration;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 /** Developer-only visual preview of the Ubuntu White desktop idiom. */
 public final class IsolationDesktop extends Application {
     private static final String BACKGROUND_NAME = "mediate-ubuntu-white-edition-001.jpeg";
+    private static final Map<String, String> ICONS = Map.of(
+        "Desktop", "folder.svg", "Documents", "folder.svg", "Downloads", "downloads.svg",
+        "Music", "folder.svg", "Pictures", "folder.svg", "Public", "folder.svg",
+        "Templates", "folder.svg", "Videos", "folder.svg", "Trash", "trash.svg"
+    );
     private static final String[] DESKTOP_ITEMS = {
         "Desktop", "Documents", "Downloads", "Music", "Pictures",
         "Public", "Templates", "Videos", "Trash"
@@ -74,7 +80,6 @@ public final class IsolationDesktop extends Application {
         };
     }
 
-    /** Resolve the canonical repository wallpaper from the source checkout. */
     private Image loadWallpaper() {
         Path[] candidates = {
             Path.of("images", BACKGROUND_NAME),
@@ -83,11 +88,34 @@ public final class IsolationDesktop extends Application {
         };
         for (Path candidate : candidates) {
             if (Files.isRegularFile(candidate)) {
-                return new Image(candidate.toAbsolutePath().toUri().toString());
+                return new Image(candidate.toAbsolutePath().toUri().toString(), true);
             }
         }
         var resource = getClass().getResource("/images/" + BACKGROUND_NAME);
-        return resource == null ? null : new Image(resource.toExternalForm());
+        return resource == null ? null : new Image(resource.toExternalForm(), true);
+    }
+
+    private Path iconPath(String filename) {
+        Path[] candidates = {
+            Path.of("ubuntu-white", "icons", filename),
+            Path.of("..", "..", "ubuntu-white", "icons", filename),
+            Path.of("..", "..", "..", "ubuntu-white", "icons", filename),
+            Path.of("..", "icons", "ubuntu-white", filename)
+        };
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) return candidate.toAbsolutePath();
+        }
+        return null;
+    }
+
+    private ImageView loadIcon(String filename) {
+        Path path = iconPath(filename);
+        if (path == null) return null;
+        ImageView view = new ImageView(new Image(path.toUri().toString(), true));
+        view.setFitWidth(48);
+        view.setFitHeight(48);
+        view.setPreserveRatio(true);
+        return view;
     }
 
     private void showDesktop(StackPane root) {
@@ -97,16 +125,16 @@ public final class IsolationDesktop extends Application {
 
         if (image != null) {
             ImageView background = new ImageView(image);
-            background.setPreserveRatio(false);
-            background.fitWidthProperty().bind(desktop.widthProperty());
-            background.fitHeightProperty().bind(desktop.heightProperty());
+            background.setPreserveRatio(true);
+            background.setSmooth(true);
+            background.setMouseTransparent(true);
             desktop.getChildren().add(background);
         }
 
-        VBox icons = new VBox(18);
+        VBox icons = new VBox(14);
         icons.setAlignment(Pos.TOP_LEFT);
-        icons.setLayoutX(36);
-        icons.setLayoutY(36);
+        icons.setTranslateX(34);
+        icons.setTranslateY(28);
         for (String name : DESKTOP_ITEMS) {
             VBox icon = createDesktopIcon(name);
             icons.getChildren().add(icon);
@@ -125,11 +153,17 @@ public final class IsolationDesktop extends Application {
     }
 
     private VBox createDesktopIcon(String name) {
-        Label glyph = new Label("▰");
-        glyph.setStyle("-fx-text-fill: white; -fx-font-size: 34px; -fx-font-weight: bold;");
+        ImageView image = loadIcon(ICONS.get(name));
         Label label = new Label(name);
         label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
-        VBox icon = new VBox(2, glyph, label);
+        VBox icon = new VBox(3);
+        if (image != null) icon.getChildren().add(image);
+        else {
+            Label missing = new Label("□");
+            missing.setStyle("-fx-text-fill: white; -fx-font-size: 34px;");
+            icon.getChildren().add(missing);
+        }
+        icon.getChildren().add(label);
         icon.setAlignment(Pos.CENTER);
         icon.setPrefWidth(100);
         return icon;
