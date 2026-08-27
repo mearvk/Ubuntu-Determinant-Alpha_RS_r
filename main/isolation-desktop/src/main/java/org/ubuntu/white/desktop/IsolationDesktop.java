@@ -17,9 +17,12 @@ import javafx.stage.Stage;
 import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 /** Developer-only visual preview of the Ubuntu White desktop idiom. */
 public final class IsolationDesktop extends Application {
-    private static final String BACKGROUND = "/images/mediate-ubuntu-white-edition-001.jpeg";
+    private static final String BACKGROUND_NAME = "mediate-ubuntu-white-edition-001.jpeg";
 
     @Override
     public void start(Stage stage) {
@@ -67,12 +70,24 @@ public final class IsolationDesktop extends Application {
         };
     }
 
-    private void showDesktop(StackPane root) {
-        Image image = null;
-        var resource = getClass().getResource(BACKGROUND);
-        if (resource != null) {
-            image = new Image(resource.toExternalForm());
+    /** Resolve the canonical repository wallpaper from the source checkout. */
+    private Image loadWallpaper() {
+        Path[] candidates = {
+            Path.of("images", BACKGROUND_NAME),
+            Path.of("..", "..", "images", BACKGROUND_NAME),
+            Path.of("..", "..", "..", "images", BACKGROUND_NAME)
+        };
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                return new Image(candidate.toAbsolutePath().toUri().toString());
+            }
         }
+        var resource = getClass().getResource("/images/" + BACKGROUND_NAME);
+        return resource == null ? null : new Image(resource.toExternalForm());
+    }
+
+    private void showDesktop(StackPane root) {
+        Image image = loadWallpaper();
 
         Label title = new Label("Ubuntu White Desktop Preview");
         title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
