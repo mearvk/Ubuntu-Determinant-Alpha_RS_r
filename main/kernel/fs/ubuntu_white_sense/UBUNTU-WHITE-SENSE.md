@@ -1,4 +1,8 @@
-# Ubuntu White Sense, COMB, and LF Filesystem Metadata
+# Ubuntu White Sense, COMB, LF, MF, and DRM Filesystem Metadata
+
+## Vocabulary
+
+See [`VOCABULARY.md`](./VOCABULARY.md) for the canonical definitions of Ubuntu White, Sense, COMB, `lf`, `mf`, DRM, Hold type, file payload, and the 18 generic rating names. The vocabulary is normative for this prototype. fileciteturn69file0
 
 ## Purpose
 
@@ -9,8 +13,6 @@ Ubuntu White adds a filesystem-level metadata model for installed files. Ordinar
 Each managed file has up to three ordered Sense layers. When all three are present, they are Sense 1, Sense 2, and Sense 3. **Each Sense layer has its own 18 generic ratings and its own overall health rating.** Ratings are metadata, not executable policy and not intrinsic judgments about people.
 
 ## 18 generic ratings
-
-The requested vocabulary contained `use` twice. The prototype treats that repetition as one generic rating slot so that the schema has exactly 18 slots:
 
 1. `use`
 2. `age`
@@ -47,16 +49,15 @@ Each managed file record may carry a `hold_type` string. It is an extensible gen
 
 ## LF
 
-`lf` is the Ubuntu White companion to `ls`. It lists common file data and can optionally display Sense-layer ratings and health. Default output is intentionally concise; detailed metadata requires an explicit flag.
+`lf` is the Ubuntu White companion to `ls`. It lists common file data and can optionally display Sense-layer ratings and health.
 
-Initial interface:
+## MF
 
-- `lf FILE...` — common file data.
-- `lf -g FILE...` — generic ratings for all available Sense layers.
-- `lf -s N FILE...` — display one Sense layer (`N` is 1, 2, or 3).
-- `lf -H FILE...` — display Sense health values.
-- `lf -a FILE...` — display all supported metadata fields.
-- `lf --schema` — display the metadata schema.
+`mf` modifies supported file metadata, including identity/name/date/author/database and Sense metadata. It must not alter the file payload merely to change metadata.
+
+## DRM
+
+DRM is the metadata-removal interface. Its vocabulary and scope are limited to the Ubuntu White metadata class; it must not treat metadata removal as permission to destroy ordinary file contents or EXT4 structures.
 
 ## Filesystem boundary
 
@@ -65,12 +66,3 @@ The prototype remains compatible with stock EXT4 by using a sidecar/index repres
 ## Installation behavior
 
 The OS installer creates fresh metadata records for files it installs. Existing records are preserved unless an explicit migration is requested. `comb` and `lf` do not modify file payloads merely to inspect metadata.
-
-## Safety
-
-- Never overwrite file contents merely to create metadata.
-- Never treat ratings as executable policy.
-- Never infer sensitive human traits from metadata.
-- Preserve unknown fields for forward compatibility.
-- Report malformed records instead of silently accepting corruption.
-- Make collection and listing deterministic and auditable.
