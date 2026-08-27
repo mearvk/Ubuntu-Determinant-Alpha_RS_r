@@ -14,22 +14,18 @@ The XMC Look image library presents the selected public icon family below. The c
 
 ### Icon Set 4 — Fourth Collection
 
-![XMC Look Icon Set 4 — Fourth Collection](images/set-4/cmd-icon-set-4-transparent-master-trimmed.png)
+**The actual icon artwork is shown below at the native size of each repository asset.** The labels identify the intended interface size; the images themselves are not CSS-scaled for display.
 
-**Icon Set 4 — Fourth Collection** is the current public icon collection for XMC Look. Its transparent master provides the reference artwork, accompanied by the 12, 16, 24, 32, and 48 px trimmed variants for interface and packaging use.
+| Size | Label | Icon |
+|---|---|---|
+| **64 × 64** | **Master** | ![XMC Look Icon Set 4 — 64 × 64 Master](images/set-4/cmd-icon-set-4-transparent-master-trimmed.png) |
+| **48 × 48** | **Large** | ![XMC Look Icon Set 4 — 48 × 48 Large](images/set-4/cmd-icon-set-4-48x48-trimmed.png) |
+| **32 × 32** | **Standard** | ![XMC Look Icon Set 4 — 32 × 32 Standard](images/set-4/cmd-icon-set-4-32x32-trimmed.png) |
+| **24 × 24** | **Compact** | ![XMC Look Icon Set 4 — 24 × 24 Compact](images/set-4/cmd-icon-set-4-24x24-trimmed.png) |
+| **16 × 16** | **Small** | ![XMC Look Icon Set 4 — 16 × 16 Small](images/set-4/cmd-icon-set-4-16x16-trimmed.png) |
+| **12 × 12** | **Micro** | ![XMC Look Icon Set 4 — 12 × 12 Micro](images/set-4/cmd-icon-set-4-12x12-trimmed.png) |
 
-### Icon Sizes
-
-| Size | Public Label | Asset |
-|---:|---|---|
-| **64 × 64** | **64 × 64 — Master** | `cmd-icon-set-4-transparent-master-trimmed.png` |
-| **48 × 48** | **48 × 48 — Large** | `cmd-icon-set-4-48x48.png` |
-| **32 × 32** | **32 × 32 — Standard** | `cmd-icon-set-4-32x32.png` |
-| **24 × 24** | **24 × 24 — Compact** | `cmd-icon-set-4-24x24.png` |
-| **16 × 16** | **16 × 16 — Small** | `cmd-icon-set-4-16x16.png` |
-| **12 × 12** | **12 × 12 — Micro** | `cmd-icon-set-4-12x12.png` |
-
-The 64 × 64 master is the visual reference; the smaller sizes are the production variants intended for increasingly compact interface surfaces.
+The **64 × 64 Master** is the visual reference for the collection. The 48, 32, 24, 16, and 12 px files are the corresponding production variants. The repository preserves each image as its own asset so public documentation and software packaging can use the appropriate native-size artwork.
 
 [Open Icon Set 4 — Fourth Collection](images/set-4/)
 
