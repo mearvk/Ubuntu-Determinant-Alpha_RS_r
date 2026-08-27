@@ -4,6 +4,7 @@
 #include <cctype>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
 namespace smaug::input {
 
@@ -28,13 +29,8 @@ std::string trim(std::string value) {
 }
 }
 
-FeedResult feed_json_file(const std::string& path) {
-    return feed_json(read_all(path));
-}
-
-FeedResult feed_xml_file(const std::string& path) {
-    return feed_xml(read_all(path));
-}
+FeedResult feed_json_file(const std::string& path) { return feed_json(read_all(path)); }
+FeedResult feed_xml_file(const std::string& path) { return feed_xml(read_all(path)); }
 
 FeedResult feed_json(const std::string& data) {
     FeedResult result;
