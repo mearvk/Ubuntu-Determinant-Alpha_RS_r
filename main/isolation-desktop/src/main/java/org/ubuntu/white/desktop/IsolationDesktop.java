@@ -23,6 +23,10 @@ import java.nio.file.Path;
 /** Developer-only visual preview of the Ubuntu White desktop idiom. */
 public final class IsolationDesktop extends Application {
     private static final String BACKGROUND_NAME = "mediate-ubuntu-white-edition-001.jpeg";
+    private static final String[] DESKTOP_ITEMS = {
+        "Desktop", "Documents", "Downloads", "Music", "Pictures",
+        "Public", "Templates", "Videos", "Trash"
+    };
 
     @Override
     public void start(Stage stage) {
@@ -88,30 +92,47 @@ public final class IsolationDesktop extends Application {
 
     private void showDesktop(StackPane root) {
         Image image = loadWallpaper();
-
-        Label title = new Label("Ubuntu White Desktop Preview");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
-        Label subtitle = new Label("Developer isolation environment");
-        subtitle.setStyle("-fx-text-fill: white;");
-        VBox content = new VBox(10, title, subtitle);
-        content.setAlignment(Pos.CENTER);
-
-        BorderPane desktop = new BorderPane(content);
-        desktop.setTop(new Label("  Applications     Files     Settings"));
-        desktop.setBottom(new Label("  Ubuntu White • Desktop Preview"));
-        desktop.setStyle("-fx-background-color: rgba(247,247,247,0.18); -fx-padding: 24px;");
+        StackPane desktop = new StackPane();
+        desktop.setStyle("-fx-background-color: black;");
 
         if (image != null) {
             ImageView background = new ImageView(image);
             background.setPreserveRatio(false);
-            background.fitWidthProperty().bind(root.widthProperty());
-            background.fitHeightProperty().bind(root.heightProperty());
-            StackPane composed = new StackPane(background, desktop);
-            root.getChildren().setAll(composed);
-        } else {
-            root.getChildren().setAll(desktop);
+            background.fitWidthProperty().bind(desktop.widthProperty());
+            background.fitHeightProperty().bind(desktop.heightProperty());
+            desktop.getChildren().add(background);
         }
+
+        VBox icons = new VBox(18);
+        icons.setAlignment(Pos.TOP_LEFT);
+        icons.setLayoutX(36);
+        icons.setLayoutY(36);
+        for (String name : DESKTOP_ITEMS) {
+            VBox icon = createDesktopIcon(name);
+            icons.getChildren().add(icon);
+        }
+        desktop.getChildren().add(icons);
+
+        Label panel = new Label("  Applications     Files     Settings");
+        panel.setStyle("-fx-background-color: rgba(255,255,255,0.88); -fx-text-fill: #333333; -fx-padding: 10px 18px; -fx-font-size: 14px;");
+        BorderPane shell = new BorderPane();
+        shell.setTop(panel);
+        shell.setCenter(desktop);
+        shell.setBottom(new Label("  Ubuntu White • Desktop Preview"));
+        shell.setStyle("-fx-background-color: transparent;");
+        root.getChildren().setAll(shell);
         installExitKeys(root);
+    }
+
+    private VBox createDesktopIcon(String name) {
+        Label glyph = new Label("▰");
+        glyph.setStyle("-fx-text-fill: white; -fx-font-size: 34px; -fx-font-weight: bold;");
+        Label label = new Label(name);
+        label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
+        VBox icon = new VBox(2, glyph, label);
+        icon.setAlignment(Pos.CENTER);
+        icon.setPrefWidth(100);
+        return icon;
     }
 
     private void installExitKeys(javafx.scene.Node node) {
