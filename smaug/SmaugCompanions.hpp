@@ -1,0 +1,35 @@
+#ifndef SMAUG_COMPANIONS_HPP
+#define SMAUG_COMPANIONS_HPP
+
+#include <cstdint>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+    double emerald_score;
+    double strike_readiness;
+    double wanderer_score;
+    double uncertainty;
+    int review_required;
+} SmaugCompanionAssessment;
+
+/* Direct C entry points: bounded advisory assessments only. */
+SmaugCompanionAssessment smaug_emerald_strike_pick(double emerald_signal,
+                                                   double coverage,
+                                                   double uncertainty);
+
+SmaugCompanionAssessment smaug_wanderer_mid_pick(double exploration,
+                                                 double evidence,
+                                                 double uncertainty);
+
+SmaugCompanionAssessment smaug_prestrike_thoughtfulness(double evidence,
+                                                        double reversibility,
+                                                        double uncertainty);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* SMAUG_COMPANIONS_HPP */
