@@ -4,19 +4,14 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 VERSION="9.7.1"
 cd "$ROOT"
-mkdir -p build
 
-if [ -x "$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle" ]; then
-    exec "$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle" clean build
+# Always provision/check the pinned project-local Gradle distribution first.
+./bootstrap-gradle
+GRADLE="$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle"
+
+if [ ! -x "$GRADLE" ]; then
+    echo "Pinned Gradle $VERSION was not provisioned." >&2
+    exit 3
 fi
 
-if [ -x ./gradlew ]; then
-    exec ./gradlew clean build
-fi
-
-if command -v gradle >/dev/null 2>&1; then
-    exec gradle clean build
-fi
-
-echo "Gradle has not been provisioned. Run ./bootstrap-gradle or make." >&2
-exit 3
+exec "$GRADLE" clean build
