@@ -1,20 +1,17 @@
 #!/bin/sh
 set -eu
+
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 VERSION="9.7.1"
 cd "$ROOT"
 
-if [ -x "$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle" ]; then
-    exec "$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle" run
+# Use the same project-local, pinned Gradle distribution as compilation.
+./bootstrap-gradle
+GRADLE="$ROOT/.gradle-dist/gradle-$VERSION/bin/gradle"
+
+if [ ! -x "$GRADLE" ]; then
+    echo "Pinned Gradle $VERSION was not provisioned." >&2
+    exit 3
 fi
 
-if [ -x ./gradlew ]; then
-    exec ./gradlew run
-fi
-
-if command -v gradle >/dev/null 2>&1; then
-    exec gradle run
-fi
-
-echo "Gradle has not been provisioned. Run ./bootstrap-gradle or make." >&2
-exit 3
+exec "$GRADLE" run
