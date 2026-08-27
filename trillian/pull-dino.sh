@@ -1,58 +1,56 @@
 #!/bin/sh
 set -eu
 
-# Vendor the complete upstream Dino source into this directory.
-# The checkout is intentionally local-only; trillian/.gitignore excludes it
-# from the parent repository so normal pushes do not upload Dino source.
+# Import the complete upstream Dino source as ordinary files under
+# trillian/dino/. The imported directory is intentionally NOT a Git
+# repository of its own, so the parent repository can track the source.
 REPO_URL='https://github.com/dino/dino.git'
 PIN='8d49d83b3b45ab22d7b9d945c4b32296b07cb49e'
 DEST='dino'
 
 if [ -d "$DEST/.git" ]; then
-    echo "Existing local Dino checkout detected."
+    echo "Existing Dino Git checkout detected. Converting it to an ordinary source tree."
     cd "$DEST"
-
     if ! git diff --quiet || ! git diff --cached --quiet; then
-        echo "Dino checkout has local modifications; refusing automatic change." >&2
+        echo "Dino checkout has local modifications; refusing conversion." >&2
         exit 3
     fi
-
     CURRENT="$(git rev-parse HEAD)"
-    if [ "$CURRENT" = "$PIN" ]; then
-        echo "Dino is already at pinned commit: $PIN"
-        exit 0
+    if [ "$CURRENT" != "$PIN" ]; then
+        echo "Dino checkout is at $CURRENT, expected $PIN; refusing conversion." >&2
+        exit 2
     fi
-
-    echo "Dino exists at commit: $CURRENT"
-    echo "Pinned project revision: $PIN"
-    echo "No automatic overwrite or reset performed." >&2
-    exit 2
-fi
-
-if [ -e "$DEST" ]; then
+    rm -rf .git
+    cd ..
+elif [ -e "$DEST" ]; then
     echo "A non-Git path already exists at $DEST; refusing to overwrite." >&2
     exit 1
+else
+    TMP="${DEST}.import.$$"
+    trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+    git clone --depth 1 "$REPO_URL" "$TMP"
+    cd "$TMP"
+    git fetch --depth 1 origin "$PIN"
+    git checkout --detach "$PIN"
+    cd ..
+    rm -rf "$DEST"
+    mv "$TMP" "$DEST"
+    trap - EXIT HUP INT TERM
+    rm -rf "$DEST/.git"
 fi
 
-git clone --no-checkout "$REPO_URL" "$DEST"
-cd "$DEST"
-git checkout --detach "$PIN"
-cd ..
-
 cat > DINO-VENDOR.md <<'EOF'
-# Dino Vendor Record
+# Dino Source Import Record
 
-This directory is an independent vendor/import location for the open-source Dino XMPP client.
+This directory contains an ordinary-file import of the open-source Dino XMPP client for independent development.
 
 Upstream: https://github.com/dino/dino
 Pinned commit: `8d49d83b3b45ab22d7b9d945c4b32296b07cb49e`
 License: GPL-3.0
 
-The imported source remains governed by its upstream license and notices. It is not recovered source code from the historical Cerulean Studios Trillian client.
+The source is intentionally stored as ordinary files under `trillian/dino/`, not as a Git submodule or nested Git repository. Upstream `.git` administration data is removed by the import script.
 
-The `dino/` checkout is intentionally local-only and is excluded by `trillian/.gitignore`; it must not be committed to the parent repository.
-
-To refresh the vendor copy, choose a new reviewed upstream commit and update this record and script together.
+This is not recovered source code from the historical Cerulean Studios Trillian client. Upstream copyright and license notices remain part of the imported source tree.
 EOF
 
-echo "Dino source imported at $DEST/$PIN"
+echo "Dino source imported as ordinary files at $DEST/$PIN"
