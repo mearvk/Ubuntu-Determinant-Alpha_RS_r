@@ -23,7 +23,10 @@ COMMON_CPPFLAGS = $(CPPFLAGS) -DXMC_INSTALL_PREFIX=\"$(PREFIX)\"
 COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS) -include BUILD-POSIX-COMPAT.h \
                   -Wno-error=stringop-truncation -Wno-error=format-truncation
 
-.PHONY: all clean install uninstall test process-test clean-user-integration
+SANITIZER_CFLAGS  = -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1
+SANITIZER_LDFLAGS = -fsanitize=address,undefined -lm
+
+.PHONY: all clean install uninstall test process-test sanitize-test check-version clean-user-integration
 
 all: $(BIN) $(PACKER) $(BOOTSTRAP)
 
@@ -34,13 +37,16 @@ $(PACKER): $(PACKSRC) asysma_native_layout.h
 	$(CC) $(COMMON_CFLAGS) -o $@ $< $(LDFLAGS)
 
 $(BOOTSTRAP): $(BOOT_SRC) asysma_native_layout.h
-	$(CC) $(COMMON_CFLAGS) -o $@ $(BOOT_SRC)
+	$(CC) $(COMMON_CFLAGS) -o $@ $(BOOT_SRC) $(LDFLAGS)
 
 $(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
 	$(CC) $(COMMON_CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(LDFLAGS)
 
+check-version:
+	@./tests/test_version.sh
+
 clean:
-	rm -f $(BIN) $(CORE) $(PACKER) $(BOOTSTRAP) *.o *.xclass *.asysma *.desktop
+	rm -f $(BIN) $(CORE) $(PACKER) $(BOOTSTRAP) *.o
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin
@@ -63,8 +69,17 @@ uninstall:
 	      $(DESTDIR)$(PREFIX)/share/mime/packages/xmc-asysma.xml
 	rm -f $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/mimetypes/xmc-asysma.svg
 
+# Development-only sanitizer build. This deliberately does not overwrite the
+# normal release binaries.
+sanitize-test:
+	@set -e; \
+	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o xmc-core-sanitize $(SRC) $(SANITIZER_LDFLAGS); \
+	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma_pack-sanitize $(PACKSRC) $(SANITIZER_LDFLAGS); \
+	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma-bootstrap-sanitize $(BOOT_SRC) $(SANITIZER_LDFLAGS); \
+	./tests/test_sanitized.sh ./xmc-core-sanitize; \
+	rm -f xmc-core-sanitize asysma_pack-sanitize asysma-bootstrap-sanitize
 
-test: all
+test: all check-version
 	@./tests/test_xmc.sh
 
 process-test: all
