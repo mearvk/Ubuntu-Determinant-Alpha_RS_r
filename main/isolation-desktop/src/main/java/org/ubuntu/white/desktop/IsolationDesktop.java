@@ -104,16 +104,6 @@ public final class IsolationDesktop extends Application {
         return null;
     }
 
-    private ImageView loadIcon(String filename) {
-        Path path = iconPath(filename);
-        if (path == null) return null;
-        ImageView view = new ImageView(new Image(path.toUri().toString()));
-        view.setFitWidth(64);
-        view.setFitHeight(64);
-        view.setPreserveRatio(true);
-        return view;
-    }
-
     private void showDesktop(StackPane root) {
         StackPane desktop = new StackPane();
         desktop.setStyle("-fx-background-color: black;");
@@ -151,14 +141,12 @@ public final class IsolationDesktop extends Application {
         installExitKeys(root);
     }
 
-    /** Fill the frame without distortion: preserve the source aspect ratio and crop overflow. */
     private void fitWallpaperToFrame(ImageView background, StackPane desktop) {
         double frameW = desktop.getWidth();
         double frameH = desktop.getHeight();
-        if (frameW <= 0 || frameH <= 0) return;
         double imageW = background.getImage().getWidth();
         double imageH = background.getImage().getHeight();
-        if (imageW <= 0 || imageH <= 0) return;
+        if (frameW <= 0 || frameH <= 0 || imageW <= 0 || imageH <= 0) return;
         double scale = Math.max(frameW / imageW, frameH / imageH);
         double renderedW = imageW * scale;
         double renderedH = imageH * scale;
@@ -169,19 +157,23 @@ public final class IsolationDesktop extends Application {
     }
 
     private VBox createDesktopIcon(String name) {
-        ImageView image = loadIcon(ICONS.get(name));
-        Label label = new Label(name);
-        label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
         VBox icon = new VBox(5);
-        if (image != null) icon.getChildren().add(image);
-        else {
-            Label missing = new Label("□");
-            missing.setStyle("-fx-text-fill: white; -fx-font-size: 42px;");
-            icon.getChildren().add(missing);
-        }
-        icon.getChildren().add(label);
         icon.setAlignment(Pos.CENTER);
         icon.setPrefWidth(110);
+        Label label = new Label(name);
+        label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
+        Label loading = new Label("…");
+        loading.setStyle("-fx-text-fill: white; -fx-font-size: 42px;");
+        icon.getChildren().addAll(loading, label);
+
+        SvgIconRenderer.render(iconPath(ICONS.get(name)), 64, 64, rendered -> {
+            if (rendered != null) {
+                rendered.setMouseTransparent(true);
+                Platform.runLater(() -> {
+                    if (icon.getChildren().size() > 0) icon.getChildren().set(0, rendered);
+                });
+            }
+        });
         return icon;
     }
 
