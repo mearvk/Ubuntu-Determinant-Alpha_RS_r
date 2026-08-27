@@ -1,4 +1,4 @@
-# ASYSMA 1-2-3-4 Design Record — 2026-08-25
+# ASYSMA 1-2-3-4 Design Record — 2026-08-26
 
 ```mermaid
 flowchart TD
@@ -7,118 +7,79 @@ flowchart TD
     C --> D[4 — Java / Application]
     A --> N[Native OS representation]
     N --> B
-    B --> P{Entry Type}
+    B --> P{Explicit Entry Type}
     P -->|JAVA| J[SecureJDK 28]
     P -->|NATIVE| X[Native Application]
     P -->|NATIVE_THEN_JAVA| T[Native Bootstrap] --> J
     J --> APP[Java Application]
     B --> S[Filesystem Size Observation]
-    B --> C[CTRMS Filesystem Observation]
+    B --> C2[CTRMS Filesystem Observation]
     S --> I[Evidence / Provenance]
-    C --> I
+    C2 --> I
+    I --> AUTH[Integrity + Authorization Policy]
+    AUTH --> DEC{Execution Decision}
+    DEC -->|allow| P
+    DEC -->|deny| R[Controlled Refusal]
 ```
 
-## 1 — Native Foundation
+## Normative 1-2-3-4 contract
 
-The initial ASYSMA execution model targets modern x86-64 Intel/AMD systems and relies on the operating system's native executable loader. ASYSMA does not replace ELF, PE/COFF, or Mach-O.
+1. **Native Foundation** establishes the platform handoff; it does not replace ELF, PE/COFF, or Mach-O.
+2. **Host and Integrity** validates bounded package structures and records host/evidence observations. Observation is not authorization.
+3. **Execution Bridge** permits only explicitly declared entry modes: `JAVA`, `NATIVE`, or `NATIVE_THEN_JAVA`.
+4. **Java / Application** performs the ordinary managed-runtime contract; ASYSMA packaging is subsequent composition rather than a claim that `javac` is replaced.
 
-The native bootstrap is intentionally small. It establishes the platform handoff and provides the boundary into the ASYSMA runtime rather than attempting to become a second operating system.
+Every stage must consume validated output from the preceding stage. A failed earlier stage cannot be converted into success by a later stage.
 
-The repository also provides `tools/ctrmsctl/` as a Linux-native filesystem observation service. Its service boundary remains outside the ASYSMA executable format itself.
+## XMC quality norms
 
-## 2 — Host and Integrity
-
-After native startup, ASYSMA establishes a host profile and evaluates package integrity before application execution.
-
-Known observations include:
-
-- CPU architecture
-- operating-system family
-- operating-system version
-- available memory
-- available storage
-- required runtime capabilities
-- logical size of relevant files and directory trees
-- filesystem metadata observations and bounded change events
-
-The repository's `/tools/size/` utility supplies a simple read-only measurement for filesystem extent. It recursively sums regular-file byte lengths beneath a supplied parent directory. It does not treat directory-entry size, filesystem allocation blocks, snapshots, compression, or symbolic-link targets as ordinary file payload.
-
-The repository's `/tools/ctrmsctl/` service supplies a complementary metadata observation surface. Its light index records file paths/names, regular-file counts, directory counts, logical bytes, modes, modification times, and selected create/move/delete/write events. It does not read file contents or execute discovered commands.
-
-CTRMS uses **procedural care rather than an IQ score**: observations are facts about a filesystem surface at a time, not judgments about intelligence, intent, ownership, authorship, or trust.
-
-Integrity and policy remain separate concerns. A valid signature or hash does not by itself grant authorization.
-
-Malformed offsets, sizes, architecture fields, or handoff structures must cause controlled refusal rather than execution.
-
-## 3 — Execution Bridge
-
-ASYSMA supports three explicit entry modes:
+The XMC compiler is governed by the following implementation order:
 
 ```text
-JAVA
-NATIVE
-NATIVE_THEN_JAVA
+source correctness
+    ↓
+parser integrity
+    ↓
+validated deterministic .xclass
+    ↓
+metadata separation
+    ↓
+digest / provenance
+    ↓
+ASYSMA packaging
+    ↓
+execution policy
+    ↓
+OS registration
 ```
 
-### JAVA
+Compiler correctness has priority over packaging and desktop integration.
 
-```text
-.asysma → integrity/policy → SecureJDK 28 → Java
-```
+### Correctness boundary
 
-### NATIVE
+- One authoritative version definition.
+- Numeric options use validated parsing rather than unchecked `atoi()`-style conversion.
+- String and path operations detect truncation.
+- Resource limits produce explicit diagnostics and controlled failure.
+- Invalid indexes, offsets, sizes, and enum values are rejected before use.
+- Malformed source cannot be reported as successful compilation.
 
-```text
-.asysma → native bootstrap → Direct/host profile → policy → native application
-```
+### Output boundary
 
-### NATIVE_THEN_JAVA
+- `.xclass` serialization is deterministic for a fixed toolchain/input profile.
+- Serialized text is escaped according to its format.
+- Output is validated before being exposed as a successful artifact.
+- Writes use temporary output followed by atomic rename where supported.
 
-```text
-.asysma → native bootstrap → Direct/host profile → integrity/policy → SecureJDK 28 → Java
-```
+### Security boundary
 
-A native component is always declared explicitly. Java classes do not silently confer native execution capability.
+- SHA-256 is a **digest**, not a signature.
+- A signature, provenance record, integrity digest, and authorization decision are distinct evidence classes.
+- Trusted compiler/registration paths do not construct shell commands from untrusted paths.
+- Native execution capability is explicit.
+- User-scoped registration does not silently escalate privileges.
 
-CTRMS observations can be used as host evidence, but they do not themselves authorize execution. A discovered executable filename or command-like idiom is data, not an instruction to CTRMS or ASYSMA.
-
-## 4 — Java and Application Layer
-
-The ordinary Java compilation contract remains:
-
-```text
-Java source → javac → .class
-```
-
-ASYSMA packaging is a subsequent step:
-
-```text
-.class + metadata + optional native payload → ASYSMA packager → .asysma
-```
-
-A future SecureJDK 28 toolchain may provide a convenient source-to-ASYSMA workflow without requiring `javac` itself to become a native compiler.
-
-The reference managed runtime for the initial profile is SecureJDK 28.
-
-## Filesystem observation and evidence relationship
-
-The complementary observation utilities are:
-
-```text
-size
-  → logical filesystem extent
-
-ctrmsctl
-  → names / paths / counts / timestamps / bounded events
-
-limit
-  → executable identity / metadata
-```
-
-Their outputs may be retained as provenance-tagged evidence when an application or ASYSMA workflow needs to establish what was observed about a host or package.
-
-The observation relationship is:
+## Evidence relationship
 
 ```text
 filesystem
@@ -127,104 +88,63 @@ normalized observation
     ↓
 index / query
     ↓
-evidence / provenance
+provenance-tagged evidence
     ↓
-integrity + authorization policy
+integrity verification
+    ↓
+authorization policy
+    ↓
+execution decision
 ```
 
-An observation is not proof of authenticity by itself. Hashes, signatures, ownership/permissions, package provenance, executable identity, and authorization remain distinct evidence classes.
+`size` provides logical filesystem extent. `ctrmsctl` provides metadata and bounded event observations. `limit` provides executable identity/metadata. These utilities do not, by observation alone, authorize execution.
 
-## CTRMS query surface
+## ASYSMA execution modes
 
-The initial Linux service provides:
+### JAVA
 
 ```text
-ctrmsctl status
-ctrmsctl find NAME
-ctrmsctl search TEXT
-ctrmsctl locate PATH
+.asysma → bounds/integrity/policy → SecureJDK 28 → Java application
 ```
 
-The light index is intentionally metadata-only. A future medium index may add normalized executable type, package provenance, owner/group, stable identity, content digest, and bounded event history, subject to explicit deployment policy.
-
-The service must never turn a discovered command, filename, or textual idiom into an instruction to execute. This preserves the distinction between **observation**, **interpretation**, and **authority**.
-
-## Installer and Desktop Preview — Step 1
-
-The native Linux desktop-install bootstrap is part of the 1-2-3-4 production chain as an implementation of the native foundation and host handoff.
-
-The current helper is:
-
-`installer/linux/desktop_install_probe`
-
-Its intended sequence is:
+### NATIVE
 
 ```text
-Git clone
-    ↓
-Locate install set
-    ↓
-Expose Desktop Preview / Install Profile
-    ↓
-Dry-run discovery
-    ↓
-Explicit installation
+.asysma → native bootstrap → host profile → integrity/policy → native application
 ```
 
-The helper is deliberately modest. It discovers the repository and installation set before making installation changes. The Step 1 desktop preview is documented in `installer/DESKTOP_PREVIEW_STEP_1.md`.
-
-### Installation destinations
-
-The Linux Makefile provides the project installation families:
+### NATIVE_THEN_JAVA
 
 ```text
-/user/bin
-/user/runnables
-/usr/bin
-/usr/runnables
-/deck/bin
-/deck/runnables
+.asysma → native bootstrap → host profile → integrity/policy → SecureJDK 28 → Java
 ```
 
-The default `make install` selects `/user/bin`. A user may select `/user/runnables` with:
+A Java class or filename does not silently create native capability.
 
-```sh
-make install INSTALL_CHOICE=user-runnables
-```
+## Testing and release gate
 
-Explicit `/usr` and `/deck` targets are also available. System-managed locations may require administrator privileges.
+The implementation must maintain tests for:
 
-When a `/user` location is selected, the Makefile can add that directory to the user's `~/.profile` when it is absent, without duplicating an existing entry.
+- version consistency;
+- strict C compilation;
+- Java/Python/Rust parser behavior;
+- malformed source;
+- resource limits;
+- hostile paths;
+- deterministic output;
+- output serialization;
+- SHA-256 known-answer behavior;
+- ASYSMA packaging and bootstrap;
+- ASan/UBSan behavior.
 
-### Front entry point
+A release is not considered production-ready until the applicable gates pass on the target platforms.
 
-The desktop install helper is intended to have a simple front-of-project runnable entry point resolving to the selected installed executable. Where a compiled executable is not yet available, a repository-native installation script may serve as the bootstrap fallback.
+## Current implementation status
 
-The important invariant is:
+The XMC driver, native SHA-256 module, security regression test, sanitizer build target, and quality workflow establish the first hardening layer. The next implementation pass is the XMC core correctness/parser pass, followed by deterministic output and ASYSMA packer/bootstrap verification.
 
-> **The front entry point identifies the selected installation artifact; it does not silently substitute an unrelated executable.**
+This record does not claim that every future runtime feature described here is already implemented.
 
-This provides a convenient path for Ubuntu White Edition or an already-installed desktop to launch the helper while retaining a reproducible repository source.
+## Normative companion
 
-## Current implementation concerns
-
-1. Freeze the binary ASYSMA header encoding.
-2. Define the concrete integrity/cryptographic profile.
-3. Implement the ASYSMA reader and bounds checker.
-4. Implement the packer for `.class` and native payloads.
-5. Implement native-to-Java handoff.
-6. Define the XMC compiler/packaging role if the repository's XMC component is introduced.
-7. Preserve the CMD-origin icon identity for initial ASYSMA packages.
-8. Keep format, Direct interface, native bootstrap, Java bridge, and SecureJDK versions independently negotiable.
-9. Preserve `size` as a small, read-only cross-platform filesystem measurement utility.
-10. Preserve `limit` as a read-only executable identity/metadata utility.
-11. Install `ctrmsctl` by default only through the explicitly selected Ubuntu White Edition provisioning profile.
-12. Keep filesystem observation, content inspection, integrity, identity, and authorization as separate evidence categories.
-13. Keep the CTRMS light index bounded and metadata-only by default.
-14. Keep the Linux desktop install probe warning-clean under strict C compilation (`-std=c11 -O2 -Wall -Wextra -Wpedantic`).
-15. Keep the installer destinations explicit and auditable across `/user`, `/usr`, and `/deck`.
-16. Keep the desktop-preview stage non-destructive until the user explicitly accepts installation.
-
-## Status
-
-This dated record captures the design state for 2026-08-25. `size`, `limit`, and the initial Linux `ctrmsctl` source/service components are implemented as native source components. The Linux desktop install probe and its Makefile/specification form the current Step 1 installer foundation. This record does not claim that every ASYSMA runtime component listed above has already been implemented.
+`ASYSMA-NORMS.md` is the companion engineering norm and ordered proceed document. If implementation behavior changes, this Mermaid record and the applicable numbered specification must be updated in the same change or the discrepancy must be recorded explicitly.
