@@ -39,7 +39,8 @@ public final class SvgIconRenderer {
                 if (state == Worker.State.SUCCEEDED) {
                     WritableImage snapshot = new WritableImage((int) Math.ceil(width), (int) Math.ceil(height));
                     SnapshotParameters parameters = new SnapshotParameters();
-                    webView.snapshot(snapshot, parameters);
+                    // JavaFX signature is snapshot(SnapshotParameters, WritableImage).
+                    webView.snapshot(parameters, snapshot);
                     ImageView image = new ImageView(snapshot);
                     image.setFitWidth(width);
                     image.setFitHeight(height);
