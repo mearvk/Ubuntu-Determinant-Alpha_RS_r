@@ -1,4 +1,4 @@
-#include "SmaugCompanions.hpp"
+#include "SmaugCompanions.h"
 
 static double clamp01(double value) {
     if (value < 0.0) return 0.0;
