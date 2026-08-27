@@ -3,17 +3,16 @@
  * Copyright (C) 2026 MEARVK LLC
  * SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0
  *
- * The driver deliberately avoids shell interpretation. Child processes are
- * executed with explicit argv vectors and filesystem work is performed with
- * native POSIX APIs where practical.
+ * The driver avoids shell interpretation. Child processes are executed with
+ * explicit argv vectors and filesystem work is performed with native APIs.
  */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
 #include "xmc-version.h"
 #include "xmc-os-register.h"
+#include "xmc-sha256.h"
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,37 +39,8 @@ static int run(char *const argv[]) {
     int status = 0;
     if (waitpid(pid, &status, 0) < 0) { perror("xmc: waitpid"); return 1; }
     if (WIFEXITED(status)) return WEXITSTATUS(status);
-    if (WIFSIGNALED(status)) {
-        fprintf(stderr, "xmc: child terminated by signal %d\n", WTERMSIG(status));
-    }
+    if (WIFSIGNALED(status)) fprintf(stderr, "xmc: child terminated by signal %d\n", WTERMSIG(status));
     return 1;
-}
-
-static int sha256_file(const char *path, char out[65]) {
-    int pipefd[2];
-    if (pipe(pipefd) != 0) { perror("xmc: pipe"); return -1; }
-    pid_t pid = fork();
-    if (pid < 0) { close(pipefd[0]); close(pipefd[1]); perror("xmc: fork"); return -1; }
-    if (pid == 0) {
-        char *const argv[] = { (char *)"sha256sum", (char *)path, NULL };
-        if (dup2(pipefd[1], STDOUT_FILENO) < 0) _exit(126);
-        close(pipefd[0]); close(pipefd[1]);
-        execvp(argv[0], argv);
-        _exit(127);
-    }
-    close(pipefd[1]);
-    size_t n = 0;
-    while (n < 64) {
-        ssize_t r = read(pipefd[0], out + n, 64 - n);
-        if (r < 0) { if (errno == EINTR) continue; close(pipefd[0]); waitpid(pid, NULL, 0); return -1; }
-        if (r == 0) break;
-        n += (size_t)r;
-    }
-    close(pipefd[0]);
-    int status = 0;
-    if (waitpid(pid, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0 || n < 64) return -1;
-    out[64] = '\0';
-    return 0;
 }
 
 static int find_source(int argc, char **argv) {
@@ -182,7 +152,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "xmc: icon path is too long\n"); return 1;
     }
     char icon_sha[65] = "unavailable";
-    (void)sha256_file(icon, icon_sha);
+    if (xmc_sha256_file(icon, icon_sha) != 0)
+        fprintf(stderr, "xmc: warning: unable to compute icon SHA-256\n");
 
     char *pack_argv[] = {
         packer, (char *)"--output", asysma, (char *)"--entry", (char *)"JAVA",
