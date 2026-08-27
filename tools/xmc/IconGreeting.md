@@ -18,6 +18,19 @@ The XMC Look image library presents the selected public icon family below. The c
 
 **Icon Set 4 — Fourth Collection** is the current public icon collection for XMC Look. Its transparent master provides the reference artwork, accompanied by the 12, 16, 24, 32, and 48 px trimmed variants for interface and packaging use.
 
+### Icon Sizes
+
+| Size | Public Label | Asset |
+|---:|---|---|
+| **64 × 64** | **64 × 64 — Master** | `cmd-icon-set-4-transparent-master-trimmed.png` |
+| **48 × 48** | **48 × 48 — Large** | `cmd-icon-set-4-48x48.png` |
+| **32 × 32** | **32 × 32 — Standard** | `cmd-icon-set-4-32x32.png` |
+| **24 × 24** | **24 × 24 — Compact** | `cmd-icon-set-4-24x24.png` |
+| **16 × 16** | **16 × 16 — Small** | `cmd-icon-set-4-16x16.png` |
+| **12 × 12** | **12 × 12 — Micro** | `cmd-icon-set-4-12x12.png` |
+
+The 64 × 64 master is the visual reference; the smaller sizes are the production variants intended for increasingly compact interface surfaces.
+
 [Open Icon Set 4 — Fourth Collection](images/set-4/)
 
 ## Visual Character
