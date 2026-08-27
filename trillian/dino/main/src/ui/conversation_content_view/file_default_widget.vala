@@ -1,0 +1,178 @@
+using Gee;
+using Gdk;
+using Gtk;
+
+using Dino.Entities;
+
+namespace Dino.Ui {
+
+[GtkTemplate (ui = "/im/dino/Dino/file_default_widget.ui")]
+public class FileDefaultWidget : Box {
+
+    public signal void clicked();
+
+    [GtkChild] public unowned Stack image_stack;
+    [GtkChild] public unowned Label name_label;
+    [GtkChild] public unowned Label mime_label;
+    [GtkChild] public unowned Image content_type_image;
+    [GtkChild] public unowned Spinner spinner;
+    [GtkChild] public unowned MenuButton file_menu;
+
+    private FileTransfer.State state;
+
+    construct {
+        check_widget_leak(this);
+    }
+
+    public void init_updating_file_info() {
+        EventControllerMotion this_motion_events = new EventControllerMotion();
+        this.add_controller(this_motion_events);
+        this_motion_events.enter.connect(on_pointer_entered_event);
+        this_motion_events.leave.connect(on_pointer_left_event);
+
+        GestureClick gesture_click_controller = new GestureClick();
+        gesture_click_controller.set_button(1); // listen for left clicks
+        this.add_controller(gesture_click_controller);
+        gesture_click_controller.pressed.connect((n_press, x, y) => {
+            // Check whether the click was inside the file menu. Otherwise, open the file.
+            double x_button, y_button;
+            this.translate_coordinates(file_menu, x, y, out x_button, out y_button);
+            if (file_menu.contains(x_button, y_button)) return;
+
+            this.clicked();
+        });
+    }
+
+    public void set_static_file_info(Xmpp.FileContentType? content_type) {
+        spinner.stop(); // A hidden spinning spinner still uses CPU. Deactivate asap
+
+        image_stack.set_visible_child_name("content_type_image");
+        content_type_image.icon_name = get_file_icon_name(content_type);
+        mime_label.label = content_type != null ? content_type.get_description() : null;
+    }
+
+    public void update_file_info(FileTransfer file_transfer) {
+        this.state = file_transfer.state;
+
+        spinner.stop(); // A hidden spinning spinner still uses CPU. Deactivate asap
+
+        content_type_image.icon_name = get_file_icon_name(file_transfer.content_type);
+        string? mime_description = file_transfer.content_type != null ? file_transfer.content_type.get_description() : null;
+
+        switch (state) {
+            case FileTransfer.State.COMPLETE:
+                mime_label.label = mime_description;
+                image_stack.set_visible_child_name("content_type_image");
+
+                // Create a menu
+                Menu menu_model = new Menu();
+
+                MenuItem open_file_item = new MenuItem(_("Open"), "app.file_open_externally");
+                open_file_item.set_action_and_target_value("app.file_open_externally", new Variant.int32(file_transfer.id));
+
+                MenuItem save_as_item = new MenuItem(_("Save as…"), "app.file_save_as");
+                save_as_item.set_action_and_target_value("app.file_open_save_dialog", new Variant.int32(file_transfer.id));
+
+                menu_model.append_item(open_file_item);
+                menu_model.append_item(save_as_item);
+
+                Gtk.PopoverMenu popover_menu = new Gtk.PopoverMenu.from_model(menu_model);
+                file_menu.popover = popover_menu;
+                popover_menu.closed.connect(on_pointer_left);
+                break;
+            case FileTransfer.State.IN_PROGRESS:
+                if (file_transfer.direction == FileTransfer.DIRECTION_RECEIVED) {
+                    if (file_transfer.size > 0) {
+                        int64 progress = file_transfer.transferred_bytes * 100 / file_transfer.size;
+                        mime_label.label = _("Downloading %s… (%u%%)").printf(get_size_string(file_transfer.size), progress);
+                    } else {
+                        mime_label.label = _("Downloading %s…").printf(get_size_string(file_transfer.size));
+                    }
+                } else {
+                    int64 progress = file_transfer.transferred_bytes * 100 / file_transfer.size;
+                    mime_label.label = _("Uploading %s… (%u%%)").printf(get_size_string(file_transfer.size), progress);
+                }
+                spinner.start();
+                image_stack.set_visible_child_name("spinner");
+
+                // Create a menu
+                Menu menu_model = new Menu();
+                menu_model.append(_("Cancel"), "file.cancel_download");
+                Gtk.PopoverMenu popover_menu = new Gtk.PopoverMenu.from_model(menu_model);
+                file_menu.popover = popover_menu;
+                popover_menu.closed.connect(on_pointer_left);
+                break;
+            case FileTransfer.State.NOT_STARTED:
+                if (mime_description != null) {
+                    mime_label.label =  _("%s offered: %s").printf(mime_description, get_size_string(file_transfer.size));
+                } else if (file_transfer.size != -1) {
+                    mime_label.label = _("File offered: %s").printf(get_size_string(file_transfer.size));
+                } else {
+                    mime_label.label = _("File offered");
+                }
+                image_stack.set_visible_child_name("content_type_image");
+                break;
+            case FileTransfer.State.FAILED:
+                mime_label.use_markup = true;
+                mime_label.label = "<span foreground=\"#f44336\">" + _("File transfer failed") + "</span>";
+                image_stack.set_visible_child_name("content_type_image");
+                break;
+        }
+    }
+
+    private void on_pointer_entered_event() {
+        this.set_cursor_from_name("pointer");
+        content_type_image.opacity = 0.7;
+        if (state == FileTransfer.State.NOT_STARTED) {
+            image_stack.set_visible_child_name("download_image");
+        }
+        if (state == FileTransfer.State.COMPLETE || state == FileTransfer.State.IN_PROGRESS) {
+            file_menu.opacity = 1;
+        }
+    }
+
+    private void on_pointer_left_event() {
+        if (file_menu.popover != null && file_menu.popover.visible) return;
+
+        this.set_cursor(null);
+        on_pointer_left();
+    }
+
+    private void on_pointer_left() {
+        content_type_image.opacity = 0.5;
+        if (state == FileTransfer.State.NOT_STARTED) {
+            image_stack.set_visible_child_name("content_type_image");
+        }
+        file_menu.opacity = 0;
+    }
+
+    public static string get_file_icon_name(Xmpp.FileContentType? content_type) {
+        if (content_type == null) return "dino-file-symbolic";
+
+        string generic_icon_name = content_type.get_generic_icon_name() ?? "";
+        switch (generic_icon_name) {
+            case "audio-x-generic": return "dino-file-music-symbolic";
+            case "image-x-generic": return "dino-file-image-symbolic";
+            case "text-x-generic": return "dino-file-document-symbolic";
+            case "text-x-generic-template": return "dino-file-document-symbolic";
+            case "video-x-generic": return "dino-file-video-symbolic";
+            case "x-office-document": return "dino-file-document-symbolic";
+            case "x-office-spreadsheet": return "dino-file-table-symbolic";
+            default: return "dino-file-symbolic";
+        }
+    }
+
+    public static string get_size_string(int64 size) {
+        if (size < 1024) {
+            return @"$(size) B";
+        } else if (size < 1000 * 1000) {
+            return @"$(size / 1000) kB";
+        } else if (size < 1000 * 1000 * 1000) {
+            return @"$(size / 1000  / 1000) MB";
+        } else {
+            return @"$(size  / 1000  / 1000  / 1000) GB";
+        }
+    }
+}
+
+}
