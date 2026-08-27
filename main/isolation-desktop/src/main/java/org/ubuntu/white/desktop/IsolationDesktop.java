@@ -1,5 +1,6 @@
 package org.ubuntu.white.desktop;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -11,10 +12,10 @@ import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 
 import java.nio.file.Files;
@@ -52,7 +53,6 @@ public final class IsolationDesktop extends Application {
         box.setAlignment(Pos.CENTER);
         StackPane root = new StackPane(box);
         root.setStyle("-fx-background-color: white; -fx-font-family: 'Sans Serif'; -fx-font-size: 16px;");
-
         final int[] step = {0};
         PauseTransition timer = new PauseTransition(Duration.millis(140));
         timer.setOnFinished(event -> {
@@ -61,8 +61,7 @@ public final class IsolationDesktop extends Application {
             progress.setProgress(value);
             percent.setText((int) Math.round(value * 100) + "%");
             status.setText(value < 1 ? assessment(step[0]) : "Desktop ready");
-            if (value < 1) timer.playFromStart();
-            else showDesktop(root);
+            if (value < 1) timer.playFromStart(); else showDesktop(root);
         });
         timer.play();
         installExitKeys(root);
@@ -87,9 +86,7 @@ public final class IsolationDesktop extends Application {
             Path.of("..", "..", "..", "images", BACKGROUND_NAME)
         };
         for (Path candidate : candidates) {
-            if (Files.isRegularFile(candidate)) {
-                return new Image(candidate.toAbsolutePath().toUri().toString(), true);
-            }
+            if (Files.isRegularFile(candidate)) return new Image(candidate.toAbsolutePath().toUri().toString(), true);
         }
         var resource = getClass().getResource("/images/" + BACKGROUND_NAME);
         return resource == null ? null : new Image(resource.toExternalForm(), true);
@@ -102,9 +99,7 @@ public final class IsolationDesktop extends Application {
             Path.of("..", "..", "..", "ubuntu-white", "icons", filename),
             Path.of("..", "icons", "ubuntu-white", filename)
         };
-        for (Path candidate : candidates) {
-            if (Files.isRegularFile(candidate)) return candidate.toAbsolutePath();
-        }
+        for (Path candidate : candidates) if (Files.isRegularFile(candidate)) return candidate.toAbsolutePath();
         return null;
     }
 
@@ -119,44 +114,53 @@ public final class IsolationDesktop extends Application {
     }
 
     private void showDesktop(StackPane root) {
-        Image image = loadWallpaper();
         StackPane desktop = new StackPane();
         desktop.setStyle("-fx-background-color: black;");
-
+        Image image = loadWallpaper();
         if (image != null) {
             ImageView background = new ImageView(image);
             background.setPreserveRatio(true);
             background.setSmooth(true);
             background.setMouseTransparent(true);
+            background.setManaged(false);
+            // Natural-size wallpaper: never stretch it to the fullscreen frame.
+            desktop.widthProperty().addListener((obs, oldV, newV) -> centerWallpaper(background, desktop));
+            desktop.heightProperty().addListener((obs, oldV, newV) -> centerWallpaper(background, desktop));
             desktop.getChildren().add(background);
+            Platform.runLater(() -> centerWallpaper(background, desktop));
         }
 
-        VBox icons = new VBox(14);
+        GridPane icons = new GridPane();
+        icons.setHgap(24);
+        icons.setVgap(22);
         icons.setAlignment(Pos.TOP_LEFT);
-        icons.setTranslateX(34);
-        icons.setTranslateY(28);
-        for (String name : DESKTOP_ITEMS) {
-            VBox icon = createDesktopIcon(name);
-            icons.getChildren().add(icon);
+        icons.setTranslateX(38);
+        icons.setTranslateY(32);
+        for (int i = 0; i < DESKTOP_ITEMS.length; i++) {
+            icons.add(createDesktopIcon(DESKTOP_ITEMS[i]), i / 5, i % 5);
         }
         desktop.getChildren().add(icons);
 
+        BorderPane shell = new BorderPane();
+        shell.setCenter(desktop);
         Label panel = new Label("  Applications     Files     Settings");
         panel.setStyle("-fx-background-color: rgba(255,255,255,0.88); -fx-text-fill: #333333; -fx-padding: 10px 18px; -fx-font-size: 14px;");
-        BorderPane shell = new BorderPane();
         shell.setTop(panel);
-        shell.setCenter(desktop);
         shell.setBottom(new Label("  Ubuntu White • Desktop Preview"));
-        shell.setStyle("-fx-background-color: transparent;");
         root.getChildren().setAll(shell);
         installExitKeys(root);
+    }
+
+    private void centerWallpaper(ImageView background, StackPane desktop) {
+        background.setTranslateX((desktop.getWidth() - background.getBoundsInParent().getWidth()) / 2.0);
+        background.setTranslateY((desktop.getHeight() - background.getBoundsInParent().getHeight()) / 2.0);
     }
 
     private VBox createDesktopIcon(String name) {
         ImageView image = loadIcon(ICONS.get(name));
         Label label = new Label(name);
-        label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;");
-        VBox icon = new VBox(3);
+        label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
+        VBox icon = new VBox(4);
         if (image != null) icon.getChildren().add(image);
         else {
             Label missing = new Label("□");
@@ -165,22 +169,17 @@ public final class IsolationDesktop extends Application {
         }
         icon.getChildren().add(label);
         icon.setAlignment(Pos.CENTER);
-        icon.setPrefWidth(100);
+        icon.setPrefWidth(92);
         return icon;
     }
 
     private void installExitKeys(javafx.scene.Node node) {
         node.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.ESCAPE ||
-                (event.isControlDown() && event.getCode() == KeyCode.TAB)) {
-                Platform.exit();
-            }
+            if (event.getCode() == KeyCode.ESCAPE || (event.isControlDown() && event.getCode() == KeyCode.TAB)) Platform.exit();
         });
         node.setFocusTraversable(true);
         node.requestFocus();
     }
 
-    public static void main(String[] args) {
-        launch(args);
-    }
+    public static void main(String[] args) { launch(args); }
 }
