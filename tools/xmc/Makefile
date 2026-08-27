@@ -15,6 +15,8 @@ BOOTSTRAP  = asysma-bootstrap
 DRIVER_SRC = xmc-driver.c
 REG_SRC    = xmc-os-register.c
 REG_HDR    = xmc-os-register.h
+SHA_SRC    = xmc-sha256.c
+SHA_HDR    = xmc-sha256.h
 SRC        = xmc.c
 PACKSRC    = asysma_pack.c
 BOOT_SRC   = asysma-bootstrap.c
@@ -39,8 +41,8 @@ $(PACKER): $(PACKSRC) asysma_native_layout.h
 $(BOOTSTRAP): $(BOOT_SRC) asysma_native_layout.h
 	$(CC) $(COMMON_CFLAGS) -o $@ $(BOOT_SRC) $(LDFLAGS)
 
-$(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
-	$(CC) $(COMMON_CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(LDFLAGS)
+$(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(SHA_SRC) $(SHA_HDR) $(CORE) $(PACKER) $(BOOTSTRAP)
+	$(CC) $(COMMON_CFLAGS) -o $@ $(DRIVER_SRC) $(REG_SRC) $(SHA_SRC) $(LDFLAGS)
 
 check-version:
 	@sh ./tests/test_version.sh
@@ -76,8 +78,10 @@ sanitize-test:
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o xmc-core-sanitize $(SRC) $(SANITIZER_LDFLAGS); \
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma_pack-sanitize $(PACKSRC) $(SANITIZER_LDFLAGS); \
 	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o asysma-bootstrap-sanitize $(BOOT_SRC) $(SANITIZER_LDFLAGS); \
+	$(CC) $(COMMON_CFLAGS) $(SANITIZER_CFLAGS) -o xmc-sha256-test xmc-sha256.c tests/test_sha256.c $(SANITIZER_LDFLAGS); \
 	sh ./tests/test_sanitized.sh ./xmc-core-sanitize; \
-	rm -f xmc-core-sanitize asysma_pack-sanitize asysma-bootstrap-sanitize
+	./xmc-sha256-test; \
+	rm -f xmc-core-sanitize asysma_pack-sanitize asysma-bootstrap-sanitize xmc-sha256-test
 
 test: all check-version
 	@sh ./tests/test_xmc.sh
