@@ -10,39 +10,15 @@ xmcLook presents its icon vocabulary as part of the tool's visual identity: **pr
 
 ## The Icon Set
 
-The xmcLook image library currently presents **four icon sets**. Each set is preserved as its own visual family under `tools/xmc/images/`, with trimmed raster sizes and a transparent master artwork file. The four sets are presented here at the public-facing level so visitors can see the vocabulary before entering the implementation directories.
-
-### Icon Set 1 — First Collection
-
-![xmcLook Icon Set 1](images/set-1/cmd-icon-set-1-transparent-master-trimmed.png)
-
-**Set 1** is the first collection in the xmcLook icon sequence. Its transparent master is the reference presentation for this family; the same set is also supplied in 12, 16, 24, 32, and 48 px trimmed forms.
-
-[Open Icon Set 1](images/set-1/)
-
-### Icon Set 2 — Second Collection
-
-![xmcLook Icon Set 2](images/set-2/cmd-icon-set-2-transparent-master-trimmed.png)
-
-**Set 2** is the second collection, maintained as a distinct visual variant while retaining the common xmcLook icon vocabulary and sizing system. Its directory contains the transparent master plus the 12, 16, 24, 32, and 48 px forms.
-
-[Open Icon Set 2](images/set-2/)
-
-### Icon Set 3 — Third Collection
-
-![xmcLook Icon Set 3](images/set-3/cmd-icon-set-3-transparent-master-trimmed.png)
-
-**Set 3** is the third collection in the sequence. It follows the same public asset discipline: transparent master artwork accompanied by trimmed interface sizes from 12 through 48 px.
-
-[Open Icon Set 3](images/set-3/)
+The xmcLook image library presents the selected public icon family below. The current public presentation is **Icon Set 4 — Fourth Collection**. It is preserved under `tools/xmc/images/`, with its transparent master artwork and production-oriented trimmed sizes.
 
 ### Icon Set 4 — Fourth Collection
 
-![xmcLook Icon Set 4](images/set-4/cmd-icon-set-4-transparent-master-trimmed.png)
+![xmcLook Icon Set 4 — Fourth Collection](images/set-4/cmd-icon-set-4-transparent-master-trimmed.png)
 
-**Set 4** is the fourth collection and completes the current four-set presentation. Its transparent master is accompanied by the same 12, 16, 24, 32, and 48 px trimmed variants.
+**Icon Set 4 — Fourth Collection** is the current public icon collection for xmcLook. Its transparent master provides the reference artwork, accompanied by the 12, 16, 24, 32, and 48 px trimmed variants for interface and packaging use.
 
-[Open Icon Set 4](images/set-4/)
+[Open Icon Set 4 — Fourth Collection](images/set-4/)
 
 ## Visual Character
 
@@ -56,7 +32,7 @@ The xmcLook treatment favors:
 - recognizable forms at both small and large interface sizes;
 - accessible names and descriptions for interface use.
 
-The four sets share an important practical convention: **the master artwork is retained, while production-oriented trimmed sizes are provided alongside it.** This makes the public gallery useful both as a visual introduction and as a reference for implementation.
+The selected collection retains an important practical convention: **the master artwork is retained, while production-oriented trimmed sizes are provided alongside it.** This makes the public gallery useful both as a visual introduction and as a reference for implementation.
 
 ## Tool Identity
 
@@ -86,7 +62,7 @@ For public-facing presentation, icons should:
 
 ## Relationship to xmcLook
 
-This document is the visual greeting and icon-gallery companion for `tools/xmc`. It intentionally presents the four image collections from `tools/xmc/images/` so the public repository communicates the visual system directly rather than merely naming the assets.
+This document is the visual greeting and icon-gallery companion for `tools/xmc`. It intentionally presents **Icon Set 4 — Fourth Collection** from `tools/xmc/images/set-4/` so the public repository communicates the current visual system directly rather than retaining the earlier three-set presentation.
 
 Where an icon asset exists in a tool directory, public documentation should prefer showing the actual repository asset rather than substituting an unrelated illustration.
 
