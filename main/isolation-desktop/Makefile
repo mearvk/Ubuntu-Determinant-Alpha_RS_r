@@ -1,8 +1,11 @@
-.PHONY: all compile run clean
+.PHONY: all bootstrap compile run clean
 
 all: compile
 
-compile:
+bootstrap:
+	./bootstrap-gradle
+
+compile: bootstrap
 	./compile-desktop
 
 run: compile
