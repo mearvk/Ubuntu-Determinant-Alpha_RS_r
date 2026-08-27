@@ -1,0 +1,43 @@
+name: Smaug Native Build
+
+on:
+  push:
+    paths:
+      - 'smaug/**'
+      - '.github/workflows/smaug-native.yml'
+  pull_request:
+    paths:
+      - 'smaug/**'
+      - '.github/workflows/smaug-native.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler:
+          - gcc
+          - clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler
+        if: matrix.compiler == 'clang'
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Compile check
+        working-directory: smaug
+        env:
+          CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+          CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
+        run: make check
+      - name: Build shared library
+        working-directory: smaug
+        env:
+          CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+          CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
+        run: make
+      - name: Exercise dream target
+        working-directory: smaug
+        env:
+          CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+          CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
+        run: make dream DREAM_TURNS=3
