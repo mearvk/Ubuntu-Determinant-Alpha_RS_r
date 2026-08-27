@@ -28,7 +28,7 @@ COMMON_CFLAGS   = $(CFLAGS) $(COMMON_CPPFLAGS) -include BUILD-POSIX-COMPAT.h \
 SANITIZER_CFLAGS  = -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1
 SANITIZER_LDFLAGS = -fsanitize=address,undefined -lm
 
-.PHONY: all clean install uninstall test process-test sanitize-test check-version clean-user-integration
+.PHONY: all clean install uninstall test process-test sanitize-test check-version security-test clean-user-integration
 
 all: $(BIN) $(PACKER) $(BOOTSTRAP)
 
@@ -46,6 +46,9 @@ $(BIN): $(DRIVER_SRC) $(REG_SRC) $(REG_HDR) $(SHA_SRC) $(SHA_HDR) $(CORE) $(PACK
 
 check-version:
 	@sh ./tests/test_version.sh
+
+security-test: all
+	@sh ./tests/test_security.sh
 
 clean:
 	rm -f $(BIN) $(CORE) $(PACKER) $(BOOTSTRAP) *.o
