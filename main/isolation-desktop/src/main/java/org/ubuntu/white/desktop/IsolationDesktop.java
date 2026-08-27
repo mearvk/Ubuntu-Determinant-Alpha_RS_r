@@ -19,14 +19,14 @@ import javafx.util.Duration;
 
 /** Developer-only visual preview of the Ubuntu White desktop idiom. */
 public final class IsolationDesktop extends Application {
-    private static final int WIDTH = 1280;
-    private static final int HEIGHT = 800;
     private static final String BACKGROUND = "/images/mediate-ubuntu-white-edition-001.jpeg";
 
     @Override
     public void start(Stage stage) {
         stage.setTitle("Ubuntu White — Desktop Preview");
-        stage.setScene(new Scene(loader(), WIDTH, HEIGHT));
+        stage.setScene(new Scene(loader(), 1280, 800));
+        stage.setFullScreen(true);
+        stage.setFullScreenExitHint("");
         stage.show();
     }
 
@@ -71,7 +71,7 @@ public final class IsolationDesktop extends Application {
         Image image = null;
         var resource = getClass().getResource(BACKGROUND);
         if (resource != null) {
-            image = new Image(resource.toExternalForm(), WIDTH, HEIGHT, false, true);
+            image = new Image(resource.toExternalForm());
         }
 
         Label title = new Label("Ubuntu White Desktop Preview");
@@ -84,13 +84,13 @@ public final class IsolationDesktop extends Application {
         BorderPane desktop = new BorderPane(content);
         desktop.setTop(new Label("  Applications     Files     Settings"));
         desktop.setBottom(new Label("  Ubuntu White • Desktop Preview"));
-        desktop.setStyle("-fx-background-color: #f7f7f7; -fx-padding: 24px;");
+        desktop.setStyle("-fx-background-color: rgba(247,247,247,0.18); -fx-padding: 24px;");
 
         if (image != null) {
             ImageView background = new ImageView(image);
             background.setPreserveRatio(false);
-            background.setFitWidth(WIDTH);
-            background.setFitHeight(HEIGHT);
+            background.fitWidthProperty().bind(root.widthProperty());
+            background.fitHeightProperty().bind(root.heightProperty());
             StackPane composed = new StackPane(background, desktop);
             root.getChildren().setAll(composed);
         } else {
