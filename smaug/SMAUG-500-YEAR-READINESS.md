@@ -15,20 +15,24 @@ The Smaug native layer is intended to be maintainable for a very long-lived proj
 - Dream execution is a separate executable and does not place a `main` symbol in the shared library.
 - `make check` is the compile-only gate; `make` builds the shared library; `make dream` exercises the bounded dream executable.
 
-## Preservation rules
+## Preservation contract
 
-1. Keep public C structures fixed-width where possible.
-2. Keep C++ interfaces explicitly versioned when they become externally stable.
-3. Avoid undocumented compiler extensions in the core model.
-4. Keep generated binaries out of source control unless a release artifact is deliberately archived.
-5. Preserve build instructions with the source.
-6. Test with more than one compiler family when available.
-7. Treat stored records as migrations, not immutable assumptions about future operating systems.
-8. Never interpret fictional capability numbers as human intelligence claims.
+1. Keep source in portable C11/C++17 where practical.
+2. Keep public interfaces documented and versioned before external stabilization.
+3. Keep externally supplied dimensions, records, strands, coils, and turns bounded.
+4. Keep storage behind a replaceable Store interface so MySQL or another database can be substituted later.
+5. Keep JSON/XML ingestion defensive and replaceable.
+6. Preserve compiler-warning gates and build instructions.
+7. Test across compiler families and supported operating systems.
+8. Treat generated binaries as rebuildable artifacts, never as the only copy of the program.
+9. Record migration notes whenever a data format, ABI, compiler, operating-system, or database dependency changes.
+10. Preserve old formats long enough to provide explicit conversion paths.
 
-## Verification
+## Compatibility horizon
 
-From `smaug/`:
+The durable 500-year artifact is the **source + specifications + tests + documented build environment + migration history**. A 2026 executable, shared object, operating-system ABI, or database connector should not be assumed to remain executable centuries later.
+
+## Verification sequence
 
 ```sh
 make clean
@@ -37,4 +41,8 @@ make
 make dream DREAM_TURNS=3
 ```
 
-The repository integration provides the commands; a successful result must be verified by an actual CI runner or host compiler. GitHub source inspection alone cannot establish a successful native build.
+Then inspect the resulting field/evidence output and record the compiler, platform, and build date. Failures are review events, not silent success.
+
+## Authority
+
+Smaug's companion, habit, Emerald, Smite, Atom, Overtine, and storage layers are advisory simulation components. Castle/INCLARE remains the authority boundary. Uncertainty can request review; historical patterns, capability scores, and fictional IQ terminology do not independently grant authority.
