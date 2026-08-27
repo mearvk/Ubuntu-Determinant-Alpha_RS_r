@@ -6,6 +6,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
@@ -19,6 +21,7 @@ import javafx.util.Duration;
 public final class IsolationDesktop extends Application {
     private static final int WIDTH = 1280;
     private static final int HEIGHT = 800;
+    private static final String BACKGROUND = "/images/mediate-ubuntu-white-edition-001.jpeg";
 
     @Override
     public void start(Stage stage) {
@@ -65,16 +68,34 @@ public final class IsolationDesktop extends Application {
     }
 
     private void showDesktop(StackPane root) {
+        Image image = null;
+        var resource = getClass().getResource(BACKGROUND);
+        if (resource != null) {
+            image = new Image(resource.toExternalForm(), WIDTH, HEIGHT, false, true);
+        }
+
         Label title = new Label("Ubuntu White Desktop Preview");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white;");
         Label subtitle = new Label("Developer isolation environment");
+        subtitle.setStyle("-fx-text-fill: white;");
         VBox content = new VBox(10, title, subtitle);
         content.setAlignment(Pos.CENTER);
+
         BorderPane desktop = new BorderPane(content);
         desktop.setTop(new Label("  Applications     Files     Settings"));
         desktop.setBottom(new Label("  Ubuntu White • Desktop Preview"));
         desktop.setStyle("-fx-background-color: #f7f7f7; -fx-padding: 24px;");
-        root.getChildren().setAll(desktop);
+
+        if (image != null) {
+            ImageView background = new ImageView(image);
+            background.setPreserveRatio(false);
+            background.setFitWidth(WIDTH);
+            background.setFitHeight(HEIGHT);
+            StackPane composed = new StackPane(background, desktop);
+            root.getChildren().setAll(composed);
+        } else {
+            root.getChildren().setAll(desktop);
+        }
         installExitKeys(root);
     }
 
