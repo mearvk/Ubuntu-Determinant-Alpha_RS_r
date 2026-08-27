@@ -23,8 +23,9 @@ if [ -d "$DEST/.git" ]; then
     rm -rf .git
     cd ..
 elif [ -e "$DEST" ]; then
-    echo "A non-Git path already exists at $DEST; refusing to overwrite." >&2
-    exit 1
+    echo "A non-Git path already exists at $DEST; it is already an ordinary source tree."
+    echo "No overwrite performed."
+    exit 0
 else
     TMP="${DEST}.import.$$"
     trap 'rm -rf "$TMP"' EXIT HUP INT TERM
