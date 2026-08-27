@@ -1,8 +1,8 @@
 #include "SmaugSystemStore.hpp"
 
 #include <fstream>
-#include <iomanip>
 #include <mutex>
+#include <utility>
 
 namespace smaug::system {
 namespace {
