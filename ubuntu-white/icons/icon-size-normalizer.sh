@@ -17,8 +17,8 @@ set -euo pipefail
 #   Filtering:    high-quality Lanczos
 #
 # ImageMagick 8 is the required image-processing backend.
-# The script accepts either the unified `magick` launcher or the
-# versioned installation's `convert`/`identify` compatibility commands.
+# The script searches PATH and common local installation locations so a
+# legacy ImageMagick 6 command earlier in PATH does not hide ImageMagick 8.
 # Existing set-002 files are replaced.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,42 +27,83 @@ REPO_ROOT="$SCRIPT_DIR"
 SOURCE_DIR="$REPO_ROOT/images/desktop-icons/set-001"
 TARGET_DIR="$REPO_ROOT/images/desktop-icons/set-002"
 
-# ImageMagick 8 installations can expose the unified `magick` command,
-# or expose `convert` and `identify` directly. Prefer the unified launcher,
-# but do not reject a valid ImageMagick 8 installation merely because its
-# packaging does not provide `magick` in PATH.
 MAGICK_CMD=()
 IDENTIFY_CMD=()
 MAGICK_VERSION=""
 
-if command -v magick >/dev/null 2>&1; then
-    MAGICK_CMD=(magick)
-    IDENTIFY_CMD=(magick identify)
-    MAGICK_VERSION="$(magick -version 2>/dev/null | head -n 1 || true)"
-elif command -v convert >/dev/null 2>&1 && command -v identify >/dev/null 2>&1; then
-    MAGICK_CMD=(convert)
-    IDENTIFY_CMD=(identify)
-    MAGICK_VERSION="$(identify -version 2>/dev/null | head -n 1 || true)"
-    if [[ -z "$MAGICK_VERSION" ]]; then
-        MAGICK_VERSION="$(convert -version 2>/dev/null | head -n 1 || true)"
+# Test a candidate unified ImageMagick launcher and accept it only if it is 8.x.
+try_magick8() {
+    local candidate="$1"
+    [[ -x "$candidate" ]] || return 1
+
+    local version
+    version="$("$candidate" -version 2>/dev/null | head -n 1 || true)"
+    [[ "$version" == *"ImageMagick 8."* ]] || return 1
+
+    MAGICK_CMD=("$candidate")
+    IDENTIFY_CMD=("$candidate" identify)
+    MAGICK_VERSION="$version"
+    return 0
+}
+
+# First inspect every `magick` visible through PATH, not just the first one.
+while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    if try_magick8 "$candidate"; then
+        break
     fi
+done < <(type -P -a magick 2>/dev/null | awk '!seen[$0]++')
+
+# Common locations for locally compiled/versioned ImageMagick installations.
+if [[ -z "$MAGICK_VERSION" ]]; then
+    while IFS= read -r candidate; do
+        [[ -n "$candidate" ]] || continue
+        if try_magick8 "$candidate"; then
+            break
+        fi
+    done < <(
+        for dir in /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
+            [[ -d "$dir" ]] || continue
+            find "$dir" -maxdepth 1 -type f -name magick -print 2>/dev/null
+        done
+        for dir in /opt /usr/local/ImageMagick* /usr/local/imagemagick*; do
+            [[ -d "$dir" ]] || continue
+            find "$dir" -maxdepth 4 -type f -name magick -print 2>/dev/null
+        done
+    )
+fi
+
+# Some package layouts expose ImageMagick 8 through convert/identify rather
+# than the unified launcher. Search those commands as a secondary fallback.
+if [[ -z "$MAGICK_VERSION" ]]; then
+    while IFS= read -r convert_candidate; do
+        [[ -x "$convert_candidate" ]] || continue
+        version="$("$convert_candidate" -version 2>/dev/null | head -n 1 || true)"
+        [[ "$version" == *"ImageMagick 8."* ]] || continue
+
+        identify_candidate="$(dirname "$convert_candidate")/identify"
+        if [[ -x "$identify_candidate" ]]; then
+            MAGICK_CMD=("$convert_candidate")
+            IDENTIFY_CMD=("$identify_candidate")
+            MAGICK_VERSION="$version"
+            break
+        fi
+    done < <(
+        type -P -a convert 2>/dev/null | awk '!seen[$0]++'
+        for dir in /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
+            [[ -d "$dir" ]] || continue
+            find "$dir" -maxdepth 1 -type f -name convert -print 2>/dev/null
+        done
+    )
 fi
 
 if [[ -z "$MAGICK_VERSION" ]]; then
     echo "ERROR: ImageMagick 8 is required."
     echo
-    echo "Could not find a usable ImageMagick command."
-    echo "Supported command layouts:"
-    echo "  magick"
-    echo "  convert + identify"
-    exit 1
-fi
-
-if [[ "$MAGICK_VERSION" != *"ImageMagick 8."* ]]; then
-    echo "ERROR: ImageMagick 8 is required."
-    echo "Detected: ${MAGICK_VERSION:-unknown}"
-    echo
-    echo "A usable ImageMagick installation was found, but it is not version 8."
+    echo "No ImageMagick 8 command was found."
+    echo "A legacy ImageMagick installation may be earlier in PATH."
+    echo "Searched PATH, /usr/local/bin, /usr/local/sbin, /opt/bin,"
+    echo "/opt/local/bin, and common /opt or /usr/local ImageMagick trees."
     exit 1
 fi
 
