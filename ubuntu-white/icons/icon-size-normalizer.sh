@@ -112,16 +112,22 @@ echo "Target: $TARGET_DIR"
 echo "Canvas: 96x96 transparent"
 echo
 
-for i in $(seq -w 1 12); do
-    source="$SOURCE_DIR/icon-$i.png"
-    target="$TARGET_DIR/icon-$i.png"
+shopt -s nullglob
+files=("$SOURCE_DIR"/*.png)
+shopt -u nullglob
 
-    if [[ ! -f "$source" ]]; then
-        echo "WARNING: Missing $source"
-        continue
-    fi
+if (( ${#files[@]} == 0 )); then
+    echo "ERROR: No PNG files found in $SOURCE_DIR"
+    exit 1
+fi
 
-    echo "Normalizing icon-$i.png..."
+processed=0
+
+for source in "${files[@]}"; do
+    filename="$(basename "$source")"
+    target="$TARGET_DIR/$filename"
+
+    echo "Normalizing $filename..."
 
     "${MAGICK_CMD[@]}" "$source" \
         -auto-orient \
@@ -133,17 +139,20 @@ for i in $(seq -w 1 12); do
         -filter Lanczos \
         -define png:color-type=6 \
         "$target"
+
+    ((processed += 1))
 done
 
 echo
 echo "Normalization complete."
+echo "Processed: $processed PNG file(s)"
 echo
 echo "Generated files:"
-find "$TARGET_DIR" -maxdepth 1 -type f -name 'icon-*.png' -print | sort
+find "$TARGET_DIR" -maxdepth 1 -type f -name '*.png' -print | sort
 
 echo
 echo "Image dimensions:"
-for file in "$TARGET_DIR"/icon-*.png; do
+for file in "$TARGET_DIR"/*.png; do
     [[ -f "$file" ]] || continue
     "${IDENTIFY_CMD[@]}" -format '%f: %wx%h\n' "$file"
 done
