@@ -1,0 +1,62 @@
+name: Materialize Ubuntu White Icons
+
+on:
+  push:
+    paths:
+      - 'ubuntu-white/icons/set2/ubuntu-white-set2-icons-32x32.zip'
+      - '.github/workflows/ubuntu-white-icons-materialize.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-icons:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Materialize individual PNG and JPEG icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y imagemagick unzip
+
+          work="${RUNNER_TEMP}/ubuntu-white-icons"
+          rm -rf "$work"
+          mkdir -p "$work/source" "$work/out"
+
+          unzip -o "ubuntu-white/icons/set2/ubuntu-white-set2-icons-32x32.zip" -d "$work/source" >/dev/null
+
+          find "$work/source" -type f \( -iname '*.png' -o -iname '*.PNG' \) -print0 | while IFS= read -r -d '' src; do
+            name="$(basename "$src")"
+            stem="${name%.*}"
+            cp "$src" "ubuntu-white/icons/${stem}.png"
+            # JPEG has no alpha channel; use white only as the JPEG fallback.
+            magick "$src" -background white -alpha remove -alpha off -quality 95 "ubuntu-white/icons/${stem}.jpeg"
+          done
+
+          find "$work/source" -type f \( -iname '*.jpg' -o -iname '*.jpeg' \) -print0 | while IFS= read -r -d '' src; do
+            name="$(basename "$src")"
+            stem="${name%.*}"
+            cp "$src" "ubuntu-white/icons/${stem}.jpeg"
+          done
+
+          test -n "$(find ubuntu-white/icons -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpeg' \) -print -quit)"
+
+      - name: Commit generated icon files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ubuntu-white/icons/*.png ubuntu-white/icons/*.jpeg
+          if git diff --cached --quiet; then
+            echo "No icon changes to commit."
+            exit 0
+          fi
+          git commit -m "Materialize Ubuntu White desktop icons [skip ci]"
+          git push
