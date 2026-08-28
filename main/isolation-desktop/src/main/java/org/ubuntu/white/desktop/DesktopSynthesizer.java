@@ -50,7 +50,6 @@ public final class DesktopSynthesizer {
     private static final class DesktopApp extends Application {
         @Override public void start(Stage stage) {
             stage.setTitle("Ubuntu White — Desktop Synthesizer");
-
             StackPane desktop = new StackPane();
             desktop.setStyle("-fx-background-color: black;");
             buildDesktop(desktop);
@@ -63,24 +62,12 @@ public final class DesktopSynthesizer {
             bottom.setStyle("-fx-background-color: rgba(255,255,255,0.88); -fx-text-fill: #333333; -fx-padding: 8px 14px; -fx-font-size: 12px;");
             shell.setBottom(bottom);
 
-            Scene scene = new Scene(shell);
+            Scene scene = new Scene(shell, 1280, 800);
             scene.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) Platform.exit(); });
             stage.setScene(scene);
-
-            // Fullscreen is the desktop mode. Do not combine it with maximized-window
-            // state: on Linux window managers, setMaximized(true) can cause JavaFX
-            // fullscreen negotiation to be undone on the next map/focus cycle.
-            stage.setFullScreenExitHint("Press ESC to exit Ubuntu White Desktop");
-            stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
+            stage.setFullScreenExitHint("");
             stage.setFullScreen(true);
             stage.show();
-
-            // Reassert fullscreen only after the native window has been mapped.
-            Platform.runLater(() -> {
-                stage.setFullScreen(true);
-                stage.toFront();
-                stage.requestFocus();
-            });
         }
     }
 
@@ -112,8 +99,9 @@ public final class DesktopSynthesizer {
             Pattern entry = Pattern.compile("\\{\\s*\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"label\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"source\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*\\}");
             Matcher m = entry.matcher(json);
             while (m.find()) {
-                String source = m.group(3).toLowerCase();
-                if (source.endsWith(".png") || source.endsWith(".jpeg")) result.add(new IconSpec(m.group(1), m.group(2), m.group(3)));
+                String source = m.group(3);
+                String lower = source.toLowerCase();
+                if (lower.endsWith(".png") || lower.endsWith(".jpeg")) result.add(new IconSpec(m.group(1), m.group(2), source));
             }
         }
         if (result.size() != EXPECTED_ICONS) {
