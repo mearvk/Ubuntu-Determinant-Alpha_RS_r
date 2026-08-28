@@ -3,35 +3,24 @@ set -euo pipefail
 
 # Ubuntu White — Desktop Icon Normalizer
 #
-# Converts:
-#   images/desktop-icons/set-001/icon-001.png ... icon-012.png
+# Converts icon PNGs from the source set into a normalized 96x96 transparent
+# canvas. Paths are relative to the directory containing this script, so the
+# script can be launched from any working directory.
 #
-# Into:
-#   images/desktop-icons/set-002/icon-001.png ... icon-012.png
-#
-# Normalization:
-#   Canvas:       96 x 96 pixels
-#   Background:   transparent
-#   Artwork:      aspect ratio preserved
-#   Placement:    centered
-#   Filtering:    high-quality Lanczos
-#
-# ImageMagick 6+ is supported. The script prefers the unified `magick`
-# launcher when available, but also supports the legacy `convert` and
-# `identify` commands shipped by ImageMagick 6.
-# Existing set-002 files are replaced.
+# ImageMagick 6+ is supported through either `magick` or legacy `convert`.
+# Existing output files are replaced.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$SCRIPT_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-SOURCE_DIR="$REPO_ROOT/images/desktop-icons/set-001"
-TARGET_DIR="$REPO_ROOT/images/desktop-icons/set-002"
+# Keep all project paths relative to this script's directory. Do not depend
+# on the caller's current working directory.
+SOURCE_DIR="$SCRIPT_DIR/images/desktop-icons/set-001"
+TARGET_DIR="$SCRIPT_DIR/images/desktop-icons/set-002"
 
 MAGICK_CMD=()
 IDENTIFY_CMD=()
 MAGICK_VERSION=""
 
-# Accept ImageMagick 6.x or newer through a unified `magick` executable.
 try_magick() {
     local candidate="$1"
     [[ -x "$candidate" ]] || return 1
@@ -46,7 +35,6 @@ try_magick() {
     return 0
 }
 
-# Accept ImageMagick 6.x or newer through the legacy `convert` executable.
 try_convert() {
     local candidate="$1"
     [[ -x "$candidate" ]] || return 1
@@ -64,7 +52,7 @@ try_convert() {
     return 0
 }
 
-# First inspect every `magick` visible through PATH, not just the first one.
+# Search PATH first, then explicit system locations.
 while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
     if try_magick "$candidate"; then
@@ -72,8 +60,6 @@ while IFS= read -r candidate; do
     fi
 done < <(type -P -a magick 2>/dev/null | awk '!seen[$0]++')
 
-# Explicitly inspect /usr/bin as well. This matters on systems where the
-# ImageMagick executable exists there but is not exposed through PATH.
 if [[ -z "$MAGICK_VERSION" ]]; then
     for candidate in /usr/bin/magick /usr/bin/ImageMagick-8 /usr/bin/ImageMagick8 /usr/bin/ImageMagick-7 /usr/bin/ImageMagick7 /usr/bin/ImageMagick-6 /usr/bin/ImageMagick6; do
         if try_magick "$candidate"; then
@@ -82,7 +68,6 @@ if [[ -z "$MAGICK_VERSION" ]]; then
     done
 fi
 
-# Common locations for locally compiled/versioned ImageMagick installations.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r candidate; do
         [[ -n "$candidate" ]] || continue
@@ -101,8 +86,7 @@ if [[ -z "$MAGICK_VERSION" ]]; then
     )
 fi
 
-# ImageMagick 6 commonly provides `convert` and `identify` instead of the
-# unified `magick` launcher. Search PATH and explicit system locations.
+# ImageMagick 6 uses convert/identify.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r convert_candidate; do
         [[ -n "$convert_candidate" ]] || continue
@@ -136,6 +120,7 @@ fi
 mkdir -p "$TARGET_DIR"
 
 echo "Ubuntu White — Icon Normalizer"
+echo "Script directory: $SCRIPT_DIR"
 echo "ImageMagick: $MAGICK_VERSION"
 echo "ImageMagick command: ${MAGICK_CMD[*]}"
 echo "Identify command: ${IDENTIFY_CMD[*]}"
