@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Full-window Ubuntu White desktop synthesizer preview. */
+/** Full-window Ubuntu White Linux-style desktop preview. */
 public final class DesktopSynthesizer extends Application {
     private static final String WALLPAPER = "mediate-ubuntu-white-edition-001.jpeg";
     private static final int ICON_SIZE = 64;
@@ -31,11 +31,16 @@ public final class DesktopSynthesizer extends Application {
     private static final double MARGIN_X = 28;
     private static final double MARGIN_Y = 28;
 
+    // Canonical Ubuntu White icon set. These are the normalized set-002 assets.
     private static final String[] ICONS = {
         "icon-001.png", "icon-002.png", "icon-003.png", "icon-004.png",
         "icon-005.png", "icon-006.png", "icon-007.png", "icon-008.png",
         "icon-009.png", "icon-010.png", "icon-011.png", "icon-012.png"
     };
+
+    // One Smaug image is used everywhere Smaug is represented by this desktop.
+    // Do not substitute or rotate among the other Smaug images.
+    private static final String SMAUG_ICON = "smaug-icon-001.jpeg";
 
     private static final String[] LABELS = {
         "Desktop", "Documents", "Downloads", "Music",
@@ -89,14 +94,18 @@ public final class DesktopSynthesizer extends Application {
         desktop.getChildren().add(iconLayer);
 
         for (int i = 0; i < ICONS.length; i++) {
-            iconLayer.getChildren().add(createIcon(i));
+            iconLayer.getChildren().add(createIcon(ICONS[i], LABELS[i], i));
         }
+
+        // Smaug is a single desktop identity and uses one canonical image only.
+        iconLayer.getChildren().add(createIcon(SMAUG_ICON, "Smaug", ICONS.length));
         installExternalDrop(iconLayer);
     }
 
     private Image loadWallpaper() {
         Path[] candidates = {
             Path.of("images", WALLPAPER),
+            Path.of("ubuntu-white", "images", WALLPAPER),
             Path.of("..", "..", "images", WALLPAPER),
             Path.of("..", "..", "..", "images", WALLPAPER)
         };
@@ -109,9 +118,10 @@ public final class DesktopSynthesizer extends Application {
 
     private Path iconPath(String filename) {
         Path[] candidates = {
-            Path.of("images", "desktop-icons", "set-001", filename),
-            Path.of("..", "..", "images", "desktop-icons", "set-001", filename),
-            Path.of("..", "..", "..", "images", "desktop-icons", "set-001", filename)
+            Path.of("ubuntu-white", "icons", "set-002", filename),
+            Path.of("images", "desktop-icons", "set-002", filename),
+            Path.of("..", "..", "ubuntu-white", "icons", "set-002", filename),
+            Path.of("..", "..", "..", "ubuntu-white", "icons", "set-002", filename)
         };
         for (Path path : candidates) {
             if (Files.isRegularFile(path)) return path.toAbsolutePath();
@@ -119,13 +129,25 @@ public final class DesktopSynthesizer extends Application {
         return null;
     }
 
-    private VBox createIcon(int index) {
+    private Path smaugIconPath() {
+        Path[] candidates = {
+            Path.of("ubuntu-white", "icons", "smaug", SMAUG_ICON),
+            Path.of("..", "..", "ubuntu-white", "icons", "smaug", SMAUG_ICON),
+            Path.of("..", "..", "..", "ubuntu-white", "icons", "smaug", SMAUG_ICON)
+        };
+        for (Path path : candidates) {
+            if (Files.isRegularFile(path)) return path.toAbsolutePath();
+        }
+        return null;
+    }
+
+    private VBox createIcon(String filename, String labelText, int index) {
         VBox icon = new VBox(5);
         icon.setAlignment(Pos.CENTER);
         icon.setPrefSize(108, 88);
         icon.setCursor(Cursor.OPEN_HAND);
 
-        Path path = iconPath(ICONS[index]);
+        Path path = "Smaug".equals(labelText) ? smaugIconPath() : iconPath(filename);
         if (path != null) {
             ImageView image = new ImageView(new Image(path.toUri().toString()));
             image.setFitWidth(ICON_SIZE);
@@ -140,10 +162,11 @@ public final class DesktopSynthesizer extends Application {
             icon.getChildren().add(missing);
         }
 
-        Label label = new Label(LABELS[index]);
+        Label label = new Label(labelText);
         label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
         icon.getChildren().add(label);
-        icon.relocate(MARGIN_X + (index % 5) * GRID_X, MARGIN_Y + (index / 5) * GRID_Y);
+        int columns = 5;
+        icon.relocate(MARGIN_X + (index % columns) * GRID_X, MARGIN_Y + (index / columns) * GRID_Y);
         installIconDrag(icon);
         return icon;
     }
