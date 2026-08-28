@@ -6,11 +6,42 @@ A lightweight developer preview of the Ubuntu White desktop idiom.
 
 Isolation Desktop is a **desktop application preview**, not an ISO builder and not a virtual machine. It lets GUI developers compile and launch the desktop shell locally so they can iterate on look-and-feel without rebooting or installing the operating system.
 
+The current interactive reference implementation is `org.ubuntu.white.desktop.DesktopSynthesizer`. See [`DESKTOP_SYNTHESIZER.md`](DESKTOP_SYNTHESIZER.md) for its support specification.
+
+## Desktop Synthesizer
+
+The Desktop Synthesizer provides the current proposed full-window desktop look and feel:
+
+- Fullscreen JavaFX presentation.
+- Previously established Ubuntu White wallpaper, scaled proportionally to fill the desktop.
+- Twelve reference icons from `images/desktop-icons/set-001/`.
+- Uniform 64 px icon rendering with preserved source aspect ratios.
+- Mouse drag-and-drop for desktop icons.
+- Deterministic grid snapping on icon release.
+- Host-file drag-and-drop onto the desktop surface.
+- Simple top and bottom desktop chrome for the visual preview.
+
+The icon reference is documented in `ubuntu-white/IconGreeting2.md`.
+
 ## Developer workflow
 
 ```text
 source → compile → desktop preview → edit → compile → preview
 ```
+
+Run the current synthesizer with:
+
+```text
+gradle -b desktop-synthesizer.gradle run
+```
+
+or:
+
+```text
+./launch-synthesizer
+```
+
+The dedicated Gradle configuration targets Java 21 and JavaFX 21.0.8.
 
 The eventual Ubuntu White OS installer may consume the same GUI assets and source, but the preview remains independently runnable.
 
@@ -31,4 +62,15 @@ The eventual Ubuntu White OS installer may consume the same GUI assets and sourc
 
 `Makefile` — convenient developer build/run interface.
 
-The implementation should use the GUI toolkit selected by the Ubuntu White desktop source; JavaFX remains the project's preferred GUI technology where applicable.
+`launch-synthesizer` — launch the current Gradle Desktop Synthesizer.
+
+The implementation uses JavaFX as the current Ubuntu White GUI technology.
+
+## Next support work
+
+- Persist desktop icon positions.
+- Add double-click/open behavior.
+- Add selection states and context menus.
+- Package wallpaper and icons as application resources for distribution.
+- Integrate the synthesizer with the boot-to-Desktop startup path.
+- Add JavaFX build/smoke checks to CI.
