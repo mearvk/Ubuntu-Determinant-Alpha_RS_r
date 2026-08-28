@@ -8,9 +8,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.Dragboard;
 import javafx.scene.input.KeyCode;
-import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
@@ -69,8 +67,14 @@ public final class DesktopSynthesizer {
             stage.setScene(scene);
             stage.setFullScreenExitHint("Press ESC to exit Ubuntu White Desktop");
             stage.setFullScreen(true);
+            stage.setMaximized(true);
             stage.show();
-            Platform.runLater(stage::requestFocus);
+            Platform.runLater(() -> {
+                stage.setMaximized(true);
+                stage.setFullScreen(true);
+                stage.toFront();
+                stage.requestFocus();
+            });
         }
     }
 
@@ -78,14 +82,9 @@ public final class DesktopSynthesizer {
         Pane icons = new Pane();
         icons.setPickOnBounds(false);
         desktop.getChildren().add(icons);
-
         List<IconSpec> specs = loadManifest();
         System.out.println("Ubuntu White Desktop: loaded " + specs.size() + "/" + EXPECTED_ICONS + " icon definitions");
-        for (int i = 0; i < EXPECTED_ICONS; i++) {
-            VBox icon = createIcon(specs.get(i), i);
-            icons.getChildren().add(icon);
-        }
-        installExternalDrop(icons);
+        for (int i = 0; i < EXPECTED_ICONS; i++) icons.getChildren().add(createIcon(specs.get(i), i));
     }
 
     private static List<IconSpec> loadManifest() {
@@ -98,24 +97,20 @@ public final class DesktopSynthesizer {
             if (Files.isRegularFile(candidate)) { try { json = Files.readString(candidate); break; } catch (Exception ignored) {} }
             if (Files.isDirectory(p.resolve(".git"))) break;
         }
-        if (json == null) {
-            try (InputStream in = DesktopSynthesizer.class.getResourceAsStream("/" + MANIFEST)) {
-                if (in != null) json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            } catch (Exception ignored) {}
-        }
+        if (json == null) try (InputStream in = DesktopSynthesizer.class.getResourceAsStream("/" + MANIFEST)) {
+            if (in != null) json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {}
 
         List<IconSpec> result = new ArrayList<>();
         if (json != null) {
             Pattern entry = Pattern.compile("\\{\\s*\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"label\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*\\\"source\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"\\s*\\}");
             Matcher m = entry.matcher(json);
             while (m.find()) {
-                String source = m.group(3);
-                String lower = source.toLowerCase();
-                if ((lower.endsWith(".png") || lower.endsWith(".jpeg")) && !lower.endsWith(".svg")) result.add(new IconSpec(m.group(1), m.group(2), source));
+                String source = m.group(3).toLowerCase();
+                if (source.endsWith(".png") || source.endsWith(".jpeg")) result.add(new IconSpec(m.group(1), m.group(2), m.group(3)));
             }
         }
         if (result.size() != EXPECTED_ICONS) {
-            System.err.println("Ubuntu White Desktop: manifest contained " + result.size() + " icons; restoring required 13-icon set");
             result.clear();
             for (int i = 0; i < EXPECTED_ICONS; i++) result.add(new IconSpec("desktop-" + String.format("%03d", i + 1), DEFAULT_LABELS[i], DEFAULT_SOURCES[i]));
         }
@@ -140,8 +135,8 @@ public final class DesktopSynthesizer {
         Path path = resolve(source);
         if (path != null) {
             Image image = new Image(path.toUri().toString(), ICON_SIZE, ICON_SIZE, true, true, false);
-            if (!image.isError()) return image;
-            System.err.println("Ubuntu White Desktop: JavaFX image decode failed: " + path);
+            if (!image.isError()) { System.out.println("ICON " + source + " -> " + path); return image; }
+            System.err.println("ICON DECODE FAILED: " + path);
         }
         try (InputStream in = DesktopSynthesizer.class.getResourceAsStream("/" + source)) {
             if (in != null) {
@@ -149,7 +144,7 @@ public final class DesktopSynthesizer {
                 if (!image.isError()) return image;
             }
         } catch (Exception ignored) {}
-        System.err.println("Ubuntu White Desktop: image source unavailable: " + source);
+        System.err.println("ICON NOT FOUND: " + source);
         return null;
     }
 
@@ -159,22 +154,12 @@ public final class DesktopSynthesizer {
         box.setPrefSize(145, 105);
         box.setCursor(Cursor.OPEN_HAND);
         box.setPickOnBounds(true);
-
         Image image = loadImage(spec.source);
         if (image != null) {
             ImageView iv = new ImageView(image);
-            iv.setFitWidth(ICON_SIZE);
-            iv.setFitHeight(ICON_SIZE);
-            iv.setPreserveRatio(true);
-            iv.setSmooth(true);
-            iv.setMouseTransparent(true);
+            iv.setFitWidth(ICON_SIZE); iv.setFitHeight(ICON_SIZE); iv.setPreserveRatio(true); iv.setSmooth(true); iv.setMouseTransparent(true);
             box.getChildren().add(iv);
-        } else {
-            Label missing = new Label("MISSING");
-            missing.setStyle("-fx-text-fill:#ffdddd;-fx-font-size:11px;-fx-font-weight:bold;");
-            box.getChildren().add(missing);
         }
-
         Label label = new Label(spec.label);
         label.setStyle("-fx-text-fill:white;-fx-font-size:13px;-fx-font-weight:bold;-fx-effect:dropshadow(gaussian,black,3,0.7,0,1);");
         label.setMouseTransparent(true);
@@ -186,23 +171,10 @@ public final class DesktopSynthesizer {
     }
 
     private static void installIconDrag(VBox icon) {
-        final double[] press = new double[2];
-        final double[] origin = new double[2];
-        icon.setOnMousePressed(e -> {
-            press[0] = e.getSceneX(); press[1] = e.getSceneY();
-            origin[0] = icon.getLayoutX(); origin[1] = icon.getLayoutY();
-            icon.setCursor(Cursor.CLOSED_HAND); icon.toFront(); e.consume();
-        });
-        icon.setOnMouseDragged(e -> {
-            icon.relocate(origin[0] + e.getSceneX() - press[0], origin[1] + e.getSceneY() - press[1]);
-            e.consume();
-        });
+        final double[] press = new double[2], origin = new double[2];
+        icon.setOnMousePressed(e -> { press[0]=e.getSceneX(); press[1]=e.getSceneY(); origin[0]=icon.getLayoutX(); origin[1]=icon.getLayoutY(); icon.setCursor(Cursor.CLOSED_HAND); icon.toFront(); e.consume(); });
+        icon.setOnMouseDragged(e -> { icon.relocate(origin[0]+e.getSceneX()-press[0], origin[1]+e.getSceneY()-press[1]); e.consume(); });
         icon.setOnMouseReleased(e -> { icon.setCursor(Cursor.OPEN_HAND); e.consume(); });
-    }
-
-    private static void installExternalDrop(Pane d) {
-        d.setOnDragOver(e -> { if (e.getDragboard().hasFiles()) e.acceptTransferModes(TransferMode.COPY); e.consume(); });
-        d.setOnDragDropped(e -> { Dragboard b=e.getDragboard(); boolean ok=false; if(b.hasFiles()){List<Path> dropped=new ArrayList<>();for(var f:b.getFiles())dropped.add(f.toPath());System.out.println("Ubuntu White Desktop received: "+dropped);ok=!dropped.isEmpty();}e.setDropCompleted(ok);e.consume(); });
     }
 
     private record IconSpec(String id, String label, String source) { }
