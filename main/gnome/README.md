@@ -1,6 +1,6 @@
 # Ubuntu Determinant Custom GNOME
 
-This directory defines the upstream GNOME sources and the customization boundary for the Ubuntu Determinant desktop.
+This directory defines the upstream GNOME foundation and the customization boundary for the Ubuntu Determinant desktop.
 
 ## Upstream components
 
@@ -12,9 +12,9 @@ The production desktop is based on selected upstream GNOME components rather tha
 
 Upstream source is maintained by the GNOME Project. This repository keeps the integration and customization work under `main/gnome/` while preserving upstream copyright and licensing notices.
 
-## Customization direction
+## Ubuntu White Edition boundary
 
-Ubuntu Determinant will use GNOME as an upstream foundation and develop a custom desktop experience on top of it. The initial boundary is:
+The visual identity is implemented as an additive overlay instead of a fork of GNOME source:
 
 ```text
 X11 / Wayland display stack
@@ -23,17 +23,36 @@ X11 / Wayland display stack
         |
    GNOME Shell
         |
- Ubuntu Determinant UI
+ Ubuntu White Edition theme
+        |
+ Ubuntu White icon theme
         |
     Nautilus / Files
 ```
 
-The implementation should preserve upstream source provenance, COPYING/LICENSE files, SPDX notices, and third-party attribution. GNOME modules use a mixture of GPL, LGPL, and other OSI-approved licenses; each imported module must retain its own license terms.
+The approved desktop icon reference artwork is `images/desktop-icons/set-002/`. The ISO installer retrieves that exact set and installs it into the `Ubuntu-White` GNOME icon theme. The source artwork remains unchanged.
 
-## Source import policy
+The initial visual layer includes GTK CSS, GNOME Shell CSS, GSettings defaults, and a GNOME-compatible icon theme. Behavioral changes should use GNOME extensions where practical; source patches are reserved for behavior that cannot be implemented cleanly at the extension/configuration layer.
 
-Do not copy an arbitrary generated build directory into this tree. Import upstream source at a pinned release/commit, record the upstream URL and commit in `UPSTREAM.md`, and apply Ubuntu Determinant changes as clearly identifiable patches or source changes.
+## Source preservation policy
 
-## Current status
+Do not overwrite upstream Ubuntu/GNOME source merely to customize appearance. Add Determinant changes as clearly identifiable overlay files, configuration, extensions, or patches. Preserve upstream COPYING/LICENSE files, SPDX notices, and third-party attribution for any imported source.
 
-The top-level ISO build currently advertises MATE + LightDM as its desktop target. This directory establishes the replacement path for a custom GNOME implementation. The ISO target should be changed only after the GNOME integration builds and starts successfully in the root filesystem.
+## Build choices
+
+GNOME is the default production desktop:
+
+```sh
+make desktop
+DESKTOP=gnome make desktop
+```
+
+The Ubuntu White Edition visual layer is enabled by default. It can be controlled with `GNOME_THEME`, `UBUNTU_WHITE_ICONS`, and `UBUNTU_WHITE_CSS`; see `BUILD_OPTIONS.md`.
+
+MATE remains available as an independent option:
+
+```sh
+DESKTOP=mate make desktop
+```
+
+The MATE compatibility path remains pinned to its prior implementation and is not modified by the GNOME/Ubuntu White overlay.
