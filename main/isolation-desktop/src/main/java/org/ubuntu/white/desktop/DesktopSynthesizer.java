@@ -82,8 +82,7 @@ public final class DesktopSynthesizer {
         List<IconSpec> specs = loadManifest();
         System.out.println("Ubuntu White Desktop: loaded " + specs.size() + "/" + EXPECTED_ICONS + " icon definitions");
         for (int i = 0; i < EXPECTED_ICONS; i++) {
-            IconSpec spec = specs.get(i);
-            VBox icon = createIcon(spec, i);
+            VBox icon = createIcon(specs.get(i), i);
             icons.getChildren().add(icon);
         }
         installExternalDrop(icons);
@@ -112,9 +111,7 @@ public final class DesktopSynthesizer {
             while (m.find()) {
                 String source = m.group(3);
                 String lower = source.toLowerCase();
-                if ((lower.endsWith(".png") || lower.endsWith(".jpeg")) && !lower.endsWith(".svg")) {
-                    result.add(new IconSpec(m.group(1), m.group(2), source));
-                }
+                if ((lower.endsWith(".png") || lower.endsWith(".jpeg")) && !lower.endsWith(".svg")) result.add(new IconSpec(m.group(1), m.group(2), source));
             }
         }
         if (result.size() != EXPECTED_ICONS) {
@@ -144,10 +141,9 @@ public final class DesktopSynthesizer {
         if (path != null) {
             Image image = new Image(path.toUri().toString(), ICON_SIZE, ICON_SIZE, true, true, false);
             if (!image.isError()) return image;
-            System.err.println("Ubuntu White Desktop: ImageMagick/JavaFX image decode failed: " + path);
+            System.err.println("Ubuntu White Desktop: JavaFX image decode failed: " + path);
         }
-        String resourceName = "/" + source;
-        try (InputStream in = DesktopSynthesizer.class.getResourceAsStream(resourceName)) {
+        try (InputStream in = DesktopSynthesizer.class.getResourceAsStream("/" + source)) {
             if (in != null) {
                 Image image = new Image(in, ICON_SIZE, ICON_SIZE, true, true);
                 if (!image.isError()) return image;
@@ -181,6 +177,7 @@ public final class DesktopSynthesizer {
 
         Label label = new Label(spec.label);
         label.setStyle("-fx-text-fill:white;-fx-font-size:13px;-fx-font-weight:bold;-fx-effect:dropshadow(gaussian,black,3,0.7,0,1);");
+        label.setMouseTransparent(true);
         box.getChildren().add(label);
         int columns = 6;
         box.relocate(MARGIN_X + (index % columns) * GRID_X, MARGIN_Y + (index / columns) * GRID_Y);
@@ -194,17 +191,13 @@ public final class DesktopSynthesizer {
         icon.setOnMousePressed(e -> {
             press[0] = e.getSceneX(); press[1] = e.getSceneY();
             origin[0] = icon.getLayoutX(); origin[1] = icon.getLayoutY();
-            icon.setCursor(Cursor.CLOSED_HAND); icon.toFront();
-            e.consume();
+            icon.setCursor(Cursor.CLOSED_HAND); icon.toFront(); e.consume();
         });
         icon.setOnMouseDragged(e -> {
             icon.relocate(origin[0] + e.getSceneX() - press[0], origin[1] + e.getSceneY() - press[1]);
             e.consume();
         });
-        icon.setOnMouseReleased(e -> {
-            icon.setCursor(Cursor.OPEN_HAND);
-            e.consume();
-        });
+        icon.setOnMouseReleased(e -> { icon.setCursor(Cursor.OPEN_HAND); e.consume(); });
     }
 
     private static void installExternalDrop(Pane d) {
