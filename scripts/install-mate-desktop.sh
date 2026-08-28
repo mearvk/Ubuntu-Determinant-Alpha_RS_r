@@ -2,17 +2,27 @@
 set -euo pipefail
 
 # Ubuntu Determinant Desktop selector.
-# Default is GNOME. Set DESKTOP=mate to retain the MATE desktop.
+# Default is GNOME. Set DESKTOP=mate to retain the exact pre-GNOME MATE installer.
 DESKTOP="${DESKTOP:-gnome}"
 BASE_URL="https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/scripts"
+MATE_REV="2fc57231c2f2d35b218e044b0004a4fa2c4d0ec4"
 
 case "${DESKTOP,,}" in
-  gnome) SCRIPT="install-gnome-desktop.sh" ;;
-  mate)  SCRIPT="install-mate-desktop-original.sh" ;;
-  *) echo "ERROR: Unknown DESKTOP='${DESKTOP}'. Use gnome or mate." >&2; exit 2 ;;
+  gnome)
+    SCRIPT="install-gnome-desktop.sh"
+    URL="${BASE_URL}/${SCRIPT}"
+    ;;
+  mate)
+    SCRIPT="install-mate-desktop.sh"
+    URL="https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/${MATE_REV}/scripts/${SCRIPT}"
+    ;;
+  *)
+    echo "ERROR: Unknown DESKTOP='${DESKTOP}'. Use gnome or mate." >&2
+    exit 2
+    ;;
 esac
 
-if [ -x "/tmp/${SCRIPT}" ]; then
+if [ "${DESKTOP,,}" = "gnome" ] && [ -x "/tmp/${SCRIPT}" ]; then
   exec "/tmp/${SCRIPT}"
 fi
 
@@ -21,6 +31,6 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 1
 fi
 
-curl --fail --location --retry 3 --output "/tmp/${SCRIPT}.download" "${BASE_URL}/${SCRIPT}"
+curl --fail --location --retry 3 --output "/tmp/${SCRIPT}.download" "${URL}"
 chmod 755 "/tmp/${SCRIPT}.download"
 exec "/tmp/${SCRIPT}.download"
