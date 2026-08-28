@@ -3,19 +3,14 @@ set -euo pipefail
 
 # Ubuntu White — Desktop Icon Normalizer
 #
-# Converts icon PNGs from the source set into a normalized 96x96 transparent
-# canvas. Paths are relative to the directory containing this script, so the
-# script can be launched from any working directory.
+# All project paths are relative to the CURRENT WORKING DIRECTORY.
+# Run this script from the repository root:
+#   ./ubuntu-white/icons/icon-size-normalizer.sh
 #
 # ImageMagick 6+ is supported through either `magick` or legacy `convert`.
-# Existing output files are replaced.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-
-# Keep all project paths relative to this script's directory. Do not depend
-# on the caller's current working directory.
-SOURCE_DIR="$SCRIPT_DIR/images/desktop-icons/set-001"
-TARGET_DIR="$SCRIPT_DIR/images/desktop-icons/set-002"
+SOURCE_DIR="./images/desktop-icons/set-001"
+TARGET_DIR="./images/desktop-icons/set-002"
 
 MAGICK_CMD=()
 IDENTIFY_CMD=()
@@ -24,11 +19,9 @@ MAGICK_VERSION=""
 try_magick() {
     local candidate="$1"
     [[ -x "$candidate" ]] || return 1
-
     local version
     version="$("$candidate" -version 2>/dev/null | head -n 1 || true)"
     [[ "$version" == *"ImageMagick "* ]] || return 1
-
     MAGICK_CMD=("$candidate")
     IDENTIFY_CMD=("$candidate" identify)
     MAGICK_VERSION="$version"
@@ -38,42 +31,35 @@ try_magick() {
 try_convert() {
     local candidate="$1"
     [[ -x "$candidate" ]] || return 1
-
     local version
     version="$("$candidate" -version 2>/dev/null | head -n 1 || true)"
     [[ "$version" == *"ImageMagick "* ]] || return 1
-
     local identify_candidate="$(dirname "$candidate")/identify"
     [[ -x "$identify_candidate" ]] || return 1
-
     MAGICK_CMD=("$candidate")
     IDENTIFY_CMD=("$identify_candidate")
     MAGICK_VERSION="$version"
     return 0
 }
 
-# Search PATH first, then explicit system locations.
+# Search PATH first.
 while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
-    if try_magick "$candidate"; then
-        break
-    fi
+    if try_magick "$candidate"; then break; fi
 done < <(type -P -a magick 2>/dev/null | awk '!seen[$0]++')
 
+# Explicitly inspect /usr/bin.
 if [[ -z "$MAGICK_VERSION" ]]; then
     for candidate in /usr/bin/magick /usr/bin/ImageMagick-8 /usr/bin/ImageMagick8 /usr/bin/ImageMagick-7 /usr/bin/ImageMagick7 /usr/bin/ImageMagick-6 /usr/bin/ImageMagick6; do
-        if try_magick "$candidate"; then
-            break
-        fi
+        if try_magick "$candidate"; then break; fi
     done
 fi
 
+# Common local installations.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r candidate; do
         [[ -n "$candidate" ]] || continue
-        if try_magick "$candidate"; then
-            break
-        fi
+        if try_magick "$candidate"; then break; fi
     done < <(
         for dir in /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
             [[ -d "$dir" ]] || continue
@@ -86,13 +72,11 @@ if [[ -z "$MAGICK_VERSION" ]]; then
     )
 fi
 
-# ImageMagick 6 uses convert/identify.
+# ImageMagick 6 commonly provides convert/identify.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r convert_candidate; do
         [[ -n "$convert_candidate" ]] || continue
-        if try_convert "$convert_candidate"; then
-            break
-        fi
+        if try_convert "$convert_candidate"; then break; fi
     done < <(
         type -P -a convert 2>/dev/null | awk '!seen[$0]++'
         for dir in /usr/bin /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
@@ -104,8 +88,6 @@ fi
 
 if [[ -z "$MAGICK_VERSION" ]]; then
     echo "ERROR: ImageMagick 6 or newer is required."
-    echo
-    echo "No compatible ImageMagick command was found."
     echo "Searched PATH, /usr/bin, /usr/local/bin, /usr/local/sbin, /opt/bin,"
     echo "/opt/local/bin, and common /opt or /usr/local ImageMagick trees."
     exit 1
@@ -114,13 +96,15 @@ fi
 if [[ ! -d "$SOURCE_DIR" ]]; then
     echo "ERROR: Source directory not found:"
     echo "  $SOURCE_DIR"
+    echo
+    echo "Run this script from the repository root."
     exit 1
 fi
 
 mkdir -p "$TARGET_DIR"
 
 echo "Ubuntu White — Icon Normalizer"
-echo "Script directory: $SCRIPT_DIR"
+echo "Current directory: $(pwd -P)"
 echo "ImageMagick: $MAGICK_VERSION"
 echo "ImageMagick command: ${MAGICK_CMD[*]}"
 echo "Identify command: ${IDENTIFY_CMD[*]}"
