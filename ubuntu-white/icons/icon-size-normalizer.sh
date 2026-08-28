@@ -3,14 +3,16 @@ set -euo pipefail
 
 # Ubuntu White — Desktop Icon Normalizer
 #
-# All project paths are relative to the CURRENT WORKING DIRECTORY.
-# Run this script from the repository root:
-#   ./ubuntu-white/icons/icon-size-normalizer.sh
+# Paths are relative to the CURRENT WORKING DIRECTORY (.).
+# Run from ubuntu-white/icons/:
+#   ./icon-size-normalizer.sh
 #
-# ImageMagick 6+ is supported through either `magick` or legacy `convert`.
+# Source: ./set-001
+# Target: ./set-002
+# ImageMagick 6+ is supported through `magick` or legacy `convert`.
 
-SOURCE_DIR="./images/desktop-icons/set-001"
-TARGET_DIR="./images/desktop-icons/set-002"
+SOURCE_DIR="./set-001"
+TARGET_DIR="./set-002"
 
 MAGICK_CMD=()
 IDENTIFY_CMD=()
@@ -42,20 +44,17 @@ try_convert() {
     return 0
 }
 
-# Search PATH first.
 while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
     if try_magick "$candidate"; then break; fi
 done < <(type -P -a magick 2>/dev/null | awk '!seen[$0]++')
 
-# Explicitly inspect /usr/bin.
 if [[ -z "$MAGICK_VERSION" ]]; then
     for candidate in /usr/bin/magick /usr/bin/ImageMagick-8 /usr/bin/ImageMagick8 /usr/bin/ImageMagick-7 /usr/bin/ImageMagick7 /usr/bin/ImageMagick-6 /usr/bin/ImageMagick6; do
         if try_magick "$candidate"; then break; fi
     done
 fi
 
-# Common local installations.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r candidate; do
         [[ -n "$candidate" ]] || continue
@@ -72,7 +71,6 @@ if [[ -z "$MAGICK_VERSION" ]]; then
     )
 fi
 
-# ImageMagick 6 commonly provides convert/identify.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r convert_candidate; do
         [[ -n "$convert_candidate" ]] || continue
@@ -97,7 +95,8 @@ if [[ ! -d "$SOURCE_DIR" ]]; then
     echo "ERROR: Source directory not found:"
     echo "  $SOURCE_DIR"
     echo
-    echo "Run this script from the repository root."
+    echo "Current directory: $(pwd -P)"
+    echo "Run this script from: ubuntu-white/icons/"
     exit 1
 fi
 
