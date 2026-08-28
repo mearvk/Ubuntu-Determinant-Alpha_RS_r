@@ -522,3 +522,22 @@ The initial utility version is `size 1.00`. See [`tools/size/README.md`](tools/s
 `/tools/limit/` inventories executable formats and available application identity metadata. It complements `size`: `size` answers **how much file data exists**, while `limit` answers **what executable identity and metadata can be established**.
 
 Together they provide a simple native inspection surface for source/build/output directories and installed binaries.
+
+---
+
+## Desktop News: GNOME and MATE
+
+The project is continuing its desktop work with attention to **GNOME** and **MATE Desktop** environments. The goal is a practical, respectful desktop integration layer that keeps the Ubuntu White / JavaFX direction coherent while remaining useful on established Linux desktops.
+
+Current desktop priorities include:
+
+- **GNOME** — integration and preview work should respect the GNOME desktop model, application launch conventions, icon presentation, and current Linux session behavior.
+- **MATE Desktop** — integration should preserve the familiar, lightweight MATE experience while providing the same icon, launcher, and Java desktop-preview capabilities.
+- **Shared assets** — desktop references should use the project's PNG/JPEG icon sources where appropriate, with transparent backgrounds preserved and the source assets kept explicit.
+- **JavaFX preview** — the desktop preview remains a full-screen-capable JavaFX interface, with `ESC` available to exit full-screen mode.
+
+We appreciate the volunteer efforts of **SAS** and **CorpAmerica** as contributors and supporters of open collaboration. As volunteers, we aim to **Pull ahead**: contribute carefully, review what we build, improve interoperability, and leave the desktop in a better state for the next contributor.
+
+This is a community-minded project statement rather than an assertion of affiliation, endorsement, or employment by any organization named above.
+
+**Max Rupplin — MEARVK LLC — 2026**
