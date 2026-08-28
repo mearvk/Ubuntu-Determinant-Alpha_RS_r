@@ -26,20 +26,17 @@ import java.util.List;
 public final class DesktopSynthesizer extends Application {
     private static final String WALLPAPER = "mediate-ubuntu-white-edition-001.jpeg";
     private static final int ICON_SIZE = 64;
-    private static final double GRID_X = 132;
+    private static final double GRID_X = 150;
     private static final double GRID_Y = 112;
     private static final double MARGIN_X = 28;
     private static final double MARGIN_Y = 28;
 
-    // Canonical Ubuntu White icon set. These are the normalized set-002 assets.
     private static final String[] ICONS = {
         "icon-001.png", "icon-002.png", "icon-003.png", "icon-004.png",
         "icon-005.png", "icon-006.png", "icon-007.png", "icon-008.png",
         "icon-009.png", "icon-010.png", "icon-011.png", "icon-012.png"
     };
 
-    // One Smaug image is used everywhere Smaug is represented by this desktop.
-    // Do not substitute or rotate among the other Smaug images.
     private static final String SMAUG_ICON = "smaug-icon-001.jpeg";
 
     private static final String[] LABELS = {
@@ -59,7 +56,7 @@ public final class DesktopSynthesizer extends Application {
         Label top = new Label("  Applications     Files     Settings");
         top.setStyle("-fx-background-color: rgba(255,255,255,0.90); -fx-text-fill: #333333; -fx-padding: 10px 18px; -fx-font-size: 14px;");
         shell.setTop(top);
-        Label bottom = new Label("  Ubuntu White • Desktop Synthesizer    •    Drag icons to move • Grid snap enabled");
+        Label bottom = new Label("  Ubuntu White • Desktop Synthesizer    •    12 desktop icons + Smaug    •    Drag icons to move • Grid snap enabled");
         bottom.setStyle("-fx-background-color: rgba(255,255,255,0.88); -fx-text-fill: #333333; -fx-padding: 8px 14px; -fx-font-size: 12px;");
         shell.setBottom(bottom);
 
@@ -96,8 +93,6 @@ public final class DesktopSynthesizer extends Application {
         for (int i = 0; i < ICONS.length; i++) {
             iconLayer.getChildren().add(createIcon(ICONS[i], LABELS[i], i));
         }
-
-        // Smaug is a single desktop identity and uses one canonical image only.
         iconLayer.getChildren().add(createIcon(SMAUG_ICON, "Smaug", ICONS.length));
         installExternalDrop(iconLayer);
     }
@@ -144,7 +139,7 @@ public final class DesktopSynthesizer extends Application {
     private VBox createIcon(String filename, String labelText, int index) {
         VBox icon = new VBox(5);
         icon.setAlignment(Pos.CENTER);
-        icon.setPrefSize(108, 88);
+        icon.setPrefSize(120, 88);
         icon.setCursor(Cursor.OPEN_HAND);
 
         Path path = "Smaug".equals(labelText) ? smaugIconPath() : iconPath(filename);
@@ -157,14 +152,15 @@ public final class DesktopSynthesizer extends Application {
             image.setMouseTransparent(true);
             icon.getChildren().add(image);
         } else {
-            Label missing = new Label("□");
-            missing.setStyle("-fx-text-fill: white; -fx-font-size: 40px;");
+            Label missing = new Label("ICON");
+            missing.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
             icon.getChildren().add(missing);
         }
 
         Label label = new Label(labelText);
         label.setStyle("-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-effect: dropshadow(gaussian, black, 3, 0.7, 0, 1);");
         icon.getChildren().add(label);
+
         int columns = 5;
         icon.relocate(MARGIN_X + (index % columns) * GRID_X, MARGIN_Y + (index / columns) * GRID_Y);
         installIconDrag(icon);
