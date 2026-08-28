@@ -54,6 +54,16 @@ while IFS= read -r candidate; do
     fi
 done < <(type -P -a magick 2>/dev/null | awk '!seen[$0]++')
 
+# Explicitly inspect /usr/bin as well. This matters on systems where /usr/bin
+# contains ImageMagick but the command is not exposed through the current PATH.
+if [[ -z "$MAGICK_VERSION" ]]; then
+    for candidate in /usr/bin/magick /usr/bin/ImageMagick-8 /usr/bin/ImageMagick8; do
+        if try_magick8 "$candidate"; then
+            break
+        fi
+    done
+fi
+
 # Common locations for locally compiled/versioned ImageMagick installations.
 if [[ -z "$MAGICK_VERSION" ]]; then
     while IFS= read -r candidate; do
@@ -90,7 +100,7 @@ if [[ -z "$MAGICK_VERSION" ]]; then
         fi
     done < <(
         type -P -a convert 2>/dev/null | awk '!seen[$0]++'
-        for dir in /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
+        for dir in /usr/bin /usr/local/bin /usr/local/sbin /opt/bin /opt/local/bin; do
             [[ -d "$dir" ]] || continue
             find "$dir" -maxdepth 1 -type f -name convert -print 2>/dev/null
         done
@@ -102,7 +112,7 @@ if [[ -z "$MAGICK_VERSION" ]]; then
     echo
     echo "No ImageMagick 8 command was found."
     echo "A legacy ImageMagick installation may be earlier in PATH."
-    echo "Searched PATH, /usr/local/bin, /usr/local/sbin, /opt/bin,"
+    echo "Searched PATH, /usr/bin, /usr/local/bin, /usr/local/sbin, /opt/bin,"
     echo "/opt/local/bin, and common /opt or /usr/local ImageMagick trees."
     exit 1
 fi
