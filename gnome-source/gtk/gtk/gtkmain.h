@@ -1,0 +1,68 @@
+/* GTK - The GIMP Toolkit
+ * Copyright (C) 1995-1997 Peter Mattis, Spencer Kimball and Josh MacDonald
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#if !defined (__GTK_H_INSIDE__) && !defined (GTK_COMPILATION)
+#error "Only <gtk/gtk.h> can be included directly."
+#endif
+
+#include <gdk/gdk.h>
+#include <gtk/gtkwidget.h>
+#ifdef G_PLATFORM_WIN32
+#include <gtk/gtkbox.h>
+#include <gtk/gtkwindow.h>
+#endif
+
+G_BEGIN_DECLS
+
+#define GTK_PRIORITY_RESIZE (G_PRIORITY_HIGH_IDLE + 10)
+
+GDK_AVAILABLE_IN_ALL
+void     gtk_init                 (void);
+
+GDK_AVAILABLE_IN_ALL
+gboolean gtk_init_check           (void);
+
+GDK_AVAILABLE_IN_ALL
+gboolean gtk_is_initialized       (void);
+
+#ifdef G_OS_WIN32
+GDK_AVAILABLE_IN_ALL
+void     gtk_init_abi_check       (int     num_checks,
+                                   size_t  sizeof_GtkWindow,
+                                   size_t  sizeof_GtkBox);
+GDK_AVAILABLE_IN_ALL
+gboolean gtk_init_check_abi_check (int     num_checks,
+                                   size_t  sizeof_GtkWindow,
+                                   size_t  sizeof_GtkBox);
+#define gtk_init() gtk_init_abi_check (2, sizeof (GtkWindow), sizeof (GtkBox))
+#define gtk_init_check() gtk_init_check_abi_check (2, sizeof (GtkWindow), sizeof (GtkBox))
+#endif
+
+GDK_AVAILABLE_IN_ALL
+void              gtk_disable_setlocale    (void);
+GDK_AVAILABLE_IN_4_18
+void              gtk_disable_portals      (void);
+GDK_AVAILABLE_IN_4_22
+void              gtk_disable_portal_interfaces (const char **portal_interfaces);
+GDK_AVAILABLE_IN_ALL
+PangoLanguage *   gtk_get_default_language (void);
+GDK_AVAILABLE_IN_ALL
+GtkTextDirection  gtk_get_locale_direction (void);
+
+G_END_DECLS
