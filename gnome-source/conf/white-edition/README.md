@@ -21,9 +21,40 @@ gnome-source/conf/white-edition/
 ├── theme/
 │   ├── README.md
 │   ├── white-edition.css
-│   └── lighting.conf
+│   ├── lighting.conf
+│   ├── icons.conf
+│   ├── icon-theme/
+│   │   └── index.theme
+│   └── install-icons.sh
 └── install-config.sh
 ```
+
+## Desktop icon source of truth
+
+The **initial Ubuntu White Edition Desktop LAF uses the artwork in `ubuntu-white/icons/`**. This repository path is authoritative for the initial desktop icon artwork; GNOME source trees are not an alternate icon source.
+
+The icon tree currently contains root-level SVG artwork such as `folder.svg`, `home.svg`, `trash.svg`, `terminal.svg`, `settings.svg`, and `downloads.svg`, as well as development/working sets including `set-001`, `set-002`, `smaug`, and `svg-earlies`. The installation script intentionally does **not** install those working sets wholesale. Only explicitly approved root-level assets are mapped into the `Ubuntu-White` icon theme.
+
+The mapping is currently:
+
+```text
+ubuntu-white/icons/folder.svg   → places/folder.svg
+ubuntu-white/icons/home.svg     → places/home.svg
+ubuntu-white/icons/trash.svg    → places/trash.svg
+ubuntu-white/icons/terminal.svg → apps/terminal.svg
+ubuntu-white/icons/settings.svg → apps/settings.svg
+ubuntu-white/icons/downloads.svg → actions/downloads.svg
+```
+
+Additional icons should be added to the allow-list only after review. This prevents an unfinished icon set, build script, or unrelated directory from silently becoming part of the ISO's production LAF.
+
+## Safe icon installation
+
+`theme/install-icons.sh` takes an explicit ISO target root and refuses to operate without one. It requires the target to contain `/etc`, requires `ubuntu-white/icons` to exist, rejects symbolic links and special filesystem objects in the icon source, and copies only the approved artwork. It never deletes unrelated files from the target.
+
+The installer creates `/usr/share/icons/Ubuntu-White/` in the target root and installs the repository-controlled `index.theme`. SVG transparency is preserved. The icon artwork itself remains under `ubuntu-white/icons/` as the source of truth.
+
+The build system should run the icon installer before final dconf compilation/theme validation and should record the Git revision of the icon source in the ISO build manifest.
 
 ## Policy
 
@@ -33,6 +64,7 @@ gnome-source/conf/white-edition/
 - Do not copy compiled dconf databases into the repository.
 - Keep module-specific policy in GSettings schemas and use this layer for distribution defaults.
 - Do not place credentials, private databases, or machine-specific state here.
+- Preserve the original icon artwork and use explicit allow-lists for production packaging.
 
 ## White Edition visual system
 
@@ -40,7 +72,7 @@ The desktop is intentionally predominantly white. Dark gray supplies readable te
 
 The visual system uses one stationary upper-left virtual key light. Icons receive a precise contact shadow, the bottom taskbar receives modest elevation, windows receive progressively softer shadows, and dialogs receive the greatest separation. During movement, the light remains stationary while object elevation changes. This produces a coherent 3D impression instead of unrelated decorative drop shadows.
 
-The lighting specification is in `theme/lighting.conf`. The CSS/theme contract is in `theme/white-edition.css`. These files describe the desired appearance; supported GNOME Shell, GTK, and compositor mechanisms remain responsible for implementing the actual effects.
+The lighting specification is in `theme/lighting.conf`. The CSS/theme contract is in `theme/white-edition.css`. The icon source contract is in `theme/icons.conf`. These files describe the desired appearance; supported GNOME Shell, GTK, and compositor mechanisms remain responsible for implementing the actual effects.
 
 The persistent taskbar/panel is a White Edition desktop requirement. Because GNOME Shell does not expose every layout behavior as a simple dconf preference, bottom placement should be implemented through the supported Shell extension/customization layer rather than by inventing a dconf key.
 
