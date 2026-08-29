@@ -3,12 +3,11 @@ set -euo pipefail
 umask 022
 
 # Source acquisition for the Ubuntu Determinant Cairo integration.
-# The script lives in gnome-source/cairo and always installs the pristine
-# upstream release below gnome-source/cairo/upstream/.
+# The final canonical source boundary is gnome-source/cairo/source/.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST="$ROOT/gnome-source/cairo"
-UPSTREAM="$DEST/upstream"
+SOURCE="$DEST/source"
 
 VERSION="${CAIRO_VERSION:-1.18.4}"
 BASE_URL="${CAIRO_RELEASE_BASE_URL:-https://cairographics.org/releases}"
@@ -29,11 +28,7 @@ command -v tar >/dev/null || { echo 'ERROR: tar is required' >&2; exit 1; }
 
 case "$URL" in
   https://cairographics.org/releases/*|https://www.cairographics.org/releases/*) ;;
-  *)
-    echo "ERROR: CAIRO_SOURCE_URL must point to the official Cairo release archive." >&2
-    echo "       Current URL: $URL" >&2
-    exit 2
-    ;;
+  *) echo "ERROR: CAIRO_SOURCE_URL must point to the official Cairo release archive." >&2; exit 2 ;;
 esac
 
 if [ -z "$EXPECTED_SHA256" ]; then
@@ -47,8 +42,7 @@ echo "  Version:    $VERSION"
 echo "  Archive:    $URL"
 echo "  SHA256:     $EXPECTED_SHA256"
 
-curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
-  --output "$TMP/$ARCHIVE" "$URL"
+curl --fail --location --retry 3 --proto '=https' --tlsv1.2 --output "$TMP/$ARCHIVE" "$URL"
 
 ACTUAL_SHA256="$(sha256sum "$TMP/$ARCHIVE" | awk '{print $1}')"
 if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
@@ -59,33 +53,27 @@ if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
 fi
 
 echo "=== Cairo source checksum verified ==="
-sha256sum "$TMP/$ARCHIVE"
-
 tar -xJf "$TMP/$ARCHIVE" -C "$TMP"
 SRC="$TMP/cairo-${VERSION}"
 test -d "$SRC" || { echo "ERROR: expected extracted directory $SRC not found" >&2; exit 1; }
 test -f "$SRC/meson.build" || { echo 'ERROR: incomplete Cairo source tree (meson.build missing)' >&2; exit 1; }
 test -f "$SRC/README.md" || { echo 'ERROR: incomplete Cairo source tree (README.md missing)' >&2; exit 1; }
 
-# Preserve the pristine upstream baseline. Do not place it under another
-# /cairo directory: this script itself is already gnome-source/cairo.
 mkdir -p "$DEST"
-rm -rf "$UPSTREAM"
-mkdir -p "$UPSTREAM"
-cp -a "$SRC/." "$UPSTREAM/"
+rm -rf "$SOURCE"
+mkdir -p "$SOURCE"
+cp -a "$SRC/." "$SOURCE/"
 
 cat > "$DEST/SOURCE-INFO.txt" <<EOF
-Cairo upstream source baseline
+Cairo source baseline
 Project: Cairo
 Version: ${VERSION}
 Archive: ${URL}
 SHA256: ${EXPECTED_SHA256}
 Source repository: https://gitlab.freedesktop.org/cairo/cairo
-Official release page: https://cairographics.org/news/cairo-${VERSION}/
 
-The pristine source is stored in upstream/.
-Determinant modifications belong outside upstream/ as offsets or patches.
-No GitHub/GitLab username or password is required for this release download.
+Canonical source directory: source/
+Determinant modifications belong in patches/offsets outside source/.
 EOF
 
-printf 'Imported Cairo %s into %s/upstream\n' "$VERSION" "$DEST"
+printf 'Imported Cairo %s into %s/source\n' "$VERSION" "$DEST"
