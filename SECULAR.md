@@ -1,6 +1,6 @@
 # Ubuntu.Determinant.Beta.Restricted — Structural and Definition Glossary
 
-`SECULAR.md` is the repository-wide structural glossary for the OS build. It relates the principal READMEs and specification documents to their implementation modules, source trees, build layers, configuration, tools, kernels, userland, and ISO construction.
+`SECULAR.md` is the repository-wide structural glossary for the OS build. It relates the principal READMEs and specification documents to their implementation modules, source trees, build layers, configuration, tools, kernels, userland, Total native moderation, and ISO construction.
 
 The term is used here as a **non-confessional engineering classification**. It does not classify people by religion, belief, ethnicity, or other sensitive personal characteristics.
 
@@ -15,6 +15,11 @@ README.md
   ├── kernels/
   ├── tools/
   ├── userland/
+  ├── total/
+  │    ├── README.md
+  │    ├── include/
+  │    ├── src/
+  │    └── tests/
   │
   └── gnome-source/
        ├── README.md
@@ -42,6 +47,128 @@ README.md
 | `markdown/HSS_PREHEADER.md` | HSS layer | Project-specific document/protocol concepts. |
 | `markdown/CTRMSCTL-1-2-3-4.mmd` | Evidence chain | 1-2-3-4 document/evidence structure. |
 | `markdown/GCC-METADATA-1-2-3-4-2026-08-25.mmd` | GCC metadata | Metadata/evidence record. |
+| `total/README.md` | Total native moderator | Defines the middle native layer between Linux/OS facilities and managed/application semantics. |
+| `total/total.conf.example` | Total configuration | Example configuration boundary for Total startup/service policy. |
+| `total/include/README.md` | Total ABI | Explains public native interfaces and ABI vocabulary. |
+| `total/tests/README.md` | Total verification | Documents the first native test surface and its limits. |
+
+## Total native moderator
+
+`total/` is a first-class native subsystem in the OS architecture. Its README describes **Total** as a C implementation of the project's moderator layer, positioned above Linux kernel facilities and below ordinary userland policy, with controlled cooperation from SecureJDK 28 and Graal. fileciteturn253file0L2-L2
+
+The intended three-tier relationship is:
+
+```text
+                         TOP
+                SecureJDK 28 / Graal
+                 managed semantics
+                         │
+                authenticated evidence
+                         ▼
+                       MIDDLE
+                        Total
+                 native moderation
+                         │
+                  kernel / OS evidence
+                         ▼
+                       GROUND
+                Linux kernel / hardware
+```
+
+Total is therefore **not the kernel and not the ordinary desktop/userland**. It is a native policy/evidence mediation layer. The project documentation explicitly separates evidence from authority: an input or validated evidence record does not itself authorize an action. fileciteturn253file0L2-L2
+
+### Total source structure
+
+The current repository structure establishes four principal surfaces:
+
+| Path | Definition | Relationship |
+|---|---|---|
+| `total/include/` | Public native headers | Defines the native interface/ABI boundary. |
+| `total/src/` | Native implementation | Implements Total's C logic. |
+| `total/tests/` | Native tests | Exercises the initial evidence/domain surface. |
+| `total/Makefile` | Local build entry | Provides the native compilation/install interface. |
+| `total/total.conf.example` | Configuration example | Defines the expected configuration surface without being machine-local state. |
+| `total/README.md` | Architecture contract | Describes purpose, authority boundaries, evidence flow, security posture and implementation status. |
+
+The directory currently contains `Makefile`, `README.md`, `include/`, `src/`, `tests/`, and `total.conf.example`. fileciteturn251file0L2-L2
+
+### Total evidence pipeline
+
+```text
+input
+  ↓
+normalization
+  ↓
+provenance
+  ↓
+validation
+  ↓
+policy
+  ↓
+action
+  ↓
+observation
+  ↓
+retained evidence
+```
+
+The first-edition input registry is designed for a configured capacity from **3 through 1000 input channels**. This is an architectural ceiling, not an instruction to activate every channel. fileciteturn253file0L2-L2
+
+### Total policy boundary
+
+The first policy-provider ABI separates jurisdiction-specific policy from the privileged native core. Its documented decision vocabulary is:
+
+```text
+DENY | ALLOW | REVIEW
+```
+
+The policy context includes a policy identifier, version, jurisdiction, and evaluation time. Production policy providers remain a future implementation area and are expected to add authenticated bundles, capability scopes, provenance, compatibility checks, and audit references. fileciteturn253file0L2-L2
+
+### Total memory relationship
+
+Total is documented as a native manager for policy coordination, resource admission, accounting, memory pressure, and safe release/reclamation coordination. It does **not** replace Linux virtual memory, `malloc`, `free`, or JVM garbage collection. The intended direction is:
+
+```text
+observe → account → admit → pressure → release
+```
+
+Stronger intervention should remain behind explicit policy, tests, capability controls, and operating-system primitives such as cgroups and PSI. fileciteturn253file0L2-L2
+
+### Total and the rest of the OS
+
+The structural relationship is:
+
+```text
+Linux kernel / hardware
+        │
+        │ OS facts/resources
+        ▼
+      Total
+        │
+        ├── native policy/evidence mediation
+        │
+        ├── controlled userland services
+        │
+        └── authenticated runtime boundary
+                     │
+                     ▼
+             SecureJDK 28 / Graal
+                     │
+                     ▼
+             applications/services
+```
+
+This makes `total/` an architectural peer to major OS layers, not a GNOME component. GNOME remains the desktop/UI subsystem, while Total supplies a native moderation/evidence boundary that may mediate selected services beneath application semantics.
+
+### Total implementation status
+
+The Total README identifies as implemented the common C domain/evidence vocabulary, versioned policy ABI definition, bounded input registry, initial evidence tests, native interface documentation, domain-service architecture, and United States statutory-posture baseline. It identifies production policy providers, cryptographic provenance, formal input adapters, authenticated IPC, cgroup/PSI controls, SecureJDK/Graal bridging, systemd packaging, and broader CI/integration testing as still to implement. fileciteturn253file0L2-L2
+
+The distinction is preserved throughout this glossary:
+
+```text
+specified ≠ implemented ≠ production-certified
+```
 
 ## GNOME documentation
 
@@ -113,7 +240,7 @@ Generated output must not become a second source tree. This separation makes pro
 
 ## Tools
 
-`tools/` is a userspace tool collection, separate from the kernel. Its current Makefile explicitly builds and installs `pcopy` and `pmove`; `pmove` is intentionally a first-class tool rather than only a compatibility alias. fileciteturn249file0
+`tools/` is a userspace tool collection, separate from the kernel. Its current Makefile explicitly builds and installs `pcopy` and `pmove`; `pmove` is intentionally a first-class tool rather than only a compatibility alias.
 
 The repository also contains `tools/git/` for Git acquisition/documentation and `scripts/` for repository/build automation. Other tool directories should be classified by their own README/build metadata rather than assumed to be kernel components.
 
@@ -121,7 +248,7 @@ The repository also contains `tools/git/` for Git acquisition/documentation and 
 
 The repository currently contains `kernels/linux-5.15.204/`. A kernel source tree alone does not prove that kernel code has been altered. A kernel alteration should be evidenced by a source revision, patch/diff, configuration, build metadata, or resulting artifact.
 
-The normal Linux build system supports an out-of-tree output directory through `make O=<output-dir>`, keeping generated configuration and build output separate from kernel source. citeturn0search0
+The normal Linux build system supports an out-of-tree output directory through `make O=<output-dir>`, keeping generated configuration and build output separate from kernel source.
 
 Kernel changes should therefore record:
 
@@ -132,8 +259,6 @@ Kernel changes should therefore record:
 5. build command/toolchain;
 6. kernel/module/package artifacts;
 7. boot/runtime verification.
-
-Ubuntu's kernel annotations tooling provides an architecture/flavour configuration representation and import/export path; this is preferable to treating arbitrary generated `.config` files as the source of truth. citeturn0search9
 
 ## Userland/operator layer
 
@@ -156,7 +281,7 @@ configuration
       ↓
 icons/theme
       ↓
-userland + kernel
+kernel + Total + userland + GNOME
       ↓
 root filesystem
       ↓
@@ -165,7 +290,7 @@ ISO/image
 boot/test/verification
 ```
 
-GNOME is therefore one major subsystem of the OS, not the OS itself.
+GNOME and Total are therefore distinct major subsystems of the OS: GNOME supplies the desktop experience; Total supplies a native evidence/policy mediation layer; Linux supplies the ground operating-system facilities.
 
 ## Status vocabulary
 
