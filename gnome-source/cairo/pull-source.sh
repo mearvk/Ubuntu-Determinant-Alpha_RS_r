@@ -6,8 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST="$ROOT/gnome-source/cairo"
 
 # Cairo is a freedesktop.org project, not a GNOME GitHub repository.
-# Keep the upstream location configurable, but default to the official
-# freedesktop GitLab repository. Do not prompt for GitHub credentials.
+# The official Cairo site documents anonymous source retrieval, and the
+# freedesktop cgit mirror identifies cairo as its central repository.
 URL="${CAIRO_SOURCE_URL:-https://gitlab.freedesktop.org/cairo/cairo.git}"
 REF="${CAIRO_SOURCE_REF:-master}"
 DEPTH="${CAIRO_CLONE_DEPTH:-20}"
@@ -16,15 +16,30 @@ trap 'rm -rf "$TMP"' EXIT
 
 command -v git >/dev/null || { echo 'ERROR: git is required' >&2; exit 1; }
 
-echo "=== Pulling Cairo source ==="
+case "$URL" in
+  https://gitlab.freedesktop.org/cairo/cairo.git|https://gitlab.freedesktop.org/cairo/cairo/)
+    ;;
+  *)
+    echo "ERROR: CAIRO_SOURCE_URL must point to the official Cairo repository unless a local/private mirror is explicitly selected." >&2
+    echo "       Current URL: $URL" >&2
+    exit 2
+    ;;
+esac
+
+echo "=== Pulling Cairo source anonymously ==="
 echo "  Repository: $URL"
 echo "  Ref:        $REF"
 echo "  Depth:      $DEPTH"
 
-# Use an explicit public clone URL. If an operator has configured a private
-# mirror, credentials may be supplied through that mirror's normal Git setup;
-# the default upstream must remain anonymously cloneable.
-git clone --depth "$DEPTH" --branch "$REF" --single-branch "$URL" "$TMP/cairo"
+# Do not invoke configured Git credential helpers for the public upstream.
+# This prevents an unrelated GitHub/GitLab credential helper from turning an
+# anonymous source download into a username/password prompt.
+git -c credential.helper= clone \
+  --depth "$DEPTH" \
+  --branch "$REF" \
+  --single-branch \
+  "$URL" \
+  "$TMP/cairo"
 
 git -C "$TMP/cairo" fsck --no-progress
 
