@@ -5,15 +5,38 @@ set -euo pipefail
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CHROMIUM_SRC=${CHROMIUM_SRC:-"$SCRIPT_DIR/../chromium-src"}
 CHROMIUM_OUT=${CHROMIUM_OUT:-"$CHROMIUM_SRC/out/WhiteEdition"}
+DEPOT_TOOLS=${DEPOT_TOOLS:-"$SCRIPT_DIR/../depot_tools"}
 MODE=${1:-check}
 
-fail() {
-    printf 'ERROR: %s\n' "$*" >&2
-    exit 1
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+setup_tools() {
+    if [ -d "$DEPOT_TOOLS" ]; then
+        case ":$PATH:" in
+            *":$DEPOT_TOOLS:"*) ;;
+            *) PATH="$DEPOT_TOOLS:$PATH"; export PATH ;;
+        esac
+    fi
 }
 
-need_cmd() {
-    command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+find_gn() {
+    if command -v gn >/dev/null 2>&1; then
+        GN_BIN=$(command -v gn)
+        return
+    fi
+    if [ -x "$DEPOT_TOOLS/gn" ]; then
+        GN_BIN="$DEPOT_TOOLS/gn"
+        return
+    fi
+    if [ -x "$CHROMIUM_SRC/buildtools/linux64/gn" ]; then
+        GN_BIN="$CHROMIUM_SRC/buildtools/linux64/gn"
+        return
+    fi
+    fail "GN not found. Install/fetch Chromium depot_tools and set DEPOT_TOOLS, or provide gn on PATH."
+}
+
+need_autoninja() {
+    command -v autoninja >/dev/null 2>&1 || fail "autoninja not found. Add depot_tools to PATH or set DEPOT_TOOLS."
 }
 
 check_source() {
@@ -42,27 +65,30 @@ write_args() {
     fi
 }
 
+setup_tools
+
 case "$MODE" in
     check)
-        need_cmd gn
+        find_gn
         check_source
         printf 'Chromium source: %s\n' "$CHROMIUM_SRC"
         printf 'GN output:       %s\n' "$CHROMIUM_OUT"
+        printf 'GN:              %s\n' "$GN_BIN"
         printf 'Source layout:   OK\n'
         ;;
     gen)
-        need_cmd gn
+        find_gn
         check_source
         write_args
-        (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
-        (cd "$CHROMIUM_SRC" && gn check "$CHROMIUM_OUT")
+        (cd "$CHROMIUM_SRC" && "$GN_BIN" gen "$CHROMIUM_OUT")
+        (cd "$CHROMIUM_SRC" && "$GN_BIN" check "$CHROMIUM_OUT")
         ;;
     build)
-        need_cmd gn
-        need_cmd autoninja
+        find_gn
+        need_autoninja
         check_source
         write_args
-        (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
+        (cd "$CHROMIUM_SRC" && "$GN_BIN" gen "$CHROMIUM_OUT")
         if [ -n "${BUILD_JOBS:-}" ]; then
             (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" -j "$BUILD_JOBS" chrome)
         else
@@ -70,7 +96,7 @@ case "$MODE" in
         fi
         ;;
     test)
-        need_cmd autoninja
+        need_autoninja
         check_source
         [ -d "$CHROMIUM_OUT" ] || fail "build directory missing; run gen first"
         (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" unit_tests)
