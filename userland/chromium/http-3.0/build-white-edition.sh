@@ -1,22 +1,15 @@
 #!/usr/bin/env bash
 # Ubuntu White Edition Chromium build preflight/build wrapper.
 #
-# This script intentionally keeps Chromium's upstream source tree separate from
-# project configuration and generated output. It checks the expected source
-# layout, writes a reproducible GN args file, generates the build directory,
-# validates GN targets, and optionally builds chrome.
+# Keeps Chromium's upstream source tree separate from project configuration
+# and generated output. Checks source layout, writes GN args, generates the
+# build directory, validates GN targets, and optionally builds chrome.
 #
 # Usage:
 #   ./build-white-edition.sh check
 #   ./build-white-edition.sh gen
 #   ./build-white-edition.sh build
 #   ./build-white-edition.sh test
-#
-# Environment overrides:
-#   CHROMIUM_SRC   Chromium checkout (default: ../chromium-src relative to this dir)
-#   CHROMIUM_OUT   GN output directory (default: <source>/out/WhiteEdition)
-#   TARGET_CPU     target CPU override, if needed
-#   BUILD_JOBS     passed to autoninja as -jN
 
 set -euo pipefail
 
@@ -50,12 +43,12 @@ symbol_level = 1
 blink_symbol_level = 0
 v8_symbol_level = 0
 
-# Keep the build suitable for local development/testing.
+# Local development/testing build.
 is_official_build = false
 is_chrome_branded = false
 
-# White Edition feature contract; consumed only after corresponding source
-# integration exists. These names must be declared by the patched source tree.
+# White Edition feature contract. Enable these only after the corresponding
+# variables are declared by the patched Chromium source tree.
 # white_edition_ui = true
 # white_edition_http_io = true
 # white_edition_secondary_taskbar = true
@@ -67,41 +60,42 @@ EOF
   fi
 }
 
-check) 
-  need_cmd gn
-  check_source
-  echo "Chromium source: $CHROMIUM_SRC"
-  echo "GN output:       $CHROMIUM_OUT"
-  echo "Source layout:   OK"
-  echo "Build values:    args.gn will use debug + reduced symbols + unbranded Chromium"
-  ;;
-gen)
-  need_cmd gn
-  check_source
-  write_args
-  (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
-  (cd "$CHROMIUM_SRC" && gn check "$CHROMIUM_OUT")
-  ;;
-build)
-  need_cmd gn
-  need_cmd autoninja
-  check_source
-  write_args
-  (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
-  if [[ -n "${BUILD_JOBS:-}" ]]; then
-    (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" -j"$BUILD_JOBS" chrome)
-  else
-    (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" chrome)
-  fi
-  ;;
-test)
-  need_cmd autoninja
-  check_source
-  [[ -d "$CHROMIUM_OUT" ]] || fail "build directory does not exist; run gen or build first"
-  (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" unit_tests)
-  ;;
-*)
-  echo "Usage: $0 {check|gen|build|test}" >&2
-  exit 2
-  ;;
+case "$MODE" in
+  check)
+    need_cmd gn
+    check_source
+    echo "Chromium source: $CHROMIUM_SRC"
+    echo "GN output:       $CHROMIUM_OUT"
+    echo "Source layout:   OK"
+    echo "Build values:    debug + reduced symbols + unbranded Chromium"
+    ;;
+  gen)
+    need_cmd gn
+    check_source
+    write_args
+    (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
+    (cd "$CHROMIUM_SRC" && gn check "$CHROMIUM_OUT")
+    ;;
+  build)
+    need_cmd gn
+    need_cmd autoninja
+    check_source
+    write_args
+    (cd "$CHROMIUM_SRC" && gn gen "$CHROMIUM_OUT")
+    if [[ -n "${BUILD_JOBS:-}" ]]; then
+      (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" -j"$BUILD_JOBS" chrome)
+    else
+      (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" chrome)
+    fi
+    ;;
+  test)
+    need_cmd autoninja
+    check_source
+    [[ -d "$CHROMIUM_OUT" ]] || fail "build directory does not exist; run gen or build first"
+    (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" unit_tests)
+    ;;
+  *)
+    echo "Usage: $0 {check|gen|build|test}" >&2
+    exit 2
+    ;;
 esac
