@@ -10,34 +10,19 @@ Every module uses the same source boundary:
 gnome-source/<module>/
 ├── README.md
 ├── pull-source.sh
-├── source/              # canonical upstream source tree
+├── source/               # canonical upstream source tree
 └── patches/              # optional Determinant offsets/patches
 ```
 
 **`source/` is the final source directory name.** The older `upstream/` name is transitional only and must not be used as the production source boundary.
 
-If a source acquisition script still produces `upstream/`, run:
+If an older acquisition still leaves an `upstream/` directory, run:
 
 ```bash
 ./gnome-source/normalize-source-layout.sh
 ```
 
-The normalizer safely migrates an acquired `upstream/` tree to `source/` without changing the upstream contents. It is intended for build-host source trees as well as repository-contained trees.
-
-## Source policy
-
-For every imported component, preserve:
-
-- upstream repository or official release URL;
-- exact revision, tag, release, or archive checksum;
-- import/acquisition metadata;
-- applicable license and copyright notices;
-- local Determinant modifications as separate patches/offsets;
-- a recognizable upstream build entry point.
-
-Do not mix Ubuntu White Edition changes into the pristine `source/` tree unless a deliberate source patch is being maintained there by the build system.
-
-Do not commit generated build artifacts or caches as source.
+The normalizer migrates an acquired `upstream/` tree to `source/` without changing the source contents.
 
 ## Current module set
 
@@ -53,14 +38,16 @@ gnome-terminal/
 gtk/
 gvfs/
 mutter/
-orcа/
+orca/
 vala/
 gala/
 ```
 
-`orca/` above is the GNOME accessibility component; its source must still be validated by the module audit. Gala remains separately identified as the elementary OS compositor/window-manager project and is not substituted for Mutter.
+Gala remains separately identified as the elementary OS compositor/window-manager project; it is not a substitute for GNOME Mutter.
 
-## Build principle
+## Source policy
+
+For every module, preserve the upstream repository or official release URL, exact revision/tag/release, checksum where applicable, license and copyright notices, and acquisition metadata. Keep Ubuntu White Edition / Determinant changes in a separate patch or offset layer.
 
 The ISO build should consume only:
 
@@ -68,6 +55,6 @@ The ISO build should consume only:
 gnome-source/<module>/source/
 ```
 
-and apply any Ubuntu White Edition / Determinant customization from a separate patch or offset layer. This makes the source boundary consistent across all GNOME modules and avoids baking the acquisition mechanism (`upstream/`) into the final build contract.
+This gives every module one consistent source boundary regardless of whether the acquisition mechanism uses Git or an official release archive.
 
 See `SECTIONAL.md` for the per-module source and build audit.
