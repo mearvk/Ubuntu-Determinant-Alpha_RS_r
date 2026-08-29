@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Ubuntu White Edition Chromium build wrapper.
+# Performs source/dependency preflight before invoking GN or Ninja.
 set -euo pipefail
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 CHROMIUM_SRC=${CHROMIUM_SRC:-"$SCRIPT_DIR/../chromium-src"}
 CHROMIUM_OUT=${CHROMIUM_OUT:-"$CHROMIUM_SRC/out/WhiteEdition"}
 DEPOT_TOOLS=${DEPOT_TOOLS:-"$SCRIPT_DIR/../depot_tools"}
@@ -11,41 +12,56 @@ MODE=${1:-check}
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 setup_tools() {
-    if [ -d "$DEPOT_TOOLS" ]; then
-        case ":$PATH:" in
-            *":$DEPOT_TOOLS:"*) ;;
-            *) PATH="$DEPOT_TOOLS:$PATH"; export PATH ;;
-        esac
-    fi
+    [ -d "$DEPOT_TOOLS" ] || return 0
+    case ":$PATH:" in
+        *":$DEPOT_TOOLS:"*) ;;
+        *) PATH="$DEPOT_TOOLS:$PATH"; export PATH ;;
+    esac
 }
 
 find_gn() {
-    if command -v gn >/dev/null 2>&1; then
-        GN_BIN=$(command -v gn)
-        return
-    fi
-    if [ -x "$DEPOT_TOOLS/gn" ]; then
-        GN_BIN="$DEPOT_TOOLS/gn"
-        return
-    fi
-    if [ -x "$CHROMIUM_SRC/buildtools/linux64/gn" ]; then
-        GN_BIN="$CHROMIUM_SRC/buildtools/linux64/gn"
-        return
-    fi
-    fail "GN not found. Install/fetch Chromium depot_tools and set DEPOT_TOOLS, or provide gn on PATH."
+    if command -v gn >/dev/null 2>&1; then GN_BIN=$(command -v gn); return; fi
+    [ -x "$CHROMIUM_SRC/buildtools/linux64/gn" ] && { GN_BIN="$CHROMIUM_SRC/buildtools/linux64/gn"; return; }
+    fail "GN not found. Run userland/chromium/install-gn.sh first."
 }
 
 need_autoninja() {
-    command -v autoninja >/dev/null 2>&1 || fail "autoninja not found. Add depot_tools to PATH or set DEPOT_TOOLS."
+    command -v autoninja >/dev/null 2>&1 || fail "autoninja not found. Run userland/chromium/install-gn.sh first."
 }
 
 check_source() {
     [ -d "$CHROMIUM_SRC" ] || fail "Chromium source directory missing: $CHROMIUM_SRC"
     [ -f "$CHROMIUM_SRC/DEPS" ] || fail "not a Chromium checkout: DEPS missing"
-    [ -d "$CHROMIUM_SRC/chrome" ] || fail "unusual source structure: chrome/ missing"
-    [ -d "$CHROMIUM_SRC/content" ] || fail "unusual source structure: content/ missing"
-    [ -d "$CHROMIUM_SRC/components" ] || fail "unusual source structure: components/ missing"
     [ -f "$CHROMIUM_SRC/BUILD.gn" ] || fail "unusual source structure: BUILD.gn missing"
+    for d in chrome content components third_party; do
+        [ -d "$CHROMIUM_SRC/$d" ] || fail "unusual source structure: $d/ missing"
+    done
+}
+
+check_required_files() {
+    # These are known GN imports required by the Chromium tree. Add entries
+    # here when GN reports a missing dependency rather than creating stubs.
+    local required=(
+        "third_party/angle/dotfile_settings.gni"
+    )
+    local missing=0 file
+    for file in "${required[@]}"; do
+        if [ ! -f "$CHROMIUM_SRC/$file" ]; then
+            printf 'MISSING DEPENDENCY: %s\n' "$file" >&2
+            missing=1
+        fi
+    done
+    if [ "$missing" -ne 0 ]; then
+        printf '%s\n' "Chromium dependency tree is incomplete." >&2
+        printf '%s\n' "Repair with: gclient sync && gclient runhooks" >&2
+        printf '%s\n' "Do not create placeholder .gni files." >&2
+        exit 1
+    fi
+}
+
+check_source_tree() {
+    check_source
+    check_required_files
 }
 
 write_args() {
@@ -70,15 +86,15 @@ setup_tools
 case "$MODE" in
     check)
         find_gn
-        check_source
+        check_source_tree
         printf 'Chromium source: %s\n' "$CHROMIUM_SRC"
         printf 'GN output:       %s\n' "$CHROMIUM_OUT"
         printf 'GN:              %s\n' "$GN_BIN"
-        printf 'Source layout:   OK\n'
+        printf 'Source/deps:     OK\n'
         ;;
     gen)
         find_gn
-        check_source
+        check_source_tree
         write_args
         (cd "$CHROMIUM_SRC" && "$GN_BIN" gen "$CHROMIUM_OUT")
         (cd "$CHROMIUM_SRC" && "$GN_BIN" check "$CHROMIUM_OUT")
@@ -86,7 +102,7 @@ case "$MODE" in
     build)
         find_gn
         need_autoninja
-        check_source
+        check_source_tree
         write_args
         (cd "$CHROMIUM_SRC" && "$GN_BIN" gen "$CHROMIUM_OUT")
         if [ -n "${BUILD_JOBS:-}" ]; then
@@ -97,7 +113,7 @@ case "$MODE" in
         ;;
     test)
         need_autoninja
-        check_source
+        check_source_tree
         [ -d "$CHROMIUM_OUT" ] || fail "build directory missing; run gen first"
         (cd "$CHROMIUM_SRC" && autoninja -C "$CHROMIUM_OUT" unit_tests)
         ;;
