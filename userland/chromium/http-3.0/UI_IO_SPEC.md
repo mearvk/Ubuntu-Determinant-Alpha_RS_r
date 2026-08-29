@@ -4,26 +4,40 @@
 
 This document specifies the data contract for the secondary tasking bar beneath the URL/omnibox in the White Edition Chromium UI.
 
-The bar is approximately **80% of the usable width of the URL input pane** and presents compact, non-secret network/I/O information.
+The bar is approximately **80% of the usable width of the URL input pane**, attaches directly beneath it, and presents compact, non-secret network/I/O information plus a modest request-variable review surface.
 
 This specification is a UI and observation contract. It does not create a new wire protocol.
 
-## 2. Layout contract
+## 2. Visual and geometry contract
 
 ```text
-URL / omnibox:       100% reference width
-Secondary I/O pane:   80% reference width
+┌───────────────────────────────────────────────────────────────┐
+│ URL / omnibox                                                 │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│        Secondary HTTP I/O / variable review pane              │
+│        ≈ 80% of URL-pane usable width                         │
+│                                                               │
+├───────────────────────────────────────────────────────────────┤
+│ web content                                                   │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-The implementation should use responsive layout measurements rather than a fixed pixel width.
+The pane MUST attach directly to the URL/omnibox row and remain beneath it. It must not float over page content.
 
-Suggested layout:
+The width target is approximately 80% of the URL input pane's usable width. Responsive layout measurements MUST determine the actual width; 80% is not a fixed pixel requirement.
 
-```text
-[Protocol] [Transport] [Connection] [Stream] [Security] [Latency] [Transfer] [Activity]
-```
+The variable-review field is a **modest text bar**, not a full developer console. It should be clean, crisp, lightly beveled, and visually integrated with the White Edition browser chrome.
 
-On narrow windows, fields should collapse by priority rather than forcing horizontal overflow.
+### Bevel contract
+
+- small corner radius;
+- one restrained highlight edge;
+- one restrained gray lower/outer shadow;
+- no excessive glossy gradients;
+- no animated bevel effects;
+- sufficient contrast for text and focus states;
+- consistent with the desktop's precision-lighting direction.
 
 ## 3. Data model
 
@@ -35,6 +49,9 @@ transport
 connection_state
 stream_state
 origin
+request_target
+method
+content_type
 security_state
 latency_ms
 request_bytes
@@ -44,12 +61,69 @@ cache_state
 activity_state
 error_code
 error_text
+normalization_schema
 last_updated
 ```
 
 All values are observational and should be treated as potentially transient.
 
-## 4. Protocol field
+## 4. Variable review bar
+
+The second row has two logical regions:
+
+```text
+[HTTP state / compact controls] [ request-variable review text ]
+```
+
+The variable text field is read-only by default and shows a compact, escaped representation of the current request's GET or POST variables.
+
+Examples:
+
+```text
+GET  q=ubuntu&page=2
+```
+
+```text
+POST  {"name":"Example","enabled":true}
+```
+
+```text
+POST  username=example&mode=white
+```
+
+The field may expose a detail affordance to open the full normalized XML inspector. It must not expose secrets by default.
+
+## 5. Four initial data cases
+
+The UI MUST handle these initial cases:
+
+| Case | Input | Review representation |
+|---|---|---|
+| JSON | `application/json` | Compact escaped JSON preview plus canonical XML representation. |
+| XML | `application/xml` / `text/xml` | Validated XML preview plus canonical XML representation. |
+| POST data | Form/body content | Normalized fields plus canonical XML representation. |
+| GET data | URI query | Ordered query parameters plus canonical XML representation. |
+
+The actual HTTP method and content type remain authoritative. These cases are normalization categories, not protocol replacements.
+
+## 6. Canonical XML normalization
+
+HTTP/1.0, HTTP/1.1, HTTP/2, and HTTP/3 observations are normalized into the project's bounded XML observation model before the browser UI consumes them.
+
+The detailed contract is defined in:
+
+`IO_XML_NORMALIZATION.md`
+
+```text
+HTTP/1.0 ─┐
+HTTP/1.1 ─┤
+HTTP/2   ─┼→ protocol observer → canonical XML → UI model → tasking bar
+HTTP/3   ─┘
+```
+
+The XML is an internal data representation. It is not a new HTTP syntax and does not alter the bytes transmitted on the network.
+
+## 7. Protocol field
 
 `protocol` represents the protocol actually negotiated by Chromium.
 
@@ -62,13 +136,13 @@ http/1.1
 unknown
 ```
 
-For HTTP/3, `h3` corresponds to the ALPN identifier defined by RFC 9114. citeturn0search0
+For HTTP/3, `h3` corresponds to the ALPN identifier defined by RFC 9114. citeturn0search1
 
 The UI MUST NOT display `h3` solely because the HTTP 3.0 feature is enabled.
 
-## 5. Transport field
+## 8. Transport field
 
-For HTTP/3, the transport is QUIC. QUIC provides multiplexed streams, flow control, connection migration, and integrated TLS handshake functionality. citeturn0search2
+For HTTP/3, the transport is QUIC. HTTP/3 maps HTTP semantics onto QUIC, which supplies multiplexed streams and flow control. citeturn0search1
 
 Example display:
 
@@ -76,11 +150,11 @@ Example display:
 QUIC v1
 ```
 
-The display should be concise. Detailed diagnostics belong in a diagnostic view, not the primary tasking bar.
+Detailed diagnostics belong outside the primary strip.
 
-## 6. Connection state
+## 9. Connection and stream state
 
-Allowed presentation states:
+Allowed connection presentation states:
 
 ```text
 idle
@@ -93,13 +167,7 @@ closed
 failed
 ```
 
-Connection reuse is significant because HTTP/3 connections are persistent and can service multiple requests. citeturn0search0
-
-## 7. Stream state
-
-HTTP/3 maps request/response exchanges onto QUIC streams. Independent streams allow unrelated transactions to make progress independently. citeturn0search0
-
-Suggested states:
+Suggested stream states:
 
 ```text
 none
@@ -112,7 +180,24 @@ cancelled
 failed
 ```
 
-## 8. Security state
+HTTP/3 maps request/response exchanges onto QUIC streams. citeturn0search1
+
+## 10. HTTP method handling
+
+The observer MUST preserve the actual HTTP method.
+
+The initial UI explicitly supports:
+
+```text
+GET
+POST
+```
+
+GET is treated as the retrieval method defined by HTTP semantics. POST carries request content for resource-specific processing. citeturn0search0turn0search3
+
+A GET request body, if encountered, must not be silently interpreted as ordinary GET parameters. The URI query remains the normal GET-data source.
+
+## 11. Security state
 
 The pane may show a coarse state such as:
 
@@ -135,42 +220,25 @@ It MUST NOT expose:
 - raw credential-bearing headers;
 - decrypted secret material.
 
-HTTP/3 relies on QUIC's TLS integration for confidentiality, integrity, and peer authentication. citeturn0search0turn0search2
+HTTP/3 relies on QUIC's TLS integration for confidentiality and integrity. citeturn0search1
 
-## 9. Latency
+## 12. Latency and transfer counters
 
-`latency_ms` is an approximate presentation metric. It should never be presented as a precise measurement of end-to-end network performance unless the underlying measurement definition supports that precision.
+`latency_ms` is an approximate presentation metric. It should not imply end-to-end precision that the underlying measurement cannot support.
 
-Recommended display:
-
-```text
-12 ms
-```
-
-or, when unavailable:
+Recommended displays:
 
 ```text
-—
-```
-
-## 10. Transfer counters
-
-`request_bytes` and `response_bytes` are presentation counters.
-
-They should use compact formatting:
-
-```text
+23 ms
 ↑ 4.2 KB
 ↓ 1.8 MB
 ```
 
-The counters should reset only according to an explicitly defined request/navigation scope.
+or `—` when unavailable.
 
-## 11. Flow state
+## 13. Flow, cache, and activity
 
-The UI may summarize transport flow conditions without exposing implementation-specific internal data.
-
-Suggested states:
+Suggested flow states:
 
 ```text
 normal
@@ -179,11 +247,7 @@ backpressured
 unknown
 ```
 
-Detailed congestion-control and QUIC packet diagnostics belong outside the primary UI.
-
-## 12. Cache state
-
-Suggested presentation values:
+Suggested cache states:
 
 ```text
 network
@@ -193,11 +257,7 @@ cache-miss
 unknown
 ```
 
-This field must not imply that all network traffic was observed by the UI layer.
-
-## 13. Activity
-
-The tasking bar should expose one compact activity indicator:
+Suggested activity states:
 
 ```text
 idle
@@ -210,42 +270,42 @@ complete
 failed
 ```
 
-The activity indicator is a presentation of state, not a transport command.
+These are presentation states, not transport commands.
 
-## 14. Error handling
+## 14. Error handling and fallback
 
-Errors should use a safe short label in the tasking bar and retain detailed diagnostics in a separate diagnostic surface.
+Errors use a short label in the tasking bar and detailed diagnostics in a separate surface.
 
 Example:
 
 ```text
-HTTP/3 unavailable
-Falling back to HTTP/2
+HTTP/3 unavailable — using HTTP/2
 ```
 
-RFC 9114 notes that clients should use TCP-based HTTP versions when QUIC connectivity fails. citeturn0search0
+The UI must report the actual negotiated protocol. HTTP/3 connectivity failure must not be represented as successful HTTP/3 merely because the feature is installed. HTTP/3 is standardized in RFC 9114 over QUIC. citeturn0search1
 
 ## 15. Responsive behavior
 
-At full width, all high-priority fields may be visible. At reduced widths, use this priority order:
+At full width, high-priority fields and the variable preview may be visible. At reduced widths, use this priority order:
 
-1. protocol;
+1. method/protocol;
 2. connection;
 3. activity;
-4. security;
-5. stream;
-6. latency;
-7. transfer;
-8. transport detail;
-9. cache/flow detail.
+4. variable preview;
+5. security;
+6. stream;
+7. latency;
+8. transfer;
+9. transport detail;
+10. cache/flow detail.
 
-No field should cause the browser content area to become unusable.
+The variable preview should shorten with an explicit ellipsis rather than causing horizontal overflow.
 
 ## 16. Accessibility
 
-Every status must have a text representation available to assistive technologies. Color alone MUST NOT communicate security, failure, or protocol state.
+Every status has a text representation available to assistive technologies. Color alone MUST NOT communicate security, failure, or protocol state.
 
-The bar must support keyboard focus and navigation without interfering with omnibox shortcuts.
+The pane must support keyboard focus and navigation without interfering with omnibox shortcuts.
 
 ## 17. Rendering
 
@@ -255,35 +315,37 @@ White Edition presentation:
 - dark-gray text and controls;
 - subtle gray elevation/shadow;
 - restrained Ubuntu-red active/focus indication;
+- slight curved bevel at the pane boundary;
 - precision upper-left lighting consistent with the desktop LAF;
 - no unnecessary animation.
 
-The information pane should visually read as a **professional instrumentation strip**, not as a second browser toolbar.
+The information pane should read as a **professional instrumentation strip with a compact variable review field**, not as a second developer toolbar.
 
 ## 18. Data ownership
 
-The network/IO observer owns the observation record. The UI owns presentation state only.
+The network/I/O observer owns the observation record. The UI owns presentation state only.
 
 ```text
 Chromium network stack
         ↓
-observation adapter
+protocol observer
+        ↓
+normalization adapter
         ↓
 HTTP 3.0 UI model
         ↓
 secondary tasking bar
 ```
 
-No UI event should directly mutate transport internals through this interface.
+No UI event should directly mutate transport internals through this observation interface.
 
 ## 19. Versioning
 
-This UI contract should expose a schema version independently of the negotiated HTTP protocol.
-
-Initial proposal:
+The UI contract exposes a schema version independently of the negotiated HTTP protocol:
 
 ```text
-ui_io_schema = 1
+ui_io_schema = 2
+normalization_schema = 1
 wire_protocol = negotiated
 ```
 
@@ -291,6 +353,4 @@ A future project-specific wire protocol must receive a separate protocol specifi
 
 ## 20. Reference standards
 
-The current interoperability baseline is standardized HTTP/3 from RFC 9114 over QUIC. RFC 9114 defines HTTP/3 as HTTP semantics mapped onto QUIC and specifies its framing, streams, SETTINGS, connection management, and QPACK use. citeturn0search0
-
-QUIC Version 1 is specified by RFC 9000. citeturn0search2
+The interoperability baseline is standardized HTTP/3 from RFC 9114 over QUIC. HTTP semantics shared by HTTP/1.0, HTTP/1.1, HTTP/2, and HTTP/3 are defined by RFC 9110. citeturn0search1turn0search0
