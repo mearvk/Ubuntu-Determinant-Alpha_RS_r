@@ -1,18 +1,30 @@
 #!/usr/bin/env bash
 # Chromium White Edition top-level build entry point.
-# Ensures the Chromium GN toolchain is available, then delegates to the
-# HTTP 3.0 / White Edition build contract.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DEPOT_TOOLS=${DEPOT_TOOLS:-"$SCRIPT_DIR/depot_tools"}
+export DEPOT_TOOLS
+export PATH="$DEPOT_TOOLS:$PATH"
 
-if ! command -v gn >/dev/null 2>&1; then
-    "${SCRIPT_DIR}/install-gn.sh"
+# The depot_tools checkout may contain the GN resolver before its managed
+# bootstrap has completed. Initialize it before invoking the build wrapper.
+if [ ! -f "$DEPOT_TOOLS/python3_bin_reldir.txt" ]; then
+    [ -d "$DEPOT_TOOLS/.git" ] || "$SCRIPT_DIR/install-gn.sh"
+    [ -x "$DEPOT_TOOLS/gclient" ] || "$SCRIPT_DIR/install-gn.sh"
+    (cd "$DEPOT_TOOLS" && ./gclient --version >/dev/null 2>&1 || true)
 fi
 
-# install-gn.sh runs in a child shell, so make its depot_tools location
-# available to the delegated build explicitly.
-export DEPOT_TOOLS="${DEPOT_TOOLS:-${SCRIPT_DIR}/depot_tools}"
-export PATH="${DEPOT_TOOLS}:${PATH}"
+# Refresh depot_tools when its updater is available. Do not require an exact
+# number of GN entries: standalone GN installations are valid too.
+if [ -x "$DEPOT_TOOLS/update_depot_tools" ]; then
+    (cd "$DEPOT_TOOLS" && ./update_depot_tools) || true
+fi
 
-exec "${SCRIPT_DIR}/http-3.0/build-white-edition.sh" "$@"
+# Resolve GN after bootstrap. Running gn --version is the authoritative test.
+if ! command -v gn >/dev/null 2>&1 || ! gn --version >/dev/null 2>&1; then
+    "$SCRIPT_DIR/install-gn.sh"
+    export PATH="$DEPOT_TOOLS:$PATH"
+fi
+
+exec "$SCRIPT_DIR/http-3.0/build-white-edition.sh" "$@"
