@@ -137,3 +137,4 @@ GMenu *          gtk_application_get_menu_by_id                  (GtkApplication
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(GtkApplication, g_object_unref)
 
 G_END_DECLS
+
