@@ -1,198 +1,69 @@
 # Ubuntu.Determinant.Beta.Restricted — Structural and Definition Glossary
 
-`SECULAR.md` is the repository-wide structural glossary for the OS build. It relates the principal READMEs and specification documents to their implementation modules, source trees, build layers, configuration, tools, kernels, userland, Total native moderation, and ISO construction.
-
-The term is used here as a **non-confessional engineering classification**. It does not classify people by religion, belief, ethnicity, or other sensitive personal characteristics.
+`SECULAR.md` is the repository-wide structural glossary for the OS build. It relates the principal READMEs and specification documents to their implementation modules, source trees, build layers, configuration, tools, kernels, userland, Total native moderation, GNOME, White Edition, and ISO construction.
 
 ## System reading order
 
 ```text
 README.md
-  │
   ├── markdown/BUILD.md
-  ├── markdown/BUILD_SOURCE_SAFETY.md
-  │
   ├── kernels/
   ├── tools/
   ├── userland/
   ├── total/
-  │    ├── README.md
-  │    ├── include/
-  │    ├── src/
-  │    └── tests/
-  │
   └── gnome-source/
-       ├── README.md
-       ├── SECTIONAL.md
        ├── <module>/source/
        ├── <module>/build/
        └── conf/white-edition/
 ```
 
-## Primary documentation glossary
+## Core glossary
 
-| Document | Relevance | Relationship |
+| Document / area | Relevance | Relationship |
 |---|---|---|
 | `README.md` | Repository architecture | Top-level project vocabulary and system map. |
-| `SECULAR.md` | Structural glossary | This cross-module index and dependency/definition map. |
+| `SECULAR.md` | Structural glossary | Cross-module index and definition map. |
 | `markdown/BUILD.md` | Build system | Describes how source becomes the OS. |
 | `markdown/BUILD_SOURCE_SAFETY.md` | Source/build safety | Controls source acquisition and build inputs. |
 | `markdown/FILESYSTEM.md` | Filesystem | Defines filesystem and userland relationships. |
-| `markdown/THREE_TIER.md` | Total / Ground / Top | Connects kernel/OS, native moderation, and managed runtime. |
-| `markdown/GRAAL_SECURITY_CONCEPT.md` | Graal security | Managed runtime/compiler security architecture. |
-| `markdown/DOMAIN_SERVICES.md` | Domain adapters | Application/service evidence and authorization model. |
-| `markdown/CERTIFICATES.md` | Certificates | Certificate-related runtime/build material. |
-| `markdown/LEGAL.md` | Legal | Project legal and trademark guidance. |
-| `markdown/LEGAL_NAMING_AND_SOURCE.md` | Provenance/naming | Source and naming boundaries. |
-| `markdown/HSS_PREHEADER.md` | HSS layer | Project-specific document/protocol concepts. |
-| `markdown/CTRMSCTL-1-2-3-4.mmd` | Evidence chain | 1-2-3-4 document/evidence structure. |
-| `markdown/GCC-METADATA-1-2-3-4-2026-08-25.mmd` | GCC metadata | Metadata/evidence record. |
-| `total/README.md` | Total native moderator | Defines the middle native layer between Linux/OS facilities and managed/application semantics. |
-| `total/total.conf.example` | Total configuration | Example configuration boundary for Total startup/service policy. |
-| `total/include/README.md` | Total ABI | Explains public native interfaces and ABI vocabulary. |
-| `total/tests/README.md` | Total verification | Documents the first native test surface and its limits. |
+| `markdown/THREE_TIER.md` | System tiers | Connects kernel/OS, native moderation, and managed runtime. |
+| `total/README.md` | Total native moderator | Defines the native middle layer. |
+| `tools/` | Native/userland tools | Utility and operator layer separate from the kernel. |
+| `kernels/` | Kernel | Linux operating-system foundation. |
+| `gnome-source/README.md` | GNOME overview | Desktop module map and provenance. |
+| `gnome-source/SECTIONAL.md` | GNOME audit | Per-module source/build completeness. |
+| `gnome-source/conf/white-edition/` | White Edition configuration | Distribution defaults and LAF policy. |
 
 ## Total native moderator
 
-`total/` is a first-class native subsystem in the OS architecture. Its README describes **Total** as a C implementation of the project's moderator layer, positioned above Linux kernel facilities and below ordinary userland policy, with controlled cooperation from SecureJDK 28 and Graal. fileciteturn253file0L2-L2
-
-The intended three-tier relationship is:
-
-```text
-                         TOP
-                SecureJDK 28 / Graal
-                 managed semantics
-                         │
-                authenticated evidence
-                         ▼
-                       MIDDLE
-                        Total
-                 native moderation
-                         │
-                  kernel / OS evidence
-                         ▼
-                       GROUND
-                Linux kernel / hardware
-```
-
-Total is therefore **not the kernel and not the ordinary desktop/userland**. It is a native policy/evidence mediation layer. The project documentation explicitly separates evidence from authority: an input or validated evidence record does not itself authorize an action. fileciteturn253file0L2-L2
-
-### Total source structure
-
-The current repository structure establishes four principal surfaces:
-
-| Path | Definition | Relationship |
-|---|---|---|
-| `total/include/` | Public native headers | Defines the native interface/ABI boundary. |
-| `total/src/` | Native implementation | Implements Total's C logic. |
-| `total/tests/` | Native tests | Exercises the initial evidence/domain surface. |
-| `total/Makefile` | Local build entry | Provides the native compilation/install interface. |
-| `total/total.conf.example` | Configuration example | Defines the expected configuration surface without being machine-local state. |
-| `total/README.md` | Architecture contract | Describes purpose, authority boundaries, evidence flow, security posture and implementation status. |
-
-The directory currently contains `Makefile`, `README.md`, `include/`, `src/`, `tests/`, and `total.conf.example`. fileciteturn251file0L2-L2
-
-### Total evidence pipeline
-
-```text
-input
-  ↓
-normalization
-  ↓
-provenance
-  ↓
-validation
-  ↓
-policy
-  ↓
-action
-  ↓
-observation
-  ↓
-retained evidence
-```
-
-The first-edition input registry is designed for a configured capacity from **3 through 1000 input channels**. This is an architectural ceiling, not an instruction to activate every channel. fileciteturn253file0L2-L2
-
-### Total policy boundary
-
-The first policy-provider ABI separates jurisdiction-specific policy from the privileged native core. Its documented decision vocabulary is:
-
-```text
-DENY | ALLOW | REVIEW
-```
-
-The policy context includes a policy identifier, version, jurisdiction, and evaluation time. Production policy providers remain a future implementation area and are expected to add authenticated bundles, capability scopes, provenance, compatibility checks, and audit references. fileciteturn253file0L2-L2
-
-### Total memory relationship
-
-Total is documented as a native manager for policy coordination, resource admission, accounting, memory pressure, and safe release/reclamation coordination. It does **not** replace Linux virtual memory, `malloc`, `free`, or JVM garbage collection. The intended direction is:
-
-```text
-observe → account → admit → pressure → release
-```
-
-Stronger intervention should remain behind explicit policy, tests, capability controls, and operating-system primitives such as cgroups and PSI. fileciteturn253file0L2-L2
-
-### Total and the rest of the OS
-
-The structural relationship is:
+`total/` is a first-class native subsystem positioned between Linux facilities and higher-level application/runtime semantics. Its documented model separates evidence from authority and uses a controlled policy boundary. The source tree contains `include/`, `src/`, `tests/`, `Makefile`, `README.md`, and `total.conf.example`.
 
 ```text
 Linux kernel / hardware
-        │
-        │ OS facts/resources
-        ▼
+        ↓
       Total
-        │
-        ├── native policy/evidence mediation
-        │
-        ├── controlled userland services
-        │
-        └── authenticated runtime boundary
-                     │
-                     ▼
-             SecureJDK 28 / Graal
-                     │
-                     ▼
-             applications/services
+        ↓
+SecureJDK 28 / Graal
+        ↓
+applications/services
 ```
 
-This makes `total/` an architectural peer to major OS layers, not a GNOME component. GNOME remains the desktop/UI subsystem, while Total supplies a native moderation/evidence boundary that may mediate selected services beneath application semantics.
-
-### Total implementation status
-
-The Total README identifies as implemented the common C domain/evidence vocabulary, versioned policy ABI definition, bounded input registry, initial evidence tests, native interface documentation, domain-service architecture, and United States statutory-posture baseline. It identifies production policy providers, cryptographic provenance, formal input adapters, authenticated IPC, cgroup/PSI controls, SecureJDK/Graal bridging, systemd packaging, and broader CI/integration testing as still to implement. fileciteturn253file0L2-L2
-
-The distinction is preserved throughout this glossary:
+Its documented evidence flow is:
 
 ```text
-specified ≠ implemented ≠ production-certified
+input → normalization → provenance → validation → policy
+      → action → observation → retained evidence
 ```
 
-## GNOME documentation
+The project distinguishes specified, implemented, production-certified, and boot-verified states; documentation alone does not establish successful compilation or deployment.
 
-| Location | Relevance | Relationship |
-|---|---|---|
-| `gnome-source/README.md` | GNOME overview | Module purposes, provenance, complexity and build relationships. |
-| `gnome-source/SECTIONAL.md` | Module audit | Per-module source/build completeness. |
-| `gnome-source/<module>/README.md` | Module documentation | Source, acquisition, purpose and build details. |
-| `gnome-source/<module>/source/` | Source | Canonical pristine source boundary; `upstream/` is not the final name. |
-| `gnome-source/<module>/build/` | Local build | Module build wrapper and structural preflight. |
-| `gnome-source/conf/white-edition/` | Distribution configuration | GNOME defaults separated from source. |
-| `gnome-source/conf/white-edition/theme/` | White Edition LAF | Theme, lighting, icon and installation contracts. |
-| `theme/lighting.conf` | 3D lighting | Shared upper-left virtual light and elevation model. |
-| `theme/white-edition.css` | Visual styling | White/gray/red presentation layer. |
-| `theme/icons.conf` | Icon source | Declares `ubuntu-white/icons/set-002/*.png` as the initial Desktop LAF. |
-| `theme/install-icons.sh` | Icon packaging | Validates and stages the set-002 PNG artwork into the ISO. |
-
-### GNOME module glossary
+## GNOME glossary
 
 | Module | Purpose | Desktop relationship |
 |---|---|---|
 | Cairo | 2D rendering | Rendering primitive. |
 | GDK-Pixbuf | Image loading/scaling | Raster/image handling. |
-| GLib | Core GNOME infrastructure | GIO, GSettings and common runtime utilities. |
+| GLib | Core GNOME infrastructure | GIO, GSettings and common runtime services. |
 | glib-networking | Networking/TLS integration | GIO/GLib networking. |
 | GTK | UI toolkit | Application widgets and presentation. |
 | Mutter | Compositor/window manager | Windows, display composition and compositor effects. |
@@ -205,26 +76,67 @@ specified ≠ implemented ≠ production-certified
 | Vala | Language/compiler | Build-time GNOME development tooling. |
 | Gala | Separate compositor | Optional; not the GNOME Shell compositor. |
 
-## White Edition icon chain
+## White Edition visual system
+
+The White Edition configuration layer establishes a predominantly white professional desktop with dark gray controls/text, neutral gray depth and shadows, and restrained Ubuntu-red active/focus accents. The precision-lighting specification uses one stationary upper-left virtual key light and progressively different elevations for icons, taskbar, windows, and dialogs.
+
+The implementation boundary is intentionally separated:
 
 ```text
-ubuntu-white/icons/set-002/*.png
-            │
-            ▼
-gnome-source/conf/white-edition/theme/
-            │
-            ▼
-      Ubuntu-White theme
-            │
-       ┌────┴────┐
-       ▼         ▼
-   Shell       GTK/GVfs
-       └────┬────┘
-            ▼
-        Desktop LAF
+conf/white-edition
+        │
+        ├── dconf/GSettings defaults
+        ├── theme/CSS
+        ├── theme/lighting.conf
+        └── theme/icon contract
+                    │
+          ┌─────────┼─────────┐
+          ↓         ↓         ↓
+       Shell      Mutter     GTK
 ```
 
-Set-002 PNGs are the current development artwork source of truth for the initial Desktop LAF. The installer validates the source and does not silently substitute SVGs or unrelated icon sets.
+The bottom taskbar is a White Edition requirement. Where GNOME does not expose a behavior as a normal dconf setting, the implementation belongs in the supported Shell extension/customization layer rather than an invented configuration key.
+
+## White Edition PNG icon inventory — set-002
+
+`ubuntu-white/icons/set-002/` is the authoritative **development artwork source for the initial Desktop LAF**. These are PNG assets. They must remain separate from GNOME upstream source and are installed through the White Edition icon-theme packaging layer after validation.
+
+The current repository inventory contains 12 numbered PNG assets. The Markdown image links below deliberately point to the repository artwork so GitHub renders the actual icons in this glossary.
+
+| # | Icon | Filename | Format | Source | Initial LAF descriptor |
+|---:|---|---|---|---|---|
+| 001 | ![icon-001](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-001.png) | `icon-001.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 001; semantic role remains tied to the artwork until explicitly catalogued. |
+| 002 | ![icon-002](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-002.png) | `icon-002.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 002; semantic role remains tied to the artwork until explicitly catalogued. |
+| 003 | ![icon-003](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-003.png) | `icon-003.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 003; semantic role remains tied to the artwork until explicitly catalogued. |
+| 004 | ![icon-004](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-004.png) | `icon-004.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 004; semantic role remains tied to the artwork until explicitly catalogued. |
+| 005 | ![icon-005](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-005.png) | `icon-005.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 005; semantic role remains tied to the artwork until explicitly catalogued. |
+| 006 | ![icon-006](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-006.png) | `icon-006.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 006; semantic role remains tied to the artwork until explicitly catalogued. |
+| 007 | ![icon-007](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-007.png) | `icon-007.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 007; semantic role remains tied to the artwork until explicitly catalogued. |
+| 008 | ![icon-008](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-008.png) | `icon-008.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 008; semantic role remains tied to the artwork until explicitly catalogued. |
+| 009 | ![icon-009](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-009.png) | `icon-009.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 009; semantic role remains tied to the artwork until explicitly catalogued. |
+| 010 | ![icon-010](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-010.png) | `icon-010.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 010; semantic role remains tied to the artwork until explicitly catalogued. |
+| 011 | ![icon-011](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-011.png) | `icon-011.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 011; semantic role remains tied to the artwork until explicitly catalogued. |
+| 012 | ![icon-012](https://raw.githubusercontent.com/mearvk/Ubuntu.Determinant.Beta.Restricted/main/ubuntu-white/icons/set-002/icon-012.png) | `icon-012.png` | PNG | `ubuntu-white/icons/set-002/` | Initial Desktop LAF asset 012; semantic role remains tied to the artwork until explicitly catalogued. |
+
+The repository directory confirms these 12 PNG files and their individual source paths/sizes. fileciteturn256file0L2-L2 The table intentionally does **not** invent semantic names from filenames alone. Once the artwork is formally assigned roles such as folder, home, trash, terminal, settings, or downloads, those assignments should be recorded here and in the icon-theme manifest together.
+
+### Icon safety contract
+
+```text
+set-002 PNG artwork
+       ↓
+validate filesystem objects
+       ↓
+validate PNG-only boundary
+       ↓
+preserve source artwork
+       ↓
+package as Ubuntu-White
+       ↓
+GNOME Shell / GTK / GVfs consumers
+```
+
+The production installer must not silently substitute SVGs, follow external symlinks, or consume unrelated development sets. Generated/resized derivatives belong in the build/package layer, not in the authoritative artwork directory.
 
 ## Source/build boundary
 
