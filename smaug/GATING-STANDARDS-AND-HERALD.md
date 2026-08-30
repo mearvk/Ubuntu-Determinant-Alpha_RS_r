@@ -1,12 +1,10 @@
 # Smaug Gating Standards and Herald
 
-## 1. Relevance of the approach
+## 1. System-centric contract
 
-The gate is relevant because Smaug is system-facing: it observes operating-system state, receives Player and Overtine proposals, and models effects that can be mistaken for host-system authority if the boundary is not explicit. The gate therefore makes the authority boundary executable rather than leaving it as documentation alone.
+The gate and Herald are treated as native system components. They are not prose-only policy and they are not an authority shortcut. The operating system remains the ground of resource truth. A modeled effect is not a host capability, and an observation is not ownership.
 
-The design concern is not whether a simulated Firecaster or BreathWeapon is interesting. The concern is whether a request can cross from modeled state into protected host state without a deliberate authorization path. The answer must be no.
-
-The gate establishes a narrow contract:
+The executable sequence is:
 
 ```text
 observe
@@ -19,93 +17,128 @@ observe
   -> record
 ```
 
-Every stage is conceptually separate. Failure at any stage is a denial or review condition; it is not an invitation to guess.
+Each stage has a distinct purpose. Failure or uncertainty routes to denial or review rather than best-effort interpretation.
 
-## 2. System-centric authority
+## 2. Dependent and independent paths
 
-The gate treats the operating system as the ground of resource truth. Smaug may observe a path, process, memory condition, service, or package, but observation is not ownership. A modeled effect is not a filesystem primitive. A privileged request is not automatically a permitted request.
+The **dependent path** follows the system's authoritative prerequisites: valid stage, recognized effect, bounded privilege, explicit target, complete input, and the existing administrative simulation boundary.
 
-The current administrative gate requires:
+The **independent path** is the Herald's evidence check. It recomputes basic integrity conditions from the decision itself, validates subject/reason shape, checks provenance, verifies protected scope, and preserves a fingerprint and audit token. The Herald cannot turn a failed gate into an approval.
 
-- modeled privilege from 3 through 7;
-- a non-empty protected target;
-- complete provenance evidence (`whole_cloth` and `yard_evidence`);
-- a recognized simulation effect;
-- explicit separation between simulation and host mutation.
+This creates two related but distinguishable questions:
 
-The gate deliberately has no file-writing, deletion, encryption, rename, chmod, or chown primitive.
+1. Did the dependent system path admit the proposal?
+2. Does the independent observation support the recorded disposition?
 
-## 3. Standards vocabulary
+A mismatch is a review condition.
 
-| Standard | Meaning |
+## 3. Gating implementation
+
+`SmaugGateStandards.cpp` has been expanded into an 1800+ line native policy implementation. The source contains a 1800-entry system-rule catalog plus the executable admission, dependency, provenance, scope, fingerprint, audit-token, failure-reason, and fail-closed logic.
+
+The rule catalog is deliberately data-driven: each rule records a bounded privilege floor and policy flags. The catalog is not permission to mutate the host; every rule remains simulation-only.
+
+The public gate contract now exposes:
+
+- dependency safety;
+- independent evidence validation;
+- protected-scope validation;
+- decision fingerprinting;
+- stable rule metadata;
+- text/provenance/privilege/stage/effect validation;
+- dependency-chain validation;
+- review detection;
+- fail-closed detection;
+- structured failure reasons;
+- audit tokens.
+
+## 4. Herald implementation
+
+`SmaugHerald.cpp` is the independent recording layer. It now records:
+
+- canonical sequence;
+- subject and reason;
+- provenance disposition;
+- decision fingerprint;
+- audit token;
+- monotonically increasing event sequence;
+- accepted/review state;
+- explicit event status;
+- bounded history;
+- event verification;
+- deterministic rendering;
+- batch announcement;
+- configurable retention and fail-closed behavior.
+
+The Herald never authorizes a host operation. It announces and verifies the disposition of the gate.
+
+## 5. Explicit status model
+
+The Herald distinguishes:
+
+| Status | Meaning |
 |---|---|
-| Identity | Identify the actor/request without treating naming as authority. |
-| Provenance | Preserve where the request and protected target came from. |
-| Scope | Bind the decision to the declared target and effect. |
-| Privilege | Require a bounded privilege level rather than an unbounded integer. |
-| Integrity | Reject incomplete or contradictory evidence. |
-| Target | Require a concrete protected target before authorization. |
-| Intent | Keep requested effect explicit. |
-| Simulation | Keep game/model effects in model state. |
-| Non-destructive | Never convert an effect into an implicit host mutation. |
-| Audit | Preserve the decision path and disposition. |
-| Review | Route uncertainty or policy conflict to human review. |
-| Record | Emit a durable, inspectable event. |
+| `Accepted` | The gate admitted a bounded simulation proposal and independent evidence supports the record. |
+| `Review` | Evidence, scope, or policy conditions are incomplete or require human review. |
+| `Denied` | The gate rejected admission. The Herald preserves the denial. |
+| `DependencyFailure` | A prerequisite in the dependent system path failed. |
+| `Invalid` | The event does not satisfy its structural contract. |
 
-## 4. The Herald
+## 6. Evidence preservation
 
-The Herald is the observable companion to the gate. It does not grant authority. It announces the result of a gate decision and retains the event in memory for the surrounding system to inspect.
+Every recorded event carries a fingerprint derived from the decision and an audit token derived from that fingerprint. These are integrity aids, not cryptographic signatures and not substitutes for a trusted audit store.
 
-The canonical announcement sequence is:
+The Herald verifies event shape and disposition consistency. It does not claim that an in-memory event is tamper-proof after the process terminates.
+
+## 7. Protected-system boundary
+
+The administrative layer continues to expose only declarative simulation authorization. Firecaster and BreathWeapon remain modeled effects. They do not become filesystem, process, service, permission, encryption, deletion, rename, or kernel operations.
+
+The correct boundary is therefore:
 
 ```text
-OBSERVE -> NORMALIZE -> PROVENANCE -> VALIDATE
-        -> ASSESS -> AUTHORIZE -> SIMULATE -> RECORD
+model request
+    |
+    v
+native gate -----> deny/review
+    |
+    v
+bounded simulation
+    |
+    v
+independent Herald record
 ```
 
-A denied or incomplete proposal is announced as a review condition. An admitted proposal is announced as a simulation admission. Neither announcement changes the protected target.
+There is no implicit arrow from a simulation effect to protected host mutation.
 
-## 5. Why a Herald is separate
+## 8. ClamAV.US.Legal.Edition reference discipline
 
-A gate answers **may this proposal enter the modeled effect path?** The Herald answers **what did the system announce about that decision?** Combining these concerns makes logging itself look like authority. Separating them keeps the security boundary simpler.
+The `ClamAV.US.Legal.Edition` repository is treated as a reference for provenance, legal/compliance documentation, attribution, and system-facing review discipline. It is not treated as permission to copy unrelated code or as an authority over the Smaug architecture.
 
-The Herald is intentionally small and deterministic. It is not an AI oracle, an administrator, or a replacement for the operating system.
+The security engine and the legal/analytical layer remain conceptually separate. A security finding is not weakened by a Herald interpretation.
 
-## 6. Relationship to Castle / INCLARE
+## 9. Build contract
 
-Castle / INCLARE remains the higher-level authority boundary described by the existing Smaug model. The new gate standards provide a native implementation surface beneath that vocabulary. They do not supersede Castle, Player review, provenance rules, or system policy.
+The existing `smaug/Makefile` already compiles `SmaugGateStandards.cpp` and `SmaugHerald.cpp` as part of the native C++17 shared-library build. No additional mandatory runtime dependency is introduced.
 
-## 7. Firecaster and BreathWeapon
+The intended verification command remains:
 
-Firecaster and BreathWeapon remain modeled effects. Existing game calculations such as `2D8 + 48 + (Perch Rank × 72)` Hit Dice and the separate Emerald Roll are simulation quantities. They are not host capabilities.
+```text
+make check
+```
 
-The administrative gate therefore authorizes only the simulation effect token. It never interprets that token as permission to manipulate a protected file, process, service, or operating-system resource.
+A syntax-clean build establishes compiler correctness for the checked source; it does not by itself establish that a policy is legally or socially sufficient.
 
-## 8. Failure philosophy
+## 10. Failure philosophy
 
-The system fails closed. Missing provenance, an invalid privilege range, an empty target, an unknown effect, or an invalid stage does not receive a best-effort interpretation. The request is rejected or routed to review.
+The system fails closed. Missing provenance, invalid privilege, unknown effects, invalid stages, incomplete target scope, contradictory evidence, and dependent-system failures cannot be silently promoted to approval.
 
-This is especially important for system-centric code because ambiguity at the application layer can become authority at the kernel boundary if the implementation is careless.
-
-## 9. Implementation surface
-
-Files:
-
-- `SmaugAdminGate.hpp/.cpp` — existing protected administrative simulation gate.
-- `SmaugGateStandards.hpp/.cpp` — native standards and admissibility contract.
-- `SmaugHerald.hpp/.cpp` — bounded decision announcement/history.
-- `Makefile` — native build and syntax-check integration.
-
-The build remains C++17-compatible and does not add a mandatory external runtime dependency.
-
-## 10. Verification intent
-
-The implementation should be checked with the existing `make check` target and, where a complete toolchain is available, with the normal shared-library build. A successful compile proves syntax and linkage assumptions; it does not prove that a policy is socially, legally, or scientifically correct.
+The independent Herald is especially important here: it prevents the reporting layer from becoming a hidden second authorization mechanism.
 
 ## 11. Preservation rule
 
-The source contract is the durable artifact. Binaries may be replaced. The standards, vocabulary, provenance semantics, build contract, and evidence sequence should remain readable and migratable.
+The source code, rule catalog, event schema, provenance semantics, and evidence sequence are the durable artifacts. Generated binaries may change without changing the conceptual contract.
 
 ## 12. Design conclusion
 
-The gate is deliberately boring at the host boundary. That is a feature. Smaug can remain expressive inside its simulation model while the operating-system boundary remains narrow, explicit, auditable, and non-destructive.
+The improved architecture is intentionally careful, dependent where dependency is authoritative, and independent where evidence can be recomputed. The gate decides admission into a bounded simulation path. The Herald independently observes and records the disposition. Neither component acquires an implicit right to alter the host system.
