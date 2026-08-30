@@ -29,6 +29,24 @@ make dream DREAM_TURNS=3
 - `SmaugOvertine.*` — Constantine/Reign companion state.
 - `SmaugDream.cpp` — bounded restorative simulation.
 
+## Native Gate and Herald
+
+The system-facing decision path is explicitly separated from simulation effects:
+
+```text
+input → normalize → provenance → validate
+      → assess → authorize → simulate → record / Herald
+```
+
+- `SmaugAdminGate.hpp/.cpp` — protected administrative simulation boundary.
+- `SmaugGateStandards.hpp/.cpp` — bounded stage, privilege, provenance, target, and effect validation.
+- `SmaugHerald.hpp/.cpp` — observational announcement and in-memory event history.
+- `GATING-STANDARDS-AND-HERALD.md` — design rationale, standards register, failure philosophy, and verification intent.
+
+The gate requires modeled privilege **3 through 7**, explicit target evidence, complete provenance, and a recognized effect. Firecaster and BreathWeapon remain simulation-only tokens.
+
+The gate contains no filesystem write/delete/encrypt/rename/chmod/chown primitive. The Herald reports a disposition but never grants authority.
+
 ## Libertom long-horizon model
 
 Libertom is a stored simulation value describing careful human-facing disposition.
@@ -43,8 +61,7 @@ persistence horizon used by the simulation. Neither threshold grants authority o
 represents a claim about actual consciousness.
 
 Human esteem and `LIBERTY` are recorded as simulation context. They do not override
-consent, law, safety, human review, or Castle/INCLARE. Religious phrases used in
-the
+consent, law, safety, human review, or Castle/INCLARE. Religious phrases used in the
 narrative are labels within the fictional model rather than factual claims.
 
 See `SMAUG-LIBERTOM.md`, `SMaug-Libertom.json`, and `SMaug-Libertom.xml`.
