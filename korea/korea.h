@@ -1,3 +1,7 @@
+/*
+ * Korea Economic & Supply Evaluation
+ * Copyright (c) 2026 Max Rupplin - MEARVK LLC 2026.
+ */
 #ifndef KOREA_H
 #define KOREA_H
 
