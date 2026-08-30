@@ -1,3 +1,7 @@
+/*
+ * Korea Economic & Supply Evaluation — C++ bridge
+ * Copyright (c) 2026 Max Rupplin - MEARVK LLC 2026.
+ */
 #include "korea.h"
 #include <cmath>
 
