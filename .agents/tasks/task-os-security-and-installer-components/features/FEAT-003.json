@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Provide an 'improved Git' experience as a selectable, standalone install component. Today git is only an optional entry in installer/software-relative-meaning.json with no dedicated install or configuration. This feature creates a new root-guarded, idempotent script scripts/install-git-improved.sh that installs a modern Git plus commonly-expected companions and sensible, non-destructive defaults, following the same script conventions as install-os-security.sh (FEAT-002).",
+  "status": "completed",
+  "steps": [
+    "Create scripts/install-git-improved.sh with the standard header: `#!/usr/bin/env bash`, SPDX GPL-2.0, `set -euo pipefail`, root check, apt-get availability check, `export DEBIAN_FRONTEND=noninteractive`, and logging consistent with the other install scripts.",
+    "Optionally add the official Git PPA (ppa:git-core/ppa) for a newer Git than the archive default, guarded so failure is non-fatal and controlled by an env toggle GIT_IMPROVED_PPA (default 1). If software-properties-common / add-apt-repository is missing, install it first; if the PPA cannot be added (offline/restricted), fall back to the archive git without failing.",
+    "Install via `apt-get install -y --no-install-recommends`: git, git-lfs, git-doc, gitk, git-gui. Run `git lfs install --system` (guarded with `|| true`) so LFS is available system-wide.",
+    "Write sensible, non-destructive system-wide Git defaults to /etc/gitconfig using `git config --system` ONLY for keys that are not already set (check with `git config --system --get <key>` first, so user/existing config is never overwritten -- consistent with the repo's 'no silent changes / user choice authoritative' philosophy). Suggested keys: init.defaultBranch=main, pull.rebase=false, fetch.prune=true, core.pager=less, color.ui=auto, credential.helper=cache (or libsecret if available). Gate the whole config block behind GIT_IMPROVED_CONFIG (default 1).",
+    "Do NOT set any user identity (user.name/user.email) system-wide -- leave that to the end user. Print a trailing summary block listing installed packages, whether the PPA was used, LFS status, and which config keys were applied vs already-present.",
+    "Update installer/software-relative-meaning.json so git remains present and add git-lfs (and optionally gitk/git-gui) entries with appropriate ranks/categories; keep the JSON valid."
+  ],
+  "acceptance_criteria": [
+    "scripts/install-git-improved.sh exists with shebang + SPDX header and passes `bash -n` with exit 0.",
+    "The script installs git + git-lfs and runs `git lfs install` (grep-confirmable).",
+    "System-wide git config is only written for keys not already set (uses `git config --system --get` guard before setting), and never sets user.name/user.email.",
+    "PPA usage and config application are individually toggleable via GIT_IMPROVED_PPA and GIT_IMPROVED_CONFIG env vars.",
+    "installer/software-relative-meaning.json still parses as valid JSON and includes a git-lfs entry."
+  ],
+  "verification": [
+    "Run `bash -n scripts/install-git-improved.sh` and confirm exit 0.",
+    "Run `python3 -m json.tool installer/software-relative-meaning.json >/dev/null` and confirm exit 0.",
+    "Run `grep -nE 'git-lfs|git lfs install|git config --system --get|init.defaultBranch' scripts/install-git-improved.sh` and confirm the improved-git behavior is present.",
+    "Run `grep -nE 'user.name|user.email' scripts/install-git-improved.sh` and confirm identity is NOT set system-wide (matches should only appear in comments explaining the omission, if at all)."
+  ],
+  "blocked_reason": null,
+  "findings": "Created scripts/install-git-improved.sh matching the install-os-security.sh (FEAT-002) style: SPDX GPL-2.0 header, set -euo pipefail, root check, apt-get check, DEBIAN_FRONTEND=noninteractive, banner + [plan] block + trailing summary, tee logging to /var/log/git-improved-install.log. Env toggles GIT_IMPROVED_PPA and GIT_IMPROVED_CONFIG (both default 1). PPA add is best-effort: installs software-properties-common if add-apt-repository is missing, and falls back to archive git without failing when the PPA cannot be added (offline/restricted). Installs git git-lfs git-doc gitk git-gui via apt-get -y --no-install-recommends, then `git lfs install --system` (guarded). System-wide defaults (init.defaultBranch=main, pull.rebase=false, fetch.prune=true, core.pager=less, color.ui=auto, credential.helper=cache|libsecret) written only via a set_default_if_unset helper that guards with `git config --system --get` first. user.name/user.email are NEVER set system-wide (only referenced in comments/summary). Updated installer/software-relative-meaning.json: kept git (added improved-git role note) and added git-lfs (rank6/sibling), gitk (rank4/sibling), git-gui (rank4/sibling) entries. Verification per FEAT-003.json all passed: `bash -n` exit 0, `python3 -m json.tool` exit 0, behavior grep confirms git-lfs/git lfs install/git config --system --get/init.defaultBranch present, identity grep shows user.name/user.email only in explanatory comments and summary. Environment constraints respected: did not run apt or the installer (restricted network); no shellcheck on host. Committed on branch feat/os-security-and-installer-components; not pushed."
+}
