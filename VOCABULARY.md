@@ -154,3 +154,52 @@ word forms not present as headwords in the dictionary. A sample:
 As documented in `tools/ai/VOCABULARY_GROWTH.md`, producing a *usable* model
 from a grown vocabulary still requires model (re)training; this pipeline
 produces the vocabulary, merges, and definitions — the first stage of growth.
+
+---
+
+## 6. The CSV dictionary reference (how many words)
+
+The B–Z sections added under `tools/ai/bpe/data/dictionary-csv/` (sourced from
+[karthikramx/snippable-dictionary](https://github.com/karthikramx/snippable-dictionary/tree/main/Dictionary-in-csv))
+are the reference the definitions above are drawn from. Headword and sense
+counts per file, parsed with the pipeline's own parser:
+
+| Section | Headwords | Senses |
+| :---: | ---: | ---: |
+| B | 5,675 | 9,877 |
+| C | 10,373 | 16,736 |
+| D | 6,967 | 10,806 |
+| E | 5,380 | 7,520 |
+| F | 4,232 | 7,419 |
+| G | 3,441 | 5,417 |
+| H | 4,124 | 6,269 |
+| I | 5,570 | 7,783 |
+| J | 822 | 1,338 |
+| K | 874 | 1,283 |
+| L | 3,485 | 5,814 |
+| M | 6,047 | 8,846 |
+| N | 2,056 | 3,034 |
+| O | 3,212 | 4,461 |
+| P | 10,142 | 15,429 |
+| Q | 650 | 1,043 |
+| R | 4,982 | 8,910 |
+| S | 12,586 | 21,503 |
+| T | 5,697 | 9,285 |
+| U | 2,486 | 3,358 |
+| V | 1,811 | 2,796 |
+| W | 2,471 | 4,457 |
+| X | 127 | 147 |
+| Y | 332 | 486 |
+| Z | 356 | 415 |
+| **CSV total (B–Z, 25 files)** | **103,898** | **164,432** |
+
+Adding the local A section (`data/webster1913_A.txt`, 203 headwords) gives the
+full reference. After de-duplication of headwords shared across sections, the
+combined dictionary the pipeline loads (`webster1913.json`) contains
+**104,052 unique headwords / 164,648 senses**. (Per-file counts are computed
+independently and therefore sum marginally higher, 104,101, before the merge
+collapses ~49 cross-section duplicates.)
+
+**In short:** the CSV reference we added contributes **103,898 headwords** (of
+the 104,052 in the full A–Z dictionary) — i.e. essentially the entire
+dictionary beyond the small A starter slice.
