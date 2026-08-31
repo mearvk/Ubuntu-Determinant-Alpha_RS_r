@@ -1,4 +1,4 @@
-.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test
+.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test white-installer white-installer-static
 
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic
@@ -6,6 +6,13 @@ TARGET := desktop_install_probe
 SRC := desktop_install_probe.c
 NXTT_TARGET := nxtt
 NXTT_SRC := nxtt-uninstaller.c
+
+# White Edition smooth install orchestrator ELF (the "usual" front door).
+# It wraps and delegates to scripts/galactic-cherry-installer; it contains no
+# disk/system-provisioning logic of its own.
+WIO_TARGET := white-installer
+WIO_SRC := white_installer_orchestrator.c
+WIO_HDR := white_installer_orchestrator.h
 
 USER_ROOT ?= /user
 USR_ROOT ?= /usr
@@ -22,13 +29,27 @@ USR_RUNNABLES := $(USR_ROOT)/runnables
 DECK_BIN := $(DECK_ROOT)/bin
 DECK_RUNNABLES := $(DECK_ROOT)/runnables
 
-all: $(TARGET) $(NXTT_TARGET)
+all: $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
 
 $(TARGET): $(SRC) desktop_install_probe.h
 	$(CC) $(CFLAGS) -o $@ $(SRC)
 
 $(NXTT_TARGET): $(NXTT_SRC)
 	$(CC) $(CFLAGS) -o $@ $(NXTT_SRC)
+
+# Default (in-sandbox validated) build: normal dynamic link. -static-libgcc is
+# fine here; full -static is provided as a separate portable target below.
+$(WIO_TARGET): $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
+	$(CC) $(CFLAGS) -static-libgcc -o $@ $(WIO_SRC)
+
+# Portable/static build for the live ISO and minimal environments where a
+# dynamic loader / shared libc may be unavailable. NOTE: full `-static` needs a
+# static libc, which is NOT present in the restricted build sandbox
+# ("cannot find -lc"); this target is expected to link on a full toolchain and
+# MAY FAIL in the sandbox. That failure is acceptable — use the default
+# `white-installer` target for in-sandbox compile validation.
+white-installer-static: $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
+	$(CC) $(CFLAGS) -static -o $(WIO_TARGET) $(WIO_SRC)
 
 install: $(TARGET)
 	@case "$(INSTALL_CHOICE)" in \
@@ -116,10 +137,13 @@ update-front-link:
 	fi
 
 clean:
-	rm -f $(TARGET) $(NXTT_TARGET)
+	rm -f $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
 
 uninstall:
 	rm -f $(USER_BIN)/$(TARGET) $(USER_RUNNABLES)/$(TARGET) \
 	      $(USR_BIN)/$(TARGET) $(USR_RUNNABLES)/$(TARGET) \
 	      $(DECK_BIN)/$(TARGET) $(DECK_RUNNABLES)/$(TARGET) \
+	      $(USER_BIN)/$(WIO_TARGET) $(USER_RUNNABLES)/$(WIO_TARGET) \
+	      $(USR_BIN)/$(WIO_TARGET) $(USR_RUNNABLES)/$(WIO_TARGET) \
+	      $(DECK_BIN)/$(WIO_TARGET) $(DECK_RUNNABLES)/$(WIO_TARGET) \
 	      $(FRONT_LINK)
