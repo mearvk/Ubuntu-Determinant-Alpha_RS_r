@@ -7,7 +7,7 @@ table of every **new whole-word token** that was defined from the dictionary.
 
 > Reproducibility: every number and word below is generated from the pipeline
 > artifacts (`tools/ai/bpe/out/`), not hand-entered. Regenerate with the
-> commands in [`tools/ai/bpe/README.md`](tools/ai/bpe/README.md). No definitions
+> commands in [`tools/ai/bpe/README.md`](../bpe/README.md). No definitions
 > are fabricated — words absent from the dictionary are reported as
 > `needs_definition`.
 
