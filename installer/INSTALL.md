@@ -102,6 +102,16 @@ recorded in the audit report, but it is not forwarded as an engine argument.
 The engine's own disk-selection step stays authoritative for choosing and
 erasing the device.
 
+Because of this, a delegated headless run is only headless up to the disk
+step. The Bash engine's `step_disk` reads its target from an interactive
+prompt (or a `dialog` radiolist) and has no environment or flag intake for the
+device, so even `--non-interactive --install --target /dev/sda` still stops and
+prompts at the engine's disk step. The orchestrator makes this explicit: when a
+target is recorded on an authorized run it prints a `NOTE` that the recorded
+target is not forwarded and the engine will still prompt for the device to
+erase. The orchestrator deliberately does not reimplement disk selection, so it
+cannot erase a device it merely recorded.
+
 If `scripts/galactic-cherry-installer` is absent, the orchestrator falls back
 to `installer/install-native.sh`.
 

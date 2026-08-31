@@ -417,6 +417,18 @@ static void stage_target(run_state *st) {
 /* ------------------------------------------------------------------ */
 /* AUDIT report (ARCHITECTURE.md section 7 fields, no secrets/PII).   */
 /* ------------------------------------------------------------------ */
+
+/*
+ * Outcome of the run, so the audit reports what actually happened rather than
+ * what was merely planned. The audit's operation/verification/warnings lines
+ * are derived from this, never from st->delegate alone.
+ */
+typedef enum {
+    WIO_OUTCOME_DRYRUN = 0,   /* no delegating flag: plan/preview only        */
+    WIO_OUTCOME_ABORTED,      /* --install but confirmation declined/refused  */
+    WIO_OUTCOME_DELEGATED,    /* authorized and about to hand off to the engine */
+} wio_outcome;
+
 static void iso_time(char *out, size_t n) {
     time_t t = time(NULL);
     struct tm g;
@@ -426,7 +438,7 @@ static void iso_time(char *out, size_t n) {
 
 static void stage_audit(const run_state *st, const char *repo, const char *engine,
                         const char *engine_cmdline, const char *start_iso,
-                        int preview_ok, int engine_present) {
+                        int preview_ok, int engine_present, wio_outcome outcome) {
     char end_iso[32];
     iso_time(end_iso, sizeof end_iso);
 
@@ -448,22 +460,44 @@ static void stage_audit(const run_state *st, const char *repo, const char *engin
         pclose(fp);
     }
     printf("host                   : %s\n", host);
-    printf("operation              : %s\n",
-           st->delegate ? "install (delegated to engine)" : "dry-run (plan/preview only)");
+    const char *op_label;
+    switch (outcome) {
+        case WIO_OUTCOME_DELEGATED: op_label = "install (delegated to engine)"; break;
+        case WIO_OUTCOME_ABORTED:   op_label = "install (authorized but NOT delegated; confirmation refused)"; break;
+        default:                    op_label = "dry-run (plan/preview only)"; break;
+    }
+    printf("operation              : %s\n", op_label);
     printf("source                 : %s (%s)\n", repo, DIP_REPOSITORY_URL);
     printf("resolved target        : %s\n", st->target[0] ? st->target : "(deferred to engine disk step)");
     printf("resolved desktop       : %s\n", st->desktop[0] ? st->desktop : "(engine default)");
     printf("resolved components    : %s\n", comps[0] ? comps : "(none)");
     printf("commands/contracts     : %s\n", engine_cmdline);
-    printf("privilege boundary     : orchestrator ran UNPRIVILEGED; privileged\n");
-    printf("                         operations delegated to the root-enforcing engine (%s)\n",
-           engine_present ? engine : "engine absent -> native fallback");
+    if (outcome == WIO_OUTCOME_DELEGATED) {
+        printf("privilege boundary     : orchestrator ran UNPRIVILEGED; privileged\n");
+        printf("                         operations delegated to the root-enforcing engine (%s)\n",
+               engine_present ? engine : "engine absent -> native fallback");
+    } else {
+        printf("privilege boundary     : orchestrator ran UNPRIVILEGED; no privileged\n");
+        printf("                         operation was delegated (nothing was executed)\n");
+    }
     printf("start/end time         : %s / %s\n", start_iso, end_iso);
-    printf("verification result    : probe ok; preview %s; plan built ok\n",
-           preview_ok ? "ok" : "missing");
-    printf("warnings               : %s\n",
-           st->delegate ? "target device data will be erased by the engine"
-                        : "none (dry-run performed no changes)");
+    switch (outcome) {
+        case WIO_OUTCOME_DELEGATED:
+            printf("verification result    : probe ok; preview %s; plan built ok; delegating to engine\n",
+                   preview_ok ? "ok" : "missing");
+            printf("warnings               : target device data will be erased by the engine\n");
+            break;
+        case WIO_OUTCOME_ABORTED:
+            printf("verification result    : probe ok; preview %s; plan built ok; delegation refused (no changes)\n",
+                   preview_ok ? "ok" : "missing");
+            printf("warnings               : install was authorized on the CLI but confirmation was refused; nothing was delegated\n");
+            break;
+        default:
+            printf("verification result    : probe ok; preview %s; plan built ok (no changes)\n",
+                   preview_ok ? "ok" : "missing");
+            printf("warnings               : none (dry-run performed no changes)\n");
+            break;
+    }
     puts("no secrets/PII in this report (credentials are never collected here).");
     puts("----------------------------------------------------------------");
     puts("[info] a persisted copy may be written to $TMPDIR or a path you supply;");
@@ -494,9 +528,32 @@ static void build_engine_cmdline(const run_state *st, const char *engine, char *
 /* Returns an exit code if it does NOT delegate; on delegation the    */
 /* process image is replaced (execv) and control does not return.     */
 /* ------------------------------------------------------------------ */
+/*
+ * Return non-zero only if `line` (a fgets result) is exactly an affirmative
+ * "yes"/"y" once its trailing newline and surrounding blanks are stripped.
+ * A loose prefix match would wrongly accept "yesterday" as authorization for
+ * a disk-erasing install, so the comparison is exact.
+ */
+static int is_affirmative(const char *line) {
+    if (!line) return 0;
+    char buf[16];
+    snprintf(buf, sizeof buf, "%s", line);
+    /* strip a single trailing newline / carriage return */
+    size_t l = strlen(buf);
+    while (l && (buf[l - 1] == '\n' || buf[l - 1] == '\r')) buf[--l] = '\0';
+    /* strip leading blanks */
+    char *s = buf;
+    while (*s == ' ' || *s == '\t') s++;
+    /* strip trailing blanks */
+    l = strlen(s);
+    while (l && (s[l - 1] == ' ' || s[l - 1] == '\t')) s[--l] = '\0';
+    return strcmp(s, "yes") == 0 || strcmp(s, "y") == 0;
+}
+
 static int stage_confirm_and_delegate(run_state *st, const char *repo,
                                        const char *engine, int engine_present,
-                                       const char *engine_cmdline) {
+                                       const char *engine_cmdline,
+                                       const char *start_iso, int preview_ok) {
     char comps[256];
     selection_string(st, comps, sizeof comps);
 
@@ -510,30 +567,52 @@ static int stage_confirm_and_delegate(run_state *st, const char *repo,
 
     if (!st->delegate) {
         puts("[dry-run] plan complete; NOT delegating. Re-run with --install to proceed.");
+        stage_audit(st, repo, engine, engine_cmdline, start_iso, preview_ok,
+                    engine_present, WIO_OUTCOME_DRYRUN);
         return 0;
     }
 
     puts("  WARNING: proceeding will let the engine ERASE the target device.");
+    if (st->target[0]) {
+        /* The engine has no headless disk intake: it reads INSTALL_DISK only
+         * from its own interactive read/dialog. A recorded --target is audited
+         * but not forwarded, so a delegated headless run still stops at the
+         * engine's disk step. Be honest about that here. */
+        puts("  NOTE: the recorded target is not forwarded; the engine's own disk");
+        puts("        step will still prompt for the device to erase.");
+    }
 
     if (st->non_interactive) {
         /* Authorized only when selections were supplied explicitly. */
         if (!st->preset && !st->desktop[0] && !st->target[0]) {
             fputs("[refuse] --non-interactive --install without any explicit selection.\n", stderr);
             fputs("         Provide --desktop/--enable/--target (or INSTALL_COMPONENTS) to authorize.\n", stderr);
+            stage_audit(st, repo, engine, engine_cmdline, start_iso, preview_ok,
+                        engine_present, WIO_OUTCOME_ABORTED);
             return 2;
         }
     } else if (isatty(STDIN_FILENO)) {
         printf("  Type 'yes' to authorize the install: ");
         fflush(stdout);
         char line[16];
-        if (!fgets(line, sizeof line, stdin) || strncmp(line, "yes", 3) != 0) {
+        if (!fgets(line, sizeof line, stdin) || !is_affirmative(line)) {
             puts("[abort] not confirmed; nothing was delegated.");
+            stage_audit(st, repo, engine, engine_cmdline, start_iso, preview_ok,
+                        engine_present, WIO_OUTCOME_ABORTED);
             return 0;
         }
     } else {
         fputs("[refuse] no TTY for confirmation; use --non-interactive with explicit selections.\n", stderr);
+        stage_audit(st, repo, engine, engine_cmdline, start_iso, preview_ok,
+                    engine_present, WIO_OUTCOME_ABORTED);
         return 2;
     }
+
+    /* Delegation is authorized and will now proceed. Emit the audit BEFORE the
+     * handoff because execv replaces this process and would discard it. The
+     * record is only written on this path, so it reflects a real delegation. */
+    stage_audit(st, repo, engine, engine_cmdline, start_iso, preview_ok,
+                engine_present, WIO_OUTCOME_DELEGATED);
 
     puts("");
     puts("== Stage 6/7: DELEGATE ==");
@@ -624,16 +703,16 @@ int main(int argc, char **argv) {
     char engine_cmdline[WIO_CMDLINE_MAX];
     build_engine_cmdline(&st, engine, engine_cmdline, sizeof engine_cmdline);
 
-    /* For a dry-run we still emit the audit; for a real run the audit is
-     * printed BEFORE delegation because execv replaces this process. */
-    if (!st.delegate) {
-        int rc = stage_confirm_and_delegate(&st, repo, engine, engine_present, engine_cmdline);
-        stage_audit(&st, repo, engine, engine_cmdline, start_iso, preview_ok, engine_present);
-        return rc;
-    }
-
-    /* Delegating run: emit the audit (plan) first so the record survives the
-     * process replacement, then confirm + delegate. */
-    stage_audit(&st, repo, engine, engine_cmdline, start_iso, preview_ok, engine_present);
-    return stage_confirm_and_delegate(&st, repo, engine, engine_present, engine_cmdline);
+    /*
+     * The audit is emitted from inside stage_confirm_and_delegate so it always
+     * reflects the actual outcome:
+     *   - dry-run           -> audit labeled "dry-run (plan/preview only)"
+     *   - authorized+delegated -> audit labeled "install (delegated to engine)",
+     *                             printed BEFORE execv replaces this process
+     *   - authorized+refused/aborted -> audit labeled "authorized but NOT
+     *                             delegated", printed before the non-delegating
+     *                             return so a refused run is never mislabeled.
+     */
+    return stage_confirm_and_delegate(&st, repo, engine, engine_present,
+                                      engine_cmdline, start_iso, preview_ok);
 }
