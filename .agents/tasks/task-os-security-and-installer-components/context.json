@@ -1,0 +1,25 @@
+{
+  "project_type": "From-source Ubuntu remaster ('Ubuntu Determinant / Galactic Cherry Marvell Edition'). Bash install/build scripts + Markdown specs + JSON manifests. No single application language.",
+  "language": "Bash (shell) primary; JSON manifests; Markdown docs.",
+  "build_system": "GNU Make (top-level Makefile) plus orchestration shell scripts under scripts/ (build-from-manifest.sh drives make targets). No compiled application build for the installer scripts themselves.",
+  "test_framework": "None. No formal test harness. Scripts are validated by `bash -n` (syntax) and, if available, shellcheck. shellcheck is NOT installed on this host.",
+  "build_command": "No build required for these shell/JSON/doc changes. (Full ISO build is `scripts/build-from-manifest.sh` / Makefile, not runnable in this sandbox.)",
+  "test_command": "bash -n on every modified .sh file and the galactic-cherry-installer script; python3 -c 'import json' or `jq .` to validate any modified JSON. shellcheck if it becomes available.",
+  "verification_instructions": "1) Run `bash -n <file>` on every modified shell script and confirm exit 0. 2) Validate any modified JSON with `python3 -m json.tool <file> >/dev/null`. 3) Grep-confirm new components are referenced in step_install (not just declared). 4) Do NOT execute the installer against a disk; only static/syntax validation is permitted in this sandbox.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "Repo already sparse-checked-out at /projects/sandbox/udbr on branch main. Checked-out dirs: gnome-source, ubuntu-white, kernels, installer, scripts, build, main, hardened. GIT_LFS_SKIP_SMUDGE=1 was used; large binaries are LFS pointers but all scripts/docs/JSON are real text. Do NOT run a full checkout. To materialize more paths: `git -C /projects/sandbox/udbr sparse-checkout set <dirs...>`.",
+  "environment_constraints": "Network mode appears restricted (INTEGRATIONS_ONLY-style): the installer scripts apt-install from archive.ubuntu.com and curl scripts from raw.githubusercontent.com at RUN time on a live target, NOT at authoring time. We do NOT run apt or the installer here. No whiptail/dialog/shellcheck on host. Validation is limited to `bash -n` and JSON parsing. Sub-agent cannot push or open PRs; orchestrator publishes afterward.",
+  "contribution_requirements": "Follow the repo philosophy documented in ubuntu-white/INSTALL.md and scripts/build-safety.sh: 'inspect -> plan -> authorize -> apply -> verify', prefer user choice as authoritative (installer/software-relative-meaning.json principles), and no silent privileged changes. Keep changes conservative and consistent with existing script style (SPDX headers, set -e, apt-get --no-install-recommends, systemctl enable with `|| true` guards, log to $LOG).",
+  "key_patterns": "Installer TUI `scripts/galactic-cherry-installer` uses a $DIALOG frontend abstraction (whiptail|dialog|text) with helper wrappers msg/yesno/input/password_input/progress; step_desktop already uses `--radiolist` with a numbered text fallback; step_install pipes numbered progress into a `--gauge`. Desktop installers apt-install from archive.ubuntu.com then curl overlay scripts from raw.githubusercontent.com. install-jwstf.sh is the ONLY place ClamAV/UFW are actually installed today. Environment-variable-driven config is the established CLI-entry pattern (INSTALL_DESKTOP, GNOME_THEME, UBUNTU_WHITE_ICONS, DESKTOP, DEBIAN_FRONTEND=noninteractive).",
+  "relevant_files": [
+    "scripts/galactic-cherry-installer  (TUI wizard: add checklist step + CLI flags + wire selections through step_install)",
+    "scripts/install-gnome-desktop.sh  (working GNOME + Ubuntu White baseline to verify; NOT to be broken)",
+    "scripts/install-jwstf.sh  (only current source of ClamAV/UFW install; lines ~95-97 packages, ~405-422 firewall/ClamAV enable -- pattern to reuse)",
+    "scripts/install-ubuntu-installer.sh  (GUI/Flutter installer branding; HTML slide at ~line 170-190 advertises ClamAV/rkhunter/chkrootkit -- keep consistent)",
+    "scripts/install-desktop-selector.sh and scripts/install-mate-desktop.sh  (env-var DESKTOP selector pattern to mirror for CLI entry)",
+    "scripts/build-from-manifest.sh  (BUILD_ORDER includes tools-clamav/tools-chkrootkit/tools-rkhunter -- security is expected in the build)",
+    "installer/software-relative-meaning.json  (package ranking: apparmor rank8/main, ufw rank7/optional, git rank8/optional -- update to reflect security suite + git-improved)",
+    "ubuntu-white/INSTALL.md  (documents inspect->plan->authorize->apply->verify philosophy)"
+  ],
+  "directory_structure": "scripts/ = all install/build shell scripts (the core of this task). installer/ = installer app sources, docs, and software-relative-meaning.json manifest. ubuntu-white/ = additive theme overlay + INSTALL.md philosophy. gnome-source/ = upstream GNOME source trees used only by build-safety SHA gate, NOT wired to boot. build/ kernels/ hardened/ main/ = other build inputs not central to this task."
+}
