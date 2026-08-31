@@ -208,7 +208,115 @@ external moderation layer wrapping the engine. None of those live in this code.
 
 ---
 
-## 8. Summary
+## 8. Vocabulary and decoding descriptors (mapping intuitive terms to the real machinery)
+
+This section answers a follow-up set of questions about *vocabulary* and about
+giving a "decider" more control over content. As elsewhere in this document, the
+intuitive framing is kept but each idea is anchored to a real construct in the
+source; where a framing has no counterpart in the code, that is said plainly. A
+fuller treatment lives in `tools/ai/DISPERSIONS.md`; this is the DESCRIPTIVE
+summary tied to specific files.
+
+### 8a. The vocabulary is a 2-D table, and it is storage — not reasoning
+
+A model's vocabulary lives in a 2-D **embedding matrix** of shape
+`[n_vocab, n_embd]` — one row per token, each row a vector of hidden width
+`n_embd`. At the input, the row for each token ID is selected (a `get_rows`
+operation); at the output, a similar matrix projects the final hidden state back
+onto one **logit** per vocabulary token.
+
+- Code: token/vocab handling in `src/llama-vocab.cpp`; weights wired in
+  `src/llama-model.cpp`; the tensor op in `ggml/` (`GGML_OP_GET_ROWS`).
+
+The load-bearing point: the embedding table stores *what each token means in
+isolation*. The reasoning happens **between** the input and output tables, in the
+attention + feed-forward stack (`src/llama-graph.cpp`). Changing the vocabulary
+changes how meaning is *packed into tokens*; it does not, by itself, change how
+meaning is *composed*.
+
+### 8b. The only trigonometry over tokens is RoPE — and it encodes order, not meaning
+
+If one is looking for a "trigonometric model of vocabulary," the one real
+candidate is **Rotary Position Embedding (RoPE)**. RoPE does not rotate the
+vocabulary table; it rotates the *query and key* vectors by an angle proportional
+to a token's position, using paired sine/cosine rotations.
+
+- Code: `GGML_OP_ROPE`, applied to Q and K in `src/llama-graph.cpp`.
+
+So the honest description is: the 2-D embedding table (8a) supplies *meaning*, and
+RoPE adds a trigonometric encoding of *position/order* on top. There is no
+separate trigonometric vocabulary model beyond this.
+
+### 8c. "Richer vocabulary" is a trade-off with a sweet spot, not a free win
+
+Enlarging `n_vocab` (for example, the LLaMA-1 ~32K vocabulary versus the
+LLaMA-3 ~128K vocabulary) has mixed effects:
+
+| Effect of a larger vocabulary | Direction | Why |
+| --- | --- | --- |
+| Tokens needed for the same text | decreases | each token carries more meaning |
+| Attention compute (quadratic in length) | improves | shorter sequences; more content fits context |
+| Embedding + output-projection parameters | grows (linear in `n_vocab`) | both tables and the final softmax scale with vocabulary size |
+| Rare-token quality | degrades | training signal is spread thinner across more tokens |
+| Coverage of code, math, non-Latin scripts | improves | fewer tokenization artifacts |
+
+The practical rule: the useful vocabulary size **scales with model size**. Large
+models can exploit a richer vocabulary; small models are hurt by one because
+undertrained rare tokens dominate. Effect on *reasoning* specifically: modest and
+bounded — better packing and coverage, not a higher reasoning ceiling. That
+ceiling is set by depth, width, training data, and alignment, not by the size of
+the vocabulary table.
+
+### 8d. Giving the "decider" more authorship: what the sampler can and cannot do
+
+The engine's only discrete decision is the **sampler** (Section 4;
+`src/llama-sampler.cpp`). It can reshape or hard-mask the distribution — more
+deterministic, more exploratory, or format-constrained — but it **cannot add
+knowledge or reasoning the weights do not already contain.** It reorders and
+prunes what the network already made likely. So "more authorship by the decider"
+buys *reliability, style, and validity*, not deeper reasoning.
+
+### 8e. Definitions of the decoding terms
+
+At each step the network emits a **logit** per token; softmax turns logits into a
+probability distribution; the following samplers shape it and select a token. All
+are assembled into a chain via `llama_sampler_chain_add` (`include/llama.h`) and
+implemented in `src/llama-sampler.cpp`.
+
+- **Logits** — the raw, unnormalized scores the model assigns to each candidate
+  next token (before softmax). Higher = the model finds it more likely.
+- **Softmax** — converts logits into a probability distribution (values in
+  `[0,1]` summing to 1). Tensor op `GGML_OP_SOFT_MAX`.
+- **Temperature (`temp`)** — divides logits before softmax. `temp < 1` sharpens
+  (more deterministic); `temp > 1` flattens (more diverse); `temp = 1` is
+  unchanged. API: `llama_sampler_init_temp`.
+- **Top-k (`top_k`)** — keep only the *k most probable* tokens, renormalize, and
+  sample from them. A fixed-count cutoff; `k = 1` is effectively greedy. API:
+  `llama_sampler_init_top_k`.
+- **Top-p / nucleus (`top_p`)** — keep the *smallest set of tokens whose
+  cumulative probability reaches p* (e.g. 0.9 = 90% of the mass), then
+  renormalize and sample. An adaptive cutoff: narrow when the model is confident,
+  wide when it is unsure. API: `llama_sampler_init_top_p`.
+- **Greedy / argmax** — always take the single highest-probability token
+  (`llama_sampler_greedy_apply`, Section 3b; equivalent to `top_k = 1`). Fully
+  deterministic.
+- **Grammar-constrained (GBNF)** — a *hard* mask that zeroes out any token
+  violating a formal grammar's production rules (`nonterminal ::= sequence...`),
+  guaranteeing, e.g., valid JSON. Code: `src/llama-grammar.cpp`, `grammars/`; API
+  `llama_sampler_init_grammar`. This is the format/legality layer of Section 3c.
+- **Sampler chain** — samplers applied in sequence (e.g. grammar → top-k → top-p
+  → temperature → draw). The chain *is* the "decider," expressed as explicit,
+  readable code.
+
+Relation to "intent / authorship": temperature and top-k/top-p tune how much
+freedom versus commitment the decider exercises; greedy decoding and grammar
+constraints are the two ways to exert *maximal* control (single deterministic
+choice, and hard legality). None of them add knowledge — they govern *selection*
+from the distribution the trained weights produce.
+
+---
+
+## 9. Summary
 
 - `llama.cpp` is an **inference engine**: it runs a pre-trained neural network,
   it does not contain knowledge, reasoning, morality, or a world model.
@@ -221,3 +329,9 @@ external moderation layer wrapping the engine. None of those live in this code.
   generosity, or law anywhere in the source. Where such constraints are wanted,
   they come from training data, a runtime system prompt/template, or an external
   layer — never from a dedicated file in this engine.
+- The **vocabulary** is a 2-D embedding table (`[n_vocab, n_embd]`) that *stores*
+  token meaning; reasoning happens in the stack between the input and output
+  tables. A richer vocabulary is a bounded trade-off (better packing/coverage,
+  not a higher reasoning ceiling), and the **sampler** ("decider") controls
+  selection, determinism, and validity — never added knowledge. See Section 8 and
+  `tools/ai/DISPERSIONS.md`.
