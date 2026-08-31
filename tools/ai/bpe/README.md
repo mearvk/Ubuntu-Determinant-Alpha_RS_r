@@ -103,22 +103,33 @@ Outputs land in `tools/ai/bpe/out/` (git-ignored; regenerate any time):
 
 ## The "known, good source of vocabulary content"
 
-A real one ships in `data/`: **Webster's 1913 dictionary** (public domain).
-`parse_webster.py` converts its plain-text `Headword (pos) definition` entries
-into the dictionary JSON the pipeline consumes:
+The full **Webster's 1913 dictionary** (public domain) ships in `data/`:
+
+* `data/webster1913_A.txt` — the A-section (starter slice, `Headword (pos) definition` text).
+* `data/dictionary-csv/B.csv` … `Z.csv` — the B–Z sections, sourced from
+  [karthikramx/snippable-dictionary](https://github.com/karthikramx/snippable-dictionary/tree/main/Dictionary-in-csv)
+  (same `Headword (pos) definition` format, 14 MB total, each file well under
+  the 50 MB limit).
+
+`parse_webster.py` converts all of these (it accepts multiple `--in` files) into
+one combined dictionary JSON the pipeline consumes:
 
 ```sh
 python3 tools/ai/bpe/parse_webster.py \
-  --in  tools/ai/bpe/data/webster1913_A.txt \
+  --in  tools/ai/bpe/data/webster1913_A.txt tools/ai/bpe/data/dictionary-csv/[B-Z].csv \
   --out tools/ai/bpe/data/webster1913.json
 ```
 
-Verified end-to-end run (Webster A-section, 203 headwords, against the 128K
-LLaMA seed): 416 new tokens discovered; **114 defined with real Webster
-definitions** (e.g. Abandon, Achieve, Avarice, Audacious, Attain); the rest
-flagged `needs_definition` (BPE fragments or words outside the shipped section).
-`data/webster1913_A.txt` is a starter slice; drop the full Webster text in the
-same format for complete coverage.
+This yields **104,052 headwords / 164,648 senses** covering A–Z. The generated
+`webster1913.json` is ~32 MB and is **git-ignored** (it is derivable from the raw
+sources above); regenerate it with the command shown before running
+`define_new_tokens.py --dict tools/ai/bpe/data/webster1913.json`.
+
+Verified full-dictionary run: spot checks resolve real definitions across the
+whole alphabet — e.g. *beautiful, courage, dragon, elephant, justice, ocean,
+science, universe, zebra* — and the earlier A-section run defined 114 new tokens
+(Abandon, Achieve, Avarice, …). Words absent from the source are still flagged
+`needs_definition`; no meanings are fabricated.
 
 Because external dictionary APIs are unreachable here, the definition source is a
 **local file** supplied via `--dict` (Webster's above, or your own). Supported
