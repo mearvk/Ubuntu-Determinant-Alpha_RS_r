@@ -36,9 +36,11 @@ import sys
 ENTRY_RE = re.compile(r"^\s*(?P<head>.+?)\s*\((?P<pos>[^)]*)\)\s*(?P<defn>.*)$")
 
 
-def parse_lines(lines):
-    entries = {}
-    order = []
+def parse_lines(lines, entries=None, order=None):
+    if entries is None:
+        entries = {}
+    if order is None:
+        order = []
     for raw in lines:
         line = raw.rstrip("\n")
         if not line.strip():
@@ -72,15 +74,17 @@ def parse_lines(lines):
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Convert Webster's 1913 text entries to dictionary JSON.")
-    ap.add_argument("--in", dest="infile", required=True,
-                    help="Input text file of Webster 1913 entries.")
+    ap.add_argument("--in", dest="infiles", required=True, nargs="+",
+                    help="One or more input text/CSV files of Webster 1913 entries.")
     ap.add_argument("--out", default="tools/ai/bpe/data/webster1913.json")
     ap.add_argument("--compact", action="store_true",
                     help="Write compact {word: definition} form instead of rich objects.")
     args = ap.parse_args()
 
-    with open(args.infile, "r", encoding="utf-8", errors="replace") as f:
-        entries, order = parse_lines(f)
+    entries, order = {}, []
+    for path in args.infiles:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            parse_lines(f, entries, order)
 
     import os
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
