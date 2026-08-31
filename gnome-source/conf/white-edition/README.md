@@ -26,8 +26,35 @@ gnome-source/conf/white-edition/
 │   ├── icon-theme/
 │   │   └── index.theme
 │   └── install-icons.sh
+├── boot/                          # boot-to-desktop presentation chain
+│   ├── README.md
+│   ├── ASSUMPTION.md              # OS-wide white-skinned-Ubuntu contract
+│   ├── install-boot-presentation.sh
+│   ├── grub/                      # white GRUB menu + default entry
+│   ├── plymouth/white-edition/    # white boot splash
+│   └── gdm/                       # white greeter + "Ubuntu White" session offering
 └── install-config.sh
 ```
+
+## Presentation is continuous from boot to desktop
+
+The files at this level (`profile/`, `db/`, `theme/`) only style the desktop
+**after** a session starts. The `boot/` subdirectory covers everything the user
+sees **before** that — the GRUB menu, the boot splash, and the login greeter — so
+the white-skinned presentation is never interrupted by stock Ubuntu styling.
+
+```text
+GRUB menu → Plymouth splash → GDM greeter (offers "Ubuntu White") → GNOME session
+  boot/grub   boot/plymouth      boot/gdm                            db/ + theme/
+```
+
+The OS-wide assumption that the installed system is a white-skinned Ubuntu, and
+the requirement that the **first boot after install presents the white-flavored
+Ubuntu offering**, are specified in [`boot/ASSUMPTION.md`](boot/ASSUMPTION.md).
+The build host installs the whole chain into an ISO target root with
+[`boot/install-boot-presentation.sh`](boot/install-boot-presentation.sh) and then
+runs the target-root activation steps (`update-grub`, `update-initramfs -u`,
+`dconf update`) it prints.
 
 ## Desktop icon source of truth
 
