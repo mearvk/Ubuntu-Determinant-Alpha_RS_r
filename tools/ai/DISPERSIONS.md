@@ -293,7 +293,181 @@ syntactic or legal validity.
 
 ---
 
-## 7. Summary table — production → capability
+## 7. The vocabulary–intent question: your terms, mapped to the known machinery
+
+This section takes a set of conceptual framings — *"a 2D matrix for vocabulary,"
+"increasing the intent over authorship,"* *"a decider,"* *"a 3D trig model for
+vocabulary,"* and *"a much richer vocabulary to observe with"* — and translates
+each into the corresponding, well-attested Computer Science construct in
+`llama.cpp`, then states honestly how much improvement is and is not on the
+table. The goal is a faithful mix: keep the intent of the original framing, but
+anchor every claim to something real in the source and the literature.
+
+### 7.1 "A 2D matrix for vocabulary" → the **embedding matrix** `[n_vocab, n_embd]`
+
+The intuition is exactly right. In llama.cpp the token embeddings *are* a 2-D
+matrix of shape `[n_vocab, n_embd]` — one row per vocabulary entry, each row a
+vector of hidden dimension `n_embd`. At the input, `GGML_OP_GET_ROWS` selects the
+row for each token ID; at the output, the transpose of a similar matrix projects
+the final hidden state back onto vocabulary logits. So "vocabulary" enters and
+leaves the model through a flat 2-D table. Everything between the two tables is
+the reasoning stack (attention + SwiGLU) described in §2–§3.
+
+**Load-bearing consequence:** the embedding table is *storage of what each token
+means in isolation*. It is **not** where reasoning happens. Enriching the table
+changes how meaning is *packed*, not how it is *composed*.
+
+### 7.2 "A 3D trig model for vocabulary" → **RoPE**, the one genuinely trigonometric part
+
+There is a real, and only one, place where trigonometry meets vocabulary in this
+architecture: **Rotary Position Embedding** (`GGML_OP_ROPE`, §3). RoPE does not
+rotate the *vocabulary* table; it rotates the *query and key vectors* by an angle
+proportional to a token's position, using paired sine/cosine rotations across the
+embedding dimensions. If one wants a "trig model," this is it — but it encodes
+**order**, not **meaning**. So the honest mapping of "3D trig model for
+vocabulary" is: *the 2-D embedding table (§7.1) supplies meaning; RoPE adds a
+rotational, trigonometric encoding of position on top.* Together they are as close
+as the architecture gets to a "geometry-plus-trigonometry" model of tokens. There
+is no separate trigonometric vocabulary model beyond this, and inventing one would
+not correspond to any operation in `ggml.h`.
+
+### 7.3 "Intent / authorship / the decider" → the **decoding (sampling) layer**
+
+The cluster of ideas around *intent over authorship* and *a decider* maps
+cleanly onto the **sampler chain** — the stage that decides *which* token is
+actually emitted from the probability distribution the network produces. In
+llama.cpp this is the sampler API in `include/llama.h` (`llama_sampler_init_top_k`,
+`_top_p`, `_temp`, `_grammar`, and others), assembled into a chain via
+`llama_sampler_chain_add`. This is the "decider": the network *proposes* a
+distribution; the sampler *disposes* by choosing.
+
+The precise, honest statement about how much "authorship" this layer can exert:
+
+- **It can reshape and mask the distribution** — make output more deterministic
+  or more exploratory, or forbid tokens outright (grammar). This is real control
+  over *style, determinism, and validity*.
+- **It cannot add knowledge or reasoning the weights do not already contain.**
+  The sampler only reorders and prunes what the productions of §2 already made
+  likely. Turning the "decider" up does not deepen reasoning; it sharpens
+  *selection*. In the vocabulary of §0, the sampler chooses where along the
+  dispersed spectrum to collapse — it does not widen the spectrum.
+
+So "how much better can reasoning be made by giving the decider more authorship
+over content?" — bounded, and mostly about *reliability and format*, not
+*reasoning depth*. The reasoning ceiling is set upstream, by the trained weights.
+
+### 7.4 "A much richer vocabulary to observe with" → the **vocabulary-size trade-off**
+
+This is the most quantifiable part of your question, and the answer is a genuine
+engineering trade-off with a sweet spot, **not** a monotonic "richer is better":
+
+| Effect of enlarging `n_vocab` | Direction | Why |
+|---|---|---|
+| Sequence length for the same text | **decreases** | each token carries more meaning, so fewer tokens are needed |
+| Attention compute (quadratic in length) | **improves** | shorter sequences are cheaper; more content fits the context window |
+| Embedding + output-projection parameters | **grows (linear in `n_vocab`)** | both tables scale with vocabulary size; the final softmax also costs more |
+| Rare-token quality | **degrades** | a bigger vocabulary spreads training signal thinner; rare tokens are undertrained |
+| Coverage of code, math symbols, non-Latin scripts | **improves** | fewer tokenization artifacts, cleaner handling of specialized text |
+
+The historical arc is concrete: LLaMA-1 used a ~32K-token vocabulary; LLaMA-3
+moved to ~128K. The larger vocabulary shortens sequences and improves
+multilingual/code coverage, at the cost of larger embedding/output tables. The
+practical rule is that **the useful vocabulary size scales with model size** —
+big models can afford and exploit a richer vocabulary; small models are hurt by
+one, because the undertrained-rare-token problem dominates.
+
+**Effect on *reasoning* specifically:** modest and bounded. A richer vocabulary
+improves *how efficiently meaning is packed into tokens* and *coverage of
+specialized notation* — it does **not** move the reasoning ceiling, which lives
+in depth, width, training data, and alignment (§3, §4, §6). There is no theorem of
+the form "increase vocabulary by X ⇒ reasoning improves by Y"; the relationship is
+non-linear, task-dependent, and empirically a plateau, not a lever.
+
+### 7.5 The honest bottom line
+
+Mixing your framing with the established terms:
+
+- Your **"2D vocabulary matrix"** is the embedding table — real, and it is
+  *storage*, not *reasoning*.
+- Your **"3D trig model"** is best identified with RoPE — real, and it encodes
+  *order*, not *meaning*.
+- Your **"intent / authorship / decider"** is the sampler chain — real, and it
+  controls *selection, determinism, and validity*, but cannot manufacture
+  reasoning the weights lack.
+- Your **"richer vocabulary"** is the vocabulary-size trade-off — real, with a
+  size-dependent sweet spot and bounded, efficiency-oriented gains.
+
+The single most important correction: **vocabulary and the decider shape how the
+dispersion is packed and collapsed; they do not deepen the dispersion itself.**
+Reasoning improvement comes from the stack that sits *between* the two vocabulary
+tables, not from the tables or the chooser at the ends.
+
+---
+
+## 8. Definitions — the decoding vocabulary (top-k, top-p, and friends)
+
+These are the standard Computer Science terms for the "decider" of §7.3. Each is
+a sampler that can be added to the chain in `include/llama.h`. At every step the
+network outputs a **logit** (raw score) for every token in the vocabulary;
+softmax turns logits into a probability distribution; the samplers below decide
+how that distribution is shaped and how a single token is drawn from it.
+
+- **Logits** — the unnormalized scores the model assigns to each candidate next
+  token before softmax. Higher logit = the model finds that token more likely.
+
+- **Softmax** — the function that converts a vector of logits into a probability
+  distribution (all values in `[0,1]`, summing to 1). Implemented as
+  `GGML_OP_SOFT_MAX`. It is what makes the output a *distribution* that the
+  samplers below can operate on.
+
+- **Temperature (`temp`)** — a scalar that divides the logits before softmax.
+  `temp < 1` sharpens the distribution (more deterministic, the top token
+  dominates); `temp > 1` flattens it (more random, more diverse); `temp = 1`
+  leaves it unchanged. In llama.cpp: `llama_sampler_init_temp(t)`. Intuitively,
+  temperature is *how boldly the decider commits* to the most likely token.
+
+- **Top-k sampling (`top_k`)** — keep only the **k most probable** tokens,
+  discard the rest, renormalize, and sample from those k. A fixed-count cutoff.
+  Small k (e.g. 1) is nearly greedy/deterministic; larger k admits more
+  candidates. In llama.cpp: `llama_sampler_init_top_k(k)`. Example: `top_k = 50`
+  means "only ever consider the 50 best next tokens."
+
+- **Top-p sampling / nucleus sampling (`top_p`)** — instead of a fixed count,
+  keep the **smallest set of tokens whose cumulative probability reaches p**
+  (e.g. `p = 0.9` keeps just enough top tokens to cover 90% of the probability
+  mass), then renormalize and sample. This adapts the candidate set to how
+  confident the model is: when one token dominates, the set is tiny; when the
+  model is unsure, the set widens. In llama.cpp: `llama_sampler_init_top_p(p,
+  min_keep)`. "Nucleus" refers to that adaptive high-probability core.
+
+- **Greedy decoding / argmax** — always take the single highest-probability token
+  (`GGML_OP_ARGMAX`, or equivalently `top_k = 1`). Fully deterministic; no
+  exploration. This is the extreme "maximal authorship by the decider toward the
+  single most likely continuation."
+
+- **Grammar-constrained sampling (GBNF)** — a *hard* mask, not a soft reweighting:
+  at each step it zeroes out every token that would violate a formal grammar's
+  **production rules** (`nonterminal ::= sequence...`), so the output is
+  guaranteed to be, e.g., valid JSON or valid C. In llama.cpp:
+  `llama_sampler_init_grammar`, with grammars in `grammars/*.gbnf`. This is the
+  "legality" layer of §5.4 — the decider enforcing *what is permitted*, on top of
+  the statistical productions that decide *what is likely*.
+
+- **Sampler chain** — samplers are composed in sequence (`llama_sampler_chain_add`)
+  so that, for example, a grammar mask, then top-k, then top-p, then temperature,
+  then a final draw are applied in order. The chain *is* the decider of §7.3 in
+  concrete form.
+
+**How these relate to "intent / authorship":** temperature and top-k/top-p tune
+*how much freedom vs. commitment* the decider exercises over content; greedy
+decoding and grammar constraints are the two ways to exert *maximal* control
+(deterministic choice, and hard legality respectively). None of them add
+knowledge — they govern *selection* from the distribution the trained weights
+produce.
+
+---
+
+## 9. Summary table — production → capability
 
 | Requested capability | Primary productions that carry it | External grounding |
 |---|---|---|
