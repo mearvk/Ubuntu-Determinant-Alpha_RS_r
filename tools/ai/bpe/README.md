@@ -23,6 +23,37 @@ Python 3 runs, offline.
 | `extract_seed_vocab.py` | Read the token list from a vendored `*.gguf` (default: the 128K LLaMA-BPE vocab) into a plain seed list. This is "what we already have." |
 | `train_bpe.py` | Train byte-level BPE on a corpus up to a target vocab size. Emits `vocab.json`, `merges.txt`, and `new_tokens.json` — the tokens that are **NEW** relative to the seed. |
 | `define_new_tokens.py` | Look up definitions for the **new whole-word** tokens using a **local** dictionary source. Never invents meanings: unmatched words are marked `needs_definition`. |
+| `grow_seed.py` | Iteratively **grow the seed toward improvement**: train on a corpus, fold the round's new tokens back into the seed, repeat until the corpus yields nothing new (convergence). Writes a grown seed and a `growth_report.json` trajectory. |
+
+## Growing the seed "toward improvement"
+
+`grow_seed.py` treats vocabulary growth as accumulation. Each round trains BPE on
+the corpus, adds the newly discovered tokens to the seed, and repeats; the seed
+strictly grows and the count of still-new tokens falls to zero at convergence.
+The trajectory is recorded so improvement is measured, not asserted.
+
+```sh
+# from tools/ai/bpe/
+python3 grow_seed.py \
+  --corpus   out/corpus_llamacpp.txt \
+  --seed-in  out/seed_vocab.txt \
+  --seed-out out/seed_grown.txt \
+  --rounds 4 --per-round-target 500 --min-pair-freq 3 \
+  --report   out/growth_report.json
+```
+
+Example run against the vendored llama.cpp docs corpus:
+`round 1: found 97 new, seed 128256 -> 128353 (+97); round 2: 0 new -> converged`.
+
+### On "pull new words from known good sources"
+External sources cannot be fetched here: the sandbox network is
+integrations-only, so `huggingface.co`, PyPI, and web dictionary APIs are all
+blocked, and there is no system word list (`/usr/share/dict/` is empty). The
+**known, good source used is local and in-tree**: the vendored llama.cpp
+documentation and source under `tools/ai/llama.cpp/` form a real, relevant
+technical corpus. New words are mined from it; definitions are attached only from
+a local `--dict` file, and any word without an entry is reported
+`needs_definition` rather than given a fabricated meaning.
 
 ## The two requirements this implements
 
