@@ -588,6 +588,14 @@ step_install() {
             ;;
     esac
 
+    # The Ubuntu White overlay is a GNOME theme/icon set and is applied inside
+    # the gnome case above. If the user selected ubuntu-white with a non-gnome
+    # desktop, log a NOTE so the skipped selection is auditable rather than a
+    # silent no-op — matching the NOTE pattern used by the other components.
+    if component_selected "ubuntu-white" && [ "$INSTALL_DESKTOP" != "gnome" ]; then
+        echo "  NOTE: ubuntu-white theme requires the gnome desktop — skipping overlay for '$INSTALL_DESKTOP'" >> "$LOG"
+    fi
+
     echo "68"
     echo "Installing OS security suite..."
 
@@ -759,14 +767,17 @@ step_done() {
 while [ $# -gt 0 ]; do
     case "$1" in
         --desktop)
+            [ -n "${2:-}" ] || { echo "ERROR: --desktop requires a value (mate|gnome|vanilla)" >&2; exit 1; }
             INSTALL_DESKTOP="$2"; shift 2 ;;
         --desktop=*)
             INSTALL_DESKTOP="${1#*=}"; shift ;;
         --enable)
+            [ -n "${2:-}" ] || { echo "ERROR: --enable requires a comma/space list of components" >&2; exit 1; }
             components_enable "$2"; COMPONENTS_PRESET=1; shift 2 ;;
         --enable=*)
             components_enable "${1#*=}"; COMPONENTS_PRESET=1; shift ;;
         --disable)
+            [ -n "${2:-}" ] || { echo "ERROR: --disable requires a comma/space list of components" >&2; exit 1; }
             components_disable "$2"; COMPONENTS_PRESET=1; shift 2 ;;
         --disable=*)
             components_disable "${1#*=}"; COMPONENTS_PRESET=1; shift ;;
