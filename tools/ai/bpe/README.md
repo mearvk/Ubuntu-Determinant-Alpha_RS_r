@@ -103,8 +103,26 @@ Outputs land in `tools/ai/bpe/out/` (git-ignored; regenerate any time):
 
 ## The "known, good source of vocabulary content"
 
+A real one ships in `data/`: **Webster's 1913 dictionary** (public domain).
+`parse_webster.py` converts its plain-text `Headword (pos) definition` entries
+into the dictionary JSON the pipeline consumes:
+
+```sh
+python3 tools/ai/bpe/parse_webster.py \
+  --in  tools/ai/bpe/data/webster1913_A.txt \
+  --out tools/ai/bpe/data/webster1913.json
+```
+
+Verified end-to-end run (Webster A-section, 203 headwords, against the 128K
+LLaMA seed): 416 new tokens discovered; **114 defined with real Webster
+definitions** (e.g. Abandon, Achieve, Avarice, Audacious, Attain); the rest
+flagged `needs_definition` (BPE fragments or words outside the shipped section).
+`data/webster1913_A.txt` is a starter slice; drop the full Webster text in the
+same format for complete coverage.
+
 Because external dictionary APIs are unreachable here, the definition source is a
-**local file** you (or CI) supply via `--dict`. Supported formats:
+**local file** supplied via `--dict` (Webster's above, or your own). Supported
+formats:
 
 * JSON object `{ "word": "definition", ... }`
 * JSON object `{ "word": {"definition": "...", "pos": "..."}, ... }`
