@@ -203,3 +203,18 @@ collapses ~49 cross-section duplicates.)
 **In short:** the CSV reference we added contributes **103,898 headwords** (of
 the 104,052 in the full A–Z dictionary) — i.e. essentially the entire
 dictionary beyond the small A starter slice.
+
+### Full alphabetical word list
+
+All **104,052** headwords, sorted alphabetically (case-insensitive, `'Em` →
+`Zythum`), are provided as a companion file rather than inlined here — at ~1 MB
+and 104k lines an inline list would exceed GitHub's Markdown rendering limit and
+make this document unusable:
+
+- [`tools/ai/bpe/vocabulary/all_words_alphabetical.txt`](tools/ai/bpe/vocabulary/all_words_alphabetical.txt) — one headword per line.
+
+It is generated from the combined dictionary (`webster1913.json`) and can be
+regenerated at any time with `parse_webster.py`. The smaller, run-specific word
+files remain in the same directory:
+
+- [`words.txt`](tools/ai/bpe/vocabulary/words.txt) / [`words.csv`](tools/ai/bpe/vocabulary/words.csv) / [`words.json`](tools/ai/bpe/vocabulary/words.json) — the 52 words this BPE run defined (see §3).
