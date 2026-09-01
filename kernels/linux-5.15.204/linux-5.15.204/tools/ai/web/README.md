@@ -285,10 +285,52 @@ Dave posts public opinions to GitHub Discussions:
 
 ```bash
 cd tools/ai/web
+make cjson-fetch  # Vendor cJSON (needs network); see "cJSON dependency" below
 make              # Build dave_web binary
 sudo make install # Install all tools + create directories
 sudo make schema  # Load MySQL tables (web + SSL)
 ```
+
+### cJSON dependency
+
+Only the cJSON header (`cjson/cJSON.h`, MIT) and a non-compiling placeholder
+`cjson/cJSON.c` ship in this tree; the full cJSON implementation (~1700 lines)
+is not vendored. You must supply the real `cjson/cJSON.c` before `make` can
+link `dave_web`.
+
+- With network access: run `make cjson-fetch`. It downloads `cJSON.c` and
+  `cJSON.h` from the upstream project and only overwrites the placeholder on a
+  successful download. If the fetch fails, it prints an actionable error and
+  leaves the placeholder untouched (the build then fails loudly rather than
+  silently).
+- Without network access (offline / restricted build): vendor cJSON manually
+  by copying the MIT-licensed sources into `cjson/`:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.c -o cjson/cJSON.c
+  curl -fsSL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.h -o cjson/cJSON.h
+  ```
+
+  or copy `cJSON.c` / `cJSON.h` from a local checkout of
+  `github.com/DaveGamble/cJSON`. Preserve the MIT license header.
+
+Building against the placeholder fails with a clear message pointing here,
+rather than a confusing preprocessor error.
+
+### Chrome binary path
+
+`dave_web` resolves the Chromium/Chrome executable at runtime rather than
+assuming a single hard-coded path:
+
+1. `$DAVE_CHROME`, if set and non-empty, is used verbatim.
+2. Otherwise the first executable found among
+   `/usr/lib/chromium/chrome`, `/usr/lib/chromium-browser/chrome`,
+   `/usr/bin/chromium`, `/usr/bin/chromium-browser`,
+   `/usr/local/bin/chrome`, `/usr/bin/google-chrome` is used.
+3. If none exist, it falls back to `/usr/lib/chromium/chrome`.
+
+`dave_web --status` prints the resolved path. Set `DAVE_CHROME` to override
+detection, e.g. `DAVE_CHROME=/usr/local/bin/chrome dave_web --status`.
 
 ---
 
@@ -304,6 +346,6 @@ tools/ai/web/dave_ssl_schema.sql      - MySQL schema (ssl_certificates, site_aut
 tools/ai/web/dave_web_capabilities.json - Capability specification
 tools/ai/web/Makefile                  - Build/install/schema
 tools/ai/web/cjson/cJSON.h            - JSON library header (MIT, bundled)
-tools/ai/web/cjson/cJSON.c            - JSON library (fetched at build time)
+tools/ai/web/cjson/cJSON.c            - JSON library (placeholder; vendor via 'make cjson-fetch')
 tools/ai/web/README.md                - This file
 ```

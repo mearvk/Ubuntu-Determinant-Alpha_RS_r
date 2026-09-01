@@ -50,7 +50,7 @@
 // ============================================================
 
 #define DAVE_WEB_VERSION        "1.0.0"
-#define CHROME_BINARY           "/usr/lib/chromium/chrome"
+#define CHROME_BINARY           "/usr/lib/chromium/chrome"  // default / last-resort fallback
 #define CHROME_USER_DATA_DIR    "/var/lib/kernel-ai/chrome-data"
 #define SCREENSHOT_DIR          "/var/lib/kernel-ai/screenshots"
 #define CDP_PORT                9222
@@ -149,6 +149,48 @@ static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *use
 }
 
 // ============================================================
+// Chrome Binary Resolution
+// ============================================================
+
+// Resolve the Chrome/Chromium binary to use at runtime.
+// Order of precedence:
+//   1. The DAVE_CHROME environment variable, if set and non-empty.
+//   2. The first entry in a probe list that is executable (access X_OK).
+//   3. The compiled-in CHROME_BINARY default as a last resort.
+// The result is cached after the first call.
+static const char *chrome_binary(void)
+{
+    static const char *cached = NULL;
+    if (cached)
+        return cached;
+
+    const char *env = getenv("DAVE_CHROME");
+    if (env && env[0] != '\0') {
+        cached = env;
+        return cached;
+    }
+
+    static const char *candidates[] = {
+        "/usr/lib/chromium/chrome",
+        "/usr/lib/chromium-browser/chrome",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/local/bin/chrome",
+        "/usr/bin/google-chrome",
+    };
+
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        if (access(candidates[i], X_OK) == 0) {
+            cached = candidates[i];
+            return cached;
+        }
+    }
+
+    cached = CHROME_BINARY;
+    return cached;
+}
+
+// ============================================================
 // Chrome Process Management
 // ============================================================
 
@@ -178,7 +220,7 @@ static pid_t launch_chrome_headless(void)
         char port_arg[64];
         snprintf(port_arg, sizeof(port_arg), "--remote-debugging-port=%d", CDP_PORT);
 
-        execlp(CHROME_BINARY, "chrome",
+        execlp(chrome_binary(), "chrome",
                "--headless=new",
                "--disable-gpu",
                "--no-sandbox",
@@ -369,29 +411,86 @@ static char *cdp_send_command(const char *ws_url __attribute__((unused)),
 // This uses the Chrome CLI capabilities directly.
 // ============================================================
 
-// Capture screenshot by navigating headless Chrome to URL and using
-// the DevTools Protocol's Page.captureScreenshot via HTTP POST
+// Run headless chrome as a child process (no shell) and wait for it.
+// Passing an argv vector avoids any shell interpretation of the URL or
+// paths, which closes the single-quote shell-injection hole. If out_fd
+// is >= 0, it is duplicated onto STDOUT in the child (used for --dump-dom);
+// otherwise stdout/stderr are sent to /dev/null. Returns 0 on a clean exit,
+// -1 otherwise.
+static int run_chrome_child(const char *program, char *const argv[], int out_fd)
+{
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return -1;
+    }
+
+    if (pid == 0) {
+        // Child: redirect output, then exec chrome with no shell involved.
+        int devnull = open("/dev/null", O_WRONLY);
+        if (out_fd >= 0) {
+            dup2(out_fd, STDOUT_FILENO);
+            if (devnull >= 0)
+                dup2(devnull, STDERR_FILENO);
+        } else if (devnull >= 0) {
+            dup2(devnull, STDOUT_FILENO);
+            dup2(devnull, STDERR_FILENO);
+        }
+        if (devnull >= 0)
+            close(devnull);
+
+        execvp(program, argv);
+        perror("execvp chrome");
+        _exit(127);
+    }
+
+    // Parent: wait for the short-lived chrome process.
+    int status;
+    if (waitpid(pid, &status, 0) < 0)
+        return -1;
+    return (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : -1;
+}
+
+// Capture screenshot by navigating headless Chrome to the URL using
+// Chrome's built-in --screenshot mode.
 static int capture_screenshot_cdp(const char *target_url, const char *output_path)
 {
-    // Use Chrome's built-in headless screenshot mode
-    // This is the most reliable method: spawn a short-lived chrome process
-    char cmd[MAX_URL_LEN + 1024];
-    snprintf(cmd, sizeof(cmd),
-             "%s --headless=new --disable-gpu --no-sandbox "
-             "--disable-dev-shm-usage --window-size=1920,1080 "
-             "--screenshot='%s' --virtual-time-budget=5000 '%s' "
-             ">/dev/null 2>&1",
-             CHROME_BINARY, output_path, target_url);
+    // Use Chrome's built-in headless screenshot mode via a short-lived
+    // chrome process. We build an argv vector (no shell) so a URL or path
+    // containing quotes or shell metacharacters cannot break out.
+    const char *chrome = chrome_binary();
 
-    int ret = system(cmd);
+    char screenshot_arg[512 + 16];
+    snprintf(screenshot_arg, sizeof(screenshot_arg), "--screenshot=%s", output_path);
+
+    char *argv_vtb[] = {
+        (char *)"chrome",
+        (char *)"--headless=new",
+        (char *)"--disable-gpu",
+        (char *)"--no-sandbox",
+        (char *)"--disable-dev-shm-usage",
+        (char *)"--window-size=1920,1080",
+        screenshot_arg,
+        (char *)"--virtual-time-budget=5000",
+        (char *)target_url,
+        NULL
+    };
+    int ret = run_chrome_child(chrome, argv_vtb, -1);
+
     if (ret != 0) {
-        // Fallback: try without virtual-time-budget
-        snprintf(cmd, sizeof(cmd),
-                 "%s --headless=new --disable-gpu --no-sandbox "
-                 "--disable-dev-shm-usage --window-size=1920,1080 "
-                 "--screenshot='%s' '%s' >/dev/null 2>&1",
-                 CHROME_BINARY, output_path, target_url);
-        ret = system(cmd);
+        // Fallback: try without virtual-time-budget.
+        char *argv_novtb[] = {
+            (char *)"chrome",
+            (char *)"--headless=new",
+            (char *)"--disable-gpu",
+            (char *)"--no-sandbox",
+            (char *)"--disable-dev-shm-usage",
+            (char *)"--window-size=1920,1080",
+            screenshot_arg,
+            (char *)target_url,
+            NULL
+        };
+        ret = run_chrome_child(chrome, argv_novtb, -1);
     }
 
     struct stat st;
@@ -404,16 +503,23 @@ static char *extract_page_text(const char *target_url)
     char tmpfile[] = "/tmp/dave_web_dom_XXXXXX";
     int fd = mkstemp(tmpfile);
     if (fd < 0) return NULL;
+
+    // Run chrome with no shell (argv vector); the child's stdout is
+    // redirected to the temp file via out_fd, mirroring how
+    // launch_chrome_headless redirects to its log file.
+    char *argv_dom[] = {
+        (char *)"chrome",
+        (char *)"--headless=new",
+        (char *)"--disable-gpu",
+        (char *)"--no-sandbox",
+        (char *)"--disable-dev-shm-usage",
+        (char *)"--dump-dom",
+        (char *)"--virtual-time-budget=5000",
+        (char *)target_url,
+        NULL
+    };
+    int ret = run_chrome_child(chrome_binary(), argv_dom, fd);
     close(fd);
-
-    char cmd[MAX_URL_LEN + 1024];
-    snprintf(cmd, sizeof(cmd),
-             "%s --headless=new --disable-gpu --no-sandbox "
-             "--disable-dev-shm-usage --dump-dom "
-             "--virtual-time-budget=5000 '%s' > '%s' 2>/dev/null",
-             CHROME_BINARY, target_url, tmpfile);
-
-    int ret = system(cmd);
     if (ret != 0) {
         unlink(tmpfile);
         return NULL;
@@ -555,6 +661,11 @@ static MYSQL *db_connect(void)
 
 static int db_store_finding(MYSQL *conn, const WebFinding *f)
 {
+    // Default to failure so any early `goto cleanup` (e.g. malloc failure)
+    // returns an error deterministically instead of reading an
+    // uninitialized value.
+    int ret = -1;
+
     // Escape strings for safe insertion
     char *esc_url = malloc(strlen(f->url) * 2 + 1);
     char *esc_title = malloc(strlen(f->title) * 2 + 1);
@@ -602,7 +713,7 @@ static int db_store_finding(MYSQL *conn, const WebFinding *f)
              f->http_status, f->load_time_ms,
              (long)f->timestamp);
 
-    int ret = mysql_query(conn, query);
+    ret = mysql_query(conn, query);
     if (ret != 0) {
         fprintf(stderr, "[dave_web] ERROR: MySQL insert failed: %s\n",
                 mysql_error(conn));
@@ -793,10 +904,11 @@ static void show_status(void)
     printf("║  Dave Web Interface — Status                    ║\n");
     printf("╚══════════════════════════════════════════════════╝\n\n");
 
-    // Check Chrome
-    printf("  Chrome binary:     %s\n", CHROME_BINARY);
+    // Check Chrome (report the runtime-resolved binary path)
+    const char *chrome = chrome_binary();
+    printf("  Chrome binary:     %s\n", chrome);
     struct stat st;
-    if (stat(CHROME_BINARY, &st) == 0) {
+    if (stat(chrome, &st) == 0) {
         printf("  Chrome status:     INSTALLED\n");
     } else {
         printf("  Chrome status:     NOT FOUND\n");

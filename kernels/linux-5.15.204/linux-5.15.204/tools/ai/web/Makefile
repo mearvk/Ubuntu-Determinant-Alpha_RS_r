@@ -46,16 +46,52 @@ $(TARGET): $(OBJ)
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Ensure cJSON dependency exists (fetch if needed)
-cjson/cJSON.c:
+# cJSON dependency (MIT license). The real implementation (~1700 lines) is
+# NOT vendored in this tree; only the header plus a placeholder cJSON.c that
+# intentionally fails to compile ship here. This rule fetches the real source
+# when network access is available. If the fetch fails we do NOT overwrite the
+# placeholder with a broken one-line stub (which produced a confusing later
+# error); instead we fail loudly with an actionable message so the builder
+# knows exactly what to do. See README.md ("cJSON dependency").
+CJSON_BASE_URL := https://raw.githubusercontent.com/DaveGamble/cJSON/master
+
+# Only (re)fetch when cJSON.c is missing or is still the placeholder. The
+# placeholder is detectable by its "#error" marker.
+.PHONY: cjson-fetch
+cjson-fetch:
 	@mkdir -p cjson
-	@echo "Fetching cJSON (MIT license)..."
-	@curl -sL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.c \
-		-o cjson/cJSON.c 2>/dev/null || \
-		echo "// cJSON stub — fetch manually from github.com/DaveGamble/cJSON" > cjson/cJSON.c
-	@curl -sL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.h \
-		-o cjson/cJSON.h 2>/dev/null || \
-		echo "// cJSON stub — fetch manually from github.com/DaveGamble/cJSON" > cjson/cJSON.h
+	@if [ -f cjson/cJSON.c ] && ! grep -q '#error' cjson/cJSON.c; then \
+		echo "cJSON already present (cjson/cJSON.c)."; \
+	else \
+		echo "Fetching cJSON (MIT license) from $(CJSON_BASE_URL) ..."; \
+		if curl -fsSL "$(CJSON_BASE_URL)/cJSON.c" -o cjson/cJSON.c.tmp && \
+		   curl -fsSL "$(CJSON_BASE_URL)/cJSON.h" -o cjson/cJSON.h.tmp; then \
+			mv cjson/cJSON.c.tmp cjson/cJSON.c; \
+			mv cjson/cJSON.h.tmp cjson/cJSON.h; \
+			echo "cJSON fetched into cjson/."; \
+		else \
+			rm -f cjson/cJSON.c.tmp cjson/cJSON.h.tmp; \
+			echo ""; \
+			echo "ERROR: could not fetch cJSON (no network access?)."; \
+			echo "dave_web needs the real cJSON source. Vendor it manually:"; \
+			echo "  curl -fsSL $(CJSON_BASE_URL)/cJSON.c -o cjson/cJSON.c"; \
+			echo "  curl -fsSL $(CJSON_BASE_URL)/cJSON.h -o cjson/cJSON.h"; \
+			echo "or copy cJSON.c/cJSON.h from github.com/DaveGamble/cJSON (MIT)."; \
+			echo "The placeholder cjson/cJSON.c has NOT been modified."; \
+			exit 1; \
+		fi; \
+	fi
+
+# Building the object requires a real cJSON.c. If the placeholder is still in
+# place, run 'make cjson-fetch' first (needs network) or vendor it manually.
+cjson/cJSON.o: cjson/cJSON.c
+	@if grep -q '#error' cjson/cJSON.c; then \
+		echo "ERROR: cjson/cJSON.c is still the placeholder."; \
+		echo "Run 'make cjson-fetch' (needs network) or vendor cJSON manually."; \
+		echo "See README.md ('cJSON dependency') for the exact commands."; \
+		exit 1; \
+	fi
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 dirs:
 	@mkdir -p $(DATADIR)/screenshots
