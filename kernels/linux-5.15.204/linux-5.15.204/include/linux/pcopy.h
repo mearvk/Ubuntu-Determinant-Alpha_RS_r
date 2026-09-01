@@ -18,7 +18,7 @@
 /*
  * PCOPY_IOCTL_MAGIC — unique ioctl type for pcopy operations
  */
-#define PCOPY_IOCTL_MAGIC       0xPC
+#define PCOPY_IOCTL_MAGIC       'P'	/* "P" for PCopy */
 
 /*
  * Maximum limits

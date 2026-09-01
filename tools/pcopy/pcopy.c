@@ -59,7 +59,7 @@
 #include <time.h>
 
 /* Must match kernel module definitions */
-#define PCOPY_IOCTL_MAGIC       0xPC
+#define PCOPY_IOCTL_MAGIC       'P'	/* pcopy ioctl type ("P" for PCopy) */
 #define PCOPY_MAX_FILES         4096
 
 #define PCOPY_F_SYNC            (1 << 0)

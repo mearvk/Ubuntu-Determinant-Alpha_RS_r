@@ -30,7 +30,7 @@
 #define PCOPY_CHUNK_SIZE_MIN    (64 * 1024)        /* 64KB minimum */
 #define PCOPY_CHUNK_SIZE_MAX    (64 * 1024 * 1024) /* 64MB maximum */
 #define PCOPY_PIPE_BUFS         16      /* Splice pipe buffer count */
-#define PCOPY_IOCTL_MAGIC       0xPC
+#define PCOPY_IOCTL_MAGIC       'P'	/* pcopy ioctl type ("P" for PCopy) */
 
 /* ===========================================================================
  * Storage Device Class Speed Constants (MB/s)
