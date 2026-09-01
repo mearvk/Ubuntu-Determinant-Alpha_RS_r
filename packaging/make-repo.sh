@@ -54,9 +54,17 @@ generate_packages_portable() {
         sha1=$(sha1sum "$deb" | awk '{print $1}')
         sha256=$(sha256sum "$deb" | awk '{print $1}')
 
-        # Extract the control file from the .deb (ar member control.tar.gz).
+        # Extract the control file from the .deb. The control member may be
+        # compressed with any scheme (dpkg-deb defaults to zstd; the ar+tar
+        # fallback uses gzip), so detect the actual member name and let tar
+        # auto-detect the compression (-a) rather than assuming .gz.
         ctl="$(mktemp -d)"
-        ( cd "$ctl" && ar x "$deb" control.tar.gz 2>/dev/null && tar -xzf control.tar.gz ./control 2>/dev/null || tar -xzf control.tar.gz control 2>/dev/null || true )
+        cmember="$(ar t "$deb" | grep '^control\.tar' | head -n1)"
+        ( cd "$ctl" \
+            && ar x "$deb" "$cmember" 2>/dev/null \
+            && ( tar -xaf "$cmember" ./control 2>/dev/null \
+                 || tar -xaf "$cmember" control 2>/dev/null \
+                 || true ) )
         # Emit the stanza: control fields + apt pool/checksum fields.
         # Insert Filename/Size/checksums right after the Description-less head by
         # simply appending the standard fields; apt accepts field order freely.

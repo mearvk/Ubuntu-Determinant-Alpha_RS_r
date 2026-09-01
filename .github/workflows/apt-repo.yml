@@ -112,14 +112,24 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
-          # 5. Each .deb is a structurally valid archive with the 3 required
-          #    members in order, and installs into a system bin dir.
+          # 5. Each .deb is a structurally valid archive: the three required
+          #    members must appear in order (debian-binary, then control.tar.*,
+          #    then data.tar.*). The compression suffix varies by toolchain —
+          #    dpkg-deb defaults to zstd (.zst), the ar+tar fallback uses .gz —
+          #    so accept .gz/.zst/.xz/.bz2/.lzma or uncompressed tar.
           for deb in packaging/out/pool/*.deb; do
-            members=$(ar t "$deb" | tr '\n' ' ')
-            case "$members" in
-              "debian-binary control.tar.gz data.tar.gz "*) : ;;
-              *) echo "::error::$deb has unexpected ar members: $members"; missing=1 ;;
-            esac
+            m1=$(ar t "$deb" | sed -n 1p)
+            m2=$(ar t "$deb" | sed -n 2p)
+            m3=$(ar t "$deb" | sed -n 3p)
+            ok=1
+            [ "$m1" = "debian-binary" ] || ok=0
+            case "$m2" in control.tar|control.tar.gz|control.tar.zst|control.tar.xz|control.tar.bz2|control.tar.lzma) : ;; *) ok=0 ;; esac
+            case "$m3" in data.tar|data.tar.gz|data.tar.zst|data.tar.xz|data.tar.bz2|data.tar.lzma) : ;; *) ok=0 ;; esac
+            if [ "$ok" -eq 1 ]; then
+              echo "  ok  members: $(basename "$deb") ($m2 $m3)"
+            else
+              echo "::error::$(basename "$deb") has unexpected ar members: $m1 $m2 $m3"; missing=1
+            fi
           done
 
           [ "$missing" -eq 0 ] || { echo "::error::packaging validation failed"; exit 1; }
