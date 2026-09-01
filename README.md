@@ -540,4 +540,50 @@ We appreciate the volunteer efforts of **SAS** and **CorpAmerica** as contributo
 
 This is a community-minded project statement rather than an assertion of affiliation, endorsement, or employment by any organization named above.
 
+---
+
+## Recent Installation and Hardening Work
+
+This section records the recent body of work now merged to `main`. It extends the installation and system-hardening surface without replacing the established install engine or the existing native helpers.
+
+### OS security baseline
+
+`scripts/install-os-security.sh` provides a general-purpose, idempotent security install for the host. It is independent of the Java web-server path and can be run on its own. It installs and enables a set of standard defenses:
+
+- **ClamAV** with `freshclam` signature updates and the scanning daemon;
+- **UFW** configured with a default-deny-incoming firewall policy;
+- **AppArmor** mandatory access control;
+- **fail2ban** for brute-force mitigation;
+- **unattended-upgrades** for automatic security patching;
+- **rkhunter** and **chkrootkit** rootkit checks.
+
+Each component has its own `OS_SECURITY_*` toggle, so an operator can enable or disable individual defenses without editing the script. Re-running the script is safe: it converges toward the configured state rather than duplicating work.
+
+### Improved Git
+
+`scripts/install-git-improved.sh` installs a modern Git and its companion tooling. It prefers the git-core PPA and falls back gracefully to the distribution archive when the PPA is unavailable. Alongside `git` it installs `git-lfs`, `git-doc`, `gitk`, and `git-gui`, initializes Git LFS system-wide, and writes non-destructive defaults to `/etc/gitconfig`. It never sets a user identity, leaving `user.name` and `user.email` to the operator.
+
+### Selectable installer components
+
+`scripts/galactic-cherry-installer` gained selectable components. Interactively it presents a multi-select checkbox step (a `--checklist`); non-interactively it accepts the same selections on the command line through `--desktop`, `--enable`, `--disable`, `--non-interactive`, and `--help`, plus the `INSTALL_COMPONENTS` and `GC_COMPONENTS` environment variables. Every component is surfaced with an explicit default:
+
+```text
+ubuntu-white   ON
+security       ON
+git-improved   ON
+jwstf          OFF
+```
+
+### white-installer smooth orchestrator ELF
+
+`installer/linux/white-installer` is a new native C11 binary (source `installer/linux/white_installer_orchestrator.c` and `.h`) that serves as the default "usual" smooth front door for installing the system. It runs a seven-stage guided flow:
+
+```text
+PROBE -> PREVIEW -> COMPONENTS -> TARGET -> CONFIRM -> DELEGATE -> AUDIT
+```
+
+The orchestrator is a control plane. It reimplements no disk, partition, chroot, or package logic, runs unprivileged, and delegates the actual work to the existing Bash engine `scripts/galactic-cherry-installer` (which remains independently runnable), falling back to `installer/install-native.sh` when the engine is absent. The PREVIEW stage is read-only, COMPONENTS reuses the checkbox and CLI selection surface described above, and the default action is a safe dry-run. The prebuilt ELF is committed alongside the existing `desktop_install_probe` and `nxtt` native helpers. See [`installer/INSTALL.md`](installer/INSTALL.md) for full usage.
+
+---
+
 **Max Rupplin — MEARVK LLC — 2026**

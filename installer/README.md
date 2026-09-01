@@ -99,6 +99,28 @@ No install operation should jump directly from discovery to execution.
 
 The existing ISO and Ubuntu installer paths remain the established image/provisioning contracts. This master installer adds the recent native-tool installation layer rather than silently replacing those paths.
 
+## Native install binaries (installer/linux)
+
+`installer/linux/` holds three committed native ELF binaries that support the install path. Consistent with the framing above, the orchestrator adds a smooth front door and delegates to the established contracts rather than replacing them.
+
+- `white-installer`: the smooth-install orchestrator ELF and default front door. It runs a seven-stage guided flow (PROBE, PREVIEW read-only, COMPONENTS, TARGET, CONFIRM, DELEGATE, AUDIT) with checkbox and command-line component selection. It is a control plane that delegates to `scripts/galactic-cherry-installer` rather than reimplementing disk or package logic, runs unprivileged, and defaults to a safe dry-run. This is the headline new binary.
+- `desktop_install_probe`: the existing Step-1 discovery and bootstrap probe. It locates the clone and the install set, previews and performs dry-run discovery, and can carry out an explicit install. It already exists and is listed here for context.
+- `nxtt`: the NXTT uninstaller helper ELF.
+
+These build from `installer/linux/Makefile`:
+
+```text
+make -C installer/linux all
+```
+
+A portable static build of the orchestrator is available for the live ISO and minimal environments:
+
+```text
+make -C installer/linux white-installer-static
+```
+
+See [`INSTALL.md`](INSTALL.md) for detailed usage.
+
 ## Project reference
 
 **Max Rupplin — MEARVK LLC — 2026** records project-level development and maintenance attention. Upstream kernel, Ubuntu, GCC, Java, JavaFX, QEMU, and other third-party attribution remains governed by their applicable licenses and provenance.
