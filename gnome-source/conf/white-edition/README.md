@@ -33,6 +33,20 @@ gnome-source/conf/white-edition/
 │   ├── grub/                      # white GRUB menu + default entry
 │   ├── plymouth/white-edition/    # white boot splash
 │   └── gdm/                       # white greeter + "Ubuntu White" session offering
+├── shell-extension/
+│   └── white-edition@mearvk/
+│       ├── metadata.json
+│       ├── extension.js
+│       ├── prefs.js
+│       ├── stylesheet.css
+│       ├── install.sh
+│       ├── README.md
+│       ├── schemas/
+│       │   └── org.gnome.shell.extensions.white-edition.gschema.xml
+│       └── logos/
+│           ├── circle-of-friends.svg
+│           ├── mono-accent.svg
+│           └── focus-ring.svg
 └── install-config.sh
 ```
 
@@ -102,6 +116,8 @@ The visual system uses one stationary upper-left virtual key light. Icons receiv
 The lighting specification is in `theme/lighting.conf`. The CSS/theme contract is in `theme/white-edition.css`. The icon source contract is in `theme/icons.conf`. These files describe the desired appearance; supported GNOME Shell, GTK, and compositor mechanisms remain responsible for implementing the actual effects.
 
 The persistent taskbar/panel is a White Edition desktop requirement. Because GNOME Shell does not expose every layout behavior as a simple dconf preference, bottom placement should be implemented through the supported Shell extension/customization layer rather than by inventing a dconf key.
+
+That Shell extension layer is provided by `shell-extension/white-edition@mearvk/`. It adds a Start button that stays fixed at the left of the panel (the panel left box) and a Start menu popup whose horizontal alignment (left, center, or right) is configurable through the `start-menu-alignment` GSettings key, with `left` as the default. The extension keeps the button anchored left and moves only the popup; it does not itself relocate the panel to the bottom of the screen, which remains the separate Shell-layout concern noted above. See `shell-extension/white-edition@mearvk/README.md` for the button-stays-left contract, the three selectable Ubuntu-themed logos, and install steps.
 
 ## Configuration ownership
 
