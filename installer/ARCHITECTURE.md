@@ -100,3 +100,74 @@ No passwords, private keys, or unrelated personal information belong in the repo
 ## 8. White Edition presentation
 
 The professional interface uses a restrained white surface and makes the state of the system visible. The installer should be clean and business-friendly rather than visually aggressive.
+
+## 9. System registration (dpkg / systemd / cron)
+
+This section documents how the installers register the software they place on
+the system, so operators know exactly what is tracked by the package manager,
+what runs as a service, and what is scheduled. It reflects the current
+behaviour; it does not prescribe new work.
+
+### 9.1 dpkg (package database)
+
+The component installers register cleanly with `dpkg`. Both the Bash
+`scripts/install-os-security.sh` / `scripts/install-git-improved.sh` and their
+compiled counterparts `installer/linux/os-security-installer` /
+`installer/linux/git-improved-installer` place **all** their packages through
+`apt-get install`, which drives `dpkg` underneath. Everything they install —
+ClamAV, UFW, AppArmor, fail2ban, unattended-upgrades, rkhunter, chkrootkit,
+git, git-lfs and companions — therefore:
+
+- appears in `dpkg -l` / `apt list --installed`;
+- is removable through `apt` / `dpkg`;
+- carries its maintainer scripts and package-shipped units, timers and
+  `cron.*` jobs.
+
+**Exception — the native tool installer.** `installer/install-native.sh` is a
+separate component that compiles the repository's C utilities (`limit`, `size`,
+`ctrmsctl`, and `xmc` via its own Makefile) and places them with raw
+`install -m 0755` under `/usr/local/bin` (and a systemd unit for `ctrmsctl`).
+These files are deliberately **not** wrapped in a `.deb`, so they are **not**
+recorded in the dpkg database: they will not show up in `dpkg -l`, and they are
+removed by the installer's own `uninstall` path rather than by `apt`. This is
+the conventional "local software under `/usr/local`" arrangement; packaging
+them as real `.deb`s would be a separate, additive change.
+
+### 9.2 systemd (services)
+
+Service registration is systemd-first. The OS-security installer runs
+`systemctl daemon-reload` and then `systemctl enable` for each selected
+component's units:
+
+- `clamav-freshclam.service` and `clamav-daemon.service` (ClamAV);
+- `apparmor.service` (only when not already active);
+- `fail2ban.service`;
+- `unattended-upgrades.service`.
+
+`ctrmsctl` (via the native tool installer) installs and enables its own
+`ctrmsctl.service` when a systemd host is detected.
+
+### 9.3 cron and scheduled work
+
+The installers do **not** create any `crontab`, `/etc/cron.*` entry, or
+custom systemd timer of their own. Scheduled behaviour comes from two sources:
+
+- **Package-shipped schedulers, which are active.** `clamav-freshclam` refreshes
+  signatures as an enabled systemd service; `unattended-upgrades` is driven by
+  the distribution's `apt-daily` / `apt-daily-upgrade` systemd timers plus the
+  `/etc/apt/apt.conf.d/20auto-upgrades` drop-in that the OS-security installer
+  writes. No cron is required for these.
+- **On-demand tools that are installed but not scheduled — a known gap.**
+  `rkhunter` and `chkrootkit` are installed but their periodic scans are left
+  disabled: the installers do not enable `rkhunter`'s `CRON_DAILY_RUN` in
+  `/etc/default/rkhunter`, nor `chkrootkit`'s `RUN_DAILY` in
+  `/etc/chkrootkit.conf` / `/etc/default/chkrootkit`. Likewise, `clamav-freshclam`
+  updates signatures but no periodic full-filesystem ClamAV **scan** is
+  scheduled. Until this is addressed, rootkit and antivirus **scanning** is a
+  manual/administrator responsibility even though the tools are present.
+
+Operators who want scheduled scanning today can enable the package-provided
+`cron.daily` hooks (rkhunter/chkrootkit) or add a ClamAV scan timer manually.
+Automating this in the installers (preferably as systemd timers, to match the
+systemd-first style above) would be an additive enhancement rather than a
+correctness fix to the existing package/service registration.
