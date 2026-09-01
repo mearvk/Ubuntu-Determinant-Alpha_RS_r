@@ -1,0 +1,21 @@
+# MUNTUTILS — HSSS Source/Structure Record
+
+Program based on Science at NCSU - Max Rupplin - MEARVK LLC 2026.
+
+## 1. Source
+The implementation is split by language on purpose. `muntutils_fs.c` (with `muntutils_fs.h`) is the authoritative C11 core for filesystem enumeration and logical size measurement. `muntutils_trim.cpp` (with `muntutils_trim.hpp`) is the authoritative C++17 engine for source scanning, reachability estimation, and slim-tree emission. `main.cpp` is the C++17 front end that exposes the `trim` and `report` subcommands and calls the C core through its `extern "C"` API. Both languages are genuinely used together.
+
+## 2. Specification
+`trim` analyzes a source tree, decides which functions are confidently unused under conservative rules, and writes a slimmed copy. `report` measures the raw source, an optional slimmed tree, and compiled artifacts, then writes a dual-audience report with a plain-language summary and a detailed programmer section. Directory entries themselves are not counted; regular-file bytes are summed. Symbolic links and Windows reparse points are not recursively followed.
+
+## 3. System Boundary
+Input: a filesystem source-tree path plus options. Output for `trim`: a slimmed tree in a separate output directory by default, or in-place rewrites with `.bak` backups under the explicit opt-in flag; plus a summary of kept, removed, and unresolved functions. Output for `report`: a text/markdown report to a file or standard output. Errors go to stderr and cause a non-zero result. On a default `trim` run the tool does not modify originals; it never executes discovered content.
+
+## 4. Compiler Relationship
+`build.sh` first searches for the locally built GCC 16.2.0 C and C++ compilers contained in the repository, honoring `MEARVK_GCC` and `MEARVK_GXX`. If the compiler advertises `-fme-metadata`, the build emits explicit MEARVK-META values per translation unit. Otherwise a clearly reported system `gcc`/`g++` fallback is used and metadata emission is reported as unavailable. The C translation unit is compiled with the C compiler, the C++ translation units with the C++ compiler, and the objects are linked with the C++ compiler.
+
+## 5. Authority
+Metadata identifies the build configuration and provenance supplied to the compiler. The NCSU and MEARVK attributions record scientific origin and build provenance. Neither the metadata nor the attribution is an assertion that MEARVK owns the analyzed source, nor a fiduciary or execution authorization claim. Reachability results are conservative estimates offered for review, not guarantees.
+
+## 6. Verification
+Run `./build.sh`, then `./muntutils --version`. Create a small sample source tree with used and unused functions. Run `./muntutils trim <src> --out <dir>` and confirm the originals are byte-identical (for example with `sha256sum`) while a slim tree appears in the output directory. Run `./muntutils trim` with `--in-place` on a throwaway copy and confirm a `.bak` backup is created before each rewrite. Run `./muntutils report <src> --slim <dir> --out <file>` and confirm the report contains raw stats, slim stats, compiled-artifact stats, a plain-language summary, and a detailed programmer section.

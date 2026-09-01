@@ -1,0 +1,31 @@
+{
+  "project_type": "Native C/C++ userspace tools inside a large Ubuntu remaster repository (mearvk/Ubuntu.Determinant.Beta.Restricted). Sibling tools under tools/ (size, limit, pcopy, pmove) are small self-contained utilities with matching engineering records.",
+  "language": "C11 (filesystem/size core) and C++17 (source analysis + trimming engine), matching the repo toolchain (derived GCC 16.2.0 with MEARVK-META extension).",
+  "build_system": "Two conventions coexist: (1) tools/Makefile chains per-dir Makefiles via $(MAKE) -C <dir> (pcopy, pmove). (2) size/limit use a standalone build.sh that prefers a repo-derived GCC and emits -fme-metadata flags when advertised, else falls back to system gcc with a printed warning. muntutils will provide BOTH: a build.sh (size/limit convention, C+C++) AND a small per-dir Makefile so it slots into tools/Makefile without breaking the pcopy/pmove chain.",
+  "test_framework": "None. No runtime test harness exists in the repo. Validation = compile with cc/g++ (-std=c11 / -std=c++17 -Wall -Wextra -Werror -O2) + run the tool on sample inputs + static review.",
+  "build_command": "cd tools/muntutils && ./build.sh   (or: make -C tools all which now includes muntutils). build.sh searches derived GCC candidates ($ROOT/tools/gcc/build/gcc/xgcc|gcc, $ROOT/tools/gcc/gcc-16.2.0/build/gcc/xgcc|gcc), honors MEARVK_GCC override, falls back to system gcc/g++. Only system gcc/g++ 11.5.0 is available in this sandbox; derived GCC is NOT built here.",
+  "test_command": "No formal tests. Validate: ./muntutils <subcommand> on a small sample source tree; confirm capability 1 writes a slim copy into a SEPARATE output dir and does NOT touch originals on default run; confirm --in-place only rewrites with a backup; confirm capability 2 emits a raw-vs-slim-vs-compiled size report.",
+  "verification_instructions": "1) cd tools/muntutils && ./build.sh (system gcc/g++ fallback, will print the no -fme-metadata warning). 2) Create a tiny sample source tree with used + unused functions. 3) Run the trim subcommand with an output dir; verify originals unchanged (diff/checksums) and slim tree exists in the out dir. 4) Run with --in-place on a throwaway copy; verify a .bak backup was created before rewrite. 5) Run the size/report subcommand; verify the report contains raw source size, slimmed source size, compiled-artifact sizes, a plain-language summary, and detailed programmer numbers. 6) Confirm make -C tools all still builds pcopy/pmove and now muntutils.",
+  "snapshot_or_generated_files": "None. No checked-in generated/snapshot artifacts for tools/.",
+  "setup_instructions": "Repo is a sparse blobless checkout at /projects/sandbox/udbr on branch main. tools/ is already materialized. GIT_LFS_SKIP_SMUDGE=1. No apt/network. Use system gcc/g++ 11.5.0 for validation.",
+  "environment_constraints": "Network restricted (no apt, no package installs, no image pulls). Derived GCC 16.2.0 is NOT built in this sandbox, so -fme-metadata is unavailable; build.sh MUST fall back to system gcc/g++ and print the standard warning. Validation is compile + run + static checks only. Do NOT full-checkout the repo (~20GB with LFS); use sparse-checkout.",
+  "contribution_requirements": "Match per-tool conventions EXACTLY (model on tools/size and tools/limit). Each tool dir contains: source (.c/.cpp/.h), build.sh, install.sh, README.md, a .hss (semantic spec), a .hsss (source/structure record), and a 1-2-3-4.mmd (ordered engineering/provenance record). No em dashes in prose (flag names like --in-place and numeric ranges are fine). Include NCSU attribution EXACTLY: 'Program based on Science at NCSU - Max Rupplin - MEARVK LLC 2026.' as a science/attribution statement (not a legal ownership/authorization claim), alongside existing MEARVK provenance. Initial version 1.00.",
+  "key_patterns": "build.sh: set -euo pipefail; ROOT two dirs up; derived-GCC candidate search with MEARVK_GCC override and system fallback; CFLAGS -std=c11/-std=c++17 -Wall -Wextra -Werror -O2; META flags guarded by `\"$CC\" --help=common | grep -q -- '-fme-metadata'` else printed warning; -fme-metadata-source=tools/muntutils/<file>. install.sh: tiny, PREFIX defaulting to /usr/local/bin, compile, install -m 0755. 1-2-3-4.mmd sections: '# <TOOL> — 1-2-3-4 Engineering Record' (NOTE: existing files use an em dash in this heading; preserve heading style to match convention while avoiding em dashes in NEW prose), '## 1 — Identity','## 2 — Structure','## 3 — Process','## 4 — Evidence / Authority','## Change Record'. .hsss sections: '## 1. Source','## 2. Specification','## 3. System Boundary','## 4. Compiler Relationship','## 5. Authority','## 6. Verification'. README: Build (derived GCC + -fme-metadata + fallback), Behavior, Platform behavior, Engineering records, Scope, Versioning (initial 1.00). SAFETY philosophy in repo: inspect -> plan -> authorize -> apply -> verify; no silent changes; size/limit are read-only.",
+  "relevant_files": [
+    "tools/size/size.c",
+    "tools/size/build.sh",
+    "tools/size/install.sh",
+    "tools/size/README.md",
+    "tools/size/size.hss",
+    "tools/size/size.hsss",
+    "tools/size/1-2-3-4.mmd",
+    "tools/limit/build.sh",
+    "tools/limit/README.md",
+    "tools/limit/limit.hss",
+    "tools/limit/limit.hsss",
+    "tools/limit/1-2-3-4.mmd",
+    "tools/Makefile",
+    "tools/pcopy/Makefile"
+  ],
+  "directory_structure": "tools/ holds one dir per utility. tools/size and tools/limit are the authoritative templates for build.sh/install.sh/README/.hss/.hsss/1-2-3-4.mmd. tools/pcopy has a per-dir Makefile that tools/Makefile chains. tools/muntutils/ does NOT exist yet and must be created."
+}
