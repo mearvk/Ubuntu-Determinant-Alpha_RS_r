@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Establish a verified baseline and validation harness before making changes. Confirm the White Desktop / GNOME boot path is present and intact (this is the 'check that we have that' part of the request), document the gnome-source-not-wired-to-boot disconnect, and establish the syntax-validation procedure used for all later features. No functional code changes in this feature -- it produces a short baseline report and confirms every existing installer script parses.",
+  "status": "completed",
+  "steps": [
+    "Create a feature branch off main: `git -C . checkout -b feat/os-security-and-installer-components` (run from repo root /projects/sandbox/udbr).",
+    "Run `bash -n` on the existing scripts to capture a clean baseline: scripts/galactic-cherry-installer, scripts/install-gnome-desktop.sh, scripts/install-jwstf.sh, scripts/install-ubuntu-installer.sh, scripts/install-desktop-selector.sh, scripts/install-mate-desktop.sh. Record that all currently parse (exit 0).",
+    "Confirm the GNOME + Ubuntu White baseline: verify scripts/install-gnome-desktop.sh installs gnome-shell/mutter/nautilus/gdm3 from archive.ubuntu.com, sets `systemctl set-default graphical.target`, and applies the Ubuntu White overlay via scripts/install-ubuntu-white-theme.sh when GNOME_THEME is ubuntu-white. Confirm scripts/install-desktop-selector.sh routes DESKTOP=gnome to this script.",
+    "Confirm and document that gnome-source/ trees (glib, pango, gdk-pixbuf, cairo, gtk, gnome-shell, mutter) are referenced only by scripts/build-safety.sh (SHA-256 source-safety gate) and are NOT built or installed into the boot path. Verify with a grep for 'gnome-source' across scripts/.",
+    "Write a concise baseline note to .agents/tasks/task-os-security-and-installer-components/BASELINE.md summarizing: (a) White/GNOME boot path is present and functional, (b) gnome-source is only a safety-gate input, not wired to boot, (c) security tools (ClamAV etc.) are currently installed ONLY by install-jwstf.sh and merely advertised in the general installer, (d) git is only an optional manifest entry with no dedicated install."
+  ],
+  "acceptance_criteria": [
+    "A feature branch feat/os-security-and-installer-components exists and is checked out.",
+    "`bash -n` returns exit 0 for all six listed existing scripts (baseline is green).",
+    "BASELINE.md exists under the task directory and documents the four points above with specific file/line references.",
+    "No functional changes were made to any script in this feature."
+  ],
+  "verification": [
+    "Run `bash -n scripts/galactic-cherry-installer scripts/install-gnome-desktop.sh scripts/install-jwstf.sh scripts/install-ubuntu-installer.sh scripts/install-desktop-selector.sh scripts/install-mate-desktop.sh` and confirm every file exits 0.",
+    "Run `git -C . branch --show-current` and confirm it prints feat/os-security-and-installer-components.",
+    "Confirm .agents/tasks/task-os-security-and-installer-components/BASELINE.md exists and is non-empty."
+  ],
+  "blocked_reason": null,
+  "findings": "Branch feat/os-security-and-installer-components created off main and checked out. bash -n exits 0 for all six scripts (galactic-cherry-installer, install-gnome-desktop.sh, install-jwstf.sh, install-ubuntu-installer.sh, install-desktop-selector.sh, install-mate-desktop.sh) => baseline is green. GNOME+White boot path confirmed: install-desktop-selector.sh defaults DESKTOP=gnome and routes to install-gnome-desktop.sh (lines 6,10); install-gnome-desktop.sh installs gnome-shell/mutter/nautilus/gdm3 from archive.ubuntu.com (lines 56-66), runs `systemctl set-default graphical.target` (lines 71-77), and applies the Ubuntu White overlay via install-ubuntu-white-theme.sh when GNOME_THEME=ubuntu-white (lines 16,24-27,86-99). gnome-source/ is referenced ONLY by scripts/build-safety.sh (GNOME_ROOT=$ROOT/gnome-source, lines 10-11,19,34,48) as a SHA-256 source-safety gate; grep -rn 'gnome-source|GNOME_ROOT' scripts/ matches build-safety.sh only, and nothing builds/installs it into boot. ClamAV/UFW are actually installed only by install-jwstf.sh (packages lines 95-97; firewall+freshclam enable lines 405-422); merely advertised in galactic-cherry-installer:157 and install-ubuntu-installer.sh:185-187; build-from-manifest.sh:191-193 lists tools-clamav/chkrootkit/rkhunter in BUILD_ORDER. git is only an optional manifest entry installer/software-relative-meaning.json:74 (rank 8, optional) with no dedicated install script and no git-improved component. BASELINE.md (101 lines) written under the task dir. NOTE: the grep_search tool returned no matches inside scripts/ (indexing gap); bash grep was used and is authoritative. No functional script changes made. Validation limited to bash -n + python3 -m json.tool per sandbox constraints (no apt/whiptail/dialog/shellcheck)."
+}

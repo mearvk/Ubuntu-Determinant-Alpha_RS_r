@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add a general-purpose OS security module that installs and configures the 'basics of OS security including ClamAV' for the general OS install, independent of the JWSTF/Java web server path. Today ClamAV/UFW are only installed by scripts/install-jwstf.sh and rkhunter/chkrootkit/ClamAV are merely advertised in the installer welcome text and GUI slides. This feature creates a new standalone, idempotent, root-guarded script scripts/install-os-security.sh that reuses the proven package/enable patterns from install-jwstf.sh (lines ~95-97 and ~405-422) and applies a conservative, non-silent hardening baseline consistent with ubuntu-white/INSTALL.md.",
+  "status": "completed",
+  "steps": [
+    "Create scripts/install-os-security.sh with the repo's standard header style: `#!/usr/bin/env bash`, SPDX-License-Identifier: GPL-2.0, `set -euo pipefail`, a root check (`id -u -ne 0` -> error+exit), an apt-get availability check, and `export DEBIAN_FRONTEND=noninteractive`. Log to a file (e.g. /var/log/os-security-install.log) following the install-jwstf.sh logging style.",
+    "Install the security package set via `apt-get install -y --no-install-recommends`: clamav, clamav-daemon, clamav-freshclam, ufw, rkhunter, chkrootkit, apparmor, apparmor-utils, apparmor-profiles, fail2ban, unattended-upgrades, apt-listchanges. Group them clearly and mirror the install-jwstf.sh package-block style.",
+    "Enable services with the existing guarded pattern (`systemctl enable <svc> 2>/dev/null || true`): clamav-freshclam.service, clamav-daemon.service, apparmor.service (or `aa-enabled` check), fail2ban.service, unattended-upgrades.service.",
+    "Configure UFW with a conservative default policy WITHOUT the JWSTF-specific web ports: `ufw default deny incoming`, `ufw default allow outgoing`, `ufw allow OpenSSH` (or `ufw allow 22/tcp`), then enable it non-interactively (`ufw --force enable`). Guard each with `|| true`. Keep this clearly separate from the JWSTF web-port rules so the two do not conflict when both run.",
+    "Configure unattended-upgrades for security updates: enable via `dpkg-reconfigure -f noninteractive unattended-upgrades` or by writing /etc/apt/apt.conf.d/20auto-upgrades with APT::Periodic::Update-Package-Lists and Unattended-Upgrade set to 1. Guard with `|| true`.",
+    "Gate every enablement behind idempotent checks so re-running the script is safe, and honor toggle env vars for headless/CLI use with sensible defaults ON: OS_SECURITY_CLAMAV=1, OS_SECURITY_UFW=1, OS_SECURITY_APPARMOR=1, OS_SECURITY_FAIL2BAN=1, OS_SECURITY_UNATTENDED=1. When a toggle is 0, skip that component's install+enable. Print a clear summary block at the end (mirroring install-gnome-desktop.sh's trailing echo summary) listing what was installed and enabled.",
+    "Update installer/software-relative-meaning.json representative_seed so the newly-guaranteed security components are represented: keep apparmor (rank 8, main), promote ufw's role note, and add entries for clamav, rkhunter, chkrootkit, fail2ban, unattended-upgrades with appropriate ranks/categories (do NOT invent unrelated packages; validate JSON afterward)."
+  ],
+  "acceptance_criteria": [
+    "scripts/install-os-security.sh exists, is executable-style (has shebang + SPDX header), and passes `bash -n` with exit 0.",
+    "The script installs clamav + clamav-daemon + clamav-freshclam and enables clamav-freshclam.service (grep-confirmable).",
+    "The script installs and enables ufw with `default deny incoming` / `default allow outgoing` / SSH allowed and `ufw --force enable`, and does NOT hard-code the JWSTF web ports (80/443/8080/8443/23).",
+    "The script installs apparmor + fail2ban + unattended-upgrades and enables their services with the guarded `|| true` pattern.",
+    "Each component is individually toggleable via OS_SECURITY_* env vars defaulting to 1.",
+    "installer/software-relative-meaning.json still parses as valid JSON and now contains entries for clamav, rkhunter, chkrootkit, fail2ban, and unattended-upgrades."
+  ],
+  "verification": [
+    "Run `bash -n scripts/install-os-security.sh` and confirm exit 0.",
+    "Run `python3 -m json.tool installer/software-relative-meaning.json >/dev/null` and confirm exit 0 (valid JSON).",
+    "Run `grep -nE 'clamav|clamav-freshclam|ufw --force enable|default deny incoming|apparmor|fail2ban|unattended-upgrades' scripts/install-os-security.sh` and confirm the security baseline is present.",
+    "Run `grep -nE '80/tcp|8080|8443|Telnet' scripts/install-os-security.sh` and confirm NO JWSTF web-server ports were copied into the general OS security script."
+  ],
+  "blocked_reason": null,
+  "findings": "Created scripts/install-os-security.sh, a standalone root-guarded idempotent OS security baseline that reuses the install-jwstf.sh package/enable patterns and the install-gnome-desktop.sh header/summary style. Installs clamav+clamav-daemon+clamav-freshclam, ufw, apparmor(+utils/profiles), fail2ban, unattended-upgrades(+apt-listchanges), and rkhunter/chkrootkit. Enables clamav-freshclam/clamav-daemon, apparmor (guarded by aa-enabled), fail2ban, unattended-upgrades via `systemctl enable ... 2>/dev/null || true`. UFW uses a conservative policy: default deny incoming, allow outgoing, allow OpenSSH (fallback ssh), then `ufw --force enable`; the JWSTF web ports (80/443/8080/8443/23) are deliberately NOT opened (only referenced in a clarifying comment). Each component is toggleable via OS_SECURITY_{CLAMAV,UFW,APPARMOR,FAIL2BAN,UNATTENDED}=1 defaults; a 0 skips both install and enable because the package list is assembled per-toggle. unattended-upgrades also writes /etc/apt/apt.conf.d/20auto-upgrades. Updated installer/software-relative-meaning.json representative_seed: promoted ufw to main/usability_main with a role note and added clamav, clamav-daemon, clamav-freshclam, rkhunter, chkrootkit, fail2ban, unattended-upgrades entries; apparmor kept at rank 8/main. Verification (sandbox-permitted static only): `bash -n scripts/install-os-security.sh` exit 0; `python3 -m json.tool installer/software-relative-meaning.json` exit 0; baseline grep confirms all components present; JWSTF-web-port grep matches only the explanatory comment (no actual rule). No apt/installer run per network constraints."
+}

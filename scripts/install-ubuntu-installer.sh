@@ -185,6 +185,8 @@ li { margin: 8px 0; }
 <li><span class="accent">chkrootkit 2.51</span> — Rootkit detection (100+ signatures)</li>
 <li><span class="accent">rkhunter 8.46.9</span> — System integrity verification</li>
 <li><span class="accent">ClamAV</span> — Protected antivirus (Memory Grain 3)</li>
+<li><span class="accent">UFW + AppArmor</span> — Firewall + mandatory access control</li>
+<li><span class="accent">fail2ban + unattended-upgrades</span> — Brute-force defense + auto security updates</li>
 <li><span class="accent">File Integrity DB</span> — MySQL-backed SHA-256 baselines</li>
 <li><span class="accent">Heuristic Port Monitor</span> — Three-stage packet analysis</li>
 <li><span class="accent">sudo_gate</span> — 8-level graded privilege system</li>

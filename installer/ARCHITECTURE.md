@@ -16,6 +16,14 @@ JavaFX Professional Launcher
         +-- Privileged Helper -- only for explicitly confirmed operations
 ```
 
+The console/native orchestrator `white-installer`
+(`installer/linux/white_installer_orchestrator.c`) is the C-side control-plane
+sibling to the JavaFX launcher. It drives the existing Make/ISO/installer
+contracts (notably the Bash engine `scripts/galactic-cherry-installer`) rather
+than duplicating them, keeps the display and probe unprivileged, and emits the
+section-7 audit report. See `installer/INSTALL.md` for its flow, flags, and
+delegation scheme.
+
 ## 2. Existing repository integration
 
 The repository already has an ISO build target and a `scripts/gen-iso.sh` implementation. The new interface should call those established contracts rather than create a competing ISO implementation. fileciteturn195file0L2-L2 fileciteturn200file0L2-L2
