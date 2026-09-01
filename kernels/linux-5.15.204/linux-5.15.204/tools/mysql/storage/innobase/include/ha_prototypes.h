@@ -45,6 +45,11 @@ class THD;
 class MDL_ticket;
 struct CHARSET_INFO;
 struct dict_table_t;
+/* trx_t is used below by pointer only (e.g. innobase_quote_identifier,
+innobase_commit_low); forward-declare it here as upstream MySQL does. The full
+definition lives in trx0trx.h and is intentionally not pulled in to keep this
+header light, per the note above. */
+struct trx_t;
 
 /** Formats the raw data in "data" (in InnoDB on-disk format) that is of
  type DATA_(CHAR|VARCHAR|MYSQL|VARMYSQL) using "charset_coll" and writes

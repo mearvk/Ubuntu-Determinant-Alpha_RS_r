@@ -34,7 +34,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifndef sync0arr_h
 #define sync0arr_h
 
+#include <thread> /* std::thread (used in the waiter prototypes below) */
+
 #include "univ.i"
+
+#include "ut0core.h" /* ut::Location (parameter of the wait/reserve calls) */
 
 /** Synchronization wait array cell */
 struct sync_cell_t;

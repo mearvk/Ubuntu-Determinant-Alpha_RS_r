@@ -49,7 +49,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /* os_offset_t */
 #include "os0file.h"
 
-/* ut::map */
+/* ut::map (the PSI-instrumented std::map alias is declared in ut0new.h, not
+ut0ut.h) */
+#include "ut0new.h"
 #include "ut0ut.h"
 
 /** In-memory dictionary of meta data of existing log files.

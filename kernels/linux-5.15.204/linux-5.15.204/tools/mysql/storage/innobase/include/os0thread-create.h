@@ -38,8 +38,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "univ.i"
 
+#include "mysqld_error.h" /* ER_IB_MSG_* */
 #include "os0thread.h"
 #include "sql_thd_internal_api.h"
+#include "sync0sync.h" /* mysql_pfs_key_t, PFS_NOT_INSTRUMENTED */
+#include "ut0log.h"    /* ib::warn / ib::info / ib::error */
 
 #include <atomic>
 #include <functional>

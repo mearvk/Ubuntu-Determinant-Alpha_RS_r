@@ -34,6 +34,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0rnd.h"
 #include <random>
 
+#include "my_rdtsc.h"      /* my_timer_cycles */
+#include "ut0cpu_cache.h" /* ut::INNODB_CACHE_LINE_SIZE */
+
 namespace ut::detail {
 
 /* Changes for each threads for more different sequences. */

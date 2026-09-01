@@ -154,6 +154,17 @@ struct allocation_low_level_info {
 #include "ut0dbg.h"
 #include "ut0ut.h"
 
+/** Explicitly invoke the destructor of the object pointed to by ptr without
+freeing the underlying storage. InnoDB uses this to run destructors on objects
+whose memory is managed separately (e.g. placement-new'd into a mem_heap or a
+statically-lived struct that must be re-initialised). Matches the upstream
+MySQL InnoDB helper.
+@param[in]  ptr  pointer to the object whose destructor is to be called */
+template <typename T>
+void call_destructor(T *ptr) {
+  ptr->~T();
+}
+
 namespace ut {
 
 /** Light-weight and type-safe wrapper around the PSI_memory_key

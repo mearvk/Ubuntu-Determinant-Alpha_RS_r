@@ -37,6 +37,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "univ.i"
 
+/* os0event.ic (included at the bottom of this header) uses the Wait_stats
+type as the return type of os_event_wait_for(); pull in its definition here,
+as upstream MySQL does. */
+#include "ut0ut.h"
+
 // Forward declaration.
 struct os_event;
 typedef struct os_event *os_event_t;

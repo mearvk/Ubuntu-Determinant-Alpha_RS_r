@@ -49,6 +49,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include "os0atomic.h"
 #include "os0enc.h"
 
+/* os0file.h uses dberr_t return types, the mysql_pfs_key_t performance-schema
+key type (declared in sync0sync.h under HAVE_PSI_INTERFACE), and the ut::
+namespace helpers such as ut::INNODB_CACHE_LINE_SIZE (ut0cpu_cache.h). Include
+these so the header is self-contained regardless of include order. ut0core.h
+provides ut::Location (used by the os_file_* creation/open prototypes) and
+ut0cpu_cache.h provides ut::INNODB_CACHE_LINE_SIZE. */
+#include "db0err.h"
+#include "sync0sync.h"
+#include "ut0core.h"
+#include "ut0cpu_cache.h"
+
 #ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>

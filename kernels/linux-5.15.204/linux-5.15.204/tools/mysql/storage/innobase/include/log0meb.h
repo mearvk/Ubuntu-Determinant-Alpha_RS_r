@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 
 #include "univ.i"
 
+#include "sync0sync.h" /* mysql_pfs_key_t */
+
 class THD;
 struct SYS_VAR;
 struct st_mysql_value;

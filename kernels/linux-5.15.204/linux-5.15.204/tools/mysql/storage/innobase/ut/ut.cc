@@ -39,7 +39,9 @@ external tools. */
 #include <ctime>
 
 #include <iomanip>
+#include <thread> /* std::this_thread */
 
+#include "os0thread.h" /* to_string(std::thread::id) */
 #include "univ.i"
 #include "ut/ut.h"
 

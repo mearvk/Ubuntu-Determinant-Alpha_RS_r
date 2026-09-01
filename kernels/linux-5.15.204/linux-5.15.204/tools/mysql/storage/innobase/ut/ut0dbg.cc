@@ -32,9 +32,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
  **********************************************************************/
 
 #include <cstdlib>
+#include <thread> /* std::this_thread */
 
 #include "my_dbug.h"
+#include "mysqld_error.h" /* ER_IB_MSG_* */
+#include "os0thread.h" /* to_string(std::thread::id) */
 #include "univ.i"
+#include "ut0log.h" /* ib::error */
 
 #ifndef UNIV_HOTBACKUP
 #include "ha_prototypes.h"
