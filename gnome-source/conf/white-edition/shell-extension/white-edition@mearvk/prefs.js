@@ -31,7 +31,7 @@ export default class WhiteEditionPanelPreferences extends ExtensionPreferences {
 
         const group = new Adw.PreferencesGroup({
             title: 'Start Menu',
-            description: 'The Start button stays fixed at the bottom-left. Only the Start menu popup and the button logo are configurable.',
+            description: 'The Start button stays fixed at the left of the panel. Only the Start menu popup and the button logo are configurable.',
         });
         page.add(group);
 

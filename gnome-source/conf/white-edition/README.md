@@ -117,7 +117,7 @@ The lighting specification is in `theme/lighting.conf`. The CSS/theme contract i
 
 The persistent taskbar/panel is a White Edition desktop requirement. Because GNOME Shell does not expose every layout behavior as a simple dconf preference, bottom placement should be implemented through the supported Shell extension/customization layer rather than by inventing a dconf key.
 
-That Shell extension layer is provided by `shell-extension/white-edition@mearvk/`. It adds a Start button that stays fixed at the bottom-left of the panel and a Start menu popup whose horizontal alignment (left, center, or right) is configurable through the `start-menu-alignment` GSettings key, with `left` as the default. See `shell-extension/white-edition@mearvk/README.md` for the button-stays-left contract, the three selectable Ubuntu-themed logos, and install steps.
+That Shell extension layer is provided by `shell-extension/white-edition@mearvk/`. It adds a Start button that stays fixed at the left of the panel (the panel left box) and a Start menu popup whose horizontal alignment (left, center, or right) is configurable through the `start-menu-alignment` GSettings key, with `left` as the default. The extension keeps the button anchored left and moves only the popup; it does not itself relocate the panel to the bottom of the screen, which remains the separate Shell-layout concern noted above. See `shell-extension/white-edition@mearvk/README.md` for the button-stays-left contract, the three selectable Ubuntu-themed logos, and install steps.
 
 ## Configuration ownership
 

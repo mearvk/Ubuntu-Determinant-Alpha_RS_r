@@ -1,8 +1,8 @@
 # Ubuntu White Edition Panel
 
 An additive GNOME Shell extension for the Ubuntu White Edition desktop. It adds a
-Start button that stays fixed at the bottom-left of the panel and a Start menu
-popup whose horizontal alignment is configurable.
+Start button that stays fixed at the left of the panel and a Start menu popup
+whose horizontal alignment is configurable.
 
 This is the supported Shell extension/customization layer that the White Edition
 GNOME configuration README calls for. It is additive and reversible: it does not
@@ -10,8 +10,9 @@ edit any vendored upstream GNOME source.
 
 ## Behavior
 
-- The Start button is always placed at the bottom-left of the panel and never
-  moves. It is inserted into the panel left box at position 0 unconditionally.
+- The Start button is always placed at the left of the panel and never moves.
+  It is inserted into the panel left box (the top-left on a stock GNOME panel)
+  at position 0 unconditionally.
 - Only the Start menu popup's horizontal anchoring changes, driven by the
   `start-menu-alignment` GSettings key:
   - `left` (default): popup opens near the button at the left edge.
@@ -125,7 +126,8 @@ be exercised at runtime and should be confirmed on a real White Edition session:
 
 - the popup actually anchoring left, center, and right on the primary monitor
   work area;
-- the Start button staying fixed at the bottom-left while only the popup moves;
+- the Start button staying fixed at the left of the panel while only the popup
+  moves;
 - the live GSettings binding updating the button glyph and popup alignment;
 - the `prefs.js` preferences UI rendering under Adwaita and GTK 4.
 
