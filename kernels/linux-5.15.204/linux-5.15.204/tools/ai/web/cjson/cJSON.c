@@ -6,13 +6,16 @@
   is fetched at build time by the Makefile from:
     https://github.com/DaveGamble/cJSON
 
-  To fetch manually:
-    curl -sL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.c -o cjson/cJSON.c
+  To fetch it (needs network access), run from tools/ai/web:
+    make cjson-fetch
+  or fetch manually:
+    curl -fsSL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.c -o cjson/cJSON.c
+    curl -fsSL https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.h -o cjson/cJSON.h
 
   cJSON is a lightweight JSON parser for C. MIT licensed.
   Used by dave_web to parse Chrome DevTools Protocol responses
   and to generate JSON output for links and metadata.
 */
 
-/* BUILD WILL FAIL UNTIL REAL cJSON.c IS FETCHED — run 'make' to auto-download */
-#error "cJSON.c not yet fetched. Run 'make' to auto-download from GitHub, or fetch manually."
+/* BUILD WILL FAIL UNTIL THE REAL cJSON.c IS VENDORED. */
+#error "cJSON.c is a placeholder. Run 'make cjson-fetch' (needs network) or vendor cJSON manually. See README.md."
