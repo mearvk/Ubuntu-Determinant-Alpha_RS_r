@@ -57,6 +57,7 @@ PREFIX        := /usr
         tools-chkrootkit tools-chkrootkit-install \
         tools-rkhunter tools-rkhunter-install \
         tools-xgcc tools-xgcc-install \
+        tools-muntutils tools-muntutils-install \
         jdesk-install \
         desktop rootfs rootfs-full initramfs grub iso \
         clean distclean help
@@ -361,7 +362,7 @@ tools-install:
 # Tools - Extended (autotools/cmake-based, longer builds)
 # ==============================================================================
 
-tools-all: tools tools-drm tools-tandem-equals tools-palladium-grooves tools-palladium-grooves-iv tools-rebate-certificates tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter tools-xgcc
+tools-all: tools tools-drm tools-tandem-equals tools-palladium-grooves tools-palladium-grooves-iv tools-rebate-certificates tools-cronie tools-clamav tools-mysql tools-ai tools-chkrootkit tools-rkhunter tools-xgcc tools-muntutils
 
 # DRM (Deferred Remove) - undo-capable file deletion
 tools-drm:
@@ -601,8 +602,23 @@ tools-xgcc-install:
 	@$(MAKE) -C tools/xgcc install DESTDIR=$(abspath $(ROOTFS_DIR))
 	@echo "  ✓ xgcc + xgcc-user installed to /usr/local/bin/"
 
+# muntutils - source reachability trimmer and raw-vs-compiled size reporter
+tools-muntutils:
+	@echo "=== Building muntutils ==="
+	@if [ -d "tools/muntutils" ] && [ -f "tools/muntutils/Makefile" ]; then \
+		$(MAKE) -C tools/muntutils all; \
+	fi
+
+tools-muntutils-install:
+	@echo "=== Installing muntutils ==="
+	@if [ -d "tools/muntutils" ] && [ -f "tools/muntutils/muntutils" ]; then \
+		install -d $(ROOTFS_DIR)/usr/local/bin; \
+		install -m 755 tools/muntutils/muntutils $(ROOTFS_DIR)/usr/local/bin/; \
+		echo "  ✓ muntutils installed to /usr/local/bin/"; \
+	fi
+
 # Full tools install (all)
-tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-palladium-grooves-install tools-palladium-grooves-iv-install tools-rebate-certificates-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install tools-xgcc-install
+tools-all-install: tools-install tools-drm-install tools-tandem-equals-install tools-palladium-grooves-install tools-palladium-grooves-iv-install tools-rebate-certificates-install tools-cronie-install tools-clamav-install tools-mysql-install tools-ai-install tools-chkrootkit-install tools-rkhunter-install tools-xgcc-install tools-muntutils-install
 
 # ==============================================================================
 # Desktop Environment (MATE + LightDM + Red Cherry Theme)
