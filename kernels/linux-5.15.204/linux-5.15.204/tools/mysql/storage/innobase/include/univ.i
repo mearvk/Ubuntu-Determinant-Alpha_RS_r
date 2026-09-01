@@ -55,6 +55,20 @@ this program; if not, write to the Free Software Foundation, Inc.,
  *
  * >>> FLAGGED FOR MAINTAINER REVIEW: if a pristine upstream MySQL 9.7.0 univ.i
  * >>> becomes available, prefer replacing this reconstruction with it verbatim.
+ *
+ * Reconstruction deviations from upstream (behavior reviewed and accepted; noted
+ * here only so this file is not mistaken for a verbatim upstream copy):
+ *   1. UNIV_DEBUG_VALGRIND is auto-enabled below via `#if defined HAVE_VALGRIND`,
+ *      whereas upstream MySQL 9.7.0 keeps that define only inside a manual
+ *      `#if 0` block. It is inert in this build (HAVE_VALGRIND is #undef), but on
+ *      any build host whose configure detects valgrind headers it would turn on
+ *      extra InnoDB valgrind client-request instrumentation that upstream would
+ *      not enable.
+ *   2. The branch-prediction hint macros (UNIV_LIKELY / UNIV_UNLIKELY /
+ *      UNIV_EXPECT / UNIV_LIKELY_NULL) are reconstructed as plain pass-throughs
+ *      (no __builtin_expect). This is semantically identical to upstream and only
+ *      drops the optimizer hint (performance-only), but is a deviation from
+ *      upstream's __builtin_expect forms.
  * ------------------------------------------------------------------------- */
 
 #ifndef univ_i
