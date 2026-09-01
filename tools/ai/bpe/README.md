@@ -10,7 +10,7 @@ integrations-only (PyPI and model hubs are blocked), so the toolkit deliberately
 avoids `tokenizers`, `sentencepiece`, and any external download. It runs anywhere
 Python 3 runs, offline.
 
-> Read `tools/ai/VOCABULARY_GROWTH.md` first. A larger vocabulary shortens
+> Read `tools/ai/llama.cpp/VOCABULARY_GROWTH.md` first. A larger vocabulary shortens
 > sequences and improves coverage, but **does not** by itself raise a pre-trained
 > model's reasoning ceiling. To be *usable*, a new vocabulary requires model
 > (re)training — this toolkit produces the vocabulary/merges and a definitions
