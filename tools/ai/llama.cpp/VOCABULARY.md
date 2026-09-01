@@ -151,7 +151,7 @@ word forms not present as headwords in the dictionary. A sample:
 - It does **not** fabricate meanings: unmatched words are flagged, and subword
   fragments are excluded from definition lookup.
 
-As documented in `tools/ai/VOCABULARY_GROWTH.md`, producing a *usable* model
+As documented in `tools/ai/llama.cpp/VOCABULARY_GROWTH.md`, producing a *usable* model
 from a grown vocabulary still requires model (re)training; this pipeline
 produces the vocabulary, merges, and definitions — the first stage of growth.
 
@@ -210,7 +210,7 @@ All **104,052** headwords of the full A–Z dictionary, sorted alphabetically
 (case-insensitive, `'Em` → `Zythum`), are listed inline in
 [§7 below](#7-all-words-word-definition-date-added) as a three-column table
 (word, definition, date added). They are also available as plain files in
-`tools/ai/bpe/vocabulary/` (`all_words_alphabetical.txt`, and the run-specific
+`tools/ai/llama.cpp/vocabulary/` (`all_words_alphabetical.txt`, and the run-specific
 `words.txt` / `words.csv` / `words.json` from §3).
 
 > Note: because the inline table is ~8.8 MB / 104k rows, GitHub's web view will

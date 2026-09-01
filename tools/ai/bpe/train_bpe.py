@@ -17,7 +17,7 @@ Design goals
   only records merges/tokens that are genuinely NEW relative to that seed.
 
 This produces a vocabulary + merge table. It does NOT train model weights — see
-tools/ai/VOCABULARY_GROWTH.md for why a new vocabulary requires model training
+tools/ai/llama.cpp/VOCABULARY_GROWTH.md for why a new vocabulary requires model training
 to be usable, and why enlarging vocabulary alone does not raise the reasoning
 ceiling.
 """
