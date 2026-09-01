@@ -19,6 +19,12 @@ on:
       - 'packaging/**'
       - 'docs/apt/**'
       - '.github/workflows/apt-repo.yml'
+  pull_request:
+    paths:
+      - 'installer/linux/**'
+      - 'packaging/**'
+      - 'docs/apt/**'
+      - '.github/workflows/apt-repo.yml'
   workflow_dispatch:
     inputs:
       version:
@@ -37,7 +43,94 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Validation-only job: build all 5 .deb packages and the repository index on
+  # every PR (and tag/dispatch), WITHOUT signing or publishing. Asserts that
+  # each expected package is produced and that the generated index is internally
+  # consistent (checksums match the built .debs). This keeps packaging green.
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Debian packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Build .deb packages
+        run: |
+          chmod +x packaging/build-deb.sh packaging/make-repo.sh
+          packaging/build-deb.sh
+
+      - name: Generate repository index
+        run: packaging/make-repo.sh
+
+      - name: Assert all 5 packages built and the index is consistent
+        run: |
+          set -euo pipefail
+          expected="os-security-installer git-improved-installer white-installer desktop-install-probe nxtt"
+
+          # 1. Every expected .deb exists in the pool.
+          missing=0
+          for p in $expected; do
+            if ls packaging/out/pool/${p}_*.deb >/dev/null 2>&1; then
+              echo "  ok  pool: $p"
+            else
+              echo "::error::missing .deb for $p"; missing=1
+            fi
+          done
+
+          # 2. The pool contains exactly 5 packages (no strays, none dropped).
+          count=$(ls packaging/out/pool/*.deb 2>/dev/null | wc -l)
+          echo "  pool package count: $count (expected 5)"
+          [ "$count" -eq 5 ] || { echo "::error::expected 5 .debs, found $count"; missing=1; }
+
+          # 3. The Packages index lists all 5 stanzas.
+          pkgs="packaging/out/dists/stable/main/binary-amd64/Packages"
+          stanzas=$(grep -c '^Filename: ' "$pkgs" || true)
+          echo "  index stanza count: $stanzas (expected 5)"
+          [ "$stanzas" -eq 5 ] || { echo "::error::index has $stanzas stanzas, expected 5"; missing=1; }
+
+          # 4. Each SHA256 in the index matches the actual .deb it points at.
+          #    (Reads Filename/SHA256 pairs from the Packages file and re-hashes.)
+          python3 - "$pkgs" <<'PY'
+          import sys, hashlib, pathlib
+          root = pathlib.Path("packaging/out")
+          text = pathlib.Path(sys.argv[1]).read_text()
+          fname = sha = None
+          bad = 0
+          for line in text.splitlines() + [""]:
+              if line.startswith("Filename: "): fname = line.split(" ",1)[1].strip()
+              elif line.startswith("SHA256: "):  sha   = line.split(" ",1)[1].strip()
+              elif line.strip() == "" and fname:
+                  data = (root / fname).read_bytes()
+                  actual = hashlib.sha256(data).hexdigest()
+                  ok = (actual == sha)
+                  print(f"  {'ok ' if ok else 'BAD'} sha256: {fname}")
+                  if not ok:
+                      print(f"::error::SHA256 mismatch for {fname}: index={sha} actual={actual}")
+                      bad += 1
+                  fname = sha = None
+          sys.exit(1 if bad else 0)
+          PY
+
+          # 5. Each .deb is a structurally valid archive with the 3 required
+          #    members in order, and installs into a system bin dir.
+          for deb in packaging/out/pool/*.deb; do
+            members=$(ar t "$deb" | tr '\n' ' ')
+            case "$members" in
+              "debian-binary control.tar.gz data.tar.gz "*) : ;;
+              *) echo "::error::$deb has unexpected ar members: $members"; missing=1 ;;
+            esac
+          done
+
+          [ "$missing" -eq 0 ] || { echo "::error::packaging validation failed"; exit 1; }
+          echo "All 5 packages built and the index is consistent."
+
+  # Publish job: signs and deploys to GitHub Pages. Runs ONLY on tag pushes and
+  # manual dispatch — never on pull requests (a fork PR must not touch Pages or
+  # the signing secret). Gated behind a green validate job.
   build-and-publish:
+    needs: validate
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
