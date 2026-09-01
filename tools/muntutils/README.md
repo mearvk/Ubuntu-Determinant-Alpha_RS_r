@@ -44,6 +44,12 @@ c++ -std=c++17 -Wall -Wextra -O2 -o muntutils muntutils_fs.o muntutils_trim.o ma
 
 You can also run `make` in this directory, which the repository `tools/Makefile` chains as the `muntutils` target.
 
+### Intended build entry point
+
+`make -C tools muntutils` is the intended way to build this tool from the repository root. That target is deliberately dependency-free: it builds `muntutils` on its own without touching the other tools.
+
+The aggregate `make -C tools all` and `make -C tools install` targets are currently expected to fail. They route through the sibling `pcopy`/`pmove` tools, and `pcopy` has a pre-existing, unrelated build error (an invalid `PCOPY_IOCTL_MAGIC 0xPC` token in `pcopy.c`) that stops the aggregate build before it reaches anything else. That defect is outside the scope of this tool and is not fixed here. Until the unrelated `pcopy` fix lands, build and install `muntutils` through its own target (`make -C tools muntutils`, or `./build.sh` / `./install.sh` in this directory), not through the aggregate `all`/`install` targets.
+
 ## Behavior
 
 `muntutils trim <src-tree> --out <dir>` walks the source tree, records the functions it can see, works out which ones are reachable, and writes a slimmed copy of the tree into the output directory with the confidently unused functions removed. `--strict` also treats non-static functions as trimmable when nothing references them.
@@ -57,6 +63,8 @@ The trimmer never overwrites or deletes your originals on a default run. By defa
 ## Reachability limits
 
 Deciding what code is actually used is undecidable in general, and static analysis cannot fully resolve every path a program can take. `muntutils` cannot always see through dynamic dispatch, function pointers, `dlopen`/`dlsym` loading, reflection, or preprocessor conditionals. Because of this the tool is deliberately conservative: when it cannot prove a function is unused, it keeps that function, and it reports the constructs it could not fully resolve so a reviewer can check them by hand. Treat the removed-function list as a proposal to review, not as a guarantee.
+
+Name-based dispatch is handled specifically. Many programs select a function by its textual name at runtime through a custom loader, a plugin or command registry, or config-driven dispatch, not only through `dlsym`/`GetProcAddress`. To stay conservative in that case, `muntutils` collects every identifier-shaped token that appears inside a string literal anywhere in the tree and, if such a token matches a defined function name, keeps that function alive as a root even when nothing else references it by symbol. In addition, whenever the tool proposes a removal while any string literal in the tree matches a defined function name, it records that as an unresolved construct and lowers the reported confidence below full certainty, because that is exactly the situation where a name could be assembled or referenced textually in a way the scanner cannot follow.
 
 ## Report audience
 

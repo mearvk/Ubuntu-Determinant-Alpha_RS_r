@@ -8,9 +8,11 @@
  * brace-balanced body, and records every identifier reference across the whole
  * tree. It then computes a conservative reachable set. Roots include main, any
  * function whose address is taken, symbols named in dlsym or GetProcAddress
- * string arguments, and by default every externally linkable (non-static)
- * function. A function is trimmed only when it is provably unreferenced under
- * these rules. When uncertain the engine keeps the function.
+ * string arguments, any function whose name appears verbatim inside a string
+ * literal anywhere in the tree (general name-based dynamic dispatch), and by
+ * default every externally linkable (non-static) function. A function is
+ * trimmed only when it is provably unreferenced under these rules. When
+ * uncertain the engine keeps the function.
  *
  * It calls the C11 filesystem core through the extern "C" API in
  * muntutils_fs.h to enumerate source files in a portable, symlink-safe way.
@@ -254,6 +256,82 @@ void collect_dynamic_symbols(const std::string &raw,
     }
 }
 
+// Extract every whitespace-free identifier-shaped token that appears as (or
+// inside) a double-quoted string literal in the raw text. This is the general
+// defense against name-based dynamic dispatch: any custom loader, plugin
+// registry, command table, or config-driven handler that selects a function by
+// its textual name leaves that name in a string literal, even when there is no
+// dlsym or GetProcAddress call. Any such token that matches a defined function
+// name is treated as a conservative root so the function is never trimmed.
+//
+// A string may hold more than a bare identifier (paths, format strings,
+// messages), so we tokenize the string body on non-identifier characters and
+// emit each maximal identifier run. This over-collects harmlessly: a stray
+// word that happens to equal a function name only causes that function to be
+// kept, which is the safe direction.
+void collect_quoted_identifiers(const std::string &raw,
+                                std::unordered_set<std::string> &quoted_idents) {
+    size_t n = raw.size();
+    size_t i = 0;
+    while (i < n) {
+        char c = raw[i];
+        // Skip line comments so commented-out text does not create phantom
+        // roots; block comments are handled the same way for consistency.
+        if (c == '/' && i + 1 < n && raw[i + 1] == '/') {
+            i += 2;
+            while (i < n && raw[i] != '\n') ++i;
+            continue;
+        }
+        if (c == '/' && i + 1 < n && raw[i + 1] == '*') {
+            i += 2;
+            while (i + 1 < n && !(raw[i] == '*' && raw[i + 1] == '/')) ++i;
+            i += 2;
+            continue;
+        }
+        if (c == '\'') {
+            // Character literal: skip its contents so an escaped quote inside
+            // does not desynchronize the double-quote scanner.
+            ++i;
+            while (i < n && raw[i] != '\'') {
+                if (raw[i] == '\\' && i + 1 < n) { i += 2; continue; }
+                ++i;
+            }
+            if (i < n) ++i;
+            continue;
+        }
+        if (c == '"') {
+            ++i;
+            std::string body;
+            while (i < n && raw[i] != '"') {
+                if (raw[i] == '\\' && i + 1 < n) {
+                    // Keep the escaped character verbatim minus the backslash so
+                    // runs are not artificially split; good enough heuristically.
+                    body.push_back(raw[i + 1]);
+                    i += 2;
+                    continue;
+                }
+                body.push_back(raw[i]);
+                ++i;
+            }
+            if (i < n) ++i; // consume closing quote
+            // Tokenize the string body into maximal identifier runs.
+            size_t k = 0;
+            size_t bn = body.size();
+            while (k < bn) {
+                if (is_ident_start(body[k])) {
+                    size_t s = k;
+                    while (k < bn && is_ident_char(body[k])) ++k;
+                    quoted_idents.insert(body.substr(s, k - s));
+                } else {
+                    ++k;
+                }
+            }
+            continue;
+        }
+        ++i;
+    }
+}
+
 // Note preprocessor conditionals and function-pointer typedefs as unresolved
 // constructs so the report is honest about analysis limits.
 void note_unresolved(const FileText &ft, TrimResult &result) {
@@ -360,12 +438,74 @@ extern "C" int collect_cb(const char *abs_path, const char *rel_path, void *user
 
 } // namespace
 
+// Canonicalize a path for containment comparison. On POSIX, realpath resolves
+// symlinks and "." / ".." components for existing paths; for a not-yet-created
+// --out dir we canonicalize its existing parent and re-append the leaf. The
+// returned string has no trailing slash. On failure the input is returned as
+// given (a lexical best effort), which still catches the common cases.
+std::string canonical_path(const std::string &p) {
+    if (p.empty()) return p;
+#if !defined(_WIN32)
+    char resolved[4096];
+    if (realpath(p.c_str(), resolved) != nullptr) {
+        return std::string(resolved);
+    }
+    // Path may not exist yet (typical for --out). Resolve the parent instead.
+    {
+        std::string path = p;
+        while (path.size() > 1 && path.back() == '/') path.pop_back();
+        size_t slash = path.find_last_of('/');
+        std::string parent = (slash == std::string::npos) ? "." : path.substr(0, slash);
+        std::string leaf = (slash == std::string::npos) ? path : path.substr(slash + 1);
+        if (parent.empty()) parent = "/";
+        if (realpath(parent.c_str(), resolved) != nullptr) {
+            std::string base(resolved);
+            if (!base.empty() && base.back() == '/') base.pop_back();
+            return base + "/" + leaf;
+        }
+    }
+#endif
+    std::string lexical = p;
+    while (lexical.size() > 1 && (lexical.back() == '/' || lexical.back() == '\\'))
+        lexical.pop_back();
+    return lexical;
+}
+
+// True if child is equal to, or lexically nested inside, parent (both assumed
+// already canonicalized with no trailing separator).
+bool path_within(const std::string &child, const std::string &parent) {
+    if (parent.empty() || child.empty()) return false;
+    if (child == parent) return true;
+    if (child.size() > parent.size() &&
+        child.compare(0, parent.size(), parent) == 0 &&
+        (child[parent.size()] == '/' || child[parent.size()] == '\\')) {
+        return true;
+    }
+    return false;
+}
+
 bool run_trim(const TrimOptions &opts, TrimResult &result, std::string &error) {
     // Safety gate: default runs must never touch originals.
     if (!opts.in_place && opts.out_dir.empty()) {
         error = "trim requires --out <dir> unless --in-place is given explicitly";
         result.ok = false;
         return false;
+    }
+
+    // Reject an --out directory that resolves inside the source tree. If it did,
+    // a subsequent run would enumerate the generated slim copy as fresh input,
+    // conflating output with input and re-analyzing produced files. The source
+    // tree itself is also not a valid output root.
+    if (!opts.in_place && !opts.out_dir.empty()) {
+        std::string csrc = canonical_path(opts.src_tree);
+        std::string cout = canonical_path(opts.out_dir);
+        if (path_within(cout, csrc)) {
+            error = "refusing to write slim output into the source tree (--out '" +
+                    opts.out_dir + "' resolves inside '" + opts.src_tree +
+                    "'); choose an --out directory outside the source tree";
+            result.ok = false;
+            return false;
+        }
     }
 
     Collector col;
@@ -405,10 +545,12 @@ bool run_trim(const TrimOptions &opts, TrimResult &result, std::string &error) {
     std::unordered_map<std::string, std::unordered_set<size_t>> def_offsets;
     for (const auto &f : funcs) def_offsets[f.file].insert(f.name_offset);
 
-    // Pass 2: collect references, address-taken uses, and dynamic symbols.
+    // Pass 2: collect references, address-taken uses, dynamic symbols, and
+    // every identifier-shaped token found inside a string literal.
     std::unordered_set<std::string> referenced;
     std::unordered_set<std::string> address_taken;
     std::unordered_set<std::string> dynamic;
+    std::unordered_set<std::string> quoted_idents;
     for (const auto &ft : files) {
         const auto it = def_offsets.find(ft.rel);
         static const std::unordered_set<size_t> empty_offsets;
@@ -416,6 +558,18 @@ bool run_trim(const TrimOptions &opts, TrimResult &result, std::string &error) {
             it != def_offsets.end() ? it->second : empty_offsets;
         collect_references(ft.stripped, func_names, skip, referenced, address_taken);
         collect_dynamic_symbols(ft.raw, dynamic);
+        collect_quoted_identifiers(ft.raw, quoted_idents);
+    }
+
+    // Any quoted token that matches a defined function name is a
+    // name-in-string root. This closes the general name-based dispatch hole:
+    // a function selected by textual name through a custom (non-dlsym) loader,
+    // a plugin/command registry, or config-driven dispatch stays alive because
+    // its name is present in the source, just inside a string literal. A name
+    // present in the source is not proven unreferenced, so we keep it.
+    std::unordered_set<std::string> string_named;
+    for (const auto &f : funcs) {
+        if (quoted_idents.count(f.name)) string_named.insert(f.name);
     }
 
     // Determine the conservative root set and mark reachability. Because the
@@ -430,6 +584,9 @@ bool run_trim(const TrimOptions &opts, TrimResult &result, std::string &error) {
         if (f.name == "main") root = true;
         if (address_taken.count(f.name)) { root = true; f.address_taken = true; }
         if (dynamic.count(f.name)) root = true;
+        // Name appears verbatim inside a string literal: possible name-based
+        // dynamic dispatch. Keep it regardless of --strict.
+        if (string_named.count(f.name)) root = true;
         if (!opts.strict && !f.is_static) root = true; // externally linkable
         // Referenced anywhere in the tree keeps it alive.
         if (referenced.count(f.name)) root = true;
@@ -447,10 +604,41 @@ bool run_trim(const TrimOptions &opts, TrimResult &result, std::string &error) {
         }
     }
 
+    // When the tree both proposes a removal and contains string literals whose
+    // text matches a defined function name, the analysis is operating in the
+    // exact blind spot where name-based dispatch can hide a live reference.
+    // Even though those matched names were promoted to roots above, other
+    // functions may be dispatched by names we could not correlate (assembled
+    // strings, substrings, names built at runtime). Surface this honestly as an
+    // unresolved construct so the reported confidence degrades here rather than
+    // only for the patterns we happen to match syntactically.
+    bool string_dispatch_blindspot = false;
+    if (result.functions_dead > 0 && !string_named.empty()) {
+        string_dispatch_blindspot = true;
+        std::string names;
+        size_t shown = 0;
+        for (const auto &nm : string_named) {
+            if (shown++) names += ", ";
+            names += nm;
+            if (shown >= 8) { names += ", ..."; break; }
+        }
+        result.unresolved.push_back(
+            {opts.src_tree,
+             "string literals name defined functions (" + names +
+                 "); name-based dynamic dispatch may reference other functions "
+                 "by textual name. Matched names were kept; review removals."});
+    }
+
     // Confidence: start at full and reduce for each unresolved construct,
     // floored at a modest value so we never claim certainty we do not have.
     double penalty = 0.03 * (double)result.unresolved.size();
     result.confidence = penalty >= 0.6 ? 0.4 : (1.0 - penalty);
+    // Never report full certainty when a removal is proposed while string
+    // literals matching defined function names exist: that is precisely the
+    // situation where a heuristic scanner is most likely to be wrong.
+    if (string_dispatch_blindspot && result.confidence > 0.90) {
+        result.confidence = 0.90;
+    }
 
     // Emit slimmed output.
     if (opts.in_place) {
