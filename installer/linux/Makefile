@@ -1,4 +1,4 @@
-.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test white-installer white-installer-static
+.PHONY: all clean install uninstall install-user-bin install-user-runnables install-usr-bin install-usr-runnables install-deck-bin install-deck-runnables update-path update-front-link nxtt nxtt-install nxtt-uninstall nxtt-clean nxtt-test white-installer white-installer-static component-installers install-component-installers
 
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic
@@ -13,6 +13,18 @@ NXTT_SRC := nxtt-uninstaller.c
 WIO_TARGET := white-installer
 WIO_SRC := white_installer_orchestrator.c
 WIO_HDR := white_installer_orchestrator.h
+
+# Compiled component installers — the "cleaner/safer" native counterparts of
+# scripts/install-os-security.sh and scripts/install-git-improved.sh. They are
+# control planes: every privileged action is a fixed argv run via fork/execvp
+# against an allow-list (component_installer.h), never a shell string. Default
+# action is a safe DRY RUN. The .sh scripts remain the delegated engine path;
+# these binaries are additive front doors.
+OSI_TARGET := os-security-installer
+OSI_SRC := os_security_installer.c
+GII_TARGET := git-improved-installer
+GII_SRC := git_improved_installer.c
+CI_HDR := component_installer.h
 
 USER_ROOT ?= /user
 USR_ROOT ?= /usr
@@ -29,7 +41,7 @@ USR_RUNNABLES := $(USR_ROOT)/runnables
 DECK_BIN := $(DECK_ROOT)/bin
 DECK_RUNNABLES := $(DECK_ROOT)/runnables
 
-all: $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
+all: $(TARGET) $(NXTT_TARGET) $(WIO_TARGET) $(OSI_TARGET) $(GII_TARGET)
 
 $(TARGET): $(SRC) desktop_install_probe.h
 	$(CC) $(CFLAGS) -o $@ $(SRC)
@@ -50,6 +62,24 @@ $(WIO_TARGET): $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
 # `white-installer` target for in-sandbox compile validation.
 white-installer-static: $(WIO_SRC) $(WIO_HDR) desktop_install_probe.h
 	$(CC) $(CFLAGS) -static -o $(WIO_TARGET) $(WIO_SRC)
+
+# --- Compiled component installers ---------------------------------------
+$(OSI_TARGET): $(OSI_SRC) $(CI_HDR)
+	$(CC) $(CFLAGS) -o $@ $(OSI_SRC)
+
+$(GII_TARGET): $(GII_SRC) $(CI_HDR)
+	$(CC) $(CFLAGS) -o $@ $(GII_SRC)
+
+component-installers: $(OSI_TARGET) $(GII_TARGET)
+
+# Install the compiled component installers alongside their .sh counterparts in
+# /usr/sbin (the same directory galactic-cherry-installer expects the scripts).
+# Additive: the scripts are NOT removed. DESTDIR is honored for chroot installs.
+install-component-installers: $(OSI_TARGET) $(GII_TARGET)
+	install -d $(DESTDIR)/usr/sbin
+	install -m 0755 $(OSI_TARGET) $(DESTDIR)/usr/sbin/$(OSI_TARGET)
+	install -m 0755 $(GII_TARGET) $(DESTDIR)/usr/sbin/$(GII_TARGET)
+	@echo "Installed $(OSI_TARGET) and $(GII_TARGET) to $(DESTDIR)/usr/sbin"
 
 install: $(TARGET)
 	@case "$(INSTALL_CHOICE)" in \
@@ -137,7 +167,7 @@ update-front-link:
 	fi
 
 clean:
-	rm -f $(TARGET) $(NXTT_TARGET) $(WIO_TARGET)
+	rm -f $(TARGET) $(NXTT_TARGET) $(WIO_TARGET) $(OSI_TARGET) $(GII_TARGET)
 
 uninstall:
 	rm -f $(USER_BIN)/$(TARGET) $(USER_RUNNABLES)/$(TARGET) \
