@@ -199,6 +199,17 @@ store the given number of bits.
 @return nonzero if n is zero or a power of two; zero otherwise */
 #define ut_is_2pow(n) UNIV_LIKELY(!((n) & ((n)-1)))
 
+/** Convert a scoped enumeration (enum class) value to its underlying integer
+type. InnoDB uses this throughout the log, archive and dictionary code to
+serialize enum values (e.g. to_int(Log_format::CURRENT), to_int(space->purpose))
+without an explicit static_cast. Matches the upstream MySQL InnoDB helper.
+@param[in]  v  the enumerator value
+@return v as its underlying integer type */
+template <typename T>
+constexpr typename std::underlying_type<T>::type to_int(T v) {
+  return static_cast<typename std::underlying_type<T>::type>(v);
+}
+
 /** Functor that compares two C strings. Can be used as a comparator for
 e.g. std::map that uses char* as keys. */
 struct ut_strcmp_functor {
@@ -401,6 +412,12 @@ class Throttler {
 };
 
 }  // namespace ib
+
+/** Minimum wall-clock interval between successive progress/diagnostic log
+messages emitted by long-running InnoDB operations (tablespace scanning,
+recovery, rename, etc.). Compared against std::chrono::steady_clock elapsed
+time. Matches the upstream MySQL InnoDB constant. */
+constexpr std::chrono::seconds PRINT_INTERVAL{10};
 
 namespace ut {
 

@@ -47,6 +47,11 @@ external tools. */
 
 #include "univ.i"
 
+/* This header declares members returning dberr_t (Encryption::check(),
+validate(), Encryption_key deserialize(), ...); include the InnoDB error-code
+definitions so the header is self-contained regardless of include order. */
+#include "db0err.h"
+
 /** Compression algorithm. */
 struct Compression {
   /** Algorithm types supported */

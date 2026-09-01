@@ -37,6 +37,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <atomic>
 #include <cstdint>
 
+#include "my_rdtsc.h" /* my_timer_cycles */
 #include "univ.i"
 #include "ut0byte.h"
 #include "ut0math.h"

@@ -60,6 +60,26 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "ut0new.h"
 #include "ut0rnd.h"
 
+/* NAME_LEN (the maximum identifier byte length used by the SQL layer) is the
+basis for the InnoDB name-length limits below. */
+#include "mysql_com.h"
+
+/* Maximum lengths, in bytes, of the database and table identifier components
+of an InnoDB internal table name, and of the combined "database/table" name
+(the +14 accounts for the '/' separator plus the "#sql-" temporary-name and
+partition suffixes InnoDB may append). These match the upstream MySQL InnoDB
+dict0dict.h definitions and are relied on by dict0crea.ic, dict0dd.ic,
+fts0fts.cc and others (76+ references to MAX_FULL_NAME_LEN alone). */
+#ifndef MAX_DATABASE_NAME_LEN
+#define MAX_DATABASE_NAME_LEN NAME_LEN
+#endif
+#ifndef MAX_TABLE_NAME_LEN
+#define MAX_TABLE_NAME_LEN NAME_LEN
+#endif
+#ifndef MAX_FULL_NAME_LEN
+#define MAX_FULL_NAME_LEN (MAX_TABLE_NAME_LEN + MAX_DATABASE_NAME_LEN + 14)
+#endif
+
 #define dict_sys_mutex_enter() mutex_enter(&dict_sys->mutex)
 
 #define dict_sys_mutex_exit() mutex_exit(&dict_sys->mutex)

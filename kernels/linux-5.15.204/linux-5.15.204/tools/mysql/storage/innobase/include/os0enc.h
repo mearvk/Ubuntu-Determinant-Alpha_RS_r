@@ -34,6 +34,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 #include <mysql/components/my_service.h>
 #include "univ.i"
 
+/* Several members here return dberr_t (Encryption::set_or_generate(),
+decode_encryption_info(), ...); include the InnoDB error-code definitions so
+the header is self-contained regardless of include order. */
+#include "db0err.h"
+
 namespace innobase {
 namespace encryption {
 

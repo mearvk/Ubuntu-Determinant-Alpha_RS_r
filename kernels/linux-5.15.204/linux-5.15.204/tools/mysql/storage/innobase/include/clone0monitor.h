@@ -36,7 +36,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /* mysql_stage_inc_work_completed */
 #include "mysql/psi/mysql_stage.h"
 #include "univ.i"
+#include "ut0byte.h" /* ut_uint64_align_down */
 #include "ut0dbg.h"
+#include "ut0ut.h" /* ut_2_exp */
 
 /** Function to alert caller for long wait.
 @return error code */

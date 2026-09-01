@@ -34,6 +34,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define CLONE_API_INCLUDE
 
 #include "univ.i"
+
+/* Many prototypes below return dberr_t; include the InnoDB error-code
+definitions so the header is self-contained regardless of include order. */
+#include "db0err.h"
+
 #ifndef UNIV_HOTBACKUP
 #include "sql/handler.h"
 
