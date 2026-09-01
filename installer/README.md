@@ -28,6 +28,24 @@ macOS:   ./installer/install-all-macos.sh
 
 The master installer first invokes the native installer for the host. When Java and Maven are available, it also builds the JavaFX installer package.
 
+### Install via apt-get (signed APT repository)
+
+The precompiled installer binaries are also published as a **signed APT
+repository** on GitHub Pages, so they can be installed with `apt-get`:
+
+```sh
+curl -fsSL https://mearvk.github.io/Ubuntu.Determinant.Beta.Restricted/apt/KEY.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/ubuntu-determinant.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ubuntu-determinant.gpg] https://mearvk.github.io/Ubuntu.Determinant.Beta.Restricted/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/ubuntu-determinant.list
+sudo apt-get update
+sudo apt-get install os-security-installer git-improved-installer
+```
+
+See `docs/apt/index.md` for the full package list and usage, `packaging/README.md`
+for how the repository is built, and `packaging/SIGNING.md` for the signing/key
+setup.
+
 ### Native installers
 
 ```text

@@ -1,0 +1,125 @@
+name: APT repository
+
+# Builds the precompiled installer binaries into .deb packages, generates a
+# signed APT repository index, and publishes it to GitHub Pages so users can
+# install with apt-get. See packaging/README.md and docs/apt/index.md.
+#
+# One-time setup required in the repository (see packaging/SIGNING.md):
+#   - Settings > Pages: set Source = "GitHub Actions"
+#   - Settings > Secrets and variables > Actions:
+#       APT_GPG_PRIVATE_KEY  (ASCII-armored private key)
+#       APT_GPG_PASSPHRASE   (its passphrase; may be empty)
+
+on:
+  push:
+    tags:
+      - 'v*'
+    paths:
+      - 'installer/linux/**'
+      - 'packaging/**'
+      - 'docs/apt/**'
+      - '.github/workflows/apt-repo.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one concurrent Pages deployment.
+concurrency:
+  group: apt-repo-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Debian packaging tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${v:-1.0.0}" >> "$GITHUB_OUTPUT"
+
+      - name: Build .deb packages
+        env:
+          DEB_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          chmod +x packaging/build-deb.sh packaging/make-repo.sh
+          packaging/build-deb.sh
+
+      - name: Generate repository index
+        run: packaging/make-repo.sh
+
+      - name: Import GPG signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "${APT_GPG_PRIVATE_KEY:-}" ]; then
+            echo "::error::APT_GPG_PRIVATE_KEY secret is not set. See packaging/SIGNING.md."
+            exit 1
+          fi
+          echo "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          # Record the key id and export the public key users will import.
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          echo "APT_GPG_KEYID=$KEYID" >> "$GITHUB_ENV"
+          gpg --batch --armor --export "$KEYID" > packaging/out/KEY.gpg
+          echo "Exported public key $KEYID to packaging/out/KEY.gpg"
+
+      - name: Sign Release (InRelease + Release.gpg)
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          REL="packaging/out/dists/stable/Release"
+          # Clearsigned inline index.
+          gpg --batch --yes --pinentry-mode loopback \
+              ${APT_GPG_PASSPHRASE:+--passphrase "$APT_GPG_PASSPHRASE"} \
+              --local-user "$APT_GPG_KEYID" \
+              --clearsign -o "${REL%/Release}/InRelease" "$REL"
+          # Detached signature.
+          gpg --batch --yes --pinentry-mode loopback \
+              ${APT_GPG_PASSPHRASE:+--passphrase "$APT_GPG_PASSPHRASE"} \
+              --local-user "$APT_GPG_KEYID" \
+              -abs -o "${REL%/Release}/Release.gpg" "$REL"
+          echo "Signed $REL"
+
+      - name: Assemble Pages site
+        run: |
+          # Publish the repo under /apt and copy the landing page to the root.
+          mkdir -p site/apt
+          cp -r packaging/out/* site/apt/
+          if [ -f docs/apt/index.md ]; then cp docs/apt/index.md site/apt/README.md; fi
+          # A minimal root index so the Pages URL isn't a 404.
+          cat > site/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8">
+          <title>Ubuntu Determinant APT repository</title>
+          <h1>Ubuntu Determinant — APT repository</h1>
+          <p>Signed APT repository for the precompiled installer binaries.</p>
+          <p>Setup instructions: <a href="apt/README.md">apt/README.md</a>.</p>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
