@@ -187,6 +187,7 @@ declare -a BUILD_ORDER=(
     "x11"
     "wallpapers"
     "tools"
+    "tools-muntutils"
     "tools-cronie"
     "tools-clamav"
     "tools-chkrootkit"
