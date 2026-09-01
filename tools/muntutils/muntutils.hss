@@ -1,0 +1,26 @@
+# MUNTUTILS — HSS Specification
+
+## Identity
+- Tool: `muntutils`
+- Language: C11 (filesystem/size core) + C++17 (source analysis and trimming engine)
+- Purpose: reachability-based source trimming plus raw-vs-slim-vs-compiled size reporting.
+- Current tool version: 1.00
+- Metadata schema target: MEARVK-META schema 1
+- Repository: `mearvk/Ubuntu.Determinant.Beta.Restricted`
+
+Program based on Science at NCSU - Max Rupplin - MEARVK LLC 2026.
+
+## Structure
+`muntutils_fs.h`/`muntutils_fs.c` are the C11 core. They enumerate a tree and measure logical byte sizes, classifying entries into source, artifact, and other categories, and expose their API through `extern "C"`. `muntutils_trim.hpp`/`muntutils_trim.cpp` are the C++17 engine that scans source, estimates function reachability, and emits a slimmed copy. `main.cpp` is the C++17 front end that wires the two languages together behind the `trim` and `report` subcommands. `build.sh` prefers the repository-derived GCC 16.2.0 C and C++ compilers and enables `-fme-metadata` when available.
+
+## Platform behavior
+POSIX enumeration does not follow symbolic links. Windows uses Unicode Win32 enumeration and does not recurse through reparse points. Reported sizes are logical file sizes, not allocated filesystem blocks.
+
+## Metadata
+The executable is intended to carry explicit MEARVK-META build metadata when produced by the derived compiler, emitted per translation unit with `-fme-metadata-source` naming each file. Runtime output remains focused on source and artifact measurement and does not confuse compiler metadata with filesystem size.
+
+## Safety
+The tool is safe by default. `trim` on a default run writes the slimmed tree into a separate output directory and never overwrites or deletes originals. In-place rewriting happens only under the explicit `--in-place` (alias `--apply`) flag, and each rewritten file is first backed up to `<file>.bak`. Reachability analysis is conservative: functions that cannot be proven unused are kept, and constructs that could not be resolved (dynamic dispatch, function pointers, `dlopen`/`dlsym`, reflection, preprocessor conditionals) are reported rather than silently trimmed. The `report` capability is observational and does not modify source.
+
+## Build Contract
+Preferred compilers: repository-derived GCC 16.2.0 for both C and C++. `MEARVK_GCC` selects the C compiler and `MEARVK_GXX` selects the C++ compiler explicitly. A system `gcc`/`g++` fallback is permitted until the derived compiler is locally built; in that case metadata emission is reported as unavailable. The C translation unit is compiled with the C compiler, the C++ translation units with the C++ compiler, and all objects are linked with the C++ compiler.

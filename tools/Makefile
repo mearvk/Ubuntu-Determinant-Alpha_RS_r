@@ -8,9 +8,9 @@
 
 SHELL := /bin/sh
 
-TOOLS := pcopy pmove
+TOOLS := pcopy pmove muntutils
 
-.PHONY: all pcopy pmove install uninstall clean
+.PHONY: all pcopy pmove muntutils install uninstall clean
 
 all: $(TOOLS)
 
@@ -20,14 +20,22 @@ pcopy:
 pmove: pcopy
 	$(MAKE) -C pmove all
 
+# muntutils is independent of pcopy/pmove and must not depend on them, so it
+# can build even when the pcopy/pmove chain does not.
+muntutils:
+	$(MAKE) -C muntutils all
+
 install: all
 	$(MAKE) -C pcopy install
 	$(MAKE) -C pmove install
+	$(MAKE) -C muntutils install
 
 uninstall:
 	$(MAKE) -C pmove uninstall
 	$(MAKE) -C pcopy uninstall
+	$(MAKE) -C muntutils uninstall
 
 clean:
 	$(MAKE) -C pmove clean
 	$(MAKE) -C pcopy clean
+	$(MAKE) -C muntutils clean
