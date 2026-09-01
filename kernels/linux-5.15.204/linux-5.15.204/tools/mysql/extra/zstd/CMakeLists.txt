@@ -46,12 +46,21 @@ SET(ZSTD_SRCS
   ${ZSTD_VERSION_DIR}/lib/dictBuilder/zdict.c
 )
 
+# LOCAL BRING-UP (task-dave-web-local-bringup, FEAT-002): the x86-64 assembly
+# optimization file huf_decompress_amd64.S is NOT present in this vendored zstd
+# 1.5.7 copy. If it is missing, fall back to the pure-C decompression path by
+# defining ZSTD_DISABLE_ASM (upstream-supported) instead of trying to compile a
+# non-existent source. This keeps the bundled zstd usable with no network.
 IF((LINUX AND NOT LINUX_ARM) OR
     (APPLE AND NOT APPLE_ARM))
-  ENABLE_LANGUAGE(ASM)
-  LIST(APPEND ZSTD_SRCS
-    ${ZSTD_VERSION_DIR}/lib/decompress/huf_decompress_amd64.S
-    )
+  IF(EXISTS "${ZSTD_VERSION_DIR}/lib/decompress/huf_decompress_amd64.S")
+    ENABLE_LANGUAGE(ASM)
+    LIST(APPEND ZSTD_SRCS
+      ${ZSTD_VERSION_DIR}/lib/decompress/huf_decompress_amd64.S
+      )
+  ELSE()
+    ADD_DEFINITIONS(-DZSTD_DISABLE_ASM)
+  ENDIF()
 ENDIF()
 
 ADD_CONVENIENCE_LIBRARY(zstd
