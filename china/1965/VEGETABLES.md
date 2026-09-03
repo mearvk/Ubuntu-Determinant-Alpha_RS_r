@@ -2,14 +2,13 @@
 
 The parent directory identifies the year. This document covers vegetable production as part of China's horticultural and food-supply system.
 
-## Indicators
-- Vegetable sown/harvested area where reported.
-- Vegetable output.
-- Yield per hectare where available.
-- Major vegetable categories where the source provides a consistent series.
-- Related protected cultivation and horticultural indicators when officially available.
+## 1965 Actual Price Data
+
+| Date | Product | Region | Season | Price |
+|---|---|---|---|---:|
+| 1965 | Fresh vegetables — commodity price | China | Annual | N/A — no verified national yuan/kg quotation located |
 
 ## Data rule
-Vegetable definitions and commodity groupings can vary by statistical publication and period. Preserve the original classification and do not infer missing commodity totals from unrelated series.
+The archive does not substitute a later-period vegetable price, a price index, or an estimated value for a 1965 national commodity quotation. Vegetable production and price observations remain separate until a period-specific source is verified.
 
 Reference: https://www.stats.gov.cn/sj/ndsj/
