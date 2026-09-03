@@ -122,11 +122,6 @@ int transport_push(struct repository *repo,
 		   struct refspec *rs, int flags,
 		   unsigned int * reject_reasons);
 
-#ifdef BUILTIN_H
-#include "push-budget.h"
-#define transport_push transport_push_with_budget
-#endif
-
 struct transport_ls_refs_options {
 	struct strvec ref_prefixes;
 	const char *unborn_head_target;
@@ -144,6 +139,13 @@ int transport_fetch_refs(struct transport *transport, struct ref *refs);
 int transport_fetch_object_info(struct transport *transport,
 				const struct oid_array *oids,
 				struct fetch_object_info_results *results);
+
+/* Ubuntu Determinant native push policy. It is enabled only for builtin
+ * translation units, after the underlying transport API is declared. */
+#ifdef BUILTIN_H
+#include "push-budget.h"
+#define transport_push transport_push_with_budget
+#endif
 
 #define TRANSPORT_UNLOCK_PACK_IN_SIGNAL_HANDLER (1 << 0)
 void transport_unlock_pack(struct transport *transport, unsigned int flags);
