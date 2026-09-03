@@ -4,6 +4,12 @@ This year directory is the archival container for the requested China statistics
 
 > **Metadata:** `record_type=annual_archive_index` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `methodology=source_led_archival_record` · `revision_policy=preserve_source_definitions`
 
+## Methods
+
+The purpose of this archive is not merely to collect numbers, but to preserve a durable evidence base for why those numbers matter. It is designed to serve **college and university study**, **professional research**, and long-term historical analysis by keeping each observation tied to its source, definition, year, and methodological context. That makes the record useful for students learning how evidence is constructed, professionals comparing economic and agricultural systems, and researchers who need to distinguish an observed historical fact from a later reconstruction, estimate, or interpretation.
+
+The longer-term purpose is also **legal, congressional, institutional, and moral**: to provide a traceable historical record that can support serious public-policy analysis, legislative research, oversight, historical inquiry, and ethical judgment without turning the archive itself into advocacy. A durable record should allow future readers to ask not only *what happened*, but *what evidence supports the claim, what was known at the time, what definitions were used, and why a later conclusion should or should not be trusted*. The method therefore favors provenance, transparency, comparability controls, and explicit uncertainty over convenient numbers or unsupported conclusions.
+
 ## Status
 
 The annual directory structure is established for 1965–2026. A category is `AVAILABLE` only when an authoritative source publishes an observation for the specific year and series. Otherwise the record must remain `NOT_AVAILABLE`.
