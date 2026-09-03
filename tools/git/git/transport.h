@@ -122,9 +122,6 @@ int transport_push(struct repository *repo,
 		   struct refspec *rs, int flags,
 		   unsigned int * reject_reasons);
 
-/* Ubuntu Determinant native push policy. The macro is intentionally enabled
- * only for builtin translation units. transport.c keeps the original
- * transport_push() implementation as the underlying operation. */
 #ifdef BUILTIN_H
 #include "push-budget.h"
 #define transport_push transport_push_with_budget
@@ -151,7 +148,7 @@ int transport_fetch_object_info(struct transport *transport,
 #define TRANSPORT_UNLOCK_PACK_IN_SIGNAL_HANDLER (1 << 0)
 void transport_unlock_pack(struct transport *transport, unsigned int flags);
 int transport_disconnect(struct transport *transport);
-char *transport_anonymize_url(struct transport *transport);
+char *transport_anonymize_url(const char *url);
 void transport_take_over(struct transport *transport,
 			 struct child_process *child);
 int transport_connect(struct transport *transport,
