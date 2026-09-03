@@ -1,33 +1,57 @@
-# Korea Data Sources and Initial Verified Data Pass
+# Korea Data Sources and Full-Data Build
 
-## Verified source families
+## Source hierarchy
 
-### KOSIS
-KOSIS is the Korean Statistical Information Service and exposes statistical databases for agriculture and forestry, economy and market, prices, national accounts, environment, and other domains. Its public statistical dashboard also exposes long historical indicator years, including 1965 onward for some series. Historical coverage therefore varies by indicator and must be checked table-by-table.
-
-### KAMIS
-KAMIS provides agricultural, livestock, and fishery market-price information. Its current public pages expose annual, monthly, daily, and historical retail series. The annual retail view is suitable for controlled transcription of commodity prices; the site also documents that prices are reference averages and may differ from individual sellers, origins, brands, and specifications.
-
-A historical KAMIS annual example available during this research pass contains annual oyster retail observations back through the 1990s. This demonstrates that useful historical price depth exists, but it does not establish that every commodity has the same start year.
+### KOSIS / Statistics Korea
+KOSIS provides long historical national indicators and statistical tables. The current public indicators confirm, for example, nominal GDP coverage from 1953 through 2025 and per-capita rice consumption coverage from 1963 through 2025. The food-crop production indicator currently exposes 1998-2024/2026-era coverage depending on the table/version. These ranges demonstrate why coverage must be tracked per series rather than assumed globally.
 
 ### MAFRA
-The Ministry of Agriculture, Food and Rural Affairs publishes the annual agricultural and food statistical yearbook. The 2025 statistical yearbook was published in 2026 and is an important current anchor for agriculture, food, and livestock series.
+The Ministry of Agriculture, Food and Rural Affairs publishes annual agricultural and food statistical yearbooks. MAFRA's statistical service documents the yearbook as a long-running publication beginning in 1952; historical volumes contain agriculture, forestry, livestock, food, production, price-index, and rural-household statistics. The current publication system exposes yearbooks and major-statistics volumes through recent years.
+
+### KAMIS
+KAMIS provides agricultural, livestock, and fishery market-price information with annual, monthly, daily, wholesale, retail, and historical views. Its public annual pages expose current and historical commodity price observations. Price units, grade, market type, and product definition must be retained when transcribing.
 
 ### Bank of Korea
-The Bank of Korea publishes national accounts and methodological documentation. Its 2025 national-accounts release provides current macroeconomic observations and a documented national-accounts framework.
+The Bank of Korea supplies national-account observations and methodology. KOSIS identifies the BOK national-accounts table as the source for the annual nominal GDP series and notes that 2025 figures may be provisional depending on the release.
 
-## Current observations captured for later structured transcription
+### FAOSTAT / AQUASTAT
+The automated annual builder uses compatible FAOSTAT Crops and livestock products data for item-level agricultural/livestock series and compatible AQUASTAT-derived freshwater-withdrawal data where available. These international series are not treated as superior to Korean primary tables; they provide a reproducible machine-readable baseline and make gaps explicit.
 
-- KAMIS 2026 annual retail page currently reports annual commodity averages, including rice and other food commodities.
-- Bank of Korea's 2025 national-accounts release reports nominal GDP of KRW 2,676.7 trillion and real GDP growth of 1.1% for 2025 in the June 2026 finalized/preliminary release context.
-- Statistics Korea's 2024 Farm Household Sale and Purchase Price Survey reports a farm-gate sale price index of 116.3, a farm purchase price index of 120.1, and a terms-of-trade index of 96.8.
+### World Bank WDI / Our World in Data
+The builder uses World Bank WDI for GDP, GDP growth, and agriculture value-added indicators and compatible Our World in Data series for selected crop, livestock, and water observations. These are machine-readable extraction layers, not replacements for primary Korean source tables.
 
-These observations are source anchors, not substitutes for year-by-year extraction. The annual files intentionally retain `PENDING_SOURCE` where a precise historical observation has not yet been transcribed and validated.
+## Current source-backed anchors
 
-## Next extraction priorities
+- KOSIS reports nominal GDP in KRW with an annual series beginning in 1953 and extending through 2025 on its current GDP indicator.
+- KOSIS reports per-capita rice consumption for 1963-2025 and identifies the source as the Grain Consumption Survey.
+- KOSIS currently reports food-crop production series beginning in 1998 and identifies the Crop Production Survey as the source.
+- KOSIS currently reports 2025 per-capita rice consumption at 53.9 kg.
+- KOSIS currently reports 2025 cultivated area at 1,499,911 hectares and 2024 food-crop production at 4,190,030 tonnes.
+- KAMIS currently exposes annual retail and wholesale price series and supports historical year selection.
+- MAFRA's publication system exposes agricultural and food statistical yearbooks through 2025, while older yearbooks establish deeper historical coverage.
 
-1. KOSIS long-run agricultural production, cultivated area, livestock inventory, and farm-household series.
-2. KAMIS commodity price series with stable definitions and documented start dates.
-3. MAFRA yearbook tables for agriculture, food, livestock, and forestry.
-4. Bank of Korea national accounts for GDP and related macro series.
-5. Water statistics from compatible Korean government and FAO/AQUASTAT sources.
+## Automated Markdown coverage
+
+`tools/korea/build_korea_annual_data.py` generates ten domain documents for every year 1965-2026:
+
+`ECONOMY`, `AGRICULTURE`, `FARMING_STATS`, `PRODUCE`, `GRAINS`, `MEAT`, `LIVESTOCK`, `VEGETABLES`, `FRUIT`, `WATER`.
+
+The builder fetches data at build time, preserves source units, performs no interpolation, and writes `N/A` where a source has no observation. The 2026 records are explicitly live/incomplete unless a final annual source observation exists.
+
+## Validation rules
+
+1. A numeric value must have an identified source family.
+2. Units must remain source-compatible.
+3. Country geography must be Republic of Korea / South Korea.
+4. Missing values remain `N/A`; they are not estimated from adjacent years.
+5. Revisions supersede older observations only when the source identifies the revised series.
+6. KOSIS/MAFRA/KAMIS/BOK table-level observations should replace or supplement international series when an exact Korean primary series is available.
+7. Derived values must identify the underlying observations and formula.
+
+## Web research anchors
+
+- KOSIS GDP: https://kosis.kr/visual/nsportalStats/detailContents.do?listId=B&statJipyoId=3654&vStatJipyoId=5181
+- KOSIS per-capita rice consumption: https://kosis.kr/visual/nsportalStats/detailContents.do?listId=N&statJipyoId=3720&vStatJipyoId=4851
+- KOSIS food-crop production: https://kosis.kr/visual/nsportalStats/detailContents.do?listId=N&statJipyoId=3724&vStatJipyoId=4867
+- MAFRA statistical publications: https://kass.mafra.go.kr/newkass/kas/sti/pbl/kasPblictn.do
+- KAMIS annual retail prices: https://www.kamis.or.kr/customer/price/agricultureRetail/period.do?action=yearly
