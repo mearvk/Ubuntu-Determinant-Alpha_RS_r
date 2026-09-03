@@ -2,17 +2,13 @@
 
 The parent directory identifies the year. Livestock covers animal inventories and production systems associated with China's animal-husbandry sector.
 
-## Core series
-- Hogs/pigs.
-- Cattle.
-- Sheep and goats.
-- Poultry.
-- Other livestock where officially reported.
-- Beginning/end inventories where available.
-- Slaughter and meat production.
-- Milk and eggs where the annual source provides them.
+## 1965 Actual Price Data
+
+| Date | Product | Region | Season | Price |
+|---|---|---|---|---:|
+| 1965 | Pigs — state procurement | China | Annual procurement | ¥0.9416/kg |
 
 ## Interpretation
-Inventory counts, slaughter counts and product output are different measures and must not be substituted for one another. NBS agriculture tables separately identify livestock numbers and livestock-product output.
+Inventory counts, slaughter counts and product output are different measures and must not be substituted for one another. The price above is the historical national procurement price for pigs, not a retail pork quotation.
 
 Reference: https://www.stats.gov.cn/yearbook/ml/lc.htm
