@@ -8,4 +8,4 @@
 | Cotton | 2.207 MMT |
 | Oilseeds | 6.435 MMT |
 
-The 1979 national annual report states agricultural total output value reached 1,584 billion? Source-unit note: the original Chinese report gives 1,584亿元 (100 million yuan), i.e. 1584 hundred-million yuan. Foodgrain and product figures are reported annual observations; no interpolation.
+The 1979 national annual report states agricultural total output value reached 1,584亿元, i.e. 1,584 hundred-million yuan. Foodgrain and product figures are reported annual observations; no interpolation.
