@@ -4,6 +4,12 @@ The parent directory identifies the year. Produce covers harvested food and agri
 
 > **Metadata:** `record_type=annual_produce` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation`
 
+## Methods
+
+The purpose of this record is to preserve the evidence behind food and produce statistics so they remain useful for **college study, professional analysis, and long-term historical research**. The WHY is not simply to list commodities or prices, but to preserve enough context for a future reader to understand how a food-supply system was measured and why a particular observation can be trusted, compared, or questioned.
+
+Produce statistics can also matter to **legal, congressional, institutional, and moral inquiry** when questions of food security, public policy, resource allocation, economic responsibility, or historical conditions arise. This record therefore separates production from procurement and market measures and avoids filling gaps with convenient estimates. Its purpose is to provide a durable evidentiary foundation for responsible analysis, not to provide legal advice or political advocacy.
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
