@@ -3,33 +3,71 @@
 
 #include "strbuf.h"
 #include "oid-array.h"
+#include "refs.h"
 
-/*
- * The Ubuntu Determinant Git policy places a hard default ceiling on a
- * single push effort. This is an object-graph budget, not a working-tree
- * file-size limit.
- */
+/* Hard native ceiling: 200 MiB per push effort. */
 #define GIT_PUSH_MAX_BYTES ((uintmax_t)200 * 1024 * 1024)
 
-static int push_budget_add_local_tips(const struct refspec *rs,
-				      struct oid_array *tips)
+struct push_budget_refs {
+	struct refspec *rs;
+	struct oid_array *tips;
+	int mirror;
+};
+
+static int push_budget_has_matching_refspec(const struct refspec *rs)
 {
-	struct ref *local_refs = get_local_heads();
-	struct ref *ref;
+	for (int i = 0; i < rs->nr; i++)
+		if (rs->items[i].matching)
+			return 1;
+	return 0;
+}
 
-	for (ref = local_refs; ref; ref = ref->next) {
-		char *dst;
+static int push_budget_collect_ref(const struct reference *ref, void *cb_data)
+{
+	struct push_budget_refs *data = cb_data;
+	char *dst;
 
-		dst = apply_refspecs((struct refspec *)rs, ref->name);
-		if (!dst)
-			continue;
+	if (!ref->oid || (ref->flags & REF_ISBROKEN))
+		return 0;
 
-		if (!is_null_oid(&ref->old_oid))
-			oid_array_append(tips, &ref->old_oid);
-		free(dst);
+	/* A plain ':' push means matching branches, except --mirror, which
+	 * intentionally operates on the complete local ref namespace. */
+	if (push_budget_has_matching_refspec(data->rs) && !data->mirror &&
+	    !starts_with(ref->name, "refs/heads/"))
+		return 0;
+
+	dst = apply_refspecs(data->rs, ref->name);
+	if (!dst)
+		return 0;
+
+	oid_array_append(data->tips, ref->oid);
+	free(dst);
+	return 0;
+}
+
+static int push_budget_add_local_tips(const struct refspec *rs,
+				      struct oid_array *tips, int mirror)
+{
+	struct push_budget_refs data = {
+		.rs = (struct refspec *)rs,
+		.tips = tips,
+		.mirror = mirror,
+	};
+	struct object_id head_oid;
+
+	refs_for_each_ref(get_main_ref_store(the_repository),
+			  push_budget_collect_ref, &data);
+
+	/* HEAD is not part of refs_for_each_ref(). Explicit HEAD refspecs still
+	 * need their commit included in the budget. */
+	for (int i = 0; i < rs->nr; i++) {
+		if (rs->items[i].src && !strcmp(rs->items[i].src, "HEAD") &&
+		    !repo_get_oid(the_repository, "HEAD", &head_oid)) {
+			oid_array_append(tips, &head_oid);
+			break;
+		}
 	}
 
-	free_refs(local_refs);
 	return tips->nr != 0;
 }
 
@@ -92,7 +130,7 @@ static int push_budget_measure(const struct oid_array *tips,
 
 static int push_budget_check(struct transport *transport,
 				     struct refspec *rs,
-				     int flags UNUSED)
+				     int flags)
 {
 	const struct ref *remote_refs;
 	struct oid_array tips = OID_ARRAY_INIT;
@@ -100,13 +138,12 @@ static int push_budget_check(struct transport *transport,
 	uintmax_t bytes = 0;
 	int ret = 0;
 
-	/* A dry-run does not transfer data, but still performs the same analysis
-	 * so users can see whether the real push would fit the policy. */
+	/* Fetch the remote advertisement once. transport_push() will reuse the
+	 * transport's cached advertisement rather than needing a second lookup. */
 	remote_refs = transport_get_remote_refs(transport, NULL);
-	if (!remote_refs)
-		goto cleanup;
 
-	if (!push_budget_add_local_tips(rs, &tips))
+	if (!push_budget_add_local_tips(rs, &tips,
+					flags & TRANSPORT_PUSH_MIRROR))
 		goto cleanup;
 
 	push_budget_add_remote_tips(remote_refs, &remote_tips);
@@ -135,11 +172,9 @@ cleanup:
 	return ret;
 }
 
-/*
- * The public transport_push() implementation remains authoritative for
- * matching, status, hooks, and transport-specific behavior. This front-end
- * performs the object-graph safety decision before handing control to it.
- */
+/* Native front-end used by builtin push callers. The original transport_push()
+ * remains the authoritative implementation for negotiation, hooks, status,
+ * and transport-specific transfer behavior. */
 static inline int transport_push_with_budget(struct repository *repo,
 					     struct transport *connection,
 					     struct refspec *rs,
