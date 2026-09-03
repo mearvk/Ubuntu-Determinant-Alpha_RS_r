@@ -4,6 +4,12 @@ This file is part of the China annual statistical archive. The year is defined b
 
 > **Metadata:** `record_type=annual_economy` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions`
 
+## Methods
+
+The purpose of this record is to make economic history useful beyond a single citation or classroom exercise. It is structured for **college and university study**, **professional economic and policy analysis**, and long-term research by preserving the distinction between an original observation, a statistical definition, and a later interpretation. The WHY is continuity: a number should remain understandable decades later, so that students, analysts, and researchers can examine what was measured, why it was measured, and what conclusions the evidence can legitimately support.
+
+The record is also intended to remain useful for **legal, congressional, institutional, and moral inquiry**. Economic statistics can become evidence in public debate, legislative research, oversight, historical assessment, and judgments about the consequences of policy. This archive therefore does not treat a statistic as self-justifying; it preserves provenance and uncertainty so future readers can evaluate competing claims on the evidence itself. It is an archival method, not legal advice or political advocacy, and its central WHY is to make historical economic evidence durable, transparent, and accountable.
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
