@@ -54,8 +54,24 @@ Example:
 
 A successful run ends with `Result: VERIFIED`. A missing `.source-commit` is reported as a warning because the tree can still be checked for cleanliness, but its acquisition provenance cannot be independently verified.
 
+## `push-safe.sh`
+
+`push-safe.sh` is the guarded push entry point for repository changes. It estimates the new Git object payload before invoking `git push` and refuses the operation when that estimate exceeds **200 MiB (209,715,200 bytes)**.
+
+The guard is deliberately pre-push: when the limit is exceeded, no `git push` is attempted. The default limit can be overridden for controlled environments with `GIT_PUSH_MAX_BYTES`, but the repository policy is 200 MiB unless an explicit operational exception is made.
+
+Example:
+
+```bash
+./tools/git/push-safe.sh origin main
+```
+
+The payload estimate is based on the sizes of objects reachable from the local source ref and not already advertised by the selected remote. It is a conservative local estimate rather than an exact network wire-size prediction because Git transport may delta-compress objects.
+
+The helper reports the remote, refspec, object count, estimated payload, and configured limit before proceeding. A rejected push ends with `No git push was attempted.`
+
 ## Repository policy
 
 These tools are infrastructure, not application source. They should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so they can be reused by the ISO build system.
 
-Source acquisition and verification are intentionally separate operations: acquisition obtains and records a source snapshot; verification independently checks that snapshot before it is consumed by later build stages.
+Source acquisition, verification, and push are intentionally separate operations: acquisition obtains and records a source snapshot; verification independently checks that snapshot before it is consumed; the guarded push path prevents an oversized object transfer from being attempted.
