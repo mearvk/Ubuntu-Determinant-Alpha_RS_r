@@ -4,6 +4,12 @@ The parent directory identifies the year. Meat covers national slaughter-output 
 
 > **Metadata:** `record_type=annual_meat` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation`
 
+## Methods
+
+The purpose of this record is to preserve meat statistics as evidence about the food system, livestock economy, and historical conditions. It is intended for **college study, professional agricultural and economic work, and long-term research**. The WHY is to prevent a historical price or production number from being detached from the system that produced it, allowing future readers to understand the distinction between procurement, production, slaughter, and consumption measures.
+
+The same evidence may later inform **legal, congressional, institutional, and moral inquiry**, especially where food supply, public policy, resource allocation, or historical responsibility are examined. The archive therefore records what the source actually establishes and avoids turning a missing observation into an invented fact. This is an evidentiary and historical method, not legal advice or political advocacy.
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
