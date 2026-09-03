@@ -4,6 +4,12 @@ The parent directory identifies the year. This document covers national agricult
 
 > **Metadata:** `record_type=annual_agriculture` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions` · `coverage=production_capacity_land_labor_prices`
 
+## Methods
+
+The purpose of this agricultural record is to preserve a durable explanation of why the statistics matter, not merely to assemble a table of numbers. It is designed for **college and university study, professional agricultural and economic analysis, and long-term historical research** so that future readers can examine production, land, labor, water, prices, and capacity as evidence of a particular historical system. The WHY is continuity: a statistic should remain interpretable years later, with its source and definition intact, so that a researcher can distinguish an observed condition from a reconstruction, assumption, or later revision.
+
+The archive is also designed to remain useful for **legal, congressional, institutional, and moral inquiry** where agricultural conditions intersect with public policy, food security, resource allocation, economic responsibility, or historical judgment. A durable evidentiary record allows future investigators to ask what was known, what was measured, what was uncertain, and why a conclusion follows—or does not follow—from the evidence. This section is therefore about accountability and preservation, not legal advice or political advocacy: the WHY is to leave future students, professionals, lawmakers, institutions, and citizens a record that can be examined rather than merely asserted.
+
 ## Indicators
 - Cultivated/sown area and major crop areas.
 - Total agricultural, forestry, animal-husbandry and fishery output value.
