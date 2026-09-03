@@ -2,6 +2,8 @@
 
 The parent directory identifies the year. This document provides the farming-statistics framework used to interpret annual agricultural performance.
 
+> **Metadata:** `record_type=annual_farming_statistics` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions`
+
 ## Indicators
 - Farm and rural labor measures.
 - Sown area and harvested area.
@@ -29,4 +31,13 @@ The parent directory identifies the year. This document provides the farming-sta
 ## Comparability
 NBS has used reporting, sampling and census-based methods across different periods. Historical methodological notes must accompany numerical comparisons. These are procurement prices, not retail prices.
 
-Reference: https://www.stats.gov.cn/english/Statisticaldata/yearbook/
+## Sources
+
+- National Bureau of Statistics of China (NBS), *China Statistical Yearbook* — agricultural production, labor, land, machinery and related national statistical series.
+- NBS, agricultural statistical methodology and definitions — reporting, sampling and survey-method controls.
+- Chinese Agricultural Yearbook 1980 — historical agricultural procurement-price series.
+- Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1 — reproduced historical procurement prices.
+- FAOSTAT — standardized agricultural series where applicable.
+- FAO AQUASTAT — irrigation and agricultural-water series where applicable.
+
+Primary NBS reference: https://www.stats.gov.cn/english/Statisticaldata/yearbook/
