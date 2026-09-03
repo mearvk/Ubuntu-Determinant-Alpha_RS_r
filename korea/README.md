@@ -4,24 +4,35 @@ This directory is a source-aware annual archive for the Republic of Korea, organ
 
 ## Architecture
 
-Each year contains `META.md`, `INDEX.md`, and twelve domain documents: economy, agriculture, farming statistics, produce, grains, meat, livestock, vegetables, fruit, and water. Documents are intentionally source-led: a value is included only when it can be traced to an identified source. Unverified values are marked `PENDING_SOURCE` or `NOT_AVAILABLE` rather than estimated.
+Each year contains `META.md`, `INDEX.md`, and ten generated data-domain documents: `ECONOMY.md`, `AGRICULTURE.md`, `FARMING_STATS.md`, `PRODUCE.md`, `GRAINS.md`, `MEAT.md`, `LIVESTOCK.md`, `VEGETABLES.md`, `FRUIT.md`, and `WATER.md`. The generator preserves the existing annual metadata/index files and replaces domain placeholders with source observations on each build.
 
-## Primary source families
+## Data sources
 
-- KOSIS / Statistics Korea: national statistical tables, including agriculture and forestry, prices, economy and national accounts.
-- Ministry of Agriculture, Food and Rural Affairs (MAFRA): agricultural and food statistical yearbooks and administrative statistics.
-- KAMIS: agricultural, livestock and fishery market-price information, including annual and historical retail series.
-- Bank of Korea: national accounts and macroeconomic statistics.
-- FAOSTAT / FAO AQUASTAT: international agriculture and water series used only when the Korean series and definitions are compatible.
+- **KOSIS / Statistics Korea:** national statistical tables, agriculture and forestry, prices, economy, national accounts, population, and related domains.
+- **MAFRA:** agricultural and food statistical yearbooks and administrative statistics. MAFRA states that its statistical yearbook has been published annually since 1952 and contains agricultural, forestry, livestock, food, production, price, and rural-household statistics.
+- **KAMIS:** agricultural, livestock, and fishery market-price information, including annual and historical retail series.
+- **Bank of Korea:** national accounts and macroeconomic statistics.
+- **FAOSTAT / FAO AQUASTAT:** compatible international crop, livestock, and water series used to make the annual archive reproducible without inventing missing observations.
+- **World Bank WDI / Our World in Data:** machine-readable macro and selected agricultural/water series used by the automated builder when they preserve a compatible Korea series.
+
+## Full-data build
+
+`tools/korea/build_korea_annual_data.py` fetches source data at build time and writes the ten domain Markdown records for every year 1965-2026. It does **not** interpolate missing years. Missing observations are written as `N/A`; 2026 is treated as a live/incomplete year unless a source provides a final annual observation.
+
+The builder is run automatically by `.github/workflows/build-korea-annual-data.yml` on relevant changes and on a monthly schedule. This makes the Markdown archive refreshable rather than a one-time transcription.
 
 ## Data posture
 
-This is an archival research structure, not a claim that every annual series has already been completely transcribed. Current verified source availability is recorded in `DATA_SOURCES.md`. Historical extraction should preserve original units, definitions, geographic scope, revisions, and source dates.
+Source observations remain distinguishable from derived model outputs. Korean primary sources are preferred for future table-level supplementation, especially KOSIS, MAFRA, KAMIS, and Bank of Korea. International machine-readable series are used where their geography, units, item definitions, and temporal coverage are compatible. No historical value is manufactured solely to make a table continuous.
 
 ## Document contract
 
-Every annual document points to that year's `META.md`. `META.md` is controlling metadata for the annual set. No document may convert an absence of evidence into a factual claim. Analytical scores or models must be explicitly labeled as derived values and must retain the underlying observations.
+Every annual document points to that year's `META.md`. `META.md` is controlling metadata for the annual set. `INDEX.md` is the annual navigation map. The domain files contain source observations and source notes. Analytical scores or models must be explicitly labeled as derived values and must retain the underlying observations.
 
-## Build
+## Build locally
+
+```bash
+python3 tools/korea/build_korea_annual_data.py
+```
 
 The existing C/C++ evaluation module remains at the top level of `korea/`. The annual archive is documentary data, while `data.json`, `congruences.xml`, and `results.xml` remain machine-readable model inputs/outputs.
