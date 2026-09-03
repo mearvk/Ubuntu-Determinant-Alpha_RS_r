@@ -24,7 +24,8 @@ C_SOURCES := \
 	$(GIT_SRC)/merge-metadoc.c \
 	$(GIT_SRC)/operation-logic.c \
 	$(GIT_SRC)/restage.c \
-	$(GIT_SRC)/autocheck.c
+	$(GIT_SRC)/autocheck.c \
+	$(GIT_SRC)/moral.c
 
 CPP_SOURCES := \
 	$(GIT_SRC)/add-budget.cpp \
@@ -32,7 +33,8 @@ CPP_SOURCES := \
 	$(GIT_SRC)/rebase-metadoc.cpp \
 	$(GIT_SRC)/operation-logic.cpp \
 	$(GIT_SRC)/restage.cpp \
-	$(GIT_SRC)/autocheck.cpp
+	$(GIT_SRC)/autocheck.cpp \
+	$(GIT_SRC)/moral.cpp
 
 C_OBJECTS := $(patsubst $(GIT_SRC)/%.c,$(BUILD_DIR)/c-%.o,$(C_SOURCES))
 CPP_OBJECTS := $(patsubst $(GIT_SRC)/%.cpp,$(BUILD_DIR)/cpp-%.o,$(CPP_SOURCES))
@@ -42,7 +44,7 @@ CPP_OBJECTS := $(patsubst $(GIT_SRC)/%.cpp,$(BUILD_DIR)/cpp-%.o,$(CPP_SOURCES))
 all: native-policy
 
 native-policy: $(C_OBJECTS) $(CPP_OBJECTS)
-	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck"
+	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage, autocheck, moral"
 
 $(BUILD_DIR):
 	@mkdir -p $@
