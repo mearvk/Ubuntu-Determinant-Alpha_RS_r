@@ -2,18 +2,24 @@
 
 The parent directory identifies the year. Produce covers harvested food and agricultural commodities intended for human consumption and related market analysis.
 
-## Indicators
-- Total agricultural produce output where officially defined.
-- Major cereals, beans and tubers.
-- Oil-bearing crops and processed produce where available.
-- Vegetables, fruits and melons.
-- Tea, cotton and sugar crops as applicable.
-- Per-hectare yield and harvested area when published.
+## 1965 Actual Price Data
+
+| Date | Product | Region | Season | Price |
+|---|---|---|---|---:|
+| 1965 | Wheat, Grade 3 — state procurement | China | Annual procurement | ¥0.2212/kg |
+| 1965 | Corn — state procurement | China | Annual procurement | ¥0.1516/kg |
+| 1965 | Paddy rice — state procurement | China | Annual procurement | ¥0.1694/kg |
+| 1965 | Average grain — state procurement | China | Annual procurement | ¥0.1848/kg |
+| 1965 | Cotton, ginned | China | Annual procurement | ¥1.8404/kg |
+| 1965 | Peanuts, shelled | China | Annual procurement | ¥0.6078/kg |
+| 1965 | Rapeseed | China | Annual procurement | ¥0.4548/kg |
+| 1965 | Sugarcane | China | Annual procurement | ¥0.0300/kg |
+| 1965 | Sugar beet | China | Annual procurement | ¥0.0546/kg |
 
 ## Method
-Preserve the source unit and statistical definition. Do not combine production measures with farm-gate value measures without an explicit conversion or source definition. For years lacking a comparable series, mark the observation unavailable.
+These are historical national procurement prices, not retail-market prices. Preserve the source unit and statistical definition. Do not combine production measures with farm-gate value measures without an explicit source definition.
 
 ## Sources
-NBS agricultural tables are primary for national historical observations; FAOSTAT may be used for standardized commodity series.
+Chinese Agricultural Yearbook 1980, reproduced in Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1.
 
 Reference: https://www.stats.gov.cn/sj/ndsj/
