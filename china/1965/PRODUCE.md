@@ -2,6 +2,8 @@
 
 The parent directory identifies the year. Produce covers harvested food and agricultural commodities intended for human consumption and related market analysis.
 
+> **Metadata:** `record_type=annual_produce` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation`
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
@@ -20,6 +22,10 @@ The parent directory identifies the year. Produce covers harvested food and agri
 These are historical national procurement prices, not retail-market prices. Preserve the source unit and statistical definition. Do not combine production measures with farm-gate value measures without an explicit source definition.
 
 ## Sources
-Chinese Agricultural Yearbook 1980, reproduced in Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1.
 
-Reference: https://www.stats.gov.cn/sj/ndsj/
+- Chinese Agricultural Yearbook 1980 — historical agricultural procurement-price series.
+- Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1 — reproduced procurement prices for wheat, corn, paddy rice, grain, cotton, peanuts, rapeseed, sugarcane, and sugar beet.
+- National Bureau of Statistics of China (NBS), *China Statistical Yearbook* / historical annual statistical database — national agricultural production and commodity statistical framework.
+- FAOSTAT — internationally standardized agricultural and food-production series where applicable.
+
+Primary NBS reference: https://www.stats.gov.cn/sj/ndsj/
