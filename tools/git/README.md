@@ -15,6 +15,7 @@ Design goals:
 - Support shallow clones for build environments through `GIT_CLONE_DEPTH`.
 - Keep downloaded source separate from our customization/offset layers.
 - Fail rather than silently continue when the source cannot be obtained.
+- Record the resolved source commit in `.source-commit`.
 
 Example:
 
@@ -32,8 +33,29 @@ GIT_CLONE_DEPTH=1
 GIT_ALLOW_CREDENTIAL_HELPER=0
 ```
 
-For private repositories, credentials should be supplied through the build environment's normal secure Git configuration rather than being written into this script or committed to the repository.
+## `verify-source.sh`
+
+`verify-source.sh` is a read-only provenance and cleanliness check for a source tree acquired by `pull-source.sh`.
+
+It verifies:
+
+- the destination is a Git repository;
+- `HEAD` can be resolved;
+- when `.source-commit` exists, it exactly matches `HEAD`;
+- an optional expected branch/ref exists locally;
+- the tracked working tree has no modifications; and
+- no untracked files are present.
+
+Example:
+
+```bash
+./tools/git/verify-source.sh /path/to/source main
+```
+
+A successful run ends with `Result: VERIFIED`. A missing `.source-commit` is reported as a warning because the tree can still be checked for cleanliness, but its acquisition provenance cannot be independently verified.
 
 ## Repository policy
 
-This tool is infrastructure, not application source. It should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so it can be reused by the ISO build system.
+These tools are infrastructure, not application source. They should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so they can be reused by the ISO build system.
+
+Source acquisition and verification are intentionally separate operations: acquisition obtains and records a source snapshot; verification independently checks that snapshot before it is consumed by later build stages.
