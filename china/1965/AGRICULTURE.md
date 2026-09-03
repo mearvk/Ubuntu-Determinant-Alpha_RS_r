@@ -2,6 +2,8 @@
 
 The parent directory identifies the year. This document covers national agricultural production and the farming system for that year.
 
+> **Metadata:** `record_type=annual_agriculture` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions` · `coverage=production_capacity_land_labor_prices`
+
 ## Indicators
 - Cultivated/sown area and major crop areas.
 - Total agricultural, forestry, animal-husbandry and fishery output value.
@@ -24,11 +26,52 @@ The parent directory identifies the year. This document covers national agricult
 | 1965 | Rapeseed | China | Annual procurement | ¥0.4548/kg |
 | 1965 | Sugarcane | China | Annual procurement | ¥0.0300/kg |
 | 1965 | Sugar beet | China | Annual procurement | ¥0.0546/kg |
+| 1965 | Pigs | China | Annual procurement | ¥0.9416/kg |
+
+## 1965 Agricultural Production & Capacity
+
+| Indicator | 1965 value | Unit | Scope | Source / Note |
+|---|---:|---|---|---|
+| Population | 725 | million persons | China | Historical demographic/agricultural series |
+| Agricultural labour force | 234 | million persons | China | Oxford historical series; definition is source-specific |
+| Arable/cultivated land | 103.6 | million ha | China | SSB historical series |
+| Paddy fields | 25.0 | million ha | China | SSB historical series |
+| Irrigated area | 33.1 | million ha | China | SSB historical series; 33.06m ha in a more precise historical table |
+| Total sown area | 143.3 | million ha | China | SSB historical series |
+| Grain sown area | 119.6 | million ha | China | SSB historical series |
+| Multiple-cropping index | 138 | percent | China | Sown area relative to cultivated area |
+| Arable land per capita | 0.14 | ha/person | China | Derived/published historical series |
+| Arable land per agricultural worker | 0.44 | ha/worker | China | Oxford historical series |
+| Grain production | 194.53 | million tonnes | China | Historical SSB production series |
+| Cotton production | 2.098 | million tonnes | China | Historical production series |
+| Oil-bearing crops | 3.625 | million tonnes | China | Historical production series |
+| Meat production | 5.510 | million tonnes | China | Historical secondary series; retained as source-specific |
+| Fish production | 2.98 | million tonnes | China | Historical FAO/food-production series |
+| Fruit production | 3.24 | million tonnes | China | Historical FAO/food-production series |
+| Sugarcane production | 13.4 | million tonnes | China | Historical secondary series; rounded |
+| Sugar beet production | 2.0 | million tonnes | China | Historical secondary series; rounded |
+| Tea production | 0.10 | million tonnes | China | Historical secondary series; rounded |
+
+## Historical Agricultural-System Measures
+
+| Indicator | 1965 value | Unit / index base | Interpretation |
+|---|---:|---|---|
+| Gross agricultural output value index | 133 | 1952=100 | Historical reconstructed agricultural output index |
+| Adjusted sown area | 182.2 | million ha | NBER productivity-series measure adjusted for irrigation and multiple cropping |
+| Farm capital | 18.105 | billion yuan | 1952 yuan; NBER historical productivity series |
+| Current input index | 290 | index | Historical agricultural productivity/input series |
+| Agricultural prices relative to industrial prices | 168.3 | 1950=100 | Relative-price index, not a farm-product procurement price |
+
+## Source Reconciliation
+
+The principal land-area series used here reports 103.6 million hectares of cultivated/arable land, 143.3 million hectares of total sown area, 119.6 million hectares of grain area, and 33.1 million hectares irrigated. FAO reproduces these figures from the State Statistical Bureau (SSB) historical statistical yearbooks. A separate historical agricultural source reports 103.6 million hectares of arable land, 143.3 million hectares sown, and 234 million agricultural workers, with a multiple-cropping index of about 1.4. These series are retained because their definitions are mutually documented.
+
+Some historical datasets use different territorial coverage, definitions, or reconstruction methods. In particular, an alternate statistical table gives lower land/sown-area figures for 1965. Those values are not merged into this national series without a documented methodological bridge. Likewise, the NBER agricultural productivity series reports 201.267 million agricultural workers and 182.2 million hectares of adjusted sown area under its own reconstruction. Those figures are preserved as source-specific measures rather than substituted for the SSB/Oxford series.
 
 ## Statistical discipline
-Definitions and survey systems changed over time. Historical comparisons must retain the source's units, coverage and methodological notes. The 1965 prices above are national procurement prices reported in yuan per kilogram, not retail-market prices.
+Definitions and survey systems changed over time. Historical comparisons must retain the source's units, coverage and methodological notes. The 1965 prices above are national procurement prices reported in yuan per kilogram, not retail-market prices. Production and capacity figures are separate from the price table and must not be interpreted as price observations.
 
 ## Sources
-Primary historical price series: Chinese Agricultural Yearbook 1980, as reproduced in Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1. NBS China Statistical Yearbook remains the primary production-statistics source.
+Primary historical price series: Chinese Agricultural Yearbook 1980, as reproduced in Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1. Historical land, population and agricultural-labour series: State Statistical Bureau historical yearbooks as reproduced in Oxford/World Bank agricultural studies and FAO historical tables. Historical production series: State Statistical Bureau and FAO historical food-production tables. Historical productivity measures: NBER working paper series on Chinese agricultural output, inputs, prices and productivity, 1952–1977.
 
 Reference: https://www.stats.gov.cn/sj/ndsj/
