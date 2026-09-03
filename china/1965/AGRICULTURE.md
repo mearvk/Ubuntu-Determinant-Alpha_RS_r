@@ -72,6 +72,21 @@ Some historical datasets use different territorial coverage, definitions, or rec
 Definitions and survey systems changed over time. Historical comparisons must retain the source's units, coverage and methodological notes. The 1965 prices above are national procurement prices reported in yuan per kilogram, not retail-market prices. Production and capacity figures are separate from the price table and must not be interpreted as price observations.
 
 ## Sources
-Primary historical price series: Chinese Agricultural Yearbook 1980, as reproduced in Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606, Table 2.1. Historical land, population and agricultural-labour series: State Statistical Bureau historical yearbooks as reproduced in Oxford/World Bank agricultural studies and FAO historical tables. Historical production series: State Statistical Bureau and FAO historical food-production tables. Historical productivity measures: NBER working paper series on Chinese agricultural output, inputs, prices and productivity, 1952–1977.
 
-Reference: https://www.stats.gov.cn/sj/ndsj/
+### Sites and statistical databases
+- National Bureau of Statistics of China (NBS), *China Statistical Yearbook* and historical annual statistical database — national production, land, population and statistical-methodology material.
+- Food and Agriculture Organization of the United Nations (FAO), historical agricultural tables — cultivated land, paddy fields, irrigation, sown area and cropping-index series reproduced from State Statistical Bureau sources.
+- FAOSTAT — standardized historical agricultural and food-production series used for selected production measures.
+- Oxford Academic — *Feeding China: The Experience since 1949* — historical population, agricultural labour, arable land, sown area and multiple-cropping measures.
+- NBER — *Chinese Agricultural Output, Inputs, Prices and Productivity Growth, 1952–77* — reconstructed agricultural output, labor, adjusted sown area, capital, input and relative-price indices.
+
+### Books, reports and archival publications
+- State Statistical Bureau of China (SSB), *China Statistical Yearbook* / historical statistical yearbooks — underlying national statistical series.
+- Chinese Agricultural Yearbook 1980 — historical agricultural procurement-price series, Table 2.1 source material.
+- Nicholas R. Lardy, *Agricultural Prices in China*, World Bank Staff Working Paper 606 — Table 2.1, “Procurement Prices of Selected Farm Products, 1952–79,” reproducing the historical procurement prices used above.
+- United Nations University historical agricultural/industrial output tables — grain, cotton and oil-bearing-crop production series used for cross-checking 1965 production.
+
+### Source-status note
+No audio recording, podcast, broadcast transcript, or other audio source was referenced or used for the figures in this file. All cited evidence is textual statistical, book, report, or database material. Secondary estimates are explicitly labeled where they are not direct NBS/SSB observations.
+
+Primary NBS reference: https://www.stats.gov.cn/sj/ndsj/
