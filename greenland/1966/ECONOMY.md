@@ -1,4 +1,4 @@
-# Greenland Economy — {{YEAR}}
+# Greenland Economy — 1966
 
 ## Scope
 
