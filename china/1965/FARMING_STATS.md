@@ -4,6 +4,12 @@ The parent directory identifies the year. This document provides the farming-sta
 
 > **Metadata:** `record_type=annual_farming_statistics` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions`
 
+## Methods
+
+The purpose of this record is to preserve farming statistics as evidence of how an agricultural system actually operated, rather than as isolated figures. It is intended for **college and university study**, **professional agricultural analysis**, and long-term research into land, labor, yields, machinery, water, and production. The WHY is to let future readers reconstruct the conditions behind agricultural performance and understand how definitions and measurement systems affect the story told by the data.
+
+It also supports **legal, congressional, institutional, and moral inquiry** where agricultural conditions become relevant to policy, public resources, food security, oversight, or historical responsibility. The archive therefore favors traceable sources and explicit definitions so that a future researcher can challenge, confirm, or reinterpret a conclusion without losing the underlying evidence. This is not legal advice or advocacy; its purpose is to make the historical record sufficiently durable and transparent to support responsible judgment.
+
 ## Indicators
 - Farm and rural labor measures.
 - Sown area and harvested area.
