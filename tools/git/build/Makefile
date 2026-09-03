@@ -22,13 +22,15 @@ C_SOURCES := \
 	$(GIT_SRC)/commit-budget.c \
 	$(GIT_SRC)/rebase-metadoc.c \
 	$(GIT_SRC)/merge-metadoc.c \
-	$(GIT_SRC)/operation-logic.c
+	$(GIT_SRC)/operation-logic.c \
+	$(GIT_SRC)/restage.c
 
 CPP_SOURCES := \
 	$(GIT_SRC)/add-budget.cpp \
 	$(GIT_SRC)/commit-budget.cpp \
 	$(GIT_SRC)/rebase-metadoc.cpp \
-	$(GIT_SRC)/operation-logic.cpp
+	$(GIT_SRC)/operation-logic.cpp \
+	$(GIT_SRC)/restage.cpp
 
 C_OBJECTS := $(patsubst $(GIT_SRC)/%.c,$(BUILD_DIR)/c-%.o,$(C_SOURCES))
 CPP_OBJECTS := $(patsubst $(GIT_SRC)/%.cpp,$(BUILD_DIR)/cpp-%.o,$(CPP_SOURCES))
@@ -38,7 +40,7 @@ CPP_OBJECTS := $(patsubst $(GIT_SRC)/%.cpp,$(BUILD_DIR)/cpp-%.o,$(CPP_SOURCES))
 all: native-policy
 
 native-policy: $(C_OBJECTS) $(CPP_OBJECTS)
-	@echo "Native policy sources compiled: add, commit, push, merge, rebase"
+	@echo "Native policy sources compiled: add, commit, push, merge, rebase, restage"
 
 $(BUILD_DIR):
 	@mkdir -p $@
