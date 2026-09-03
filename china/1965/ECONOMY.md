@@ -2,6 +2,8 @@
 
 This file is part of the China annual statistical archive. The year is defined by its parent directory. It records the economy indicators relevant to agricultural and food-system analysis.
 
+> **Metadata:** `record_type=annual_economy` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `methodology=historical_source_preservation` · `revision_policy=preserve_source_definitions`
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
@@ -22,4 +24,11 @@ Use the National Bureau of Statistics (NBS) China Statistical Yearbook as the pr
 ## Archive rule
 This annual record is descriptive and source-led. It does not manufacture missing historical observations.
 
-Primary reference: https://www.stats.gov.cn/english/Statisticaldata/yearbook/
+## Sources
+
+- National Bureau of Statistics of China (NBS), *China Statistical Yearbook* / historical annual statistical database — national economic and agricultural statistical framework.
+- NBS, historical yearbook methodology and definitions — source and survey-method controls.
+- FAOSTAT — internationally standardized agricultural series where applicable.
+- FAO AQUASTAT — water-resource and irrigation series where applicable.
+
+Primary NBS reference: https://www.stats.gov.cn/english/Statisticaldata/yearbook/
