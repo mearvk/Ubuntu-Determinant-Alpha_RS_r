@@ -7,7 +7,7 @@ int git_operation_logic_validate(const struct git_operation_logic_record *record
 	if (!git_operation_logic_record_valid(record))
 		return -1;
 	if (record->operation < GIT_OPERATION_ADD ||
-		record->operation > GIT_OPERATION_REBASE)
+		record->operation > GIT_OPERATION_AUTOCHECK)
 		return -1;
 	if (record->relevance < GIT_RELEVANCE_TIER1 ||
 		record->relevance > GIT_RELEVANCE_UPLOAD)
