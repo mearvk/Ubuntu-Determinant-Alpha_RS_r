@@ -4,6 +4,12 @@ The parent directory identifies the year. Livestock covers animal inventories an
 
 > **Metadata:** `record_type=annual_livestock` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation`
 
+## Methods
+
+The purpose of this record is to preserve the structure behind livestock statistics so that animal inventories, production, slaughter, and prices remain analytically distinct. It is designed for **college and university education, professional agricultural and economic analysis, and long-term historical research**. The WHY is continuity: researchers should be able to revisit the evidence later and still understand what was counted, how it was defined, and why one measure should not be substituted for another.
+
+Livestock conditions can also enter **legal, congressional, institutional, and moral inquiry** through questions of food supply, public policy, economic development, resource use, and historical responsibility. The record therefore favors source fidelity over false completeness and preserves uncertainty where evidence is absent. It provides an evidentiary foundation for inquiry rather than legal advice, political advocacy, or a predetermined judgment.
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
