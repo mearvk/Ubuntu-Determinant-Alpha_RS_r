@@ -1,6 +1,6 @@
 # Git Tooling
 
-This directory contains small, self-contained Bash tooling for working with Git in the Ubuntu Determinant build and source-management environment.
+This directory contains small, self-contained tooling for working with Git in the Ubuntu Determinant build and source-management environment.
 
 ## `pull-source.sh`
 
@@ -17,22 +17,6 @@ Design goals:
 - Fail rather than silently continue when the source cannot be obtained.
 - Record the resolved source commit in `.source-commit`.
 
-Example:
-
-```bash
-./tools/git/pull-source.sh \
-  https://github.com/example/project.git \
-  /path/to/source
-```
-
-Optional environment variables:
-
-```text
-GIT_SOURCE_REF=main
-GIT_CLONE_DEPTH=1
-GIT_ALLOW_CREDENTIAL_HELPER=0
-```
-
 ## `verify-source.sh`
 
 `verify-source.sh` is a read-only provenance and cleanliness check for a source tree acquired by `pull-source.sh`.
@@ -46,32 +30,28 @@ It verifies:
 - the tracked working tree has no modifications; and
 - no untracked files are present.
 
-Example:
+## Native push policy
 
-```bash
-./tools/git/verify-source.sh /path/to/source main
+Push-size enforcement is implemented in the native Git source rather than as a Bash wrapper.
+
+`git push` now enters a guarded front-end in `git/push-budget.h` for builtin push callers. The policy uses the actual Git ref/object graph to determine the candidate local tips selected by the push refspec, obtains the remote's advertised tips, and asks Git's own `rev-list` object traversal to calculate the disk usage of objects reachable from the candidate tips but not already reachable from the remote tips.
+
+The default maximum is a compiled **200 MiB (209,715,200 bytes)** per push effort:
+
+```text
+GIT_PUSH_MAX_BYTES = 200 MiB
 ```
 
-A successful run ends with `Result: VERIFIED`. A missing `.source-commit` is reported as a warning because the tree can still be checked for cleanliness, but its acquisition provenance cannot be independently verified.
+When the calculated object budget exceeds that ceiling, the push is rejected before the normal transport push is entered. No shell wrapper or environment-variable override is required. Dry runs perform the same analysis so a user can see whether the corresponding real push would fit the policy.
 
-## `push-safe.sh`
+The calculation deliberately operates on commits, refs, and Git objects rather than summing working-tree files. Multiple selected refs are considered together and shared reachable objects are naturally deduplicated by Git's revision/object traversal. Remote object reachability is used as the exclusion set, so objects already represented by advertised remote refs do not count toward the new-object budget.
 
-`push-safe.sh` is the guarded push entry point for repository changes. It estimates the new Git object payload before invoking `git push` and refuses the operation when that estimate exceeds **200 MiB (209,715,200 bytes)**.
+The measured value is an on-disk object-size estimate, not a prediction of the final network packet size. Git transport compression can change the wire size; the 200 MiB policy therefore acts as a conservative pre-transfer object budget.
 
-The guard is deliberately pre-push: when the limit is exceeded, no `git push` is attempted. The default limit can be overridden for controlled environments with `GIT_PUSH_MAX_BYTES`, but the repository policy is 200 MiB unless an explicit operational exception is made.
-
-Example:
-
-```bash
-./tools/git/push-safe.sh origin main
-```
-
-The payload estimate is based on the sizes of objects reachable from the local source ref and not already advertised by the selected remote. It is a conservative local estimate rather than an exact network wire-size prediction because Git transport may delta-compress objects.
-
-The helper reports the remote, refspec, object count, estimated payload, and configured limit before proceeding. A rejected push ends with `No git push was attempted.`
+The underlying upstream `transport_push()` implementation remains responsible for normal ref matching, hooks, status reporting, transport selection, negotiation, and actual transfer. The native policy is a front-end safety decision before that operation.
 
 ## Repository policy
 
 These tools are infrastructure, not application source. They should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so they can be reused by the ISO build system.
 
-Source acquisition, verification, and push are intentionally separate operations: acquisition obtains and records a source snapshot; verification independently checks that snapshot before it is consumed; the guarded push path prevents an oversized object transfer from being attempted.
+Source acquisition, verification, and push are separate stages: acquisition obtains and records a source snapshot; verification independently checks that snapshot; native push policy evaluates the object graph before transport and prevents an oversized push effort from being attempted.
