@@ -6,7 +6,7 @@
 | Rice | 16856.9 |
 | Wheat | 8580.5 |
 | Corn | 6382.6 |
-| Soybeans | 2603.6 |
+| Beans | 2603.6 |
 | Oil-bearing crops | 1578.4 |
 | Peanuts | 666.4 |
 | Rapeseed | 560.7 |
