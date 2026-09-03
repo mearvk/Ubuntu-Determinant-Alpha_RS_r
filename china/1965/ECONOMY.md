@@ -2,16 +2,16 @@
 
 This file is part of the China annual statistical archive. The year is defined by its parent directory. It records the economy indicators relevant to agricultural and food-system analysis.
 
-## Indicators
-- Gross domestic product and annual real growth.
-- Primary-industry value added and share of GDP.
-- Agriculture, forestry, animal husbandry and fishery value added.
-- Agricultural and related-industry value added where officially published.
-- Rural household income and agricultural employment where available.
-- Food, agricultural and resource trade indicators where comparable.
+## 1965 Actual Price Data
+
+| Date | Product | Region | Season | Price |
+|---|---|---|---|---:|
+| 1965 | Agricultural products — purchasing-price index | China | Annual | 185.1 (1950=100) |
+
+This is an official-era agricultural purchasing-price index, not a yuan-per-kilogram commodity quotation. Commodity-level procurement prices are recorded in the sector-specific files.
 
 ## Interpretation
-Use the National Bureau of Statistics (NBS) China Statistical Yearbook as the primary national source. NBS notes that newly published yearbooks can revise historical observations; the latest authoritative historical release should therefore take precedence over an older printed value. Blank/not-available observations must remain explicitly unavailable rather than estimated.
+Use the National Bureau of Statistics (NBS) China Statistical Yearbook as the primary national source. Historical price data may be reported as indices or administered procurement prices; the archive keeps those measures distinct.
 
 ## Source hierarchy
 1. NBS China Statistical Yearbook and national accounts releases.
