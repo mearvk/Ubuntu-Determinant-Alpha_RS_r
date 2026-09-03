@@ -4,6 +4,12 @@ The parent directory identifies the year. Grain statistics cover the major cerea
 
 > **Metadata:** `record_type=annual_grains` · `year=1965` · `geography=China` · `scope=national` · `status=historical_actual` · `units=source_specific` · `price_basis=state_procurement` · `methodology=historical_source_preservation`
 
+## Methods
+
+The purpose of this grain record is to preserve a reliable historical basis for understanding food production, procurement, and agricultural capacity. It is intended for **college and university study, professional agricultural and economic analysis, and long-term historical research**. The WHY is to keep the underlying evidence interpretable: a future reader should be able to distinguish production from price, an original observation from a reconstruction, and a documented definition from an assumption.
+
+Grain evidence can also become relevant to **legal, congressional, institutional, and moral questions** involving food security, public policy, resource allocation, or historical responsibility. The archive therefore emphasizes provenance and methodological honesty rather than filling gaps for completeness. Its role is to support responsible inquiry and public understanding, not to give legal advice or advocate a predetermined conclusion.
+
 ## 1965 Actual Price Data
 
 | Date | Product | Region | Season | Price |
