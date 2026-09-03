@@ -493,97 +493,92 @@ SecureJDK is expected to preserve ordinary Java compatibility where practical wh
 
 Supported Java programs may run through the SecureJDK/Graal path with Total providing policy assistance and memory/resource observation. Native programs may continue to use the ordinary OS allocator and VM path. Participation in the managed path should be explicit and authenticated.
 
-### Repository status
+---
 
-The project is experimental. Native Total, UTF-4088, JPIX, SecureJDK/Graal integration, and domain-service adapters should not be treated as production-certified merely because the architecture is complete on paper. The project prioritizes deterministic behavior, evidence, provenance, reproducibility, and auditable policy as it progresses toward a larger Linux framework.
+## Native Git Operation Intelligence
+
+The vendored Git tree under `/tools/git/git/` now carries a native policy layer for repository operations. The policy is designed to supplement ordinary Git semantics with deterministic accounting, provenance, relevance, and administrative observations without pretending that metadata replaces Git's actual object graph.
+
+### Operation logic
+
+`tools/git/GIT_OPERATIONS.logic` is the shared UTF-8, line-oriented `.logic` contract. It records the common rules for:
+
+```text
+add → commit → push → merge → rebase → restage → autocheck → moral
+```
+
+The operation model preserves ordinary Git file and history semantics while recording additional **Tier-1**, **Tier-2**, **PRIORI-INTEGRATION**, upload, provenance, parent-commit, author, committer, date, timestamp, and object references where the operation emits metadata.
+
+### Add / commit / push sizing
+
+The current native planning contracts use:
+
+- **100 MiB logical add blocks**, with deterministic pathname ordering and no individual-file splitting;
+- **50 MiB logical commit units**, so `commit N` represents `N × 50 MiB` of planned commit units;
+- **200 MiB conservative push accounting per transport transaction**.
+
+These are planning/accounting policies. Actual Git object and transport accounting remains authoritative.
+
+### Merge / rebase
+
+Merge metadata can record a future-base message, priority, provenance, source count, and an explicit rebase signal. Two or more explicitly associated merge events may qualify a later explicit rebase; the signal never silently rewrites history.
+
+Rebase metadata treats rebase as a schedule-relative reseating operation with an associated county, worker, schedule, director/seat/resume references, provenance, and other declared fields. Sensitive identifiers are references or `PRESUMED/UNSET`, not invented identity data.
+
+### Restage
+
+`restage` is modeled as a relative index-frame operation with two related histories:
+
+```text
+Base Commit Chain        Administrative Restage Chain
+C1 → C2 → C3 → C4        A1 → A2 → A3 → A4
+        │                      │
+        └──── cross-reference ─┘
+```
+
+Each restage observation records the relative movement, base commit before/after, index state before/after, exact function/command call, surrounding provenance, and administrative parent. `restage chains` correlates the administrative chain with the ordinary Git base chain.
+
+### Autocheck
+
+`autocheck` is the native policy foundation for a pull-first repository check. It inspects local and remote state, prefers a clean merge for codebases younger than 92 days and a rebase at or beyond that boundary when appropriate, halts rather than inventing unresolved conflict resolutions, then applies the established add/commit accounting and prepares push work under the native 200 MiB transport budget.
+
+Autocheck prepares transport work but does not silently push.
+
+---
+
+## Moral Command
+
+The repository also defines a small **`moral`** operation as a ceremonial software-blessing layer. It is intentionally separate from security authorization, identity assessment, correctness, and access control.
+
+The native policy is expressed by:
+
+```text
+moral spell      → +1 mana
+moral great ...  → +10 mana per spell
+```
+
+A **Great** invocation is an explicit command mode, not an inferred judgment about a person's intelligence, appearance, social status, identity, credentials, or worth. The moral layer therefore provides game-like accounting and a blessing record without turning subjective human qualities into a security or eligibility mechanism.
+
+The blessing contract is recorded in:
+
+```text
+tools/git/git/moral.h
+tools/git/git/moral.c
+tools/git/git/moral.cpp
+tools/git/MORAL.md
+tools/git/MORAL_BLESSING.metadoc
+```
+
+The native C/C++ policy companions are included in the native policy build alongside the existing add, commit, merge, rebase, restage, and autocheck components. As with the other newly introduced policy foundations, the moral policy does not by itself claim that a fully registered `git moral` builtin has replaced the normal Git dispatcher; builtin registration remains a distinct integration step.
+
+The intended invariant is simple:
+
+> **The software remains cool, complete, auditable, and ordinary Git-compatible while the blessing remains ceremonial.**
+
+---
+
+## Repository Status
+
+The project is experimental. Native Total, UTF-4088, JPIX, SecureJDK/Graal integration, domain-service adapters, and the native Git operation-policy layer should not be treated as production-certified merely because the architecture is complete on paper. The project prioritizes deterministic behavior, evidence, provenance, reproducibility, and auditable policy as it progresses toward a larger Linux framework.
 
 For current repository maturity and remaining engineering work, see [`markdown/PROGRESS.md`](markdown/PROGRESS.md).
-
----
-
-## Native Utilities: `size` and `limit`
-
-The repository now includes small native utilities under `/tools` for direct inspection of the local system.
-
-### `size`
-
-`/tools/size/` provides a portable C implementation for recursively measuring the **logical byte size of a parent folder and all regular files beneath it**. It reports exact bytes plus a human-readable binary-unit value and accepts multiple paths.
-
-```text
-size tools/xmc tools/gcc tools/limit
-```
-
-The utility is read-only. POSIX symbolic links are not followed; Windows reparse points are not recursively followed. Its result is logical file length, not filesystem allocation, so it deliberately does not claim to measure disk blocks, snapshots, compression, or other filesystem overhead.
-
-The initial utility version is `size 1.00`. See [`tools/size/README.md`](tools/size/README.md).
-
-### `limit`
-
-`/tools/limit/` inventories executable formats and available application identity metadata. It complements `size`: `size` answers **how much file data exists**, while `limit` answers **what executable identity and metadata can be established**.
-
-Together they provide a simple native inspection surface for source/build/output directories and installed binaries.
-
----
-
-## Desktop News: GNOME and MATE
-
-The project is continuing its desktop work with attention to **GNOME** and **MATE Desktop** environments. The goal is a practical, respectful desktop integration layer that keeps the Ubuntu White / JavaFX direction coherent while remaining useful on established Linux desktops.
-
-Current desktop priorities include:
-
-- **GNOME** — integration and preview work should respect the GNOME desktop model, application launch conventions, icon presentation, and current Linux session behavior.
-- **MATE Desktop** — integration should preserve the familiar, lightweight MATE experience while providing the same icon, launcher, and Java desktop-preview capabilities.
-- **Shared assets** — desktop references should use the project's PNG/JPEG icon sources where appropriate, with transparent backgrounds preserved and the source assets kept explicit.
-- **JavaFX preview** — the desktop preview remains a full-screen-capable JavaFX interface, with `ESC` available to exit full-screen mode.
-
-We appreciate the volunteer efforts of **SAS** and **CorpAmerica** as contributors and supporters of open collaboration. As volunteers, we aim to **Pull ahead**: contribute carefully, review what we build, improve interoperability, and leave the desktop in a better state for the next contributor.
-
-This is a community-minded project statement rather than an assertion of affiliation, endorsement, or employment by any organization named above.
-
----
-
-## Recent Installation and Hardening Work
-
-This section records the recent body of work now merged to `main`. It extends the installation and system-hardening surface without replacing the established install engine or the existing native helpers.
-
-### OS security baseline
-
-`scripts/install-os-security.sh` provides a general-purpose, idempotent security install for the host. It is independent of the Java web-server path and can be run on its own. It installs and enables a set of standard defenses:
-
-- **ClamAV** with `freshclam` signature updates and the scanning daemon;
-- **UFW** configured with a default-deny-incoming firewall policy;
-- **AppArmor** mandatory access control;
-- **fail2ban** for brute-force mitigation;
-- **unattended-upgrades** for automatic security patching;
-- **rkhunter** and **chkrootkit** rootkit checks.
-
-Each component has its own `OS_SECURITY_*` toggle, so an operator can enable or disable individual defenses without editing the script. Re-running the script is safe: it converges toward the configured state rather than duplicating work.
-
-### Improved Git
-
-`scripts/install-git-improved.sh` installs a modern Git and its companion tooling. It prefers the git-core PPA and falls back gracefully to the distribution archive when the PPA is unavailable. Alongside `git` it installs `git-lfs`, `git-doc`, `gitk`, and `git-gui`, initializes Git LFS system-wide, and writes non-destructive defaults to `/etc/gitconfig`. It never sets a user identity, leaving `user.name` and `user.email` to the operator.
-
-### Selectable installer components
-
-`scripts/galactic-cherry-installer` gained selectable components. Interactively it presents a multi-select checkbox step (a `--checklist`); non-interactively it accepts the same selections on the command line through `--desktop`, `--enable`, `--disable`, `--non-interactive`, and `--help`, plus the `INSTALL_COMPONENTS` and `GC_COMPONENTS` environment variables. Every component is surfaced with an explicit default:
-
-```text
-ubuntu-white   ON
-security       ON
-git-improved   ON
-jwstf          OFF
-```
-
-### white-installer smooth orchestrator ELF
-
-`installer/linux/white-installer` is a new native C11 binary (source `installer/linux/white_installer_orchestrator.c` and `.h`) that serves as the default "usual" smooth front door for installing the system. It runs a seven-stage guided flow:
-
-```text
-PROBE -> PREVIEW -> COMPONENTS -> TARGET -> CONFIRM -> DELEGATE -> AUDIT
-```
-
-The orchestrator is a control plane. It reimplements no disk, partition, chroot, or package logic, runs unprivileged, and delegates the actual work to the existing Bash engine `scripts/galactic-cherry-installer` (which remains independently runnable), falling back to `installer/install-native.sh` when the engine is absent. The PREVIEW stage is read-only, COMPONENTS reuses the checkbox and CLI selection surface described above, and the default action is a safe dry-run. The prebuilt ELF is committed alongside the existing `desktop_install_probe` and `nxtt` native helpers. See [`installer/INSTALL.md`](installer/INSTALL.md) for full usage.
-
----
-
-**Max Rupplin — MEARVK LLC — 2026**
