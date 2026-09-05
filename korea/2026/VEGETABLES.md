@@ -1,11 +1,27 @@
 # Korea — Vegetables Annual Record
 
-The containing year directory defines the archive year.
+**Archive year:** 2026
 
-Status: `SOURCE_STRUCTURED`; 2026 is incomplete/current and unresolved observations remain `N/A`.
+## Evidence status
+`CURRENT_YEAR / INCOMPLETE`
 
-Indicators: total vegetable production; cabbage; radish; chili; onion; garlic. Units: thousand tonnes.
+2026 is an in-progress statistical year. This record therefore does not project a full-year production total from partial observations.
 
-Methods — WHY: production, area, value and price are separate concepts; do not infer missing historical values.
+## Standard indicators
+| Indicator | Unit | 2026 |
+|---|---:|---:|
+| Total vegetable cultivated area | thousand ha | N/A |
+| Total vegetable production | thousand t | N/A |
+| Cabbage production | thousand t | N/A |
+| Radish production | thousand t | N/A |
+| Chili production | thousand t | N/A |
+| Onion production | thousand t | N/A |
+| Garlic production | thousand t | N/A |
 
-Sources: KOSIS Crop Production Survey; NIHHS Vegetable Basic Statistics; MAFRA/KASS. Archive build: 2026-09-04.
+## Method
+Current-year observations are recorded only when the period and measurement basis are explicit. No annual total is extrapolated from incomplete data. `N/A` does not mean zero.
+
+## Sources
+KOSIS Crop Production Survey; NIHHS Vegetable Basic Statistics; MAFRA statistical releases and Statistical Yearbook of Agriculture, Food and Rural Affairs.
+
+**Archive build:** 2026-09-04

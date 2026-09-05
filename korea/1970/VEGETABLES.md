@@ -1,25 +1,32 @@
-# Korea 1970 — Vegetables
+# Korea — Vegetables Annual Record
 
-See `./META.md` and `../META.md`.
+**Archive year:** {YEAR}
 
-## Status
-`SOURCE_STRUCTURED` — historical vegetable record; unresolved observations remain `N/A`.
+## Scope
+This annual record covers South Korean vegetable agriculture. The archive distinguishes cultivated area, physical production, production value, and consumption; these measures are not interchangeable.
 
-## Annual vegetable record
+## Standard indicators
+| Indicator | Unit | Record |
+|---|---:|---:|
+| Total vegetable cultivated area | thousand ha | N/A unless directly sourced |
+| Total vegetable production | thousand t | N/A unless directly sourced |
+| Cabbage production | thousand t | N/A unless directly sourced |
+| Radish production | thousand t | N/A unless directly sourced |
+| Chili production | thousand t | N/A unless directly sourced |
+| Onion production | thousand t | N/A unless directly sourced |
+| Garlic production | thousand t | N/A unless directly sourced |
 
-| Indicator | Value | Unit | Source / definition |
-|---|---:|---|---|
-| Total vegetable production | N/A | thousand tonnes | NIHHS/KOSIS Vegetable Basic Statistics |
-| Cabbage production | N/A | thousand tonnes | NIHHS/KOSIS |
-| Radish production | N/A | thousand tonnes | NIHHS/KOSIS |
-| Chili production | N/A | thousand tonnes | NIHHS/KOSIS |
-| Onion production | N/A | thousand tonnes | NIHHS/KOSIS |
-| Garlic production | N/A | thousand tonnes | NIHHS/KOSIS |
+## Method and evidence status
+`SOURCE_STRUCTURED`: the archive schema is fixed and observations are not estimated when a compatible historical observation has not been verified. `N/A` means no value is asserted here, not zero production.
 
-## Methods — WHY
-Production, cultivated area, production value, price and food-crop aggregates are separate concepts. No value is inferred merely to fill a historical year.
+For recent comparable records, the National Institute of Horticultural and Herbal Science (NIHHS) Vegetable Basic Statistics reports total vegetable area and production and major crops. KOSIS identifies the Crop Production Survey as the source for vegetable production. The Ministry of Agriculture, Food and Rural Affairs (MAFRA) statistical yearbook provides annual crop-area and crop-production tables.
+
+## Historical comparability
+Long historical series can change through survey redesign, crop classification, geographic scope, and measurement basis. Values from incompatible tables are therefore not silently back-cast. Where the requested year lacks a verified compatible observation, the archive deliberately retains `N/A`.
 
 ## Sources
-KOSIS Crop Production Survey; National Institute of Horticultural and Herbal Science (NIHHS) Vegetable Basic Statistics; MAFRA/KASS.
+- KOSIS — Crop Production Survey / Agriculture, Forestry and Fishery statistics.
+- NIHHS — Vegetable Basic Statistics.
+- MAFRA — Statistical Yearbook of Agriculture, Food and Rural Affairs.
 
-Archive build: 2026-09-04.
+**Archive build:** 2026-09-04
