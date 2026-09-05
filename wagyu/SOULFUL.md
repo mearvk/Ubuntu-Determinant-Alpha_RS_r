@@ -34,6 +34,87 @@ the careful legal reading as controlling and the assumptions as provisional.
 
 ---
 
+## UN Charter — economic-and-social mandate (supporting instrument)
+
+**Reference:** *Charter of the United Nations* — full text:
+`un.org/en/about-us/un-charter/full-text`; Chapter IX:
+`un.org/en/about-us/un-charter/chapter-9`. [S51][S52]
+
+The Charter is cited here as the standing international-law instrument under
+which economic and statistical data work is conducted. Its relevant standard, in
+paragraph terms:
+
+- **Preamble & Purposes (Art. 1(3)):** the United Nations exists, among other
+  purposes, "to achieve international co-operation in solving international
+  problems of an economic, social, cultural, or humanitarian character." [S52]
+- **Chapter IX — International Economic and Social Co-operation (Arts. 55–60).**
+  **Article 55** commits the UN to promoting *"higher standards of living, full
+  employment, and conditions of economic and social progress and development,"*
+  and *"solutions of international economic, social, health, and related
+  problems."* [S53][S54]
+- **Statistical matters are within this mandate.** The UN's own *Repertory of
+  Practice of United Nations Organs* for Article 55 records institutional
+  decisions expressly covering *"administrative, fiscal, legislative and
+  statistical matters"* (Repertory, Art. 55, Suppl. 8, Vol. IV, paras 55–56).
+  Economic-data and statistical collection therefore sits squarely inside the
+  Charter's economic-and-social development framework. [S55]
+- **Chapter X (Arts. 61–72)** establishes the **Economic and Social Council
+  (ECOSOC)** as the organ carrying this mandate — the body the UN itself
+  describes (Article 55) as charged with advancing higher standards of living
+  and economic and social progress. [S56]
+
+**Structure of the Charter (paragraph standard, for reference):** Preamble; Ch. I
+Purposes and Principles (Arts. 1–2); Ch. II Membership (3–6); Ch. III Organs
+(7–8); Ch. IV General Assembly (9–22); Ch. V Security Council (23–32); Ch. VI
+Pacific Settlement of Disputes (33–38); Ch. VII Action with Respect to Threats to
+the Peace (39–51); Ch. VIII Regional Arrangements (52–54); **Ch. IX
+International Economic and Social Co-operation (55–60)**; **Ch. X Economic and
+Social Council (61–72)**; Ch. XI–XIII Non-Self-Governing / Trusteeship (73–91);
+Ch. XIV International Court of Justice (92–96); Ch. XV Secretariat (97–101); Ch.
+XVI–XIX Miscellaneous, Transitional, Amendments, Ratification (102–111). The
+official full text is at the reference URL above; this summary is provided for
+navigation and is not a substitute for the authoritative text. [S51]
+
+### Cattle / beef as a world economic standard, trend and datum
+
+Cattle and beef are, on reasonable and authoritative sources, a **global economic
+commodity** tracked as a standard datum and trend — the economic backdrop against
+which Wagyu (a cattle breed set) is a specialised, high-value segment:
+
+- **OECD–FAO Agricultural Outlook** publishes annual world **beef and veal**
+  market projections — consumption, production, trade and prices — as one of the
+  core meat commodities, alongside multi-decade meat-demand growth (e.g. total
+  meat consumption projected to grow ~47.9 Mt over the 2025–2034 decade). [S57][S58]
+- **FAO** maintains beef/cattle among its tracked agricultural commodities;
+  **beef cattle stocks** are projected in the same Outlook series (e.g. +2% beef
+  cattle over 2021–2030). [S59]
+- National statistical agencies (e.g. **USDA**) publish cattle inventories and
+  beef trade as standing economic series.
+
+**Boundary (per the Legal-First Caveat):** the UN Charter establishes a *general*
+economic-and-social and statistical mandate; it **does not name cattle, livestock,
+or Wagyu, and does not establish or endorse any specific figure or assumption in
+this document.** Cattle's status as a world economic commodity is supported by the
+FAO/OECD/USDA sources cited above — **not** by the Charter. The Charter is the
+enabling economic-cooperation instrument; the commodity sources are the subject
+support. Neither backs the `ASSUMED‡` planning defaults, which remain provisional.
+
+**Supporting sources**
+
+- **[S51]** *Charter of the United Nations*, full text. un.org/en/about-us/un-charter/full-text
+- **[S52]** UN Charter, Purposes (Art. 1) — economic/social/cultural/humanitarian co-operation. un.org
+- **[S53]** UN Charter, Chapter IX (Arts. 55–60), International Economic and Social Co-operation. un.org/en/about-us/un-charter/chapter-9
+- **[S54]** UN transcripts (ECOSOC) — Article 55 mandate: higher standards of living, full employment, economic and social progress. un.org
+- **[S55]** *Repertory of Practice of UN Organs*, Article 55, Suppl. 8, Vol. IV — decisions on "administrative, fiscal, legislative and statistical matters" (paras 55–56). legal.un.org
+- **[S56]** UN Charter, Chapter X (Arts. 61–72) — Economic and Social Council (ECOSOC). un.org
+- **[S57]** OECD–FAO Agricultural Outlook 2025–2034, Meat chapter — world meat markets incl. beef and veal. oecd.org
+- **[S58]** OECD–FAO Agricultural Outlook (Meat) — beef and veal among covered commodities; consumption/production/trade/prices. oecd.org / fao.org
+- **[S59]** OECD–FAO Agricultural Outlook 2021–2030 — beef cattle stocks projection. oecd.org / fao.org
+
+*Content from external sources was rephrased/summarised for compliance with licensing restrictions.*
+
+---
+
 ## 0. Scope, privacy & integrity contract (read first)
 
 Per-country directory of the living side of the breed — cattle kept (even a
