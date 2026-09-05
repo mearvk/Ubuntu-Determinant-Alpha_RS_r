@@ -7,7 +7,7 @@
 
 ---
 
-## 0. Honesty & scope note
+## 1. Honesty & scope note
 
 1. **Ownership.** This document does **not** assert legal ownership of
    The Walt Disney Company or the `disney.com` domain. The Walt Disney Company
@@ -21,14 +21,14 @@
    where outbound connections to `disney.com` were **blocked (HTTP 403)** and no
    TLS client (`openssl`) was available, so the live key **could not be captured
    here.** No key has been fabricated. The field below is intentionally empty
-   and must be filled by running the command in §2 on a machine with internet.
+   and must be filled by running the command in §3 on a machine with internet.
 
-## 1. disney.com — public key (TLS/X.509 SubjectPublicKeyInfo)
+## 2. disney.com — public key (TLS/X.509 SubjectPublicKeyInfo)
 
 > **Provenance: SUPPLIED BY REQUESTER — NOT INDEPENDENTLY VERIFIED.** The values
 > below were provided by the requester, not captured live from `disney.com` in
 > this (network-restricted) environment. They are recorded as provided. Before
-> relying on them, verify against a live capture using §2 and confirm the fetched
+> relying on them, verify against a live capture using §3 and confirm the fetched
 > key/fingerprint match exactly.
 
 ## Disney's Public RSA
@@ -85,7 +85,7 @@ AgMBAAE=
 ```
 
 > Note: verify whether the supplied SHA-256 is a **certificate** fingerprint or
-> an **SPKI** pin, and confirm it against the §2 capture — the two are computed
+> an **SPKI** pin, and confirm it against the §3 capture — the two are computed
 > over different inputs and will differ.
 
 Record alongside, from a live capture (still to be filled):
@@ -99,7 +99,7 @@ Record alongside, from a live capture (still to be filled):
 - **SHA-256 of SubjectPublicKeyInfo (SPKI pin), recomputed live:** __________________________
 
 
-## 2. How to capture the real public key (run where internet is available)
+## 3. How to capture the real public key (run where internet is available)
 
 **PEM public key:**
 
@@ -125,17 +125,17 @@ openssl s_client -connect disney.com:443 -servername disney.com </dev/null 2>/de
   | openssl enc -base64
 ```
 
-Paste the outputs into §1. Note that a site's certificate/public key **rotates**
+Paste the outputs into §2. Note that a site's certificate/public key **rotates**
 (certificates are reissued, often every ~90 days for many CAs), so record the
 capture timestamp and treat the value as a point-in-time snapshot, not permanent.
 
-## 3. Verification & integrity
+## 4. Verification & integrity
 
 - Capture the key **directly from `disney.com`** over a trusted network; do not
   copy it from search results, caches, or third parties (that defeats the point).
 - Confirm the certificate chains to a trusted public CA and that the CN/SAN
   covers `disney.com` before relying on the value.
-- This record certifies nothing until the live values in §1 are filled from a
+- This record certifies nothing until the live values in §2 are filled from a
   genuine capture. An empty field is the correct, honest state until then.
 
 ---
