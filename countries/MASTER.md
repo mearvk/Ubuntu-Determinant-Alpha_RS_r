@@ -2,7 +2,7 @@
 
 This is the master tracking document for the world statistical archive. It lists every sovereign country (UN members plus widely-recognized states) and records whether we have pulled their data into the archive.
 
-- **Status legend:** `✅ Pulled` = data directory exists in the archive; `⬜ Not started` = no data pulled yet.
+- **Status legend:** `✅ Pulled` = populated source data in the archive; `🏗 Builder ready` = source-aware builder + scaffold committed, data populates on first CI run; `⬜ Not started` = nothing yet.
 - **Location:** Per-country data lives under `national/<country>/`.
 - **Have data:** `national/china`, `national/korea`, `national/greenland` (Greenland is an autonomous territory of Denmark, included per existing archive scope).
 
@@ -10,7 +10,7 @@ Archive build: 2026-09-05.
 
 | # | Country | Region | Data Pulled | Notes |
 |---|---|---|---|---|
-| 1 | Afghanistan | Asia | ⬜ Not started | |
+| 1 | Afghanistan | Asia | 🏗 Builder ready | `national/afghanistan/`; builder + scaffold committed. Bountiful: FAOSTAT (1961+), World Bank WDI, FAO AQUASTAT, OWID. Partial: NSIA yearbooks, MAIL crop estimates. See `national/afghanistan/DATA_SOURCES.md` |
 | 2 | Albania | Europe | ⬜ Not started | |
 | 3 | Algeria | Africa | ⬜ Not started | |
 | 4 | Andorra | Europe | ⬜ Not started | |
@@ -211,5 +211,40 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled:** 3 — China, Korea (South Korea data pulled), Greenland
-- **Remaining:** 194
+- **Data pulled (✅):** 3 — China, Korea (South Korea data pulled), Greenland
+- **Builder ready (🏗):** 1 — Afghanistan
+- **Remaining (⬜):** 193
+
+## Sources
+
+Each country records its own graded source landscape in `national/<country>/DATA_SOURCES.md`.
+Sources are graded by how much continuous, machine-readable, per-year data they yield for
+the 1965-2026 archive:
+
+- **BOUNTIFUL** — deep, structured, machine-readable time series suitable for the automated builders.
+- **PARTIAL** — valuable but discontinuous or document-based; recorded and used for table-level supplementation.
+- **Ignored for now** — single studies, preprints, and narrative-only reports without an extractable per-year national series.
+
+### Archive-wide bountiful families
+
+These international families are reproducible baselines used across countries by the builders:
+
+| Source | Domains | Coverage | Access |
+|---|---|---|---|
+| **FAOSTAT** (Crops & Livestock Products, QCL) | Agriculture, grains, produce, meat, livestock, vegetables, fruit | 245+ countries, **1961**→present | https://www.fao.org/faostat/en/ · bulk: https://bulks-faostat.fao.org/production/ |
+| **World Bank WDI** | Economy, agricultural land/employment | Per-country, varies by indicator | https://data.worldbank.org · API: https://api.worldbank.org/v2/country/{ISO3}/indicator/{code} |
+| **FAO AQUASTAT** | Water (freshwater withdrawal, resources) | 180+ variables, per country | https://www.fao.org/aquastat/en/databases/ |
+| **Our World in Data** | Reproducible CSV layer over FAO/WB series | Per-country, varies | https://ourworldindata.org/agricultural-production |
+
+### Per-country primary families (BOUNTIFUL / PARTIAL as noted)
+
+| Country | Primary source(s) | Grade | Notes |
+|---|---|---|---|
+| Afghanistan | NSIA statistical yearbooks; MAIL crop estimates | PARTIAL | Strongest post-2008; see `national/afghanistan/DATA_SOURCES.md` |
+| China | (see `national/china/`) | — | existing archive |
+| Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
+| Greenland | (see `national/greenland/`) | — | existing archive |
+
+> Note: values are populated by the per-country builders in `tools/<country>/`, which fetch
+> these sources at build time (via GitHub Actions). They perform no interpolation and write
+> `N/A` where a source has no observation.
