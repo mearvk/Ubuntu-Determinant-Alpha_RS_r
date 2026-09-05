@@ -3,43 +3,34 @@
 **Project:** Ubuntu Determinant
 **Edition:** Ubuntu White Edition
 **Project attention:** Max Rupplin — MEARVK LLC — 2026
-**Status:** Directory of PUBLIC organisations/contacts + herd presence, per country (alphabetical)
+**Status:** Directory of PUBLIC organisations/contacts + herd presence, per country (alphabetical). Countries with more than one associated registry list all of them.
 
 ---
 
 ## 0. Scope, privacy & integrity contract (read first)
 
-This is a **soulful** companion to `WAGYU.MASTER.md`: it records, per country,
-the living side of the breed — how many cattle are kept (even a single cow or
-calf), the breed **organisations**, their **public websites**, **public business
-contacts**, and industry infrastructure (processors/slaughter facilities) — for
-**every country in the world**, listed alphabetically.
+Per-country directory of the living side of the breed — cattle kept (even a
+single cow or calf), breed **organisations/registries**, **public websites**,
+**public business contacts**, and industry infrastructure — for **every country**,
+alphabetical. **Where a country has more than one associated registry / breed
+body, all of them are listed.**
 
-Two firm rules:
-
-1. **Privacy — organisations and businesses only.** Contacts here are **public
-   association / registry / company** details (published business phone, office
-   address, official website). This file does **not** compile private
-   individuals' personal contact data (home addresses, personal phone numbers,
-   personal emails). Named people appear only where they are a public business
-   contact already published by their own organisation, and even then only the
-   business coordinates are recorded — never a personal dossier. "Known
-   cattlemen" is therefore represented by their **public breeding operation /
-   brand**, not by private personal data.
-
-2. **Integrity — nothing invented.** Reported facts carry a source tag `[Sn]`
-   (§Sources). Anything not published is `NR*` (Not Reported). There is **no
-   public per-country Wagyu head census** (Wagyu is a breed set, not a customs
-   code), and direct site fetches were blocked (HTTP 403) in the authoring
-   environment, so most per-country head counts and processor lists are `NR*`.
-   They are placeholders to populate later from a reviewed feed, never guesses.
+1. **Privacy — organisations/businesses only.** Association / registry / company
+   details that are already public (business phone, office address, official
+   website). No private individuals' personal contact data. Named people appear
+   only as a public business contact published by their own organisation.
+2. **Integrity — nothing invented.** Reported facts carry `[Sn]` (§3). Anything
+   not published is `NR*`. No public per-country Wagyu head census exists, and
+   primary-site fetches were blocked (HTTP 403) in the authoring environment, so
+   most head counts / processor lists are `NR*`, to populate later — never guessed.
 
 ## 1. What each country entry records
 
-- **Head (cattle count):** number of Wagyu (any purity) kept in the country.
-- **Association / registry:** the national or serving breed body + official site.
-- **Public contact:** published business phone / office address / website.
-- **Slaughter / processing:** processors or abattoirs handling Wagyu (public).
+- **Head (Wagyu cattle):** number kept in the country (any purity).
+- **Associations / registries:** the national or serving breed body/bodies +
+  official site(s). Listed as multiple bullets where more than one exists.
+- **Public contact:** published business phone / office / website.
+- **Slaughter / processing:** processors/abattoirs handling Wagyu (public).
 - **Notable operations (public):** breeding operations / brands as published.
 - **Notes:** provenance, role, genetics.
 
@@ -47,52 +38,68 @@ Fields with no published value are `NR*`.
 
 ## 2. Global anchor facts (sourced)
 
-- Fullblood Wagyu worldwide: **~2,000,000**, with **~96% in Japan**. [S25][S26]
-- By share of the global Wagyu population: **Japan ~96%**, **Australia ~18%**,
-  **United States ~2%**, **New Zealand ~1%** (shares are from differing bases and
-  overlap definitions; treat as indicative). [S27]
-- Wagyu of **≥50% genetics** worldwide: estimated **~3,000,000**. [S32]
-- Foundation genetics: **~220** Wagyu cattle exported from Japan (1976 & early
-  1990s), predominantly to **Australia** and the **USA**. [S8][S9b]
+- Fullblood Wagyu worldwide: **~2,000,000**, **~96% in Japan** [S25][S26]; by
+  share: Japan ~96%, Australia ~18%, USA ~2%, NZ ~1% (indicative, differing
+  bases) [S27]; Wagyu ≥50% genetics worldwide **~3,000,000** [S32]; ~220
+  foundation cattle exported from Japan (1976 & early 1990s), mainly to Australia
+  and the USA [S8][S9b].
 
 ## 3. Sources
 
 Public organisation/business data. Direct page fetches were blocked (HTTP 403);
 values are from indexed search results, rephrased for compliance.
 
-- **[S3]** ResearchGate — Japanese Wagyu industry (four breeds; brand now includes AUS/US). researchgate.net
+- **[S3]** ResearchGate — Japanese Wagyu industry (four breeds). researchgate.net
 - **[S4]** Australian Wagyu Association — boxed value AUD ~2.0bn (2023); ~80% to 40+ countries. wagyu.org.au
 - **[S5]** AWA International Wagyu Office Fact Sheet — serves UK/EU/USA/Canada members. wagyu.org.au
-- **[S6]** AWA Contact — head office +61 2 8880 7700; Intl office Fort Worth TX, +1 682 418 4774. wagyu.org.au
+- **[S6]** AWA Contact — +61 2 8880 7700; Intl office Fort Worth TX, +1 682 418 4774. wagyu.org.au
 - **[S7b]** Nippon.com — Japan beef exports record; US/Taiwan/Hong Kong lead. nippon.com
-- **[S8]** Wagyu International (foundation) — ~220 foundation cattle → AUS/USA. wagyuinternational.co
+- **[S8]** Wagyu International (foundation) — ~220 foundation cattle → AUS/USA; Canada 1991 Itotani semen. wagyuinternational.co
 - **[S9]** AWA — >25,000 calves/yr. wagyu.org.au
-- **[S9b]** AWA ("Continued success…") — ~220 individual Wagyu exported from Japan. wagyu.org.au
+- **[S9b]** AWA — ~220 individual Wagyu exported from Japan. wagyu.org.au
 - **[S11]** Wagyu International (Netherlands) — European herds from De Drie Morgen / Takeda. wagyuinternational.co
 - **[S14]** JIRCAS (JARQ) — 1,368,800 Wagyu cattle in Japan. jircas.go.jp
 - **[S15]** Wikipedia (Wagyu) — Japanese Black >90% of Japan Wagyu. en.wikipedia.org
 - **[S19]** AWA (Member Services Officer) — >40,000 new calves/yr. wagyu.org.au
 - **[S20]** AWA (partners) — >1,500 members incl. >650 international (2025). wagyu.org.au
-- **[S21]** AWA ("Continued success…") — genomics DB >400,000 individuals. wagyu.org.au
+- **[S21]** AWA — genomics DB >400,000 individuals. wagyu.org.au
 - **[S22]** Good Ranchers (citing AWA) — <5,000 Fullblood Wagyu in the US (~2022). goodranchers.com
 - **[S23]** AZ Central — American Wagyu Association >900 members (2021). azcentral.com
-- **[S25]** Wagyu International — ~2,000,000 fullblood Wagyu globally; ~96% in Japan. wagyuinternational.co
+- **[S25]** Wagyu International — ~2,000,000 fullblood; ~96% in Japan. wagyuinternational.co
 - **[S26]** Straits Research — 96% of Wagyu cattle in Japan. straitsresearch.com
 - **[S27]** Straits Research (global distribution) — Japan 96%, Australia 18%, USA 2%, NZ 1%. straitsresearch.com
 - **[S28]** AWA (about) — est. 1989; >1,000 members from 30 countries. wagyu.org.au
-- **[S29]** American Wagyu Association — wagyu.org (breed promotion/registry). wagyu.org
-- **[S30]** American Wagyu Association public office phone +1 208-262-8100. wagyu.org (via listings)
+- **[S29]** American Wagyu Association — wagyu.org. wagyu.org
+- **[S30]** American Wagyu Association — public office phone +1 208-262-8100. (public listings)
 - **[S31]** New Zealand Wagyu Breeders Association — est. 1992; grass-fed focus. nzwba.co.nz
-- **[S32]** Lone Mountain Wagyu (citing Wagyu International) — ~3,000,000 Wagyu ≥50% genetics worldwide. lonemountainwagyu.com
+- **[S32]** Lone Mountain Wagyu (citing Wagyu International) — ~3,000,000 Wagyu ≥50% genetics. lonemountainwagyu.com
+- **[S33]** Wagyu Registry Association (Zenwa) — breed registry site. zwtk.or.jp / cus4.zwtk.or.jp
+- **[S34]** Japan Times (Best of Japan) — Wagyu Registry Association est. 1948, public-interest assoc since 2012. japantimes.co.jp
+- **[S35]** JLEC — National Livestock Breeding Center individual-ID traceability. jlec-pr.jp
+- **[S36]** JLEC — export promotion council. jlec-pr.jp
+- **[S37]** JA Zen-Noh — calf ID and production/distribution database. zennoh.or.jp
+- **[S38]** Destination Wagyu — JMGA grading system (BMS/A5). destinationwagyu.com
+- **[S39]** Destination Wagyu — 'wagyu' not a protected term in the US. destinationwagyu.com
+- **[S40]** British Wagyu Association — est. July 2014. britishwagyu.co.uk
+- **[S41]** Wagyu Verband Deutschland e.V. — member directory / meat pages. wagyuverband.com
+- **[S42]** Wagyu International (Germany) — Wagyu Association Germany; German Studbook. wagyuinternational.co
+- **[S43]** France Wagyu Association. france-wagyu-association.com
+- **[S44]** Wagyu France. wagyufrance.eu
+- **[S45]** Wagyu International (France) — 100 Westholme (AUS) embryos to Belgium, 2005. wagyuinternational.co
+- **[S46]** Wagyu International (Brazil) — ABCBRW est. 1995, Bragança Paulista SP. wagyuinternational.co
+- **[S47]** Wagyu Brasil — breed community/news. wagyubrasil.com
+- **[S48]** Wagyu Society of South Africa — Certified Wagyu Beef programme. wagyu.org.za
+- **[S49]** Wagyu International (Canada) — national assoc inactive; register via AUS/USA. wagyuinternational.co
+- **[S50]** Wikipedia (nl) — Wagyu offered by a small number of Dutch breeders. nl.wikipedia.org
 
 ## 4. Per-country directory (alphabetical)
 
-Every country is listed. `NR*` = not publicly reported (populate later).
+Every country is listed. Multiple registries are listed per country where they exist. `NR*` = not publicly reported.
 
 ### Afghanistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -101,7 +108,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Albania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -110,7 +117,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Algeria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -119,7 +126,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Andorra
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -128,7 +135,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Angola
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -137,7 +144,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Antigua and Barbuda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -146,7 +153,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Argentina
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -155,7 +162,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Armenia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -164,16 +171,16 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Australia
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** 2nd-largest population, ~18% of global total [S27]; AWA genomics DB >400,000 individuals; >25,000-40,000 calves registered/yr [S21][S9][S19]
-- **Association / registry:** Australian Wagyu Association (AWA), est. 1989 — wagyu.org.au [S28]
+- **Associations / registries:** Australian Wagyu Association (AWA), est. 1989 — wagyu.org.au [S28]
 - **Public contact:** AWA head office ph +61 2 8880 7700; International office: Fort Worth Livestock Exchange Bldg, Suite 107, 131 East Exchange Ave, Fort Worth TX 76164 USA, ph +1 682 418 4774 [S6]
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR* (see association's public member/brand directory)
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** World's largest Wagyu exporter; boxed value AUD ~2.0bn (2023), ~80% exported to 40+ countries [S4]. ~1,000-1,500 members from ~30 countries [S28][S20].
 
 ### Austria
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -182,7 +189,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Azerbaijan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -191,7 +198,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bahamas
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -200,7 +207,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bahrain
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -209,7 +216,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bangladesh
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -218,7 +225,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Barbados
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -227,7 +234,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Belarus
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -236,16 +243,16 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Belgium
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** European Wagyu breeding presence; first European Wagyu embryos (100, from Westholme Australia) implanted in Belgium in 2005 [S45]
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Belgian Johan Hemelaere introduced Wagyu to Europe (2005) [S45].
 
 ### Belize
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -254,7 +261,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Benin
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -263,7 +270,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bhutan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -272,7 +279,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bolivia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -281,7 +288,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bosnia and Herzegovina
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -290,7 +297,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Botswana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -299,16 +306,18 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Brazil
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
-- **Public contact:** NR*
+- **Associations / registries (multiple):**
+    - Associação Brasileira de Criadores de Bovinos da Raça Wagyu (ABCBRW), est. 1995, Bragança Paulista, SP [S46]
+    - Wagyu Brasil (breed information/community) — wagyubrasil.com [S47]
+- **Public contact:** ABCBRW — Bragança Paulista, SP, Brazil [S46] (public org)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Wagyu developed in Brazil by Yakult; ABCBRW handles communication, development and classification [S46].
 
 ### Brunei
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -317,7 +326,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Bulgaria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -326,7 +335,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Burkina Faso
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -335,7 +344,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Burundi
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -344,7 +353,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Cabo Verde
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -353,7 +362,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Cambodia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -362,7 +371,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Cameroon
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -371,16 +380,16 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Canada
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** Canadian Wagyu Association (national breed body) — see association website. Foundation herd from Japanese genetics via Canada (1991) [S8].
-- **Public contact:** NR* (see association website)
+- **Associations / registries:** No longer-active national Canadian Wagyu association; Canadian producers register in Australia (AWA) and/or the USA (American Wagyu Association), sometimes both [S49]
+- **Public contact:** Via AWA (wagyu.org.au) and/or American Wagyu Association (wagyu.org) [S49]
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding presence.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Foundation genetics routed through Canada in 1991 (Itotani semen) [S8].
 
 ### Central African Republic
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -389,7 +398,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Chad
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -398,7 +407,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Chile
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -407,7 +416,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### China
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -416,7 +425,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Colombia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -425,7 +434,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Comoros
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -434,7 +443,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Congo (Brazzaville)
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -443,7 +452,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Congo (Kinshasa)
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -452,7 +461,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Costa Rica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -461,7 +470,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Croatia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -470,7 +479,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Cuba
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -479,7 +488,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Cyprus
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -488,7 +497,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Czechia
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -497,7 +506,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Denmark
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -506,7 +515,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Djibouti
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -515,7 +524,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Dominica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -524,7 +533,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Dominican Republic
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -533,7 +542,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Ecuador
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -542,7 +551,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Egypt
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -551,7 +560,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### El Salvador
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -560,7 +569,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Equatorial Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -569,7 +578,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Eritrea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -578,7 +587,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Estonia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -587,7 +596,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Eswatini
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -596,7 +605,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Ethiopia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -605,7 +614,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Fiji
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -614,7 +623,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Finland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -623,16 +632,18 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### France
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
-- **Public contact:** NR*
+- **Associations / registries (multiple):**
+    - France Wagyu Association — france-wagyu-association.com [S43]
+    - Wagyu France — wagyufrance.eu [S44]
+- **Public contact:** France Wagyu Association — france-wagyu-association.com [S43] (public org site)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** European Wagyu introduced via Belgian import of 100 Australian (Westholme) embryos in 2005 [S45].
 
 ### Gabon
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -641,7 +652,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Gambia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -650,7 +661,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Georgia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -659,16 +670,18 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Germany
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
-- **Public contact:** NR*
+- **Associations / registries (multiple):**
+    - Wagyu Verband Deutschland e.V. — wagyuverband.com [S41]
+    - Wagyu Association Germany / German Studbook (registration of German-raised Wagyu) [S42]
+- **Public contact:** Wagyu Verband Deutschland e.V. — wagyuverband.com [S41] (public org site)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Fullblood Wagyu descend from Japanese genetics bred in USA/Canada/Australia; German-raised Wagyu recorded in the German Studbook [S42].
 
 ### Ghana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -677,7 +690,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Greece
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -686,7 +699,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Grenada
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -695,7 +708,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Guatemala
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -704,7 +717,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -713,7 +726,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Guinea-Bissau
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -722,7 +735,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Guyana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -731,7 +744,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Haiti
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -740,7 +753,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Honduras
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -749,7 +762,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Hungary
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -758,7 +771,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Iceland
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -767,7 +780,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### India
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -776,7 +789,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Indonesia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -785,7 +798,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Iran
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -794,7 +807,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Iraq
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -803,16 +816,16 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Ireland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** European Wagyu breeding presence (De Drie Morgen / Takeda bloodlines) [S11].
-- **Public contact:** NR* (see association website)
+- **Associations / registries:** Served via AWA international membership (UK/EU) [S5]; European Wagyu breeding presence (De Drie Morgen / Takeda bloodlines) [S11]
+- **Public contact:** NR*
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding presence.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Documented European Wagyu breeding presence.
 
 ### Israel
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -821,7 +834,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Italy
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -830,7 +843,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Ivory Coast
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -839,7 +852,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Jamaica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -847,17 +860,22 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 
 ### Japan
 - **Tier:** `producer`
-- **Head (Wagyu cattle):** ~1,368,800 Wagyu head [S14]; ~2,000,000 fullblood globally with ~96% in Japan [S25][S26]; Japanese Black >90% of Japan Wagyu [S15]
-- **Association / registry:** Japan Meat Grading Association (JMGA); Wagyu Registry Association (breed registry) [S3]
-- **Public contact:** NR* (national registry bodies; no single public business line captured)
+- **Head (Wagyu cattle):** ~1,368,800 Wagyu head [S14]; ~2,000,000 fullblood globally, ~96% in Japan [S25][S26]; Japanese Black >90% of Japan Wagyu [S15]
+- **Associations / registries (multiple):**
+    - Wagyu Registry Association (Zenwa / 全国和牛登録協会), breed registry est. 1948, public-interest assoc. since 2012 — zwtk.or.jp [S33][S34]
+    - Japan Meat Grading Association (JMGA) — carcass grading (BMS/A5) [S3][S38]
+    - National Livestock Breeding Center — individual-ID traceability database [S35]
+    - Japan Livestock Products Export Promotion Council (JLEC) — export promotion — jlec-pr.jp [S36]
+    - JA Zen-Noh — calf ID/production-distribution database [S37]
+- **Public contact:** Wagyu Registry Association — cus4.zwtk.or.jp [S33]; JLEC — jlec-pr.jp [S36] (public org sites)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR* (see association's public member/brand directory)
-- **Notes:** Origin of the breed; four breeds (Black, Brown, Shorthorn, Polled). Largest producer and exporter market by value; top destinations US/Taiwan/Hong Kong [S7b].
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Origin of the breed; four breeds (Black, Brown, Polled, Shorthorn). Largest producer; top export markets US/Taiwan/Hong Kong [S7b].
 
 ### Jordan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -866,7 +884,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Kazakhstan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -875,7 +893,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Kenya
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -884,7 +902,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Kiribati
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -893,7 +911,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Kuwait
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -902,7 +920,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Kyrgyzstan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -911,7 +929,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Laos
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -920,7 +938,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Latvia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -929,7 +947,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Lebanon
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -938,7 +956,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Lesotho
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -947,7 +965,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Liberia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -956,7 +974,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Libya
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -965,7 +983,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Liechtenstein
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -974,7 +992,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Lithuania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -983,7 +1001,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Luxembourg
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -992,7 +1010,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Madagascar
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1001,7 +1019,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Malawi
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1010,7 +1028,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Malaysia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1019,7 +1037,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Maldives
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1028,7 +1046,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mali
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1037,7 +1055,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Malta
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1046,7 +1064,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Marshall Islands
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1055,7 +1073,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mauritania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1064,7 +1082,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mauritius
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1073,7 +1091,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mexico
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1082,7 +1100,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Micronesia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1091,7 +1109,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Moldova
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1100,7 +1118,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Monaco
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1109,7 +1127,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mongolia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1118,7 +1136,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Montenegro
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1127,7 +1145,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Morocco
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1136,7 +1154,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Mozambique
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1145,7 +1163,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Myanmar
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1154,7 +1172,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Namibia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1163,7 +1181,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Nauru
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1172,7 +1190,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Nepal
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1181,25 +1199,25 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Netherlands
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** European Wagyu herds established from De Drie Morgen embryos / Takeda Farms genetics [S11].
-- **Public contact:** NR* (see association website)
+- **Associations / registries:** European Wagyu breeding presence; herds established from De Drie Morgen embryos / Takeda Farms genetics [S11]
+- **Public contact:** NR* (small number of breeders) [S50]
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding presence.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Wagyu offered by a small number of Dutch breeders [S50].
 
 ### New Zealand
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** ~1% of global Wagyu population [S27]
-- **Association / registry:** New Zealand Wagyu Breeders Association, Inc., est. 11 May 1992 — nzwba.co.nz [S31]
-- **Public contact:** NR* (see association website)
+- **Associations / registries:** New Zealand Wagyu Breeders Association, Inc., est. 11 May 1992 — nzwba.co.nz [S31]
+- **Public contact:** NR* (see association website nzwba.co.nz)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR* (see association's public member/brand directory)
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** Predominantly grass-fed Wagyu breeding focus [S31].
 
 ### Nicaragua
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1208,7 +1226,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Niger
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1217,7 +1235,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Nigeria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1226,7 +1244,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### North Korea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1235,7 +1253,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### North Macedonia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1244,7 +1262,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Norway
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1253,7 +1271,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Oman
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1262,7 +1280,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Pakistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1271,7 +1289,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Palau
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1280,7 +1298,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Panama
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1289,7 +1307,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Papua New Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1298,7 +1316,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Paraguay
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1307,7 +1325,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Peru
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1316,7 +1334,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Philippines
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1325,7 +1343,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Poland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1334,7 +1352,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Portugal
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1343,7 +1361,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Qatar
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1352,7 +1370,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Romania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1361,7 +1379,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Russia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1370,7 +1388,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Rwanda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1379,7 +1397,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Saint Kitts and Nevis
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1388,7 +1406,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Saint Lucia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1397,7 +1415,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Saint Vincent and the Grenadines
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1406,7 +1424,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Samoa
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1415,7 +1433,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### San Marino
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1424,7 +1442,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Sao Tome and Principe
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1433,7 +1451,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Saudi Arabia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1442,7 +1460,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Senegal
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1451,7 +1469,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Serbia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1460,7 +1478,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Seychelles
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1469,7 +1487,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Sierra Leone
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1478,7 +1496,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Singapore
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1487,7 +1505,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Slovakia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1496,7 +1514,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Slovenia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1505,7 +1523,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Solomon Islands
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1514,7 +1532,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Somalia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1523,16 +1541,16 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### South Africa
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
-- **Public contact:** NR*
+- **Associations / registries:** Wagyu Society of South Africa — wagyu.org.za; runs the Certified Wagyu Beef (CWB) programme [S48]
+- **Public contact:** Wagyu Society of South Africa — wagyu.org.za [S48] (public org site)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Certified Wagyu Beef quality-assurance programme [S48].
 
 ### South Korea
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1541,7 +1559,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### South Sudan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1550,7 +1568,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Spain
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1559,7 +1577,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Sri Lanka
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1568,7 +1586,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Sudan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1577,7 +1595,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Suriname
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1586,7 +1604,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Sweden
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1595,7 +1613,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Switzerland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1604,7 +1622,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Syria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1613,7 +1631,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Taiwan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1622,7 +1640,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Tajikistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1631,7 +1649,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Tanzania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1640,7 +1658,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Thailand
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1649,7 +1667,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Timor-Leste
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1658,7 +1676,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Togo
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1667,7 +1685,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Tonga
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1676,7 +1694,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Trinidad and Tobago
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1685,7 +1703,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Tunisia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1694,7 +1712,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Turkey
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1703,7 +1721,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Turkmenistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1712,7 +1730,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Tuvalu
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1721,7 +1739,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Uganda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1730,7 +1748,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Ukraine
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1739,7 +1757,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### United Arab Emirates
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1748,25 +1766,27 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### United Kingdom
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** Wagyu breeder membership served via AWA international (UK/EU) [S5]; UK breed-group presence documented.
-- **Public contact:** NR* (see association website)
+- **Associations / registries (multiple):**
+    - British Wagyu Association (BWA), est. July 2014 — britishwagyu.co.uk [S40]
+    - Australian Wagyu Association (international service for UK members) — wagyu.org.au [S5]
+- **Public contact:** British Wagyu Association — britishwagyu.co.uk [S40] (public org site)
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR*
-- **Notes:** Documented Wagyu breeding presence.
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** BWA promotes British Wagyu and represents members at home and abroad [S40].
 
 ### United States
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** ~2% of global Wagyu population [S27]; <5,000 Fullblood (AWA est., ~2022) [S22]
-- **Association / registry:** American Wagyu Association — wagyu.org [S29]
+- **Associations / registries:** American Wagyu Association — wagyu.org [S29]
 - **Public contact:** American Wagyu Association public office ph +1 208-262-8100 [S30]
 - **Slaughter / processing:** NR*
-- **Notable operations (public):** NR* (see association's public member/brand directory)
-- **Notes:** Herd founded on 1976/1993 Japanese imports; 'American purebred' = 15/16 (93.75%). >900 AWA members (2021) [S23].
+- **Notable operations (public):** NR* (see the association's public member/brand directory)
+- **Notes:** Herd founded on 1976/1993 Japanese imports; 'American purebred' = 15/16 (93.75%). >900 AWA members (2021) [S23]. 'Wagyu' is not a protected term in the US [S39].
 
 ### Uruguay
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1775,7 +1795,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Uzbekistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1784,7 +1804,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Vanuatu
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1793,7 +1813,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Vatican City
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1802,7 +1822,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Venezuela
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1811,7 +1831,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Vietnam
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1820,7 +1840,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Yemen
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1829,7 +1849,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Zambia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1838,7 +1858,7 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 ### Zimbabwe
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
-- **Association / registry:** NR*
+- **Associations / registries:** NR*
 - **Public contact:** NR*
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
@@ -1846,4 +1866,4 @@ Every country is listed. `NR*` = not publicly reported (populate later).
 
 ---
 
-*Public organisations/businesses only; no private personal contact data is compiled. Reported facts carry source tags; `NR*` cells are genuinely unreported (no public per-country Wagyu census exists and primary-site fetches were blocked), to be populated later from a reviewed feed. Max Rupplin — MEARVK LLC — 2026.*
+*Public organisations/businesses only; no private personal contact data. Multiple registries are listed per country where they exist. Reported facts carry source tags; `NR*` cells are genuinely unreported (no public per-country Wagyu census; primary-site fetches blocked), to populate later from a reviewed feed. Max Rupplin — MEARVK LLC — 2026.*
