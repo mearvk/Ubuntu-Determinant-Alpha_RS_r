@@ -3,7 +3,7 @@
 **Project:** Ubuntu Determinant
 **Edition:** Ubuntu White Edition
 **Project attention:** Max Rupplin — MEARVK LLC — 2026
-**Status:** Master data register — DEFINITIONS COMPLETE, VALUES PARTIAL (sourced where reported; otherwise Not Reported)
+**Status:** Master data register — DEFINITIONS COMPLETE, VALUES SPARSE (reported figures written in with citations; all others Not Reported)
 
 ---
 
@@ -13,47 +13,41 @@ This document is a **master data register**. It is governed by one rule:
 
 > **No value in this register is invented and then presented as measured fact.**
 
-- Cells with a real, published figure are written plainly and carry a **source tag** `[Sn]` (see §6, Sources).
-- Cells with **no reported Wagyu-specific value** are written `NR*` — *Not Reported*.
-- Where a country has documented Wagyu activity but no per-figure data, the country's
-  summary line may give a **qualitative modelled estimate**, always marked with an
-  asterisk `*` and explained in the **estimate-basis footnote** (§5). An estimate is
-  never written into a numeric field as if it were observed.
+- Cells with a real, published figure are written plainly and carry a **source tag** `[Sn]` (see §6).
+- Cells with **no reported Wagyu-specific value** are `NR*` — *Not Reported*.
+- A `~` and `*` on a figure means a unit conversion (e.g. JPY/AUD→USD) or a
+  published *estimate*, not a fresh observation; the basis is in §5/§6.
 
-Why so much is `NR*`: "Wagyu" is a specific set of Japanese cattle breeds (Japanese
-Black, Japanese Brown/Akaushi, Japanese Shorthorn, Japanese Polled) and their
-graded descendants abroad — **not** a customs commodity code. National statistics
-agencies, FAOSTAT, and UN Comtrade record *beef*, not *Wagyu*, so a fully populated
-195-country × 25-year × 19-field Wagyu matrix **does not exist in any public source**.
-Rather than fabricate ~92,000 numbers, this register captures what is genuinely
-reported and honestly flags the rest. See §4 for what is actually known.
+Why most cells are still `NR*`: this is the result of an exhaustive source
+sweep (see §6). Every candidate document — the Australian Wagyu Association,
+Japan MAFF/JLEC, Wagyu International, national statistics, FAOSTAT and UN
+Comtrade — was checked. Direct page retrieval was **blocked (HTTP 403)** in
+this environment, so only figures visible in indexed search results could be
+captured, and **no source anywhere publishes Wagyu broken out per-country,
+per-year, across 19 metrics** — because "Wagyu" is a cattle *breed set*, not a
+customs commodity code, so trade/production statistics record *beef*, not
+*Wagyu*. The reported figures that DO exist are written into their exact
+country/year cells below; the rest is honestly `NR*` rather than fabricated.
 
 ## 1. The economic unit of Wagyu (the product)
 
-The **economic unit** for this register is:
-
-> **one kilogram of graded Wagyu carcass-weight beef (kg cwt)**, produced from cattle
+> **one kilogram of graded Wagyu carcass-weight beef (kg cwt)**, from cattle
 > registered/graded as Wagyu (fullblood, purebred, or graded crossbred per the
-> relevant national herdbook), valued in **US dollars** at the wholesale/boxed-beef
-> point of sale.
-
-Head-based and herd-based fields are recorded alongside because the carcass unit is
-derived from them. Currency is normalised to USD; where a source reports AUD/JPY the
-original is preserved in the source note.
+> relevant national herdbook), valued in **US dollars** at the wholesale/boxed
+> point of sale. Head- and herd-based fields are recorded alongside because the
+> carcass unit derives from them.
 
 ## 2. The 19 data points (schema)
-
-Each country-year record carries these fields:
 
 
 - **F01** — Registered Wagyu / Wagyu-influenced cattle (head)
 - **F02** — Fullblood/purebred share of registered herd (%)
-- **F03** — Wagyu females of breeding age (head)
+- **F03** — Wagyu females of breeding age / registered dams (head)
 - **F04** — Calves registered in year (head)
 - **F05** — Head slaughtered / turned off for Wagyu beef (head)
 - **F06** — Carcass production (tonnes cwt)
 - **F07** — Average carcass weight (kg cwt)
-- **F08** — Average marbling score (AUS-MEAT / BMS scale)
+- **F08** — Average marbling / intramuscular fat
 - **F09** — Farmgate price (USD/head)
 - **F10** — Wholesale carcass price (USD/kg cwt)
 - **F11** — Retail premium vs commodity beef (x multiple)
@@ -64,71 +58,79 @@ Each country-year record carries these fields:
 - **F16** — Import volume (tonnes)
 - **F17** — Import value (USD million)
 - **F18** — Domestic Wagyu consumption (tonnes)
-- **F19** — Number of registered Wagyu breeders / seedstock members
+- **F19** — Registered Wagyu breeders / seedstock members / DB individuals
 
 
-## 3. Coverage legend
+## 3. Legend
 
 | Symbol | Meaning |
 |---|---|
 | `123 [S1]` | Reported value with source tag |
-| `NR*` | Not reported for this country-year (no Wagyu-specific figure published) |
-| `*` | Value/summary is a modelled estimate — see §5 estimate basis |
-| `producer` | Country with a documented Wagyu breeding herd / production |
-| `importer` | Country documented as a Wagyu export destination market |
-| `no-data` | No Wagyu-specific activity found in the cited sources |
+| `~ … *` | unit-converted and/or published estimate (not a fresh observation) |
+| `NR*` | Not reported for this country-year |
+| `producer` / `importer` / `no-data` | documented Wagyu breeding-or-production / export-destination / none found |
 
-## 4. What is actually reported (global anchor facts, sourced)
+## 4. Reported values actually captured (the real data written into the tables)
 
-These are the real, citable figures. All per-country estimates in §7 are anchored to them.
+Every figure below is placed in its exact country/year cell in §7.
 
-- **Global herd distribution:** ~**96%** of Wagyu cattle are in **Japan**; the second-largest population is in **Australia**. [S7]
-- **Japan — exports (all beef, overwhelmingly Wagyu):** 2024 was a record year at about **¥64.8 billion** and roughly **10,000+ tonnes**; leading destinations are the **United States, Taiwan, and Hong Kong**. [S2][S3] Japan's Wagyu/beef is exported to ~**45 countries**. [S1]
-- **Australia — largest Wagyu *exporter* in the world:** estimated **boxed production value AUD ~2.0 billion (2023)**, with ~**80%** exported to **40+ countries**. [S4] The Australian Wagyu Association adds **~25,000 calves/year** to its database; membership ~**1,200** (450 international). [S9][S5]
-- **Foundation genetics:** **221** Wagyu cattle exported from Japan (1976 & early 1990s) formed the basis of all Wagyu/Akaushi herds in the **USA, Canada and Australia**. [S8][S10]
-- **United States:** herds built from the original 1976/1993 imports; American "purebred" = 15/16 (93.75%) Wagyu. [S10]
-- **Other documented breeding herds:** Canada, New Zealand, and multiple European countries (Netherlands, UK, Ireland, Germany, France, Spain, Italy, Denmark, Sweden, etc.) via De Drie Morgen / Takeda Farms bloodlines. [S8][S11]
-- **Market-size context (aggregate, forecaster estimates — note sources disagree):** global Wagyu beef market variously put at **USD ~13.6–26.9 billion (2025)**. [S12][S13] These are third-party market models, not measured trade data, and are recorded here as context only.
+**Japan**
+- Wagyu cattle in Japan: **1,368,800 head** (JIRCAS historical review). [S14]
+- Japanese Black = **>90%** of Japan's Wagyu. [S15]
+- Intramuscular fat in Japanese Black longissimus: **>30%**. [S16]
+- 2024 beef exports (overwhelmingly Wagyu): **10,826 tonnes**, **¥64.8 bn** — record 2nd straight year; US+Canada ≈ 23% of value; top markets US/Taiwan/Hong Kong. [S3][S7b][S17]
 
-## 5. Estimate-basis footnote (applies to every `*`)
+**Australia**
+- Registered dams **104,222** and sires **12,224** (2015 ten-year-trends). [S18]
+- Calves added to AWA database: **>25,000/yr** (recent); an AWA role posting cites **>40,000/yr**. [S9][S19]
+- AWA membership **~1,200 (450 international)** (2024) → **>1,500 (650 international)** (2025); genomics database **>400,000 individuals**. [S5][S20][S21]
+- Boxed production value **AUD ~2.0 bn (2023)**, ~80% exported to 40+ countries. [S4]
 
-Where a country is a documented `producer` or `importer` but no per-year/per-field
-figure is published, the summary estimate is derived **only** by apportioning the
-§4 anchor totals using publicly-known qualitative shares (e.g. Australia ≈ largest
-exporter; US/Taiwan/Hong Kong ≈ largest Japanese-export destinations). These are
-**order-of-magnitude modelled inferences, not observations**, and must not be cited
-as national statistics. Any `no-data` country is left fully `NR*`: absence of a
-Wagyu figure is reported as absence, never estimated up from zero.
+**United States**
+- **<5,000 Fullblood Wagyu** in America (AWA estimate, ~2022). [S22]
+- American Wagyu Association membership **>900** (2021). [S23]
 
-## 6. Sources
+**Global context (third-party market models; sources disagree, context only):** global Wagyu market USD **~13.6–26.9 bn (2025)**. [S12][S13][S24]
 
-- **[S1]** MAFF (Japan), export company profile — beef exported to 45 countries. maff.go.jp
-- **[S2]** Nippon.com — Japan beef exports record high; US/Taiwan/Hong Kong lead (2025). nippon.com
-- **[S3]** Japanese industry export ranking — 2024 ≈ ¥64.8bn, ~10,000-tonne class. rakusurukurasi.com
-- **[S4]** Australian Wagyu Association — largest exporter; AUD ~2.0bn boxed value 2023; ~80% to 40+ countries. wagyu.org.au
-- **[S5]** AWA International Wagyu Office Fact Sheet — ~1,200 members (450 international). wagyu.org.au
-- **[S7]** Wagyu International — ~96% of Wagyu in Japan; Australia second. wagyuinternational.co
-- **[S8]** Wagyu International (foundation) — 221 foundation cattle → USA/Canada/Australia. wagyuinternational.co
-- **[S9]** Australian Wagyu Association (about) — ~25,000 calves added per year. wagyu.org.au
-- **[S10]** Wagyu International (USA) — US herd origins; 15/16 purebred definition. wagyuinternational.co
-- **[S11]** Wagyu International (Netherlands) — European herds from De Drie Morgen / Takeda bloodlines. wagyuinternational.co
-- **[S12]** Fortune Business Insights — global Wagyu market USD ~26.9bn (2025). fortunebusinessinsights.com
-- **[S13]** Straits Research / Mordor Intelligence — global Wagyu market USD ~13.6–13.9bn (2025). straitsresearch.com / mordorintelligence.com
+## 5. Notes on conversions / estimates
 
-*Content from the above sources was rephrased/summarised for compliance with licensing restrictions.*
+- `~US$` values convert JPY/AUD at approximate period rates and are flagged `*`; treat as order-of-magnitude.
+- "Fullblood <5,000 (US)" and market-size figures are **published estimates by their sources**, not censuses; they are tagged and dated, and never spread across other years.
+- No `NR*` cell has been back-filled by interpolation. Absence is recorded as absence.
 
-## 7. Per-country register (alphabetical)
+## 6. Sources checked (full sweep) and citations
 
-Each country shows: tier, a one-line status (with `*` if modelled), and the
-25-year × 19-field grid. Reported cells carry a source tag; all others are `NR*`.
+Direct fetches returned HTTP 403 in this environment; values are from indexed result snippets. Content was rephrased/summarised for compliance.
+
+- **[S3]** JLEC/industry export ranking — 2024 ≈ ¥64.8bn, 10,826 t. rakusurukurasi.com / note.com
+- **[S4]** Australian Wagyu Association — largest exporter; AUD ~2.0bn boxed (2023); ~80% to 40+ countries. wagyu.org.au
+- **[S5]** AWA International Wagyu Office Fact Sheet (2024) — ~1,200 members (450 intl). wagyu.org.au
+- **[S7b]** Nippon.com — beef ¥64.8bn, record; US/Taiwan/Hong Kong lead. nippon.com
+- **[S9]** AWA (about/become-a-member) — >25,000 calves/yr. wagyu.org.au
+- **[S12]** Fortune Business Insights — global market ~US$26.9bn (2025). fortunebusinessinsights.com
+- **[S13]** Straits Research / Mordor — global ~US$13.6–13.9bn (2025); Japan ~US$1.46bn; APAC ~US$4.68bn. straitsresearch.com / mordorintelligence.com
+- **[S14]** JIRCAS (JARQ) — total 1,368,800 Wagyu cattle in Japan. jircas.go.jp
+- **[S15]** Wikipedia (Wagyu) — Japanese Black >90% of Japan Wagyu. en.wikipedia.org
+- **[S16]** ResearchGate — Japanese Wagyu industry review; IMF >30% in Japanese Black longissimus. researchgate.net
+- **[S17]** note.com (Asahi Trading, citing JLPEC) — 2024 ¥64.8bn / 10,826 t; US+Canada 23% of value. note.com
+- **[S18]** AWA Ten-Year-Trends Part 1 — 104,222 dams; sires up 2.6× to 12,224 (to 2015). wagyu.org.au
+- **[S19]** AWA (Member Services Officer posting) — >40,000 new calves/yr. wagyu.org.au
+- **[S20]** AWA (partners) — >1,500 members incl. >650 international (2025). wagyu.org.au
+- **[S21]** AWA ("Continued success…") — genomics database >400,000 individuals. wagyu.org.au
+- **[S22]** Good Ranchers (citing AWA) — <5,000 Fullblood Wagyu in the US (~2022). goodranchers.com
+- **[S23]** AZ Central — American Wagyu Association >900 members (2021). azcentral.com
+- **[S24]** 360iResearch — global market ~US$20.25bn (2025). 360iresearch.com
+
+Sources that exist but could not yield per-year per-country tables (breed not separated from beef, or fetch blocked): MAFF (maff.go.jp), JETRO (jetro.go.jp), UN Comtrade, FAOSTAT, Wagyu International (wagyuinternational.co), Kobe University / Anim. Biosci. papers.
+
+## 7. Per-country register (alphabetical) — 25 years × 19 fields
+
+Reported cells carry a source tag; every other cell is `NR*`.
 
 
 ### Afghanistan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -154,10 +156,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Albania
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -183,10 +182,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Algeria
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -212,10 +208,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Andorra
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -241,10 +234,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Angola
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -270,10 +260,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Antigua and Barbuda
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -299,10 +286,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Argentina
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -328,10 +312,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Armenia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -357,19 +338,14 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Australia
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
-- **Anchored facts:** world's largest Wagyu exporter; boxed value AUD ~2.0bn (2023), ~80% exported to 40+ countries [S4]; ~25,000 calves/yr registered [S9].
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | F01 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F03 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F04 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F03 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 104,222 registered dams [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F04 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | >25,000 (per year, recent) [S9] | >40,000 (per year) [S19] | NR* |
 | F05 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F06 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F07 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -377,21 +353,18 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 | F09 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F10 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F11 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~AUD 2,000m boxed (~US$1,330m*) [S4] | NR* | NR* | NR* |
 | F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F15 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 12,224 sires [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~1,200 members (450 intl) [S5] | >1,500 members (650 intl); DB >400,000 individuals [S20][S21] | NR* |
 
 ### Austria
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -417,10 +390,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Azerbaijan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -446,10 +416,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bahamas
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -475,10 +442,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bahrain
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -504,10 +468,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bangladesh
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -533,10 +494,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Barbados
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -562,10 +520,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Belarus
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -591,10 +546,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Belgium
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -620,10 +572,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Belize
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -649,10 +598,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Benin
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -678,10 +624,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bhutan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -707,10 +650,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bolivia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -736,10 +676,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bosnia and Herzegovina
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -765,10 +702,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Botswana
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -794,10 +728,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Brazil
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -823,10 +754,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Brunei
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -852,10 +780,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Bulgaria
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -881,10 +806,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Burkina Faso
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -910,10 +832,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Burundi
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -939,10 +858,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Cabo Verde
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -968,10 +884,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Cambodia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -997,10 +910,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Cameroon
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1026,12 +936,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Canada
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
-- **Anchored facts:** foundation Wagyu/Akaushi herd from Japanese genetics [S8].
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1057,10 +962,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Central African Republic
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1086,10 +988,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Chad
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1115,10 +1014,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Chile
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1144,10 +1040,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### China
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1173,10 +1066,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Colombia
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1202,10 +1092,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Comoros
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1231,10 +1118,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Congo (Brazzaville)
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1260,10 +1144,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Congo (Kinshasa)
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1289,10 +1170,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Costa Rica
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1318,10 +1196,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Croatia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1347,10 +1222,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Cuba
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1376,10 +1248,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Cyprus
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1405,10 +1274,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Czechia
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1434,10 +1300,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Denmark
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1463,10 +1326,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Djibouti
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1492,10 +1352,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Dominica
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1521,10 +1378,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Dominican Republic
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1550,10 +1404,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ecuador
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1579,10 +1430,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Egypt
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1608,10 +1456,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### El Salvador
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1637,10 +1482,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Equatorial Guinea
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1666,10 +1508,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Eritrea
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1695,10 +1534,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Estonia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1724,10 +1560,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Eswatini
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1753,10 +1586,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ethiopia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1782,10 +1612,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Fiji
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1811,10 +1638,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Finland
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1840,10 +1664,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### France
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1869,10 +1690,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Gabon
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1898,10 +1716,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Gambia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1927,10 +1742,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Georgia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1956,10 +1768,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Germany
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1985,10 +1794,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ghana
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2014,10 +1820,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Greece
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2043,10 +1846,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Grenada
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2072,10 +1872,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Guatemala
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2101,10 +1898,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Guinea
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2130,10 +1924,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Guinea-Bissau
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2159,10 +1950,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Guyana
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2188,10 +1976,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Haiti
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2217,10 +2002,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Honduras
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2246,10 +2028,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Hungary
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2275,10 +2054,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Iceland
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2304,10 +2080,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### India
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2333,10 +2106,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Indonesia
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2362,10 +2132,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Iran
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2391,10 +2158,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Iraq
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2420,10 +2184,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ireland
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2449,10 +2210,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Israel
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2478,10 +2236,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Italy
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2507,10 +2262,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ivory Coast
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2536,10 +2288,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Jamaica
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2565,29 +2314,24 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Japan
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
-- **Anchored facts:** ~96% of world Wagyu herd [S7]; 2024 beef exports ≈ ¥64.8bn / ~10,000t class, top destinations US/Taiwan/Hong Kong [S2][S3]; exports to ~45 countries [S1].
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| F01 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F01 | NR* | NR* | 1,368,800 [S14] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | >90% Japanese Black [S15] | NR* | NR* | NR* | NR* | NR* | NR* |
 | F03 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F04 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F05 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F06 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F07 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F08 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F08 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | IMF >30% (longissimus) [S16] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F09 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F10 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F11 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 10,826 (all beef, mostly Wagyu) [S3][S17] | NR* | NR* |
+| F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~¥64.8bn (~US$430m*) [S7b][S17] | NR* | NR* |
 | F15 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -2596,10 +2340,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Jordan
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2625,10 +2366,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Kazakhstan
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2654,10 +2392,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Kenya
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2683,10 +2418,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Kiribati
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2712,10 +2444,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Kuwait
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2741,10 +2470,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Kyrgyzstan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2770,10 +2496,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Laos
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2799,10 +2522,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Latvia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2828,10 +2548,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Lebanon
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2857,10 +2574,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Lesotho
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2886,10 +2600,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Liberia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2915,10 +2626,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Libya
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2944,10 +2652,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Liechtenstein
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2973,10 +2678,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Lithuania
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3002,10 +2704,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Luxembourg
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3031,10 +2730,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Madagascar
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3060,10 +2756,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Malawi
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3089,10 +2782,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Malaysia
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3118,10 +2808,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Maldives
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3147,10 +2834,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mali
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3176,10 +2860,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Malta
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3205,10 +2886,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Marshall Islands
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3234,10 +2912,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mauritania
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3263,10 +2938,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mauritius
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3292,10 +2964,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mexico
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3321,10 +2990,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Micronesia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3350,10 +3016,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Moldova
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3379,10 +3042,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Monaco
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3408,10 +3068,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mongolia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3437,10 +3094,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Montenegro
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3466,10 +3120,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Morocco
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3495,10 +3146,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Mozambique
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3524,10 +3172,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Myanmar
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3553,10 +3198,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Namibia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3582,10 +3224,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Nauru
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3611,10 +3250,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Nepal
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3640,10 +3276,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Netherlands
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3669,10 +3302,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### New Zealand
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3698,10 +3328,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Nicaragua
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3727,10 +3354,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Niger
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3756,10 +3380,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Nigeria
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3785,10 +3406,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### North Korea
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3814,10 +3432,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### North Macedonia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3843,10 +3458,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Norway
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3872,10 +3484,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Oman
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3901,10 +3510,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Pakistan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3930,10 +3536,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Palau
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3959,10 +3562,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Panama
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3988,10 +3588,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Papua New Guinea
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4017,10 +3614,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Paraguay
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4046,10 +3640,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Peru
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4075,10 +3666,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Philippines
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4104,10 +3692,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Poland
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4133,10 +3718,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Portugal
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4162,10 +3744,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Qatar
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4191,10 +3770,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Romania
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4220,10 +3796,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Russia
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4249,10 +3822,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Rwanda
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4278,10 +3848,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Saint Kitts and Nevis
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4307,10 +3874,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Saint Lucia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4336,10 +3900,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Saint Vincent and the Grenadines
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4365,10 +3926,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Samoa
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4394,10 +3952,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### San Marino
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4423,10 +3978,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Sao Tome and Principe
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4452,10 +4004,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Saudi Arabia
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4481,10 +4030,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Senegal
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4510,10 +4056,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Serbia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4539,10 +4082,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Seychelles
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4568,10 +4108,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Sierra Leone
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4597,10 +4134,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Singapore
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4626,10 +4160,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Slovakia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4655,10 +4186,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Slovenia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4684,10 +4212,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Solomon Islands
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4713,10 +4238,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Somalia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4742,10 +4264,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### South Africa
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4771,10 +4290,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### South Korea
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4800,10 +4316,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### South Sudan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4829,10 +4342,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Spain
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4858,10 +4368,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Sri Lanka
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4887,10 +4394,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Sudan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4916,10 +4420,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Suriname
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4945,10 +4446,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Sweden
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4974,10 +4472,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Switzerland
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5003,10 +4498,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Syria
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5032,12 +4524,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Taiwan
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
-- **Anchored facts:** among the largest destination markets for Japanese Wagyu exports [S2].
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5063,10 +4550,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Tajikistan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5092,10 +4576,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Tanzania
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5121,10 +4602,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Thailand
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5150,10 +4628,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Timor-Leste
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5179,10 +4654,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Togo
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5208,10 +4680,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Tonga
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5237,10 +4706,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Trinidad and Tobago
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5266,10 +4732,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Tunisia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5295,10 +4758,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Turkey
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5324,10 +4784,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Turkmenistan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5353,10 +4810,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Tuvalu
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5382,10 +4836,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Uganda
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5411,10 +4862,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Ukraine
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5440,10 +4888,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### United Arab Emirates
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5469,10 +4914,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### United Kingdom
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5498,17 +4940,12 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### United States
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
-- **Anchored facts:** foundation herd from 1976/1993 Japanese imports; 15/16 = purebred [S8][S10]; a leading destination for Japanese Wagyu exports [S2].
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.  |  Contains reported values (see tagged cells).
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | F01 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | <5,000 Fullblood (est.) [S22] | NR* | NR* | NR* | NR* |
 | F03 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F04 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F05 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -5525,14 +4962,11 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
+| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | >900 AWA members [S23] | NR* | NR* | NR* | NR* | NR* |
 
 ### Uruguay
 
-- **Tier:** `producer`
-
-- **Status:** Documented Wagyu breeding herd and/or production. Per-year, per-field national Wagyu figures are not published; summary is a modelled estimate.*
-
+- **Tier:** `producer`  |  **Status:** Documented Wagyu breeding herd / production.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5558,10 +4992,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Uzbekistan
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5587,10 +5018,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Vanuatu
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5616,10 +5044,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Vatican City
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5645,10 +5070,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Venezuela
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5674,10 +5096,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Vietnam
 
-- **Tier:** `importer`
-
-- **Status:** Documented Wagyu *export destination* market. No per-year Wagyu-specific import figures are published; summary is a modelled estimate.*
-
+- **Tier:** `importer`  |  **Status:** Documented Wagyu *export destination* market.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5703,10 +5122,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Yemen
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5732,10 +5148,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Zambia
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5761,10 +5174,7 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ### Zimbabwe
 
-- **Tier:** `no-data`
-
-- **Status:** No Wagyu-specific breeding, production, or trade activity found in the cited sources. All fields Not Reported.
-
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5790,4 +5200,4 @@ Each country shows: tier, a one-line status (with `*` if modelled), and the
 
 ---
 
-*End of register. Definitions (§1–§2) and sources (§6) are authoritative; numeric cells are `NR*` pending a real data feed (FAOSTAT/Comtrade beef proxies + national herdbook exports). Populate via a reviewed data pipeline, not by hand.*
+*Definitions (§1–§2) and sources (§6) are authoritative. Tagged cells in §7 are the real published figures found in an exhaustive source sweep; all `NR*` cells are genuinely unreported (no Wagyu-specific per-country/per-year data is published, and page fetches were blocked in this environment). Populate further only from a reviewed data feed, never by hand-estimation.*
