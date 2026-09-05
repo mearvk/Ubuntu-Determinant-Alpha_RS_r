@@ -31,6 +31,25 @@
 > relying on them, verify against a live capture using §2 and confirm the fetched
 > key/fingerprint match exactly.
 
+##Disney's Public RSA
+
+43 F8 07 14 20 CA 9C 3A FB 3E A9 13 55 FC C2 54
+83 40 CC 45 DF 8F 8D E1 C5 57 A4 08 87 DA 7A 83
+D5 09 08 6F A5 BB 30 8B 4F 34 72 52 A1 69 A0 81
+99 D9 CA 86 CB 76 3E 76 A8 3A 78 90 5F 14 F4 A3
+00 F8 36 81 6A 7D 63 D7 20 4E 2C 9B 66 85 CB 01
+BD CB FC 0B D9 1E 53 2C 21 A1 D2 9C 38 7B 68 93
+C7 06 91 B2 40 B8 17 51 C3 E5 C6 C8 E7 17 63 AE
+61 7A B2 4C B8 F4 A8 C7 C2 92 04 AE 8F 0E F4 81
+8D 78 30 30 C8 79 9B 5B E8 CA 1C F2 27 80 63 36
+7B D7 D8 91 81 B8 33 F7 56 22 D9 E4 B6 8D DE 8B
+2C 8E C2 9A 33 14 96 45 B5 9A 20 02 06 AB 94 A2
+53 F0 41 8B DD 57 D7 AB 11 3B C1 70 A1 12 3A 85
+BC 5D 22 59 0D 60 48 A7 0D FE 66 0E 71 CE A6 97
+8D C4 47 5B 75 D9 1D DE D1 1F BF 7F 4C 65 A4 43
+A8 00 14 26 80 F2 A3 03 82 BA C7 51 15 C7 29 05
+2E 56 A5 F1 52 3C 7E 5E 47 3A DE A1 C4 AE A4 77
+
 **Public key (RSA 2048-bit).** Reconstructed as a standard X.509
 SubjectPublicKeyInfo PEM from the supplied 256-byte modulus with public exponent
 65537 (F4):
