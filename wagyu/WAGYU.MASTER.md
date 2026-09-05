@@ -19,6 +19,35 @@ measured fact.** Values come only from `wagyu.data.csv`; blank/absent cells are
 code, so most public statistics record *beef*, not *Wagyu* — hence most cells
 are `NR*` until a reviewed data feed fills them.
 
+## 0a. Institutional basis (UN / FAO) and legal-first caveat
+
+**Law first.** This register is prepared in an ICC/UN-facing context; legal
+review precedes any reliance and no ICC/UN endorsement of any figure herein is
+asserted or implied.
+
+**UN Charter — economic/statistical mandate (public):** the *Charter of the
+United Nations* (public, free at `un.org/en/about-us/un-charter/full-text`)
+establishes, in **Chapter IX (Arts. 55–60, incl. Art. 55)** and via **ECOSOC
+(Ch. X, Arts. 61–72)**, a mandate to promote higher standards of living and
+economic and social development; the UN *Repertory of Practice* for Article 55
+expressly covers "administrative, fiscal, legislative and **statistical**
+matters."
+
+**UN / FAO — active cattle & Wagyu tracking:** the UN, through the FAO
+(`fao.org/statistics`), tracks cattle globally — **FAOSTAT** (inventories,
+production, slaughter, ~200 countries), **Gridded Livestock of the World (GLW)**
+(spatial distribution), **GLEAM** (herd/environment) — and documents **Wagyu at
+breed level** in **DAD-IS** (Japanese Black/Kuroge Washu, Japanese Brown/Akaushi,
+Japanese Shorthorn/Nihon Tankaku Washu, Japanese Polled/Mukaku Washu) and the
+*State of the World's Animal Genetic Resources* reports.
+
+**Boundary:** the Charter is the enabling economic/statistical mandate; FAO
+systems are the real cattle/Wagyu tracking; OECD–FAO/USDA series establish
+cattle/beef as a world economic commodity. **None publishes a per-country Wagyu
+head census, and none endorses any value in this register.** Cells are sourced
+where reported and `NR*` otherwise. See `wagyu/SOULFUL.md` §UN Charter / §UN-FAO
+for the full reference and link series.
+
 ## 1. The economic unit of Wagyu (the product)
 
 > **one kilogram of graded Wagyu carcass-weight beef (kg cwt)** — cattle
