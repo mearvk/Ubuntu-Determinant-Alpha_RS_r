@@ -3,7 +3,8 @@
 This is the master tracking document for the world statistical archive. It lists every sovereign country (UN members plus widely-recognized states) and records whether we have pulled their data into the archive.
 
 - **Status legend:** `✅ Pulled` = data directory exists in the archive; `⬜ Not started` = no data pulled yet.
-- **Have data:** `china`, `korea`, `greenland` (Greenland is an autonomous territory of Denmark, included per existing archive scope).
+- **Location:** Per-country data lives under `national/<country>/`.
+- **Have data:** `national/china`, `national/korea`, `national/greenland` (Greenland is an autonomous territory of Denmark, included per existing archive scope).
 
 Archive build: 2026-09-05.
 
@@ -44,7 +45,7 @@ Archive build: 2026-09-05.
 | 33 | Central African Republic | Africa | ⬜ Not started | |
 | 34 | Chad | Africa | ⬜ Not started | |
 | 35 | Chile | Americas | ⬜ Not started | |
-| 36 | China | Asia | ✅ Pulled | Directory `china/` |
+| 36 | China | Asia | ✅ Pulled | Directory `national/china/` |
 | 37 | Colombia | Americas | ⬜ Not started | |
 | 38 | Comoros | Africa | ⬜ Not started | |
 | 39 | Congo (Republic) | Africa | ⬜ Not started | |
@@ -76,7 +77,7 @@ Archive build: 2026-09-05.
 | 65 | Germany | Europe | ⬜ Not started | |
 | 66 | Ghana | Africa | ⬜ Not started | |
 | 67 | Greece | Europe | ⬜ Not started | |
-| 68 | Greenland | Americas | ✅ Pulled | Directory `greenland/`; autonomous territory of Denmark |
+| 68 | Greenland | Americas | ✅ Pulled | Directory `national/greenland/`; autonomous territory of Denmark |
 | 69 | Grenada | Americas | ⬜ Not started | |
 | 70 | Guatemala | Americas | ⬜ Not started | |
 | 71 | Guinea | Africa | ⬜ Not started | |
@@ -99,7 +100,7 @@ Archive build: 2026-09-05.
 | 88 | Kazakhstan | Asia | ⬜ Not started | |
 | 89 | Kenya | Africa | ⬜ Not started | |
 | 90 | Kiribati | Oceania | ⬜ Not started | |
-| 91 | Korea (North & South) | Asia | ✅ Pulled | Directory `korea/`; data pulled is Republic of Korea (South). North Korea (DPRK) not yet pulled |
+| 91 | Korea (North & South) | Asia | ✅ Pulled | Directory `national/korea/`; data pulled is Republic of Korea (South). North Korea (DPRK) not yet pulled |
 | 92 | Kosovo | Europe | ⬜ Not started | Partially recognized |
 | 93 | Kuwait | Asia | ⬜ Not started | |
 | 94 | Kyrgyzstan | Asia | ⬜ Not started | |
