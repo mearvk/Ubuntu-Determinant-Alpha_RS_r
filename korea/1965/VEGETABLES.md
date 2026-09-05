@@ -2,10 +2,22 @@
 
 See `./META.md` and `../META.md`.
 
-Data status: `PENDING_SOURCE`.
+## Status
+`SOURCE_STRUCTURED` — historical vegetable record; unresolved observations remain `N/A`.
 
-Extraction target: major vegetable acreage, yield, production, and documented price series.
+| Indicator | Value | Unit | Source / definition |
+|---|---:|---|---|
+| Total vegetable production | N/A | thousand tonnes | NIHHS/KOSIS Vegetable Basic Statistics |
+| Cabbage production | N/A | thousand tonnes | NIHHS/KOSIS |
+| Radish production | N/A | thousand tonnes | NIHHS/KOSIS |
+| Chili production | N/A | thousand tonnes | NIHHS/KOSIS |
+| Onion production | N/A | thousand tonnes | NIHHS/KOSIS |
+| Garlic production | N/A | thousand tonnes | NIHHS/KOSIS |
 
-Methods — WHY: preserve commodity and grading definitions; do not substitute modern classifications for historical ones without a note.
+## Methods — WHY
+Production, cultivated area, production value, price and food-crop aggregates are separate concepts. No value is inferred merely to fill a historical year.
 
-Sources: KOSIS; MAFRA; KAMIS where historical coverage applies.
+## Sources
+KOSIS Crop Production Survey; National Institute of Horticultural and Herbal Science (NIHHS) Vegetable Basic Statistics; MAFRA/KASS.
+
+Archive build: 2026-09-04.
