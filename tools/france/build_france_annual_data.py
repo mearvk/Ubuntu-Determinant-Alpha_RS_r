@@ -78,6 +78,13 @@ series = {
 f = fao()
 
 def find_fao(patterns, element='Production'):
+    # Prefer an exact item-name match (case-insensitive) for single-word patterns,
+    # so 'wheat' matches item 'Wheat' and not 'Buckwheat'. Fall back to substring.
+    if len(patterns) == 1:
+        target = patterns[0].lower()
+        for (item, el, unit), vals in f.items():
+            if el == element and item.lower() == target:
+                return vals, item, unit
     for (item, el, unit), vals in f.items():
         if el == element and all(p.lower() in item.lower() for p in patterns):
             return vals, item, unit
