@@ -89,3 +89,62 @@ The shell surface exposes the inventory through
 `git-workflow.sh premount [repo] [--add|--commit|--both]`, which prints the
 table for the selected source. The native structures remain the contract that
 a later `builtin` integration can adopt.
+
+## `premount push`: reference + ordered 200 MiB add/commit sequence
+
+`premount push` turns the read-only inventory into a **transfer plan**. It
+produces a deterministic premount *document*, computes a cryptographic
+*reference* for that document, and then transfers the ordered candidate set as
+an ordered add/commit sequence bounded by the native 200 MiB transaction size,
+with partial-commit/resume support.
+
+```
+git-workflow.sh premount [repo] push [remote] [branch] [--sha512] [--attempts N]
+```
+
+### The document and its reference
+
+The document body is **deterministic**: one line per ordered candidate file, as
+`transaction<TAB>size<TAB>path`, in Git pathname order, grouped into 200 MiB
+transactions. The reference is a digest computed **over that body only** —
+never over volatile fields such as the wall-clock timestamp — so the same
+candidate set always yields the same reference. This is what makes the output
+*consistent* and what a resumed run can check against.
+
+| Aspect | Policy |
+|---|---|
+| Digest floor | **SHA-256** (64 hex chars) |
+| "Or better" | **SHA-512** via `--sha512` (128 hex chars) |
+| Reference scope | deterministic document body (paths, sizes, txn grouping) |
+| Excluded from reference | timestamp and any host-specific presentation |
+
+The native contract mirrors this: `git_premount_digest_algo`
+(`SHA256`/`SHA512`), `git_premount_digest_hexlen()`, and
+`git_premount_digest_label()` in `premount.h`, with the plan validated by
+`git_premount_push_plan_finalize()`. Per `SHA256.md`, the reference proves
+byte-level integrity only; it is not authenticity or authorization.
+
+### Ordered 200 MiB transactions
+
+The ordered candidate set is partitioned into transactions of at most
+**200 MiB** (`GIT_PREMOUNT_PUSH_TXN_BYTES`). A file is never split; a single
+object larger than 200 MiB is an explicit oversize planning error, not a silent
+fragmentation. The partitioning is implemented deterministically by
+`git_premount_push_partition()` and mirrored in the shell.
+
+| Boundary | Value |
+|---|---:|
+| transaction size | 200 MiB |
+| relation to add block | 2 × 100 MiB |
+| relation to commit unit | 4 × 50 MiB |
+
+### Partial commits and resume
+
+Each transaction is committed in order, forming an ordered chain. The push is
+then driven by the resume policy (`RESUME.md`): an interrupted transfer resumes
+from the last remote-acknowledged commit rather than restarting, up to
+`--attempts N` (default 5; `0` = unlimited by policy). Because each commit sits
+on a 200 MiB transaction boundary, a lossy interruption never leaves a
+partially transferred transaction — only fully acknowledged commits advance the
+remote. The 200 MiB object guard re-runs on every attempt, so `premount push`
+never weakens the ceiling.

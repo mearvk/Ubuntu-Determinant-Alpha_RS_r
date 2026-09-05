@@ -54,6 +54,10 @@ The underlying upstream `transport_push()` implementation remains responsible fo
 
 The push front-end is resume-aware. `builtin/push.c` routes its transport call through `push-budget.h`'s `transport_push_resume()`, which drives the checkpoint model in `resume-budget.h`. Interruption is treated as a normal condition: the still-unacknowledged remainder is retried rather than restarted, progress is measured only by the remote's acknowledged tips, and the effort halts instead of looping once retries are exhausted. The 200 MiB object guard re-runs before every attempt, so resume never weakens the ceiling. The retry ceiling is configurable through `push.resumeAttempts` (default 5; `0` means unlimited by policy). See `RESUME.md` for the full model.
 
+### `premount push`
+
+`git-workflow.sh premount [repo] push [remote] [branch] [--sha512] [--attempts N]` produces a deterministic premount document, computes a SHA-256 (or, with `--sha512`, SHA-512) reference over the document body only — so the same candidate set always yields the same reference — and then transfers the ordered candidate set as an ordered 200 MiB add/commit sequence. The commits form a chain that the resume policy pushes with partial-commit/resume support, and no file is split across the 200 MiB boundary. The reference proves byte-level integrity only (see `SHA256.md`). Full model in `PREMOUNT.md`.
+
 ## Repository policy
 
 These tools are infrastructure, not application source. They should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so they can be reused by the ISO build system.
