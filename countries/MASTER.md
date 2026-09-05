@@ -11,16 +11,16 @@ Archive build: 2026-09-05.
 | # | Country | Region | Data Pulled | Notes |
 |---|---|---|---|---|
 | 1 | Afghanistan | Asia | 🏗 Builder ready | `national/afghanistan/`; builder + scaffold committed. Bountiful: FAOSTAT (1961+), World Bank WDI, FAO AQUASTAT, OWID. Partial: NSIA yearbooks, MAIL crop estimates. See `national/afghanistan/DATA_SOURCES.md` |
-| 2 | Albania | Europe | ⬜ Not started | |
-| 3 | Algeria | Africa | ⬜ Not started | |
-| 4 | Andorra | Europe | ⬜ Not started | |
-| 5 | Angola | Africa | ⬜ Not started | |
-| 6 | Antigua and Barbuda | Americas | ⬜ Not started | |
-| 7 | Argentina | Americas | ⬜ Not started | |
-| 8 | Armenia | Asia | ⬜ Not started | |
-| 9 | Australia | Oceania | ⬜ Not started | |
-| 10 | Austria | Europe | ⬜ Not started | |
-| 11 | Azerbaijan | Asia | ⬜ Not started | |
+| 2 | Albania | Europe | 🏗 Builder ready | `national/albania/`; builder+scaffold. Partial: INSTAT. See `national/albania/DATA_SOURCES.md` |
+| 3 | Algeria | Africa | 🏗 Builder ready | `national/algeria/`; builder+scaffold. Partial: ONS. See `national/algeria/DATA_SOURCES.md` |
+| 4 | Andorra | Europe | 🏗 Builder ready | `national/andorra/`; builder+scaffold. Small state — sparse FAOSTAT/WDI expected (honest `N/A`). Partial: Departament d'Estadística |
+| 5 | Angola | Africa | 🏗 Builder ready | `national/angola/`; builder+scaffold. Partial: INE Angola. See `national/angola/DATA_SOURCES.md` |
+| 6 | Antigua and Barbuda | Americas | 🏗 Builder ready | `national/antigua-and-barbuda/`; builder+scaffold. Small state — sparse coverage expected. Partial: Statistics Division |
+| 7 | Argentina | Americas | 🏗 Builder ready | `national/argentina/`; builder+scaffold. Partial: INDEC. See `national/argentina/DATA_SOURCES.md` |
+| 8 | Armenia | Asia | 🏗 Builder ready | `national/armenia/`; builder+scaffold. Partial: ARMSTAT. See `national/armenia/DATA_SOURCES.md` |
+| 9 | Australia | Oceania | 🏗 Builder ready | `national/australia/`; builder+scaffold. Partial: ABS. See `national/australia/DATA_SOURCES.md` |
+| 10 | Austria | Europe | 🏗 Builder ready | `national/austria/`; builder+scaffold. Partial: Statistik Austria. See `national/austria/DATA_SOURCES.md` |
+| 11 | Azerbaijan | Asia | 🏗 Builder ready | `national/azerbaijan/`; builder+scaffold. Partial: AZSTAT. See `national/azerbaijan/DATA_SOURCES.md` |
 | 12 | Bahamas | Americas | ⬜ Not started | |
 | 13 | Bahrain | Asia | ⬜ Not started | |
 | 14 | Bangladesh | Asia | ⬜ Not started | |
@@ -212,8 +212,8 @@ Archive build: 2026-09-05.
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
 - **Data pulled (✅):** 3 — China, Korea (South Korea data pulled), Greenland
-- **Builder ready (🏗):** 1 — Afghanistan
-- **Remaining (⬜):** 193
+- **Builder ready (🏗):** 11 — Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan
+- **Remaining (⬜):** 183
 
 ## Sources
 
@@ -241,6 +241,16 @@ These international families are reproducible baselines used across countries by
 | Country | Primary source(s) | Grade | Notes |
 |---|---|---|---|
 | Afghanistan | NSIA statistical yearbooks; MAIL crop estimates | PARTIAL | Strongest post-2008; see `national/afghanistan/DATA_SOURCES.md` |
+| Albania | INSTAT (Institute of Statistics) | PARTIAL | see `national/albania/DATA_SOURCES.md` |
+| Algeria | ONS (Office National des Statistiques) | PARTIAL | see `national/algeria/DATA_SOURCES.md` |
+| Andorra | Departament d'Estadística | PARTIAL | small state; sparse FAOSTAT/WDI expected |
+| Angola | INE Angola | PARTIAL | see `national/angola/DATA_SOURCES.md` |
+| Antigua and Barbuda | Statistics Division | PARTIAL | small state; sparse coverage expected |
+| Argentina | INDEC | PARTIAL | see `national/argentina/DATA_SOURCES.md` |
+| Armenia | ARMSTAT | PARTIAL | see `national/armenia/DATA_SOURCES.md` |
+| Australia | ABS (Australian Bureau of Statistics) | PARTIAL | strong national data; see `national/australia/DATA_SOURCES.md` |
+| Austria | Statistik Austria | PARTIAL | see `national/austria/DATA_SOURCES.md` |
+| Azerbaijan | AZSTAT (State Statistical Committee) | PARTIAL | see `national/azerbaijan/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
