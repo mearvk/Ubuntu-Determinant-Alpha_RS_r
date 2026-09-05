@@ -1,6 +1,6 @@
 # Korea — Vegetables Annual Record
 
-**Archive year:** {YEAR}
+**Archive year:** see containing year directory.
 
 ## Scope
 This annual record covers South Korean vegetable agriculture. The archive distinguishes cultivated area, physical production, production value, and consumption; these measures are not interchangeable.
