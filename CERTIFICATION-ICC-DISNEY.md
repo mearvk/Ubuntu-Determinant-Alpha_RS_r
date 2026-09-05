@@ -91,15 +91,20 @@ To make this binding independently dated, timestamp the binding hash in §3 usin
 any method in `ICC/INTEGRITY.md` §4–§5 (RFC 3161 TSA, eIDAS Qualified Timestamp,
 or OpenTimestamps) and record the returned proof in §6.
 
-## 6. Optional signature / timestamp over the binding (to be filled)
+## 6. Signature / timestamp over the binding (to be filled)
 
-If a real signature/timestamp over the §3 binding is obtained, record it here and
-commit the proof/token into `ICC/`:
+The signing procedure is in **`SIGNING.md`** (same folder): it produces a real,
+interoperable Ed25519 signature over the §3 binding using a **project (MEARVK)
+key** — the private key signs, the published public key verifies. No signature is
+committed yet (the authoring environment lacked `openssl`/crypto libraries and
+network access; a non-conformant hand-rolled attempt was rejected rather than
+shipped). Run `SIGNING.md` §2 on a capable machine, commit
+`mearvk-project-ed25519.pub.pem` + `binding.sig.b64`, and fill in below:
 
-- **Signer / service:** __________________ (a PRIVATE-key holder or TSA/QTSP; not the Disney public key)
+- **Signer / service:** __________________ (MEARVK project private-key holder, or a TSA/QTSP; NOT the Disney public key)
 - **Signed/timestamped digest (must equal §3 BINDING):** __________________
-- **Proof file committed:** __________________
-- **Verification command / URL:** __________________
+- **Proof file(s) committed:** __________________
+- **Verification command / URL:** `openssl pkeyutl -verify -pubin -inkey mearvk-project-ed25519.pub.pem -rawin -in binding.txt -sigfile binding.sig`
 
 ---
 
