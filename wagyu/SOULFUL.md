@@ -108,6 +108,42 @@ navigation and is not a substitute for the authoritative text. [S51]
 
 ### Cattle / beef as a world economic standard, trend and datum
 
+### UN / FAO — active global cattle tracking, including Wagyu at breed level
+
+The United Nations actively tracks cattle globally, and documents Wagyu
+specifically, through its specialised agency the **Food and Agriculture
+Organization (FAO)** — `fao.org/statistics`. This is the concrete, institutional
+link between the Charter's economic-and-statistical mandate (above) and this
+document's subject. The tracking spans several public FAO systems:
+
+- **FAOSTAT — Agricultural Production.** Country-by-country cattle inventories,
+  meat production (carcass weight and volume) and milk yields across nearly 200
+  countries and territories; the FAO describes the domain as covering livestock
+  commodities "from production volumes to … animal slaughtering rates." [S60]
+- **Gridded Livestock of the World (GLW).** A peer-reviewed spatial dataset (now
+  in its latest version) mapping global cattle density and production systems at
+  subnational resolution, calibrated to FAOSTAT national estimates. [S61][S62]
+- **Global Livestock Environmental Assessment Model (GLEAM).** FAO modelling of
+  cattle herd demographics, feeding systems and greenhouse-gas emissions at
+  national, regional and global scale (GLEAM 3.0 on 2015 animal-number/
+  distribution data). [S63]
+- **Domestic Animal Diversity Information System (DAD-IS)** — the FAO's global
+  clearing-house for **animal genetic resources**, with searchable breed
+  profiles and **species-by-country** listings. It is the UN system that
+  catalogues **Wagyu at breed level**, including Japan's four constituent breeds:
+  **Japanese Black (Kuroge Washu), Japanese Brown / Akaushi, Japanese Shorthorn
+  (Nihon Tankaku Washu), and Japanese Polled (Mukaku Washu).** [S64][S65]
+- **State of the World's Animal Genetic Resources.** FAO's comprehensive
+  assessments record international gene flows and breed distribution — including
+  live animals and semen/embryo movements — for transboundary breeds such as
+  Wagyu across non-origin countries. [S66]
+
+So, unlike the general Charter mandate, the FAO's **breed-level** tracking
+(DAD-IS + the State of the World AnGR reports) does document **Wagyu** by name and
+by constituent breed. It does **not**, however, publish a per-country Wagyu head
+census or endorse this document's `ASSUMED‡` planning defaults — DAD-IS records
+breed *presence, characteristics and status*, not a universal per-country count.
+
 Cattle and beef are, on reasonable and authoritative sources, a **global economic
 commodity** tracked as a standard datum and trend — the economic backdrop against
 which Wagyu (a cattle breed set) is a specialised, high-value segment:
@@ -123,12 +159,15 @@ which Wagyu (a cattle breed set) is a specialised, high-value segment:
   beef trade as standing economic series.
 
 **Boundary (per the Legal-First Caveat):** the UN Charter establishes a *general*
-economic-and-social and statistical mandate; it **does not name cattle, livestock,
-or Wagyu, and does not establish or endorse any specific figure or assumption in
-this document.** Cattle's status as a world economic commodity is supported by the
-FAO/OECD/USDA sources cited above — **not** by the Charter. The Charter is the
-enabling economic-cooperation instrument; the commodity sources are the subject
-support. Neither backs the `ASSUMED‡` planning defaults, which remain provisional.
+economic-and-social and statistical mandate; it **does not itself name cattle,
+livestock, or Wagyu.** The UN's *operational* cattle and breed tracking lives in
+its FAO systems above: FAOSTAT/GLW/GLEAM track **cattle** globally, and **DAD-IS**
+and the *State of the World's Animal Genetic Resources* reports document **Wagyu**
+at breed level. What none of these sources provide is a per-country Wagyu **head
+census** or any endorsement of this document's `ASSUMED‡` planning defaults, which
+therefore remain provisional. In short: the Charter is the enabling mandate; the
+FAO systems are the real cattle/Wagyu tracking; the OECD–FAO/USDA series establish
+cattle/beef as a world economic commodity; the assumptions are ours alone.
 
 **Supporting sources**
 
@@ -141,6 +180,13 @@ support. Neither backs the `ASSUMED‡` planning defaults, which remain provisio
 - **[S57]** OECD–FAO Agricultural Outlook 2025–2034, Meat chapter — world meat markets incl. beef and veal. oecd.org
 - **[S58]** OECD–FAO Agricultural Outlook (Meat) — beef and veal among covered commodities; consumption/production/trade/prices. oecd.org / fao.org
 - **[S59]** OECD–FAO Agricultural Outlook 2021–2030 — beef cattle stocks projection. oecd.org / fao.org
+- **[S60]** FAO — Statistics / FAOSTAT Agricultural Production (cattle inventories, meat production, slaughter rates, ~200 countries). fao.org/statistics ; fao.org (Agricultural Production Statistics 2000–2022)
+- **[S61]** FAO — Gridded Livestock of the World (GLW): global cattle distribution/density, peer-reviewed, calibrated to FAOSTAT. fao.org/livestock-systems/global-distributions/cattle
+- **[S62]** FAO — Livestock Systems / global distributions overview. fao.org/livestock-systems
+- **[S63]** FAO — Global Livestock Environmental Assessment Model (GLEAM): herd demographics, feeding, GHG emissions. fao.org/gleam
+- **[S64]** FAO — Domestic Animal Diversity Information System (DAD-IS): breed profiles + species-by-country; global AnGR clearing-house. fao.org/dad-is
+- **[S65]** DAD-IS / breed references — Wagyu constituent breeds: Japanese Black (Kuroge Washu), Japanese Brown/Akaushi, Japanese Shorthorn (Nihon Tankaku Washu), Japanese Polled (Mukaku Washu). fao.org/dad-is ; en.wikipedia.org/wiki/Japanese_Black
+- **[S66]** FAO — *State of the World's Animal Genetic Resources for Food and Agriculture* (international gene flows / transboundary breed distribution incl. Wagyu). openknowledge.fao.org
 
 *Content from external sources was rephrased/summarised for compliance with licensing restrictions.*
 
