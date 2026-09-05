@@ -3,43 +3,35 @@
 **Project:** Ubuntu Determinant
 **Edition:** Ubuntu White Edition
 **Project attention:** Max Rupplin — MEARVK LLC — 2026
-**Status:** Intrinsic Series ASSIGNED (canonical) — values sparse (reported figures cited; all others Not Reported)
+**Status:** Intrinsic Series ASSIGNED (canonical) — GENERATED FROM wagyu.data.csv
+
+> **This file is generated.** Do not edit values here by hand. Edit
+> `wagyu/wagyu.data.csv`, then run `python3 wagyu/build_wagyu.py`. See
+> `wagyu/README.md`.
 
 ---
 
-## 0. Data-integrity contract (read first)
+## 0. Data-integrity contract
 
-Master data register, one rule:
-
-> **No value is invented and then presented as measured fact.**
-
-Reported figures are written plainly with a source tag `[Sn]` (§6). Unreported
-cells are `NR*`. `~ … *` marks a unit conversion or a published estimate. Most
-cells are `NR*` because "Wagyu" is a cattle *breed set*, not a customs commodity
-code, so no public source publishes it per-country/per-year across the series;
-see §6 for the full source sweep (page fetches were blocked HTTP 403, so only
-indexed-result figures could be captured).
+Master data register, one rule: **no value is invented and then presented as
+measured fact.** Values come only from `wagyu.data.csv`; blank/absent cells are
+`NR*` (Not Reported). "Wagyu" is a cattle *breed set*, not a customs commodity
+code, so most public statistics record *beef*, not *Wagyu* — hence most cells
+are `NR*` until a reviewed data feed fills them.
 
 ## 1. The economic unit of Wagyu (the product)
 
 > **one kilogram of graded Wagyu carcass-weight beef (kg cwt)** — cattle
-> registered/graded as Wagyu (fullblood, purebred, or graded crossbred per the
-> relevant national herdbook), valued in **USD** at the wholesale/boxed point of
+> registered/graded as Wagyu, valued in **USD** at the wholesale/boxed point of
 > sale. Head- and herd-based fields are recorded alongside because the carcass
 > unit derives from them.
 
 ## 2. The Wagyu Intrinsic Series (the 19+ data points) — CANONICAL
 
-The following ordered set is hereby **assigned as the Wagyu Intrinsic Series**:
-the canonical, invariant set of data points recorded for the Wagyu economic unit
-at every `(country, year)` coordinate. It is the authoritative column definition
-for this register and for any downstream data feed; field codes are stable and
-must not be renumbered.
-
-The series is **19+**: nineteen **core** intrinsic points (the I-19) plus a
-declared **extension block** (E-series). "19+" means the core count is fixed at
-19 and the series is extensible only by appending higher codes (F20, F21, …) —
-never by altering F01–F19.
+The canonical, invariant set of points recorded at every `(country, year)`
+coordinate. 19 **core** points (I-19, frozen) plus a declared **extension
+block** (E-series), so the series is explicitly **19+**; extension is
+append-only and the core codes are never renumbered.
 
 **Core intrinsic series — I-19 (F01–F19):**
 
@@ -64,75 +56,42 @@ never by altering F01–F19.
 - **F18** — Domestic Wagyu consumption (tonnes)
 - **F19** — Registered Wagyu breeders / seedstock members / DB individuals
 
-**Extension block — E-series (the "+"; part of the intrinsic series, reserved & appended):**
+**Extension block — E-series (the "+"; reserved & appended):**
 
 - **F20** — Herd growth rate, year-on-year (%)
 - **F21** — Feed-cost index (relative, base year = 100)
 - **F22** — Registered Wagyu brands / certification marks (count)
 
 
-**Series invariants**
-
-- **Cardinality:** 19 core + 3 extension = **22** points (≥ 19+).
-- **Coordinate:** every record is indexed by `(country, year)` with `year ∈ [2002, 2026]` (25 years).
-- **Order & codes are canonical:** F01…F22 are fixed identifiers; renumbering is prohibited.
-- **Extensibility:** append-only (F23+). The core I-19 is frozen.
-- **Unit:** the economic unit of §1; monetary points normalised to USD (originals noted in §6).
-
-Every country in §7 carries the complete intrinsic series (22 rows × 25 years).
+**Series invariants:** 19 core + 3 extension = **22** points; coordinate `(country, year)`, `year ∈ [2002, 2026]`; codes fixed; extension append-only.
 
 ## 3. Legend
 
 | Symbol | Meaning |
 |---|---|
-| `123 [S1]` | Reported value with source tag |
-| `~ … *` | unit-converted and/or published estimate |
-| `NR*` | Not reported for this country-year |
+| `value [Src]` | Reported value from `wagyu.data.csv` with its source tag |
+| `NR*` | Not reported (no value supplied in the CSV for this cell) |
 | `producer` / `importer` / `no-data` | documented breeding-or-production / export-destination / none found |
 
-## 4. Reported values written into the tables
+## 4. Population status
 
-**Japan** — Wagyu cattle 1,368,800 head [S14]; Japanese Black >90% [S15]; IMF >30% [S16]; 2024 beef exports 10,826 t / ¥64.8bn, top markets US/Taiwan/Hong Kong, US+Canada ~23% of value [S3][S7b][S17].
-**Australia** — 104,222 dams + 12,224 sires (2015) [S18]; >25,000-40,000 calves/yr [S9][S19]; membership ~1,200 (2024) -> >1,500 / DB >400,000 (2025) [S5][S20][S21]; boxed value AUD ~2.0bn (2023) [S4].
-**United States** — <5,000 Fullblood (est., ~2022) [S22]; >900 AWA members (2021) [S23].
-**Global context (third-party models, disagree; context only):** ~US$13.6-26.9bn (2025) [S12][S13][S24].
+- Intrinsic series: **22** points × **25** years × **195** countries = **107,250** cells.
+- Cells populated from `wagyu.data.csv`: **14**.
+- Remaining `NR*`: **107,236**.
 
-## 5. Notes on conversions / estimates
+Sourcing for the seeded values (Japan, Australia, United States) is in the CSV
+`source` column and expanded in `wagyu/README.md` §Sources. Fetches of primary
+sites were blocked in the authoring environment (HTTP 403); seeded figures came
+from indexed search results and are cited.
 
-`~US$` values convert JPY/AUD at approximate period rates (flagged `*`). US Fullblood count and market-size figures are their sources' published estimates, dated and never spread across other years. No `NR*` cell is interpolated.
-
-## 6. Sources checked (full sweep) and citations
-
-Direct fetches returned HTTP 403; values are from indexed result snippets, rephrased for compliance.
-
-- **[S3]/[S17]** JLEC / note.com (Asahi Trading) — 2024 ¥64.8bn, 10,826 t; US+Canada 23% of value. rakusurukurasi.com / note.com
-- **[S4]** Australian Wagyu Association — largest exporter; AUD ~2.0bn boxed (2023); ~80% to 40+ countries. wagyu.org.au
-- **[S5]** AWA International Wagyu Office Fact Sheet (2024) — ~1,200 members (450 intl). wagyu.org.au
-- **[S7b]** Nippon.com — beef ¥64.8bn record; US/Taiwan/Hong Kong lead. nippon.com
-- **[S9]** AWA — >25,000 calves/yr. wagyu.org.au
-- **[S12]** Fortune Business Insights — ~US$26.9bn (2025). fortunebusinessinsights.com
-- **[S13]** Straits Research / Mordor — ~US$13.6-13.9bn (2025); Japan ~US$1.46bn; APAC ~US$4.68bn. straitsresearch.com / mordorintelligence.com
-- **[S14]** JIRCAS (JARQ) — 1,368,800 Wagyu cattle in Japan. jircas.go.jp
-- **[S15]** Wikipedia (Wagyu) — Japanese Black >90% of Japan Wagyu. en.wikipedia.org
-- **[S16]** ResearchGate — Japanese Wagyu industry review; IMF >30%. researchgate.net
-- **[S18]** AWA Ten-Year-Trends Part 1 — 104,222 dams; sires up 2.6× to 12,224 (to 2015). wagyu.org.au
-- **[S19]** AWA (Member Services Officer posting) — >40,000 new calves/yr. wagyu.org.au
-- **[S20]** AWA (partners) — >1,500 members incl. >650 international (2025). wagyu.org.au
-- **[S21]** AWA ("Continued success…") — genomics database >400,000 individuals. wagyu.org.au
-- **[S22]** Good Ranchers (citing AWA) — <5,000 Fullblood Wagyu in the US (~2022). goodranchers.com
-- **[S23]** AZ Central — American Wagyu Association >900 members (2021). azcentral.com
-- **[S24]** 360iResearch — ~US$20.25bn (2025). 360iresearch.com
-
-Checked but no per-country/per-year series (breed not separated, or fetch blocked): MAFF, JETRO, UN Comtrade, FAOSTAT, Wagyu International, Kobe University / Anim. Biosci. papers.
-
-## 7. Per-country register (alphabetical) — full intrinsic series (22 points) × 25 years
+## 5. Per-country register (alphabetical) — full intrinsic series × 25 years
 
 Reported cells carry a source tag; every other cell is `NR*`.
 
 
 ### Afghanistan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -161,7 +120,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Albania
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -190,7 +149,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Algeria
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -219,7 +178,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Andorra
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -248,7 +207,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Angola
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -277,7 +236,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Antigua and Barbuda
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -335,7 +294,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Armenia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -379,14 +338,14 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F09 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F10 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F11 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~AUD 2,000m boxed (~US$1,330m*) [S4] | NR* | NR* | NR* |
+| F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~AUD 2000m boxed (~US$1330m*) [S4] | NR* | NR* | NR* |
 | F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F15 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F18 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 12,224 sires [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~1,200 members (450 intl) [S5] | >1,500 members (650 intl); DB >400,000 [S20][S21] | NR* |
+| F19 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 12,224 sires [S18] | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~1,200 members (450 intl) [S5] | >1,500 members (650 intl); DB >400,000 [S20] | NR* |
 | F20 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F21 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F22 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -422,7 +381,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Azerbaijan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -451,7 +410,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bahamas
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -509,7 +468,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bangladesh
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -538,7 +497,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Barbados
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -567,7 +526,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Belarus
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -625,7 +584,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Belize
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -654,7 +613,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Benin
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -683,7 +642,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bhutan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -712,7 +671,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bolivia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -741,7 +700,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bosnia and Herzegovina
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -770,7 +729,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Botswana
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -828,7 +787,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Brunei
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -857,7 +816,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Bulgaria
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -886,7 +845,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Burkina Faso
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -915,7 +874,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Burundi
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -944,7 +903,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Cabo Verde
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -973,7 +932,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Cambodia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1002,7 +961,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Cameroon
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1060,7 +1019,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Central African Republic
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1089,7 +1048,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Chad
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1205,7 +1164,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Comoros
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1234,7 +1193,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Congo (Brazzaville)
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1263,7 +1222,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Congo (Kinshasa)
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1292,7 +1251,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Costa Rica
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1321,7 +1280,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Croatia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1350,7 +1309,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Cuba
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1466,7 +1425,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Djibouti
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1495,7 +1454,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Dominica
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1524,7 +1483,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Dominican Republic
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1553,7 +1512,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Ecuador
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1611,7 +1570,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### El Salvador
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1640,7 +1599,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Equatorial Guinea
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1669,7 +1628,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Eritrea
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1698,7 +1657,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Estonia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1727,7 +1686,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Eswatini
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1756,7 +1715,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Ethiopia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1872,7 +1831,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Gabon
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1901,7 +1860,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Gambia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1930,7 +1889,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Georgia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1988,7 +1947,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Ghana
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2046,7 +2005,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Grenada
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2075,7 +2034,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Guatemala
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2104,7 +2063,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Guinea
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2133,7 +2092,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Guinea-Bissau
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2162,7 +2121,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Guyana
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2191,7 +2150,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Haiti
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2220,7 +2179,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Honduras
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2365,7 +2324,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Iran
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2394,7 +2353,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Iraq
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2510,7 +2469,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Ivory Coast
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2539,7 +2498,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Jamaica
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2584,8 +2543,8 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | F10 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F11 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F12 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 10,826 (all beef, mostly Wagyu) [S3][S17] | NR* | NR* |
-| F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~¥64.8bn (~US$430m*) [S7b][S17] | NR* | NR* |
+| F13 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | 10,826 (all beef, mostly Wagyu) [S3] | NR* | NR* |
+| F14 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | ~¥64.8bn (~US$430m*) [S7b] | NR* | NR* |
 | F15 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F16 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F17 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -2655,7 +2614,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Kenya
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2684,7 +2643,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Kiribati
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2742,7 +2701,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Kyrgyzstan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2771,7 +2730,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Laos
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2800,7 +2759,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Latvia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2858,7 +2817,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Lesotho
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2887,7 +2846,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Liberia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2916,7 +2875,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Libya
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2945,7 +2904,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Liechtenstein
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -2974,7 +2933,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Lithuania
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3032,7 +2991,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Madagascar
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3061,7 +3020,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Malawi
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3148,7 +3107,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Mali
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3206,7 +3165,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Marshall Islands
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3235,7 +3194,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Mauritania
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3322,7 +3281,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Micronesia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3351,7 +3310,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Moldova
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3409,7 +3368,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Mongolia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3438,7 +3397,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Montenegro
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3467,7 +3426,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Morocco
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3496,7 +3455,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Mozambique
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3525,7 +3484,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Myanmar
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3554,7 +3513,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Namibia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3583,7 +3542,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Nauru
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3612,7 +3571,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Nepal
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3699,7 +3658,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Nicaragua
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3728,7 +3687,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Niger
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3757,7 +3716,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Nigeria
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3786,7 +3745,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### North Korea
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3815,7 +3774,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### North Macedonia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3902,7 +3861,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Pakistan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3931,7 +3890,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Palau
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3989,7 +3948,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Papua New Guinea
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4018,7 +3977,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Paraguay
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4192,7 +4151,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Romania
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4250,7 +4209,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Rwanda
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4279,7 +4238,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Saint Kitts and Nevis
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4308,7 +4267,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Saint Lucia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4337,7 +4296,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Saint Vincent and the Grenadines
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4366,7 +4325,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Samoa
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4395,7 +4354,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### San Marino
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4424,7 +4383,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Sao Tome and Principe
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4482,7 +4441,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Senegal
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4511,7 +4470,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Serbia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4540,7 +4499,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Seychelles
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4569,7 +4528,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Sierra Leone
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4627,7 +4586,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Slovakia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4656,7 +4615,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Slovenia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4685,7 +4644,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Solomon Islands
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4714,7 +4673,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Somalia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4801,7 +4760,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### South Sudan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4859,7 +4818,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Sri Lanka
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4888,7 +4847,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Sudan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -4917,7 +4876,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Suriname
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5004,7 +4963,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Syria
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5062,7 +5021,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Tajikistan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5091,7 +5050,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Tanzania
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5149,7 +5108,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Timor-Leste
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5178,7 +5137,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Togo
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5207,7 +5166,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Tonga
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5236,7 +5195,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Trinidad and Tobago
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5265,7 +5224,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Tunisia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5323,7 +5282,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Turkmenistan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5352,7 +5311,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Tuvalu
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5381,7 +5340,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Uganda
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5410,7 +5369,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Ukraine
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5502,7 +5461,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | F01 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
-| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | <5,000 Fullblood (est.) [S22] | NR* | NR* | NR* | NR* |
+| F02 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | <5000 Fullblood (est.) [S22] | NR* | NR* | NR* | NR* |
 | F03 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F04 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
 | F05 | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* | NR* |
@@ -5555,7 +5514,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Uzbekistan
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5584,7 +5543,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Vanuatu
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5613,7 +5572,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Vatican City
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5642,7 +5601,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Venezuela
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5700,7 +5659,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Yemen
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5729,7 +5688,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Zambia
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5758,7 +5717,7 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ### Zimbabwe
 
-- **Tier:** `no-data`  |  **Status:** No Wagyu-specific breeding, production or trade activity found in the checked sources; all fields Not Reported.
+- **Tier:** `no-data`  |  **Status:** No Wagyu-specific activity found in the checked sources; all fields Not Reported.
 
 | Field / Year | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 2009 | 2010 | 2011 | 2012 | 2013 | 2014 | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -5787,4 +5746,4 @@ Reported cells carry a source tag; every other cell is `NR*`.
 
 ---
 
-*The Wagyu Intrinsic Series (§2) is canonical: 19 core + 3 extension = 22 points, indexed by (country, year) over 2002–2026. Definitions (§1–§2) and sources (§6) are authoritative; tagged cells are the real published figures; all `NR*` cells are genuinely unreported and to be populated later from a reviewed data feed, never by hand-estimation.*
+*Generated from `wagyu.data.csv` by `build_wagyu.py`. The Wagyu Intrinsic Series (§2) is canonical: 19 core + 3 extension = 22 points over 2002–2026. Populate by editing the CSV and regenerating; never hand-edit values here.*
