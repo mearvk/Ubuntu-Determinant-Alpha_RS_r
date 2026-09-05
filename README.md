@@ -1,5 +1,11 @@
 # Ubuntu.Determinant.Beta.Restricted
 
+## Bitcoin Conjegeum
+
+bc1qs6v4q9zsw70t0umk3m0quhvf9dr6cdeskl28dh
+
+US Democratic and US Policy.
+
 ## SecureJDK / Graal Proffer Project
 
 This repository is an experimental systems project exploring a common security and modeling vocabulary across **SecureJDK, Graal, native C/C++, operating-system state, memory, process, geometry, time, provenance, and hardened historical/economic data**.
