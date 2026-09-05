@@ -4,6 +4,7 @@
 #include "strbuf.h"
 #include "oid-array.h"
 #include "refs.h"
+#include "resume-budget.h"
 
 /* Hard native ceiling: 200 MiB per push effort. */
 #define GIT_PUSH_MAX_BYTES ((uintmax_t)200 * 1024 * 1024)
@@ -185,6 +186,103 @@ static inline int transport_push_with_budget(struct repository *repo,
 		return -1;
 
 	return transport_push(repo, connection, rs, flags, reject_reasons);
+}
+
+/*
+ * Count the candidate local push tips whose object id already appears among
+ * the remote's advertised tips. This is a coarse, ref-level acknowledgement
+ * signal: it does not decode individual 50 MiB units, but it lets the resume
+ * front-end distinguish "the remote already has our tips" (nothing to do) from
+ * "work remains" without inventing progress the remote never confirmed.
+ */
+static int push_budget_acked_tips(struct transport *transport,
+				  struct refspec *rs, int flags)
+{
+	const struct ref *remote_refs = transport_get_remote_refs(transport, NULL);
+	struct oid_array tips = OID_ARRAY_INIT;
+	struct oid_array remote_tips = OID_ARRAY_INIT;
+	int acked = 0;
+
+	push_budget_add_local_tips(rs, &tips, flags & TRANSPORT_PUSH_MIRROR);
+	push_budget_add_remote_tips(remote_refs, &remote_tips);
+
+	for (size_t i = 0; i < tips.nr; i++) {
+		for (size_t j = 0; j < remote_tips.nr; j++) {
+			if (oideq(&tips.oid[i], &remote_tips.oid[j])) {
+				acked++;
+				break;
+			}
+		}
+	}
+
+	oid_array_clear(&tips);
+	oid_array_clear(&remote_tips);
+	return acked;
+}
+
+/*
+ * Resume-aware native push front-end for slow or lossy connections.
+ *
+ * Semantics:
+ *   - The 200 MiB object budget guard runs before every transport attempt.
+ *   - Progress is measured only by the remote's acknowledged tips, never by
+ *     what was merely attempted (see resume-budget.h).
+ *   - On a transport failure the still-unacknowledged remainder is retried up
+ *     to the checkpoint's attempt ceiling, then the effort HALTs rather than
+ *     looping.
+ *   - The checkpoint never authorizes an oversized transfer; the guard remains
+ *     authoritative every attempt.
+ *
+ * `cp` must be initialised by the caller (git_resume_checkpoint_init). Its
+ * total_units/max_attempts describe the effort; the front-end updates its
+ * acked_units/attempt/state. Returns 0 once the remote acknowledges the tips,
+ * or -1 when the effort halts with work remaining or the guard rejects it.
+ */
+static inline int transport_push_resume(struct repository *repo,
+					struct transport *connection,
+					struct refspec *rs,
+					int flags,
+					unsigned int *reject_reasons,
+					struct git_resume_checkpoint *cp)
+{
+	if (!git_resume_checkpoint_valid(cp))
+		return -1;
+
+	/* Record what the remote already acknowledges before we start. */
+	if (push_budget_acked_tips(connection, rs, flags) > 0 &&
+	    git_resume_is_complete(cp))
+		return 0;
+
+	while (git_resume_begin_attempt(cp) > 0) {
+		int err;
+
+		/* The budget guard re-measures the real object graph here. */
+		err = transport_push_with_budget(repo, connection, rs, flags,
+						 reject_reasons);
+
+		if (!err) {
+			/*
+			 * The transport reported success. Confirm against the
+			 * remote advertisement and mark the effort complete
+			 * only on genuine acknowledgement.
+			 */
+			if (push_budget_acked_tips(connection, rs, flags) > 0) {
+				git_resume_record_outcome(cp, git_resume_units_remaining(cp), 0);
+				if (git_resume_is_complete(cp))
+					return 0;
+			} else {
+				git_resume_record_outcome(cp, 0, 1);
+			}
+		} else {
+			/* Interruption: no new units acknowledged; retry. */
+			git_resume_record_outcome(cp, 0, 1);
+		}
+
+		if (cp->state == GIT_RESUME_HALT)
+			break;
+	}
+
+	return git_resume_is_complete(cp) ? 0 : -1;
 }
 
 #endif

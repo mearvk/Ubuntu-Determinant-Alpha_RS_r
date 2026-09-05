@@ -23,6 +23,7 @@
 #include "send-pack.h"
 #include "trace2.h"
 #include "color.h"
+#include "push-budget.h"
 
 static const char * const push_usage[] = {
 	N_("git push [<options>] [<repository> [<refspec>...]]"),
@@ -63,6 +64,14 @@ static int verbosity;
 static int progress = -1;
 static int recurse_submodules = RECURSE_SUBMODULES_DEFAULT;
 static enum transport_family family;
+
+/*
+ * Native resume policy: retry the still-unacknowledged remainder of a push on
+ * a slow or lossy connection, up to this attempt ceiling (0 = unlimited by
+ * policy; the 200 MiB object guard still runs every attempt). Configurable via
+ * push.resumeAttempts. See tools/git/RESUME.md and resume-budget.h.
+ */
+static unsigned int push_resume_attempts = 5;
 
 static struct push_cas_option cas;
 
@@ -389,8 +398,35 @@ static int push_with_options(struct transport *transport, struct refspec *rs,
 	if (verbosity > 0)
 		fprintf(stderr, _("Pushing to %s\n"), anon_url);
 	trace2_region_enter("push", "transport_push", the_repository);
-	err = transport_push(the_repository, transport,
-			     rs, flags, &reject_reasons);
+	{
+		/*
+		 * Route through the native resume/budget front-end. It runs the
+		 * 200 MiB object guard before every attempt and, on a slow or
+		 * lossy connection, retries the still-unacknowledged remainder
+		 * up to push_resume_attempts before halting. A single-unit
+		 * effort with attempt ceiling 1 reproduces ordinary single-shot
+		 * push behavior. See tools/git/RESUME.md.
+		 */
+		struct git_resume_checkpoint cp;
+
+		/*
+		 * push_resume_attempts is the retry ceiling; 0 means unlimited
+		 * by policy (the object guard still runs every attempt). It is
+		 * passed through unchanged: the checkpoint treats max_attempts
+		 * == 0 as unlimited.
+		 */
+		if (git_resume_checkpoint_init(&cp, "push", 1,
+					       push_resume_attempts)) {
+			/* Fall back to the guarded single push if the checkpoint
+			 * cannot be initialised for any reason. */
+			err = transport_push_with_budget(the_repository, transport,
+							 rs, flags, &reject_reasons);
+		} else {
+			err = transport_push_resume(the_repository, transport,
+						    rs, flags, &reject_reasons,
+						    &cp);
+		}
+	}
 	trace2_region_leave("push", "transport_push", the_repository);
 	if (err != 0) {
 		fprintf(stderr, "%s", push_get_color(PUSH_COLOR_ERROR));
@@ -504,6 +540,12 @@ static int git_push_config(const char *k, const char *v,
 	} else if (!strcmp(k, "push.autosetupremote")) {
 		if (git_config_bool(k, v))
 			*flags |= TRANSPORT_PUSH_AUTO_UPSTREAM;
+		return 0;
+	} else if (!strcmp(k, "push.resumeattempts")) {
+		int val = git_config_int(k, v, ctx->kvi);
+		if (val < 0)
+			return error(_("invalid value for '%s'"), k);
+		push_resume_attempts = (unsigned int)val;
 		return 0;
 	} else if (!strcmp(k, "push.gpgsign")) {
 		switch (git_parse_maybe_bool(v)) {

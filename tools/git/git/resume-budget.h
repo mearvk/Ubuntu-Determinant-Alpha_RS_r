@@ -139,6 +139,27 @@ static inline int git_resume_checkpoint_valid(
 	return 1;
 }
 
-/* Implemented in resume-budget.c / resume-budget.cpp; declared per-TU. */
+/*
+ * Lifecycle functions implemented in resume-budget.c / resume-budget.cpp.
+ * Declared here so header-only callers (e.g. the push-budget.h front-end and
+ * builtin/push.c) share one prototype. The C++ companion defines these with
+ * extern "C" linkage, matching this declaration when compiled as C++.
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int git_resume_checkpoint_init(struct git_resume_checkpoint *cp,
+			       const char *effort_id,
+			       uintmax_t total_units,
+			       uintmax_t max_attempts);
+intmax_t git_resume_begin_attempt(struct git_resume_checkpoint *cp);
+int git_resume_record_outcome(struct git_resume_checkpoint *cp,
+			      uintmax_t newly_acked_units,
+			      int connection_lost);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* GIT_RESUME_BUDGET_H */

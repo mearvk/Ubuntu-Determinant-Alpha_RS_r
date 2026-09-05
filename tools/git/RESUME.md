@@ -65,28 +65,39 @@ checkpoint.
 - Provenance (author, committer, date, timestamp, parent object, and the effort
   correlation id) is preserved across attempts.
 
-## Native implementation contract
+## Native implementation
 
 The policy lives in native source — `git/resume-budget.h` with C and C++
-companions `git/resume-budget.c` and `git/resume-budget.cpp` — rather than a
-shell wrapper. The current change establishes the checkpoint structure, the
-attempt lifecycle (`init` / `begin_attempt` / `record_outcome`), the resume
-arithmetic, and overflow/regression rejection.
+companions `git/resume-budget.c` and `git/resume-budget.cpp`. It establishes
+the checkpoint structure, the attempt lifecycle
+(`init` / `begin_attempt` / `record_outcome`), the resume arithmetic, and the
+overflow/regression rejection.
 
-The eventual implementation should:
+**This method is now integrated into the builtin push front-end.**
+`git/push-budget.h` provides `transport_push_resume()`, which drives the
+checkpoint lifecycle, and `builtin/push.c` routes its push through it in
+`push_with_options()`:
 
-1. leave ordinary `git commit` and `git push` behavior unchanged unless the
-   resumable form is deliberately selected;
-2. derive units from the existing commit-part planner and transactions from the
-   existing 200 MiB push budget;
-3. advance the checkpoint only on remote acknowledgement;
-4. resume at the first unacknowledged unit after a lossy interruption;
-5. re-run the authoritative push guard on every attempt;
-6. halt — never loop — when retries are exhausted with work remaining;
-7. treat the checkpoint as advisory metadata that never bypasses the transport
+1. ordinary `git push` behavior is preserved — a single-unit effort with an
+   attempt ceiling of 1 reproduces single-shot push exactly;
+2. transactions and units come from the existing 200 MiB push budget and the
+   50 MiB commit-part granularity;
+3. the checkpoint advances only when the remote's advertised tips confirm the
+   push (`push_budget_acked_tips()`), never on mere attempt;
+4. after a lossy interruption the remaining work is retried, resuming rather
+   than restarting;
+5. the authoritative 200 MiB object guard (`push_budget_check()`) re-runs on
+   every attempt;
+6. the effort halts — it never loops — when retries are exhausted with work
+   remaining;
+7. the checkpoint is advisory metadata and never bypasses the transport
    ceiling.
 
-The shell surface exposes the behavior through
+The retry ceiling is configurable via the `push.resumeAttempts` config key
+(default 5; `0` = unlimited by policy, with the object guard still enforced
+every attempt).
+
+The shell surface mirrors the behavior for scripted use through
 `git-workflow.sh push-resume [repo] [remote] [branch] [--attempts N]`, which
 retries the still-unacknowledged remainder of a push across a lossy connection
 without weakening the native ceiling.

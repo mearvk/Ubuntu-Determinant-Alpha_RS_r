@@ -50,6 +50,10 @@ The measured value is an on-disk object-size estimate, not a prediction of the f
 
 The underlying upstream `transport_push()` implementation remains responsible for normal ref matching, hooks, status reporting, transport selection, negotiation, and actual transfer. The native policy is a front-end safety decision before that operation.
 
+### Resumable push on slow or lossy connections
+
+The push front-end is resume-aware. `builtin/push.c` routes its transport call through `push-budget.h`'s `transport_push_resume()`, which drives the checkpoint model in `resume-budget.h`. Interruption is treated as a normal condition: the still-unacknowledged remainder is retried rather than restarted, progress is measured only by the remote's acknowledged tips, and the effort halts instead of looping once retries are exhausted. The 200 MiB object guard re-runs before every attempt, so resume never weakens the ceiling. The retry ceiling is configurable through `push.resumeAttempts` (default 5; `0` means unlimited by policy). See `RESUME.md` for the full model.
+
 ## Repository policy
 
 These tools are infrastructure, not application source. They should remain independent of GNOME, MATE, Ubuntu White Edition, and individual upstream projects so they can be reused by the ISO build system.
