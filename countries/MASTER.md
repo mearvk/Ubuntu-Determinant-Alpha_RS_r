@@ -10,17 +10,17 @@ Archive build: 2026-09-05.
 
 | # | Country | Region | Data Pulled | Notes |
 |---|---|---|---|---|
-| 1 | Afghanistan | Asia | 🏗 Builder ready | `national/afghanistan/`; builder + scaffold committed. Bountiful: FAOSTAT (1961+), World Bank WDI, FAO AQUASTAT, OWID. Partial: NSIA yearbooks, MAIL crop estimates. See `national/afghanistan/DATA_SOURCES.md` |
-| 2 | Albania | Europe | 🏗 Builder ready | `national/albania/`; builder+scaffold. Partial: INSTAT. See `national/albania/DATA_SOURCES.md` |
-| 3 | Algeria | Africa | 🏗 Builder ready | `national/algeria/`; builder+scaffold. Partial: ONS. See `national/algeria/DATA_SOURCES.md` |
-| 4 | Andorra | Europe | 🏗 Builder ready | `national/andorra/`; builder+scaffold. Small state — sparse FAOSTAT/WDI expected (honest `N/A`). Partial: Departament d'Estadística |
-| 5 | Angola | Africa | 🏗 Builder ready | `national/angola/`; builder+scaffold. Partial: INE Angola. See `national/angola/DATA_SOURCES.md` |
-| 6 | Antigua and Barbuda | Americas | 🏗 Builder ready | `national/antigua-and-barbuda/`; builder+scaffold. Small state — sparse coverage expected. Partial: Statistics Division |
-| 7 | Argentina | Americas | 🏗 Builder ready | `national/argentina/`; builder+scaffold. Partial: INDEC. See `national/argentina/DATA_SOURCES.md` |
-| 8 | Armenia | Asia | 🏗 Builder ready | `national/armenia/`; builder+scaffold. Partial: ARMSTAT. See `national/armenia/DATA_SOURCES.md` |
-| 9 | Australia | Oceania | 🏗 Builder ready | `national/australia/`; builder+scaffold. Partial: ABS. See `national/australia/DATA_SOURCES.md` |
-| 10 | Austria | Europe | 🏗 Builder ready | `national/austria/`; builder+scaffold. Partial: Statistik Austria. See `national/austria/DATA_SOURCES.md` |
-| 11 | Azerbaijan | Asia | 🏗 Builder ready | `national/azerbaijan/`; builder+scaffold. Partial: AZSTAT. See `national/azerbaijan/DATA_SOURCES.md` |
+| 1 | Afghanistan | Asia | ✅ Pulled | `national/afghanistan/`; builder + scaffold committed. Bountiful: FAOSTAT (1961+), World Bank WDI, FAO AQUASTAT, OWID. Partial: NSIA yearbooks, MAIL crop estimates. See `national/afghanistan/DATA_SOURCES.md` |
+| 2 | Albania | Europe | ✅ Pulled | `national/albania/`; builder+scaffold. Partial: INSTAT. See `national/albania/DATA_SOURCES.md` |
+| 3 | Algeria | Africa | ✅ Pulled | `national/algeria/`; builder+scaffold. Partial: ONS. See `national/algeria/DATA_SOURCES.md` |
+| 4 | Andorra | Europe | ✅ Pulled | `national/andorra/`; builder+scaffold. Small state — sparse FAOSTAT/WDI expected (honest `N/A`). Partial: Departament d'Estadística |
+| 5 | Angola | Africa | ✅ Pulled | `national/angola/`; builder+scaffold. Partial: INE Angola. See `national/angola/DATA_SOURCES.md` |
+| 6 | Antigua and Barbuda | Americas | ✅ Pulled | `national/antigua-and-barbuda/`; builder+scaffold. Small state — sparse coverage expected. Partial: Statistics Division |
+| 7 | Argentina | Americas | ✅ Pulled | `national/argentina/`; builder+scaffold. Partial: INDEC. See `national/argentina/DATA_SOURCES.md` |
+| 8 | Armenia | Asia | ✅ Pulled | `national/armenia/`; builder+scaffold. Partial: ARMSTAT. See `national/armenia/DATA_SOURCES.md` |
+| 9 | Australia | Oceania | ✅ Pulled | `national/australia/`; builder+scaffold. Partial: ABS. See `national/australia/DATA_SOURCES.md` |
+| 10 | Austria | Europe | ✅ Pulled | `national/austria/`; builder+scaffold. Partial: Statistik Austria. See `national/austria/DATA_SOURCES.md` |
+| 11 | Azerbaijan | Asia | ✅ Pulled | `national/azerbaijan/`; builder+scaffold. Partial: AZSTAT. See `national/azerbaijan/DATA_SOURCES.md` |
 | 12 | Bahamas | Americas | ⬜ Not started | |
 | 13 | Bahrain | Asia | ⬜ Not started | |
 | 14 | Bangladesh | Asia | ⬜ Not started | |
@@ -211,8 +211,7 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 3 — China, Korea (South Korea data pulled), Greenland
-- **Builder ready (🏗):** 11 — Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan
+- **Data pulled (✅):** 14 — China, Korea (South), Greenland, Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan (all populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states like Andorra & Antigua expectedly sparse)
 - **Remaining (⬜):** 183
 
 ## Sources
