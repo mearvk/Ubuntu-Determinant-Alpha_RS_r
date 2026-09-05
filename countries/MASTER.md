@@ -72,17 +72,17 @@ Archive build: 2026-09-05.
 | 60 | Finland | Europe | ✅ Pulled | `national/finland/`; Partial: Statistics Finland |
 | 61 | France | Europe | ✅ Pulled | `national/france/`; Partial: INSEE |
 | 62 | Gabon | Africa | ✅ Pulled | `national/gabon/`; Partial: DGS Gabon |
-| 63 | Gambia | Africa | ⬜ Not started | |
-| 64 | Georgia | Asia | ⬜ Not started | |
-| 65 | Germany | Europe | ⬜ Not started | |
-| 66 | Ghana | Africa | ⬜ Not started | |
-| 67 | Greece | Europe | ⬜ Not started | |
+| 63 | Gambia | Africa | ✅ Pulled | `national/gambia/`; small state — sparse coverage expected. Partial: GBoS |
+| 64 | Georgia | Asia | ✅ Pulled | `national/georgia/`; Partial: Geostat |
+| 65 | Germany | Europe | ✅ Pulled | `national/germany/`; Partial: Destatis |
+| 66 | Ghana | Africa | ✅ Pulled | `national/ghana/`; Partial: GSS |
+| 67 | Greece | Europe | ✅ Pulled | `national/greece/`; Partial: ELSTAT |
 | 68 | Greenland | Americas | ✅ Pulled | Directory `national/greenland/`; autonomous territory of Denmark |
-| 69 | Grenada | Americas | ⬜ Not started | |
-| 70 | Guatemala | Americas | ⬜ Not started | |
-| 71 | Guinea | Africa | ⬜ Not started | |
-| 72 | Guinea-Bissau | Africa | ⬜ Not started | |
-| 73 | Guyana | Americas | ⬜ Not started | |
+| 69 | Grenada | Americas | ✅ Pulled | `national/grenada/`; small state — sparse coverage expected. Partial: CSO Grenada |
+| 70 | Guatemala | Americas | ✅ Pulled | `national/guatemala/`; Partial: INE Guatemala |
+| 71 | Guinea | Africa | ✅ Pulled | `national/guinea/`; Partial: INS Guinea |
+| 72 | Guinea-Bissau | Africa | ✅ Pulled | `national/guinea-bissau/`; small state — sparse coverage expected. Partial: INE Guinea-Bissau |
+| 73 | Guyana | Americas | ✅ Pulled | `national/guyana/`; small state — sparse coverage expected. Partial: Bureau of Statistics |
 | 74 | Haiti | Americas | ⬜ Not started | |
 | 75 | Honduras | Americas | ⬜ Not started | |
 | 76 | Hungary | Europe | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 64 — through Gabon alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Gabon). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 133
+- **Data pulled (✅):** 74 — through Guyana alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Guyana). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 123
 
 ## Sources
 
@@ -300,6 +300,16 @@ These international families are reproducible baselines used across countries by
 | Finland | Statistics Finland | PARTIAL | see `national/finland/DATA_SOURCES.md` |
 | France | INSEE | PARTIAL | see `national/france/DATA_SOURCES.md` |
 | Gabon | DGS Gabon | PARTIAL | see `national/gabon/DATA_SOURCES.md` |
+| Gambia | GBoS | PARTIAL | small state; sparse coverage expected |
+| Georgia | Geostat | PARTIAL | see `national/georgia/DATA_SOURCES.md` |
+| Germany | Destatis | PARTIAL | see `national/germany/DATA_SOURCES.md` |
+| Ghana | GSS | PARTIAL | see `national/ghana/DATA_SOURCES.md` |
+| Greece | ELSTAT | PARTIAL | see `national/greece/DATA_SOURCES.md` |
+| Grenada | CSO Grenada | PARTIAL | small state; sparse coverage expected |
+| Guatemala | INE Guatemala | PARTIAL | see `national/guatemala/DATA_SOURCES.md` |
+| Guinea | INS Guinea | PARTIAL | see `national/guinea/DATA_SOURCES.md` |
+| Guinea-Bissau | INE Guinea-Bissau | PARTIAL | small state; sparse coverage expected |
+| Guyana | Bureau of Statistics Guyana | PARTIAL | small state; sparse coverage expected |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
