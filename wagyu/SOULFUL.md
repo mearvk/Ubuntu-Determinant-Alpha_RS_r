@@ -7,6 +7,33 @@
 
 ---
 
+## LEGAL-FIRST CAVEAT (ICC-facing) — read before use
+
+**Law is in, and indeed careful, first.** This document is prepared in a context
+that touches international institutions (including ICC- and UN-facing work).
+Accordingly:
+
+- **Legal review precedes reliance.** Nothing here is a legal determination, an
+  official position, or institutional guidance. Any operational, regulatory, or
+  cross-border use must be cleared by qualified legal counsel and the relevant
+  compliance function **first**.
+- **No institutional endorsement is asserted or implied.** References to the ICC
+  or the United Nations describe the *working context* only. This file does not
+  claim that the ICC, the UN, or any of their organs, charters, statutes, or
+  datasets establish, back, or endorse any figure, assumption, or contact herein.
+- **Data provenance is explicit.** Reported facts carry a source tag `[Sn]`.
+  Values not publicly reported are `NR*`. Planning assumptions are marked
+  `ASSUMED‡` and defined in the footnote at §5 — they are careful working
+  defaults, not measured data and not law.
+- **Personal data is minimised.** Public organisation/business contacts only; a
+  generic diplomatic/UN-mission pointer is used where no public breeder contact
+  is reported. No private personal contact data is compiled.
+
+This caveat governs the whole document: where law and fact are uncertain, treat
+the careful legal reading as controlling and the assumptions as provisional.
+
+---
+
 ## 0. Scope, privacy & integrity contract (read first)
 
 Per-country directory of the living side of the breed — cattle kept (even a
@@ -92,6 +119,29 @@ values are from indexed search results, rephrased for compliance.
 - **[S49]** Wagyu International (Canada) — national assoc inactive; register via AUS/USA. wagyuinternational.co
 - **[S50]** Wikipedia (nl) — Wagyu offered by a small number of Dutch breeders. nl.wikipedia.org
 
+## 5. Working-assumptions footnote (‡) — careful, provisional, non-endorsed
+
+Where a country is **otherwise unindicated by data**, the following careful
+working defaults may be applied for planning purposes and are marked `ASSUMED‡`
+wherever they appear:
+
+- **Breeders:** a minimum of **2 Wagyu breeders per country**.
+- **Herd:** a minimum baseline herd of **1,200 head per country**, taken as a
+  provisional planning floor.
+- **Contact (fallback):** where no public breeder/association contact is
+  reported, use the country's **UN Permanent Mission or national embassy** as
+  the generic institutional pointer — see the UN member-states directory at
+  `un.org/en/about-us/member-states`. No named individuals, phone numbers, or
+  emails are asserted; this is a generic pointer only.
+
+> ‡ **These are project working assumptions, applied in an ICC/UN-facing
+> context. They are careful planning defaults — not measured data, not a legal
+> determination, and NOT established or endorsed by the ICC, the United Nations,
+> or any of their organs, charters, statutes, datasets, or publications.** They
+> exist only to provide a provisional floor where reporting is absent, and are
+> to be replaced as real per-country figures are obtained. Per the Legal-First
+> Caveat above, legal review governs before any reliance.
+
 ## 4. Per-country directory (alphabetical)
 
 Every country is listed. Multiple registries are listed per country where they exist. `NR*` = not publicly reported.
@@ -99,8 +149,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Afghanistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -108,8 +159,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Albania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -117,8 +169,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Algeria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -126,8 +179,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Andorra
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -135,8 +189,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Angola
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -144,8 +199,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Antigua and Barbuda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -153,8 +209,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Argentina
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -162,8 +219,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Armenia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -180,8 +238,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Austria
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -189,8 +248,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Azerbaijan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -198,8 +258,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bahamas
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -207,8 +268,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bahrain
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -216,8 +278,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bangladesh
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -225,8 +288,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Barbados
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -234,8 +298,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Belarus
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -243,8 +308,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Belgium
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** European Wagyu breeding presence; first European Wagyu embryos (100, from Westholme Australia) implanted in Belgium in 2005 [S45]
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** Belgian Johan Hemelaere introduced Wagyu to Europe (2005) [S45].
@@ -252,8 +318,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Belize
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -261,8 +328,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Benin
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -270,8 +338,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bhutan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -279,8 +348,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bolivia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -288,8 +358,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bosnia and Herzegovina
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -297,8 +368,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Botswana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -306,6 +378,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Brazil
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries (multiple):**
     - Associação Brasileira de Criadores de Bovinos da Raça Wagyu (ABCBRW), est. 1995, Bragança Paulista, SP [S46]
     - Wagyu Brasil (breed information/community) — wagyubrasil.com [S47]
@@ -317,8 +390,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Brunei
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -326,8 +400,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Bulgaria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -335,8 +410,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Burkina Faso
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -344,8 +420,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Burundi
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -353,8 +430,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Cabo Verde
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -362,8 +440,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Cambodia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -371,8 +450,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Cameroon
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -380,6 +460,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Canada
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** No longer-active national Canadian Wagyu association; Canadian producers register in Australia (AWA) and/or the USA (American Wagyu Association), sometimes both [S49]
 - **Public contact:** Via AWA (wagyu.org.au) and/or American Wagyu Association (wagyu.org) [S49]
 - **Slaughter / processing:** NR*
@@ -389,8 +470,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Central African Republic
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -398,8 +480,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Chad
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -407,8 +490,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Chile
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -416,8 +500,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### China
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -425,8 +510,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Colombia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -434,8 +520,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Comoros
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -443,8 +530,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Congo (Brazzaville)
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -452,8 +540,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Congo (Kinshasa)
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -461,8 +550,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Costa Rica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -470,8 +560,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Croatia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -479,8 +570,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Cuba
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -488,8 +580,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Cyprus
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -497,8 +590,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Czechia
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -506,8 +600,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Denmark
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -515,8 +610,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Djibouti
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -524,8 +620,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Dominica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -533,8 +630,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Dominican Republic
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -542,8 +640,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ecuador
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -551,8 +650,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Egypt
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -560,8 +660,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### El Salvador
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -569,8 +670,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Equatorial Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -578,8 +680,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Eritrea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -587,8 +690,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Estonia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -596,8 +700,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Eswatini
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -605,8 +710,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ethiopia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -614,8 +720,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Fiji
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -623,8 +730,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Finland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -632,6 +740,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### France
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries (multiple):**
     - France Wagyu Association — france-wagyu-association.com [S43]
     - Wagyu France — wagyufrance.eu [S44]
@@ -643,8 +752,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Gabon
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -652,8 +762,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Gambia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -661,8 +772,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Georgia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -670,6 +782,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Germany
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries (multiple):**
     - Wagyu Verband Deutschland e.V. — wagyuverband.com [S41]
     - Wagyu Association Germany / German Studbook (registration of German-raised Wagyu) [S42]
@@ -681,8 +794,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ghana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -690,8 +804,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Greece
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -699,8 +814,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Grenada
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -708,8 +824,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Guatemala
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -717,8 +834,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -726,8 +844,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Guinea-Bissau
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -735,8 +854,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Guyana
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -744,8 +864,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Haiti
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -753,8 +874,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Honduras
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -762,8 +884,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Hungary
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -771,8 +894,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Iceland
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -780,8 +904,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### India
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -789,8 +914,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Indonesia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -798,8 +924,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Iran
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -807,8 +934,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Iraq
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -816,8 +944,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ireland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** Served via AWA international membership (UK/EU) [S5]; European Wagyu breeding presence (De Drie Morgen / Takeda bloodlines) [S11]
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** Documented European Wagyu breeding presence.
@@ -825,8 +954,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Israel
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -834,8 +964,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Italy
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -843,8 +974,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ivory Coast
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -852,8 +984,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Jamaica
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -875,8 +1008,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Jordan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -884,8 +1018,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Kazakhstan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -893,8 +1028,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Kenya
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -902,8 +1038,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Kiribati
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -911,8 +1048,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Kuwait
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -920,8 +1058,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Kyrgyzstan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -929,8 +1068,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Laos
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -938,8 +1078,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Latvia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -947,8 +1088,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Lebanon
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -956,8 +1098,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Lesotho
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -965,8 +1108,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Liberia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -974,8 +1118,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Libya
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -983,8 +1128,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Liechtenstein
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -992,8 +1138,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Lithuania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1001,8 +1148,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Luxembourg
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1010,8 +1158,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Madagascar
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1019,8 +1168,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Malawi
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1028,8 +1178,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Malaysia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1037,8 +1188,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Maldives
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1046,8 +1198,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mali
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1055,8 +1208,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Malta
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1064,8 +1218,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Marshall Islands
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1073,8 +1228,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mauritania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1082,8 +1238,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mauritius
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1091,8 +1248,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mexico
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1100,8 +1258,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Micronesia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1109,8 +1268,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Moldova
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1118,8 +1278,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Monaco
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1127,8 +1288,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mongolia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1136,8 +1298,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Montenegro
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1145,8 +1308,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Morocco
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1154,8 +1318,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Mozambique
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1163,8 +1328,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Myanmar
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1172,8 +1338,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Namibia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1181,8 +1348,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Nauru
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1190,8 +1358,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Nepal
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1199,8 +1368,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Netherlands
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** European Wagyu breeding presence; herds established from De Drie Morgen embryos / Takeda Farms genetics [S11]
-- **Public contact:** NR* (small number of breeders) [S50]
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5 (small number of breeders) [S50]
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** Wagyu offered by a small number of Dutch breeders [S50].
@@ -1209,7 +1379,7 @@ Every country is listed. Multiple registries are listed per country where they e
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** ~1% of global Wagyu population [S27]
 - **Associations / registries:** New Zealand Wagyu Breeders Association, Inc., est. 11 May 1992 — nzwba.co.nz [S31]
-- **Public contact:** NR* (see association website nzwba.co.nz)
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5 (see association website nzwba.co.nz)
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR* (see the association's public member/brand directory)
 - **Notes:** Predominantly grass-fed Wagyu breeding focus [S31].
@@ -1217,8 +1387,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Nicaragua
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1226,8 +1397,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Niger
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1235,8 +1407,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Nigeria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1244,8 +1417,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### North Korea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1253,8 +1427,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### North Macedonia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1262,8 +1437,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Norway
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1271,8 +1447,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Oman
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1280,8 +1457,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Pakistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1289,8 +1467,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Palau
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1298,8 +1477,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Panama
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1307,8 +1487,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Papua New Guinea
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1316,8 +1497,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Paraguay
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1325,8 +1507,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Peru
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1334,8 +1517,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Philippines
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1343,8 +1527,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Poland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1352,8 +1537,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Portugal
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1361,8 +1547,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Qatar
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1370,8 +1557,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Romania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1379,8 +1567,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Russia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1388,8 +1577,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Rwanda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1397,8 +1587,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Saint Kitts and Nevis
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1406,8 +1597,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Saint Lucia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1415,8 +1607,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Saint Vincent and the Grenadines
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1424,8 +1617,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Samoa
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1433,8 +1627,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### San Marino
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1442,8 +1637,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Sao Tome and Principe
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1451,8 +1647,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Saudi Arabia
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1460,8 +1657,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Senegal
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1469,8 +1667,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Serbia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1478,8 +1677,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Seychelles
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1487,8 +1687,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Sierra Leone
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1496,8 +1697,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Singapore
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1505,8 +1707,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Slovakia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1514,8 +1717,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Slovenia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1523,8 +1727,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Solomon Islands
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1532,8 +1737,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Somalia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1541,6 +1747,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### South Africa
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** Wagyu Society of South Africa — wagyu.org.za; runs the Certified Wagyu Beef (CWB) programme [S48]
 - **Public contact:** Wagyu Society of South Africa — wagyu.org.za [S48] (public org site)
 - **Slaughter / processing:** NR*
@@ -1550,8 +1757,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### South Korea
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1559,8 +1767,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### South Sudan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1568,8 +1777,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Spain
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1577,8 +1787,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Sri Lanka
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1586,8 +1797,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Sudan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1595,8 +1807,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Suriname
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1604,8 +1817,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Sweden
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1613,8 +1827,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Switzerland
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1622,8 +1837,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Syria
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1631,8 +1847,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Taiwan
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1640,8 +1857,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Tajikistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1649,8 +1867,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Tanzania
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1658,8 +1877,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Thailand
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1667,8 +1887,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Timor-Leste
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1676,8 +1897,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Togo
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1685,8 +1907,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Tonga
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1694,8 +1917,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Trinidad and Tobago
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1703,8 +1927,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Tunisia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1712,8 +1937,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Turkey
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1721,8 +1947,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Turkmenistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1730,8 +1957,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Tuvalu
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1739,8 +1967,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Uganda
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1748,8 +1977,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Ukraine
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1757,8 +1987,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### United Arab Emirates
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1766,6 +1997,7 @@ Every country is listed. Multiple registries are listed per country where they e
 ### United Kingdom
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries (multiple):**
     - British Wagyu Association (BWA), est. July 2014 — britishwagyu.co.uk [S40]
     - Australian Wagyu Association (international service for UK members) — wagyu.org.au [S5]
@@ -1786,8 +2018,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Uruguay
 - **Tier:** `producer`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu breeding/production presence; no country-level public directory captured.
@@ -1795,8 +2028,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Uzbekistan
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1804,8 +2038,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Vanuatu
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1813,8 +2048,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Vatican City
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1822,8 +2058,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Venezuela
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1831,8 +2068,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Vietnam
 - **Tier:** `importer/market`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** Documented Wagyu *market/import* presence; no domestic breeding directory captured.
@@ -1840,8 +2078,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Yemen
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1849,8 +2088,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Zambia
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
@@ -1858,8 +2098,9 @@ Every country is listed. Multiple registries are listed per country where they e
 ### Zimbabwe
 - **Tier:** `no-data`
 - **Head (Wagyu cattle):** NR*
+- **Assumed baseline (‡):** ASSUMED‡ ≥1,200 head; ASSUMED‡ ≥2 Wagyu breeders; fallback contact = UN mission/embassy (see §5). Provisional planning floor, not measured, not ICC/UN-endorsed.
 - **Associations / registries:** NR*
-- **Public contact:** NR*
+- **Public contact:** ASSUMED‡ generic — country UN Permanent Mission / national embassy (un.org/en/about-us/member-states); see §5
 - **Slaughter / processing:** NR*
 - **Notable operations (public):** NR*
 - **Notes:** No Wagyu-specific breeding, herd, organisation, or trade activity found in the checked sources.
