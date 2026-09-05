@@ -21,16 +21,16 @@ Archive build: 2026-09-05.
 | 9 | Australia | Oceania | ✅ Pulled | `national/australia/`; builder+scaffold. Partial: ABS. See `national/australia/DATA_SOURCES.md` |
 | 10 | Austria | Europe | ✅ Pulled | `national/austria/`; builder+scaffold. Partial: Statistik Austria. See `national/austria/DATA_SOURCES.md` |
 | 11 | Azerbaijan | Asia | ✅ Pulled | `national/azerbaijan/`; builder+scaffold. Partial: AZSTAT. See `national/azerbaijan/DATA_SOURCES.md` |
-| 12 | Bahamas | Americas | ⬜ Not started | |
-| 13 | Bahrain | Asia | ⬜ Not started | |
-| 14 | Bangladesh | Asia | ⬜ Not started | |
-| 15 | Barbados | Americas | ⬜ Not started | |
-| 16 | Belarus | Europe | ⬜ Not started | |
-| 17 | Belgium | Europe | ⬜ Not started | |
-| 18 | Belize | Americas | ⬜ Not started | |
-| 19 | Benin | Africa | ⬜ Not started | |
-| 20 | Bhutan | Asia | ⬜ Not started | |
-| 21 | Bolivia | Americas | ⬜ Not started | |
+| 12 | Bahamas | Americas | ✅ Pulled | `national/bahamas/`; small state — sparse coverage expected. Partial: BNSI |
+| 13 | Bahrain | Asia | ✅ Pulled | `national/bahrain/`; small state — sparse coverage expected. Partial: iGA |
+| 14 | Bangladesh | Asia | ✅ Pulled | `national/bangladesh/`; Partial: BBS. See `national/bangladesh/DATA_SOURCES.md` |
+| 15 | Barbados | Americas | ✅ Pulled | `national/barbados/`; small state — sparse coverage expected. Partial: Barbados Statistical Service |
+| 16 | Belarus | Europe | ✅ Pulled | `national/belarus/`; Partial: Belstat. See `national/belarus/DATA_SOURCES.md` |
+| 17 | Belgium | Europe | ✅ Pulled | `national/belgium/`; Partial: Statbel. See `national/belgium/DATA_SOURCES.md` |
+| 18 | Belize | Americas | ✅ Pulled | `national/belize/`; small state — sparse coverage expected. Partial: SIB |
+| 19 | Benin | Africa | ✅ Pulled | `national/benin/`; Partial: INStaD. See `national/benin/DATA_SOURCES.md` |
+| 20 | Bhutan | Asia | ✅ Pulled | `national/bhutan/`; Partial: NSB. See `national/bhutan/DATA_SOURCES.md` |
+| 21 | Bolivia | Americas | ✅ Pulled | `national/bolivia/`; Partial: INE Bolivia. See `national/bolivia/DATA_SOURCES.md` |
 | 22 | Bosnia and Herzegovina | Europe | ⬜ Not started | |
 | 23 | Botswana | Africa | ⬜ Not started | |
 | 24 | Brazil | Americas | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 14 — China, Korea (South), Greenland, Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan (all populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states like Andorra & Antigua expectedly sparse)
-- **Remaining (⬜):** 183
+- **Data pulled (✅):** 24 — China, Korea (South), Greenland, Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan, Bahamas, Bahrain, Bangladesh, Barbados, Belarus, Belgium, Belize, Benin, Bhutan, Bolivia (all populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse)
+- **Remaining (⬜):** 173
 
 ## Sources
 
@@ -250,6 +250,16 @@ These international families are reproducible baselines used across countries by
 | Australia | ABS (Australian Bureau of Statistics) | PARTIAL | strong national data; see `national/australia/DATA_SOURCES.md` |
 | Austria | Statistik Austria | PARTIAL | see `national/austria/DATA_SOURCES.md` |
 | Azerbaijan | AZSTAT (State Statistical Committee) | PARTIAL | see `national/azerbaijan/DATA_SOURCES.md` |
+| Bahamas | BNSI | PARTIAL | small state; sparse coverage expected |
+| Bahrain | iGA (Information & eGovernment Authority) | PARTIAL | small state; sparse coverage expected |
+| Bangladesh | BBS (Bangladesh Bureau of Statistics) | PARTIAL | see `national/bangladesh/DATA_SOURCES.md` |
+| Barbados | Barbados Statistical Service | PARTIAL | small state; sparse coverage expected |
+| Belarus | Belstat | PARTIAL | see `national/belarus/DATA_SOURCES.md` |
+| Belgium | Statbel | PARTIAL | see `national/belgium/DATA_SOURCES.md` |
+| Belize | SIB (Statistical Institute of Belize) | PARTIAL | small state; sparse coverage expected |
+| Benin | INStaD | PARTIAL | see `national/benin/DATA_SOURCES.md` |
+| Bhutan | NSB (National Statistics Bureau) | PARTIAL | see `national/bhutan/DATA_SOURCES.md` |
+| Bolivia | INE Bolivia | PARTIAL | see `national/bolivia/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
