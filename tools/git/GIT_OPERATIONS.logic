@@ -2,7 +2,7 @@
 # UTF-8 plain text, line-oriented .logic contract
 
 LOGIC-VERSION: 1
-OPERATIONS: premount,add,commit,push,merge,rebase,restage,autocheck,moral
+OPERATIONS: premount,add,commit,push,resume,merge,rebase,restage,autocheck,moral
 
 [ORIGINAL]
 RULE: Preserve each operation's ordinary Git file and history semantics.
@@ -50,6 +50,19 @@ ORDER: Deterministic Git pathname order.
 METHOD: Ordinary git push plus native transport accounting.
 LIMIT: 200 MiB conservative object accounting per transport transaction.
 RULE: Metadata estimates never override actual transport accounting.
+
+[RESUME]
+METHOD: Checkpoint/resume layer over the ordered 50 MiB commit units for slow or lossy connections.
+UNIT: The commit-part 50 MiB logical unit is the resumable granularity.
+TRANSACTION: Each push transaction carries at most 4 units (200 MiB); the native push guard re-measures the real object graph every attempt.
+CHECKPOINT: Record only units acknowledged by the remote, never units merely attempted.
+PARTIAL: A lossy attempt may acknowledge fewer units than requested, including zero; the acknowledged count must never regress.
+RESUME: The next attempt restarts at the first unacknowledged unit, not from zero.
+RETRY: Retries are bounded by a max-attempt ceiling; zero means unlimited by policy but the transaction ceiling still applies.
+HALT: When retries are exhausted with work remaining, HALT rather than loop; do not silently continue.
+LOSSY: Treat interruption as a normal condition; never weaken the 200 MiB ceiling to make a transfer fit.
+PROVENANCE: Preserve author, committer, date, timestamp, parent object, and effort correlation id across attempts.
+RULE: The checkpoint is advisory transport bookkeeping; a stale or altered checkpoint never authorizes an oversized transfer or bypasses ordinary Git negotiation.
 
 [MERGE]
 METHOD: Ordinary Git merge plus future-base and relevance metadata.
