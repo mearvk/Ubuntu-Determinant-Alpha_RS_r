@@ -1,4 +1,4 @@
-# Korea 1965 — Farming Statistics
+# Korea 1966 — Farming Statistics
 
 See `./META.md` and `../META.md`.
 
