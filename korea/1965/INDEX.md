@@ -16,6 +16,8 @@ Controlling metadata: `./META.md`. Archive-wide rules: `../META.md`.
 | [VEGETABLES.md](VEGETABLES.md) | Vegetables |
 | [FRUIT.md](FRUIT.md) | Fruit |
 | [WATER.md](WATER.md) | Water |
+| [FORESTRY.md](FORESTRY.md) | Forestry |
+| [FISHERY.md](FISHERY.md) | Fishery |
 
 ## Archive status
 
@@ -31,6 +33,6 @@ The index provides a stable entry point for academic, professional, institutiona
 
 ## Sources
 
-Primary source families include KOSIS national statistics and MAFRA/KASS agricultural statistics. International series may be used as secondary cross-checks where definitions are comparable. KOSIS provides Agriculture and Forestry as a dedicated statistical subject and exposes statistical tables and metadata through its statistical database. citeturn0search2turn0search6
+Primary source families include KOSIS national statistics and MAFRA/KASS agricultural statistics. International series may be used as secondary cross-checks where definitions are comparable. KOSIS provides Agriculture and Forestry and Fishery as dedicated statistical subjects and exposes statistical tables and metadata through its statistical database.
 
-Archive build: 2026-09-04.
+Archive build: 2026-09-05.
