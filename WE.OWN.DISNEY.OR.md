@@ -3,7 +3,7 @@
 **Project:** Ubuntu Determinant
 **Edition:** Ubuntu White Edition
 **Project attention:** Max Rupplin — MEARVK LLC — 2026
-**Status:** Public-key record for `disney.com` — FETCH FIELD EMPTY (to be filled from a live connection; not fabricated)
+**Status:** Public-key record for `disney.com` — POPULATED AS SUPPLIED BY REQUESTER (RSA-2048 PEM + SHA-256); NOT independently verified against a live connection in this environment
 
 ---
 
@@ -25,16 +25,50 @@
 
 ## 1. disney.com — public key (TLS/X.509 SubjectPublicKeyInfo)
 
-> ⚠️ **NOT YET CAPTURED.** Fill this block from a live fetch (see §2). Do not
-> paste a value from any untrusted source; capture it directly from the site.
+> **Provenance: SUPPLIED BY REQUESTER — NOT INDEPENDENTLY VERIFIED.** The values
+> below were provided by the requester, not captured live from `disney.com` in
+> this (network-restricted) environment. They are recorded as provided. Before
+> relying on them, verify against a live capture using §2 and confirm the fetched
+> key/fingerprint match exactly.
+
+**Public key (RSA 2048-bit).** Reconstructed as a standard X.509
+SubjectPublicKeyInfo PEM from the supplied 256-byte modulus with public exponent
+65537 (F4):
 
 ```text
 -----BEGIN PUBLIC KEY-----
-(EMPTY — paste the PEM public key captured live from disney.com here)
+MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBD+AcUIMqcOvs+qRNV/MJU
+g0DMRd+PjeHFV6QIh9p6g9UJCG+luzCLTzRyUqFpoIGZ2cqGy3Y+dqg6eJBfFPSj
+APg2gWp9Y9cgTiybZoXLAb3L/AvZHlMsIaHSnDh7aJPHBpGyQLgXUcPlxsjnF2Ou
+YXqyTLj0qMfCkgSujw70gY14MDDIeZtb6Moc8ieAYzZ719iRgbgz91Yi2eS2jd6L
+LI7CmjMUlkW1miACBquUolPwQYvdV9erETvBcKESOoW8XSJZDWBIpw3+Zg5xzqaX
+jcRHW3XZHd7RH79/TGWkQ6gAFCaA8qMDgrrHURXHKQUuVqXxUjx+Xkc63qHErqR3
+AgMBAAE=
 -----END PUBLIC KEY-----
 ```
 
-Record alongside it, from the same live capture:
+- **Key algorithm / size:** RSA, 2048-bit modulus, exponent 65537 (0x10001)
+- **Modulus (n), hex (256 bytes, as supplied):**
+  `43F8071420CA9C3AFB3EA91355FCC2548340CC45DF8F8DE1C557A40887DA7A83`
+  `D509086FA5BB308B4F347252A169A08199D9CA86CB763E76A83A78905F14F4A3`
+  `00F836816A7D63D7204E2C9B6685CB01BDCBFC0BD91E532C21A1D29C387B6893`
+  `C70691B240B81751C3E5C6C8E71763AE617AB24CB8F4A8C7C29204AE8F0EF481`
+  `8D783030C8799B5BE8CA1CF22780633667BD7D89181B833F75622D9E4B68DDE8B`
+  `2C8EC29A33149645B59A200206AB94A253F0418BDD57D7AB113BC170A1123A85`
+  `BC5D22590D6048A70DFE660E71CEA6978DC4475B75D91DDED11FBF7F4C65A443`
+  `A800142680F2A30382BAC75115C729052E56A5F1523C7E5E473ADEA1C4AEA477`
+
+**SHA-256 fingerprint / SPKI pin (as supplied):**
+
+```text
+2d8e0e595849a4538093bee907d0e59848a846f7e6320c3fcd033dc49e976242
+```
+
+> Note: verify whether the supplied SHA-256 is a **certificate** fingerprint or
+> an **SPKI** pin, and confirm it against the §2 capture — the two are computed
+> over different inputs and will differ.
+
+Record alongside, from a live capture (still to be filled):
 
 - **Fetched at (UTC):** __________________________
 - **Host / SNI:** `disney.com` (and/or `www.disney.com`)
@@ -42,8 +76,8 @@ Record alongside it, from the same live capture:
 - **Issuer (CA):** __________________________
 - **Serial number:** __________________________
 - **Valid from / to:** __________________________
-- **Key algorithm / size:** (e.g. RSA 2048 / ECDSA P-256) ______________
-- **SHA-256 of SubjectPublicKeyInfo (SPKI pin):** __________________________
+- **SHA-256 of SubjectPublicKeyInfo (SPKI pin), recomputed live:** __________________________
+
 
 ## 2. How to capture the real public key (run where internet is available)
 
