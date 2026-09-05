@@ -31,16 +31,16 @@ Archive build: 2026-09-05.
 | 19 | Benin | Africa | ✅ Pulled | `national/benin/`; Partial: INStaD. See `national/benin/DATA_SOURCES.md` |
 | 20 | Bhutan | Asia | ✅ Pulled | `national/bhutan/`; Partial: NSB. See `national/bhutan/DATA_SOURCES.md` |
 | 21 | Bolivia | Americas | ✅ Pulled | `national/bolivia/`; Partial: INE Bolivia. See `national/bolivia/DATA_SOURCES.md` |
-| 22 | Bosnia and Herzegovina | Europe | ⬜ Not started | |
-| 23 | Botswana | Africa | ⬜ Not started | |
-| 24 | Brazil | Americas | ⬜ Not started | |
-| 25 | Brunei | Asia | ⬜ Not started | |
-| 26 | Bulgaria | Europe | ⬜ Not started | |
-| 27 | Burkina Faso | Africa | ⬜ Not started | |
-| 28 | Burundi | Africa | ⬜ Not started | |
-| 29 | Cabo Verde | Africa | ⬜ Not started | |
-| 30 | Cambodia | Asia | ⬜ Not started | |
-| 31 | Cameroon | Africa | ⬜ Not started | |
+| 22 | Bosnia and Herzegovina | Europe | ✅ Pulled | `national/bosnia-and-herzegovina/`; Partial: BHAS. See its `DATA_SOURCES.md` |
+| 23 | Botswana | Africa | ✅ Pulled | `national/botswana/`; Partial: Statistics Botswana |
+| 24 | Brazil | Americas | ✅ Pulled | `national/brazil/`; Partial: IBGE. See its `DATA_SOURCES.md` |
+| 25 | Brunei | Asia | ✅ Pulled | `national/brunei/`; small economy — sparse coverage expected. Partial: DEPS |
+| 26 | Bulgaria | Europe | ✅ Pulled | `national/bulgaria/`; Partial: NSI |
+| 27 | Burkina Faso | Africa | ✅ Pulled | `national/burkina-faso/`; Partial: INSD |
+| 28 | Burundi | Africa | ✅ Pulled | `national/burundi/`; Partial: ISTEEBU |
+| 29 | Cabo Verde | Africa | ✅ Pulled | `national/cabo-verde/`; small state — sparse coverage expected. Partial: INE Cabo Verde |
+| 30 | Cambodia | Asia | ✅ Pulled | `national/cambodia/`; Partial: NIS |
+| 31 | Cameroon | Africa | ✅ Pulled | `national/cameroon/`; Partial: INS Cameroon |
 | 32 | Canada | Americas | ⬜ Not started | |
 | 33 | Central African Republic | Africa | ⬜ Not started | |
 | 34 | Chad | Africa | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 24 — China, Korea (South), Greenland, Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Australia, Austria, Azerbaijan, Bahamas, Bahrain, Bangladesh, Barbados, Belarus, Belgium, Belize, Benin, Bhutan, Bolivia (all populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse)
-- **Remaining (⬜):** 173
+- **Data pulled (✅):** 34 — through Cameroon alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Cameroon). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 163
 
 ## Sources
 
@@ -260,6 +260,16 @@ These international families are reproducible baselines used across countries by
 | Benin | INStaD | PARTIAL | see `national/benin/DATA_SOURCES.md` |
 | Bhutan | NSB (National Statistics Bureau) | PARTIAL | see `national/bhutan/DATA_SOURCES.md` |
 | Bolivia | INE Bolivia | PARTIAL | see `national/bolivia/DATA_SOURCES.md` |
+| Bosnia and Herzegovina | BHAS | PARTIAL | see `national/bosnia-and-herzegovina/DATA_SOURCES.md` |
+| Botswana | Statistics Botswana | PARTIAL | see `national/botswana/DATA_SOURCES.md` |
+| Brazil | IBGE | PARTIAL | see `national/brazil/DATA_SOURCES.md` |
+| Brunei | DEPS | PARTIAL | small economy; sparse coverage expected |
+| Bulgaria | NSI | PARTIAL | see `national/bulgaria/DATA_SOURCES.md` |
+| Burkina Faso | INSD | PARTIAL | see `national/burkina-faso/DATA_SOURCES.md` |
+| Burundi | ISTEEBU | PARTIAL | see `national/burundi/DATA_SOURCES.md` |
+| Cabo Verde | INE Cabo Verde | PARTIAL | small state; sparse coverage expected |
+| Cambodia | NIS | PARTIAL | see `national/cambodia/DATA_SOURCES.md` |
+| Cameroon | INS Cameroon | PARTIAL | see `national/cameroon/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
