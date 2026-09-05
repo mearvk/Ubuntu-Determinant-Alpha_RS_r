@@ -36,9 +36,40 @@ the careful legal reading as controlling and the assumptions as provisional.
 
 ## UN Charter — economic-and-social mandate (supporting instrument)
 
-**Reference:** *Charter of the United Nations* — full text:
-`un.org/en/about-us/un-charter/full-text`; Chapter IX:
-`un.org/en/about-us/un-charter/chapter-9`. [S51][S52]
+**Reference — clear and publicly available.** The *Charter of the United Nations*
+is a public document, published in full and free of charge by the United Nations
+on un.org. The reference below is clear, official, and publicly accessible to any
+reader; no restricted access is required. [S51][S52]
+
+**UN Charter link series (official, un.org):**
+
+- Overview / landing: https://www.un.org/en/about-us/un-charter
+- Full text: https://www.un.org/en/about-us/un-charter/full-text
+- Preamble: https://www.un.org/en/about-us/un-charter/preamble
+- Chapter I — Purposes and Principles (Arts. 1–2): https://www.un.org/en/about-us/un-charter/chapter-1
+- Chapter II — Membership (Arts. 3–6): https://www.un.org/en/about-us/un-charter/chapter-2
+- Chapter III — Organs (Arts. 7–8): https://www.un.org/en/about-us/un-charter/chapter-3
+- Chapter IV — The General Assembly (Arts. 9–22): https://www.un.org/en/about-us/un-charter/chapter-4
+- Chapter V — The Security Council (Arts. 23–32): https://www.un.org/en/about-us/un-charter/chapter-5
+- Chapter VI — Pacific Settlement of Disputes (Arts. 33–38): https://www.un.org/en/about-us/un-charter/chapter-6
+- Chapter VII — Action with Respect to Threats to the Peace (Arts. 39–51): https://www.un.org/en/about-us/un-charter/chapter-7
+- Chapter VIII — Regional Arrangements (Arts. 52–54): https://www.un.org/en/about-us/un-charter/chapter-8
+- **Chapter IX — International Economic and Social Co-operation (Arts. 55–60):** https://www.un.org/en/about-us/un-charter/chapter-9
+- **Chapter X — The Economic and Social Council (Arts. 61–72):** https://www.un.org/en/about-us/un-charter/chapter-10
+- Chapter XI — Declaration Regarding Non-Self-Governing Territories (Arts. 73–74): https://www.un.org/en/about-us/un-charter/chapter-11
+- Chapter XII — International Trusteeship System (Arts. 75–85): https://www.un.org/en/about-us/un-charter/chapter-12
+- Chapter XIII — The Trusteeship Council (Arts. 86–91): https://www.un.org/en/about-us/un-charter/chapter-13
+- Chapter XIV — The International Court of Justice (Arts. 92–96): https://www.un.org/en/about-us/un-charter/chapter-14
+- Chapter XV — The Secretariat (Arts. 97–101): https://www.un.org/en/about-us/un-charter/chapter-15
+- Chapter XVI — Miscellaneous Provisions (Arts. 102–105): https://www.un.org/en/about-us/un-charter/chapter-16
+- Chapter XVII — Transitional Security Arrangements (Arts. 106–107): https://www.un.org/en/about-us/un-charter/chapter-17
+- Chapter XVIII — Amendments (Arts. 108–109): https://www.un.org/en/about-us/un-charter/chapter-18
+- Chapter XIX — Ratification and Signature (Arts. 110–111): https://www.un.org/en/about-us/un-charter/chapter-19
+- Article 55 institutional practice (statistical matters), UN Repertory of Practice: https://legal.un.org/repertory/art55/english/rep_supp8_vol4_art55_ab.pdf
+
+*The chapter/article ranges follow the Charter's standard structure; the URLs
+above are the official UN publication paths. Where a specific chapter path
+differs on un.org, the Overview and Full-text links resolve to every chapter.*
 
 The Charter is cited here as the standing international-law instrument under
 which economic and statistical data work is conducted. Its relevant standard, in
