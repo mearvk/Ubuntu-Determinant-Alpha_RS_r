@@ -62,16 +62,16 @@ Archive build: 2026-09-05.
 | 50 | Dominican Republic | Americas | ✅ Pulled | `national/dominican-republic/`; Partial: ONE |
 | 51 | Ecuador | Americas | ✅ Pulled | `national/ecuador/`; Partial: INEC |
 | 52 | Egypt | Africa | ✅ Pulled | `national/egypt/`; Partial: CAPMAS |
-| 53 | El Salvador | Americas | ⬜ Not started | |
-| 54 | Equatorial Guinea | Africa | ⬜ Not started | |
-| 55 | Eritrea | Africa | ⬜ Not started | |
-| 56 | Estonia | Europe | ⬜ Not started | |
-| 57 | Eswatini | Africa | ⬜ Not started | |
-| 58 | Ethiopia | Africa | ⬜ Not started | |
-| 59 | Fiji | Oceania | ⬜ Not started | |
-| 60 | Finland | Europe | ⬜ Not started | |
-| 61 | France | Europe | ⬜ Not started | |
-| 62 | Gabon | Africa | ⬜ Not started | |
+| 53 | El Salvador | Americas | ✅ Pulled | `national/el-salvador/`; Partial: ONEC (formerly DIGESTYC) |
+| 54 | Equatorial Guinea | Africa | ✅ Pulled | `national/equatorial-guinea/`; small economy — sparse coverage expected. Partial: INEGE |
+| 55 | Eritrea | Africa | ✅ Pulled | `national/eritrea/`; small/limited data — sparse coverage expected. Partial: National Statistics Office |
+| 56 | Estonia | Europe | ✅ Pulled | `national/estonia/`; Partial: Statistics Estonia |
+| 57 | Eswatini | Africa | ✅ Pulled | `national/eswatini/`; small state — sparse coverage expected. Partial: CSO Eswatini |
+| 58 | Ethiopia | Africa | ✅ Pulled | `national/ethiopia/`; FAOSTAT entity "Ethiopia" (post-1993; pre-1993 under Ethiopia PDR → `N/A`). Partial: ESS |
+| 59 | Fiji | Oceania | ✅ Pulled | `national/fiji/`; small state — sparse coverage expected. Partial: FBoS |
+| 60 | Finland | Europe | ✅ Pulled | `national/finland/`; Partial: Statistics Finland |
+| 61 | France | Europe | ✅ Pulled | `national/france/`; Partial: INSEE |
+| 62 | Gabon | Africa | ✅ Pulled | `national/gabon/`; Partial: DGS Gabon |
 | 63 | Gambia | Africa | ⬜ Not started | |
 | 64 | Georgia | Asia | ⬜ Not started | |
 | 65 | Germany | Europe | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 54 — through Egypt alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Egypt). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 143
+- **Data pulled (✅):** 64 — through Gabon alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Gabon). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 133
 
 ## Sources
 
@@ -290,6 +290,16 @@ These international families are reproducible baselines used across countries by
 | Dominican Republic | ONE | PARTIAL | see `national/dominican-republic/DATA_SOURCES.md` |
 | Ecuador | INEC | PARTIAL | see `national/ecuador/DATA_SOURCES.md` |
 | Egypt | CAPMAS | PARTIAL | see `national/egypt/DATA_SOURCES.md` |
+| El Salvador | ONEC (ex-DIGESTYC) | PARTIAL | see `national/el-salvador/DATA_SOURCES.md` |
+| Equatorial Guinea | INEGE | PARTIAL | small economy; sparse coverage expected |
+| Eritrea | National Statistics Office | PARTIAL | limited data; sparse coverage expected |
+| Estonia | Statistics Estonia | PARTIAL | see `national/estonia/DATA_SOURCES.md` |
+| Eswatini | CSO Eswatini | PARTIAL | small state; sparse coverage expected |
+| Ethiopia | ESS (Ethiopian Statistical Service) | PARTIAL | FAOSTAT entity "Ethiopia" (post-1993) |
+| Fiji | FBoS | PARTIAL | small state; sparse coverage expected |
+| Finland | Statistics Finland | PARTIAL | see `national/finland/DATA_SOURCES.md` |
+| France | INSEE | PARTIAL | see `national/france/DATA_SOURCES.md` |
+| Gabon | DGS Gabon | PARTIAL | see `national/gabon/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
