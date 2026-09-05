@@ -52,16 +52,16 @@ Archive build: 2026-09-05.
 | 40 | Congo (DRC) | Africa | ✅ Pulled | `national/congo-drc/`; FAOSTAT entity "Democratic Republic of the Congo". Partial: INS RDC |
 | 41 | Costa Rica | Americas | ✅ Pulled | `national/costa-rica/`; Partial: INEC |
 | 42 | Côte d'Ivoire | Africa | ✅ Pulled | `national/cote-divoire/`; Partial: INS Côte d'Ivoire |
-| 43 | Croatia | Europe | ⬜ Not started | |
-| 44 | Cuba | Americas | ⬜ Not started | |
-| 45 | Cyprus | Asia | ⬜ Not started | |
-| 46 | Czechia | Europe | ⬜ Not started | |
-| 47 | Denmark | Europe | ⬜ Not started | |
-| 48 | Djibouti | Africa | ⬜ Not started | |
-| 49 | Dominica | Americas | ⬜ Not started | |
-| 50 | Dominican Republic | Americas | ⬜ Not started | |
-| 51 | Ecuador | Americas | ⬜ Not started | |
-| 52 | Egypt | Africa | ⬜ Not started | |
+| 43 | Croatia | Europe | ✅ Pulled | `national/croatia/`; Partial: DZS |
+| 44 | Cuba | Americas | ✅ Pulled | `national/cuba/`; Partial: ONEI |
+| 45 | Cyprus | Asia | ✅ Pulled | `national/cyprus/`; small state — sparse coverage expected. Partial: CYSTAT |
+| 46 | Czechia | Europe | ✅ Pulled | `national/czechia/`; Partial: CZSO |
+| 47 | Denmark | Europe | ✅ Pulled | `national/denmark/`; Partial: Statistics Denmark |
+| 48 | Djibouti | Africa | ✅ Pulled | `national/djibouti/`; small state — sparse coverage expected. Partial: INSTAD |
+| 49 | Dominica | Americas | ✅ Pulled | `national/dominica/`; small state — sparse coverage expected. Partial: Central Statistics Office |
+| 50 | Dominican Republic | Americas | ✅ Pulled | `national/dominican-republic/`; Partial: ONE |
+| 51 | Ecuador | Americas | ✅ Pulled | `national/ecuador/`; Partial: INEC |
+| 52 | Egypt | Africa | ✅ Pulled | `national/egypt/`; Partial: CAPMAS |
 | 53 | El Salvador | Americas | ⬜ Not started | |
 | 54 | Equatorial Guinea | Africa | ⬜ Not started | |
 | 55 | Eritrea | Africa | ⬜ Not started | |
@@ -211,8 +211,8 @@ Archive build: 2026-09-05.
 ## Summary
 
 - **Total entries listed:** 197 (193 UN members with the two Koreas combined into one entry, + Vatican City, Palestine, Kosovo, Taiwan, and Greenland as territory)
-- **Data pulled (✅):** 44 — through Côte d'Ivoire alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Côte d'Ivoire). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
-- **Remaining (⬜):** 153
+- **Data pulled (✅):** 54 — through Egypt alphabetically (China, Korea (South), Greenland, Afghanistan and Albania→Egypt). All populated with real FAOSTAT/World Bank/AQUASTAT data via CI; sparse `N/A` where sources have no observation — small states expectedly sparse.
+- **Remaining (⬜):** 143
 
 ## Sources
 
@@ -280,6 +280,16 @@ These international families are reproducible baselines used across countries by
 | Congo (DRC) | INS RDC | PARTIAL | FAOSTAT entity "Democratic Republic of the Congo" |
 | Costa Rica | INEC | PARTIAL | see `national/costa-rica/DATA_SOURCES.md` |
 | Côte d'Ivoire | INS Côte d'Ivoire | PARTIAL | see `national/cote-divoire/DATA_SOURCES.md` |
+| Croatia | DZS | PARTIAL | see `national/croatia/DATA_SOURCES.md` |
+| Cuba | ONEI | PARTIAL | see `national/cuba/DATA_SOURCES.md` |
+| Cyprus | CYSTAT | PARTIAL | small state; sparse coverage expected |
+| Czechia | CZSO | PARTIAL | see `national/czechia/DATA_SOURCES.md` |
+| Denmark | Statistics Denmark | PARTIAL | see `national/denmark/DATA_SOURCES.md` |
+| Djibouti | INSTAD | PARTIAL | small state; sparse coverage expected |
+| Dominica | Central Statistics Office | PARTIAL | small state; sparse coverage expected |
+| Dominican Republic | ONE | PARTIAL | see `national/dominican-republic/DATA_SOURCES.md` |
+| Ecuador | INEC | PARTIAL | see `national/ecuador/DATA_SOURCES.md` |
+| Egypt | CAPMAS | PARTIAL | see `national/egypt/DATA_SOURCES.md` |
 | China | (see `national/china/`) | — | existing archive |
 | Korea (South) | KOSIS; MAFRA/KASS; KAMIS; Bank of Korea | BOUNTIFUL | see `national/korea/DATA_SOURCES.md` |
 | Greenland | (see `national/greenland/`) | — | existing archive |
